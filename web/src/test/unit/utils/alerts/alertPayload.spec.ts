@@ -190,3 +190,40 @@ describe("getAlertPayload warning-field normalization", () => {
     expect("promql_warning_value" in payload.query_condition).toBe(false);
   });
 });
+
+// Feature 2 (PT-1/PT-6): priority & tags reach the API in the shapes the
+// backend expects, and are ABSENT when unset so pre-Feature-2 alerts are
+// byte-identical.
+describe("getAlertPayload priority & tags", () => {
+  it("priority ships as an integer even though the select yields a string", () => {
+    const payload = getAlertPayload(
+      { ...makeFormData(), priority: "2" } as any,
+      makeContext({ tab: "sql" }),
+    );
+    expect(payload.priority).toBe(2);
+  });
+
+  it("unset priority is deleted, never sent as null or 0", () => {
+    for (const unset of [null, undefined, ""]) {
+      const payload = getAlertPayload(
+        { ...makeFormData(), priority: unset } as any,
+        makeContext({ tab: "sql" }),
+      );
+      expect("priority" in payload).toBe(false);
+    }
+  });
+
+  it("tags ship as an array and are dropped when empty", () => {
+    const withTags = getAlertPayload(
+      { ...makeFormData(), tags: ["prod", "service:checkout"] } as any,
+      makeContext({ tab: "sql" }),
+    );
+    expect(withTags.tags).toEqual(["prod", "service:checkout"]);
+
+    const empty = getAlertPayload(
+      { ...makeFormData(), tags: [] } as any,
+      makeContext({ tab: "sql" }),
+    );
+    expect("tags" in empty).toBe(false);
+  });
+});

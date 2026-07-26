@@ -263,16 +263,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </template>
 
-              <template #cell-last_trained_at="{ row }">
-                <OTimeCell
-                  :value="row.last_trained_at"
-                  unit="iso"
-                  mode="absolute"
-                  :timezone="store.state.timezone"
-                  empty-label="—"
-                />
-              </template>
-
               <template #cell-status="{ row }">
                 <span v-if="row.status && row.status !== '--'" class="relative inline-flex">
                   <OTag type="alertStatus" :value="row.status" />
@@ -285,17 +275,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span v-else class="text-text-body">—</span>
               </template>
 
-              <template #cell-state="{ row }">
+              <!-- Priority (PT-3). Unset renders an em dash, not a chip:
+                   most alerts have none and a wall of grey chips is noise. -->
+              <template #cell-priority="{ row }">
                 <OTag
-                  :variant="stateVariant(row)"
-                  size="sm"
-                  :data-test="`alert-list-${row.name}-state`"
-                >
-                  <template #icon>
-                    <OIcon :name="stateIconName(row)" size="xs" />
-                  </template>
-                  {{ stateLabel(row) }}
-                </OTag>
+                  v-if="row.priority"
+                  type="alertPriority"
+                  :value="`p${row.priority}`"
+                  :data-test="`alert-list-${row.name}-priority`"
+                />
+                <span v-else class="text-text-secondary">—</span>
+              </template>
+
+              <!-- Tags (PT-6). Three visible + overflow count, so an alert
+                   carrying 64 tags cannot blow out the row height. -->
+              <template #cell-tags="{ row }">
+                <div v-if="row.tags?.length" class="flex flex-wrap items-center gap-1">
+                  <OTag
+                    v-for="tag in row.tags.slice(0, 3)"
+                    :key="tag"
+                    type="exampleChip"
+                    value="dim"
+                    :label="tag"
+                    :data-test="`alert-list-${row.name}-tag`"
+                  />
+                  <OTooltip v-if="row.tags.length > 3" :content="row.tags.join(', ')">
+                    <span class="text-text-secondary text-2xs">+{{ row.tags.length - 3 }}</span>
+                  </OTooltip>
+                </div>
+                <span v-else class="text-text-secondary">—</span>
               </template>
 
               <template #cell-last_outcome="{ row }">
@@ -316,26 +324,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                 </OTooltip>
                 <span v-else class="text-text-body">—</span>
-              </template>
-
-              <template #cell-period="{ row }">
-                {{
-                  row.period
-                    ? row.period >= 60
-                      ? row.period % 60 === 0
-                        ? `${Math.floor(row.period / 60)} Hours`
-                        : `${Math.floor(row.period / 60)} Hours ${row.period % 60} Mins`
-                      : `${row.period} Mins`
-                    : "--"
-                }}
-              </template>
-
-              <template #cell-frequency="{ row }">
-                {{
-                  row.frequency
-                    ? row.frequency + (row.frequency_type == "cron" ? "" : " Mins")
-                    : "--"
-                }}
               </template>
 
               <template #cell-folder_name="{ row }">
@@ -1210,21 +1198,6 @@ export default defineComponent({
           // Flex: fills the leftover width on load, freezes on first resize.
           meta: { align: "left", flex: true },
         },
-        // "state" (Active / Paused) — a single at-a-glance operational state for
-        // EVERY alert type, derived from `enabled`. Sits right after the name so
-        // it's always visible without horizontal scroll. Distinct from the
-        // anomaly-only "status" (training) column: this answers "is it running?".
-        {
-          id: "state",
-          accessorKey: "enabled",
-          header: t("alerts.state"),
-          cell: " ",
-          sortable: true,
-          resizable: true,
-          hideable: true,
-          size: COL.status,
-          meta: { align: "left" },
-        },
         // "last_outcome" — did the most recent evaluation fire? Distinct from
         // "state" (is it running?) and from the anomaly-only "status" (is the
         // model trained?). Backed by the alert_states rollup row.
@@ -1239,17 +1212,31 @@ export default defineComponent({
           size: COL.status,
           meta: { align: "left" },
         },
-        // "level" — how bad, distinct from last_outcome (did it fire) and from
-        // state (is it running). Only meaningful for multi-level alerts.
+        // "priority" — how much humans care (Feature 2, PT-3). A different
+        // axis from "last_outcome" (did it fire): a P1 alert whose last run was
+        // normal is perfectly ordinary.
         {
-          id: "level",
-          accessorKey: "level",
-          header: t("alerts.level"),
+          id: "priority",
+          accessorKey: "priority",
+          header: t("alerts.priority"),
           cell: " ",
           sortable: true,
           resizable: true,
           hideable: true,
           size: COL.status,
+          meta: { align: "left" },
+        },
+        // "tags" — the selection primitive (PT-6). Not sortable: a tag list has
+        // no meaningful order and sorting by it would imply one.
+        {
+          id: "tags",
+          accessorKey: "tags",
+          header: t("alerts.tags"),
+          cell: " ",
+          sortable: false,
+          resizable: true,
+          hideable: true,
+          size: 200,
           meta: { align: "left" },
         },
         {
@@ -1263,38 +1250,6 @@ export default defineComponent({
           size: COL.owner,
           meta: { align: "left" },
         },
-        // "period" (Look back window) — all tabs except realTime
-        ...(activeTab.value !== "realTime"
-          ? [
-              {
-                id: "period",
-                accessorKey: "period",
-                header: t("alerts.period"),
-                cell: " ",
-                sortable: true,
-                resizable: true,
-                hideable: true,
-                size: 150,
-                meta: { align: "left" },
-              } as OTableColumnDef,
-            ]
-          : []),
-        // "frequency" (Check every) — all tabs except realTime
-        ...(activeTab.value !== "realTime"
-          ? [
-              {
-                id: "frequency",
-                accessorKey: "frequency",
-                header: t("alerts.frequency"),
-                cell: " ",
-                sortable: true,
-                resizable: true,
-                hideable: true,
-                size: COL.frequency,
-                meta: { align: "left" },
-              } as OTableColumnDef,
-            ]
-          : []),
         {
           id: "last_triggered_at",
           accessorKey: "last_triggered_at",
@@ -1320,17 +1275,6 @@ export default defineComponent({
         // Anomaly Detection columns — shown on anomalyDetection and all tabs
         ...(activeTab.value === "anomalyDetection" || activeTab.value === "all"
           ? [
-              {
-                id: "last_trained_at",
-                accessorKey: "last_trained_at",
-                header: t("alerts.lastTrainedAt"),
-                cell: " ",
-                sortable: true,
-                resizable: true,
-                hideable: true,
-                size: COL.dateAbsolute,
-                meta: { align: "left" },
-              } as OTableColumnDef,
               {
                 id: "status",
                 accessorKey: "status",
@@ -1565,6 +1509,12 @@ export default defineComponent({
             // This is the LAST RUN outcome, not a live firing flag — always
             // paired with last_outcome_at so the UI can say "as of <time>".
             last_outcome: data.last_outcome ?? null,
+            // Configured priority & tags (Feature 2). Must be carried
+            // explicitly: this mapping builds the row object field by field,
+            // so anything not listed here is invisible to the table no matter
+            // what the API returns.
+            priority: data.priority ?? null,
+            tags: data.tags ?? [],
             // Severity axis (alerts_2.md Feature 1) — independent of outcome.
             level: data.level ?? null,
             level_since: data.level_since ?? null,

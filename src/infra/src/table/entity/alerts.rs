@@ -38,6 +38,11 @@ pub struct Model {
     /// Level/threshold configuration blob (`ThresholdConfig`). `None` = a
     /// single-level alert. Decision D1 in `alerts_2.md`.
     pub trigger_thresholds: Option<Json>,
+    /// Feature 2 (PT-2): storage ids 1..=5, P1 = 1. NULL = unset.
+    pub priority: Option<i32>,
+    /// Feature 2 (PT-6, D18): JSON array of normalized tag strings.
+    /// NULL or absent = no tags.
+    pub tags: Option<Json>,
     pub trigger_frequency_type: i16,
     pub trigger_frequency_seconds: i64,
     pub trigger_frequency_cron: Option<String>,
@@ -112,6 +117,8 @@ mod tests {
             trigger_period_seconds: 60,
             trigger_threshold_count: 10,
             trigger_thresholds: None,
+            priority: None,
+            tags: None,
             trigger_frequency_type: 0,
             trigger_frequency_seconds: 300,
             trigger_frequency_cron: None,

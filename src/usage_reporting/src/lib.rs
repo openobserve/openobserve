@@ -552,7 +552,7 @@ mod tests {
     use config::meta::{
         self_reporting::{
             error::ErrorData,
-            usage::{TriggerData, RunOutcome, TriggerDataType},
+            usage::{RunOutcome, TriggerData, TriggerDataType},
         },
         stream::StreamParams,
     };
@@ -631,6 +631,7 @@ mod tests {
             threshold_operator: None,
             level: None,
             group_label: None,
+            value_is_lower_bound: None,
         }
     }
 

@@ -19,7 +19,7 @@ use chrono::{DateTime, FixedOffset, TimeZone, Utc};
 use config::meta::{
     alerts::{
         QueryCondition as MetaQueryCondition, TriggerCondition as MetaTriggerCondition,
-        alert::{Alert as MetaAlert, ListAlertsParams},
+        alert::{Alert as MetaAlert, AlertSortField as MetaAlertSortField, ListAlertsParams},
         deduplication::DeduplicationConfig as MetaDeduplicationConfig,
     },
     folder::{Folder as MetaFolder, FolderType},
@@ -28,9 +28,9 @@ use config::meta::{
 use hashbrown::HashMap;
 use itertools::Itertools;
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, ConnectionTrait, DeriveIden, EntityTrait, ModelTrait,
-    PaginatorTrait, QueryFilter, QueryOrder, Set, TransactionTrait, TryIntoModel, prelude::Expr,
-    sea_query::Func,
+    ActiveModelTrait, ColumnTrait, Condition, ConnectionTrait, DeriveIden, EntityTrait, ModelTrait,
+    Order, PaginatorTrait, QueryFilter, QueryOrder, Set, TransactionTrait, TryIntoModel,
+    prelude::Expr, sea_query::Func,
 };
 use svix_ksuid::{Ksuid, KsuidLike};
 
@@ -189,6 +189,17 @@ impl TryFrom<alerts::Model> for MetaAlert {
 
         alert.creates_incident = value.creates_incident;
         alert.workflows = workflows;
+
+        // Feature 2 (PT-2 / PT-6). Both degrade to "unset" rather than failing
+        // the load: one row with a junk priority id or a malformed tags blob
+        // must not take the whole alert list down.
+        alert.priority = value
+            .priority
+            .and_then(config::meta::alerts::priority::AlertPriority::from_i32);
+        alert.tags = value
+            .tags
+            .and_then(|v| serde_json::from_value::<Vec<String>>(v).ok())
+            .unwrap_or_default();
 
         Ok(alert)
     }
@@ -529,6 +540,14 @@ async fn get_model_by_name<C: ConnectionTrait>(
     Ok(Some((folder, maybe_alert)))
 }
 
+/// Chunk size for the tag-resolved ID predicate, so a broad tag filter cannot
+/// emit an unbounded `IN (...)` that some drivers reject outright.
+const TAG_ID_PREDICATE_CHUNK: usize = 500;
+
+/// Stands in for an empty resolved ID set. `id IN ()` is not portable, and
+/// dropping the filter would turn "nothing matches" into "everything matches".
+const TAG_FILTER_NO_MATCH_SENTINEL: &str = "";
+
 /// Lists alert ORM models using the given parameters. Returns each alert and
 /// its parent folder.
 async fn list_models<C: ConnectionTrait>(
@@ -580,10 +599,71 @@ async fn list_models<C: ConnectionTrait>(
         query
     };
 
-    // Apply ordering.
-    let query = query
-        .order_by_asc(alerts::Column::Name)
-        .order_by_asc(folders::Column::Name);
+    // Apply the optional priority filter (PT-3). Multiple values OR together;
+    // alerts with no priority are excluded, because "show me the P1s" must not
+    // surface unprioritized alerts.
+    let query = if params.priority.is_empty() {
+        query
+    } else {
+        let ids: Vec<i32> = params.priority.iter().map(|p| p.to_i32()).collect();
+        query.filter(alerts::Column::Priority.is_in(ids))
+    };
+
+    // Apply the optional tag filter (PT-8) as an ID predicate resolved by the
+    // caller. Chunked so a broad filter cannot emit an unbounded `IN (...)`;
+    // an empty resolved set must match nothing, NOT everything.
+    let query = match &params.tag_alert_ids {
+        None => query,
+        Some(ids) if ids.is_empty() => {
+            // Deliberate: `id IN ()` is not portable, and omitting the filter
+            // would turn "no alert carries these tags" into "return them all".
+            query.filter(alerts::Column::Id.eq(TAG_FILTER_NO_MATCH_SENTINEL))
+        }
+        Some(ids) => {
+            let mut cond = Condition::any();
+            for chunk in ids.chunks(TAG_ID_PREDICATE_CHUNK) {
+                cond = cond.add(alerts::Column::Id.is_in(chunk.to_vec()));
+            }
+            query.filter(cond)
+        }
+    };
+
+    // Apply ordering (PT-3).
+    //
+    // Unset priority always sorts LAST, in BOTH directions, and it is spelled
+    // out rather than left to the database: PostgreSQL puts NULLs last on
+    // ascending while SQLite/MySQL put them first, so native ordering would
+    // give three supported databases two different list orders.
+    //
+    // Ties break on (name, folder name) so pagination is stable — without a
+    // total order, two pages can repeat or skip a row.
+    let query = match params.sort_by {
+        Some(MetaAlertSortField::Priority) => {
+            let nulls_last =
+                Expr::expr(Expr::case(alerts::Column::Priority.is_null(), 1).finally(0));
+            let query = query.order_by(nulls_last, Order::Asc);
+            let query = if params.sort_desc {
+                query.order_by_desc(alerts::Column::Priority)
+            } else {
+                query.order_by_asc(alerts::Column::Priority)
+            };
+            query
+                .order_by_asc(alerts::Column::Name)
+                .order_by_asc(folders::Column::Name)
+        }
+        Some(MetaAlertSortField::Name) => {
+            let query = if params.sort_desc {
+                query.order_by_desc(alerts::Column::Name)
+            } else {
+                query.order_by_asc(alerts::Column::Name)
+            };
+            query.order_by_asc(folders::Column::Name)
+        }
+        // Historical default, unchanged.
+        None => query
+            .order_by_asc(alerts::Column::Name)
+            .order_by_asc(folders::Column::Name),
+    };
 
     // Execute the query, either getting all results or a specific page of results.
     let results = if let Some((page_size, page_idx)) = params.page_size_and_idx
@@ -755,6 +835,14 @@ fn update_mutable_fields(
     alert_am.trigger_period_seconds = Set(trigger_period_seconds);
     alert_am.trigger_threshold_count = Set(trigger_threshold_count);
     alert_am.trigger_thresholds = Set(trigger_thresholds);
+    // Feature 2: NULL rather than 0/[] when unset, so an alert that sets
+    // neither field is byte-identical to its pre-Feature-2 row (G5).
+    alert_am.priority = Set(alert.priority.map(|p| p.to_i32()));
+    alert_am.tags = Set(if alert.tags.is_empty() {
+        None
+    } else {
+        Some(serde_json::json!(alert.tags))
+    });
     alert_am.trigger_frequency_type = Set(trigger_frequency_type);
     alert_am.trigger_frequency_seconds = Set(trigger_frequency_seconds);
     alert_am.trigger_frequency_cron = Set(trigger_frequency_cron);
@@ -831,6 +919,8 @@ mod tests {
             trigger_period_seconds: 900, // 15 min × 60
             trigger_threshold_count: 100,
             trigger_thresholds: None,
+            priority: None,
+            tags: None,
             trigger_frequency_type: 1, // Seconds
             trigger_frequency_seconds: 300,
             trigger_frequency_cron: None,
@@ -857,6 +947,47 @@ mod tests {
         assert_eq!(alert.org_id, "myorg");
         assert!(alert.enabled);
         assert!(!alert.creates_incident);
+    }
+
+    // ── Feature 2: priority & tags storage mapping (PT-2, PT-6) ────────────
+
+    #[test]
+    fn test_priority_and_tags_unpack_from_model() {
+        let id = Ksuid::new(None, None).to_string();
+        let mut model = make_model(&id);
+        model.priority = Some(2);
+        model.tags = Some(serde_json::json!(["prod", "service:checkout"]));
+
+        let alert = MetaAlert::try_from(model).unwrap();
+        assert_eq!(
+            alert.priority,
+            Some(config::meta::alerts::priority::AlertPriority::P2)
+        );
+        assert_eq!(alert.tags, vec!["prod", "service:checkout"]);
+    }
+
+    #[test]
+    fn test_null_priority_and_tags_unpack_as_unset() {
+        let id = Ksuid::new(None, None).to_string();
+        let alert = MetaAlert::try_from(make_model(&id)).unwrap();
+        assert_eq!(alert.priority, None);
+        assert!(alert.tags.is_empty());
+    }
+
+    /// One corrupt row must not take the alert list down: a priority id
+    /// outside 1..=5 (or a tags blob that is not an array of strings) degrades
+    /// to unset instead of failing the whole load.
+    #[test]
+    fn test_corrupt_priority_or_tags_degrade_to_unset() {
+        let id = Ksuid::new(None, None).to_string();
+
+        let mut bad_priority = make_model(&id);
+        bad_priority.priority = Some(99);
+        assert_eq!(MetaAlert::try_from(bad_priority).unwrap().priority, None);
+
+        let mut bad_tags = make_model(&id);
+        bad_tags.tags = Some(serde_json::json!({"not": "an array"}));
+        assert!(MetaAlert::try_from(bad_tags).unwrap().tags.is_empty());
     }
 
     #[test]

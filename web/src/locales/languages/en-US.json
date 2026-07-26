@@ -4452,6 +4452,11 @@
     "lastOutcome": "Last Outcome",
     "level": "Level",
     "warnAt": "warn at",
+    "priority": "Priority",
+    "priorityUnset": "Unset",
+    "priorityTooltip": "How much this alert matters to your team. Used for filtering, sorting and notification routing — it does not affect when the alert fires.",
+    "tags": "Tags",
+    "tagsTooltip": "Labels for filtering and grouping alerts, e.g. prod or service:checkout. Lowercased automatically; must start with a letter.",
     "criticalIf": "Critical if",
     "warningIf": "Warning if",
     "addWarning": "Add warning",
@@ -4729,6 +4734,7 @@
       "settingsSaveError": "Failed to save settings"
     },
     "placeholders": {
+      "addTag": "Add tag and press Enter",
       "typeSomething": "Type something",
       "value": "Value",
       "selectColumn": "Select column",

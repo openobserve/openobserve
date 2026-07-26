@@ -21,7 +21,10 @@ use utoipa::ToSchema;
 
 use crate::{
     meta::{
-        alerts::{QueryCondition, TriggerCondition, deduplication::DeduplicationConfig},
+        alerts::{
+            QueryCondition, TriggerCondition, deduplication::DeduplicationConfig,
+            priority::AlertPriority,
+        },
         stream::StreamType,
         triggers::{ScheduledTriggerData, Trigger},
     },
@@ -101,6 +104,31 @@ pub struct Alert {
     pub creates_incident: bool,
     #[serde(default)]
     pub workflows: Vec<String>,
+    /// How much humans care about this alert (PT-1). `None` = unset, which is
+    /// every pre-Feature-2 alert.
+    ///
+    /// **Mutable** configuration — editable on any update, like `name`.
+    /// Display + propagation only: it must never influence evaluation,
+    /// silence, delivery or incident severity (PT-5 / D19).
+    ///
+    /// `value_type` is required here because the enum serializes as an
+    /// integer via serde `try_from`/`into`; without it the generated OpenAPI
+    /// would advertise a string enum and lie about the payload.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<u8>, example = 3)]
+    pub priority: Option<AlertPriority>,
+    /// Selection tags (PT-6): bare (`prod`) or `key:value`
+    /// (`service:checkout`), normalized and validated at save by
+    /// `tags::normalize_tags`.
+    ///
+    /// NOT `context_attributes` — that field is free-form KV shipped into
+    /// notification payloads with no validation. These are the filtering /
+    /// scoping primitive.
+    ///
+    /// Skipped when empty so alerts that set no tags serialize exactly as
+    /// they did before Feature 2 (G5).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tags: Vec<String>,
 }
 
 impl MemorySize for Alert {
@@ -122,6 +150,8 @@ impl MemorySize for Alert {
             + self.last_edited_by.mem_size()
             + self.deduplication.mem_size()
             + self.workflows.mem_size()
+            + self.tags.mem_size()
+            + std::mem::size_of::<Option<AlertPriority>>()
     }
 }
 
@@ -160,6 +190,8 @@ impl Default for Alert {
             deduplication: None,
             creates_incident: false,
             workflows: vec![],
+            priority: None,
+            tags: vec![],
         }
     }
 }
@@ -277,6 +309,38 @@ pub struct ListAlertsParams {
 
     /// The optional alert type filter. Defaults to `All`.
     pub alert_type: AlertTypeFilter,
+
+    /// Optional priority filter (PT-3). Multiple values are OR-ed, so
+    /// `?priority=1&priority=2` returns P1 **or** P2. Empty = no filter.
+    ///
+    /// Alerts with no priority are excluded whenever this is non-empty —
+    /// "show me the P1s" must not surface unprioritized alerts.
+    pub priority: Vec<AlertPriority>,
+
+    /// Tag filter (PT-8), **already resolved to alert IDs** by the service
+    /// layer, which owns the in-memory alert cache the infra layer cannot
+    /// reach. `None` = no tag filter.
+    ///
+    /// `Some(empty)` means "no alert carries these tags" and MUST match
+    /// nothing — collapsing it back to `None` would turn a zero-result filter
+    /// into a match-all, the same class of bug the filter parser guards
+    /// against.
+    pub tag_alert_ids: Option<Vec<String>>,
+
+    /// Optional sort column (PT-3). `None` keeps the historical ordering
+    /// (name, then folder name).
+    pub sort_by: Option<AlertSortField>,
+
+    /// Sort direction; ignored when `sort_by` is `None`.
+    pub sort_desc: bool,
+}
+
+/// Columns the alert list can be sorted by (PT-3).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AlertSortField {
+    /// Ascending = most urgent first, because P1 stores as 1.
+    Priority,
+    Name,
 }
 
 impl ListAlertsParams {
@@ -292,7 +356,30 @@ impl ListAlertsParams {
             owner: None,
             page_size_and_idx: None,
             alert_type: AlertTypeFilter::All,
+            priority: vec![],
+            tag_alert_ids: None,
+            sort_by: None,
+            sort_desc: false,
         }
+    }
+
+    /// Filter by one or more priorities (OR). Empty = no filter.
+    pub fn with_priorities(mut self, priorities: Vec<AlertPriority>) -> Self {
+        self.priority = priorities;
+        self
+    }
+
+    /// Filter by a tag-resolved alert-ID set (see `tag_alert_ids`).
+    pub fn with_tag_alert_ids(mut self, ids: Vec<String>) -> Self {
+        self.tag_alert_ids = Some(ids);
+        self
+    }
+
+    /// Sort by a column. Ascending priority = most urgent first (PT-3).
+    pub fn sorted_by(mut self, field: AlertSortField, desc: bool) -> Self {
+        self.sort_by = Some(field);
+        self.sort_desc = desc;
+        self
     }
 
     /// Filter alerts by the given folder ID surrogate key.
@@ -740,5 +827,149 @@ mod tests {
         assert!(obj.contains_key("context_attributes"));
         assert!(obj.contains_key("updated_at"));
         assert!(obj.contains_key("deduplication"));
+    }
+
+    // ── Feature 2: list params (PT-3, PT-8) ─────────────────────────────────
+
+    #[test]
+    fn test_list_params_default_to_no_priority_tag_or_sort_filters() {
+        let p = ListAlertsParams::new("org");
+        assert!(p.priority.is_empty());
+        assert_eq!(p.tag_alert_ids, None, "None = no tag filter at all");
+        assert_eq!(p.sort_by, None, "None keeps the historical ordering");
+        assert!(!p.sort_desc);
+    }
+
+    #[test]
+    fn test_priority_filter_accepts_multiple_values_for_or_semantics() {
+        let p = ListAlertsParams::new("org")
+            .with_priorities(vec![AlertPriority::P1, AlertPriority::P2]);
+        assert_eq!(p.priority, vec![AlertPriority::P1, AlertPriority::P2]);
+    }
+
+    /// The distinction that prevents a match-all bug: "no tag filter" (`None`)
+    /// and "a tag filter that matched nothing" (`Some(vec![])`) must stay
+    /// different, or a zero-result filter silently returns every alert.
+    #[test]
+    fn test_empty_resolved_tag_set_is_distinct_from_no_tag_filter() {
+        let no_filter = ListAlertsParams::new("org");
+        assert_eq!(no_filter.tag_alert_ids, None);
+
+        let matched_nothing = ListAlertsParams::new("org").with_tag_alert_ids(vec![]);
+        assert_eq!(matched_nothing.tag_alert_ids, Some(vec![]));
+        assert_ne!(no_filter.tag_alert_ids, matched_nothing.tag_alert_ids);
+    }
+
+    #[test]
+    fn test_sort_builder_records_field_and_direction() {
+        let asc = ListAlertsParams::new("org").sorted_by(AlertSortField::Priority, false);
+        assert_eq!(asc.sort_by, Some(AlertSortField::Priority));
+        assert!(!asc.sort_desc);
+
+        let desc = ListAlertsParams::new("org").sorted_by(AlertSortField::Name, true);
+        assert_eq!(desc.sort_by, Some(AlertSortField::Name));
+        assert!(desc.sort_desc);
+    }
+
+    // ── Feature 2: priority & tags (PT-1, PT-6) ─────────────────────────────
+    // These test the PRODUCTION `Alert`, unlike the stand-in pattern test in
+    // `priority.rs` which proves only serde-attribute behaviour.
+
+    #[test]
+    fn test_alert_defaults_have_no_priority_and_no_tags() {
+        let alert = Alert::default();
+        assert_eq!(alert.priority, None, "unset is the default, never P1");
+        assert!(alert.tags.is_empty());
+    }
+
+    /// G5: an alert that configures neither field must serialize EXACTLY as it
+    /// did before Feature 2 — no new keys, so stored JSON and API payloads are
+    /// byte-identical for every existing alert.
+    #[test]
+    fn test_unset_priority_and_empty_tags_are_omitted_entirely() {
+        let alert = Alert::default();
+        let json = serde_json::to_value(&alert).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(
+            !obj.contains_key("priority"),
+            "unset priority must not appear"
+        );
+        assert!(!obj.contains_key("tags"), "empty tags must not appear");
+    }
+
+    #[test]
+    fn test_priority_and_tags_round_trip_through_serde() {
+        let alert = Alert {
+            priority: Some(AlertPriority::P2),
+            tags: vec!["prod".to_string(), "service:checkout".to_string()],
+            ..Default::default()
+        };
+        let json = serde_json::to_value(&alert).unwrap();
+        // Integer wire form (D17) — matches the storage column exactly.
+        assert_eq!(json["priority"], serde_json::json!(2));
+        assert_eq!(
+            json["tags"],
+            serde_json::json!(["prod", "service:checkout"])
+        );
+
+        let back: Alert = serde_json::from_value(json).unwrap();
+        assert_eq!(back.priority, Some(AlertPriority::P2));
+        assert_eq!(back.tags, alert.tags);
+    }
+
+    /// PT-1: priority is MUTABLE static configuration. "Static" contrasts it
+    /// with evaluated state; it does not mean write-once. An edit must be able
+    /// to raise it, lower it, and clear it back to unset.
+    #[test]
+    fn test_priority_is_mutable_including_back_to_unset() {
+        let mut alert = Alert::default();
+        alert.priority = Some(AlertPriority::P4);
+        assert_eq!(alert.priority, Some(AlertPriority::P4));
+
+        alert.priority = Some(AlertPriority::P1); // raised
+        assert_eq!(alert.priority, Some(AlertPriority::P1));
+
+        alert.priority = None; // cleared
+        let json = serde_json::to_value(&alert).unwrap();
+        assert!(
+            !json.as_object().unwrap().contains_key("priority"),
+            "clearing must return to absent, not leave a stale value"
+        );
+    }
+
+    #[test]
+    fn test_tags_are_mutable_including_back_to_empty() {
+        let mut alert = Alert::default();
+        alert.tags = vec!["prod".to_string()];
+        alert.tags.clear();
+        let json = serde_json::to_value(&alert).unwrap();
+        assert!(!json.as_object().unwrap().contains_key("tags"));
+    }
+
+    /// PT-1/PT-6: unlike the warning family (rejected on realtime by D12),
+    /// priority and tags are inert metadata and ARE allowed on realtime
+    /// alerts — excluding them would punch holes in list filtering.
+    #[test]
+    fn test_realtime_alerts_may_carry_priority_and_tags() {
+        let alert = Alert {
+            is_real_time: true,
+            priority: Some(AlertPriority::P3),
+            tags: vec!["prod".to_string()],
+            ..Default::default()
+        };
+        let json = serde_json::to_value(&alert).unwrap();
+        assert_eq!(json["priority"], serde_json::json!(3));
+        assert_eq!(json["tags"], serde_json::json!(["prod"]));
+    }
+
+    /// Old payloads (no such keys) must still deserialize — the fields are
+    /// additive.
+    #[test]
+    fn test_pre_feature2_payload_still_deserializes() {
+        let legacy = serde_json::json!({ "name": "old", "org_id": "o" });
+        let alert: Alert = serde_json::from_value(legacy).unwrap();
+        assert_eq!(alert.name, "old");
+        assert_eq!(alert.priority, None);
+        assert!(alert.tags.is_empty());
     }
 }

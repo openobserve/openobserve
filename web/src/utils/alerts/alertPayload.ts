@@ -33,6 +33,9 @@ export interface PayloadFormData {
   row_template?: string;
   row_template_type?: string;
   creates_incident?: boolean;
+  /** Feature 2: integer storage id 1..5, or null/undefined when unset. */
+  priority?: number | string | null;
+  tags?: string[];
   uuid?: string;
   updatedAt?: string;
   createdAt?: string;
@@ -220,6 +223,22 @@ export const getAlertPayload = (formData: PayloadFormData, context: PayloadConte
     "promql_warning_value" in (payload.query_condition ?? {});
   if (!hasAnyWarning) {
     delete (payload.trigger_condition as any).notify_on_warning;
+  }
+
+  // Feature 2 (PT-1/PT-6). The select yields a string when a user picks a
+  // value, so coerce; an unset priority is DELETED rather than sent as null or
+  // 0, keeping pre-Feature-2 payloads byte-identical (G5).
+  if (payload.priority === null || payload.priority === undefined || payload.priority === "") {
+    delete (payload as any).priority;
+  } else {
+    const n = Number(payload.priority);
+    if (Number.isNaN(n)) delete (payload as any).priority;
+    else payload.priority = n;
+  }
+  // Tags are normalized server-side (that is the authority); here we only drop
+  // the field when empty so an untagged alert adds no key.
+  if (!Array.isArray(payload.tags) || payload.tags.length === 0) {
+    delete (payload as any).tags;
   }
 
   if (formData.query_condition.vrl_function) {

@@ -37,8 +37,10 @@ pub mod deduplication;
 pub mod grouping;
 pub mod incidents;
 pub mod level;
+pub mod priority;
 pub mod state;
 pub mod state_level;
+pub mod tags;
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema, PartialEq, Default)]
 #[serde(default)]

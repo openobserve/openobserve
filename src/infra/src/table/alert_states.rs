@@ -60,13 +60,12 @@ impl From<alert_states::Model> for AlertState {
 /// Fetch the state row for one `(alert_id, group_key)`.
 pub async fn get(alert_id: &str, group_key: &str) -> Result<Option<AlertState>, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    Ok(alert_states::Entity::find_by_id((
-        alert_id.to_string(),
-        group_key.to_string(),
-    ))
-    .one(client)
-    .await?
-    .map(Into::into))
+    Ok(
+        alert_states::Entity::find_by_id((alert_id.to_string(), group_key.to_string()))
+            .one(client)
+            .await?
+            .map(Into::into),
+    )
 }
 
 /// Fetch the rollup rows for a batch of alerts — what the alert list needs.

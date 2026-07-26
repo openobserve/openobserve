@@ -17,8 +17,8 @@
 //!
 //! Two tables with deliberately different shapes:
 //!
-//! * `alert_states` — current state, one row per `(alert_id, group_key)`,
-//!   UPDATE-in-place. `group_key = ''` is the per-alert rollup row.
+//! * `alert_states` — current state, one row per `(alert_id, group_key)`, UPDATE-in-place.
+//!   `group_key = ''` is the per-alert rollup row.
 //! * `alert_state_transitions` — append-only change log, deleted by retention.
 //!
 //! Mixing them would put retention DELETEs on the hottest-updated pages.
@@ -36,7 +36,9 @@ pub struct Migration;
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        manager.create_table(create_alert_states_statement()).await?;
+        manager
+            .create_table(create_alert_states_statement())
+            .await?;
         manager
             .create_table(create_alert_state_transitions_statement())
             .await?;
@@ -51,11 +53,7 @@ impl MigrationTrait for Migration {
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager
-            .drop_table(
-                Table::drop()
-                    .table(AlertStateTransitions::Table)
-                    .to_owned(),
-            )
+            .drop_table(Table::drop().table(AlertStateTransitions::Table).to_owned())
             .await?;
         manager
             .drop_table(Table::drop().table(AlertStates::Table).to_owned())

@@ -94,6 +94,17 @@ pub struct ListAlertsResponseBodyItem {
     /// When `level` last CHANGED — powers "critical for 20 minutes".
     #[serde(skip_serializing_if = "Option::is_none")]
     pub level_since: Option<i64>,
+    /// Configured priority as the integer storage id 1..=5 (Feature 2, PT-3).
+    ///
+    /// A THIRD axis: `enabled` is is-it-running, `last_outcome` is
+    /// did-it-fire, `level` is how-bad-now, and this is how much humans care.
+    /// Absent when unset, which is every pre-Feature-2 alert.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<u8>, example = 3)]
+    pub priority: Option<u8>,
+    /// Normalized selection tags (PT-6). Omitted when empty.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub tags: Vec<String>,
 }
 
 /// HTTP response body for `EnableAlert` endpoint.
@@ -166,6 +177,8 @@ impl TryFrom<(meta_folders::Folder, meta_alerts::Alert, Option<Trigger>)>
             last_outcome_since: None,
             level: None,
             level_since: None,
+            priority: alert.priority.map(|p| p.to_i32() as u8),
+            tags: alert.tags,
         })
     }
 }
@@ -247,6 +260,10 @@ pub fn anomaly_config_to_list_item(v: &serde_json::Value) -> Option<ListAlertsRe
             .and_then(|e| e.as_str())
             .filter(|s| !s.is_empty())
             .map(String::from),
+        // Anomaly configs carry neither field (PT-3): they sort as
+        // unset and are excluded by any priority filter.
+        priority: None,
+        tags: vec![],
     })
 }
 
@@ -325,6 +342,8 @@ mod tests {
             last_outcome_since: None,
             level: None,
             level_since: None,
+            priority: None,
+            tags: vec![],
         };
         let json = serde_json::to_value(&item).unwrap();
         let obj = json.as_object().unwrap();

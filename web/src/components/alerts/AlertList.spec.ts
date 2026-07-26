@@ -446,44 +446,43 @@ describe("AlertList - data fetching and columns", () => {
     expect(wrapper.vm.filteredResults.length).toBe(alertsDB.length);
   });
 
-  it("shows period & frequency columns for all/scheduled tabs and hides in realTime", async () => {
+  // period ("Look back window"), frequency ("Check every"), state, level and
+  // last_trained_at were removed from the list: they are configuration detail
+  // or duplicate a neighbouring column, and the row was too wide to scan.
+  // They remain on the alert detail/edit views.
+  it("no longer renders the removed configuration columns on any tab", async () => {
     const wrapper: any = await mountAlertList();
     await waitData(wrapper);
 
-    // Ensure we're in alerts view mode first
     wrapper.vm.viewMode = "alerts";
     await flushPromises();
 
-    // default tab: all
-    // OTableColumnDef uses `id` field (not `name`)
-    wrapper.vm.activeTab = "all";
-    await flushPromises();
-    let ids = wrapper.vm.columns.map((c: any) => c.id ?? c.name);
-    expect(ids).toContain("period");
-    expect(ids).toContain("frequency");
-
-    // switch to realTime
-    wrapper.vm.activeTab = "realTime";
-    await flushPromises();
-    ids = wrapper.vm.columns.map((c: any) => c.id ?? c.name);
-    expect(ids).not.toContain("period");
-    expect(ids).not.toContain("frequency");
-
-    // switch to scheduled
-    wrapper.vm.activeTab = "scheduled";
-    await flushPromises();
-    ids = wrapper.vm.columns.map((c: any) => c.id ?? c.name);
-    expect(ids).toContain("period");
-    expect(ids).toContain("frequency");
+    for (const tab of ["all", "scheduled", "realTime", "anomalyDetection"]) {
+      wrapper.vm.activeTab = tab;
+      await flushPromises();
+      const ids = wrapper.vm.columns.map((c: any) => c.id ?? c.name);
+      for (const removed of ["period", "frequency", "state", "level", "last_trained_at"]) {
+        expect(ids, `tab=${tab} must not show "${removed}"`).not.toContain(removed);
+      }
+    }
   });
 
-  it("renders the State column and the summary strip with operational counts", async () => {
+  // Feature 2 (PT-3/PT-6): the columns that REPLACED them.
+  it("renders the priority and tags columns", async () => {
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+    const ids = wrapper.vm.columns.map((c: any) => c.id ?? c.name);
+    expect(ids).toContain("priority");
+    expect(ids).toContain("tags");
+  });
+
+  it("renders the summary strip with operational counts", async () => {
     const wrapper: any = await mountAlertList();
     await waitData(wrapper);
 
-    // State column is present on every tab (derived from `enabled`).
-    const ids = wrapper.vm.columns.map((c: any) => c.id ?? c.name);
-    expect(ids).toContain("state");
+    // NOTE: the State *column* was removed from the table, but the derived
+    // counts still drive the summary strip above it — that is the whole reason
+    // the column was redundant.
 
     // Drive the counts from an explicit set so the assertion is deterministic
     // regardless of cross-test store state.

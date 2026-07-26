@@ -54,7 +54,8 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // for DDL commands and migrations
 // 54: m20260725_000001_create_alert_states_tables (alert run state, Part IV)
 // 55: m20260725_000002_add_threshold_and_level_columns (multi-level thresholds)
-pub const DB_SCHEMA_VERSION: u64 = 55;
+// 56: m20260726_000001_add_priority_and_tags_to_alerts (priority & tags)
+pub const DB_SCHEMA_VERSION: u64 = 56;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables

@@ -153,6 +153,11 @@ export const defaultAlertValue: any = () => {
     lastEditedBy: "",
     folder_id: "",
     creates_incident: false,
+    // Feature 2 (PT-1/PT-6). `null` (not 0) is unset — 0 is not a valid
+    // priority id, and the payload layer drops null so pre-Feature-2 alerts
+    // serialize unchanged.
+    priority: null,
+    tags: [],
   };
 };
 

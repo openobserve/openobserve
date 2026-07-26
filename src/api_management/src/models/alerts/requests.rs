@@ -235,6 +235,23 @@ pub struct ListAlertsQuery {
     /// Optional alert type filter: `all` (default), `scheduled`, `realtime`,
     /// or `anomaly_detection`.
     pub alert_type: Option<meta_alerts::AlertTypeFilter>,
+
+    /// Optional priority filter (PT-3). Comma-separated, OR semantics, and
+    /// each value may be given as `1` or `P1` — query strings are typed by
+    /// humans, so both forms parse. Unparseable values are ignored rather
+    /// than 400: a filter is a view, not a write.
+    pub priority: Option<String>,
+
+    /// Optional tag filter (PT-8). Comma-separated, **AND** semantics — an
+    /// alert must carry every listed tag.
+    pub tags: Option<String>,
+
+    /// Optional sort column: `priority` or `name`. Anything else keeps the
+    /// historical ordering.
+    pub sort_by: Option<String>,
+
+    /// Sort direction: `desc` for descending, anything else ascending.
+    pub sort_order: Option<String>,
 }
 
 /// HTTP URL query component that contains parameters for enabling alerts.
@@ -275,8 +292,45 @@ impl ListAlertsQuery {
                 .page_size
                 .map(|page_size| (page_size, self.page_idx.unwrap_or(0))),
             alert_type: self.alert_type.unwrap_or_default(),
+            priority: parse_priority_filter(self.priority.as_deref()),
+            // Resolved by the service layer, which owns the alert cache the
+            // infra layer cannot reach (PT-8).
+            tag_alert_ids: None,
+            sort_by: match self.sort_by.as_deref() {
+                Some("priority") => Some(meta_alerts::AlertSortField::Priority),
+                Some("name") => Some(meta_alerts::AlertSortField::Name),
+                _ => None,
+            },
+            sort_desc: matches!(self.sort_order.as_deref(), Some("desc")),
         }
     }
+
+    /// The requested tag filter, normalized leniently (PT-8/D22).
+    ///
+    /// Invalid tokens are KEPT: dropping them would collapse `?tags=!!!` into
+    /// an empty filter, and an empty filter matches every alert — a request
+    /// that must return nothing would return everything.
+    pub fn requested_tags(&self) -> Vec<String> {
+        let raw: Vec<String> = self
+            .tags
+            .as_deref()
+            .unwrap_or_default()
+            .split(',')
+            .map(|t| t.to_string())
+            .collect();
+        config::meta::alerts::tags::normalize_filter_tags(&raw)
+    }
+}
+
+/// Parse a comma-separated priority filter, accepting `1` and `P1` alike.
+///
+/// Unparseable entries are skipped: a bad filter value should narrow nothing
+/// rather than fail the page.
+fn parse_priority_filter(raw: Option<&str>) -> Vec<config::meta::alerts::priority::AlertPriority> {
+    let Some(raw) = raw else { return vec![] };
+    raw.split(',')
+        .filter_map(|token| token.trim().parse().ok())
+        .collect()
 }
 
 #[derive(Deserialize, ToSchema)]
@@ -457,6 +511,10 @@ mod tests {
             page_size: Some(20),
             page_idx: Some(1),
             alert_type: None,
+            priority: None,
+            tags: None,
+            sort_by: None,
+            sort_order: None,
         };
         let params = q.into("my_org");
         assert_eq!(params.org_id, "my_org");
@@ -478,6 +536,10 @@ mod tests {
             page_size: None,
             page_idx: None,
             alert_type: None,
+            priority: None,
+            tags: None,
+            sort_by: None,
+            sort_order: None,
         };
         let params = q.into("org2");
         assert_eq!(params.org_id, "org2");
@@ -497,6 +559,10 @@ mod tests {
             page_size: Some(5),
             page_idx: None,
             alert_type: None,
+            priority: None,
+            tags: None,
+            sort_by: None,
+            sort_order: None,
         };
         let params = q.into("org3");
         assert_eq!(params.page_size_and_idx, Some((5, 0)));
@@ -516,4 +582,91 @@ pub struct GenerateSqlRequestBody {
     /// Query condition containing aggregation and WHERE conditions
     /// The conditions field within QueryCondition supports both V1 and V2 formats
     pub query_condition: QueryCondition,
+}
+
+#[cfg(test)]
+mod priority_tag_query_tests {
+    use config::meta::alerts::priority::AlertPriority;
+
+    use super::*;
+
+    fn q(
+        priority: Option<&str>,
+        tags: Option<&str>,
+        sort_by: Option<&str>,
+        order: Option<&str>,
+    ) -> ListAlertsQuery {
+        ListAlertsQuery {
+            folder: None,
+            alert_name_substring: None,
+            stream_type: None,
+            stream_name: None,
+            enabled: None,
+            owner: None,
+            page_size: None,
+            page_idx: None,
+            alert_type: None,
+            priority: priority.map(|s| s.to_string()),
+            tags: tags.map(|s| s.to_string()),
+            sort_by: sort_by.map(|s| s.to_string()),
+            sort_order: order.map(|s| s.to_string()),
+        }
+    }
+
+    /// Query strings are typed by humans, so both `1` and `P1` parse (PT-3).
+    #[test]
+    fn test_priority_filter_accepts_both_forms_and_ors_them() {
+        let p = q(Some("1,P2, p3"), None, None, None).into("org");
+        assert_eq!(
+            p.priority,
+            vec![AlertPriority::P1, AlertPriority::P2, AlertPriority::P3]
+        );
+    }
+
+    /// A bad filter value narrows nothing rather than failing the page — a
+    /// filter is a view, not a write.
+    #[test]
+    fn test_unparseable_priority_values_are_skipped_not_fatal() {
+        let p = q(Some("banana,2,P9"), None, None, None).into("org");
+        assert_eq!(p.priority, vec![AlertPriority::P2]);
+    }
+
+    #[test]
+    fn test_absent_priority_means_no_filter() {
+        assert!(q(None, None, None, None).into("org").priority.is_empty());
+    }
+
+    #[test]
+    fn test_sort_by_and_order_parse() {
+        let p = q(None, None, Some("priority"), Some("desc")).into("org");
+        assert_eq!(p.sort_by, Some(meta_alerts::AlertSortField::Priority));
+        assert!(p.sort_desc);
+
+        let n = q(None, None, Some("name"), None).into("org");
+        assert_eq!(n.sort_by, Some(meta_alerts::AlertSortField::Name));
+        assert!(!n.sort_desc);
+
+        // Unknown column keeps the historical ordering rather than erroring.
+        let u = q(None, None, Some("nonsense"), None).into("org");
+        assert_eq!(u.sort_by, None);
+    }
+
+    /// REGRESSION GUARD: an all-invalid tag filter must NOT collapse to empty,
+    /// because an empty filter matches every alert.
+    #[test]
+    fn test_invalid_tags_are_retained_so_the_filter_still_narrows() {
+        let tags = q(None, Some("!!!"), None, None).requested_tags();
+        assert_eq!(tags, vec!["!!!"], "must not collapse to a match-all filter");
+    }
+
+    #[test]
+    fn test_tag_filter_is_case_normalized_and_drops_separator_blanks() {
+        let tags = q(None, Some("Prod,,SERVICE:Checkout"), None, None).requested_tags();
+        assert_eq!(tags, vec!["prod", "service:checkout"]);
+    }
+
+    #[test]
+    fn test_absent_tags_means_no_filter() {
+        assert!(q(None, None, None, None).requested_tags().is_empty());
+    }
 }

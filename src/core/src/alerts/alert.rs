@@ -126,6 +126,11 @@ pub enum AlertError {
     #[error("A PromQL warning value requires a PromQL condition")]
     PromqlWarningWithoutCondition,
 
+    /// A tag failed normalization (PT-7). The inner error names the offending
+    /// tag so the user knows exactly which one to fix.
+    #[error("Invalid tag: {0}")]
+    InvalidTag(config::meta::alerts::tags::TagError),
+
     /// On aggregation and PromQL alerts, `trigger_condition.threshold` is a
     /// COVERAGE gate (group/series count), not severity — a warning there is
     /// explicitly disallowed (D13). Severity warnings belong to the family's
@@ -425,6 +430,12 @@ async fn prepare_alert(
         }
         alert.context_attributes = Some(new_attrs);
     }
+
+    // Tags are normalized at save (PT-7), NOT merely validated: the repaired
+    // form (trimmed, lowercased, deduped) is what gets stored, so filtering
+    // compares like with like. Rejections name the offending tag.
+    alert.tags =
+        config::meta::alerts::tags::normalize_tags(&alert.tags).map_err(AlertError::InvalidTag)?;
 
     // before saving alert check column type to decide numeric condition
     let schema = infra::schema::get(org_id, stream_name, stream_type).await?;
@@ -2003,6 +2014,16 @@ async fn process_dest_template(
             "{alert_level}",
             &level.map(|l| l.to_string()).unwrap_or_default(),
         )
+        // Feature 2 (PT-4 / PT-9). Scope is DESTINATION TEMPLATES ONLY (D25):
+        // incident notifications build custom JSON and workflows carry
+        // hard-coded metadata; neither is wired here in v1. Unset priority and
+        // empty tags render as "" rather than "P0"/"null", so a template that
+        // interpolates them unconditionally still produces clean output.
+        .replace(
+            "{alert_priority}",
+            &alert.priority.map(|p| p.to_string()).unwrap_or_default(),
+        )
+        .replace("{alert_tags}", &alert.tags.join(","))
         .replace("{alert_threshold_crit}", &fmt_observed(family_crit))
         .replace(
             "{alert_threshold_warn}",
@@ -2579,6 +2600,40 @@ mod threshold_validation_tests {
         assert_eq!(err, ThresholdError::OperatorNotOrderable(Operator::EqualTo));
         let msg = AlertError::InvalidWarningThreshold(err).to_string();
         assert!(msg.contains("no severity ordering"), "got: {msg}");
+    }
+
+    // ── Feature 2: tag validation reaches the API as a 400 (PT-7) ──────────
+
+    /// The offending tag must survive the wrap into `AlertError`, so the user
+    /// is told exactly which tag to fix rather than "invalid tags".
+    #[test]
+    fn test_invalid_tag_error_names_the_offending_tag() {
+        use config::meta::alerts::tags::{TagError, normalize_tags};
+
+        let err = normalize_tags(&["1bad".to_string()]).unwrap_err();
+        assert_eq!(err, TagError::MustStartWithLetter("1bad".to_string()));
+
+        let wrapped = AlertError::InvalidTag(err).to_string();
+        assert!(
+            wrapped.contains("1bad"),
+            "the offending tag must reach the user, got: {wrapped}"
+        );
+    }
+
+    /// Normalization is applied at save, not merely checked: the REPAIRED
+    /// form is what gets stored, so a later filter compares like with like.
+    #[test]
+    fn test_save_stores_the_normalized_form_not_the_raw_input() {
+        use config::meta::alerts::tags::normalize_tags;
+
+        let stored = normalize_tags(&[
+            "  Prod  ".to_string(),
+            "SERVICE:Checkout".to_string(),
+            "prod".to_string(),
+            "".to_string(),
+        ])
+        .unwrap();
+        assert_eq!(stored, vec!["prod", "service:checkout"]);
     }
 
     /// D13: on aggregation/PromQL alerts the count threshold is COVERAGE, not
@@ -4477,6 +4532,62 @@ mod tests {
         )
         .await;
         assert_eq!(result, "count=3");
+    }
+
+    /// PT-4/PT-9: priority and tags reach destination templates.
+    #[tokio::test]
+    async fn test_priority_and_tags_render_into_templates() {
+        // `Alert` has private fields, so a functional-update literal is not
+        // available outside the `config` crate.
+        let mut alert = Alert::default();
+        alert.priority = Some(config::meta::alerts::priority::AlertPriority::P2);
+        alert.tags = vec!["prod".to_string(), "service:checkout".to_string()];
+        let options = ProcessTemplateOptions {
+            rows_end_time: 0,
+            start_time: None,
+            evaluation_timestamp: 0,
+            is_email: false,
+            level: None,
+            actual_value: None,
+        };
+        let result = process_dest_template(
+            "test_org",
+            "p={alert_priority} tags={alert_tags}",
+            &alert,
+            &[],
+            &[Value::String("".into())],
+            options,
+            &hashbrown::HashMap::new(),
+        )
+        .await;
+        // `P2`, not `2`: templates and UI use the human form (PT-4).
+        assert_eq!(result, "p=P2 tags=prod,service:checkout");
+    }
+
+    /// Unset priority and empty tags render as EMPTY, never "P0" or "null" —
+    /// a template that always interpolates them must still read cleanly.
+    #[tokio::test]
+    async fn test_unset_priority_and_empty_tags_render_empty() {
+        let alert = Alert::default();
+        let options = ProcessTemplateOptions {
+            rows_end_time: 0,
+            start_time: None,
+            evaluation_timestamp: 0,
+            is_email: false,
+            level: None,
+            actual_value: None,
+        };
+        let result = process_dest_template(
+            "test_org",
+            "p=[{alert_priority}] tags=[{alert_tags}]",
+            &alert,
+            &[],
+            &[Value::String("".into())],
+            options,
+            &hashbrown::HashMap::new(),
+        )
+        .await;
+        assert_eq!(result, "p=[] tags=[]");
     }
 
     /// T-5: `{alert_threshold_crit}`/`{alert_threshold_warn}` resolve from the

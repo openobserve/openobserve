@@ -117,6 +117,30 @@ export const BADGE_GROUPS = {
     },
   },
 
+  // Alert PRIORITY (Feature 2, PT-3) — how much humans care about this alert,
+  // set at configuration time.
+  //
+  // A THIRD axis, distinct from both neighbours below: `alertState` is the run
+  // outcome ("did it fire?"), `alertLevel` is the evaluated severity right now
+  // ("how bad?"), and this is neither — a P1 alert sitting at level Ok is
+  // perfectly normal, so these must never share a group.
+  //
+  // Palette follows the existing `severity` hot→cold ramp so P1–P4 read the
+  // same as they do on incidents, extended with a neutral P5 (that scale stops
+  // at P4).
+  alertPriority: {
+    mode: "dot",
+    shape: "pill",
+    values: {
+      p1: { variant: "error-soft", label: "P1" },
+      p2: { variant: "orange-soft", label: "P2" },
+      p3: { variant: "amber-soft", label: "P3" },
+      p4: { variant: "blue-soft", label: "P4" },
+      p5: { variant: "default-soft", label: "P5" },
+    },
+    fallback: { variant: "default-soft" },
+  },
+
   // Alert severity LEVEL (alerts_2.md Feature 1) — dot, PILL.
   //
   // A separate axis from `alertState` above, which renders the run OUTCOME

@@ -17,16 +17,15 @@
 //!
 //! Three additive, nullable changes:
 //!
-//! 1. `alerts.trigger_thresholds` — JSON config for the level/threshold axis.
-//!    A blob rather than one column per knob because SLO alerting brings a
-//!    cluster of them at once (burn-rate warning/critical, long/short windows,
-//!    error-budget threshold) on top of recovery thresholds and
-//!    `notify_on_warning`. Scope rule: this column holds **threshold and level
-//!    configuration only** — not routing, not scheduling.
-//! 2. `alert_states` — the level axis, deliberately separate from the outcome
-//!    axis shipped in `m20260725_000001`.
-//! 3. `alert_state_transitions` — level before/after, so an escalation is
-//!    recorded even when the outcome is unchanged.
+//! 1. `alerts.trigger_thresholds` — JSON config for the level/threshold axis. A blob rather than
+//!    one column per knob because SLO alerting brings a cluster of them at once (burn-rate
+//!    warning/critical, long/short windows, error-budget threshold) on top of recovery thresholds
+//!    and `notify_on_warning`. Scope rule: this column holds **threshold and level configuration
+//!    only** — not routing, not scheduling.
+//! 2. `alert_states` — the level axis, deliberately separate from the outcome axis shipped in
+//!    `m20260725_000001`.
+//! 3. `alert_state_transitions` — level before/after, so an escalation is recorded even when the
+//!    outcome is unchanged.
 //!
 //! Everything is nullable with no backfill: absent = single-level alert with no
 //! level ever classified, which is exactly the pre-existing behaviour (G5).
@@ -41,13 +40,12 @@ impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         // Two SQLite constraints shape this, both learned the hard way:
         //
-        // 1. Only ONE alter option per ALTER TABLE — sea-query *panics*
-        //    (not errors) when a statement carries more, taking the node down
-        //    mid-migration. Hence one `add_column` per statement.
-        // 2. `add_column_if_not_exists` is NOT idempotent on SQLite: it emits a
-        //    plain ADD COLUMN, so re-running after a partial failure dies with
-        //    "duplicate column name" and can never recover. Hence the explicit
-        //    `has_column` guard below.
+        // 1. Only ONE alter option per ALTER TABLE — sea-query *panics* (not errors) when a
+        //    statement carries more, taking the node down mid-migration. Hence one `add_column` per
+        //    statement.
+        // 2. `add_column_if_not_exists` is NOT idempotent on SQLite: it emits a plain ADD COLUMN,
+        //    so re-running after a partial failure dies with "duplicate column name" and can never
+        //    recover. Hence the explicit `has_column` guard below.
         //
         // NOTE: no index on any of the state columns. `alert_states` is
         // high-churn (one upsert per evaluation per alert) and indexing a
@@ -56,7 +54,13 @@ impl MigrationTrait for Migration {
         add_column(manager, ALERTS, Alerts::TriggerThresholds, ColType::Json).await?;
 
         add_column(manager, ALERT_STATES, AlertStates::Level, ColType::Int).await?;
-        add_column(manager, ALERT_STATES, AlertStates::LevelSince, ColType::BigInt).await?;
+        add_column(
+            manager,
+            ALERT_STATES,
+            AlertStates::LevelSince,
+            ColType::BigInt,
+        )
+        .await?;
         add_column(manager, ALERT_STATES, AlertStates::LevelAt, ColType::BigInt).await?;
 
         add_column(
@@ -79,7 +83,10 @@ impl MigrationTrait for Migration {
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         // Same one-per-statement rule as `up`.
-        for col in [AlertStateTransitions::FromLevel, AlertStateTransitions::ToLevel] {
+        for col in [
+            AlertStateTransitions::FromLevel,
+            AlertStateTransitions::ToLevel,
+        ] {
             manager
                 .alter_table(
                     Table::alter()
@@ -89,7 +96,11 @@ impl MigrationTrait for Migration {
                 )
                 .await?;
         }
-        for col in [AlertStates::Level, AlertStates::LevelSince, AlertStates::LevelAt] {
+        for col in [
+            AlertStates::Level,
+            AlertStates::LevelSince,
+            AlertStates::LevelAt,
+        ] {
             manager
                 .alter_table(
                     Table::alter()

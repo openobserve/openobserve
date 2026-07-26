@@ -76,6 +76,7 @@ impl From<AlertError> for Response {
             | AlertError::WarningThresholdOnRealtimeAlert
             | AlertError::WarningOnCoverageGate { .. }
             | AlertError::PromqlWarningWithoutCondition
+            | AlertError::InvalidTag(_)
             | AlertError::SqlMissingQuery
             | AlertError::SqlContainsSelectStar
             | AlertError::PromqlMissingQuery

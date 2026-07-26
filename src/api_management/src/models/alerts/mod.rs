@@ -145,6 +145,24 @@ pub struct Alert {
     #[serde(default)]
     #[schema(example = json!(["abcde12345"]))]
     pub workflows: Vec<String>,
+
+    /// Priority 1..=5 (P1 = most urgent), Feature 2 / PT-1.
+    ///
+    /// Mutable configuration; display + propagation only — it does not affect
+    /// when the alert fires. Omitted = unset.
+    ///
+    /// `value_type` is required because the enum serializes as an integer via
+    /// serde `try_from`/`into`; without it the OpenAPI schema would advertise a
+    /// string enum and lie about the payload.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<u8>, example = 3)]
+    pub priority: Option<config::meta::alerts::priority::AlertPriority>,
+
+    /// Selection tags (PT-6): `prod`, `service:checkout`. Normalized and
+    /// validated on save; omitted when empty.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[schema(example = json!(["prod", "service:checkout"]))]
+    pub tags: Vec<String>,
 }
 
 /// Configuration for when and how an alert should be triggered.
@@ -479,6 +497,8 @@ impl From<(meta_alerts::alert::Alert, Option<Trigger>)> for Alert {
             deduplication: alert.deduplication,
             creates_incident: alert.creates_incident,
             workflows: alert.workflows,
+            priority: alert.priority,
+            tags: alert.tags,
         }
     }
 }
@@ -665,6 +685,8 @@ impl From<Alert> for meta_alerts::alert::Alert {
         alert.deduplication = value.deduplication;
         alert.creates_incident = value.creates_incident;
         alert.workflows = value.workflows;
+        alert.priority = value.priority;
+        alert.tags = value.tags;
 
         alert
     }

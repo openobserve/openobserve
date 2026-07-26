@@ -755,6 +755,102 @@ pub async fn delete_alert_bulk(
     })
 }
 
+/// Query parameters for the tag facet endpoint (PT-8b).
+#[derive(Debug, serde::Deserialize, utoipa::IntoParams)]
+#[into_params(style = Form, parameter_in = Query)]
+#[serde(rename_all = "snake_case")]
+pub struct ListAlertTagsQuery {
+    /// Optional case-insensitive prefix filter for autocomplete.
+    pub prefix: Option<String>,
+    /// Maximum tags to return. Defaults to 100, capped at 1000.
+    pub limit: Option<usize>,
+    /// Restrict to one folder, matching the list endpoint's scope.
+    pub folder: Option<String>,
+}
+
+/// One tag and how many visible alerts carry it.
+#[derive(Debug, serde::Serialize, utoipa::ToSchema)]
+pub struct AlertTagCount {
+    pub tag: String,
+    pub count: u64,
+}
+
+/// ListAlertTags
+///
+/// Distinct alert tags for autocomplete and facets (PT-8b).
+///
+/// **Authorization is load-bearing, not incidental (D23):** tag values leak
+/// service, environment, team and customer names, so this returns only tags
+/// carried by alerts the caller may actually list. It reuses the list
+/// endpoint's permission path rather than scanning the org-wide cache.
+#[utoipa::path(
+    get,
+    path = "/{org_id}/alerts/tags",
+    context_path = "/api/v2",
+    tag = "Alerts",
+    operation_id = "ListAlertTags",
+    summary = "List distinct alert tags",
+    description = "Returns distinct tags across the alerts the caller can see, with occurrence counts, for autocomplete and filter facets.",
+    security(("Authorization" = [])),
+    params(("org_id" = String, Path, description = "Organization name"), ListAlertTagsQuery),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Vec<AlertTagCount>),
+        (status = 403, description = "Forbidden", content_type = "application/json"),
+    ),
+)]
+pub async fn list_alert_tags(
+    Path(org_id): Path<String>,
+    Query(query): Query<ListAlertTagsQuery>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    #[cfg(not(feature = "enterprise"))]
+    let user_id = None;
+    #[cfg(feature = "enterprise")]
+    let user_id = Some(user_email.user_id.as_str());
+
+    // Bounded (PT-8b): 1,000 alerts x 64 tags is 64,000 values, so "return
+    // everything" is not an option the response size can afford.
+    const DEFAULT_LIMIT: usize = 100;
+    const MAX_LIMIT: usize = 1000;
+    let limit = query.limit.unwrap_or(DEFAULT_LIMIT).clamp(1, MAX_LIMIT);
+
+    // Resolve the caller's VISIBLE alerts through the same permission path the
+    // list endpoint uses — this is what keeps the facet from leaking tags off
+    // alerts the caller cannot see.
+    let mut params = config::meta::alerts::alert::ListAlertsParams::new(&org_id);
+    if let Some(folder) = query.folder.clone() {
+        params = params.in_folder(&folder);
+    }
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let visible_ids: Vec<String> = match alert::list_v2(client, user_id, params).await {
+        Ok(list) => list
+            .into_iter()
+            .filter_map(|(_, a)| a.id.map(|id| id.to_string()))
+            .collect(),
+        Err(e) => return e.into(),
+    };
+
+    let mut counts = db::alerts::alert::tag_counts_for_alerts(&org_id, &visible_ids).await;
+
+    if let Some(prefix) = query.prefix.as_deref() {
+        let prefix = prefix.trim().to_lowercase();
+        if !prefix.is_empty() {
+            counts.retain(|(tag, _)| tag.starts_with(&prefix));
+        }
+    }
+
+    // Deterministic order: most-used first, then lexicographic so the tail is
+    // stable rather than hash-ordered.
+    counts.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+    counts.truncate(limit);
+
+    let body: Vec<AlertTagCount> = counts
+        .into_iter()
+        .map(|(tag, count)| AlertTagCount { tag, count })
+        .collect();
+    MetaHttpResponse::json(body)
+}
+
 /// ListAlerts
 #[utoipa::path(
     get,
@@ -800,10 +896,24 @@ pub async fn list_alerts(
     #[cfg(feature = "enterprise")]
     let page_size_and_idx = query.page_size.map(|s| (s, query.page_idx.unwrap_or(0)));
 
+    // Resolve the tag filter to an alert-ID set BEFORE building the query
+    // (PT-8): the tags column is JSON, and the filter must enter the SQL as an
+    // ID predicate so pagination and sorting stay correct rather than
+    // post-filtering an already-fetched page.
+    let requested_tags = query.requested_tags();
+
     #[cfg(not(feature = "enterprise"))]
-    let params = query.into(&org_id);
+    let mut params = query.into(&org_id);
     #[cfg(feature = "enterprise")]
     let mut params = query.into(&org_id);
+
+    if !requested_tags.is_empty() {
+        // `Some(empty)` is meaningful: no alert carries these tags, so the
+        // result must be empty. Leaving it `None` would match everything.
+        params = params.with_tag_alert_ids(
+            db::alerts::alert::resolve_alert_ids_by_tags(&org_id, &requested_tags).await,
+        );
+    }
 
     let alert_type = params.alert_type;
 
