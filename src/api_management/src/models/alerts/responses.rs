@@ -260,10 +260,18 @@ pub fn anomaly_config_to_list_item(v: &serde_json::Value) -> Option<ListAlertsRe
             .and_then(|e| e.as_str())
             .filter(|s| !s.is_empty())
             .map(String::from),
-        // Anomaly configs carry neither field (PT-3): they sort as
-        // unset and are excluded by any priority filter.
-        priority: None,
-        tags: vec![],
+        // Feature 2: anomaly configs now carry the same triage metadata as
+        // alerts, so they filter and sort alongside them instead of being
+        // excluded wholesale.
+        priority: v
+            .get("priority")
+            .and_then(|p| p.as_u64())
+            .and_then(|p| u8::try_from(p).ok())
+            .filter(|p| (1..=5).contains(p)),
+        tags: v
+            .get("tags")
+            .and_then(|t| serde_json::from_value::<Vec<String>>(t.clone()).ok())
+            .unwrap_or_default(),
     })
 }
 

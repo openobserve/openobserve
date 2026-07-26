@@ -60,6 +60,16 @@ pub struct CreateAnomalyConfigRequest {
     pub enabled: Option<bool>,
     pub folder_id: Option<String>,
     pub owner: Option<String>,
+    /// Triage priority P1..P5 (Feature 2, PT-1). Anomaly configs appear in the
+    /// same alert list as scheduled/realtime alerts, so they carry the same
+    /// metadata. Absent = unset.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<u8>, example = 3)]
+    pub priority: Option<config::meta::alerts::priority::AlertPriority>,
+    /// Selection tags (PT-6), normalized and validated on save exactly as for
+    /// alerts — one `normalize_tags` serves both.
+    #[serde(default)]
+    pub tags: Vec<String>,
 }
 
 #[derive(Debug, Default, Serialize, Deserialize, ToSchema)]
@@ -82,6 +92,16 @@ pub struct UpdateAnomalyConfigRequest {
     pub enabled: Option<bool>,
     pub folder_id: Option<String>,
     pub owner: Option<String>,
+    /// `None` leaves the stored priority untouched; `Some(None)` is not
+    /// expressible here, so clearing is done by sending `priority: null`,
+    /// which serde maps to `None` — matching how the other optional fields
+    /// on this struct behave.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<u8>, example = 3)]
+    pub priority: Option<config::meta::alerts::priority::AlertPriority>,
+    /// `None` leaves stored tags untouched; `Some(vec![])` clears them.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tags: Option<Vec<String>>,
 }
 
 /// Resolve a folder name (e.g. "default") to the PK stored in `folders.id`.
@@ -316,6 +336,12 @@ pub async fn create_config(
     // Validate request
     validate_config_request(&req)?;
 
+    // Feature 2 (PT-7): same normalization the alerts path uses, so a tag
+    // means the same thing on both and a filter matches across them. Errors
+    // name the offending tag.
+    let normalized_tags = config::meta::alerts::tags::normalize_tags(&req.tags)
+        .map_err(|e| anyhow::anyhow!("Invalid tag: {e}"))?;
+
     let db = ORM_CLIENT
         .get()
         .ok_or_else(|| anyhow::anyhow!("Database not initialized"))?;
@@ -386,6 +412,16 @@ pub async fn create_config(
         ),
         folder_id: folder_pk,
         owner: req.owner.clone(),
+        // Feature 2. Tags are NORMALIZED here, not merely validated, so the
+        // stored form matches what the alerts table stores and one filter
+        // compares like with like. NULL rather than 0/[] when unset, so an
+        // existing config's row is unchanged.
+        priority: req.priority.map(|p| p.to_i32()),
+        tags: if normalized_tags.is_empty() {
+            None
+        } else {
+            Some(serde_json::json!(normalized_tags))
+        },
         status: 0i32, // 0 = waiting
         retries: 0,
         last_updated: now_us,
@@ -609,6 +645,21 @@ pub async fn update_config(
     }
     if let Some(owner) = req.owner {
         active_model.owner = Set(Some(owner));
+    }
+    // Feature 2. `None` means "not supplied, leave as-is"; an explicit value
+    // replaces it. Tags go through the same normalization as the alerts path,
+    // so an edit cannot smuggle in a form the filter will never match.
+    if let Some(priority) = req.priority {
+        active_model.priority = Set(Some(priority.to_i32()));
+    }
+    if let Some(tags) = req.tags {
+        let normalized = config::meta::alerts::tags::normalize_tags(&tags)
+            .map_err(|e| anyhow::anyhow!("Invalid tag: {e}"))?;
+        active_model.tags = Set(if normalized.is_empty() {
+            None // an explicit empty list clears the tags
+        } else {
+            Some(serde_json::json!(normalized))
+        });
     }
 
     active_model.updated_at = Set(Utc::now().timestamp_micros());
@@ -895,6 +946,11 @@ pub async fn clone_config(
         alert_destinations: src.alert_destinations.clone(),
         folder_id: resolved_folder_id,
         owner: src.owner.clone(),
+        // Feature 2: a clone inherits the original's triage metadata —
+        // copying an alert that is P1/tagged and silently dropping both
+        // would hand back something that looks configured but is not.
+        priority: src.priority,
+        tags: src.tags.clone(),
         status: 0i32,
         retries: 0,
         last_updated: now_us,

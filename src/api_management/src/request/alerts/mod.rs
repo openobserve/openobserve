@@ -185,6 +185,10 @@ async fn create_anomaly_alert(
             .filter(|f| !f.is_empty())
             .or_else(|| Some(query_folder_id.to_string()).filter(|f| !f.is_empty())),
         owner,
+        // Feature 2: anomaly configs take the same triage metadata as
+        // alerts, threaded from the shared request body.
+        priority: req_body.alert.priority,
+        tags: req_body.alert.tags,
     };
 
     match openobserve_core::anomaly_detection::create_config(org_id, req).await {
@@ -583,6 +587,10 @@ async fn build_and_run_anomaly_update(
         enabled: fields.enabled,
         folder_id: fields.folder_id,
         owner,
+        priority: alert.priority,
+        // `Some(vec![])` clears; the shared body always supplies a Vec,
+        // so an edit that removes every tag does clear them.
+        tags: Some(alert.tags),
     };
 
     match openobserve_core::anomaly_detection::update_config(org_id, anomaly_id, req).await {
@@ -921,13 +929,14 @@ pub async fn list_alerts(
     }
 
     let alert_type = params.alert_type;
-    // Anomaly configs are merged in AFTER the SQL query, so they never pass
-    // through the priority/tag filters. They carry neither field, so any
-    // active Feature-2 filter must exclude them — otherwise `?priority=1`
-    // returns every anomaly config alongside the P1 alerts.
-    // (enterprise-only consumer below; OSS builds merge no anomaly configs)
+    // Anomaly configs are merged in AFTER the SQL query, so the priority/tag
+    // filters in the query never touch them — they must be applied in Rust to
+    // the merged rows instead (see below). Captured before `params` is moved.
+    // (enterprise-only consumers; OSS builds merge no anomaly configs)
     #[cfg_attr(not(feature = "enterprise"), allow(unused_variables))]
-    let feature2_filter_active = params.priority.is_some() || params.tag_alert_ids.is_some();
+    let priority_filter = params.priority.clone();
+    #[cfg_attr(not(feature = "enterprise"), allow(unused_variables))]
+    let tag_filter = requested_tags.clone();
 
     // In enterprise builds, pagination is applied after merging regular alerts with
     // anomaly detection configs, so we fetch all matching results from the DB here.
@@ -975,19 +984,35 @@ pub async fn list_alerts(
 
     // Fetch anomaly detection configs and merge when the filter includes them (enterprise only).
     #[cfg(feature = "enterprise")]
-    if !feature2_filter_active
-        && matches!(
-            alert_type,
-            AlertTypeFilter::All | AlertTypeFilter::AnomalyDetection
-        )
-        && let Ok(configs) = openobserve_core::anomaly_detection::list_configs(
-            &org_id,
-            folder_slug.as_deref(),
-            name_substring.as_deref(),
-        )
-        .await
+    if matches!(
+        alert_type,
+        AlertTypeFilter::All | AlertTypeFilter::AnomalyDetection
+    ) && let Ok(configs) = openobserve_core::anomaly_detection::list_configs(
+        &org_id,
+        folder_slug.as_deref(),
+        name_substring.as_deref(),
+    )
+    .await
     {
-        list.extend(configs.iter().filter_map(anomaly_config_to_list_item));
+        // Apply the Feature-2 filters here, because these rows bypassed the
+        // SQL WHERE clause entirely. Without this a priority or tag filter
+        // would return every anomaly config alongside the matching alerts.
+        list.extend(
+            configs
+                .iter()
+                .filter_map(anomaly_config_to_list_item)
+                .filter(|item| match &priority_filter {
+                    None => true,
+                    // An empty set means "asked for priorities, none valid" —
+                    // matches nothing, same as the SQL side.
+                    Some(wanted) => item
+                        .priority
+                        .is_some_and(|p| wanted.iter().any(|w| w.to_i32() as u8 == p)),
+                })
+                .filter(|item| {
+                    config::meta::alerts::tags::matches_all_tags(&item.tags, &tag_filter)
+                }),
+        );
     }
 
     // Apply pagination to the combined list (regular alerts + anomaly configs).
