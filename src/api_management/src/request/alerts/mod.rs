@@ -21,6 +21,7 @@ use axum::{
     http::StatusCode,
     response::Response,
 };
+use axum_extra::extract::Query as ExtraQuery;
 use config::meta::{
     alerts::alert::{Alert as MetaAlert, AlertTypeFilter},
     triggers::{Trigger, TriggerModule},
@@ -881,7 +882,11 @@ pub async fn list_alert_tags(
 )]
 pub async fn list_alerts(
     Path(org_id): Path<String>,
-    Query(query): Query<ListAlertsQuery>,
+    // `axum_extra`'s Query (serde_html_form) rather than axum's
+    // (serde_urlencoded): only the former deserializes REPEATED keys into a
+    // `Vec`, which PT-3 requires for `?priority=1&priority=2`. axum's Query
+    // errors with "invalid type: string, expected a sequence".
+    ExtraQuery(query): ExtraQuery<ListAlertsQuery>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
 ) -> Response {
     #[cfg(not(feature = "enterprise"))]
@@ -916,6 +921,13 @@ pub async fn list_alerts(
     }
 
     let alert_type = params.alert_type;
+    // Anomaly configs are merged in AFTER the SQL query, so they never pass
+    // through the priority/tag filters. They carry neither field, so any
+    // active Feature-2 filter must exclude them — otherwise `?priority=1`
+    // returns every anomaly config alongside the P1 alerts.
+    // (enterprise-only consumer below; OSS builds merge no anomaly configs)
+    #[cfg_attr(not(feature = "enterprise"), allow(unused_variables))]
+    let feature2_filter_active = params.priority.is_some() || params.tag_alert_ids.is_some();
 
     // In enterprise builds, pagination is applied after merging regular alerts with
     // anomaly detection configs, so we fetch all matching results from the DB here.
@@ -963,15 +975,17 @@ pub async fn list_alerts(
 
     // Fetch anomaly detection configs and merge when the filter includes them (enterprise only).
     #[cfg(feature = "enterprise")]
-    if matches!(
-        alert_type,
-        AlertTypeFilter::All | AlertTypeFilter::AnomalyDetection
-    ) && let Ok(configs) = openobserve_core::anomaly_detection::list_configs(
-        &org_id,
-        folder_slug.as_deref(),
-        name_substring.as_deref(),
-    )
-    .await
+    if !feature2_filter_active
+        && matches!(
+            alert_type,
+            AlertTypeFilter::All | AlertTypeFilter::AnomalyDetection
+        )
+        && let Ok(configs) = openobserve_core::anomaly_detection::list_configs(
+            &org_id,
+            folder_slug.as_deref(),
+            name_substring.as_deref(),
+        )
+        .await
     {
         list.extend(configs.iter().filter_map(anomaly_config_to_list_item));
     }

@@ -602,11 +602,18 @@ async fn list_models<C: ConnectionTrait>(
     // Apply the optional priority filter (PT-3). Multiple values OR together;
     // alerts with no priority are excluded, because "show me the P1s" must not
     // surface unprioritized alerts.
-    let query = if params.priority.is_empty() {
-        query
-    } else {
-        let ids: Vec<i32> = params.priority.iter().map(|p| p.to_i32()).collect();
-        query.filter(alerts::Column::Priority.is_in(ids))
+    let query = match &params.priority {
+        None => query,
+        // The caller filtered by priority but nothing valid survived parsing.
+        // This must match NOTHING: treating it as "no filter" would make
+        // `?priority=P9` return every alert.
+        Some(p) if p.is_empty() => {
+            query.filter(alerts::Column::Id.eq(TAG_FILTER_NO_MATCH_SENTINEL))
+        }
+        Some(p) => {
+            let ids: Vec<i32> = p.iter().map(|v| v.to_i32()).collect();
+            query.filter(alerts::Column::Priority.is_in(ids))
+        }
     };
 
     // Apply the optional tag filter (PT-8) as an ID predicate resolved by the
@@ -647,9 +654,12 @@ async fn list_models<C: ConnectionTrait>(
             } else {
                 query.order_by_asc(alerts::Column::Priority)
             };
+            // `id` last so the order is TOTAL: without it, alerts sharing a
+            // priority and name can repeat or vanish across pages.
             query
                 .order_by_asc(alerts::Column::Name)
                 .order_by_asc(folders::Column::Name)
+                .order_by_asc(alerts::Column::Id)
         }
         Some(MetaAlertSortField::Name) => {
             let query = if params.sort_desc {
@@ -657,7 +667,9 @@ async fn list_models<C: ConnectionTrait>(
             } else {
                 query.order_by_asc(alerts::Column::Name)
             };
-            query.order_by_asc(folders::Column::Name)
+            query
+                .order_by_asc(folders::Column::Name)
+                .order_by_asc(alerts::Column::Id)
         }
         // Historical default, unchanged.
         None => query

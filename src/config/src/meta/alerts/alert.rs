@@ -311,11 +311,16 @@ pub struct ListAlertsParams {
     pub alert_type: AlertTypeFilter,
 
     /// Optional priority filter (PT-3). Multiple values are OR-ed, so
-    /// `?priority=1&priority=2` returns P1 **or** P2. Empty = no filter.
+    /// `?priority=1&priority=2` returns P1 **or** P2.
     ///
-    /// Alerts with no priority are excluded whenever this is non-empty —
+    /// `None` = no filter. `Some(empty)` = the caller asked for priorities but
+    /// none were valid, which MUST match nothing — collapsing that back to
+    /// "no filter" would make `?priority=P9` return every alert, the same
+    /// match-all bug the tag filter guards against.
+    ///
+    /// Alerts with no priority are excluded whenever a filter is present:
     /// "show me the P1s" must not surface unprioritized alerts.
-    pub priority: Vec<AlertPriority>,
+    pub priority: Option<Vec<AlertPriority>>,
 
     /// Tag filter (PT-8), **already resolved to alert IDs** by the service
     /// layer, which owns the in-memory alert cache the infra layer cannot
@@ -356,16 +361,17 @@ impl ListAlertsParams {
             owner: None,
             page_size_and_idx: None,
             alert_type: AlertTypeFilter::All,
-            priority: vec![],
+            priority: None,
             tag_alert_ids: None,
             sort_by: None,
             sort_desc: false,
         }
     }
 
-    /// Filter by one or more priorities (OR). Empty = no filter.
+    /// Filter by one or more priorities (OR). An empty vec means "matched
+    /// nothing", NOT "no filter" — see the field docs.
     pub fn with_priorities(mut self, priorities: Vec<AlertPriority>) -> Self {
-        self.priority = priorities;
+        self.priority = Some(priorities);
         self
     }
 
@@ -834,7 +840,7 @@ mod tests {
     #[test]
     fn test_list_params_default_to_no_priority_tag_or_sort_filters() {
         let p = ListAlertsParams::new("org");
-        assert!(p.priority.is_empty());
+        assert_eq!(p.priority, None);
         assert_eq!(p.tag_alert_ids, None, "None = no tag filter at all");
         assert_eq!(p.sort_by, None, "None keeps the historical ordering");
         assert!(!p.sort_desc);
@@ -844,7 +850,20 @@ mod tests {
     fn test_priority_filter_accepts_multiple_values_for_or_semantics() {
         let p = ListAlertsParams::new("org")
             .with_priorities(vec![AlertPriority::P1, AlertPriority::P2]);
-        assert_eq!(p.priority, vec![AlertPriority::P1, AlertPriority::P2]);
+        assert_eq!(p.priority, Some(vec![AlertPriority::P1, AlertPriority::P2]));
+    }
+
+    /// Same distinction the tag filter needs: "no filter" and "a filter that
+    /// matched nothing" must not collapse together, or `?priority=P9` returns
+    /// every alert instead of none.
+    #[test]
+    fn test_empty_priority_set_is_distinct_from_no_priority_filter() {
+        let no_filter = ListAlertsParams::new("org");
+        assert_eq!(no_filter.priority, None);
+
+        let matched_nothing = ListAlertsParams::new("org").with_priorities(vec![]);
+        assert_eq!(matched_nothing.priority, Some(vec![]));
+        assert_ne!(no_filter.priority, matched_nothing.priority);
     }
 
     /// The distinction that prevents a match-all bug: "no tag filter" (`None`)

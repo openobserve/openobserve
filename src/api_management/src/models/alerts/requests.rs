@@ -236,11 +236,16 @@ pub struct ListAlertsQuery {
     /// or `anomaly_detection`.
     pub alert_type: Option<meta_alerts::AlertTypeFilter>,
 
-    /// Optional priority filter (PT-3). Comma-separated, OR semantics, and
-    /// each value may be given as `1` or `P1` — query strings are typed by
-    /// humans, so both forms parse. Unparseable values are ignored rather
-    /// than 400: a filter is a view, not a write.
-    pub priority: Option<String>,
+    /// Optional priority filter (PT-3), OR semantics.
+    ///
+    /// Accepts BOTH shapes, because both are natural to type and to generate:
+    ///   * repeated — `?priority=1&priority=2`
+    ///   * comma-separated — `?priority=1,2`
+    ///
+    /// Each value may be `1` or `P1`. Declared as a `Vec` so repeated keys
+    /// deserialize; absent leaves it empty, which means *no filter*.
+    #[serde(default)]
+    pub priority: Vec<String>,
 
     /// Optional tag filter (PT-8). Comma-separated, **AND** semantics — an
     /// alert must carry every listed tag.
@@ -292,7 +297,7 @@ impl ListAlertsQuery {
                 .page_size
                 .map(|page_size| (page_size, self.page_idx.unwrap_or(0))),
             alert_type: self.alert_type.unwrap_or_default(),
-            priority: parse_priority_filter(self.priority.as_deref()),
+            priority: parse_priority_filter(&self.priority),
             // Resolved by the service layer, which owns the alert cache the
             // infra layer cannot reach (PT-8).
             tag_alert_ids: None,
@@ -322,15 +327,28 @@ impl ListAlertsQuery {
     }
 }
 
-/// Parse a comma-separated priority filter, accepting `1` and `P1` alike.
+/// Parse a priority filter, accepting repeated keys and comma-separated
+/// values, `1` and `P1` alike.
 ///
-/// Unparseable entries are skipped: a bad filter value should narrow nothing
-/// rather than fail the page.
-fn parse_priority_filter(raw: Option<&str>) -> Vec<config::meta::alerts::priority::AlertPriority> {
-    let Some(raw) = raw else { return vec![] };
-    raw.split(',')
-        .filter_map(|token| token.trim().parse().ok())
-        .collect()
+/// Returns `None` only when NOTHING was requested. When the caller did ask for
+/// priorities but none parsed, this returns `Some(empty)` — which the query
+/// layer treats as "match nothing". Returning `None` there would turn
+/// `?priority=P9` into an unfiltered list and hand back every alert, the
+/// match-all bug the tag filter already guards against.
+fn parse_priority_filter(
+    raw: &[String],
+) -> Option<Vec<config::meta::alerts::priority::AlertPriority>> {
+    // Split each entry on commas so both shapes collapse to one token list.
+    let tokens: Vec<&str> = raw
+        .iter()
+        .flat_map(|v| v.split(','))
+        .map(|t| t.trim())
+        .filter(|t| !t.is_empty())
+        .collect();
+    if tokens.is_empty() {
+        return None; // genuinely no filter
+    }
+    Some(tokens.iter().filter_map(|t| t.parse().ok()).collect())
 }
 
 #[derive(Deserialize, ToSchema)]
@@ -511,7 +529,7 @@ mod tests {
             page_size: Some(20),
             page_idx: Some(1),
             alert_type: None,
-            priority: None,
+            priority: vec![],
             tags: None,
             sort_by: None,
             sort_order: None,
@@ -536,7 +554,7 @@ mod tests {
             page_size: None,
             page_idx: None,
             alert_type: None,
-            priority: None,
+            priority: vec![],
             tags: None,
             sort_by: None,
             sort_order: None,
@@ -559,7 +577,7 @@ mod tests {
             page_size: Some(5),
             page_idx: None,
             alert_type: None,
-            priority: None,
+            priority: vec![],
             tags: None,
             sort_by: None,
             sort_order: None,
@@ -596,6 +614,9 @@ mod priority_tag_query_tests {
         sort_by: Option<&str>,
         order: Option<&str>,
     ) -> ListAlertsQuery {
+        // `priority` is a Vec so repeated query keys deserialize; a single
+        // comma-separated string is still one entry.
+        let priority = priority.map(|p| vec![p.to_string()]).unwrap_or_default();
         ListAlertsQuery {
             folder: None,
             alert_name_substring: None,
@@ -606,7 +627,7 @@ mod priority_tag_query_tests {
             page_size: None,
             page_idx: None,
             alert_type: None,
-            priority: priority.map(|s| s.to_string()),
+            priority,
             tags: tags.map(|s| s.to_string()),
             sort_by: sort_by.map(|s| s.to_string()),
             sort_order: order.map(|s| s.to_string()),
@@ -619,7 +640,11 @@ mod priority_tag_query_tests {
         let p = q(Some("1,P2, p3"), None, None, None).into("org");
         assert_eq!(
             p.priority,
-            vec![AlertPriority::P1, AlertPriority::P2, AlertPriority::P3]
+            Some(vec![
+                AlertPriority::P1,
+                AlertPriority::P2,
+                AlertPriority::P3
+            ])
         );
     }
 
@@ -628,12 +653,39 @@ mod priority_tag_query_tests {
     #[test]
     fn test_unparseable_priority_values_are_skipped_not_fatal() {
         let p = q(Some("banana,2,P9"), None, None, None).into("org");
-        assert_eq!(p.priority, vec![AlertPriority::P2]);
+        assert_eq!(p.priority, Some(vec![AlertPriority::P2]));
     }
 
     #[test]
     fn test_absent_priority_means_no_filter() {
-        assert!(q(None, None, None, None).into("org").priority.is_empty());
+        // None, NOT Some(empty): nothing was requested, so nothing is filtered.
+        assert_eq!(q(None, None, None, None).into("org").priority, None);
+    }
+
+    /// REGRESSION GUARD: an all-invalid priority filter must narrow to NOTHING.
+    ///
+    /// If parsing returned `None` here, the query layer would read it as "no
+    /// filter" and `?priority=P9` would hand back every alert — the same
+    /// match-all bug the tag filter guards against.
+    #[test]
+    fn test_all_invalid_priority_filter_matches_nothing_not_everything() {
+        let p = q(Some("P9,banana"), None, None, None).into("org");
+        assert_eq!(
+            p.priority,
+            Some(vec![]),
+            "must be an empty filter set, never None"
+        );
+    }
+
+    /// PT-3 requires the repeated form as well as the comma-separated one.
+    #[test]
+    fn test_repeated_priority_keys_are_supported() {
+        let mut query = q(None, None, None, None);
+        query.priority = vec!["1".to_string(), "P2".to_string()];
+        assert_eq!(
+            query.into("org").priority,
+            Some(vec![AlertPriority::P1, AlertPriority::P2])
+        );
     }
 
     #[test]
