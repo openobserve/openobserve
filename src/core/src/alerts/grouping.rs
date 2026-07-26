@@ -551,6 +551,7 @@ mod tests {
             vec![],
             3600,
             2,
+            None,
         );
         assert!(!ready1); // new batch, 1 alert, not full
 
@@ -561,6 +562,7 @@ mod tests {
             vec![],
             3600,
             2,
+            None,
         );
         assert!(ready2); // 2nd alert fills batch, ready=true
 
@@ -596,8 +598,24 @@ mod tests {
         PENDING_BATCHES.remove(&fp1);
         PENDING_BATCHES.remove(&fp2);
 
-        add_to_batch(fp1.clone(), org.to_string(), make_alert(), vec![], 3600, 10);
-        add_to_batch(fp2.clone(), org.to_string(), make_alert(), vec![], 3600, 10);
+        add_to_batch(
+            fp1.clone(),
+            org.to_string(),
+            make_alert(),
+            vec![],
+            3600,
+            10,
+            None,
+        );
+        add_to_batch(
+            fp2.clone(),
+            org.to_string(),
+            make_alert(),
+            vec![],
+            3600,
+            10,
+            None,
+        );
 
         let count = get_pending_batch_count(org);
         assert!(count >= 2);

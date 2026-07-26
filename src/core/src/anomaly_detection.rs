@@ -72,6 +72,22 @@ pub struct CreateAnomalyConfigRequest {
     pub tags: Vec<String>,
 }
 
+/// Deserializer that keeps "absent" and "explicit null" apart for a
+/// `Option<Option<T>>` field.
+///
+/// Serde's default collapses both to `None`: a plain `Option<Option<T>>`
+/// deserializes `null` to the OUTER `None`, so "clear this value" becomes
+/// indistinguishable from "field not supplied". That silently made priority
+/// unclearable through the direct anomaly endpoint; this restores the
+/// distinction (`null` -> `Some(None)`).
+fn double_option<'de, T, D>(deserializer: D) -> Result<Option<Option<T>>, D::Error>
+where
+    T: serde::Deserialize<'de>,
+    D: serde::Deserializer<'de>,
+{
+    serde::Deserialize::deserialize(deserializer).map(Some)
+}
+
 #[derive(Debug, Default, Serialize, Deserialize, ToSchema)]
 pub struct UpdateAnomalyConfigRequest {
     pub name: Option<String>,
@@ -101,7 +117,11 @@ pub struct UpdateAnomalyConfigRequest {
     /// A plain `Option` cannot express "clear", which made priority the only
     /// field on an anomaly config that could be set but never unset — and
     /// inconsistent with alerts, where clearing works.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        deserialize_with = "double_option",
+        skip_serializing_if = "Option::is_none"
+    )]
     #[schema(value_type = Option<u8>, example = 3)]
     pub priority: Option<Option<config::meta::alerts::priority::AlertPriority>>,
     /// `None` leaves stored tags untouched; `Some(vec![])` clears them.
@@ -1916,6 +1936,84 @@ pub async fn send_anomaly_alert(
 
 #[cfg(test)]
 mod tests {
+    // ── Feature 2: priority & tags on anomaly configs ───────────────────────
+
+    /// Tags round-trip through the create request, and an absent `tags` key
+    /// yields an empty list rather than failing — every pre-Feature-2 client
+    /// omits it.
+    #[test]
+    fn test_create_request_tags_default_to_empty() {
+        let without: CreateAnomalyConfigRequest = serde_json::from_str(
+            r#"{"name":"a","stream_name":"s","stream_type":"logs","query_mode":"filters",
+                "detection_function":"count","histogram_interval":"5m",
+                "schedule_interval":"15m","detection_window_seconds":3600}"#,
+        )
+        .unwrap();
+        assert!(without.tags.is_empty());
+        assert_eq!(without.priority, None);
+    }
+
+    /// The create path must store the NORMALIZED form, so a tag means the same
+    /// thing on an anomaly config as on an alert and one filter matches both.
+    #[test]
+    fn test_anomaly_tags_normalize_exactly_like_alert_tags() {
+        let raw = vec![
+            "  PROD  ".to_string(),
+            "Service:Checkout".to_string(),
+            "prod".to_string(),
+            "".to_string(),
+        ];
+        let normalized = config::meta::alerts::tags::normalize_tags(&raw).unwrap();
+        assert_eq!(normalized, vec!["prod", "service:checkout"]);
+    }
+
+    /// Invalid tags are rejected on anomaly configs too, naming the offender —
+    /// the same contract the alerts path has.
+    #[test]
+    fn test_anomaly_invalid_tag_is_rejected_and_named() {
+        let err = config::meta::alerts::tags::normalize_tags(&["1bad".to_string()]).unwrap_err();
+        assert!(err.to_string().contains("1bad"), "got: {err}");
+    }
+
+    /// Priority ids must be the SAME as the alerts table's, since one column
+    /// mapping and one enum serve both. If these ever diverge, a P2 anomaly
+    /// and a P2 alert would store different integers.
+    #[test]
+    fn test_anomaly_priority_ids_match_the_alert_scale() {
+        use config::meta::alerts::priority::AlertPriority;
+        for (p, id) in [
+            (AlertPriority::P1, 1),
+            (AlertPriority::P2, 2),
+            (AlertPriority::P3, 3),
+            (AlertPriority::P4, 4),
+            (AlertPriority::P5, 5),
+        ] {
+            assert_eq!(p.to_i32(), id);
+        }
+    }
+
+    /// PROBE: does serde distinguish "absent" from "explicit null" for the
+    /// double option? Written first because the answer decides whether the
+    /// clear-via-null path works, or whether only the Rust-constructed
+    /// `Some(None)` from the v2 handler does.
+    #[test]
+    fn test_update_request_priority_absent_vs_null() {
+        let absent: UpdateAnomalyConfigRequest = serde_json::from_str("{}").unwrap();
+        let null: UpdateAnomalyConfigRequest =
+            serde_json::from_str(r#"{"priority": null}"#).unwrap();
+        let set: UpdateAnomalyConfigRequest = serde_json::from_str(r#"{"priority": 3}"#).unwrap();
+        assert_eq!(absent.priority, None, "absent must leave the value alone");
+        assert_eq!(
+            null.priority,
+            Some(None),
+            "explicit null must mean CLEAR, distinct from absent"
+        );
+        assert_eq!(
+            set.priority,
+            Some(Some(config::meta::alerts::priority::AlertPriority::P3))
+        );
+    }
+
     use super::*;
     // ── combine_detection_fn ────────────────────────────────────────────────
 
@@ -2001,6 +2099,8 @@ mod tests {
             enabled: None,
             folder_id: None,
             owner: None,
+            priority: None,
+            tags: vec![],
         }
     }
 

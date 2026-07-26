@@ -535,3 +535,78 @@ pub struct GenerateSqlMetadata {
     /// Whether GROUP BY is present
     pub has_group_by: bool,
 }
+#[cfg(test)]
+mod anomaly_priority_tag_tests {
+    use super::*;
+
+    fn cfg(extra: serde_json::Value) -> serde_json::Value {
+        let mut base = serde_json::json!({
+            "anomaly_id": <Ksuid as svix_ksuid::KsuidLike>::new(None, None).to_string(),
+            "name": "anom",
+            "folder_id": "default",
+            "stream_name": "s",
+            "stream_type": "logs",
+            "enabled": true,
+        });
+        if let (Some(b), Some(e)) = (base.as_object_mut(), extra.as_object()) {
+            for (k, v) in e {
+                b.insert(k.clone(), v.clone());
+            }
+        }
+        base
+    }
+
+    /// Feature 2: anomaly configs surface priority/tags on the list, so they
+    /// render and filter alongside alerts instead of always showing "—".
+    #[test]
+    fn test_anomaly_list_item_carries_priority_and_tags() {
+        let item = anomaly_config_to_list_item(&cfg(serde_json::json!({
+            "priority": 2,
+            "tags": ["prod", "service:checkout"],
+        })))
+        .expect("should map");
+        assert_eq!(item.priority, Some(2));
+        assert_eq!(item.tags, vec!["prod", "service:checkout"]);
+    }
+
+    /// Pre-Feature-2 configs have neither key; they must map to unset rather
+    /// than failing the whole list.
+    #[test]
+    fn test_anomaly_list_item_without_the_fields_is_unset() {
+        let item = anomaly_config_to_list_item(&cfg(serde_json::json!({}))).expect("should map");
+        assert_eq!(item.priority, None);
+        assert!(item.tags.is_empty());
+    }
+
+    /// A corrupt row must degrade to unset, never take the alert list down:
+    /// an out-of-range id is not a valid priority, and a non-array tags blob
+    /// is not a tag list.
+    #[test]
+    fn test_anomaly_list_item_degrades_on_corrupt_values() {
+        for bad in [
+            serde_json::json!(0),
+            serde_json::json!(6),
+            serde_json::json!(99),
+        ] {
+            let item =
+                anomaly_config_to_list_item(&cfg(serde_json::json!({ "priority": bad }))).unwrap();
+            assert_eq!(item.priority, None, "id {bad} must not decode");
+        }
+        let item = anomaly_config_to_list_item(&cfg(serde_json::json!({
+            "tags": {"not": "an array"}
+        })))
+        .unwrap();
+        assert!(item.tags.is_empty());
+    }
+
+    /// The list response omits both when unset, so a pre-Feature-2 anomaly
+    /// config serializes exactly as it did before.
+    #[test]
+    fn test_unset_fields_are_omitted_from_the_response() {
+        let item = anomaly_config_to_list_item(&cfg(serde_json::json!({}))).unwrap();
+        let json = serde_json::to_value(&item).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(!obj.contains_key("priority"));
+        assert!(!obj.contains_key("tags"));
+    }
+}
