@@ -37,15 +37,16 @@
                     <template v-if="!label.label">
                       <span class="text-text-secondary">{{ computedLabel(label) }}</span>
                     </template>
+                    <!-- PromQL editor colours: maroon labels, string/number values -->
                     <template v-else>
-                      <span class="text-text-body">{{ label.label }}</span>
+                      <span class="text-promql-label">{{ label.label }}</span>
                       <template v-if="label.value">
                         <span class="text-text-secondary px-1">{{ label.op }}</span>
                         <span
                           :class="
                             /^-?[\d.]+$/.test(String(label.value).trim())
-                              ? 'text-badge-success-ol-text'
-                              : 'text-badge-error-ol-text'
+                              ? 'text-promql-number'
+                              : 'text-promql-string'
                           "
                           >{{ label.value }}</span
                         >

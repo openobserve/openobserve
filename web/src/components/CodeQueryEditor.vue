@@ -19,6 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       data-test="query-editor"
       class="logs-query-editor bg-card-glass-bg min-h-0 flex-1"
+      :class="{ 'promql-mode': language === 'promql' }"
       ref="editorRef"
       :id="editorId"
     />
@@ -539,10 +540,8 @@ export default defineComponent({
       if (props.language === "promql") {
         monaco.languages.register({ id: "promql" });
 
-        // Official monaco-promql grammar (with small app overlays) — without a
-        // tokenizer the query renders in a single colour (regressed repeatedly:
-        // #9779, #9793). Its language configuration declares the bracket pairs,
-        // which turns on the same rainbow bracket-pair colorization SQL gets.
+        // Official monaco-promql grammar, verbatim — without a tokenizer the
+        // query renders monochrome (#9779, #9793).
         const promql = await loadPromqlLanguage();
         monaco.languages.setMonarchTokensProvider("promql", promql.language as any);
         monaco.languages.setLanguageConfiguration("promql", promql.languageConfiguration as any);
@@ -559,13 +558,7 @@ export default defineComponent({
         inherit: true, // can also be false to completely replace the builtin rules
         rules: [
           { token: "comment", background: "FFFFFF" },
-          // Mirror monaco's built-in *.sql colours so PromQL matches the SQL
-          // editor (and the builder chips). monaco-promql token names: "type"
-          // = keywords/functions, "tag" = label names, "delimiter" = operators.
-          { token: "type.promql", foreground: "C700C7" },
-          { token: "tag.promql", foreground: "000000" },
-          { token: "string.promql", foreground: "FF0000" },
-          { token: "delimiter.promql", foreground: "778899" },
+          // PromQL: no rules on purpose — built-in "vs" colours via inherit.
         ],
         colors: {
           "editor.foreground": "#000000",
@@ -584,12 +577,7 @@ export default defineComponent({
           { token: "string", foreground: "CE9178" },
           { token: "string.sql", foreground: "CE9178" },
           { token: "string.vrl", foreground: "CE9178" },
-          // Mirror the SQL editor's colours for PromQL (strings inherit the
-          // CE9178 rule above). monaco-promql token names: "type" = keywords/
-          // functions, "tag" = label names, "delimiter" = operators.
-          { token: "type.promql", foreground: "FF00FF" },
-          { token: "tag.promql", foreground: "D4D4D4" },
-          { token: "delimiter.promql", foreground: "778899" },
+          // PromQL: no rules on purpose — built-in "vs-dark" colours via inherit.
         ],
         colors: {},
       });
@@ -1230,5 +1218,17 @@ export default defineComponent({
   background-color: color-mix(in srgb, var(--color-status-negative) 10%, transparent);
   text-decoration: underline;
   text-decoration-color: var(--color-status-negative);
+}
+
+/* PromQL brackets render plain (like Prometheus). The rainbow colours are
+   theme-global and the disable option doesn't strip these classes — repaint. */
+.logs-query-editor.promql-mode :deep(.bracket-highlighting-0),
+.logs-query-editor.promql-mode :deep(.bracket-highlighting-1),
+.logs-query-editor.promql-mode :deep(.bracket-highlighting-2),
+.logs-query-editor.promql-mode :deep(.bracket-highlighting-3),
+.logs-query-editor.promql-mode :deep(.bracket-highlighting-4),
+.logs-query-editor.promql-mode :deep(.bracket-highlighting-5),
+.logs-query-editor.promql-mode :deep(.bracket-highlighting-6) {
+  color: var(--vscode-editor-foreground) !important;
 }
 </style>

@@ -155,4 +155,33 @@ describe("AxisFieldChipLabel", () => {
     wrapper = mountLabel({ label: "count(a.b)" });
     expect(wrapper.find(CHIP).attributes("class")).toContain("font-normal");
   });
+
+  describe("PromQL-editor mode (bracketClass / leadingFn overrides)", () => {
+    it("should flatten every bracket to bracketClass when provided", () => {
+      wrapper = mountLabel({
+        label: "count(count(distinct(anomaly_id)))",
+        bracketClass: "text-text-body",
+      });
+      const brackets = leafSpans(wrapper).filter((s) => s.text === "(" || s.text === ")");
+      expect(brackets).toHaveLength(6);
+      brackets.forEach((b) => expect(b.class).toContain("text-text-body"));
+      expect(brackets.some((b) => /text-bracket-[123]/.test(b.class))).toBe(false);
+    });
+
+    it("should colour a bare leading word as a function when leadingFn is set", () => {
+      wrapper = mountLabel({
+        label: "Sum",
+        leadingFn: true,
+        fnClass: "text-promql-function",
+      });
+      const fn = leafSpans(wrapper).find((s) => s.text === "Sum");
+      expect(fn?.class).toContain("text-promql-function");
+    });
+
+    it("should not colour a bare word as a function without leadingFn", () => {
+      wrapper = mountLabel({ label: "Sum" });
+      const word = leafSpans(wrapper).find((s) => s.text === "Sum");
+      expect(word?.class).toContain("text-text-body");
+    });
+  });
 });

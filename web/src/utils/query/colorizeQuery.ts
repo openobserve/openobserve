@@ -7,8 +7,7 @@ let languagesRegistered = false;
 const registerLanguages = async () => {
   if (languagesRegistered) return;
 
-  // Register PromQL (Monaco has no built-in PromQL — official monaco-promql
-  // grammar with small app overlays)
+  // Monaco has no built-in PromQL — register the official grammar.
   languages.register({ id: "promql" });
   const promql = await loadPromqlLanguage();
   languages.setMonarchTokensProvider("promql", promql.language as any);

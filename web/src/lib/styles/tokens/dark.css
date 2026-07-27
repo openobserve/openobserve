@@ -288,6 +288,12 @@
   /* magenta: match the query editor's dark function colour */
   --color-badge-magenta-ol-text: #ff00ff;
 
+  /* PromQL syntax: Monaco built-in "vs-dark" values */
+  --color-promql-function: #3dc9b0;
+  --color-promql-label: #569cd6;
+  --color-promql-string: #ce9178;
+  --color-promql-number: #b5cea8;
+
   /* teal: brighten solid bg and outline for dark mode */
   --color-badge-teal-solid-bg: var(--color-teal-400);
   --color-badge-teal-ol-text: var(--color-teal-300);

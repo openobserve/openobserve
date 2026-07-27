@@ -30,7 +30,8 @@ vi.mock("monaco-editor/esm/vs/editor/editor.api", () => ({
 // Mock SQL contribution
 vi.mock("monaco-editor/esm/vs/basic-languages/sql/sql.contribution.js", () => ({}));
 
-// Mock PromQL language loader (wraps monaco-promql, which imports monaco-editor)
+// Mock the PromQL grammar loader (it dynamically imports monaco-promql, which
+// imports monaco-editor directly and is unresolvable in the test environment).
 vi.mock("@/utils/query/promqlLanguageDefinition", () => ({
   loadPromqlLanguage: vi.fn().mockResolvedValue({
     language: { tokenizer: { root: [] } },

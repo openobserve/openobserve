@@ -383,6 +383,12 @@
      (e.g. count) so query-builder chips read like the query below them. */
   --color-badge-magenta-ol-text: #c700c7;
 
+  /* PromQL syntax — Monaco built-in "vs" values, so builder chips match the editor */
+  --color-promql-function: #008080;
+  --color-promql-label: #800000;
+  --color-promql-string: #a31515;
+  --color-promql-number: #098658;
+
   /* Badge — teal */
   --color-badge-teal-solid-bg: var(--color-teal-600);
   --color-badge-teal-solid-text: var(--color-white);
@@ -1303,6 +1309,12 @@
 
   /* Badge — magenta (query-editor function colour) */
   --color-badge-magenta-ol-text: var(--color-badge-magenta-ol-text);
+
+  /* PromQL syntax */
+  --color-promql-function: var(--color-promql-function);
+  --color-promql-label: var(--color-promql-label);
+  --color-promql-string: var(--color-promql-string);
+  --color-promql-number: var(--color-promql-number);
 
   /* Badge — teal */
   --color-badge-teal-solid-bg: var(--color-badge-teal-solid-bg);

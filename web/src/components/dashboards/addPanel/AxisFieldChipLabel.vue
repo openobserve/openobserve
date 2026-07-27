@@ -42,6 +42,10 @@ const props = withDefaults(
     columnClass?: string;
     /** Token utility for the de-emphasized stream prefix and separators */
     mutedClass?: string;
+    /** All parentheses; unset = rainbow by nesting depth (SQL style) */
+    bracketClass?: string;
+    /** Colour the leading word as a function even without "(" (PromQL op chips) */
+    leadingFn?: boolean;
   }>(),
   // Colours mirror the SQL query editor's syntax highlighting: function names in
   // magenta, the column references in plain body text like an identifier.
@@ -49,6 +53,8 @@ const props = withDefaults(
     fnClass: "text-badge-magenta-ol-text",
     columnClass: "text-text-body",
     mutedClass: "text-text-body",
+    bracketClass: undefined,
+    leadingFn: false,
   },
 );
 
@@ -96,13 +102,17 @@ const segments = computed<Segment[]>(() => {
 
   const out: Segment[] = [];
   let depth = 0;
+  let firstWordSeen = false;
   for (let i = 0; i < tokens.length; i++) {
     const t = tokens[i];
     if (t.kind === "word") {
-      // A word is a function iff the next non-whitespace token is "(".
+      // A word is a function iff the next non-whitespace token is "(" — or it
+      // is the leading word and the caller marked those as functions.
       let j = i + 1;
       while (j < tokens.length && tokens[j].kind === "space") j++;
-      const isFn = j < tokens.length && tokens[j].raw === "(" && !t.raw.includes(".");
+      const followedByParen = j < tokens.length && tokens[j].raw === "(" && !t.raw.includes(".");
+      const isFn = followedByParen || (props.leadingFn && !firstWordSeen && !t.raw.includes("."));
+      firstWordSeen = true;
       if (isFn) {
         out.push({ text: t.raw, cls: props.fnClass });
       } else {
@@ -111,13 +121,14 @@ const segments = computed<Segment[]>(() => {
         if (field) out.push({ text: field, cls: props.columnClass });
       }
     } else if (t.kind === "paren") {
-      // Colour by depth; close ascends first so it matches its opener.
+      // Flat colour when the caller overrides; otherwise colour by depth
+      // (close ascends first so it matches its opener).
       if (t.raw === "(") {
-        out.push({ text: t.raw, cls: BRACKET_CLASSES[depth % 3] });
+        out.push({ text: t.raw, cls: props.bracketClass ?? BRACKET_CLASSES[depth % 3] });
         depth++;
       } else {
         depth = Math.max(0, depth - 1);
-        out.push({ text: t.raw, cls: BRACKET_CLASSES[depth % 3] });
+        out.push({ text: t.raw, cls: props.bracketClass ?? BRACKET_CLASSES[depth % 3] });
       }
     } else {
       // comma / whitespace / other — neutral separators

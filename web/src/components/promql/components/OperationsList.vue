@@ -48,7 +48,13 @@
                     :no-wrap="true"
                     :data-test="`promql-operation-${index}`"
                   >
-                    <AxisFieldChipLabel :label="computedLabel(element)" />
+                    <!-- PromQL editor colours: teal functions, plain brackets -->
+                    <AxisFieldChipLabel
+                      :label="computedLabel(element)"
+                      fn-class="text-promql-function"
+                      bracket-class="text-text-body"
+                      leading-fn
+                    />
                     <template #icon-right><OIcon name="arrow-drop-down" size="sm" /></template>
                   </OButton>
                 </template>
