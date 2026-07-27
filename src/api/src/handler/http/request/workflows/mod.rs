@@ -322,7 +322,7 @@ pub async fn update_workflows(
     Path((org_id, id)): Path<(String, String)>,
     Json(payload): Json<WorkflowCreatePayload>,
 ) -> Response {
-    let mut workflow= payload.workflow;
+    let mut workflow = payload.workflow;
     workflow.name = workflow.name.trim().to_lowercase();
     workflow.org_id = org_id.clone();
 

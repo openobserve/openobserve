@@ -46,17 +46,18 @@ use config::{
 };
 use cron::Schedule;
 #[cfg(feature = "enterprise")]
-use db::workflows::WorkflowTriggerType;
+use db::workflows::{AssociationDeleteEvent, WorkflowTriggerType};
 use db::{
     self,
     authz::{remove_ownership, set_ownership},
     folders,
-    workflows::AssociationDeleteEvent,
 };
+#[cfg(feature = "enterprise")]
+use infra::table::workflows::WorkflowTriggerEntity;
 use infra::{
     db::{ORM_CLIENT, connect_to_orm},
     schema::unwrap_stream_settings,
-    table::{self, workflows::WorkflowTriggerEntity},
+    table,
 };
 use itertools::Itertools;
 use lettre::{AsyncTransport, Message, message::MultiPart};
@@ -632,6 +633,7 @@ pub async fn update<C: ConnectionTrait + TransactionTrait>(
 
     prepare_alert(org_id, &stream_name, &alert_name, &mut alert, false, false).await?;
 
+    #[cfg(feature = "enterprise")]
     if let Some(ref id) = alert.id {
         let (_, old_alert) = get_by_id(conn, org_id, id.to_owned()).await?;
         let old_workflows = old_alert.workflows;

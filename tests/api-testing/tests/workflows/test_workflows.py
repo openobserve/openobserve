@@ -48,33 +48,36 @@ def _suffix():
 def _workflow_payload(name, dest_name, description="automation workflow"):
     """Minimal valid workflow graph: Alert Trigger -> Destination (bound to a pipeline dest)."""
     return {
-        "id": "",
-        "org_id": "",
-        "created_at": 0,
-        "updated_at": 0,
-        "created_by": "",
-        "name": name,
-        "description": description,
-        "enabled": True,
-        "nodes": [
-            {
-                "id": "trigger-1",
-                "data": {"node_type": "workflow_trigger"},
-                "position": {"x": 100, "y": 100},
-                "io_type": "input",
-            },
-            {
-                "id": "dest-1",
-                "data": {
-                    "node_type": "destination",
-                    "destination_id": dest_name,
-                    "template_override": None,
+        "workflow":{
+            "id": "",
+            "org_id": "",
+            "created_at": 0,
+            "updated_at": 0,
+            "created_by": "",
+            "name": name,
+            "description": description,
+            "enabled": True,
+            "nodes": [
+                {
+                    "id": "trigger-1",
+                    "data": {"node_type": "workflow_trigger"},
+                    "position": {"x": 100, "y": 100},
+                    "io_type": "input",
                 },
-                "position": {"x": 400, "y": 100},
-                "io_type": "output",
-            },
-        ],
-        "edges": [{"id": "etrigger-1-dest-1", "source": "trigger-1", "target": "dest-1"}],
+                {
+                    "id": "dest-1",
+                    "data": {
+                        "node_type": "destination",
+                        "destination_id": dest_name,
+                        "template_override": None,
+                    },
+                    "position": {"x": 400, "y": 100},
+                    "io_type": "output",
+                },
+            ],
+            "edges": [{"id": "etrigger-1-dest-1", "source": "trigger-1", "target": "dest-1"}],
+        },
+        "trigger_type":"AlertFired"
     }
 
 

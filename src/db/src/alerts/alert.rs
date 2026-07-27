@@ -27,17 +27,18 @@ use config::{
     },
     utils::time::now_micros,
 };
+#[cfg(feature = "enterprise")]
+use infra::table::workflows::WorkflowTriggerEntity;
 use infra::{
     db::{ORM_CLIENT, connect_to_orm},
-    table::{alerts as table, workflows::WorkflowTriggerEntity},
+    table::alerts as table,
 };
 use sea_orm::{ConnectionTrait, TransactionTrait};
 use svix_ksuid::Ksuid;
 
-use crate::{
-    self as db,
-    workflows::{AssociationDeleteEvent, WorkflowTriggerType},
-};
+#[cfg(feature = "enterprise")]
+use crate::workflows::{AssociationDeleteEvent, WorkflowTriggerType};
+use crate::{self as db};
 
 /// Gets the alert and its parent folder.
 pub async fn get_by_id<C: ConnectionTrait>(
@@ -210,6 +211,7 @@ pub async fn create<C: TransactionTrait>(
         e
     });
 
+    #[cfg(feature = "enterprise")]
     if let Some(ref id) = alert.id {
         let alert_id = id.to_string();
         for w in &alert.workflows {
@@ -294,6 +296,7 @@ pub async fn delete_by_id<C: ConnectionTrait>(
     };
     let alert_id_str = alert_id.to_string();
 
+    #[cfg(feature = "enterprise")]
     db::workflows::delete_workflow_association(AssociationDeleteEvent::Entity {
         org_id: org_id.to_string(),
         entity_id: alert_id_str.clone(),
@@ -337,6 +340,7 @@ pub async fn delete_by_name(
     };
     let alert_id_str = alert_id.to_string();
 
+    #[cfg(feature = "enterprise")]
     db::workflows::delete_workflow_association(AssociationDeleteEvent::Entity {
         org_id: org_id.to_string(),
         entity_id: alert_id_str.clone(),
