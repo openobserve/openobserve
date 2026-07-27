@@ -2415,7 +2415,18 @@ export class MetricsPage {
         // Pick the option by its data-test-value (per AGENT_RULES §4 OSelectItem stamp).
         const optionByValue = this.promqlTableModeOptionByValue(modeValue);
         await optionByValue.first().waitFor({ state: 'visible', timeout: 5000 });
-        await optionByValue.first().click();
+        // Bound the click so a stalled actionability check (popover mid-animation
+        // under CI load) fails fast; then retry once against a freshly-opened popover.
+        try {
+            await optionByValue.first().click({ timeout: 5000 });
+        } catch {
+            await this.page.keyboard.press('Escape');
+            await this.promqlTableModePopover.waitFor({ state: 'hidden', timeout: 5000 });
+            await trigger.click();
+            await this.promqlTableModePopover.waitFor({ state: 'visible', timeout: 5000 });
+            await optionByValue.first().waitFor({ state: 'visible', timeout: 5000 });
+            await optionByValue.first().click({ timeout: 5000 });
+        }
         await this.promqlTableModePopover.waitFor({ state: 'hidden', timeout: 5000 });
     }
 
@@ -2424,6 +2435,15 @@ export class MetricsPage {
      */
     async getPromqlTableHeaderCount() {
         return await this.promqlTableHeaders.count();
+    }
+
+    /**
+     * Waits until the PromQL table chart has rendered at least one header cell.
+     * Counting immediately after a mode switch races the table re-render and
+     * can observe an empty header row.
+     */
+    async waitForPromqlTableHeaders(timeout = 15000) {
+        await this.promqlTableHeaders.first().waitFor({ state: 'visible', timeout });
     }
 
     /**
