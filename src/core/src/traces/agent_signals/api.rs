@@ -139,6 +139,10 @@ pub async fn get_agent_signals(
 /// correct scope is the `(agent, env, version)` IDENTITY over a wide
 /// rollup-write bound — not the span-time window. 30 days matches the FE's
 /// version-enumeration retention.
+///
+/// Only referenced from the enterprise compare path; also compiled under `test`
+/// so the pure-helper unit tests below build in the OSS (non-enterprise) config.
+#[cfg(any(feature = "enterprise", test))]
 const COMPARE_ROLLUP_LOOKBACK_MICROS: i64 = 30 * 24 * 60 * 60 * 1_000_000;
 
 /// One arm (A or B) of a version-compare request.
@@ -163,6 +167,7 @@ pub struct CompareRequest {
 /// Aggregated per-arm inputs collected from the `_agent_signals` cost rows:
 /// the per-window `latency_sketch` blobs (to be merged) and the summed cost
 /// moments (additive across windows).
+#[cfg(any(feature = "enterprise", test))]
 #[derive(Debug, Default, Clone, PartialEq)]
 struct ArmAggregate {
     sketches: Vec<String>,
@@ -174,6 +179,7 @@ struct ArmAggregate {
 /// Pure helper: fold a set of `_agent_signals` cost-pass hits into an
 /// [`ArmAggregate`]. Extracted so the summation/collection logic is
 /// unit-testable without a search round-trip.
+#[cfg(any(feature = "enterprise", test))]
 fn aggregate_cost_hits(hits: &[serde_json::Value]) -> ArmAggregate {
     let mut agg = ArmAggregate::default();
     // Dedup by window `_timestamp`: the rollup can write duplicate rows for the
@@ -212,6 +218,7 @@ fn aggregate_cost_hits(hits: &[serde_json::Value]) -> ArmAggregate {
 /// Pure helper: fold a set of `_agent_signals` failure-pass hits into a
 /// `fail_class -> summed count` map. Mirrors [`aggregate_cost_hits`]'s dedup
 /// logic so double-processed rollup windows don't double-count failures.
+#[cfg(any(feature = "enterprise", test))]
 fn aggregate_failure_hits(hits: &[serde_json::Value]) -> std::collections::HashMap<String, u64> {
     let mut map: std::collections::HashMap<String, u64> = std::collections::HashMap::new();
     // Dedup by `(_timestamp, fail_class)`, NOT by `_timestamp` alone. Unlike the
@@ -331,7 +338,10 @@ async fn fetch_arm_aggregate(org_id: &str, arm: &CompareArm) -> ArmAggregate {
 }
 
 #[cfg(feature = "enterprise")]
-async fn fetch_arm_failures(org_id: &str, arm: &CompareArm) -> std::collections::HashMap<String, u64> {
+async fn fetch_arm_failures(
+    org_id: &str,
+    arm: &CompareArm,
+) -> std::collections::HashMap<String, u64> {
     use config::meta::stream::StreamType;
 
     let stream_name = "_agent_signals";
@@ -533,7 +543,10 @@ mod compare_tests {
         ];
 
         let agg = aggregate_cost_hits(&hits);
-        assert_eq!(agg.sketches, vec!["sketchA".to_string(), "sketchB".to_string()]);
+        assert_eq!(
+            agg.sketches,
+            vec!["sketchA".to_string(), "sketchB".to_string()]
+        );
         assert!((agg.cost_sum - 3.5).abs() < 1e-9);
         assert!((agg.cost_sqsum - 6.25).abs() < 1e-9);
         assert_eq!(agg.cost_n, 8);
@@ -552,7 +565,11 @@ mod compare_tests {
         let agg = aggregate_cost_hits(&hits);
         // window 1000 counted ONCE (the newest, "w1_new"), window 2000 once.
         assert_eq!(agg.sketches, vec!["w2".to_string(), "w1_new".to_string()]);
-        assert!((agg.cost_sum - 8.0).abs() < 1e-9, "cost not double-counted: {}", agg.cost_sum);
+        assert!(
+            (agg.cost_sum - 8.0).abs() < 1e-9,
+            "cost not double-counted: {}",
+            agg.cost_sum
+        );
         assert_eq!(agg.cost_n, 16, "n not double-counted");
     }
 
@@ -598,8 +615,16 @@ mod compare_tests {
         ];
 
         let agg = aggregate_failure_hits(&hits);
-        assert_eq!(agg.len(), 5, "all five distinct classes in the window survive");
-        assert_eq!(agg.get("auth_error"), Some(&12), "duplicate (ts,class) not double-counted");
+        assert_eq!(
+            agg.len(),
+            5,
+            "all five distinct classes in the window survive"
+        );
+        assert_eq!(
+            agg.get("auth_error"),
+            Some(&12),
+            "duplicate (ts,class) not double-counted"
+        );
         assert_eq!(agg.get("rate_limited"), Some(&10));
         assert_eq!(agg.get("provider_error"), Some(&8));
         assert_eq!(agg.get("context_window_exceeded"), Some(&5));

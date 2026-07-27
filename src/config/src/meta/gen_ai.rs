@@ -65,8 +65,7 @@ pub const BUILTIN_ENV_FIELDS: &[&str] = &[
 /// tier (tried first, not listed here). These built-ins cover the service-wide
 /// OTel version plus common non-standard conventions: `app.version` and
 /// `git.commit.sha` (git-SHA-as-version, i.e. deployment/canary tracking).
-pub const BUILTIN_VERSION_FIELDS: &[&str] =
-    &["service.version", "app.version", "git.commit.sha"];
+pub const BUILTIN_VERSION_FIELDS: &[&str] = &["service.version", "app.version", "git.commit.sha"];
 const TARGET_AGENT_FIELDS: &[&str] = &[
     "target_agent_name",
     "target_agent_id",
