@@ -104,11 +104,12 @@ pub async fn init() -> errors::Result<()> {
         path: wal_dir.clone(),
     })?;
 
-    // check uncompleted parquet files, need delete those files
-    wal::check_uncompleted_parquet_files().await?;
-
     // replay wal files
     tokio::task::spawn(async move {
+        // check uncompleted parquet files, need delete those files
+        if let Err(e) = wal::check_uncompleted_parquet_files().await {
+            log::error!("Check uncompleted parquet files error: {e}");
+        }
         log::info!("Scanning wal files from {wal_dir:?}");
         let wal_files = wal::wal_scan_files(&wal_dir, "wal")
             .await
