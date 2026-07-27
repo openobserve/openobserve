@@ -1255,110 +1255,41 @@ mod tests {
     // ═════════════════════════════════════════════════════════════════════
     // Concurrency
     //
-    // Every other test here writes sequentially, which is how the delivery
-    // guards could briefly be moved out of the UPDATE's WHERE clause into a
-    // plain Rust check with no test noticing: with one writer, validating
-    // before the write is indistinguishable from validating during it.
+    // These use `tokio::spawn` on a multi-threaded runtime, NOT `tokio::join!`.
+    // That is not incidental: `join!` polls both futures on one task, and
+    // measurement showed it produced the SAME ordering in 60 out of 60 rounds
+    // — the evaluation always finished first, so the interleaving under test
+    // never occurred and the "callback wins" path was dead code. Real tasks on
+    // real threads produce both orderings within a handful of rounds.
     //
-    // These assert invariants that must hold under ANY interleaving, and they
-    // repeat because a rare race is still a race.
+    // What these can and cannot establish, measured rather than assumed:
     //
-    // WHAT THEY DO NOT ESTABLISH, measured rather than assumed: deleting the
-    // `level`/`level_since` predicates from the UPDATE leaves all three of
-    // them GREEN. On SQLite the callback's deferred transaction takes its read
-    // lock before the SELECT and upgrades on the write, so a competing commit
-    // in between makes the upgrade fail rather than silently apply — the
-    // engine closes the window that the WHERE clause also closes.
+    // * They CAN catch a write that is not confined to its own columns, which
+    //   is the one-writer rule (MN-2) and holds on every backend.
+    // * They CANNOT prove the `level`/`level_since` predicates on the delivery
+    //   UPDATE are load-bearing. Deleting those predicates leaves this suite
+    //   green, because the callback's transaction reads and writes under one
+    //   SQLite write lock. Under Postgres READ COMMITTED the same read-then-
+    //   write does not conflict — the UPDATE simply observes the newer row —
+    //   so the guard is required for a backend this harness never runs
+    //   against. Treat it as covered by review, not by test.
     //
-    // The predicates are therefore NOT redundant: under Postgres READ
-    // COMMITTED the same read-then-write does not conflict, the UPDATE simply
-    // observes the newer row, and only the guard stops a stale callback
-    // writing into an episode that has moved on. That path cannot be
-    // exercised by this SQLite harness, so the guards are load-bearing for a
-    // backend these tests never run against. Treat them as required by review,
-    // not as covered here — and if this suite ever gains a Postgres backend,
-    // removing a predicate should start failing.
+    // A third test lived here and was deleted rather than fixed: it asserted
+    // that a row at a new level-episode can never carry delivery state. Real
+    // concurrency disproved it. A callback that records a delivery while its
+    // episode IS current is legitimate, and a later evaluation moves the
+    // episode without clearing delivery state — exactly as the one-writer rule
+    // requires. The intended guarantee ("a callback whose episode has already
+    // moved on is refused") is not visible in the final row at all, so it is
+    // asserted deterministically by
+    // `test_delivery_callback_is_refused_when_the_episode_moved_on` instead.
     // ═════════════════════════════════════════════════════════════════════
 
     /// Rounds per race test. High enough that a window of a few statements is
     /// hit reliably, low enough to stay quick.
     const RACE_ROUNDS: usize = 60;
 
-    #[tokio::test]
-    async fn test_a_callback_never_records_delivery_against_a_superseded_episode() {
-        // THE regression, as an invariant.
-        //
-        // A callback for episode T1 races an evaluation that moves the group to
-        // episode T2. Because the evaluation's upsert deliberately excludes the
-        // delivery columns (one-writer rule, MN-2), any delivery state on the
-        // final row can only have come from the callback — so if the row ends
-        // up at T2 while carrying delivery state, the T1 callback wrote after
-        // the episode had already moved on.
-        //
-        // Note this passes on SQLite with or without the WHERE-clause guards
-        // (see the section header): here it is the transaction that closes the
-        // window. What the test genuinely pins is the INVARIANT — no delivery
-        // state may ever be attributed to a superseded episode — which must
-        // hold on every backend, however it is enforced.
-        let db = test_db().await;
-
-        for round in 0..RACE_ROUNDS {
-            let alert_id = unique_alert_id(&format!("race-episode-{round}"));
-            persist_with(
-                db,
-                &update_of(group_row(&alert_id, "g1", AlertLevel::Critical, 1_000)),
-            )
-            .await
-            .unwrap();
-
-            let old_episode = DeliveryEpisode {
-                level: AlertLevel::Critical,
-                level_since: 1_000,
-                notified_at_enqueue: (None, None),
-            };
-
-            // The evaluation moves the group into a NEW level-episode while the
-            // callback for the old one is in flight.
-            let evaluation = async {
-                persist_with(
-                    db,
-                    &update_of(group_row(&alert_id, "g1", AlertLevel::Critical, 2_000)),
-                )
-                .await
-            };
-            let callback = async {
-                advance_delivery_state_with(
-                    db,
-                    &alert_id,
-                    "g1",
-                    old_episode,
-                    DeliveryOutcome::Delivered {
-                        silence_minutes: 10,
-                        at: 1_500,
-                    },
-                )
-                .await
-            };
-            let (eval_res, cb_res) = tokio::join!(evaluation, callback);
-            eval_res.unwrap();
-            let applied = cb_res.unwrap();
-
-            let read = get_with(db, &alert_id, "g1").await.unwrap().unwrap();
-            if read.level_since == Some(2_000) {
-                assert!(
-                    read.silenced_until.is_none() && read.last_notified_level.is_none(),
-                    "round {round}: a callback for the superseded episode wrote delivery state \
-                     into the new one (applied={applied}, row={read:?})"
-                );
-            } else {
-                // The callback won the race; its write belongs to the episode
-                // it was issued for, which is legitimate.
-                assert!(applied, "round {round}: the callback matched but did not apply");
-            }
-        }
-    }
-
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
     async fn test_a_stale_failure_never_wins_a_race_against_a_success() {
         // The attempt anchor under contention. Both callbacks belong to ONE
         // episode, so the episode guard cannot separate them — only the
@@ -1383,10 +1314,11 @@ mod tests {
                 notified_at_enqueue: (None, None),
             };
 
-            let success = async {
+            let s_id = alert_id.clone();
+            let success = tokio::spawn(async move {
                 advance_delivery_state_with(
                     db,
-                    &alert_id,
+                    &s_id,
                     "g1",
                     episode,
                     DeliveryOutcome::Delivered {
@@ -1395,44 +1327,59 @@ mod tests {
                     },
                 )
                 .await
-            };
-            let failure = async {
+            });
+            let f_id = alert_id.clone();
+            let failure = tokio::spawn(async move {
                 advance_delivery_state_with(
                     db,
-                    &alert_id,
+                    &f_id,
                     "g1",
                     episode,
                     DeliveryOutcome::Failed { at: 1_600 },
                 )
                 .await
-            };
-            let (s_res, f_res) = tokio::join!(success, failure);
-            s_res.unwrap();
-            f_res.unwrap();
+            });
+            success.await.unwrap().unwrap();
+            failure.await.unwrap().unwrap();
 
             let read = get_with(db, &alert_id, "g1").await.unwrap().unwrap();
-            // The row must describe ONE coherent outcome, never a blend of the
-            // two: delivered-and-silenced, or failed-and-unsilenced.
-            if read.last_notified_level.is_some() {
-                assert_eq!(
+
+            // Delivery state is written as a PAIR by a success and by nothing
+            // else, so a half-written pair means one writer clobbered part of
+            // another's row. This holds under every ordering.
+            assert_eq!(
+                read.silenced_until.is_some(),
+                read.last_notified_level.is_some(),
+                "round {round}: delivery state was written by halves (row={read:?})"
+            );
+
+            // Deliberately NOT asserted: that a delivered group reads as
+            // `Firing`. Failure-then-success is a legitimate ordering — the
+            // failure records `NotifyFailed`, then the success records the
+            // delivery WITHOUT clearing the outcome axis, which belongs to
+            // evaluation (see
+            // `dispatch::test_a_success_does_not_clear_a_previous_notify_failed_outcome`).
+            // An earlier version of this test forbade that state and passed
+            // only because `join!` never produced the ordering.
+            assert!(
+                matches!(
                     read.last_outcome,
-                    Some(RunOutcome::Firing),
-                    "round {round}: the group delivered, so a losing failure must not have \
-                     marked it NotifyFailed (row={read:?})"
-                );
-            } else {
+                    Some(RunOutcome::Firing) | Some(RunOutcome::NotifyFailed)
+                ),
+                "round {round}: neither callback recorded an outcome (row={read:?})"
+            );
+            if read.last_notified_level.is_none() {
                 assert_eq!(
                     read.last_outcome,
                     Some(RunOutcome::NotifyFailed),
                     "round {round}: nothing delivered, so the failure must be recorded \
                      (row={read:?})"
                 );
-                assert!(read.silenced_until.is_none());
             }
         }
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
     async fn test_an_evaluation_and_a_delivery_never_lose_each_others_writes() {
         // The one-writer rule under contention: the two writers touch disjoint
         // columns, so BOTH updates must survive whatever the interleaving.
@@ -1461,11 +1408,12 @@ mod tests {
             refreshed.last_outcome_at = Some(7_777);
             refreshed.last_seen = Some(7_777);
 
-            let evaluation = async { persist_with(db, &update_of(refreshed)).await };
-            let callback = async {
+            let evaluation = tokio::spawn(async move { persist_with(db, &update_of(refreshed)).await });
+            let cb_id = alert_id.clone();
+            let callback = tokio::spawn(async move {
                 advance_delivery_state_with(
                     db,
-                    &alert_id,
+                    &cb_id,
                     "g1",
                     episode,
                     DeliveryOutcome::Delivered {
@@ -1474,10 +1422,12 @@ mod tests {
                     },
                 )
                 .await
-            };
-            let (eval_res, cb_res) = tokio::join!(evaluation, callback);
-            eval_res.unwrap();
-            assert!(cb_res.unwrap(), "round {round}: the callback's episode was current");
+            });
+            evaluation.await.unwrap().unwrap();
+            assert!(
+                callback.await.unwrap().unwrap(),
+                "round {round}: the callback's episode was current"
+            );
 
             let read = get_with(db, &alert_id, "g1").await.unwrap().unwrap();
             assert_eq!(
