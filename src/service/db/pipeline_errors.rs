@@ -83,6 +83,37 @@ pub async fn upsert(
     Ok(())
 }
 
+/// Deduplicates a batch by pipeline_id, keeping the newest error per pipeline, and returns the
+/// result sorted by pipeline_id.
+///
+/// A batch usually holds many errors for the same pipeline, which would otherwise become
+/// repeated updates of the very same row within one transaction.
+///
+/// Sorting is what prevents deadlocks: the transaction holds every row lock it takes until it
+/// commits, so if two nodes flush overlapping pipelines in different orders, each ends up
+/// waiting on a row the other already holds. Writing rows in pipeline_id order everywhere means
+/// that wait cycle cannot form.
+fn dedup_and_sort(
+    errors: Vec<(String, String, String, i64, PipelineError)>,
+) -> Vec<(String, String, String, i64, PipelineError)> {
+    let mut by_id: std::collections::HashMap<String, (String, String, String, i64, PipelineError)> =
+        std::collections::HashMap::with_capacity(errors.len());
+
+    for error in errors {
+        match by_id.get(&error.0) {
+            // already holding a newer error for this pipeline
+            Some(existing) if existing.3 >= error.3 => {}
+            _ => {
+                by_id.insert(error.0.clone(), error);
+            }
+        }
+    }
+
+    let mut errors: Vec<_> = by_id.into_values().collect();
+    errors.sort_by(|a, b| a.0.cmp(&b.0));
+    errors
+}
+
 /// Batch upserts multiple pipeline error records in a single transaction.
 ///
 /// This is more efficient than individual upserts when processing multiple errors.
@@ -93,6 +124,9 @@ pub async fn batch_upsert(
     if errors.is_empty() {
         return Ok(());
     }
+
+    // Collapse repeats and fix the row order so concurrently flushing nodes can't deadlock
+    let errors = dedup_and_sort(errors);
 
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let txn = client.begin().await?;
@@ -235,6 +269,43 @@ mod tests {
     use config::meta::self_reporting::error::{NodeErrors, PipelineError};
 
     use super::*;
+
+    #[test]
+    fn test_dedup_and_sort() {
+        let entry = |id: &str, ts: i64, msg: &str| {
+            (
+                id.to_string(),
+                format!("Pipeline {id}"),
+                "org".to_string(),
+                ts,
+                PipelineError {
+                    pipeline_id: id.to_string(),
+                    pipeline_name: format!("Pipeline {id}"),
+                    error: Some(msg.to_string()),
+                    node_errors: HashMap::new(),
+                },
+            )
+        };
+
+        let deduped = dedup_and_sort(vec![
+            entry("pl_b", 200, "older b"),
+            entry("pl_a", 100, "only a"),
+            entry("pl_b", 300, "newer b"),
+            entry("pl_c", 100, "newer c"),
+            entry("pl_c", 50, "older c"),
+        ]);
+
+        // one row per pipeline, in pipeline_id order so every node writes rows in the same
+        // order
+        let ids: Vec<&str> = deduped.iter().map(|(id, ..)| id.as_str()).collect();
+        assert_eq!(ids, vec!["pl_a", "pl_b", "pl_c"]);
+
+        // the newest error per pipeline wins, regardless of arrival order
+        assert_eq!(deduped[1].3, 300);
+        assert_eq!(deduped[1].4.error.as_deref(), Some("newer b"));
+        assert_eq!(deduped[2].3, 100);
+        assert_eq!(deduped[2].4.error.as_deref(), Some("newer c"));
+    }
 
     #[tokio::test]
     #[ignore] // Requires database connection
