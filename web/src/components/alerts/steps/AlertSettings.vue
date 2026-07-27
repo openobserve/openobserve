@@ -836,19 +836,26 @@ export default defineComponent({
           showTimezoneWarning.value = true;
         }
 
-        // Get all available timezones
+        // Get all available timezones, with the "Browser Time" and "UTC"
+        // convenience options at the top (matching the reports picker).
+        let zones: string[];
         try {
           // @ts-ignore - supportedValuesOf is not in all TypeScript versions
           if (typeof Intl !== 'undefined' && typeof Intl.supportedValuesOf === 'function') {
             // @ts-ignore
-            filteredTimezone.value = Intl.supportedValuesOf("timeZone");
+            zones = Intl.supportedValuesOf("timeZone");
           } else {
             // Fallback for older browsers
-            filteredTimezone.value = [detectedTimezone];
+            zones = [detectedTimezone];
           }
         } catch (err) {
-          filteredTimezone.value = [detectedTimezone];
+          zones = [detectedTimezone];
         }
+        filteredTimezone.value = [
+          `Browser Time (${detectedTimezone})`,
+          "UTC",
+          ...zones,
+        ];
       } catch (e) {
         console.error('Error initializing timezone:', e);
         browserTimezone.value = "UTC";
@@ -1066,32 +1073,30 @@ export default defineComponent({
     };
 
 
-    // Timezone filter function
+    // Timezone filter function — keeps the "Browser Time" and "UTC" shortcuts
+    // at the top of the list and searchable.
     const timezoneFilterFn = (val: string, update: any) => {
       update(() => {
-        if (val === "") {
-          try {
+        let allTimezones: string[] = [];
+        try {
+          // @ts-ignore
+          if (typeof Intl !== 'undefined' && typeof Intl.supportedValuesOf === 'function') {
             // @ts-ignore
-            if (typeof Intl !== 'undefined' && typeof Intl.supportedValuesOf === 'function') {
-              // @ts-ignore
-              filteredTimezone.value = Intl.supportedValuesOf("timeZone");
-            }
-          } catch (e) {
-            // Keep current filtered list
+            allTimezones = Intl.supportedValuesOf("timeZone");
           }
+        } catch (e) {
+          allTimezones = [browserTimezone.value];
+        }
+        const options = [
+          `Browser Time (${browserTimezone.value})`,
+          "UTC",
+          ...allTimezones,
+        ];
+        if (val === "") {
+          filteredTimezone.value = options;
         } else {
           const needle = val.toLowerCase();
-          const allTimezones: string[] = [];
-          try {
-            // @ts-ignore
-            if (typeof Intl !== 'undefined' && typeof Intl.supportedValuesOf === 'function') {
-              // @ts-ignore
-              allTimezones.push(...Intl.supportedValuesOf("timeZone"));
-            }
-          } catch (e) {
-            allTimezones.push(browserTimezone.value);
-          }
-          filteredTimezone.value = allTimezones.filter((v: string) =>
+          filteredTimezone.value = options.filter((v: string) =>
             v.toLowerCase().indexOf(needle) > -1
           );
         }
