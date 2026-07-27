@@ -480,4 +480,210 @@ mod tests {
         assert_eq!(s.groups_firing_is_lower_bound, None);
         assert_eq!(s.group_labels, None);
     }
+
+    // ================= §7.6: what a FROZEN evaluation must not touch =======
+    //
+    // These need a real database. The decision — what to write — is pure and
+    // already covered in `config::meta::alerts::state`. What is only provable
+    // here is that the persistence layer HONOURS a "write nothing" decision:
+    // an evaluation that observed nothing must leave `level`, `level_since`
+    // and `level_at` exactly as they were, because a composite reading
+    // `level_at` treats a refreshed clock as "this child is fresh" (§6.4).
+
+    mod frozen {
+        use config::meta::{
+            alerts::{
+                level::AlertLevel,
+                state::{AlertState, StateUpdate},
+            },
+            self_reporting::usage::RunOutcome,
+        };
+        use sea_orm::{Database, DatabaseConnection};
+
+        use super::super::*;
+        use crate::table::migration::create_alert_state_tables_for_test;
+
+        const ALERT: &str = "alert00000000000000000000";
+
+        async fn db() -> DatabaseConnection {
+            let db = Database::connect("sqlite::memory:")
+                .await
+                .expect("in-memory sqlite");
+            create_alert_state_tables_for_test(&db)
+                .await
+                .expect("alert_states tables apply");
+            db
+        }
+
+        fn critical_state() -> AlertState {
+            AlertState {
+                alert_id: ALERT.to_string(),
+                group_key: ROLLUP_GROUP_KEY.to_string(),
+                last_outcome: Some(RunOutcome::Firing),
+                last_outcome_at: Some(1_000),
+                since: Some(1_000),
+                level: Some(AlertLevel::Critical),
+                level_since: Some(1_000),
+                level_at: Some(1_000),
+                last_seen: Some(1_000),
+                group_labels: None,
+                groups_observed: None,
+                groups_firing: None,
+                groups_observed_is_lower_bound: None,
+                groups_firing_is_lower_bound: None,
+            }
+        }
+
+        /// A `StateUpdate` carrying no state must write nothing at all — not
+        /// even touch the row. This is the durable half of "the level rots, it
+        /// does not reset".
+        #[tokio::test]
+        async fn a_noop_update_leaves_every_level_column_untouched() {
+            let db = db().await;
+
+            let txn = db.begin().await.unwrap();
+            write_update(
+                &txn,
+                &StateUpdate {
+                    state: Some(critical_state()),
+                    transition: None,
+                },
+            )
+            .await
+            .unwrap();
+            txn.commit().await.unwrap();
+
+            // A frozen evaluation: observed nothing, so decides to write nothing.
+            let txn = db.begin().await.unwrap();
+            write_update(&txn, &StateUpdate::noop()).await.unwrap();
+            txn.commit().await.unwrap();
+
+            let row =
+                alert_states::Entity::find_by_id((ALERT.to_string(), ROLLUP_GROUP_KEY.to_string()))
+                    .one(&db)
+                    .await
+                    .unwrap()
+                    .expect("the row must still exist");
+
+            assert_eq!(row.level, Some(AlertLevel::Critical.to_i32()));
+            assert_eq!(row.level_since, Some(1_000), "level_since must not move");
+            assert_eq!(
+                row.level_at,
+                Some(1_000),
+                "level_at must not be refreshed — a composite would read a \
+                 long-broken child as fresh (§6.4)"
+            );
+            assert_eq!(row.since, Some(1_000));
+        }
+
+        /// A frozen evaluation must also emit no transition: transitions record
+        /// level *changes*, and nothing changed.
+        #[tokio::test]
+        async fn a_noop_update_writes_no_transition() {
+            let db = db().await;
+            let txn = db.begin().await.unwrap();
+            write_update(&txn, &StateUpdate::noop()).await.unwrap();
+            txn.commit().await.unwrap();
+
+            let count = alert_state_transitions::Entity::find()
+                .all(&db)
+                .await
+                .unwrap()
+                .len();
+            assert_eq!(count, 0);
+        }
+
+        /// The contrast case, so the test above cannot pass vacuously: a real
+        /// observation DOES move the clocks.
+        #[tokio::test]
+        async fn a_real_observation_does_refresh_the_level_clock() {
+            let db = db().await;
+            let txn = db.begin().await.unwrap();
+            write_update(
+                &txn,
+                &StateUpdate {
+                    state: Some(critical_state()),
+                    transition: None,
+                },
+            )
+            .await
+            .unwrap();
+            txn.commit().await.unwrap();
+
+            let mut later = critical_state();
+            later.last_outcome_at = Some(2_000);
+            later.level_at = Some(2_000); // recomputed from a good evaluation
+            let txn = db.begin().await.unwrap();
+            write_update(
+                &txn,
+                &StateUpdate {
+                    state: Some(later),
+                    transition: None,
+                },
+            )
+            .await
+            .unwrap();
+            txn.commit().await.unwrap();
+
+            let row =
+                alert_states::Entity::find_by_id((ALERT.to_string(), ROLLUP_GROUP_KEY.to_string()))
+                    .one(&db)
+                    .await
+                    .unwrap()
+                    .unwrap();
+            assert_eq!(row.level_at, Some(2_000));
+            assert_eq!(
+                row.level_since,
+                Some(1_000),
+                "the level did not change, so level_since must still not move"
+            );
+        }
+
+        /// A failed transaction must leave the previous state intact — a
+        /// half-applied freeze would be worse than either outcome.
+        #[tokio::test]
+        async fn a_rolled_back_update_leaves_the_prior_state_intact() {
+            let db = db().await;
+            let txn = db.begin().await.unwrap();
+            write_update(
+                &txn,
+                &StateUpdate {
+                    state: Some(critical_state()),
+                    transition: None,
+                },
+            )
+            .await
+            .unwrap();
+            txn.commit().await.unwrap();
+
+            let mut clobber = critical_state();
+            clobber.level = Some(AlertLevel::Ok);
+            clobber.level_since = Some(9_999);
+            clobber.level_at = Some(9_999);
+            let txn = db.begin().await.unwrap();
+            write_update(
+                &txn,
+                &StateUpdate {
+                    state: Some(clobber),
+                    transition: None,
+                },
+            )
+            .await
+            .unwrap();
+            txn.rollback().await.unwrap();
+
+            let row =
+                alert_states::Entity::find_by_id((ALERT.to_string(), ROLLUP_GROUP_KEY.to_string()))
+                    .one(&db)
+                    .await
+                    .unwrap()
+                    .unwrap();
+            assert_eq!(
+                row.level,
+                Some(AlertLevel::Critical.to_i32()),
+                "a rolled-back write must not have downgraded the level"
+            );
+            assert_eq!(row.level_at, Some(1_000));
+        }
+    }
 }

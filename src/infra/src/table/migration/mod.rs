@@ -145,6 +145,57 @@ mod m20260725_000002_add_threshold_and_level_columns;
 mod m20260726_000001_add_priority_and_tags_to_alerts;
 mod m20260726_000002_add_priority_and_tags_to_anomaly_config;
 mod m20260726_000003_add_group_lifecycle_columns;
+mod m20260727_000001_create_slo_tables;
+
+/// Apply **only** the SLO tables, for targeted integration tests.
+///
+/// `Migrator::up` replays the whole chain from 2022, whose earliest migrations
+/// assume the legacy `meta` table already exists — it is created outside the
+/// migrator during normal startup. Tests that only care about the SLO tables
+/// would otherwise have to reconstruct that history, which would test the
+/// fixture rather than the schema.
+#[cfg(test)]
+pub(crate) async fn create_slo_tables_for_test(
+    db: &sea_orm::DatabaseConnection,
+) -> Result<(), DbErr> {
+    use sea_orm_migration::MigrationTrait;
+    let manager = SchemaManager::new(db);
+    m20260727_000001_create_slo_tables::Migration
+        .up(&manager)
+        .await
+}
+
+/// Apply the `alert_states` chain, for targeted integration tests (§7.6).
+///
+/// Three migrations because the level columns and the group-lifecycle columns
+/// arrived after the tables. Applied in order, as production would.
+#[cfg(test)]
+pub(crate) async fn create_alert_state_tables_for_test(
+    db: &sea_orm::DatabaseConnection,
+) -> Result<(), DbErr> {
+    use sea_orm::ConnectionTrait;
+    use sea_orm_migration::MigrationTrait;
+    let manager = SchemaManager::new(db);
+
+    // m20260725_000002 ALTERs `alerts` as well as `alert_states`, so the
+    // table has to exist. A minimal stand-in is enough and is honest about
+    // what the fixture provides: these tests are about alert *state*, not
+    // about the alerts table, and building the real one would mean replaying
+    // years of unrelated migrations.
+    db.execute_unprepared("CREATE TABLE IF NOT EXISTS alerts (id VARCHAR(27) PRIMARY KEY)")
+        .await?;
+
+    m20260725_000001_create_alert_states_tables::Migration
+        .up(&manager)
+        .await?;
+    m20260725_000002_add_threshold_and_level_columns::Migration
+        .up(&manager)
+        .await?;
+    m20260726_000003_add_group_lifecycle_columns::Migration
+        .up(&manager)
+        .await?;
+    Ok(())
+}
 
 pub struct Migrator;
 
@@ -279,6 +330,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260726_000001_add_priority_and_tags_to_alerts::Migration),
             Box::new(m20260726_000002_add_priority_and_tags_to_anomaly_config::Migration),
             Box::new(m20260726_000003_add_group_lifecycle_columns::Migration),
+            Box::new(m20260727_000001_create_slo_tables::Migration),
         ]
     }
 }

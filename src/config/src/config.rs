@@ -56,7 +56,7 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 55: m20260725_000002_add_threshold_and_level_columns (multi-level thresholds)
 // 56: m20260726_000001_add_priority_and_tags_to_alerts (priority & tags)
 // 57: m20260726_000002_add_priority_and_tags_to_anomaly_config (same, anomalies)
-pub const DB_SCHEMA_VERSION: u64 = 57;
+pub const DB_SCHEMA_VERSION: u64 = 58;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
