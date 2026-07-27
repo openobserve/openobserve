@@ -47,7 +47,7 @@
               class="rounded-default flex cursor-pointer flex-col items-center gap-0.5 border px-2.5 py-1.5 transition-colors"
               :class="
                 localJoinType === option.type
-                  ? 'border-accent bg-[color-mix(in_srgb,var(--color-accent)_15%,transparent)] text-accent'
+                  ? 'border-accent text-accent bg-[color-mix(in_srgb,var(--color-accent)_15%,transparent)]'
                   : 'text-text-secondary hover:bg-surface-subtle border-transparent'
               "
               :aria-pressed="localJoinType === option.type"
