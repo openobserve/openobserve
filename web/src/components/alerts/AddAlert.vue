@@ -447,6 +447,7 @@ import {
   smartDecodeVrlFunction,
   isValidResourceName,
   getTimezonesByOffset,
+  resolveBrowserTimezone,
 } from "@/utils/zincutils";
 import { cloneDeep } from "lodash-es";
 import { useRouter } from "vue-router";
@@ -2311,6 +2312,13 @@ export default defineComponent({
             },
           );
         }
+      } else {
+        // Heal legacy alerts (e.g. created on older releases) that persisted a
+        // "Browser Time (<zone>)" label — resolve it to a plain IANA zone so the
+        // picker shows a valid value and the save path computes a real offset.
+        this.formData.trigger_condition.timezone = resolveBrowserTimezone(
+          this.formData.trigger_condition.timezone,
+        );
       }
 
       if (this.formData.query_condition.vrl_function) {
@@ -2504,10 +2512,22 @@ export default defineComponent({
         // Combine them in the HH:MM format
         const time = `${hours}:${minutes}`;
 
+        // Resolve any lingering "Browser Time (<zone>)" label (e.g. an existing
+        // alert opened from an older release) to a plain IANA zone before
+        // deriving the offset — otherwise convertDateToTimestamp returns NaN and
+        // tz_offset serializes to null in the saved payload. Optional chaining
+        // keeps this defensive against a missing trigger_condition.
+        const resolvedTimezone = resolveBrowserTimezone(
+          this.formData?.trigger_condition?.timezone ?? "",
+        );
+        if (this.formData?.trigger_condition) {
+          this.formData.trigger_condition.timezone = resolvedTimezone;
+        }
+
         const convertedDateTime = this.convertDateToTimestamp(
           date,
           time,
-          this.formData.trigger_condition.timezone,
+          resolvedTimezone,
         );
 
         this.formData.tz_offset = convertedDateTime.offset;
