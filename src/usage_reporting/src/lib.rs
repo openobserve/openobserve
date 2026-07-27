@@ -5,16 +5,22 @@
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 
-use std::sync::{Arc, LazyLock as Lazy, OnceLock};
+use std::{
+    sync::{Arc, LazyLock as Lazy, OnceLock},
+    time::Duration,
+};
 
 use async_trait::async_trait;
 use chrono::{DateTime, Datelike, Timelike};
 use config::{
-    SIZE_IN_MB, get_config,
+    SIZE_IN_MB,
+    cluster::LOCAL_NODE,
+    get_config,
     meta::{
         self_reporting::{
-            ReportingData, ReportingMessage, ReportingQueue, ReportingRunner,
-            usage::{RequestStats, UsageData, UsageEvent, UsageType},
+            EnqueueError, ReportingData, ReportingMessage, ReportingQueue, ReportingRunner,
+            error::ErrorData,
+            usage::{RequestStats, TriggerData, UsageData, UsageEvent, UsageType},
         },
         stream::StreamType,
     },
@@ -41,6 +47,161 @@ pub fn set_batch_publisher(
     publisher: Arc<dyn BatchPublisher>,
 ) -> Result<(), Arc<dyn BatchPublisher>> {
     BATCH_PUBLISHER.set(publisher)
+}
+
+pub async fn run() {
+    #[cfg(not(feature = "enterprise"))]
+    {
+        if !get_config().common.usage_enabled {
+            return;
+        }
+    }
+
+    if let Err(error) = start().await {
+        log::error!("[SELF-REPORTING] Reporting queue initialization failed: {error}");
+        return;
+    }
+
+    log::debug!("[SELF-REPORTING] successfully initialized reporting queues");
+}
+
+pub fn publish_triggers_usage(trigger: TriggerData) {
+    #[cfg(not(feature = "enterprise"))]
+    {
+        if !get_config().common.usage_enabled {
+            log::debug!(
+                "[SELF-REPORTING] Skipping trigger usage publish - usage reporting disabled"
+            );
+            return;
+        }
+    }
+
+    log::debug!(
+        "[SELF-REPORTING] Publishing trigger usage: org={}, module={:?}, key={}, status={:?}",
+        trigger.org,
+        trigger.module,
+        trigger.key,
+        trigger.status
+    );
+
+    match try_enqueue(ReportingData::Trigger(Box::new(trigger))) {
+        Ok(()) => {
+            log::debug!(
+                "[SELF-REPORTING] Successfully queued trigger usage data to be ingested (non-blocking)"
+            )
+        }
+        Err(tokio::sync::mpsc::error::TrySendError::Full(message)) => {
+            let dropped_info = match message {
+                ReportingMessage::Data(ReportingData::Trigger(trigger)) => {
+                    Some((trigger.org.clone(), trigger.key.clone()))
+                }
+                _ => None,
+            };
+
+            if let Some((org, key)) = dropped_info {
+                log::warn!(
+                    "[SELF-REPORTING] Usage queue full, dropping trigger data for org={}, key={}. \
+                     System is overloaded. Consider increasing ZO_USAGE_REPORTING_THREAD_NUM or ZO_USAGE_BATCH_SIZE.",
+                    org,
+                    key
+                );
+            } else {
+                log::warn!(
+                    "[SELF-REPORTING] Usage queue full, dropping trigger data. \
+                     System is overloaded. Consider increasing ZO_USAGE_REPORTING_THREAD_NUM or ZO_USAGE_BATCH_SIZE."
+                );
+            }
+
+            metrics::SELF_REPORTING_DROPPED_TRIGGERS
+                .with_label_values(&["usage"])
+                .inc();
+        }
+        Err(tokio::sync::mpsc::error::TrySendError::Closed(_)) => {
+            log::error!(
+                "[SELF-REPORTING] Usage queue closed, cannot send trigger data. \
+                 Self-reporting service may have shut down."
+            );
+        }
+    }
+}
+
+pub async fn publish_error(error_data: ErrorData) {
+    let cfg = get_config();
+    #[cfg(not(feature = "enterprise"))]
+    {
+        if !cfg.common.usage_enabled {
+            log::debug!("[SELF-REPORTING] Skipping error publish - usage reporting disabled");
+            return;
+        }
+    }
+
+    let timeout_duration = Duration::from_secs(cfg.common.error_publish_timeout_secs);
+    let org = error_data.stream_params.org_id.clone();
+    let error_source = match &error_data.error_source {
+        config::meta::self_reporting::error::ErrorSource::Alert => "Alert",
+        config::meta::self_reporting::error::ErrorSource::Dashboard => "Dashboard",
+        config::meta::self_reporting::error::ErrorSource::Function(_) => "Function",
+        config::meta::self_reporting::error::ErrorSource::Ingestion => "Ingestion",
+        config::meta::self_reporting::error::ErrorSource::Pipeline(_) => "Pipeline",
+        config::meta::self_reporting::error::ErrorSource::Search => "Search",
+        config::meta::self_reporting::error::ErrorSource::Other => "Other",
+        config::meta::self_reporting::error::ErrorSource::SsoClaimParser(_) => "SsoClaimParser",
+        config::meta::self_reporting::error::ErrorSource::OrgStorage(_) => "OrgStorage",
+    };
+
+    log::debug!(
+        "[SELF-REPORTING] Publishing error data: org={}, source={}, timeout={:?}",
+        org,
+        error_source,
+        timeout_duration
+    );
+
+    let start = std::time::Instant::now();
+    match enqueue_error_with_timeout(ReportingData::Error(Box::new(error_data)), timeout_duration)
+        .await
+    {
+        Ok(()) => {
+            log::debug!(
+                "[SELF-REPORTING] Successfully queued error data to be ingested (took {:?}, timeout-based)",
+                start.elapsed()
+            );
+        }
+        Err(EnqueueError::Timeout) => {
+            log::warn!(
+                "[SELF-REPORTING] Timeout ({:?}) queueing error data for org={}, source={}. \
+                 System overloaded, error reporting degraded. \
+                 Consider increasing ZO_USAGE_REPORTING_THREAD_NUM or ZO_USAGE_BATCH_SIZE.",
+                timeout_duration,
+                org,
+                error_source
+            );
+            metrics::SELF_REPORTING_TIMEOUT_ERRORS
+                .with_label_values(&["error"])
+                .inc();
+        }
+        Err(EnqueueError::SendFailed(error)) => {
+            log::error!(
+                "[SELF-REPORTING] Failed to send error data for org={}, source={}: {error}",
+                org,
+                error_source
+            );
+        }
+    }
+}
+
+pub async fn flush() {
+    let cfg = get_config();
+
+    #[cfg(feature = "enterprise")]
+    let usage_enabled = true;
+    #[cfg(not(feature = "enterprise"))]
+    let usage_enabled = cfg.common.usage_enabled;
+
+    if !usage_enabled || (!LOCAL_NODE.is_ingester() && !LOCAL_NODE.is_querier()) {
+        return;
+    }
+
+    shutdown(cfg.limit.usage_reporting_thread_num).await;
 }
 
 pub async fn report_request_usage_stats(

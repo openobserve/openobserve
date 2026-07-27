@@ -58,6 +58,9 @@ const TOPIC_ACCOUNTING_OVERHEAD_BYTES: u64 = 256;
 const VISIBILITY_TIMEOUT: Duration = Duration::from_secs(30);
 /// Interval of the maintenance loop (expiration and visibility timeouts).
 const MAINTENANCE_INTERVAL: Duration = Duration::from_secs(1);
+/// How long a pull consumer waits for a message before returning `None`.
+/// Matches the batch-request expiry of the NATS pull consumer.
+const PULL_WAIT: Duration = Duration::from_secs(30);
 /// Delivery channel capacity, same as the NATS backend.
 const CHANNEL_CAPACITY: usize = 1024;
 /// Metric label for this backend.
@@ -246,6 +249,85 @@ impl Drop for MemoryAckHandle {
     }
 }
 
+/// Pull consumer over the in-memory queue.
+///
+/// Messages stay in the topic's pending deque until [`Self::next`] hands them
+/// to the caller, so the visibility timeout only starts at actual delivery —
+/// there is no channel buffering messages ahead of the consumer.
+pub struct MemoryPullConsumer {
+    shared: Arc<Shared>,
+    topic: Arc<str>,
+    generation: u64,
+    notify: Arc<Notify>,
+    /// Occupies the topic's consumer slot: dropping this receiver closes the
+    /// slot's sender so a new consumer can attach.
+    _liveness: mpsc::Receiver<super::Message>,
+}
+
+impl MemoryPullConsumer {
+    pub(crate) fn ack_wait(&self) -> Duration {
+        VISIBILITY_TIMEOUT
+    }
+
+    pub(crate) async fn next(&mut self) -> Result<Option<super::Message>> {
+        let deadline = Instant::now() + PULL_WAIT;
+        loop {
+            if let Some(message) = self.try_next()? {
+                return Ok(Some(message));
+            }
+            // a permit stored by notify_one before we start waiting completes
+            // the wait immediately, so a publish between the check above and
+            // this await cannot be missed
+            if tokio::time::timeout_at(deadline, self.notify.notified())
+                .await
+                .is_err()
+            {
+                return Ok(None);
+            }
+        }
+    }
+
+    fn try_next(&self) -> Result<Option<super::Message>> {
+        let mut inner = self.shared.lock_inner();
+        // reserve the token before borrowing the topic to keep the borrows disjoint
+        inner.next_token += 1;
+        let token = inner.next_token;
+        let Some(topic_state) = inner.topics.get_mut(self.topic.as_ref()) else {
+            return Err(QueueError::TopicNotFound(self.topic.to_string()).into());
+        };
+        if !topic_state
+            .consumer
+            .as_ref()
+            .is_some_and(|c| c.generation == self.generation)
+        {
+            return Err(QueueError::ConsumerAlreadyActive(self.topic.to_string()).into());
+        }
+        let Some(mut entry) = topic_state.pending.pop_front() else {
+            return Ok(None);
+        };
+        entry.deliveries += 1;
+        let sequence = entry.sequence;
+        let payload = entry.payload.clone();
+        // insert into in_flight before returning so an ack can never miss the entry
+        topic_state.in_flight.insert(
+            sequence,
+            InFlight {
+                entry,
+                token,
+                delivered_at: Instant::now(),
+            },
+        );
+        let handle = MemoryAckHandle {
+            shared: Arc::downgrade(&self.shared),
+            topic: self.topic.clone(),
+            sequence,
+            token,
+            acked: AtomicBool::new(false),
+        };
+        Ok(Some(super::Message::from_memory(payload, handle)))
+    }
+}
+
 #[async_trait]
 impl super::Queue for MemoryQueue {
     async fn create(&self, topic: &str) -> Result<()> {
@@ -414,6 +496,53 @@ impl super::Queue for MemoryQueue {
             notify,
         ));
         Ok(Arc::new(rx))
+    }
+
+    async fn pull_consume(
+        &self,
+        topic: &str,
+        // group is meaningful for distributed backends; a process-local queue
+        // has exactly one consumer per topic, so it is ignored here
+        _group: &str,
+        deliver_policy: Option<DeliverPolicy>,
+    ) -> Result<super::PullConsumer> {
+        let topic_key: Arc<str> = format_key(topic).into();
+        // the sender occupies the consumer slot; the receiver only signals
+        // liveness (dropping the pull consumer closes it, freeing the slot)
+        let (tx, rx) = mpsc::channel(1);
+        let notify = Arc::new(Notify::new());
+        let generation;
+        {
+            let mut inner = self.shared.lock_inner();
+            let Some(topic_state) = inner.topics.get_mut(topic_key.as_ref()) else {
+                return Err(QueueError::TopicNotFound(topic_key.to_string()).into());
+            };
+            if topic_state
+                .consumer
+                .as_ref()
+                .is_some_and(|c| !c.tx.is_closed())
+            {
+                return Err(QueueError::ConsumerAlreadyActive(topic_key.to_string()).into());
+            }
+            let released =
+                apply_deliver_policy(topic_state, deliver_policy.unwrap_or(DeliverPolicy::All));
+            topic_state.next_generation += 1;
+            generation = topic_state.next_generation;
+            topic_state.consumer = Some(Consumer {
+                generation,
+                tx,
+                notify: notify.clone(),
+            });
+            inner.used_bytes = inner.used_bytes.saturating_sub(released);
+            update_gauges(&inner);
+        }
+        Ok(super::PullConsumer::from_memory(MemoryPullConsumer {
+            shared: self.shared.clone(),
+            topic: topic_key,
+            generation,
+            notify,
+            _liveness: rx,
+        }))
     }
 
     async fn purge(&self, _topic: &str, _sequence: usize) -> Result<()> {
@@ -1035,5 +1164,99 @@ mod tests {
         tokio::task::yield_now().await;
         let rx = q.consume(TOPIC, None).await.unwrap();
         drop(rx);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn test_pull_consume_delivers_fifo_and_acks() {
+        let q = MemoryQueue::new(1024 * 1024);
+        q.create(TOPIC).await.unwrap();
+        for i in 0..3u8 {
+            q.publish(TOPIC, Bytes::from(vec![i])).await.unwrap();
+        }
+        let mut consumer = q.pull_consume(TOPIC, "group", None).await.unwrap();
+        assert_eq!(consumer.ack_wait(), VISIBILITY_TIMEOUT);
+        for i in 0..3u8 {
+            let msg = consumer.next().await.unwrap().expect("expected a message");
+            assert_eq!(msg.message().as_ref(), &[i]);
+            msg.ack().await.unwrap();
+        }
+        assert_eq!(q.used_bytes(), topic_overhead(TOPIC));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn test_pull_consume_returns_none_when_empty() {
+        let q = MemoryQueue::new(1024 * 1024);
+        q.create(TOPIC).await.unwrap();
+        let mut consumer = q.pull_consume(TOPIC, "group", None).await.unwrap();
+        // mirrors the NATS batch expiry: an empty poll returns None
+        assert!(consumer.next().await.unwrap().is_none());
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn test_pull_consume_wakes_up_on_publish() {
+        let q = Arc::new(MemoryQueue::new(1024 * 1024));
+        q.create(TOPIC).await.unwrap();
+        let mut consumer = q.pull_consume(TOPIC, "group", None).await.unwrap();
+        let publisher = {
+            let q = Arc::clone(&q);
+            tokio::spawn(async move {
+                tokio::time::sleep(Duration::from_secs(1)).await;
+                q.publish(TOPIC, Bytes::from_static(b"x")).await.unwrap();
+            })
+        };
+        let msg = consumer.next().await.unwrap().expect("expected a message");
+        assert_eq!(msg.message().as_ref(), b"x");
+        msg.ack().await.unwrap();
+        publisher.await.unwrap();
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn test_pull_consume_visibility_timeout_starts_at_delivery() {
+        let q = MemoryQueue::new(1024 * 1024);
+        q.create(TOPIC).await.unwrap();
+        q.publish(TOPIC, Bytes::from_static(b"x")).await.unwrap();
+        let mut consumer = q.pull_consume(TOPIC, "group", None).await.unwrap();
+
+        // the message waits far longer than the visibility timeout before the
+        // consumer picks it up; a pull consumer must not count that as in-flight
+        tokio::time::sleep(VISIBILITY_TIMEOUT * 3).await;
+        let msg = consumer.next().await.unwrap().expect("expected a message");
+        assert_eq!(msg.message().as_ref(), b"x");
+
+        // now it is in flight: the timeout runs from the moment of delivery
+        tokio::time::sleep(VISIBILITY_TIMEOUT + Duration::from_secs(1)).await;
+        let redelivered = consumer.next().await.unwrap().expect("expected redelivery");
+        assert_eq!(redelivered.message().as_ref(), b"x");
+        redelivered.ack().await.unwrap();
+        // the stale first handle acks into nothing
+        msg.ack().await.unwrap();
+        assert_eq!(q.used_bytes(), topic_overhead(TOPIC));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn test_pull_consume_unacked_drop_requeues() {
+        let q = MemoryQueue::new(1024 * 1024);
+        q.create(TOPIC).await.unwrap();
+        q.publish(TOPIC, Bytes::from_static(b"x")).await.unwrap();
+        let mut consumer = q.pull_consume(TOPIC, "group", None).await.unwrap();
+        let msg = consumer.next().await.unwrap().expect("expected a message");
+        drop(msg);
+        let msg = consumer.next().await.unwrap().expect("expected redelivery");
+        assert_eq!(msg.message().as_ref(), b"x");
+        msg.ack().await.unwrap();
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn test_pull_consume_enforces_single_consumer_and_releases_slot() {
+        let q = MemoryQueue::new(1024 * 1024);
+        q.create(TOPIC).await.unwrap();
+        let consumer = q.pull_consume(TOPIC, "group", None).await.unwrap();
+        let err = q.pull_consume(TOPIC, "group", None).await.unwrap_err();
+        assert_queue_error(err, |e| matches!(e, QueueError::ConsumerAlreadyActive(_)));
+        let err = q.consume(TOPIC, None).await.unwrap_err();
+        assert_queue_error(err, |e| matches!(e, QueueError::ConsumerAlreadyActive(_)));
+        drop(consumer);
+        let consumer = q.pull_consume(TOPIC, "group", None).await.unwrap();
+        drop(consumer);
     }
 }

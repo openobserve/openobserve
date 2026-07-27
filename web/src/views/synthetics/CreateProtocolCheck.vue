@@ -32,6 +32,7 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import CheckConfigure from "@/components/synthetics/configure/CheckConfigure.vue";
 import AgentSetupDrawer from "@/components/synthetic-monitoring/AgentSetupDrawer.vue";
 import CreateBrowserTestSkeleton from "@/components/synthetics/CreateBrowserTestSkeleton.vue";
+import BetaBadge from "@/components/common/BetaBadge.vue";
 import CheckHttpConfig from "@/components/synthetics/configure/types/CheckHttpConfig.vue";
 import CheckTcpConfig from "@/components/synthetics/configure/types/CheckTcpConfig.vue";
 import CheckTlsConfig from "@/components/synthetics/configure/types/CheckTlsConfig.vue";
@@ -108,10 +109,16 @@ async function fetchLocations() {
   try {
     const org = store.state.selectedOrganization.identifier;
     const res = await syntheticsService.getLocations(org);
-    // Protocol checks run from public locations and private agents alike;
-    // disabled locations are hidden.
+    // Protocol checks run from public locations and protocol-capable private
+    // agents. Hide disabled locations, and hide private locations whose live
+    // agents are browser-only (a browser agent can't run an HTTP/TCP/… check) —
+    // `types` reflects live agents' capabilities, so a private location shows
+    // only when it currently has an agent advertising a non-browser type.
+    // Mirror of the browser page, which requires `types` to include 'browser'.
     locations.value = (((res.data ?? {}).locations ?? []) as SyntheticsLocation[]).filter(
-      (l) => l.enabled !== false,
+      (l) =>
+        l.enabled !== false &&
+        (l.kind !== "private" || (l.types ?? []).some((t) => t !== "browser")),
     );
   } catch {
     locations.value = [];
@@ -266,7 +273,6 @@ async function saveCheck() {
 
 <template>
   <OPageLayout
-    :title="headerTitle"
     :back="{
       label: t('synthetics.newCheck.back'),
       to: { name: 'synthetics' },
@@ -274,6 +280,12 @@ async function saveCheck() {
     }"
     bleed
   >
+    <template #title>
+      <span class="inline-flex min-w-0 items-center gap-2">
+        <span class="truncate">{{ headerTitle }}</span>
+        <BetaBadge />
+      </span>
+    </template>
     <CreateBrowserTestSkeleton v-if="isLoadingEdit" :rows="10" />
     <template v-else>
       <div class="min-h-0 flex-1 overflow-y-auto">

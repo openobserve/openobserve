@@ -25,6 +25,7 @@ enterprise = [
     "search_service/enterprise",
     "enrichment-data/enterprise",
     "stream/enterprise",
+    "usage_reporting/enterprise",
 ]
 cloud = [
     "enterprise",
@@ -58,8 +59,10 @@ common.workspace = true
 audit.workspace = true
 db.workspace = true
 openobserve-core.workspace = true
+openobserve-node.workspace = true
 openobserve-builtins.workspace = true
 openobserve-sourcemaps.workspace = true
+openobserve-tls.workspace = true
 ingestion-common.workspace = true
 stream.workspace = true
 enrichment-data.workspace = true
@@ -71,6 +74,7 @@ openobserve-api-management.workspace = true
 openobserve-api-query.workspace = true
 openobserve-api-common.workspace = true
 openobserve-mcp.workspace = true
+usage_reporting.workspace = true
 axum.workspace = true
 axum-extra.workspace = true
 tower.workspace = true

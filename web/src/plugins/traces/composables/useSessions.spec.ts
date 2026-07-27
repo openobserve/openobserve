@@ -400,6 +400,13 @@ describe("useSessions — fetchSession: trace row mapping", () => {
     expect(traces[0].cost).toBeCloseTo(0.0099);
   });
 
+  it("maps a plain-text input AnyValue to the turn preview", async () => {
+    setupDetailsMock([makeStreamHit({ gen_ai_input_messages: "hello" })]);
+    const { fetchSession } = useSessions();
+    const { traces } = await fetchSession("stream", "sess-1", 1000, 2000);
+    expect(traces[0].turnUserMessage).toBe("hello");
+  });
+
   it("status='error' when spans[1] (error_count) > 0", async () => {
     setupDetailsMock([makeStreamHit({ spans: [5, 2] })]);
     const { fetchSession } = useSessions();
@@ -583,6 +590,26 @@ describe("useSessions — fetchSession: SessionDetail derivation", () => {
     const { detail } = await fetchSession("stream", "sess-1", 1000, 5000);
 
     expect(detail!.turns).toBe(2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// fetchSessionSpans
+// ---------------------------------------------------------------------------
+
+describe("useSessions — fetchSessionSpans", () => {
+  it("uses the canonical tool name field without legacy tool fields", async () => {
+    mockExecuteQuery.mockResolvedValue([{ span_id: "span-1" }]);
+
+    const { fetchSessionSpans } = useSessions();
+    const result = await fetchSessionSpans("default", ["trace-1"], 1000, 2000);
+
+    const sql = mockExecuteQuery.mock.calls[0][0] as string;
+    expect(sql).toContain("gen_ai_tool_name");
+    expect(sql).not.toMatch(/\btool_name\b/);
+    expect(sql).not.toContain("tool_args");
+    expect(mockExecuteQuery).toHaveBeenCalledWith(sql, 1000, 2000);
+    expect(result).toEqual([{ span_id: "span-1" }]);
   });
 });
 

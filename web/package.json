@@ -41,8 +41,8 @@
   "dependencies": {
     "@esbuild-plugins/node-globals-polyfill": "^0.2.3",
     "@joakimono/echarts-extension-leaflet": "^1.1.0",
-    "@openobserve/browser-logs": "0.4.0-beta.7",
-    "@openobserve/browser-rum": "0.4.0-beta.7",
+    "@openobserve/browser-logs": "0.4.1",
+    "@openobserve/browser-rum": "0.4.1",
     "@openobserve/node-sql-parser": "^0.1.5",
     "@openobserve/rrweb-player": "^0.2.1",
     "@rudderstack/analytics-js": "3.6.0",
