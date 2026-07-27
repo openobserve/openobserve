@@ -905,7 +905,8 @@
     "language": "Language",
     "actions": "Actions",
     "keyboardShortcuts": "Keyboard Shortcuts",
-    "synthetic": "Synthetics"
+    "synthetic": "Synthetics",
+    "experience": "Experience"
   },
   "rum": {
     "title": "Real User Monitoring",
@@ -9770,7 +9771,7 @@
       "clearFiltersDesc": "Remove all active filters",
       "device": "Device",
       "duration": "Duration",
-      "editMonitor": "Edit Monitor",
+      "editCheck": "Edit Check",
       "error": "Error",
       "failed": "Failed",
       "failedRuns": "Failed Runs",
