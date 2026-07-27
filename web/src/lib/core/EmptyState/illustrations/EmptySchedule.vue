@@ -17,8 +17,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!--
   EmptySchedule — object-only "no scheduled jobs" illustration: a queue of
   search-job rows with a ticking clock badge, signalling work that runs later
-  in the background. Distinct from `history` (clock + rewind). CSS motion gated
-  by `animated` + prefers-reduced-motion.
+  in the background. Distinct from `history` (clock + rewind). Pure SMIL motion
+  gated behind `animated` (prefers-reduced-motion; OEmptyState wires this up
+  automatically).
 -->
 <template>
   <svg
@@ -28,7 +29,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     xmlns="http://www.w3.org/2000/svg"
     role="img"
     aria-label="No scheduled search jobs"
-    :class="['es-root', { 'es-static': !animated }]"
   >
     <circle cx="120" cy="84" r="64" fill="var(--color-primary-500)" opacity="0.05" />
     <ellipse cx="120" cy="156" rx="70" ry="9" fill="var(--color-primary-900)" opacity="0.1" />
@@ -38,8 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <circle cx="210" cy="44" r="1.6" />
     </g>
 
-    <!-- job queue card (matches the standard 156-wide card used by the other
-         empty-state illustrations so it renders at a consistent size) -->
+    <!-- job queue card (standard 156-wide card, matching the other empty-state illustrations) -->
     <rect
       x="42"
       y="46"
@@ -53,15 +52,50 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- queued job rows (status dot + bar) -->
     <g>
-      <circle class="es-dot es-dot-1" cx="60" cy="68" r="4.5" fill="var(--color-primary-500)" />
+      <circle cx="60" cy="68" r="4.5" fill="var(--color-primary-500)">
+        <animate
+          v-if="animated"
+          attributeName="opacity"
+          values="0.35;1;0.35"
+          keyTimes="0;0.5;1"
+          dur="3s"
+          repeatCount="indefinite"
+          calcMode="spline"
+          keySplines="0.42 0 0.58 1; 0.42 0 0.58 1"
+        />
+      </circle>
       <rect x="74" y="63.5" width="94" height="8" rx="4" fill="var(--color-border-default)" />
     </g>
     <g>
-      <circle class="es-dot es-dot-2" cx="60" cy="92" r="4.5" fill="var(--color-primary-500)" />
+      <circle cx="60" cy="92" r="4.5" fill="var(--color-primary-500)">
+        <animate
+          v-if="animated"
+          attributeName="opacity"
+          values="0.35;1;0.35"
+          keyTimes="0;0.5;1"
+          dur="3s"
+          repeatCount="indefinite"
+          begin="0.6s"
+          calcMode="spline"
+          keySplines="0.42 0 0.58 1; 0.42 0 0.58 1"
+        />
+      </circle>
       <rect x="74" y="87.5" width="80" height="8" rx="4" fill="var(--color-border-default)" />
     </g>
     <g>
-      <circle class="es-dot es-dot-3" cx="60" cy="116" r="4.5" fill="var(--color-primary-500)" />
+      <circle cx="60" cy="116" r="4.5" fill="var(--color-primary-500)">
+        <animate
+          v-if="animated"
+          attributeName="opacity"
+          values="0.35;1;0.35"
+          keyTimes="0;0.5;1"
+          dur="3s"
+          repeatCount="indefinite"
+          begin="1.2s"
+          calcMode="spline"
+          keySplines="0.42 0 0.58 1; 0.42 0 0.58 1"
+        />
+      </circle>
       <rect x="74" y="111.5" width="88" height="8" rx="4" fill="var(--color-border-default)" />
     </g>
 
@@ -86,7 +120,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       opacity="0.75"
     />
     <line
-      class="es-hand"
       x1="182"
       y1="128"
       x2="192"
@@ -94,7 +127,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       stroke="var(--color-primary-600)"
       stroke-width="2.25"
       stroke-linecap="round"
-    />
+    >
+      <animateTransform
+        v-if="animated"
+        attributeName="transform"
+        type="rotate"
+        values="0 182 128; 360 182 128"
+        keyTimes="0;1"
+        dur="6s"
+        repeatCount="indefinite"
+      />
+    </line>
     <circle cx="182" cy="128" r="2.75" fill="var(--color-primary-600)" />
   </svg>
 </template>
@@ -102,48 +145,3 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 withDefaults(defineProps<{ width?: number; animated?: boolean }>(), { width: 260, animated: true });
 </script>
-
-<style scoped>
-/* keep(keyframes): SVG illustration animation. Scoped on purpose (W2.b): the
-   20 illustrations reused generic keyframe names (es-pulse, es-twinkle, …) with
-   DIFFERENT bodies from unscoped blocks — a global name collision where the
-   last-loaded illustration hijacked the others' animations. Vue rewrites scoped
-   keyframe names per component, which ends the collision. All selectors and the
-   es-static gate live in this file's own template. */
-.es-hand {
-  transform-box: view-box;
-  transform-origin: 182px 128px;
-  animation: es-tick 6s linear infinite;
-}
-.es-dot {
-  animation: es-blink 3s ease-in-out infinite;
-}
-.es-dot-2 {
-  animation-delay: 0.6s;
-}
-.es-dot-3 {
-  animation-delay: 1.2s;
-}
-@keyframes es-tick {
-  to {
-    transform: rotate(360deg);
-  }
-}
-@keyframes es-blink {
-  0%,
-  100% {
-    opacity: 0.35;
-  }
-  50% {
-    opacity: 1;
-  }
-}
-.es-static :where(.es-hand, .es-dot) {
-  animation: none;
-}
-@media (prefers-reduced-motion: reduce) {
-  :where(.es-hand, .es-dot) {
-    animation: none;
-  }
-}
-</style>

@@ -157,7 +157,7 @@ def test_test_endpoint_with_valid_vrl_returns_transformed_events(client: OpenObs
     ("vrl_function", "description"),
     [
         (".test=2jehwkhhe\n.", "VRL with syntax error"),
-        ("test", "plain text (not a VRL function)"),
+        ("test", "plain text (undefined VRL variable)"),
         ("=====", "VRL with only special chars"),
     ],
     ids=["syntax-error", "plain-text", "special-chars-only"],
@@ -165,13 +165,67 @@ def test_test_endpoint_with_valid_vrl_returns_transformed_events(client: OpenObs
 def test_test_endpoint_with_invalid_vrl_returns_400(
     client: OpenObserveClient, vrl_function: str, description: str
 ):
-    """Various invalid VRL function bodies passed to /functions/test all return 400.
+    """COMPILE-invalid VRL bodies passed to /functions/test return 400.
 
     Consolidates 3 near-identical legacy tests (testinvalidfunction,
     onlytextfunction, testonlyspecialcharfunction) — each was 25-30 LOC
     of copy-paste differing only in one field.
+
+    Note (PR #13156): the compile-check now reports only COMPILE errors, not
+    runtime errors. All three bodies below are genuine VRL *compile* errors
+    when trans_type=0 (`test` and `=====` are "call to undefined variable" /
+    syntax errors, not merely runtime failures), so they still 400. Runtime
+    failures that compile cleanly now return 200 with a per-event message —
+    see test_test_endpoint_with_*_runtime_error_returns_200 below.
     """
-    payload = {"function": vrl_function, "events": SAMPLE_EVENTS, "trans_type":0 }
+    payload = {"function": vrl_function, "events": SAMPLE_EVENTS, "trans_type": 0}
     resp = client.post("functions/test", json=payload)
     assert resp.status_code == 400, \
         f"{description}: expected 400, got {resp.status_code}: {resp.text}"
+
+
+def test_test_endpoint_with_js_runtime_error_returns_200(client: OpenObserveClient):
+    """JS that compiles but throws at RUNTIME returns 200, with the error
+    surfaced per-event in results[].message (PR #13156 behaviour change).
+
+    `undefinedVar` is a valid JS identifier (syntactically fine), so the
+    compile-check passes; the ReferenceError only happens when the code runs
+    against each event. Previously this 200-path dropped results[].message;
+    #13156 wires the runtime error through per-event.
+    """
+    payload = {
+        "function": "row.field = undefinedVar;",
+        "events": SAMPLE_EVENTS,
+        "trans_type": 1,
+    }
+    resp = client.post("functions/test", json=payload)
+    assert resp.status_code == 200, \
+        f"JS runtime error should be 200, got {resp.status_code}: {resp.text}"
+    body = resp.json()
+    assert "results" in body, f"response missing 'results': {body}"
+    assert len(body["results"]) == len(SAMPLE_EVENTS), \
+        f"expected one result per event, got: {body['results']}"
+    assert all("ReferenceError" in r.get("message", "") for r in body["results"]), \
+        f"expected a per-event ReferenceError message, got: {body['results']}"
+
+
+def test_test_endpoint_with_vrl_runtime_error_returns_200(client: OpenObserveClient):
+    """VRL that compiles but aborts at RUNTIME returns 200, with the error
+    surfaced per-event in results[].message (PR #13156 behaviour change).
+
+    `to_int!(.s)` compiles fine; it only aborts when `.s` can't be coerced to
+    an int at runtime. Before #13156 VRL runtime errors were tooltip-only —
+    now they render per-event, mirroring the JS path.
+    """
+    payload = {
+        "function": ".x = to_int!(.s)",
+        "events": [{"s": "notanumber"}, {"s": "alsobad"}],
+        "trans_type": 0,
+    }
+    resp = client.post("functions/test", json=payload)
+    assert resp.status_code == 200, \
+        f"VRL runtime error should be 200, got {resp.status_code}: {resp.text}"
+    body = resp.json()
+    assert "results" in body, f"response missing 'results': {body}"
+    assert all("vrl runtime error" in r.get("message", "") for r in body["results"]), \
+        f"expected a per-event VRL runtime error message, got: {body['results']}"
