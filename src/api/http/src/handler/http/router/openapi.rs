@@ -143,6 +143,8 @@ use crate::{common::meta, handler::http::request};
         openobserve_api_management::request::alerts::incidents::update_incident,
         openobserve_api_management::request::alerts::incidents::get_incident_stats,
         openobserve_api_management::request::alerts::incidents::trigger_incident_rca,
+        openobserve_api_management::request::alerts::incidents::cancel_incident_rca,
+        openobserve_api_management::request::alerts::incidents::get_incident_rca_history,
         openobserve_api_management::request::alerts::templates::list_templates,
         openobserve_api_management::request::alerts::templates::get_template,
         openobserve_api_management::request::alerts::templates::save_template,
