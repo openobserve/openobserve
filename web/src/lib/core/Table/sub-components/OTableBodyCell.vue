@@ -20,7 +20,9 @@ let copyTimer: ReturnType<typeof setTimeout> | null = null;
 
 async function handleCopy(event: MouseEvent) {
   event.stopPropagation();
-  const value = String(props.cell.getValue() ?? "");
+  // Copy what the user sees: the formatted display value (dashboard format fns
+  // handle units, timestamps and no_value_replacement), not the raw cell value.
+  const value = String(displayValue.value ?? "");
   const success = await copyToClipboard(value, { silent: true });
   if (success) {
     copied.value = true;
@@ -255,7 +257,8 @@ function onCellActionsLeave() {
             ? 'overflow-hidden whitespace-nowrap'
             : 'overflow-hidden text-ellipsis whitespace-nowrap',
       meta?.cellClass ?? '',
-      isTreeColumn || hasCellActions ? 'relative' : '',
+      isTreeColumn || hasCellActions || enableCellCopy ? 'relative' : '',
+      enableCellCopy ? 'group/cell' : '',
       isTreeColumn && treeMeta?.isParent && treeMeta?.isExpanded ? 'o2-tree-parent-expanded' : '',
       isTreeColumn && treeMeta && treeMeta.parentId !== null ? 'o2-tree-child' : '',
       isTreeColumn && treeMeta?.isLastChild ? 'o2-tree-last-child' : '',
@@ -345,7 +348,7 @@ function onCellActionsLeave() {
       v-if="enableCellCopy && !$slots.default"
       type="button"
       :data-test="`o2-table-cell-copy-${cell.column.id}`"
-      class="bg-surface-base border-border-default rounded-default text-text-muted hover:text-text-body absolute right-1 cursor-pointer border p-0.5 leading-none opacity-0 transition-opacity group-hover:opacity-100"
+      class="bg-surface-base border-border-default rounded-default text-text-muted hover:text-text-body absolute top-1/2 right-1 -translate-y-1/2 cursor-pointer border p-0.5 leading-none opacity-0 transition-opacity group-hover/cell:opacity-100"
       :title="copied ? 'Copied!' : 'Copy'"
       @click="handleCopy"
     >
