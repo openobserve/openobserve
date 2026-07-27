@@ -3035,13 +3035,11 @@ CREATE TABLE IF NOT EXISTS stream_stats
     )
     .await?;
 
-    // Autovacuum tuning
+    // Autovacuum tuning + column width compatibility
     if cfg.common.meta_partition_mode == "auto" {
         apply_autovacuum_tuning(&pool).await?;
+        apply_column_width_compat(&pool).await?;
     }
-
-    // Column width compatibility for file and account columns
-    apply_column_width_compat(&pool).await?;
 
     Ok(())
 }
