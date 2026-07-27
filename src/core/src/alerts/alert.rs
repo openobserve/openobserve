@@ -2687,19 +2687,28 @@ mod threshold_validation_tests {
         assert!(msg.contains("promql_warning_value"), "got: {msg}");
     }
 
-    // ── Per-group alerting at the save boundary (M-9/M-10, §5.5 MN-11) ──────
-    // The rule matrix lives in `config::meta::alerts::grouping`; these cover
-    // the WIRING — that `prepare_alert` actually consults it, that the error
-    // maps to HTTP 400, and that an alert which did not opt in is untouched.
-    // `prepare_alert` itself needs a live DB (folders, schema), so these
-    // exercise the same validation call it makes, in the same order.
+    // ── Per-group alerting rules as `prepare_alert` applies them ───────────
+    // (M-9/M-10, §5.5 MN-11.)
+    //
+    // SCOPE, stated plainly so these are not mistaken for boundary tests:
+    // they call `validate_multi_alert_config` — the function `prepare_alert`
+    // delegates to — with realistic whole-`Alert` inputs. They pin the RULES
+    // and the HTTP mapping. They do NOT pin the WIRING: deleting
+    // `validate_multi_alert_config(alert)?` from `prepare_alert` would leave
+    // every one of them green.
+    //
+    // Closing that needs `prepare_alert` itself, which reaches for folders,
+    // `get_by_id_db` and `infra::schema::get` — all through the global
+    // `ORM_CLIENT` rather than an injectable connection. The infra SQLite
+    // harness cannot reach it without first making that global overridable in
+    // tests; until then the wiring is verified by review, not by test.
 
     use config::{meta::alerts::alert::Alert, utils::json::json};
 
-    /// The **production** function `prepare_alert` calls — not a copy of it.
-    /// Changing the real call site therefore changes what these tests
-    /// exercise, instead of silently leaving them testing a stale duplicate.
-    use super::validate_multi_alert_config as validate_at_save_boundary;
+    /// The **production** function `prepare_alert` delegates to — not a copy.
+    /// Changing the rule therefore changes what these tests exercise. It does
+    /// not, and cannot, prove `prepare_alert` still calls it.
+    use super::validate_multi_alert_config as validate_rules;
 
     fn multi_alert_fixture() -> Alert {
         let mut alert = Alert::default();
@@ -2721,18 +2730,18 @@ mod threshold_validation_tests {
     }
 
     #[test]
-    fn test_save_accepts_a_valid_multi_alert() {
-        assert!(validate_at_save_boundary(&multi_alert_fixture()).is_ok());
+    fn test_a_valid_multi_alert_passes_the_rules() {
+        assert!(validate_rules(&multi_alert_fixture()).is_ok());
     }
 
     #[test]
-    fn test_save_rejects_multi_alert_with_incidents() {
+    fn test_the_rules_reject_multi_alert_with_incidents() {
         // MN-11. Without this wiring the pure rule exists but every API
         // client can still create the unsupported combination.
         let mut alert = multi_alert_fixture();
         alert.creates_incident = true;
 
-        let err = validate_at_save_boundary(&alert).expect_err("must be rejected");
+        let err = validate_rules(&alert).expect_err("must be rejected");
         assert!(matches!(err, AlertError::InvalidMultiAlert(_)));
         assert!(
             err.to_string().contains("creates_incident"),
@@ -2741,20 +2750,20 @@ mod threshold_validation_tests {
     }
 
     #[test]
-    fn test_save_rejects_multi_alert_with_a_group_count_threshold() {
+    fn test_the_rules_reject_multi_alert_with_a_group_count_threshold() {
         // M-10: "at least 3 groups" and "any breaching group" are different
         // alerts; accepting both would leave the 3 doing nothing.
         let mut alert = multi_alert_fixture();
         alert.trigger_condition.threshold = 3;
 
         assert!(matches!(
-            validate_at_save_boundary(&alert),
+            validate_rules(&alert),
             Err(AlertError::InvalidMultiAlert(_))
         ));
     }
 
     #[test]
-    fn test_save_rejects_removing_the_last_group_by_from_a_multi_alert() {
+    fn test_the_rules_reject_removing_the_last_group_by_from_a_multi_alert() {
         // The UPDATE path specifically: `prepare_alert` runs on both, so an
         // edit that empties group_by while the flag stays on is rejected.
         let mut alert = multi_alert_fixture();
@@ -2766,13 +2775,13 @@ mod threshold_validation_tests {
             .group_by = Some(vec![]);
 
         assert!(matches!(
-            validate_at_save_boundary(&alert),
+            validate_rules(&alert),
             Err(AlertError::InvalidMultiAlert(_))
         ));
     }
 
     #[test]
-    fn test_save_leaves_ordinary_incident_alerts_alone() {
+    fn test_the_rules_leave_ordinary_incident_alerts_alone() {
         // The guard is multi-only. An incident-creating alert with a group
         // count threshold and no opt-in stays perfectly valid.
         let mut alert = multi_alert_fixture();
@@ -2785,7 +2794,7 @@ mod threshold_validation_tests {
             .unwrap()
             .multi_alert = false;
 
-        assert!(validate_at_save_boundary(&alert).is_ok());
+        assert!(validate_rules(&alert).is_ok());
     }
 
     #[test]

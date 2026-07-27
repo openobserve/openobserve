@@ -221,50 +221,39 @@ pub async fn advance_delivery_state(
 }
 
 /// [`advance_delivery_state`] against a caller-supplied connection.
-pub async fn advance_delivery_state_with<C: sea_orm::ConnectionTrait>(
+pub async fn advance_delivery_state_with<C: sea_orm::ConnectionTrait + TransactionTrait>(
     conn: &C,
     alert_id: &str,
     group_key: &str,
     episode: DeliveryEpisode,
     outcome: DeliveryOutcome,
 ) -> Result<bool, errors::Error> {
-    let mut update = alert_states::Entity::update_many()
-        .filter(alert_states::Column::AlertId.eq(alert_id))
-        .filter(alert_states::Column::GroupKey.eq(group_key))
-        // The episode guard, evaluated by the database as part of the write.
-        .filter(alert_states::Column::Level.eq(episode.level.to_i32()))
-        .filter(alert_states::Column::LevelSince.eq(episode.level_since));
-
-    // The ATTEMPT guard, for failures only — and it must live here, in the
-    // same statement, not just in the pure layer. `DeliveryEpisode` carries
-    // the delivery state as it stood at enqueue precisely so an older
-    // attempt's failure cannot overwrite a newer attempt's success within one
-    // episode; if that predicate is missing from the SQL, the pure guard says
-    // "stale, drop it" while the real UPDATE happily applies it.
-    //
-    // Success deliberately omits these predicates — see
-    // `dispatch::delivery_success_update` for why the two guards differ.
-    //
-    // `eq(NULL)` is never true in SQL, so a never-delivered anchor has to be
-    // matched with IS NULL rather than `=`.
-    if matches!(outcome, DeliveryOutcome::Failed { .. }) {
-        let (notified_level, silenced_until) = episode.notified_at_enqueue;
-        update = match notified_level {
-            Some(l) => update.filter(alert_states::Column::LastNotifiedLevel.eq(l.to_i32())),
-            None => update.filter(alert_states::Column::LastNotifiedLevel.is_null()),
-        };
-        update = match silenced_until {
-            Some(t) => update.filter(alert_states::Column::SilencedUntil.eq(t)),
-            None => update.filter(alert_states::Column::SilencedUntil.is_null()),
-        };
-    }
-
     match outcome {
+        // ── Success: one atomic UPDATE, two columns ─────────────────────────
         DeliveryOutcome::Delivered {
             notified_level,
             silenced_until,
         } => {
-            update = update
+            let update = alert_states::Entity::update_many()
+                .filter(alert_states::Column::AlertId.eq(alert_id))
+                .filter(alert_states::Column::GroupKey.eq(group_key))
+                // The episode guard, evaluated by the database as part of the
+                // write. Success deliberately does NOT check the enqueue
+                // anchor — see `dispatch::delivery_success_update`.
+                .filter(alert_states::Column::Level.eq(episode.level.to_i32()))
+                .filter(alert_states::Column::LevelSince.eq(episode.level_since))
+                // ...but it must not move the window BACKWARDS. Two successes
+                // in one episode both pass the episode guard, and if the one
+                // computing the earlier window commits second it would shorten
+                // an active silence and let the group page early. Applying
+                // only when the new window is later makes commit order
+                // irrelevant. Within an episode the level is identical, so
+                // skipping the whole row here loses nothing.
+                .filter(
+                    alert_states::Column::SilencedUntil
+                        .is_null()
+                        .or(alert_states::Column::SilencedUntil.lt(silenced_until)),
+                )
                 .col_expr(
                     alert_states::Column::LastNotifiedLevel,
                     sea_orm::sea_query::Expr::value(notified_level.to_i32()),
@@ -273,25 +262,50 @@ pub async fn advance_delivery_state_with<C: sea_orm::ConnectionTrait>(
                     alert_states::Column::SilencedUntil,
                     sea_orm::sea_query::Expr::value(silenced_until),
                 );
+            Ok(update.exec(conn).await?.rows_affected > 0)
         }
+
+        // ── Failure: read, decide with the PURE contract, write ─────────────
+        // A failure moves the outcome axis, and that axis has invariants
+        // (`since` tracks the last change; an outcome change is a transition,
+        // MN-9). Those rules live in `dispatch::delivery_failure_update` and
+        // are unit-tested there; re-expressing them as SET clauses here is how
+        // the two layers drifted apart last time. So this path *calls* the
+        // pure function rather than reimplementing it, and writes whatever it
+        // returns.
+        //
+        // The read and the write share one transaction, and the guards are
+        // re-checked against the row that was actually read, so a concurrent
+        // delivery cannot slip between them.
         DeliveryOutcome::Failed { at } => {
-            // Delivery state is untouched on purpose: the group must
-            // re-qualify at its next evaluation (MN-6). Only the outcome axis
-            // moves, and `last_seen` stays put — a failed send is not an
-            // observation, so it must not postpone M-7.
-            update = update
-                .col_expr(
-                    alert_states::Column::LastOutcome,
-                    sea_orm::sea_query::Expr::value(RunOutcome::NotifyFailed.to_i32()),
-                )
-                .col_expr(
-                    alert_states::Column::LastOutcomeAt,
-                    sea_orm::sea_query::Expr::value(at),
-                );
+            let txn = conn.begin().await?;
+
+            let Some(current) = alert_states::Entity::find_by_id((
+                alert_id.to_string(),
+                group_key.to_string(),
+            ))
+            .one(&txn)
+            .await?
+            .map(AlertState::from) else {
+                txn.rollback().await?;
+                return Ok(false);
+            };
+
+            // Episode guard + attempt anchor, exactly as the pure layer
+            // defines them. `delivery_failure_update` returns `None` when
+            // either fails, so there is a single source of truth for staleness.
+            let Some(update) =
+                config::meta::alerts::dispatch::delivery_failure_update(&current, episode, at)
+            else {
+                txn.rollback().await?;
+                return Ok(false);
+            };
+
+            write_update(&txn, &update).await?;
+            txn.commit().await?;
+            Ok(true)
         }
     }
-
-    Ok(update.exec(conn).await?.rows_affected > 0)
 }
 
 /// Which delivery outcome [`advance_delivery_state`] should record.
@@ -1068,5 +1082,124 @@ mod tests {
         assert!(applied, "a NULL anchor must match a never-delivered row");
         let read = get_with(db, &alert_id, "g1").await.unwrap().unwrap();
         assert_eq!(read.last_outcome, Some(RunOutcome::NotifyFailed));
+    }
+
+    #[tokio::test]
+    async fn test_an_older_success_cannot_shorten_an_active_silence_window() {
+        // Success ignores the enqueue anchor by design, so BOTH attempts in an
+        // episode pass the episode guard. If the one that computed the earlier
+        // window commits second, an unconditional assignment would shorten a
+        // live silence and let the group page early — a duplicate at exactly
+        // the moment on-call is already being paged.
+        //
+        // Applying only when the new window is later makes commit order
+        // irrelevant, which is what the reverse ordering here proves.
+        let db = test_db().await;
+        let alert_id = unique_alert_id("window-regress");
+
+        persist_with(
+            db,
+            &update_of(group_row(&alert_id, "g1", AlertLevel::Critical, 1_000)),
+        )
+        .await
+        .unwrap();
+
+        let ep = DeliveryEpisode {
+            level: AlertLevel::Critical,
+            level_since: 1_000,
+            notified_at_enqueue: (None, None),
+        };
+
+        // The NEWER delivery lands first, setting a window far out.
+        assert!(
+            advance_delivery_state_with(
+                db,
+                &alert_id,
+                "g1",
+                ep,
+                DeliveryOutcome::Delivered {
+                    notified_level: AlertLevel::Critical,
+                    silenced_until: Some(9_000),
+                },
+            )
+            .await
+            .unwrap()
+        );
+
+        // An OLDER delivery from the same episode commits afterwards.
+        let applied = advance_delivery_state_with(
+            db,
+            &alert_id,
+            "g1",
+            ep,
+            DeliveryOutcome::Delivered {
+                notified_level: AlertLevel::Critical,
+                silenced_until: Some(5_000),
+            },
+        )
+        .await
+        .unwrap();
+
+        assert!(!applied, "an earlier window is not an update");
+        let read = get_with(db, &alert_id, "g1").await.unwrap().unwrap();
+        assert_eq!(
+            read.silenced_until,
+            Some(9_000),
+            "the later window must survive, whatever order the callbacks commit in"
+        );
+        assert_eq!(read.last_notified_level, Some(AlertLevel::Critical));
+    }
+
+    #[tokio::test]
+    async fn test_a_zero_silence_success_does_not_clear_a_live_window() {
+        // `silence = 0` means "page every evaluation" and writes NULL. Arriving
+        // late, it must not wipe a window a sibling attempt already set —
+        // `NULL` is the earliest window, not the newest.
+        let db = test_db().await;
+        let alert_id = unique_alert_id("zero-silence-late");
+
+        persist_with(
+            db,
+            &update_of(group_row(&alert_id, "g1", AlertLevel::Critical, 1_000)),
+        )
+        .await
+        .unwrap();
+
+        let ep = DeliveryEpisode {
+            level: AlertLevel::Critical,
+            level_since: 1_000,
+            notified_at_enqueue: (None, None),
+        };
+        advance_delivery_state_with(
+            db,
+            &alert_id,
+            "g1",
+            ep,
+            DeliveryOutcome::Delivered {
+                notified_level: AlertLevel::Critical,
+                silenced_until: Some(9_000),
+            },
+        )
+        .await
+        .unwrap();
+
+        advance_delivery_state_with(
+            db,
+            &alert_id,
+            "g1",
+            ep,
+            DeliveryOutcome::Delivered {
+                notified_level: AlertLevel::Critical,
+                silenced_until: None,
+            },
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(
+            get_with(db, &alert_id, "g1").await.unwrap().unwrap().silenced_until,
+            Some(9_000),
+            "a NULL window must not overwrite a live one"
+        );
     }
 }

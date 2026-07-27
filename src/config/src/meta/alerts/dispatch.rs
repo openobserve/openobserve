@@ -734,56 +734,86 @@ mod tests {
     }
 
     #[test]
-    fn test_duplicate_group_keys_are_refused() {
-        // Multi-time-range evaluations flatten one result array per range, so
-        // the SAME group key can appear more than once in a classification.
-        // Dispatching both would page the group twice and consume two slots of
-        // the MN-8 budget. (Validation rejects multi_alert + multi_time_range
-        // outright — this is the defence in depth for any other path that
-        // could produce a repeat.)
+    fn test_duplicate_group_keys_are_refused_outright() {
+        // One coherent policy, because there is no safe alternative. The
+        // classification is severity-sorted while `rows_by_group_key` keeps
+        // the FIRST raw row, so for a duplicated key the winning level and the
+        // winning payload can come from different observations — a Critical
+        // item carrying a Warning row. Sending "once" would page a real
+        // severity against a mismatched measurement, which is worse than not
+        // paging: on-call would act on a number that never went with that
+        // level.
+        //
+        // Validation already rejects the known duplicate source
+        // (`multi_alert` + multi-window), so any duplicate reaching here is a
+        // genuine invariant violation. Refusing and reporting matches how the
+        // missing-state and missing-row cases are handled, and the next
+        // evaluation recovers.
         let now = 1_000 * SEC;
         let c = classified(&[("a", 150.0), ("a", 150.0), ("b", 120.0)], 500);
-        // Classification maps observations 1:1 — it does NOT coalesce — which
-        // is precisely why dispatch has to. Asserting the fixture's shape
-        // keeps this test honest: if classification ever starts deduping, this
-        // fails here rather than passing vacuously.
         assert_eq!(c.groups.len(), 3, "fixture: `a` is observed twice");
 
         let states = states_for(&c, now, None, None);
         let plan = plan_dispatch(&c, &states, &rows_for(&c), &tc(None), now, 0);
 
+        assert!(
+            !plan.items.iter().any(|i| i.group_key == key_of("a")),
+            "a duplicated key must not page at all"
+        );
         assert_eq!(
-            plan.items.iter().filter(|i| i.group_key == key_of("a")).count(),
+            plan.items.len(),
             1,
-            "a duplicated group must page exactly once"
+            "only the unambiguous group pages; `b` is unaffected by `a`'s problem"
         );
-        assert_eq!(plan.items.len(), 2, "`a` once, `b` once — not three sends");
-        assert!(
-            plan.inconsistent.contains(&key_of("a")),
-            "and the duplication must be reported, not silently coalesced"
-        );
-        assert!(
-            !plan.inconsistent.contains(&key_of("b")),
-            "the group that appeared once is not inconsistent"
-        );
+        assert_eq!(plan.items[0].group_key, key_of("b"));
+        assert!(plan.inconsistent.contains(&key_of("a")));
+        assert!(!plan.inconsistent.contains(&key_of("b")));
     }
 
     #[test]
-    fn test_a_duplicated_group_consumes_exactly_one_budget_slot() {
-        // The other half of the duplicate problem: even when coalesced for
-        // sending, a repeat must not eat two slots of the MN-8 budget and
-        // starve a genuinely distinct group.
+    fn test_conflicting_duplicate_values_never_produce_a_mismatched_page() {
+        // The case the identical-value fixture cannot detect, and the reason
+        // the policy is "refuse" rather than "coalesce". Here the same key is
+        // observed at Warning and at Critical: severity-first ordering makes
+        // the classification winner Critical, while the row map keeps
+        // whichever row came first. Any implementation that paged once could
+        // emit a Critical item carrying the 75.0 Warning row.
         let now = 1_000 * SEC;
-        let c = classified(&[("a", 150.0), ("a", 150.0), ("b", 120.0)], 500);
+        let c = classified(&[("a", 75.0), ("a", 150.0), ("b", 120.0)], 500);
+        assert_eq!(c.groups.len(), 3, "fixture: `a` observed at two levels");
+
+        let states = states_for(&c, now, None, None);
+        let plan = plan_dispatch(&c, &states, &rows_for(&c), &tc(None), now, 0);
+
+        for item in &plan.items {
+            assert_ne!(
+                item.group_key,
+                key_of("a"),
+                "an ambiguous group must never page, at either level"
+            );
+            // Whatever does page must be internally consistent: its payload
+            // row has to be the row its own value came from.
+            assert_eq!(
+                item.row.get("alert_agg_value").and_then(|v| v.as_f64()),
+                Some(item.actual_value),
+                "an item's level, value and row must all describe one observation"
+            );
+        }
+        assert!(plan.inconsistent.contains(&key_of("a")));
+    }
+
+    #[test]
+    fn test_a_duplicated_group_consumes_no_budget_slot() {
+        // A refused group is not a send, so it must not spend a slot of the
+        // MN-8 budget and starve a group that could have paged.
+        let now = 1_000 * SEC;
+        let c = classified(&[("a", 150.0), ("a", 150.0), ("b", 120.0), ("c", 110.0)], 500);
         let states = states_for(&c, now, None, None);
 
         let plan = plan_dispatch(&c, &states, &rows_for(&c), &tc(None), now, 2);
 
-        assert_eq!(plan.items.len(), 2);
-        assert!(
-            plan.dropped_by_knob.is_empty(),
-            "two distinct groups fit a budget of two; the duplicate must not crowd one out"
-        );
+        assert_eq!(plan.items.len(), 2, "`b` and `c` both page");
+        assert!(plan.dropped_by_knob.is_empty());
     }
 
     #[test]
