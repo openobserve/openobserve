@@ -40,6 +40,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Composer: location inputs + platform tabs + composed command -->
         <template v-if="canCompose">
           <div class="rounded-default border-border-default flex flex-col gap-3 border p-3">
+            <OInput
+              v-if="!locationId"
+              v-model="draftLocation"
+              :label="t('synthetics.privateLocations.setup.locationNameLabel')"
+              :placeholder="t('synthetics.privateLocations.setup.locationNamePlaceholder')"
+              required
+              size="sm"
+              data-test="synthetics-agent-setup-location-input"
+            />
             <div class="flex flex-col gap-1">
               <OInput
                 v-model="draftAgentName"
@@ -52,15 +61,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ t("synthetics.privateLocations.setup.agentNameHint") }}
               </p>
             </div>
-            <OInput
-              v-if="!locationId"
-              v-model="draftLocation"
-              :label="t('synthetics.privateLocations.setup.locationNameLabel')"
-              :placeholder="t('synthetics.privateLocations.setup.locationNamePlaceholder')"
-              required
-              size="sm"
-              data-test="synthetics-agent-setup-location-input"
-            />
           </div>
 
           <!-- Which agent to install. The two are different programs, not two

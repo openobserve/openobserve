@@ -250,117 +250,24 @@ const selectedLocations = computed({
       </h3>
     </div>
     <div class="flex flex-col gap-3 px-3 py-2">
-      <!-- Rendered whenever private locations are allowed, even with zero
-           locations of any kind — the private subsection's empty state carries
-           the "set up private agent" CTA, which is the only way out of a
-           no-locations org. Without private support an empty list has nothing
-           actionable, so it falls through to the plain empty state below. -->
-      <OCheckboxGroup
-        v-if="locations.length || allowPrivate"
-        v-model="selectedLocations"
-        data-test="synthetics-check-locations-group"
-      >
-        <template v-if="allowPrivate && publicLocations.length">
-          <div class="text-text-muted pb-1 text-xs font-medium uppercase">
-            {{ t("synthetics.locations.publicTitle") }}
-          </div>
-        </template>
-        <OCheckbox
-          v-for="location in publicLocations"
-          :key="location.id"
-          :value="location.id"
-          :data-test="`synthetics-check-locations-option-${location.id}`"
-          class="pb-2"
-        >
-          <template #label>
-            <span class="flex items-center gap-1.5">
-              <OIcon :name="locationIcon(location.provider)" size="sm" />
-              {{ locationDisplayName(location) }}
-            </span>
-          </template>
-        </OCheckbox>
-
-        <template v-if="allowPrivate">
-          <div class="flex items-center justify-between pt-2 pb-1">
-            <div class="text-text-muted text-xs font-medium uppercase">
-              {{ t("synthetics.locations.privateTitle") }}
-            </div>
-            <OButton
-              variant="ghost"
-              size="xs"
-              icon-left="add"
-              data-test="synthetics-check-locations-setup-agent-btn"
-              @click="emit('setup-agent')"
-            >
-              {{ t("synthetics.locations.setupAgent") }}
-            </OButton>
-          </div>
-
-          <template v-if="privateLocations.length">
-            <OCheckbox
-              v-for="location in privateLocations"
-              :key="location.id"
-              :value="location.id"
-              :data-test="`synthetics-check-locations-option-${location.id}`"
-              class="pb-2"
-            >
-              <template #label>
-                <span class="flex flex-col gap-0.5">
-                  <span class="flex items-center gap-1.5">
-                    <span
-                      class="inline-block h-2 w-2 shrink-0 rounded-full"
-                      :class="
-                        location.status === 'online'
-                          ? 'bg-status-success-text'
-                          : location.status === 'offline'
-                            ? 'bg-status-error-text'
-                            : 'bg-text-disabled'
-                      "
-                      :data-test="`synthetics-check-locations-status-${location.id}`"
-                    />
-                    {{ locationDisplayName(location) }}
-                    <OTag size="xs" shape="rounded" variant="purple-soft">
-                      {{ t("synthetics.locations.privateBadge") }}
-                    </OTag>
-                  </span>
-                  <span class="text-text-muted text-xs">{{ agentSubtext(location) }}</span>
-                  <span
-                    v-if="location.status !== 'online'"
-                    class="text-status-warning-text text-xs"
-                    :data-test="`synthetics-check-locations-warning-${location.id}`"
-                  >
-                    {{ t("synthetics.locations.offlineWarning") }}
-                  </span>
-                </span>
-              </template>
-            </OCheckbox>
-          </template>
-
-          <div
-            v-else
-            class="rounded-default border-border-default text-text-muted flex flex-col items-center gap-2 border border-dashed px-3 py-4 text-sm"
-            data-test="synthetics-check-locations-private-empty"
-          >
-            <span>{{ t("synthetics.locations.privateEmptyBody") }}</span>
-            <OButton
-              variant="outline"
-              size="sm"
-              icon-left="add"
-              data-test="synthetics-check-locations-private-empty-cta"
-              @click="emit('setup-agent')"
-            >
-              {{ t("synthetics.locations.setupAgent") }}
-            </OButton>
-          </div>
-        </template>
-      </OCheckboxGroup>
-
-      <div
-        v-else
-        class="rounded-default border-border-default text-text-muted flex items-center justify-center border border-dashed px-3 py-3 text-sm"
-        data-test="synthetics-check-locations-empty"
-      >
-        {{ t("synthetics.locations.empty") }}
+      <!-- ── Search ────────────────────────────────────────────────────────── -->
+      <!-- ── Search + refresh ────────────────────────────────────────────────── -->
+      <div v-if="!loadingLocations" class="flex items-center gap-2">
+        <OInput
+          v-if="showSearch"
+          v-model="searchQuery"
+          type="search"
+          :placeholder="t('synthetics.locations.searchPlaceholder')"
+          class="flex-1"
+          data-test="synthetics-check-locations-search"
+        />
+        <OButton
+          variant="outline"
+          size="sm"
+          icon-left="refresh"
+          data-test="synthetics-check-locations-refresh-btn"
+          @click="emit('refresh-locations')"
+        />
       </div>
 
       <!-- ── Loading skeleton ──────────────────────────────────────────────── -->

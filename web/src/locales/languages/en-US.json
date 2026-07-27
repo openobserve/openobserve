@@ -10637,7 +10637,7 @@
       "selectedCount": "{selected} of {total} locations selected",
       "title": "Locations",
       "privateBadge": "Private",
-      "publicTitle": "Public",
+      "publicTitle": "Public locations",
       "privateTitle": "Private locations",
       "setupAgent": "Set up private agent",
       "privateEmptyBody": "Run this check from your own VPC or on-premise network.",
