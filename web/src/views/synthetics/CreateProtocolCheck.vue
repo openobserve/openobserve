@@ -331,7 +331,7 @@ async function saveCheck() {
           data-test="synthetics-create-save-btn"
           @click="saveCheck"
         >
-          {{ editId ? t("synthetics.newCheck.updateCheck") : t("synthetics.newCheck.saveCheck") }}
+          {{ t("synthetics.newCheck.saveAndExit") }}
         </OButton>
       </div>
 

@@ -957,11 +957,7 @@ function onClearResults() {
               data-test="synthetics-create-save-btn"
               @click="onSaveAndExit"
             >
-              {{
-                props.editId
-                  ? t("synthetics.newCheck.saveAndExit")
-                  : t("synthetics.newCheck.saveCheck")
-              }}
+              {{ t("synthetics.newCheck.saveAndExit") }}
             </OButton>
           </template>
         </div>
