@@ -59,6 +59,15 @@ pub async fn test_db() -> &'static DatabaseConnection {
                 .await
                 .expect("connect to the test sqlite database");
 
+            // WAL + a busy timeout, matching `db::sqlite::connect_rw`. Without
+            // them concurrent writers fail with SQLITE_BUSY instead of
+            // serialising, which would make the concurrency tests flaky rather
+            // than meaningful — and those are the only tests that can catch a
+            // guard missing from an UPDATE's WHERE clause.
+            conn.execute_unprepared("PRAGMA journal_mode=WAL; PRAGMA busy_timeout=15000;")
+                .await
+                .expect("configure sqlite for concurrent writers");
+
             // The migration set predates the ORM: the earliest migrations read
             // the legacy key/value `meta` table to populate the typed tables,
             // and `meta` is created by `db::create_table()` — the non-ORM path,

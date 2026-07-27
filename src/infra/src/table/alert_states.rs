@@ -1251,4 +1251,245 @@ mod tests {
             "a zero-silence callback must not clear a live window"
         );
     }
+
+    // ═════════════════════════════════════════════════════════════════════
+    // Concurrency
+    //
+    // Every other test here writes sequentially, which is how the delivery
+    // guards could briefly be moved out of the UPDATE's WHERE clause into a
+    // plain Rust check with no test noticing: with one writer, validating
+    // before the write is indistinguishable from validating during it.
+    //
+    // These assert invariants that must hold under ANY interleaving, and they
+    // repeat because a rare race is still a race.
+    //
+    // WHAT THEY DO NOT ESTABLISH, measured rather than assumed: deleting the
+    // `level`/`level_since` predicates from the UPDATE leaves all three of
+    // them GREEN. On SQLite the callback's deferred transaction takes its read
+    // lock before the SELECT and upgrades on the write, so a competing commit
+    // in between makes the upgrade fail rather than silently apply — the
+    // engine closes the window that the WHERE clause also closes.
+    //
+    // The predicates are therefore NOT redundant: under Postgres READ
+    // COMMITTED the same read-then-write does not conflict, the UPDATE simply
+    // observes the newer row, and only the guard stops a stale callback
+    // writing into an episode that has moved on. That path cannot be
+    // exercised by this SQLite harness, so the guards are load-bearing for a
+    // backend these tests never run against. Treat them as required by review,
+    // not as covered here — and if this suite ever gains a Postgres backend,
+    // removing a predicate should start failing.
+    // ═════════════════════════════════════════════════════════════════════
+
+    /// Rounds per race test. High enough that a window of a few statements is
+    /// hit reliably, low enough to stay quick.
+    const RACE_ROUNDS: usize = 60;
+
+    #[tokio::test]
+    async fn test_a_callback_never_records_delivery_against_a_superseded_episode() {
+        // THE regression, as an invariant.
+        //
+        // A callback for episode T1 races an evaluation that moves the group to
+        // episode T2. Because the evaluation's upsert deliberately excludes the
+        // delivery columns (one-writer rule, MN-2), any delivery state on the
+        // final row can only have come from the callback — so if the row ends
+        // up at T2 while carrying delivery state, the T1 callback wrote after
+        // the episode had already moved on.
+        //
+        // Note this passes on SQLite with or without the WHERE-clause guards
+        // (see the section header): here it is the transaction that closes the
+        // window. What the test genuinely pins is the INVARIANT — no delivery
+        // state may ever be attributed to a superseded episode — which must
+        // hold on every backend, however it is enforced.
+        let db = test_db().await;
+
+        for round in 0..RACE_ROUNDS {
+            let alert_id = unique_alert_id(&format!("race-episode-{round}"));
+            persist_with(
+                db,
+                &update_of(group_row(&alert_id, "g1", AlertLevel::Critical, 1_000)),
+            )
+            .await
+            .unwrap();
+
+            let old_episode = DeliveryEpisode {
+                level: AlertLevel::Critical,
+                level_since: 1_000,
+                notified_at_enqueue: (None, None),
+            };
+
+            // The evaluation moves the group into a NEW level-episode while the
+            // callback for the old one is in flight.
+            let evaluation = async {
+                persist_with(
+                    db,
+                    &update_of(group_row(&alert_id, "g1", AlertLevel::Critical, 2_000)),
+                )
+                .await
+            };
+            let callback = async {
+                advance_delivery_state_with(
+                    db,
+                    &alert_id,
+                    "g1",
+                    old_episode,
+                    DeliveryOutcome::Delivered {
+                        silence_minutes: 10,
+                        at: 1_500,
+                    },
+                )
+                .await
+            };
+            let (eval_res, cb_res) = tokio::join!(evaluation, callback);
+            eval_res.unwrap();
+            let applied = cb_res.unwrap();
+
+            let read = get_with(db, &alert_id, "g1").await.unwrap().unwrap();
+            if read.level_since == Some(2_000) {
+                assert!(
+                    read.silenced_until.is_none() && read.last_notified_level.is_none(),
+                    "round {round}: a callback for the superseded episode wrote delivery state \
+                     into the new one (applied={applied}, row={read:?})"
+                );
+            } else {
+                // The callback won the race; its write belongs to the episode
+                // it was issued for, which is legitimate.
+                assert!(applied, "round {round}: the callback matched but did not apply");
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_a_stale_failure_never_wins_a_race_against_a_success() {
+        // The attempt anchor under contention. Both callbacks belong to ONE
+        // episode, so the episode guard cannot separate them — only the
+        // enqueue-time delivery-state anchor can. If the failure lands after
+        // the success, it must be refused; a group that was paged must never
+        // read as NotifyFailed and re-page next cycle.
+        let db = test_db().await;
+
+        for round in 0..RACE_ROUNDS {
+            let alert_id = unique_alert_id(&format!("race-attempt-{round}"));
+            persist_with(
+                db,
+                &update_of(group_row(&alert_id, "g1", AlertLevel::Critical, 1_000)),
+            )
+            .await
+            .unwrap();
+
+            // Both attempts were enqueued before anything had been delivered.
+            let episode = DeliveryEpisode {
+                level: AlertLevel::Critical,
+                level_since: 1_000,
+                notified_at_enqueue: (None, None),
+            };
+
+            let success = async {
+                advance_delivery_state_with(
+                    db,
+                    &alert_id,
+                    "g1",
+                    episode,
+                    DeliveryOutcome::Delivered {
+                        silence_minutes: 10,
+                        at: 1_500,
+                    },
+                )
+                .await
+            };
+            let failure = async {
+                advance_delivery_state_with(
+                    db,
+                    &alert_id,
+                    "g1",
+                    episode,
+                    DeliveryOutcome::Failed { at: 1_600 },
+                )
+                .await
+            };
+            let (s_res, f_res) = tokio::join!(success, failure);
+            s_res.unwrap();
+            f_res.unwrap();
+
+            let read = get_with(db, &alert_id, "g1").await.unwrap().unwrap();
+            // The row must describe ONE coherent outcome, never a blend of the
+            // two: delivered-and-silenced, or failed-and-unsilenced.
+            if read.last_notified_level.is_some() {
+                assert_eq!(
+                    read.last_outcome,
+                    Some(RunOutcome::Firing),
+                    "round {round}: the group delivered, so a losing failure must not have \
+                     marked it NotifyFailed (row={read:?})"
+                );
+            } else {
+                assert_eq!(
+                    read.last_outcome,
+                    Some(RunOutcome::NotifyFailed),
+                    "round {round}: nothing delivered, so the failure must be recorded \
+                     (row={read:?})"
+                );
+                assert!(read.silenced_until.is_none());
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_an_evaluation_and_a_delivery_never_lose_each_others_writes() {
+        // The one-writer rule under contention: the two writers touch disjoint
+        // columns, so BOTH updates must survive whatever the interleaving.
+        // Sequentially this is `test_evaluation_never_clobbers_delivery_state`;
+        // concurrently it also catches a callback that echoed back observation
+        // fields it had read before the evaluation committed.
+        let db = test_db().await;
+
+        for round in 0..RACE_ROUNDS {
+            let alert_id = unique_alert_id(&format!("race-writers-{round}"));
+            persist_with(
+                db,
+                &update_of(group_row(&alert_id, "g1", AlertLevel::Critical, 1_000)),
+            )
+            .await
+            .unwrap();
+
+            // Same episode, so the callback is always legitimate — only the
+            // observation columns move.
+            let episode = DeliveryEpisode {
+                level: AlertLevel::Critical,
+                level_since: 1_000,
+                notified_at_enqueue: (None, None),
+            };
+            let mut refreshed = group_row(&alert_id, "g1", AlertLevel::Critical, 1_000);
+            refreshed.last_outcome_at = Some(7_777);
+            refreshed.last_seen = Some(7_777);
+
+            let evaluation = async { persist_with(db, &update_of(refreshed)).await };
+            let callback = async {
+                advance_delivery_state_with(
+                    db,
+                    &alert_id,
+                    "g1",
+                    episode,
+                    DeliveryOutcome::Delivered {
+                        silence_minutes: 10,
+                        at: 1_500,
+                    },
+                )
+                .await
+            };
+            let (eval_res, cb_res) = tokio::join!(evaluation, callback);
+            eval_res.unwrap();
+            assert!(cb_res.unwrap(), "round {round}: the callback's episode was current");
+
+            let read = get_with(db, &alert_id, "g1").await.unwrap().unwrap();
+            assert_eq!(
+                read.last_notified_level,
+                Some(AlertLevel::Critical),
+                "round {round}: the evaluation erased the delivery (row={read:?})"
+            );
+            assert_eq!(
+                read.last_seen,
+                Some(7_777),
+                "round {round}: the callback rolled the observation back (row={read:?})"
+            );
+        }
+    }
 }
