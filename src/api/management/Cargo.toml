@@ -1,0 +1,101 @@
+[package]
+name = "openobserve-api-management"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[lib]
+path = "src/lib.rs"
+
+[features]
+default = []
+enterprise = [
+    "audit/enterprise",
+    "dep:o2_dex",
+    "dep:o2_enterprise",
+    "dep:o2_openfga",
+    "dep:openobserve-cipher",
+    "openobserve-http-common/enterprise",
+    "openobserve-core/enterprise",
+    "openobserve-org-storage/enterprise",
+    "openobserve-sourcemaps/enterprise",
+    "search_service/enterprise",
+    "stream/enterprise",
+    "usage_reporting/enterprise",
+]
+cloud = [
+    "enterprise",
+    "o2_enterprise/cloud",
+    "openobserve-core/cloud",
+    "openobserve-http-common/cloud",
+    "stream/cloud",
+]
+vectorscan = [
+    "openobserve-core/vectorscan",
+    "search_service/vectorscan",
+    "stream/vectorscan",
+]
+profiling = [
+    "dep:jemalloc_pprof",
+    "dep:pprof",
+    "dep:tikv-jemalloc-ctl",
+    "dep:tikv-jemalloc-sys",
+]
+
+[package.metadata.cargo-machete]
+ignored = ["tikv-jemalloc-sys"]
+
+[dependencies]
+anyhow.workspace = true
+async-stream.workspace = true
+audit.workspace = true
+axum.workspace = true
+axum-extra.workspace = true
+base64.workspace = true
+bytes.workspace = true
+chrono.workspace = true
+common.workspace = true
+config.workspace = true
+db.workspace = true
+futures.workspace = true
+hashbrown.workspace = true
+http.workspace = true
+infra.workspace = true
+itertools.workspace = true
+jemalloc_pprof = { workspace = true, optional = true }
+log.workspace = true
+mime.workspace = true
+o2_dex = { workspace = true, optional = true }
+o2_enterprise = { workspace = true, optional = true, default-features = false }
+o2_openfga = { workspace = true, optional = true }
+openobserve-builtins.workspace = true
+openobserve-cipher = { workspace = true, optional = true }
+openobserve-core.workspace = true
+openobserve-http-common.workspace = true
+openobserve-node.workspace = true
+openobserve-org-storage.workspace = true
+openobserve-sourcemaps.workspace = true
+opentelemetry.workspace = true
+pprof = { workspace = true, optional = true }
+regex.workspace = true
+reqwest.workspace = true
+search.workspace = true
+search_service.workspace = true
+sea-orm.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+stream.workspace = true
+svix-ksuid.workspace = true
+tikv-jemalloc-ctl = { workspace = true, optional = true }
+tikv-jemalloc-sys = { workspace = true, optional = true }
+time.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+url.workspace = true
+usage_reporting.workspace = true
+utoipa.workspace = true
+zip.workspace = true
+
+[dev-dependencies]
+cron.workspace = true

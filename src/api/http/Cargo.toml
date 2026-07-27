@@ -1,0 +1,91 @@
+[package]
+name = "openobserve-http"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[lib]
+path = "src/lib.rs"
+
+[features]
+default = []
+enterprise = [
+    "dep:o2_dex",
+    "dep:o2_enterprise",
+    "dep:o2_ratelimit",
+    "openobserve-api-ingest/enterprise",
+    "openobserve-api-management/enterprise",
+    "openobserve-api-pipelines/enterprise",
+    "openobserve-api-search/enterprise",
+    "openobserve-http-common/enterprise",
+    "openobserve-core/enterprise",
+    "stream/enterprise",
+]
+cloud = [
+    "enterprise",
+    "o2_enterprise/cloud",
+    "openobserve-api-ingest/cloud",
+    "openobserve-api-management/cloud",
+    "openobserve-api-pipelines/cloud",
+    "openobserve-api-search/cloud",
+    "openobserve-http-common/cloud",
+    "openobserve-core/cloud",
+    "stream/cloud",
+]
+vectorscan = [
+    "openobserve-api-ingest/vectorscan",
+    "openobserve-api-management/vectorscan",
+    "openobserve-api-pipelines/vectorscan",
+    "openobserve-api-search/vectorscan",
+    "openobserve-core/vectorscan",
+    "stream/vectorscan",
+]
+profiling = ["openobserve-api-management/profiling"]
+
+[dependencies]
+common.workspace = true
+audit.workspace = true
+db.workspace = true
+openobserve-core.workspace = true
+openobserve-tls.workspace = true
+ingestion-common.workspace = true
+stream.workspace = true
+search.workspace = true
+openobserve-api-ingest.workspace = true
+openobserve-api-management.workspace = true
+openobserve-api-pipelines.workspace = true
+openobserve-api-search.workspace = true
+openobserve-http-common.workspace = true
+openobserve-mcp.workspace = true
+axum.workspace = true
+axum-server.workspace = true
+tower.workspace = true
+tower-http.workspace = true
+http.workspace = true
+http-body-util.workspace = true
+anyhow.workspace = true
+base64.workspace = true
+bytes.workspace = true
+futures.workspace = true
+hashbrown.workspace = true
+log.workspace = true
+o2_dex = { workspace = true, optional = true }
+o2_enterprise = { workspace = true, optional = true, default-features = false }
+o2_ratelimit = { workspace = true, optional = true }
+rand.workspace = true
+regex.workspace = true
+reqwest.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+time.workspace = true
+tokio.workspace = true
+url.workspace = true
+utoipa.workspace = true
+utoipa-swagger-ui.workspace = true
+config.workspace = true
+infra.workspace = true
+futures-util.workspace = true
+
+[dev-dependencies]
+base64.workspace = true

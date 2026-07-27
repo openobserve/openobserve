@@ -1,0 +1,1204 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+//! AI Chat handlers that redirect to o2-sre-agent.
+//!
+//! These endpoints accept the legacy PromptRequest format for backward compatibility
+//! but internally forward all requests to the o2-sre-agent service, which handles
+//! the actual AI processing with MCP tool integration.
+
+#[cfg(feature = "enterprise")]
+use audit::report_http as report_to_audit;
+use axum::{
+    Json,
+    body::Body,
+    extract::{FromRequestParts, Path},
+    http::StatusCode,
+    response::{IntoResponse, Response},
+};
+use openobserve_http_common::X_O2_ASSISTANT_SESSION_ID;
+use serde::Deserialize;
+#[cfg(feature = "enterprise")]
+use {
+    futures::StreamExt,
+    o2_enterprise::enterprise::{
+        ai::{
+            agent::meta::Role,
+            client::{
+                DEFAULT_AGENT_TYPE, ImageAttachment, QueryRequest, RCA_AGENT_TYPE, get_agent_client,
+            },
+        },
+        common::config::get_config as get_o2_config,
+    },
+};
+
+use crate::{
+    common::meta::http::HttpResponse as MetaHttpResponse,
+    handler::http::{
+        extractors::Headers,
+        models::ai::{PromptRequest, PromptResponse},
+    },
+};
+
+/// Determine agent type based on context.
+/// - If context contains incident_id, use SRE agent for incident investigation
+/// - Otherwise use default copilot agent
+#[cfg(feature = "enterprise")]
+fn get_agent_type(context: &serde_json::Value) -> &'static str {
+    if context
+        .as_object()
+        .is_some_and(|obj| obj.contains_key("incident_id"))
+    {
+        RCA_AGENT_TYPE
+    } else {
+        DEFAULT_AGENT_TYPE
+    }
+}
+
+/// Extract headers from the request that match the configured passthrough patterns.
+/// Supports exact matches and prefix wildcards (e.g., "x-forwarded-*").
+fn extract_passthrough_headers(
+    headers: &axum::http::HeaderMap,
+    passthrough_config: &str,
+) -> std::collections::HashMap<String, String> {
+    let mut result = std::collections::HashMap::new();
+
+    // Parse the passthrough config into patterns
+    let patterns: Vec<&str> = passthrough_config
+        .split(',')
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+        .collect();
+
+    for (header_name, header_value) in headers.iter() {
+        let header_name_lower = header_name.as_str().to_lowercase();
+
+        for pattern in &patterns {
+            let pattern_lower = pattern.to_lowercase();
+            let matches = if pattern_lower.ends_with('*') {
+                // Prefix match (e.g., "x-forwarded-*" matches "x-forwarded-for")
+                let prefix = &pattern_lower[..pattern_lower.len() - 1];
+                header_name_lower.starts_with(prefix)
+            } else {
+                // Exact match
+                header_name_lower == pattern_lower
+            };
+
+            if matches {
+                if let Ok(value) = header_value.to_str() {
+                    result.insert(header_name_lower.clone(), value.to_string());
+                }
+                break;
+            }
+        }
+    }
+
+    result
+}
+
+/// CreateChat
+#[utoipa::path(
+    post,
+    path = "/{org_id}/ai/chat",
+    context_path = "/api",
+    tag = "AI",
+    operation_id = "Chat",
+    summary = "Generate AI chat response",
+    description = "Generates an AI-powered response to user queries and requests.",
+    security(
+        ("Authorization" = [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name")
+    ),
+    request_body(
+        content = inline(PromptRequest),
+        description = "Prompt details",
+        example = json!({
+            "messages": [
+                {
+                    "role": "user",
+                    "content": "Write a SQL query to get the top 10 users by response time in the default stream",
+                }
+            ]
+        }),
+    ),
+    responses(
+        (status = StatusCode::OK, description = "Chat response", body = inline(PromptResponse)),
+        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = Object),
+        (status = StatusCode::BAD_REQUEST, description = "Bad Request", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Chat", "operation": "create"}))
+    )
+)]
+pub async fn chat(Path(org_id): Path<String>, in_req: axum::extract::Request) -> Response {
+    // Extract headers manually to avoid conflict with body extraction
+    let (mut parts, body) = in_req.into_parts();
+
+    // Extract TraceInfo from headers
+    let auth_data = match Headers::<TraceInfo>::from_request_parts(&mut parts, &()).await {
+        Ok(Headers(data)) => data,
+        Err(e) => return e.into_response(),
+    };
+
+    // Parse JSON body
+    let body_bytes = match axum::body::to_bytes(body, usize::MAX).await {
+        Ok(bytes) => bytes,
+        Err(e) => {
+            return MetaHttpResponse::bad_request(format!("Failed to read request body: {e}"));
+        }
+    };
+
+    let prompt_body: PromptRequest = match serde_json::from_slice(&body_bytes) {
+        Ok(b) => b,
+        Err(e) => {
+            return MetaHttpResponse::bad_request(format!("Invalid JSON body: {e}"));
+        }
+    };
+
+    #[cfg(feature = "enterprise")]
+    {
+        let trace_id = auth_data.get_trace_id();
+        let user_id = &auth_data.user_id;
+        let org_id_str = org_id.as_str();
+        let o2_cfg = get_o2_config();
+
+        // Check if AI/agent is enabled
+        if !o2_cfg.ai.enabled {
+            return MetaHttpResponse::bad_request("AI is not enabled");
+        }
+
+        if o2_cfg.ai.agent_url.is_empty() {
+            return MetaHttpResponse::bad_request("AI agent URL is not set");
+        }
+
+        // AI credit check (cloud only)
+        // All orgs try free quota first. On exhaustion, paid orgs overflow to
+        // Stripe billing; unpaid orgs get a hard 402.
+        #[cfg(feature = "cloud")]
+        {
+            let deduction = openobserve_core::trial_quota::try_deduct(
+                org_id_str,
+                openobserve_core::trial_quota::TrialQuotaFeature::AiChat,
+            )
+            .await;
+
+            let usage_ctx = openobserve_core::trial_quota::AiUsageContext {
+                user_email: user_id.to_string(),
+                trace_id: Some(trace_id.clone()),
+                session_id: None,
+                incident_id: None,
+            };
+            match &deduction {
+                Ok(_) => {
+                    openobserve_core::trial_quota::record_free_ai_usage(
+                        org_id_str,
+                        &usage_ctx,
+                        openobserve_core::trial_quota::TrialQuotaFeature::AiChat,
+                    );
+                }
+                Err(e) => {
+                    let policy = o2_enterprise::enterprise::cloud::ai_credits::resolve_ai_credit_exhaustion_policy(
+                        org_id_str,
+                    )
+                    .await;
+                    if policy.allows_metered_overage() {
+                        openobserve_core::trial_quota::record_billable_ai_usage(
+                            org_id_str,
+                            &usage_ctx,
+                            openobserve_core::trial_quota::TrialQuotaFeature::AiChat,
+                        );
+                    } else {
+                        return MetaHttpResponse::payment_required(
+                            policy.quota_exhausted_message(e.as_ref()),
+                        );
+                    }
+                }
+            }
+        }
+
+        // Extract user auth from headers to pass to the agent
+        let auth_str = openobserve_core::auth::extract_auth_str_from_headers(&parts.headers).await;
+        // Auth header is passed directly to agent - no need to extract user_token
+
+        // Get global agent client singleton
+        let client = match get_agent_client() {
+            Some(c) => c,
+            None => {
+                log::error!(
+                    "[trace_id:{trace_id}] [user_id:{user_id}] [org_id:{org_id_str}] \
+                     Agent service not configured"
+                );
+                return MetaHttpResponse::bad_request("Agent service not configured");
+            }
+        };
+
+        // Extract headers to pass through to the agent
+        // Note: passthrough_headers config field needs to be added to o2_enterprise Ai config
+        // For now, use empty string (no passthrough) until config is updated
+        let passthrough_config = ""; // TODO: Replace with config.ai.passthrough_headers once field is added
+        let passthrough_headers = extract_passthrough_headers(&parts.headers, passthrough_config);
+
+        // Transform PromptRequest -> QueryRequest
+        // Extract the last user message as the query
+        let last_user_message = prompt_body
+            .messages
+            .iter()
+            .rfind(|m| m.role == Role::User)
+            .map(|m| m.content.clone())
+            .unwrap_or_default();
+
+        // Build history from all messages except the last user message
+        let history: Vec<serde_json::Value> = prompt_body
+            .messages
+            .iter()
+            .take(prompt_body.messages.len().saturating_sub(1))
+            .map(|m| {
+                serde_json::json!({
+                    "role": format!("{:?}", m.role).to_lowercase(),
+                    "content": m.content
+                })
+            })
+            .collect();
+
+        // Merge org_id into context
+        let mut context = serde_json::to_value(&prompt_body.context).unwrap_or_default();
+        if let Some(obj) = context.as_object_mut() {
+            obj.insert(
+                "org_id".to_string(),
+                serde_json::Value::String(org_id.clone()),
+            );
+        }
+
+        // Determine agent type based on context (incident_id -> sre, otherwise o2-ai)
+        // Must be done before context is moved into QueryRequest
+        let agent_type = get_agent_type(&context);
+
+        // Convert images to agent format
+        let images = prompt_body.images.map(|imgs| {
+            imgs.into_iter()
+                .map(|img| ImageAttachment {
+                    data: img.data,
+                    mime_type: img.mime_type,
+                    filename: img.filename,
+                })
+                .collect()
+        });
+
+        let (tool_mcps, tool_clis, tool_skills) =
+            o2_enterprise::enterprise::ai::toolsets::push::load_agent_tools(org_id_str).await;
+        let query_req = QueryRequest {
+            query: last_user_message,
+            context,
+            model: if prompt_body.model.is_empty() {
+                None
+            } else {
+                Some(prompt_body.model)
+            },
+            history: if history.is_empty() {
+                None
+            } else {
+                Some(history)
+            },
+            images,
+            mcps: if tool_mcps.is_empty() {
+                None
+            } else {
+                Some(tool_mcps)
+            },
+            clis: if tool_clis.is_empty() {
+                None
+            } else {
+                Some(tool_clis)
+            },
+            skills: if tool_skills.is_empty() {
+                None
+            } else {
+                Some(tool_skills)
+            },
+        };
+
+        // Query agent with headers
+        // TODO: Once RcaAgentClient.query_with_headers() method is available, pass headers
+        // For now, passthrough_headers are collected but not passed to maintain compatibility
+        let _headers_to_forward = if passthrough_headers.is_empty() {
+            None
+        } else {
+            Some(passthrough_headers)
+        };
+
+        match client.query(agent_type, query_req, &auth_str).await {
+            Ok(response) => {
+                // QueryResponse has a `response: String` field
+                let prompt_response = PromptResponse {
+                    role: Role::Assistant,
+                    content: response.response,
+                };
+                (StatusCode::OK, Json(prompt_response)).into_response()
+            }
+            Err(e) => {
+                let error_msg = e.to_string();
+                log::error!(
+                    "[trace_id:{trace_id}] [user_id:{user_id}] [org_id:{org_id_str}] \
+                     Agent query failed: {error_msg}"
+                );
+
+                // Check if this is a rate limit error (429)
+                if error_msg.contains("status 429") || error_msg.contains("rate_limit_exceeded") {
+                    return (
+                        StatusCode::TOO_MANY_REQUESTS,
+                        Json(serde_json::json!({
+                            "error": error_msg,
+                            "code": 429
+                        })),
+                    )
+                        .into_response();
+                }
+
+                MetaHttpResponse::internal_error(error_msg)
+            }
+        }
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    {
+        drop(org_id);
+        drop(parts);
+        drop(auth_data);
+        drop(prompt_body);
+        MetaHttpResponse::bad_request("AI chat is only available in enterprise version")
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub struct TraceInfo {
+    pub user_id: String,
+    pub traceparent: Option<String>,
+    #[serde(default)]
+    pub authorization: Option<String>,
+}
+
+impl TraceInfo {
+    /// Extract trace_id from traceparent header if present, otherwise generate UUID v7
+    fn get_trace_id(&self) -> String {
+        if let Some(traceparent) = &self.traceparent
+            && !traceparent.is_empty()
+        {
+            // Parse traceparent format: 00-{trace_id}-{span_id}-{flags}
+            let parts: Vec<&str> = traceparent.split('-').collect();
+            if parts.len() >= 3 {
+                let trace_id = parts[1].to_string();
+                // Validate trace_id (32 hex chars, not all zeros)
+                if trace_id.len() == 32
+                    && trace_id.chars().all(|c| c.is_ascii_hexdigit())
+                    && trace_id.chars().any(|c| c != '0')
+                {
+                    return trace_id;
+                }
+            }
+        }
+        // Generate new UUID v7 trace_id if traceparent is invalid or missing
+        config::ider::generate_trace_id()
+    }
+}
+
+/// CreateChatStream
+#[utoipa::path(
+    post,
+    path = "/{org_id}/ai/chat_stream",
+    context_path = "/api",
+    tag = "AI",
+    operation_id = "ChatStream",
+    summary = "Generate streaming AI chat response",
+    description = "Generates an AI response with real-time streaming for improved user experience. \
+                   This endpoint redirects to the o2-sre-agent service for processing.",
+    security(
+        ("Authorization" = [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name")
+    ),
+    request_body(
+        content = inline(PromptRequest),
+        description = "Prompt details",
+        example = json!({
+            "messages": [
+                {
+                    "role": "user",
+                    "content": "Write a SQL query to get the top 10 users by response time in the default stream",
+                }
+            ]
+        }),
+    ),
+    responses(
+        (status = StatusCode::OK, description = "Chat response", body = ()),
+        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = Object),
+        (status = StatusCode::BAD_REQUEST, description = "Bad Request", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Chat", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
+#[axum::debug_handler]
+pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Request) -> Response {
+    // Extract headers manually to avoid conflict with body extraction
+    let (mut parts, body) = in_req.into_parts();
+
+    // Extract TraceInfo from headers
+    let auth_data = match Headers::<TraceInfo>::from_request_parts(&mut parts, &()).await {
+        Ok(Headers(data)) => data,
+        Err(e) => return e.into_response(),
+    };
+
+    let trace_id = auth_data.get_trace_id();
+    let user_id = auth_data.user_id.clone();
+
+    // Create OTel span for AI tracing using the OpenTelemetry API directly.
+    // We avoid the tracing-opentelemetry bridge here because it has issues with
+    // span lifecycle management in async generators (spans created via tracing::info_span!
+    // don't get properly exported when held inside async_stream::stream!).
+    #[cfg(feature = "enterprise")]
+    let otel_chat_span = {
+        if get_o2_config().ai.tracing_enabled {
+            use opentelemetry::trace::{SpanKind, TraceContextExt, Tracer};
+
+            // Extract parent context from incoming traceparent header
+            let parent_cx = opentelemetry::global::get_text_map_propagator(|propagator| {
+                propagator.extract(&common::utils::http::RequestHeaderExtractor::new(
+                    &parts.headers,
+                ))
+            });
+
+            // Create the span as a child of the incoming request
+            let tracer = opentelemetry::global::tracer("openobserve");
+            let span = tracer
+                .span_builder("ai.chat_stream")
+                .with_kind(SpanKind::Server)
+                .with_attributes(vec![
+                    opentelemetry::KeyValue::new("http.method", "POST"),
+                    opentelemetry::KeyValue::new("http.route", "/api/{org_id}/ai/chat_stream"),
+                    opentelemetry::KeyValue::new(
+                        "http.target",
+                        format!("/api/{}/ai/chat_stream", org_id),
+                    ),
+                    opentelemetry::KeyValue::new("trace_id", trace_id.clone()),
+                    opentelemetry::KeyValue::new("user_id", user_id.clone()),
+                    opentelemetry::KeyValue::new("org_id", org_id.clone()),
+                ])
+                .start_with_context(&tracer, &parent_cx);
+
+            // Build the context with this span so we can inject a traceparent for downstream
+            let span_cx = parent_cx.with_span(span);
+            Some(span_cx)
+        } else {
+            None
+        }
+    };
+
+    #[cfg(not(feature = "enterprise"))]
+    let otel_chat_span: Option<opentelemetry::Context> = None;
+
+    let mut forward_headers = std::collections::HashMap::new();
+
+    // Extract and validate session ID (UUID v7 format: 8-4-4-4-12 hex digits)
+    if let Some(session_id) = parts.headers.get(X_O2_ASSISTANT_SESSION_ID.as_str())
+        && let Ok(val) = session_id.to_str()
+    {
+        if val.len() == 36 && val.chars().filter(|&c| c == '-').count() == 4 {
+            forward_headers.insert(
+                X_O2_ASSISTANT_SESSION_ID.as_str().to_string(),
+                val.to_string(),
+            );
+        } else {
+            log::warn!("[trace_id:{}] Invalid session ID format: {}", trace_id, val);
+        }
+    }
+
+    // Generate a new traceparent from the ai.chat_stream span's context.
+    // This ensures the agent sees ai.chat_stream as its parent (not the frontend span).
+    if let Some(ref span_cx) = otel_chat_span {
+        let mut injected_headers = std::collections::HashMap::new();
+        opentelemetry::global::get_text_map_propagator(|propagator| {
+            propagator.inject_context(span_cx, &mut injected_headers);
+        });
+        if let Some(tp) = injected_headers.remove("traceparent") {
+            log::info!(
+                "[trace_id:{}] Forwarding traceparent from ai.chat_stream span: {}",
+                trace_id,
+                tp
+            );
+            forward_headers.insert("traceparent".to_string(), tp);
+        }
+    } else if let Some(traceparent) = &auth_data.traceparent
+        && !traceparent.is_empty()
+    {
+        // Fallback: forward original traceparent when tracing is disabled
+        forward_headers.insert("traceparent".to_string(), traceparent.clone());
+    }
+
+    if let Some(user_agent) = parts.headers.get("user-agent")
+        && let Ok(val) = user_agent.to_str()
+    {
+        forward_headers.insert("user-agent".to_string(), val.to_string());
+    }
+
+    // Extract and merge passthrough headers from config
+    #[cfg(feature = "enterprise")]
+    {
+        // Note: passthrough_headers config field needs to be added to o2_enterprise Ai config
+        // For now, use empty string (no passthrough) until config is updated
+        let passthrough_config = ""; // TODO: Replace with _config.ai.passthrough_headers once field is added
+        let passthrough_headers = extract_passthrough_headers(&parts.headers, passthrough_config);
+        // Merge passthrough headers, but don't override already-set headers (like session_id,
+        // traceparent)
+        for (key, value) in passthrough_headers {
+            forward_headers.entry(key).or_insert(value);
+        }
+    }
+
+    // Log correlation context for debugging
+    log::info!(
+        "[trace_id:{}] AI chat request: user_id={}, session_id={}",
+        trace_id,
+        user_id,
+        forward_headers
+            .get(X_O2_ASSISTANT_SESSION_ID.as_str())
+            .unwrap_or(&"none".to_string())
+    );
+
+    // Parse JSON body
+    let body_bytes = match axum::body::to_bytes(body, usize::MAX).await {
+        Ok(bytes) => bytes,
+        Err(e) => {
+            return MetaHttpResponse::bad_request(format!("Failed to read request body: {}", e));
+        }
+    };
+
+    let prompt_body: PromptRequest = match serde_json::from_slice(&body_bytes) {
+        Ok(b) => b,
+        Err(e) => {
+            return MetaHttpResponse::bad_request(format!("Invalid JSON body: {}", e));
+        }
+    };
+
+    #[cfg(feature = "enterprise")]
+    {
+        let org_id_str = org_id.clone();
+        let mut code = StatusCode::OK.as_u16();
+        let body_bytes_str = serde_json::to_string(&prompt_body).unwrap_or_default();
+
+        // Check if AI/agent is enabled
+        if !get_o2_config().ai.enabled {
+            let error_message = Some("AI is not enabled".to_string());
+            code = StatusCode::BAD_REQUEST.as_u16();
+            report_to_audit(
+                user_id.clone(),
+                org_id_str.clone(),
+                trace_id.clone(),
+                code,
+                error_message,
+                "POST".to_string(),
+                format!("/api/{}/ai/chat_stream", org_id_str),
+                String::new(),
+                body_bytes_str,
+            )
+            .await;
+            return MetaHttpResponse::bad_request("AI is not enabled");
+        }
+
+        // AI credit check (cloud only)
+        // All orgs try free quota first. On exhaustion, paid orgs overflow to
+        // Stripe billing; unpaid orgs get a hard 402.
+        #[cfg(feature = "cloud")]
+        {
+            let deduction = openobserve_core::trial_quota::try_deduct(
+                &org_id_str,
+                openobserve_core::trial_quota::TrialQuotaFeature::AiChat,
+            )
+            .await;
+
+            let usage_ctx = openobserve_core::trial_quota::AiUsageContext {
+                user_email: user_id.clone(),
+                trace_id: Some(trace_id.clone()),
+                session_id: forward_headers
+                    .get(X_O2_ASSISTANT_SESSION_ID.as_str())
+                    .cloned(),
+                incident_id: None,
+            };
+            match &deduction {
+                Ok(_) => {
+                    openobserve_core::trial_quota::record_free_ai_usage(
+                        &org_id_str,
+                        &usage_ctx,
+                        openobserve_core::trial_quota::TrialQuotaFeature::AiChat,
+                    );
+                }
+                Err(e) => {
+                    let policy = o2_enterprise::enterprise::cloud::ai_credits::resolve_ai_credit_exhaustion_policy(
+                        &org_id_str,
+                    )
+                    .await;
+                    if policy.allows_metered_overage() {
+                        openobserve_core::trial_quota::record_billable_ai_usage(
+                            &org_id_str,
+                            &usage_ctx,
+                            openobserve_core::trial_quota::TrialQuotaFeature::AiChat,
+                        );
+                    } else {
+                        return MetaHttpResponse::payment_required(
+                            policy.quota_exhausted_message(e.as_ref()),
+                        );
+                    }
+                }
+            }
+        }
+
+        // Get global agent client
+        let client = match get_agent_client() {
+            Some(c) => c,
+            None => {
+                let error_message = Some("Agent service not configured".to_string());
+                code = StatusCode::BAD_REQUEST.as_u16();
+                report_to_audit(
+                    user_id.clone(),
+                    org_id_str.clone(),
+                    trace_id.clone(),
+                    code,
+                    error_message,
+                    "POST".to_string(),
+                    format!("/api/{}/ai/chat_stream", org_id_str),
+                    String::new(),
+                    body_bytes_str,
+                )
+                .await;
+                return MetaHttpResponse::bad_request("Agent service not configured");
+            }
+        };
+
+        // Extract user token from cookie/header for per-user MCP auth
+        // Unwrap Session:: wrapper if present, otherwise use token as-is
+        let auth_str = openobserve_core::auth::extract_auth_str_from_headers(&parts.headers).await;
+        // Auth header is passed directly to agent - no need to extract user_token
+
+        // Transform PromptRequest -> QueryRequest
+        let last_user_message = prompt_body
+            .messages
+            .iter()
+            .rfind(|m| m.role == Role::User)
+            .map(|m| m.content.clone())
+            .unwrap_or_default();
+
+        let history: Vec<serde_json::Value> = prompt_body
+            .messages
+            .iter()
+            .take(prompt_body.messages.len().saturating_sub(1))
+            .map(|m| {
+                serde_json::json!({
+                    "role": format!("{:?}", m.role).to_lowercase(),
+                    "content": m.content
+                })
+            })
+            .collect();
+
+        let mut context = serde_json::to_value(&prompt_body.context).unwrap_or_default();
+        if let Some(obj) = context.as_object_mut() {
+            obj.insert(
+                "org_id".to_string(),
+                serde_json::Value::String(org_id_str.clone()),
+            );
+        }
+
+        // Determine agent type based on context (incident_id -> sre, otherwise o2-ai)
+        // Must be done before context is moved into QueryRequest
+        let agent_type = get_agent_type(&context);
+
+        // Convert images to agent format
+        let images = prompt_body.images.map(|imgs| {
+            imgs.into_iter()
+                .map(|img| ImageAttachment {
+                    data: img.data,
+                    mime_type: img.mime_type,
+                    filename: img.filename,
+                })
+                .collect()
+        });
+
+        let (tool_mcps, tool_clis, tool_skills) =
+            o2_enterprise::enterprise::ai::toolsets::push::load_agent_tools(&org_id_str).await;
+        let query_req = QueryRequest {
+            query: last_user_message,
+            context,
+            model: if prompt_body.model.is_empty() {
+                None
+            } else {
+                Some(prompt_body.model)
+            },
+            history: if history.is_empty() {
+                None
+            } else {
+                Some(history)
+            },
+            images,
+            mcps: if tool_mcps.is_empty() {
+                None
+            } else {
+                Some(tool_mcps)
+            },
+            clis: if tool_clis.is_empty() {
+                None
+            } else {
+                Some(tool_clis)
+            },
+            skills: if tool_skills.is_empty() {
+                None
+            } else {
+                Some(tool_skills)
+            },
+        };
+
+        // Report successful start to audit
+        report_to_audit(
+            user_id.clone(),
+            org_id_str.clone(),
+            trace_id.clone(),
+            code,
+            None,
+            "POST".to_string(),
+            format!("/api/{}/ai/chat_stream", org_id_str),
+            String::new(),
+            body_bytes_str,
+        )
+        .await;
+
+        // Create streaming response
+        let headers_to_forward = if forward_headers.is_empty() {
+            None
+        } else {
+            Some(forward_headers)
+        };
+
+        // Move the OTel span context into the stream so it stays alive for the
+        // full streaming duration. When the stream completes, the span is explicitly
+        // ended. We use the OpenTelemetry API directly (not the tracing bridge) to
+        // ensure reliable span export from async generators.
+        let s = async_stream::stream! {
+            // Call the agent service with forwarded headers
+            let response = match client
+                .query_stream_with_headers(agent_type, query_req, &auth_str, headers_to_forward.as_ref())
+                .await
+            {
+                Ok(r) => r,
+                Err(e) => {
+                    log::error!(
+                        "[trace_id:{trace_id}] [user_id:{user_id}] [org_id:{org_id_str}] \
+                         Agent query failed: {e}"
+                    );
+                    let error_event = serde_json::json!({
+                        "type": "error",
+                        "error": format!("Agent query failed: {}", e)
+                    });
+                    yield Ok(bytes::Bytes::from(format!("data: {}\n\n", error_event)));
+                    // End span on error path too
+                    if let Some(span_cx) = otel_chat_span {
+                        use opentelemetry::trace::TraceContextExt;
+                        span_cx.span().end();
+                    }
+                    return;
+                }
+            };
+
+            // Forward the streaming response from agent
+            let mut agent_stream = response.bytes_stream();
+
+            // Poll the stream with proper instrumentation
+            // Each chunk is traced within the context of ai.chat_stream
+            while let Some(chunk_result) = agent_stream.next().await {
+                match chunk_result {
+                    Ok(bytes) => {
+                        yield Ok::<bytes::Bytes, std::io::Error>(bytes);
+                    }
+                    Err(e) => {
+                        log::error!(
+                            "[trace_id:{trace_id}] [user_id:{user_id}] [org_id:{org_id_str}] \
+                             Agent stream chunk error: {e}"
+                        );
+                        let error_event = serde_json::json!({
+                            "type": "error",
+                            "error": format!("Stream interrupted: {}", e)
+                        });
+                        yield Ok::<bytes::Bytes, std::io::Error>(bytes::Bytes::from(format!("data: {}\n\n", error_event)));
+                        break;
+                    }
+                }
+            }
+            log::info!(
+                "[trace_id:{trace_id}] [user_id:{user_id}] [org_id:{org_id_str}] \
+                 Agent stream ended"
+            );
+            // Explicitly end the OTel span when the stream completes.
+            // This is critical: the span must be ended before it can be exported
+            // by the BatchSpanProcessor.
+            if let Some(span_cx) = otel_chat_span {
+                use opentelemetry::trace::TraceContextExt;
+                span_cx.span().end();
+            }
+        };
+
+        axum::http::Response::builder()
+            .status(StatusCode::OK)
+            .header(
+                axum::http::header::CONTENT_TYPE,
+                mime::TEXT_EVENT_STREAM.as_ref(),
+            )
+            .header(axum::http::header::CACHE_CONTROL, "no-cache")
+            .header("X-Accel-Buffering", "no")
+            .body(Body::from_stream(s))
+            .unwrap_or_else(|_| Response::new(Body::empty()))
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    {
+        drop(org_id);
+        drop(auth_data);
+        drop(trace_id);
+        drop(user_id);
+        drop(prompt_body);
+        MetaHttpResponse::bad_request("AI chat is only available in enterprise version")
+    }
+}
+
+/// Submit user feedback for an AI response.
+///
+/// Proxies feedback (thumbs up/down, rating) to the o2-sre-agent's /feedback endpoint.
+/// The agent stores this and emits it as OTEL spans for OpenObserve ingestion.
+pub async fn feedback(Path(org_id): Path<String>, in_req: axum::extract::Request) -> Response {
+    let (parts, body) = in_req.into_parts();
+
+    // Extract trace info from headers (user_id may not be present for feedback)
+    let traceparent = parts
+        .headers
+        .get("traceparent")
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.to_string());
+
+    let trace_id = traceparent
+        .as_ref()
+        .and_then(|tp| tp.split('-').nth(1).map(|s| s.to_string()))
+        .unwrap_or_else(|| "unknown".to_string());
+
+    let mut forward_headers = std::collections::HashMap::new();
+
+    // Forward session ID if present
+    if let Some(session_id) = parts.headers.get(X_O2_ASSISTANT_SESSION_ID.as_str())
+        && let Ok(val) = session_id.to_str()
+        && val.len() == 36
+        && val.chars().filter(|&c| c == '-').count() == 4
+    {
+        forward_headers.insert(
+            X_O2_ASSISTANT_SESSION_ID.as_str().to_string(),
+            val.to_string(),
+        );
+    }
+
+    // Parse JSON body
+    let body_bytes = match axum::body::to_bytes(body, usize::MAX).await {
+        Ok(bytes) => bytes,
+        Err(e) => {
+            return MetaHttpResponse::bad_request(format!("Failed to read request body: {}", e));
+        }
+    };
+
+    let feedback_body: serde_json::Value = match serde_json::from_slice(&body_bytes) {
+        Ok(b) => b,
+        Err(e) => {
+            return MetaHttpResponse::bad_request(format!("Invalid JSON body: {}", e));
+        }
+    };
+
+    #[cfg(feature = "enterprise")]
+    {
+        if !get_o2_config().ai.enabled {
+            return MetaHttpResponse::bad_request("AI is not enabled");
+        }
+
+        let client = match get_agent_client() {
+            Some(c) => c,
+            None => {
+                return MetaHttpResponse::bad_request("Agent service not configured");
+            }
+        };
+
+        // Extract user auth from headers to pass to the agent
+        let auth_str = openobserve_core::auth::extract_auth_str_from_headers(&parts.headers).await;
+
+        let headers_to_forward = if forward_headers.is_empty() {
+            None
+        } else {
+            Some(forward_headers)
+        };
+
+        match client
+            .post_feedback(feedback_body, &auth_str, headers_to_forward.as_ref())
+            .await
+        {
+            Ok(response) => {
+                log::info!(
+                    "[trace_id:{}] Feedback submitted for org={}",
+                    trace_id,
+                    org_id
+                );
+                Json(response).into_response()
+            }
+            Err(e) => {
+                log::error!("[trace_id:{}] Feedback submission failed: {}", trace_id, e);
+                MetaHttpResponse::internal_error(format!("Feedback submission failed: {}", e))
+            }
+        }
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    {
+        drop(org_id);
+        drop(trace_id);
+        drop(feedback_body);
+        MetaHttpResponse::bad_request("AI feedback is only available in enterprise version")
+    }
+}
+
+/// ConfirmAction - Proxy confirmation response to o2-sre-agent
+#[utoipa::path(
+    post,
+    path = "/{org_id}/ai/confirm/{session_id}",
+    context_path = "/api",
+    tag = "AI",
+    operation_id = "ConfirmAction",
+    summary = "Confirm or reject a destructive AI tool action",
+    description = "Forwards user confirmation or rejection to the o2-sre-agent service \
+                   for a pending destructive tool call.",
+    security(
+        ("Authorization" = [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("session_id" = String, Path, description = "Chat session ID")
+    ),
+    request_body(
+        content = serde_json::Value,
+        description = "Confirmation payload",
+        example = json!({"approved": true}),
+    ),
+    responses(
+        (status = StatusCode::OK, description = "Confirmation forwarded", body = Object),
+        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = Object),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
+pub async fn confirm_action(
+    Path((_org_id, session_id)): Path<(String, String)>,
+    in_req: axum::extract::Request,
+) -> Response {
+    let (parts, body) = in_req.into_parts();
+
+    // Parse JSON body
+    let body_bytes = match axum::body::to_bytes(body, usize::MAX).await {
+        Ok(bytes) => bytes,
+        Err(e) => {
+            return MetaHttpResponse::bad_request(format!("Failed to read request body: {e}"));
+        }
+    };
+
+    #[cfg(feature = "enterprise")]
+    {
+        let o2_cfg = get_o2_config();
+        if !o2_cfg.ai.enabled {
+            return MetaHttpResponse::bad_request("AI is not enabled");
+        }
+
+        let client = match get_agent_client() {
+            Some(c) => c,
+            None => {
+                return MetaHttpResponse::bad_request("Agent service not configured");
+            }
+        };
+
+        // Extract user auth from headers to pass to the agent
+        let auth_str = openobserve_core::auth::extract_auth_str_from_headers(&parts.headers).await;
+
+        // Agent uses Authorization header directly - no need to inject user_token into body
+        let forward_bytes = body_bytes;
+
+        // Forward the confirmation to the agent's /confirm endpoint
+        let confirm_url = format!(
+            "{}/confirm/{}",
+            o2_cfg.ai.agent_url.trim_end_matches('/'),
+            session_id
+        );
+
+        match client
+            .confirm_action(&confirm_url, forward_bytes.to_vec(), &auth_str)
+            .await
+        {
+            Ok(resp) => {
+                let status = resp.status();
+                let response_body = resp.text().await.unwrap_or_else(|_| "{}".to_string());
+
+                if status.is_success() {
+                    (
+                        StatusCode::OK,
+                        axum::Json(
+                            serde_json::from_str::<serde_json::Value>(&response_body)
+                                .unwrap_or(serde_json::json!({"ok": true})),
+                        ),
+                    )
+                        .into_response()
+                } else {
+                    log::error!(
+                        "Agent confirm endpoint returned {}: {}",
+                        status,
+                        response_body
+                    );
+                    MetaHttpResponse::internal_error(format!(
+                        "Confirmation failed: {}",
+                        response_body
+                    ))
+                }
+            }
+            Err(e) => {
+                log::error!("Failed to forward confirmation to agent: {e}");
+                MetaHttpResponse::internal_error(format!("Failed to forward confirmation: {e}"))
+            }
+        }
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    {
+        drop(session_id);
+        drop(parts);
+        drop(body_bytes);
+        MetaHttpResponse::bad_request("AI chat is only available in enterprise version")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_extract_passthrough_headers_exact_match() {
+        // Create a test request with headers
+        let mut headers = axum::http::HeaderMap::new();
+        headers.insert("user-agent", "Mozilla/5.0".parse().unwrap());
+        headers.insert("x-custom-header", "custom-value".parse().unwrap());
+        headers.insert("authorization", "Bearer secret".parse().unwrap());
+
+        let config = "user-agent,x-custom-header";
+        let result = extract_passthrough_headers(&headers, config);
+
+        assert_eq!(result.len(), 2);
+        assert_eq!(result.get("user-agent"), Some(&"Mozilla/5.0".to_string()));
+        assert_eq!(
+            result.get("x-custom-header"),
+            Some(&"custom-value".to_string())
+        );
+        // Authorization should not be included
+        assert!(!result.contains_key("authorization"));
+    }
+
+    #[test]
+    fn test_extract_passthrough_headers_wildcard_match() {
+        let mut headers = axum::http::HeaderMap::new();
+        headers.insert("x-forwarded-for", "192.168.1.1".parse().unwrap());
+        headers.insert("x-forwarded-proto", "https".parse().unwrap());
+        headers.insert("x-forwarded-host", "example.com".parse().unwrap());
+        headers.insert("x-other-header", "other".parse().unwrap());
+
+        let config = "x-forwarded-*";
+        let result = extract_passthrough_headers(&headers, config);
+
+        assert_eq!(result.len(), 3);
+        assert_eq!(
+            result.get("x-forwarded-for"),
+            Some(&"192.168.1.1".to_string())
+        );
+        assert_eq!(result.get("x-forwarded-proto"), Some(&"https".to_string()));
+        assert_eq!(
+            result.get("x-forwarded-host"),
+            Some(&"example.com".to_string())
+        );
+        // X-Other-Header should not match
+        assert!(!result.contains_key("x-other-header"));
+    }
+
+    #[test]
+    fn test_extract_passthrough_headers_mixed_patterns() {
+        let mut headers = axum::http::HeaderMap::new();
+        headers.insert("user-agent", "curl/7.68.0".parse().unwrap());
+        headers.insert("x-forwarded-for", "10.0.0.1".parse().unwrap());
+        headers.insert("x-forwarded-proto", "http".parse().unwrap());
+        headers.insert("x-request-id", "abc-123".parse().unwrap());
+
+        let config = "x-forwarded-*,user-agent,x-request-id";
+        let result = extract_passthrough_headers(&headers, config);
+
+        assert_eq!(result.len(), 4);
+        assert!(result.contains_key("user-agent"));
+        assert!(result.contains_key("x-forwarded-for"));
+        assert!(result.contains_key("x-forwarded-proto"));
+        assert!(result.contains_key("x-request-id"));
+    }
+
+    #[test]
+    fn test_extract_passthrough_headers_empty_config() {
+        let mut headers = axum::http::HeaderMap::new();
+        headers.insert("user-agent", "test".parse().unwrap());
+
+        let config = "";
+        let result = extract_passthrough_headers(&headers, config);
+
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_extract_passthrough_headers_case_insensitive() {
+        let mut headers = axum::http::HeaderMap::new();
+        headers.insert("USER-AGENT", "test-agent".parse().unwrap());
+        headers.insert("X-FORWARDED-FOR", "1.2.3.4".parse().unwrap());
+
+        let config = "User-Agent,x-forwarded-for";
+        let result = extract_passthrough_headers(&headers, config);
+
+        assert_eq!(result.len(), 2);
+        assert_eq!(result.get("user-agent"), Some(&"test-agent".to_string()));
+        assert_eq!(result.get("x-forwarded-for"), Some(&"1.2.3.4".to_string()));
+    }
+
+    #[test]
+    fn test_extract_passthrough_headers_whitespace_handling() {
+        let mut headers = axum::http::HeaderMap::new();
+        headers.insert("user-agent", "test".parse().unwrap());
+        headers.insert("x-custom", "value".parse().unwrap());
+
+        let config = " user-agent , x-custom , ";
+        let result = extract_passthrough_headers(&headers, config);
+
+        assert_eq!(result.len(), 2);
+        assert!(result.contains_key("user-agent"));
+        assert!(result.contains_key("x-custom"));
+    }
+}

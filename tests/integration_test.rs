@@ -60,18 +60,16 @@ mod tests {
     use infra::schema::{STREAM_SCHEMAS, STREAM_SCHEMAS_LATEST, STREAM_SETTINGS};
     use ingestion_common::IngestionResponse;
     use openobserve::migration;
-    use openobserve_api::handler::{
-        grpc::{auth::check_auth, flight::FlightServiceImpl},
-        http::{
-            self,
-            router::{basic_routes, config_routes, service_routes},
-        },
-    };
+    use openobserve_api_grpc::handler::grpc::{auth::check_auth, flight::FlightServiceImpl};
     use openobserve_api_management::models::{
         alerts::responses::{GetAlertResponseBody, ListAlertsResponseBody},
         destinations::{Destination, DestinationType},
     };
     use openobserve_core::alerts::scheduler::handlers::handle_triggers;
+    use openobserve_http::handler::http::{
+        self,
+        router::{basic_routes, config_routes, service_routes},
+    };
     use prost::Message;
     use proto::{cluster_rpc::search_server::SearchServer, prometheus_rpc};
     use search_service::SEARCH_SERVER;
@@ -2428,7 +2426,7 @@ mod tests {
         let (status, body) =
             make_request(&app, Method::GET, "/api/e2e/pipelines", Some(headers), None).await;
         assert!(status.is_success());
-        let pipeline_list: openobserve_api::handler::http::models::pipelines::PipelineList =
+        let pipeline_list: openobserve_http::handler::http::models::pipelines::PipelineList =
             json::from_slice(&body).unwrap();
         let pipeline = pipeline_list.list.first();
         assert!(pipeline.is_some());
@@ -2544,7 +2542,7 @@ mod tests {
         let (status, body) =
             make_request(&app, Method::GET, "/api/e2e/pipelines", Some(headers), None).await;
         assert!(status.is_success());
-        let pipeline_list: openobserve_api::handler::http::models::pipelines::PipelineList =
+        let pipeline_list: openobserve_http::handler::http::models::pipelines::PipelineList =
             json::from_slice(&body).unwrap();
         let pipelines = pipeline_list.list.first();
         assert!(pipelines.is_some());
@@ -3071,7 +3069,7 @@ mod tests {
         let (status, body) =
             make_request(&app, Method::GET, "/api/e2e/pipelines", Some(headers), None).await;
         assert!(status.is_success());
-        let pipeline_list: openobserve_api::handler::http::models::pipelines::PipelineList =
+        let pipeline_list: openobserve_http::handler::http::models::pipelines::PipelineList =
             json::from_slice(&body).unwrap();
         let pipeline = pipeline_list.list.first();
         assert!(pipeline.is_some());
@@ -3089,7 +3087,7 @@ mod tests {
         let (status, body) =
             make_request(&app, Method::GET, "/api/e2e/pipelines", Some(headers), None).await;
         assert!(status.is_success(), "Failed to list pipelines");
-        let pipeline_response: openobserve_api::handler::http::models::pipelines::PipelineList =
+        let pipeline_response: openobserve_http::handler::http::models::pipelines::PipelineList =
             json::from_slice(&body).unwrap();
         // Get the pipeline that matches the pipeline name
         let pipeline = pipeline_response
