@@ -78,9 +78,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 &nbsp;
               </div>
               <OButtonGroup
-                class="axis-field border-border-default border-s-badge-indigo-ol-border bg-surface-panel overflow-hidden border border-s-2"
+                class="axis-field border-border-default border-s-badge-indigo-ol-border bg-surface-panel overflow-hidden border border-s-2 [&>*:not(:first-child)]:!border-s"
                 radius="sm"
-                :divided="false"
+                :divided="true"
                 :draggable="isDragArmed('x-' + index)"
                 @dragstart="onFieldDragStart($event, itemX, 'x', Number(index))"
                 @drop="onDrop($event, 'x', Number(index))"
@@ -102,7 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OButton
                       variant="ghost"
                       size="chip-12"
-                      class="!ps-1 !pe-0"
+                      class="!ps-1 !pe-1"
                       :data-test="`dashboard-x-item-${itemX?.alias}`"
                     >
                       <AxisFieldChipLabel :label="xLabel[index]" />
@@ -139,7 +139,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OButton
                   variant="ghost"
                   size="icon-chip"
-                  class="-ms-1 !w-4"
+                  class="!w-4"
                   :data-test="`dashboard-x-item-${itemX?.alias}-remove`"
                   @click="removeXAxisItemByIndex(Number(index))"
                 >
@@ -243,9 +243,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 &nbsp;
               </div>
               <OButtonGroup
-                class="axis-field border-border-default border-s-badge-orange-ol-border bg-surface-panel overflow-hidden border border-s-2"
+                class="axis-field border-border-default border-s-badge-orange-ol-border bg-surface-panel overflow-hidden border border-s-2 [&>*:not(:first-child)]:!border-s"
                 radius="sm"
-                :divided="false"
+                :divided="true"
                 :draggable="isDragArmed('breakdown-' + index)"
                 @dragstart="onFieldDragStart($event, itemB, 'breakdown', Number(index))"
                 @drop="onDrop($event, 'breakdown', Number(index))"
@@ -267,7 +267,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OButton
                       variant="ghost"
                       size="chip-12"
-                      class="!ps-1 !pe-0"
+                      class="!ps-1 !pe-1"
                       :data-test="`dashboard-b-item-${itemB?.alias}`"
                     >
                       <AxisFieldChipLabel :label="bLabel[index]" />
@@ -304,7 +304,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OButton
                   variant="ghost"
                   size="icon-chip"
-                  class="-ms-1 !w-4"
+                  class="!w-4"
                   :data-test="`dashboard-b-item-${itemB?.alias}-remove`"
                   @click="removeBreakdownItemByIndex(Number(index))"
                 >
@@ -378,9 +378,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             &nbsp;
           </div>
           <OButtonGroup
-            class="axis-field border-border-default border-s-badge-success-ol-border bg-surface-panel overflow-hidden border border-s-2"
+            class="axis-field border-border-default border-s-badge-success-ol-border bg-surface-panel overflow-hidden border border-s-2 [&>*:not(:first-child)]:!border-s"
             radius="sm"
-            :divided="false"
+            :divided="true"
             :draggable="isDragArmed('y-' + index)"
             @dragstart="onFieldDragStart($event, itemY, 'y', Number(index))"
             @drop="onDrop($event, 'y', Number(index))"
@@ -402,7 +402,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OButton
                   variant="ghost"
                   size="chip-12"
-                  class="!ps-1 !pe-0"
+                  class="!ps-1 !pe-1"
                   :data-test="`dashboard-y-item-${itemY?.alias}`"
                 >
                   <AxisFieldChipLabel :label="yLabel[index]" />
@@ -439,7 +439,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               variant="ghost"
               size="icon-chip"
-              class="-ms-1 !w-4"
+              class="!w-4"
               :data-test="`dashboard-y-item-${itemY?.alias}-remove`"
               @click="removeYAxisItemByIndex(Number(index))"
             >
@@ -512,9 +512,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               &nbsp;
             </div>
             <OButtonGroup
-              class="axis-field border-border-default border-s-badge-success-ol-border bg-surface-panel overflow-hidden border border-s-2"
+              class="axis-field border-border-default border-s-badge-success-ol-border bg-surface-panel overflow-hidden border border-s-2 [&>*:not(:first-child)]:!border-s"
               radius="sm"
-              :divided="false"
+              :divided="true"
               :draggable="isDragArmed('z-' + index)"
               @dragstart="onFieldDragStart($event, itemZ, 'z', Number(index))"
               @drop="onDrop($event, 'z', Number(index))"
@@ -536,7 +536,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OButton
                     variant="ghost"
                     size="chip-12"
-                    class="!ps-1 !pe-0"
+                    class="!ps-1 !pe-1"
                     :data-test="`dashboard-z-item-${itemZ?.alias}`"
                   >
                     <AxisFieldChipLabel :label="zLabel[index]" />
@@ -573,7 +573,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 variant="ghost"
                 size="icon-chip"
-                class="-ms-1 !w-4"
+                class="!w-4"
                 :data-test="`dashboard-z-item-${itemZ?.alias}-remove`"
                 @click="removeZAxisItemByIndex(Number(index))"
               >

@@ -19,16 +19,16 @@
           class="my-0.5 mr-2 flex flex-row"
         >
           <OButtonGroup
-            class="axis-field border-border-default border-s-badge-teal-ol-border bg-surface-panel border border-s-2"
+            class="axis-field border-border-default border-s-badge-teal-ol-border bg-surface-panel border border-s-2 [&>*:not(:first-child)]:!border-s"
             radius="sm"
-            :divided="false"
+            :divided="true"
           >
             <ODropdown>
               <template #trigger>
                 <OButton
                   variant="ghost"
                   size="chip-12"
-                  class="!pe-0"
+                  class="!pe-1"
                   :data-test="`dashboard-join-item-${index}`"
                   icon-right="arrow-drop-down"
                 >
@@ -63,7 +63,7 @@
             <OButton
               variant="ghost"
               size="icon-chip"
-              class="-ms-1 !w-4"
+              class="!w-4"
               :data-test="`dashboard-join-item-${index}-remove`"
               @click="handleRemoveJoin(index)"
               :aria-label="t('panel.removeJoin')"

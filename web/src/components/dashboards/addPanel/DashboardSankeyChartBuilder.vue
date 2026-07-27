@@ -44,9 +44,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-source-layout"
       >
         <OButtonGroup
-          class="axis-field border-border-default border-s-badge-indigo-ol-border bg-surface-panel my-0.5 mr-2 overflow-hidden border border-s-2"
+          class="axis-field border-border-default border-s-badge-indigo-ol-border bg-surface-panel my-0.5 mr-2 overflow-hidden border border-s-2 [&>*:not(:first-child)]:!border-s"
           radius="sm"
-          :divided="false"
+          :divided="true"
           v-if="
             dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
               ?.source
@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 variant="ghost"
                 size="chip-12"
-                class="!ps-1 !pe-0"
+                class="!ps-1 !pe-1"
                 :data-test="`dashboard-source-item-${sourceLabel}`"
               >
                 <AxisFieldChipLabel :label="sourceLabel" />
@@ -122,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             variant="ghost"
             size="icon-chip"
-            class="-ms-1 !w-4"
+            class="!w-4"
             :data-test="`dashboard-source-item-${sourceLabel}-remove`"
             @click="removeSource()"
           >
@@ -170,9 +170,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-target-layout"
       >
         <OButtonGroup
-          class="axis-field border-border-default border-s-badge-orange-ol-border bg-surface-panel my-0.5 mr-2 overflow-hidden border border-s-2"
+          class="axis-field border-border-default border-s-badge-orange-ol-border bg-surface-panel my-0.5 mr-2 overflow-hidden border border-s-2 [&>*:not(:first-child)]:!border-s"
           radius="sm"
-          :divided="false"
+          :divided="true"
           v-if="
             dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
               ?.target
@@ -203,7 +203,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 variant="ghost"
                 size="chip-12"
-                class="!ps-1 !pe-0"
+                class="!ps-1 !pe-1"
                 :data-test="`dashboard-target-item-${targetLabel}`"
               >
                 <AxisFieldChipLabel :label="targetLabel" />
@@ -248,7 +248,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             variant="ghost"
             size="icon-chip"
-            class="-ms-1 !w-4"
+            class="!w-4"
             :data-test="`dashboard-target-item-${targetLabel}-remove`"
             @click="removeTarget()"
           >
@@ -295,9 +295,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-value-layout"
       >
         <OButtonGroup
-          class="axis-field border-border-default border-s-badge-success-ol-border bg-surface-panel my-0.5 mr-2 overflow-hidden border border-s-2"
+          class="axis-field border-border-default border-s-badge-success-ol-border bg-surface-panel my-0.5 mr-2 overflow-hidden border border-s-2 [&>*:not(:first-child)]:!border-s"
           radius="sm"
-          :divided="false"
+          :divided="true"
           v-if="
             dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
               ?.value
@@ -328,7 +328,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 variant="ghost"
                 size="chip-12"
-                class="!ps-1 !pe-0"
+                class="!ps-1 !pe-1"
                 :data-test="`dashboard-value-item-${valueLabel}`"
               >
                 <AxisFieldChipLabel :label="valueLabel" />
@@ -373,7 +373,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             variant="ghost"
             size="icon-chip"
-            class="-ms-1 !w-4"
+            class="!w-4"
             :data-test="`dashboard-value-item-${valueLabel}-remove`"
             @click="removeValue()"
           >

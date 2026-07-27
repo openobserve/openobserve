@@ -44,9 +44,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-name-layout"
       >
         <OButtonGroup
-          class="axis-field border-border-default border-s-badge-indigo-ol-border bg-surface-panel my-0.5 mr-2 overflow-hidden border border-s-2"
+          class="axis-field border-border-default border-s-badge-indigo-ol-border bg-surface-panel my-0.5 mr-2 overflow-hidden border border-s-2 [&>*:not(:first-child)]:!border-s"
           radius="sm"
-          :divided="false"
+          :divided="true"
           v-if="
             dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
               ?.name
@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 variant="ghost"
                 size="chip-12"
-                class="!ps-1 !pe-0"
+                class="!ps-1 !pe-1"
                 :data-test="`dashboard-name-item-${nameLabel}`"
               >
                 <AxisFieldChipLabel :label="nameLabel" />
@@ -122,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             variant="ghost"
             size="icon-chip"
-            class="-ms-1 !w-4"
+            class="!w-4"
             :data-test="`dashboard-name-item-${nameLabel}-remove`"
             @click="removeMapName()"
           >
@@ -169,9 +169,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-value_for_maps-layout"
       >
         <OButtonGroup
-          class="axis-field border-border-default border-s-badge-success-ol-border bg-surface-panel my-0.5 mr-2 overflow-hidden border border-s-2"
+          class="axis-field border-border-default border-s-badge-success-ol-border bg-surface-panel my-0.5 mr-2 overflow-hidden border border-s-2 [&>*:not(:first-child)]:!border-s"
           radius="sm"
-          :divided="false"
+          :divided="true"
           v-if="
             dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
               ?.value_for_maps
@@ -202,7 +202,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 variant="ghost"
                 size="chip-12"
-                class="!ps-1 !pe-0"
+                class="!ps-1 !pe-1"
                 :data-test="`dashboard-value_for_maps-item-${valueLabel}`"
               >
                 <AxisFieldChipLabel :label="valueLabel" />
@@ -247,7 +247,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             variant="ghost"
             size="icon-chip"
-            class="-ms-1 !w-4"
+            class="!w-4"
             :data-test="`dashboard-value_for_maps-item-${valueLabel}-remove`"
             @click="removeMapValue()"
           >

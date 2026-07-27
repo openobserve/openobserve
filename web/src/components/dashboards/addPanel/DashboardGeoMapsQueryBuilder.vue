@@ -44,9 +44,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-latitude-layout"
       >
         <OButtonGroup
-          class="axis-field border-border-default border-s-badge-indigo-ol-border bg-surface-panel my-0.5 mr-2 overflow-hidden border border-s-2"
+          class="axis-field border-border-default border-s-badge-indigo-ol-border bg-surface-panel my-0.5 mr-2 overflow-hidden border border-s-2 [&>*:not(:first-child)]:!border-s"
           radius="sm"
-          :divided="false"
+          :divided="true"
           v-if="
             dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
               ?.latitude
@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 variant="ghost"
                 size="chip-12"
-                class="!ps-1 !pe-0"
+                class="!ps-1 !pe-1"
                 :data-test="`dashboard-latitude-item-${latitudeLabel}`"
               >
                 <AxisFieldChipLabel :label="latitudeLabel" />
@@ -118,7 +118,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             variant="ghost"
             size="icon-chip"
-            class="-ms-1 !w-4"
+            class="!w-4"
             :data-test="`dashboard-latitude-item-${latitudeLabel}-remove`"
             @click="removeLatitude()"
           >
@@ -165,9 +165,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-longitude-layout"
       >
         <OButtonGroup
-          class="axis-field border-border-default border-s-badge-orange-ol-border bg-surface-panel my-0.5 mr-2 overflow-hidden border border-s-2"
+          class="axis-field border-border-default border-s-badge-orange-ol-border bg-surface-panel my-0.5 mr-2 overflow-hidden border border-s-2 [&>*:not(:first-child)]:!border-s"
           radius="sm"
-          :divided="false"
+          :divided="true"
           v-if="
             dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
               ?.longitude
@@ -198,7 +198,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 variant="ghost"
                 size="chip-12"
-                class="!ps-1 !pe-0"
+                class="!ps-1 !pe-1"
                 :data-test="`dashboard-longitude-item-${longitudeLabel}`"
               >
                 <AxisFieldChipLabel :label="longitudeLabel" />
@@ -239,7 +239,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             variant="ghost"
             size="icon-chip"
-            class="-ms-1 !w-4"
+            class="!w-4"
             :data-test="`dashboard-longitude-item-${longitudeLabel}-remove`"
             @click="removeLongitude()"
           >
@@ -286,9 +286,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-weight-layout"
       >
         <OButtonGroup
-          class="axis-field border-border-default border-s-badge-success-ol-border bg-surface-panel my-0.5 mr-2 overflow-hidden border border-s-2"
+          class="axis-field border-border-default border-s-badge-success-ol-border bg-surface-panel my-0.5 mr-2 overflow-hidden border border-s-2 [&>*:not(:first-child)]:!border-s"
           radius="sm"
-          :divided="false"
+          :divided="true"
           v-if="
             dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
               ?.weight
@@ -319,7 +319,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 variant="ghost"
                 size="chip-12"
-                class="!ps-1 !pe-0"
+                class="!ps-1 !pe-1"
                 :data-test="`dashboard-weight-item-${weightLabel}`"
               >
                 <AxisFieldChipLabel :label="weightLabel" />
@@ -360,7 +360,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             variant="ghost"
             size="icon-chip"
-            class="-ms-1 !w-4"
+            class="!w-4"
             :data-test="`dashboard-weight-item-${weightLabel}-remove`"
             @click="removeWeight()"
           >

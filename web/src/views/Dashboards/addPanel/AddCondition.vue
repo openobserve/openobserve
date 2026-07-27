@@ -10,16 +10,16 @@
       :data-test="`dashboard-add-condition-logical-operator-${conditionIndex}`"
     />
     <OButtonGroup
-      class="axis-field border-border-default border-s-text-body bg-surface-panel shrink-0 border border-s-2"
+      class="axis-field border-border-default border-s-text-body bg-surface-panel shrink-0 border border-s-2 [&>*:not(:first-child)]:!border-s"
       radius="sm"
-      :divided="false"
+      :divided="true"
     >
       <ODropdown @update:open="(v: boolean) => v && loadFilterItem(condition.column)">
         <template #trigger>
           <OButton
             variant="ghost"
             size="chip-12"
-            class="!pe-0"
+            class="!pe-1"
             :data-test="`dashboard-add-condition-label-${conditionIndex}-${computedLabel(condition)}`"
             icon-right="arrow-drop-down"
           >
@@ -145,7 +145,7 @@
       <OButton
         variant="ghost"
         size="icon-chip"
-        class="-ms-1 !w-4 shrink-0"
+        class="!w-4 shrink-0"
         @click="$emit('remove-condition')"
         data-test="dashboard-add-condition-remove"
       >
