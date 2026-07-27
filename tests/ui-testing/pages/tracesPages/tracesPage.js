@@ -2408,7 +2408,7 @@ export class TracesPage {
    * @returns {Locator}
    */
   getFirstLogTimestampCell() {
-    return this.page.locator('[data-test="logs-search-result-logs-table"] tbody tr:first-child td').first();
+    return this.page.locator('[data-test="logs-search-result-logs-table"] tbody tr[data-test^="o2-table-row-"]').first().locator('[data-test^="o2-table-cell-"]').first();
   }
 
   /**

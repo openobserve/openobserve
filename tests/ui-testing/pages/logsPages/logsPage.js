@@ -392,8 +392,8 @@ export class LogsPage {
 
         // Table and pagination CSS selectors
         this.tableBottom = '[data-test="logs-search-result-pagination"]';
-        this.tableBodyRow = 'tbody tr';
-        this.tableBodyRowWithIndex = 'tbody tr[data-index]';
+        this.tableBodyRow = 'tbody tr[data-test^="o2-table-row-"]';
+        this.tableBodyRowWithIndex = 'tbody tr[data-test^="o2-table-row-"]';
         this.tableHeaderCell = 'thead th';
         this.tableHeaders = 'thead th';
 
@@ -441,7 +441,7 @@ export class LogsPage {
         this.patternEmptyState = 'text=No patterns found';
 
         // ===== V0.40 REGRESSION TEST LOCATORS =====
-        this.logsSearchResultTableRows = '[data-test="logs-search-result-logs-table"] tbody tr';
+        this.logsSearchResultTableRows = '[data-test="logs-search-result-logs-table"] tbody tr[data-test^="o2-table-row-"]';
         this.tableRowExpandMenu = '[data-test^="o2-table-expand-"]';
         this.logDetailsIncludeExcludeBtn = '[data-test="log-details-include-exclude-field-btn"]';
         this.timestampCells = '[data-test="o2-table-cell-_timestamp"]';
@@ -1502,7 +1502,7 @@ export class LogsPage {
     }
 
     async expectLogsTableRowCount(count) {
-        return await expect(this.page.locator('[data-test="logs-search-result-logs-table"] tbody tr')).toHaveCount(count);
+        return await expect(this.page.locator('[data-test="logs-search-result-logs-table"] tbody tr[data-test^="o2-table-row-"]')).toHaveCount(count);
     }
 
     // Time and date methods
@@ -2285,7 +2285,7 @@ export class LogsPage {
             }
         }
 
-        const rows = await this.page.locator('[data-test^="logs-search-result-detail-"]').all();
+        const rows = await this.page.locator('[data-test^="o2-table-row-"]').all();
         let previousValue = orderType === 'desc' ? Number.MAX_SAFE_INTEGER : Number.MIN_SAFE_INTEGER;
 
         for (const row of rows) {
@@ -6170,7 +6170,7 @@ export class LogsPage {
     }
 
     async getLogsTableRowCount() {
-        return await this.page.locator(`${this.logsTable} tbody tr`).count();
+        return await this.page.locator(`${this.logsTable} tbody tr[data-test^="o2-table-row-"]`).count();
     }
 
     /**
@@ -6179,7 +6179,7 @@ export class LogsPage {
      * @returns {Promise<string[]>} Array of row text content
      */
     async getLogsTableRowTexts(limit = 10) {
-        const rows = this.page.locator(`${this.logsTable} tbody tr`);
+        const rows = this.page.locator(`${this.logsTable} tbody tr[data-test^="o2-table-row-"]`);
         const count = Math.min(await rows.count(), limit);
         const texts = [];
         for (let i = 0; i < count; i++) {
@@ -7084,7 +7084,7 @@ export class LogsPage {
      * reactive store before callers check for the analyze button or row-dependent UI.
      */
     async waitForSearchResultRows(timeout = 20000) {
-        await this.page.locator(`${this.logsTable} tbody tr`).first()
+        await this.page.locator(`${this.logsTable} tbody tr[data-test^="o2-table-row-"]`).first()
             .waitFor({ state: 'visible', timeout });
         testLogger.info('waitForSearchResultRows: at least one result row is visible');
     }
@@ -10442,7 +10442,7 @@ export class LogsPage {
      * @returns {import('@playwright/test').Locator}
      */
     getLogsTableRows() {
-        return this.page.locator('[data-test="logs-search-result-logs-table"] tbody tr');
+        return this.page.locator('[data-test="logs-search-result-logs-table"] tbody tr[data-test^="o2-table-row-"]');
     }
 
     /**
