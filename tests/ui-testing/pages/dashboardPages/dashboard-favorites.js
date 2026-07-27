@@ -107,17 +107,34 @@ export default class DashboardFavorites {
 
   // ── Favorite toggling ──────────────────────────────────────────────────
 
+  // Toggling a favorite updates the UI optimistically, then fires a
+  // fire-and-forget POST to persist it (useFavoriteDashboards.ts). A test that
+  // reloads right after addToFavorites() can otherwise race the page teardown
+  // against that still-in-flight request and lose the favorite server-side
+  // while the DOM already looked correct. Wait for the response so callers
+  // get a genuinely persisted state, not just the optimistic one.
+  async waitForFavoritesPersisted(action) {
+    await Promise.all([
+      this.page.waitForResponse(
+        (response) =>
+          /\/settings\/v2\/user\//.test(response.url()) &&
+          response.status() === 200
+      ),
+      action(),
+    ]);
+  }
+
   async addToFavorites(dashboardName) {
     const toggle = this.getFavoriteToggle(dashboardName);
     await toggle.waitFor({ state: "visible", timeout: 15000 });
-    await toggle.click();
+    await this.waitForFavoritesPersisted(() => toggle.click());
     await this.verifyIsFavorite(dashboardName);
   }
 
   async removeFromFavorites(dashboardName) {
     const toggle = this.getFavoriteToggle(dashboardName);
     await toggle.waitFor({ state: "visible", timeout: 15000 });
-    await toggle.click();
+    await this.waitForFavoritesPersisted(() => toggle.click());
     // Unfavoriting drops the row entirely when viewed from the Favorites
     // pseudo-folder, but only flips the icon class when viewed from the
     // dashboard's real folder — the toggle element itself disappears in
