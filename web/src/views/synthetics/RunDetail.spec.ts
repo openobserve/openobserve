@@ -15,6 +15,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
+import { ref } from "vue";
 import RunDetail from "./RunDetail.vue";
 
 vi.mock("vue-router", () => ({
@@ -24,6 +25,7 @@ vi.mock("vue-router", () => ({
   }),
   useRoute: () => ({
     params: { id: "mon-1", runId: "4821", executionId: "exec-1" },
+    query: {},
   }),
   RouterLink: {
     name: "RouterLinkStub",
@@ -70,6 +72,15 @@ const mockRunDetail = {
   traceKey: null,
 };
 
+// ── Controllable `loading` ref shared with the mocked composable, so
+// RunDetail's direct `synthetics.loading.value = true` write (the defensive
+// loading fix) is observable in the rendered template. `fetchRun` mirrors the
+// real composable's contract by flipping it back to false once "done".
+const mockLoading = ref(false);
+const mockFetchRun = vi.fn(async () => {
+  mockLoading.value = false;
+});
+
 vi.mock("@/composables/useSyntheticResults", () => ({
   default: () => ({
     kpi: {
@@ -86,56 +97,88 @@ vi.mock("@/composables/useSyntheticResults", () => ({
     buckets: { value: [] },
     runs: { value: [] },
     runDetail: { value: { ...mockRunDetail } },
-    loading: { value: false },
+    loading: mockLoading,
     error: { value: null },
     hasLoadedOnce: { value: true },
     fetchAll: vi.fn(),
-    fetchRun: vi.fn(),
+    fetchRun: mockFetchRun,
     cancelAll: vi.fn(),
   }),
 }));
+
+// ── Controllable mock for the monitor-type lookup (resolveMonitorType) and
+// the locations prefetch, so tests can assert whether the API was hit and
+// control the timing of its resolution.
+const mockGetSynthetics = vi.fn().mockResolvedValue({ data: { type: "browser" } });
+const mockGetLocations = vi.fn().mockResolvedValue({ data: { locations: [] } });
+
+vi.mock("@/services/synthetics", () => ({
+  default: {
+    get: (...args: any[]) => mockGetSynthetics(...args),
+    getLocations: (...args: any[]) => mockGetLocations(...args),
+    presignArtifacts: vi.fn().mockResolvedValue({ data: { urls: [] } }),
+    artifactUrl: vi.fn(() => ""),
+  },
+}));
+
+const stubs = {
+  OCard: {
+    template: '<div class="ocard-stub"><slot /></div>',
+  },
+  OCardSection: {
+    template: '<div class="ocardsection-stub"><slot /></div>',
+    props: ["role"],
+  },
+  OSeparator: {
+    template: '<div class="oseparator-stub" />',
+  },
+  OButton: {
+    template:
+      '<button class="obutton-stub" @click="$emit(\'click\')"><slot /><slot name="prefix" /><slot name="suffix" /></button>',
+    props: ["disabled", "iconLeft"],
+  },
+  OIcon: {
+    template: '<span class="oicon-stub" />',
+    props: ["name"],
+  },
+  OBadge: {
+    template: '<span class="obadge-stub"><slot /></span>',
+    props: ["variant", "size", "icon"],
+  },
+  BetaBadge: {
+    template: '<span data-test="beta-badge">BETA</span>',
+  },
+  // Protocol (non-browser) runs delegate entirely to ProtocolRunSummary —
+  // stub it so branch-selection tests don't need to satisfy its own
+  // composable/service dependencies.
+  ProtocolRunSummary: {
+    name: "ProtocolRunSummary",
+    props: ["monitorId", "runId", "executionId", "drawerMode", "locationNames"],
+    template: '<div data-test="protocol-run-summary-stub" />',
+  },
+};
+
+function mountComponent(props: Record<string, unknown> = {}) {
+  return mount(RunDetail, {
+    props,
+    global: { stubs },
+  });
+}
 
 describe("RunDetail", () => {
   let wrapper: VueWrapper;
 
   beforeEach(async () => {
-    wrapper = mount(RunDetail, {
-      global: {
-        stubs: {
-          OCard: {
-            template: '<div class="ocard-stub"><slot /></div>',
-          },
-          OCardSection: {
-            template: '<div class="ocardsection-stub"><slot /></div>',
-            props: ["role"],
-          },
-          OSeparator: {
-            template: '<div class="oseparator-stub" />',
-          },
-          OButton: {
-            template:
-              '<button class="obutton-stub" @click="$emit(\'click\')"><slot /><slot name="prefix" /><slot name="suffix" /></button>',
-            props: ["disabled", "iconLeft"],
-          },
-          OIcon: {
-            template: '<span class="oicon-stub" />',
-            props: ["name"],
-          },
-          OBadge: {
-            template: '<span class="obadge-stub"><slot /></span>',
-            props: ["variant", "size", "icon"],
-          },
-          BetaBadge: {
-            template: '<span data-test="beta-badge">BETA</span>',
-          },
-        },
-      },
-    });
+    wrapper = mountComponent();
     await flushPromises();
   });
 
   afterEach(() => {
     wrapper?.unmount();
+    vi.clearAllMocks();
+    mockLoading.value = false;
+    mockGetSynthetics.mockResolvedValue({ data: { type: "browser" } });
+    mockGetLocations.mockResolvedValue({ data: { locations: [] } });
   });
 
   it("should render the run detail page shell", () => {
@@ -174,5 +217,72 @@ describe("RunDetail", () => {
 
   it("should render the Beta badge in the page title", () => {
     expect(wrapper.find('[data-test="beta-badge"]').exists()).toBe(true);
+  });
+
+  describe("monitor type resolution (drawer mode override)", () => {
+    it("skips the resolveMonitorType fetch and delegates to ProtocolRunSummary when overrideMonitorType is already known", async () => {
+      // The outer beforeEach already mounted the default (non-drawer) wrapper,
+      // which calls syntheticsService.get once — clear that call so this
+      // assertion only reflects the wrapper mounted below.
+      mockGetSynthetics.mockClear();
+      const w = mountComponent({
+        drawerMode: true,
+        overrideMonitorId: "mon-2",
+        overrideRunId: "run-2",
+        overrideExecutionId: "exec-2",
+        overrideMonitorType: "http",
+      });
+      await flushPromises();
+
+      expect(mockGetSynthetics).not.toHaveBeenCalled();
+      expect(w.find('[data-test="protocol-run-summary-stub"]').exists()).toBe(true);
+      expect(w.find('[data-test="synthetics-run-detail"]').exists()).toBe(false);
+
+      w.unmount();
+    });
+
+    it("falls back to resolveMonitorType via syntheticsService.get when overrideMonitorType is empty", async () => {
+      mockGetSynthetics.mockClear();
+      const w = mountComponent({
+        drawerMode: true,
+        overrideMonitorId: "mon-2",
+        overrideRunId: "run-2",
+        overrideExecutionId: "exec-2",
+        overrideMonitorType: "",
+      });
+      await flushPromises();
+
+      expect(mockGetSynthetics).toHaveBeenCalledWith("org-1", "mon-2", "");
+
+      w.unmount();
+    });
+  });
+
+  describe("defensive loading state", () => {
+    it("sets loading synchronously once loadRun starts, before monitor type resolution settles", async () => {
+      // Keep resolveMonitorType's underlying fetch pending so monitorType is
+      // still unresolved (null) at assertion time.
+      let resolveGet!: (value: unknown) => void;
+      mockGetSynthetics.mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveGet = resolve;
+          }),
+      );
+
+      const w = mountComponent();
+
+      // No flushPromises yet — assert immediately after mount, while
+      // resolveMonitorType() is still pending.
+      expect(w.find('[data-test="synthetics-run-detail-info-skeleton"]').exists()).toBe(true);
+      expect(w.find('[data-test="synthetics-run-detail-info-bar"]').exists()).toBe(false);
+
+      // Settle the pending fetch so the component doesn't leak a dangling
+      // promise across tests.
+      resolveGet({ data: { type: "browser" } });
+      await flushPromises();
+
+      w.unmount();
+    });
   });
 });

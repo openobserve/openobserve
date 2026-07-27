@@ -9592,6 +9592,8 @@
       "modalSubtitle": "Wählen Sie aus, was Sie überwachen möchten",
       "modalTitle": "Eine Prüfung erstellen",
       "pageTitle": "Neue {label}-Prüfung",
+      "saveAndContinue": "Speichern & fortfahren",
+      "saveAndExit": "Speichern & beenden",
       "saveCheck": "Prüfung speichern",
       "saveFailed": "Prüfung konnte nicht gespeichert werden.",
       "saved": "Prüfung erfolgreich gespeichert.",

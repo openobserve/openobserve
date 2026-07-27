@@ -543,6 +543,7 @@ interface Props {
   overrideMonitorName?: string;
   overrideRunId?: string;
   overrideExecutionId?: string;
+  overrideMonitorType?: string;
 }
 const props = withDefaults(defineProps<Props>(), {
   drawerMode: false,
@@ -550,6 +551,7 @@ const props = withDefaults(defineProps<Props>(), {
   overrideMonitorName: "",
   overrideRunId: "",
   overrideExecutionId: "",
+  overrideMonitorType: "",
 });
 
 const { t } = useI18n();
@@ -592,8 +594,12 @@ const synthetics = useSyntheticResults();
 
 // ── Monitor type — protocol runs render ProtocolRunSummary instead ──────────
 // null until resolved; browser view only fetches once known (avoids running
-// the steps/screenshot query for protocol runs).
-const monitorType = ref<string | null>(null);
+// the steps/screenshot query for protocol runs). In drawer mode the parent
+// (MonitorResults.vue) already knows the type — seed from it to skip the
+// redundant fetch and the render gap while this would otherwise be null.
+const monitorType = ref<string | null>(
+  props.drawerMode && props.overrideMonitorType ? props.overrideMonitorType : null,
+);
 
 async function resolveMonitorType() {
   try {
@@ -1070,6 +1076,10 @@ watch(
 // ── Fetch data on mount / route change ────────────────────────────────────
 async function loadRun() {
   if (!runIdParam.value || !executionIdParam.value) return;
+  // Show the skeleton (rather than the empty browser layout) for as long as
+  // the monitor type is unresolved, since we don't yet know which branch —
+  // this one or ProtocolRunSummary — will end up rendering.
+  synthetics.loading.value = true;
   // Resolve the monitor type first — protocol runs are rendered by
   // ProtocolRunSummary (which fetches its own row), so skip the browser
   // steps/screenshot query for them.

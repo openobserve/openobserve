@@ -9592,6 +9592,8 @@
       "modalSubtitle": "監視するものを選択",
       "modalTitle": "チェックを作成",
       "pageTitle": "新規 {label} チェック",
+      "saveAndContinue": "保存して続行",
+      "saveAndExit": "保存して終了",
       "saveCheck": "チェックを保存",
       "saveFailed": "チェックの保存に失敗しました。",
       "saved": "チェックが正常に保存されました。",

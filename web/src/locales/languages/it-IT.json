@@ -9592,6 +9592,8 @@
       "modalSubtitle": "Scegli cosa monitorare",
       "modalTitle": "Crea un check",
       "pageTitle": "Nuovo controllo {label}",
+      "saveAndContinue": "Salva e continua",
+      "saveAndExit": "Salva ed esci",
       "saveCheck": "Salva controllo",
       "saveFailed": "Salvataggio del controllo fallito.",
       "saved": "Controllo salvato con successo.",
