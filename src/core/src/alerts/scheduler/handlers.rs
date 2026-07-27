@@ -195,13 +195,10 @@ async fn dispatch_per_group(
 
     // Durable state first (MN-1), then read it back: the delivery decision is
     // made against the rows this evaluation just committed.
-    persist_alert_run_state(
-        &alert_id,
-        &config::meta::self_reporting::usage::RunOutcome::Firing,
-        rollup_level,
-        Some(classification),
-    )
-    .await;
+    // The rollup outcome follows the classification, not an assumption: an
+    // evaluation can reach dispatch with every group healthy.
+    let rollup_outcome = config::meta::alerts::grouping::group_outcome(classification.rollup);
+    persist_alert_run_state(&alert_id, &rollup_outcome, rollup_level, Some(classification)).await;
 
     let states = match load_tracked_group_states(&alert_id).await {
         Ok(s) => s,
@@ -244,6 +241,10 @@ async fn dispatch_per_group(
         );
     }
 
+    // One clock for the whole pass: per-item `now_micros()` would give
+    // groups from a single evaluation slightly different windows for no
+    // reason, and makes the log harder to reconcile.
+    let delivered_at = now_micros();
     let (mut delivered, mut failed) = (0usize, 0usize);
     for item in &plan.items {
         // The group's OWN row, level and value — never the worst group's
@@ -288,19 +289,19 @@ async fn dispatch_per_group(
         // a failed group re-qualify at its next evaluation with no retry
         // machinery. The write is episode- and attempt-guarded, so a callback
         // that lost a race is dropped rather than applied.
+        // The window itself is computed by `delivery_success_update` — the
+        // scheduler only says how long the alert's silence is. Computing it
+        // here as well would put the same rule in two places, which is exactly
+        // how the pure and SQL layers drifted apart before.
         let record = if ok {
             delivered += 1;
             infra::table::alert_states::DeliveryOutcome::Delivered {
-                notified_level: item.level,
-                silenced_until: (alert.trigger_condition.silence > 0).then(|| {
-                    now_micros().saturating_add(
-                        alert.trigger_condition.silence.saturating_mul(60 * 1_000_000),
-                    )
-                }),
+                silence_minutes: alert.trigger_condition.silence,
+                at: delivered_at,
             }
         } else {
             failed += 1;
-            infra::table::alert_states::DeliveryOutcome::Failed { at: now_micros() }
+            infra::table::alert_states::DeliveryOutcome::Failed { at: delivered_at }
         };
 
         if let Err(e) = infra::table::alert_states::advance_delivery_state(

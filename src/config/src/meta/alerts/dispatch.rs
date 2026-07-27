@@ -257,10 +257,22 @@ pub fn delivery_success_update(
         return None;
     }
 
+    let candidate = (silence_minutes > 0)
+        .then(|| delivered_at.saturating_add(silence_minutes.saturating_mul(60 * 1_000_000)));
+
     let mut next = current.clone();
     next.last_notified_level = Some(episode.level);
-    next.silenced_until = (silence_minutes > 0)
-        .then(|| delivered_at.saturating_add(silence_minutes.saturating_mul(60 * 1_000_000)));
+    // Never move the window BACKWARDS. Success ignores the attempt anchor, so
+    // two callbacks in one episode both reach here; if the one computing the
+    // earlier window commits second, an unconditional assignment would shorten
+    // a live silence and let the group page early. Taking the later of the two
+    // makes commit order irrelevant — and `None` (silence = 0) is the earliest
+    // window, not the newest, so it cannot wipe a live one.
+    next.silenced_until = match (current.silenced_until, candidate) {
+        (Some(existing), Some(new)) => Some(existing.max(new)),
+        (Some(existing), None) => Some(existing),
+        (None, new) => new,
+    };
     Some(next)
 }
 
@@ -401,7 +413,12 @@ impl DeliveryEpisode {
     pub fn of(state: &AlertState) -> Option<Self> {
         Some(Self {
             level: state.level?,
-            level_since: state.level_since.unwrap_or_default(),
+            // A classified row always has `level_since` (`apply_outcome` sets
+            // them together). Defaulting a missing one to 0 would mint an
+            // episode the guarded UPDATE can never match — the delivery would
+            // never be recorded and the group would re-page every cycle — so a
+            // row that cannot name its episode gets none.
+            level_since: state.level_since?,
             notified_at_enqueue: (state.last_notified_level, state.silenced_until),
         })
     }
@@ -1664,6 +1681,62 @@ mod tests {
                 notified_at_enqueue: (Some(AlertLevel::Warning), Some(9_999)),
             })
         );
+    }
+
+    #[test]
+    fn test_a_success_never_shortens_a_live_silence_window() {
+        // Two successes in one episode: the one computing the EARLIER window
+        // commits second. The active window must survive, or the group pages
+        // early — a duplicate at exactly the moment on-call is already busy.
+        let since = 1_000 * SEC;
+        let row = state(
+            &key_of("a"),
+            AlertLevel::Critical,
+            since,
+            Some(AlertLevel::Critical),
+            Some(since + 30 * MIN),
+        );
+
+        let updated =
+            delivery_success_update(&row, episode(AlertLevel::Critical, since), 1, since + MIN)
+                .expect("a delivery that happened is still recorded");
+
+        assert_eq!(
+            updated.silenced_until,
+            Some(since + 30 * MIN),
+            "the later window wins regardless of commit order"
+        );
+        assert_eq!(updated.last_notified_level, Some(AlertLevel::Critical));
+    }
+
+    #[test]
+    fn test_a_zero_silence_success_does_not_wipe_a_live_window() {
+        // `silence = 0` writes NULL, which is the EARLIEST window rather than
+        // the newest. Arriving late it must not clear one a sibling set.
+        let since = 1_000 * SEC;
+        let row = state(
+            &key_of("a"),
+            AlertLevel::Critical,
+            since,
+            Some(AlertLevel::Critical),
+            Some(since + 30 * MIN),
+        );
+
+        let updated =
+            delivery_success_update(&row, episode(AlertLevel::Critical, since), 0, since + MIN)
+                .expect("still recorded");
+        assert_eq!(updated.silenced_until, Some(since + 30 * MIN));
+    }
+
+    #[test]
+    fn test_a_row_without_a_level_episode_yields_no_episode() {
+        // `level` set but `level_since` missing (a legacy or corrupt row):
+        // defaulting to 0 would mint an episode the guarded UPDATE can never
+        // match, so every delivery for that group would go unrecorded and it
+        // would re-page forever.
+        let mut row = state(&key_of("a"), AlertLevel::Critical, 1_000 * SEC, None, None);
+        row.level_since = None;
+        assert_eq!(DeliveryEpisode::of(&row), None);
     }
 
     #[test]
