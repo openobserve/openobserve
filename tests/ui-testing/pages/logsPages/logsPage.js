@@ -6714,8 +6714,18 @@ export class LogsPage {
                 // marks the row with data-status-bar. The level rides along on the row
                 // class (o2-log-level-<level>) so it stays machine-readable whichever
                 // column is shown.
-                const bgColor = row.style.getPropertyValue('--row-status-color').trim();
-                if (!bgColor || bgColor === 'rgba(0, 0, 0, 0)' || bgColor === 'transparent') continue;
+                const raw = row.style.getPropertyValue('--row-status-color').trim();
+                if (!raw || raw === 'rgba(0, 0, 0, 0)' || raw === 'transparent') continue;
+                // The token resolves to a hex; callers normalise through rgbToHex,
+                // so hand back the rgb() form a computed style would have given.
+                let bgColor = raw;
+                const hex = raw.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
+                if (hex) {
+                    let h = hex[1];
+                    if (h.length === 3) h = h.split('').map((c) => c + c).join('');
+                    const n = parseInt(h, 16);
+                    bgColor = `rgb(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255})`;
+                }
 
                 const levelClass = Array.from(row.classList).find((c) => c.startsWith('o2-log-level-'));
                 const level = levelClass ? levelClass.replace('o2-log-level-', '') : null;

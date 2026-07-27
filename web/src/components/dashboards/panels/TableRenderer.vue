@@ -42,6 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :enable-column-filter="enableFiltering"
       :enable-column-reorder="false"
       :enable-cell-copy="true"
+      :class="{ 'wrap-enabled': wrapCells }"
       data-test="dashboard-panel-table"
       @row-click="
         (row: any, evt: MouseEvent) => $emit('row-click', evt ?? null, row, sortedRows.indexOf(row))
