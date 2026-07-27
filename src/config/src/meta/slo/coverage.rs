@@ -33,8 +33,13 @@ use crate::meta::self_reporting::usage::RunOutcome;
 /// where expected comes from the aligned grid — never from what a query
 /// happened to return.
 pub fn coverage(observed_slices: i64, expected_slices: i64) -> f64 {
-    let _ = (observed_slices, expected_slices);
-    todo!("coverage::coverage")
+    if expected_slices <= 0 {
+        // Nothing was expected, so nothing was covered. Reporting 1.0 here
+        // would make an empty window look fully measured.
+        return 0.0;
+    }
+    // Clamped: duplicate rows must never report more than fully covered.
+    (observed_slices as f64 / expected_slices as f64).clamp(0.0, 1.0)
 }
 
 /// One window's worth of aggregated slices, as read from the status row.
@@ -87,8 +92,20 @@ impl Observation {
 /// `watermark_stale` is computed by [`super::window::watermark_is_stale`] and
 /// passed in so this stays a pure decision over already-gathered facts.
 pub fn observe(read: WindowRead, coverage_floor: f64, watermark_stale: bool) -> Observation {
-    let _ = (read, coverage_floor, watermark_stale);
-    todo!("coverage::observe")
+    // Precedence is fixed and deliberate. Staleness first: if the data is not
+    // current, nothing about it is a measurement, whatever its coverage says.
+    // Then coverage: we cannot claim a window was empty if we did not measure
+    // it. Only then emptiness.
+    if watermark_stale {
+        return Observation::Unobserved(UnobservedReason::StaleWatermark);
+    }
+    if coverage(read.observed_slices, read.expected_slices) < coverage_floor {
+        return Observation::Unobserved(UnobservedReason::BelowCoverageFloor);
+    }
+    match super::math::sli(read.good, read.total) {
+        Some(sli) => Observation::Observed { sli },
+        None => Observation::Unobserved(UnobservedReason::ZeroTotal),
+    }
 }
 
 /// Whether one evaluation of a **source alert** counts as a measurement, for
@@ -104,14 +121,18 @@ pub fn observe(read: WindowRead, coverage_floor: f64, watermark_stale: bool) -> 
 /// returns before publishing), so its slices have no evidence of measurement
 /// and fall through gap-fill as uncovered.
 pub fn evaluation_is_measured(outcome: &RunOutcome) -> bool {
-    let _ = outcome;
-    todo!("coverage::evaluation_is_measured")
+    match outcome {
+        // Computed a level — the same set §7.6 refreshes `level_at` for.
+        RunOutcome::Firing | RunOutcome::Normal | RunOutcome::NotifyFailed => true,
+        // Observed nothing: the query failed, the run was skipped, or the
+        // outcome belongs to a non-condition module.
+        RunOutcome::Error | RunOutcome::Skipped | RunOutcome::Succeeded => false,
+    }
 }
 
 /// Whether an SLO's overall status should read as `NoData` (S-8).
 pub fn is_no_data(read: WindowRead, coverage_floor: f64) -> bool {
-    let _ = (read, coverage_floor);
-    todo!("coverage::is_no_data")
+    coverage(read.observed_slices, read.expected_slices) < coverage_floor
 }
 
 #[cfg(test)]

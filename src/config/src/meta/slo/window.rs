@@ -27,8 +27,26 @@
 
 /// Align a timestamp down to the start of its slice.
 pub fn align_down(ts_secs: i64, slice_interval_secs: i64) -> i64 {
-    let _ = (ts_secs, slice_interval_secs);
-    todo!("window::align_down")
+    if slice_interval_secs <= 0 {
+        return ts_secs;
+    }
+    // `div_euclid`, not `/`: integer division truncates toward zero, so a
+    // negative timestamp would align *up* and land inside the wrong bucket.
+    ts_secs.div_euclid(slice_interval_secs) * slice_interval_secs
+}
+
+/// Align a timestamp **up** to the next slice boundary, leaving an exact
+/// boundary alone.
+fn align_up(ts_secs: i64, slice_interval_secs: i64) -> i64 {
+    if slice_interval_secs <= 0 {
+        return ts_secs;
+    }
+    let down = align_down(ts_secs, slice_interval_secs);
+    if down == ts_secs {
+        down
+    } else {
+        down + slice_interval_secs
+    }
 }
 
 /// A closed ingest range: `[start, end)`, both aligned to the slice grid.
@@ -44,14 +62,24 @@ pub struct IngestRange {
 impl IngestRange {
     /// Number of slices the range covers.
     pub fn slice_count(&self, slice_interval_secs: i64) -> i64 {
-        let _ = slice_interval_secs;
-        todo!("IngestRange::slice_count")
+        if slice_interval_secs <= 0 {
+            return 0;
+        }
+        (self.end - self.start).max(0) / slice_interval_secs
     }
 
     /// Every aligned `slice_start` in the range, ascending.
     pub fn slice_starts(&self, slice_interval_secs: i64) -> Vec<i64> {
-        let _ = slice_interval_secs;
-        todo!("IngestRange::slice_starts")
+        if slice_interval_secs <= 0 {
+            return Vec::new();
+        }
+        let mut out = Vec::new();
+        let mut s = self.start;
+        while s < self.end {
+            out.push(s);
+            s += slice_interval_secs;
+        }
+        out
     }
 }
 
@@ -99,22 +127,56 @@ pub struct IngestRangeParams {
 /// A watermark ahead of `now` (clock skew) therefore also yields `None`, which
 /// is the safe response — never a backwards range.
 pub fn ingest_range(params: IngestRangeParams) -> Option<IngestRange> {
-    let _ = params;
-    todo!("window::ingest_range")
+    let slice = params.slice_interval_secs;
+    if slice <= 0 {
+        return None;
+    }
+
+    // The last COMPLETE slice: never the one still filling.
+    let end = align_down(params.now_secs - params.ingest_delay_secs, slice);
+
+    // Nothing new has closed — do not re-query the same trailing slices on
+    // every tick. A watermark ahead of `now` (clock skew) lands here too,
+    // which is the safe response.
+    if let Some(watermark) = params.watermark_end
+        && end <= watermark
+    {
+        return None;
+    }
+
+    // Reach back K slices for late data. On the first pass of a generation
+    // there is no watermark to reach back from.
+    let reach_back = align_down(params.now_secs, slice) - params.recompute_slices * slice;
+    let start = match params.watermark_end {
+        Some(watermark) => watermark.min(reach_back),
+        None => params.generation_reset_time,
+    };
+
+    // Never scan before the generation began, and keep `start` on the grid:
+    // an unaligned start would make the histogram emit a `slice_start` below
+    // it, i.e. a bucket that partly predates the generation.
+    let floor = align_up(params.generation_reset_time, slice);
+    let start = align_down(start, slice).max(floor);
+
+    if end <= start {
+        return None;
+    }
+    Some(IngestRange { start, end })
 }
 
 /// How many slices a read window *should* contain — the denominator of
 /// coverage. Derived from the aligned grid, never from what a query returned.
 pub fn expected_slices(from_secs: i64, to_secs: i64, slice_interval_secs: i64) -> i64 {
-    let _ = (from_secs, to_secs, slice_interval_secs);
-    todo!("window::expected_slices")
+    if slice_interval_secs <= 0 {
+        return 0;
+    }
+    (to_secs - from_secs).max(0) / slice_interval_secs
 }
 
 /// The `[from, to)` a read window covers, anchored at the watermark rather
 /// than the wall clock (SA-14).
 pub fn read_window(watermark_end: i64, window_secs: i64) -> (i64, i64) {
-    let _ = (watermark_end, window_secs);
-    todo!("window::read_window")
+    (watermark_end - window_secs, watermark_end)
 }
 
 /// Whether a watermark is too old to trust — `now > watermark + K × slice`
@@ -126,8 +188,7 @@ pub fn watermark_is_stale(
     slice_interval_secs: i64,
     stale_k: i64,
 ) -> bool {
-    let _ = (now_secs, watermark_end, slice_interval_secs, stale_k);
-    todo!("window::watermark_is_stale")
+    now_secs > watermark_end + stale_k * slice_interval_secs
 }
 
 #[cfg(test)]

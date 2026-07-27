@@ -38,14 +38,16 @@
 /// window with zero events is *not* 100% and *not* 0%, it is undefined, and
 /// SA-18 turns that into "unobserved" rather than a recovery.
 pub fn sli(good: f64, total: f64) -> Option<f64> {
-    let _ = (good, total);
-    todo!("math::sli")
+    // `<= 0` rather than `== 0`: a negative total is corruption, not a 0% SLI.
+    if !(total > 0.0) {
+        return None;
+    }
+    Some(100.0 * good / total)
 }
 
 /// Error rate as a percentage: the complement of the SLI.
 pub fn error_rate(sli: f64) -> f64 {
-    let _ = sli;
-    todo!("math::error_rate")
+    100.0 - sli
 }
 
 /// Burn rate: observed error rate divided by the budgeted error rate.
@@ -53,38 +55,40 @@ pub fn error_rate(sli: f64) -> f64 {
 /// 1.0 means the budget lands exactly at the window's end. 14.4 over a 30-day
 /// SLO exhausts it in about two days.
 pub fn burn_rate(sli: f64, target: f64) -> f64 {
-    let _ = (sli, target);
-    todo!("math::burn_rate")
+    error_rate(sli) / (100.0 - target)
 }
 
 /// The largest burn rate physically reachable for a target — `1/(1 − target)`.
 /// A threshold above this needs an error rate over 100% and can never fire
 /// (SA-6).
 pub fn max_burn_rate(target: f64) -> f64 {
-    let _ = target;
-    todo!("math::max_burn_rate")
+    // Identically `burn_rate(0.0, target)` — the burn rate of a totally failed
+    // window. Written out so the SA-6 cap reads as its own idea.
+    100.0 / (100.0 - target)
 }
 
 /// Percentage of the error budget consumed over the full window.
 /// Identically `100 × burn_rate(window)`.
 pub fn error_budget_consumed(sli_window: f64, target: f64) -> f64 {
-    let _ = (sli_window, target);
-    todo!("math::error_budget_consumed")
+    100.0 * burn_rate(sli_window, target)
 }
 
 /// Percentage of the error budget remaining — **signed**. A blown budget reads
 /// negative and is rendered that way; it is never clamped to zero (S-6).
 pub fn error_budget_remaining(sli_window: f64, target: f64) -> f64 {
-    let _ = (sli_window, target);
-    todo!("math::error_budget_remaining")
+    100.0 - error_budget_consumed(sli_window, target)
 }
 
 /// How long the window's budget lasts at a sustained burn rate:
 /// `window / burn`. `None` when the burn rate is zero or negative — the budget
 /// is not being consumed at all.
 pub fn time_to_exhaust_secs(window_secs: i64, burn: f64) -> Option<i64> {
-    let _ = (window_secs, burn);
-    todo!("math::time_to_exhaust_secs")
+    // `!(burn > 0.0)` also rejects NaN, which a `burn <= 0.0` test would let
+    // through into a division.
+    if !(burn > 0.0) {
+        return None;
+    }
+    Some((window_secs as f64 / burn) as i64)
 }
 
 #[cfg(test)]
@@ -95,8 +99,16 @@ mod tests {
     /// identities, so the tests hold themselves several orders tighter.
     const EPS: f64 = 1e-9;
 
+    /// Absolute for small values, **relative** for large ones.
+    ///
+    /// A flat `1e-9` was tighter than f64 can represent for the larger
+    /// quantities here: `max_burn_rate(99.99)` is `9999.999999994885`, off by
+    /// 5.1e-9 purely from `100.0 - 99.99` not being exact. That is a
+    /// representation limit, not an arithmetic error — the relative error is
+    /// 5e-13 — and it is well inside the §9 gate. Asserting a flat epsilon
+    /// against a four-digit multiplier was the mistake.
     fn close(a: f64, b: f64) -> bool {
-        (a - b).abs() < EPS
+        (a - b).abs() <= EPS.max(b.abs() * 1e-12)
     }
 
     // ---- sli ---------------------------------------------------------------

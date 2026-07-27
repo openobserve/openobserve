@@ -76,8 +76,7 @@ pub struct SliceRow {
 /// cache, the cache is rebuilt by reconciliation, and alerts read the cache
 /// rather than slices.
 pub fn is_visible(row: &SliceRow, watermark_end: i64, generation: i32) -> bool {
-    let _ = (row, watermark_end, generation);
-    todo!("slice::is_visible")
+    row.definition_generation == generation && row.slice_start < watermark_end
 }
 
 /// Collapse duplicate revisions of the same key, keeping the **latest
@@ -86,14 +85,34 @@ pub fn is_visible(row: &SliceRow, watermark_end: i64, generation: i32) -> bool {
 /// Input need not be sorted. Output is ascending by `(group_key, slice_start)`
 /// so downstream aggregation is deterministic.
 pub fn dedupe_latest_rev(rows: Vec<SliceRow>) -> Vec<SliceRow> {
-    let _ = rows;
-    todo!("slice::dedupe_latest_rev")
+    use std::collections::BTreeMap;
+
+    // BTreeMap so the output order is deterministic by (group_key,
+    // slice_start) without a separate sort.
+    let mut best: BTreeMap<(String, i64), SliceRow> = BTreeMap::new();
+    for row in rows {
+        let key = (row.group_key.clone(), row.slice_start);
+        match best.get(&key) {
+            // Strictly greater: an equal revision must not flip the winner, or
+            // the result would depend on input order.
+            Some(existing) if existing.rev >= row.rev => {}
+            _ => {
+                best.insert(key, row);
+            }
+        }
+    }
+    best.into_values().collect()
 }
 
 /// Clamp and dedupe — the canonical read path.
 pub fn visible_slices(rows: Vec<SliceRow>, watermark_end: i64, generation: i32) -> Vec<SliceRow> {
-    let _ = (rows, watermark_end, generation);
-    todo!("slice::visible_slices")
+    // Clamp BEFORE dedupe: a row from another generation must not win a key
+    // just because its revision is higher.
+    let visible = rows
+        .into_iter()
+        .filter(|r| is_visible(r, watermark_end, generation))
+        .collect();
+    dedupe_latest_rev(visible)
 }
 
 /// What the ingest job emits for a bucket the query did not return.
@@ -108,8 +127,14 @@ pub enum GapFill {
 
 /// How a missing bucket is interpreted, per SLI type (D48).
 pub fn gap_fill_policy(sli_type: SliType) -> GapFill {
-    let _ = sli_type;
-    todo!("slice::gap_fill_policy")
+    match sli_type {
+        // "No rows" is a real observation of zero traffic.
+        SliType::Count => GapFill::CoveredZero,
+        // The aggregate had no input, so there is no value to compare.
+        SliType::TimeSlice => GapFill::Nothing,
+        // Coverage comes from the triggers stream instead (S-16, D65).
+        SliType::Alert => GapFill::Nothing,
+    }
 }
 
 /// Fill the buckets a successful query did not return, per the type's policy.
@@ -124,8 +149,32 @@ pub fn fill_gaps(
     template: &SliceRow,
     sli_type: SliType,
 ) -> Vec<SliceRow> {
-    let _ = (observed, expected_starts, group_keys, template, sli_type);
-    todo!("slice::fill_gaps")
+    if gap_fill_policy(sli_type) == GapFill::Nothing {
+        return observed;
+    }
+
+    use std::collections::HashSet;
+    let present: HashSet<(String, i64)> = observed
+        .iter()
+        .map(|r| (r.group_key.clone(), r.slice_start))
+        .collect();
+
+    let mut out = observed;
+    for group_key in group_keys {
+        for &slice_start in expected_starts {
+            if present.contains(&(group_key.clone(), slice_start)) {
+                continue;
+            }
+            out.push(SliceRow {
+                group_key: group_key.clone(),
+                slice_start,
+                good: 0.0,
+                total: 0.0,
+                ..template.clone()
+            });
+        }
+    }
+    out
 }
 
 /// Whether a recomputed slice should be re-emitted (D55 write-on-change).
@@ -134,8 +183,13 @@ pub fn fill_gaps(
 /// rows per logical slice forever — at documented defaults that was ~8 billion
 /// rows over a 90-day window.
 pub fn should_emit(previous: Option<(f64, f64)>, recomputed: (f64, f64)) -> bool {
-    let _ = (previous, recomputed);
-    todo!("slice::should_emit")
+    let Some((prev_good, prev_total)) = previous else {
+        return true;
+    };
+    // `same` rather than `!=` so an unchanged NaN compares as unchanged;
+    // `NaN != NaN` would make the slice churn on every pass forever.
+    let same = |a: f64, b: f64| a == b || (a.is_nan() && b.is_nan());
+    !(same(prev_good, recomputed.0) && same(prev_total, recomputed.1))
 }
 
 /// Which lane wrote a batch.
@@ -168,8 +222,18 @@ pub enum ObservationError {
 /// stops the row churning, but still lets invalid data into the stream, where
 /// it silently corrupts every window aggregate that touches it.
 pub fn validate_observation(good: f64, total: f64) -> Result<(), ObservationError> {
-    let _ = (good, total);
-    todo!("slice::validate_observation")
+    for (field, value) in [("good", good), ("total", total)] {
+        if !value.is_finite() {
+            return Err(ObservationError::NotFinite { field, value });
+        }
+        if value < 0.0 {
+            return Err(ObservationError::Negative { field, value });
+        }
+    }
+    if good > total {
+        return Err(ObservationError::GoodExceedsTotal { good, total });
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -298,17 +362,33 @@ mod tests {
     // ---- the composed read path -------------------------------------------
 
     #[test]
-    fn visible_slices_filters_barrier_then_dedupes() {
+    fn visible_slices_clamps_then_dedupes() {
         let rows = vec![
-            row("a", 9_000, 1.0, 2.0, 1),  // visible
-            row("a", 9_000, 5.0, 9.0, 2),  // NEWER but uncommitted
-            row("a", 10_500, 9.0, 9.0, 1), // past the watermark
+            row("a", 9_000, 1.0, 2.0, 1),  // superseded
+            row("a", 9_000, 5.0, 9.0, 2),  // the later revision
+            row("a", 10_500, 9.0, 9.0, 1), // at/after the watermark
         ];
         let out = visible_slices(rows, WATERMARK, 1);
+        assert_eq!(out.len(), 1, "the unclosed slice is clamped away");
+        assert_eq!(
+            out[0].good, 5.0,
+            "the later revision wins — there is no commit record to gate on (D64)"
+        );
+    }
+
+    /// Order matters: clamping must happen BEFORE dedupe, or a row from
+    /// another generation could win a key on revision alone and then be
+    /// filtered out, leaving the key empty.
+    #[test]
+    fn clamping_happens_before_dedupe_not_after() {
+        let mut foreign = row("a", 9_000, 99.0, 99.0, 9);
+        foreign.definition_generation = 2;
+        let current = row("a", 9_000, 1.0, 1.0, 1);
+        let out = visible_slices(vec![foreign, current], WATERMARK, 1);
         assert_eq!(out.len(), 1);
         assert_eq!(
             out[0].good, 1.0,
-            "the uncommitted higher revision must not win"
+            "a higher revision in the wrong generation must not consume the key"
         );
     }
 
