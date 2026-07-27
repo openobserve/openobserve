@@ -18,7 +18,7 @@
     <div class="flex min-h-0 flex-1 flex-col p-3">
       <div class="mb-2 flex items-start justify-between gap-4">
         <div class="flex min-w-0 flex-1 flex-col gap-1">
-          <div class="text-badge-teal-ol-text flex items-center gap-2">
+          <div class="text-theme-accent flex items-center gap-2">
             <LeftJoinSvg class="h-4" />
             <span class="text-compact font-semibold">{{ t("dashboard.addJoinPopUp.join") }}</span>
           </div>
@@ -47,7 +47,7 @@
               class="rounded-default flex cursor-pointer flex-col items-center gap-0.5 border px-2.5 py-1.5 transition-colors"
               :class="
                 localJoinType === option.type
-                  ? 'border-badge-teal-ol-border bg-badge-teal-soft-bg text-badge-teal-ol-text'
+                  ? 'border-accent bg-[color-mix(in_srgb,var(--color-accent)_15%,transparent)] text-accent'
                   : 'text-text-secondary hover:bg-surface-subtle border-transparent'
               "
               :aria-pressed="localJoinType === option.type"
@@ -64,7 +64,7 @@
         </div>
 
         <div class="flex min-w-0 flex-1 flex-col gap-1">
-          <div class="text-badge-teal-ol-text flex items-center gap-2">
+          <div class="text-theme-accent flex items-center gap-2">
             <RightJoinSvg class="h-4" />
             <span class="text-compact font-semibold">{{ t("dashboard.addJoinPopUp.on") }}</span>
           </div>
@@ -85,7 +85,7 @@
         <div class="text-text-secondary py-2 text-center text-xs" v-if="showJoinSummary">
           {{ t("dashboard.addJoinPopUp.performing") }}
           <span
-            class="rounded-default bg-badge-teal-soft-bg text-badge-teal-ol-text inline-flex items-center px-1.5 py-0.5 text-xs font-semibold"
+            class="rounded-default text-accent inline-flex items-center bg-[color-mix(in_srgb,var(--color-accent)_15%,transparent)] px-1.5 py-0.5 text-xs font-semibold"
             >{{ joinTypeLabel }} {{ t("dashboard.addJoinPopUp.join") }}</span
           >
           {{ t("dashboard.addJoinPopUp.between") }}
