@@ -35,27 +35,20 @@ describe("EmptyServiceGraph", () => {
     expect(wrapper.find("svg").exists()).toBe(true);
   });
 
-  it("should default animated prop to true when not provided", () => {
+  // Motion is native SVG (SMIL) <animateTransform>/<animate>, gated on `animated`
+  // so callers can honour prefers-reduced-motion (OEmptyState wires this up).
+  it("should render SMIL animation elements when animated (the default)", () => {
     wrapper = mount(EmptyServiceGraph);
-    // When animated=true, es-static class should NOT be on the svg
-    const svg = wrapper.find("svg");
-    expect(svg.classes()).not.toContain("es-static");
+    expect(wrapper.html().toLowerCase()).toContain("animatetransform");
   });
 
-  it("should add es-static class to the svg element when animated is false", () => {
+  it("should omit all SMIL animation elements when animated is false", () => {
     wrapper = mount(EmptyServiceGraph, {
       props: { animated: false },
     });
-    const svg = wrapper.find("svg");
-    expect(svg.classes()).toContain("es-static");
-  });
-
-  it("should not have es-static class when animated is true", () => {
-    wrapper = mount(EmptyServiceGraph, {
-      props: { animated: true },
-    });
-    const svg = wrapper.find("svg");
-    expect(svg.classes()).not.toContain("es-static");
+    const html = wrapper.html().toLowerCase();
+    expect(html).not.toContain("animatetransform");
+    expect(html).not.toContain("<animate");
   });
 
   it("should accept a width prop and apply it to the svg element", () => {
@@ -64,11 +57,5 @@ describe("EmptyServiceGraph", () => {
     });
     const svg = wrapper.find("svg");
     expect(svg.attributes("width")).toBe("320");
-  });
-
-  it("should always have the es-root class on the svg element", () => {
-    wrapper = mount(EmptyServiceGraph);
-    const svg = wrapper.find("svg");
-    expect(svg.classes()).toContain("es-root");
   });
 });
