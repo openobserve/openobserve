@@ -48,7 +48,8 @@ const {
   mockServiceGetAgentSetup: vi
     .fn()
     .mockResolvedValue({ data: { install: "curl ...", token: "abc123" } }),
-  mockRouterPush: vi.fn(),
+  // router.push returns a Promise in vue-router; callers here chain .catch() on it.
+  mockRouterPush: vi.fn().mockResolvedValue(undefined),
 }));
 
 // ── Module mocks ─────────────────────────────────────────────────────────
@@ -96,6 +97,7 @@ vi.mock("@/utils/synthetics/buildPayload", () => ({
 }));
 
 import SyntheticMonitoring from "./SyntheticMonitoring.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 // ── Test helpers ─────────────────────────────────────────────────────────
 
@@ -129,6 +131,12 @@ const baseStubs = {
   MoveAcrossFolders: {
     template: '<div data-test="synthetic-monitoring-move-dialog" />',
     props: ["type", "moduleId", "activeFolderId", "open"],
+  },
+  SelectFolderDropDown: {
+    name: "SelectFolderDropDown",
+    template: "<div />",
+    props: ["type", "activeFolderId", "disableDropdown"],
+    emits: ["folder-selected"],
   },
   ODropdown: {
     template:
@@ -502,6 +510,123 @@ describe("SyntheticMonitoring", () => {
       await nextTick();
 
       expect((wrapper.vm as any).showSetupDrawer).toBe(false);
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // Duplicate Check dialog — folder picker, folder-scoped requests
+  // ═══════════════════════════════════════════════════════════════════════
+  describe("duplicate check dialog", () => {
+    const row = { id: "m-1", name: "Checkout flow", folderId: "f-2" };
+
+    const findTable = () =>
+      wrapper.findComponent('[data-test="synthetic-monitoring-monitors-table"]');
+    const findDialog = () =>
+      wrapper.findComponent('[data-test="synthetic-monitoring-duplicate-dialog"]');
+    const findFolderSelect = () => wrapper.findComponent({ name: "SelectFolderDropDown" });
+
+    /** Opens the dialog for a row and waits for the source fetch to settle. */
+    const openDuplicate = async (monitor: any = row) => {
+      findTable().vm.$emit("duplicate", monitor);
+      await flushPromises();
+    };
+
+    beforeEach(() => {
+      mockServiceGet.mockResolvedValue({
+        data: { id: "m-1", name: "Checkout flow", target: "https://example.com" },
+      });
+      mockServiceCreate.mockResolvedValue({ data: { id: "m-2" } });
+    });
+
+    it("prefills the folder dropdown with the row's own folder", async () => {
+      wrapper = mountPage();
+      await flushPromises();
+      await openDuplicate();
+
+      expect(findDialog().exists()).toBe(true);
+      expect(
+        wrapper.find('[data-test="synthetic-monitoring-duplicate-folder-select"]').exists(),
+      ).toBe(true);
+      expect(findFolderSelect().props("activeFolderId")).toBe("f-2");
+      expect(findFolderSelect().props("type")).toBe("synthetics");
+    });
+
+    it("falls back to the active folder when the row carries no folderId", async () => {
+      wrapper = mountPage();
+      await flushPromises();
+      await openDuplicate({ id: "m-9", name: "No folder" });
+
+      expect(findFolderSelect().props("activeFolderId")).toBe("default");
+    });
+
+    it("fetches the source check scoped to the row's folder when opened", async () => {
+      wrapper = mountPage();
+      await flushPromises();
+      await openDuplicate();
+
+      expect(mockServiceGet).toHaveBeenCalledTimes(1);
+      const [, id, folderId] = mockServiceGet.mock.calls[0];
+      expect(id).toBe("m-1");
+      expect(folderId).toBe("f-2");
+    });
+
+    it("closes the dialog and does not create when the source fetch fails", async () => {
+      mockServiceGet.mockRejectedValueOnce({ response: { data: { message: "boom" } } });
+      wrapper = mountPage();
+      await flushPromises();
+      await openDuplicate();
+
+      expect(findDialog().exists()).toBe(false);
+      expect(mockServiceCreate).not.toHaveBeenCalled();
+    });
+
+    it("creates the copy in the folder chosen in the dropdown", async () => {
+      wrapper = mountPage();
+      await flushPromises();
+      await openDuplicate();
+
+      findFolderSelect().vm.$emit("folder-selected", { label: "Ops", value: "f-9" });
+      await nextTick();
+
+      findDialog().vm.$emit("click:primary");
+      await flushPromises();
+
+      expect(mockServiceCreate).toHaveBeenCalledTimes(1);
+      const [, payload, folderId] = mockServiceCreate.mock.calls[0];
+      // The payload folder and the ?folder= RBAC scope must agree.
+      expect((payload as any).folder).toBe("f-9");
+      expect(folderId).toBe("f-9");
+      expect((payload as any).id).toBeUndefined();
+    });
+
+    it("follows the copy into its destination folder with a single reload", async () => {
+      wrapper = mountPage();
+      await flushPromises();
+      const listCallsAfterMount = mockServiceList.mock.calls.length;
+
+      await openDuplicate();
+      findFolderSelect().vm.$emit("folder-selected", { label: "Ops", value: "f-9" });
+      await nextTick();
+      findDialog().vm.$emit("click:primary");
+      await flushPromises();
+
+      expect((wrapper.vm as any).activeFolderId).toBe("f-9");
+      expect(mockServiceList.mock.calls.length - listCallsAfterMount).toBe(1);
+    });
+
+    it("closes the dialog without an extra error toast on a 403", async () => {
+      mockServiceCreate.mockRejectedValueOnce({ response: { status: 403 } });
+      wrapper = mountPage();
+      await flushPromises();
+      await openDuplicate();
+
+      findDialog().vm.$emit("click:primary");
+      await flushPromises();
+
+      expect(findDialog().exists()).toBe(false);
+      expect(vi.mocked(toast)).not.toHaveBeenCalledWith(
+        expect.objectContaining({ variant: "error" }),
+      );
     });
   });
 });
