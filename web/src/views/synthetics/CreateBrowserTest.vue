@@ -265,7 +265,13 @@ const check = ref<BrowserCheck>({
   journey: [],
   schedule: { type: "interval", intervalValue: 5, intervalUnit: "minutes" },
   locations: [],
-  retries: 0,
+  // New browser monitors retry once before declaring failure (spec P1.3).
+  // A single slow render should never page an on-call engineer; passing on retry
+  // is reported as `warning` (flaky), which never alerts. Deliberately changed
+  // ONLY here — the buildPayload fallbacks are absent-field defaults, and
+  // raising those would silently re-interpret existing monitors stored without
+  // a retries value (P1.3.3).
+  retries: 1,
   waitBeforeRetrySecs: 5,
   alertIfFails: 1,
   cooldownMins: 5,

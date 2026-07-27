@@ -17,7 +17,7 @@ const OInputStub = {
   props: ["modelValue", "label", "placeholder", "type"],
   emits: ["update:modelValue"],
   template:
-    '<input v-bind="$attrs" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" :data-label="label" />',
+    '<input v-bind="$attrs" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" :data-label="label" :placeholder="placeholder" />',
 };
 const OSelectStub = {
   props: ["modelValue", "label", "options"],
@@ -198,6 +198,85 @@ describe("BrowserJourneyStep", () => {
 
       const valueInput = wrapper.find('[data-test="synthetics-journey-step-value-input"]');
       expect(valueInput.exists()).toBe(true);
+    });
+
+    // ── Timeout guard rails (spec P1.1.4, P1.1.5 / T1-13, T1-14) ───────────
+    // The recorder no longer stamps a timeout, so this field renders empty. An
+    // empty box reads as "no timeout", which is wrong and invites needless
+    // overrides — show the default the runner will actually apply.
+    describe("timeout guard rails", () => {
+      const timeoutInput = (w: VueWrapper) =>
+        w.find('[data-test="synthetics-journey-step-timeout-input"]');
+      const warning = (w: VueWrapper) =>
+        w.find('[data-test="synthetics-journey-step-timeout-warning"]');
+
+      it("shows the 60s navigate/assert default as placeholder when unset", () => {
+        wrapper = mountStep({
+          step: makeStep({ action: "navigate", timeout: undefined }),
+          expanded: true,
+        });
+        expect(timeoutInput(wrapper).attributes("placeholder")).toBe("60000");
+      });
+
+      it("shows the 30s interaction default as placeholder when unset", () => {
+        wrapper = mountStep({
+          step: makeStep({ action: "click", timeout: undefined }),
+          expanded: true,
+        });
+        expect(timeoutInput(wrapper).attributes("placeholder")).toBe("30000");
+      });
+
+      it("warns when the author lowers the timeout below the category default", () => {
+        wrapper = mountStep({
+          step: makeStep({ action: "click", timeout: 5000 }),
+          expanded: true,
+        });
+        expect(warning(wrapper).exists()).toBe(true);
+      });
+
+      it("does not warn at or above the category default", () => {
+        wrapper = mountStep({
+          step: makeStep({ action: "click", timeout: 30000 }),
+          expanded: true,
+        });
+        expect(warning(wrapper).exists()).toBe(false);
+      });
+
+      it("does not warn when no explicit timeout is set", () => {
+        wrapper = mountStep({
+          step: makeStep({ action: "click", timeout: undefined }),
+          expanded: true,
+        });
+        expect(warning(wrapper).exists()).toBe(false);
+      });
+
+      // The warning is advisory. Lowering is the author's call — it must never
+      // block, only inform.
+      it("keeps the timeout editable while warning", () => {
+        wrapper = mountStep({
+          step: makeStep({ action: "click", timeout: 5000 }),
+          expanded: true,
+        });
+        expect(timeoutInput(wrapper).attributes("disabled")).toBeUndefined();
+      });
+    });
+
+    // ── Retired actions (spec X-9 / T1-9) ──────────────────────────────────
+    it("flags a retired action on an existing step", () => {
+      wrapper = mountStep({
+        step: makeStep({ action: "wait", timeout: 30000 }),
+        expanded: true,
+      });
+      expect(
+        wrapper.find('[data-test="synthetics-journey-step-retired-action"]').exists(),
+      ).toBe(true);
+    });
+
+    it("does not flag a supported action", () => {
+      wrapper = mountStep({ step: makeStep({ action: "click" }), expanded: true });
+      expect(
+        wrapper.find('[data-test="synthetics-journey-step-retired-action"]').exists(),
+      ).toBe(false);
     });
 
     it("should show timeout input when expanded", () => {

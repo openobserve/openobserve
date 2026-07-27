@@ -12,7 +12,9 @@ import {
   VALUE_LABELS,
   SELECTOR_TYPE_OPTIONS,
   actionOptions,
+  isRetiredAction,
 } from "@/constants/synthetics";
+import { defaultTimeoutFor } from "@/utils/synthetics/mapRecordedStep";
 
 /**
  * Replay status dot states.
@@ -113,6 +115,22 @@ const valueComputed = computed({
 const timeoutComputed = computed({
   get: () => String(props.step.timeout ?? ""),
   set: (v: string) => update({ timeout: v ? Number(v) : undefined }),
+});
+
+// ── Timeout guard rails (spec P1.1.4, P1.1.5) ───────────────────────────────
+// The recorder no longer stamps a timeout, so this field renders empty — which
+// reads as "no timeout" and invites authors to fill it in needlessly. Show the
+// default the runner will actually apply, so an author can see what they would
+// be overriding before they override it.
+const timeoutDefault = computed(() => defaultTimeoutFor(props.step.action));
+
+// Lowering below the category default is permitted — it is the author's call —
+// but a step timeout shorter than the application's real response time is
+// precisely the condition that produced the observed production failures.
+// Advisory only: it must never block saving.
+const timeoutBelowDefault = computed(() => {
+  const explicit = props.step.timeout;
+  return explicit !== undefined && explicit < timeoutDefault.value;
 });
 
 // ── Status dot visual mapping (combines with step number during replay) ─────
@@ -454,14 +472,32 @@ function toggleExpanded() {
         data-test="synthetics-journey-step-value-input"
       />
 
-      <!-- Timeout -->
+      <!-- Timeout — placeholder shows the runner default this step would get -->
       <OInput
         v-model="timeoutComputed"
         :label="t('synthetics.journey.timeoutLabel')"
-        :placeholder="t('synthetics.journey.timeoutPlaceholder')"
+        :placeholder="String(timeoutDefault)"
         type="number"
         data-test="synthetics-journey-step-timeout-input"
       />
+      <p
+        v-if="timeoutBelowDefault"
+        class="text-status-warning-text m-0 flex items-start gap-1 text-xs"
+        data-test="synthetics-journey-step-timeout-warning"
+      >
+        <OIcon name="warning" size="xs" class="mt-0.5 shrink-0" aria-hidden="true" />
+        <span>{{ t("synthetics.journey.timeoutBelowDefaultWarning", { default: timeoutDefault }) }}</span>
+      </p>
+
+      <!-- Retired action notice (spec X-9) -->
+      <p
+        v-if="isRetiredAction(step.action)"
+        class="text-status-warning-text m-0 flex items-start gap-1 text-xs"
+        data-test="synthetics-journey-step-retired-action"
+      >
+        <OIcon name="warning" size="xs" class="mt-0.5 shrink-0" aria-hidden="true" />
+        <span>{{ t("synthetics.journey.retiredActionWarning", { action: actionLabel }) }}</span>
+      </p>
     </div>
   </div>
 </template>

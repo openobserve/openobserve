@@ -37,7 +37,20 @@ const WIRE_SELECTOR_TYPE_MAP: Record<SelectorType, WireStep["selector_type"]> = 
   TestID: "data-test",
 };
 
-const DEFAULT_TIMEOUT = 30000;
+/**
+ * Per-action-category timeout defaults owned by the RUNNER, not written into
+ * steps. Used here only to show the author what a step will actually get
+ * (placeholder text) and to warn when they lower it. See spec P1.2, P1.1.5.
+ */
+export const NAV_ASSERT_TIMEOUT_MS = 60000;
+export const INTERACTION_TIMEOUT_MS = 30000;
+
+/** The timeout this step will get from the runner when none is set explicitly. */
+export function defaultTimeoutFor(action: StepAction): number {
+  return action === "navigate" || action === "assert"
+    ? NAV_ASSERT_TIMEOUT_MS
+    : INTERACTION_TIMEOUT_MS;
+}
 
 function mapAction(action: string): StepAction {
   const mapped = ACTION_MAP[action];
@@ -73,7 +86,11 @@ export function mapWireStep(wire: WireStep): BrowserStep {
     selector: wire.selector,
     selectorType: wire.selector_type ? SELECTOR_TYPE_MAP[wire.selector_type] : undefined,
     value: mapValue(wire, action),
-    timeout: wire.timeout_ms ?? DEFAULT_TIMEOUT,
+    // Undefined means "use the runner's category default" (spec P1.1.2). The
+    // recorder no longer stamps a value, and substituting one here would put the
+    // guess back — the previous `?? 30000` was unreachable anyway, because the
+    // extension always sent 10000.
+    timeout: wire.timeout_ms,
     code: wire.code || "",
     // Keep the original extension step untouched for replay (full fidelity).
     wire: {
@@ -91,8 +108,14 @@ export function mapWireSteps(wires: WireStep[]): BrowserStep[] {
 /**
  * Reverse of {@link mapWireStep}: reconstruct a replayable {@link WireStep} from a
  * lean UI step that has no recorded `wire` (i.e. manually added in the editor).
- * Mirrors the fields the extension's `buildActionFromStep` consumes. Returns
- * `null` for actions the Playwright player can't replay (hover/scroll/wait/screenshot).
+ * Mirrors the fields the extension's `buildActionFromStep` consumes.
+ *
+ * Always returns a wire step. The previous doc claimed it returned `null` for
+ * hover/scroll/wait/screenshot, but no branch ever did — which made the
+ * `.filter(w => w != null)` in {@link journeyToWireSteps} dead code and left a
+ * trap for anyone adding an action. Those four are now RETIRED_ACTIONS: they are
+ * still sent for replay, where the extension substitutes a no-op and the result
+ * is reported as "not simulated" rather than as a pass. See spec P1.R.2a/P1.R.3.
  */
 export function buildWireFromStep(step: BrowserStep): WireStep | null {
   const base: WireStep = {
@@ -101,7 +124,8 @@ export function buildWireFromStep(step: BrowserStep): WireStep | null {
     name: step.name ?? "",
     selector: step.selector,
     selector_type: step.selectorType ? WIRE_SELECTOR_TYPE_MAP[step.selectorType] : undefined,
-    timeout_ms: step.timeout ?? DEFAULT_TIMEOUT,
+    // Only carry a timeout the author actually set; absence means runner default.
+    timeout_ms: step.timeout,
     pageAlias: "page",
     framePath: [],
   };

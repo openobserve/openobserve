@@ -50,11 +50,37 @@ export const VALUE_ACTIONS: readonly StepAction[] = [
   "assert",
 ];
 
+/**
+ * Actions retired from the authoring vocabulary (spec X-9).
+ *
+ * Upstream Playwright's recorder action model has no counterpart for any of
+ * these — `ActionName` in @recorder/actions omits them entirely — so the
+ * recorder has never emitted one and the player has never been able to replay
+ * one. They entered journeys only through this picker, and the moment an author
+ * used one, replay died before step 1.
+ *
+ * `scroll` additionally carries no information: Playwright scrolls an element
+ * into view before acting on it, and the probe silently no-ops the step — a
+ * false green. `screenshot` is redundant with the per-run capture setting.
+ * `wait` is the hard sleep this whole design exists to remove.
+ *
+ * Kept in ACTION_LABELS/ACTION_ICONS so existing monitors still RENDER; removed
+ * from the picker so no new journey can contain one. Stored monitors keep
+ * executing them until migrated (spec Q-10).
+ */
+export const RETIRED_ACTIONS: readonly StepAction[] = ["hover", "scroll", "wait", "screenshot"];
+
+export function isRetiredAction(action: StepAction): boolean {
+  return RETIRED_ACTIONS.includes(action);
+}
+
 // ── Action dropdown options ──────────────────────────────────────────────
-export const actionOptions = (Object.keys(ACTION_LABELS) as StepAction[]).map((a) => ({
-  label: ACTION_LABELS[a],
-  value: a,
-}));
+export const actionOptions = (Object.keys(ACTION_LABELS) as StepAction[])
+  .filter((a) => !isRetiredAction(a))
+  .map((a) => ({
+    label: ACTION_LABELS[a],
+    value: a,
+  }));
 
 // ── Selector type options ────────────────────────────────────────────────
 export const SELECTOR_TYPE_OPTIONS: readonly {

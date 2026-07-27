@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { BrowserStep, WireStep } from "@/types/synthetics";
 import {
   buildWireFromStep,
+  defaultTimeoutFor,
   journeyToWireSteps,
   mapWireStep,
   mapWireSteps,
@@ -200,8 +201,31 @@ describe("mapRecordedStep", () => {
     warn.mockRestore();
   });
 
-  it("should default timeout to 30000 when timeout_ms is absent", () => {
-    expect(mapWireStep({ id: "s9", action: "click" }).timeout).toBe(30000);
+  // Spec P1.1.2. The mapper must NOT substitute a timeout: absence means "use
+  // the runner's per-action-category default". Stamping one here would put the
+  // machine's guess back into stored config, which is what the recorder's
+  // hardcoded 10000 did — the direct cause of the observed production failures.
+  it("should leave timeout undefined when timeout_ms is absent", () => {
+    expect(mapWireStep({ id: "s9", action: "click" }).timeout).toBeUndefined();
+  });
+
+  it("should preserve an author-set timeout", () => {
+    expect(mapWireStep({ id: "s9", action: "click", timeout_ms: 5000 }).timeout).toBe(5000);
+  });
+
+  it("exposes the runner's category defaults for display only", () => {
+    // 60s for navigate/assert (the slow phases), 30s for interactions.
+    expect(defaultTimeoutFor("navigate")).toBe(60000);
+    expect(defaultTimeoutFor("assert")).toBe(60000);
+    expect(defaultTimeoutFor("click")).toBe(30000);
+    expect(defaultTimeoutFor("type")).toBe(30000);
+  });
+
+  it("should not carry a timeout into the wire step unless the author set one", () => {
+    expect(buildWireFromStep({ id: "s1", action: "click", code: "" })?.timeout_ms).toBeUndefined();
+    expect(
+      buildWireFromStep({ id: "s1", action: "click", code: "", timeout: 4200 })?.timeout_ms,
+    ).toBe(4200);
   });
 
   it("should generate a compact UUIDv7 id when the wire step has none", () => {
