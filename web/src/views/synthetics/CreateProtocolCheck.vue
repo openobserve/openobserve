@@ -218,7 +218,7 @@ const agentSetupLocationName = ref<string | null>(null);
 async function openAgentSetup(locationId?: string) {
   agentSetupLocationId.value = locationId ?? null;
   agentSetupLocationName.value = locationId
-    ? locations.value.find((l) => l.id === locationId)?.label ?? null
+    ? (locations.value.find((l) => l.id === locationId)?.label ?? null)
     : null;
   showAgentSetup.value = true;
   if (agentSetup.value) return;

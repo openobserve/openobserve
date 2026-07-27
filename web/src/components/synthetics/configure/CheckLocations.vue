@@ -55,7 +55,6 @@ const { t } = useI18nTyped();
 // ── Search ────────────────────────────────────────────────────────────────────
 
 const searchQuery = ref("");
-const showSearch = computed(() => props.locations.length > 6);
 
 function matchesSearch(location: SyntheticsLocation): boolean {
   const q = searchQuery.value.trim().toLowerCase();
@@ -254,7 +253,6 @@ const selectedLocations = computed({
       <!-- ── Search + refresh ────────────────────────────────────────────────── -->
       <div v-if="!loadingLocations" class="flex items-center gap-2">
         <OInput
-          v-if="showSearch"
           v-model="searchQuery"
           type="search"
           :placeholder="t('synthetics.locations.searchPlaceholder')"

@@ -17,17 +17,23 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 
 vi.mock("vue-i18n", () => ({
-  useI18n: vi.fn(() => ({ t: (key: string, opts?: Record<string, unknown>) => {
-    // Simple interpolation mock
-    if (opts) {
-      return key + " " + JSON.stringify(opts);
-    }
-    return key;
-  } })),
+  useI18n: vi.fn(() => ({
+    t: (key: string, opts?: Record<string, unknown>) => {
+      // Simple interpolation mock
+      if (opts) {
+        return key + " " + JSON.stringify(opts);
+      }
+      return key;
+    },
+  })),
 }));
 
 import CheckLocations from "./CheckLocations.vue";
-import { mockMonitorHttp, mockLocations, mockPrivateLocations } from "@/test/unit/mockData/synthetics";
+import {
+  mockMonitorHttp,
+  mockLocations,
+  mockPrivateLocations,
+} from "@/test/unit/mockData/synthetics";
 import type { SyntheticsLocation } from "@/types/synthetics";
 
 // ── Shared Symbol for checkbox group provide/inject ──────────────────────────
@@ -112,7 +118,8 @@ const OButtonStub = {
 const OInputStub = {
   props: ["modelValue", "type", "placeholder", "clearable"],
   emits: ["update:modelValue"],
-  template: '<input v-bind="$attrs" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />',
+  template:
+    '<input v-bind="$attrs" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />',
 };
 
 const SkeletonBoxStub = {
@@ -421,7 +428,9 @@ describe("CheckLocations", () => {
 
     it("should show per-row add agent buttons for private locations", () => {
       expect(
-        wrapper.find('[data-test="synthetics-check-locations-add-agent-private-mumbai-1"]').exists(),
+        wrapper
+          .find('[data-test="synthetics-check-locations-add-agent-private-mumbai-1"]')
+          .exists(),
       ).toBe(true);
     });
 
@@ -457,38 +466,50 @@ describe("CheckLocations", () => {
   describe("status tiers", () => {
     it("should show check_circle icon for online locations", () => {
       wrapper = mountWithPrivate();
-      const icon = wrapper.find('[data-test="synthetics-check-locations-status-icon-private-mumbai-1"]');
+      const icon = wrapper.find(
+        '[data-test="synthetics-check-locations-status-icon-private-mumbai-1"]',
+      );
       expect(icon.exists()).toBe(true);
     });
 
     it("should show schedule icon for pending locations", () => {
       wrapper = mountWithPrivate();
-      const icon = wrapper.find('[data-test="synthetics-check-locations-status-icon-private-pending-1"]');
+      const icon = wrapper.find(
+        '[data-test="synthetics-check-locations-status-icon-private-pending-1"]',
+      );
       expect(icon.exists()).toBe(true);
     });
 
     it("should show status label badge for all private locations", () => {
       wrapper = mountWithPrivate();
       // Ready
-      const readyBadge = wrapper.find('[data-test="synthetics-check-locations-status-badge-private-mumbai-1"]');
+      const readyBadge = wrapper.find(
+        '[data-test="synthetics-check-locations-status-badge-private-mumbai-1"]',
+      );
       expect(readyBadge.exists()).toBe(true);
       expect(readyBadge.attributes("data-variant")).toBe("success-outline");
       expect(readyBadge.text()).toContain("synthetics.locations.statusReady");
 
       // Connecting
-      const connectingBadge = wrapper.find('[data-test="synthetics-check-locations-status-badge-private-pending-1"]');
+      const connectingBadge = wrapper.find(
+        '[data-test="synthetics-check-locations-status-badge-private-pending-1"]',
+      );
       expect(connectingBadge.exists()).toBe(true);
       expect(connectingBadge.attributes("data-variant")).toBe("info-outline");
       expect(connectingBadge.text()).toContain("synthetics.locations.statusConnecting");
 
       // Down
-      const downBadge = wrapper.find('[data-test="synthetics-check-locations-status-badge-private-down-1"]');
+      const downBadge = wrapper.find(
+        '[data-test="synthetics-check-locations-status-badge-private-down-1"]',
+      );
       expect(downBadge.exists()).toBe(true);
       expect(downBadge.attributes("data-variant")).toBe("error-outline");
       expect(downBadge.text()).toContain("synthetics.locations.statusDown");
 
       // Offline
-      const offlineBadge = wrapper.find('[data-test="synthetics-check-locations-status-badge-private-offline-1"]');
+      const offlineBadge = wrapper.find(
+        '[data-test="synthetics-check-locations-status-badge-private-offline-1"]',
+      );
       expect(offlineBadge.exists()).toBe(true);
       expect(offlineBadge.attributes("data-variant")).toBe("warning-outline");
       expect(offlineBadge.text()).toContain("synthetics.locations.statusOffline");
@@ -511,17 +532,27 @@ describe("CheckLocations", () => {
 
     it("should show +N badge when there are 2+ agents", () => {
       // private-blr-1 has 3 agents → should show +2 badge
-      const badge = wrapper.find('[data-test="synthetics-check-locations-extra-agents-private-blr-1"]');
+      const badge = wrapper.find(
+        '[data-test="synthetics-check-locations-extra-agents-private-blr-1"]',
+      );
       expect(badge.exists()).toBe(true);
       expect(badge.text()).toBe("+2");
     });
 
     it("should not show +N badge for single-agent locations", () => {
-      expect(wrapper.find('[data-test="synthetics-check-locations-extra-agents-private-mumbai-1"]').exists()).toBe(false);
+      expect(
+        wrapper
+          .find('[data-test="synthetics-check-locations-extra-agents-private-mumbai-1"]')
+          .exists(),
+      ).toBe(false);
     });
 
     it("should not show +N badge for locations without agents", () => {
-      expect(wrapper.find('[data-test="synthetics-check-locations-extra-agents-private-offline-1"]').exists()).toBe(false);
+      expect(
+        wrapper
+          .find('[data-test="synthetics-check-locations-extra-agents-private-offline-1"]')
+          .exists(),
+      ).toBe(false);
     });
   });
 
@@ -530,7 +561,9 @@ describe("CheckLocations", () => {
   describe("private location sorting", () => {
     it("should sort online before pending before offline", () => {
       wrapper = mountWithPrivate();
-      const checkboxes = wrapper.findAll('[data-test^="synthetics-check-locations-option-private-"]');
+      const checkboxes = wrapper.findAll(
+        '[data-test^="synthetics-check-locations-option-private-"]',
+      );
       const ids = checkboxes.map((c) => c.attributes("data-test"));
       // online (mumbai, blr) → pending (delhi) → offline (chennai) → down (kolkata)
       const mumbaiIdx = ids.indexOf("synthetics-check-locations-option-private-mumbai-1");
@@ -549,12 +582,12 @@ describe("CheckLocations", () => {
   // ── Search ─────────────────────────────────────────────────────────────
 
   describe("search", () => {
-    it("should not show search input when locations <= 6", () => {
+    it("should always show the search input, even with few locations", () => {
       wrapper = mountCheckLocations();
-      expect(wrapper.find('[data-test="synthetics-check-locations-search"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="synthetics-check-locations-search"]').exists()).toBe(true);
     });
 
-    it("should show search input when locations > 6", () => {
+    it("should show search input with many locations", () => {
       // Create 8 locations
       const manyLocations: SyntheticsLocation[] = Array.from({ length: 8 }, (_, i) => ({
         id: `loc-${i}`,
