@@ -675,6 +675,18 @@ pub enum IncidentEventType {
         /// User who cancelled the run. `None` when cancelled by the system.
         user_id: Option<String>,
     },
+
+    /// Forward-compatibility catch-all for event types this binary does not know.
+    ///
+    /// During a rolling deploy an old node reads rows written by a newer node. Without
+    /// this variant a single unrecognized `type` tag fails the whole `Vec<IncidentEvent>`
+    /// parse; combined with `unwrap_or_default()` on the read path that silently yields an
+    /// empty timeline, which the next `append` then writes back — destroying every prior
+    /// event. Capturing unknown events verbatim keeps them intact across the round-trip.
+    ///
+    /// Must stay LAST: `#[serde(untagged)]` variants are only tried after all tagged ones.
+    #[serde(untagged)]
+    Unknown(serde_json::Value),
 }
 
 impl IncidentEvent {
@@ -831,6 +843,49 @@ impl IncidentEvent {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A node that predates an event type must still recover the whole timeline.
+    ///
+    /// Without the `Unknown` catch-all the array parse fails on the first unrecognized
+    /// tag, and callers that decode-then-write persist the truncated result — silently
+    /// destroying every prior event during a rolling deploy.
+    #[test]
+    fn test_unknown_event_type_preserves_timeline() {
+        let stored = serde_json::json!([
+            {"timestamp": 1, "type": "Created"},
+            {"timestamp": 2, "type": "some_future_event", "data": {"foo": "bar"}},
+            {"timestamp": 3, "type": "ai_analysis_complete"},
+        ]);
+
+        let events: Vec<IncidentEvent> = serde_json::from_value(stored.clone()).unwrap();
+        assert_eq!(events.len(), 3, "unknown tag must not discard other events");
+        assert!(matches!(
+            events[1].event_type,
+            IncidentEventType::Unknown(_)
+        ));
+
+        // The unknown event must survive a read/write cycle byte-for-byte, otherwise an
+        // old node rewriting the row would strip data a newer node depends on.
+        let rewritten = serde_json::to_value(&events).unwrap();
+        assert_eq!(rewritten, stored, "unknown events must round-trip verbatim");
+    }
+
+    /// Known variants must still win over the untagged catch-all.
+    #[test]
+    fn test_known_event_types_not_captured_as_unknown() {
+        let event = IncidentEvent {
+            timestamp: 5,
+            event_type: IncidentEventType::AIAnalysisCancelled {
+                user_id: Some("bob".into()),
+            },
+        };
+        let json = serde_json::to_value(&event).unwrap();
+        let roundtrip: IncidentEvent = serde_json::from_value(json).unwrap();
+        assert!(matches!(
+            roundtrip.event_type,
+            IncidentEventType::AIAnalysisCancelled { .. }
+        ));
+    }
 
     #[test]
     fn test_incident_event_serde_created() {
