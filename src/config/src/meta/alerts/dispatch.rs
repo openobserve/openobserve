@@ -30,8 +30,12 @@
 use std::collections::{BTreeMap, HashMap};
 
 use super::{
-    TriggerCondition, grouping::GroupClassification, level::AlertLevel, state::AlertState,
+    TriggerCondition,
+    grouping::{GroupClassification, group_key},
+    level::{AlertLevel, DeliveryDecision, delivery_decision},
+    state::{AlertState, StateTransition, StateUpdate},
 };
+use crate::meta::self_reporting::usage::RunOutcome;
 use crate::utils::json::{Map, Value};
 
 /// The version a delayed delivery carries — the group's **level-episode** at
@@ -131,8 +135,90 @@ pub fn plan_dispatch(
     now: i64,
     max_sends: usize,
 ) -> DispatchPlan {
-    let _ = (classification, states, rows, tc, now, max_sends);
-    todo!("§5.5 MN-1/MN-8: implement after test review")
+    let mut items = Vec::new();
+    let mut suppressed = 0usize;
+    let mut dropped_by_knob = Vec::new();
+    let mut inconsistent = Vec::new();
+
+    // A key appearing twice in one classification is an invariant violation
+    // (validation rejects the known source, MN-12). Counting first means both
+    // copies are refused, rather than the first winning by accident.
+    let mut occurrences: HashMap<&str, usize> = HashMap::new();
+    let keys: Vec<String> = classification
+        .groups
+        .iter()
+        .map(|g| group_key(&g.labels))
+        .collect();
+    for key in &keys {
+        *occurrences.entry(key.as_str()).or_default() += 1;
+    }
+
+    // `classification.groups` is already `(severity desc, group_key asc)`, so
+    // iterating it IS worst-first — the knob therefore always keeps the most
+    // severe groups, and ties break deterministically.
+    for (group, key) in classification.groups.iter().zip(&keys) {
+        if occurrences[key.as_str()] > 1 {
+            if !inconsistent.contains(key) {
+                inconsistent.push(key.clone());
+            }
+            continue;
+        }
+
+        // Healthy groups are not candidates, and are not "suppressed" either —
+        // nothing was withheld from them.
+        let Some(level) = group.level.filter(|l| l.is_firing()) else {
+            continue;
+        };
+
+        // Both of these are consistency failures, not routine outcomes: the
+        // plan committed a row for every retained group before dispatch ran,
+        // and MN-3 forbids synthesizing a payload.
+        let (Some(state), Some(row)) = (states.get(key), rows.get(key)) else {
+            inconsistent.push(key.clone());
+            continue;
+        };
+        let Some(episode) = DeliveryEpisode::of(state) else {
+            inconsistent.push(key.clone());
+            continue;
+        };
+
+        let decision = delivery_decision(
+            level,
+            state.last_notified_level,
+            state.silenced_until,
+            now,
+            tc.notify_on_warning,
+        );
+        match decision {
+            DeliveryDecision::Deliver | DeliveryDecision::DeliverEscalation => {
+                // The knob counts QUALIFYING sends, so a silenced group never
+                // spends budget a deliverable one could have used.
+                if max_sends > 0 && items.len() >= max_sends {
+                    dropped_by_knob.push(key.clone());
+                    continue;
+                }
+                items.push(DispatchItem {
+                    group_key: key.clone(),
+                    labels: group.labels.clone(),
+                    level,
+                    actual_value: group.actual_value,
+                    escalation: decision == DeliveryDecision::DeliverEscalation,
+                    episode,
+                    row: row.clone(),
+                });
+            }
+            DeliveryDecision::SuppressedBySilence
+            | DeliveryDecision::SuppressedByWarningPolicy => suppressed += 1,
+            DeliveryDecision::NotFiring => {}
+        }
+    }
+
+    DispatchPlan {
+        items,
+        suppressed,
+        dropped_by_knob,
+        inconsistent,
+    }
 }
 
 /// The write that records one group's **successful** delivery (MN-6).
@@ -167,8 +253,15 @@ pub fn delivery_success_update(
     silence_minutes: i64,
     delivered_at: i64,
 ) -> Option<AlertState> {
-    let _ = (current, episode, silence_minutes, delivered_at);
-    todo!("§5.5 MN-6: implement after test review")
+    if current.level != Some(episode.level) || current.level_since != Some(episode.level_since) {
+        return None;
+    }
+
+    let mut next = current.clone();
+    next.last_notified_level = Some(episode.level);
+    next.silenced_until = (silence_minutes > 0)
+        .then(|| delivered_at.saturating_add(silence_minutes.saturating_mul(60 * 1_000_000)));
+    Some(next)
 }
 
 /// The write that records one group's **failed** delivery (MN-7).
@@ -200,8 +293,46 @@ pub fn delivery_failure_update(
     episode: DeliveryEpisode,
     failed_at: i64,
 ) -> Option<super::state::StateUpdate> {
-    let _ = (current, episode, failed_at);
-    todo!("§5.5 MN-7: implement after test review")
+    if current.level != Some(episode.level) || current.level_since != Some(episode.level_since) {
+        return None;
+    }
+    // The attempt anchor: a newer success in this episode has already moved
+    // delivery state, so this failure is describing a send that has been
+    // overtaken.
+    if (current.last_notified_level, current.silenced_until) != episode.notified_at_enqueue {
+        return None;
+    }
+
+    let outcome_changed = current.last_outcome != Some(RunOutcome::NotifyFailed);
+
+    let mut state = current.clone();
+    state.last_outcome = Some(RunOutcome::NotifyFailed);
+    state.last_outcome_at = Some(failed_at);
+    if outcome_changed {
+        // `since` records when the outcome last CHANGED; a repeated failure
+        // must leave it, so "delivery has been failing since X" stays true.
+        state.since = Some(failed_at);
+    }
+
+    let transition = outcome_changed.then(|| StateTransition {
+        alert_id: current.alert_id.clone(),
+        group_key: current.group_key.clone(),
+        from_outcome: current.last_outcome.clone(),
+        to_outcome: RunOutcome::NotifyFailed,
+        // Delivery does not touch the level axis, so the transition records no
+        // level change either.
+        from_level: current.level,
+        to_level: current.level,
+        at: failed_at,
+        // A delivery failure is not an observation.
+        value: None,
+        group_labels: current.group_labels.clone(),
+    });
+
+    Some(StateUpdate {
+        state: Some(state),
+        transition,
+    })
 }
 
 /// Whether an alert keeps evaluating while silenced (MN-10 / §7.1).
@@ -211,8 +342,7 @@ pub fn delivery_failure_update(
 /// trigger after host-a pages would leave host-b unevaluated and unpaged for
 /// the whole window, and would freeze every group's `last_seen` besides.
 pub fn evaluates_through_silence(multi_alert: bool, has_warning: bool) -> bool {
-    let _ = (multi_alert, has_warning);
-    todo!("§5.5 MN-10: implement after test review")
+    multi_alert || has_warning
 }
 
 /// `group_key -> original result row`, verbatim (MN-3).
@@ -269,8 +399,11 @@ impl DeliveryEpisode {
     /// The episode a state row is currently in, if it has a classified level,
     /// snapshotting its delivery state as the attempt anchor.
     pub fn of(state: &AlertState) -> Option<Self> {
-        let _ = state;
-        todo!("§5.5: implement after test review")
+        Some(Self {
+            level: state.level?,
+            level_since: state.level_since.unwrap_or_default(),
+            notified_at_enqueue: (state.last_notified_level, state.silenced_until),
+        })
     }
 }
 
