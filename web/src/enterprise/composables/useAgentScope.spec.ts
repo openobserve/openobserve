@@ -225,7 +225,7 @@ describe("useAgentScope — Shape 2 (allAgents:false, Graph/Behavior)", () => {
     expect(values).not.toContain(ALL_AGENTS_VALUE);
   });
 
-  it("Behavior-equivalence: effectiveStream resolves to the first agent's source_stream (?? \"\" invisible)", async () => {
+  it('Behavior-equivalence: effectiveStream resolves to the first agent\'s source_stream (?? "" invisible)', async () => {
     const activeStream = ref("live_stream");
     const filterMode = ref<"stream" | "agent">("agent");
     const { scope } = makeScope(filterMode, activeStream);
@@ -252,15 +252,64 @@ describe("useAgentScope — Shape 2 (allAgents:false, Graph/Behavior)", () => {
 describe("useAgentScope — Env→Agent→Version cascade (Plan 2)", () => {
   // 3 in production (a@v1, a@v2, b@v1), 1 in staging (a@v1), 1 with null env/version.
   const CASCADE_AGENTS: GenAiAgentListItem[] = [
-    { name: "a", id: "a", source_stream: "s", source_stream_type: "traces", env: "production", version: "v1" },
-    { name: "a", id: "a", source_stream: "s", source_stream_type: "traces", env: "production", version: "v2" },
-    { name: "b", id: "b", source_stream: "s", source_stream_type: "traces", env: "production", version: "v1" },
-    { name: "a", id: "a", source_stream: "s", source_stream_type: "traces", env: "staging", version: "v1" },
-    { name: "x", id: "x", source_stream: "s", source_stream_type: "traces", env: null, version: null },
+    {
+      name: "a",
+      id: "a",
+      source_stream: "s",
+      source_stream_type: "traces",
+      env: "production",
+      version: "v1",
+    },
+    {
+      name: "a",
+      id: "a",
+      source_stream: "s",
+      source_stream_type: "traces",
+      env: "production",
+      version: "v2",
+    },
+    {
+      name: "b",
+      id: "b",
+      source_stream: "s",
+      source_stream_type: "traces",
+      env: "production",
+      version: "v1",
+    },
+    {
+      name: "a",
+      id: "a",
+      source_stream: "s",
+      source_stream_type: "traces",
+      env: "staging",
+      version: "v1",
+    },
+    {
+      name: "x",
+      id: "x",
+      source_stream: "s",
+      source_stream_type: "traces",
+      env: null,
+      version: null,
+    },
   ];
   const SINGLE_ENV_AGENTS: GenAiAgentListItem[] = [
-    { name: "a", id: "a", source_stream: "s", source_stream_type: "traces", env: "production", version: "v1" },
-    { name: "b", id: "b", source_stream: "s", source_stream_type: "traces", env: "production", version: "v2" },
+    {
+      name: "a",
+      id: "a",
+      source_stream: "s",
+      source_stream_type: "traces",
+      env: "production",
+      version: "v1",
+    },
+    {
+      name: "b",
+      id: "b",
+      source_stream: "s",
+      source_stream_type: "traces",
+      env: "production",
+      version: "v2",
+    },
   ];
 
   function makeCascade(list: GenAiAgentListItem[]) {
@@ -284,11 +333,7 @@ describe("useAgentScope — Env→Agent→Version cascade (Plan 2)", () => {
   it("derives Env→Agent→Version cascade with auto-select + unset", () => {
     const scope = makeCascade(CASCADE_AGENTS);
     // envs: production, staging, UNSET
-    expect(scope.envs.value.map((e: any) => e.value)).toEqual([
-      "production",
-      "staging",
-      UNSET,
-    ]);
+    expect(scope.envs.value.map((e: any) => e.value)).toEqual(["production", "staging", UNSET]);
     scope.selectedEnv.value = "production";
     // agentNames within production: a, b
     expect(scope.agentNames.value.map((a: any) => a.value)).toEqual(["a", "b"]);
@@ -321,7 +366,14 @@ describe("useAgentScope — Env→Agent→Version cascade (Plan 2)", () => {
 
   it("represents null env/version as the UNSET option", () => {
     const scope = makeCascade([
-      { name: "x", id: "x", source_stream: "s", source_stream_type: "traces", env: null, version: null },
+      {
+        name: "x",
+        id: "x",
+        source_stream: "s",
+        source_stream_type: "traces",
+        env: null,
+        version: null,
+      },
     ]);
     expect(scope.envs.value.some((e: any) => e.value === UNSET)).toBe(true);
     // Single env (UNSET) auto-selects; then agent x auto-selects; version UNSET auto-selects.

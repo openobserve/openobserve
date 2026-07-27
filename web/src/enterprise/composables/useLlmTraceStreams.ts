@@ -43,9 +43,7 @@ export function useLlmTraceStreams(activeStream: Ref<string>) {
     try {
       const res: any = await getStreams("traces", false, false);
       const list = res?.list || [];
-      const llmStreams = list.filter(
-        (stream: any) => stream?.settings?.is_llm_stream !== false,
-      );
+      const llmStreams = list.filter((stream: any) => stream?.settings?.is_llm_stream !== false);
       availableStreams.value = llmStreams.map((stream: any) => stream.name);
       if (!availableStreams.value.includes(activeStream.value)) {
         activeStream.value = availableStreams.value[0] || "";

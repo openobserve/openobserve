@@ -13,10 +13,7 @@ export function formatAgentOption(agent: GenAiAgentListItem): string {
 }
 
 /** Short label for a variant row under an agent header: `env · vVERSION`. */
-function variantLabel(
-  agent: GenAiAgentListItem,
-  t: (k: string) => string,
-): string {
+function variantLabel(agent: GenAiAgentListItem, t: (k: string) => string): string {
   const parts: string[] = [];
   if (agent.env) parts.push(agent.env);
   if (agent.version) parts.push(`v${agent.version}`);

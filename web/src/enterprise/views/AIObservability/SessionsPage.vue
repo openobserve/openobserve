@@ -84,10 +84,7 @@ const {
   // (its prior refresh call), rather than relying on the bare no-arg default.
   invokeRefresh: async () => {
     await nextTick();
-    await sessionsRef.value?.refresh?.(
-      timeRange.value.startTime,
-      timeRange.value.endTime,
-    );
+    await sessionsRef.value?.refresh?.(timeRange.value.startTime, timeRange.value.endTime);
   },
 });
 

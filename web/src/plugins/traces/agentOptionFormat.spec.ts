@@ -15,9 +15,9 @@ const a = (o: Partial<GenAiAgentListItem>): GenAiAgentListItem => ({
 
 describe("formatAgentOption", () => {
   it("appends env and version when present", () => {
-    expect(
-      formatAgentOption(a({ id: "id-1", env: "prod", version: "1.2.0" })),
-    ).toBe("sre_agent (id-1) · prod · v1.2.0");
+    expect(formatAgentOption(a({ id: "id-1", env: "prod", version: "1.2.0" }))).toBe(
+      "sre_agent (id-1) · prod · v1.2.0",
+    );
   });
   it("omits missing segments", () => {
     expect(formatAgentOption(a({ env: "prod" }))).toBe("sre_agent · prod");
@@ -28,10 +28,7 @@ describe("formatAgentOption", () => {
 describe("buildAgentSelectOptions", () => {
   it("groups variants under one header per agent", () => {
     const opts = buildAgentSelectOptions(
-      [
-        a({ env: "prod", version: "1.2.0" }),
-        a({ env: "prod", version: "1.3.0" }),
-      ],
+      [a({ env: "prod", version: "1.2.0" }), a({ env: "prod", version: "1.3.0" })],
       (k: string) => k,
     );
     expect(opts.filter((o: any) => o.header)).toHaveLength(1);

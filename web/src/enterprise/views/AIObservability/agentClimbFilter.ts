@@ -15,14 +15,9 @@ export const buildAgentClimbFilter = (
   agent: string | undefined,
   variant: { env?: string | null; version?: string | null } = {},
 ): string => {
-  const clauses = [
-    agent ? `${callerExpr} = '${escapeSingleQuotes(agent)}'` : "1=1",
-  ];
+  const clauses = [agent ? `${callerExpr} = '${escapeSingleQuotes(agent)}'` : "1=1"];
   if (variant.version)
-    clauses.push(
-      `c.gen_ai_agent_version = '${escapeSingleQuotes(variant.version)}'`,
-    );
-  if (variant.env)
-    clauses.push(`c.gen_ai_agent_env = '${escapeSingleQuotes(variant.env)}'`);
+    clauses.push(`c.gen_ai_agent_version = '${escapeSingleQuotes(variant.version)}'`);
+  if (variant.env) clauses.push(`c.gen_ai_agent_env = '${escapeSingleQuotes(variant.env)}'`);
   return clauses.join(" AND ");
 };

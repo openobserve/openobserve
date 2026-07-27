@@ -61,9 +61,7 @@
               data-test="gen-ai-agent-name-fields-input"
             >
               <template #tooltip>
-                <OTooltip
-                  :content="t('settings.genAiAgentMapping.agentNameInfo')"
-                />
+                <OTooltip :content="t('settings.genAiAgentMapping.agentNameInfo')" />
               </template>
             </OTextarea>
             <BuiltinFields
@@ -82,9 +80,7 @@
               data-test="gen-ai-agent-id-fields-input"
             >
               <template #tooltip>
-                <OTooltip
-                  :content="t('settings.genAiAgentMapping.agentIdInfo')"
-                />
+                <OTooltip :content="t('settings.genAiAgentMapping.agentIdInfo')" />
               </template>
             </OTextarea>
             <BuiltinFields
@@ -106,10 +102,7 @@
                 <OTooltip :content="t('settings.genAiAgentMapping.envInfo')" />
               </template>
             </OTextarea>
-            <BuiltinFields
-              :standard="BUILTIN_FIELDS.env.standard"
-              data-test="gen-ai-env-builtin"
-            />
+            <BuiltinFields :standard="BUILTIN_FIELDS.env.standard" data-test="gen-ai-env-builtin" />
           </div>
           <div class="flex flex-col gap-2">
             <OTextarea
@@ -122,9 +115,7 @@
               data-test="gen-ai-version-fields-input"
             >
               <template #tooltip>
-                <OTooltip
-                  :content="t('settings.genAiAgentMapping.versionInfo')"
-                />
+                <OTooltip :content="t('settings.genAiAgentMapping.versionInfo')" />
               </template>
             </OTextarea>
             <BuiltinFields

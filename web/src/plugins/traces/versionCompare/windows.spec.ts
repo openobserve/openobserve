@@ -14,21 +14,21 @@ describe("resolveCompareWindows — sinceRollout (disjoint)", () => {
     const w = resolveCompareWindows(a, b, now);
     expect(w.mode).toBe("sinceRollout");
     expect(w.overlap).toBe("disjoint");
-    expect(w.deltaMicros).toBe(48 * H);                              // Δ = min(48h, 100h) = 48h
-    expect(w.a).toEqual({ start: now - 48 * H, end: now });          // A's first Δ (== all of A)
-    expect(w.b).toEqual({ start: (now - 100 * H) - 48 * H, end: now - 100 * H }); // B's last Δ
-    expect(w.limitedBy).toBe("a");                                   // A (48h) is the shorter arm
+    expect(w.deltaMicros).toBe(48 * H); // Δ = min(48h, 100h) = 48h
+    expect(w.a).toEqual({ start: now - 48 * H, end: now }); // A's first Δ (== all of A)
+    expect(w.b).toEqual({ start: now - 100 * H - 48 * H, end: now - 100 * H }); // B's last Δ
+    expect(w.limitedBy).toBe("a"); // A (48h) is the shorter arm
   });
 
   it("FAIRNESS CLAMP: when B's lifetime (6h) < A's window (48h), both windows are 6h", () => {
     const now = 1000 * H;
-    const a = { firstSeen: now - 48 * H, lastSeen: now };            // durA = 48h
+    const a = { firstSeen: now - 48 * H, lastSeen: now }; // durA = 48h
     const b = { firstSeen: now - 106 * H, lastSeen: now - 100 * H }; // durB = 6h (the limiter)
     const w = resolveCompareWindows(a, b, now);
     expect(w.deltaMicros).toBe(6 * H);
     expect(w.a).toEqual({ start: now - 48 * H, end: now - 48 * H + 6 * H }); // A's FIRST 6h
-    expect(w.b).toEqual({ start: now - 106 * H, end: now - 100 * H });        // B's last 6h == all of B
-    expect(w.limitedBy).toBe("b");   // B (6h) is the shorter/limiting arm
+    expect(w.b).toEqual({ start: now - 106 * H, end: now - 100 * H }); // B's last 6h == all of B
+    expect(w.limitedBy).toBe("b"); // B (6h) is the shorter/limiting arm
   });
 });
 

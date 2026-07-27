@@ -26,11 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   Renders empty when enoughSample is true AND overlap is "concurrent".
 -->
 <template>
-  <OBanner
-    v-if="!enoughSample"
-    variant="warning"
-    data-test="version-compare-banner-small-sample"
-  >
+  <OBanner v-if="!enoughSample" variant="warning" data-test="version-compare-banner-small-sample">
     {{ t("aiObservability.versionCompare.banner.smallSample", { nA, nB }) }}
   </OBanner>
   <OBanner

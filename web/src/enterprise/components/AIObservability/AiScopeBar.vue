@@ -40,8 +40,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div
-    class="flex items-center gap-3 px-page-edge py-2"
-    :class="{ 'border-b border-border-default': bordered }"
+    class="px-page-edge flex items-center gap-3 py-2"
+    :class="{ 'border-border-default border-b': bordered }"
   >
     <OToggleGroup
       :model-value="filterMode"
@@ -58,11 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :data-test="`${dataTest}-stream-selector`"
       class="w-64 flex-shrink-0"
     >
-      <OSkeleton
-        type="text"
-        v-if="showStreamSkeleton && !streamsLoaded"
-        class="w-full h-8.5"
-      />
+      <OSkeleton type="text" v-if="showStreamSkeleton && !streamsLoaded" class="h-8.5 w-full" />
       <OSelect
         v-else
         v-model="activeStreamModel"
@@ -72,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         labelKey="label"
         valueKey="value"
         :option-tooltip="streamOptionTooltip"
-        class="w-full rounded-default"
+        class="rounded-default w-full"
         @update:model-value="onStreamChange"
       />
     </div>
@@ -87,11 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          selection, so the separate env/version scope badges are gone. The
          skeleton gate is preserved (LLM gates until agents load). -->
     <template v-else>
-      <OSkeleton
-        type="text"
-        v-if="agentSkeleton && !agentsLoaded"
-        class="w-44 h-8.5"
-      />
+      <OSkeleton type="text" v-if="agentSkeleton && !agentsLoaded" class="h-8.5 w-44" />
       <AgentScopeCascade
         v-else
         :prefix="dataTest"

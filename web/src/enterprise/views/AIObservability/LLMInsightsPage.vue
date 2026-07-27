@@ -99,10 +99,7 @@ const {
   // refresh call), rather than relying on the bare no-arg default.
   invokeRefresh: async () => {
     await nextTick();
-    await dashboardRef.value?.refresh?.(
-      timeRange.value.startTime,
-      timeRange.value.endTime,
-    );
+    await dashboardRef.value?.refresh?.(timeRange.value.startTime, timeRange.value.endTime);
   },
 });
 

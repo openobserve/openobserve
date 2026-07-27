@@ -34,21 +34,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
        dot + "version — window · N traces". Two of these sit in a tight legend
        row above the metrics, so the sample-size context reads as a caption for
        the comparison rather than two oversized boxes. -->
-  <div
-    class="inline-flex items-center gap-2"
-    :data-test="`version-window-card-${arm}`"
-  >
+  <div class="inline-flex items-center gap-2" :data-test="`version-window-card-${arm}`">
     <span
       class="h-2 w-2 shrink-0 rounded-full"
       :class="arm === 'a' ? 'bg-accent' : 'bg-series-b'"
       :data-test="`version-window-card-${arm}-chip`"
     />
-    <span class="text-sm text-text-body" :data-test="`version-window-card-${arm}-label`">
+    <span class="text-text-body text-sm" :data-test="`version-window-card-${arm}-label`">
       {{ label }}
     </span>
     <span
       v-if="showClamp"
-      class="text-xs text-text-secondary"
+      class="text-text-secondary text-xs"
       :data-test="`version-window-card-${arm}-clamp`"
     >
       {{ t("aiObservability.versionCompare.windowCard.clamp", { duration: clampDuration }) }}

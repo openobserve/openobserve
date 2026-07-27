@@ -114,9 +114,7 @@ describe("AgentScopeCascade", () => {
       agentNames: [opt("checkout")],
       versions: [opt("1.0")],
     });
-    expect(
-      w.find('[data-test="sessions-list-cascade-agent"]').findAll(".opt"),
-    ).toHaveLength(1);
+    expect(w.find('[data-test="sessions-list-cascade-agent"]').findAll(".opt")).toHaveLength(1);
 
     // The parent (useAgentScope) re-derives the lower lists on env change; the
     // component reflects the new props immediately.
@@ -125,13 +123,9 @@ describe("AgentScopeCascade", () => {
       agentNames: [opt("billing"), opt("payments")],
       versions: [opt("3.0"), opt("4.0")],
     });
-    const agentOpts = w
-      .find('[data-test="sessions-list-cascade-agent"]')
-      .findAll(".opt");
+    const agentOpts = w.find('[data-test="sessions-list-cascade-agent"]').findAll(".opt");
     expect(agentOpts.map((o) => o.text())).toEqual(["billing", "payments"]);
-    const versionOpts = w
-      .find('[data-test="sessions-list-cascade-version"]')
-      .findAll(".opt");
+    const versionOpts = w.find('[data-test="sessions-list-cascade-version"]').findAll(".opt");
     expect(versionOpts.map((o) => o.text())).toEqual(["3.0", "4.0"]);
   });
 
@@ -158,20 +152,14 @@ describe("AgentScopeCascade", () => {
 
   it("renders the Version dropdown by default (show-version defaults true)", () => {
     const w = mountCascade();
-    expect(
-      w.find('[data-test="sessions-list-cascade-version"]').exists(),
-    ).toBe(true);
+    expect(w.find('[data-test="sessions-list-cascade-version"]').exists()).toBe(true);
   });
 
   it("hides ONLY the Version dropdown when show-version is false (Env + Agent stay)", () => {
     const w = mountCascade({ showVersion: false });
     expect(w.find('[data-test="sessions-list-cascade-env"]').exists()).toBe(true);
-    expect(
-      w.find('[data-test="sessions-list-cascade-agent"]').exists(),
-    ).toBe(true);
-    expect(
-      w.find('[data-test="sessions-list-cascade-version"]').exists(),
-    ).toBe(false);
+    expect(w.find('[data-test="sessions-list-cascade-agent"]').exists()).toBe(true);
+    expect(w.find('[data-test="sessions-list-cascade-version"]').exists()).toBe(false);
   });
 
   it("uses the passed prefix in every data-test (different page)", () => {

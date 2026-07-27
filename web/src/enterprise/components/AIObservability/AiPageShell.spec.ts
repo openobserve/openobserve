@@ -52,10 +52,7 @@ const baseProps = {
   isLoading: false,
 };
 
-const mountShell = (
-  overrides: Record<string, unknown> = {},
-  slots: Record<string, string> = {},
-) =>
+const mountShell = (overrides: Record<string, unknown> = {}, slots: Record<string, string> = {}) =>
   mount(AiPageShell, {
     global: { stubs },
     props: { ...baseProps, ...overrides },

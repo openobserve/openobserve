@@ -23,11 +23,7 @@
   Renders nothing when both are absent, so callers can drop it in unconditionally.
 -->
 <template>
-  <span
-    v-if="hasAny"
-    class="inline-flex items-center gap-1 align-middle"
-    :data-test="dataTest"
-  >
+  <span v-if="hasAny" class="inline-flex items-center gap-1 align-middle" :data-test="dataTest">
     <ODimensionChip
       v-if="env"
       dim-key="env"

@@ -15,14 +15,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
-    class="sessions-list h-full! flex flex-col bg-card-glass-bg"
-  >
+  <div class="sessions-list bg-card-glass-bg flex h-full! flex-col">
     <!-- No LLM streams exist in the org at all — nothing to select, so show
          the rich first-run empty state on its own (no table chrome). -->
     <div
       v-if="streamsLoaded && availableStreams.length === 0"
-      class="flex-1 min-h-0 flex items-center justify-center"
+      class="flex min-h-0 flex-1 items-center justify-center"
       data-test="sessions-empty-no-streams"
     >
       <OEmptyState size="hero" preset="no-llm-sessions" @action="onEmptyAction" />
@@ -92,12 +90,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :show-global-filter="false"
       :frame="false"
       width="100%"
-      class="w-full h-full"
+      class="h-full w-full"
       data-test="sessions-list-table"
       @row-click="(row: any) => handleRowClick(row)"
       @pagination-change="onPaginationChange"
     >
-
       <!-- Empty / error body — rendered inside the frame so the toolbar (and
            thus the stream selector) stays visible. -->
       <template #empty>
@@ -123,84 +120,85 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :action-label="t('traces.sessionsList.viewByStream')"
           @action="onFilterModeChange('stream')"
         />
-        <div
-          v-else
-          class="flex items-center justify-center py-12"
-          data-test="sessions-empty"
-        >
+        <div v-else class="flex items-center justify-center py-12" data-test="sessions-empty">
           <OEmptyState size="hero" preset="no-llm-sessions" @action="onEmptyAction" />
         </div>
       </template>
-        <!-- Timestamp -->
-        <template #cell-firstSeenNanos="{ row }">
-          <span class="text-xs tabular-nums">
-            {{ formatTimestamp(row.firstSeenNanos) }}
-          </span>
-        </template>
+      <!-- Timestamp -->
+      <template #cell-firstSeenNanos="{ row }">
+        <span class="text-xs tabular-nums">
+          {{ formatTimestamp(row.firstSeenNanos) }}
+        </span>
+      </template>
 
-        <!-- Session ID -->
-        <template #cell-sessionId="{ row }">
-          <div class="text-xs truncate w-full">
-            {{ row.sessionId }}
-            <OTooltip :content="row.sessionId" />
-          </div>
-        </template>
+      <!-- Session ID -->
+      <template #cell-sessionId="{ row }">
+        <div class="w-full truncate text-xs">
+          {{ row.sessionId }}
+          <OTooltip :content="row.sessionId" />
+        </div>
+      </template>
 
-        <!-- User -->
-        <template #cell-userId="{ row }">
-          <OUserCell
-            :value="row.userId"
-            :empty-label="t('traces.sessionsList.unknownUser')"
+      <!-- User -->
+      <template #cell-userId="{ row }">
+        <OUserCell :value="row.userId" :empty-label="t('traces.sessionsList.unknownUser')" />
+      </template>
+
+      <!-- First user message -->
+      <template #cell-firstUserMessage="{ row }">
+        <div v-if="row.firstUserMessage" class="text-text-secondary w-full truncate text-xs">
+          {{ row.firstUserMessage }}
+          <OTooltip :content="row.firstUserMessage" />
+        </div>
+        <span v-else class="text-text-muted text-xs">—</span>
+      </template>
+
+      <!-- Turns -->
+      <template #cell-turns="{ row }">
+        <span class="text-xs">{{ row.turns }}</span>
+      </template>
+
+      <!-- Duration -->
+      <template #cell-durationNanos="{ row }">
+        <span class="text-xs">
+          {{ formatDuration(row.durationNanos) }}
+          <OTooltip
+            :content="`${row.durationNanos.toLocaleString()} ${t('traces.sessionsList.durationNs')}`"
           />
-        </template>
+        </span>
+      </template>
 
-        <!-- First user message -->
-        <template #cell-firstUserMessage="{ row }">
-          <div
-            v-if="row.firstUserMessage"
-            class="text-xs text-text-secondary truncate w-full"
-          >
-            {{ row.firstUserMessage }}
-            <OTooltip :content="row.firstUserMessage" />
-          </div>
-          <span v-else class="text-xs text-text-muted">—</span>
-        </template>
-
-        <!-- Turns -->
-        <template #cell-turns="{ row }">
-          <span class="text-xs">{{ row.turns }}</span>
-        </template>
-
-        <!-- Duration -->
-        <template #cell-durationNanos="{ row }">
-          <span class="text-xs">
-            {{ formatDuration(row.durationNanos) }}
-            <OTooltip :content="`${row.durationNanos.toLocaleString()} ${t('traces.sessionsList.durationNs')}`" />
-          </span>
-        </template>
-
-        <!-- Tokens -->
-        <template #cell-tokens="{ row }">
-          <span class="text-xs tabular-nums">
-            {{ formatTokens(row.inputTokens) }} → {{ formatTokens(row.outputTokens) }} = {{ formatTokens(row.tokens) }}
-            <OTooltip :content="t('traces.sessionsList.tokenTooltip', { input: row.inputTokens.toLocaleString(), output: row.outputTokens.toLocaleString(), total: row.tokens.toLocaleString() })" />
-          </span>
-        </template>
-
-        <!-- Cost -->
-        <template #cell-cost="{ row }">
-          <span class="text-xs">${{ row.cost.toFixed(4) }}</span>
-        </template>
-
-        <!-- Status (derived from error_count) -->
-        <template #cell-status="{ row }">
-          <OTag
-            type="sessionStatus"
-            :value="row.status"
-            :data-test="`sessions-list-status-${row.sessionId}`"
+      <!-- Tokens -->
+      <template #cell-tokens="{ row }">
+        <span class="text-xs tabular-nums">
+          {{ formatTokens(row.inputTokens) }} → {{ formatTokens(row.outputTokens) }} =
+          {{ formatTokens(row.tokens) }}
+          <OTooltip
+            :content="
+              t('traces.sessionsList.tokenTooltip', {
+                input: row.inputTokens.toLocaleString(),
+                output: row.outputTokens.toLocaleString(),
+                total: row.tokens.toLocaleString(),
+              })
+            "
           />
-        </template>
-      </OTable>
+        </span>
+      </template>
+
+      <!-- Cost -->
+      <template #cell-cost="{ row }">
+        <span class="text-xs">${{ row.cost.toFixed(4) }}</span>
+      </template>
+
+      <!-- Status (derived from error_count) -->
+      <template #cell-status="{ row }">
+        <OTag
+          type="sessionStatus"
+          :value="row.status"
+          :data-test="`sessions-list-status-${row.sessionId}`"
+        />
+      </template>
+    </OTable>
   </div>
 </template>
 
@@ -223,10 +221,7 @@ import { isInputFocused } from "@/utils/keyboardShortcuts";
 import type { AcceptableValue } from "reka-ui";
 import genAiAgentMappingService from "@/services/gen-ai-agent-mapping.service";
 import { buildAgentSessionFilter } from "./llmAgentFilter";
-import {
-  splitNumberWithUnit,
-  splitDuration,
-} from "./llmInsightsDashboard.utils";
+import { splitNumberWithUnit, splitDuration } from "./llmInsightsDashboard.utils";
 import AiScopeBar from "@/enterprise/components/AIObservability/AiScopeBar.vue";
 
 interface Props {
@@ -275,8 +270,7 @@ const activeStream = ref<string>(
 // Trace-stream loading is shared with the other AI pages via
 // useLlmTraceStreams. availableStreams/streamsLoaded/ensureStreamsLoaded are
 // byte-identical to the previous inline versions.
-const { availableStreams, streamsLoaded, ensureStreamsLoaded } =
-  useLlmTraceStreams(activeStream);
+const { availableStreams, streamsLoaded, ensureStreamsLoaded } = useLlmTraceStreams(activeStream);
 const MODE_LS_KEY = "sessionsList_filterMode";
 // Persists the RESOLVED agent NAME of the cascade selection (was the old single
 // `activeAgent` key). On reload we re-seed the cascade from it (see
@@ -287,18 +281,14 @@ const AGENT_LS_KEY = "sessionsList_agentFilter";
 // Default scope is ALWAYS "agent" — every AI page lands on Agent for consistency.
 // Only an explicit `?type=stream` URL param overrides it (a stale saved
 // preference must not silently land on Stream).
-const filterMode = ref<"stream" | "agent">(
-  urlType === "stream" ? "stream" : "agent",
-);
+const filterMode = ref<"stream" | "agent">(urlType === "stream" ? "stream" : "agent");
 // `agents` / `agentsLoaded` are module-scoped (see useSessions) so the agent
 // picker keeps its options — and stays off its skeleton — across a remount.
 // Agent NAME to seed the cascade with once the list loads: the URL `?agent=`
 // deep-link first, else the persisted last selection. Resolved into
 // selectedEnv/AgentName/Version via `selectAgentByName`, then cleared.
 const pendingAgentName = ref<string | null>(
-  filterMode.value === "agent"
-    ? urlAgentName || localStorage.getItem(AGENT_LS_KEY) || null
-    : null,
+  filterMode.value === "agent" ? urlAgentName || localStorage.getItem(AGENT_LS_KEY) || null : null,
 );
 
 // Server-side pagination (1-indexed). OTable owns the footer controls in
@@ -374,106 +364,107 @@ watch(total, () => {
 // `sessionId` stays mandatory (it's the row identity). `firstUserMessage` is
 // the flex column — it fills leftover width on load and freezes on first
 // resize. All widths are user-resizable + persisted via `table-id`.
-const tableColumns = computed(() => [
-  {
-    id: "firstSeenNanos",
-    header: t('traces.sessionsList.columns.timestamp'),
-    accessorKey: "firstSeenNanos",
-    size: 170,
-    sortable: false,
-    hideable: true,
-    meta: { align: "left" },
-  },
-  {
-    id: "sessionId",
-    header: t('traces.sessionsList.columns.sessionId'),
-    accessorKey: "sessionId",
-    size: 250,
-    sortable: false,
-    meta: { align: "left" },
-  },
-  {
-    id: "userId",
-    header: t('traces.sessionsList.columns.user'),
-    accessorKey: "userId",
-    size: 110,
-    sortable: false,
-    hideable: true,
-    meta: { align: "left" },
-  },
-  {
-    id: "firstUserMessage",
-    header: t('traces.sessionsList.columns.firstMessage'),
-    accessorKey: "firstUserMessage",
-    size: 360,
-    // Flex columns collapse to `minSize` when the table overflows horizontally;
-    // pin a floor so the message stays readable instead of clipping to "Han…".
-    // The user drives how much they want to see via resize, capped by maxSize.
-    minSize: 200,
-    maxSize: 600,
-    sortable: false,
-    hideable: true,
-    meta: { align: "left", flex: true },
-  },
-  {
-    id: "turns",
-    header: t('traces.sessionsList.columns.turns'),
-    accessorKey: "turns",
-    size: 50,
-    sortable: false,
-    hideable: true,
-    meta: { align: "right" },
-  },
-  {
-    id: "durationNanos",
-    header: t('traces.sessionsList.columns.duration'),
-    accessorKey: "durationNanos",
-    size: 90,
-    sortable: false,
-    hideable: true,
-    meta: { align: "left" },
-  },
-  {
-    id: "tokens",
-    header: t('traces.sessionsList.columns.tokens'),
-    accessorKey: "tokens",
-    size: 150,
-    minSize: 150,
-    sortable: false,
-    hideable: true,
-    meta: { align: "right" },
-  },
-  {
-    id: "cost",
-    header: t('traces.sessionsList.columns.cost'),
-    accessorKey: "cost",
-    size: 100,
-    sortable: false,
-    hideable: true,
-    meta: { align: "right" },
-  },
-  {
-    id: "status",
-    header: t('traces.sessionsList.columns.status'),
-    accessorKey: "status",
-    size: 100,
-    sortable: false,
-    hideable: true,
-    meta: { align: "left", disableCellAction: true },
-  },
-].map((c: any) => ({
-  ...c,
-  // Offer every column except the session id (row identity) in OTable's
-  // "Manage columns" chooser.
-  hideable: c.id !== "sessionId",
-})));
+const tableColumns = computed(() =>
+  [
+    {
+      id: "firstSeenNanos",
+      header: t("traces.sessionsList.columns.timestamp"),
+      accessorKey: "firstSeenNanos",
+      size: 170,
+      sortable: false,
+      hideable: true,
+      meta: { align: "left" },
+    },
+    {
+      id: "sessionId",
+      header: t("traces.sessionsList.columns.sessionId"),
+      accessorKey: "sessionId",
+      size: 250,
+      sortable: false,
+      meta: { align: "left" },
+    },
+    {
+      id: "userId",
+      header: t("traces.sessionsList.columns.user"),
+      accessorKey: "userId",
+      size: 110,
+      sortable: false,
+      hideable: true,
+      meta: { align: "left" },
+    },
+    {
+      id: "firstUserMessage",
+      header: t("traces.sessionsList.columns.firstMessage"),
+      accessorKey: "firstUserMessage",
+      size: 360,
+      // Flex columns collapse to `minSize` when the table overflows horizontally;
+      // pin a floor so the message stays readable instead of clipping to "Han…".
+      // The user drives how much they want to see via resize, capped by maxSize.
+      minSize: 200,
+      maxSize: 600,
+      sortable: false,
+      hideable: true,
+      meta: { align: "left", flex: true },
+    },
+    {
+      id: "turns",
+      header: t("traces.sessionsList.columns.turns"),
+      accessorKey: "turns",
+      size: 50,
+      sortable: false,
+      hideable: true,
+      meta: { align: "right" },
+    },
+    {
+      id: "durationNanos",
+      header: t("traces.sessionsList.columns.duration"),
+      accessorKey: "durationNanos",
+      size: 90,
+      sortable: false,
+      hideable: true,
+      meta: { align: "left" },
+    },
+    {
+      id: "tokens",
+      header: t("traces.sessionsList.columns.tokens"),
+      accessorKey: "tokens",
+      size: 150,
+      minSize: 150,
+      sortable: false,
+      hideable: true,
+      meta: { align: "right" },
+    },
+    {
+      id: "cost",
+      header: t("traces.sessionsList.columns.cost"),
+      accessorKey: "cost",
+      size: 100,
+      sortable: false,
+      hideable: true,
+      meta: { align: "right" },
+    },
+    {
+      id: "status",
+      header: t("traces.sessionsList.columns.status"),
+      accessorKey: "status",
+      size: 100,
+      sortable: false,
+      hideable: true,
+      meta: { align: "left", disableCellAction: true },
+    },
+  ].map((c: any) => ({
+    ...c,
+    // Offer every column except the session id (row identity) in OTable's
+    // "Manage columns" chooser.
+    hideable: c.id !== "sessionId",
+  })),
+);
 
 function formatTimestamp(nanos: number): string {
   if (!nanos) return "—";
   // Backend ships timestamps as nanoseconds — formatDate wants ms.
   return formatDate(Math.floor(nanos / 1_000_000), "YYYY-MM-DD HH:mm:ss");
 }
-
 
 function formatDuration(nanos: number): string {
   if (!nanos) return "—";
@@ -487,7 +478,6 @@ function formatTokens(n: number): string {
   const t = splitNumberWithUnit(n);
   return `${t.value}${t.unit}`;
 }
-
 
 async function loadAgents(startTime?: number, endTime?: number) {
   const orgId = store.state.selectedOrganization?.identifier;
@@ -528,11 +518,7 @@ function clearSessionRows() {
   total.value = 0;
 }
 
-async function loadSessions(
-  startTime?: number,
-  endTime?: number,
-  force = false,
-) {
+async function loadSessions(startTime?: number, endTime?: number, force = false) {
   const start = startTime ?? props.startTime;
   const end = endTime ?? props.endTime;
   if (!start || !end) return;
@@ -610,9 +596,7 @@ function onStreamChange() {
   loadSessions(undefined, undefined, true);
 }
 
-function onFilterModeChange(
-  mode?: AcceptableValue | AcceptableValue[] | boolean,
-) {
+function onFilterModeChange(mode?: AcceptableValue | AcceptableValue[] | boolean) {
   const next = mode === "agent" ? "agent" : "stream";
   if (next === filterMode.value) return;
   filterMode.value = next;
@@ -690,6 +674,11 @@ onUnmounted(() => {
 });
 
 useShortcuts([
-  { id: "sessionsRefresh", handler: () => { if (!isInputFocused()) refresh(); } },
+  {
+    id: "sessionsRefresh",
+    handler: () => {
+      if (!isInputFocused()) refresh();
+    },
+  },
 ]);
 </script>

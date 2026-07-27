@@ -23,9 +23,7 @@
     <span class="text-text-secondary">{{
       t("settings.genAiAgentMapping.alwaysAppliedStandard")
     }}</span>
-    <OBadge v-for="f in standard" :key="f" variant="primary-soft" size="sm">{{
-      f
-    }}</OBadge>
+    <OBadge v-for="f in standard" :key="f" variant="primary-soft" size="sm">{{ f }}</OBadge>
   </div>
 </template>
 

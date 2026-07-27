@@ -41,10 +41,14 @@ describe("VersionErrorDiff", () => {
     const wrapper = mountDiff(fullDiff());
 
     expect(wrapper.find('[data-test="version-error-diff-group-introduced"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="version-error-diff-row-introduced-timeout"]').text()).toContain("3");
+    expect(
+      wrapper.find('[data-test="version-error-diff-row-introduced-timeout"]').text(),
+    ).toContain("3");
 
     expect(wrapper.find('[data-test="version-error-diff-group-fixed"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="version-error-diff-row-fixed-rate_limit"]').text()).toContain("2");
+    expect(wrapper.find('[data-test="version-error-diff-row-fixed-rate_limit"]').text()).toContain(
+      "2",
+    );
 
     expect(wrapper.find('[data-test="version-error-diff-group-shared"]').exists()).toBe(true);
     const sharedRow = wrapper.find('[data-test="version-error-diff-row-shared-auth_error"]');

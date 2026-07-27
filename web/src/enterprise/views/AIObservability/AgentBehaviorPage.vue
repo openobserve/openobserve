@@ -62,10 +62,10 @@
     <!-- Full-height column: the panel splits the available height between its
          two cards, so the page itself never scrolls — each table scrolls
          internally when its rows overflow. -->
-    <div class="flex-1 min-h-0 flex flex-col px-page-edge py-4">
+    <div class="px-page-edge flex min-h-0 flex-1 flex-col py-4">
       <AgentBehaviorPanel
         ref="panelRef"
-        class="flex-1 min-h-0"
+        class="min-h-0 flex-1"
         :source-stream="effectiveStream"
         :agent-filter="agentFilter"
         :agent-env="filterMode === 'agent' ? selectedAgent?.env : null"
@@ -98,14 +98,8 @@ const store = useStore();
 // Shared with LLM Insights / Sessions / Quality — see useAiDateRange.ts.
 // Agent Behavior has no from/to/period URL sync (urlSync:false), matching its
 // prior behavior of resolving from shared state only.
-const {
-  dateState,
-  timeRange,
-  applyRelative,
-  onDateChange,
-  mountResolve,
-  DEFAULT_RELATIVE,
-} = useAiDateController({ urlSync: false });
+const { dateState, timeRange, applyRelative, onDateChange, mountResolve, DEFAULT_RELATIVE } =
+  useAiDateController({ urlSync: false });
 
 // Agent is the default scope: the page is about a specific agent's behaviour,
 // so it opens focused on one agent. Stream mode widens to every agent's signals.

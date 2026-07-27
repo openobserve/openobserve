@@ -13,8 +13,12 @@ describe("percentile", () => {
 describe("bootstrapDiffCI (seeded → deterministic)", () => {
   const rngNormalish = (base: number, n: number, seed: number) => {
     // cheap deterministic pseudo-samples around `base`
-    let s = seed; const out: number[] = [];
-    for (let i = 0; i < n; i++) { s = (s * 1103515245 + 12345) & 0x7fffffff; out.push(base + (s % 1000) / 100); }
+    let s = seed;
+    const out: number[] = [];
+    for (let i = 0; i < n; i++) {
+      s = (s * 1103515245 + 12345) & 0x7fffffff;
+      out.push(base + (s % 1000) / 100);
+    }
     return out;
   };
   it("CI excludes zero for a clearly higher A distribution", () => {
@@ -31,7 +35,8 @@ describe("bootstrapDiffCI (seeded → deterministic)", () => {
     expect(ci.straddlesZero).toBe(true);
   });
   it("is deterministic under a fixed seed", () => {
-    const A = rngNormalish(150, 300, 5), B = rngNormalish(120, 300, 6);
+    const A = rngNormalish(150, 300, 5),
+      B = rngNormalish(120, 300, 6);
     const c1 = bootstrapDiffCI(A, B, mean, 1000, 0.9, 99);
     const c2 = bootstrapDiffCI(A, B, mean, 1000, 0.9, 99);
     expect(c1).toEqual(c2);

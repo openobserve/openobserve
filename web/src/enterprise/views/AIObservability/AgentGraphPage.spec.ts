@@ -245,20 +245,12 @@ describe("AgentGraphPage — agent-mode stream gating", () => {
     const wrapper = await mountPage();
 
     // Version dropdown is suppressed on the Graph (topology is version-agnostic).
-    expect(
-      wrapper.find('[data-test="agent-graph-cascade-version"]').exists(),
-    ).toBe(false);
+    expect(wrapper.find('[data-test="agent-graph-cascade-version"]').exists()).toBe(false);
     // Env + Agent dropdowns still render.
-    expect(
-      wrapper.find('[data-test="agent-graph-cascade-env"]').exists(),
-    ).toBe(true);
-    expect(
-      wrapper.find('[data-test="agent-graph-cascade-agent"]').exists(),
-    ).toBe(true);
+    expect(wrapper.find('[data-test="agent-graph-cascade-env"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="agent-graph-cascade-agent"]').exists()).toBe(true);
     // The version-agnostic hint (info icon + tooltip) rides beside the cascade.
-    const hint = wrapper.find(
-      '[data-test="agent-graph-version-agnostic-hint"]',
-    );
+    const hint = wrapper.find('[data-test="agent-graph-version-agnostic-hint"]');
     expect(hint.exists()).toBe(true);
     expect(hint.find(".o-tooltip").attributes("data-content")).toBe(
       "aiObservability.agentGraph.versionAgnosticHint",

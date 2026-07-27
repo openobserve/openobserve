@@ -24,13 +24,7 @@ describe("buildRawSampleSql", () => {
   });
 
   it("splices a non-empty agent filter with AND (<filter>)", () => {
-    const sql = buildRawSampleSql(
-      "default",
-      "gen_ai_agent_id = 'abc'",
-      1000,
-      2000,
-      2000,
-    );
+    const sql = buildRawSampleSql("default", "gen_ai_agent_id = 'abc'", 1000, 2000, 2000);
     expect(sql).toContain(" AND (gen_ai_agent_id = 'abc')");
   });
 

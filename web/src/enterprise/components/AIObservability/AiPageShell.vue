@@ -47,8 +47,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            page-level picker is disabled and explains why via a tooltip. Wrapping
            in OTooltip even when enabled is harmless — `disabled` on OTooltip
            itself suppresses the bubble in that case. -->
-      <OTooltip :content="dateDisabledTooltip ?? ''" :disabled="!dateDisabled || !dateDisabledTooltip">
-        <date-time
+      <OTooltip
+        :content="dateDisabledTooltip ?? ''"
+        :disabled="!dateDisabled || !dateDisabledTooltip"
+      >
+        <DateTime
           ref="dateTimeRef"
           auto-apply
           menu-align="end"
@@ -67,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Last-refresh + refresh control, consistent across every AI page
            header. -->
       <div
-        class="inline-flex items-center border border-border-default rounded-default px-1 h-8 overflow-hidden"
+        class="border-border-default rounded-default inline-flex h-8 items-center overflow-hidden border px-1"
       >
         <ORefreshButton
           :last-run-at="lastRunAt"

@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
        the trend chart (they reshape the chart's x-axis), and Exit lives up in the
        scope row next to where Compare was entered — mirroring how Datadog/Grafana/
        Sentry keep entity-selection separate from the overlay/align control. -->
-  <div class="px-page-edge py-2 border-b border-border-default">
+  <div class="px-page-edge border-border-default border-b py-2">
     <div class="flex items-center gap-3">
       <div class="w-64 flex-shrink-0">
         <OSelect
@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :options="optionsWithoutUnset"
           labelKey="label"
           valueKey="value"
-          class="w-full rounded-default"
+          class="rounded-default w-full"
           data-test="version-compare-bar-a"
           @update:model-value="(v: unknown) => emit('update:a', v as string)"
         />
@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :options="optionsWithoutUnset"
           labelKey="label"
           valueKey="value"
-          class="w-full rounded-default"
+          class="rounded-default w-full"
           data-test="version-compare-bar-b"
           @update:model-value="(v: unknown) => emit('update:b', v as string)"
         />
@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <span
         v-if="sameVersion"
         data-test="version-compare-bar-same-hint"
-        class="text-xs text-text-secondary"
+        class="text-text-secondary text-xs"
       >
         {{ t("aiObservability.versionCompare.bar.samePickHint") }}
       </span>

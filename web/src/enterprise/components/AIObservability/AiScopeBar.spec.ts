@@ -21,8 +21,7 @@ const OToggleGroupItem = {
 const OSelect = {
   props: ["modelValue", "label", "options", "loading"],
   emits: ["update:modelValue"],
-  template:
-    '<div class="o-select" :data-loading="loading"><slot name="trigger" /></div>',
+  template: '<div class="o-select" :data-loading="loading"><slot name="trigger" /></div>',
 };
 const OSkeleton = {
   props: ["type"],
@@ -121,9 +120,7 @@ describe("AiScopeBar", () => {
       activeStream: "s1",
       selectedStreamCount: 3,
     });
-    expect(
-      w.find('[data-test="sessions-list-stream-selector"]').exists(),
-    ).toBe(true);
+    expect(w.find('[data-test="sessions-list-stream-selector"]').exists()).toBe(true);
     // Agent-mode controls (cascade) are hidden in stream mode.
     expect(w.find(".agent-scope-cascade").exists()).toBe(false);
     const badge = w.find('[data-test="sessions-list-stream-count"]');
@@ -136,9 +133,7 @@ describe("AiScopeBar", () => {
     const cascade = w.find('[data-test="sessions-list-cascade"]');
     expect(cascade.exists()).toBe(true);
     // The single agent OSelect trigger is gone.
-    expect(w.find('[data-test="sessions-list-agent-selector"]').exists()).toBe(
-      false,
-    );
+    expect(w.find('[data-test="sessions-list-agent-selector"]').exists()).toBe(false);
     // Derived option lists are forwarded through.
     expect(cascade.attributes("data-envs")).toBe("1");
     expect(cascade.attributes("data-names")).toBe("1");
@@ -151,9 +146,7 @@ describe("AiScopeBar", () => {
       selectedAgent: { name: "checkout", env: "prod", version: "2.1" },
     });
     expect(w.find(".agent-badges").exists()).toBe(false);
-    expect(
-      w.find('[data-test="sessions-list-scope-badges"]').exists(),
-    ).toBe(false);
+    expect(w.find('[data-test="sessions-list-scope-badges"]').exists()).toBe(false);
   });
 
   it("gates the stream select behind an OSkeleton when showStreamSkeleton and streams not loaded", () => {

@@ -43,16 +43,12 @@ describe("AiNoAgentsEmpty", () => {
 
   it("defaults the illustration to constellation", () => {
     const w = mountEmpty();
-    expect(w.find(".o-empty-state").attributes("data-illustration")).toBe(
-      "constellation",
-    );
+    expect(w.find(".o-empty-state").attributes("data-illustration")).toBe("constellation");
   });
 
   it("respects an overridden illustration (e.g. service-graph for Graph)", () => {
     const w = mountEmpty({ illustration: "service-graph", actionLabel: undefined });
-    expect(w.find(".o-empty-state").attributes("data-illustration")).toBe(
-      "service-graph",
-    );
+    expect(w.find(".o-empty-state").attributes("data-illustration")).toBe("service-graph");
   });
 
   it("emits view-by-stream when the empty state's action fires", async () => {

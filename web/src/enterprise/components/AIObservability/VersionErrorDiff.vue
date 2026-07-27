@@ -31,18 +31,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <OCard
-    class="rounded-surface! border border-border-default bg-surface-panel"
+    class="rounded-surface! border-border-default bg-surface-panel border"
     data-test="version-error-diff"
   >
     <OCardSection role="header" class="flex flex-col gap-0.5 p-3!">
-      <span class="text-sm font-semibold text-text-body">{{ t("aiObservability.errorDiff.title") }}</span>
-      <span v-if="!showEmpty" class="text-xs text-text-muted">
+      <span class="text-text-body text-sm font-semibold">{{
+        t("aiObservability.errorDiff.title")
+      }}</span>
+      <span v-if="!showEmpty" class="text-text-muted text-xs">
         {{ t("aiObservability.errorDiff.subtitle", { a: labelA, b: labelB }) }}
       </span>
     </OCardSection>
 
     <OCardSection v-if="showEmpty" role="body" class="p-3! pt-0!">
-      <span class="text-xs text-text-muted" data-test="version-error-diff-empty">
+      <span class="text-text-muted text-xs" data-test="version-error-diff-empty">
         {{ t("aiObservability.errorDiff.noData") }}
       </span>
     </OCardSection>
@@ -50,58 +52,65 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Three parallel groups side-by-side (not stacked) and the body height is
          capped + scrollable, so a version with many failure classes never grows
          the panel tall enough to push the trend chart below the fold. -->
-    <OCardSection v-else role="body" class="grid max-h-64 grid-cols-1 gap-x-6 gap-y-4 overflow-y-auto p-3! pt-0! sm:grid-cols-2 lg:grid-cols-3">
-      <div
-        v-if="errorDiff!.introduced.length"
-        data-test="version-error-diff-group-introduced"
-      >
-        <div class="flex items-baseline gap-1.5 border-b border-border-default pb-1">
-          <span class="text-xs font-semibold uppercase text-error-600">
+    <OCardSection
+      v-else
+      role="body"
+      class="grid max-h-64 grid-cols-1 gap-x-6 gap-y-4 overflow-y-auto p-3! pt-0! sm:grid-cols-2 lg:grid-cols-3"
+    >
+      <div v-if="errorDiff!.introduced.length" data-test="version-error-diff-group-introduced">
+        <div class="border-border-default flex items-baseline gap-1.5 border-b pb-1">
+          <span class="text-error-600 text-xs font-semibold uppercase">
             {{ t("aiObservability.errorDiff.introduced") }}
           </span>
-          <span class="text-2xs text-text-muted">{{ t("aiObservability.errorDiff.introducedHint", { b: labelB }) }}</span>
+          <span class="text-2xs text-text-muted">{{
+            t("aiObservability.errorDiff.introducedHint", { b: labelB })
+          }}</span>
         </div>
         <ul class="mt-1.5 flex flex-col gap-1">
           <li
             v-for="row in errorDiff!.introduced"
             :key="row.fail_class"
-            class="flex items-center justify-between gap-2 text-sm text-text-body"
+            class="text-text-body flex items-center justify-between gap-2 text-sm"
             :data-test="`version-error-diff-row-introduced-${row.fail_class}`"
           >
             <span class="truncate">{{ row.fail_class }}</span>
-            <span class="shrink-0 font-medium tabular-nums text-error-600">+{{ row.count }}</span>
+            <span class="text-error-600 shrink-0 font-medium tabular-nums">+{{ row.count }}</span>
           </li>
         </ul>
       </div>
 
       <div v-if="errorDiff!.fixed.length" data-test="version-error-diff-group-fixed">
-        <div class="flex items-baseline gap-1.5 border-b border-border-default pb-1">
-          <span class="text-xs font-semibold uppercase text-success-600">
+        <div class="border-border-default flex items-baseline gap-1.5 border-b pb-1">
+          <span class="text-success-600 text-xs font-semibold uppercase">
             {{ t("aiObservability.errorDiff.fixed") }}
           </span>
-          <span class="text-2xs text-text-muted">{{ t("aiObservability.errorDiff.fixedHint", { b: labelB }) }}</span>
+          <span class="text-2xs text-text-muted">{{
+            t("aiObservability.errorDiff.fixedHint", { b: labelB })
+          }}</span>
         </div>
         <ul class="mt-1.5 flex flex-col gap-1">
           <li
             v-for="row in errorDiff!.fixed"
             :key="row.fail_class"
-            class="flex items-center justify-between gap-2 text-sm text-text-body"
+            class="text-text-body flex items-center justify-between gap-2 text-sm"
             :data-test="`version-error-diff-row-fixed-${row.fail_class}`"
           >
             <span class="truncate">{{ row.fail_class }}</span>
-            <span class="shrink-0 font-medium tabular-nums text-success-600">−{{ row.count }}</span>
+            <span class="text-success-600 shrink-0 font-medium tabular-nums">−{{ row.count }}</span>
           </li>
         </ul>
       </div>
 
       <div v-if="errorDiff!.shared.length" data-test="version-error-diff-group-shared">
-        <div class="flex items-baseline justify-between gap-1.5 border-b border-border-default pb-1">
+        <div
+          class="border-border-default flex items-baseline justify-between gap-1.5 border-b pb-1"
+        >
           <span class="flex items-baseline gap-1.5">
-            <span class="text-xs font-semibold uppercase text-text-secondary">
+            <span class="text-text-secondary text-xs font-semibold uppercase">
               {{ t("aiObservability.errorDiff.shared") }}
             </span>
           </span>
-          <span class="inline-flex items-center gap-1 text-2xs">
+          <span class="text-2xs inline-flex items-center gap-1">
             <span class="text-accent font-medium">{{ labelA }}</span>
             <span class="text-text-muted">→</span>
             <span class="text-series-b font-medium">{{ labelB }}</span>
@@ -111,7 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <li
             v-for="row in errorDiff!.shared"
             :key="row.fail_class"
-            class="flex items-center justify-between gap-2 text-sm text-text-body"
+            class="text-text-body flex items-center justify-between gap-2 text-sm"
             :data-test="`version-error-diff-row-shared-${row.fail_class}`"
           >
             <span class="truncate">{{ row.fail_class }}</span>

@@ -15,14 +15,47 @@ import type { GenAiAgentListItem } from "@/services/gen-ai-agent-mapping.service
 // its own spec). The stubs re-emit the events the view listens to.
 const stub = (name: string, emits: string[] = []) => ({
   name,
-  props: ["versions", "a", "b", "align", "prefix", "envs", "arm", "env", "version", "window", "traceCount", "limitedBy", "deltaHours", "overlap", "enoughSample", "nA", "nB", "result", "seriesA", "seriesB", "mode", "modelValue", "startDate", "startTime", "endDate", "endTime"],
+  props: [
+    "versions",
+    "a",
+    "b",
+    "align",
+    "prefix",
+    "envs",
+    "arm",
+    "env",
+    "version",
+    "window",
+    "traceCount",
+    "limitedBy",
+    "deltaHours",
+    "overlap",
+    "enoughSample",
+    "nA",
+    "nB",
+    "result",
+    "seriesA",
+    "seriesB",
+    "mode",
+    "modelValue",
+    "startDate",
+    "startTime",
+    "endDate",
+    "endTime",
+  ],
   emits,
   template: `<div :data-test="'stub-' + '${name}'"></div>`,
 });
 
 const AGENT_A: GenAiAgentListItem = {
-  name: "checkout-agent", id: "a1", source_stream: "s", source_stream_type: "traces",
-  env: "prod", version: "1.5.0", first_seen: 1_700_000_000_000_000, last_seen: 1_700_100_000_000_000,
+  name: "checkout-agent",
+  id: "a1",
+  source_stream: "s",
+  source_stream_type: "traces",
+  env: "prod",
+  version: "1.5.0",
+  first_seen: 1_700_000_000_000_000,
+  last_seen: 1_700_100_000_000_000,
 };
 const AGENT_B: GenAiAgentListItem = { ...AGENT_A, id: "a2", version: "1.4.0" };
 
@@ -95,12 +128,23 @@ describe("VersionCompareView — default version seeding", () => {
     // SAME version → A === B → run() gated off → blank panels. Dedup must prevent
     // that. Here 2.1.0 appears 3× and 2.0.0 3× (interleaved) — the regression
     // repro from the ddsketch_test org.
-    const v21 = (fs: number): GenAiAgentListItem => ({ ...AGENT_A, version: "2.1.0", first_seen: fs });
-    const v20 = (fs: number): GenAiAgentListItem => ({ ...AGENT_A, version: "2.0.0", first_seen: fs });
+    const v21 = (fs: number): GenAiAgentListItem => ({
+      ...AGENT_A,
+      version: "2.1.0",
+      first_seen: fs,
+    });
+    const v20 = (fs: number): GenAiAgentListItem => ({
+      ...AGENT_A,
+      version: "2.0.0",
+      first_seen: fs,
+    });
     const dupes = [
-      v21(1_784_989_582_452_101), v21(1_784_989_582_452_101),
-      v20(1_784_989_422_452_101), v20(1_784_989_422_452_101),
-      v21(1_784_989_113_443_419), v20(1_784_988_953_443_419),
+      v21(1_784_989_582_452_101),
+      v21(1_784_989_582_452_101),
+      v20(1_784_989_422_452_101),
+      v20(1_784_989_422_452_101),
+      v21(1_784_989_113_443_419),
+      v20(1_784_988_953_443_419),
     ];
     const w = mountView(dupes);
     const runEvents = w.emitted("run");

@@ -89,12 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-6"
         data-test="version-compare-strip-skeleton"
       >
-        <OSkeleton
-          v-for="n in 6"
-          :key="n"
-          type="rect"
-          class="h-20 rounded-surface"
-        />
+        <OSkeleton v-for="n in 6" :key="n" type="rect" class="rounded-surface h-20" />
       </div>
       <VersionDeltaStrip v-else-if="result" :result="result" />
       <VersionErrorDiff
@@ -105,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
       <span
         v-if="sampledNote"
-        class="text-xs text-text-muted"
+        class="text-text-muted text-xs"
         data-test="version-compare-sampled-note"
       >
         {{ sampledNote }}
@@ -157,10 +152,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @on:date-change="(v: unknown) => onManualDateChange('b', v)"
             />
           </template>
-          <span v-else class="text-xs text-text-muted" data-test="version-compare-auto-window">
+          <span v-else class="text-text-muted text-xs" data-test="version-compare-auto-window">
             <span class="text-accent">{{ armAMeta?.version ?? selectedA }}</span> {{ autoWindowA }}
-            <span class="mx-1 text-text-muted">·</span>
-            <span class="text-series-b">{{ armBMeta?.version ?? selectedB }}</span> {{ autoWindowB }}
+            <span class="text-text-muted mx-1">·</span>
+            <span class="text-series-b">{{ armBMeta?.version ?? selectedB }}</span>
+            {{ autoWindowB }}
           </span>
         </div>
       </div>
@@ -168,7 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OSkeleton
         v-if="loading && !windows"
         type="rect"
-        class="h-55 w-full rounded-surface"
+        class="rounded-surface h-55 w-full"
         data-test="version-compare-chart-skeleton"
       />
       <!-- A line needs >=2 points per series. In sameWallClock mode a wide page
@@ -177,10 +173,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            narrow the range instead of showing a blank grid. -->
       <div
         v-else-if="windows && !chartPlottable"
-        class="flex h-55 items-center justify-center rounded-surface border border-border-default bg-surface-panel px-4 text-center"
+        class="rounded-surface border-border-default bg-surface-panel flex h-55 items-center justify-center border px-4 text-center"
         data-test="version-overlay-chart-lowres"
       >
-        <span class="text-xs text-text-muted">{{ t("aiObservability.overlayChart.lowResolution") }}</span>
+        <span class="text-text-muted text-xs">{{
+          t("aiObservability.overlayChart.lowResolution")
+        }}</span>
       </div>
       <VersionOverlayChart
         v-else-if="windows"
@@ -210,7 +208,10 @@ import VersionCompareBanner from "./VersionCompareBanner.vue";
 import VersionWindowCard from "./VersionWindowCard.vue";
 import VersionDeltaStrip from "./VersionDeltaStrip.vue";
 import VersionErrorDiff from "./VersionErrorDiff.vue";
-import VersionOverlayChart, { type OverlayPoint, type OverlayMode } from "./VersionOverlayChart.vue";
+import VersionOverlayChart, {
+  type OverlayPoint,
+  type OverlayMode,
+} from "./VersionOverlayChart.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import type { GenAiAgentListItem } from "@/services/gen-ai-agent-mapping.service";
 import type { AlignMode, CompareWindows } from "@/plugins/traces/versionCompare/windows";
@@ -410,7 +411,10 @@ const chartPlottable = computed(
   () => overlaySeriesA.value.length >= 2 || overlaySeriesB.value.length >= 2,
 );
 
-function requestRun(manual?: { a?: { start: number; end: number }; b?: { start: number; end: number } }) {
+function requestRun(manual?: {
+  a?: { start: number; end: number };
+  b?: { start: number; end: number };
+}) {
   const a = armAMeta.value;
   const b = armBMeta.value;
   if (!a || !b) return;
@@ -479,8 +483,20 @@ function onManualDateChange(arm: "a" | "b", payload: unknown) {
 
   // Both arms pinned: the edited arm's window + the other arm's chosen-or-seeded
   // window, so a single edit never leaves the untouched arm on an empty window.
-  const winA = arm === "a" ? win : (manualWinA.value ?? { start: manualDefaultA.value.startTime, end: manualDefaultA.value.endTime });
-  const winB = arm === "b" ? win : (manualWinB.value ?? { start: manualDefaultB.value.startTime, end: manualDefaultB.value.endTime });
+  const winA =
+    arm === "a"
+      ? win
+      : (manualWinA.value ?? {
+          start: manualDefaultA.value.startTime,
+          end: manualDefaultA.value.endTime,
+        });
+  const winB =
+    arm === "b"
+      ? win
+      : (manualWinB.value ?? {
+          start: manualDefaultB.value.startTime,
+          end: manualDefaultB.value.endTime,
+        });
   // Debounced so the BURST of DateTime mount emits (onMounted + a
   // defaultAbsoluteTime watch, ×2 pickers) collapses into ONE settled run
   // instead of 4 racing runs (the "populate/clear repeatedly + slow" thrash).

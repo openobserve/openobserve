@@ -74,7 +74,9 @@ describe("VersionCompareBanner", () => {
   it("prefers the small-sample banner when both guardrails trip", () => {
     const wrapper = mountBanner({ overlap: "disjoint", enoughSample: false });
     expect(wrapper.find('[data-test="version-compare-banner-small-sample"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="version-compare-banner-overlap-disjoint"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="version-compare-banner-overlap-disjoint"]').exists()).toBe(
+      false,
+    );
   });
 
   it("uses warning tone", () => {

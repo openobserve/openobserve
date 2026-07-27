@@ -96,10 +96,7 @@ export interface UseAgentScopeOptions {
    */
   activeAgent?: Ref<string>;
   /** Optional SQL predicate builder (buildAgentTraceFilter / buildAgentSessionFilter / name). */
-  filterBuilder?: (
-    agent: GenAiAgentListItem | null,
-    stream: string,
-  ) => string;
+  filterBuilder?: (agent: GenAiAgentListItem | null, stream: string) => string;
   t: (k: string) => string;
 }
 
@@ -140,9 +137,7 @@ export interface UseAgentScopeReturn {
   selectAgentByName: (name: string) => boolean;
 }
 
-export function useAgentScope(
-  opts: UseAgentScopeOptions,
-): UseAgentScopeReturn {
+export function useAgentScope(opts: UseAgentScopeOptions): UseAgentScopeReturn {
   const allAgents = opts.allAgents ?? false;
 
   // Hazard 2 — module-scoped agents: use the injected refs when provided
@@ -187,7 +182,7 @@ export function useAgentScope(
       if (seen.has(v)) continue;
       seen.add(v);
       out.push({
-        label: v === UNSET ? unsetLabel ?? v : v,
+        label: v === UNSET ? (unsetLabel ?? v) : v,
         value: v,
       });
     }
@@ -195,20 +190,13 @@ export function useAgentScope(
   }
 
   const envs = computed<SelectOption[]>(() =>
-    cascade
-      ? distinctOptions(
-          agents.value.map(agentEnv),
-          opts.t("traces.agentNoEnv"),
-        )
-      : [],
+    cascade ? distinctOptions(agents.value.map(agentEnv), opts.t("traces.agentNoEnv")) : [],
   );
 
   const agentNames = computed<SelectOption[]>(() =>
     cascade
       ? distinctOptions(
-          agents.value
-            .filter((a) => agentEnv(a) === selectedEnv.value)
-            .map((a) => a.name),
+          agents.value.filter((a) => agentEnv(a) === selectedEnv.value).map((a) => a.name),
         )
       : [],
   );
@@ -217,11 +205,7 @@ export function useAgentScope(
     cascade
       ? distinctOptions(
           agents.value
-            .filter(
-              (a) =>
-                agentEnv(a) === selectedEnv.value &&
-                a.name === selectedAgentName.value,
-            )
+            .filter((a) => agentEnv(a) === selectedEnv.value && a.name === selectedAgentName.value)
             .map(agentVersion),
           opts.t("traces.agentNoVersion"),
         )
@@ -257,11 +241,10 @@ export function useAgentScope(
     // `flush: 'sync'` so a caller that sets a higher level and immediately reads
     // the re-derived lower levels (the common imperative usage) sees a
     // consistent cascade without awaiting a tick.
-    watch(
-      [agents, selectedEnv, selectedAgentName, selectedVersion],
-      reconcile,
-      { immediate: true, flush: "sync" },
-    );
+    watch([agents, selectedEnv, selectedAgentName, selectedVersion], reconcile, {
+      immediate: true,
+      flush: "sync",
+    });
   }
 
   // Seed the cascade from an agent name (URL deep-link / persistence restore).
@@ -290,20 +273,14 @@ export function useAgentScope(
 
   const selectedStreamCount = computed(
     () =>
-      streamSelectOptions.value.find(
-        (o) => o.value === opts.activeStream.value,
-      )?.agentCount ?? 0,
+      streamSelectOptions.value.find((o) => o.value === opts.activeStream.value)?.agentCount ?? 0,
   );
 
   const selectedAgent = computed<GenAiAgentListItem | null>(() => {
     // Cascade mode: resolve the concrete agent from env + name + version
     // (all three must be pinned to a real, unset-aware value).
     if (cascade) {
-      if (
-        !selectedEnv.value ||
-        !selectedAgentName.value ||
-        !selectedVersion.value
-      ) {
+      if (!selectedEnv.value || !selectedAgentName.value || !selectedVersion.value) {
         return null;
       }
       return (
@@ -317,9 +294,7 @@ export function useAgentScope(
     }
     // Single-dropdown mode (unchanged).
     if (allAgents && activeAgent.value === ALL_AGENTS_VALUE) return null;
-    return (
-      agents.value.find((a) => agentOptionKey(a) === activeAgent.value) ?? null
-    );
+    return agents.value.find((a) => agentOptionKey(a) === activeAgent.value) ?? null;
   });
 
   // Hazard 3 — effectiveStream normalization: uniformly `?? ""`. In agent mode
@@ -336,16 +311,11 @@ export function useAgentScope(
   );
 
   const agentFilterClause = computed(() =>
-    opts.filterBuilder
-      ? opts.filterBuilder(effectiveAgent.value, effectiveStream.value)
-      : "",
+    opts.filterBuilder ? opts.filterBuilder(effectiveAgent.value, effectiveStream.value) : "",
   );
 
   const agentEmpty = computed(
-    () =>
-      opts.filterMode.value === "agent" &&
-      agentsLoaded.value &&
-      agents.value.length === 0,
+    () => opts.filterMode.value === "agent" && agentsLoaded.value && agents.value.length === 0,
   );
 
   async function loadAgents(start?: number, end?: number): Promise<void> {
@@ -356,11 +326,7 @@ export function useAgentScope(
     if (!org || !startTime || !endTime) return;
     agentsLoaded.value = false;
     try {
-      const res = await genAiAgentMappingService.listAgents(
-        org,
-        startTime,
-        endTime,
-      );
+      const res = await genAiAgentMappingService.listAgents(org, startTime, endTime);
       agents.value = res.agents ?? [];
       if (allAgents) {
         // Sentinel shape: keep All-Agents; only clamp a now-invalid selection.

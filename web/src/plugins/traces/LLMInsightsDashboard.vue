@@ -19,9 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
        panels each carry their own `bg-card-glass-bg`. Wrapping them in
        another bg-card-glass-bg would render same-bg-on-same-bg and the
        inner cards would visually disappear (no border contrast). -->
-  <div
-    class="bg-transparent h-full flex flex-col"
-  >
+  <div class="flex h-full flex-col bg-transparent">
     <!-- Toolbar: Stream/Agent mode tab (left) + the matching picker (right) —
          hidden when no streams are available. Padding lives on the toolbar +
          scroll area (not the root) so the scrollbar hugs the content-area edge
@@ -75,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="llm-insights-compare-entry"
             @click="enterCompareMode"
           >
-            {{ t('traces.lLMInsightsDashboard.compareEntry') }}
+            {{ t("traces.lLMInsightsDashboard.compareEntry") }}
           </OButton>
         </OTooltip>
         <!-- Exit compare lives in the SAME spot as the enter affordance, so the
@@ -88,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="llm-insights-compare-exit"
           @click="exitCompareMode"
         >
-          {{ t('aiObservability.versionCompare.bar.exit') }}
+          {{ t("aiObservability.versionCompare.bar.exit") }}
         </OButton>
       </template>
     </AiScopeBar>
@@ -116,182 +114,175 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          empty states / dashboard content stays intact without adding a DOM
          wrapper node. -->
     <template v-if="!compareMode">
-    <!-- Full-page skeleton only until the stream list is known. Once we have a
+      <!-- Full-page skeleton only until the stream list is known. Once we have a
          stream, we fall through to the content so the trend/table panels mount
          and fire their queries immediately — in parallel with the KPI fetch,
          rather than waiting for it (the KPI strip keeps its own skeleton). -->
-    <LLMInsightsSkeleton
-      v-if="!streamsLoaded || switching"
-      :hide-toolbar="streamsLoaded"
-      class="flex-1 px-page-edge"
-    />
+      <LLMInsightsSkeleton
+        v-if="!streamsLoaded || switching"
+        :hide-toolbar="streamsLoaded"
+        class="px-page-edge flex-1"
+      />
 
-    <!-- Generic error state — kept separate because a failed request is a
+      <!-- Generic error state — kept separate because a failed request is a
          different signal from "no data yet". Once we have a result we fall
          through to the consolidated empty / dashboard branches below. -->
-    <OEmptyState
-      v-else-if="error && hasLoadedOnce"
-      size="hero"
-      illustration="broken-panel"
-      variant="error"
-      data-test="llm-insights-empty-error"
-      :title="t('traces.lLMInsightsDashboard.failedToLoad')"
-      :description="error || ''"
-      :action-label="t('traces.lLMInsightsDashboard.retry')"
-      action-icon="refresh"
-      @action="loadInsights()"
-    />
+      <OEmptyState
+        v-else-if="error && hasLoadedOnce"
+        size="hero"
+        illustration="broken-panel"
+        variant="error"
+        data-test="llm-insights-empty-error"
+        :title="t('traces.lLMInsightsDashboard.failedToLoad')"
+        :description="error || ''"
+        :action-label="t('traces.lLMInsightsDashboard.retry')"
+        action-icon="refresh"
+        @action="loadInsights()"
+      />
 
-    <!-- Consolidated empty state — single OEmptyState covers all three
+      <!-- Consolidated empty state — single OEmptyState covers all three
          "no data" shapes (no LLM streams in the org, the active stream has
          no gen_ai_* fields, or the time window returned nothing). The page
          doesn't expose a search/filter widget, so we never set `:filtered`
          — both the first-run and the "no data right now" cases land on
          the preset's "Instrument with OpenTelemetry" call to action. -->
-    <div
-      v-else-if="isEmpty"
-      class="flex-1 min-h-0 flex items-center justify-center px-page-edge"
-      data-test="llm-insights-empty"
-    >
-      <OEmptyState
-        size="hero"
-        preset="no-llm-insights"
-        @action="onEmptyAction"
-      />
-    </div>
+      <div
+        v-else-if="isEmpty"
+        class="px-page-edge flex min-h-0 flex-1 items-center justify-center"
+        data-test="llm-insights-empty"
+      >
+        <OEmptyState size="hero" preset="no-llm-insights" @action="onEmptyAction" />
+      </div>
 
-    <!-- Agent tab with no agents in the window — its own empty state (reuses
+      <!-- Agent tab with no agents in the window — its own empty state (reuses
          the same constellation illustration) rather than bare text, with a way
          back to the Stream tab. -->
-    <div
-      v-else-if="agentEmpty"
-      class="flex-1 min-h-0 flex items-center justify-center px-page-edge"
-      data-test="llm-insights-agent-empty"
-    >
-      <OEmptyState
-        size="hero"
-        illustration="constellation"
-        :title="t('traces.lLMInsightsDashboard.noAgentsInRange')"
-        :description="t('traces.lLMInsightsDashboard.noAgentsDescription')"
-        :action-label="t('traces.lLMInsightsDashboard.viewByStream')"
-        @action="onFilterModeChange('stream')"
-      />
-    </div>
+      <div
+        v-else-if="agentEmpty"
+        class="px-page-edge flex min-h-0 flex-1 items-center justify-center"
+        data-test="llm-insights-agent-empty"
+      >
+        <OEmptyState
+          size="hero"
+          illustration="constellation"
+          :title="t('traces.lLMInsightsDashboard.noAgentsInRange')"
+          :description="t('traces.lLMInsightsDashboard.noAgentsDescription')"
+          :action-label="t('traces.lLMInsightsDashboard.viewByStream')"
+          @action="onFilterModeChange('stream')"
+        />
+      </div>
 
-    <!-- Dashboard content — scrollable panel area. Horizontal padding lives
+      <!-- Dashboard content — scrollable panel area. Horizontal padding lives
          here (inside the scroll container) so the scrollbar sits at the
          content-area edge with content padded away from it. -->
-    <div v-else class="flex-1 overflow-y-auto px-page-edge pb-3">
-      <!-- KPI strip: keep a skeleton until the first KPI result lands so the
+      <div v-else class="px-page-edge flex-1 overflow-y-auto pb-3">
+        <!-- KPI strip: keep a skeleton until the first KPI result lands so the
            cards never flash zeros. The panels below render regardless, so
            their queries fire in parallel with the KPI fetch. -->
-      <LLMInsightsSkeleton
-        v-if="loading || !hasLoadedOnce"
-        kpi-only
-        class="mb-2.5"
-      />
-      <!-- KPI Cards Row -->
-      <KpiCardRow
-        v-else
-        :columns="5"
-        class="mt-2.5 mb-2.5"
-      >
-        <div
-          v-for="card in kpiCards"
-          :key="card.label"
-          class="bg-card-glass-bg rounded-default flex flex-col px-3.5 py-2.5 gap-1 min-h-32.5 border border-border-default"
-        >
-          <!-- P95 rides its own (slower) query — skeleton the WHOLE card while
+        <LLMInsightsSkeleton v-if="loading || !hasLoadedOnce" kpi-only class="mb-2.5" />
+        <!-- KPI Cards Row -->
+        <KpiCardRow v-else :columns="5" class="mt-2.5 mb-2.5">
+          <div
+            v-for="card in kpiCards"
+            :key="card.label"
+            class="bg-card-glass-bg rounded-default border-border-default flex min-h-32.5 flex-col gap-1 border px-3.5 py-2.5"
+          >
+            <!-- P95 rides its own (slower) query — skeleton the WHOLE card while
                it loads, matching the initial strip skeleton tile (see
                LLMInsightsSkeleton). Its sparkline comes from the histogram, but
                showing a chart before the number reads as ready, so we hold both. -->
-          <template v-if="card.loading">
-            <div class="flex flex-col gap-1">
-              <OSkeleton type="text" class="w-[60%] h-3" />
-              <OSkeleton type="text" class="w-[55%] h-5.5" />
-            </div>
-            <div class="flex items-end gap-[0.15rem] h-8 mt-auto">
-              <OSkeleton type="text" v-for="bar in 16" :key="bar" :style="{ height: `${30 + ((bar * 23) % 65)}%` }" class="w-full" />
-            </div>
-          </template>
-          <template v-else>
-            <div class="flex flex-col gap-1">
-              <div class="flex items-center justify-between gap-2 mb-1">
-                <div class="text-2xs leading-normal font-semibold text-text-secondary min-w-0 truncate">
-                  {{ card.label }}
+            <template v-if="card.loading">
+              <div class="flex flex-col gap-1">
+                <OSkeleton type="text" class="h-3 w-[60%]" />
+                <OSkeleton type="text" class="h-5.5 w-[55%]" />
+              </div>
+              <div class="mt-auto flex h-8 items-end gap-[0.15rem]">
+                <OSkeleton
+                  type="text"
+                  v-for="bar in 16"
+                  :key="bar"
+                  :style="{ height: `${30 + ((bar * 23) % 65)}%` }"
+                  class="w-full"
+                />
+              </div>
+            </template>
+            <template v-else>
+              <div class="flex flex-col gap-1">
+                <div class="mb-1 flex items-center justify-between gap-2">
+                  <div
+                    class="text-2xs text-text-secondary min-w-0 truncate leading-normal font-semibold"
+                  >
+                    {{ card.label }}
+                  </div>
+                  <span
+                    class="rounded-default bg-surface-subtle text-text-secondary inline-flex h-6 w-6 shrink-0 items-center justify-center"
+                  >
+                    <OIcon :name="card.icon" size="sm" />
+                  </span>
                 </div>
-                <span
-                  class="inline-flex items-center justify-center shrink-0 w-6 h-6 rounded-default bg-surface-subtle text-text-secondary"
-                >
-                  <OIcon :name="card.icon" size="sm" />
-                </span>
+                <div class="flex items-baseline gap-[0.2rem]">
+                  <span class="text-text-secondary text-2xl leading-none font-bold">
+                    {{ card.value }}
+                  </span>
+                  <span v-if="card.unit" class="text-compact text-text-secondary font-semibold">
+                    {{ card.unit }}
+                  </span>
+                </div>
               </div>
-              <div class="flex items-baseline gap-[0.2rem]">
-                <span class="text-2xl font-bold leading-none text-text-secondary">
-                  {{ card.value }}
-                </span>
-                <span
-                  v-if="card.unit"
-                  class="text-compact font-semibold text-text-secondary"
-                >
-                  {{ card.unit }}
-                </span>
-              </div>
-            </div>
-            <KpiSparkline
-              v-if="card.sparkData && card.sparkData.length > 1"
-              :data="card.sparkData"
-              :color="card.sparkColor"
-              :height="32"
-              class="mt-auto"
-            />
-          </template>
-        </div>
-      </KpiCardRow>
+              <KpiSparkline
+                v-if="card.sparkData && card.sparkData.length > 1"
+                :data="card.sparkData"
+                :color="card.sparkColor"
+                :height="32"
+                class="mt-auto"
+              />
+            </template>
+          </div>
+        </KpiCardRow>
 
-      <!-- Trend panels (config-driven). The key carries the panel-cache id
+        <!-- Trend panels (config-driven). The key carries the panel-cache id
            (stream + agent + window), so changing tab / agent / time range
            REMOUNTS each panel. That remount is deliberate: PanelSchemaRenderer
            only consults its IndexedDB cache on mount (runCount === 0), so a
            remount is what lets it restore an already-fetched result instead of
            re-querying. Same selection + window → instant cache hit; a new one →
            a clean miss that fetches. -->
-      <div class="grid grid-cols-2 gap-2.5">
-        <div
-          v-for="panel in LLM_INSIGHTS_PANELS"
-          :key="`${panel.id}::${panelCacheDashboardId}`"
-          :class="panel.layout.colSpan === 2 ? 'col-span-2' : ''"
-        >
-          <!-- Table panels use OTable (interactive, app-navigation) — matches
+        <div class="grid grid-cols-2 gap-2.5">
+          <div
+            v-for="panel in LLM_INSIGHTS_PANELS"
+            :key="`${panel.id}::${panelCacheDashboardId}`"
+            :class="panel.layout.colSpan === 2 ? 'col-span-2' : ''"
+          >
+            <!-- Table panels use OTable (interactive, app-navigation) — matches
                the other AI Observability tables; every chart panel renders
                through the shared dashboards engine (PanelSchemaRenderer). -->
-          <LLMErrorTable
-            v-if="panel.type === 'table'"
-            :panel="panel"
-            :streamName="effectiveStream"
-            :startTime="startTime"
-            :endTime="endTime"
-            :agent-filter="agentFilterClause"
-            :cache-key="panelCacheDashboardId"
-            @view-trace="onViewTrace"
-          />
-          <LLMSchemaPanel
-            v-else
-            :panel="panel"
-            :streamName="effectiveStream"
-            :startTime="startTime"
-            :endTime="endTime"
-            :agent-filter="agentFilterClause"
-            :dashboard-id="panelCacheDashboardId"
-            :folder-id="PANEL_CACHE_FOLDER"
-          />
+            <LLMErrorTable
+              v-if="panel.type === 'table'"
+              :panel="panel"
+              :streamName="effectiveStream"
+              :startTime="startTime"
+              :endTime="endTime"
+              :agent-filter="agentFilterClause"
+              :cache-key="panelCacheDashboardId"
+              @view-trace="onViewTrace"
+            />
+            <LLMSchemaPanel
+              v-else
+              :panel="panel"
+              :streamName="effectiveStream"
+              :startTime="startTime"
+              :endTime="endTime"
+              :agent-filter="agentFilterClause"
+              :dashboard-id="panelCacheDashboardId"
+              :folder-id="PANEL_CACHE_FOLDER"
+            />
+          </div>
         </div>
-      </div>
 
-      <!-- Agent behavior signals (loops / failure taxonomy) moved to their own
+        <!-- Agent behavior signals (loops / failure taxonomy) moved to their own
            dedicated "Agent Behavior" page under Monitor. LLM Insights keeps the
            cost/latency/error story; behavior lives beside Agent Graph. -->
-    </div>
+      </div>
     </template>
   </div>
 </template>
@@ -303,11 +294,7 @@ import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { useLLMInsights } from "./composables/useLLMInsights";
-import {
-  splitNumberWithUnit,
-  splitDuration,
-  splitCost,
-} from "./llmInsightsDashboard.utils";
+import { splitNumberWithUnit, splitDuration, splitCost } from "./llmInsightsDashboard.utils";
 import KpiSparkline from "./KpiSparkline.vue";
 import KpiCardRow from "@/components/common/KpiCardRow.vue";
 import LLMSchemaPanel from "./LLMSchemaPanel.vue";
@@ -395,17 +382,13 @@ const MODE_LS_KEY = "llmInsights_filterMode";
 // Default scope is ALWAYS "agent" — the AI module is agent-centric and every AI
 // page lands on Agent for consistency. Only an explicit `?type=stream` URL param
 // overrides it (a stale saved preference must not silently land on Stream).
-const filterMode = ref<"stream" | "agent">(
-  urlType === "stream" ? "stream" : "agent",
-);
+const filterMode = ref<"stream" | "agent">(urlType === "stream" ? "stream" : "agent");
 // Agent NAME to seed the cascade with once the list loads: the URL `?agent=`
 // deep-link first, else the persisted last selection. Resolved into
 // selectedEnv/AgentName/Version via `selectAgentByName`, then cleared. (The URL
 // carries the readable name, not the internal stream-scoped key.)
 const pendingAgentName = ref<string | null>(
-  filterMode.value === "agent"
-    ? urlAgentName || localStorage.getItem(AGENT_LS_KEY) || null
-    : null,
+  filterMode.value === "agent" ? urlAgentName || localStorage.getItem(AGENT_LS_KEY) || null : null,
 );
 
 // Shared derived scope computeds come from useAgentScope. LLM Insights injects
@@ -524,26 +507,21 @@ async function onCompareRun(payload: {
     versionCompare.setPair(payload.a, payload.b);
   }
   const sharedWindow =
-    payload.align === "sameWallClock"
-      ? { start: props.startTime, end: props.endTime }
-      : undefined;
+    payload.align === "sameWallClock" ? { start: props.startTime, end: props.endTime } : undefined;
   await versionCompare.run(effectiveStream.value, payload.manual, sharedWindow);
 }
 
 // sameWallClock re-runs the compare whenever the page date-picker changes —
 // in this align mode the shared page window IS the query window for both
 // arms, so a picker change must re-fetch rather than silently going stale.
-watch(
-  [() => props.startTime, () => props.endTime],
-  async () => {
-    if (!compareMode.value || compareAlign.value !== "sameWallClock") return;
-    if (!versionCompare.windows.value) return;
-    await versionCompare.run(effectiveStream.value, undefined, {
-      start: props.startTime,
-      end: props.endTime,
-    });
-  },
-);
+watch([() => props.startTime, () => props.endTime], async () => {
+  if (!compareMode.value || compareAlign.value !== "sameWallClock") return;
+  if (!versionCompare.windows.value) return;
+  await versionCompare.run(effectiveStream.value, undefined, {
+    start: props.startTime,
+    end: props.endTime,
+  });
+});
 
 // Changing the agent identity (name or env) while comparing invalidates the
 // current A/B pair — those versions belong to the OLD agent. Exit compare mode
@@ -598,15 +576,8 @@ watch(
 const PANEL_CACHE_FOLDER = "ai-llm-insights";
 const panelCacheDashboardId = computed(() => {
   const agentKey =
-    filterMode.value === "agent"
-      ? (effectiveAgent.value?.name ?? "_none")
-      : "_stream";
-  return selectionKey(
-    effectiveStream.value,
-    agentKey,
-    props.startTime,
-    props.endTime,
-  );
+    filterMode.value === "agent" ? (effectiveAgent.value?.name ?? "_none") : "_stream";
+  return selectionKey(effectiveStream.value, agentKey, props.startTime, props.endTime);
 });
 // PanelSchemaRenderer (via its annotation composable) calls getDashboard() on
 // mount, which hits the network for any dashboardId not already in the Vuex
@@ -642,10 +613,7 @@ watch(panelCacheDashboardId, (id) => ensurePanelCacheStub(id), {
 // dedicated empty state (vs. the generic "no LLM data" one). Only true once the
 // list has actually loaded, so we don't flash it before the first fetch.
 const agentEmpty = computed(
-  () =>
-    filterMode.value === "agent" &&
-    agentsLoaded.value &&
-    agents.value.length === 0,
+  () => filterMode.value === "agent" && agentsLoaded.value && agents.value.length === 0,
 );
 
 // Reflect the current filter in the URL so the view is shareable / survives a
@@ -695,9 +663,7 @@ async function loadTraceStreams() {
   try {
     const res: any = await getStreams("traces", false, false);
     const list = res?.list || [];
-    const llmStreams = list.filter(
-      (stream: any) => stream?.settings?.is_llm_stream !== false,
-    );
+    const llmStreams = list.filter((stream: any) => stream?.settings?.is_llm_stream !== false);
     availableStreams.value = llmStreams.map((stream: any) => stream.name);
     if (!availableStreams.value.includes(activeStream.value)) {
       activeStream.value = availableStreams.value[0] || "";
@@ -741,9 +707,7 @@ async function loadAgents(startTime?: number, endTime?: number) {
     // getDashboard a store lookup in every case.
     ensurePanelCacheStub(`${activeStream.value}::_stream::${start}-${end}`);
     for (const agent of agents.value) {
-      ensurePanelCacheStub(
-        `${agent.source_stream}::${agent.name}::${start}-${end}`,
-      );
+      ensurePanelCacheStub(`${agent.source_stream}::${agent.name}::${start}-${end}`);
     }
     // The cascade selection is reconciled against the fresh list by
     // useAgentScope's watcher (invalid env/name/version fall back / clear), so
@@ -816,15 +780,13 @@ const kpiCards = computed<KpiCard[]>(() => {
   const traces = splitNumberWithUnit(kpi.value.traceCount);
   const p95 = splitDuration(kpi.value.p95DurationMicros);
   const errorRate =
-    kpi.value.traceCount > 0
-      ? (kpi.value.errorCount / kpi.value.traceCount) * 100
-      : 0;
+    kpi.value.traceCount > 0 ? (kpi.value.errorCount / kpi.value.traceCount) * 100 : 0;
 
   // Cost comes straight from SUM(gen_ai_usage_cost) on the KPI summary.
   // If it's 0, either there are no LLM spans in the window or the SDK
   // isn't emitting cost; either way we render "$0".
   const costCard: KpiCard = {
-    label: t('traces.lLMInsightsDashboard.totalCost'),
+    label: t("traces.lLMInsightsDashboard.totalCost"),
     icon: "payments",
     ...splitCost(kpi.value.totalCost),
     sparkData: sparklines.value.cost,
@@ -834,7 +796,7 @@ const kpiCards = computed<KpiCard[]>(() => {
   return [
     costCard,
     {
-      label: t('traces.lLMInsightsDashboard.totalTokens'),
+      label: t("traces.lLMInsightsDashboard.totalTokens"),
       icon: "tag",
       value: tokens.value,
       unit: tokens.unit,
@@ -842,7 +804,7 @@ const kpiCards = computed<KpiCard[]>(() => {
       sparkColor: "#a855f7",
     },
     {
-      label: t('traces.lLMInsightsDashboard.totalTraces'),
+      label: t("traces.lLMInsightsDashboard.totalTraces"),
       icon: "account-tree",
       value: traces.value,
       unit: traces.unit,
@@ -850,7 +812,7 @@ const kpiCards = computed<KpiCard[]>(() => {
       sparkColor: "#3b82f6",
     },
     {
-      label: t('traces.lLMInsightsDashboard.p95Latency'),
+      label: t("traces.lLMInsightsDashboard.p95Latency"),
       icon: "schedule",
       value: p95.value,
       unit: p95.unit,
@@ -859,7 +821,7 @@ const kpiCards = computed<KpiCard[]>(() => {
       loading: p95Loading.value,
     },
     {
-      label: t('traces.lLMInsightsDashboard.errorRate'),
+      label: t("traces.lLMInsightsDashboard.errorRate"),
       icon: "error",
       value: errorRate.toFixed(1),
       unit: "%",
@@ -875,9 +837,7 @@ const kpiCards = computed<KpiCard[]>(() => {
 // stream+agent+window scope and restored on a tab toggle / same-window revisit.
 function kpiCacheKey(start: number, end: number): string {
   const agentKey =
-    filterMode.value === "agent"
-      ? (effectiveAgent.value?.name ?? "_none")
-      : "_stream";
+    filterMode.value === "agent" ? (effectiveAgent.value?.name ?? "_none") : "_stream";
   return selectionKey(effectiveStream.value, agentKey, start, end);
 }
 
@@ -885,11 +845,7 @@ function kpiCacheKey(start: number, end: number): string {
 // parent keeps in sync via `recomputeInsightsTimeRange`). Stream selector
 // changes, refresh button, and onMounted all funnel through here. `force`
 // (manual refresh) bypasses the KPI cache and pulls fresh numbers.
-async function loadInsights(
-  startTime?: number,
-  endTime?: number,
-  opts?: { force?: boolean },
-) {
+async function loadInsights(startTime?: number, endTime?: number, opts?: { force?: boolean }) {
   try {
     const force = opts?.force ?? false;
     const start = startTime ?? props.startTime;
@@ -969,9 +925,7 @@ async function loadInsights(
   }
 }
 
-function onFilterModeChange(
-  mode: boolean | AcceptableValue | AcceptableValue[],
-) {
+function onFilterModeChange(mode: boolean | AcceptableValue | AcceptableValue[]) {
   const next = mode === "agent" ? "agent" : "stream";
   if (next === filterMode.value) return;
   filterMode.value = next;

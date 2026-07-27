@@ -7,7 +7,7 @@ describe("proportionDiffCI (Newcombe)", () => {
     // A: 200/1000 = 20% errors; B: 50/1000 = 5%. Clear worse.
     const ci = proportionDiffCI(200, 1000, 50, 1000);
     expect(ci.delta).toBeCloseTo(0.15, 5);
-    expect(ci.lower).toBeGreaterThan(0);      // entire CI above zero
+    expect(ci.lower).toBeGreaterThan(0); // entire CI above zero
     expect(ci.straddlesZero).toBe(false);
   });
   it("straddles zero for a tiny difference on small n", () => {

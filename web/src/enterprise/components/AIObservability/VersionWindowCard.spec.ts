@@ -95,7 +95,11 @@ describe("VersionWindowCard", () => {
   it("renders an accent color chip for arm a and the series-b chip for arm b", () => {
     const wrapperA = mountCard({ arm: "a" });
     const wrapperB = mountCard({ arm: "b" });
-    expect(wrapperA.find('[data-test="version-window-card-a-chip"]').classes().join(" ")).toContain("accent");
-    expect(wrapperB.find('[data-test="version-window-card-b-chip"]').classes().join(" ")).toContain("series-b");
+    expect(wrapperA.find('[data-test="version-window-card-a-chip"]').classes().join(" ")).toContain(
+      "accent",
+    );
+    expect(wrapperB.find('[data-test="version-window-card-b-chip"]').classes().join(" ")).toContain(
+      "series-b",
+    );
   });
 });

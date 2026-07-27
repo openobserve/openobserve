@@ -35,8 +35,7 @@ describe("useLlmTraceStreams", () => {
     });
 
     const activeStream = ref("not-in-list");
-    const { availableStreams, streamsLoaded, loadTraceStreams } =
-      useLlmTraceStreams(activeStream);
+    const { availableStreams, streamsLoaded, loadTraceStreams } = useLlmTraceStreams(activeStream);
 
     await loadTraceStreams();
 
@@ -47,10 +46,7 @@ describe("useLlmTraceStreams", () => {
 
   it("does not clamp activeStream when it's already in the list", async () => {
     getStreams.mockResolvedValue({
-      list: [
-        { name: "a", settings: { is_llm_stream: true } },
-        { name: "c" },
-      ],
+      list: [{ name: "a", settings: { is_llm_stream: true } }, { name: "c" }],
     });
 
     const activeStream = ref("c");
@@ -65,8 +61,7 @@ describe("useLlmTraceStreams", () => {
     getStreams.mockRejectedValue(new Error("boom"));
 
     const activeStream = ref("whatever");
-    const { availableStreams, streamsLoaded, loadTraceStreams } =
-      useLlmTraceStreams(activeStream);
+    const { availableStreams, streamsLoaded, loadTraceStreams } = useLlmTraceStreams(activeStream);
 
     await loadTraceStreams();
 

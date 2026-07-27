@@ -83,10 +83,14 @@ describe("VersionCompareBar", () => {
 
   it("emits update:a / update:b when a version is picked", async () => {
     const wrapper = mountBar();
-    await wrapper.find('[data-test="version-compare-bar-a"] .opt[data-value="1.5.0"]').trigger("click");
+    await wrapper
+      .find('[data-test="version-compare-bar-a"] .opt[data-value="1.5.0"]')
+      .trigger("click");
     expect(wrapper.emitted("update:a")?.[0]).toEqual(["1.5.0"]);
 
-    await wrapper.find('[data-test="version-compare-bar-b"] .opt[data-value="1.0.0"]').trigger("click");
+    await wrapper
+      .find('[data-test="version-compare-bar-b"] .opt[data-value="1.0.0"]')
+      .trigger("click");
     expect(wrapper.emitted("update:b")?.[0]).toEqual(["1.0.0"]);
   });
 });

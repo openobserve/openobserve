@@ -32,7 +32,11 @@ import {
   type ErrorDiff,
 } from "@/services/gen-ai-agent-mapping.service";
 import { useLLMInsights } from "./useLLMInsights";
-import { resolveCompareWindows, type AlignMode, type CompareWindows } from "../versionCompare/windows";
+import {
+  resolveCompareWindows,
+  type AlignMode,
+  type CompareWindows,
+} from "../versionCompare/windows";
 import {
   buildCompareResult,
   buildCompareResultFromEndpoint,
@@ -204,8 +208,14 @@ export function useVersionCompare() {
       vb.first_seen == null ||
       vb.last_seen == null
     ) {
-      armA.error.value = va.first_seen == null || va.last_seen == null ? "Missing first/last seen" : armA.error.value;
-      armB.error.value = vb.first_seen == null || vb.last_seen == null ? "Missing first/last seen" : armB.error.value;
+      armA.error.value =
+        va.first_seen == null || va.last_seen == null
+          ? "Missing first/last seen"
+          : armA.error.value;
+      armB.error.value =
+        vb.first_seen == null || vb.last_seen == null
+          ? "Missing first/last seen"
+          : armB.error.value;
       return;
     }
 
@@ -240,16 +250,12 @@ export function useVersionCompare() {
 
     const runner = makeRunner();
 
-    const fetchAPromise = armA
-      .fetchAll(stream, queryA.start, queryA.end, va)
-      .catch((e: any) => {
-        armA.error.value = e?.message || "Failed to fetch version A";
-      });
-    const fetchBPromise = armB
-      .fetchAll(stream, queryB.start, queryB.end, vb)
-      .catch((e: any) => {
-        armB.error.value = e?.message || "Failed to fetch version B";
-      });
+    const fetchAPromise = armA.fetchAll(stream, queryA.start, queryA.end, va).catch((e: any) => {
+      armA.error.value = e?.message || "Failed to fetch version A";
+    });
+    const fetchBPromise = armB.fetchAll(stream, queryB.start, queryB.end, vb).catch((e: any) => {
+      armB.error.value = e?.message || "Failed to fetch version B";
+    });
 
     // Default path: the sketch-merge compare endpoint for latency (p50/p95/
     // p99) + cost. Error-rate + volume are NOT in the endpoint response (C2
@@ -282,8 +288,7 @@ export function useVersionCompare() {
       endpointPromise,
     ]);
 
-    const useEndpoint =
-      !!endpointResponse && endpointHasSufficientLatencyAndCost(endpointResponse);
+    const useEndpoint = !!endpointResponse && endpointHasSufficientLatencyAndCost(endpointResponse);
 
     if (useEndpoint && endpointResponse) {
       result.value = buildCompareResultFromEndpoint(
@@ -304,26 +309,18 @@ export function useVersionCompare() {
     const filterA = buildAgentTraceFilter(va, stream);
     const filterB = buildAgentTraceFilter(vb, stream);
 
-    const sampleAPromise = fetchRawSample(
-      stream,
-      filterA,
-      queryA.start,
-      queryA.end,
-      runner,
-    ).catch((e: any) => {
-      armA.error.value = armA.error.value || e?.message || "Failed to fetch sample A";
-      return { durations: [], costs: [] };
-    });
-    const sampleBPromise = fetchRawSample(
-      stream,
-      filterB,
-      queryB.start,
-      queryB.end,
-      runner,
-    ).catch((e: any) => {
-      armB.error.value = armB.error.value || e?.message || "Failed to fetch sample B";
-      return { durations: [], costs: [] };
-    });
+    const sampleAPromise = fetchRawSample(stream, filterA, queryA.start, queryA.end, runner).catch(
+      (e: any) => {
+        armA.error.value = armA.error.value || e?.message || "Failed to fetch sample A";
+        return { durations: [], costs: [] };
+      },
+    );
+    const sampleBPromise = fetchRawSample(stream, filterB, queryB.start, queryB.end, runner).catch(
+      (e: any) => {
+        armB.error.value = armB.error.value || e?.message || "Failed to fetch sample B";
+        return { durations: [], costs: [] };
+      },
+    );
 
     const [samplesA, samplesB] = await Promise.all([sampleAPromise, sampleBPromise]);
 

@@ -19,7 +19,11 @@ const routeQuery: Record<string, any> = {};
 const replaceMock = vi.fn(() => Promise.resolve());
 
 vi.mock("vue-router", () => ({
-  useRoute: () => ({ get query() { return routeQuery; } }),
+  useRoute: () => ({
+    get query() {
+      return routeQuery;
+    },
+  }),
   useRouter: () => ({ replace: replaceMock }),
 }));
 

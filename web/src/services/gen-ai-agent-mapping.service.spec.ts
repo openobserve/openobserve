@@ -71,12 +71,7 @@ describe("listVersionsForCompare", () => {
   it("uses a µs wide window (guards the RETENTION_MS off-by-1000)", async () => {
     getMock.mockResolvedValueOnce({ data: { agents: [] } });
 
-    await genAiAgentMappingService.listVersionsForCompare(
-      "org",
-      "checkout-agent",
-      null,
-      nowMicros,
-    );
+    await genAiAgentMappingService.listVersionsForCompare("org", "checkout-agent", null, nowMicros);
 
     expect(getMock).toHaveBeenCalledWith("/api/org/gen_ai/agents", {
       params: {

@@ -83,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              localStorage keys), so the two surfaces don't share a type. Same
              control shape as the Traces SearchBar toolbar for consistency. -->
         <template #trailing>
-          <div class="ml-auto flex items-center gap-2 shrink-0">
+          <div class="ml-auto flex shrink-0 items-center gap-2">
             <OToggleGroup
               :model-value="vizType"
               type="single"
@@ -108,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :options="layoutOptions"
               :searchable="false"
               data-test="agent-graph-layout-type"
-              class="w-[7.5rem] min-h-8! h-8!"
+              class="h-8! min-h-8! w-[7.5rem]"
               :disabled="vizType === 'graph'"
               @update:model-value="onLayoutTypeChange"
             />
@@ -136,14 +136,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :layout-type="layoutType"
       hide-stream-selector
       agent-highlight
-      class="flex-1 min-h-0"
+      class="min-h-0 flex-1"
     />
     <!-- No agents discovered in the current org / time window — show an empty
          state, NOT the fallback `default` service graph (the original bug). -->
     <div
       v-else-if="hasNoAgents"
       data-test="agent-graph-no-agents"
-      class="flex-1 min-h-0 flex items-center justify-center"
+      class="flex min-h-0 flex-1 items-center justify-center"
     >
       <OEmptyState
         size="block"
@@ -156,7 +156,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       v-else
       data-test="agent-graph-loading"
-      class="flex-1 min-h-0 flex items-center justify-center"
+      class="flex min-h-0 flex-1 items-center justify-center"
     >
       <OSpinner />
     </div>
@@ -207,9 +207,7 @@ const {
   mountResolve,
 } = useAiDateController({ urlSync: false });
 
-const ServiceGraph = defineAsyncComponent(
-  () => import("@/plugins/traces/ServiceGraph.vue"),
-);
+const ServiceGraph = defineAsyncComponent(() => import("@/plugins/traces/ServiceGraph.vue"));
 
 // Default scope is "agent" — the AI module is agent-centric (agents load on
 // mount, so the default is ready on first paint).
@@ -223,13 +221,9 @@ const activeStream = ref<string>("");
 // own localStorage keys persist the choice across visits. Passed down to
 // ServiceGraph via `viz-type` / `layout-type` props, which override the store.
 const vizType = ref<"tree" | "graph">(
-  (localStorage.getItem("agentGraph_visualizationType") as
-    | "tree"
-    | "graph") || "tree",
+  (localStorage.getItem("agentGraph_visualizationType") as "tree" | "graph") || "tree",
 );
-const layoutType = ref<string>(
-  localStorage.getItem("agentGraph_layoutType") || "horizontal",
-);
+const layoutType = ref<string>(localStorage.getItem("agentGraph_layoutType") || "horizontal");
 
 const layoutOptions = computed(() =>
   vizType.value === "graph"
@@ -240,9 +234,7 @@ const layoutOptions = computed(() =>
       ],
 );
 
-function onVizTypeChange(
-  value: boolean | AcceptableValue | AcceptableValue[],
-) {
+function onVizTypeChange(value: boolean | AcceptableValue | AcceptableValue[]) {
   if (value !== "tree" && value !== "graph") return;
   vizType.value = value;
   localStorage.setItem("agentGraph_visualizationType", value);
@@ -271,10 +263,7 @@ const {
   refresh,
 } = useChildRefresh(graphRef, {
   onBeforeRefresh: () => {
-    if (
-      dateState.value.valueType === "relative" &&
-      dateState.value.relativeTimePeriod
-    ) {
+    if (dateState.value.valueType === "relative" && dateState.value.relativeTimePeriod) {
       applyRelative(dateState.value.relativeTimePeriod);
     }
   },
@@ -300,9 +289,7 @@ const agentKey = (a: GenAiAgentListItem) => agentOptionKey(a);
 // to show here, so it must not appear. Derived from the agents list rather than
 // from all trace streams for exactly this reason. Passed into useAgentScope,
 // which only READS it (streamSelectOptions/selectedStreamCount).
-const availableStreams = computed(() => [
-  ...new Set(agents.value.map((a) => a.source_stream)),
-]);
+const availableStreams = computed(() => [...new Set(agents.value.map((a) => a.source_stream))]);
 
 // Shared derived scope computeds from useAgentScope. `activeAgent` (the
 // composable's single selection ref) replaces Graph's former `activeAgentKey`;
@@ -344,9 +331,7 @@ const {
 // Whether there is simply nothing agent-related to graph in the current org /
 // time window. There are no agents at all → both modes have nothing to show
 // (the Stream picker is itself derived from agent-bearing streams).
-const hasNoAgents = computed(
-  () => agentsLoaded.value && !agents.value.length,
-);
+const hasNoAgents = computed(() => agentsLoaded.value && !agents.value.length);
 
 // The graph may only mount once it has a real stream to query. In agent mode
 // that requires an actually-selected agent (whose source_stream is the stream);
@@ -358,17 +343,12 @@ const graphReady = computed(() =>
     : !!activeStream.value,
 );
 
-function onFilterModeChange(
-  mode: boolean | AcceptableValue | AcceptableValue[],
-) {
+function onFilterModeChange(mode: boolean | AcceptableValue | AcceptableValue[]) {
   if (mode === "stream" || mode === "agent") filterMode.value = mode;
 }
 
 function effectiveWindow() {
-  if (
-    dateState.value.valueType === "relative" &&
-    dateState.value.relativeTimePeriod
-  ) {
+  if (dateState.value.valueType === "relative" && dateState.value.relativeTimePeriod) {
     const r = getConsumableRelativeTime(dateState.value.relativeTimePeriod);
     if (r) return { startTime: r.startTime, endTime: r.endTime };
   }
@@ -382,11 +362,7 @@ async function loadAgents() {
   try {
     const org = store.state.selectedOrganization.identifier;
     const { startTime, endTime } = effectiveWindow();
-    const res = await genAiAgentMappingService.listAgents(
-      org,
-      startTime,
-      endTime,
-    );
+    const res = await genAiAgentMappingService.listAgents(org, startTime, endTime);
     agents.value = res.agents ?? [];
     // Reconcile the selection against the fresh list. Reloading (e.g. after a
     // time-range change) can return a different or empty set, which would

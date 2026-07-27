@@ -38,13 +38,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OCard
       v-for="metric in result.metrics"
       :key="metric.key"
-      class="rounded-surface! border border-border-default bg-surface-panel"
+      class="rounded-surface! border-border-default bg-surface-panel border"
       :data-test="`version-delta-strip-cell-${metric.key}`"
     >
       <OCardSection role="body" class="flex flex-col gap-1 p-3!">
-        <span class="text-xs text-text-secondary">{{ metricLabel(metric.key) }}</span>
+        <span class="text-text-secondary text-xs">{{ metricLabel(metric.key) }}</span>
 
-        <span class="text-sm text-text-body" :data-test="`version-delta-strip-values-${metric.key}`">
+        <span
+          class="text-text-body text-sm"
+          :data-test="`version-delta-strip-values-${metric.key}`"
+        >
           <span class="text-accent font-medium">{{ formatValue(metric.key, metric.a) }}</span>
           <span class="text-text-muted"> / </span>
           <span class="text-series-b font-medium">{{ formatValue(metric.key, metric.b) }}</span>
@@ -57,15 +60,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <template v-if="metric.ci">
             <OTooltip :content="tooltipText(metric)" side="top">
-              <span :data-test="`version-delta-strip-delta-value-${metric.key}`">{{ formatDelta(metric) }}</span>
+              <span :data-test="`version-delta-strip-delta-value-${metric.key}`">{{
+                formatDelta(metric)
+              }}</span>
             </OTooltip>
           </template>
           <template v-else>
-            <span :data-test="`version-delta-strip-delta-value-${metric.key}`">{{ formatDelta(metric) }}</span>
+            <span :data-test="`version-delta-strip-delta-value-${metric.key}`">{{
+              formatDelta(metric)
+            }}</span>
           </template>
           <span
             v-if="metric.verdict === 'insufficient'"
-            class="text-2xs font-normal text-text-muted"
+            class="text-2xs text-text-muted font-normal"
             :data-test="`version-delta-strip-indicative-${metric.key}`"
           >
             {{ t("aiObservability.deltaStrip.insufficientLabel") }}
@@ -81,7 +88,11 @@ import { useI18n } from "vue-i18n";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
-import type { CompareResult, MetricKey, MetricResult } from "@/plugins/traces/versionCompare/compareResult";
+import type {
+  CompareResult,
+  MetricKey,
+  MetricResult,
+} from "@/plugins/traces/versionCompare/compareResult";
 import { formatMicros } from "@/plugins/traces/versionCompare/formatDuration";
 
 const props = defineProps<{ result: CompareResult }>();
@@ -127,7 +138,8 @@ function tooltipText(metric: MetricResult): string {
   // Format the CI bounds in the metric's own unit: latency bounds are µs diffs
   // (humanize), cost bounds are dollars, everything else is a plain number.
   const fmtBound = (v: number): string => {
-    if (MS_KEYS.includes(metric.key)) return formatMicros(Math.abs(v)) + (v < 0 ? " faster" : " slower");
+    if (MS_KEYS.includes(metric.key))
+      return formatMicros(Math.abs(v)) + (v < 0 ? " faster" : " slower");
     if (COST_KEYS.includes(metric.key)) return `$${v.toFixed(4)}`;
     return v.toFixed(4);
   };
@@ -147,7 +159,8 @@ function tooltipText(metric: MetricResult): string {
 }
 
 function verdictWording(metric: MetricResult): string {
-  if (metric.verdict === "insufficient") return t("aiObservability.deltaStrip.tooltip.insufficient");
+  if (metric.verdict === "insufficient")
+    return t("aiObservability.deltaStrip.tooltip.insufficient");
   if (metric.verdict === "nochange") return "";
   if (metric.associative) {
     return metric.verdict === "higher"

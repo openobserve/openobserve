@@ -174,8 +174,7 @@ function mountDashboard(
         VersionOverlayChart: { template: '<div data-test="version-overlay-chart" />' },
         OButton: {
           props: ["disabled"],
-          template:
-            "<button :disabled=\"disabled\" @click=\"$emit('click')\"><slot /></button>",
+          template: '<button :disabled="disabled" @click="$emit(\'click\')"><slot /></button>',
           emits: ["click"],
         },
       },

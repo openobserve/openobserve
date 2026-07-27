@@ -9,8 +9,7 @@ import OAgentBadges from "./OAgentBadges.vue";
 const stubs = {
   ODimensionChip: {
     props: ["dimKey", "value"],
-    template:
-      '<span class="dim-chip" :data-key="dimKey">{{ dimKey }}:{{ value }}</span>',
+    template: '<span class="dim-chip" :data-key="dimKey">{{ dimKey }}:{{ value }}</span>',
   },
 };
 

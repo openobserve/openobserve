@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :options="envs"
         labelKey="label"
         valueKey="value"
-        class="w-full rounded-default"
+        class="rounded-default w-full"
         :data-test="`${prefix}-cascade-env`"
         @update:model-value="onEnvChange"
       />
@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :options="agentNames"
         labelKey="label"
         valueKey="value"
-        class="w-full rounded-default"
+        class="rounded-default w-full"
         :data-test="`${prefix}-cascade-agent`"
         @update:model-value="onAgentNameChange"
       />
@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :options="versions"
         labelKey="label"
         valueKey="value"
-        class="w-full rounded-default"
+        class="rounded-default w-full"
         :data-test="`${prefix}-cascade-version`"
         @update:model-value="onVersionChange"
       />
