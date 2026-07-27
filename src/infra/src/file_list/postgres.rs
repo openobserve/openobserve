@@ -2709,6 +2709,7 @@ async fn apply_autovacuum_tuning(pool: &sqlx::Pool<Postgres>) -> Result<()> {
 }
 
 const FILE_COLUMN_TARGET_WIDTH: i32 = 1024;
+const ACCOUNT_COLUMN_TARGET_WIDTH: i32 = 128;
 
 /// Return the declared max length of a VARCHAR column, if the column exists.
 async fn get_varchar_column_width(
@@ -2728,6 +2729,33 @@ async fn get_varchar_column_width(
     Ok(width)
 }
 
+/// Widen a VARCHAR column to `target_width` if it is currently narrower.
+async fn widen_varchar_column(
+    pool: &sqlx::Pool<Postgres>,
+    table: &str,
+    column: &str,
+    target_width: i32,
+) -> Result<()> {
+    match get_varchar_column_width(pool, table, column).await? {
+        Some(width) if width >= target_width => {
+            log::info!(
+                "[POSTGRES] Skipping {column} column widen for {table}: already VARCHAR({width})"
+            );
+            return Ok(());
+        }
+        _ => {}
+    }
+
+    let sql =
+        format!("ALTER TABLE IF EXISTS {table} ALTER COLUMN {column} TYPE VARCHAR({target_width})");
+    if let Err(e) = sqlx::query(&sql).execute(pool).await {
+        log::warn!("[POSTGRES] Failed to widen {column} column for {table}: {e}");
+    } else {
+        log::info!("[POSTGRES] Widened {column} column for {table} to VARCHAR({target_width})");
+    }
+    Ok(())
+}
+
 /// Apply column width compatibility for VARCHAR(file).
 async fn apply_column_width_compat(pool: &sqlx::Pool<Postgres>) -> Result<()> {
     let tables = [
@@ -2737,22 +2765,7 @@ async fn apply_column_width_compat(pool: &sqlx::Pool<Postgres>) -> Result<()> {
         "file_list_dump_stats",
     ];
     for table in &tables {
-        match get_varchar_column_width(pool, table, "file").await? {
-            Some(width) if width >= FILE_COLUMN_TARGET_WIDTH => {
-                log::info!(
-                    "[POSTGRES] Skipping file column widen for {table}: already VARCHAR({width})"
-                );
-                continue;
-            }
-            _ => {}
-        }
-
-        let sql = format!(
-            "ALTER TABLE IF EXISTS {table} ALTER COLUMN file TYPE VARCHAR({FILE_COLUMN_TARGET_WIDTH})"
-        );
-        if let Err(e) = sqlx::query(&sql).execute(pool).await {
-            log::warn!("[POSTGRES] Failed to widen file column for {table}: {e}");
-        }
+        widen_varchar_column(pool, table, "file", FILE_COLUMN_TARGET_WIDTH).await?;
     }
     Ok(())
 }
@@ -3024,15 +3037,9 @@ CREATE TABLE IF NOT EXISTS stream_stats
     }
 
     // after introducing org_storage, the account can have value of org_id:default,
-    // and we restrict org_id to 100 characters so here we change it to 256 from original 32
+    // and we restrict org_id to 100 characters so here we change it to 128 from original 32
     for table in &["file_list", "file_list_history", "file_list_deleted"] {
-        log::info!("[POSTGRES] updating account col to 128 for table {table}");
-        sqlx::query(&format!(
-            "ALTER TABLE {table} ALTER COLUMN account TYPE VARCHAR(128);"
-        ))
-        .execute(&pool)
-        .await?;
-        log::info!("[POSTGRES] successfully updated account col to 128 for table {table}");
+        widen_varchar_column(&pool, table, "account", ACCOUNT_COLUMN_TARGET_WIDTH).await?;
     }
 
     Ok(())
