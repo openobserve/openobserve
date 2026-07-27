@@ -121,10 +121,8 @@ impl PyWhatAdapter {
     /// Used for frontend-only caching flow
     pub async fn fetch_built_in_patterns(
         github_service: &crate::github::GitHubDataService,
+        url: &str,
     ) -> Result<Vec<BuiltInPatternResponse>, GitHubError> {
-        let config = config::get_config();
-        let url = &config.common.regex_patterns_source_url;
-
         log::info!("Fetching regex patterns from: {}", url);
 
         // Fetch raw data without caching

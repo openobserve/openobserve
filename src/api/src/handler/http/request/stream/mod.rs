@@ -25,6 +25,7 @@ use config::{
     meta::stream::{StreamType, TimeRange, UpdateStreamSettings},
     utils::schema::format_stream_name,
 };
+use enrichment_data::enrichment_table::cleanup_enrichment_table_resources;
 use hashbrown::HashMap;
 use infra::table::compactor_manual_jobs::{
     CompactorManualJob, CompactorManualJobResEntry, CompactorManualJobStatusRes,
@@ -420,6 +421,9 @@ pub async fn delete(
         &stream_name,
         stream_type,
         del_related_feature_resources,
+        |org_id, stream_name, stream_type| async move {
+            cleanup_enrichment_table_resources(&org_id, &stream_name, stream_type).await;
+        },
     )
     .await
     {
@@ -945,7 +949,7 @@ async fn get_super_cluster_delete_status(
     let mut errors = Vec::new();
 
     for cluster in clusters {
-        match openobserve_core::cluster_info::get_super_cluster_delete_job_status(
+        match openobserve_node::cluster_info::get_super_cluster_delete_job_status(
             &trace_id,
             cluster.clone(),
             id,

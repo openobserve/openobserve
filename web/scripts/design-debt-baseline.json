@@ -2,31 +2,10 @@
   "totals": {
     "rawVarInComponent": 539,
     "darkMechanism": 2,
-    "unscopedStyle": 1,
-    "stylePxUnit": 84
+    "stylePxUnit": 84,
+    "unscopedStyle": 1
   },
   "files": {
-    "components/CodeQueryEditor.vue": {
-      "rawVarInComponent": 2
-    },
-    "components/Header.vue": {
-      "rawVarInComponent": 2
-    },
-    "components/O2AIChat.vue": {
-      "rawVarInComponent": 50
-    },
-    "components/OrganizationSelector.vue": {
-      "rawVarInComponent": 2
-    },
-    "components/RichTextInput.vue": {
-      "rawVarInComponent": 18
-    },
-    "components/TenstackTable.vue": {
-      "rawVarInComponent": 3
-    },
-    "components/ThemeSwitcher.vue": {
-      "darkMechanism": 1
-    },
     "components/alerts/AddAlert.vue": {
       "rawVarInComponent": 1
     },
@@ -60,8 +39,8 @@
     "components/anomaly_detection/AnomalySummary.vue": {
       "rawVarInComponent": 7
     },
-    "components/dashboards/QueryInspector.vue": {
-      "rawVarInComponent": 4
+    "components/CodeQueryEditor.vue": {
+      "rawVarInComponent": 2
     },
     "components/dashboards/addPanel/DrilldownUserGuide.vue": {
       "rawVarInComponent": 2
@@ -69,7 +48,13 @@
     "components/dashboards/panels/TableRenderer.vue": {
       "rawVarInComponent": 8
     },
+    "components/dashboards/QueryInspector.vue": {
+      "rawVarInComponent": 4
+    },
     "components/functions/FunctionList.vue": {
+      "rawVarInComponent": 2
+    },
+    "components/Header.vue": {
       "rawVarInComponent": 2
     },
     "components/ingestion/ai/content/AIIntegrationCard.vue": {
@@ -81,20 +66,35 @@
     "components/logstream/schema.vue": {
       "rawVarInComponent": 2
     },
+    "components/O2AIChat.vue": {
+      "rawVarInComponent": 50
+    },
+    "components/OrganizationSelector.vue": {
+      "rawVarInComponent": 2
+    },
     "components/pipeline/PipelineView.vue": {
       "rawVarInComponent": 15
     },
-    "components/rum/PlayerTracesTab.vue": {
-      "rawVarInComponent": 1
+    "components/RichTextInput.vue": {
+      "rawVarInComponent": 18
     },
     "components/rum/errorTracking/view/ErrorEvents.vue": {
       "rawVarInComponent": 7
+    },
+    "components/rum/PlayerTracesTab.vue": {
+      "rawVarInComponent": 1
     },
     "components/settings/License.vue": {
       "rawVarInComponent": 4
     },
     "components/settings/Nodes.vue": {
       "rawVarInComponent": 6
+    },
+    "components/TenstackTable.vue": {
+      "rawVarInComponent": 3
+    },
+    "components/ThemeSwitcher.vue": {
+      "darkMechanism": 1
     },
     "enterprise/components/onlineEvals/forms/ScoreConfigDetail.vue": {
       "rawVarInComponent": 4
@@ -201,6 +201,9 @@
     "plugins/logs/IndexList.vue": {
       "rawVarInComponent": 1
     },
+    "plugins/logs/patterns/PatternList.vue": {
+      "rawVarInComponent": 6
+    },
     "plugins/logs/SearchBar.vue": {
       "rawVarInComponent": 1
     },
@@ -210,11 +213,11 @@
     "plugins/logs/TenstackTable.vue": {
       "rawVarInComponent": 5
     },
-    "plugins/logs/patterns/PatternList.vue": {
-      "rawVarInComponent": 6
-    },
     "plugins/pipelines/CustomNode.vue": {
       "rawVarInComponent": 10
+    },
+    "plugins/traces/components/TraceErrorTab.vue": {
+      "rawVarInComponent": 14
     },
     "plugins/traces/Index.vue": {
       "rawVarInComponent": 2
@@ -227,6 +230,9 @@
     },
     "plugins/traces/LLMInsightsSkeleton.vue": {
       "rawVarInComponent": 3
+    },
+    "plugins/traces/metrics/TracesAnalysisDashboard.vue": {
+      "rawVarInComponent": 1
     },
     "plugins/traces/SearchResult.vue": {
       "rawVarInComponent": 1
@@ -254,12 +260,6 @@
     },
     "plugins/traces/TraceTree.vue": {
       "rawVarInComponent": 2
-    },
-    "plugins/traces/components/TraceErrorTab.vue": {
-      "rawVarInComponent": 14
-    },
-    "plugins/traces/metrics/TracesAnalysisDashboard.vue": {
-      "rawVarInComponent": 1
     },
     "utils/logs/convertLogData.ts": {
       "darkMechanism": 1

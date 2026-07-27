@@ -19,22 +19,9 @@
           }}
         </span>
       </template>
-      <template #actions>
-        <OButton
-          variant="ghost"
-          size="icon-sm"
-          icon-left="close"
-          :aria-label="t('onlineEvals.buttons.cancel')"
-          :title="t('onlineEvals.buttons.cancel')"
-          data-test="job-form-close-btn"
-          :disabled="isSubmitting"
-          @click="$emit('cancel')"
-        />
-      </template>
-
-      <div class="flex min-h-0 flex-1 gap-2 overflow-hidden max-[68.75rem]:flex-col">
+      <div class="flex min-h-0 flex-1 gap-0 overflow-hidden max-[68.75rem]:flex-col">
         <div
-          class="flex min-h-0 min-w-0 flex-[6.5] flex-col gap-2 overflow-auto p-2 max-[68.75rem]:flex-[1_1_auto] [&_textarea]:max-h-[12.5rem] [&_textarea]:overflow-y-auto"
+          class="flex min-h-0 min-w-0 flex-[6.5] flex-col gap-2 overflow-auto p-2 max-[68.75rem]:flex-[1_1_auto] [&_textarea]:max-h-50 [&_textarea]:overflow-y-auto"
         >
           <!-- Details — job identity only. Kept separate from Evaluation Target
              so each heading actually describes its fields: naming the job and
@@ -44,7 +31,7 @@
             data-test="job-form-details-section"
           >
             <div class="border-border-default flex items-center border-b px-3 py-2.5">
-              <div class="rounded-default bg-theme-accent mr-2 h-4 w-[0.1875rem] shrink-0" />
+              <div class="rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">{{
                 t("onlineEvals.job.detailsSection")
               }}</span>
@@ -62,7 +49,7 @@
                 />
               </div>
 
-              <div class="[&_textarea]:max-h-[7.5rem]">
+              <div class="[&_textarea]:max-h-30">
                 <OFormTextarea
                   name="description"
                   :label="t('onlineEvals.job.descriptionLabel')"
@@ -81,7 +68,7 @@
             data-test="job-form-target-section"
           >
             <div class="border-border-default flex items-center border-b px-3 py-2.5">
-              <div class="rounded-default bg-theme-accent mr-2 h-4 w-[0.1875rem] shrink-0" />
+              <div class="rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">{{
                 t("onlineEvals.job.targetSection")
               }}</span>
@@ -122,7 +109,7 @@
             data-test="job-form-filtering-section"
           >
             <div class="border-border-default flex items-center border-b px-3 py-2.5">
-              <div class="rounded-default bg-theme-accent mr-2 h-4 w-[0.1875rem] shrink-0" />
+              <div class="rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">{{
                 t("onlineEvals.job.filteringSection")
               }}</span>
@@ -143,13 +130,13 @@
             data-test="job-form-sampling-section"
           >
             <div class="border-border-default flex items-center border-b px-3 py-2.5">
-              <div class="rounded-default bg-theme-accent mr-2 h-4 w-[0.1875rem] shrink-0" />
+              <div class="rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">{{
                 t("onlineEvals.job.stepper.sampling")
               }}</span>
             </div>
             <div class="flex flex-col gap-3 px-4 py-3.5">
-              <div class="grid grid-cols-2 gap-[0.875rem] max-[68.75rem]:grid-cols-1">
+              <div class="grid grid-cols-2 gap-3.5 max-[68.75rem]:grid-cols-1">
                 <div>
                   <OFormSelect
                     name="samplingMode"
@@ -186,7 +173,7 @@
             data-test="job-form-scorers-section"
           >
             <div class="border-border-default flex items-center border-b px-3 py-2.5">
-              <div class="rounded-default bg-theme-accent mr-2 h-4 w-[0.1875rem] shrink-0" />
+              <div class="rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">{{
                 t("onlineEvals.job.scorersSection")
               }}</span>
@@ -220,7 +207,7 @@
             data-test="job-form-completion-section"
           >
             <div class="border-border-default flex items-center border-b px-3 py-2.5">
-              <div class="rounded-default bg-theme-accent mr-2 h-4 w-[0.1875rem] shrink-0" />
+              <div class="rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">{{
                 t("onlineEvals.job.completionSection")
               }}</span>
@@ -229,7 +216,7 @@
               <div class="text-input-help-text text-xs leading-none">
                 {{ t(`onlineEvals.job.completionHelp.${formValues.targetScope}`) }}
               </div>
-              <div class="grid grid-cols-2 gap-[0.875rem] max-[68.75rem]:grid-cols-1">
+              <div class="grid grid-cols-2 gap-3.5 max-[68.75rem]:grid-cols-1">
                 <div>
                   <OFormInput
                     name="idleWindowSecs"

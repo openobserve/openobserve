@@ -135,9 +135,15 @@ describe("hasLLMPayload", () => {
     ).toBe(true);
   });
 
-  it('returns false for "[]" or "{}" (length ≤ 2 string)', () => {
+  it('returns false for empty "[]" or "{}" payloads', () => {
     expect(hasLLMPayload({ gen_ai_input_messages: "[]" })).toBe(false);
     expect(hasLLMPayload({ gen_ai_input_messages: "{}" })).toBe(false);
+  });
+
+  it("accepts scalar AnyValue payloads", () => {
+    expect(hasLLMPayload({ gen_ai_input_messages: "plain text" })).toBe(true);
+    expect(hasLLMPayload({ gen_ai_input_messages: 0 })).toBe(true);
+    expect(hasLLMPayload({ gen_ai_input_messages: false })).toBe(true);
   });
 
   // Object payloads — checks for any keys present.
@@ -453,11 +459,38 @@ describe("messagesFromInput", () => {
     expect(m2.role).toBe("assistant");
   });
 
+  it("promotes scalar AnyValue inputs to user messages", () => {
+    expect(messagesFromInput("plain text")).toEqual([
+      { role: "user", content: "plain text", sig: "user::plain text" },
+    ]);
+    expect(messagesFromInput(42)).toEqual([{ role: "user", content: "42", sig: "user::42" }]);
+    expect(messagesFromInput(false)).toEqual([
+      { role: "user", content: "false", sig: "user::false" },
+    ]);
+  });
+
+  it("decodes JSON-encoded scalar AnyValue inputs", () => {
+    expect(messagesFromInput('"encoded text"')).toEqual([
+      { role: "user", content: "encoded text", sig: "user::encoded text" },
+    ]);
+  });
+
+  it("renders unstructured object AnyValues instead of dropping them", () => {
+    expect(messagesFromInput({ prompt: "hello" })).toEqual([
+      {
+        role: "user",
+        content: '{"prompt":"hello"}',
+        sig: 'user::{"prompt":"hello"}',
+      },
+    ]);
+  });
+
   // Empty/null input → empty array.
-  it("returns [] for null / empty / unparseable input", () => {
+  it("returns [] for null / empty input", () => {
     expect(messagesFromInput(null)).toEqual([]);
     expect(messagesFromInput("")).toEqual([]);
-    expect(messagesFromInput("not json")).toEqual([]);
+    expect(messagesFromInput("[]")).toEqual([]);
+    expect(messagesFromInput("{}")).toEqual([]);
   });
 
   // Whitespace-only system_instruction is ignored — synthesising an empty
@@ -528,9 +561,36 @@ describe("messagesFromOutput", () => {
     expect(messagesFromOutput(json)).toEqual([]);
   });
 
-  it("returns [] for null / unparseable input", () => {
+  it("promotes scalar AnyValue outputs to assistant messages", () => {
+    expect(messagesFromOutput("plain response")).toEqual([
+      {
+        role: "assistant",
+        content: "plain response",
+        sig: "assistant::plain response",
+      },
+    ]);
+    expect(messagesFromOutput(0)).toEqual([
+      { role: "assistant", content: "0", sig: "assistant::0" },
+    ]);
+    expect(messagesFromOutput(true)).toEqual([
+      { role: "assistant", content: "true", sig: "assistant::true" },
+    ]);
+  });
+
+  it("renders unstructured object AnyValue outputs instead of dropping them", () => {
+    expect(messagesFromOutput({ answer: "hello" })).toEqual([
+      {
+        role: "assistant",
+        content: '{"answer":"hello"}',
+        sig: 'assistant::{"answer":"hello"}',
+      },
+    ]);
+  });
+
+  it("returns [] for null input", () => {
     expect(messagesFromOutput(null)).toEqual([]);
-    expect(messagesFromOutput("not json")).toEqual([]);
+    expect(messagesFromOutput("[]")).toEqual([]);
+    expect(messagesFromOutput("{}")).toEqual([]);
   });
 });
 

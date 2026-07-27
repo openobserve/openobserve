@@ -165,6 +165,24 @@ vi.mock("@/composables/synthetics/syntheticResultsSchema", () => {
   };
 });
 
+vi.mock("vuex", () => ({
+  useStore: () => ({
+    state: {
+      selectedOrganization: { identifier: "test-org" },
+    },
+  }),
+}));
+
+vi.mock("vue-router", () => ({
+  useRoute: () => ({
+    query: {},
+  }),
+  useRouter: () => ({
+    push: vi.fn(),
+    replace: vi.fn(),
+  }),
+}));
+
 import MonitorRuns from "./MonitorRuns.vue";
 
 // ── Stubs for every child component ─────────────────────────────────────
@@ -207,6 +225,10 @@ const baseStubs = {
   OTimeCell: {
     template: "<span />",
     props: ["value", "unit", "mode", "emptyLabel"],
+  },
+  OTooltip: {
+    template: "<span><slot /></span>",
+    props: ["content", "class"],
   },
   OBadge: {
     template: "<span :data-test=\"$attrs['data-test']\"><slot /></span>",
@@ -262,6 +284,7 @@ const baseStubs = {
     inheritAttrs: true,
   },
   MonitorStatusTimeline: {
+    name: "MonitorStatusTimeline",
     template: '<div data-test="monitor-status-timeline" />',
     props: [
       "segments",
@@ -291,7 +314,12 @@ const baseStubs = {
 // But the simplest way is to just show all content.
 
 function mountRuns(
-  props: { monitorId: string; monitorName: string; monitorStatus?: string } = {
+  props: {
+    monitorId: string;
+    monitorName: string;
+    monitorStatus?: string;
+    checkType?: string;
+  } = {
     monitorId: "mon-1",
     monitorName: "Test Monitor",
   },
@@ -380,6 +408,174 @@ describe("MonitorRuns", () => {
       wrapper = mountRuns();
       wrapper.vm.$emit("refresh");
       expect(wrapper.emitted("refresh")).toBeTruthy();
+    });
+  });
+
+  describe("breakdown cards visibility", () => {
+    it("should render device breakdown card when checkType is browser", () => {
+      wrapper = mountRuns({
+        monitorId: "mon-1",
+        monitorName: "Test Monitor",
+        checkType: "browser",
+      });
+      expect(wrapper.text()).toContain("synthetics.runs.passRateByDevice");
+    });
+
+    it("should not render device breakdown card when checkType is not browser", () => {
+      wrapper = mountRuns({
+        monitorId: "mon-1",
+        monitorName: "Test Monitor",
+        checkType: "http",
+      });
+      expect(wrapper.text()).not.toContain("synthetics.runs.passRateByDevice");
+    });
+
+    it("should render protocol duration by location card when checkType is not browser", () => {
+      wrapper = mountRuns({
+        monitorId: "mon-1",
+        monitorName: "Test Monitor",
+        checkType: "http",
+      });
+      expect(wrapper.text()).toContain("synthetics.runs.durationByLocation");
+    });
+
+    it("should not render protocol duration by location card when checkType is browser", () => {
+      wrapper = mountRuns({
+        monitorId: "mon-1",
+        monitorName: "Test Monitor",
+        checkType: "browser",
+      });
+      expect(wrapper.text()).not.toContain("synthetics.runs.durationByLocation");
+    });
+
+    it("should render browser and device filters when checkType is browser", () => {
+      wrapper = mountRuns({
+        monitorId: "mon-1",
+        monitorName: "Test Monitor",
+        checkType: "browser",
+      });
+      expect(wrapper.find('[data-test="monitor-runs-filter-browser"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="monitor-runs-filter-device"]').exists()).toBe(true);
+    });
+
+    it("should not render browser and device filters when checkType is not browser", () => {
+      wrapper = mountRuns({
+        monitorId: "mon-1",
+        monitorName: "Test Monitor",
+        checkType: "http",
+      });
+      expect(wrapper.find('[data-test="monitor-runs-filter-browser"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="monitor-runs-filter-device"]').exists()).toBe(false);
+    });
+  });
+
+  describe("steps tab visibility", () => {
+    it("should render steps tab when checkType is browser", () => {
+      wrapper = mountRuns({
+        monitorId: "mon-1",
+        monitorName: "Test Monitor",
+        checkType: "browser",
+      });
+      expect(wrapper.find('[data-test="monitor-runs-tab-steps"]').exists()).toBe(true);
+    });
+
+    it("should not render steps tab when checkType is not browser", () => {
+      wrapper = mountRuns({
+        monitorId: "mon-1",
+        monitorName: "Test Monitor",
+        checkType: "http",
+      });
+      expect(wrapper.find('[data-test="monitor-runs-tab-steps"]').exists()).toBe(false);
+    });
+  });
+
+  describe("location label resolution", () => {
+    it("should resolve location labels in locationDurationBreakdown when locations are loaded", async () => {
+      mockSyntheticsServiceGetLocations.mockResolvedValue({
+        data: {
+          locations: [
+            { id: "us-east-1", label: "US East", region: "N. Virginia" },
+            { id: "eu-west-1", label: "EU West", region: "Ireland" },
+            { id: "ap-south-1", label: "AP South", region: "Mumbai" },
+          ],
+        },
+      });
+
+      wrapper = mountRuns({
+        monitorId: "mon-1",
+        monitorName: "Test Monitor",
+        checkType: "http",
+      });
+      await flushPromises();
+
+      // locationDisplayLabel produces "Name (region)" — check that the DOM
+      // contains resolved labels rather than raw IDs like "us-east-1"
+      // Mock data has runs only from us-east-1 and eu-west-1
+      const text = wrapper.text();
+      expect(text).toContain("US East (N. Virginia)");
+      expect(text).toContain("EU West (Ireland)");
+    });
+
+    it("should resolve location labels in pass rate by location breakdown", async () => {
+      mockSyntheticsServiceGetLocations.mockResolvedValue({
+        data: {
+          locations: [
+            { id: "us-east-1", label: "US East", region: "N. Virginia" },
+            { id: "eu-west-1", label: "EU West", region: "Ireland" },
+          ],
+        },
+      });
+
+      wrapper = mountRuns({
+        monitorId: "mon-1",
+        monitorName: "Test Monitor",
+        checkType: "browser",
+      });
+      await flushPromises();
+
+      const text = wrapper.text();
+      expect(text).toContain("US East (N. Virginia)");
+      expect(text).toContain("EU West (Ireland)");
+    });
+
+    it("should resolve location labels in timeline segments when locations are loaded", async () => {
+      mockSyntheticsServiceGetLocations.mockResolvedValue({
+        data: {
+          locations: [
+            { id: "us-east-1", label: "US East", region: "N. Virginia" },
+            { id: "eu-west-1", label: "EU West", region: "Ireland" },
+          ],
+        },
+      });
+
+      wrapper = mountRuns({
+        monitorId: "mon-1",
+        monitorName: "Test Monitor",
+        checkType: "browser",
+      });
+      await flushPromises();
+
+      const timeline = wrapper.findComponent({ name: "MonitorStatusTimeline" });
+      expect(timeline.exists()).toBe(true);
+
+      const segments = timeline.props("segments") as any[];
+      expect(segments.length).toBeGreaterThan(0);
+
+      // Collect all execution locations from timeline segments
+      const allLocations = new Set<string>();
+      for (const seg of segments) {
+        for (const exec of seg.executions) {
+          allLocations.add(exec.location as string);
+        }
+      }
+
+      // Should contain only resolved display labels, not raw IDs
+      expect(allLocations.has("US East (N. Virginia)")).toBe(true);
+      expect(allLocations.has("EU West (Ireland)")).toBe(true);
+
+      // Should NOT contain raw IDs (locationLabel resolves them)
+      expect(allLocations.has("us-east-1")).toBe(false);
+      expect(allLocations.has("eu-west-1")).toBe(false);
     });
   });
 });

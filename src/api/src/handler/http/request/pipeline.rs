@@ -632,7 +632,7 @@ pub async fn enable_pipeline_bulk(
 #[cfg(test)]
 mod tests {
     use axum::{http::StatusCode, response::Response};
-    use openobserve_core::pipeline::store::PipelineError;
+    use openobserve_core::pipeline::db::PipelineError;
 
     fn status(err: PipelineError) -> StatusCode {
         Response::from(err).status()

@@ -46,6 +46,9 @@ fn folder_error_response(value: FolderError) -> Response {
         FolderError::DeleteWithReports => MetaHttpResponse::bad_request(
             "Folder contains reports, please move/delete reports from folder",
         ),
+        FolderError::DeleteWithSynthetics => MetaHttpResponse::bad_request(
+            "Folder contains synthetics, please move/delete synthetics from folder",
+        ),
         FolderError::NotFound => MetaHttpResponse::not_found("Folder not found"),
         FolderError::PermittedFoldersMissingUser => MetaHttpResponse::forbidden(""),
         FolderError::PermittedFoldersValidator(err) => MetaHttpResponse::forbidden(err),
@@ -578,6 +581,7 @@ mod tests {
             (FolderError::DeleteWithDashboards, 400),
             (FolderError::DeleteWithAlerts, 400),
             (FolderError::DeleteWithReports, 400),
+            (FolderError::DeleteWithSynthetics, 400),
             (FolderError::PermittedFoldersMissingUser, 403),
             (
                 FolderError::PermittedFoldersValidator("test".to_string()),

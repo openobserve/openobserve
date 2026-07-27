@@ -372,7 +372,7 @@ pub async fn update_function(
     if let Ok(associated_pipelines) = infra::pipeline::list_by_org(org_id).await {
         for pipeline in associated_pipelines {
             if pipeline.contains_function(&func.name)
-                && let Err(e) = crate::pipeline::store::update(&pipeline, None).await
+                && let Err(e) = crate::pipeline::db::update(&pipeline, None).await
             {
                 return Ok((
                     http::StatusCode::INTERNAL_SERVER_ERROR,

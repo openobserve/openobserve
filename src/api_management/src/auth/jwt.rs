@@ -826,7 +826,7 @@ async fn publish_org_not_found_error(org_id: &str, user_email: &str) {
         }),
     };
 
-    openobserve_core::self_reporting::publish_error(error_data).await;
+    usage_reporting::publish_error(error_data).await;
 }
 
 #[cfg(feature = "cloud")]
@@ -1157,7 +1157,7 @@ async fn process_custom_claim_parsing(
                     }),
                 };
 
-                openobserve_core::self_reporting::publish_error(error_data).await;
+                usage_reporting::publish_error(error_data).await;
             }) as std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send>>
         };
 

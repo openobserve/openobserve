@@ -1,10 +1,8 @@
 <template>
   <aside
-    class="eval-form-page__side eval-form-page__side--test max-[60rem]:border-border-default p-0 max-[60rem]:border-t max-[60rem]:border-l-0"
+    class="eval-form-page__side eval-form-page__side--test border-border-default max-[68.75rem]:border-border-default border-l p-0 max-[68.75rem]:border-t max-[68.75rem]:border-l-0"
   >
-    <section
-      class="eval-test-panel bg-surface-base rounded-default min-h-full p-5 shadow-[0_0_0.313rem_0.063rem_var(--color-hover-shadow)]"
-    >
+    <section class="eval-test-panel min-h-full p-5">
       <!-- Header -->
       <div class="flex flex-col gap-1">
         <h3 class="text-text-heading m-0 text-sm font-bold">
@@ -71,10 +69,8 @@
         v-if="state !== 'idle'"
         class="border-border-default rounded-default bg-surface-base text-text-secondary mt-4 flex flex-col gap-2 border p-3 text-xs"
         :class="{
-          'border-[color-mix(in_srgb,var(--color-status-success-text)_35%,var(--color-border-default))]':
-            state === 'success',
-          'text-status-error-text border-[color-mix(in_srgb,var(--color-status-error-text)_35%,var(--color-border-default))]':
-            state === 'error',
+          'border-status-success-text': state === 'success',
+          'border-status-error-text text-status-error-text': state === 'error',
         }"
         data-test="scorer-test-result"
       >

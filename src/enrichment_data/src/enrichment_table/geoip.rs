@@ -30,12 +30,26 @@ use maxminddb::{
     geoip2::{City, ConnectionType, Isp},
 };
 use serde::{Deserialize, Serialize};
-use tokio::sync::Notify;
+use tokio::sync::watch;
 use vector_enrichment::{Case, Condition, IndexHandle, Table};
 use vrl::value::{ObjectMap, Value};
 
-/// Signals that the initial MaxMind database download and client setup finished.
-pub static MMDB_INIT_NOTIFIER: LazyLock<Arc<Notify>> = LazyLock::new(|| Arc::new(Notify::new()));
+/// Tracks whether the initial MaxMind database download and client setup finished.
+static MMDB_INITIALIZED: LazyLock<watch::Sender<bool>> = LazyLock::new(|| watch::channel(false).0);
+
+/// Waits until the initial MaxMind database download and client setup finishes.
+pub async fn wait_for_initialization() {
+    let mut initialized = LazyLock::force(&MMDB_INITIALIZED).subscribe();
+    initialized
+        .wait_for(|initialized| *initialized)
+        .await
+        .expect("MMDB initialization channel must remain open");
+}
+
+/// Marks the initial MaxMind database setup as finished and notifies all waiters.
+pub fn notify_initialized() {
+    LazyLock::force(&MMDB_INITIALIZED).send_replace(true);
+}
 
 // MaxMind GeoIP database files have a type field we can use to recognize
 // specific products. If we encounter one of these two types, we look for
@@ -428,6 +442,24 @@ impl std::fmt::Debug for Geoip {
 mod tests {
 
     use super::*;
+
+    #[tokio::test]
+    async fn test_mmdb_initialization_notification_is_durable() {
+        notify_initialized();
+
+        tokio::time::timeout(
+            std::time::Duration::from_millis(100),
+            wait_for_initialization(),
+        )
+        .await
+        .expect("first waiter should observe initialized state");
+        tokio::time::timeout(
+            std::time::Duration::from_millis(100),
+            wait_for_initialization(),
+        )
+        .await
+        .expect("future waiters should observe initialized state");
+    }
 
     #[test]
     fn test_database_kind_from_str() {

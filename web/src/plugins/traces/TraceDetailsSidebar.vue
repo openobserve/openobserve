@@ -510,7 +510,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <!-- JSON View -->
           <div v-if="attributesViewMode === 'json'" class="grow overflow-auto">
-            <json-preview
+            <JsonPreview
               :value="attributesForDisplay"
               :highlight-query="searchQuery"
               data-test="trace-details-sidebar-attributes-table"
@@ -541,7 +541,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </li>
                 </ul>
               </template>
-            </json-preview>
+            </JsonPreview>
           </div>
           <!-- Table View -->
           <div
@@ -630,7 +630,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 table-id="trace-details-events"
               >
                 <template #expansion="{ row }">
-                  <json-preview
+                  <JsonPreview
                     :value="row"
                     class="py-1.5 pl-1.5"
                     copyButtonClass="left-1! w-fit! sticky!"

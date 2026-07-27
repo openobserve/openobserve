@@ -29,7 +29,7 @@ use axum::{
 use bytes::BytesMut;
 use chrono::{Duration, Utc};
 use config::{
-    DISTINCT_FIELDS, TIMESTAMP_COL_NAME, get_config,
+    DISTINCT_FIELDS, O2_INGEST_TS_COL_NAME, TIMESTAMP_COL_NAME, get_config,
     meta::{
         alerts::alert::Alert,
         gen_ai::GenAiAgentMappingConfig,
@@ -109,7 +109,6 @@ const SPAN_ID_BYTES_COUNT: usize = 8;
 const TRACE_ID_BYTES_COUNT: usize = 16;
 const ATTR_STATUS_CODE: &str = "status_code";
 const ATTR_STATUS_MESSAGE: &str = "status_message";
-const O2_INGEST_TS_COL_NAME: &str = "_o2_ingest_ts";
 
 // Gen-AI semantic-convention column names produced by the OTEL processor after
 // dot→underscore flattening. Must stay in sync with GEN_AI_SCHEMA_FIELDS in

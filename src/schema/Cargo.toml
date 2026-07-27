@@ -15,15 +15,16 @@ enterprise = ["config/enterprise", "db/enterprise"]
 [dependencies]
 anyhow.workspace = true
 arrow-schema.workspace = true
+async-trait.workspace = true
 common.workspace = true
 config.workspace = true
 dashmap.workspace = true
 db.workspace = true
 hashbrown.workspace = true
 infra.workspace = true
+ingester.workspace = true
+itertools.workspace = true
 log.workspace = true
 ingestion-common.workspace = true
 serde_json.workspace = true
-
-[dev-dependencies]
 tokio.workspace = true

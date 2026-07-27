@@ -129,6 +129,12 @@ function isRowDraggable(row: any): boolean {
   return true;
 }
 
+// Keeps the `as` cast out of the template, where `|` in a type union parses as a
+// (deprecated) Vue filter.
+function getVirtualRowKey(virtualRow: { key: number | string | bigint }): string | number {
+  return virtualRow.key as string | number;
+}
+
 const isVirtual = () => !!(props.virtualRows && props.virtualRows.length > 0);
 
 function getRowForIndex(index: number) {
@@ -262,7 +268,7 @@ function getRowForItem(item: any): Row<any> {
 
     <OTableBodyRow
       v-for="virtualRow in virtualRows"
-      :key="virtualRow.key as string | number"
+      :key="getVirtualRowKey(virtualRow)"
       :row="getRowForIndex(virtualRow.index)"
       :measure-el="measureElement"
       :measure-row-element="measureRowElement"

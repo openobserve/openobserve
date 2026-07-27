@@ -46,7 +46,7 @@ export function buildDynamicGrid(
   const grid: any = {
     left: "3%",
     right: "4%",
-    top: "3%",
+    top: 16,
     bottom: "3%",
     containLabel: true,
   };

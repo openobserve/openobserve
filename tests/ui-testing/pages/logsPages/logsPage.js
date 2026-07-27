@@ -10597,31 +10597,57 @@ export class LogsPage {
     }
 
     /**
+     * Locate the results scroll container in the browser context and return it.
+     * Shared by getScrollContainerPosition()/scrollToResultsBottom() so both
+     * always act on the same element.
+     *
+     * The results table (`[data-test="logs-search-result-logs-table"]`) does not
+     * own the scrollbar itself — it delegates scrolling to an ancestor pane that
+     * it shares with the pinned histogram. So walk UP from the table to the
+     * nearest ancestor with a scrollable computed overflow-y, matched by computed
+     * style so class renames (or another move of the scroller) don't break it.
+     *
+     * Falls back to the older pagination sibling-walk for the patterns view,
+     * where the whole `scrollContainerRef` pane still scrolls as one.
+     * @returns {string} evaluate-able IIFE body returning the container element.
+     */
+    static _scrollContainerFinder() {
+        return `(() => {
+            const isScrollable = (el) => /(auto|scroll)/.test(getComputedStyle(el).overflowY);
+            // Logs view: the results table owns the scrollbar.
+            const table = document.querySelector('[data-test="logs-search-result-logs-table"]');
+            if (table) {
+                let el = table.parentElement;
+                while (el && el !== document.body) {
+                    if (isScrollable(el)) return el;
+                    el = el.parentElement;
+                }
+            }
+            // Patterns view / fallback: scrollable sibling below the pagination header.
+            const pagination = document.querySelector('[data-test="logs-search-result-pagination"]');
+            if (pagination) {
+                let el = pagination.parentElement;
+                while (el && el !== document.body) {
+                    const container = Array.from(el.children).find(
+                        (child) => !child.contains(pagination) && isScrollable(child)
+                    );
+                    if (container) return container;
+                    el = el.parentElement;
+                }
+            }
+            return null;
+        })()`;
+    }
+
+    /**
      * Get the scroll position (scrollTop) of the main results scroll container.
      * Call waitForResultsLoaded() first to ensure the container exists.
-     * Post design-token migration (#13173) the `.search-list` wrapper is gone:
-     * the scroller is the combined scroll area (`ref="scrollContainerRef"` in
-     * logs/SearchResult.vue), a scrollable sibling below the pagination header.
-     * Walk up from the pagination until an ancestor has a scrollable child
-     * that is not the header itself (matched by computed overflow-y, so class
-     * renames don't break it).
      * @returns {Promise<number>}
      */
     async getScrollContainerPosition() {
-        return await this.page.evaluate(() => {
-            const pagination = document.querySelector('[data-test="logs-search-result-pagination"]');
-            if (!pagination) return -1;
-            let el = pagination.parentElement;
-            while (el && el !== document.body) {
-                const container = Array.from(el.children).find(
-                    (child) => !child.contains(pagination) &&
-                        /(auto|scroll)/.test(getComputedStyle(child).overflowY)
-                );
-                if (container) return container.scrollTop;
-                el = el.parentElement;
-            }
-            return -1;
-        });
+        return await this.page.evaluate(
+            `(() => { const c = ${LogsPage._scrollContainerFinder()}; return c ? c.scrollTop : -1; })()`
+        );
     }
 
     /**
@@ -10630,22 +10656,9 @@ export class LogsPage {
      * Uses the same container discovery as getScrollContainerPosition().
      */
     async scrollToResultsBottom() {
-        await this.page.evaluate(() => {
-            const pagination = document.querySelector('[data-test="logs-search-result-pagination"]');
-            if (!pagination) return;
-            let el = pagination.parentElement;
-            while (el && el !== document.body) {
-                const container = Array.from(el.children).find(
-                    (child) => !child.contains(pagination) &&
-                        /(auto|scroll)/.test(getComputedStyle(child).overflowY)
-                );
-                if (container) {
-                    container.scrollTop = container.scrollHeight;
-                    return;
-                }
-                el = el.parentElement;
-            }
-        });
+        await this.page.evaluate(
+            `(() => { const c = ${LogsPage._scrollContainerFinder()}; if (c) c.scrollTop = c.scrollHeight; })()`
+        );
         await this.page.waitForTimeout(500);
     }
 

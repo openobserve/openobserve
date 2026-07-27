@@ -25,7 +25,7 @@ use crate::{
     alerts::alert::AlertError,
     common::meta::http::{ERROR_HEADER, HttpResponse as MetaHttpResponse},
     dashboards::{DashboardError, reports::ReportError},
-    pipeline::store::PipelineError,
+    pipeline::db::PipelineError,
 };
 #[cfg(feature = "enterprise")]
 use crate::{
@@ -226,6 +226,10 @@ impl From<EvalJobError> for Response {
             EvalJobError::NotFound => MetaHttpResponse::not_found(value),
             EvalJobError::ReconcilerError(err) => {
                 log::error!("[EvalJob] reconciler error: {err}");
+                MetaHttpResponse::internal_error("Internal server error")
+            }
+            EvalJobError::TaskPublish(err) => {
+                log::error!("[EvalJob] task publish error: {err}");
                 MetaHttpResponse::internal_error("Internal server error")
             }
             EvalJobError::InvalidStatus(_)
