@@ -194,6 +194,7 @@ pub fn watermark_is_stale(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::meta::slo::{SLICE_60_SECS, SLICE_300_SECS};
 
     const MIN: i64 = 60;
     const FIVE_MIN: i64 = 300;
@@ -421,6 +422,70 @@ mod tests {
         };
         assert_eq!(r.slice_count(FIVE_MIN), 0);
         assert!(r.slice_starts(FIVE_MIN).is_empty());
+    }
+
+    // ---- agreement with the engine's bucketing -----------------------------
+
+    /// `histogram()` is rewritten to `date_bin(interval, source, origin)` with
+    /// **origin = 2001-01-01T00:00:00Z**, not the Unix epoch
+    /// (`rewrite_histogram.rs:250`). `align_down` aligns to the epoch. The two
+    /// therefore agree only when the origin is itself a whole number of
+    /// intervals from the epoch.
+    ///
+    /// It is — for the intervals we allow. 2001-01-01 is 978,307,200 s after
+    /// the epoch, which 60 and 300 both divide exactly. But that is a
+    /// coincidence of the constant, not a property of the design: a 7-minute
+    /// interval (420 s) leaves a remainder of 360 and the two bucketings drift
+    /// apart by a minute, which would silently misalign every slice against
+    /// the coverage grid.
+    ///
+    /// So this is pinned rather than assumed. If a new slice interval is ever
+    /// added, this test is what says whether the engine agrees with us.
+    #[test]
+    fn every_legal_slice_interval_agrees_with_the_histogram_origin() {
+        /// 2001-01-01T00:00:00Z, from `rewrite_histogram.rs`.
+        const DATE_BIN_ORIGIN_SECS: i64 = 978_307_200;
+
+        for slice in [SLICE_60_SECS, SLICE_300_SECS] {
+            assert_eq!(
+                DATE_BIN_ORIGIN_SECS % slice,
+                0,
+                "slice interval {slice}s does not divide the date_bin origin, so \
+                 histogram() buckets would not line up with align_down"
+            );
+        }
+    }
+
+    /// The same statement as a behavioural check: for a legal interval, our
+    /// bucket and the engine's are the same number.
+    #[test]
+    fn align_down_matches_date_bin_for_legal_intervals() {
+        const ORIGIN: i64 = 978_307_200;
+        let date_bin = |ts: i64, slice: i64| ORIGIN + (ts - ORIGIN).div_euclid(slice) * slice;
+
+        for slice in [SLICE_60_SECS, SLICE_300_SECS] {
+            for ts in [0, 1_000_000_000, 1_753_000_000, 2_000_000_123] {
+                assert_eq!(
+                    align_down(ts, slice),
+                    date_bin(ts, slice),
+                    "align_down and date_bin disagree at ts={ts}, slice={slice}"
+                );
+            }
+        }
+    }
+
+    /// The negative case, so the test above cannot pass vacuously: an interval
+    /// that does NOT divide the origin really does drift.
+    #[test]
+    fn an_interval_that_does_not_divide_the_origin_would_drift() {
+        const ORIGIN: i64 = 978_307_200;
+        let slice = 420; // 7 minutes — not a legal SLO slice, deliberately
+        let date_bin = ORIGIN + (1_000_000_000 - ORIGIN).div_euclid(slice) * slice;
+        assert_ne!(
+            align_down(1_000_000_000, slice),
+            date_bin,
+            "if these ever agree, the guard above has stopped meaning anything"
+        );
     }
 
     // ---- expected slices (the coverage denominator) ------------------------
