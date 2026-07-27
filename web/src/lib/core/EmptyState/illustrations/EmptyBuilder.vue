@@ -19,8 +19,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   dashboard dominates the frame while a SMALL person stands at the corner,
   presenting, as widgets fly in to fill an empty slot. Scale contrast + corner
   placement make this read very differently from a centred figure. Micro-anim:
-  tiles fly into the pulsing slot; the presenter's arm gestures. CSS motion gated
-  by `animated` + prefers-reduced-motion.
+  tiles fly into the pulsing slot; the presenter's arm gestures. Pure SMIL motion
+  gated behind `animated` (prefers-reduced-motion; OEmptyState wires this up
+  automatically).
 -->
 <template>
   <svg
@@ -30,7 +31,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     xmlns="http://www.w3.org/2000/svg"
     role="img"
     aria-label="Create your first item"
-    :class="['es-root', { 'es-static': !animated }]"
   >
     <!-- faint dotted field behind the board -->
     <g fill="var(--color-border-default)" opacity="0.45">
@@ -89,8 +89,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
     <circle cx="204" cy="96" r="3" fill="var(--color-primary-600)" />
 
-    <!-- empty slot (pulses, awaiting the flying tiles) -->
-    <g class="es-slot">
+    <!-- empty slot (pulses in place); scale about centre (145,173), the paired translate keeps it centred -->
+    <g>
+      <animateTransform
+        v-if="animated"
+        attributeName="transform"
+        type="translate"
+        values="0 0; -4.35 -5.19; 0 0"
+        keyTimes="0;0.5;1"
+        dur="2.8s"
+        additive="sum"
+        repeatCount="indefinite"
+        calcMode="spline"
+        keySplines="0.42 0 0.58 1; 0.42 0 0.58 1"
+      />
+      <animateTransform
+        v-if="animated"
+        attributeName="transform"
+        type="scale"
+        values="1; 1.03; 1"
+        keyTimes="0;0.5;1"
+        dur="2.8s"
+        additive="sum"
+        repeatCount="indefinite"
+        calcMode="spline"
+        keySplines="0.42 0 0.58 1; 0.42 0 0.58 1"
+      />
+      <animate
+        v-if="animated"
+        attributeName="opacity"
+        values="0.6;1;0.6"
+        keyTimes="0;0.5;1"
+        dur="2.8s"
+        repeatCount="indefinite"
+        calcMode="spline"
+        keySplines="0.42 0 0.58 1; 0.42 0 0.58 1"
+      />
       <rect
         x="46"
         y="148"
@@ -122,8 +156,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </g>
 
-    <!-- tiles flying in toward the slot -->
-    <g class="es-fly es-fly-a">
+    <!-- tiles flying in toward the slot (parked at far right when frozen) -->
+    <g>
+      <animateTransform
+        v-if="animated"
+        attributeName="transform"
+        type="translate"
+        values="0 0; -150 12; -160 14; -160 14"
+        keyTimes="0;0.6;0.72;1"
+        dur="3.4s"
+        repeatCount="indefinite"
+        calcMode="spline"
+        keySplines="0.42 0 0.58 1; 0.42 0 0.58 1; 0.42 0 0.58 1"
+      />
+      <animate
+        v-if="animated"
+        attributeName="opacity"
+        values="0;1;1;0;0"
+        keyTimes="0;0.15;0.6;0.72;1"
+        dur="3.4s"
+        repeatCount="indefinite"
+        calcMode="spline"
+        keySplines="0.42 0 0.58 1; 0.42 0 0.58 1; 0.42 0 0.58 1; 0.42 0 0.58 1"
+      />
       <rect
         x="300"
         y="160"
@@ -138,7 +193,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <rect x="313" y="170" width="5" height="10" rx="1.5" fill="var(--color-primary-500)" />
       <rect x="320" y="166" width="5" height="14" rx="1.5" fill="var(--color-primary-600)" />
     </g>
-    <g class="es-fly es-fly-b">
+    <g>
+      <animateTransform
+        v-if="animated"
+        attributeName="transform"
+        type="translate"
+        values="0 0; -176 42; -186 46; -186 46"
+        keyTimes="0;0.6;0.72;1"
+        dur="3.4s"
+        begin="-1.7s"
+        repeatCount="indefinite"
+        calcMode="spline"
+        keySplines="0.42 0 0.58 1; 0.42 0 0.58 1; 0.42 0 0.58 1"
+      />
+      <animate
+        v-if="animated"
+        attributeName="opacity"
+        values="0;1;1;0;0"
+        keyTimes="0;0.15;0.6;0.72;1"
+        dur="3.4s"
+        begin="-1.7s"
+        repeatCount="indefinite"
+        calcMode="spline"
+        keySplines="0.42 0 0.58 1; 0.42 0 0.58 1; 0.42 0 0.58 1; 0.42 0 0.58 1"
+      />
       <rect
         x="312"
         y="120"
@@ -190,16 +268,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         fill="var(--color-primary-600)"
         opacity="0.85"
       />
-      <!-- presenting arm (gestures toward the board) -->
-      <g class="es-present">
+      <!-- presenting arm (gestures toward the board); pivots at (293,207) -->
+      <g>
+        <animateTransform
+          v-if="animated"
+          attributeName="transform"
+          type="rotate"
+          values="0 293 207; -7 293 207; 0 293 207"
+          keyTimes="0;0.5;1"
+          dur="2.8s"
+          repeatCount="indefinite"
+          calcMode="spline"
+          keySplines="0.42 0 0.58 1; 0.42 0 0.58 1"
+        />
         <path
           d="M292 207 Q282 203 276 194 Q274 190 278 189 Q282 188 284 192 Q289 200 298 202 Z"
           fill="var(--color-primary-500)"
         />
         <ellipse cx="278" cy="191" rx="4" ry="3.5" fill="var(--color-illustration-sand)" />
       </g>
-      <!-- head facing the board -->
-      <g class="es-head">
+      <!-- head facing the board; tilts about (303,191) -->
+      <g>
+        <animateTransform
+          v-if="animated"
+          attributeName="transform"
+          type="rotate"
+          values="-1.5 303 191; 1 303 191; -1.5 303 191"
+          keyTimes="0;0.5;1"
+          dur="4s"
+          repeatCount="indefinite"
+          calcMode="spline"
+          keySplines="0.42 0 0.58 1; 0.42 0 0.58 1"
+        />
         <rect x="299" y="190" width="8" height="9" rx="3" fill="var(--color-illustration-tan)" />
         <ellipse cx="302" cy="180" rx="11" ry="12" fill="var(--color-illustration-sand)" />
         <circle cx="296" cy="181" r="2.2" fill="var(--color-illustration-tan)" />
@@ -223,114 +323,3 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 withDefaults(defineProps<{ width?: number; animated?: boolean }>(), { width: 300, animated: true });
 </script>
-
-<style scoped>
-/* keep(keyframes): SVG illustration animation. Scoped on purpose (W2.b): the
-   20 illustrations reused generic keyframe names (es-pulse, es-twinkle, …) with
-   DIFFERENT bodies from unscoped blocks — a global name collision where the
-   last-loaded illustration hijacked the others' animations. Vue rewrites scoped
-   keyframe names per component, which ends the collision. All selectors and the
-   es-static gate live in this file's own template. */
-.es-slot {
-  transform-box: fill-box;
-  transform-origin: center;
-}
-.es-fly {
-  transform-box: view-box;
-}
-.es-fly-a {
-  animation: es-fly-a 3.4s ease-in-out infinite;
-}
-.es-fly-b {
-  animation: es-fly-b 3.4s ease-in-out infinite;
-  animation-delay: -1.7s;
-}
-.es-present {
-  transform-box: view-box;
-  transform-origin: 293px 207px;
-  animation: es-present 2.8s ease-in-out infinite;
-}
-.es-head {
-  transform-box: view-box;
-  transform-origin: 303px 191px;
-  animation: es-headtilt 4s ease-in-out infinite;
-}
-.es-slot {
-  animation: es-slot 2.8s ease-in-out infinite;
-}
-
-@keyframes es-fly-a {
-  0% {
-    transform: translate(0, 0);
-    opacity: 0;
-  }
-  15% {
-    opacity: 1;
-  }
-  60% {
-    transform: translate(-150px, 12px);
-    opacity: 1;
-  }
-  72%,
-  100% {
-    transform: translate(-160px, 14px);
-    opacity: 0;
-  }
-}
-@keyframes es-fly-b {
-  0% {
-    transform: translate(0, 0);
-    opacity: 0;
-  }
-  15% {
-    opacity: 1;
-  }
-  60% {
-    transform: translate(-176px, 42px);
-    opacity: 1;
-  }
-  72%,
-  100% {
-    transform: translate(-186px, 46px);
-    opacity: 0;
-  }
-}
-@keyframes es-present {
-  0%,
-  100% {
-    transform: rotate(0deg);
-  }
-  50% {
-    transform: rotate(-7deg);
-  }
-}
-@keyframes es-headtilt {
-  0%,
-  100% {
-    transform: rotate(-1.5deg);
-  }
-  50% {
-    transform: rotate(1deg);
-  }
-}
-@keyframes es-slot {
-  0%,
-  100% {
-    transform: scale(1);
-    opacity: 0.6;
-  }
-  50% {
-    transform: scale(1.03);
-    opacity: 1;
-  }
-}
-
-.es-static :where(.es-fly, .es-present, .es-head, .es-slot) {
-  animation: none;
-}
-@media (prefers-reduced-motion: reduce) {
-  :where(.es-fly, .es-present, .es-head, .es-slot) {
-    animation: none;
-  }
-}
-</style>
