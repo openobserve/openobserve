@@ -112,7 +112,8 @@ const OButtonStub = {
   props: ["variant", "size", "icon", "iconLeft", "loading"],
   emits: ["click"],
   inheritAttrs: false,
-  template: '<button v-bind="$attrs" :data-variant="variant" :data-icon="icon"><slot /></button>',
+  template:
+    '<button v-bind="$attrs" :data-variant="variant" :data-icon="icon" :data-icon-left="iconLeft"><slot /></button>',
 };
 
 const OInputStub = {
@@ -200,7 +201,7 @@ describe("CheckLocations", () => {
       const btn = wrapper.find('[data-test="synthetics-check-locations-refresh-btn"]');
       expect(btn.exists()).toBe(true);
       expect(btn.attributes("data-variant")).toBe("outline");
-      expect(btn.attributes("data-icon")).toBe("refresh");
+      expect(btn.attributes("data-icon-left")).toBe("refresh");
     });
 
     it("should render the checkbox group", () => {

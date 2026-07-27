@@ -249,7 +249,6 @@ const selectedLocations = computed({
       </h3>
     </div>
     <div class="flex flex-col gap-3 px-3 py-2">
-      <!-- ── Search ────────────────────────────────────────────────────────── -->
       <!-- ── Search + refresh ────────────────────────────────────────────────── -->
       <div v-if="!loadingLocations" class="flex items-center gap-2">
         <OInput
@@ -297,7 +296,7 @@ const selectedLocations = computed({
                 t("synthetics.locations.publicTitle")
               }}</span>
               <OTooltip :content="t('synthetics.locations.publicSubtitle')">
-                <OIcon name="info" size="2xs" class="text-text-secondary cursor-help" />
+                <OIcon name="info" size="xs" class="text-text-secondary cursor-help" />
               </OTooltip>
             </p>
           </template>
@@ -324,7 +323,7 @@ const selectedLocations = computed({
                   t("synthetics.locations.privateTitle")
                 }}</span>
                 <OTooltip :content="t('synthetics.locations.privateSubtitle')">
-                  <OIcon name="info" size="2xs" class="text-text-secondary cursor-help" />
+                  <OIcon name="info" size="xs" class="text-text-secondary cursor-help" />
                 </OTooltip>
               </p>
               <OButton
@@ -426,7 +425,7 @@ const selectedLocations = computed({
               <OButton
                 variant="outline"
                 size="sm"
-                icon-left="add_location_alt"
+                icon-left="add"
                 data-test="synthetics-check-locations-private-empty-cta"
                 @click="emit('new-location')"
               >
