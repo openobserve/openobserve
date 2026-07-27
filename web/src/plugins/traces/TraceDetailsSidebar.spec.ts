@@ -672,8 +672,8 @@ describe("TraceDetailsSidebar", async () => {
         await flushPromises();
         await wrapper.vm.$nextTick();
 
-        // OTable renders an expand button per row: o2-table-expand-{index}
-        // (distinct from the wrapping cell o2-table-expand-cell).
+        // One expand button per row: o2-table-expand-{index}, distinct from the
+        // wrapping cell o2-table-expand-cell.
         const expandBtn = wrapper.find('[data-test="o2-table-expand-0"]');
         expect(expandBtn.exists()).toBe(true);
 

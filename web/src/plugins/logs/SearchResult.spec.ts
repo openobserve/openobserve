@@ -498,8 +498,8 @@ describe("SearchResult Component", () => {
       wrapper.vm.searchObj.data.resultGrid.colSizes = {};
       wrapper.vm.searchObj.data.stream.selectedStream = ["new-stream"];
 
-      // OTable emits column-id-keyed sizes; handleColumnSizesUpdate converts them
-      // to the legacy CSS-var persistence format so saved views load correctly.
+      // handleColumnSizesUpdate converts column-id-keyed sizes into the CSS-var
+      // persistence format so saved views load correctly.
       const newSizes = { col1: 100 };
       await wrapper.vm.handleColumnSizesUpdate(newSizes);
 

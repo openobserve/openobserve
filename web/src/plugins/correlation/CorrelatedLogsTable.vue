@@ -1143,7 +1143,7 @@ const handleExpandRow = (row: any) => {
   }
 };
 
-// ── OTable logs rendering (migrated from the correlated-logs TenstackTable) ──
+// ── Logs rendering ──
 // Same FTS pipeline as the logs grid: chunked colorized HTML rendered per cell.
 const { processedResults: correlatedProcessed, processHitsInChunks: correlatedProcessChunks } =
   useLogsHighlighter();
@@ -1152,11 +1152,10 @@ const correlatedTimestampCol = computed(
   () => store.state.zoConfig.timestamp_column || "_timestamp",
 );
 
-// `pagedResults` is a ref from useCorrelatedLogs; guard it (undefined while the
-// composable initialises / in isolated unit tests).
+// Guarded: `pagedResults` is undefined while the composable initialises.
 const pagedRows = (): any[] => ((pagedResults as any)?.value as any[]) || [];
 
-// row → index within the current page (highlight cache + expansion keyed off it).
+// Row → index within the current page; the highlight cache is keyed off it.
 const correlatedHitIndexMap = computed(() => {
   const m = new Map<any, number>();
   pagedRows().forEach((h: any, i: number) => m.set(h, i));
@@ -1189,8 +1188,8 @@ watch(
 const getCorrelatedRowStatusColor = (row: any): string | undefined =>
   extractStatusFromLog(row)?.color;
 
-// Expansion: parent tracks expandedRows as row OBJECTS; OTable keys by rowKey
-// (_timestamp). Map objects → keys, and resolve a toggle back to the row.
+// The parent tracks expandedRows as row objects while the table keys expansion
+// by _timestamp, so translate between the two.
 const correlatedExpandedIds = computed<string[]>(() =>
   (expandedRows.value || [])
     .map((r: any) => (r != null ? String(r[correlatedTimestampCol.value]) : ""))

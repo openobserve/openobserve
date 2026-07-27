@@ -31,8 +31,8 @@ const { mockQCopyToClipboard, cellActionsColumnRef } = vi.hoisted(() => ({
   mockQCopyToClipboard: vi.fn().mockResolvedValue(undefined),
   cellActionsColumnRef: {
     id: undefined as string | undefined,
-    // OTable's #cell-hover-actions passes the OTableColumnDef directly, so `meta`
-    // lives at the top level (was `columnDef.meta` under the legacy table).
+    // #cell-hover-actions passes the OTableColumnDef directly, so `meta` lives
+    // at the top level.
     meta: { disableCellAction: false },
   },
 }));
@@ -78,13 +78,11 @@ vi.mock("@/plugins/logs/data-table/CellActions.vue", () => ({
   },
 }));
 
-// ─── OTable stub (post-migration) — renders loading/empty/cell slots ─────────
+// ─── OTable stub — renders loading/empty/cell slots ─────────
 // Also renders the cell-hover-actions slot so CellActions can be exercised.
 // setup() exposes cellActionsColumnRef so each test can control column.id — the
 // component's @copy handler uses column.id + row[column.id] from the slot scope,
-// not the event args emitted by CellActions. OTable uses `data` (not `rows`),
-// emits `row-click` / `close-column` / `column-order-change`, and its cell slots
-// are scoped `{ row, value, column }` (not `{ item, cell }`).
+// not the event args emitted by CellActions.
 vi.mock("@/lib/core/Table/OTable.vue", () => ({
   default: {
     name: "OTable",
@@ -112,7 +110,7 @@ vi.mock("@/lib/core/Table/OTable.vue", () => ({
       return { cellActionsColumn: cellActionsColumnRef };
     },
     // Mirror the loading skeleton + cell slots so slot-split tests can assert on
-    // rendered output. (data-test kept stable across the migration.)
+    // rendered output.
     template: `
       <div data-test="stub-traces-table">
         <div v-if="loading && (!$slots.loading)" data-test="tenstack-table-skeleton-body">Skeleton loading...</div>

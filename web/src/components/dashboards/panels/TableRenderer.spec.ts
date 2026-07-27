@@ -344,10 +344,8 @@ describe("TableRenderer", () => {
 
   // ── cellStyleFn ───────────────────────────────────────────────────────────
   describe("cellStyleFn", () => {
-    // Post-migration, OTable's getCellStyle contract is
-    // `({ columnId, row, value }) => Record<string, any>` (a style OBJECT, not a
-    // raw-CSS string), and the column config is looked up by id (col.name) from
-    // data.columns — so tests configure the column and call with the new params.
+    // getCellStyle takes `{ columnId, row, value }` and returns a style object;
+    // the column config is looked up by id (col.name) from data.columns.
     const styleFor = (colConfig: any, value: any, valueMapping?: any[]): Record<string, any> => {
       wrapper = createWrapper({
         data: { columns: [{ name: "x", field: "x", ...colConfig }], rows: [] },
@@ -426,7 +424,7 @@ describe("TableRenderer", () => {
           rows: [],
         },
       });
-      // First value assigned gets the first palette color (#000000 — dark) → white text.
+      // The first value assigned gets the first palette color (#000000, dark).
       const style = wrapper.vm.cellStyleFn({ columnId: "status", row: {}, value: "dark-value" });
       expect(style.color).toBe("#ffffff");
     });
@@ -482,7 +480,7 @@ describe("TableRenderer", () => {
     });
   });
 
-  // ── CSV Export — field vs name lookup (fix for #11574) ──────────────────
+  // ── CSV Export — field vs name lookup ───────────────────────────────────
   describe("CSV Export — field key lookup", () => {
     // Capture Blob content via a mock class since jsdom Blob lacks .text()
     let capturedCsv: string;
@@ -623,16 +621,14 @@ describe("TableRenderer", () => {
     });
 
     it("should not render the pagination bar when showPagination is false", () => {
-      // The default #bottom pager now owns the whole bar (border + min-height)
-      // since OTable's built-in bar is suppressed via :custom-pagination-bar, so
-      // it must not render an empty bordered bar when pagination is disabled
-      // (QA #2239: duplicate/empty pagination bars).
+      // The #bottom pager owns the whole bar, so it must not render an empty
+      // bordered bar when pagination is disabled.
       wrapper = createWrapper({ showPagination: false });
       const paginationDiv = wrapper.find('[data-test="dashboard-table-pagination"]');
       expect(paginationDiv.exists()).toBe(false);
     });
 
-    it("re-slices the rows when the footer page size changes (#2239.3)", async () => {
+    it("re-slices the rows when the footer page size changes", async () => {
       const rows = Array.from({ length: 15 }, (_, i) => ({
         timestamp: `t${i}`,
         level: "INFO",
@@ -654,7 +650,7 @@ describe("TableRenderer", () => {
       expect(table.getRowModel().rows.length).toBe(10);
     });
 
-    it("re-slices when the rows-per-page config prop changes (#2239.3)", async () => {
+    it("re-slices when the rows-per-page config prop changes", async () => {
       const rows = Array.from({ length: 15 }, (_, i) => ({
         timestamp: `t${i}`,
         level: "INFO",
@@ -675,15 +671,13 @@ describe("TableRenderer", () => {
       expect(table.getRowModel().rows.length).toBe(10);
     });
 
-    it("paginates when pagination is enabled AFTER mount (#2239 Add Panel toggle)", async () => {
+    it("paginates when pagination is enabled after mount", async () => {
       const rows = Array.from({ length: 15 }, (_, i) => ({
         timestamp: `t${i}`,
         level: "INFO",
         count: i,
       }));
-      // Mounted with pagination OFF (the Add Panel default) — reproduces the
-      // captured-once bug where the client pagination row model was frozen as
-      // undefined, so enabling pagination showed the bar but never sliced.
+      // Mounted with pagination off, the Add Panel default.
       wrapper = createWrapper({
         showPagination: false,
         rowsPerPage: 5,
@@ -693,8 +687,7 @@ describe("TableRenderer", () => {
       // all rows, no pagination
       expect(wrapper.findComponent({ name: "OTable" }).vm.table.getRowModel().rows.length).toBe(15);
 
-      // User flips the "Pagination" toggle in the panel config. OTable is re-keyed
-      // on the pagination mode, so this rebuilds the table — re-query it.
+      // The table is re-keyed on the pagination mode, so this rebuilds it.
       await wrapper.setProps({ showPagination: true });
       await flushPromises();
       expect(wrapper.findComponent({ name: "OTable" }).vm.table.getRowModel().rows.length).toBe(5);

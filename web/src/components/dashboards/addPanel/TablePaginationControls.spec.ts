@@ -482,7 +482,6 @@ describe("TablePaginationControls", () => {
     });
 
     it("injects the active rowsPerPage in sorted position when it isn't a preset", () => {
-      // e.g. a custom "Records per page" typed into the panel config.
       wrapper = createWrapper({
         paginationOptions: [10, 20, 50],
         pagination: { rowsPerPage: 25, page: 1 },
@@ -495,7 +494,6 @@ describe("TablePaginationControls", () => {
         { label: "25", value: 25 },
         { label: "50", value: 50 },
       ]);
-      // The dropdown now reflects the active value instead of going blank.
       expect(select.props("modelValue")).toBe(25);
     });
 

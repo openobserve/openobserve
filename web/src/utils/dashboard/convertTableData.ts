@@ -135,8 +135,6 @@ export const convertTableData = (panelSchema: any, searchQueryData: any, store: 
       // override_config is keyed by alias; the TanStack column id is the data field.
       obj["alias"] = it.alias;
       obj["isNumeric"] = isNumber;
-      // Render number / timestamp cells in a monospace font (digits align, easier
-      // to scan). histogramFields carries the detected timestamp aliases.
       obj["mono"] = isNumber || histogramFields.includes(it.alias);
       obj["sortable"] = true;
 
@@ -277,7 +275,6 @@ export const convertTableData = (panelSchema: any, searchQueryData: any, store: 
         obj["field"] = String(it);
         obj["label"] = it != null && it !== "" ? String(it) : "";
         obj["sortable"] = true;
-        // Number / timestamp cells use a monospace font for easier scanning.
         obj["mono"] = isNumber || histogramFields.includes(it);
         // Overrides keyed by the lower-cased transposed value (transpose path).
         applyColumnOverrides(
@@ -530,7 +527,6 @@ export const convertMultiQueryTableData = (
           field: it,
           label: it,
           sortable: true,
-          // Number / timestamp cells use a monospace font for easier scanning.
           mono: isNumber || detectedTimestampAliases.has(it),
         };
         applyColumnOverrides(
@@ -599,7 +595,6 @@ export const convertMultiQueryTableData = (
       field: colName,
       label: fieldConfig?.label || colName,
       sortable: true,
-      // Number / timestamp cells use a monospace font for easier scanning.
       mono: isNumber || isTimestamp,
     };
 

@@ -1248,11 +1248,9 @@ export default defineComponent({
 
     const eventsWrap = ref(false);
 
-    // Events keyed by a GUARANTEED-unique, non-enumerable `__rowId` (their array
-    // index): span events can share — or lack — `_timestamp`, so keying
-    // expansion on the timestamp would expand duplicates together (or, when the
-    // field is absent, expand ALL rows at once). Non-enumerable → excluded from
-    // the JSON preview / copy.
+    // Keyed by a non-enumerable `__rowId` (the array index): span events can
+    // share, or lack, `_timestamp`, so keying expansion on it would expand
+    // duplicates together. Non-enumerable keeps it out of the JSON preview.
     const eventsRowsWithKey = computed(() =>
       (spanDetails.value.events || []).map((e: any, i: number) =>
         Object.defineProperty({ ...e }, "__rowId", {
@@ -1261,10 +1259,6 @@ export default defineComponent({
         }),
       ),
     );
-
-    // Column order/size persistence is handled by OTable itself (persist-columns
-    // + table-id="trace-details-events" → localStorage), so the events table no
-    // longer needs the manual order/size capture handlers (G3).
 
     const eventsTableColumns = computed(() => {
       const events = spanDetails.value.events;
@@ -1321,9 +1315,8 @@ export default defineComponent({
         });
       });
 
-      // Column reorder is owned by OTable in-session (its internal columnOrder);
-      // it is no longer re-applied to the columns prop here (that would fight
-      // OTable's own reorder state).
+      // Reorder is owned by the table's own columnOrder state; re-applying it to
+      // the columns prop here would fight it.
       return cols;
     });
 

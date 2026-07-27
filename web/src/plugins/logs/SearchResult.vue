@@ -265,12 +265,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
-      <!-- Combined scroll: histogram + logs/patterns scroll together vertically
-        (the histogram scrolls away with the list and the table's column header
-        sticks to the top of this container). The histogram is pinned only along
-        the X axis (position: sticky; left: 0 with a width locked to this
-        container's visible width — see histogramPinStyle), so horizontally
-        scrolling the wide results table can never drag the chart sideways. -->
+      <!-- Combined scroll: histogram + logs/patterns scroll together vertically.
+        The histogram is pinned along the X axis only (see histogramPinStyle), so
+        scrolling the wide results table sideways can't drag the chart with it. -->
       <div class="min-h-0 flex-1 overflow-auto" ref="scrollContainerRef">
         <div
           ref="histogramRef"
@@ -450,7 +447,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Logs View -->
         <template v-if="searchObj.meta.logsVisualizeToggle === 'logs'">
-          <!-- Missing-stream warning banner (was rendered inside the legacy table) -->
+          <!-- Missing-stream warning banner -->
           <div
             v-if="!searchObj.loading && searchObj.data.missingStreamMessage"
             class="px-page-edge text-status-warning-text bg-status-warning-bg flex items-center gap-2 py-2 text-xs"
@@ -518,8 +515,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @row-click="openLogDetailsByRow"
             @update:expandedIds="onExpandedLogIdsChange"
           >
-            <!-- FTS-highlighted cell content (chunked colorized HTML from the
-                 shared useLogsHighlighter; falls back to the plain value). -->
+            <!-- FTS-highlighted cell content; falls back to the plain value. -->
             <template
               v-for="col in getColumns || []"
               :key="col.id"
@@ -534,7 +530,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
 
             <!-- Per-cell hover actions: AI button on the timestamp cell; copy /
-                 add-search-term on closable field cells (G13). -->
+                 add-search-term on closable field cells. -->
             <template #cell-hover-actions="{ row, column, active }">
               <O2AIContextAddBtn
                 v-if="active && column.id === logsTimestampCol"
@@ -554,8 +550,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </template>
 
-            <!-- Expanded row → JSON preview (copy / add-field / add-search-term /
-                 view-trace / show-correlation / send-to-ai). -->
+            <!-- Expanded row → JSON preview -->
             <template #expansion="{ row }">
               <JsonPreview
                 :value="row"
@@ -835,9 +830,8 @@ export default defineComponent({
   },
   methods: {
     handleColumnSizesUpdate(newColSizes: any) {
-      // OTable emits sizes keyed by column id; the logs persistence stores them
-      // in the legacy CSS-var format (`--col-{id}-size` / `--header-{id}-size`)
-      // so saved views load back correctly (see useStreamFields column build).
+      // Sizes arrive keyed by column id, but persistence stores them as
+      // `--col-{id}-size` / `--header-{id}-size` so saved views load back correctly.
       const cssVarSizes: Record<string, number> = {};
       for (const [id, size] of Object.entries(newColSizes || {})) {
         cssVarSizes[`--col-${id}-size`] = size as number;
@@ -957,13 +951,9 @@ export default defineComponent({
       this.searchObj.meta.isFtsDefaultColumn = false;
       let selectedFields = this.reorderSelectedFields();
 
-      // `col` is the OTable columnDef: it carries `id` (=== the field name) but
-      // NOT the original `name` prop (useTableCore rebuilds the def and drops it).
-      // resultGrid.columns holds column OBJECTS, so the old `indexOf(col.id)` —
-      // a string lookup against an object array — always returned -1 and
-      // `splice(-1, 1)` silently removed the LAST column instead. Match by id,
-      // and fall back to id for the selectedFields (string) lookup since `name`
-      // is undefined. Guard both against -1 so a miss is a no-op, not a mis-splice.
+      // `col` is the OTable columnDef, which carries `id` but not the original
+      // `name`. resultGrid.columns holds column objects, so match on id there and
+      // fall back to id for the selectedFields (string) lookup.
       const field = col.name ?? col.id;
       const RGIndex = this.searchObj.data.resultGrid.columns.findIndex((c: any) => c.id === col.id);
       if (RGIndex !== -1) this.searchObj.data.resultGrid.columns.splice(RGIndex, 1);
@@ -1038,12 +1028,9 @@ export default defineComponent({
     // match shouldMoveActionsToMenu threshold: 3 pages when narrow, 5 when wide
     const paginationMaxPages = computed(() => (containerWidth.value < 700 ? 3 : 5));
 
-    // Histogram X-pin: the histogram shares the results' vertical scroll (so it
-    // scrolls away with the log lines) but is `position: sticky; left: 0`, so a
-    // wide table scrolling sideways can't drag it. Sticky-left alone would let
-    // it stretch to the full scroll width and mis-size the ECharts canvas, so we
-    // lock its width to the scroll container's *visible* (client) width, tracked
-    // reactively so it follows splitter / window / scrollbar changes.
+    // The histogram is sticky-left inside the shared scroll container. Sticky
+    // alone would stretch it to the full scroll width and mis-size the ECharts
+    // canvas, so lock it to the container's visible (client) width instead.
     const histogramPinWidth = ref(0);
     let histogramResizeObserver: ResizeObserver | null = null;
     const histogramPinStyle = computed(() =>
@@ -1437,8 +1424,6 @@ export default defineComponent({
         containerResizeObserver.observe(searchListContainer.value);
       }
 
-      // Keep the pinned histogram's width locked to the scroll container's
-      // visible width (see histogramPinStyle).
       if (scrollContainerRef.value) {
         syncHistogramPinWidth();
         histogramResizeObserver = new ResizeObserver(syncHistogramPinWidth);
@@ -2010,21 +1995,17 @@ export default defineComponent({
       return [...new Set([...defaultFTSKeys, ...selectedStreamFTSKeys])];
     });
 
-    // ── OTable logs-grid rendering (migrated from the logs TenstackTable) ──────
-    // FTS highlighting keeps the exact legacy pipeline: `processHitsInChunks`
-    // builds a per-(column,rowIndex) map of colorized HTML which the cell slots
-    // render via v-html (source column → full JSON with braces; FTS columns →
-    // semantic colors; else plain highlight). Chunked/async + AbortController
-    // behaviour is preserved by reusing useLogsHighlighter unchanged.
+    // ── Logs-grid rendering ───────────────────────────────────────────────────
+    // `processHitsInChunks` builds a per-(column, rowIndex) map of colorized HTML
+    // that the cell slots render via v-html.
     const { processedResults, processHitsInChunks } = useLogsHighlighter();
 
-    // Collapsible VRL function-error banner (was internal to the legacy table).
     const isFunctionErrorOpen = ref(false);
 
     const logsTimestampCol = computed(() => store.state.zoConfig.timestamp_column || "_timestamp");
 
-    // row object → its ORIGINAL index in hits (the highlight cache + the detail
-    // sidebar + expansion are all keyed by original index — G7).
+    // Row object → its original index in hits; the highlight cache, detail
+    // sidebar and expansion are all keyed by that index.
     const logsHitIndexMap = computed(() => {
       const m = new Map<any, number>();
       (searchObj.data.queryResults?.hits || []).forEach((h: any, i: number) => m.set(h, i));
@@ -2047,9 +2028,7 @@ export default defineComponent({
         selectedStreamFullTextSearchKeys.value,
       );
     };
-    // Columns change → clear cache and reprocess; new hits → reprocess (keep
-    // cache). `immediate` so a mount with results already present (restored /
-    // cached state) still highlights instead of showing plain values.
+    // `immediate` so a mount with results already present still highlights them.
     watch(
       () => getColumns.value,
       () => reprocessLogsHighlight(true),
@@ -2062,12 +2041,10 @@ export default defineComponent({
       () => reprocessLogsHighlight(false),
     );
 
-    // Severity status spine (4px left border), same source as the legacy table.
     const getLogRowStatusColor = (row: any): string | undefined => extractStatusFromLog(row)?.color;
 
-    // "Search around" highlight — the target row keeps the selected background.
-    // Applied as a CLASS (not inline style) so the row-hover utility still wins
-    // on hover (an inline background would suppress hover feedback).
+    // "Search around" highlight, applied as a class (not an inline style) so the
+    // row-hover utility still wins on hover.
     const getLogRowClass = (row: any): string => {
       const ts = searchObj.data?.searchAround?.indexTimestamp;
       if (ts != null && ts !== -1 && row[logsTimestampCol.value] === ts) {
@@ -2076,10 +2053,8 @@ export default defineComponent({
       return "";
     };
 
-    // Expansion (G7): the parent tracks `expandedLogs` as ORIGINAL indices;
-    // OTable keys expansion by rowKey (_timestamp). Map indices → rowKeys, and on
-    // a toggle resolve the changed row back to its index and emit `expandlog`
-    // (which toggles that index in the parent) — preserving the index contract.
+    // The parent tracks `expandedLogs` as hit indices while the table keys
+    // expansion by rowKey (_timestamp), so translate between the two.
     const expandedLogIds = computed<string[]>(() =>
       ((props.expandedLogs as number[]) || [])
         .map((idx) => {
@@ -2284,26 +2259,18 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped>
-/* keep(lib-override:logs-cell-font): restore the monospace log-cell font the
-   legacy logs table used (`.logs-table td { font-family: var(--font-mono) }`).
-   OTable renders body cells (td) via OTableBodyCell, so the rule must reach them
-   through :deep(). Scoped to the DATA cells (`o2-table-cell-*`) so the expanded
-   row (JsonPreview) keeps its own typography. Fixes o2-enterprise issue 2239:
-   "On Logs font style is changed". */
+/* keep(lib-override:logs-cell-font): the monospace log-cell font. Body cells are
+   rendered by OTableBodyCell, so the rule must reach them through :deep(), and it
+   is scoped to the DATA cells so the expanded row keeps its own typography. */
 .logs-results-otable :deep(td[data-test^="o2-table-cell-"]) {
   font-family: var(--font-mono);
-  /* Match main's log cell size (--text-xs). OTable cells set no explicit size,
-     so they'd otherwise inherit a larger ambient font and read as too big. */
   font-size: var(--text-xs);
-  /* Cap the line box so a single log line can't push the row past the 20px
-     target (matches main's dense rows). */
+  /* Cap the line box so a single log line can't push the row past 20px. */
   line-height: 1.125rem;
 }
 
-/* OTable's expand button is size-6 (24px), which forces EVERY log row to be
-   >=24px regardless of :row-height, so fewer lines fit per screen than on main.
-   Main's log expand button is 1.25rem (20px) — match it so the rows collapse to
-   the same 20px density and the same number of lines fit. */
+/* The default expand button is 24px, which floors every log row at 24px
+   regardless of :row-height and costs a line per screen. */
 .logs-results-otable :deep([data-test^="o2-table-expand-"]) {
   height: 1.125rem !important;
   width: 1.125rem !important;
@@ -2469,10 +2436,8 @@ export default defineComponent({
   border-radius: 0.5rem;
   position: relative;
 
-  /* Pin the histogram along the X axis inside the shared vertical scroll
-     container: it still scrolls away vertically with the log lines, but stays
-     put when the wide results table scrolls sideways (its width is locked to
-     the scroll viewport via histogramPinStyle). */
+  /* Pinned along X only: still scrolls away with the log lines, but stays put
+     when the wide results table scrolls sideways. */
   &--pinned-x {
     position: sticky;
     left: 0;

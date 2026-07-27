@@ -62,8 +62,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @column-order-change="onColumnReorder"
           @close-column="onCloseColumn"
         >
-          <!-- Per-cell hover actions (G13). `column` is the OTableColumnDef, so
-               `column.meta` (not `column.columnDef.meta`) holds disableCellAction. -->
+          <!-- `column` is the OTableColumnDef, so `column.meta` (not
+               `column.columnDef.meta`) holds disableCellAction. -->
           <template #cell-hover-actions="{ row, column, active }">
             <CellActions
               v-if="showCellActions && active && !column.meta?.disableCellAction"
@@ -272,11 +272,8 @@ const addSearchTerm = (
 const sendToAiChat = (value: string) => emit("send-to-ai-chat", value);
 
 /**
- * OTable server sort emits `{ column, order }` and cycles asc → desc → cleared
- * (3-state). The parent consumes `(field, order)` where `field` is the backend
- * field (already mapped via `sortFieldMap`). On the "cleared" tick (empty
- * column) we fall back to the default trace sort so the query never receives an
- * empty sort field.
+ * Server sort cycles asc → desc → cleared. On the cleared tick the column is
+ * empty, so fall back to the default trace sort rather than send an empty field.
  */
 const onSortChange = (params: { column: string; order: "asc" | "desc" }) => {
   if (!params.column) {
@@ -373,9 +370,8 @@ const hasResults = computed(() => props.searchPerformed && props.hits.length > 0
 }
 
 /* keep(generated-content): the error-row left border. `traceRowClass` puts
-   `oz-table__row--error` on OTable-rendered <tr>s; the rule that styled it lived
-   in the now-deleted legacy table, so it is re-homed here (mirrors
-   PlayerTracesTab's `trace-row--error`). Reaches OTable's <td>, hence :deep. */
+   `oz-table__row--error` on table-rendered <tr>s and the rule reaches their
+   <td>, hence :deep. Mirrors PlayerTracesTab's `trace-row--error`. */
 .traces-table-container :deep(.oz-table__row--error td:first-child) {
   box-shadow: inset 0.125rem 0 0 0 var(--color-status-error-text);
 }

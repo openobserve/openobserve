@@ -47,11 +47,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         (row: any, evt: MouseEvent) => $emit('row-click', evt ?? null, row, sortedRows.indexOf(row))
       "
     >
-      <!-- Empty state: mirror the dashboard chart panels' "No Data" (bar-chart)
-           treatment. PanelSchemaRenderer excludes `table` panels from its own
-           OEmptyState, delegating the empty state to this table; without this
-           slot OTable falls back to its default magnifier "No data available",
-           which reads as inconsistent next to sibling chart panels (QA #2239). -->
+      <!-- PanelSchemaRenderer excludes `table` panels from its own OEmptyState,
+           so mirror the chart panels' "No Data" treatment here. -->
       <template #empty>
         <OEmptyState
           size="inline"
@@ -65,10 +62,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Pagination footer: forward parent's #bottom slot or show default pagination controls -->
       <template #bottom="scope">
         <slot name="bottom" v-bind="scope">
-          <!-- Default: dashboard pagination controls. This #bottom IS the pager
-               (OTable's built-in bar is suppressed via :custom-pagination-bar),
-               so it carries its own top-border separator + padding that the
-               built-in OTablePagination would otherwise have provided. -->
+          <!-- This #bottom IS the pager (the built-in bar is suppressed via
+               :custom-pagination-bar), so it carries its own separator + padding. -->
           <div
             v-if="showPagination"
             class="border-border-default flex min-h-10 w-full items-center border-t px-3 py-1"
@@ -152,47 +147,35 @@ export default defineComponent({
     const { t } = useI18n();
     const tableRef = ref<any>(null);
 
-    // The "Records per page" config field is `v-model.number`, so clearing it
-    // ("Auto") yields "" — a non-number that must not reach OTable's page-size
-    // (it silently disables the page-size watch). Coerce to a positive integer,
-    // falling back to the default (QA #2239.3: rows-per-page not applying).
+    // "Records per page" is `v-model.number`, so clearing it yields "" — a
+    // non-number that would silently disable OTable's page-size watch.
     const effectivePageSize = computed(() => {
       const n = Number(props.rowsPerPage);
       return Number.isFinite(n) && n > 0 ? n : TABLE_ROWS_PER_PAGE_DEFAULT_VALUE;
     });
 
-    // Pivot tables have their own (often numerous) value/group columns and must
-    // scroll horizontally rather than compress to fit. Regular tables keep the
-    // fit-to-container (w-full/table-fixed) layout, so only opt pivot into the
-    // natural-width + overflow path (QA #2239: pivot missing horizontal scroll).
+    // Pivots carry many value/group columns and must scroll horizontally rather
+    // than compress to fit; regular tables keep the fit-to-container layout.
     const isPivot = computed(() => ((props.data?.pivotHeaderLevels?.length as number) ?? 0) > 0);
 
-    // OTable's client pagination row model is attached once at table creation
-    // (TanStack captures it then), so a table first mounted with pagination OFF
-    // can't start slicing when pagination is toggled ON later — it shows the bar
-    // but renders every row and Next does nothing. Re-key the OTable on the
-    // pagination mode so toggling it rebuilds the table with the right row model
-    // (QA #2239: Add Panel pagination toggle doesn't paginate).
+    // The client pagination row model is attached once at table creation, so
+    // re-key the table on the pagination mode: without it, a table first mounted
+    // with pagination off never starts slicing when it is toggled on.
     const paginationMode = computed(() => (props.showPagination ? "client" : "none"));
 
     const tableColumns = computed(() => (props.data?.columns as any[]) || []);
 
-    // Map the pivot column config → OTableColumnDef. Original fields (name,
-    // field, format, align, _isRowField, _isTotalColumn, …) are kept at the top
-    // level (some tests + CSV export read them there) AND mirrored into `meta` so
-    // OTable's cell/tfoot/merge engine can read them. `_col` carries the whole
-    // config for the cell-style engine (cellStyleFn reads meta._col).
+    // Map the column config → OTableColumnDef. The original fields stay at the
+    // top level (CSV export reads them there) and are mirrored into `meta` for
+    // the cell/tfoot/merge engine; `_col` carries the whole config for cellStyleFn.
     const otableColumns = computed(() =>
       (tableColumns.value as any[]).map((col: any) => ({
         ...col,
-        // Use the data-key (`field`) as the column id, matching the legacy table:
-        // `name` is the display LABEL, so two columns sharing a label would
-        // collide to the same TanStack column id and overwrite each other.
+        // Key on `field`, not `name`: `name` is the display label, so two columns
+        // sharing a label would collide to the same column id.
         id: col.field ?? col.name,
         header: col.header ?? col.label ?? col.name ?? col.field,
         accessorKey: col.field ?? col.name,
-        // Enable the per-column value-filter dropdown when the panel opts in
-        // (config.table_filtering). Row-field / total columns aren't filterable.
         filterable: props.enableFiltering && !col._isRowField && !col._isTotalColumn,
         meta: {
           ...(col.meta ?? {}),
@@ -251,20 +234,16 @@ export default defineComponent({
       return m;
     });
 
-    // OTable calls getCellStyle with `{ columnId, row, value }` and expects a
-    // style OBJECT (not the legacy raw-CSS string). Same colour engine as before:
-    // auto-color palette → value-mapping → conditional rules → column override.
+    // Colour engine, in precedence order: auto-color palette → value-mapping →
+    // conditional rules → column override.
     const cellStyleFn = computed(
       () =>
         (params: { columnId: string; row: any; value: any }): Record<string, any> => {
           const col = colById.value.get(params.columnId);
           const value = params.value;
 
-          // Number / timestamp columns render in a monospace font so digits align
-          // and are easier to scan. The type is already reflected in the column's
-          // alignment (numbers right, timestamps formatted); `mono` is the same
-          // type signal, set by the table converters. Merge it into every style
-          // branch below so it composes with color/value-mapping/conditional rules.
+          // Number / timestamp columns render monospace so digits align. Merged
+          // into every branch below so it composes with the colour rules.
           const base: Record<string, any> = col?.mono ? { fontFamily: "var(--font-mono)" } : {};
 
           // 1) Auto color mode — stable palette per distinct string value.
@@ -409,8 +388,7 @@ export default defineComponent({
       URL.revokeObjectURL(url);
     };
 
-    // Adapt OTable's server-sort `{ column, order }` (3-state, clear = empty
-    // column) to the local (by, order) sort state.
+    // Adapt the 3-state server-sort payload (clear = empty column) to local state.
     const onOTableSortChange = (params: { column: string; order: "asc" | "desc" }) =>
       handleSortChange(params.column ?? "", params.order ?? "asc");
 
@@ -453,12 +431,8 @@ export default defineComponent({
   font-family: var(--font-sans);
 }
 
-/* Column dividers drawn to match the column-resize-handle dividers other tables
-   show (dashboard listing etc.): a short, vertically-centered 1px line in the
-   `--color-border-default` colour at each header column's right edge. The panel
-   table keeps resize disabled, so it renders these statically as a ::after
-   instead of via the resize handle — identical look, header-only, no trailing
-   line on the last column. Works for both the regular and pivot layouts. */
+/* Column dividers matching the resize-handle dividers other tables show. Resize
+   is disabled here, so they're drawn statically as a header-only ::after. */
 .table-wrapper :deep(thead th) {
   position: relative;
 }
@@ -472,10 +446,8 @@ export default defineComponent({
   width: 1px;
   background: var(--color-border-default);
 }
-/* The row-field (e.g. _timestamp) header spans every level (rowspan), so a
-   short centered stub would float on the group→value boundary. This boundary
-   between the row-field column and the pivot values is the table's primary
-   separator, so draw it full-height instead of the resize-handle stub. */
+/* The row-field header spans every level (rowspan), so a short centered stub
+   would float on the group→value boundary — draw it full-height instead. */
 .table-wrapper :deep(thead th.o2-pivot-rowfield-th)::after {
   top: 0;
   bottom: 0;
@@ -491,9 +463,8 @@ export default defineComponent({
 
 .table-wrapper :deep(.pivot-group-header) {
   font-weight: 600;
-  /* 1px (not 2px) so the group→value separator matches the value→data
-     separator weight — a short value row between two heavier lines read as a
-     double line (QA feedback). */
+  /* 1px so this matches the value→data separator weight; heavier lines on both
+     sides of a short value row read as a double line. */
   border-bottom: 1px solid var(--color-table-row-divider);
 }
 

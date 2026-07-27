@@ -43,8 +43,8 @@ const props = defineProps<{
   bordered?: boolean;
   enableCellCopy?: boolean;
   getCellStyle?: (params: { columnId: string; row: any; value: any }) => Record<string, any>;
-  /** Pivot row-field cell merge (G17): hide the cell's content / inner border so
-   *  a group of equal row-field values reads as one merged cell. */
+  /** Pivot row-field cell merge: hide the cell's content / inner border so a
+   *  group of equal row-field values reads as one merged cell. */
   pivotMerge?: { hideContent: boolean; hideBorder: boolean } | null;
 }>();
 
@@ -77,9 +77,8 @@ const slotAlignClass = computed(() => {
   return "flex items-center w-full min-w-0";
 });
 
-// Slotted cell content truncates to one line by default, but in `wrap` mode it
-// must wrap (multi-line) — otherwise a slotted logs cell would clip instead of
-// growing the row height. Mirrors the default (non-slot) wrap behaviour.
+// Slotted content truncates to one line unless `wrap` is on, mirroring the
+// default (non-slot) behaviour.
 const slotContentClass = computed(() =>
   props.wrap ? "min-w-0 flex-1 break-words whitespace-normal" : "truncate min-w-0 flex-1",
 );
@@ -97,17 +96,15 @@ const rawValue = computed(() => props.cell.getValue());
 
 const displayValue = computed(() => {
   const formatFn = meta.value?.format as ((value: any, row: any) => any) | undefined;
-  // Call `format` even for null/undefined — dashboard format fns turn empty
-  // cells into the configured `no_value_replacement` (they'd render blank
-  // otherwise). When no format fn is set, pass the raw value through unchanged.
+  // Call `format` even for null/undefined: dashboard format fns turn empty cells
+  // into the configured `no_value_replacement`.
   if (!formatFn) return rawValue.value;
   return formatFn(rawValue.value, props.row.original);
 });
 
 const horizontalScroll = inject<{ value: boolean } | null>("o2TableHorizontalScroll", null);
 
-// Pivot: right-pinned total columns (P1-A3) — keep body total cells in step with
-// the sticky header + grand-total footer on horizontal scroll.
+// Keep right-pinned total cells in step with the sticky header and footer.
 const stickyColTotals = inject<{ value: boolean } | null>("o2TableStickyColTotals", null);
 const pivotTotalStyle = computed<Record<string, any>>(() => {
   if (!stickyColTotals?.value || !meta.value?._isTotalColumn) return {};
@@ -116,14 +113,13 @@ const pivotTotalStyle = computed<Record<string, any>>(() => {
     position: "sticky",
     right: `${rightOffset}px`,
     zIndex: 2,
-    // Pin the width (not just `width`) so the total column can't diverge from the
-    // fixed-width sticky header under table-auto/w-full and misalign.
+    // Pinned width, so the column can't diverge from the fixed-width sticky
+    // header under table-auto/w-full.
     width: `${PIVOT_TABLE_TOTAL_COLUMN_WIDTH}px`,
     minWidth: `${PIVOT_TABLE_TOTAL_COLUMN_WIDTH}px`,
     maxWidth: `${PIVOT_TABLE_TOTAL_COLUMN_WIDTH}px`,
     backgroundColor: "var(--color-table-cell-bg)",
-    // Carry the same subtle left-edge separator the sticky total header uses so
-    // the shadow runs down the whole column, not just the header.
+    // Same left-edge separator as the header, so it runs down the whole column.
     boxShadow: "-2px 0 4px -2px var(--color-border-default)",
   };
 });
@@ -215,12 +211,9 @@ function handleClick() {
   });
 }
 
-// ── Cell hover-actions (G13) ──────────────────────────────────────
-// A `#cell-actions` overlay renders inside every data cell; the shared
-// single-active-cell context (provided by OTable) tracks which cell the pointer
-// is over so the consumer's overlay can mount its (heavy) menu for only that one
-// cell. TanStack's `cell.id` is already `${row.id}_${column.id}`, so it uniquely
-// keys the cell.
+// ── Cell hover-actions ────────────────────────────────────────────
+// The shared single-active-cell context tracks which cell the pointer is over,
+// keyed by `cell.id` (already `${row.id}_${column.id}`).
 const hasCellActions = computed(() => !!slots["cell-hover-actions"]);
 const cellActionsCtx = inject(OTableCellActionsKey, null);
 const isCellActionActive = computed(() => cellActionsCtx?.activeCellKey.value === props.cell.id);
@@ -359,12 +352,8 @@ function onCellActionsLeave() {
       <OIcon :name="copied ? 'check' : 'content-copy'" size="xs" />
     </button>
 
-    <!-- Per-cell hover-action overlay (G13). `active` is true only for the cell
-         the pointer currently hovers (debounced in OTable) so consumers mount
-         their action menu lazily. Spans the cell's right edge full-height so it
-         anchors BOTH flow content (plain buttons, flex-centered right) AND
-         self-positioned content (e.g. CellActions' own `absolute right-0` lands
-         at the cell's right edge, not on a tiny point-box). -->
+    <!-- Per-cell hover-action overlay. Spans the cell's right edge full-height
+         so it anchors both flow content and self-positioned content. -->
     <div
       v-if="hasCellActions"
       class="o2-table-cell-hover-actions absolute inset-y-0 right-0 z-2 flex items-center"

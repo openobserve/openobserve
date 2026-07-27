@@ -188,10 +188,8 @@ const globalStubs = {
       "initialTimelineExpanded",
     ],
   },
-  // Stub OTable (post-migration) so we can trigger row clicks and inspect
-  // scoped-slot content (route, duration) without mounting the real component.
-  // OTable uses `data` (not `rows`), emits `row-click` (not `click:dataRow`),
-  // and its cell slots are scoped `{ row, value, column }` (not `{ item, cell }`).
+  // Stub OTable so row clicks and scoped-slot content (route, duration) can be
+  // exercised without mounting the real component.
   OTable: {
     name: "OTable",
     props: ["data", "columns", "rowHeight", "defaultColumns", "enableColumnReorder", "rowClass"],

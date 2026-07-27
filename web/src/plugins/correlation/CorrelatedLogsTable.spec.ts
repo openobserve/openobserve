@@ -55,7 +55,7 @@ vi.mock("@/composables/useServiceCorrelation", () => ({
   getSemanticGroupsCacheStatus: vi.fn(),
 }));
 
-// Mock OTable (post-migration table component)
+// Mock OTable
 vi.mock("@/lib/core/Table/OTable.vue", () => ({
   default: {
     name: "OTable",

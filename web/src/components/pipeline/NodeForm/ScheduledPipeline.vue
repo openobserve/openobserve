@@ -796,11 +796,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :expand-on-row-click="true"
                       data-test="scheduled-pipeline-sql-preview-table"
                     >
-                      <!-- Source column: one-line JSON (truncates); expand a row for the full view. -->
                       <template #cell-source="{ row }">
                         <span class="font-mono text-xs">{{ JSON.stringify(row) }}</span>
                       </template>
-                      <!-- Row-level "send to AI" affordance on the timestamp cell (G13 hover overlay). -->
                       <template #cell-hover-actions="{ row, column, active }">
                         <O2AIContextAddBtn
                           v-if="active && column.id === '_timestamp'"
@@ -808,7 +806,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           @send-to-ai-chat="sendToAiChat(JSON.stringify(row), true)"
                         />
                       </template>
-                      <!-- Expanded row → full JSON preview with copy + send-to-AI. -->
                       <template #expansion="{ row }">
                         <JsonPreview
                           :value="row"

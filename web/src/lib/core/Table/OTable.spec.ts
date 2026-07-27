@@ -521,9 +521,9 @@ describe("OTable", () => {
     });
   });
 
-  // ── Cell hover-action overlay (G13) ─────────────────────────
+  // ── Cell hover-action overlay ─────────────────────────
 
-  describe("cell hover actions (G13)", () => {
+  describe("cell hover actions", () => {
     it("renders a cell-hover-actions overlay per cell and activates only the hovered cell", async () => {
       vi.useFakeTimers();
       wrapper = mount(OTable, {
@@ -533,20 +533,16 @@ describe("OTable", () => {
         },
       });
 
-      // Overlay rendered in cells
       expect(wrapper.findAll('[data-test^="o2-table-cell-hover-actions-"]').length).toBeGreaterThan(
         0,
       );
-      // Nothing active before hover
       expect(wrapper.findAll('.hover-act[data-active="true"]').length).toBe(0);
 
-      // Hovering one cell activates exactly that cell after the debounce
       await wrapper.find('[data-test="o2-table-cell-id"]').trigger("mouseenter");
       vi.advanceTimersByTime(250);
       await nextTick();
       expect(wrapper.findAll('.hover-act[data-active="true"]').length).toBe(1);
 
-      // Leaving clears it after the leave debounce
       await wrapper.find('[data-test="o2-table-cell-id"]').trigger("mouseleave");
       vi.advanceTimersByTime(200);
       await nextTick();
@@ -555,8 +551,8 @@ describe("OTable", () => {
     });
 
     it("does not collide with a per-column '#cell-actions' slot (id: 'actions')", () => {
-      // The established convention: a column with id 'actions' renders its cell
-      // content via #cell-actions. The hover overlay must NOT hijack that name.
+      // A column with id 'actions' renders its cell content via #cell-actions;
+      // the hover overlay must not hijack that slot name.
       wrapper = mount(OTable, {
         props: {
           data: makeRows(1),
@@ -566,9 +562,7 @@ describe("OTable", () => {
           "cell-actions": `<span data-test="col-actions">Edit</span>`,
         },
       });
-      // Per-column actions slot still renders
       expect(wrapper.find('[data-test="col-actions"]').exists()).toBe(true);
-      // No generic hover overlay was created (that slot wasn't provided)
       expect(wrapper.findAll('[data-test^="o2-table-cell-hover-actions-"]').length).toBe(0);
     });
   });
@@ -669,13 +663,9 @@ describe("OTable", () => {
       expect(wrapper.find('[data-test="o2-table-root"]').exists()).toBe(true);
     });
 
-    // NOTE (G8 variable-height virtual rows): OTable auto-enables per-row DOM
-    // measurement when `virtualScroll && wrap` (see useTableVirtualization
-    // `dynamicRowHeight` + OTableBodyRow `data-index`/measureRowElement). It
-    // cannot be asserted in jsdom — the virtualizer returns 0 virtual items with
-    // no real scroll-element size, so the virtual branch (which carries the
-    // wiring) never renders and getBoundingClientRect is 0. Validated via the
-    // logs-grid browser QA (§6.1 wrap + scroll).
+    // Variable-height virtual rows can't be asserted in jsdom: with no real
+    // scroll-element size the virtualizer returns 0 virtual items, so the
+    // branch carrying the measurement wiring never renders.
   });
 
   // ── Column Management ──────────────────────────────────────
@@ -1236,7 +1226,7 @@ describe("OTable", () => {
     });
   });
 
-  // ── Per-column value filter (#2239.4) ────────────────────────
+  // ── Per-column value filter ────────────────────────
   describe("per-column value filter", () => {
     function filterableColumns(): OTableColumnDef<TestRow>[] {
       return makeColumns().map((c) => (c.id === "status" ? { ...c, filterable: true } : c));
@@ -1305,7 +1295,7 @@ describe("OTable", () => {
     });
   });
 
-  // ── Column close "x" gating (#2239.1) ────────────────────────
+  // ── Column close "x" gating ────────────────────────
   describe("column close (x) affordance", () => {
     it("does NOT show the close x on a hideable column by default", async () => {
       const columns: OTableColumnDef<TestRow>[] = makeColumns().map((c) =>
@@ -1315,8 +1305,7 @@ describe("OTable", () => {
         props: { data: makeRows(3), columns, pagination: "none", sorting: "none" },
       });
       await nextTick();
-      // hideable must not imply closable — otherwise every table's headers show
-      // a dead "x" (QA #2239.1, seen on the dashboards list).
+      // hideable must not imply closable, or every table's headers show a dead "x".
       expect(wrapper.find('[data-test="o2-table-th-remove-name-btn"]').exists()).toBe(false);
     });
 
@@ -1333,7 +1322,7 @@ describe("OTable", () => {
     });
   });
 
-  // ── Column reorder (#2239.11) ────────────────────────────────
+  // ── Column reorder ────────────────────────────────
   describe("column reorder", () => {
     it("re-emits column-order-change when the header updates the order", async () => {
       wrapper = mount(OTable, {
@@ -1350,8 +1339,6 @@ describe("OTable", () => {
       const newOrder = ["status", "id", "name", "email"];
       header.vm.$emit("update:column-order", newOrder);
       await nextTick();
-      // Previously OTable swallowed this (only updated its internal order), so
-      // consumers like the logs grid never persisted the reorder — #2239.11.
       const emitted = wrapper.emitted("column-order-change");
       expect(emitted).toBeTruthy();
       expect(emitted![emitted!.length - 1][0]).toEqual(newOrder);

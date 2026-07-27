@@ -1095,8 +1095,8 @@ export const useStreamFields = () => {
             cell: (info: any) => info.getValue(),
             header: "source",
             sortable: true,
-            // Not resizable, and elastic: the source (raw-JSON) column fills the
-            // leftover width beside the fixed timestamp column (matches legacy).
+            // Elastic: the source column fills the width left beside the
+            // fixed-width timestamp column.
             resizable: false,
             meta: {
               closable: false,

@@ -37,16 +37,15 @@ const props = defineProps<{
   pivotRowColumns?: any[];
   stickyColTotals?: boolean;
   dense?: boolean;
-  /** Show the Excel-style per-column value-filter dropdown on filterable columns. */
+  /** Show the per-column value-filter dropdown on filterable columns. */
   enableColumnFilter?: boolean;
 }>();
 
 const { t } = useI18n();
 
-// ── Per-column value filter (ported from the legacy TenstackTable) ──
+// ── Per-column value filter ─────────────────────────────────────
 // Filter state lives in the TanStack instance (column.getFilterValue /
-// setFilterValue → useTableCore's `valueInSet` fn); this only supplies the UI
-// and each panel's local search box.
+// setFilterValue); this only supplies the UI and each panel's search box.
 const colFilterSearch = reactive<Record<string, string>>({});
 
 function columnUniqueValues(colId: string): any[] {
@@ -107,8 +106,8 @@ const emit = defineEmits<{
   "drag-start": [event: any];
   "drag-end": [];
   "resize-start": [];
-  /** Per-column close ("x") — remove-column affordance (G4). Emits the column
-   *  definition so the consumer can drop the field (distinct from hide). */
+  /** Per-column close ("x"). Emits the column definition so the consumer can
+   *  drop the field - distinct from hiding it. */
   "close-column": [column: any];
 }>();
 
@@ -163,9 +162,8 @@ function headerSizeVar(header: any): string {
 
 function getPivotRowColStyle(colId: string): Record<string, any> {
   const col = props.table.getColumn(colId);
-  // Only make the row-field header sticky when the column is genuinely pinned
-  // left; otherwise header + (non-sticky) body cells would misalign on
-  // horizontal scroll. Row-field columns aren't pinned today, so this returns {}.
+  // Only sticky when the column is genuinely pinned left, or the header would
+  // misalign with the non-sticky body cells on horizontal scroll.
   if (!col || col.getIsPinned?.() !== "left") return {};
   const leftOffset = col.getStart("left");
   return {
@@ -192,19 +190,15 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
     minWidth: `${width}px`,
     maxWidth: `${width}px`,
     backgroundColor: "var(--color-table-header-bg)",
-    // Same subtle separator the pinned/actions columns use, instead of the old
-    // heavy blur — and the body + grand-total total cells now carry it too so
-    // the sticky total column reads as one shadowed column, not just a header.
+    // Same separator the pinned/actions columns use; the body and grand-total
+    // cells carry it too, so the whole column reads as one shadowed column.
     boxShadow: "-2px 0 4px -2px var(--color-border-default)",
   };
 }
 
-// Single-level pivots (1 breakdown + 1 Y) render the STANDARD header, not the
-// multi-row pivot header — so the sticky total column header must be positioned
-// here too. Without this the body total column sticks to the right while its
-// header scrolls away, leaving the header misaligned over a different column
-// (QA: "header has issue with sticky"). Mirrors the multi-level header + body
-// total-cell styles exactly (offset, fixed width, subtle separator).
+// Single-level pivots render the standard header, not the multi-row pivot one,
+// so the sticky total column has to be positioned here too - otherwise its body
+// column stays pinned while the header scrolls away.
 function getStandardStickyTotalStyle(header: any): Record<string, any> {
   const m = header.column.columnDef.meta as any;
   if (!props.stickyColTotals || !m?._isTotalColumn) return {};
@@ -229,21 +223,17 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
     class="sticky top-0 z-10"
     data-test="o2-table-pivot-header"
   >
-    <!-- bg on the <tr> as well as each <th>: in border-separate mode (forced by
-         pivot) the row-group background does not paint, so border-spacing seams
-         and rowspan/colspan gaps would be transparent and body rows would show
-         through the sticky header while scrolling (QA #2239: header overlap / no
-         header background). Mirrors the non-pivot header <tr> below. -->
+    <!-- bg on the <tr> as well as each <th>: in the border-separate mode pivots
+         force, the row-group background doesn't paint, so seams and rowspan gaps
+         would let body rows show through the sticky header. -->
     <tr
       v-for="(level, levelIdx) in pivotHeaderLevels"
       :key="'pivot-hl-' + levelIdx"
       class="bg-table-header-bg h-7"
     >
-      <!-- Row-field column headers: first row only, rowspan all levels.
-           Raw pivot row-field columns carry `name`/`field` but no `id`, so key +
-           sort + style must use `name` (=== the table column id for pivot). Using
-           `col.id` produced `undefined` for every one → duplicate Vue keys + dead
-           sort (P0-A1). -->
+      <!-- Row-field column headers: first row only, rowspan all levels. Raw
+           pivot row-field columns carry `name`/`field` but no `id`, so key, sort
+           and style must all use `name`. -->
       <th
         v-for="col in levelIdx === 0 ? pivotRowColumns : []"
         :key="'pivot-rh-' + (col.name ?? col.id)"
@@ -285,13 +275,9 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
             ? 'pivot-value-header text-secondary text-xs font-medium'
             : 'pivot-group-header text-secondary text-center text-xs font-medium',
           {
-            // Bottom divider on the cells that sit on the header's bottom edge
-            // (the leaf value row + the row-spanning total header) so the pivot
-            // header has the same header/data separator the standard header
-            // gets from its <thead> border-b — which doesn't paint in the
-            // border-separate mode pivots force (QA #2239). Uses the directional
-            // border-b color so it doesn't clash with the border-l color below
-            // on cells that carry both.
+            // Bottom divider on the cells along the header's bottom edge, since
+            // the <thead> border-b doesn't paint in border-separate mode. Uses
+            // the directional border-b color so it doesn't clash with border-l.
             'border-b-table-header-border border-b': level.isLeaf || cell._isTotalHeader,
           },
           {
@@ -301,10 +287,8 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
         :style="stickyColTotals && cell._isTotalHeader ? getPivotTotalHeaderStyle(cell) : {}"
         @click="cell._sortColumn && handleSort(cell._sortColumn)"
       >
-        <!-- Truncate the label so an unbreakable pivot group value (e.g. a long
-             user_email with no spaces to wrap on) can't overflow its narrow
-             fixed-width colspan and overlap neighbouring headers (QA issue 2239
-             item 9). Sort icon stays pinned via shrink-0. -->
+        <!-- Truncate the label so an unbreakable group value can't overflow its
+             fixed-width colspan and overlap neighbouring headers. -->
         <div
           :class="[
             'flex min-w-0 items-center gap-1 overflow-hidden',
@@ -518,9 +502,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
             />
           </div>
 
-          <!-- Column close ("x") — remove-column affordance (G4). Shown on hover
-               for columns whose meta marks them closable; emits close-column so
-               the consumer can drop the field (distinct from columnVisibility). -->
+          <!-- Column close ("x"), shown on hover for columns marked closable. -->
           <button
             v-if="(header.column.columnDef.meta as any)?.closable"
             type="button"
@@ -532,10 +514,8 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
             <OIcon name="close" size="xs" />
           </button>
 
-          <!-- Per-column value filter (#2239.4) — Excel-style multi-select
-               dropdown ported from the legacy TenstackTable. Rendered on
-               filterable columns only when the table opts in via
-               `enableColumnFilter`, so tables that don't are unaffected. -->
+          <!-- Per-column value filter: multi-select dropdown, rendered on
+               filterable columns only when the table opts in. -->
           <ODropdown
             v-if="enableColumnFilter && header.column.getCanFilter()"
             side="bottom"
@@ -786,7 +766,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
             />
           </div>
 
-          <!-- Column close ("x") — remove-column affordance (G4), hover-revealed. -->
+          <!-- Column close ("x"), shown on hover for columns marked closable. -->
           <button
             v-if="(header.column.columnDef.meta as any)?.closable"
             type="button"
@@ -798,10 +778,8 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
             <OIcon name="close" size="xs" />
           </button>
 
-          <!-- Per-column value filter (#2239.4) — Excel-style multi-select
-               dropdown ported from the legacy TenstackTable. Rendered on
-               filterable columns only when the table opts in via
-               `enableColumnFilter`, so tables that don't are unaffected. -->
+          <!-- Per-column value filter: multi-select dropdown, rendered on
+               filterable columns only when the table opts in. -->
           <ODropdown
             v-if="enableColumnFilter && header.column.getCanFilter()"
             side="bottom"

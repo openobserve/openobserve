@@ -246,17 +246,14 @@ provide(
   computed(() => !!props.horizontalScroll),
 );
 
-// Pivot: expose stickyColTotals so body cells of `_isTotalColumn` columns can
-// pin right in step with the header + grand-total footer (P1-A3).
+// Expose stickyColTotals so pivot total-column cells pin in step with the header.
 provide(
   "o2TableStickyColTotals",
   computed(() => !!props.stickyColTotals),
 );
 
-// ── Cell hover-actions (G13) ────────────────────────────────────
-// Single-active-cell model: hovering a cell marks it active (after a short
-// debounce), so a `#cell-actions` overlay renders for only one cell at a time —
-// consumers gate their (heavy) action menus on `active` to mount them lazily.
+// ── Cell hover-actions ──────────────────────────────────────────
+// Only one cell is active at a time, so consumers can mount heavy action menus lazily.
 const activeCellKey = ref<string | null>(null);
 let cellActionTimer: ReturnType<typeof setTimeout> | null = null;
 function setActiveCell(key: string | null): void {
@@ -265,18 +262,12 @@ function setActiveCell(key: string | null): void {
     cellActionTimer = null;
   }
   if (key === null) {
-    // Small delay on leave so moving the pointer INTO the overlay (which sits on
-    // top of the cell) doesn't flicker it away between the two mouse events.
+    // Delay the clear so moving the pointer INTO the overlay doesn't flicker it away.
     cellActionTimer = setTimeout(() => {
       activeCellKey.value = null;
       cellActionTimer = null;
     }, 120);
-  } else if (activeCellKey.value === key) {
-    // already active — no debounce needed
   } else {
-    // Activate immediately so hover actions appear instantly under the pointer
-    // (the main branch shows them on CSS hover with no delay). The leave delay
-    // above still prevents flicker when moving the pointer into the overlay.
     activeCellKey.value = key;
   }
 }
@@ -365,10 +356,7 @@ const pagination = useTablePagination(
   emit,
 );
 
-// Jump the table body back to the top whenever the page changes, so the user
-// lands on row 1 of the new page instead of staying at the previous scroll
-// offset (QA: changing page should scroll to top). Uses the delegated scroll
-// element when one is provided, else the internal scroll container.
+// Land on row 1 of the new page instead of keeping the previous scroll offset.
 watch(
   () => pagination.currentPage.value,
   () => {
@@ -454,13 +442,10 @@ const displayRows = computed(() => {
   return table.getRowModel().rows;
 });
 
-// ── Pivot: row-field cell merge (fake rowspan, G17) ─────────────
+// ── Pivot: row-field cell merge (fake rowspan) ──────────────────
 // Consecutive rows sharing the same leading row-field values collapse into one
-// visual cell: the first row shows the value; the rest hide their content (and
-// the group's inner borders) so the group reads as a single merged cell.
-// Active only when `pivotRowColumns` is supplied (dashboard pivot); a no-op — and
-// zero cost — for every other table. Keyed by each row-field column's `name`
-// (which must equal the OTable column id for that field).
+// visual cell: the first row shows the value, the rest hide their content and
+// the group's inner borders. Keyed by each row-field column's `name`.
 const PIVOT_ROW_KEY_SEP = "\u0000";
 const pivotMergeMap = computed(() => {
   const map = new Map<string, Record<string, { hideContent: boolean; hideBorder: boolean }>>();
@@ -510,7 +495,6 @@ function getPivotMerge(
   return pivotMergeMap.value.get(key)?.[columnId] ?? null;
 }
 
-// Grand-total row value for a column (pivot sticky tfoot).
 function pivotTotalCell(col: OTableColumnDef<TData>): any {
   const row = props.stickyTotalRow;
   if (!row) return "";
@@ -521,18 +505,14 @@ function pivotTotalCell(col: OTableColumnDef<TData>): any {
   return fmt ? fmt(val, row) : val;
 }
 
-// Combined inline style for a grand-total tfoot cell: the right-pinned
-// sticky-total-column geometry plus the monospace font for number/timestamp
-// columns (`col.mono`), so the total row's digits align with the mono body
-// cells above it. Inline so it wins over the scoped `td { --font-sans }` rule.
+// Inline so the mono font wins over the scoped `td { --font-sans }` rule.
 function pivotTotalCellStyle(col: OTableColumnDef<TData>): Record<string, any> {
   const style = pivotTotalColumnStyle(col);
   if ((col as any).mono) style.fontFamily = "var(--font-mono)";
   return style;
 }
 
-// Right-pinned total-column style for the grand-total tfoot cell (pixel math
-// matches the header/body sticky total columns).
+// Right-pinned total-column geometry, matching the header/body sticky total columns.
 function pivotTotalColumnStyle(col: OTableColumnDef<TData>): Record<string, any> {
   const m = col.meta as any;
   if (!props.stickyColTotals || !m?._isTotalColumn) return {};
@@ -541,21 +521,18 @@ function pivotTotalColumnStyle(col: OTableColumnDef<TData>): Record<string, any>
     position: "sticky",
     right: `${rightOffset}px`,
     zIndex: 2,
-    // Pin the width so the grand-total column cell stays aligned with the fixed
-    // sticky header/body total column under table-auto/w-full.
+    // Pinned width keeps this cell aligned with the header/body total column
+    // under table-auto/w-full.
     width: `${PIVOT_TABLE_TOTAL_COLUMN_WIDTH}px`,
     minWidth: `${PIVOT_TABLE_TOTAL_COLUMN_WIDTH}px`,
     maxWidth: `${PIVOT_TABLE_TOTAL_COLUMN_WIDTH}px`,
-    // Match the sticky total header/body: the same subtle left-edge separator so
-    // the shadow is continuous down the whole total column.
     boxShadow: "-2px 0 4px -2px var(--color-border-default)",
   };
 }
 
 // ── Virtual scroll ──────────────────────────────────────────────
-// Variable-height virtual rows (G8): only when a virtual table also wraps its
-// content (logs `wrap`), so fixed-height virtual tables (traces grid) keep the
-// cheaper fixed-stride path unchanged.
+// Measure row heights only when rows can wrap; otherwise keep the cheaper
+// fixed-stride path.
 const useDynamicRowHeight = computed(() => !!props.virtualScroll && !!props.wrap);
 
 const {
@@ -567,9 +544,8 @@ const {
 } = useTableVirtualization({
   rows: displayRows,
   parentRef: scrollContainerRef,
-  // Reactive getter (G10): `props.scrollEl` and the internal scroll container are
-  // both often null at setup; a getter lets the virtualizer rebind once either
-  // resolves after mount instead of freezing on the setup-time snapshot.
+  // Both scroll elements are usually null at setup; a getter lets the virtualizer
+  // rebind once either resolves after mount.
   scrollEl: () => props.scrollEl ?? scrollContainerRef.value ?? null,
   scrollMargin: props.scrollMargin ?? 0,
   // Keep this in sync with the --table-row-height-* tokens (dense = 38px) so the
@@ -582,12 +558,8 @@ const {
 const isVirtual = computed(() => props.virtualScroll && displayRows.value.length > 0);
 
 // ── Delegated scroll ────────────────────────────────────────────
-// When the caller passes an external `scrollEl` (e.g. the logs/traces grid
-// shares ONE scroll container with the histogram/RED charts above it), OTable
-// must NOT create its own scroll container — otherwise a second, nested
-// scrollbar appears. In that mode the inner container is `overflow-visible` and
-// height-auto so the whole table flows into the external element, which owns
-// the scroll (the virtualizer already targets that element via G10).
+// With an external `scrollEl` the table must not create its own scroll container,
+// or a second nested scrollbar appears; it flows into the caller's element instead.
 const isDelegatedScroll = computed(() => !!props.scrollEl);
 
 // ── Per-column CSS size-var overrides ──────────────────────────
@@ -1001,11 +973,8 @@ defineExpose({
     data-test="o2-table-root"
     :class="[
       'flex flex-col',
-      // Delegated-scroll tables (logs/traces grids) flow into an EXTERNAL scroll
-      // container, so the root must not clip: `overflow-hidden` here swallowed the
-      // horizontally-overflowing table, so a wide many-column grid had no bottom
-      // scrollbar (QA #2239: logs/traces horizontal scrollbar missing). Own-scroll
-      // tables keep overflow-hidden so their internal scroll container contains them.
+      // Delegated-scroll tables must not clip, or the horizontally-overflowing
+      // table is swallowed and the grid loses its bottom scrollbar.
       isDelegatedScroll ? 'overflow-visible' : 'overflow-hidden',
       props.fillHeight ? 'h-full' : 'h-auto',
     ]"
@@ -1116,16 +1085,11 @@ defineExpose({
       >
         <table
           :class="[
-            // Non-delegated horizontal-scroll pivot adds w-full so the table fills
-            // the container when narrower than the viewport; min-w-max lets it grow
-            // and scroll when wider. With a sticky total column, use an explicit
-            // content width (w-max) instead: the table lives in a flex-col scroll
-            // container, and with only a min-width the flex container can size it so
-            // the sticky containing block no longer matches the scrollable content,
-            // making the body total cells release after a few columns while the
-            // header stays put. w-max pins the table to its content width, keeping
-            // the sticky column stable and flush with the data. Delegated grids keep
-            // min-w-max.
+            // w-full + min-w-max fills a narrow container yet still scrolls when
+            // wider. Sticky total columns need an explicit content width (w-max):
+            // under a min-width the flex container can size the table so the sticky
+            // containing block no longer matches the scrollable content, and the
+            // body total cells release while the header stays put.
             props.horizontalScroll
               ? isDelegatedScroll
                 ? 'min-w-max'
@@ -1136,9 +1100,8 @@ defineExpose({
                 ? ''
                 : 'w-full',
             props.horizontalScroll || props.defaultColumns ? 'table-auto' : 'table-fixed',
-            // border-separate is required whenever cells are sticky (pinned/action
-            // columns, OR pivot sticky headers/total columns) so their borders +
-            // shadows travel with them; border-collapse renders those inconsistently.
+            // Sticky cells need border-separate so their borders and shadows travel
+            // with them; border-collapse renders those inconsistently.
             props.bordered &&
             !props.columns.some((c) => c.pinned || c.isAction) &&
             !(props.pivotHeaderLevels && props.pivotHeaderLevels.length) &&
@@ -1302,7 +1265,7 @@ defineExpose({
               <slot name="tree-warning" :row="warnSlotProps.row" />
             </template>
 
-            <!-- Per-cell hover-action overlay slot (G13) -->
+            <!-- Per-cell hover-action overlay slot -->
             <template v-if="slots['cell-hover-actions']" #cell-hover-actions="caProps">
               <slot
                 name="cell-hover-actions"
@@ -1367,7 +1330,7 @@ defineExpose({
             </tr>
           </tfoot>
 
-          <!-- ── Pivot grand-total row (sticky <tfoot>, G16/G17) ── -->
+          <!-- ── Pivot grand-total row (sticky <tfoot>) ── -->
           <tfoot
             v-if="props.stickyTotalRow"
             data-test="o2-table-pivot-total-foot"
@@ -1438,8 +1401,7 @@ defineExpose({
 
       <!-- ── Bottom Pagination (with optional bulk actions slot) ──
            Skipped when `customPaginationBar` is set: the caller's #bottom slot
-           owns the whole pagination bar (rendered standalone below), so the
-           built-in controls don't duplicate it (QA #2239). -->
+           owns the whole pagination bar (rendered standalone below). -->
       <OTablePagination
         v-if="pagination.isEnabled.value && !props.customPaginationBar"
         position="bottom"
@@ -1480,9 +1442,8 @@ defineExpose({
         </template>
       </OTablePagination>
 
-      <!-- Standalone #bottom slot: when pagination is disabled but the caller
-         still provides a `#bottom` (e.g. dashboard legend footer, or a pager
-         that hides itself), render it so it is never dropped. -->
+      <!-- Standalone #bottom slot, so a caller's footer is never dropped when
+           pagination is disabled. -->
       <div v-else-if="slots.bottom" data-test="o2-table-bottom">
         <slot
           name="bottom"

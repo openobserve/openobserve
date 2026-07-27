@@ -42,10 +42,10 @@ const props = defineProps<{
   rowStyleFn?: (row: any) => Record<string, any>;
   /** Virtual scroll: callback for measuring row DOM element height */
   measureEl?: (el: HTMLElement | null) => void;
-  /** Variable-height mode (G8): the virtualizer's measureElement callback. When
-   *  set, the row reports its real height (and is re-measured on reflow). */
+  /** Variable-height mode: the virtualizer's measureElement callback. When set,
+   *  the row reports its real height and is re-measured on reflow. */
   measureRowElement?: (el: Element | null) => void;
-  /** Variable-height mode flag (G8). */
+  /** Variable-height mode flag. */
   dynamicRowHeight?: boolean;
   /** Virtual index of this row — written as `data-index` so the virtualizer can
    *  key the measurement in variable-height mode. */
@@ -56,7 +56,7 @@ const props = defineProps<{
   enableCellCopy?: boolean;
   /** Per-cell inline style function */
   getCellStyle?: (params: { columnId: string; row: any; value: any }) => Record<string, any>;
-  /** Pivot row-field cell merge (G17). */
+  /** Pivot row-field cell merge. */
   getPivotMerge?: (
     row: any,
     columnId: string,
@@ -81,9 +81,8 @@ const slots = useSlots();
 
 const rowRef = ref<HTMLElement | null>(null);
 
-// Function ref for the row's <tr>: keeps rowRef in sync AND, in variable-height
-// mode (G8), hands the element to the virtualizer's measureElement so its real
-// height is measured (and re-measured on reflow via the virtualizer's observer).
+// Keeps rowRef in sync and, in variable-height mode, hands the element to the
+// virtualizer so its real height is measured.
 function setRowRef(el: any) {
   rowRef.value = (el as HTMLElement) ?? null;
   if (props.dynamicRowHeight && props.measureRowElement && el) {
@@ -359,7 +358,7 @@ function onRowBlur() {
           :index="row.index"
         />
       </template>
-      <!-- Per-cell hover-action overlay (G13) — forwarded to every cell -->
+      <!-- Per-cell hover-action overlay — forwarded to every cell -->
       <template v-if="slots['cell-hover-actions']" #cell-hover-actions="caProps">
         <slot name="cell-hover-actions" v-bind="caProps" />
       </template>
@@ -412,19 +411,15 @@ function onRowBlur() {
 </template>
 
 <style scoped>
-/* keep(complex-state): per-row status spine on the row's first cell (a
-   `> td:first-child` child-combinator target — an extra <td> would add a
-   phantom column and misalign cells under table-fixed). Drawn as a stacked
-   ::before rather than an inset box-shadow so the expand button — which is
-   `size-6` inside a `w-4` cell, so it overflows the spine and paints a hover/
-   active background — can no longer cover it (QA issue 2239 item 7: "clicking
-   the arrow hides the blue line"). pointer-events:none keeps it click-through. */
+/* keep(complex-state): per-row status spine on the row's first cell (an extra
+   <td> would add a phantom column and misalign cells under table-fixed). Drawn
+   as a stacked ::before rather than an inset box-shadow so the expand button,
+   which overflows the spine and paints a hover background, can't cover it.
+   pointer-events:none keeps it click-through. */
 .o2-table-row-with-status > td:first-child {
   position: relative;
-  /* Inset the cell content past the 0.25rem status spine so the expand chevron
-     isn't jammed against the coloured left border (QA #2239: arrow too close to
-     the vertical status line vs main). Scoped to status rows so non-logs tables
-     keep their default expand-column alignment. */
+  /* Inset the content past the 0.25rem status spine so the expand chevron isn't
+     jammed against the coloured left border. */
   padding-left: 0.5rem;
 }
 .o2-table-row-with-status > td:first-child::before {

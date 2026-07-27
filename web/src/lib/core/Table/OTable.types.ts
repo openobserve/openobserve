@@ -3,14 +3,12 @@
 import type { Component, ComputedRef, InjectionKey, Ref } from "vue";
 import type { Row, Table } from "@tanstack/vue-table";
 
-// ─── Cell hover-actions context (G13) ────────────────────────────
+// ─── Cell hover-actions context ──────────────────────────────────
 /**
  * Single-active-cell hover model shared by OTable → OTableBodyCell via
- * provide/inject. Hovering a cell marks it active (after a short debounce), so a
- * consumer's `#cell-actions` overlay renders for only ONE cell at a time — this
- * mirrors the legacy tables, which mounted a heavy actions menu lazily rather
- * than on every cell. `enabled` is false when no `#cell-actions` slot is present
- * so cells can skip the mouse bookkeeping entirely.
+ * provide/inject, so a consumer's hover overlay renders for one cell at a time.
+ * `enabled` is false when no `#cell-hover-actions` slot is present, letting
+ * cells skip the mouse bookkeeping entirely.
  */
 export interface OTableCellActionsContext {
   activeCellKey: Ref<string | null>;
@@ -205,15 +203,8 @@ export interface OTableProps<TData = any> {
   totalCount?: number;
   /** When true, the page index is NOT reset when the data array changes (e.g. on row expand/collapse). Defaults to false. */
   keepPageOnDataChange?: boolean;
-  /**
-   * When true, the caller's `#bottom` slot IS the pagination bar and fully
-   * replaces OTable's built-in pagination controls (records-per-page select +
-   * nav buttons + "showing X–Y of Z"). Use this when a caller renders its own
-   * complete pager in `#bottom` (e.g. the dashboard Table chart's
-   * TablePaginationControls) so the two bars don't render side-by-side
-   * (QA #2239: duplicate pagination controls). Leave false for the common case
-   * where `#bottom` holds only bulk actions that sit beside the built-in bar.
-   */
+  /** When true, the caller's `#bottom` slot IS the pagination bar and replaces
+   *  the built-in controls. Leave false when `#bottom` holds only bulk actions. */
   customPaginationBar?: boolean;
 
   // ── Sorting ──
@@ -293,8 +284,7 @@ export interface OTableProps<TData = any> {
   enableColumnResize?: boolean;
   enableColumnReorder?: boolean;
   enableColumnPin?: boolean;
-  /** Show the Excel-style per-column value-filter dropdown on `filterable`
-   *  columns (client-side). Off by default so existing tables are unaffected. */
+  /** Show the per-column value-filter dropdown on `filterable` columns (client-side) */
   enableColumnFilter?: boolean;
   /** Initial column visibility */
   columnVisibility?: Record<string, boolean>;
@@ -379,8 +369,8 @@ export interface OTableProps<TData = any> {
   pivotHeaderLevels?: any[];
   /** Pivot row field columns (for sticky headers + row-field cell merge) */
   pivotRowColumns?: any[];
-  /** Grand-total row data object rendered as a sticky `<tfoot>` (pivot). Keyed by
-   *  each column's `accessorKey`/`id`; values run through the column's `meta.format`. */
+  /** Grand-total row rendered as a sticky `<tfoot>`, keyed by each column's
+   *  `accessorKey`/`id`; values run through the column's `meta.format`. */
   stickyTotalRow?: Record<string, any> | null;
   /** Show sticky row totals (pins the grand-total `<tfoot>` to the bottom) */
   stickyRowTotals?: boolean;
@@ -428,8 +418,7 @@ export interface OTableEmits<TData = any> {
   // Column events
   "column-order-change": [order: string[]];
   "column-visibility-change": [visibility: Record<string, boolean>];
-  /** A column's close ("x") affordance was clicked (G4). Payload is the column
-   *  definition; the consumer decides how to remove/hide it. */
+  /** A column's close ("x") affordance was clicked; the consumer decides how to remove it. */
   "close-column": [column: OTableColumnDef<TData>];
   "update:columnSizes": [sizes: Record<string, number>, idMap: Record<string, string>];
 
@@ -452,17 +441,12 @@ export interface OTableSlots<TData = any> {
     table: Table<TData>;
   }) => any;
   /**
-   * Per-cell hover-action overlay (G13). Rendered as an absolutely-positioned
-   * overlay inside every data cell; `active` is true only for the single cell
-   * the pointer is currently hovering (debounced). Consumers gate their heavy
-   * action menus on `active` so they mount lazily — e.g. logs cell copy /
-   * add-search-term / add-to-table, traces "view traces". Scoped to
-   * `{ row, column, value, active }` (`row` is the original data object).
+   * Per-cell hover-action overlay, absolutely positioned inside every data cell.
+   * `active` is true only for the cell the pointer is hovering (debounced), so
+   * consumers can mount heavy action menus lazily.
    *
-   * NOTE: deliberately **not** named `cell-actions` — that name is already the
-   * established per-column cell slot for a column whose `id` is `"actions"`
-   * (the `#cell-{id}` convention), used across the app (WorkflowsList,
-   * SourceMaps, LogStream, …). This overlay is orthogonal to any single column.
+   * NOTE: deliberately not named `cell-actions` — that is the per-column cell
+   * slot for a column whose `id` is `"actions"` (the `#cell-{id}` convention).
    */
   "cell-hover-actions"?: (props: {
     row: TData;
@@ -470,11 +454,9 @@ export interface OTableSlots<TData = any> {
     value: any;
     active: boolean;
   }) => any;
-  /**
-   * Per-column cell slot (`#cell-<columnId>`) — scoped to the plain row data
-   * (`row.original`) + row index. The union also admits the `cell-hover-actions`
-   * shape above so that reserved key stays assignable to this index signature.
-   */
+  /** Per-column cell slot (`#cell-<columnId>`) — scoped to the plain row data
+   *  (`row.original`) + row index. The union also admits the `cell-hover-actions`
+   *  shape so that reserved key stays assignable to this index signature. */
   [key: `cell-${string}`]:
     | ((props: { row: TData; column: OTableColumnDef<TData>; value: any; index: number }) => any)
     | ((props: { row: TData; column: OTableColumnDef<TData>; value: any; active: boolean }) => any)

@@ -22,7 +22,7 @@
  * mode switch, or after the user adds/removes/reorders a column.
  *
  * Cell rendering is handled via scoped slots on <OTable>:
- *   #cell-{columnId}="{ row, value, column }"  (auto-detected per column id)
+ *   #cell-{columnId}="{ row, value, column }"
  *
  * Column order is fully driven by `selectedFields` (an ordered string[]).
  * LLM columns (input_tokens, output_tokens, cost) are injected dynamically

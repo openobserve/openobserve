@@ -47,9 +47,8 @@ const pageSizeModel = computed({
 
 const pageSizeSelectOptions = computed(() => {
   const opts = [...props.pageSizeOptions];
-  // Surface the active page size when it isn't one of the presets (e.g. a
-  // caller-configured size), inserted in ascending position, so the select
-  // shows it instead of rendering blank.
+  // Surface a caller-configured page size that isn't one of the presets, so the
+  // select shows it instead of rendering blank.
   if (props.pageSize != null && props.pageSize > 0 && !opts.includes(props.pageSize)) {
     const idx = opts.findIndex((o) => o > (props.pageSize as number));
     if (idx === -1) opts.push(props.pageSize);

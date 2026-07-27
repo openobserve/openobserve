@@ -182,8 +182,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           pagination="none"
           @row-click="handleTraceRowClick"
         >
-          <!-- Cell widths come from each column's `size` (OTable applies the
-               size var + truncation wrapper), so slots just render content. -->
           <template #cell-timestamp="{ row }">
             <span class="text-xs tabular-nums">
               {{ formatTraceTimestamp(row.metadata?.start_time) }}

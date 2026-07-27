@@ -50,10 +50,10 @@ const props = defineProps<{
   baseOffset?: number;
   /** Virtual scroll: ref callback for measuring elements */
   measureElement?: (el: any) => void;
-  /** Variable-height mode (G8): ref callback each row invokes so the virtualizer
-   *  measures its real DOM height. Only supplied when the table wraps content. */
+  /** Variable-height mode: ref callback each row invokes so the virtualizer
+   *  measures its real DOM height. */
   measureRowElement?: (el: Element | null) => void;
-  /** Variable-height mode flag (G8) — drives per-row measurement + data-index. */
+  /** Variable-height mode flag — drives per-row measurement + data-index. */
   dynamicRowHeight?: boolean;
   /** Status bar color function per row */
   getStatusBarColor?: (row: any) => string | undefined;
@@ -61,7 +61,7 @@ const props = defineProps<{
   enableCellCopy?: boolean;
   /** Per-cell inline style function */
   getCellStyle?: (params: { columnId: string; row: any; value: any }) => Record<string, any>;
-  /** Pivot row-field cell merge (G17): returns hide flags for a merged cell. */
+  /** Pivot row-field cell merge: returns hide flags for a merged cell. */
   getPivotMerge?: (
     row: any,
     columnId: string,

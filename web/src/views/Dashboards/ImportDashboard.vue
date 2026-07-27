@@ -218,10 +218,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
 
-              <!-- Import / API failures (e.g. a 404 on URL or file import)
-                   belong in this dedicated Error Validations panel, not squished
-                   into the file-input row where they were before (QA issue 2239
-                   item 2: "get error at a wrong place"). -->
               <div
                 v-if="filesImportResults.some((r) => r.status === 'rejected')"
                 class="error-section mb-2.5 shrink-0 overflow-auto p-2.5"

@@ -196,11 +196,9 @@ export function useTableCore<TData>(
   });
   const columnPinning = ref<{ left?: string[]; right?: string[] }>({});
 
-  // ── Per-column value filtering (Excel-style multi-select) ────────
-  // Each active filter is `{ id, value: rawValue[] }`: a row passes a column's
-  // filter when its cell value is one of the selected values. Empty/no filter =
-  // no restriction, so tables that never opt in (no `filterable` columns) behave
-  // exactly as before. Ported from the legacy TenstackTable column filter.
+  // ── Per-column value filtering (multi-select) ────────────────────
+  // Each active filter is `{ id, value: rawValue[] }`: a row passes when its cell
+  // value is one of the selected values; an empty filter is no restriction.
   const columnFilters = ref<ColumnFiltersState>([]);
   const valueInSet: FilterFn<TData> = (row, columnId, filterValue) => {
     if (!Array.isArray(filterValue) || filterValue.length === 0) return true;
@@ -256,7 +254,6 @@ export function useTableCore<TData>(
         maxSize: rigid ? size : (col.maxSize ?? 800),
         enableSorting: (props.sorting === "client" && col.sortable) ?? false,
         enableColumnFilter: col.filterable ?? false,
-        // Multi-select "value in set" matcher for the per-column filter dropdown.
         filterFn: col.filterable ? valueInSet : undefined,
         // Rigid (actions / #), permanent-elastic (autoWidth), and the invisible
         // spacer are never resizable. `flex` columns ARE resizable — dragging one
@@ -275,11 +272,8 @@ export function useTableCore<TData>(
           isAction: col.isAction,
           sortable: col.sortable,
           hideable: col.hideable,
-          // Closable (the hover "x" that emits close-column, G4) is OPT-IN per
-          // column via `meta.closable`. It must NOT default to `hideable`:
-          // that put a non-functional "x" on every hideable column of every
-          // table that never wired up @close-column (QA #2239.1 — the
-          // dashboards list showed a dead "x" in its headers).
+          // Opt-in per column via `meta.closable`; defaulting it to `hideable`
+          // would put a dead "x" on every table that never wires @close-column.
           closable: false,
           showWrap: false,
           // Width is independent of sibling columns; OTableHeader/BodyCell pin

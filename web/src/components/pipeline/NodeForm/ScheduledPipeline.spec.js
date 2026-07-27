@@ -1087,13 +1087,7 @@ describe("ScheduledPipeline Component", () => {
     });
   });
 
-  // ── SQL preview table — OTable migration parity (§7.5) ──────────────────────
-  // The SQL output pane migrated from the logs TenstackTable to OTable. These
-  // assert the data contract the OTable renders (timestamp + source columns, the
-  // source-JSON the #cell-source / #expansion slots consume) and the copy /
-  // send-to-AI handlers wired to those slots. Row virtualization + the actual
-  // expand→JsonPreview rendering are covered by manual QA (§6.6).
-  describe("SQL preview table (OTable migration)", () => {
+  describe("SQL preview table", () => {
     it("exposes a timestamp + source column contract for the OTable", () => {
       const cols = child.getColumns;
       expect(Array.isArray(cols)).toBe(true);
@@ -1108,7 +1102,6 @@ describe("ScheduledPipeline Component", () => {
     });
 
     it("copyLogToClipboard serialises the row to JSON by default", () => {
-      // Wired to the expansion JsonPreview's @copy. Should serialise, not throw.
       expect(typeof child.copyLogToClipboard).toBe("function");
       expect(() => child.copyLogToClipboard({ a: 1 })).not.toThrow();
     });
