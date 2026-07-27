@@ -1229,6 +1229,6 @@ export default defineComponent({
 .logs-query-editor.promql-mode :deep(.bracket-highlighting-4),
 .logs-query-editor.promql-mode :deep(.bracket-highlighting-5),
 .logs-query-editor.promql-mode :deep(.bracket-highlighting-6) {
-  color: var(--vscode-editor-foreground, var(--color-text-primary)) !important;
+  color: var(--vscode-editor-foreground, var(--color-text-body)) !important;
 }
 </style>
