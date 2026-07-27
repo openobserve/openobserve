@@ -1053,7 +1053,7 @@ pub async fn trigger_by_id<C: ConnectionTrait>(
     let trace_id = format!("trig_id_{trace_id}");
     let (success_message, err_message) = if !incident_routed {
         alert
-            .send_notification(&trace_id, &[], now, None, now, None, None)
+            .send_notification(&trace_id, &[], now, None, now, None, None, None)
             .await?
     } else {
         (String::new(), String::new())
@@ -1137,7 +1137,7 @@ pub async fn trigger_by_name(
     let trace_id = format!("trig_name_{trace_id}");
     let (success_message, err_message) = if !incident_routed {
         alert
-            .send_notification(&trace_id, &[], now, None, now, None, None)
+            .send_notification(&trace_id, &[], now, None, now, None, None, None)
             .await?
     } else {
         (String::new(), String::new())
@@ -1175,6 +1175,8 @@ pub trait AlertExt: Sync + Send + 'static {
         // samples only PAYLOAD_SAMPLE_ROWS rows for the payload, so
         // `rows.len()` caps at 100 — `{alert_count}` must come from here.
         actual_value: Option<f64>,
+        // Per-group notification identity (M-4). `None` = alert-level send.
+        group_labels: Option<&std::collections::BTreeMap<String, String>>,
     ) -> Result<(String, String), AlertError>;
 }
 
@@ -1219,6 +1221,7 @@ impl AlertExt for Alert {
         evaluation_timestamp: i64,
         level: Option<config::meta::alerts::level::AlertLevel>,
         actual_value: Option<f64>,
+        group_labels: Option<&std::collections::BTreeMap<String, String>>,
     ) -> Result<(String, String), AlertError> {
         let mut err_message = "".to_string();
         let mut success_message = "".to_string();
@@ -1291,6 +1294,7 @@ impl AlertExt for Alert {
                 evaluation_timestamp,
                 level,
                 actual_value,
+                group_labels,
             )
             .await
             {
@@ -1431,6 +1435,7 @@ pub(crate) async fn dispatch_notification(
 }
 
 #[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments)]
 async fn send_notification(
     alert: &Alert,
     dest_type: &DestinationType,
@@ -1441,6 +1446,7 @@ async fn send_notification(
     evaluation_timestamp: i64,
     level: Option<config::meta::alerts::level::AlertLevel>,
     actual_value: Option<f64>,
+    group_labels: Option<&std::collections::BTreeMap<String, String>>,
 ) -> Result<String, anyhow::Error> {
     let org_name = if let Some(org) = ORGANIZATIONS.read().await.get(&alert.org_id) {
         org.name.clone()
@@ -1479,6 +1485,7 @@ async fn send_notification(
             actual_value,
         },
         metadata,
+        group_labels,
     )
     .await;
 
@@ -1498,6 +1505,7 @@ async fn send_notification(
                 actual_value,
             },
             metadata,
+            group_labels,
         )
         .await
     } else {
@@ -1833,6 +1841,9 @@ async fn process_dest_template(
     rows_tpl_val: &[Value],
     options: ProcessTemplateOptions,
     metadata: &hashbrown::HashMap<String, String>,
+    // Group labels for a per-group notification (M-4). `None` for every
+    // ungrouped alert, which keeps their rendering byte-identical.
+    group_labels: Option<&std::collections::BTreeMap<String, String>>,
 ) -> String {
     let cfg = get_config();
     let ProcessTemplateOptions {
@@ -2199,6 +2210,21 @@ async fn process_dest_template(
     // credential_priority)
     for (key, value) in metadata.iter() {
         resp = resp.replace(&format!("{{{}}}", key), value);
+    }
+
+    // ── Group variables, LAST (M-4) ─────────────────────────────────────────
+    // Position is the whole defence, not a detail. Label values are user data
+    // and can contain `{...}`; because nothing runs after this, a pod named
+    // `{alert_name}` is written literally instead of being expanded into the
+    // alert's name by a later pass. Anything added below this point reopens
+    // that hole.
+    //
+    // The `group.` prefix is the other half: it stops a label called
+    // `alert_name` from shadowing the alert's own variable.
+    if let Some(labels) = group_labels {
+        for (name, value) in config::meta::alerts::grouping::group_template_vars(labels) {
+            process_variable_replace(&mut resp, &name, &VarValue::Str(&value), is_email);
+        }
     }
 
     resp
@@ -3733,7 +3759,8 @@ mod tests {
             &rows_tpl_val,
             options,
             &hashbrown::HashMap::new(),
-        )
+            None,
+)
         .await;
 
         // The result should be valid JSON with rows as a JSON array of objects
@@ -3781,7 +3808,8 @@ mod tests {
             &rows_tpl_val,
             options,
             &hashbrown::HashMap::new(),
-        )
+            None,
+)
         .await;
 
         let parsed: Value = serde_json::from_str(&result).unwrap();
@@ -3823,7 +3851,8 @@ mod tests {
             &rows_tpl_val,
             options,
             &hashbrown::HashMap::new(),
-        )
+            None,
+)
         .await;
 
         let parsed: Value = serde_json::from_str(&result).unwrap();
@@ -3871,7 +3900,8 @@ mod tests {
             &rows_tpl_val,
             options,
             &hashbrown::HashMap::new(),
-        )
+            None,
+)
         .await;
 
         // String values should be joined with \n (non-email), not injected as JSON array
@@ -3959,7 +3989,8 @@ mod tests {
             &rows_tpl_val,
             options,
             &hashbrown::HashMap::new(),
-        )
+            None,
+)
         .await;
 
         let parsed: Value = serde_json::from_str(&result).unwrap();
@@ -4016,7 +4047,8 @@ mod tests {
             &rows_tpl_val,
             options,
             &hashbrown::HashMap::new(),
-        )
+            None,
+)
         .await;
 
         let parsed: Value = serde_json::from_str(&result).unwrap();
@@ -4060,7 +4092,8 @@ mod tests {
             &rows_tpl_val,
             options,
             &hashbrown::HashMap::new(),
-        )
+            None,
+)
         .await;
 
         let parsed: Value = serde_json::from_str(&result).unwrap();
@@ -4591,7 +4624,8 @@ mod tests {
             &rows_tpl_val,
             options,
             &hashbrown::HashMap::new(),
-        )
+            None,
+)
         .await;
 
         let parsed: Value = serde_json::from_str(&result).unwrap();
@@ -4626,7 +4660,8 @@ mod tests {
             &rows_tpl_val,
             options,
             &hashbrown::HashMap::new(),
-        )
+            None,
+)
         .await;
 
         let parsed: Value = serde_json::from_str(&result).unwrap();
@@ -4659,6 +4694,7 @@ mod tests {
             &[Value::String("".into())],
             options,
             &hashbrown::HashMap::new(),
+            None,
         )
         .await;
         assert_eq!(result, "count=48213");
@@ -4688,6 +4724,7 @@ mod tests {
             &[Value::String("".into())],
             options,
             &hashbrown::HashMap::new(),
+            None,
         )
         .await;
         assert_eq!(result, "count=3");
@@ -4717,6 +4754,7 @@ mod tests {
             &[Value::String("".into())],
             options,
             &hashbrown::HashMap::new(),
+            None,
         )
         .await;
         // `P2`, not `2`: templates and UI use the human form (PT-4).
@@ -4744,6 +4782,7 @@ mod tests {
             &[Value::String("".into())],
             options,
             &hashbrown::HashMap::new(),
+            None,
         )
         .await;
         assert_eq!(result, "p=[] tags=[]");
@@ -4784,10 +4823,149 @@ mod tests {
             &[Value::String("".into())],
             options,
             &hashbrown::HashMap::new(),
+            None,
         )
         .await;
         // aggregation family: crit/warn come from having/warning_value; and
         // alert_count stays payload-length (groups), NOT actual_value.
         assert_eq!(result, "crit=85.5 warn=70 count=0");
     }
+
+    // ── M-4: group variables, and why position matters ──────────────────────
+
+    #[tokio::test]
+    async fn test_group_labels_render_as_prefixed_variables() {
+        let mut alert = Alert::default();
+        alert.name = "disk".into();
+        let labels: std::collections::BTreeMap<String, String> =
+            [("host".to_string(), "web-1".to_string())].into_iter().collect();
+
+        let result = process_dest_template(
+            "test_org",
+            "host={group.host}",
+            &alert,
+            &[],
+            &[Value::String("".into())],
+            ProcessTemplateOptions {
+                rows_end_time: 0,
+                start_time: None,
+                evaluation_timestamp: 0,
+                is_email: false,
+                level: None,
+                actual_value: None,
+            },
+            &hashbrown::HashMap::new(),
+            Some(&labels),
+        )
+        .await;
+
+        assert_eq!(result, "host=web-1");
+    }
+
+    #[tokio::test]
+    async fn test_a_group_value_containing_a_variable_is_not_expanded() {
+        // THE injection guarantee, and the reason group variables are
+        // substituted LAST. Label values are user data — a pod really can be
+        // named `{alert_name}`. Because nothing runs after this substitution,
+        // the value is written literally; if group vars were applied earlier
+        // (say through `context_attributes`, which is position 5 of 7), the
+        // built-in pass would then rewrite it into the alert's own name.
+        let mut alert = Alert::default();
+        alert.name = "disk-usage".into();
+        let labels: std::collections::BTreeMap<String, String> =
+            [("pod".to_string(), "{alert_name}".to_string())].into_iter().collect();
+
+        let result = process_dest_template(
+            "test_org",
+            "pod={group.pod}",
+            &alert,
+            &[],
+            &[Value::String("".into())],
+            ProcessTemplateOptions {
+                rows_end_time: 0,
+                start_time: None,
+                evaluation_timestamp: 0,
+                is_email: false,
+                level: None,
+                actual_value: None,
+            },
+            &hashbrown::HashMap::new(),
+            Some(&labels),
+        )
+        .await;
+
+        assert_eq!(
+            result, "pod={alert_name}",
+            "a label value must render literally, never expand into another variable"
+        );
+        assert!(
+            !result.contains("disk-usage"),
+            "the alert name leaked into a user-controlled label value"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_a_group_label_cannot_shadow_a_builtin_variable() {
+        // A label literally called `alert_name` must not overwrite the alert's
+        // own `{alert_name}`. The `group.` prefix is the whole defence.
+        let mut alert = Alert::default();
+        alert.name = "real-alert".into();
+        let labels: std::collections::BTreeMap<String, String> =
+            [("alert_name".to_string(), "spoofed".to_string())].into_iter().collect();
+
+        let result = process_dest_template(
+            "test_org",
+            "name={alert_name}",
+            &alert,
+            &[],
+            &[Value::String("".into())],
+            ProcessTemplateOptions {
+                rows_end_time: 0,
+                start_time: None,
+                evaluation_timestamp: 0,
+                is_email: false,
+                level: None,
+                actual_value: None,
+            },
+            &hashbrown::HashMap::new(),
+            Some(&labels),
+        )
+        .await;
+
+        assert_eq!(result, "name=real-alert");
+    }
+
+    #[tokio::test]
+    async fn test_an_ungrouped_alert_renders_exactly_as_before() {
+        // `None` must leave rendering byte-identical, or every existing alert's
+        // notification changes on upgrade.
+        let mut alert = Alert::default();
+        alert.name = "legacy".into();
+        let opts = || ProcessTemplateOptions {
+            rows_end_time: 0,
+            start_time: None,
+            evaluation_timestamp: 0,
+            is_email: false,
+            level: None,
+            actual_value: None,
+        };
+
+        let result = process_dest_template(
+            "test_org",
+            "n={alert_name} g={group.host}",
+            &alert,
+            &[],
+            &[Value::String("".into())],
+            opts(),
+            &hashbrown::HashMap::new(),
+            None,
+        )
+        .await;
+
+        assert_eq!(
+            result, "n=legacy g={group.host}",
+            "with no group context the placeholder is left untouched, as it is today"
+        );
+    }
+
 }

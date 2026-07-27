@@ -277,6 +277,9 @@ async fn dispatch_per_group(
                 triggered_at,
                 Some(item.level),
                 Some(item.actual_value),
+                // M-4: this group's labels become `{group.*}`, substituted
+                // last so a label value containing `{...}` cannot expand.
+                Some(&item.labels),
             )
             .await;
 
@@ -1348,17 +1351,34 @@ async fn handle_alert_triggers(
         // notification is skipped.
         && delivery.should_deliver()
     {
+        // Per-group dispatch IS this alert's batching unit (§5.5 MN-1), so a
+        // multi-alert never takes the alert-level grouping path. Letting it
+        // through would batch every group under one alert-scoped fingerprint
+        // and record delivery at ENQUEUE time — no per-group fingerprint
+        // (M-5), no per-group delivery state (MN-6), and no per-group failure
+        // accounting (MN-7). The groups would be silently collapsed back into
+        // the single notification multi-alerts exist to split apart.
+        let is_multi_alert = alert
+            .query_condition
+            .aggregation
+            .as_ref()
+            .is_some_and(|a| a.multi_alert);
+
         // Check if grouping is enabled BEFORE deduplication (enterprise-only feature)
         #[cfg(feature = "enterprise")]
-        let grouping_enabled = alert
-            .deduplication
-            .as_ref()
-            .and_then(|d| d.grouping.as_ref())
-            .map(|g| g.enabled)
-            .unwrap_or(false);
+        let grouping_enabled = !is_multi_alert
+            && alert
+                .deduplication
+                .as_ref()
+                .and_then(|d| d.grouping.as_ref())
+                .map(|g| g.enabled)
+                .unwrap_or(false);
 
         #[cfg(not(feature = "enterprise"))]
-        let grouping_enabled = false;
+        let grouping_enabled = {
+            let _ = is_multi_alert;
+            false
+        };
 
         if grouping_enabled {
             #[cfg(feature = "enterprise")]
@@ -1717,6 +1737,7 @@ async fn handle_alert_triggers(
                     triggered_at,
                     eval_level,
                     trigger_results.actual_value,
+                    None,
                 )
                 .await
             {

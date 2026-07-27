@@ -73,7 +73,34 @@ pub fn calculate_fingerprint(
         org_config,
         semantic_groups,
     );
-    with_level_component(base, alert, level)
+
+    // Level and group are the two IMPLICIT fingerprint components (M-5). The
+    // group one is derived from the row itself rather than passed in, so every
+    // caller gets it — there is no way to compute a fingerprint for a
+    // multi-alert row and accidentally leave the group out, which would let
+    // one group's notification dedup away another's.
+    //
+    // `with_group_component` returns the base unchanged for an ungrouped alert
+    // and for the rollup key, so existing fingerprints stay byte-identical and
+    // no live silence window is invalidated by the upgrade.
+    let with_level = with_level_component(base, alert, level);
+    config::meta::alerts::grouping::with_group_component(with_level, row_group_key(alert, result_row).as_deref())
+}
+
+/// This row's group identity, for the M-5 fingerprint component.
+///
+/// `None` for anything that is not an opted-in multi-alert, which is what
+/// keeps every pre-existing alert's fingerprint unchanged.
+fn row_group_key(alert: &Alert, row: &Map<String, Value>) -> Option<String> {
+    let agg = alert.query_condition.aggregation.as_ref()?;
+    if !agg.multi_alert {
+        return None;
+    }
+    let group_by = agg.group_by.as_ref()?;
+    // Same extractor the evaluation and dispatch use, so the fingerprint's
+    // notion of "which group" cannot drift from the state row's.
+    let labels = config::meta::alerts::dispatch::row_group_labels(row, group_by);
+    Some(config::meta::alerts::grouping::group_key(&labels))
 }
 
 /// Get or create deduplication state
