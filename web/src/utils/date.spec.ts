@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
   parseDuration,
   generateDurationLabel,
@@ -480,13 +480,101 @@ describe("Date Utilities", () => {
       // Test with different date formats that might cause issues
       const result1 = convertDateToTimestamp("31-12-2023", "23:59", "UTC");
       const result2 = convertDateToTimestamp("01-01-2024", "00:00", "UTC");
-      
+
       expect(result1.timestamp).toBeGreaterThanOrEqual(0);
       expect(result2.timestamp).toBeGreaterThanOrEqual(0);
       // Only compare if both timestamps are valid (not 0)
       if (result1.timestamp > 0 && result2.timestamp > 0) {
         expect(result2.timestamp).toBeGreaterThan(result1.timestamp);
       }
+    });
+
+    describe("Browser Time label across timezones", () => {
+      // Force what the code sees as the *browser* timezone without breaking
+      // Luxon. The function reads the browser zone via `Intl.DateTimeFormat()`
+      // with NO arguments; Luxon computes offsets via
+      // `new Intl.DateTimeFormat(locale, { timeZone, ... })` (always WITH
+      // arguments). We override the resolved timeZone only for the zero-arg
+      // "what's my zone" query and delegate every arg-carrying call to the real
+      // implementation, so offset math stays correct while each test pins the
+      // browser zone.
+      const RealDateTimeFormat = Intl.DateTimeFormat;
+
+      function mockBrowserTimezone(zone: string) {
+        vi.spyOn(Intl, "DateTimeFormat").mockImplementation((...args: any[]) => {
+          const instance = new (RealDateTimeFormat as any)(...args);
+          if (args.length === 0) {
+            const realResolved = instance.resolvedOptions.bind(instance);
+            instance.resolvedOptions = () => ({
+              ...realResolved(),
+              timeZone: zone,
+            });
+          }
+          return instance;
+        });
+      }
+
+      afterEach(() => {
+        vi.restoreAllMocks();
+      });
+
+      // A fixed summer date keeps offsets deterministic: LA is on PDT
+      // (UTC-7 = -420); India is UTC+5:30 = +330, no DST.
+      const DATE = "27-07-2026";
+      const TIME = "10:00";
+
+      it("unwraps a Browser Time label that matches the current browser", () => {
+        mockBrowserTimezone("America/Los_Angeles");
+        const { offset } = convertDateToTimestamp(
+          DATE,
+          TIME,
+          "Browser Time (America/Los_Angeles)",
+        );
+        expect(offset).toBe(-420);
+      });
+
+      // Regression: a label saved on a machine in one zone, re-opened/re-saved
+      // from a machine in a DIFFERENT zone. Previously the label went to Luxon
+      // verbatim (not a valid IANA zone), producing an invalid DateTime whose
+      // `.offset` is NaN — which serialized to null in the saved payload (e.g.
+      // an alert's tz_offset). Luxon does not throw, so the try/catch missed it.
+      it("unwraps a Browser Time label from a DIFFERENT browser (tz_offset null regression)", () => {
+        mockBrowserTimezone("Asia/Kolkata");
+        const { offset } = convertDateToTimestamp(
+          DATE,
+          TIME,
+          "Browser Time (America/Los_Angeles)",
+        );
+        expect(Number.isNaN(offset)).toBe(false);
+        expect(offset).toBe(-420);
+      });
+
+      it("resolves a raw IANA zone regardless of the browser zone", () => {
+        mockBrowserTimezone("Asia/Kolkata");
+        const { offset } = convertDateToTimestamp(
+          DATE,
+          TIME,
+          "America/Los_Angeles",
+        );
+        expect(offset).toBe(-420);
+      });
+
+      it("never returns NaN for an unresolvable zone (falls back to browser zone)", () => {
+        mockBrowserTimezone("Asia/Kolkata"); // +330
+        const { offset } = convertDateToTimestamp(DATE, TIME, "Not/AZone");
+        expect(Number.isNaN(offset)).toBe(false);
+        expect(offset).toBe(330);
+      });
+
+      it("is case-insensitive for the Browser Time label", () => {
+        mockBrowserTimezone("America/Los_Angeles");
+        const { offset } = convertDateToTimestamp(
+          DATE,
+          TIME,
+          "browser time (America/Los_Angeles)",
+        );
+        expect(offset).toBe(-420);
+      });
     });
   });
 });

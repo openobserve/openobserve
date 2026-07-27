@@ -1040,8 +1040,8 @@ export const convertDateToTimestamp = (
   time: string,
   timezone: string,
 ) => {
-  const browserTime =
-    "Browser Time (" + Intl.DateTimeFormat().resolvedOptions().timeZone + ")";
+  const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const browserTime = "Browser Time (" + browserTimezone + ")";
 
   const [day, month, year] = date.split("-");
   const [hour, minute] = time.split(":");
@@ -1054,17 +1054,37 @@ export const convertDateToTimestamp = (
     minute: Number(minute),
   };
 
-  if (timezone.toLowerCase() == browserTime.toLowerCase()) {
-    timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  // Timezone values may be a raw IANA zone ("America/Los_Angeles") or the
+  // wrapped "Browser Time (<zone>)" label the pickers store. The label's inner
+  // zone is a real IANA zone regardless of which machine produced it, so it
+  // must be unwrapped whether or not it matches THIS browser — otherwise Luxon
+  // receives the literal "Browser Time (…)" string as a zone, produces an
+  // invalid DateTime, and `.offset` is NaN (which serializes to null in the
+  // saved payload, e.g. an alert's tz_offset).
+  const browserTimeMatch = timezone.match(/^Browser Time \((.+)\)$/i);
+  if (browserTimeMatch) {
+    // Exact match with the current browser resolves to the live browser zone;
+    // a label from another machine falls back to the zone named in the label.
+    timezone =
+      timezone.toLowerCase() === browserTime.toLowerCase()
+        ? browserTimezone
+        : browserTimeMatch[1];
   }
 
   // Create a DateTime instance from date and time, then set the timezone
   const dateTime = _DateTime.fromObject(_date, { zone: timezone });
 
-  // Convert the DateTime to a Unix timestamp in milliseconds
-  const unixTimestampMillis = dateTime.toMillis();
+  // Guard against an unresolvable zone: an invalid Luxon DateTime returns NaN
+  // for both toMillis() and offset. Fall back to the browser zone so callers
+  // always get a usable numeric offset instead of NaN/null.
+  const resolved = dateTime.isValid
+    ? dateTime
+    : _DateTime.fromObject(_date, { zone: browserTimezone });
 
-  return { timestamp: unixTimestampMillis * 1000, offset: dateTime.offset }; // timestamp in microseconds
+  // Convert the DateTime to a Unix timestamp in milliseconds
+  const unixTimestampMillis = resolved.toMillis();
+
+  return { timestamp: unixTimestampMillis * 1000, offset: resolved.offset }; // timestamp in microseconds
 };
 
 export const isValidResourceName = (name: string) => {
