@@ -246,8 +246,17 @@ pub enum SloValidationError {
     /// against every value, so every slice classifies bad; `±inf` classifies
     /// every slice the same way in the other direction.
     ThresholdNotFinite(f64),
-    /// The `alert` SLI type is gated on the S-16 availability ledger.
-    AlertSliNotAvailable,
+    /// An `alert` SLI was configured without facts about its source.
+    AlertSliSourceUnknown,
+    /// Only scheduled alerts carry durable level state (C-7, D12).
+    AlertSliSourceNotScheduled,
+    /// Per-group coverage is not derivable: `TriggerData` is one record per
+    /// evaluation, not per group (D8), so a grouped source cannot say which of
+    /// its groups were measured (D65).
+    AlertSliSourceIsGrouped,
+    /// SLO alerts and composites are excluded as sources — which is what
+    /// prevents `SLO → alert → SLO` cycles without a cycle checker.
+    AlertSliSourceIneligible,
 }
 
 impl std::fmt::Display for SloValidationError {
@@ -281,8 +290,17 @@ impl std::fmt::Display for SloValidationError {
             Self::ThresholdNotFinite(v) => {
                 write!(f, "time-slice threshold {v} must be a finite number")
             }
-            Self::AlertSliNotAvailable => f.write_str(
-                "the alert-based SLI type requires the measurement-availability ledger (S-16)",
+            Self::AlertSliSourceUnknown => {
+                f.write_str("an alert-based SLI requires facts about its source alert")
+            }
+            Self::AlertSliSourceNotScheduled => f.write_str(
+                "an alert-based SLI requires a scheduled source alert; only those carry durable                  level state",
+            ),
+            Self::AlertSliSourceIsGrouped => f.write_str(
+                "an alert-based SLI requires an ungrouped source alert: the triggers stream                  carries one record per evaluation, not per group, so per-group coverage cannot                  be derived",
+            ),
+            Self::AlertSliSourceIneligible => f.write_str(
+                "SLO alerts and composite alerts cannot be SLI sources — that is what prevents                  SLO -> alert -> SLO cycles",
             ),
         }
     }
@@ -463,6 +481,21 @@ pub fn validate_query_safety(
     todo!("validate_query_safety")
 }
 
+/// What an `alert` SLI needs to know about its source, gathered by the caller.
+///
+/// Passed in rather than looked up, so this layer stays free of I/O — the same
+/// discipline as [`condition::SloFacts`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SourceAlertFacts {
+    /// Only scheduled alerts carry durable level state (C-7, D12).
+    pub is_scheduled: bool,
+    /// A grouped source cannot report per-group coverage: the triggers stream
+    /// carries one record per evaluation, not per group (D8, D65).
+    pub is_grouped: bool,
+    pub is_slo_alert: bool,
+    pub is_composite: bool,
+}
+
 /// Validate an SLO definition and target at save time.
 ///
 /// **Check order is part of the contract** — several inputs violate more than
@@ -472,13 +505,16 @@ pub fn validate_query_safety(
 /// 2. `window_secs` is a supported rolling window (S-3)
 /// 3. `slice_interval_secs` is 60 or 300 (S-4)
 /// 4. grouped SLOs are pinned to 300s slices (D30)
-/// 5. SLI-type specifics: comparator orderability, threshold finiteness, the S-16 gate
+/// 5. SLI-type specifics: comparator orderability, threshold finiteness, and for an `alert` SLI the
+///    source-eligibility rules (scheduled, ungrouped, not itself an SLO alert or composite)
+///
+/// `source_alert` is required when — and only when — the SLI type is `alert`.
 pub fn validate_slo(
     definition: &SloDefinition,
     target: f64,
-    alert_sli_enabled: bool,
+    source_alert: Option<SourceAlertFacts>,
 ) -> Result<(), SloValidationError> {
-    let _ = (definition, target, alert_sli_enabled);
+    let _ = (definition, target, source_alert);
     todo!("validate_slo")
 }
 
@@ -526,14 +562,14 @@ mod tests {
 
     #[test]
     fn a_well_formed_slo_is_accepted() {
-        assert_eq!(validate_slo(&ungrouped(), 99.9, false), Ok(()));
+        assert_eq!(validate_slo(&ungrouped(), 99.9, None), Ok(()));
     }
 
     #[test]
     fn a_target_of_one_hundred_is_rejected() {
         // A zero error budget makes every burn rate 0 or infinite.
         assert_eq!(
-            validate_slo(&ungrouped(), 100.0, false),
+            validate_slo(&ungrouped(), 100.0, None),
             Err(SloValidationError::TargetOutOfRange(100.0))
         );
     }
@@ -542,7 +578,7 @@ mod tests {
     fn a_target_at_or_below_zero_is_rejected() {
         for t in [0.0, -1.0] {
             assert_eq!(
-                validate_slo(&ungrouped(), t, false),
+                validate_slo(&ungrouped(), t, None),
                 Err(SloValidationError::TargetOutOfRange(t))
             );
         }
@@ -551,7 +587,7 @@ mod tests {
     #[test]
     fn a_target_above_one_hundred_is_rejected() {
         assert_eq!(
-            validate_slo(&ungrouped(), 100.5, false),
+            validate_slo(&ungrouped(), 100.5, None),
             Err(SloValidationError::TargetOutOfRange(100.5))
         );
     }
@@ -559,14 +595,14 @@ mod tests {
     #[test]
     fn three_decimal_places_are_accepted() {
         for t in [99.999, 99.95, 99.0, 95.5] {
-            assert_eq!(validate_slo(&ungrouped(), t, false), Ok(()), "{t} rejected");
+            assert_eq!(validate_slo(&ungrouped(), t, None), Ok(()), "{t} rejected");
         }
     }
 
     #[test]
     fn four_decimal_places_are_rejected() {
         assert_eq!(
-            validate_slo(&ungrouped(), 99.9999, false),
+            validate_slo(&ungrouped(), 99.9999, None),
             Err(SloValidationError::TargetTooPrecise(99.9999))
         );
     }
@@ -576,7 +612,7 @@ mod tests {
     #[test]
     fn range_is_checked_before_precision() {
         assert_eq!(
-            validate_slo(&ungrouped(), 100.0001, false),
+            validate_slo(&ungrouped(), 100.0001, None),
             Err(SloValidationError::TargetOutOfRange(100.0001))
         );
     }
@@ -588,7 +624,7 @@ mod tests {
         for w in [WINDOW_7D_SECS, WINDOW_30D_SECS, WINDOW_90D_SECS] {
             let mut d = ungrouped();
             d.window_secs = w;
-            assert_eq!(validate_slo(&d, 99.9, false), Ok(()), "window {w} rejected");
+            assert_eq!(validate_slo(&d, 99.9, None), Ok(()), "window {w} rejected");
         }
     }
 
@@ -597,7 +633,7 @@ mod tests {
         let mut d = ungrouped();
         d.window_secs = 14 * 86_400;
         assert_eq!(
-            validate_slo(&d, 99.9, false),
+            validate_slo(&d, 99.9, None),
             Err(SloValidationError::UnsupportedWindow(14 * 86_400))
         );
     }
@@ -607,7 +643,7 @@ mod tests {
     fn a_calendar_month_is_not_mistaken_for_thirty_days() {
         let mut d = ungrouped();
         d.window_secs = 31 * 86_400;
-        assert!(validate_slo(&d, 99.9, false).is_err());
+        assert!(validate_slo(&d, 99.9, None).is_err());
     }
 
     // ---- slice intervals (S-4, D30) ----------------------------------------
@@ -616,7 +652,7 @@ mod tests {
     fn both_supported_slice_intervals_are_accepted() {
         for s in [SLICE_60_SECS, SLICE_300_SECS] {
             let d = def(count_config(), None, s);
-            assert_eq!(validate_slo(&d, 99.9, false), Ok(()), "slice {s} rejected");
+            assert_eq!(validate_slo(&d, 99.9, None), Ok(()), "slice {s} rejected");
         }
     }
 
@@ -625,7 +661,7 @@ mod tests {
         for s in [30, 120, 600, 0, -60] {
             let d = def(count_config(), None, s);
             assert_eq!(
-                validate_slo(&d, 99.9, false),
+                validate_slo(&d, 99.9, None),
                 Err(SloValidationError::UnsupportedSliceInterval(s)),
                 "slice {s} accepted"
             );
@@ -638,7 +674,7 @@ mod tests {
     fn a_grouped_slo_is_pinned_to_five_minute_slices() {
         let d = def(count_config(), Some(vec!["region".into()]), SLICE_60_SECS);
         assert_eq!(
-            validate_slo(&d, 99.9, false),
+            validate_slo(&d, 99.9, None),
             Err(SloValidationError::GroupedRequiresCoarseSlice {
                 slice_interval_secs: SLICE_60_SECS
             })
@@ -648,14 +684,14 @@ mod tests {
     #[test]
     fn a_grouped_slo_with_five_minute_slices_is_accepted() {
         let d = def(count_config(), Some(vec!["region".into()]), SLICE_300_SECS);
-        assert_eq!(validate_slo(&d, 99.9, false), Ok(()));
+        assert_eq!(validate_slo(&d, 99.9, None), Ok(()));
     }
 
     /// An empty `group_by` is not "grouped" and must not trip the pin.
     #[test]
     fn an_empty_group_by_is_not_treated_as_grouped() {
         let d = def(count_config(), Some(vec![]), SLICE_60_SECS);
-        assert_eq!(validate_slo(&d, 99.9, false), Ok(()));
+        assert_eq!(validate_slo(&d, 99.9, None), Ok(()));
     }
 
     // ---- SLI-type specifics -------------------------------------------------
@@ -669,7 +705,7 @@ mod tests {
             Operator::GreaterThanEquals,
         ] {
             let d = def(time_slice_config(op), None, SLICE_60_SECS);
-            assert_eq!(validate_slo(&d, 99.9, false), Ok(()), "{op} rejected");
+            assert_eq!(validate_slo(&d, 99.9, None), Ok(()), "{op} rejected");
         }
     }
 
@@ -680,41 +716,103 @@ mod tests {
         for op in [Operator::EqualTo, Operator::NotEqualTo, Operator::Contains] {
             let d = def(time_slice_config(op), None, SLICE_60_SECS);
             assert_eq!(
-                validate_slo(&d, 99.9, false),
+                validate_slo(&d, 99.9, None),
                 Err(SloValidationError::ComparatorNotOrderable(op)),
                 "{op} accepted"
             );
         }
     }
 
-    /// S-16: without the availability ledger, "Ok for 3h" and "paused for 3h"
-    /// are indistinguishable, so this SLI would count unmeasured time as
-    /// uptime.
-    #[test]
-    fn the_alert_sli_is_rejected_while_the_ledger_is_missing() {
-        let d = def(
+    fn alert_def() -> SloDefinition {
+        def(
             SliConfig::Alert {
                 alert_id: "abc".into(),
             },
             None,
             SLICE_60_SECS,
-        );
+        )
+    }
+
+    fn eligible_source() -> SourceAlertFacts {
+        SourceAlertFacts {
+            is_scheduled: true,
+            is_grouped: false,
+            is_slo_alert: false,
+            is_composite: false,
+        }
+    }
+
+    #[test]
+    fn an_alert_sli_over_an_eligible_source_is_accepted() {
         assert_eq!(
-            validate_slo(&d, 99.9, false),
-            Err(SloValidationError::AlertSliNotAvailable)
+            validate_slo(&alert_def(), 99.9, Some(eligible_source())),
+            Ok(())
         );
     }
 
     #[test]
-    fn the_alert_sli_is_accepted_once_the_ledger_exists() {
-        let d = def(
-            SliConfig::Alert {
-                alert_id: "abc".into(),
-            },
-            None,
-            SLICE_60_SECS,
+    fn an_alert_sli_without_source_facts_is_rejected() {
+        assert_eq!(
+            validate_slo(&alert_def(), 99.9, None),
+            Err(SloValidationError::AlertSliSourceUnknown)
         );
-        assert_eq!(validate_slo(&d, 99.9, true), Ok(()));
+    }
+
+    /// Only scheduled alerts carry durable level state (C-7, D12).
+    #[test]
+    fn a_non_scheduled_source_is_rejected() {
+        let facts = SourceAlertFacts {
+            is_scheduled: false,
+            ..eligible_source()
+        };
+        assert_eq!(
+            validate_slo(&alert_def(), 99.9, Some(facts)),
+            Err(SloValidationError::AlertSliSourceNotScheduled)
+        );
+    }
+
+    /// D65: `TriggerData` is one record per evaluation, not per group (D8), so
+    /// a grouped source cannot say which of its groups were measured — and
+    /// M-6 eviction / M-7 aging make that a real distinction, not a pedantic
+    /// one.
+    #[test]
+    fn a_grouped_source_alert_is_rejected() {
+        let facts = SourceAlertFacts {
+            is_grouped: true,
+            ..eligible_source()
+        };
+        assert_eq!(
+            validate_slo(&alert_def(), 99.9, Some(facts)),
+            Err(SloValidationError::AlertSliSourceIsGrouped)
+        );
+    }
+
+    /// Excluding SLO alerts as sources is what prevents SLO -> alert -> SLO
+    /// cycles without a cycle checker.
+    #[test]
+    fn an_slo_alert_or_composite_source_is_rejected() {
+        for facts in [
+            SourceAlertFacts {
+                is_slo_alert: true,
+                ..eligible_source()
+            },
+            SourceAlertFacts {
+                is_composite: true,
+                ..eligible_source()
+            },
+        ] {
+            assert_eq!(
+                validate_slo(&alert_def(), 99.9, Some(facts)),
+                Err(SloValidationError::AlertSliSourceIneligible)
+            );
+        }
+    }
+
+    /// Source facts are irrelevant to the other SLI types and must not be
+    /// required of them.
+    #[test]
+    fn non_alert_slis_do_not_need_source_facts() {
+        assert_eq!(validate_slo(&ungrouped(), 99.9, None), Ok(()));
     }
 
     // ---- derived discriminant ----------------------------------------------
@@ -1191,7 +1289,7 @@ mod tests {
             };
             let d = def(cfg, None, SLICE_60_SECS);
             assert_eq!(
-                validate_slo(&d, 99.9, false),
+                validate_slo(&d, 99.9, None),
                 Err(SloValidationError::ThresholdNotFinite(bad)),
                 "threshold {bad} accepted"
             );
@@ -1212,7 +1310,7 @@ mod tests {
             };
             let d = def(cfg, None, SLICE_60_SECS);
             assert_eq!(
-                validate_slo(&d, 99.9, false),
+                validate_slo(&d, 99.9, None),
                 Ok(()),
                 "threshold {ok} rejected"
             );
@@ -1225,7 +1323,7 @@ mod tests {
     fn a_non_finite_target_is_rejected() {
         for bad in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
             assert!(
-                validate_slo(&ungrouped(), bad, false).is_err(),
+                validate_slo(&ungrouped(), bad, None).is_err(),
                 "target {bad} accepted"
             );
         }

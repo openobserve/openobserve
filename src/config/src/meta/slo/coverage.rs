@@ -23,6 +23,11 @@
 //!
 //! Deliberate divergence from Datadog, which counts missing data in a Time
 //! Slice SLO as uptime (D34).
+//!
+//! For an `alert`-type SLI the same question is asked of a *source alert's*
+//! evaluations rather than of a query — see [`evaluation_is_measured`].
+
+use crate::meta::self_reporting::usage::RunOutcome;
 
 /// Coverage as a fraction in `[0, 1]`: observed slices over *expected* slices,
 /// where expected comes from the aligned grid — never from what a query
@@ -86,6 +91,23 @@ pub fn observe(read: WindowRead, coverage_floor: f64, watermark_stale: bool) -> 
     todo!("coverage::observe")
 }
 
+/// Whether one evaluation of a **source alert** counts as a measurement, for
+/// an `alert`-type SLI (S-16, D65).
+///
+/// This is not a new classification — it is exactly §7.6's rule for which
+/// outcomes refresh `level_at`, i.e. which evaluations actually computed a
+/// level. An `alert` SLI's coverage is the fraction of slices containing at
+/// least one such record in the `triggers` stream.
+///
+/// The cases that are *absent* rather than negative matter just as much: a
+/// paused or disabled alert publishes **no record at all** (the scheduler
+/// returns before publishing), so its slices have no evidence of measurement
+/// and fall through gap-fill as uncovered.
+pub fn evaluation_is_measured(outcome: &RunOutcome) -> bool {
+    let _ = outcome;
+    todo!("coverage::evaluation_is_measured")
+}
+
 /// Whether an SLO's overall status should read as `NoData` (S-8).
 pub fn is_no_data(read: WindowRead, coverage_floor: f64) -> bool {
     let _ = (read, coverage_floor);
@@ -95,6 +117,7 @@ pub fn is_no_data(read: WindowRead, coverage_floor: f64) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::meta::self_reporting::usage::RunOutcome;
 
     const FLOOR: f64 = 0.8;
 
@@ -270,6 +293,89 @@ mod tests {
             },
             FLOOR
         ));
+    }
+
+    // ---- alert-SLI measurement availability (S-16, D65) --------------------
+
+    /// The outcomes that computed a level are exactly the ones that count as
+    /// measurement — the same partition §7.6 uses for `level_at`.
+    #[test]
+    fn evaluations_that_computed_a_level_count_as_measured() {
+        for outcome in [
+            RunOutcome::Firing,
+            RunOutcome::Normal,
+            RunOutcome::NotifyFailed,
+        ] {
+            assert!(
+                evaluation_is_measured(&outcome),
+                "{outcome:?} computed a level and must count as measured"
+            );
+        }
+    }
+
+    /// A query failure observed nothing, so it cannot contribute uptime — the
+    /// same reason §7.6 refuses to refresh `level_at` on an error.
+    #[test]
+    fn an_errored_evaluation_is_not_a_measurement() {
+        assert!(!evaluation_is_measured(&RunOutcome::Error));
+    }
+
+    #[test]
+    fn a_skipped_evaluation_is_not_a_measurement() {
+        assert!(!evaluation_is_measured(&RunOutcome::Skipped));
+    }
+
+    /// An interval in which the source alert was **paused** has no records at
+    /// all, so it must read as reduced coverage rather than as uptime. This is
+    /// the case S-16 exists for: pausing an alert is a routine operator
+    /// action, and counting that time as good would silently inflate the SLO
+    /// for as long as the pause lasted.
+    #[test]
+    fn a_paused_interval_reduces_coverage_rather_than_counting_as_uptime() {
+        // 100 slices expected; the source alert was paused for 40 of them, so
+        // those produced no trigger records at all.
+        let read = WindowRead {
+            good: 60.0,
+            total: 60.0, // every measured slice was healthy
+            observed_slices: 60,
+            expected_slices: 100,
+        };
+        assert!((coverage(60, 100) - 0.6).abs() < 1e-9);
+        assert_eq!(
+            observe(read, FLOOR, false),
+            Observation::Unobserved(UnobservedReason::BelowCoverageFloor),
+            "a 60%-covered window must not report the 100% SLI of the slices \
+             that happened to be measured"
+        );
+    }
+
+    /// The same, for intervals the alert *ran* but failed to evaluate. These
+    /// DO produce records, so they must be excluded by status rather than by
+    /// absence — a coverage rule keyed only on "is there a record" would count
+    /// them.
+    #[test]
+    fn an_errored_interval_reduces_coverage_rather_than_counting_as_uptime() {
+        let measured = [
+            RunOutcome::Normal,
+            RunOutcome::Error,
+            RunOutcome::Error,
+            RunOutcome::Normal,
+        ]
+        .iter()
+        .filter(|o| evaluation_is_measured(o))
+        .count();
+        assert_eq!(measured, 2, "the errored slices must not be counted");
+
+        let read = WindowRead {
+            good: 2.0,
+            total: 2.0,
+            observed_slices: measured as i64,
+            expected_slices: 4,
+        };
+        assert!(
+            !observe(read, FLOOR, false).is_observed(),
+            "half the window unmeasured must freeze, not report 100%"
+        );
     }
 
     // ---- per-window independence (SA-17) -----------------------------------
