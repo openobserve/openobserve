@@ -21,16 +21,16 @@
           class="flex items-center"
         >
           <OButtonGroup
-            class="axis-field border-border-default border-s-badge-orange-ol-border bg-surface-panel overflow-hidden border border-s-2"
+            class="axis-field border-border-default border-s-badge-orange-ol-border bg-surface-panel overflow-hidden border border-s-2 [&>*:not(:first-child)]:!border-s"
             radius="sm"
-            :divided="false"
+            :divided="true"
           >
             <ODropdown>
               <template #trigger>
                 <OButton
                   variant="ghost"
                   size="chip-12"
-                  class="!ps-1 !pe-0"
+                  class="!ps-1 !pe-1"
                   :data-test="`promql-label-filter-${index}`"
                 >
                   <span class="leading-normal font-normal whitespace-nowrap">
@@ -113,7 +113,7 @@
             <OButton
               variant="ghost"
               size="icon-chip"
-              class="-ms-1 !w-4"
+              class="!w-4"
               @click="removeLabel(index)"
               :data-test="`promql-label-filter-remove-${index}`"
             >

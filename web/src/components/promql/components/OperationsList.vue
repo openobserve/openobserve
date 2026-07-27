@@ -24,9 +24,9 @@
         <template v-for="(element, index) in props.operations" :key="getItemKey(element, index)">
           <div data-test="promql-operations-item">
             <OButtonGroup
-              class="axis-field border-border-default border-s-badge-purple-ol-border bg-surface-panel overflow-hidden border border-s-2"
+              class="axis-field border-border-default border-s-badge-purple-ol-border bg-surface-panel overflow-hidden border border-s-2 [&>*:not(:first-child)]:!border-s"
               radius="sm"
-              :divided="false"
+              :divided="true"
             >
               <OButton
                 variant="ghost"
@@ -44,7 +44,7 @@
                   <OButton
                     variant="ghost"
                     size="chip-12"
-                    class="!ps-1 !pe-0"
+                    class="!ps-1 !pe-1"
                     :no-wrap="true"
                     :data-test="`promql-operation-${index}`"
                   >
@@ -124,7 +124,7 @@
               <OButton
                 variant="ghost"
                 size="icon-chip"
-                class="-ms-1 !w-4"
+                class="!w-4"
                 @click="removeOperation(index)"
                 :data-test="`promql-operation-remove-${index}`"
               >
