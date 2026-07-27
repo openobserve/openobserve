@@ -9049,6 +9049,8 @@
       "saveError": "Failed to save eval job",
       "createdAndActivated": "Eval job created and activated",
       "createdButActivateFailed": "Eval job created, but activation failed",
+      "savedAndActivated": "Eval job saved and activated",
+      "savedButActivateFailed": "Eval job saved, but activation failed",
       "validation": {
         "nameRequired": "Job name is required",
         "streamRequired": "A stream is required",

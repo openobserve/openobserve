@@ -52,6 +52,15 @@ function escapeSqlString(s: string): string {
   return s.replace(/'/g, "''");
 }
 
+// Each evaluation invocation writes one root/summary `_evaluator` span
+// (`online_eval.evaluate`, `is_root`) with NO `attributes_scorer_id` — plus one
+// child span per scorer that DOES carry it. A "run" here means a single scorer
+// invocation, so restrict every query to scorer-bearing rows. Without this the
+// root/summary spans (and skipped spans, which also lack a scorer id) leak into
+// the table as "(unknown scorer)" rows — score `—`, 0ms latency — and skew the
+// KPIs (inflated run count + success rate, deflated avg latency).
+const SCORER_ROW_FILTER = "attributes_scorer_id IS NOT NULL AND attributes_scorer_id != ''";
+
 function toNumber(v: unknown): number | null {
   if (v == null) return null;
   const n = typeof v === "number" ? v : Number(v);
@@ -193,6 +202,7 @@ export function useEvalJobRuns(
     const where = combineWhere(
       `CAST(attributes_job_id AS VARCHAR) = '${escapeSqlString(id)}'`,
       buildEvaluatorAgentFilterWhere(agentFilter?.value ?? null),
+      SCORER_ROW_FILTER,
     );
     return [
       "SELECT",
@@ -215,6 +225,7 @@ export function useEvalJobRuns(
     const where = combineWhere(
       `CAST(attributes_job_id AS VARCHAR) = '${escapeSqlString(id)}'`,
       buildEvaluatorAgentFilterWhere(agentFilter?.value ?? null),
+      SCORER_ROW_FILTER,
     );
     return [
       "SELECT",
@@ -245,6 +256,7 @@ export function useEvalJobRuns(
     const where = combineWhere(
       `CAST(attributes_job_id AS VARCHAR) = '${escapeSqlString(id)}'`,
       buildEvaluatorAgentFilterWhere(agentFilter?.value ?? null),
+      SCORER_ROW_FILTER,
       "attributes_status IN ('error', 'timeout')",
     );
     return [
