@@ -455,6 +455,20 @@ export default defineComponent({
   height: auto;
   transform: none;
 }
+/* Group rows span whole sections, so a centered stub reads as a gap against the
+   leaf row's dividers below it — run those boundaries the full row height too. */
+.table-wrapper :deep(thead th.pivot-group-header)::after {
+  top: 0;
+  bottom: 0;
+  height: auto;
+  transform: none;
+}
+/* A sticky total header paints over the preceding cell's divider, and its own
+   separator is a soft shadow — give it a crisp left edge to match. */
+.table-wrapper :deep(thead th.pivot-group-header[style*="sticky"]),
+.table-wrapper :deep(thead th.pivot-value-header[style*="sticky"]) {
+  border-left: 1px solid var(--color-border-default);
+}
 
 /* Pivot table styles */
 .table-wrapper :deep(.pivot-total-row) {

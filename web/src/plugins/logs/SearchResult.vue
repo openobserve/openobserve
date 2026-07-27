@@ -2276,10 +2276,12 @@ export default defineComponent({
 }
 
 /* The default expand button sets a floor under every log row height
-   regardless of :row-height, which costs a line per screen. */
+   regardless of :row-height, which costs a line per screen. Sized to fill its
+   cell rather than shrunk to the glyph, so the whole cell is clickable — a
+   glyph-sized target is easy to miss near its edges. */
 .logs-results-otable :deep([data-test^="o2-table-expand-"]) {
-  height: 1.125rem !important;
-  width: 1.125rem !important;
+  height: 1.25rem !important;
+  width: 100% !important;
   min-height: 0 !important;
 }
 .logs-results-otable :deep([data-test^="o2-table-expand-"] svg) {
