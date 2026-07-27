@@ -106,14 +106,22 @@ pub async fn init() -> errors::Result<()> {
         path: wal_dir.clone(),
     })?;
 
-    // check uncompleted parquet files, need delete those files
-    wal::check_uncompleted_parquet_files().await?;
+    // process uncompleted .lock files first: this only scans the small
+    // wal/logs dir, and it MUST run before the pack index is rebuilt (a
+    // .pack.tmp referenced by a lock file is finished data, not an orphan)
+    // and before wal replay
+    wal::check_uncompleted_lock_files().await?;
 
     // clean orphan tmp pack files and rebuild the pack segment index
     pack::init().await?;
 
     // replay wal files
     tokio::task::spawn(async move {
+        // delete orphan .par files in the background: the wal/files tree can
+        // hold millions of files, walking it must not block the startup
+        if let Err(e) = wal::clean_orphan_par_files().await {
+            log::error!("Clean orphan par files error: {e}");
+        }
         log::info!("Scanning wal files from {wal_dir:?}");
         let wal_files = wal::wal_scan_files(&wal_dir, "wal")
             .await

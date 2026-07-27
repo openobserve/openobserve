@@ -50,7 +50,13 @@ use crate::{entry::RecordBatchEntry, errors::*, immutable, memtable, writer::Wri
 //    files actually wrote to disk completely, need to continue step 4 and 5
 // 4. the process is killed before step 5, so there are some .parquet files and have lock file, the
 //    files actually wrote to disk completely, need to continue step 5
-pub(crate) async fn check_uncompleted_parquet_files() -> Result<()> {
+//
+// the lock file recovery only scans the small wal/logs dir, so it is cheap
+// and MUST run synchronously before the pack index is rebuilt (a .pack.tmp
+// referenced by a lock file is finished data, not an orphan) and before wal
+// replay. the orphan .par sweep walks the whole wal/files tree which can hold
+// millions of files, so it runs in the background: see clean_orphan_par_files.
+pub(crate) async fn check_uncompleted_lock_files() -> Result<()> {
     let cfg = config::get_config();
     // 1. get all .lock files
     let wal_dir = PathBuf::from(&cfg.common.data_wal_dir).join(crate::WAL_DIR_DEFAULT_PREFIX);
@@ -100,7 +106,16 @@ pub(crate) async fn check_uncompleted_parquet_files() -> Result<()> {
         })?;
     }
 
-    // 4. delete all the .par files
+    log::info!("Check uncompleted lock files done");
+
+    Ok(())
+}
+
+// delete orphan .par files (crash before the lock file was written). this
+// walks the whole wal/files tree which can hold millions of files, so it must
+// only be called from a background task, never on the startup path.
+pub(crate) async fn clean_orphan_par_files() -> Result<()> {
+    let cfg = config::get_config();
     let parquet_dir = PathBuf::from(&cfg.common.data_wal_dir).join("files");
     // create wal dir if not exists
     create_dir_all(&parquet_dir).context(OpenDirSnafu {
@@ -112,7 +127,7 @@ pub(crate) async fn check_uncompleted_parquet_files() -> Result<()> {
         std::fs::remove_file(par_file).context(DeleteFileSnafu { path: par_file })?;
     }
 
-    log::info!("Check uncompleted parquet files done");
+    log::info!("Clean orphan par files done");
 
     Ok(())
 }
