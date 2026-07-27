@@ -639,4 +639,49 @@ describe("convertDashboardSchemaVersion", () => {
     expect(result.tabs[0].panels[0].queries[0].fields.x).toEqual([]); // unchanged
     expect(result.tabs[0].panels[0].queries[0].fields.breakdown).toEqual([]); // empty array added
   });
+
+  // Normalizes the reserved `_timestamp` output alias to `ts` on load. This runs
+  // as a version-independent tail pass, so a v8 dashboard stays v8.
+  it("normalizes a _timestamp output alias to ts without bumping the version", () => {
+    const dataV8 = {
+      version: 8,
+      tabs: [
+        {
+          panels: [
+            {
+              config: {
+                override_config: [
+                  { field: { matchBy: "name", value: "_timestamp" }, config: [] },
+                ],
+              },
+              queries: [
+                {
+                  customQuery: true,
+                  query:
+                    'SELECT histogram(_timestamp) AS "_timestamp", count(*) AS "y_axis_1" ' +
+                    'FROM "x" GROUP BY _timestamp ORDER BY _timestamp ASC',
+                  fields: {
+                    x: [{ alias: "_timestamp", column: "_timestamp", isDerived: false }],
+                    y: [{ alias: "y_axis_1", column: "count", isDerived: false }],
+                  },
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+
+    const result = convertDashboardSchemaVersion(dataV8);
+
+    expect(result.version).toBe(8); // no version bump
+    const query = result.tabs[0].panels[0].queries[0];
+    expect(query.query).toBe(
+      'SELECT histogram(_timestamp) AS "ts", count(*) AS "y_axis_1" ' +
+        'FROM "x" GROUP BY ts ORDER BY ts ASC',
+    );
+    expect(query.fields.x[0].alias).toBe("ts");
+    expect(query.fields.x[0].column).toBe("_timestamp"); // source preserved
+    expect(result.tabs[0].panels[0].config.override_config[0].field.value).toBe("ts");
+  });
 });

@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { normalizeReservedTimestampAlias } from "@/utils/dashboard/timestampAliasRewrite";
+
 export const CURRENT_DASHBOARD_SCHEMA_VERSION = 8;
 
 const convertPanelSchemaVersion = (data: any) => {
@@ -354,6 +356,11 @@ export function convertDashboardSchemaVersion(data: any) {
       data.version = 8;
     }
   }
+
+  // `_timestamp` is not allowed as a SQL output alias — normalize it to `ts`
+  // across queries, field aliases, and alias-referencing configs. Idempotent,
+  // version-independent (runs for every dashboard on load).
+  normalizeReservedTimestampAlias(data);
 
   // return converted data
   return data;

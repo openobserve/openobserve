@@ -18,6 +18,7 @@ import { useStore } from "vuex";
 import useNotifications from "../useNotifications";
 import { b64EncodeUnicode, isStreamingEnabled } from "@/utils/zincutils";
 import { extractFields, getStreamNameFromQuery } from "@/utils/query/sqlUtils";
+import { rewriteQueryTimestampAlias } from "@/utils/dashboard/timestampAliasRewrite";
 import { validatePanel } from "@/utils/dashboard/panelValidation";
 import { CUSTOM_QUERY_CHART_TYPES } from "@/utils/dashboard/constants";
 import useStreams from "../useStreams";
@@ -1027,6 +1028,22 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     ) {
       // empty the errors
       dashboardPanelData.meta.errors.queryErrors = [];
+
+      // `_timestamp` (the timestamp column) is not allowed as a SQL output alias.
+      // Capture it from the custom query and replace the alias (and its GROUP BY /
+      // ORDER BY / HAVING references) with `ts` so fields extract and the query
+      // validates. rewriteQueryTimestampAlias is idempotent and only touches a
+      // real top-level alias; anything it can't safely rewrite is left for the
+      // existing alias validation to flag.
+      const currentQueryObj =
+        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex];
+      const rewrittenQuery = rewriteQueryTimestampAlias(
+        currentQueryObj.query,
+        store.state.zoConfig.timestamp_column ?? "_timestamp",
+      );
+      if (rewrittenQuery !== currentQueryObj.query) {
+        currentQueryObj.query = rewrittenQuery;
+      }
 
       // Get the parsed query
       try {
