@@ -158,6 +158,176 @@ async fn load_tracked_group_states(
     Ok(prev)
 }
 
+/// Per-group notification dispatch (§5.5 MN-1..MN-8) — the OSS tail.
+///
+/// Returns `Some((delivered, failed))` when this alert dispatched per group,
+/// and `None` when it is not a multi-alert and the caller should fall through
+/// to the ordinary alert-level send.
+///
+/// **This replaces the alert-level send; it does not supplement it.** Sending
+/// both would page the worst group twice per incident — once as itself and
+/// once as the rollup.
+///
+/// Order is load-bearing: the group plan is committed BEFORE anything is sent,
+/// so `plan_dispatch` reads back this evaluation's own level axis, and a send
+/// that fails leaves durable state describing what was observed.
+#[allow(clippy::too_many_arguments)]
+async fn dispatch_per_group(
+    alert: &config::meta::alerts::alert::Alert,
+    trace_id: &str,
+    classification: Option<&config::meta::alerts::grouping::GroupClassification>,
+    records: &[config::utils::json::Map<String, config::utils::json::Value>],
+    rows_end_time: i64,
+    rollup_level: Option<config::meta::alerts::level::AlertLevel>,
+    start_time: Option<i64>,
+    triggered_at: i64,
+) -> Option<(usize, usize)> {
+    use config::meta::alerts::dispatch::{plan_dispatch, rows_by_group_key};
+
+    let classification = classification?;
+    let alert_id = alert.id.as_ref()?.to_string();
+    let group_by = alert
+        .query_condition
+        .aggregation
+        .as_ref()
+        .and_then(|a| a.group_by.clone())
+        .unwrap_or_default();
+
+    // Durable state first (MN-1), then read it back: the delivery decision is
+    // made against the rows this evaluation just committed.
+    persist_alert_run_state(
+        &alert_id,
+        &config::meta::self_reporting::usage::RunOutcome::Firing,
+        rollup_level,
+        Some(classification),
+    )
+    .await;
+
+    let states = match load_tracked_group_states(&alert_id).await {
+        Ok(s) => s,
+        Err(e) => {
+            log::error!("[SCHEDULER trace_id {trace_id}] group dispatch: state read failed: {e}");
+            return Some((0, 0));
+        }
+    };
+
+    let rows = rows_by_group_key(records, &group_by);
+    let cfg = get_config();
+
+    let plan = plan_dispatch(
+        classification,
+        &states,
+        &rows,
+        &alert.trigger_condition,
+        now_micros(),
+        cfg.limit.alert_max_group_notifications_per_eval,
+    );
+
+    // Never silent: both the volume cap and any consistency failure are
+    // reported, because a page that did not go out is exactly what an
+    // operator needs to know about.
+    if !plan.dropped_by_knob.is_empty() {
+        log::warn!(
+            "[SCHEDULER trace_id {trace_id}] alert {alert_id}: {} group notification(s) dropped by \
+             ZO_ALERT_MAX_GROUP_NOTIFICATIONS_PER_EVAL={}: {:?}",
+            plan.dropped_by_knob.len(),
+            cfg.limit.alert_max_group_notifications_per_eval,
+            plan.dropped_by_knob
+        );
+    }
+    if !plan.inconsistent.is_empty() {
+        log::error!(
+            "[SCHEDULER trace_id {trace_id}] alert {alert_id}: {} group(s) skipped as \
+             inconsistent (missing state/payload row, or a duplicate key): {:?}",
+            plan.inconsistent.len(),
+            plan.inconsistent
+        );
+    }
+
+    let (mut delivered, mut failed) = (0usize, 0usize);
+    for item in &plan.items {
+        // The group's OWN row, level and value — never the worst group's
+        // (MN-3). One send per group is what makes host-a and host-b page
+        // independently.
+        let outcome = alert
+            .send_notification(
+                trace_id,
+                std::slice::from_ref(&item.row),
+                rows_end_time,
+                start_time,
+                triggered_at,
+                Some(item.level),
+                Some(item.actual_value),
+            )
+            .await;
+
+        // MN-7: at least one destination delivering counts as delivered —
+        // the alert-level semantics, and the alternative would re-page
+        // destinations that already succeeded.
+        let ok = match outcome {
+            Ok((_, err_msg)) => {
+                if !err_msg.trim().is_empty() {
+                    log::error!(
+                        "[SCHEDULER trace_id {trace_id}] alert {alert_id} group {}: partial \
+                         delivery failure: {err_msg}",
+                        item.group_key
+                    );
+                }
+                true
+            }
+            Err(e) => {
+                log::error!(
+                    "[SCHEDULER trace_id {trace_id}] alert {alert_id} group {}: delivery failed: {e}",
+                    item.group_key
+                );
+                false
+            }
+        };
+
+        // MN-6: delivery state advances ONLY on success, which is what makes
+        // a failed group re-qualify at its next evaluation with no retry
+        // machinery. The write is episode- and attempt-guarded, so a callback
+        // that lost a race is dropped rather than applied.
+        let record = if ok {
+            delivered += 1;
+            infra::table::alert_states::DeliveryOutcome::Delivered {
+                notified_level: item.level,
+                silenced_until: (alert.trigger_condition.silence > 0).then(|| {
+                    now_micros().saturating_add(
+                        alert.trigger_condition.silence.saturating_mul(60 * 1_000_000),
+                    )
+                }),
+            }
+        } else {
+            failed += 1;
+            infra::table::alert_states::DeliveryOutcome::Failed { at: now_micros() }
+        };
+
+        if let Err(e) = infra::table::alert_states::advance_delivery_state(
+            &alert_id,
+            &item.group_key,
+            item.episode,
+            record,
+        )
+        .await
+        {
+            log::error!(
+                "[SCHEDULER trace_id {trace_id}] alert {alert_id} group {}: could not record \
+                 delivery outcome: {e}",
+                item.group_key
+            );
+        }
+    }
+
+    log::info!(
+        "[SCHEDULER trace_id {trace_id}] alert {alert_id}: per-group dispatch delivered={delivered} \
+         failed={failed} suppressed={} candidates={}",
+        plan.suppressed,
+        plan.items.len()
+    );
+    Some((delivered, failed))
+}
+
 pub async fn handle_triggers(
     trace_id: &str,
     trigger: db::scheduler::Trigger,
@@ -843,6 +1013,10 @@ async fn handle_alert_triggers(
 
     let mut should_store_last_end_time =
         alert.trigger_condition.frequency == (alert.trigger_condition.period * 60);
+    // Set when per-group dispatch handled delivery (§5.5 MN-1): it commits the
+    // group plan itself, before sending, so the alert-level state write at the
+    // end of this function must not run and clobber the delivery callbacks.
+    let mut multi_alert_dispatched = false;
     let mut trigger_data_stream: TriggerData = TriggerData {
         _timestamp: now,
         org: trigger.org.clone(),
@@ -1041,7 +1215,24 @@ async fn handle_alert_triggers(
             .is_some_and(|a| a.warning_value.is_some())
         || alert.query_condition.promql_warning_value.is_some();
     let notify_on_warning = alert.trigger_condition.notify_on_warning;
-    if trigger_results.data.is_some() && alert.trigger_condition.silence > 0 && !multi_level {
+    // §5.5 MN-10: a multi-alert evaluates through silence UNCONDITIONALLY,
+    // warning configured or not. Its silence state is per group, so pausing
+    // the whole trigger after host-a pages would leave host-b unevaluated and
+    // unpaged for the entire window — the cross-group blindness this feature
+    // exists to remove — and would freeze every group's `last_seen`, which
+    // M-7 reads as disappearance.
+    let evaluates_through_silence = config::meta::alerts::dispatch::evaluates_through_silence(
+        alert
+            .query_condition
+            .aggregation
+            .as_ref()
+            .is_some_and(|a| a.multi_alert),
+        multi_level,
+    );
+    if trigger_results.data.is_some()
+        && alert.trigger_condition.silence > 0
+        && !evaluates_through_silence
+    {
         new_trigger.next_run_at =
             alert
                 .trigger_condition
@@ -1447,6 +1638,42 @@ async fn handle_alert_triggers(
             };
             new_trigger.data = json::to_string(&trigger_data).unwrap();
             db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
+        } else if let Some((delivered, failed)) = dispatch_per_group(
+            &alert,
+            &scheduler_trace_id,
+            trigger_results.group_classification.as_ref(),
+            &data,
+            trigger_results.end_time,
+            eval_level,
+            Some(start_time),
+            triggered_at,
+        )
+        .await
+        {
+            // Per-group dispatch REPLACES the alert-level send (§5.5 MN-1):
+            // sending both would page the worst group twice per incident.
+            // Durable state was already committed inside, before anything was
+            // sent, so the later `persist_alert_run_state` call is skipped for
+            // this path.
+            multi_alert_dispatched = true;
+            if failed > 0 {
+                // MN-7: the evaluation's single trigger record (D8) reports a
+                // delivery failure if ANY group's send failed; the per-group
+                // detail lives on each group's own state row.
+                trigger_data_stream.status = RunOutcome::NotifyFailed;
+                trigger_data_stream.error = Some(format!(
+                    "{failed} of {} group notification(s) failed",
+                    delivered + failed
+                ));
+            }
+            record_delivery(&mut trigger_data);
+            trigger_data.period_end_time = if should_store_last_end_time {
+                Some(trigger_results.end_time)
+            } else {
+                None
+            };
+            new_trigger.data = json::to_string(&trigger_data).unwrap();
+            db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
         } else {
             // Direct notification — creates_incident=false, or incident correlation errored.
             match alert
@@ -1583,7 +1810,11 @@ async fn handle_alert_triggers(
 
     // Persist durable run state BEFORE the lossy stream publish (Part IV of
     // alerts.md). `alert.id` is the ksuid the state rows are keyed on.
-    if let Some(alert_id) = alert.id.as_ref() {
+    //
+    // Skipped when per-group dispatch ran: it committed the group plan itself,
+    // before sending, and re-running it here would overwrite the delivery
+    // state those callbacks just recorded.
+    if let Some(alert_id) = alert.id.as_ref().filter(|_| !multi_alert_dispatched) {
         persist_alert_run_state(
             &alert_id.to_string(),
             &trigger_data_stream.status,
