@@ -7627,6 +7627,7 @@ dependencies = [
  "common",
  "compaction",
  "config",
+ "datafusion",
  "db",
  "enrichment-data",
  "futures",

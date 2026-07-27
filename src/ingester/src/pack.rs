@@ -332,19 +332,41 @@ fn pack_format_error(path: &Path, reason: &str) -> crate::errors::Error {
 pub struct PackSegment {
     pub pack_path: Arc<PathBuf>,
     pub memtable_id: u64,
+    pub registered_at: i64, // micros, used for the flush-by-age condition
     pub meta: Arc<PackSegmentMeta>,
 }
 
 /// In-memory segment index: `org/stream_type/stream_name` -> segments.
 static PACK_SEGMENTS: Lazy<RwAHashMap<Arc<str>, Vec<PackSegment>>> = Lazy::new(Default::default);
 
+/// Per-pack bookkeeping for consumption and deletion.
+struct PackEntry {
+    total: usize,    // total segments in the pack
+    consumed: usize, // segments uploaded (or dropped) by the mover
+    readers: usize,  // in-flight read_from_pack calls holding this pack
+}
+
+/// Pack registry: pack path -> consumption/reader state.
+static PACK_REGISTRY: Lazy<RwAHashMap<Arc<PathBuf>, PackEntry>> = Lazy::new(Default::default);
+
 fn segment_index_key(org_id: &str, stream_type: &str, stream_name: &str) -> String {
     format!("{org_id}/{stream_type}/{stream_name}")
 }
 
 /// Register all segments of a finalized pack into the in-memory index.
-pub async fn register_pack(path: PathBuf, footer: &PackFooter) {
+pub async fn register_pack(path: PathBuf, footer: &PackFooter, registered_at: i64) {
     let pack_path = Arc::new(path);
+    {
+        let mut w = PACK_REGISTRY.write().await;
+        w.insert(
+            pack_path.clone(),
+            PackEntry {
+                total: footer.segments.len(),
+                consumed: 0,
+                readers: 0,
+            },
+        );
+    }
     let mut w = PACK_SEGMENTS.write().await;
     for seg in footer.segments.iter() {
         let key = segment_index_key(&seg.org_id, &footer.stream_type, &seg.stream_name);
@@ -353,26 +375,168 @@ pub async fn register_pack(path: PathBuf, footer: &PackFooter) {
             .push(PackSegment {
                 pack_path: pack_path.clone(),
                 memtable_id: footer.memtable_id,
+                registered_at,
                 meta: Arc::new(seg.clone()),
             });
     }
 }
 
-/// Remove all segments of a pack from the index (used when a pack is consumed).
+/// Remove all segments of a pack from the index and registry, without
+/// deleting the pack file. Used by tests and error recovery.
 pub async fn unregister_pack(path: &Path) {
     let mut w = PACK_SEGMENTS.write().await;
     for (_, segments) in w.iter_mut() {
         segments.retain(|s| s.pack_path.as_path() != path);
     }
     w.retain(|_, v| !v.is_empty());
+    drop(w);
+    let mut w = PACK_REGISTRY.write().await;
+    w.retain(|p, _| p.as_path() != path);
 }
 
-/// Number of registered segments, for stats/debugging.
+/// Number of registered streams and segments, for stats/debugging.
 pub async fn get_segment_index_stats() -> (usize, usize) {
     let r = PACK_SEGMENTS.read().await;
     let streams = r.len();
     let segments = r.values().map(|v| v.len()).sum();
     (streams, segments)
+}
+
+/// Acquire read guards on the given packs so the mover will not delete them
+/// while their segments are being read. Returns the paths actually acquired;
+/// packs already gone (consumed and deleted) are skipped.
+async fn begin_read(paths: &[Arc<PathBuf>]) -> Vec<Arc<PathBuf>> {
+    let mut acquired = Vec::with_capacity(paths.len());
+    let mut w = PACK_REGISTRY.write().await;
+    for path in paths {
+        if let Some(entry) = w.get_mut(path) {
+            entry.readers += 1;
+            acquired.push(path.clone());
+        }
+    }
+    acquired
+}
+
+/// Release read guards and delete any pack that became fully consumed while
+/// it was being read.
+async fn end_read(paths: &[Arc<PathBuf>]) {
+    let mut to_delete = Vec::new();
+    {
+        let mut w = PACK_REGISTRY.write().await;
+        for path in paths {
+            if let Some(entry) = w.get_mut(path) {
+                entry.readers = entry.readers.saturating_sub(1);
+                if entry.readers == 0 && entry.consumed >= entry.total {
+                    to_delete.push(path.clone());
+                }
+            }
+        }
+        for path in to_delete.iter() {
+            w.remove(path);
+        }
+    }
+    for path in to_delete {
+        delete_pack_file(&path).await;
+    }
+}
+
+async fn delete_pack_file(path: &Path) {
+    match fs::remove_file(path).await {
+        Ok(_) => {
+            log::info!("[INGESTER:PACK] deleted consumed pack file: {}", path.display());
+        }
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+        Err(e) => {
+            log::error!(
+                "[INGESTER:PACK] failed to delete consumed pack file: {}, error: {e}",
+                path.display()
+            );
+        }
+    }
+}
+
+/// A stream with pending (not yet uploaded) pack segments.
+pub struct PendingStream {
+    pub org_id: String,
+    pub stream_type: String,
+    pub stream_name: String,
+    pub segments: Vec<PackSegment>,
+    pub total_original_size: i64,
+    pub total_compressed_size: i64,
+    pub oldest_registered_at: i64,
+}
+
+/// Snapshot all streams with pending segments, for the pack mover job.
+pub async fn get_pending_streams() -> Vec<PendingStream> {
+    let r = PACK_SEGMENTS.read().await;
+    let mut result = Vec::with_capacity(r.len());
+    for (key, segments) in r.iter() {
+        if segments.is_empty() {
+            continue;
+        }
+        let parts: Vec<&str> = key.splitn(3, '/').collect();
+        if parts.len() != 3 {
+            continue;
+        }
+        result.push(PendingStream {
+            org_id: parts[0].to_string(),
+            stream_type: parts[1].to_string(),
+            stream_name: parts[2].to_string(),
+            segments: segments.clone(),
+            total_original_size: segments.iter().map(|s| s.meta.original_size).sum(),
+            total_compressed_size: segments.iter().map(|s| s.meta.length as i64).sum(),
+            oldest_registered_at: segments.iter().map(|s| s.registered_at).min().unwrap_or(0),
+        });
+    }
+    result
+}
+
+/// Mark segments of a stream as consumed (uploaded to object storage or
+/// dropped by retention): remove them from the index and delete any pack file
+/// whose segments are all consumed and which has no in-flight readers.
+pub async fn mark_segments_consumed(
+    org_id: &str,
+    stream_type: &str,
+    stream_name: &str,
+    segments: &[(Arc<PathBuf>, u64)],
+) {
+    if segments.is_empty() {
+        return;
+    }
+    let key = segment_index_key(org_id, stream_type, stream_name);
+    {
+        let mut w = PACK_SEGMENTS.write().await;
+        if let Some(list) = w.get_mut(key.as_str()) {
+            list.retain(|s| {
+                !segments
+                    .iter()
+                    .any(|(p, offset)| s.pack_path == *p && s.meta.offset == *offset)
+            });
+            if list.is_empty() {
+                w.remove(key.as_str());
+            }
+        }
+    }
+    // update pack consumption counters and delete fully consumed packs
+    let mut to_delete = Vec::new();
+    {
+        let mut w = PACK_REGISTRY.write().await;
+        for (path, _) in segments {
+            if let Some(entry) = w.get_mut(path) {
+                entry.consumed += 1;
+                if entry.consumed >= entry.total && entry.readers == 0 {
+                    to_delete.push(path.clone());
+                }
+            }
+        }
+        for path in to_delete.iter() {
+            w.remove(path);
+        }
+    }
+    to_delete.dedup();
+    for path in to_delete {
+        delete_pack_file(&path).await;
+    }
 }
 
 /// Read all pack segments of a stream as record batches.
@@ -398,6 +562,28 @@ pub async fn read_from_pack(
         }
     };
 
+    // hold read guards on the involved packs so the mover does not delete
+    // them between the index snapshot above and the segment reads below
+    let mut pack_paths = segments
+        .iter()
+        .map(|s| s.pack_path.clone())
+        .collect::<Vec<_>>();
+    pack_paths.sort();
+    pack_paths.dedup();
+    let acquired = begin_read(&pack_paths).await;
+
+    let result =
+        read_segments(segments, time_range, partition_filters, skip_memtable_ids).await;
+    end_read(&acquired).await;
+    result
+}
+
+async fn read_segments(
+    segments: Vec<PackSegment>,
+    time_range: Option<(i64, i64)>,
+    partition_filters: &[(String, Vec<String>)],
+    skip_memtable_ids: &HashSet<u64>,
+) -> Result<(Vec<(Arc<Schema>, Vec<RecordBatch>)>, ScanStats)> {
     let mut stats = ScanStats::new();
     let mut results = Vec::new();
     for segment in segments {
@@ -487,7 +673,16 @@ pub(crate) async fn init() -> Result<()> {
         };
         packs += 1;
         segments += footer.segments.len();
-        register_pack(pack_file, &footer).await;
+        // use the file mtime as the registered time so the flush-by-age
+        // condition survives restarts
+        let registered_at = fs::metadata(&pack_file)
+            .await
+            .ok()
+            .and_then(|m| m.modified().ok())
+            .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+            .map(|d| d.as_micros() as i64)
+            .unwrap_or_else(config::utils::time::now_micros);
+        register_pack(pack_file, &footer, registered_at).await;
     }
     if packs > 0 {
         log::info!("[INGESTER:PACK] registered {packs} pack files with {segments} segments");
@@ -677,7 +872,12 @@ mod tests {
         let (finished, ..) = pack_writer.finish().await.unwrap();
         let pack = &finished[0];
         fs::rename(&pack.tmp_path, &pack.path).await.unwrap();
-        register_pack(pack.path.clone(), &pack.footer).await;
+        register_pack(
+            pack.path.clone(),
+            &pack.footer,
+            config::utils::time::now_micros(),
+        )
+        .await;
 
         // read it back through the segment index
         let skip_ids = HashSet::new();
@@ -712,12 +912,105 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_consume_lifecycle_deletes_pack() {
+        let dir = tempfile::tempdir().unwrap();
+        let finished = write_test_pack(dir.path(), 555).await;
+        let pack = &finished[0];
+        fs::rename(&pack.tmp_path, &pack.path).await.unwrap();
+        register_pack(
+            pack.path.clone(),
+            &pack.footer,
+            config::utils::time::now_micros(),
+        )
+        .await;
+
+        // both streams are pending
+        let pending = get_pending_streams().await;
+        let seg_a = pending
+            .iter()
+            .find(|p| p.stream_name == "stream_a" && p.segments.iter().any(|s| s.memtable_id == 555))
+            .expect("stream_a pending");
+        assert_eq!(seg_a.org_id, "org1");
+        assert_eq!(seg_a.stream_type, "logs");
+        assert!(seg_a.total_original_size > 0);
+        assert!(seg_a.oldest_registered_at > 0);
+
+        // consume stream_a only: pack must remain (stream_b not consumed yet)
+        let consumed_a = seg_a
+            .segments
+            .iter()
+            .filter(|s| s.memtable_id == 555)
+            .map(|s| (s.pack_path.clone(), s.meta.offset))
+            .collect::<Vec<_>>();
+        mark_segments_consumed("org1", "logs", "stream_a", &consumed_a).await;
+        assert!(pack.path.exists());
+
+        // consume stream_b: pack fully consumed -> file deleted
+        let pending = get_pending_streams().await;
+        let seg_b = pending
+            .iter()
+            .find(|p| p.stream_name == "stream_b" && p.segments.iter().any(|s| s.memtable_id == 555))
+            .expect("stream_b pending");
+        let consumed_b = seg_b
+            .segments
+            .iter()
+            .filter(|s| s.memtable_id == 555)
+            .map(|s| (s.pack_path.clone(), s.meta.offset))
+            .collect::<Vec<_>>();
+        mark_segments_consumed("org1", "logs", "stream_b", &consumed_b).await;
+        assert!(!pack.path.exists());
+
+        // registry entry is gone
+        let r = PACK_REGISTRY.read().await;
+        assert!(!r.contains_key(&pack.path));
+    }
+
+    #[tokio::test]
+    async fn test_reader_guard_defers_pack_deletion() {
+        let dir = tempfile::tempdir().unwrap();
+        let finished = write_test_pack(dir.path(), 666).await;
+        let pack = &finished[0];
+        fs::rename(&pack.tmp_path, &pack.path).await.unwrap();
+        register_pack(
+            pack.path.clone(),
+            &pack.footer,
+            config::utils::time::now_micros(),
+        )
+        .await;
+
+        let pack_path = Arc::new(pack.path.clone());
+        let acquired = begin_read(std::slice::from_ref(&pack_path)).await;
+        assert_eq!(acquired.len(), 1);
+
+        // consume everything while a reader holds the pack
+        let all = pack
+            .footer
+            .segments
+            .iter()
+            .map(|s| (pack_path.clone(), s.offset))
+            .collect::<Vec<_>>();
+        mark_segments_consumed("org1", "logs", "stream_a", &all[..1]).await;
+        mark_segments_consumed("org1", "logs", "stream_b", &all[1..]).await;
+        // deletion deferred: reader still active
+        assert!(pack.path.exists());
+
+        // releasing the guard deletes the fully consumed pack
+        end_read(&acquired).await;
+        assert!(!pack.path.exists());
+    }
+
+    #[tokio::test]
     async fn test_register_and_unregister_pack() {
         let dir = tempfile::tempdir().unwrap();
         let finished = write_test_pack(dir.path(), 77).await;
         let pack = &finished[0];
         fs::rename(&pack.tmp_path, &pack.path).await.unwrap();
-        register_pack(pack.path.clone(), &pack.footer).await;
+        register_pack(
+            pack.path.clone(),
+            &pack.footer,
+            config::utils::time::now_micros(),
+        )
+        .await;
 
         let r = PACK_SEGMENTS.read().await;
         let segs = r.get("org1/logs/stream_a").expect("registered");

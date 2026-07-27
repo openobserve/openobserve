@@ -195,7 +195,12 @@ impl Immutable {
                 .context(RenameFileSnafu {
                     path: &pack.tmp_path,
                 })?;
-            crate::pack::register_pack(pack.path.clone(), &pack.footer).await;
+            crate::pack::register_pack(
+                pack.path.clone(),
+                &pack.footer,
+                config::utils::time::now_micros(),
+            )
+            .await;
             log::info!(
                 "[INGESTER:PACK:{}] persisted pack file: {}, size: {}, segments: {}",
                 self.idx,

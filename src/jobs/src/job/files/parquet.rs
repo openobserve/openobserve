@@ -855,66 +855,7 @@ async fn merge_files(
     // Enterprise: Extract service metadata during data processing
     // This runs BEFORE indexing checks to ensure all stream types are discovered
     #[cfg(feature = "enterprise")]
-    {
-        let service_streams_config = &get_enterprise_config().service_streams;
-
-        let valid_stream_type = stream_type == StreamType::Logs
-            || stream_type == StreamType::Metrics
-            || stream_type == StreamType::Traces;
-
-        if service_streams_config.enabled
-            && service_streams_config.node_matches_processing_node(&LOCAL_NODE)
-            && org_id != config::META_ORG_ID
-            && valid_stream_type
-        {
-            // Get stream count for this type (cached, 5-min TTL — counts rarely change).
-            let stream_count = db::schema::get_stream_count_cached(&org_id, stream_type).await;
-
-            // Get coverage deficit: how many known services are missing streams of this type.
-            // Derived entirely from the in-memory cache — no DB I/O.
-            // Feeds the fast-lane boost in the sampler: 100% incomplete → rate=1 (all streams
-            // active), tapering back to normal as coverage fills in.
-            // Passing (0, 0) when disabled is the documented no-op sentinel for the sampler.
-            let coverage_deficit = if service_streams_config.coverage_catchup_enabled {
-                get_coverage_deficit(&org_id, stream_type).await
-            } else {
-                (0, 0)
-            };
-
-            // Check if we should process this file (adaptive per-type sampling with fast lane)
-            let should_process = should_process_file(
-                &org_id,
-                stream_type,
-                &stream_name,
-                &new_file_key,
-                stream_count,
-                coverage_deficit,
-            );
-
-            if should_process {
-                let buf_clone = buf.clone();
-                let org_id_clone = org_id.clone();
-                let stream_name_clone = stream_name.clone();
-
-                // Queue services for batched processing (non-blocking)
-                tokio::spawn(async move {
-                    if let Err(e) = queue_services_from_data_file(
-                        &org_id_clone,
-                        stream_type,
-                        &stream_name_clone,
-                        file_format,
-                        buf_clone,
-                    )
-                    .await
-                    {
-                        log::error!(
-                            "[ServiceStreams] Failed to queue services for {org_id_clone}/{stream_type}/{stream_name_clone}: {e}"
-                        );
-                    }
-                });
-            }
-        }
-    }
+    queue_service_streams_if_needed(&org_id, stream_type, &stream_name, file_format, &new_file_key, &buf).await;
 
     // skip index generation if not enabled or not supported by stream type
     if !cfg.common.inverted_index_enabled || !stream_type.support_index() {
@@ -950,6 +891,77 @@ async fn merge_files(
     new_file_meta.index_size = index_size as i64;
 
     Ok((account, new_file_key, new_file_meta, retain_file_list))
+}
+
+/// Enterprise: extract service metadata during data processing, shared by the
+/// legacy file mover and the pack mover.
+#[cfg(feature = "enterprise")]
+pub(crate) async fn queue_service_streams_if_needed(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    file_format: FileFormat,
+    new_file_key: &str,
+    buf: &Bytes,
+) {
+    let service_streams_config = &get_enterprise_config().service_streams;
+
+    let valid_stream_type = stream_type == StreamType::Logs
+        || stream_type == StreamType::Metrics
+        || stream_type == StreamType::Traces;
+
+    if service_streams_config.enabled
+        && service_streams_config.node_matches_processing_node(&LOCAL_NODE)
+        && org_id != config::META_ORG_ID
+        && valid_stream_type
+    {
+        // Get stream count for this type (cached, 5-min TTL — counts rarely change).
+        let stream_count = db::schema::get_stream_count_cached(org_id, stream_type).await;
+
+        // Get coverage deficit: how many known services are missing streams of this type.
+        // Derived entirely from the in-memory cache — no DB I/O.
+        // Feeds the fast-lane boost in the sampler: 100% incomplete → rate=1 (all streams
+        // active), tapering back to normal as coverage fills in.
+        // Passing (0, 0) when disabled is the documented no-op sentinel for the sampler.
+        let coverage_deficit = if service_streams_config.coverage_catchup_enabled {
+            get_coverage_deficit(org_id, stream_type).await
+        } else {
+            (0, 0)
+        };
+
+        // Check if we should process this file (adaptive per-type sampling with fast lane)
+        let should_process = should_process_file(
+            org_id,
+            stream_type,
+            stream_name,
+            new_file_key,
+            stream_count,
+            coverage_deficit,
+        );
+
+        if should_process {
+            let buf_clone = buf.clone();
+            let org_id_clone = org_id.to_string();
+            let stream_name_clone = stream_name.to_string();
+
+            // Queue services for batched processing (non-blocking)
+            tokio::spawn(async move {
+                if let Err(e) = queue_services_from_data_file(
+                    &org_id_clone,
+                    stream_type,
+                    &stream_name_clone,
+                    file_format,
+                    buf_clone,
+                )
+                .await
+                {
+                    log::error!(
+                        "[ServiceStreams] Failed to queue services for {org_id_clone}/{stream_type}/{stream_name_clone}: {e}"
+                    );
+                }
+            });
+        }
+    }
 }
 
 fn split_perfix(prefix: &str) -> (String, StreamType, String, String) {
