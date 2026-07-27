@@ -21,6 +21,7 @@
 
 use config::meta::{
     alerts::{
+        dispatch::DeliveryEpisode,
         grouping::GroupPlan,
         level::AlertLevel,
         state::{AlertState, ROLLUP_GROUP_KEY, StateTransition, StateUpdate},
@@ -60,6 +61,8 @@ impl From<alert_states::Model> for AlertState {
             groups_firing: m.groups_firing.map(|c| c as usize),
             groups_observed_is_lower_bound: m.groups_observed_is_lower_bound,
             groups_firing_is_lower_bound: m.groups_firing_is_lower_bound,
+            silenced_until: m.silenced_until,
+            last_notified_level: m.last_notified_level.and_then(AlertLevel::from_i32),
         }
     }
 }
@@ -67,9 +70,23 @@ impl From<alert_states::Model> for AlertState {
 /// Fetch the state row for one `(alert_id, group_key)`.
 pub async fn get(alert_id: &str, group_key: &str) -> Result<Option<AlertState>, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    get_with(client, alert_id, group_key).await
+}
+
+/// [`get`] against a caller-supplied connection.
+///
+/// The `_with` variants exist so the state machine can be exercised against a
+/// real schema in tests — the same shape `alerts::create`/`update` already use.
+/// Everything public delegates here, so a test cannot accidentally verify a
+/// different code path from the one production runs.
+pub async fn get_with<C: sea_orm::ConnectionTrait>(
+    conn: &C,
+    alert_id: &str,
+    group_key: &str,
+) -> Result<Option<AlertState>, errors::Error> {
     Ok(
         alert_states::Entity::find_by_id((alert_id.to_string(), group_key.to_string()))
-            .one(client)
+            .one(conn)
             .await?
             .map(Into::into),
     )
@@ -95,10 +112,18 @@ pub async fn get_rollups(alert_ids: &[String]) -> Result<Vec<AlertState>, errors
 /// All per-group rows for one alert.
 pub async fn list_groups(alert_id: &str) -> Result<Vec<AlertState>, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    list_groups_with(client, alert_id).await
+}
+
+/// [`list_groups`] against a caller-supplied connection.
+pub async fn list_groups_with<C: sea_orm::ConnectionTrait>(
+    conn: &C,
+    alert_id: &str,
+) -> Result<Vec<AlertState>, errors::Error> {
     Ok(alert_states::Entity::find()
         .filter(alert_states::Column::AlertId.eq(alert_id))
         .filter(alert_states::Column::GroupKey.ne(ROLLUP_GROUP_KEY))
-        .all(client)
+        .all(conn)
         .await?
         .into_iter()
         .map(Into::into)
@@ -117,7 +142,18 @@ pub async fn persist(update: &StateUpdate) -> Result<(), errors::Error> {
         return Ok(());
     }
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let txn = client.begin().await?;
+    persist_with(client, update).await
+}
+
+/// [`persist`] against a caller-supplied connection.
+pub async fn persist_with<C: sea_orm::ConnectionTrait + TransactionTrait>(
+    conn: &C,
+    update: &StateUpdate,
+) -> Result<(), errors::Error> {
+    if update.state.is_none() {
+        return Ok(());
+    }
+    let txn = conn.begin().await?;
     write_update(&txn, update).await?;
     txn.commit().await?;
     Ok(())
@@ -133,7 +169,16 @@ pub async fn persist(update: &StateUpdate) -> Result<(), errors::Error> {
 /// the displaced rows would leave stored rows above the cap.
 pub async fn persist_group_plan(plan: &GroupPlan, alert_id: &str) -> Result<(), errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let txn = client.begin().await?;
+    persist_group_plan_with(client, plan, alert_id).await
+}
+
+/// [`persist_group_plan`] against a caller-supplied connection.
+pub async fn persist_group_plan_with<C: sea_orm::ConnectionTrait + TransactionTrait>(
+    conn: &C,
+    plan: &GroupPlan,
+    alert_id: &str,
+) -> Result<(), errors::Error> {
+    let txn = conn.begin().await?;
 
     for update in &plan.updates {
         write_update(&txn, update).await?;
@@ -152,6 +197,114 @@ pub async fn persist_group_plan(plan: &GroupPlan, alert_id: &str) -> Result<(), 
 
     txn.commit().await?;
     Ok(())
+}
+
+/// Record a per-group delivery outcome (§5.5 MN-6/MN-7), conditionally.
+///
+/// Writes **only** the columns the given kind owns, under a `WHERE level = ?
+/// AND level_since = ?` predicate — the level-episode version the delivery
+/// carried. One statement, so the check and the write cannot interleave:
+/// a read-check-write in Rust would reintroduce exactly the race the column
+/// split above exists to remove, and would also let a callback echo back
+/// observation fields it read before the latest evaluation.
+///
+/// Returns `true` when the row was updated, `false` when the episode had moved
+/// on and the callback was correctly dropped as stale.
+pub async fn advance_delivery_state(
+    alert_id: &str,
+    group_key: &str,
+    episode: DeliveryEpisode,
+    outcome: DeliveryOutcome,
+) -> Result<bool, errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    advance_delivery_state_with(client, alert_id, group_key, episode, outcome).await
+}
+
+/// [`advance_delivery_state`] against a caller-supplied connection.
+pub async fn advance_delivery_state_with<C: sea_orm::ConnectionTrait>(
+    conn: &C,
+    alert_id: &str,
+    group_key: &str,
+    episode: DeliveryEpisode,
+    outcome: DeliveryOutcome,
+) -> Result<bool, errors::Error> {
+    let mut update = alert_states::Entity::update_many()
+        .filter(alert_states::Column::AlertId.eq(alert_id))
+        .filter(alert_states::Column::GroupKey.eq(group_key))
+        // The episode guard, evaluated by the database as part of the write.
+        .filter(alert_states::Column::Level.eq(episode.level.to_i32()))
+        .filter(alert_states::Column::LevelSince.eq(episode.level_since));
+
+    // The ATTEMPT guard, for failures only — and it must live here, in the
+    // same statement, not just in the pure layer. `DeliveryEpisode` carries
+    // the delivery state as it stood at enqueue precisely so an older
+    // attempt's failure cannot overwrite a newer attempt's success within one
+    // episode; if that predicate is missing from the SQL, the pure guard says
+    // "stale, drop it" while the real UPDATE happily applies it.
+    //
+    // Success deliberately omits these predicates — see
+    // `dispatch::delivery_success_update` for why the two guards differ.
+    //
+    // `eq(NULL)` is never true in SQL, so a never-delivered anchor has to be
+    // matched with IS NULL rather than `=`.
+    if matches!(outcome, DeliveryOutcome::Failed { .. }) {
+        let (notified_level, silenced_until) = episode.notified_at_enqueue;
+        update = match notified_level {
+            Some(l) => update.filter(alert_states::Column::LastNotifiedLevel.eq(l.to_i32())),
+            None => update.filter(alert_states::Column::LastNotifiedLevel.is_null()),
+        };
+        update = match silenced_until {
+            Some(t) => update.filter(alert_states::Column::SilencedUntil.eq(t)),
+            None => update.filter(alert_states::Column::SilencedUntil.is_null()),
+        };
+    }
+
+    match outcome {
+        DeliveryOutcome::Delivered {
+            notified_level,
+            silenced_until,
+        } => {
+            update = update
+                .col_expr(
+                    alert_states::Column::LastNotifiedLevel,
+                    sea_orm::sea_query::Expr::value(notified_level.to_i32()),
+                )
+                .col_expr(
+                    alert_states::Column::SilencedUntil,
+                    sea_orm::sea_query::Expr::value(silenced_until),
+                );
+        }
+        DeliveryOutcome::Failed { at } => {
+            // Delivery state is untouched on purpose: the group must
+            // re-qualify at its next evaluation (MN-6). Only the outcome axis
+            // moves, and `last_seen` stays put — a failed send is not an
+            // observation, so it must not postpone M-7.
+            update = update
+                .col_expr(
+                    alert_states::Column::LastOutcome,
+                    sea_orm::sea_query::Expr::value(RunOutcome::NotifyFailed.to_i32()),
+                )
+                .col_expr(
+                    alert_states::Column::LastOutcomeAt,
+                    sea_orm::sea_query::Expr::value(at),
+                );
+        }
+    }
+
+    Ok(update.exec(conn).await?.rows_affected > 0)
+}
+
+/// Which delivery outcome [`advance_delivery_state`] should record.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DeliveryOutcome {
+    Delivered {
+        notified_level: AlertLevel,
+        /// `None` when `silence = 0` — page every evaluation.
+        silenced_until: Option<i64>,
+    },
+    Failed {
+        at: i64,
+    },
 }
 
 /// Every alert that currently has at least one per-group state row.
@@ -182,10 +335,22 @@ pub async fn delete_groups(alert_id: &str, group_keys: &[String]) -> Result<(), 
         return Ok(());
     }
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    delete_groups_with(client, alert_id, group_keys).await
+}
+
+/// [`delete_groups`] against a caller-supplied connection.
+pub async fn delete_groups_with<C: sea_orm::ConnectionTrait>(
+    conn: &C,
+    alert_id: &str,
+    group_keys: &[String],
+) -> Result<(), errors::Error> {
+    if group_keys.is_empty() {
+        return Ok(());
+    }
     alert_states::Entity::delete_many()
         .filter(alert_states::Column::AlertId.eq(alert_id))
         .filter(alert_states::Column::GroupKey.is_in(group_keys.to_vec()))
-        .exec(client)
+        .exec(conn)
         .await?;
     Ok(())
 }
@@ -215,6 +380,8 @@ where
         groups_firing: Set(state.groups_firing.map(|c| c as i32)),
         groups_observed_is_lower_bound: Set(state.groups_observed_is_lower_bound),
         groups_firing_is_lower_bound: Set(state.groups_firing_is_lower_bound),
+        silenced_until: Set(state.silenced_until),
+        last_notified_level: Set(state.last_notified_level.map(|l| l.to_i32())),
     };
 
     // Upsert on the composite primary key — rows are created lazily on an
@@ -238,6 +405,16 @@ where
                 alert_states::Column::GroupsFiring,
                 alert_states::Column::GroupsObservedIsLowerBound,
                 alert_states::Column::GroupsFiringIsLowerBound,
+                // `silenced_until` / `last_notified_level` are DELIBERATELY
+                // absent (§5.5 MN-2, one-writer rule). An evaluation carries
+                // stale copies — it read them before it ran — so listing them
+                // here would let a slow evaluation overwrite a delivery
+                // callback that landed in between, erasing a silence window
+                // and re-paging the group. Only `advance_delivery_state`
+                // writes those two columns, and only conditionally.
+                //
+                // They still appear in the INSERT above, which is correct: a
+                // brand-new row has no delivery state to protect.
             ])
             .to_owned(),
         )
@@ -359,6 +536,8 @@ mod tests {
             groups_firing: None,
             groups_observed_is_lower_bound: None,
             groups_firing_is_lower_bound: None,
+            silenced_until: None,
+            last_notified_level: None,
         }
     }
 
@@ -467,6 +646,27 @@ mod tests {
     }
 
     #[test]
+    fn test_delivery_state_columns_survive_the_roundtrip() {
+        // §5.5 MN-2. `last_notified_level` stores AlertLevel::to_i32 like the
+        // `level` column; an unknown integer degrades to None the same way.
+        let mut m = model(Some(RunOutcome::Firing.to_i32()));
+        m.silenced_until = Some(1_750_000_600_000_000);
+        m.last_notified_level = Some(AlertLevel::Warning.to_i32());
+
+        let s: AlertState = m.into();
+        assert_eq!(s.silenced_until, Some(1_750_000_600_000_000));
+        assert_eq!(s.last_notified_level, Some(AlertLevel::Warning));
+
+        let mut unknown = model(None);
+        unknown.last_notified_level = Some(999);
+        let s: AlertState = unknown.into();
+        assert_eq!(
+            s.last_notified_level, None,
+            "an uninterpretable stored level degrades, not errors"
+        );
+    }
+
+    #[test]
     fn test_legacy_rows_read_back_as_unknown_not_as_false() {
         // NULL on these columns means "written before the column existed". It
         // must stay `None` rather than degrading to `Some(false)`: `last_seen`
@@ -479,5 +679,394 @@ mod tests {
         assert_eq!(s.groups_observed_is_lower_bound, None);
         assert_eq!(s.groups_firing_is_lower_bound, None);
         assert_eq!(s.group_labels, None);
+    }
+
+    // ═════════════════════════════════════════════════════════════════════
+    // Database-backed tests (real schema, real SQL semantics)
+    //
+    // These cover what a pure test structurally cannot: that the migration
+    // and the entity agree, and that the upsert's conflict clause overwrites
+    // exactly the columns it should.
+    // ═════════════════════════════════════════════════════════════════════
+
+    use config::meta::alerts::state::StateUpdate;
+
+    use crate::table::test_harness::{test_db, unique_alert_id};
+
+    /// A firing group row for the given alert.
+    fn group_row(alert_id: &str, group_key: &str, level: AlertLevel, at: i64) -> AlertState {
+        AlertState {
+            alert_id: alert_id.to_string(),
+            group_key: group_key.to_string(),
+            last_outcome: Some(RunOutcome::Firing),
+            last_outcome_at: Some(at),
+            since: Some(at),
+            level: Some(level),
+            level_since: Some(at),
+            level_at: Some(at),
+            last_seen: Some(at),
+            group_labels: Some("host=a".to_string()),
+            groups_observed: None,
+            groups_firing: None,
+            groups_observed_is_lower_bound: None,
+            groups_firing_is_lower_bound: None,
+            silenced_until: None,
+            last_notified_level: None,
+        }
+    }
+
+    fn update_of(state: AlertState) -> StateUpdate {
+        StateUpdate {
+            state: Some(state),
+            transition: None,
+        }
+    }
+
+    #[tokio::test]
+    async fn test_harness_applies_the_real_schema() {
+        // The smoke test for the harness itself, and a genuine guard: it fails
+        // if a column exists on the entity but no migration ever added it —
+        // the drift that compiles cleanly and breaks on first write.
+        let db = test_db().await;
+        let alert_id = unique_alert_id("smoke");
+
+        let mut row = group_row(&alert_id, "g1", AlertLevel::Critical, 1_000);
+        row.groups_observed = Some(7);
+        row.groups_firing = Some(3);
+        row.groups_observed_is_lower_bound = Some(true);
+        row.groups_firing_is_lower_bound = Some(false);
+        row.silenced_until = Some(5_000);
+        row.last_notified_level = Some(AlertLevel::Warning);
+
+        persist_with(db, &update_of(row.clone()))
+            .await
+            .expect("every column must exist in the migrated schema");
+
+        let read = get_with(db, &alert_id, "g1")
+            .await
+            .unwrap()
+            .expect("the row was written");
+        assert_eq!(read, row, "every column must survive a real round-trip");
+    }
+
+    #[tokio::test]
+    async fn test_evaluation_never_clobbers_delivery_state() {
+        // THE one-writer rule (§5.5 MN-2/MN-6), and the reason
+        // `SilencedUntil`/`LastNotifiedLevel` are absent from the upsert's
+        // conflict list. An evaluation carries a COPY of delivery state read
+        // before it ran, so if the conflict clause wrote those columns, a
+        // delivery callback landing mid-evaluation would be erased — the
+        // silence window would vanish and the group would re-page next cycle.
+        //
+        // Only a real upsert can show this: the pure layer carries the values
+        // forward correctly, and the bug lives entirely in the SQL.
+        let db = test_db().await;
+        let alert_id = unique_alert_id("one-writer");
+
+        // 1. The group fires and its row is created.
+        let first = group_row(&alert_id, "g1", AlertLevel::Critical, 1_000);
+        persist_with(db, &update_of(first.clone())).await.unwrap();
+
+        // 2. A delivery succeeds and records itself.
+        let applied = advance_delivery_state_with(
+            db,
+            &alert_id,
+            "g1",
+            DeliveryEpisode { level: AlertLevel::Critical, level_since: 1_000, notified_at_enqueue: (None, None) },
+            DeliveryOutcome::Delivered {
+                notified_level: AlertLevel::Critical,
+                silenced_until: Some(9_999),
+            },
+        )
+        .await
+        .unwrap();
+        assert!(applied, "the episode matched, so the callback must apply");
+
+        // 3. The NEXT evaluation writes observation state. It still carries
+        //    the pre-delivery copy (None/None) — exactly the stale write.
+        let mut second = group_row(&alert_id, "g1", AlertLevel::Critical, 2_000);
+        second.silenced_until = None;
+        second.last_notified_level = None;
+        persist_with(db, &update_of(second)).await.unwrap();
+
+        let read = get_with(db, &alert_id, "g1").await.unwrap().unwrap();
+        assert_eq!(
+            read.silenced_until,
+            Some(9_999),
+            "the evaluation must not erase a delivery that already happened"
+        );
+        assert_eq!(read.last_notified_level, Some(AlertLevel::Critical));
+        // ...while observation state DID advance, proving the upsert still works.
+        assert_eq!(read.last_outcome_at, Some(2_000));
+    }
+
+    #[tokio::test]
+    async fn test_delivery_callback_is_refused_when_the_episode_moved_on() {
+        // The versioned callback (§5.5 round-5/6) as the database sees it:
+        // `UPDATE ... WHERE level = ? AND level_since = ?` either matched or it
+        // did not, and no amount of pure logic can assert that.
+        let db = test_db().await;
+        let alert_id = unique_alert_id("stale-episode");
+
+        // Firing since 1_000, then it escalates: a NEW level-episode.
+        persist_with(
+            db,
+            &update_of(group_row(&alert_id, "g1", AlertLevel::Warning, 1_000)),
+        )
+        .await
+        .unwrap();
+        persist_with(
+            db,
+            &update_of(group_row(&alert_id, "g1", AlertLevel::Critical, 2_000)),
+        )
+        .await
+        .unwrap();
+
+        // A delivery enqueued during the Warning episode reports back late.
+        let applied = advance_delivery_state_with(
+            db,
+            &alert_id,
+            "g1",
+            DeliveryEpisode { level: AlertLevel::Warning, level_since: 1_000, notified_at_enqueue: (None, None) },
+            DeliveryOutcome::Delivered {
+                notified_level: AlertLevel::Warning,
+                silenced_until: Some(9_999),
+            },
+        )
+        .await
+        .unwrap();
+
+        assert!(!applied, "a stale episode must not be recorded");
+        let read = get_with(db, &alert_id, "g1").await.unwrap().unwrap();
+        assert_eq!(
+            read.last_notified_level, None,
+            "the late Warning delivery must not set a baseline on the Critical episode"
+        );
+        assert_eq!(read.silenced_until, None);
+    }
+
+    #[tokio::test]
+    async fn test_failed_delivery_records_notify_failed_without_touching_delivery_state() {
+        // MN-7 through real SQL: the outcome axis moves, delivery state does
+        // NOT (so the group re-qualifies, MN-6), and `last_seen` is frozen --
+        // a failed send is not an observation and must not postpone M-7.
+        let db = test_db().await;
+        let alert_id = unique_alert_id("notify-failed");
+
+        persist_with(
+            db,
+            &update_of(group_row(&alert_id, "g1", AlertLevel::Critical, 1_000)),
+        )
+        .await
+        .unwrap();
+
+        let applied = advance_delivery_state_with(
+            db,
+            &alert_id,
+            "g1",
+            DeliveryEpisode { level: AlertLevel::Critical, level_since: 1_000, notified_at_enqueue: (None, None) },
+            DeliveryOutcome::Failed { at: 1_500 },
+        )
+        .await
+        .unwrap();
+        assert!(applied);
+
+        let read = get_with(db, &alert_id, "g1").await.unwrap().unwrap();
+        assert_eq!(read.last_outcome, Some(RunOutcome::NotifyFailed));
+        assert_eq!(read.last_outcome_at, Some(1_500));
+        assert!(read.is_firing(), "a delivery failure is still firing");
+        assert_eq!(read.silenced_until, None, "nothing advanced, so it re-qualifies");
+        assert_eq!(read.last_notified_level, None);
+        assert_eq!(read.last_seen, Some(1_000), "M-7's clock must not move");
+    }
+
+    #[tokio::test]
+    async fn test_group_plan_applies_upserts_and_evictions_in_one_call() {
+        // 7.2. Scope note, so this is not mistaken for more than it is: this
+        // asserts both EFFECTS land -- the winners upserted, the displaced row
+        // deleted, the rollup written. It does NOT prove atomicity, which
+        // would need failure injection mid-transaction; a non-transactional
+        // implementation would pass. The transaction is still the requirement
+        // (composites read the rollup, so a rollup without its group rows
+        // would hand them a state that never existed) -- it is simply asserted
+        // by construction in `persist_group_plan_with`, not by this test.
+        let db = test_db().await;
+        let alert_id = unique_alert_id("group-plan");
+
+        // An incumbent that this evaluation will evict.
+        persist_with(
+            db,
+            &update_of(group_row(&alert_id, "old", AlertLevel::Critical, 1_000)),
+        )
+        .await
+        .unwrap();
+
+        let plan = GroupPlan {
+            updates: vec![
+                update_of(group_row(&alert_id, "new", AlertLevel::Critical, 2_000)),
+                update_of(group_row(&alert_id, ROLLUP_GROUP_KEY, AlertLevel::Critical, 2_000)),
+            ],
+            evicted: vec!["old".to_string()],
+        };
+        persist_group_plan_with(db, &plan, &alert_id).await.unwrap();
+
+        assert!(
+            get_with(db, &alert_id, "old").await.unwrap().is_none(),
+            "the evicted row must be gone"
+        );
+        assert!(get_with(db, &alert_id, "new").await.unwrap().is_some());
+        assert!(
+            get_with(db, &alert_id, ROLLUP_GROUP_KEY)
+                .await
+                .unwrap()
+                .is_some(),
+            "the rollup row commits with its groups"
+        );
+
+        let groups = list_groups_with(db, &alert_id).await.unwrap();
+        assert_eq!(groups.len(), 1, "list_groups excludes the rollup row");
+        assert_eq!(groups[0].group_key, "new");
+    }
+
+    #[tokio::test]
+    async fn test_delivery_callback_targets_one_group_only() {
+        // The conditional update filters on (alert_id, group_key) as well as
+        // the episode. Without the group filter a single delivery would
+        // silence every group of the alert that happened to share a level.
+        let db = test_db().await;
+        let alert_id = unique_alert_id("scoped");
+
+        for key in ["g1", "g2"] {
+            persist_with(
+                db,
+                &update_of(group_row(&alert_id, key, AlertLevel::Critical, 1_000)),
+            )
+            .await
+            .unwrap();
+        }
+
+        advance_delivery_state_with(
+            db,
+            &alert_id,
+            "g1",
+            DeliveryEpisode { level: AlertLevel::Critical, level_since: 1_000, notified_at_enqueue: (None, None) },
+            DeliveryOutcome::Delivered {
+                notified_level: AlertLevel::Critical,
+                silenced_until: Some(9_999),
+            },
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(
+            get_with(db, &alert_id, "g1").await.unwrap().unwrap().silenced_until,
+            Some(9_999)
+        );
+        assert_eq!(
+            get_with(db, &alert_id, "g2").await.unwrap().unwrap().silenced_until,
+            None,
+            "host-a's delivery must not silence host-b"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_an_older_same_episode_failure_cannot_land_after_a_newer_success() {
+        // The attempt guard, in SQL. The pure layer rejects this pairing, but
+        // the pure layer is not what writes the row — if the enqueue-time
+        // anchor is missing from the UPDATE's predicates, the database happily
+        // applies a stale `NotifyFailed` over a group that just delivered, and
+        // the next evaluation re-pages it.
+        //
+        // Both attempts share one level-episode, so `(level, level_since)`
+        // alone cannot separate them: only the delivery-state anchor can.
+        let db = test_db().await;
+        let alert_id = unique_alert_id("attempt-anchor");
+
+        persist_with(
+            db,
+            &update_of(group_row(&alert_id, "g1", AlertLevel::Critical, 1_000)),
+        )
+        .await
+        .unwrap();
+
+        let never_delivered = DeliveryEpisode {
+            level: AlertLevel::Critical,
+            level_since: 1_000,
+            notified_at_enqueue: (None, None),
+        };
+
+        // Attempt B succeeds first.
+        assert!(
+            advance_delivery_state_with(
+                db,
+                &alert_id,
+                "g1",
+                never_delivered,
+                DeliveryOutcome::Delivered {
+                    notified_level: AlertLevel::Critical,
+                    silenced_until: Some(9_999),
+                },
+            )
+            .await
+            .unwrap()
+        );
+
+        // Attempt A — enqueued when nothing had been delivered — now fails.
+        let applied = advance_delivery_state_with(
+            db,
+            &alert_id,
+            "g1",
+            never_delivered,
+            DeliveryOutcome::Failed { at: 2_000 },
+        )
+        .await
+        .unwrap();
+
+        assert!(
+            !applied,
+            "the anchor no longer matches, so the stale failure must not be written"
+        );
+        let read = get_with(db, &alert_id, "g1").await.unwrap().unwrap();
+        assert_eq!(
+            read.last_outcome,
+            Some(RunOutcome::Firing),
+            "the group delivered; it must not read as NotifyFailed"
+        );
+        assert_eq!(read.silenced_until, Some(9_999), "and stays silenced");
+    }
+
+    #[tokio::test]
+    async fn test_a_current_attempt_failure_still_applies() {
+        // The complement: with delivery state untouched since enqueue, this IS
+        // the outstanding attempt. If the anchor predicates were too strict
+        // (e.g. `= NULL` instead of `IS NULL`), every genuine first failure
+        // would be silently swallowed and no group would ever record one.
+        let db = test_db().await;
+        let alert_id = unique_alert_id("attempt-current");
+
+        persist_with(
+            db,
+            &update_of(group_row(&alert_id, "g1", AlertLevel::Critical, 1_000)),
+        )
+        .await
+        .unwrap();
+
+        let applied = advance_delivery_state_with(
+            db,
+            &alert_id,
+            "g1",
+            DeliveryEpisode {
+                level: AlertLevel::Critical,
+                level_since: 1_000,
+                notified_at_enqueue: (None, None),
+            },
+            DeliveryOutcome::Failed { at: 1_500 },
+        )
+        .await
+        .unwrap();
+
+        assert!(applied, "a NULL anchor must match a never-delivered row");
+        let read = get_with(db, &alert_id, "g1").await.unwrap().unwrap();
+        assert_eq!(read.last_outcome, Some(RunOutcome::NotifyFailed));
     }
 }

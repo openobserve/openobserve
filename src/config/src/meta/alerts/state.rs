@@ -92,6 +92,21 @@ pub struct AlertState {
     /// *every* firing group (the fetch is severity-ordered), so the firing
     /// count is exact while the observed count is not.
     pub groups_firing_is_lower_bound: Option<bool>,
+    // ── Per-group delivery state (alerts_2.md §5.5 MN-2) ────────────────────
+    // §7.1's `delivery_decision` fed per group. Deliberately NOT named
+    // `delivery_silenced_until`: that is the ScheduledTriggerData field
+    // non-multi alerts keep using — the state row is the per-group home.
+    //
+    // Written ONLY by the delivery callbacks (`dispatch::delivery_success_update`),
+    // never by evaluation: `apply_outcome` carries both forward untouched. That
+    // one-writer rule is what makes MN-6 hold — a failed send leaves them
+    // unadvanced, so the group re-qualifies on the next evaluation.
+    /// Per-group silence window: suppress same-level re-delivery until this
+    /// instant (micros). `None` = not silenced.
+    pub silenced_until: Option<i64>,
+    /// The level of this group's last *successful* delivery — what
+    /// `delivery_decision` measures escalation against.
+    pub last_notified_level: Option<AlertLevel>,
 }
 
 impl AlertState {
@@ -112,6 +127,8 @@ impl AlertState {
             groups_firing: None,
             groups_observed_is_lower_bound: None,
             groups_firing_is_lower_bound: None,
+            silenced_until: None,
+            last_notified_level: None,
         }
     }
 
@@ -261,6 +278,9 @@ pub fn apply_outcome(
         groups_firing: prev.and_then(|p| p.groups_firing),
         groups_observed_is_lower_bound: prev.and_then(|p| p.groups_observed_is_lower_bound),
         groups_firing_is_lower_bound: prev.and_then(|p| p.groups_firing_is_lower_bound),
+        // Delivery state is the callbacks' to write; evaluation only carries it.
+        silenced_until: prev.and_then(|p| p.silenced_until),
+        last_notified_level: prev.and_then(|p| p.last_notified_level),
     };
 
     // A change on EITHER axis is a transition — an escalation while still
@@ -305,6 +325,8 @@ mod tests {
             groups_firing: None,
             groups_observed_is_lower_bound: None,
             groups_firing_is_lower_bound: None,
+            silenced_until: None,
+            last_notified_level: None,
         }
     }
 
@@ -522,6 +544,31 @@ mod tests {
     }
 
     #[test]
+    fn test_evaluation_carries_delivery_state_forward_untouched() {
+        // §5.5 MN-2/MN-6: delivery state has ONE writer — the delivery
+        // callbacks. If `apply_outcome` reset these on every evaluation, each
+        // run would erase the silence window and the alert would page every
+        // cycle regardless of silence; if it defaulted them on a fresh clone,
+        // same result.
+        let mut previous = prev(RunOutcome::Firing, 100, 100);
+        previous.silenced_until = Some(9_999);
+        previous.last_notified_level = Some(AlertLevel::Critical);
+
+        let update = apply_outcome(
+            "alert-1",
+            ROLLUP_GROUP_KEY,
+            Some(&previous),
+            RunOutcome::Firing,
+            Some(AlertLevel::Critical),
+            200,
+        );
+        let state = update.state.expect("an observed run writes state");
+
+        assert_eq!(state.silenced_until, Some(9_999));
+        assert_eq!(state.last_notified_level, Some(AlertLevel::Critical));
+    }
+
+    #[test]
     fn test_per_group_state_is_keyed_independently() {
         let pod_a = AlertState {
             alert_id: "alert-1".to_string(),
@@ -538,6 +585,8 @@ mod tests {
             groups_firing: None,
             groups_observed_is_lower_bound: None,
             groups_firing_is_lower_bound: None,
+            silenced_until: None,
+            last_notified_level: None,
         };
         let update = apply_outcome(
             "alert-1",

@@ -117,6 +117,13 @@ pub enum AlertError {
     #[error("Invalid aggregation warning value: {0}")]
     InvalidAggregationThreshold(config::meta::alerts::aggregation_level::AggThresholdError),
 
+    /// Per-group alerting (`multi_alert`) has its own admissibility rules —
+    /// group_by, orderable operator, "any group" count gates, and the v1
+    /// exclusions for incidents and multi-window comparison (alerts_2.md
+    /// M-9/M-10, §5.5 MN-11).
+    #[error("Invalid per-group alert configuration: {0}")]
+    InvalidMultiAlert(config::meta::alerts::grouping::MultiAlertError),
+
     /// Realtime alerts are out of scope for multi-level thresholds (D12):
     /// they persist no state and never classify a level.
     #[error("Warning thresholds are not supported on real-time alerts")]
@@ -279,6 +286,27 @@ async fn create_default_alerts_folder(org_id: &str) -> Result<Folder, AlertError
     folders::save_folder(org_id, default_folder, FolderType::Alerts, true)
         .await
         .map_err(|_| AlertError::CreateDefaultFolderError)
+}
+
+/// Per-group alerting admissibility (M-9/M-10, §5.5 MN-11).
+///
+/// A no-op for every alert that has not opted in — which is every alert that
+/// predates the feature, since the flag cannot be present in JSON written
+/// before it existed. Called from `prepare_alert`, so it runs on BOTH create
+/// and update: removing the last `group_by` column from a multi-alert, or
+/// turning on incidents, is rejected on the edit path too.
+///
+/// Extracted rather than inlined so the boundary tests can call **this exact
+/// function**. Duplicating the call in a test helper would still compile after
+/// the production call changed, leaving the tests quietly verifying something
+/// else.
+fn validate_multi_alert_config(alert: &Alert) -> Result<(), AlertError> {
+    config::meta::alerts::grouping::validate_multi_alert(
+        &alert.query_condition,
+        &alert.trigger_condition,
+        alert.creates_incident,
+    )
+    .map_err(AlertError::InvalidMultiAlert)
 }
 
 /// Validates the alert and prepares it before it is written to the database.
@@ -513,6 +541,8 @@ async fn prepare_alert(
         config::meta::alerts::aggregation_level::validate_aggregation_thresholds(agg)
             .map_err(AlertError::InvalidAggregationThreshold)?;
     }
+
+    validate_multi_alert_config(alert)?;
 
     // PromQL carries a third threshold family: the condition value baked into
     // the query. Its warning needs the same §4.5 direction check, measured
@@ -2655,6 +2685,126 @@ mod threshold_validation_tests {
         }
         .to_string();
         assert!(msg.contains("promql_warning_value"), "got: {msg}");
+    }
+
+    // ── Per-group alerting at the save boundary (M-9/M-10, §5.5 MN-11) ──────
+    // The rule matrix lives in `config::meta::alerts::grouping`; these cover
+    // the WIRING — that `prepare_alert` actually consults it, that the error
+    // maps to HTTP 400, and that an alert which did not opt in is untouched.
+    // `prepare_alert` itself needs a live DB (folders, schema), so these
+    // exercise the same validation call it makes, in the same order.
+
+    use config::{meta::alerts::alert::Alert, utils::json::json};
+
+    /// The **production** function `prepare_alert` calls — not a copy of it.
+    /// Changing the real call site therefore changes what these tests
+    /// exercise, instead of silently leaving them testing a stale duplicate.
+    use super::validate_multi_alert_config as validate_at_save_boundary;
+
+    fn multi_alert_fixture() -> Alert {
+        let mut alert = Alert::default();
+        alert.trigger_condition.operator = config::meta::alerts::Operator::GreaterThanEquals;
+        alert.trigger_condition.threshold = 1;
+        alert.query_condition.aggregation = Some(config::meta::alerts::Aggregation {
+            group_by: Some(vec!["host".to_string()]),
+            function: config::meta::alerts::AggFunction::Avg,
+            having: config::meta::alerts::Condition {
+                column: "value".into(),
+                operator: config::meta::alerts::Operator::GreaterThan,
+                value: json!(90),
+                ignore_case: false,
+            },
+            warning_value: None,
+            multi_alert: true,
+        });
+        alert
+    }
+
+    #[test]
+    fn test_save_accepts_a_valid_multi_alert() {
+        assert!(validate_at_save_boundary(&multi_alert_fixture()).is_ok());
+    }
+
+    #[test]
+    fn test_save_rejects_multi_alert_with_incidents() {
+        // MN-11. Without this wiring the pure rule exists but every API
+        // client can still create the unsupported combination.
+        let mut alert = multi_alert_fixture();
+        alert.creates_incident = true;
+
+        let err = validate_at_save_boundary(&alert).expect_err("must be rejected");
+        assert!(matches!(err, AlertError::InvalidMultiAlert(_)));
+        assert!(
+            err.to_string().contains("creates_incident"),
+            "the message must name the field: {err}"
+        );
+    }
+
+    #[test]
+    fn test_save_rejects_multi_alert_with_a_group_count_threshold() {
+        // M-10: "at least 3 groups" and "any breaching group" are different
+        // alerts; accepting both would leave the 3 doing nothing.
+        let mut alert = multi_alert_fixture();
+        alert.trigger_condition.threshold = 3;
+
+        assert!(matches!(
+            validate_at_save_boundary(&alert),
+            Err(AlertError::InvalidMultiAlert(_))
+        ));
+    }
+
+    #[test]
+    fn test_save_rejects_removing_the_last_group_by_from_a_multi_alert() {
+        // The UPDATE path specifically: `prepare_alert` runs on both, so an
+        // edit that empties group_by while the flag stays on is rejected.
+        let mut alert = multi_alert_fixture();
+        alert
+            .query_condition
+            .aggregation
+            .as_mut()
+            .unwrap()
+            .group_by = Some(vec![]);
+
+        assert!(matches!(
+            validate_at_save_boundary(&alert),
+            Err(AlertError::InvalidMultiAlert(_))
+        ));
+    }
+
+    #[test]
+    fn test_save_leaves_ordinary_incident_alerts_alone() {
+        // The guard is multi-only. An incident-creating alert with a group
+        // count threshold and no opt-in stays perfectly valid.
+        let mut alert = multi_alert_fixture();
+        alert.creates_incident = true;
+        alert.trigger_condition.threshold = 3;
+        alert
+            .query_condition
+            .aggregation
+            .as_mut()
+            .unwrap()
+            .multi_alert = false;
+
+        assert!(validate_at_save_boundary(&alert).is_ok());
+    }
+
+    #[test]
+    fn test_multi_alert_rejection_is_a_bad_request() {
+        // Misconfiguration is user input, not a server fault — the same 400
+        // the other threshold validations produce.
+        for variant in [
+            config::meta::alerts::grouping::MultiAlertError::IncidentsUnsupported,
+            config::meta::alerts::grouping::MultiAlertError::NotGrouped,
+            config::meta::alerts::grouping::MultiAlertError::CountGateNotAnyGroup,
+            config::meta::alerts::grouping::MultiAlertError::MultiTimeRangeUnsupported,
+        ] {
+            let resp: axum::response::Response = AlertError::InvalidMultiAlert(variant).into();
+            assert_eq!(
+                resp.status(),
+                axum::http::StatusCode::BAD_REQUEST,
+                "{variant:?} must be a 400, not a server error"
+            );
+        }
     }
 
     /// D12: realtime alerts are out of scope for levels entirely.

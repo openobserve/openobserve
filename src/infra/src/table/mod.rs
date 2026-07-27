@@ -42,6 +42,8 @@ pub mod gen_ai_agents;
 pub mod incident_events;
 pub mod kv_store;
 mod migration;
+#[cfg(test)]
+pub mod test_harness;
 pub mod model_pricing;
 pub mod online_eval_jobs;
 pub mod org_ai_toolsets;

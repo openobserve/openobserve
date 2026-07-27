@@ -34,6 +34,7 @@ pub mod aggregation_level;
 pub mod alert;
 pub mod composite;
 pub mod deduplication;
+pub mod dispatch;
 pub mod grouping;
 pub mod incidents;
 pub mod level;

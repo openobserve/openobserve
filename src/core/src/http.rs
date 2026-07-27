@@ -73,6 +73,7 @@ impl From<AlertError> for Response {
             // trigger-condition validations.
             | AlertError::InvalidWarningThreshold(_)
             | AlertError::InvalidAggregationThreshold(_)
+            | AlertError::InvalidMultiAlert(_)
             | AlertError::WarningThresholdOnRealtimeAlert
             | AlertError::WarningOnCoverageGate { .. }
             | AlertError::PromqlWarningWithoutCondition

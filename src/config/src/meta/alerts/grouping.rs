@@ -24,7 +24,7 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use serde::{Deserialize, Serialize};
 
 use super::{
-    Aggregation, Operator, TriggerCondition,
+    Operator, TriggerCondition,
     level::{AlertLevel, evaluate_level},
     state::{AlertState, ROLLUP_GROUP_KEY, StateTransition, StateUpdate, apply_outcome},
 };
@@ -72,6 +72,16 @@ pub enum MultiAlertError {
     /// `having.operator` has no severity direction, so neither a warning band
     /// nor the severity-ordered fetch can be defined over it.
     OperatorNotOrderable,
+    /// `creates_incident` is a third delivery route (§5.5 MN-11) whose
+    /// per-group identity is unspecified in v1; the combination is rejected
+    /// rather than silently collapsing groups into one incident or bypassing
+    /// correlation.
+    IncidentsUnsupported,
+    /// Multi-window comparison flattens one result set per time range, so a
+    /// single group key arrives once per range — there is no coherent "same
+    /// group last week" to hold one state row, and dispatch would page the
+    /// group once per window.
+    MultiTimeRangeUnsupported,
 }
 
 impl std::fmt::Display for MultiAlertError {
@@ -91,6 +101,14 @@ impl std::fmt::Display for MultiAlertError {
             Self::OperatorNotOrderable => f.write_str(
                 "per-group alerting needs an ordered comparison (>, >=, <, <=); `=` and `!=` have \
                  no severity direction",
+            ),
+            Self::IncidentsUnsupported => f.write_str(
+                "per-group alerting cannot yet be combined with incident creation; turn off \
+                 creates_incident or per-group alerting",
+            ),
+            Self::MultiTimeRangeUnsupported => f.write_str(
+                "per-group alerting cannot be combined with multi-window comparison; remove the \
+                 comparison periods or turn off per-group alerting",
             ),
         }
     }
@@ -120,11 +138,35 @@ fn is_any_group_gate(op: Operator, threshold: i64) -> bool {
 /// the legacy count-gated level provably the same verdict, so opting in never
 /// rewrites what "firing" means for an alert (D27).
 pub fn validate_multi_alert(
-    agg: &Aggregation,
+    query: &super::QueryCondition,
     tc: &TriggerCondition,
+    creates_incident: bool,
 ) -> Result<(), MultiAlertError> {
+    // Takes the whole `QueryCondition` rather than the aggregation alone
+    // because two of the rules are about what surrounds it: an alert with no
+    // aggregation cannot have opted in at all, and multi-window comparison is
+    // a sibling field.
+    let Some(agg) = query.aggregation.as_ref() else {
+        return Ok(());
+    };
     if !agg.multi_alert {
         return Ok(());
+    }
+
+    // MN-11: incident correlation is a third delivery route whose per-group
+    // identity v1 does not define. Rejecting beats the two silent
+    // alternatives — one incident for every group (un-does per-group paging),
+    // or bypassing correlation (makes `creates_incident` a lie).
+    if creates_incident {
+        return Err(MultiAlertError::IncidentsUnsupported);
+    }
+
+    // Multi-window flattens one result set per range, so a group key arrives
+    // once per range: one state row cannot represent "this group, this week"
+    // and "this group, last week" at once, and dispatch would page it per
+    // window while consuming one MN-8 slot each.
+    if query.multi_time_range.as_ref().is_some_and(|r| !r.is_empty()) {
+        return Err(MultiAlertError::MultiTimeRangeUnsupported);
     }
 
     match agg.group_by.as_deref() {
@@ -685,6 +727,8 @@ pub fn resolve_group_update(
         groups_firing: prev.groups_firing,
         groups_observed_is_lower_bound: prev.groups_observed_is_lower_bound,
         groups_firing_is_lower_bound: prev.groups_firing_is_lower_bound,
+        silenced_until: prev.silenced_until,
+        last_notified_level: prev.last_notified_level,
     };
 
     // An already-Ok group that vanished changes nothing on either axis, so no
@@ -1296,6 +1340,8 @@ mod tests {
             groups_firing: None,
             groups_observed_is_lower_bound: None,
             groups_firing_is_lower_bound: None,
+            silenced_until: None,
+            last_notified_level: None,
         }
     }
 
@@ -1317,6 +1363,8 @@ mod tests {
             groups_firing: None,
             groups_observed_is_lower_bound: None,
             groups_firing_is_lower_bound: None,
+            silenced_until: None,
+            last_notified_level: None,
         }
     }
 
@@ -1354,6 +1402,17 @@ mod tests {
         assert!(
             cfg.limit.alert_group_reap_grace_secs > 0,
             "a zero grace period deletes a group's row the instant it recovers"
+        );
+        assert!(
+            cfg.limit.alert_group_sweep_interval > 0,
+            "a zero sweep interval stops vanished groups ever resolving"
+        );
+        // §5.5 MN-8/D48: unlimited by default. Paging per group IS the
+        // contract, and the M-6 cap already bounds the worst case — a
+        // non-zero default here would silently drop pages out of the box.
+        assert_eq!(
+            cfg.limit.alert_max_group_notifications_per_eval, 0,
+            "the notification cap must be opt-in, not on by default"
         );
     }
 
@@ -1468,6 +1527,24 @@ mod tests {
     }
 
     // ── M-7: what a resolution writes ───────────────────────────────────────
+
+    #[test]
+    fn test_resolution_preserves_delivery_state() {
+        // §5.5 MN-2: M-7 resolution is not a delivery event. Wiping
+        // `silenced_until` here would let a group that vanishes and
+        // immediately returns bypass its own silence window.
+        let key = group_key(&labels(&[("host", "gone")]));
+        let mut prev = state_at(&key, Some(AlertLevel::Critical), 50);
+        prev.silenced_until = Some(9_999);
+        prev.last_notified_level = Some(AlertLevel::Critical);
+
+        let state = resolve_group_update("alert-1", &key, &prev, 5_000)
+            .state
+            .expect("resolution writes state");
+
+        assert_eq!(state.silenced_until, Some(9_999));
+        assert_eq!(state.last_notified_level, Some(AlertLevel::Critical));
+    }
 
     #[test]
     fn test_resolution_records_the_recovery_transition() {
@@ -2646,6 +2723,14 @@ mod tests {
         },
     };
 
+    /// A QueryCondition carrying this aggregation — what validation takes.
+    fn qc(agg: &Aggregation) -> crate::meta::alerts::QueryCondition {
+        crate::meta::alerts::QueryCondition {
+            aggregation: Some(agg.clone()),
+            ..Default::default()
+        }
+    }
+
     /// An aggregation alert config. `group_by: None` = ungrouped.
     fn agg_cfg(group_by: Option<&[&str]>, op: Operator, multi_alert: bool) -> Aggregation {
         Aggregation {
@@ -2732,18 +2817,18 @@ mod tests {
         let a = agg_cfg(Some(&["host"]), Operator::GreaterThan, true);
 
         assert_eq!(
-            validate_multi_alert(&a, &tc(Operator::GreaterThanEquals, 1, None)),
+            validate_multi_alert(&qc(&a), &tc(Operator::GreaterThanEquals, 1, None), false),
             Ok(())
         );
         // `> 0` is the same statement as `>= 1`; a UI that normalises one way
         // must not make an otherwise-valid alert unsavable.
         assert_eq!(
-            validate_multi_alert(&a, &tc(Operator::GreaterThan, 0, None)),
+            validate_multi_alert(&qc(&a), &tc(Operator::GreaterThan, 0, None), false),
             Ok(())
         );
         // An explicit warning gate that also means "any group".
         assert_eq!(
-            validate_multi_alert(&a, &tc(Operator::GreaterThanEquals, 1, Some(1))),
+            validate_multi_alert(&qc(&a), &tc(Operator::GreaterThanEquals, 1, Some(1)), false),
             Ok(())
         );
     }
@@ -2755,7 +2840,7 @@ mod tests {
         // visibly in the UI doing nothing at all.
         let a = agg_cfg(Some(&["host"]), Operator::GreaterThan, true);
         assert_eq!(
-            validate_multi_alert(&a, &tc(Operator::GreaterThanEquals, 3, None)),
+            validate_multi_alert(&qc(&a), &tc(Operator::GreaterThanEquals, 3, None), false),
             Err(MultiAlertError::CountGateNotAnyGroup)
         );
     }
@@ -2769,7 +2854,7 @@ mod tests {
         // M-2: one Warning group is legacy-Ok but most-severe-Warning.
         let a = agg_cfg(Some(&["host"]), Operator::GreaterThan, true);
         assert_eq!(
-            validate_multi_alert(&a, &tc(Operator::GreaterThanEquals, 1, Some(3))),
+            validate_multi_alert(&qc(&a), &tc(Operator::GreaterThanEquals, 1, Some(3)), false),
             Err(MultiAlertError::WarningCountGateNotAnyGroup)
         );
     }
@@ -2781,7 +2866,7 @@ mod tests {
         // alert would go permanently green exactly when it should fire.
         let a = agg_cfg(Some(&["host"]), Operator::GreaterThan, true);
         assert_eq!(
-            validate_multi_alert(&a, &tc(Operator::LessThan, 3, None)),
+            validate_multi_alert(&qc(&a), &tc(Operator::LessThan, 3, None), false),
             Err(MultiAlertError::CountGateNotAnyGroup)
         );
     }
@@ -2795,7 +2880,7 @@ mod tests {
         for op in [Operator::EqualTo, Operator::NotEqualTo] {
             let a = agg_cfg(Some(&["host"]), op, true);
             assert_eq!(
-                validate_multi_alert(&a, &tc(Operator::GreaterThanEquals, 1, None)),
+                validate_multi_alert(&qc(&a), &tc(Operator::GreaterThanEquals, 1, None), false),
                 Err(MultiAlertError::OperatorNotOrderable),
                 "{op:?} has no worst-first ordering"
             );
@@ -2808,7 +2893,7 @@ mod tests {
         // raw payloads — hiding a control is not enforcing a rule.
         let a = agg_cfg(None, Operator::GreaterThan, true);
         assert_eq!(
-            validate_multi_alert(&a, &tc(Operator::GreaterThanEquals, 1, None)),
+            validate_multi_alert(&qc(&a), &tc(Operator::GreaterThanEquals, 1, None), false),
             Err(MultiAlertError::NotGrouped)
         );
     }
@@ -2821,8 +2906,72 @@ mod tests {
         // to group by.
         let a = agg_cfg(Some(&[]), Operator::GreaterThan, true);
         assert_eq!(
-            validate_multi_alert(&a, &tc(Operator::GreaterThanEquals, 1, None)),
+            validate_multi_alert(&qc(&a), &tc(Operator::GreaterThanEquals, 1, None), false),
             Err(MultiAlertError::NotGrouped)
+        );
+    }
+
+    #[test]
+    fn test_opting_in_with_creates_incident_is_rejected() {
+        // §5.5 MN-11. Incident correlation is a third delivery route with no
+        // per-group identity specified in v1. Accepting the combination forces
+        // one of two silent lies: every group collapsed into one incident
+        // (un-does per-group paging), or correlation bypassed entirely
+        // (creates_incident stops meaning anything).
+        let a = agg_cfg(Some(&["host"]), Operator::GreaterThan, true);
+        assert_eq!(
+            validate_multi_alert(&qc(&a), &tc(Operator::GreaterThanEquals, 1, None), true),
+            Err(MultiAlertError::IncidentsUnsupported)
+        );
+        // Incidents without multi stay untouched — this guard is multi-only.
+        let simple = agg_cfg(Some(&["host"]), Operator::GreaterThan, false);
+        assert_eq!(
+            validate_multi_alert(&qc(&simple), &tc(Operator::GreaterThanEquals, 3, None), true),
+            Ok(())
+        );
+        assert!(
+            MultiAlertError::IncidentsUnsupported
+                .to_string()
+                .contains("creates_incident"),
+            "the rejection must name the field to change"
+        );
+    }
+
+    #[test]
+    fn test_opting_in_with_multi_time_range_is_rejected() {
+        // Multi-window comparison flattens one result set per range, so the
+        // same group key arrives once per range. One state row cannot be both
+        // "this group now" and "this group last week", and dispatch would page
+        // the group once per window while burning one MN-8 slot each.
+        let a = agg_cfg(Some(&["host"]), Operator::GreaterThan, true);
+        let mut query = qc(&a);
+        query.multi_time_range = Some(vec![crate::meta::alerts::CompareHistoricData {
+            offset: "1w".to_string(),
+        }]);
+
+        assert_eq!(
+            validate_multi_alert(&query, &tc(Operator::GreaterThanEquals, 1, None), false),
+            Err(MultiAlertError::MultiTimeRangeUnsupported)
+        );
+
+        // An EMPTY comparison list is not a multi-window alert.
+        let mut empty = qc(&a);
+        empty.multi_time_range = Some(vec![]);
+        assert_eq!(
+            validate_multi_alert(&empty, &tc(Operator::GreaterThanEquals, 1, None), false),
+            Ok(())
+        );
+    }
+
+    #[test]
+    fn test_an_alert_without_an_aggregation_is_never_multi() {
+        // A count-based alert has no aggregation to carry the flag, so
+        // validation must pass it straight through rather than panicking or
+        // inventing a rule.
+        let query = crate::meta::alerts::QueryCondition::default();
+        assert_eq!(
+            validate_multi_alert(&query, &tc(Operator::GreaterThanEquals, 5, None), true),
+            Ok(())
         );
     }
 
@@ -2836,13 +2985,13 @@ mod tests {
         // feature was never supposed to touch.
         let legacy = agg_cfg(Some(&["host"]), Operator::EqualTo, false);
         assert_eq!(
-            validate_multi_alert(&legacy, &tc(Operator::LessThan, 5, Some(9))),
+            validate_multi_alert(&qc(&legacy), &tc(Operator::LessThan, 5, Some(9)), false),
             Ok(())
         );
 
         let ungrouped = agg_cfg(None, Operator::EqualTo, false);
         assert_eq!(
-            validate_multi_alert(&ungrouped, &tc(Operator::GreaterThanEquals, 7, None)),
+            validate_multi_alert(&qc(&ungrouped), &tc(Operator::GreaterThanEquals, 7, None), false),
             Ok(())
         );
     }
@@ -2914,7 +3063,7 @@ mod tests {
             agg.warning_value = warning;
 
             for gate in &gates {
-                validate_multi_alert(&agg, gate)
+                validate_multi_alert(&qc(&agg), gate, false)
                     .expect("fixture must be a shape M-10 actually permits");
 
                 for values in &value_sets {
@@ -2980,7 +3129,7 @@ mod tests {
         let gate = tc(Operator::GreaterThanEquals, 1, Some(3));
 
         assert_eq!(
-            validate_multi_alert(&agg, &gate),
+            validate_multi_alert(&qc(&agg), &gate, false),
             Err(MultiAlertError::WarningCountGateNotAnyGroup),
             "fixture must be a shape M-10 rejects"
         );

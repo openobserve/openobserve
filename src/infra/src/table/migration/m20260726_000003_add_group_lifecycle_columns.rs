@@ -68,6 +68,17 @@ impl MigrationTrait for Migration {
             ColType::Boolean,
         )
         .await?;
+        // Per-group delivery state (§5.5 MN-2). Deliberately NOT
+        // `delivery_silenced_until` — that name is the ScheduledTriggerData
+        // field non-multi alerts keep using.
+        add_column(manager, STATES, AlertStates::SilencedUntil, ColType::BigInt).await?;
+        add_column(
+            manager,
+            STATES,
+            AlertStates::LastNotifiedLevel,
+            ColType::Int,
+        )
+        .await?;
 
         add_column(
             manager,
@@ -94,6 +105,8 @@ impl MigrationTrait for Migration {
             drop_column(manager, TRANSITIONS, col).await?;
         }
         for col in [
+            AlertStates::LastNotifiedLevel,
+            AlertStates::SilencedUntil,
             AlertStates::GroupsFiringIsLowerBound,
             AlertStates::GroupsObservedIsLowerBound,
             AlertStates::GroupsFiring,
@@ -176,6 +189,8 @@ enum AlertStates {
     GroupsFiring,
     GroupsObservedIsLowerBound,
     GroupsFiringIsLowerBound,
+    SilencedUntil,
+    LastNotifiedLevel,
 }
 
 #[derive(DeriveIden, Clone)]

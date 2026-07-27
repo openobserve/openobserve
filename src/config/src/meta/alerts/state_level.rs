@@ -53,6 +53,8 @@ mod tests {
             groups_firing: None,
             groups_observed_is_lower_bound: None,
             groups_firing_is_lower_bound: None,
+            silenced_until: None,
+            last_notified_level: None,
         }
     }
 

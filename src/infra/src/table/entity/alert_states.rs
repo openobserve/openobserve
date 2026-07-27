@@ -39,6 +39,12 @@ pub struct Model {
     /// the two diverge: a full page that reached healthy groups has seen every
     /// firing group, so that count stays exact.
     pub groups_firing_is_lower_bound: Option<bool>,
+    /// Per-group silence window (§5.5 MN-2): suppress same-level re-delivery
+    /// until this instant. Written only by the delivery callbacks.
+    pub silenced_until: Option<i64>,
+    /// `AlertLevel::to_i32` of this group's last *successful* delivery — what
+    /// escalation is measured against (§7.1 per group).
+    pub last_notified_level: Option<i32>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

@@ -731,27 +731,18 @@ impl QueryConditionExt for QueryCondition {
                     if let Some(cap) = multi_group_cap
                         && let Some(group_by) = agg.group_by.as_ref()
                     {
+                        // Labels come from the SHARED extractor, not a local
+                        // copy: dispatch keys each group's notification
+                        // payload by `group_key(row_group_labels(row))`, so if
+                        // the two renderings ever diverged, every dispatch
+                        // item would fail to find its row and the feature
+                        // would break silently.
                         let observations: Vec<GroupObservation> = records
                             .iter()
                             .filter_map(|r| {
                                 let value = r.get("alert_agg_value")?.as_f64()?;
-                                let labels: std::collections::BTreeMap<String, String> = group_by
-                                    .iter()
-                                    .filter_map(|col| {
-                                        r.get(col).map(|v| {
-                                            let rendered = match v.as_str() {
-                                                Some(s) => s.to_string(),
-                                                // A non-string group value
-                                                // (numeric pod ordinal, bool
-                                                // flag) is still an identity —
-                                                // render it rather than drop
-                                                // the group entirely.
-                                                None => v.to_string(),
-                                            };
-                                            (col.clone(), rendered)
-                                        })
-                                    })
-                                    .collect();
+                                let labels =
+                                    config::meta::alerts::dispatch::row_group_labels(r, group_by);
                                 Some(GroupObservation::new(labels, value))
                             })
                             .collect();
