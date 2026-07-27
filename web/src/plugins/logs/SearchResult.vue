@@ -2047,11 +2047,16 @@ export default defineComponent({
     // "Search around" highlight, applied as a class (not an inline style) so the
     // row-hover utility still wins on hover.
     const getLogRowClass = (row: any): string => {
+      const classes: string[] = [];
       const ts = searchObj.data?.searchAround?.indexTimestamp;
       if (ts != null && ts !== -1 && row[logsTimestampCol.value] === ts) {
-        return "bg-table-row-selected-bg";
+        classes.push("bg-table-row-selected-bg");
       }
-      return "";
+      // Carries the detected severity for the status spine, which is otherwise
+      // only readable as a colour.
+      const level = extractStatusFromLog(row)?.level;
+      if (level) classes.push(`o2-log-level-${level}`);
+      return classes.join(" ");
     };
 
     // The parent tracks `expandedLogs` as hit indices while the table keys

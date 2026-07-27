@@ -188,23 +188,23 @@ export default class DashboardLegendsCopy {
       }
     });
     // Wait for data cells to be attached after scroll reset
-    await this.dashboardTable.locator('[data-test="dashboard-data-row-cell"]').first()
+    await this.dashboardTable.locator('[data-test^="o2-table-cell-"]').first()
       .waitFor({ state: 'attached', timeout: 10000 });
   }
 
   /**
    * Get a table cell by row and column index.
    * Filters out virtual scroll spacer rows by only targeting rows
-   * that contain data-test="dashboard-data-row-cell" cells.
+   * that contain data-test="o2-table-cell-<columnId>" cells.
    * @param {number} rowIndex - 0-based row index
    * @param {number} colIndex - 0-based column index
    * @returns {import('@playwright/test').Locator}
    */
   getTableCell(rowIndex, colIndex) {
     const dataRows = this.dashboardTable
-      .locator('[data-test="dashboard-data-row"]')
-      .filter({ has: this.page.locator('[data-test="dashboard-data-row-cell"]') });
-    return dataRows.nth(rowIndex).locator('[data-test="dashboard-data-row-cell"]').nth(colIndex);
+      .locator('[data-test^="o2-table-row-"]')
+      .filter({ has: this.page.locator('[data-test^="o2-table-cell-"]') });
+    return dataRows.nth(rowIndex).locator('[data-test^="o2-table-cell-"]').nth(colIndex);
   }
 
   /**
@@ -257,9 +257,7 @@ export default class DashboardLegendsCopy {
    */
   async getTableCellText(rowIndex, colIndex) {
     const cell = this.getTableCell(rowIndex, colIndex);
-    // Get the span with the actual text, excluding the copy button
-    const textSpan = cell.locator('[data-test="dashboard-table-cell-value"]');
-    const text = await textSpan.textContent();
+    const text = await cell.textContent();
     return text.trim();
   }
 

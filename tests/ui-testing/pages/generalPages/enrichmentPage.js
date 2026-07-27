@@ -60,10 +60,10 @@ class EnrichmentPage {
         // ────────────────────────────────────────────────────────────────────
         // Logs page locators (used by explore-from-table flow)
         // ────────────────────────────────────────────────────────────────────
-        this.timestampColumn = page.locator('[data-test="log-table-column-0-_timestamp"]');
+        this.timestampColumn = page.locator('[data-test="o2-table-row-0"] [data-test="o2-table-cell-_timestamp"]');
         this.logDetailDrawer = page.locator('[data-test="logs-search-result-detail-dialog"]');
         this.logDetailDrawerClose = page.locator('[data-test="logs-search-result-detail-dialog"] [data-test="o-drawer-close-btn"]');
-        this.expandMenu = '[data-test="table-row-expand-menu"]';
+        this.expandMenu = '[data-test^="o2-table-expand-"]';
         this.protocolKeywordText = '[data-test="log-expand-detail-key-protocol_keyword"]';
         this.dateTimeBtn = page.locator('[data-test="date-time-btn"]');
 
@@ -1625,7 +1625,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
     async clickFirstLogRow() {
         testLogger.debug('Clicking first log row');
 
-        const firstLogRow = this.page.locator('[data-test="log-table-column-0-_timestamp"]').first();
+        const firstLogRow = this.page.locator('[data-test="o2-table-row-0"] [data-test="o2-table-cell-_timestamp"]').first();
         await firstLogRow.waitFor({ state: 'visible', timeout: 30000 });
         await firstLogRow.click();
 

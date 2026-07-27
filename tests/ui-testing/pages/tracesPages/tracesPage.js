@@ -2400,7 +2400,7 @@ export class TracesPage {
    * @returns {Locator}
    */
   getLogsTimestampHeader() {
-    return this.page.locator('[data-test="log-search-result-table-th-timestamp"]');
+    return this.page.locator('[data-test="o2-table-th-timestamp"]');
   }
 
   /**

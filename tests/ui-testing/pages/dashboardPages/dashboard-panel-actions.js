@@ -22,7 +22,7 @@ export default class DashboardactionPage {
     // toast is produced).
     this.panelNameError = page.locator('[data-test="dashboard-panel-name-error"]');
     // TanStack table data rows / cells (source data-tests in TenstackTable.vue)
-    this.tableDataRow = page.locator('[data-test="dashboard-panel-table"] [data-test="dashboard-data-row"]');
+    this.tableDataRow = page.locator('[data-test="dashboard-panel-table"] [data-test^="o2-table-row-"]');
   }
 
   // Returns the error toast locator for assertions
@@ -40,11 +40,11 @@ export default class DashboardactionPage {
     return this.tableDataRow;
   }
 
-  // Returns the nth data cell (data-test="dashboard-data-row-cell") of the first data row
+  // Returns the nth data cell (data-test="o2-table-cell-<columnId>") of the first data row
   firstRowNthCell(index) {
     return this.tableDataRow
       .first()
-      .locator('[data-test="dashboard-data-row-cell"]')
+      .locator('[data-test^="o2-table-cell-"]')
       .nth(index);
   }
 

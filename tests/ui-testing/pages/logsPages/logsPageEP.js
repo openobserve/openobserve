@@ -169,7 +169,7 @@ async validateDecryResult(cipherName) {
   
   await this.page.waitForTimeout(10000);
   
-  const expandMenuLocator = this.page.locator('[data-test="log-table-column-0-_timestamp"] [data-test="table-row-expand-menu"]');
+  const expandMenuLocator = this.page.locator('[data-test="o2-table-expand-0"]');
   await expect(expandMenuLocator).toBeVisible();
   await expandMenuLocator.click();
   
