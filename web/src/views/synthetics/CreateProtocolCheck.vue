@@ -332,7 +332,6 @@ async function saveCheck() {
           @click="saveCheck"
         >
           {{ editId ? t("synthetics.newCheck.updateCheck") : t("synthetics.newCheck.saveCheck") }}
-          <template #suffix><OIcon name="save" size="sm" /></template>
         </OButton>
       </div>
 

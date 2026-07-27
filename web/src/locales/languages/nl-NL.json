@@ -9592,6 +9592,8 @@
       "modalSubtitle": "Kies wat u wilt monitoren",
       "modalTitle": "Maak een Check",
       "pageTitle": "Nieuwe {label}-controle",
+      "saveAndContinue": "Opslaan en doorgaan",
+      "saveAndExit": "Opslaan en afsluiten",
       "saveCheck": "Controle opslaan",
       "saveFailed": "Kan controle niet opslaan.",
       "saved": "Controle succesvol opgeslagen.",

@@ -406,7 +406,13 @@ function beforeUnloadHandler(e: BeforeUnloadEvent) {
   e.preventDefault();
 }
 
-async function saveCheck() {
+/**
+ * Validates and persists the check. Owns validation, the API call and all
+ * toasts — but deliberately NOT navigation, so the footer buttons can decide
+ * where to go afterwards (stay on Configure vs. return to the checks list).
+ * Returns true only when the check was actually written.
+ */
+async function persist(): Promise<boolean> {
   // ── Pre-save validation ───────────────────────────────────────────
   validationErrors.value = {};
   const toValidate = {
@@ -435,7 +441,7 @@ async function saveCheck() {
       variant: "error",
       message: t("synthetics.validation.fixHighlightedFields"),
     });
-    return;
+    return false;
   }
 
   isSaving.value = true;
@@ -451,32 +457,28 @@ async function saveCheck() {
       await syntheticsService.update(org, props.editId, apiPayload.value, check.value.folder);
       dismiss();
       toast({ variant: "success", message: t("synthetics.newCheck.updated") });
-      isDirty.value = false;
-      if (currentStep.value !== 1) {
-        router.push({ name: "synthetics", query: { folder: check.value.folder } });
-      }
     } else {
-      const res = await syntheticsService.create(org, apiPayload.value, check.value.folder);
-      const savedId = res.data?.id ?? crypto.randomUUID();
+      await syntheticsService.create(org, apiPayload.value, check.value.folder);
       dismiss();
       toast({ variant: "success", message: t("synthetics.newCheck.saved") });
-      isDirty.value = false;
-      router.push({ name: "synthetics", query: { folder: check.value.folder } });
     }
+    isDirty.value = false;
+    return true;
   } catch (err: any) {
     dismiss();
     if (err?.response?.status === 404) {
+      // Already navigated away — the caller must not push on top of this.
       forceLeave = true;
       router.push({ name: "synthetics" });
       toast({ variant: "warning", message: t("synthetics.newCheck.notFoundInOrg") });
-      isSaving.value = false;
-      return;
+      return false;
     }
     toast({
       variant: "error",
       message: err?.response?.data?.message || t("synthetics.newCheck.saveFailed"),
     });
     console.error("[synthetics] save failed", err);
+    return false;
   } finally {
     isSaving.value = false;
   }
@@ -498,6 +500,19 @@ function onContinueToConfigure() {
   if (!valid) return;
   journeyStepDone.value = true;
   currentStep.value = 2;
+}
+
+/** Edit mode, Journey step: persist, then move on to Configure. */
+async function onSaveAndContinue() {
+  if (!(await persist())) return;
+  journeyStepDone.value = true;
+  currentStep.value = 2;
+}
+
+/** Persist, then return to the checks list. */
+async function onSaveAndExit() {
+  if (!(await persist())) return;
+  router.push({ name: "synthetics", query: { folder: check.value.folder } });
 }
 
 // ── Replay — uses the composable's phase-based state machine ────────────────
@@ -621,7 +636,7 @@ function onClearResults() {
             data-test="synthetics-create-record-btn"
             @click="onRecordClick"
           >
-            <template #prefix>
+            <template #icon-left>
               <OIcon name="smart-display" size="sm" />
             </template>
             {{ t("synthetics.journey.recordJourney") }}
@@ -632,7 +647,7 @@ function onClearResults() {
             data-test="synthetics-create-build-btn"
             @click="buildManually"
           >
-            <template #prefix>
+            <template #icon-left>
               <OIcon name="edit" size="sm" />
             </template>
             {{ t("synthetics.createBrowserTest.buildManually") }}
@@ -857,7 +872,7 @@ function onClearResults() {
         <div
           class="border-border-default bg-surface-base flex shrink-0 items-center gap-2 border-t px-3 py-2.5"
         >
-          <!-- Journey step: Cancel | Selection actions (left) | Replay status + Continue (right) -->
+          <!-- Journey step: Selection actions (left) | Cancel + save/continue actions (right) -->
           <template v-if="currentStep === 1">
             <!-- Selection actions — moved from BrowserJourney, kept on the left -->
             <template v-if="journeySelectionState.count > 0 && !journeySelectionState.isRecording">
@@ -884,26 +899,36 @@ function onClearResults() {
             >
               {{ t("common.cancel") }}
             </OButton>
+            <!-- Create mode: nothing to save yet — Configure holds the required fields -->
             <OButton
+              v-if="!props.editId"
               variant="outline"
               size="sm"
               data-test="synthetics-create-continue-btn"
               @click="onContinueToConfigure"
             >
               {{ t("synthetics.createBrowserTest.continue") }}
-              <template #suffix><OIcon name="chevron-right" size="sm" /></template>
             </OButton>
-            <OButton
-              v-if="props.editId"
-              variant="primary"
-              size="sm"
-              :loading="isSaving"
-              data-test="synthetics-create-save-from-journey-btn"
-              @click="saveCheck"
-            >
-              {{ t("synthetics.newCheck.updateCheck") }}
-              <template #suffix><OIcon name="save" size="sm" /></template>
-            </OButton>
+            <template v-else>
+              <OButton
+                variant="outline"
+                size="sm"
+                :loading="isSaving"
+                data-test="synthetics-create-save-continue-btn"
+                @click="onSaveAndContinue"
+              >
+                {{ t("synthetics.newCheck.saveAndContinue") }}
+              </OButton>
+              <OButton
+                variant="primary"
+                size="sm"
+                :loading="isSaving"
+                data-test="synthetics-create-save-exit-btn"
+                @click="onSaveAndExit"
+              >
+                {{ t("synthetics.newCheck.saveAndExit") }}
+              </OButton>
+            </template>
           </template>
 
           <!-- Configure step: Cancel | Back + Save -->
@@ -923,7 +948,6 @@ function onClearResults() {
               data-test="synthetics-create-back-to-journey-btn"
               @click="currentStep = 1"
             >
-              <template #prefix><OIcon name="chevron-left" size="sm" /></template>
               {{ t("common.goBack") }}
             </OButton>
             <OButton
@@ -931,14 +955,13 @@ function onClearResults() {
               size="sm"
               :loading="isSaving"
               data-test="synthetics-create-save-btn"
-              @click="saveCheck"
+              @click="onSaveAndExit"
             >
               {{
                 props.editId
-                  ? t("synthetics.newCheck.updateCheck")
+                  ? t("synthetics.newCheck.saveAndExit")
                   : t("synthetics.newCheck.saveCheck")
               }}
-              <template #suffix><OIcon name="save" size="sm" /></template>
             </OButton>
           </template>
         </div>

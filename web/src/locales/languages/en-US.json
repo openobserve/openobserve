@@ -9660,6 +9660,8 @@
       "modalSubtitle": "Choose what you want to monitor",
       "modalTitle": "Create a Check",
       "pageTitle": "New {label} Check",
+      "saveAndContinue": "Save & Continue",
+      "saveAndExit": "Save & Exit",
       "saveCheck": "Save check",
       "saveFailed": "Failed to save check.",
       "saved": "Check saved successfully.",
