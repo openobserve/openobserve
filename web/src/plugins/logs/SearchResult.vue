@@ -2281,7 +2281,10 @@ export default defineComponent({
    glyph-sized target is easy to miss near its edges. */
 .logs-results-otable :deep([data-test^="o2-table-expand-"]) {
   height: 1.25rem !important;
-  width: 100% !important;
+  /* Definite width matching the w-4 expand cell — NOT 100%: a percent-width
+     child inside the auto-layout table is circular, and Chromium resolves it
+     by inflating the table to its 500000px cap, pushing all data off-screen. */
+  width: 1rem !important;
   min-height: 0 !important;
 }
 .logs-results-otable :deep([data-test^="o2-table-expand-"] svg) {
