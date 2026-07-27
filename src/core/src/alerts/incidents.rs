@@ -1003,6 +1003,19 @@ async fn find_or_create_incident(
                 );
             }
 
+            if let Err(e) = crate::incidents::send_incident_event_trigger(
+                org_id,
+                &incident.id,
+                IncidentEvent::alert(&alert_id, &alert.name, triggered_at),
+            )
+            .await
+            {
+                log::error!(
+                    "error triggering workflow for alert added for {org_id} incident id {} : {e}",
+                    incident.id
+                );
+            }
+
             spawn_topology_enrichment(
                 org_id,
                 &incident.id,
@@ -1070,6 +1083,20 @@ async fn find_or_create_incident(
             {
                 log::error!(
                     "[Incidents] Failed to record alert event for incident {}: {e}",
+                    existing.id
+                );
+            }
+
+            if !is_new_alert_type
+                && let Err(e) = crate::incidents::send_incident_event_trigger(
+                    org_id,
+                    &existing.id,
+                    IncidentEvent::alert(&alert.get_unique_key(), &alert.name, triggered_at),
+                )
+                .await
+            {
+                log::error!(
+                    "error triggering workflow for incident created for {org_id} incident id {} : {e}",
                     existing.id
                 );
             }

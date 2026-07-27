@@ -158,8 +158,8 @@ async fn get_event_metadata(
 }
 
 // NOTE: This is specifically for sending event trigger without appending event in db
-// This should ideally avoided for anything except created event, has its handling for db
-// is different than other event types. For anything other than create event, we should use the
+// This should ideally avoided for anything except created and alert events, has its handling for db
+// is different than other event types. For anything other than these, we should use the
 // append_event fn below
 pub async fn send_incident_event_trigger(
     org_id: &str,
