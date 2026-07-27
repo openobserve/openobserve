@@ -182,7 +182,7 @@ pub async fn send_incident_event_trigger(
     let metadata = match get_event_metadata(org_id, incident_id, event).await {
         Ok(v) => v,
         Err(e) => {
-            log::error!("error getting incident event workflows for {org_id}/{incident_id} : {e}");
+            log::error!("error getting incident event metadata for {org_id}/{incident_id} : {e}");
             return Ok(());
         }
     };
@@ -193,7 +193,7 @@ pub async fn send_incident_event_trigger(
             "associating trace id {trace_id} with workflow {} for incident {incident_id} event trigger",
             workflow.workflow_id
         );
-        send_workflow_trigger(
+        if let Err(e) = send_workflow_trigger(
             &trace_id,
             org_id,
             incident_id.to_string(),
@@ -202,7 +202,13 @@ pub async fn send_incident_event_trigger(
             metadata.clone(),
             &[],
         )
-        .await?;
+        .await
+        {
+            log::error!(
+                "error sending workflow trigger for {org_id}/{} trace_id {trace_id} incident {incident_id} : {e}",
+                workflow.workflow_id
+            );
+        }
     }
     Ok(())
 }

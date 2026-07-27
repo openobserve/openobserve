@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -35,7 +35,7 @@ impl MigrationTrait for Migration {
     }
 }
 
-/// Statement to create the workflows table
+/// Statement to create the workflow associations table
 fn create_workflows_associations_table_statement() -> TableCreateStatement {
     Table::create()
         .table(WorkflowAssociations::Table)
