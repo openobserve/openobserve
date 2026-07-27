@@ -31,6 +31,7 @@ use crate::{
     entry::PersistStat,
     errors::{DeleteFileSnafu, RenameFileSnafu, Result, TokioMpscSendSnafu, WriteDataSnafu},
     memtable::MemTable,
+    pack::PackWriter,
     rwmap::RwIndexMap,
     writer::WriterKey,
 };
@@ -91,6 +92,14 @@ impl Immutable {
     }
 
     pub(crate) async fn persist(&self, wal_path: &PathBuf) -> Result<PersistStat> {
+        if config::get_config().common.feature_wal_pack_enabled {
+            self.persist_pack(wal_path).await
+        } else {
+            self.persist_files(wal_path).await
+        }
+    }
+
+    async fn persist_files(&self, wal_path: &PathBuf) -> Result<PersistStat> {
         let mut persist_stat = PersistStat::default();
         // 1. dump memtable to disk
         let (schema_size, paths) = self
@@ -100,6 +109,7 @@ impl Immutable {
                 self.idx,
                 &self.key.org_id,
                 &self.key.stream_type,
+                None,
             )
             .await?;
         persist_stat.arrow_size += schema_size;
@@ -128,6 +138,87 @@ impl Immutable {
         fs::remove_file(&done_path)
             .await
             .context(DeleteFileSnafu { path: &done_path })?;
+        Ok(persist_stat)
+    }
+
+    /// Persist the memtable into pack files: a few large files per rotation
+    /// instead of one file per stream × hour. Follows the same lock-file
+    /// crash-recovery flow as `persist_files`.
+    async fn persist_pack(&self, wal_path: &PathBuf) -> Result<PersistStat> {
+        let cfg = config::get_config();
+        // 1. dump memtable into pack files (kept as .pack.tmp, fsynced)
+        let mut pack_writer = PackWriter::new(
+            self.idx,
+            self.memtable.id(),
+            &self.key.stream_type,
+            cfg.limit.wal_pack_max_size as u64,
+        );
+        let (schema_size, _) = self
+            .memtable
+            .persist(
+                self.memtable.id(),
+                self.idx,
+                &self.key.org_id,
+                &self.key.stream_type,
+                Some(&mut pack_writer),
+            )
+            .await?;
+        let (finished, mut persist_stat, bytes_by_org) = pack_writer.finish().await?;
+        persist_stat.arrow_size += schema_size;
+
+        // empty memtable: nothing was written, just delete the wal file
+        if finished.is_empty() {
+            fs::remove_file(wal_path)
+                .await
+                .context(DeleteFileSnafu { path: wal_path })?;
+            return Ok(persist_stat);
+        }
+
+        // 2. create a lock file listing the tmp pack files
+        let done_path = wal_path.with_extension("lock");
+        let lock_data = finished
+            .iter()
+            .map(|p| p.tmp_path.to_string_lossy())
+            .collect::<Vec<_>>()
+            .join("\n");
+        fs::write(&done_path, lock_data.as_bytes())
+            .await
+            .context(WriteDataSnafu)?;
+        // 3. delete wal file
+        fs::remove_file(wal_path)
+            .await
+            .context(DeleteFileSnafu { path: wal_path })?;
+        // 4. rename the tmp files to pack files and register the segments
+        for pack in finished.iter() {
+            fs::rename(&pack.tmp_path, &pack.path)
+                .await
+                .context(RenameFileSnafu {
+                    path: &pack.tmp_path,
+                })?;
+            crate::pack::register_pack(pack.path.clone(), &pack.footer).await;
+            log::info!(
+                "[INGESTER:PACK:{}] persisted pack file: {}, size: {}, segments: {}",
+                self.idx,
+                pack.path.display(),
+                pack.size,
+                pack.footer.segments.len(),
+            );
+        }
+        // 5. delete the lock file
+        fs::remove_file(&done_path)
+            .await
+            .context(DeleteFileSnafu { path: &done_path })?;
+
+        // update metrics
+        for (org_id, bytes) in bytes_by_org {
+            metrics::INGEST_WAL_USED_BYTES
+                .with_label_values(&[org_id.as_str(), self.key.stream_type.as_ref()])
+                .add(bytes);
+            metrics::INGEST_WAL_WRITE_BYTES
+                .with_label_values(&[org_id.as_str(), self.key.stream_type.as_ref()])
+                .inc_by(bytes as u64);
+        }
+
         Ok(persist_stat)
     }
 }

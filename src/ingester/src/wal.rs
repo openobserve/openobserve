@@ -78,13 +78,18 @@ pub(crate) async fn check_uncompleted_parquet_files() -> Result<()> {
             let line = line.context(ReadFileSnafu { path: lock_file })?;
             par_files.push(line);
         }
-        // rename the .par file to .parquet
+        // rename the .par file to .parquet, and the .pack.tmp file to .pack
         for par_file in par_files.iter() {
             let par_file = PathBuf::from(par_file);
-            let parquet_file = par_file.with_extension("parquet");
-            log::warn!("rename par file: {par_file:?} to parquet");
+            let target_file = if par_file.to_string_lossy().ends_with(".pack.tmp") {
+                // strip the .tmp suffix to finalize the pack file
+                par_file.with_extension("")
+            } else {
+                par_file.with_extension("parquet")
+            };
+            log::warn!("rename uncompleted file: {par_file:?} to {target_file:?}");
             if par_file.exists() {
-                std::fs::rename(&par_file, &parquet_file)
+                std::fs::rename(&par_file, &target_file)
                     .context(RenameFileSnafu { path: par_file })?;
             }
         }

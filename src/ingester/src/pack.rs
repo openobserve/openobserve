@@ -1,0 +1,735 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+//! Packed persist format for the ingester WAL.
+//!
+//! Instead of writing one parquet file per stream × hour on every memtable
+//! rotation, all streams of a memtable are appended into a few large "pack"
+//! files. Each segment inside a pack is a complete, self-contained parquet
+//! file, so uploading a single segment later is a plain byte-range copy.
+//!
+//! File layout:
+//!
+//! ```text
+//! [segment 0: parquet bytes][segment 1: parquet bytes]...[footer JSON]
+//! [footer_len u32 LE][footer_hash u64 LE][version u16 LE][magic 8B]
+//! ```
+//!
+//! Packs live in `{data_wal_dir}/pack/{idx}/{memtable_id}.{seq}.pack` and are
+//! written as `.pack.tmp` first; the same `.lock` recovery flow as the legacy
+//! per-stream files guarantees exactly-once persistence across crashes.
+
+use std::{
+    io::SeekFrom,
+    path::{Path, PathBuf},
+    sync::{Arc, LazyLock as Lazy},
+};
+
+use arrow::record_batch::RecordBatch;
+use arrow_schema::Schema;
+use config::{
+    FileFormat, RwAHashMap,
+    meta::{search::ScanStats, stream::FileMeta},
+    utils::hash::{Sum64, gxhash},
+};
+use hashbrown::{HashMap, HashSet};
+use serde::{Deserialize, Serialize};
+use snafu::ResultExt;
+use tokio::{
+    fs,
+    io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt},
+};
+
+use crate::{
+    entry::PersistStat,
+    errors::{
+        CreateFileSnafu, DeleteFileSnafu, JSONSerializationSnafu, OpenFileSnafu, ReadFileSnafu,
+        Result, WriteFileSnafu,
+    },
+};
+
+pub const PACK_DIR_PREFIX: &str = "pack";
+pub const PACK_FILE_EXT: &str = "pack";
+const PACK_MAGIC: [u8; 8] = *b"O2PACK\x00\x01";
+const PACK_VERSION: u16 = 1;
+// footer_len(u32) + footer_hash(u64) + version(u16) + magic(8)
+const PACK_TRAILER_LEN: usize = 4 + 8 + 2 + 8;
+
+/// Metadata of one segment (a complete parquet file) inside a pack.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PackSegmentMeta {
+    pub org_id: String,
+    pub stream_name: String,
+    /// partition path fragment, e.g. `2026/07/27/08/country=US`
+    pub partition_key: String,
+    pub offset: u64,
+    pub length: u64,
+    pub min_ts: i64,
+    pub max_ts: i64,
+    pub records: i64,
+    pub original_size: i64,
+}
+
+/// Footer of a pack file, stores the index of all segments.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PackFooter {
+    pub memtable_id: u64,
+    pub stream_type: String,
+    pub segments: Vec<PackSegmentMeta>,
+}
+
+/// A finalized pack file, still named `.pack.tmp` until the caller renames it
+/// after the wal file is deleted (same crash-recovery flow as legacy files).
+pub(crate) struct FinishedPack {
+    pub tmp_path: PathBuf,
+    pub path: PathBuf,
+    pub footer: PackFooter,
+    pub size: u64,
+}
+
+struct CurrentPack {
+    file: fs::File,
+    tmp_path: PathBuf,
+    path: PathBuf,
+    offset: u64,
+    segments: Vec<PackSegmentMeta>,
+}
+
+/// Appends per-stream parquet segments into pack files, rolling over to a new
+/// pack when `max_size` is exceeded.
+pub(crate) struct PackWriter {
+    dir: PathBuf,
+    memtable_id: u64,
+    stream_type: String,
+    max_size: u64,
+    seq: usize,
+    current: Option<CurrentPack>,
+    finished: Vec<FinishedPack>,
+    pub(crate) stat: PersistStat,
+    /// bytes written per org, used for metrics accounting after finalize
+    pub(crate) bytes_by_org: HashMap<String, i64>,
+}
+
+impl PackWriter {
+    pub(crate) fn new(idx: usize, memtable_id: u64, stream_type: &str, max_size: u64) -> Self {
+        let cfg = config::get_config();
+        let dir = PathBuf::from(&cfg.common.data_wal_dir)
+            .join(PACK_DIR_PREFIX)
+            .join(idx.to_string());
+        Self {
+            dir,
+            memtable_id,
+            stream_type: stream_type.to_string(),
+            max_size,
+            seq: 0,
+            current: None,
+            finished: Vec::new(),
+            stat: PersistStat::default(),
+            bytes_by_org: HashMap::new(),
+        }
+    }
+
+    async fn open_next(&mut self) -> Result<()> {
+        fs::create_dir_all(&self.dir)
+            .await
+            .context(CreateFileSnafu { path: &self.dir })?;
+        let path = self
+            .dir
+            .join(format!("{}.{}.{}", self.memtable_id, self.seq, PACK_FILE_EXT));
+        let tmp_path = self.dir.join(format!(
+            "{}.{}.{}.tmp",
+            self.memtable_id, self.seq, PACK_FILE_EXT
+        ));
+        self.seq += 1;
+        let file = fs::OpenOptions::new()
+            .create(true)
+            .write(true)
+            .truncate(true)
+            .open(&tmp_path)
+            .await
+            .context(CreateFileSnafu { path: &tmp_path })?;
+        self.current = Some(CurrentPack {
+            file,
+            tmp_path,
+            path,
+            offset: 0,
+            segments: Vec::new(),
+        });
+        Ok(())
+    }
+
+    pub(crate) async fn append_segment(
+        &mut self,
+        org_id: &str,
+        stream_name: &str,
+        partition_key: &str,
+        data: &[u8],
+        file_meta: &FileMeta,
+    ) -> Result<()> {
+        // roll over to a new pack when the current one is full
+        if let Some(current) = self.current.as_ref()
+            && current.offset > 0
+            && current.offset + data.len() as u64 > self.max_size
+        {
+            self.finish_current().await?;
+        }
+        if self.current.is_none() {
+            self.open_next().await?;
+        }
+        let current = self.current.as_mut().unwrap();
+        current
+            .file
+            .write_all(data)
+            .await
+            .context(WriteFileSnafu {
+                path: &current.tmp_path,
+            })?;
+        current.segments.push(PackSegmentMeta {
+            org_id: org_id.to_string(),
+            stream_name: stream_name.to_string(),
+            partition_key: partition_key.to_string(),
+            offset: current.offset,
+            length: data.len() as u64,
+            min_ts: file_meta.min_ts,
+            max_ts: file_meta.max_ts,
+            records: file_meta.records,
+            original_size: file_meta.original_size,
+        });
+        current.offset += data.len() as u64;
+        *self.bytes_by_org.entry_ref(org_id).or_insert(0) += data.len() as i64;
+        Ok(())
+    }
+
+    async fn finish_current(&mut self) -> Result<()> {
+        let Some(mut current) = self.current.take() else {
+            return Ok(());
+        };
+        if current.segments.is_empty() {
+            // nothing written, remove the empty tmp file
+            let _ = fs::remove_file(&current.tmp_path).await;
+            return Ok(());
+        }
+        let footer = PackFooter {
+            memtable_id: self.memtable_id,
+            stream_type: self.stream_type.clone(),
+            segments: std::mem::take(&mut current.segments),
+        };
+        let footer_data = serde_json::to_string(&footer).context(JSONSerializationSnafu)?;
+        let footer_hash = gxhash::new().sum64(&footer_data);
+        let mut trailer = Vec::with_capacity(footer_data.len() + PACK_TRAILER_LEN);
+        trailer.extend_from_slice(footer_data.as_bytes());
+        trailer.extend_from_slice(&(footer_data.len() as u32).to_le_bytes());
+        trailer.extend_from_slice(&footer_hash.to_le_bytes());
+        trailer.extend_from_slice(&PACK_VERSION.to_le_bytes());
+        trailer.extend_from_slice(&PACK_MAGIC);
+        current
+            .file
+            .write_all(&trailer)
+            .await
+            .context(WriteFileSnafu {
+                path: &current.tmp_path,
+            })?;
+        current.file.sync_all().await.context(WriteFileSnafu {
+            path: &current.tmp_path,
+        })?;
+        self.stat.file_num += 1;
+        self.finished.push(FinishedPack {
+            size: current.offset + trailer.len() as u64,
+            tmp_path: current.tmp_path,
+            path: current.path,
+            footer,
+        });
+        Ok(())
+    }
+
+    /// Finalize all pack files (footer written + fsynced), still named
+    /// `.pack.tmp`. Returns the finished packs for the lock/rename flow.
+    pub(crate) async fn finish(mut self) -> Result<(Vec<FinishedPack>, PersistStat, HashMap<String, i64>)> {
+        self.finish_current().await?;
+        Ok((self.finished, self.stat, self.bytes_by_org))
+    }
+}
+
+/// Read and verify the footer of a pack file.
+pub async fn read_footer(path: &Path) -> Result<PackFooter> {
+    let mut file = fs::File::open(path).await.context(OpenFileSnafu { path })?;
+    let file_size = file
+        .metadata()
+        .await
+        .context(ReadFileSnafu { path })?
+        .len();
+    if file_size < PACK_TRAILER_LEN as u64 {
+        return Err(pack_format_error(path, "file too small"));
+    }
+    file.seek(SeekFrom::End(-(PACK_TRAILER_LEN as i64)))
+        .await
+        .context(ReadFileSnafu { path })?;
+    let mut trailer = [0u8; PACK_TRAILER_LEN];
+    file.read_exact(&mut trailer)
+        .await
+        .context(ReadFileSnafu { path })?;
+    if trailer[14..22] != PACK_MAGIC {
+        return Err(pack_format_error(path, "invalid magic"));
+    }
+    let version = u16::from_le_bytes(trailer[12..14].try_into().unwrap());
+    if version != PACK_VERSION {
+        return Err(pack_format_error(path, "unsupported version"));
+    }
+    let footer_len = u32::from_le_bytes(trailer[0..4].try_into().unwrap()) as u64;
+    let footer_hash = u64::from_le_bytes(trailer[4..12].try_into().unwrap());
+    if footer_len + PACK_TRAILER_LEN as u64 > file_size {
+        return Err(pack_format_error(path, "invalid footer length"));
+    }
+    file.seek(SeekFrom::End(-((PACK_TRAILER_LEN as u64 + footer_len) as i64)))
+        .await
+        .context(ReadFileSnafu { path })?;
+    let mut footer_data = vec![0u8; footer_len as usize];
+    file.read_exact(&mut footer_data)
+        .await
+        .context(ReadFileSnafu { path })?;
+    let footer_data = String::from_utf8(footer_data)
+        .map_err(|_| pack_format_error(path, "footer is not valid utf8"))?;
+    if gxhash::new().sum64(&footer_data) != footer_hash {
+        return Err(pack_format_error(path, "footer hash mismatch"));
+    }
+    serde_json::from_str(&footer_data).context(JSONSerializationSnafu)
+}
+
+/// Read the raw bytes of one segment from a pack file.
+pub async fn read_segment(path: &Path, offset: u64, length: u64) -> Result<Vec<u8>> {
+    let mut file = fs::File::open(path).await.context(OpenFileSnafu { path })?;
+    file.seek(SeekFrom::Start(offset))
+        .await
+        .context(ReadFileSnafu { path })?;
+    let mut buf = vec![0u8; length as usize];
+    file.read_exact(&mut buf)
+        .await
+        .context(ReadFileSnafu { path })?;
+    Ok(buf)
+}
+
+fn pack_format_error(path: &Path, reason: &str) -> crate::errors::Error {
+    crate::errors::Error::ReadFileError {
+        path: path.to_path_buf(),
+        source: std::io::Error::new(std::io::ErrorKind::InvalidData, reason.to_string()),
+    }
+}
+
+/// One registered segment, resolvable to parquet bytes inside a pack file.
+#[derive(Clone)]
+pub struct PackSegment {
+    pub pack_path: Arc<PathBuf>,
+    pub memtable_id: u64,
+    pub meta: Arc<PackSegmentMeta>,
+}
+
+/// In-memory segment index: `org/stream_type/stream_name` -> segments.
+static PACK_SEGMENTS: Lazy<RwAHashMap<Arc<str>, Vec<PackSegment>>> = Lazy::new(Default::default);
+
+fn segment_index_key(org_id: &str, stream_type: &str, stream_name: &str) -> String {
+    format!("{org_id}/{stream_type}/{stream_name}")
+}
+
+/// Register all segments of a finalized pack into the in-memory index.
+pub async fn register_pack(path: PathBuf, footer: &PackFooter) {
+    let pack_path = Arc::new(path);
+    let mut w = PACK_SEGMENTS.write().await;
+    for seg in footer.segments.iter() {
+        let key = segment_index_key(&seg.org_id, &footer.stream_type, &seg.stream_name);
+        w.entry(Arc::from(key.as_str()))
+            .or_default()
+            .push(PackSegment {
+                pack_path: pack_path.clone(),
+                memtable_id: footer.memtable_id,
+                meta: Arc::new(seg.clone()),
+            });
+    }
+}
+
+/// Remove all segments of a pack from the index (used when a pack is consumed).
+pub async fn unregister_pack(path: &Path) {
+    let mut w = PACK_SEGMENTS.write().await;
+    for (_, segments) in w.iter_mut() {
+        segments.retain(|s| s.pack_path.as_path() != path);
+    }
+    w.retain(|_, v| !v.is_empty());
+}
+
+/// Number of registered segments, for stats/debugging.
+pub async fn get_segment_index_stats() -> (usize, usize) {
+    let r = PACK_SEGMENTS.read().await;
+    let streams = r.len();
+    let segments = r.values().map(|v| v.len()).sum();
+    (streams, segments)
+}
+
+/// Read all pack segments of a stream as record batches.
+///
+/// Segments are fully materialized into memory, so the caller does not need to
+/// hold any lock on the pack files afterwards. Segments whose memtable is
+/// still readable in memory (`skip_memtable_ids`) are skipped to avoid
+/// duplicates, mirroring the legacy wal parquet search.
+pub async fn read_from_pack(
+    org_id: &str,
+    stream_type: &str,
+    stream_name: &str,
+    time_range: Option<(i64, i64)>,
+    partition_filters: &[(String, Vec<String>)],
+    skip_memtable_ids: &HashSet<u64>,
+) -> Result<(Vec<(Arc<Schema>, Vec<RecordBatch>)>, ScanStats)> {
+    let key = segment_index_key(org_id, stream_type, stream_name);
+    let segments = {
+        let r = PACK_SEGMENTS.read().await;
+        match r.get(key.as_str()) {
+            Some(v) => v.clone(),
+            None => return Ok((Vec::new(), ScanStats::new())),
+        }
+    };
+
+    let mut stats = ScanStats::new();
+    let mut results = Vec::new();
+    for segment in segments {
+        if skip_memtable_ids.contains(&segment.memtable_id) {
+            continue;
+        }
+        if let Some((min_ts, max_ts)) = time_range
+            && (min_ts, max_ts) != (0, 0)
+            && (segment.meta.min_ts > max_ts || segment.meta.max_ts < min_ts)
+        {
+            continue;
+        }
+        if !config::utils::schema::filter_source_by_partition_key(
+            &format!("{}/", segment.meta.partition_key),
+            partition_filters,
+        ) {
+            continue;
+        }
+        let data = match read_segment(
+            segment.pack_path.as_path(),
+            segment.meta.offset,
+            segment.meta.length,
+        )
+        .await
+        {
+            Ok(v) => v,
+            Err(e) => {
+                // the pack may have been consumed and deleted concurrently,
+                // its data is already readable from object storage then
+                log::warn!(
+                    "[INGESTER:PACK] read segment from {} failed: {e}, skip",
+                    segment.pack_path.display()
+                );
+                continue;
+            }
+        };
+        let (schema, batches) = config::utils::parquet::read_recordbatch_from_bytes(
+            FileFormat::Parquet,
+            bytes::Bytes::from(data),
+        )
+        .await
+        .map_err(|e| crate::errors::Error::ExternalError { source: e.into() })?;
+        stats.files += 1;
+        stats.records += segment.meta.records;
+        stats.original_size += segment.meta.original_size;
+        stats.compressed_size += segment.meta.length as i64;
+        results.push((schema, batches));
+        tokio::task::coop::consume_budget().await;
+    }
+    Ok((results, stats))
+}
+
+/// Scan the pack directory on startup: delete orphan `.tmp` files (the `.lock`
+/// recovery has already run) and rebuild the segment index from pack footers.
+pub(crate) async fn init() -> Result<()> {
+    let cfg = config::get_config();
+    let pack_dir = PathBuf::from(&cfg.common.data_wal_dir).join(PACK_DIR_PREFIX);
+    fs::create_dir_all(&pack_dir)
+        .await
+        .context(CreateFileSnafu { path: &pack_dir })?;
+
+    let tmp_files = crate::wal::wal_scan_files(&pack_dir, "tmp")
+        .await
+        .unwrap_or_default();
+    for tmp_file in tmp_files {
+        log::warn!("[INGESTER:PACK] delete orphan tmp pack file: {tmp_file:?}");
+        fs::remove_file(&tmp_file)
+            .await
+            .context(DeleteFileSnafu { path: &tmp_file })?;
+    }
+
+    let pack_files = crate::wal::wal_scan_files(&pack_dir, PACK_FILE_EXT)
+        .await
+        .unwrap_or_default();
+    let mut packs = 0;
+    let mut segments = 0;
+    for pack_file in pack_files {
+        let footer = match read_footer(&pack_file).await {
+            Ok(v) => v,
+            Err(e) => {
+                log::error!(
+                    "[INGESTER:PACK] read footer from {} failed: {e}, skip the file",
+                    pack_file.display()
+                );
+                continue;
+            }
+        };
+        packs += 1;
+        segments += footer.segments.len();
+        register_pack(pack_file, &footer).await;
+    }
+    if packs > 0 {
+        log::info!("[INGESTER:PACK] registered {packs} pack files with {segments} segments");
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn test_file_meta(min_ts: i64, max_ts: i64, records: i64, original_size: i64) -> FileMeta {
+        FileMeta {
+            min_ts,
+            max_ts,
+            records,
+            original_size,
+            ..Default::default()
+        }
+    }
+
+    async fn write_test_pack(dir: &Path, memtable_id: u64) -> Vec<FinishedPack> {
+        let mut writer = PackWriter::new(0, memtable_id, "logs", 1024 * 1024);
+        writer.dir = dir.to_path_buf();
+        writer
+            .append_segment(
+                "org1",
+                "stream_a",
+                "2026/07/27/08",
+                b"parquet-bytes-aaaa",
+                &test_file_meta(100, 200, 10, 1000),
+            )
+            .await
+            .unwrap();
+        writer
+            .append_segment(
+                "org1",
+                "stream_b",
+                "2026/07/27/09",
+                b"parquet-bytes-bb",
+                &test_file_meta(300, 400, 5, 500),
+            )
+            .await
+            .unwrap();
+        let (finished, stat, bytes_by_org) = writer.finish().await.unwrap();
+        assert_eq!(stat.file_num, 1);
+        assert_eq!(bytes_by_org.get("org1"), Some(&(18 + 16)));
+        finished
+    }
+
+    #[tokio::test]
+    async fn test_pack_write_read_roundtrip() {
+        let dir = tempfile::tempdir().unwrap();
+        let finished = write_test_pack(dir.path(), 42).await;
+        assert_eq!(finished.len(), 1);
+        let pack = &finished[0];
+        assert!(pack.tmp_path.exists());
+        // rename like the persist flow does
+        fs::rename(&pack.tmp_path, &pack.path).await.unwrap();
+
+        let footer = read_footer(&pack.path).await.unwrap();
+        assert_eq!(footer.memtable_id, 42);
+        assert_eq!(footer.stream_type, "logs");
+        assert_eq!(footer.segments.len(), 2);
+        let seg0 = &footer.segments[0];
+        assert_eq!(seg0.stream_name, "stream_a");
+        assert_eq!(seg0.offset, 0);
+        assert_eq!(seg0.length, 18);
+        assert_eq!(seg0.min_ts, 100);
+        let seg1 = &footer.segments[1];
+        assert_eq!(seg1.stream_name, "stream_b");
+        assert_eq!(seg1.offset, 18);
+        assert_eq!(seg1.length, 16);
+
+        let data = read_segment(&pack.path, seg1.offset, seg1.length)
+            .await
+            .unwrap();
+        assert_eq!(data, b"parquet-bytes-bb");
+        let data = read_segment(&pack.path, seg0.offset, seg0.length)
+            .await
+            .unwrap();
+        assert_eq!(data, b"parquet-bytes-aaaa");
+    }
+
+    #[tokio::test]
+    async fn test_pack_rolls_over_by_size() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut writer = PackWriter::new(0, 7, "metrics", 20);
+        writer.dir = dir.path().to_path_buf();
+        // 18 bytes, fits
+        writer
+            .append_segment("o", "s1", "p", b"parquet-bytes-aaaa", &test_file_meta(1, 2, 1, 1))
+            .await
+            .unwrap();
+        // 18 more bytes would exceed 20 -> roll over
+        writer
+            .append_segment("o", "s2", "p", b"parquet-bytes-aaaa", &test_file_meta(1, 2, 1, 1))
+            .await
+            .unwrap();
+        let (finished, stat, _) = writer.finish().await.unwrap();
+        assert_eq!(finished.len(), 2);
+        assert_eq!(stat.file_num, 2);
+        assert_ne!(finished[0].path, finished[1].path);
+        // each pack holds exactly one segment starting at offset 0
+        for pack in finished.iter() {
+            assert_eq!(pack.footer.segments.len(), 1);
+            assert_eq!(pack.footer.segments[0].offset, 0);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_read_footer_rejects_corruption() {
+        let dir = tempfile::tempdir().unwrap();
+        let finished = write_test_pack(dir.path(), 1).await;
+        let pack = &finished[0];
+        fs::rename(&pack.tmp_path, &pack.path).await.unwrap();
+
+        // truncated file
+        let data = fs::read(&pack.path).await.unwrap();
+        let truncated = dir.path().join("truncated.pack");
+        fs::write(&truncated, &data[..data.len() - 4]).await.unwrap();
+        assert!(read_footer(&truncated).await.is_err());
+
+        // corrupted footer byte
+        let mut corrupted_data = data.clone();
+        let n = corrupted_data.len();
+        corrupted_data[n - PACK_TRAILER_LEN - 5] ^= 0xff;
+        let corrupted = dir.path().join("corrupted.pack");
+        fs::write(&corrupted, &corrupted_data).await.unwrap();
+        assert!(read_footer(&corrupted).await.is_err());
+
+        // too small
+        let small = dir.path().join("small.pack");
+        fs::write(&small, b"tiny").await.unwrap();
+        assert!(read_footer(&small).await.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_empty_writer_produces_no_pack() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut writer = PackWriter::new(0, 9, "logs", 1024);
+        writer.dir = dir.path().to_path_buf();
+        let (finished, stat, _) = writer.finish().await.unwrap();
+        assert!(finished.is_empty());
+        assert_eq!(stat.file_num, 0);
+    }
+
+    #[tokio::test]
+    async fn test_read_from_pack_with_real_parquet_segment() {
+        use arrow::array::{Int64Array, StringArray};
+        use arrow_schema::{DataType, Field};
+
+        // build a real parquet segment
+        let schema = Arc::new(Schema::new(vec![
+            Field::new(config::TIMESTAMP_COL_NAME, DataType::Int64, false),
+            Field::new("value", DataType::Utf8, true),
+        ]));
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(Int64Array::from(vec![1000i64, 2000i64])),
+                Arc::new(StringArray::from(vec!["a", "b"])),
+            ],
+        )
+        .unwrap();
+        let file_meta = test_file_meta(1000, 2000, 2, 100);
+        let mut buf = Vec::new();
+        let mut writer = config::utils::parquet::new_parquet_writer(
+            &mut buf,
+            &schema,
+            &[],
+            &file_meta,
+            true,
+            None,
+        );
+        writer.write(&batch).await.unwrap();
+        writer.close().await.unwrap();
+
+        // pack it
+        let dir = tempfile::tempdir().unwrap();
+        let mut pack_writer = PackWriter::new(0, 8888, "logs", 1024 * 1024);
+        pack_writer.dir = dir.path().to_path_buf();
+        pack_writer
+            .append_segment("porg", "pstream", "2026/07/27/08", &buf, &file_meta)
+            .await
+            .unwrap();
+        let (finished, ..) = pack_writer.finish().await.unwrap();
+        let pack = &finished[0];
+        fs::rename(&pack.tmp_path, &pack.path).await.unwrap();
+        register_pack(pack.path.clone(), &pack.footer).await;
+
+        // read it back through the segment index
+        let skip_ids = HashSet::new();
+        let (batches, stats) =
+            read_from_pack("porg", "logs", "pstream", Some((0, 3000)), &[], &skip_ids)
+                .await
+                .unwrap();
+        assert_eq!(stats.files, 1);
+        assert_eq!(stats.records, 2);
+        assert_eq!(batches.len(), 1);
+        let (read_schema, read_batches) = &batches[0];
+        assert_eq!(read_schema.fields().len(), 2);
+        assert_eq!(read_batches.iter().map(|b| b.num_rows()).sum::<usize>(), 2);
+
+        // time range filter excludes the segment
+        let (batches, stats) =
+            read_from_pack("porg", "logs", "pstream", Some((5000, 6000)), &[], &skip_ids)
+                .await
+                .unwrap();
+        assert!(batches.is_empty());
+        assert_eq!(stats.files, 0);
+
+        // skip when its memtable is still readable in memory
+        let skip_ids = HashSet::from_iter([8888u64]);
+        let (batches, _) =
+            read_from_pack("porg", "logs", "pstream", Some((0, 3000)), &[], &skip_ids)
+                .await
+                .unwrap();
+        assert!(batches.is_empty());
+
+        unregister_pack(&pack.path).await;
+    }
+
+    #[tokio::test]
+    async fn test_register_and_unregister_pack() {
+        let dir = tempfile::tempdir().unwrap();
+        let finished = write_test_pack(dir.path(), 77).await;
+        let pack = &finished[0];
+        fs::rename(&pack.tmp_path, &pack.path).await.unwrap();
+        register_pack(pack.path.clone(), &pack.footer).await;
+
+        let r = PACK_SEGMENTS.read().await;
+        let segs = r.get("org1/logs/stream_a").expect("registered");
+        assert!(segs.iter().any(|s| s.memtable_id == 77));
+        drop(r);
+
+        unregister_pack(&pack.path).await;
+        let r = PACK_SEGMENTS.read().await;
+        assert!(
+            r.get("org1/logs/stream_a")
+                .map(|v| v.iter().all(|s| s.memtable_id != 77))
+                .unwrap_or(true)
+        );
+    }
+}

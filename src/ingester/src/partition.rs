@@ -35,6 +35,7 @@ use crate::{
     ReadRecordBatchEntry,
     entry::{Entry, PersistStat, RecordBatchEntry},
     errors::*,
+    pack::PackWriter,
 };
 
 pub(crate) struct Partition {
@@ -140,6 +141,7 @@ impl Partition {
         org_id: &str,
         stream_type: &str,
         stream_name: &str,
+        mut pack: Option<&mut PackWriter>,
     ) -> Result<(usize, Vec<(PathBuf, PersistStat)>)> {
         let cfg = config::get_config();
         let base_path = PathBuf::from(&cfg.common.data_wal_dir);
@@ -231,6 +233,18 @@ impl Partition {
 
                 writer.close().await.context(WriteParquetRecordBatchSnafu)?;
                 file_meta.compressed_size = buf_parquet.len() as i64;
+
+                // pack mode: append the parquet bytes as a segment instead of
+                // creating one file per stream × hour
+                if let Some(w) = pack.as_deref_mut() {
+                    w.append_segment(org_id, stream_name, hour.as_ref(), &buf_parquet, &file_meta)
+                        .await?;
+                    w.stat.json_size += persist_stat.json_size;
+                    w.stat.arrow_size += persist_stat.arrow_size;
+                    w.stat.batch_num += persist_stat.batch_num;
+                    w.stat.records += persist_stat.records;
+                    continue;
+                }
 
                 // write into local file
                 let file_name =

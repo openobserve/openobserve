@@ -17,6 +17,7 @@ mod entry;
 pub mod errors;
 mod immutable;
 mod memtable;
+pub mod pack;
 mod partition;
 mod rwmap;
 mod stream;
@@ -36,6 +37,7 @@ pub use immutable::{
     check_persist_done, get_immutables_cache_stats, get_processing_tables_cache_stats,
     read_from_immutable,
 };
+pub use pack::read_from_pack;
 use snafu::ResultExt;
 use tokio::sync::{Mutex, mpsc};
 pub use wal::collect_wal_parquet_metrics;
@@ -106,6 +108,9 @@ pub async fn init() -> errors::Result<()> {
 
     // check uncompleted parquet files, need delete those files
     wal::check_uncompleted_parquet_files().await?;
+
+    // clean orphan tmp pack files and rebuild the pack segment index
+    pack::init().await?;
 
     // replay wal files
     tokio::task::spawn(async move {
