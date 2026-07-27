@@ -45,7 +45,6 @@ pub mod search_job_results;
 pub mod search_jobs;
 pub mod search_queue;
 pub mod sessions;
-pub mod slo_batch_manifest;
 pub mod slo_status;
 pub mod source_maps;
 pub mod synthetics_agents;

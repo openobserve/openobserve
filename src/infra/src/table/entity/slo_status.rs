@@ -22,9 +22,11 @@
 //!   alert evaluation are O(1) rather than a window scan. Everything stored here is **target-free**
 //!   (D56) — SLI, error budget and burn rate are derived at read time with the *current* target,
 //!   which is what lets a target edit take effect without a rebuild.
-//! * **The commit state.** The rollup row (`group_key = ''`) additionally carries the publication
-//!   barrier: the watermark, the per-writer committed marks, and the abandoned-batch set
-//!   (D53/D58/D63).
+//! * **The watermark.** The rollup row (`group_key = ''`) carries it. A forward clamp only — it
+//!   stops readers seeing the currently-filling slice, which for a time-slice SLI would classify
+//!   against a partial bucket. It is deliberately NOT a commit barrier: slices publish
+//!   at-least-once like every other stream, and a batch whose delta never landed is repaired by
+//!   reconciliation rather than hidden (D64).
 
 use sea_orm::entity::prelude::*;
 
@@ -59,20 +61,9 @@ pub struct Model {
     /// write-on-change can compare without re-reading the stream (D55).
     pub trailing_slices: Option<Json>,
 
-    // ---- publication barrier: rollup row only -----------------------------
-    /// Forward barrier — readers ignore slices at or after this (§6b.4a).
+    // ---- the watermark: rollup row only -----------------------------------
+    /// Forward clamp — readers ignore slices at or after this (§6b.4a).
     pub watermark_end: Option<i64>,
-    /// The generation's ownership split: `slice_start >= reset_time` belongs
-    /// to the incremental writer, below it to backfill (D58).
-    pub reset_time: Option<i64>,
-    /// Backward barrier, per writer. A shared scalar would expose one writer's
-    /// torn batch the moment the other committed (D58).
-    pub committed_batch_rev_incr: Option<i64>,
-    pub committed_batch_rev_bf: Option<i64>,
-    /// Batches written but never committed, then explicitly abandoned (D63).
-    /// Their rows are invisible regardless of revision — which is what makes
-    /// "the correct answer is no row" need no tombstone. JSON array of i64.
-    pub abandoned_batch_revs: Option<Json>,
 
     // ---- group bookkeeping (S-10) -----------------------------------------
     pub groups_observed: Option<i64>,

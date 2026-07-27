@@ -13,44 +13,35 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! The SLO publication protocol — `alerts_2.md` §6b.4a, D53/D58/D59/D62/D63.
+//! SLO status writes — `alerts_2.md` §6b.4c, §6b.8, D64.
 //!
-//! Slices live in a columnar stream and the commit state lives here, in the
-//! meta store, with **no transaction spanning the two**. Everything in this
-//! module exists to make that boundary safe:
+//! Slices go to a columnar stream; this table holds the running window
+//! aggregate that status reads and alerts evaluate against, plus the watermark
+//! that keeps readers off the currently-filling slice.
 //!
-//! ```text
-//!   reserve_batch()      one txn: write the manifest (the write-ahead intent)
-//!        ↓
-//!   write slices         columnar; NOT transactional; may tear
-//!        ↓
-//!   commit_batch()       one txn: status deltas + marks + watermark
-//!                        + abandonment + clear the manifest,
-//!                        all CAS-fenced on definition_generation
-//! ```
+//! **There is no transactional publication protocol.** Three earlier designs
+//! built one — a write-ahead manifest, per-writer committed marks, an
+//! abandoned-batch set — to guarantee a reader never sees rows from a batch
+//! that did not commit. D64 removed all of it, because the guarantee was
+//! protecting against a harm that does not exist: a torn batch's rows are real
+//! measurements whose delta was never folded into this cache, the cache is
+//! rebuilt from slices by reconciliation, alerts read the cache rather than
+//! slices, and a partial batch shows up as reduced coverage, which is already
+//! gated. Slices publish at-least-once, like every other stream in the
+//! product.
 //!
-//! A manifest row surviving into the next pass is exactly the signature of a
-//! crash between write and commit. Recovery abandons that batch number and
-//! allocates a fresh one (D63) — abandonment, not revision ordering, is what
-//! hides the orphans, which is why a key whose correct value is *no row at
-//! all* needs no tombstone.
+//! What this module still owes the caller is ordinary and small:
 //!
-//! The pure decision logic lives in `config::meta::slo::slice`; this module is
-//! only responsible for making those decisions durable **atomically**.
+//! * the status write is **one transaction** — a rollup inconsistent with its group rows would hand
+//!   composites a state that never existed;
+//! * it is **CAS-fenced on `definition_generation`** (D59), because mixing two definitions across a
+//!   90-day window is real corruption that no amount of eventual consistency repairs.
 
 use config::meta::slo::slice::Writer;
 use sea_orm::{ConnectionTrait, DatabaseConnection, TransactionTrait};
 
-use super::entity::{slo_batch_manifest, slo_status};
+use super::entity::slo_status;
 use crate::errors;
-
-/// Storage id for a writer.
-pub fn writer_id(writer: Writer) -> i16 {
-    match writer {
-        Writer::Incremental => slo_batch_manifest::WRITER_INCREMENTAL,
-        Writer::Backfill => slo_batch_manifest::WRITER_BACKFILL,
-    }
-}
 
 /// One group's contribution to the running window aggregate.
 #[derive(Debug, Clone, PartialEq)]
@@ -63,116 +54,58 @@ pub struct GroupDelta {
     pub covered_slices_delta: i32,
 }
 
-/// Everything one commit makes durable, in a single transaction.
+/// One pass's effect on the status table.
 #[derive(Debug, Clone, PartialEq)]
-pub struct BatchCommit {
+pub struct StatusWrite {
     pub slo_id: String,
-    /// The generation the pass was planned under — CAS-fenced (D59). A commit
-    /// whose generation no longer matches the stored one must fail, or a
-    /// writer that outlived a computation edit would advance the *new*
-    /// generation's marks using the *old* definition's arithmetic.
+    /// The generation the pass was planned under — CAS-fenced (D59). A write
+    /// whose generation no longer matches the stored one must fail, or a pass
+    /// that outlived a computation edit would fold the *old* definition's
+    /// arithmetic into the *new* generation's aggregate.
     pub definition_generation: i32,
     pub writer: Writer,
-    pub batch_rev: i64,
     pub deltas: Vec<GroupDelta>,
-    /// Advanced by the incremental writer only; backfill never touches it.
+    /// Advanced by the incremental writer only. Backfill fills history behind
+    /// the watermark and never moves it.
     pub watermark_end: Option<i64>,
-    /// The torn batch this pass is superseding, recorded in the same
-    /// transaction so a crash cannot leave it half-abandoned (D63).
-    pub abandon: Option<i64>,
     pub trailing_slices: Option<serde_json::Value>,
     pub computed_at: i64,
 }
 
-/// Why a commit did not take effect.
+/// Why a status write did not take effect.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum CommitOutcome {
-    Committed,
-    /// The SLO's generation moved while this pass was in flight. The pass's
-    /// columnar rows stay orphaned under its batch number and are abandoned by
-    /// whoever runs next.
+pub enum WriteOutcome {
+    Applied,
+    /// The SLO's generation moved while this pass was in flight. Its slices
+    /// remain in the stream under the old generation and are invisible to
+    /// readers, which filter on the current one.
     FencedByGeneration {
         expected: i32,
         found: i32,
     },
 }
 
-/// Record the intent to write a batch, **before** any columnar row exists.
-///
-/// Upserts: one manifest row per `(slo_id, writer)`, so reserving while a
-/// manifest is outstanding **replaces** it. That is safe only because
-/// [`config::meta::slo::slice::plan_batch`] widens the replacement's range to
-/// cover the one it supersedes.
-///
-/// # OPEN (P0): abandonment is not yet durable across a second crash
-///
-/// The replaced batch's number is currently recorded as abandoned by
-/// [`commit_batch`], not here — so a crash *between* two reserves loses it:
-///
-/// ```text
-/// reserve 101, write, CRASH
-/// recovery: reserve 102 (plans to abandon 101), write, CRASH
-/// recovery: reserve 103, commit abandoning 102
-///   -> mark 103, abandoned {102}; 101 <= 103 and unabandoned = PUBLISHED
-/// ```
-///
-/// The fix is to record the abandonment in this transaction rather than at
-/// commit. It is deliberately **not** applied yet: that would be the fourth
-/// amendment to the publication protocol, and D62 says the storage boundary
-/// should be reopened rather than the machinery extended a fourth time. See
-/// the pending decision before implementing this function.
-pub async fn reserve_batch(
+/// Apply a pass's deltas, watermark and trailing buffer — all in one
+/// transaction, fenced on generation.
+pub async fn apply_status(
     db: &DatabaseConnection,
-    slo_id: &str,
-    writer: Writer,
-    batch_rev: i64,
-    range: (i64, i64),
-    definition_generation: i32,
-    now: i64,
-) -> Result<(), errors::Error> {
-    let _ = (
-        db,
-        slo_id,
-        writer,
-        batch_rev,
-        range,
-        definition_generation,
-        now,
-    );
-    todo!("slo::reserve_batch")
-}
-
-/// Read a writer's outstanding manifest, if it has one.
-pub async fn load_pending(
-    db: &DatabaseConnection,
-    slo_id: &str,
-    writer: Writer,
-) -> Result<Option<slo_batch_manifest::Model>, errors::Error> {
-    let _ = (db, slo_id, writer);
-    todo!("slo::load_pending")
-}
-
-/// Apply a batch: status deltas, the writer's committed mark, the watermark,
-/// any abandonment, and clearing the manifest — **all or nothing**.
-pub async fn commit_batch(
-    db: &DatabaseConnection,
-    commit: &BatchCommit,
-) -> Result<CommitOutcome, errors::Error> {
-    let _ = (db, commit);
-    todo!("slo::commit_batch")
+    write: &StatusWrite,
+) -> Result<WriteOutcome, errors::Error> {
+    let _ = (db, write);
+    todo!("slo::apply_status")
 }
 
 /// The same work against an already-open transaction, so callers can compose
 /// it and tests can roll back instead of committing.
-pub async fn commit_batch_in_txn<C: ConnectionTrait>(
+pub async fn apply_status_in_txn<C: ConnectionTrait>(
     txn: &C,
-    commit: &BatchCommit,
-) -> Result<CommitOutcome, errors::Error> {
-    let _ = (txn, commit);
-    todo!("slo::commit_batch_in_txn")
+    write: &StatusWrite,
+) -> Result<WriteOutcome, errors::Error> {
+    let _ = (txn, write);
+    todo!("slo::apply_status_in_txn")
 }
 
-/// Read the rollup row, which carries the commit state.
+/// Read one status row. `group_key = ""` is the rollup.
 pub async fn load_status(
     db: &DatabaseConnection,
     slo_id: &str,
@@ -182,20 +115,18 @@ pub async fn load_status(
     todo!("slo::load_status")
 }
 
-/// Create the rollup row for a new generation, resetting the barrier.
+/// Create the rollup row for a new generation.
 ///
-/// The running aggregates are left **NULL, not zero**. The distinction is the
-/// same one the whole feature turns on: `Some(0.0)` is "we measured, and it
-/// was zero", while `None` is "nothing has been measured yet". A fresh
-/// generation is the latter, and coverage must not read it as a real
+/// The running aggregates are left **NULL, not zero**. `Some(0.0)` is "we
+/// measured, and it was zero"; `None` is "nothing has been measured yet". A
+/// fresh generation is the latter, and coverage must not read it as a real
 /// observation of an empty window.
 pub async fn init_generation(
     db: &DatabaseConnection,
     slo_id: &str,
     definition_generation: i32,
-    reset_time: i64,
 ) -> Result<(), errors::Error> {
-    let _ = (db, slo_id, definition_generation, reset_time);
+    let _ = (db, slo_id, definition_generation);
     todo!("slo::init_generation")
 }
 
@@ -205,10 +136,24 @@ pub async fn bump_generation(
     db: &DatabaseConnection,
     slo_id: &str,
     new_generation: i32,
-    reset_time: i64,
 ) -> Result<(), errors::Error> {
-    let _ = (db, slo_id, new_generation, reset_time);
+    let _ = (db, slo_id, new_generation);
     todo!("slo::bump_generation")
+}
+
+/// Recompute a status row from its slices — the reconciliation path.
+///
+/// This is what makes at-least-once publication safe (D64): the running
+/// aggregate is a cache, and this rebuilds it from the slices that are the
+/// source of truth. It is therefore **load-bearing**, not hygiene.
+pub async fn reconcile_from_slices(
+    db: &DatabaseConnection,
+    slo_id: &str,
+    group_key: &str,
+    recomputed: (f64, f64, i32),
+) -> Result<(), errors::Error> {
+    let _ = (db, slo_id, group_key, recomputed);
+    todo!("slo::reconcile_from_slices")
 }
 
 #[cfg(test)]
@@ -222,11 +167,11 @@ mod tests {
     const SLO: &str = "slo00000000000000000000000";
     const ROLLUP: &str = slo_status::ROLLUP_GROUP_KEY;
 
-    /// A real SQLite database with the SLO tables applied.
+    /// A real SQLite database with the SLO table applied.
     ///
-    /// `sea-orm`'s mock connection cannot be used for any of this: these tests
-    /// are *about* transaction atomicity, rollback and the CAS fence, none of
-    /// which a mock models — it replays canned results.
+    /// `sea-orm`'s mock connection cannot be used here: these tests are about
+    /// transaction atomicity, rollback and the CAS fence, none of which a mock
+    /// models — it replays canned results.
     async fn db() -> DatabaseConnection {
         let db = Database::connect("sqlite::memory:")
             .await
@@ -246,18 +191,16 @@ mod tests {
         }
     }
 
-    fn commit_of(batch_rev: i64, generation: i32) -> BatchCommit {
-        BatchCommit {
+    fn write_of(generation: i32) -> StatusWrite {
+        StatusWrite {
             slo_id: SLO.to_string(),
             definition_generation: generation,
             writer: Writer::Incremental,
-            batch_rev,
             deltas: vec![
                 delta(ROLLUP, 10.0, 10.0, 1),
                 delta("region:eu", 5.0, 5.0, 1),
             ],
             watermark_end: Some(9_900),
-            abandon: None,
             trailing_slices: Some(serde_json::json!({"9600": [10.0, 10.0]})),
             computed_at: 1_000,
         }
@@ -268,266 +211,169 @@ mod tests {
     #[tokio::test]
     async fn the_migration_applies_to_a_fresh_database() {
         let db = db().await;
-        // Both tables must be queryable after migrating.
         assert!(load_status(&db, SLO, ROLLUP).await.unwrap().is_none());
-        assert!(
-            load_pending(&db, SLO, Writer::Incremental)
-                .await
-                .unwrap()
-                .is_none()
-        );
     }
 
     #[tokio::test]
     async fn the_migration_is_idempotent() {
         let db = db().await;
-        // Re-running must not fail — a migration interrupted part-way has to
-        // be retryable (§8b trap 3). `create_table_if_not_exists` gives this
-        // for free, which is one reason new tables are cheaper than ALTERs.
+        // A migration interrupted part-way has to be retryable (§8b trap 3).
+        // `create_table_if_not_exists` gives this for free, which is one reason
+        // new tables are cheaper than ALTERs.
         create_slo_tables_for_test(&db).await.expect("second run");
     }
 
-    // ===================== the happy path =================================
+    // ===================== the write path =================================
 
     #[tokio::test]
-    async fn a_clean_pass_reserves_writes_and_commits() {
+    async fn a_pass_applies_its_deltas_and_watermark() {
         let db = db().await;
-        init_generation(&db, SLO, 1, 0).await.unwrap();
-
-        reserve_batch(&db, SLO, Writer::Incremental, 101, (9_000, 9_900), 1, 1)
-            .await
-            .unwrap();
-        assert!(
-            load_pending(&db, SLO, Writer::Incremental)
-                .await
-                .unwrap()
-                .is_some(),
-            "the manifest exists between reserve and commit"
+        init_generation(&db, SLO, 1).await.unwrap();
+        assert_eq!(
+            apply_status(&db, &write_of(1)).await.unwrap(),
+            WriteOutcome::Applied
         );
-
-        let outcome = commit_batch(&db, &commit_of(101, 1)).await.unwrap();
-        assert_eq!(outcome, CommitOutcome::Committed);
 
         let status = load_status(&db, SLO, ROLLUP).await.unwrap().unwrap();
-        assert_eq!(status.committed_batch_rev_incr, Some(101));
-        assert_eq!(status.watermark_end, Some(9_900));
         assert_eq!(status.good, Some(10.0));
-        assert!(
-            load_pending(&db, SLO, Writer::Incremental)
-                .await
-                .unwrap()
-                .is_none(),
-            "a successful commit clears its own manifest"
-        );
+        assert_eq!(status.watermark_end, Some(9_900));
     }
 
     #[tokio::test]
-    async fn deltas_accumulate_across_commits() {
+    async fn deltas_accumulate_across_passes() {
         let db = db().await;
-        init_generation(&db, SLO, 1, 0).await.unwrap();
-        for batch in 101..=103 {
-            reserve_batch(&db, SLO, Writer::Incremental, batch, (0, 1), 1, 1)
-                .await
-                .unwrap();
-            commit_batch(&db, &commit_of(batch, 1)).await.unwrap();
+        init_generation(&db, SLO, 1).await.unwrap();
+        for _ in 0..3 {
+            apply_status(&db, &write_of(1)).await.unwrap();
         }
         let status = load_status(&db, SLO, ROLLUP).await.unwrap().unwrap();
-        assert_eq!(status.good, Some(30.0), "three commits of +10");
-        assert_eq!(status.committed_batch_rev_incr, Some(103));
+        assert_eq!(status.good, Some(30.0), "three passes of +10");
     }
 
     #[tokio::test]
     async fn a_negative_delta_retires_a_slice_leaving_the_window() {
         let db = db().await;
-        init_generation(&db, SLO, 1, 0).await.unwrap();
-        reserve_batch(&db, SLO, Writer::Incremental, 101, (0, 1), 1, 1)
-            .await
-            .unwrap();
-        commit_batch(&db, &commit_of(101, 1)).await.unwrap();
+        init_generation(&db, SLO, 1).await.unwrap();
+        apply_status(&db, &write_of(1)).await.unwrap();
 
-        let mut retire = commit_of(102, 1);
+        let mut retire = write_of(1);
         retire.deltas = vec![delta(ROLLUP, -10.0, -10.0, -1)];
-        reserve_batch(&db, SLO, Writer::Incremental, 102, (0, 1), 1, 1)
-            .await
-            .unwrap();
-        commit_batch(&db, &retire).await.unwrap();
+        apply_status(&db, &retire).await.unwrap();
 
         let status = load_status(&db, SLO, ROLLUP).await.unwrap().unwrap();
         assert_eq!(status.good, Some(0.0), "the trailing edge subtracted");
     }
 
-    // ===================== failure injection: the crash ===================
-
-    /// The signature of a crash between the columnar write and the commit: the
-    /// manifest survives, and nothing else moved.
     #[tokio::test]
-    async fn a_crash_after_reserve_leaves_the_manifest_and_nothing_else() {
+    async fn per_group_deltas_land_on_their_own_rows() {
         let db = db().await;
-        init_generation(&db, SLO, 1, 0).await.unwrap();
-        reserve_batch(&db, SLO, Writer::Incremental, 101, (9_000, 9_300), 1, 1)
-            .await
-            .unwrap();
-        // ...rows were written to the stream here, then the process died.
+        init_generation(&db, SLO, 1).await.unwrap();
+        apply_status(&db, &write_of(1)).await.unwrap();
 
-        let pending = load_pending(&db, SLO, Writer::Incremental)
-            .await
-            .unwrap()
-            .expect("the manifest must survive the crash");
-        assert_eq!(pending.batch_rev, 101);
-        assert_eq!((pending.range_start, pending.range_end), (9_000, 9_300));
-
-        let status = load_status(&db, SLO, ROLLUP).await.unwrap().unwrap();
+        let group = load_status(&db, SLO, "region:eu").await.unwrap().unwrap();
+        assert_eq!(group.good, Some(5.0));
         assert_eq!(
-            status.committed_batch_rev_incr, None,
-            "the mark must not have moved"
-        );
-        assert_eq!(status.watermark_end, None);
-        assert_eq!(status.good, None, "no delta may have been applied");
-    }
-
-    /// Recovery abandons the torn number, allocates a fresh one, and records
-    /// both facts in the SAME transaction — so a second crash cannot leave the
-    /// batch half-abandoned.
-    #[tokio::test]
-    async fn recovery_abandons_the_torn_batch_atomically_with_its_replacement() {
-        let db = db().await;
-        init_generation(&db, SLO, 1, 0).await.unwrap();
-        reserve_batch(&db, SLO, Writer::Incremental, 101, (9_000, 9_300), 1, 1)
-            .await
-            .unwrap();
-        // crash
-
-        // Recovery: fresh number, abandoning 101.
-        reserve_batch(&db, SLO, Writer::Incremental, 102, (8_700, 11_100), 1, 2)
-            .await
-            .unwrap();
-        let mut repair = commit_of(102, 1);
-        repair.abandon = Some(101);
-        assert_eq!(
-            commit_batch(&db, &repair).await.unwrap(),
-            CommitOutcome::Committed
-        );
-
-        let status = load_status(&db, SLO, ROLLUP).await.unwrap().unwrap();
-        let abandoned: Vec<i64> =
-            serde_json::from_value(status.abandoned_batch_revs.clone().unwrap()).unwrap();
-        assert_eq!(abandoned, vec![101]);
-        assert_eq!(status.committed_batch_rev_incr, Some(102));
-        assert!(
-            load_pending(&db, SLO, Writer::Incremental)
-                .await
-                .unwrap()
-                .is_none()
+            group.watermark_end, None,
+            "only the rollup row carries the watermark"
         );
     }
 
+    /// Backfill fills history *behind* the watermark, so moving it would
+    /// publish slices the incremental writer has not reached.
     #[tokio::test]
-    async fn repeated_abandonments_accumulate_rather_than_replace() {
+    async fn backfill_does_not_move_the_watermark() {
         let db = db().await;
-        init_generation(&db, SLO, 1, 0).await.unwrap();
-        for (batch, abandon) in [(102, 101), (104, 103)] {
-            reserve_batch(&db, SLO, Writer::Incremental, batch, (0, 1), 1, 1)
-                .await
-                .unwrap();
-            let mut c = commit_of(batch, 1);
-            c.abandon = Some(abandon);
-            commit_batch(&db, &c).await.unwrap();
-        }
+        init_generation(&db, SLO, 1).await.unwrap();
+        apply_status(&db, &write_of(1)).await.unwrap(); // watermark 9_900
+
+        let mut bf = write_of(1);
+        bf.writer = Writer::Backfill;
+        bf.watermark_end = None;
+        bf.deltas = vec![delta(ROLLUP, 3.0, 3.0, 1)];
+        apply_status(&db, &bf).await.unwrap();
+
         let status = load_status(&db, SLO, ROLLUP).await.unwrap().unwrap();
-        let abandoned: Vec<i64> =
-            serde_json::from_value(status.abandoned_batch_revs.clone().unwrap()).unwrap();
-        assert_eq!(
-            abandoned,
-            vec![101, 103],
-            "losing an earlier abandonment would republish its orphans"
-        );
+        assert_eq!(status.watermark_end, Some(9_900));
+        assert_eq!(status.good, Some(13.0), "but its delta still lands");
     }
 
-    // ===================== failure injection: atomicity ===================
-
-    /// The whole commit is one transaction. A failure part-way must leave
-    /// **nothing** behind — not the deltas, not the mark, not the watermark,
-    /// not the abandonment, and not the manifest clear.
+    /// The watermark is a forward clamp; letting it retreat would hide slices
+    /// that readers have already been shown.
     #[tokio::test]
-    async fn a_failed_commit_leaves_no_partial_state() {
+    async fn the_watermark_never_moves_backwards() {
         let db = db().await;
-        init_generation(&db, SLO, 1, 0).await.unwrap();
-        reserve_batch(&db, SLO, Writer::Incremental, 101, (9_000, 9_300), 1, 1)
-            .await
-            .unwrap();
+        init_generation(&db, SLO, 1).await.unwrap();
+        apply_status(&db, &write_of(1)).await.unwrap();
 
-        // Do the work inside a transaction, then abort instead of committing —
-        // exactly what a crash mid-transaction looks like to the database.
+        let mut backwards = write_of(1);
+        backwards.watermark_end = Some(5_000);
+        let _ = apply_status(&db, &backwards).await;
+
+        let status = load_status(&db, SLO, ROLLUP).await.unwrap().unwrap();
+        assert_eq!(status.watermark_end, Some(9_900));
+    }
+
+    // ===================== atomicity ======================================
+
+    /// The rollup and its group rows go in one transaction: composites read
+    /// the rollup, and a rollup inconsistent with partially-written group rows
+    /// would feed them a state that never existed.
+    #[tokio::test]
+    async fn a_failed_write_leaves_no_partial_state() {
+        let db = db().await;
+        init_generation(&db, SLO, 1).await.unwrap();
+
         let txn = db.begin().await.unwrap();
-        let mut c = commit_of(101, 1);
-        // 101 supersedes a torn 100, so the rollback must also undo the
-        // abandonment — otherwise 100 would be hidden with nothing replacing it.
-        c.abandon = Some(100);
-        commit_batch_in_txn(&txn, &c).await.unwrap();
+        apply_status_in_txn(&txn, &write_of(1)).await.unwrap();
         txn.rollback().await.unwrap();
 
         let status = load_status(&db, SLO, ROLLUP).await.unwrap().unwrap();
-        assert_eq!(status.committed_batch_rev_incr, None, "mark leaked");
-        assert_eq!(status.watermark_end, None, "watermark leaked");
         assert_eq!(status.good, None, "delta leaked");
-        assert_eq!(status.abandoned_batch_revs, None, "abandonment leaked");
+        assert_eq!(status.watermark_end, None, "watermark leaked");
         assert!(
-            load_pending(&db, SLO, Writer::Incremental)
-                .await
-                .unwrap()
-                .is_some(),
-            "the manifest must survive a failed commit, or the torn batch \
-             becomes unrecoverable"
+            load_status(&db, SLO, "region:eu").await.unwrap().is_none(),
+            "a group row leaked from a rolled-back write"
         );
     }
 
-    /// The manifest clear is part of the same transaction — losing only that
-    /// would make the next pass repair a batch that already committed,
-    /// abandoning a *live* batch number.
     #[tokio::test]
-    async fn the_manifest_clear_is_atomic_with_the_marks() {
+    async fn a_committed_transaction_applies_the_rollup_and_its_groups_together() {
         let db = db().await;
-        init_generation(&db, SLO, 1, 0).await.unwrap();
-        reserve_batch(&db, SLO, Writer::Incremental, 101, (0, 1), 1, 1)
-            .await
-            .unwrap();
+        init_generation(&db, SLO, 1).await.unwrap();
 
         let txn = db.begin().await.unwrap();
-        commit_batch_in_txn(&txn, &commit_of(101, 1)).await.unwrap();
+        apply_status_in_txn(&txn, &write_of(1)).await.unwrap();
         txn.commit().await.unwrap();
 
-        let status = load_status(&db, SLO, ROLLUP).await.unwrap().unwrap();
-        assert_eq!(status.committed_batch_rev_incr, Some(101));
-        assert!(
-            load_pending(&db, SLO, Writer::Incremental)
+        assert_eq!(
+            load_status(&db, SLO, ROLLUP).await.unwrap().unwrap().good,
+            Some(10.0)
+        );
+        assert_eq!(
+            load_status(&db, SLO, "region:eu")
                 .await
                 .unwrap()
-                .is_none(),
-            "mark advanced but manifest survived — the next pass would abandon \
-             a committed batch"
+                .unwrap()
+                .good,
+            Some(5.0)
         );
     }
 
-    // ===================== failure injection: the CAS fence ===============
+    // ===================== the CAS fence ==================================
 
-    /// A writer that outlived a computation edit must fail its commit, not
-    /// advance the new generation's marks with the old definition's
-    /// arithmetic (D59).
+    /// A pass that outlived a computation edit must not fold the old
+    /// definition's arithmetic into the new generation (D59). This is the one
+    /// corruption eventual consistency does NOT repair — reconciliation would
+    /// happily rebuild a cache that mixes two definitions.
     #[tokio::test]
-    async fn a_commit_from_a_superseded_generation_is_fenced() {
+    async fn a_write_from_a_superseded_generation_is_fenced() {
         let db = db().await;
-        init_generation(&db, SLO, 1, 0).await.unwrap();
-        reserve_batch(&db, SLO, Writer::Incremental, 101, (0, 1), 1, 1)
-            .await
-            .unwrap();
+        init_generation(&db, SLO, 1).await.unwrap();
+        bump_generation(&db, SLO, 2).await.unwrap();
 
-        // A computation edit lands while the pass is in flight.
-        bump_generation(&db, SLO, 2, 10_000).await.unwrap();
-
-        let outcome = commit_batch(&db, &commit_of(101, 1)).await.unwrap();
         assert_eq!(
-            outcome,
-            CommitOutcome::FencedByGeneration {
+            apply_status(&db, &write_of(1)).await.unwrap(),
+            WriteOutcome::FencedByGeneration {
                 expected: 1,
                 found: 2
             }
@@ -535,302 +381,80 @@ mod tests {
 
         let status = load_status(&db, SLO, ROLLUP).await.unwrap().unwrap();
         assert_eq!(status.definition_generation, 2);
-        assert_eq!(
-            status.committed_batch_rev_incr, None,
-            "the fenced writer must not have advanced the new generation's mark"
-        );
-        assert_eq!(status.good, None, "nor applied its deltas");
-    }
-
-    #[tokio::test]
-    async fn a_fenced_commit_leaves_the_manifest_for_the_next_pass() {
-        let db = db().await;
-        init_generation(&db, SLO, 1, 0).await.unwrap();
-        reserve_batch(&db, SLO, Writer::Incremental, 101, (0, 1), 1, 1)
-            .await
-            .unwrap();
-        bump_generation(&db, SLO, 2, 10_000).await.unwrap();
-        commit_batch(&db, &commit_of(101, 1)).await.unwrap();
-
-        assert!(
-            load_pending(&db, SLO, Writer::Incremental)
-                .await
-                .unwrap()
-                .is_some(),
-            "the orphaned rows still need abandoning by whoever runs next"
-        );
+        assert_eq!(status.good, None, "the fenced pass applied nothing");
     }
 
     #[tokio::test]
     async fn a_generation_bump_clears_the_running_aggregate() {
         let db = db().await;
-        init_generation(&db, SLO, 1, 0).await.unwrap();
-        reserve_batch(&db, SLO, Writer::Incremental, 101, (0, 1), 1, 1)
-            .await
-            .unwrap();
-        commit_batch(&db, &commit_of(101, 1)).await.unwrap();
+        init_generation(&db, SLO, 1).await.unwrap();
+        apply_status(&db, &write_of(1)).await.unwrap();
 
-        bump_generation(&db, SLO, 2, 10_000).await.unwrap();
+        bump_generation(&db, SLO, 2).await.unwrap();
         let status = load_status(&db, SLO, ROLLUP).await.unwrap().unwrap();
         assert_eq!(status.definition_generation, 2);
-        assert_eq!(
-            status.good, None,
-            "the old generation's arithmetic must not survive into the new one"
-        );
-        assert_eq!(status.watermark_end, None, "the barrier resets");
-        assert_eq!(status.committed_batch_rev_incr, None);
+        assert_eq!(status.good, None, "the old arithmetic must not survive");
+        assert_eq!(status.watermark_end, None);
     }
 
-    // ===================== concurrent writers =============================
-
-    /// Incremental and backfill hold independent marks. One committing must
-    /// never move the other's — that is what stops a high incremental mark
-    /// from publishing a torn backfill batch (D58).
     #[tokio::test]
-    async fn the_two_writers_advance_independent_marks() {
+    async fn a_group_row_inherits_the_generation_it_was_written_under() {
         let db = db().await;
-        init_generation(&db, SLO, 1, 0).await.unwrap();
+        init_generation(&db, SLO, 3).await.unwrap();
+        apply_status(&db, &write_of(3)).await.unwrap();
 
-        reserve_batch(&db, SLO, Writer::Incremental, 900, (0, 1), 1, 1)
+        let group = load_status(&db, SLO, "region:eu").await.unwrap().unwrap();
+        assert_eq!(group.definition_generation, 3);
+    }
+
+    // ===================== reconciliation =================================
+
+    /// The mechanism that makes at-least-once publication safe (D64). A cache
+    /// that has drifted — because a pass wrote slices and never applied its
+    /// delta — is repaired from the slices themselves.
+    #[tokio::test]
+    async fn reconciliation_repairs_a_drifted_aggregate() {
+        let db = db().await;
+        init_generation(&db, SLO, 1).await.unwrap();
+        apply_status(&db, &write_of(1)).await.unwrap(); // cache says 10/10
+
+        // The stream actually holds 12/12: one pass wrote slices and died
+        // before applying its delta.
+        reconcile_from_slices(&db, SLO, ROLLUP, (12.0, 12.0, 2))
             .await
             .unwrap();
-        commit_batch(&db, &commit_of(900, 1)).await.unwrap();
-
-        reserve_batch(&db, SLO, Writer::Backfill, 5, (0, 1), 1, 1)
-            .await
-            .unwrap();
-        let mut bf = commit_of(5, 1);
-        bf.writer = Writer::Backfill;
-        bf.watermark_end = None; // backfill never touches the watermark
-        commit_batch(&db, &bf).await.unwrap();
 
         let status = load_status(&db, SLO, ROLLUP).await.unwrap().unwrap();
-        assert_eq!(status.committed_batch_rev_incr, Some(900));
-        assert_eq!(status.committed_batch_rev_bf, Some(5));
-        assert_eq!(
-            status.watermark_end,
-            Some(9_900),
-            "backfill must not have moved the watermark"
-        );
+        assert_eq!(status.good, Some(12.0));
+        assert_eq!(status.total, Some(12.0));
+        assert_eq!(status.covered_slices, Some(2));
     }
 
     #[tokio::test]
-    async fn each_writer_keeps_its_own_manifest() {
+    async fn reconciliation_does_not_disturb_the_watermark() {
         let db = db().await;
-        init_generation(&db, SLO, 1, 0).await.unwrap();
-        reserve_batch(&db, SLO, Writer::Incremental, 101, (9_000, 9_300), 1, 1)
+        init_generation(&db, SLO, 1).await.unwrap();
+        apply_status(&db, &write_of(1)).await.unwrap();
+        reconcile_from_slices(&db, SLO, ROLLUP, (12.0, 12.0, 2))
             .await
             .unwrap();
-        reserve_batch(&db, SLO, Writer::Backfill, 7, (0, 3_000), 1, 1)
-            .await
-            .unwrap();
-
-        // Committing one must not clear the other's outstanding intent.
-        commit_batch(&db, &commit_of(101, 1)).await.unwrap();
-        assert!(
-            load_pending(&db, SLO, Writer::Incremental)
-                .await
-                .unwrap()
-                .is_none()
-        );
-        assert!(
-            load_pending(&db, SLO, Writer::Backfill)
-                .await
-                .unwrap()
-                .is_some(),
-            "backfill's torn batch must still be recoverable"
-        );
-    }
-
-    /// A genuine race, not a sequence.
-    ///
-    /// The predecessor of this test ran the two commits one after the other
-    /// and carried a comment rationalising it. That was wrong: the hazard the
-    /// name promises — a read-modify-write lost update, where two commits both
-    /// read `good` and both write `good + delta` — is invisible unless the two
-    /// actually overlap. Sequential execution cannot tell a safe
-    /// implementation from an unsafe one, and `deltas_accumulate_across_commits`
-    /// already covers the sequential case.
-    ///
-    /// Uses a **file-backed** database: separate connections to
-    /// `sqlite::memory:` get separate databases, so an in-memory race would
-    /// silently test nothing.
-    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
-    async fn concurrent_commits_do_not_lose_an_update() {
-        let dir = tempfile::tempdir().unwrap();
-        let url = format!("sqlite://{}/slo.db?mode=rwc", dir.path().display());
-        let setup = Database::connect(&url).await.unwrap();
-        create_slo_tables_for_test(&setup).await.unwrap();
-        init_generation(&setup, SLO, 1, 0).await.unwrap();
-        reserve_batch(&setup, SLO, Writer::Incremental, 101, (0, 1), 1, 1)
-            .await
-            .unwrap();
-        reserve_batch(&setup, SLO, Writer::Backfill, 7, (0, 1), 1, 1)
-            .await
-            .unwrap();
-
-        let a = Database::connect(&url).await.unwrap();
-        let b = Database::connect(&url).await.unwrap();
-
-        let mut incr = commit_of(101, 1);
-        incr.deltas = vec![delta(ROLLUP, 10.0, 10.0, 1)];
-        let mut bf = commit_of(7, 1);
-        bf.writer = Writer::Backfill;
-        bf.watermark_end = None;
-        bf.deltas = vec![delta(ROLLUP, 3.0, 3.0, 1)];
-
-        // Retry on contention: SQLite may refuse one writer outright, which is
-        // a legitimate outcome. Silently losing a delta is not.
-        async fn commit_retrying(db: &DatabaseConnection, c: &BatchCommit) {
-            for _ in 0..50 {
-                if commit_batch(db, c).await.is_ok() {
-                    return;
-                }
-                tokio::time::sleep(std::time::Duration::from_millis(5)).await;
-            }
-            panic!("commit never succeeded under contention");
-        }
-
-        let (ra, rb) = tokio::join!(commit_retrying(&a, &incr), commit_retrying(&b, &bf));
-        let _ = (ra, rb);
-
-        let status = load_status(&setup, SLO, ROLLUP).await.unwrap().unwrap();
-        assert_eq!(
-            status.good,
-            Some(13.0),
-            "both writers' deltas must survive a real race: 10 + 3"
-        );
-        assert_eq!(status.committed_batch_rev_incr, Some(101));
-        assert_eq!(status.committed_batch_rev_bf, Some(7));
-    }
-
-    /// Two passes of the SAME writer racing is the sharper lost-update case:
-    /// both read the same `good` and both add to it.
-    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
-    async fn concurrent_commits_from_one_writer_do_not_lose_an_update() {
-        let dir = tempfile::tempdir().unwrap();
-        let url = format!("sqlite://{}/slo.db?mode=rwc", dir.path().display());
-        let setup = Database::connect(&url).await.unwrap();
-        create_slo_tables_for_test(&setup).await.unwrap();
-        init_generation(&setup, SLO, 1, 0).await.unwrap();
-        reserve_batch(&setup, SLO, Writer::Incremental, 101, (0, 1), 1, 1)
-            .await
-            .unwrap();
-
-        let a = Database::connect(&url).await.unwrap();
-        let b = Database::connect(&url).await.unwrap();
-        let mut first = commit_of(101, 1);
-        first.deltas = vec![delta(ROLLUP, 10.0, 10.0, 1)];
-        let mut second = commit_of(102, 1);
-        second.deltas = vec![delta(ROLLUP, 10.0, 10.0, 1)];
-
-        let (x, y) = tokio::join!(commit_batch(&a, &first), commit_batch(&b, &second));
-
-        // Whichever outcomes occurred, the stored total must equal the sum of
-        // the commits that reported success — never less.
-        let succeeded = [(&x, 10.0), (&y, 10.0)]
-            .iter()
-            .filter(|(r, _)| matches!(r, Ok(CommitOutcome::Committed)))
-            .map(|(_, d)| *d)
-            .sum::<f64>();
-        let status = load_status(&setup, SLO, ROLLUP).await.unwrap().unwrap();
-        assert_eq!(
-            status.good.unwrap_or(0.0),
-            succeeded,
-            "a commit that reported success must not have been lost"
-        );
-    }
-
-    // ===================== replay, monotonicity, staleness ================
-
-    /// Committing a batch number at or below the current mark is a replay —
-    /// applying its deltas again would double-count.
-    #[tokio::test]
-    async fn a_replayed_batch_number_is_rejected() {
-        let db = db().await;
-        init_generation(&db, SLO, 1, 0).await.unwrap();
-        reserve_batch(&db, SLO, Writer::Incremental, 101, (0, 1), 1, 1)
-            .await
-            .unwrap();
-        commit_batch(&db, &commit_of(101, 1)).await.unwrap();
-
-        reserve_batch(&db, SLO, Writer::Incremental, 101, (0, 1), 1, 2)
-            .await
-            .unwrap();
-        let replay = commit_batch(&db, &commit_of(101, 1)).await;
-        let status = load_status(&db, SLO, ROLLUP).await.unwrap().unwrap();
-        assert_eq!(
-            status.good,
-            Some(10.0),
-            "a replayed commit must not double-count its deltas; got {:?} \
-             (replay returned {:?})",
-            status.good,
-            replay.as_ref().map(|o| *o)
-        );
-    }
-
-    /// The watermark is a publication barrier and only ever moves forward.
-    /// Letting it retreat would make already-published slices invisible again.
-    #[tokio::test]
-    async fn the_watermark_never_moves_backwards() {
-        let db = db().await;
-        init_generation(&db, SLO, 1, 0).await.unwrap();
-        reserve_batch(&db, SLO, Writer::Incremental, 101, (0, 1), 1, 1)
-            .await
-            .unwrap();
-        commit_batch(&db, &commit_of(101, 1)).await.unwrap(); // watermark 9_900
-
-        let mut backwards = commit_of(102, 1);
-        backwards.watermark_end = Some(5_000);
-        reserve_batch(&db, SLO, Writer::Incremental, 102, (0, 1), 1, 2)
-            .await
-            .unwrap();
-        let _ = commit_batch(&db, &backwards).await;
 
         let status = load_status(&db, SLO, ROLLUP).await.unwrap().unwrap();
         assert_eq!(
             status.watermark_end,
             Some(9_900),
-            "the watermark retreated, un-publishing committed slices"
+            "reconciliation repairs the aggregate, not the read clamp"
         );
-    }
-
-    /// A manifest left by a **superseded** generation describes arithmetic
-    /// that no longer matches the definition, so it is abandoned outright
-    /// rather than repaired — repairing it would recompute the old
-    /// definition's values into the new generation.
-    #[tokio::test]
-    async fn a_manifest_from_a_superseded_generation_is_not_repairable() {
-        let db = db().await;
-        init_generation(&db, SLO, 1, 0).await.unwrap();
-        reserve_batch(&db, SLO, Writer::Incremental, 101, (9_000, 9_300), 1, 1)
-            .await
-            .unwrap();
-        // crash, then a computation edit lands
-        bump_generation(&db, SLO, 2, 10_000).await.unwrap();
-
-        let pending = load_pending(&db, SLO, Writer::Incremental)
-            .await
-            .unwrap()
-            .expect("the manifest survives the bump");
-        assert_eq!(
-            pending.definition_generation, 1,
-            "the manifest must still say which generation planned it, so \
-             recovery can tell repair from abandon"
-        );
-        let status = load_status(&db, SLO, ROLLUP).await.unwrap().unwrap();
-        assert_eq!(status.definition_generation, 2);
     }
 
     // ===================== stored shapes ==================================
 
-    /// A fresh generation must leave the aggregates NULL, not zero: `Some(0.0)`
-    /// means "measured, and empty", `None` means "not yet measured", and
-    /// coverage must not confuse the two.
+    /// `Some(0.0)` is "measured and empty"; `None` is "not yet measured".
+    /// Coverage must not confuse the two.
     #[tokio::test]
     async fn a_fresh_generation_has_null_aggregates_not_zero() {
         let db = db().await;
-        init_generation(&db, SLO, 1, 0).await.unwrap();
+        init_generation(&db, SLO, 1).await.unwrap();
         let status = load_status(&db, SLO, ROLLUP).await.unwrap().unwrap();
         assert_eq!(status.good, None);
         assert_eq!(status.total, None);
@@ -841,11 +465,8 @@ mod tests {
     #[tokio::test]
     async fn the_trailing_buffer_round_trips() {
         let db = db().await;
-        init_generation(&db, SLO, 1, 0).await.unwrap();
-        reserve_batch(&db, SLO, Writer::Incremental, 101, (0, 1), 1, 1)
-            .await
-            .unwrap();
-        commit_batch(&db, &commit_of(101, 1)).await.unwrap();
+        init_generation(&db, SLO, 1).await.unwrap();
+        apply_status(&db, &write_of(1)).await.unwrap();
 
         let status = load_status(&db, SLO, ROLLUP).await.unwrap().unwrap();
         assert_eq!(
@@ -856,43 +477,44 @@ mod tests {
         );
     }
 
-    /// Storage ids are persisted, so reordering them would silently reassign
-    /// every stored manifest to the other writer.
-    #[test]
-    fn writer_storage_ids_are_stable() {
-        assert_eq!(writer_id(Writer::Incremental), 0);
-        assert_eq!(writer_id(Writer::Backfill), 1);
-    }
+    // ===================== concurrency ====================================
 
-    // ===================== per-group rows =================================
+    /// A genuine race. The hazard is a read-modify-write lost update — two
+    /// passes both reading `good` and both writing `good + delta` — which is
+    /// invisible unless they overlap.
+    ///
+    /// Uses a **file-backed** database: separate connections to
+    /// `sqlite::memory:` get separate databases, so an in-memory race would
+    /// silently test nothing.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn concurrent_writes_do_not_lose_an_update() {
+        let dir = tempfile::tempdir().unwrap();
+        let url = format!("sqlite://{}/slo.db?mode=rwc", dir.path().display());
+        let setup = Database::connect(&url).await.unwrap();
+        create_slo_tables_for_test(&setup).await.unwrap();
+        init_generation(&setup, SLO, 1).await.unwrap();
 
-    #[tokio::test]
-    async fn per_group_deltas_land_on_their_own_rows() {
-        let db = db().await;
-        init_generation(&db, SLO, 1, 0).await.unwrap();
-        reserve_batch(&db, SLO, Writer::Incremental, 101, (0, 1), 1, 1)
-            .await
-            .unwrap();
-        commit_batch(&db, &commit_of(101, 1)).await.unwrap();
+        let a = Database::connect(&url).await.unwrap();
+        let b = Database::connect(&url).await.unwrap();
+        let mut first = write_of(1);
+        first.deltas = vec![delta(ROLLUP, 10.0, 10.0, 1)];
+        let mut second = write_of(1);
+        second.deltas = vec![delta(ROLLUP, 3.0, 3.0, 1)];
 
-        let group = load_status(&db, SLO, "region:eu").await.unwrap().unwrap();
-        assert_eq!(group.good, Some(5.0));
+        let (x, y) = tokio::join!(apply_status(&a, &first), apply_status(&b, &second));
+
+        // Whatever the outcomes, the stored total must equal the sum of the
+        // writes that reported success — never less.
+        let expected: f64 = [(&x, 10.0), (&y, 3.0)]
+            .iter()
+            .filter(|(r, _)| matches!(r, Ok(WriteOutcome::Applied)))
+            .map(|(_, d)| *d)
+            .sum();
+        let status = load_status(&setup, SLO, ROLLUP).await.unwrap().unwrap();
         assert_eq!(
-            group.committed_batch_rev_incr, None,
-            "only the rollup row carries commit state"
+            status.good.unwrap_or(0.0),
+            expected,
+            "a write that reported success must not have been lost"
         );
-    }
-
-    #[tokio::test]
-    async fn a_group_row_inherits_the_generation_it_was_written_under() {
-        let db = db().await;
-        init_generation(&db, SLO, 3, 0).await.unwrap();
-        reserve_batch(&db, SLO, Writer::Incremental, 101, (0, 1), 3, 1)
-            .await
-            .unwrap();
-        commit_batch(&db, &commit_of(101, 3)).await.unwrap();
-
-        let group = load_status(&db, SLO, "region:eu").await.unwrap().unwrap();
-        assert_eq!(group.definition_generation, 3);
     }
 }
