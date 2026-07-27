@@ -179,11 +179,13 @@ describe("WorkflowTrigger", () => {
       expect(meta.status).toBe("resolved");
       expect(meta).not.toHaveProperty("user_id");
 
-      // event-specific block appears with ONLY the extras
+      // event-specific block shows the extras INSIDE meta, with a "..."
+      // placeholder for the common fields (not repeated).
       expect(w.find('[data-test="workflow-trigger-specific-structure"]').exists()).toBe(true);
       const specific = JSON.parse(jsonEditors(w)[1].props("query"));
-      expect(specific).toHaveProperty("user_id");
-      expect(specific).not.toHaveProperty("incident_id");
+      expect(specific.meta).toHaveProperty("..."); // stands in for common fields
+      expect(specific.meta).toHaveProperty("user_id"); // the event's added field
+      expect(specific.meta).not.toHaveProperty("incident_id"); // common not repeated
     });
   });
 

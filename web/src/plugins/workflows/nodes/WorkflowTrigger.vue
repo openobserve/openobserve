@@ -89,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <p
         v-else
         data-test="workflow-trigger-no-extras"
-        class="text-text-secondary text-xs leading-normal italic"
+        class="text-text-secondary text-xs leading-normal"
       >
         {{ t("workflow.node.incidentNoExtraFields") }}
       </p>
@@ -113,7 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="h-full! w-full"
         />
       </div>
-      <p v-if="noteKey" class="text-text-secondary mt-2 text-xs leading-normal italic">
+      <p v-if="noteKey" class="text-text-secondary mt-2 text-xs leading-normal">
         {{ t(noteKey) }}
       </p>
     </template>
@@ -183,7 +183,13 @@ const specificFields = computed<Record<string, unknown>>(() => {
   for (const k of Object.keys(meta)) if (!commonSet.has(k)) extras[k] = meta[k];
   return extras;
 });
-const specificText = computed(() => JSON.stringify(specificFields.value, null, 2));
+// Render the extras INSIDE the real `meta` object, with a "..." placeholder
+// standing in for the common fields (shown above) — so the exact merged shape
+// is clear (these nest into the same `meta`, after the common ones) without
+// repeating the common block. Kept valid JSON so the editor never flags it.
+const specificText = computed(() =>
+  JSON.stringify({ meta: { "...": "common fields above", ...specificFields.value } }, null, 2),
+);
 const hasSpecific = computed(() => Object.keys(specificFields.value).length > 0);
 
 // Combined single-payload text for non-split kinds (Alert Fired).
