@@ -90,6 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { ref } from "vue";
 import type { AiDateState } from "@/enterprise/composables/useAiDateRange";
+import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import DateTime from "@/components/DateTime.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
@@ -105,7 +106,7 @@ defineProps<{
   /** Resolved page subtitle. */
   subtitle: string;
   /** OPageHeader icon name. */
-  icon: string;
+  icon: IconName;
   /** Shared AI date-range state (useAiDateRange().state) bound to the picker. */
   dateState: AiDateState;
   /** Epoch-ms of the last refresh, shown on the refresh control (or null). */

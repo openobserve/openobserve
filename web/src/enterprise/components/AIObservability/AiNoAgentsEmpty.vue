@@ -41,6 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import type { IllustrationName } from "@/lib/core/EmptyState/illustrations";
 
 withDefaults(
   defineProps<{
@@ -54,7 +55,7 @@ withDefaults(
     actionLabel?: string;
     /** Empty-state illustration. Defaults to `constellation` (Sessions);
         Agent Graph passes `service-graph`. */
-    illustration?: string;
+    illustration?: IllustrationName;
   }>(),
   {
     illustration: "constellation",
