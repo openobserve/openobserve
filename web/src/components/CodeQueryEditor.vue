@@ -78,7 +78,7 @@ const loadMonaco = async () => {
 };
 
 import { vrlLanguageDefinition } from "@/utils/query/vrlLanguageDefinition";
-import { promqlLanguageDefinition } from "@/utils/query/promqlLanguageDefinition";
+import { loadPromqlLanguage } from "@/utils/query/promqlLanguageDefinition";
 
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
@@ -539,33 +539,13 @@ export default defineComponent({
       if (props.language === "promql") {
         monaco.languages.register({ id: "promql" });
 
-        // Monaco has no built-in PromQL support — without a tokenizer the
-        // query renders in a single colour (regressed repeatedly: #9779, #9793).
-        monaco.languages.setMonarchTokensProvider("promql", promqlLanguageDefinition as any);
-
-        // Declaring the bracket pairs turns on the same rainbow bracket-pair
-        // colorization the SQL editor gets, plus matching/auto-closing.
-        monaco.languages.setLanguageConfiguration("promql", {
-          brackets: [
-            ["{", "}"],
-            ["[", "]"],
-            ["(", ")"],
-          ],
-          autoClosingPairs: [
-            { open: "{", close: "}" },
-            { open: "[", close: "]" },
-            { open: "(", close: ")" },
-            { open: '"', close: '"' },
-            { open: "'", close: "'" },
-          ],
-          surroundingPairs: [
-            { open: "{", close: "}" },
-            { open: "[", close: "]" },
-            { open: "(", close: ")" },
-            { open: '"', close: '"' },
-            { open: "'", close: "'" },
-          ],
-        });
+        // Official monaco-promql grammar (with small app overlays) — without a
+        // tokenizer the query renders in a single colour (regressed repeatedly:
+        // #9779, #9793). Its language configuration declares the bracket pairs,
+        // which turns on the same rainbow bracket-pair colorization SQL gets.
+        const promql = await loadPromqlLanguage();
+        monaco.languages.setMonarchTokensProvider("promql", promql.language as any);
+        monaco.languages.setLanguageConfiguration("promql", promql.languageConfiguration as any);
       }
       if (props.language === "vrl") {
         monaco.languages.register({ id: "vrl" });
@@ -580,11 +560,12 @@ export default defineComponent({
         rules: [
           { token: "comment", background: "FFFFFF" },
           // Mirror monaco's built-in *.sql colours so PromQL matches the SQL
-          // editor (and the builder chips): functions magenta, strings red,
-          // word-operators slate.
-          { token: "predefined.promql", foreground: "C700C7" },
+          // editor (and the builder chips). monaco-promql token names: "type"
+          // = keywords/functions, "tag" = label names, "delimiter" = operators.
+          { token: "type.promql", foreground: "C700C7" },
+          { token: "tag.promql", foreground: "000000" },
           { token: "string.promql", foreground: "FF0000" },
-          { token: "operator.promql", foreground: "778899" },
+          { token: "delimiter.promql", foreground: "778899" },
         ],
         colors: {
           "editor.foreground": "#000000",
@@ -603,10 +584,12 @@ export default defineComponent({
           { token: "string", foreground: "CE9178" },
           { token: "string.sql", foreground: "CE9178" },
           { token: "string.vrl", foreground: "CE9178" },
-          // Mirror the SQL editor's colours for PromQL: functions magenta,
-          // word-operators slate (strings inherit the CE9178 rule above).
-          { token: "predefined.promql", foreground: "FF00FF" },
-          { token: "operator.promql", foreground: "778899" },
+          // Mirror the SQL editor's colours for PromQL (strings inherit the
+          // CE9178 rule above). monaco-promql token names: "type" = keywords/
+          // functions, "tag" = label names, "delimiter" = operators.
+          { token: "type.promql", foreground: "FF00FF" },
+          { token: "tag.promql", foreground: "D4D4D4" },
+          { token: "delimiter.promql", foreground: "778899" },
         ],
         colors: {},
       });

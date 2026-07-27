@@ -23,11 +23,20 @@ vi.mock("monaco-editor/esm/vs/editor/editor.api", () => ({
   languages: {
     register: vi.fn(),
     setMonarchTokensProvider: vi.fn(),
+    setLanguageConfiguration: vi.fn(),
   },
 }));
 
 // Mock SQL contribution
 vi.mock("monaco-editor/esm/vs/basic-languages/sql/sql.contribution.js", () => ({}));
+
+// Mock PromQL language loader (wraps monaco-promql, which imports monaco-editor)
+vi.mock("@/utils/query/promqlLanguageDefinition", () => ({
+  loadPromqlLanguage: vi.fn().mockResolvedValue({
+    language: { tokenizer: { root: [] } },
+    languageConfiguration: {},
+  }),
+}));
 
 // Mock VRL language definition
 vi.mock("@/utils/query/vrlLanguageDefinition", () => ({
