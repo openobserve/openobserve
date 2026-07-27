@@ -12,7 +12,7 @@
         {{ t("panel.labelFilters") }}
       </div>
       <span class="mr-0.5 ml-0.5 flex items-center">:</span>
-      <div class="scroll m-0.5 flex flex-wrap items-center gap-2 min-h-8">
+      <div class="scroll m-0.5 flex min-h-8 flex-wrap items-center gap-2">
         <!-- Label Filter Items -->
         <div
           v-for="(label, index) in props.labels"
@@ -33,7 +33,7 @@
                   class="!ps-1 !pe-0"
                   :data-test="`promql-label-filter-${index}`"
                 >
-                  <span class="font-normal leading-normal whitespace-nowrap">
+                  <span class="leading-normal font-normal whitespace-nowrap">
                     <template v-if="!label.label">
                       <span class="text-text-secondary">{{ computedLabel(label) }}</span>
                     </template>

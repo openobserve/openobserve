@@ -11,7 +11,7 @@
       {{ t("panel.operations") }}
     </div>
     <span class="mr-0.5 ml-0.5 flex items-center">:</span>
-    <div class="scroll m-0.5 flex flex-wrap items-center gap-2 min-h-8">
+    <div class="scroll m-0.5 flex min-h-8 flex-wrap items-center gap-2">
       <!-- Operations with Drag and Drop -->
       <draggable
         v-if="props.operations.length"
@@ -31,7 +31,7 @@
               <OButton
                 variant="ghost"
                 size="icon-chip"
-                class="drag-handle cursor-grab active:cursor-grabbing !w-4"
+                class="drag-handle !w-4 cursor-grab active:cursor-grabbing"
                 :data-test="`promql-operation-drag-${index}`"
               >
                 <template #icon-left>
