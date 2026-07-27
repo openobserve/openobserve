@@ -639,8 +639,15 @@ pub struct BrowserConfig {
     pub env: Vec<String>,
     #[serde(default)]
     pub secrets: Vec<BrowserSecret>,
+    /// Playwright's page default timeout — NOT a check timeout, despite the
+    /// name. Every step passes an explicit timeout, so this does not cap the
+    /// runner's per-category defaults.
     #[serde(default = "default_browser_timeout_ms")]
     pub timeout_ms: u32,
+    /// Wall-clock ceiling for one attempt. Absent means
+    /// [`DEFAULT_JOURNEY_BUDGET_MS`]. Validated against the job lease so a full
+    /// retry sequence cannot outlive it — see `validate_browser_config`.
+    pub journey_budget_ms: Option<u32>,
     pub capture: Option<BrowserCapture>,
 }
 
@@ -772,6 +779,26 @@ const SELECTOR_ACTIONS: &[&str] = &[
     "upload",
     "setInputFiles",
 ];
+
+/// Wall-clock ceiling for ONE browser attempt, in milliseconds.
+///
+/// The recorder used to stamp a 10s timeout into every step, so runs were short
+/// and nobody needed a budget. With runner-owned defaults (60s navigation and
+/// assertions, 30s interactions) and `retries` defaulting to 1, an 18-step
+/// journey's worst case goes from ~180s to ~1085s — past the job lease, after
+/// which the reaper requeues the job and it runs again.
+const DEFAULT_JOURNEY_BUDGET_MS: u32 = 300_000;
+const MIN_JOURNEY_BUDGET_MS: u32 = 5_000;
+const MAX_JOURNEY_BUDGET_MS: u32 = 900_000;
+
+/// Lease held on a browser job while it runs — must stay in sync with
+/// `LEASE_SECS` in o2-enterprise `synthetics/dispatcher/mod.rs`.
+///
+/// NOTE: the AWS Lambda function timeout must be >= this value, or runs are
+/// killed mid-journey. That setting lives outside this repository and cannot be
+/// asserted here. 900s is also AWS's maximum, so raising `retries` or
+/// `journey_budget_ms` further requires re-deriving all three together.
+const BROWSER_LEASE_SECS: i64 = 900;
 
 const MAX_STEPS: usize = 50;
 const MAX_STEPS_JSON_BYTES: usize = 100_000;
@@ -1053,7 +1080,14 @@ impl Synthetic {
             SyntheticType::Browser => {
                 let cfg: BrowserConfig = serde_json::from_value(self.config.clone())
                     .map_err(|e| format!("config: not a valid browser config: {e}"))?;
-                validate_browser_config(&cfg, &self.frequency, allowed_browsers, allowed_devices)
+                validate_browser_config(
+                    &cfg,
+                    &self.frequency,
+                    allowed_browsers,
+                    allowed_devices,
+                    self.retries,
+                    self.wait_before_retry_secs,
+                )
             }
             SyntheticType::Http | SyntheticType::Api => {
                 let cfg: HttpConfig = serde_json::from_value(self.config.clone())
@@ -1127,7 +1161,34 @@ fn validate_browser_config(
     frequency: &SyntheticFrequency,
     allowed_browsers: &[String],
     allowed_devices: &[String],
+    retries: i32,
+    wait_before_retry_secs: i32,
 ) -> Result<(), String> {
+    // ── journey budget vs. job lease ───────────────────────────────────────
+    // A browser job holds a lease while it runs (o2-enterprise dispatcher,
+    // LEASE_SECS). If a run outlives its lease the reaper requeues it and the
+    // journey EXECUTES AGAIN — duplicate result records, multiplied browser
+    // cost, and false alerts. Per-step timeouts alone cannot bound this, so the
+    // whole retry sequence must be checked against the lease up front.
+    let budget_ms = cfg.journey_budget_ms.unwrap_or(DEFAULT_JOURNEY_BUDGET_MS);
+    if !(MIN_JOURNEY_BUDGET_MS..=MAX_JOURNEY_BUDGET_MS).contains(&budget_ms) {
+        return Err(format!(
+            "config.journey_budget_ms: must be {MIN_JOURNEY_BUDGET_MS}..={MAX_JOURNEY_BUDGET_MS}, got {budget_ms}"
+        ));
+    }
+    let attempts = i64::from(retries) + 1;
+    let worst_case_ms =
+        attempts * i64::from(budget_ms) + i64::from(retries) * i64::from(wait_before_retry_secs) * 1_000;
+    let lease_ms = BROWSER_LEASE_SECS * 1_000;
+    if worst_case_ms > lease_ms {
+        return Err(format!(
+            "config.journey_budget_ms: a full retry sequence must fit inside the {BROWSER_LEASE_SECS}s job lease, \
+             but retries={retries} x journey_budget_ms={budget_ms} (+ wait_before_retry_secs={wait_before_retry_secs}) \
+             needs {worst_case_ms}ms. Lower journey_budget_ms or retries — a run that outlives its lease is requeued \
+             and executed a second time."
+        ));
+    }
+
     // ── steps ──────────────────────────────────────────────────────────────
     if cfg.steps.is_empty() {
         return Err("config.steps: at least one step is required".to_string());
@@ -1561,6 +1622,78 @@ mod tests {
                 .validate(&locs, &brs, &devs, true)
                 .is_ok()
         );
+    }
+
+    // ── Journey budget vs. job lease (spec P1.5.4 / T1-5) ────────────────────
+    // Raising per-step timeouts and defaulting retries to 1 takes the worst-case
+    // run to ~1085s against a 300s job lease. An overrunning job has its lease
+    // expire, is requeued by the reaper, and RUNS AGAIN — duplicate results,
+    // multiplied browser cost, and a new class of false alert caused by the fix.
+    // The invariant that keeps a full retry sequence inside its lease:
+    //   (retries + 1) * journey_budget_ms + retries * wait_before_retry_secs * 1000
+    //     <= LEASE_SECS * 1000
+
+    #[test]
+    fn test_browser_journey_budget_within_lease_ok() {
+        let (locs, brs, devs) = allowed();
+        let mut s = valid_browser_synthetic();
+        s.retries = 1;
+        s.wait_before_retry_secs = 5;
+        s.config["journey_budget_ms"] = serde_json::json!(300_000);
+        // 2 * 300s + 5s = 605s, inside the 900s lease.
+        assert!(s.validate(&locs, &brs, &devs, true).is_ok());
+    }
+
+    #[test]
+    fn test_browser_journey_budget_exceeding_lease_rejected() {
+        let (locs, brs, devs) = allowed();
+        let mut s = valid_browser_synthetic();
+        s.retries = 3;
+        s.wait_before_retry_secs = 5;
+        s.config["journey_budget_ms"] = serde_json::json!(300_000);
+        // 4 * 300s + 15s = 1215s — well past the 900s lease.
+        let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
+        // The error must name all three inputs, or an operator cannot tell which
+        // one to change.
+        assert!(err.contains("journey_budget_ms"), "{err}");
+        assert!(err.contains("retries"), "{err}");
+        assert!(err.contains("lease"), "{err}");
+    }
+
+    #[test]
+    fn test_browser_journey_budget_boundary_is_inclusive() {
+        let (locs, brs, devs) = allowed();
+        let mut s = valid_browser_synthetic();
+        s.retries = 1;
+        s.wait_before_retry_secs = 0;
+        // Exactly 2 * 450s = 900s — equal to the lease, which is permitted.
+        s.config["journey_budget_ms"] = serde_json::json!(450_000);
+        assert!(s.validate(&locs, &brs, &devs, true).is_ok());
+
+        // One millisecond more per attempt tips it over.
+        s.config["journey_budget_ms"] = serde_json::json!(450_001);
+        assert!(s.validate(&locs, &brs, &devs, true).is_err());
+    }
+
+    #[test]
+    fn test_browser_journey_budget_defaults_when_absent() {
+        let (locs, brs, devs) = allowed();
+        let mut s = valid_browser_synthetic();
+        s.retries = 1;
+        s.wait_before_retry_secs = 5;
+        // No journey_budget_ms in config — the 300s default applies and fits.
+        assert!(s.config.get("journey_budget_ms").is_none());
+        assert!(s.validate(&locs, &brs, &devs, true).is_ok());
+    }
+
+    #[test]
+    fn test_browser_journey_budget_bounds() {
+        let (locs, brs, devs) = allowed();
+        let mut s = valid_browser_synthetic();
+        s.retries = 0;
+        s.config["journey_budget_ms"] = serde_json::json!(500);
+        let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
+        assert!(err.contains("journey_budget_ms"), "{err}");
     }
 
     #[test]
