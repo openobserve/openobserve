@@ -193,6 +193,42 @@ pub fn evaluate_aggregation_alert(
     ))
 }
 
+/// `ORDER BY` fragment that sorts groups **worst-first** for a multi-alert's
+/// bounded fetch (`alerts_2.md` §5.3).
+///
+/// The multi path drops the `HAVING` filter so healthy groups come back too
+/// (otherwise a recovering group is indistinguishable from a vanished one), but
+/// it still reads a bounded page. Ordering is what makes that page usable: the
+/// worst groups are provably inside it, so the rollup level is always exact and
+/// the M-6 cap admits the true top of the distribution.
+///
+/// Buckets by **severity band**, not by raw value. Ordering by the aggregate
+/// itself would retain "most extreme within a band", so ordinary jitter between
+/// two equally-Critical groups would churn the retained row set every
+/// evaluation — the instability `classify_groups`' `(severity_rank desc,
+/// group_key asc)` admission contract exists to avoid. Callers append the
+/// `group_by` columns as a deterministic tiebreak.
+///
+/// Requires an orderable operator; `=`/`!=` have no worst-first direction,
+/// which is why M-10 refuses them for multi-alerts.
+pub fn severity_order_sql(agg: &Aggregation, value_alias: &str) -> Result<String, AggThresholdError> {
+    let (critical, warning) = aggregation_thresholds(agg)?;
+    let op = match agg.having.operator {
+        Operator::GreaterThan => ">",
+        Operator::GreaterThanEquals => ">=",
+        Operator::LessThan => "<",
+        Operator::LessThanEquals => "<=",
+        _ => return Err(AggThresholdError::OperatorNotOrderable),
+    };
+
+    let mut sql = format!("CASE WHEN \"{value_alias}\" {op} {critical} THEN 2");
+    if let Some(w) = warning {
+        sql.push_str(&format!(" WHEN \"{value_alias}\" {op} {w} THEN 1"));
+    }
+    sql.push_str(" ELSE 0 END DESC");
+    Ok(sql)
+}
+
 /// Validate an aggregation's threshold pair (§4.5, applied to
 /// `having.operator`).
 pub fn validate_aggregation_thresholds(agg: &Aggregation) -> Result<(), AggThresholdError> {
@@ -221,7 +257,7 @@ mod tests {
         aggregation_level::{
             AggThresholdError, aggregation_thresholds, evaluate_aggregation_alert,
             evaluate_aggregation_level, evaluate_level_over_items, having_filter_value,
-            validate_aggregation_thresholds,
+            severity_order_sql, validate_aggregation_thresholds,
         },
         level::{AlertLevel, evaluate_level_values},
     };
@@ -241,6 +277,7 @@ mod tests {
             function: AggFunction::Avg,
             having: having(op, critical),
             warning_value: warning,
+            multi_alert: false,
         }
     }
 
@@ -806,5 +843,80 @@ mod tests {
         // Single-level: the critical threshold is the filter.
         let a = agg(Operator::GreaterThan, json!(100), None);
         assert_eq!(having_filter_value(&a).unwrap(), 100.0);
+    }
+
+    // ── §5.3: worst-first ordering for the multi-alert fetch ────────────────
+
+    #[test]
+    fn test_severity_order_ranks_critical_above_warning_above_healthy() {
+        let a = agg(Operator::GreaterThan, json!(90), Some(80.0));
+        assert_eq!(
+            severity_order_sql(&a, "alert_agg_value").unwrap(),
+            "CASE WHEN \"alert_agg_value\" > 90 THEN 2 \
+             WHEN \"alert_agg_value\" > 80 THEN 1 ELSE 0 END DESC"
+        );
+    }
+
+    #[test]
+    fn test_severity_order_without_a_warning_band_has_two_buckets() {
+        let a = agg(Operator::GreaterThan, json!(90), None);
+        assert_eq!(
+            severity_order_sql(&a, "alert_agg_value").unwrap(),
+            "CASE WHEN \"alert_agg_value\" > 90 THEN 2 ELSE 0 END DESC"
+        );
+    }
+
+    #[test]
+    fn test_severity_order_follows_the_operator_direction() {
+        // For `<` the WORST group is the smallest, so the comparison — not the
+        // sort direction — is what flips. Emitting `ASC` on the raw value
+        // instead would put the healthiest groups first and the cap would
+        // retain exactly the wrong ones.
+        let a = agg(Operator::LessThan, json!(10), Some(20.0));
+        let sql = severity_order_sql(&a, "alert_agg_value").unwrap();
+        assert_eq!(
+            sql,
+            "CASE WHEN \"alert_agg_value\" < 10 THEN 2 \
+             WHEN \"alert_agg_value\" < 20 THEN 1 ELSE 0 END DESC"
+        );
+        assert!(
+            sql.ends_with("DESC"),
+            "severity rank always sorts descending; the operator carries the direction"
+        );
+    }
+
+    #[test]
+    fn test_severity_order_buckets_rather_than_ranking_raw_values() {
+        // Two equally-Critical groups must be interchangeable to the sort, so
+        // ordinary jitter between them cannot churn the retained row set. The
+        // proof is that the aggregate appears only inside comparisons, never as
+        // a bare sort key.
+        let a = agg(Operator::GreaterThan, json!(90), Some(80.0));
+        let sql = severity_order_sql(&a, "alert_agg_value").unwrap();
+        assert!(sql.starts_with("CASE WHEN"));
+        assert!(
+            !sql.contains("END DESC, \"alert_agg_value\""),
+            "the raw aggregate must not be a secondary sort key"
+        );
+    }
+
+    #[test]
+    fn test_severity_order_rejects_an_unorderable_operator() {
+        // `=` has no worst-first direction. M-10 refuses these for multi-alerts
+        // precisely so this is unreachable in practice — but the SQL builder
+        // must not invent an ordering if it ever is reached.
+        for op in [Operator::EqualTo, Operator::NotEqualTo] {
+            let a = agg(op, json!(90), None);
+            assert!(matches!(
+                severity_order_sql(&a, "alert_agg_value"),
+                Err(AggThresholdError::OperatorNotOrderable)
+            ));
+        }
+    }
+
+    #[test]
+    fn test_severity_order_rejects_a_non_numeric_threshold() {
+        let a = agg(Operator::GreaterThan, json!("not a number"), None);
+        assert!(severity_order_sql(&a, "alert_agg_value").is_err());
     }
 }

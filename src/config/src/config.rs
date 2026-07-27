@@ -1752,6 +1752,30 @@ pub struct Limit {
     pub alert_hybrid_count_threshold: i64,
     #[env_config(name = "ZO_ALERT_SCHEDULE_CONCURRENCY", default = 5)]
     pub alert_schedule_concurrency: i64,
+    #[env_config(
+        name = "ZO_ALERT_MAX_GROUPS",
+        default = 500,
+        help = "Cardinality cap for multi-alerts (alerts_2.md M-6): the most per-group state rows one alert may track. Overflow is evaluated and counted but not persisted beyond the cap, and the true count is surfaced as a warning. 0 = unlimited."
+    )]
+    pub alert_max_groups: usize,
+    #[env_config(
+        name = "ZO_ALERT_GROUP_DISAPPEARANCE_K",
+        default = 3,
+        help = "A multi-alert group unseen for K x the alert's frequency is resolved to Ok (alerts_2.md M-7). Must exceed 1, or a single slow evaluation resolves every group and re-fires it on the next pass."
+    )]
+    pub alert_group_disappearance_k: i64,
+    #[env_config(
+        name = "ZO_ALERT_GROUP_REAP_GRACE_SECS",
+        default = 3600,
+        help = "How long a resolved multi-alert group's state row is retained before deletion (alerts_2.md M-7). Its transition history is kept regardless."
+    )]
+    pub alert_group_reap_grace_secs: i64,
+    #[env_config(
+        name = "ZO_ALERT_GROUP_SWEEP_INTERVAL",
+        default = 60,
+        help = "How often the multi-alert group lifecycle sweep runs, in seconds (alerts_2.md M-7). The sweep only decides fates on elapsed time, so it need not match any alert's frequency. 0 disables it, which stops vanished groups from ever resolving or being reaped."
+    )]
+    pub alert_group_sweep_interval: u64,
     #[env_config(name = "ZO_ALERT_SCHEDULE_TIMEOUT", default = 90)] // seconds
     pub alert_schedule_timeout: i64,
     #[env_config(

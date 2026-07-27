@@ -50,6 +50,48 @@ pub struct AlertState {
     /// Freshness, not change-time: composite staleness (§6.4) runs on this, so
     /// an alert erroring every minute cannot look fresh while its level rots.
     pub level_at: Option<i64>,
+    /// Last evaluation that actually *included* this group (M-7).
+    ///
+    /// A separate clock from `last_outcome_at` on purpose. Resolving a vanished
+    /// group records a real outcome at the resolution time, so `last_outcome_at`
+    /// must advance — but the group was not seen then, so `last_seen` must not.
+    /// Overloading one field for both would either make the recovery row claim
+    /// a timestamp at which the group was still firing, or reset the
+    /// disappearance clock so the row could never be reaped.
+    pub last_seen: Option<i64>,
+    /// Rendered labels for UI and templates (M-4). `None` on the rollup row.
+    pub group_labels: Option<String>,
+    /// **Rollup row only**: the true number of groups the last evaluation
+    /// observed, before the M-6 cap truncated them. `None` on group rows.
+    ///
+    /// Persisted rather than recomputed because the cap-overflow warning has to
+    /// render from the stored row on list and detail views, long after the
+    /// evaluation that produced it. The retained row count cannot substitute —
+    /// it is post-cap, so an overflowing alert would report "500 of 500" and be
+    /// indistinguishable from one that never overflowed.
+    pub groups_observed: Option<usize>,
+    /// **Rollup row only**: how many of `groups_observed` were firing
+    /// (warning-or-worse), before the M-6 cap. `None` on group rows.
+    ///
+    /// Counted pre-cap for the same reason as `groups_observed`, and stored
+    /// separately from it because the "N of M groups firing" chip cannot be
+    /// derived from the retained rows: past the cap those are truncated, so
+    /// counting them under-reports exactly when the number matters most.
+    pub groups_firing: Option<usize>,
+    /// Whether `groups_observed` is a `≥` lower bound rather than exact — the
+    /// bounded fetch page came back full, so more groups may exist below it
+    /// (§5.3). `None` = written before this was tracked.
+    ///
+    /// Persisted rather than recomputed: exactness cannot be recovered later
+    /// from the count and a cap that is mutable config.
+    pub groups_observed_is_lower_bound: Option<bool>,
+    /// Whether `groups_firing` is a `≥` lower bound.
+    ///
+    /// Tracked separately from `groups_observed_is_lower_bound` because the two
+    /// genuinely diverge: a full page that reached healthy groups has seen
+    /// *every* firing group (the fetch is severity-ordered), so the firing
+    /// count is exact while the observed count is not.
+    pub groups_firing_is_lower_bound: Option<bool>,
 }
 
 impl AlertState {
@@ -64,6 +106,12 @@ impl AlertState {
             level: None,
             level_since: None,
             level_at: None,
+            last_seen: None,
+            group_labels: None,
+            groups_observed: None,
+            groups_firing: None,
+            groups_observed_is_lower_bound: None,
+            groups_firing_is_lower_bound: None,
         }
     }
 
@@ -87,6 +135,16 @@ pub struct StateTransition {
     pub from_level: Option<AlertLevel>,
     pub to_level: Option<AlertLevel>,
     pub at: i64,
+    /// Observed value at transition time — the source for per-group history
+    /// (M-8, §7.2). `None` where no value was observed, which includes the
+    /// disappearance transition: a group that stopped being returned has no
+    /// value, and recording 0 would render as a real measurement.
+    pub value: Option<f64>,
+    /// Rendered labels, duplicated from the state row on purpose: the state row
+    /// is reaped after the grace period (M-7) while transitions are retained,
+    /// and `group_key` is a hash. Without this, history outlives the only thing
+    /// that could say which host it was about.
+    pub group_labels: Option<String>,
 }
 
 /// What `apply_outcome` decided to do about an observed evaluation result.
@@ -195,6 +253,14 @@ pub fn apply_outcome(
         level,
         level_since,
         level_at,
+        // An observation, by definition, saw the group.
+        last_seen: Some(at),
+        group_labels: prev.and_then(|p| p.group_labels.clone()),
+        // Set by the per-group planner on the rollup row only.
+        groups_observed: prev.and_then(|p| p.groups_observed),
+        groups_firing: prev.and_then(|p| p.groups_firing),
+        groups_observed_is_lower_bound: prev.and_then(|p| p.groups_observed_is_lower_bound),
+        groups_firing_is_lower_bound: prev.and_then(|p| p.groups_firing_is_lower_bound),
     };
 
     // A change on EITHER axis is a transition — an escalation while still
@@ -207,6 +273,10 @@ pub fn apply_outcome(
         from_level: previous_level,
         to_level: level,
         at,
+        // Filled by the per-group planner, which is the only caller that has
+        // an observed value and a label set.
+        value: None,
+        group_labels: None,
     });
 
     StateUpdate {
@@ -229,6 +299,12 @@ mod tests {
             level: None,
             level_since: None,
             level_at: None,
+            last_seen: Some(at),
+            group_labels: None,
+            groups_observed: None,
+            groups_firing: None,
+            groups_observed_is_lower_bound: None,
+            groups_firing_is_lower_bound: None,
         }
     }
 
@@ -456,6 +532,12 @@ mod tests {
             level: None,
             level_since: None,
             level_at: None,
+            last_seen: Some(100),
+            group_labels: None,
+            groups_observed: None,
+            groups_firing: None,
+            groups_observed_is_lower_bound: None,
+            groups_firing_is_lower_bound: None,
         };
         let update = apply_outcome(
             "alert-1",

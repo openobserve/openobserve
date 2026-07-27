@@ -22,7 +22,7 @@ use config::{
     meta::{
         alerts::{
             AggFunction, AlertConditionParams, Condition, ConditionList, Operator, QueryCondition,
-            QueryType, TriggerCondition, TriggerEvalResults,
+            QueryType, TriggerCondition, TriggerEvalResults, grouping::GroupObservation,
         },
         cluster::RoleGroup,
         search::{SearchEventContext, SearchEventType, SqlQuery},
@@ -382,8 +382,23 @@ impl QueryConditionExt for QueryCondition {
             hybrid_exact_count = Some(exact);
         }
 
+        // Per-group evaluation reads a page sized to the M-6 cap, not to the
+        // threshold: for a multi-alert the count gate is always "any group"
+        // (M-10), so `required_search_size` would ask for a handful of rows and
+        // the fan-out would see a fraction of the groups.
+        let multi_group_cap = self
+            .aggregation
+            .as_ref()
+            .filter(|a| a.multi_alert && a.group_by.as_ref().is_some_and(|g| !g.is_empty()))
+            .map(|_| get_config().limit.alert_max_groups);
+
         let size = if self.search_event_type.is_some() {
             -1
+        } else if let Some(cap) = multi_group_cap {
+            // ONE row past the cap, so a full page is itself the overflow
+            // signal (M-6) and the persisted counts can be marked lower bounds
+            // honestly (§5.3). `cap == 0` means unlimited.
+            if cap == 0 { -1 } else { cap as i64 + 1 }
         } else if hybrid {
             // Decision already made from the exact count; this fetch is only
             // the notification payload sample.
@@ -707,6 +722,68 @@ impl QueryConditionExt for QueryCondition {
                     eval_results.level = level;
                     eval_results.actual_value = worst;
                     eval_results.group_label = group_label;
+
+                    // ── Per-group fan-out (M-1/M-2/M-3, gated by M-9) ───────
+                    // Purely additive: everything above still runs, because the
+                    // worst-group collapse is what the single per-evaluation
+                    // trigger record needs (D8) and what every non-multi alert
+                    // is evaluated by. This only *adds* the per-group view.
+                    if let Some(cap) = multi_group_cap
+                        && let Some(group_by) = agg.group_by.as_ref()
+                    {
+                        let observations: Vec<GroupObservation> = records
+                            .iter()
+                            .filter_map(|r| {
+                                let value = r.get("alert_agg_value")?.as_f64()?;
+                                let labels: std::collections::BTreeMap<String, String> = group_by
+                                    .iter()
+                                    .filter_map(|col| {
+                                        r.get(col).map(|v| {
+                                            let rendered = match v.as_str() {
+                                                Some(s) => s.to_string(),
+                                                // A non-string group value
+                                                // (numeric pod ordinal, bool
+                                                // flag) is still an identity —
+                                                // render it rather than drop
+                                                // the group entirely.
+                                                None => v.to_string(),
+                                            };
+                                            (col.clone(), rendered)
+                                        })
+                                    })
+                                    .collect();
+                                Some(GroupObservation::new(labels, value))
+                            })
+                            .collect();
+
+                        let classification = config::meta::alerts::grouping::classify_groups_by(
+                            observations,
+                            |v| {
+                                config::meta::alerts::aggregation_level::evaluate_aggregation_level(
+                                    v, agg,
+                                )
+                                .ok()
+                                .flatten()
+                            },
+                            cap,
+                        );
+
+                        // Both facts come free from the classification: the
+                        // page filled if we got everything we asked for, and it
+                        // reached healthy groups if not every observed group
+                        // was firing. Together they decide whether the counts
+                        // are exact and whether absence proves disappearance.
+                        let observed =
+                            classification.groups.len() + classification.dropped.len();
+                        let page = config::meta::alerts::grouping::FetchPage {
+                            filled: size > 0 && records.len() as i64 >= size,
+                            reached_healthy: classification.firing_observed < observed,
+                        };
+
+                        eval_results.group_classification =
+                            Some(classification.with_page(page));
+                    }
+
                     level.map(|_| records)
                 }
                 // ── Count-based alerts ──────────────────────────────────────
@@ -1398,11 +1475,30 @@ pub async fn build_sql(
     if let Some(group) = agg.group_by.as_ref()
         && !group.is_empty()
     {
-        sql = format!(
-            "SELECT {}, {func_expr} AS alert_agg_value, MIN({TIMESTAMP_COL_NAME}) as zo_sql_min_time, MAX({TIMESTAMP_COL_NAME}) AS zo_sql_max_time FROM \"{stream_name}\"{where_sql} GROUP BY {} HAVING {having_expr}",
-            group.join(", "),
-            group.join(", "),
-        );
+        let cols = group.join(", ");
+        if agg.multi_alert {
+            // Multi-alerts (M-9) drop the HAVING filter. A group that falls
+            // back under the threshold must still be RETURNED: otherwise its
+            // recovery is indistinguishable from it vanishing, and it would
+            // only resolve via M-7's timeout — K evaluations late, and with a
+            // NULL value where the real reading should be.
+            //
+            // The page stays bounded, so it is ordered worst-first (§5.3).
+            // That ordering is what keeps the rollup level exact and lets the
+            // M-6 cap admit the true top of the distribution rather than an
+            // arbitrary slice. The group columns are the deterministic
+            // tiebreak within a severity band.
+            let severity_order =
+                config::meta::alerts::aggregation_level::severity_order_sql(agg, "alert_agg_value")
+                    .map_err(|e| anyhow::anyhow!("Invalid aggregation threshold: {e}"))?;
+            sql = format!(
+                "SELECT {cols}, {func_expr} AS alert_agg_value, MIN({TIMESTAMP_COL_NAME}) as zo_sql_min_time, MAX({TIMESTAMP_COL_NAME}) AS zo_sql_max_time FROM \"{stream_name}\"{where_sql} GROUP BY {cols} ORDER BY {severity_order}, {cols}"
+            );
+        } else {
+            sql = format!(
+                "SELECT {cols}, {func_expr} AS alert_agg_value, MIN({TIMESTAMP_COL_NAME}) as zo_sql_min_time, MAX({TIMESTAMP_COL_NAME}) AS zo_sql_max_time FROM \"{stream_name}\"{where_sql} GROUP BY {cols} HAVING {having_expr}"
+            );
+        }
     }
     if sql.is_empty() {
         sql = format!(

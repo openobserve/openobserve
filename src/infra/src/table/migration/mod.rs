@@ -144,6 +144,7 @@ mod m20260725_000001_create_alert_states_tables;
 mod m20260725_000002_add_threshold_and_level_columns;
 mod m20260726_000001_add_priority_and_tags_to_alerts;
 mod m20260726_000002_add_priority_and_tags_to_anomaly_config;
+mod m20260726_000003_add_group_lifecycle_columns;
 
 pub struct Migrator;
 
@@ -277,6 +278,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260725_000002_add_threshold_and_level_columns::Migration),
             Box::new(m20260726_000001_add_priority_and_tags_to_alerts::Migration),
             Box::new(m20260726_000002_add_priority_and_tags_to_anomaly_config::Migration),
+            Box::new(m20260726_000003_add_group_lifecycle_columns::Migration),
         ]
     }
 }

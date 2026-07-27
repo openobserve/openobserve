@@ -70,8 +70,39 @@ async fn persist_alert_run_state(
     alert_id: &str,
     outcome: &RunOutcome,
     level: Option<config::meta::alerts::level::AlertLevel>,
+    grouped: Option<&config::meta::alerts::grouping::GroupClassification>,
 ) {
     use config::meta::alerts::state::{ROLLUP_GROUP_KEY, apply_outcome};
+
+    // ── Per-group fan-out (M-1/M-2/M-3) ─────────────────────────────────────
+    // Only reachable for an alert that opted in (M-9); everything else falls
+    // through to the single-row path below, unchanged.
+    //
+    // `Skipped` is excluded here as well as below: a silenced or paused run
+    // observed nothing, and the planner — unlike `apply_outcome` — has no
+    // notion of an outcome that must not be written, so it would happily
+    // stamp every group as healthy.
+    if let Some(classification) = grouped
+        && !matches!(outcome, RunOutcome::Skipped)
+    {
+        let prev = match load_tracked_group_states(alert_id).await {
+            Ok(p) => p,
+            Err(e) => {
+                log::warn!("[SCHEDULER] could not read group states for {alert_id}: {e}");
+                return;
+            }
+        };
+        let plan = config::meta::alerts::grouping::plan_group_updates(
+            alert_id,
+            classification,
+            &prev,
+            now_micros(),
+        );
+        if let Err(e) = infra::table::alert_states::persist_group_plan(&plan, alert_id).await {
+            log::error!("[SCHEDULER] could not persist group states for {alert_id}: {e}");
+        }
+        return;
+    }
 
     // `Skipped` runs are dropped by `apply_outcome` so a silenced evaluation
     // cannot erase a real firing state.
@@ -97,6 +128,34 @@ async fn persist_alert_run_state(
     if let Err(e) = infra::table::alert_states::persist(&update).await {
         log::error!("[SCHEDULER] could not persist alert state for {alert_id}: {e}");
     }
+}
+
+/// Every state row this alert currently tracks, keyed by `group_key` — the
+/// rollup row included, since [`plan_group_updates`] diffs against it too.
+///
+/// Two queries rather than one per group: the planner needs the previous row
+/// for every group it is about to write, and fetching them individually would
+/// put a query per group on the hottest write path in the system.
+async fn load_tracked_group_states(
+    alert_id: &str,
+) -> Result<
+    std::collections::HashMap<String, config::meta::alerts::state::AlertState>,
+    infra::errors::Error,
+> {
+    use config::meta::alerts::state::ROLLUP_GROUP_KEY;
+
+    let mut prev: std::collections::HashMap<_, _> = infra::table::alert_states::list_groups(
+        alert_id,
+    )
+    .await?
+    .into_iter()
+    .map(|s| (s.group_key.clone(), s))
+    .collect();
+
+    if let Some(rollup) = infra::table::alert_states::get(alert_id, ROLLUP_GROUP_KEY).await? {
+        prev.insert(ROLLUP_GROUP_KEY.to_string(), rollup);
+    }
+    Ok(prev)
 }
 
 pub async fn handle_triggers(
@@ -878,7 +937,7 @@ async fn handle_alert_triggers(
         if let Some(alert_id) = alert.id.as_ref() {
             // Query failed: no level was computed, so the level axis carries
             // forward untouched (including its freshness clock).
-            persist_alert_run_state(&alert_id.to_string(), &trigger_data_stream.status, None).await;
+            persist_alert_run_state(&alert_id.to_string(), &trigger_data_stream.status, None, None).await;
         }
         publish_triggers_usage(trigger_data_stream);
 
@@ -1197,6 +1256,7 @@ async fn handle_alert_triggers(
                         &alert_id.to_string(),
                         &trigger_data_stream.status,
                         eval_level,
+                        trigger_results.group_classification.as_ref(),
                     )
                     .await;
                 }
@@ -1244,6 +1304,7 @@ async fn handle_alert_triggers(
                                 &alert_id.to_string(),
                                 &trigger_data_stream.status,
                                 eval_level,
+                                trigger_results.group_classification.as_ref(),
                             )
                             .await;
                         }
@@ -1527,6 +1588,7 @@ async fn handle_alert_triggers(
             &alert_id.to_string(),
             &trigger_data_stream.status,
             eval_level,
+            trigger_results.group_classification.as_ref(),
         )
         .await;
     }

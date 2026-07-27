@@ -47,6 +47,12 @@ mod tests {
             // Freshness: when the level was last COMPUTED (§7.6). Starts equal
             // to level_since; diverges as same-level runs refresh it.
             level_at: Some(level_since),
+            last_seen: Some(outcome_since),
+            group_labels: None,
+            groups_observed: None,
+            groups_firing: None,
+            groups_observed_is_lower_bound: None,
+            groups_firing_is_lower_bound: None,
         }
     }
 

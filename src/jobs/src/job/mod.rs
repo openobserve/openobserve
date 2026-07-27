@@ -43,6 +43,7 @@ fn eval_scheduler_fetch_size(total: usize, max_rows: usize) -> anyhow::Result<i6
 
 #[cfg(feature = "enterprise")]
 pub mod alert_grouping;
+mod alert_group_reaper;
 mod alert_manager;
 #[cfg(feature = "cloud")]
 mod cloud;
@@ -1056,6 +1057,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(pipeline::run());
     pipeline_error_cleanup::run();
     session_cleanup::run();
+    // Multi-alert group lifecycle (M-7): retires groups the evaluation path
+    // can never retire on its own, because a vanished group produces no
+    // observation to act on.
+    alert_group_reaper::run();
 
     if LOCAL_NODE.is_compactor() {
         tokio::task::spawn(file_list_dump::run());

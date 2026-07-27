@@ -363,6 +363,15 @@ pub struct Aggregation {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schema(example = 50.0)]
     pub warning_value: Option<f64>,
+    /// Opt in to per-group evaluation (multi-alerts): each group gets its own
+    /// level, state row and notifications. Omitted = `false` = the alert
+    /// evaluates as a single collapsed result, exactly as before.
+    ///
+    /// Requires a non-empty `group_by`, an orderable `having.operator`, and
+    /// "any group" count thresholds — see `alerts_2.md` M-9/M-10.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    #[schema(example = false)]
+    pub multi_alert: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, ToSchema)]
@@ -566,6 +575,7 @@ impl From<meta_alerts::Aggregation> for Aggregation {
             function: value.function.into(),
             having: value.having.into(),
             warning_value: value.warning_value,
+            multi_alert: value.multi_alert,
         }
     }
 }
@@ -755,6 +765,7 @@ impl From<Aggregation> for meta_alerts::Aggregation {
             function: value.function.into(),
             having: value.having.into(),
             warning_value: value.warning_value,
+            multi_alert: value.multi_alert,
         }
     }
 }
@@ -1301,6 +1312,7 @@ mod tests {
     fn test_aggregation_from_meta() {
         let meta = meta_alerts::Aggregation {
             warning_value: None,
+            multi_alert: false,
             group_by: Some(vec!["service".to_string(), "region".to_string()]),
             function: meta_alerts::AggFunction::Count,
             having: meta_alerts::Condition {
@@ -1323,6 +1335,7 @@ mod tests {
     fn test_aggregation_to_meta() {
         let agg = Aggregation {
             warning_value: None,
+            multi_alert: false,
             group_by: None,
             function: AggFunction::Avg,
             having: Condition {

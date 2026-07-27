@@ -341,6 +341,55 @@ impl TriggerCondition {
     }
 }
 
+impl TriggerCondition {
+    /// How long a group of this alert may go unobserved before M-7 resolves it,
+    /// in microseconds, measured from `last_seen`.
+    ///
+    /// Two schedule shapes, and they cannot share an implementation. A fixed
+    /// frequency is a constant, so `K × frequency` is the whole answer. A cron
+    /// alert's numeric `frequency` is **not** the cadence it runs at, and the
+    /// gap between consecutive fires is not even constant (weekday-only,
+    /// monthly, DST), so its deadline has to be read off the schedule itself —
+    /// anchored to this row's `last_seen` so it cannot drift between sweeps.
+    pub fn group_resolve_threshold_micros(&self, last_seen: i64, k: i64) -> i64 {
+        use crate::meta::alerts::grouping::{
+            cron_resolve_threshold_micros, resolve_threshold_micros,
+        };
+
+        if self.frequency_type != FrequencyType::Cron {
+            return resolve_threshold_micros(self.frequency, k);
+        }
+
+        // An unparseable expression or an out-of-range timestamp must never
+        // resolve a live group: saturating high leaves the row alone until the
+        // schedule can be read, while any finite fallback would resolve groups
+        // on a cadence nobody configured.
+        let (Ok(schedule), Some(anchor)) = (
+            Schedule::from_str(&self.cron),
+            chrono::DateTime::from_timestamp_micros(last_seen),
+        ) else {
+            return i64::MAX;
+        };
+
+        // Same DST-aware offset resolution as `get_next_trigger_time_*`, so the
+        // sweep and the scheduler agree on when this alert actually fires.
+        let offset_minutes = match get_timezone_from_string(self.timezone.as_deref(), 0) {
+            Ok(tz) => get_offset_minutes_from_tz(&tz, anchor),
+            Err(_) => 0,
+        };
+        let Some(tz_offset) = FixedOffset::east_opt(offset_minutes * 60) else {
+            return i64::MAX;
+        };
+
+        let anchored = anchor.with_timezone(&tz_offset);
+        let occurrences = schedule
+            .after(&anchored)
+            .take(k.max(0) as usize)
+            .map(|d| d.timestamp_micros());
+        cron_resolve_threshold_micros(last_seen, occurrences, k)
+    }
+}
+
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct TriggerEvalResults {
     pub data: Option<Vec<Map<String, Value>>>,
@@ -364,6 +413,17 @@ pub struct TriggerEvalResults {
     /// be higher (§7.5). History renders a `≥` prefix. Hybrid evaluations are
     /// always exact.
     pub value_is_lower_bound: bool,
+    /// Per-group view of this evaluation — `Some` only for an alert that opted
+    /// in to multi-alerts (M-9). `None` puts state persistence on exactly the
+    /// path it took before this feature existed.
+    ///
+    /// Classification happens during evaluation rather than at persist time
+    /// because that is where the aggregation's own thresholds are in scope:
+    /// `TriggerCondition.threshold` is the group-COUNT gate for an aggregation
+    /// alert, so classifying against it there would compare aggregates to a
+    /// count.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub group_classification: Option<grouping::GroupClassification>,
 }
 
 #[derive(Clone, Default, Debug, Serialize, Deserialize, ToSchema, PartialEq)]
@@ -582,6 +642,20 @@ pub struct Aggregation {
     /// values (averages, percentiles) are not integers.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub warning_value: Option<f64>,
+    /// Opt-in to per-group evaluation — multi-alerts, `alerts_2.md` M-9/D26.
+    ///
+    /// `#[serde(default)]` is the whole backward-compatibility guarantee: an
+    /// aggregation stored before this field existed cannot contain it, so it
+    /// deserializes to `false` and the alert keeps its legacy collapsed
+    /// evaluation byte-for-byte. Nothing is inferred from `group_by` being
+    /// present — that would silently change paging cadence and reset silence
+    /// fingerprints for every existing grouped alert.
+    ///
+    /// Validated by [`grouping::validate_multi_alert`] (M-10): requires a
+    /// non-empty `group_by`, an orderable `having.operator`, and "any group"
+    /// count gates.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub multi_alert: bool,
 }
 
 impl MemorySize for Aggregation {

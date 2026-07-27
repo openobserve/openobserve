@@ -4607,6 +4607,7 @@ mod tests {
                 ignore_case: false,
             },
             warning_value: Some(70.0),
+            multi_alert: false,
         });
         let options = ProcessTemplateOptions {
             rows_end_time: 0,

@@ -2,7 +2,8 @@
 
 use sea_orm::entity::prelude::*;
 
-#[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
+// No `Eq`: `value` is an f64. sea-orm only requires `PartialEq`.
+#[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
 #[sea_orm(table_name = "alert_state_transitions")]
 pub struct Model {
     #[sea_orm(primary_key)]
@@ -16,6 +17,12 @@ pub struct Model {
     pub from_level: Option<i32>,
     pub to_level: Option<i32>,
     pub at: i64,
+    /// Observed value at transition time; source for per-group history (M-8).
+    /// `None` on a disappearance transition — no observation was made.
+    pub value: Option<f64>,
+    /// Rendered labels, duplicated from the state row so history stays
+    /// readable after that row is reaped (M-7).
+    pub group_labels: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

@@ -21,6 +21,7 @@
 
 use config::meta::{
     alerts::{
+        grouping::GroupPlan,
         level::AlertLevel,
         state::{AlertState, ROLLUP_GROUP_KEY, StateTransition, StateUpdate},
     },
@@ -53,6 +54,12 @@ impl From<alert_states::Model> for AlertState {
             level: m.level.and_then(AlertLevel::from_i32),
             level_since: m.level_since,
             level_at: m.level_at,
+            last_seen: m.last_seen,
+            group_labels: m.group_labels,
+            groups_observed: m.groups_observed.map(|c| c as usize),
+            groups_firing: m.groups_firing.map(|c| c as usize),
+            groups_observed_is_lower_bound: m.groups_observed_is_lower_bound,
+            groups_firing_is_lower_bound: m.groups_firing_is_lower_bound,
         }
     }
 }
@@ -106,12 +113,92 @@ pub async fn list_groups(alert_id: &str) -> Result<Vec<AlertState>, errors::Erro
 /// recovery pairing unreliable, which is the whole reason this is not on the
 /// lossy stream path.
 pub async fn persist(update: &StateUpdate) -> Result<(), errors::Error> {
+    if update.state.is_none() {
+        return Ok(());
+    }
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let txn = client.begin().await?;
+    write_update(&txn, update).await?;
+    txn.commit().await?;
+    Ok(())
+}
+
+/// Persist one grouped evaluation's entire [`GroupPlan`] in a **single
+/// transaction** (§7.2).
+///
+/// Atomicity is not incidental here: composites read the rollup row, so a
+/// rollup committed alongside only some of its group rows would hand them a
+/// state that never existed. The evictions go in the same transaction for the
+/// same reason — a cap overflow that upserted the winners but failed to delete
+/// the displaced rows would leave stored rows above the cap.
+pub async fn persist_group_plan(plan: &GroupPlan, alert_id: &str) -> Result<(), errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let txn = client.begin().await?;
+
+    for update in &plan.updates {
+        write_update(&txn, update).await?;
+    }
+
+    // Evicted rows are deleted outright with NO transition (M-6): an eviction
+    // is bookkeeping, not a level change — the group may well still be firing,
+    // so a recovery row would be a lie.
+    if !plan.evicted.is_empty() {
+        alert_states::Entity::delete_many()
+            .filter(alert_states::Column::AlertId.eq(alert_id))
+            .filter(alert_states::Column::GroupKey.is_in(plan.evicted.clone()))
+            .exec(&txn)
+            .await?;
+    }
+
+    txn.commit().await?;
+    Ok(())
+}
+
+/// Every alert that currently has at least one per-group state row.
+///
+/// The M-7 sweep's entry point. Distinct alert ids rather than all rows: the
+/// sweep then pulls each alert's groups only if that alert passes the
+/// completeness gate, so a cluster full of frozen alerts costs one query
+/// instead of a full table read every tick.
+pub async fn list_alert_ids_with_groups() -> Result<Vec<String>, errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    Ok(alert_states::Entity::find()
+        .select_only()
+        .column(alert_states::Column::AlertId)
+        .filter(alert_states::Column::GroupKey.ne(ROLLUP_GROUP_KEY))
+        .distinct()
+        .into_tuple::<String>()
+        .all(client)
+        .await?)
+}
+
+/// Delete per-group state rows, for M-7 reaping and M-6 eviction.
+///
+/// Deletes only `alert_states`; the transition log is retained on purpose so
+/// per-group history (M-8) survives the row it described — which is exactly why
+/// transitions carry their own `group_labels`.
+pub async fn delete_groups(alert_id: &str, group_keys: &[String]) -> Result<(), errors::Error> {
+    if group_keys.is_empty() {
+        return Ok(());
+    }
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    alert_states::Entity::delete_many()
+        .filter(alert_states::Column::AlertId.eq(alert_id))
+        .filter(alert_states::Column::GroupKey.is_in(group_keys.to_vec()))
+        .exec(client)
+        .await?;
+    Ok(())
+}
+
+/// One state upsert plus its optional transition, inside a caller-owned
+/// transaction. Split out so a whole plan can share one transaction.
+async fn write_update<C>(txn: &C, update: &StateUpdate) -> Result<(), errors::Error>
+where
+    C: sea_orm::ConnectionTrait,
+{
     let Some(state) = update.state.as_ref() else {
         return Ok(());
     };
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let txn = client.begin().await?;
 
     let model = alert_states::ActiveModel {
         alert_id: Set(state.alert_id.clone()),
@@ -122,6 +209,12 @@ pub async fn persist(update: &StateUpdate) -> Result<(), errors::Error> {
         level: Set(state.level.map(|l| l.to_i32())),
         level_since: Set(state.level_since),
         level_at: Set(state.level_at),
+        last_seen: Set(state.last_seen),
+        group_labels: Set(state.group_labels.clone()),
+        groups_observed: Set(state.groups_observed.map(|c| c as i32)),
+        groups_firing: Set(state.groups_firing.map(|c| c as i32)),
+        groups_observed_is_lower_bound: Set(state.groups_observed_is_lower_bound),
+        groups_firing_is_lower_bound: Set(state.groups_firing_is_lower_bound),
     };
 
     // Upsert on the composite primary key — rows are created lazily on an
@@ -139,10 +232,16 @@ pub async fn persist(update: &StateUpdate) -> Result<(), errors::Error> {
                 alert_states::Column::Level,
                 alert_states::Column::LevelSince,
                 alert_states::Column::LevelAt,
+                alert_states::Column::LastSeen,
+                alert_states::Column::GroupLabels,
+                alert_states::Column::GroupsObserved,
+                alert_states::Column::GroupsFiring,
+                alert_states::Column::GroupsObservedIsLowerBound,
+                alert_states::Column::GroupsFiringIsLowerBound,
             ])
             .to_owned(),
         )
-        .exec(&txn)
+        .exec(txn)
         .await?;
 
     if let Some(t) = update.transition.as_ref() {
@@ -154,13 +253,14 @@ pub async fn persist(update: &StateUpdate) -> Result<(), errors::Error> {
             from_level: Set(t.from_level.map(|l| l.to_i32())),
             to_level: Set(t.to_level.map(|l| l.to_i32())),
             at: Set(t.at),
+            value: Set(t.value),
+            group_labels: Set(t.group_labels.clone()),
             ..Default::default()
         }
-        .insert(&txn)
+        .insert(txn)
         .await?;
     }
 
-    txn.commit().await?;
     Ok(())
 }
 
@@ -169,9 +269,27 @@ pub async fn list_transitions(
     alert_id: &str,
     limit: u64,
 ) -> Result<Vec<StateTransition>, errors::Error> {
+    list_transitions_filtered(alert_id, None, limit).await
+}
+
+/// Transitions for one alert, newest first, optionally scoped to one group
+/// (M-8: the history drawer's group filter).
+///
+/// `None` means "every group", which is NOT the same as `Some("")` — the empty
+/// string is the rollup row's real key. Collapsing the two would silently turn
+/// an unfiltered request into a rollup-only one.
+pub async fn list_transitions_filtered(
+    alert_id: &str,
+    group_key: Option<&str>,
+    limit: u64,
+) -> Result<Vec<StateTransition>, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    Ok(alert_state_transitions::Entity::find()
-        .filter(alert_state_transitions::Column::AlertId.eq(alert_id))
+    let mut query = alert_state_transitions::Entity::find()
+        .filter(alert_state_transitions::Column::AlertId.eq(alert_id));
+    if let Some(key) = group_key {
+        query = query.filter(alert_state_transitions::Column::GroupKey.eq(key));
+    }
+    Ok(query
         .order_by_desc(alert_state_transitions::Column::At)
         .limit(limit)
         .all(client)
@@ -186,6 +304,8 @@ pub async fn list_transitions(
                 from_level: m.from_level.and_then(AlertLevel::from_i32),
                 to_level: m.to_level.and_then(AlertLevel::from_i32),
                 at: m.at,
+                value: m.value,
+                group_labels: m.group_labels,
             })
         })
         .collect())
@@ -233,6 +353,12 @@ mod tests {
             level: None,
             level_since: None,
             level_at: None,
+            last_seen: Some(1_750_000_000_000_000),
+            group_labels: None,
+            groups_observed: None,
+            groups_firing: None,
+            groups_observed_is_lower_bound: None,
+            groups_firing_is_lower_bound: None,
         }
     }
 
@@ -284,5 +410,74 @@ mod tests {
             s.is_firing(),
             "a delivery failure must still count as a firing"
         );
+    }
+
+    // ── Group lifecycle columns (Feature 3) ─────────────────────────────────
+    // These carry everything the group UI renders. A column added to the
+    // migration and the entity but dropped in this conversion fails silently:
+    // the write succeeds, the read returns None, and the feature just looks
+    // broken with nothing in the logs.
+
+    #[test]
+    fn test_group_lifecycle_columns_survive_the_roundtrip() {
+        let mut m = model(Some(RunOutcome::Firing.to_i32()));
+        m.group_key = "abc123".to_string();
+        m.last_seen = Some(1_750_000_000_000_000);
+        m.group_labels = Some("host=web-1,env=prod".to_string());
+        m.level = Some(AlertLevel::Critical.to_i32());
+        m.level_since = Some(1_749_000_000_000_000);
+        m.level_at = Some(1_750_000_000_000_000);
+
+        let s: AlertState = m.into();
+        assert_eq!(s.group_key, "abc123");
+        assert_eq!(s.last_seen, Some(1_750_000_000_000_000));
+        assert_eq!(s.group_labels.as_deref(), Some("host=web-1,env=prod"));
+        assert_eq!(s.level, Some(AlertLevel::Critical));
+        assert_eq!(s.level_since, Some(1_749_000_000_000_000));
+        assert_eq!(s.level_at, Some(1_750_000_000_000_000));
+    }
+
+    #[test]
+    fn test_group_counts_survive_the_roundtrip() {
+        let mut m = model(Some(RunOutcome::Firing.to_i32()));
+        m.groups_observed = Some(900);
+        m.groups_firing = Some(120);
+
+        let s: AlertState = m.into();
+        assert_eq!(s.groups_observed, Some(900));
+        assert_eq!(
+            s.groups_firing,
+            Some(120),
+            "the chip reads this straight off the stored row"
+        );
+    }
+
+    #[test]
+    fn test_lower_bound_markers_survive_the_roundtrip_independently() {
+        // They must not collapse into one another: the divergent case — a full
+        // page that reached healthy groups — is exactly `observed = true,
+        // firing = false`, and it is the common one.
+        let mut m = model(Some(RunOutcome::Firing.to_i32()));
+        m.groups_observed_is_lower_bound = Some(true);
+        m.groups_firing_is_lower_bound = Some(false);
+
+        let s: AlertState = m.into();
+        assert_eq!(s.groups_observed_is_lower_bound, Some(true));
+        assert_eq!(s.groups_firing_is_lower_bound, Some(false));
+    }
+
+    #[test]
+    fn test_legacy_rows_read_back_as_unknown_not_as_false() {
+        // NULL on these columns means "written before the column existed". It
+        // must stay `None` rather than degrading to `Some(false)`: `last_seen`
+        // in particular is read as *unknown* by `group_fate`, and reading it as
+        // a real value would resolve or reap every legacy row on the first
+        // sweep after upgrade.
+        let s: AlertState = model(Some(RunOutcome::Firing.to_i32())).into();
+        assert_eq!(s.groups_observed, None);
+        assert_eq!(s.groups_firing, None);
+        assert_eq!(s.groups_observed_is_lower_bound, None);
+        assert_eq!(s.groups_firing_is_lower_bound, None);
+        assert_eq!(s.group_labels, None);
     }
 }

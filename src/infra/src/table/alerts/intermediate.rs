@@ -120,6 +120,12 @@ pub struct QueryAggregation {
     /// still deserialize — absent = single-level.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub warning_value: Option<f64>,
+    /// Per-group evaluation opt-in (alerts_2.md M-9). `#[serde(default)]` for
+    /// the same reason as `warning_value`: rows written before this field
+    /// existed must read back as `false`, which is what keeps every
+    /// pre-existing grouped alert on its legacy evaluation path.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub multi_alert: bool,
 }
 
 impl From<MetaAggregation> for QueryAggregation {
@@ -129,6 +135,7 @@ impl From<MetaAggregation> for QueryAggregation {
             function: value.function.into(),
             having: value.having.into(),
             warning_value: value.warning_value,
+            multi_alert: value.multi_alert,
         }
     }
 }
@@ -140,6 +147,7 @@ impl From<QueryAggregation> for MetaAggregation {
             function: value.function.into(),
             having: value.having.into(),
             warning_value: value.warning_value,
+            multi_alert: value.multi_alert,
         }
     }
 }
@@ -1432,6 +1440,7 @@ mod tests {
     fn test_query_aggregation_from_meta() {
         let meta = MetaAggregation {
             warning_value: None,
+            multi_alert: false,
             group_by: Some(vec!["service".to_string()]),
             function: MetaAggFunction::Count,
             having: MetaCondition {
@@ -1455,6 +1464,7 @@ mod tests {
     fn test_meta_aggregation_from_query_aggregation() {
         let qa = QueryAggregation {
             warning_value: None,
+            multi_alert: false,
             group_by: None,
             function: AggFunction::Avg,
             having: QueryCondition {
