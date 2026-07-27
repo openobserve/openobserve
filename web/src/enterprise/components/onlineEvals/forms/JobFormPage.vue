@@ -333,7 +333,6 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import useStreams from "@/composables/useStreams";
 import onlineEvalsService, {
   type EvalJob,
-  type EvalTargetScope,
   type Scorer,
   type SpanSelector,
 } from "@/services/online-evals.service";
@@ -360,6 +359,7 @@ import { buildConditionsString } from "@/utils/alerts/conditionsFormatter";
 import {
   buildJobInputMappingPayload,
   normalizeJobInputMappings,
+  scorerUsesSpans,
   syncJobInputMappings,
 } from "../utils/jobMappings";
 import {
@@ -718,6 +718,7 @@ function syncMappings() {
     props.scorers,
     inputMappings.value,
     scorerVersions.value,
+    formValues.value.targetScope,
   );
   inputMappings.value = nextMappings;
   scorerVersions.value = nextVersions;
@@ -740,14 +741,15 @@ async function onSubmit(value: JobForm) {
     showError(new Error(t("onlineEvals.job.selectAtLeastOne")), t("onlineEvals.job.saveError"));
     return;
   }
-  // Mirrors the backend's validate_for_activation(): EVERY trace scorer needs a
-  // Span Selector binding, whether or not its prompt uses {{ spans }}. Keep this
-  // in step with online_eval_jobs.rs — relaxing it here just trades a clear
-  // client-side message for a server rejection.
+  const scorersMissingSpanSelectors = selectedScorers.value.filter(
+    (scorer) =>
+      scorerUsesSpans(scorer, inputMappings.value[entityId(scorer)]) &&
+      !spanSelectorBindings.value[entityId(scorer)],
+  );
   if (
     value.targetScope === "trace" &&
     (activateOnSave.value || (props.mode === "edit" && props.row?.status === "active")) &&
-    value.scorerIds.some((scorerId) => !spanSelectorBindings.value[scorerId])
+    scorersMissingSpanSelectors.length
   ) {
     showError(
       new Error(t("onlineEvals.job.spanSelector.validation.binding")),
@@ -776,11 +778,7 @@ async function onSubmit(value: JobForm) {
         id,
         version: scorerVersions.value[id] ?? null,
       })),
-      inputMapping: buildJobInputMappingPayload(
-        value.scorerIds,
-        inputMappings.value,
-        value.targetScope as EvalTargetScope,
-      ),
+      inputMapping: buildJobInputMappingPayload(value.scorerIds, inputMappings.value),
       spanSelectors: value.targetScope === "trace" ? spanSelectors.value : [],
       spanSelectorBindings: value.targetScope === "trace" ? spanSelectorBindings.value : {},
       ...completionConfigs,

@@ -15,7 +15,7 @@
           class="gap-1 font-medium"
           @click="systemVariablesDrawerOpen = true"
         >
-          <span>{{ t("alerts.alertSettings.helpLearnMore") }}</span>
+          <span>{{ t("onlineEvals.job.inputMapping.systemProvided.about") }}</span>
         </OButton>
       </div>
       <span class="text-input-help-text text-xs leading-none">{{
@@ -60,7 +60,7 @@
               <code
                 class="rounded-default bg-surface-subtle w-fit max-w-full px-1.5 py-0.5"
                 :data-test="`job-input-mapping-system-variable-${row.name}`"
-                >{{ formatTemplateVariable(row.name) }}</code
+                >{{ row.name }}</code
               >
             </template>
 
@@ -112,13 +112,8 @@
             }}
           </span>
         </div>
-        <!-- The binding is per SCORER, not per variable: the backend's
-             validate_for_activation() requires one for EVERY trace scorer,
-             whether or not its prompt uses {{ spans }}. Rendering it inside the
-             `spans` row made it unreachable for scorers without that variable,
-             so activation could be blocked with no way to satisfy it. -->
         <div
-          v-if="targetScope === 'trace'"
+          v-if="targetScope === 'trace' && scorerUsesSpans(scorer, inputMappings[entityId(scorer)])"
           class="border-dialog-header-border flex flex-col gap-1 border-b px-3 py-2"
           :data-test="`job-input-mapping-span-selector-${entityId(scorer)}`"
         >
@@ -136,8 +131,6 @@
               @update:binding="updateSpanSelectorBinding(entityId(scorer), $event)"
             />
           </div>
-          <!-- Required with no explanation is why this read as arbitrary: say
-               what a selector does and why a trace needs one. -->
           <span class="text-2xs text-text-secondary leading-[1.4]">
             {{ t("onlineEvals.job.spanSelector.bindingHelp") }}
           </span>
@@ -147,50 +140,37 @@
           <div
             v-for="variable in variablesFor(scorer)"
             :key="`${entityId(scorer)}-${variable}`"
-            class="grid grid-cols-[minmax(8.125rem,0.35fr)_minmax(0,1fr)] items-start gap-2.5"
+            class="grid grid-cols-[minmax(8.125rem,0.35fr)_minmax(0,1fr)] items-center gap-2.5"
+            :data-test="`job-input-mapping-row-${entityId(scorer)}-${variable}`"
           >
-            <code
-              class="rounded-default bg-surface-subtle mt-0.5 truncate overflow-hidden px-2 py-1.25"
-              >{{ formatTemplateVariable(variable) }}</code
-            >
-            <div
-              v-if="isSystemProvided(variable)"
-              class="flex min-h-7 flex-wrap items-center gap-x-2 gap-y-1 px-1 py-1.5"
-              :data-test="`job-input-mapping-system-provided-${entityId(scorer)}-${variable}`"
-            >
-              <!-- Auto-filled rows stay quiet: an icon plus where the value
-                   comes from. A badge on every row shouted the one thing that
-                   is true of most rows, which is what made the list read as
-                   noise rather than as a list. `spans` reads the same way — the
-                   selector that fills it is bound once per scorer above. -->
-              <OIcon name="bolt" size="xs" class="text-text-tertiary shrink-0" />
-              <span class="text-2xs text-text-secondary leading-[1.4]">
-                {{ systemProvidedDescription(variable) }}
-              </span>
+            <code class="rounded-default bg-surface-subtle truncate overflow-hidden px-2 py-1.25">{{
+              formatTemplateVariable(variable)
+            }}</code>
+            <div class="flex min-w-0 items-center gap-1.5">
+              <OSelect
+                class="min-w-0 flex-1"
+                size="sm"
+                searchable
+                :options="mappingOptions"
+                :model-value="inputMappings[entityId(scorer)]?.[variable] || ''"
+                :placeholder="t('onlineEvals.job.inputMapping.placeholder')"
+                :search-placeholder="t('onlineEvals.job.inputMapping.searchPlaceholder')"
+                :data-test="`job-input-mapping-select-${entityId(scorer)}-${variable}`"
+                @update:model-value="
+                  updateMapping(entityId(scorer), variable, String($event ?? ''))
+                "
+              />
+              <OButton
+                type="button"
+                variant="ghost-muted"
+                size="icon-chip"
+                icon-left="content-copy"
+                :aria-label="t('common.copy')"
+                :title="t('common.copy')"
+                :data-test="`job-input-mapping-copy-${entityId(scorer)}-${variable}`"
+                @click="copyMapping(entityId(scorer), variable)"
+              />
             </div>
-            <OInput
-              v-else
-              class="group min-w-0 font-mono"
-              size="sm"
-              :model-value="inputMappings[entityId(scorer)]?.[variable] || ''"
-              :placeholder="defaultJobMappingValue(variable)"
-              :data-test="`job-input-mapping-input-${entityId(scorer)}-${variable}`"
-              @update:model-value="updateMapping(entityId(scorer), variable, String($event ?? ''))"
-            >
-              <template #icon-right>
-                <OButton
-                  type="button"
-                  variant="ghost-muted"
-                  size="icon-chip"
-                  icon-left="content-copy"
-                  class="pointer-events-none opacity-0 transition-opacity group-focus-within:pointer-events-auto group-focus-within:opacity-100 group-hover:pointer-events-auto group-hover:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100"
-                  :aria-label="t('common.copy')"
-                  :title="t('common.copy')"
-                  :data-test="`job-input-mapping-copy-${entityId(scorer)}-${variable}`"
-                  @click="copyMapping(entityId(scorer), variable)"
-                />
-              </template>
-            </OInput>
           </div>
         </div>
         <div
@@ -208,19 +188,23 @@
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import type { EvalTargetScope, Scorer, SpanSelector } from "@/services/online-evals.service";
 import { copyToClipboard } from "@/utils/clipboard";
+import { DEFAULT_JOB_STREAM_FIELDS } from "../../utils/defaultStreamFields";
 import { entityId, scorerTypeOf } from "../../utils/evalEntity";
 import { formatTemplateVariable } from "../../utils/evalFormat";
-import { defaultJobMappingValue, jobMappingVariablesForScorer } from "../../utils/jobMappings";
 import {
-  isSystemProvidedVariable,
+  defaultJobMappingValue,
+  jobMappingVariablesForScorer,
+  scorerUsesSpans,
+} from "../../utils/jobMappings";
+import {
   systemProvidedVariablesForScope,
   type SystemProvidedVariable,
 } from "../../utils/systemProvidedVariables";
@@ -264,6 +248,48 @@ const systemProvidedDescriptionText = computed(() =>
   }),
 );
 const systemProvidedVariables = computed(() => systemProvidedVariablesForScope(props.targetScope));
+const mappingStreamFields = computed(() =>
+  props.streamFields.length ? props.streamFields : DEFAULT_JOB_STREAM_FIELDS,
+);
+const mappingOptions = computed<SelectOption[]>(() => {
+  const options: SelectOption[] = [];
+  const systemValues = new Set<string>();
+
+  if (systemProvidedVariables.value.length) {
+    options.push({
+      label: t("onlineEvals.job.inputMapping.groups.systemProvided", {
+        scope: targetScopeName.value.toLowerCase(),
+      }),
+      header: true,
+    });
+    systemProvidedVariables.value.forEach(({ name }) => {
+      const value = mappingExpression(name);
+      systemValues.add(value);
+      options.push({
+        label: name,
+        value,
+      });
+    });
+  }
+
+  const seenAttributes = new Set<string>();
+  const attributeOptions = mappingStreamFields.value.flatMap((field) => {
+    const value = mappingExpression(field.value);
+    if (systemValues.has(value) || seenAttributes.has(value)) return [];
+    seenAttributes.add(value);
+    return [{ label: field.label, value }];
+  });
+
+  if (attributeOptions.length) {
+    options.push({
+      label: t("onlineEvals.job.inputMapping.groups.spanAttributes"),
+      header: true,
+    });
+    options.push(...attributeOptions);
+  }
+
+  return options;
+});
 const systemProvidedColumns = computed<OTableColumnDef<SystemProvidedVariable>[]>(() => [
   {
     id: "variable",
@@ -292,22 +318,18 @@ const systemProvidedColumns = computed<OTableColumnDef<SystemProvidedVariable>[]
   },
 ]);
 
-function isSystemProvided(variable: string) {
-  return isSystemProvidedVariable(props.targetScope, variable);
-}
-
-function systemProvidedDescription(variable: string) {
-  return t(
-    `onlineEvals.job.inputMapping.systemProvided.variables.${variable}.${props.targetScope}`,
-  );
-}
-
 function variablesFor(scorer: Scorer) {
   return jobMappingVariablesForScorer(scorer, props.inputMappings[entityId(scorer)]);
 }
 
+function mappingExpression(source: string) {
+  return `{{${source.trim()}}}`;
+}
+
 function copyMapping(scorerId: string, variable: string) {
-  const value = props.inputMappings[scorerId]?.[variable] || defaultJobMappingValue(variable);
+  const value =
+    props.inputMappings[scorerId]?.[variable] ||
+    defaultJobMappingValue(variable, props.targetScope);
   void copyToClipboard(value, {
     successMessage: t("common.copySuccess"),
   });
