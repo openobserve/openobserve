@@ -9740,6 +9740,7 @@
       "error": "Error",
       "failed": "Failed",
       "init": "init",
+      "loading": "Loading run details",
       "location": "Location",
       "notFound": "Run not found",
       "passed": "Passed",
