@@ -2753,24 +2753,16 @@ async fn widen_varchar_column(
     Ok(())
 }
 
-/// Apply column width compatibility for VARCHAR columns widened after release:
-/// - file: widened to VARCHAR(1024)
-/// - account: after introducing org_storage the account can hold org_id:default and org_id is
-///   restricted to 100 characters, so widened to VARCHAR(128) from the original 32
+/// Apply column width compatibility for VARCHAR(file).
 async fn apply_column_width_compat(pool: &sqlx::Pool<Postgres>) -> Result<()> {
-    let file_tables = [
+    let tables = [
         "file_list",
         "file_list_history",
         "file_list_deleted",
         "file_list_dump_stats",
     ];
-    for table in &file_tables {
+    for table in &tables {
         widen_varchar_column(pool, table, "file", FILE_COLUMN_TARGET_WIDTH).await?;
-    }
-
-    let account_tables = ["file_list", "file_list_history", "file_list_deleted"];
-    for table in &account_tables {
-        widen_varchar_column(pool, table, "account", ACCOUNT_COLUMN_TARGET_WIDTH).await?;
     }
     Ok(())
 }
@@ -3039,6 +3031,12 @@ CREATE TABLE IF NOT EXISTS stream_stats
     if cfg.common.meta_partition_mode == "auto" {
         apply_autovacuum_tuning(&pool).await?;
         apply_column_width_compat(&pool).await?;
+    }
+
+    // after introducing org_storage, the account can have value of org_id:default,
+    // and we restrict org_id to 100 characters so here we change it to 128 from original 32
+    for table in &["file_list", "file_list_history", "file_list_deleted"] {
+        widen_varchar_column(&pool, table, "account", ACCOUNT_COLUMN_TARGET_WIDTH).await?;
     }
 
     Ok(())
