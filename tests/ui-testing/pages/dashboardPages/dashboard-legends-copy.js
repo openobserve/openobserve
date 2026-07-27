@@ -204,7 +204,12 @@ export default class DashboardLegendsCopy {
     const dataRows = this.dashboardTable
       .locator('[data-test^="o2-table-row-"]')
       .filter({ has: this.page.locator('[data-test^="o2-table-cell-"]') });
-    return dataRows.nth(rowIndex).locator('[data-test^="o2-table-cell-"]').nth(colIndex);
+    return dataRows
+      .nth(rowIndex)
+      .locator(
+        '[data-test^="o2-table-cell-"]:not([data-test^="o2-table-cell-copy-"]):not([data-test^="o2-table-cell-hover-actions-"])'
+      )
+      .nth(colIndex);
   }
 
   /**

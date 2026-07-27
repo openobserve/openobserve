@@ -348,6 +348,7 @@ function onCellActionsLeave() {
       v-if="enableCellCopy && !$slots.default"
       type="button"
       :data-test="`o2-table-cell-copy-${cell.column.id}`"
+      :data-copied="copied ? 'true' : undefined"
       class="bg-surface-base border-border-default rounded-default text-text-muted hover:text-text-body absolute top-1/2 right-1 -translate-y-1/2 cursor-pointer border p-0.5 leading-none opacity-0 transition-opacity group-hover/cell:opacity-100"
       :title="copied ? 'Copied!' : 'Copy'"
       @click="handleCopy"
