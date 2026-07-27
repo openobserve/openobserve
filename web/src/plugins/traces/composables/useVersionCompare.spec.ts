@@ -432,8 +432,11 @@ describe("useVersionCompare — sketch endpoint (Task 7)", () => {
     mockCompareAgentVersions.mockResolvedValue({
       data: {
         p50: sufficientDelta(100, 100, 0, -5, 5), // straddles zero
-        p95: sufficientDelta(300, 200, 100, 20, 180), // clear regression, up-worse
-        p99: sufficientDelta(500, 400, 100, 20, 180),
+        // Clear p95 regression: B is HIGHER than A (delta = A - B < 0, CI
+        // entirely negative), so verdict resolves to "higher" per the
+        // classifyVerdict contract (delta<0 ⇒ B regressed ⇒ higher).
+        p95: sufficientDelta(200, 300, -100, -180, -20),
+        p99: sufficientDelta(400, 500, -100, -180, -20),
         cost: sufficientDelta(0.01, 0.01, 0, -0.001, 0.001),
       },
     });

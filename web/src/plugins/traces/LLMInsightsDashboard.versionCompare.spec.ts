@@ -31,6 +31,9 @@ const mockGetStreams = vi.fn().mockResolvedValue({
 });
 const mockListAgents = vi.fn();
 const mockListVersionsForCompare = vi.fn();
+// Sketch-merge compare endpoint: default to no data so run() uses the
+// raw-sample fallback. Individual tests can override the resolved value.
+const mockCompareAgentVersions = vi.fn().mockResolvedValue({ data: null });
 const mockRouterPush = vi.fn();
 
 import { ref } from "vue";
@@ -80,11 +83,19 @@ vi.mock("@/composables/useStreams", () => ({
 
 // useVersionCompare's raw-sample query runner rides fetchQueryDataWithHttpStream
 // directly (same transport as useLLMInsights, but not through the mocked
-// composable) — stub it to resolve with zero hits so `run()` completes without
-// hitting a real streaming client.
+// composable) — stub it to resolve with a spread of raw-sample hits so `run()`
+// completes without a real streaming client AND the overlay chart has >=2
+// plottable points per series (a single bucket renders the low-res placeholder
+// instead of the chart). Each hit carries the `duration`/`cost` fields
+// fetchRawSample reads.
+const RAW_SAMPLE_HITS = Array.from({ length: 50 }, (_, i) => ({
+  duration: 1000 + i * 100,
+  cost: 0.01 + i * 0.001,
+}));
 vi.mock("@/composables/useStreamingSearch", () => ({
   default: () => ({
     fetchQueryDataWithHttpStream: (_req: any, handlers: any) => {
+      handlers.data?.({}, { content: { results: { hits: RAW_SAMPLE_HITS } } });
       handlers.complete?.();
     },
     cancelStreamQueryBasedOnRequestId: vi.fn(),
@@ -96,6 +107,11 @@ vi.mock("@/services/gen-ai-agent-mapping.service", () => ({
     listAgents: (...args: any[]) => mockListAgents(...args),
     listVersionsForCompare: (...args: any[]) => mockListVersionsForCompare(...args),
   },
+  // Named export used directly by useVersionCompare.run(). Resolve with no data
+  // so the sketch-merge endpoint is judged insufficient and `run()` falls back
+  // to the raw-sample path (stubbed above to complete with zero hits), which
+  // still builds a CompareResult — the delta strip renders off that.
+  compareAgentVersions: (...args: any[]) => mockCompareAgentVersions(...args),
 }));
 
 vi.mock("vue-i18n", () => ({
@@ -234,6 +250,17 @@ describe("LLMInsightsDashboard — version compare entry", () => {
 
 describe("LLMInsightsDashboard — compare mode surfaces", () => {
   it("entering compare mode renders the 5 compare surfaces and hides the single-select body; exit restores it", async () => {
+    // The overlay chart needs >=2 points per arm series or it renders the
+    // low-resolution placeholder instead of the chart. Both arms share the
+    // mocked useLLMInsights sparklines ref, so seed it with a multi-point cost
+    // series (that's what toOverlayPoints reads) to exercise the real chart.
+    mockSparklines.value = {
+      cost: [1, 2, 3, 4],
+      tokens: [10, 20, 30, 40],
+      traces: [1, 1, 1, 1],
+      p95Micros: [100, 200, 300, 400],
+      errorRate: [0, 0, 0, 0],
+    };
     const wrapper = mountDashboard();
     await flushPromises();
     await flushPromises();

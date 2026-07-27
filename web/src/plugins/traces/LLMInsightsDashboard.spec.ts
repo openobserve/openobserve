@@ -92,7 +92,10 @@ vi.mock("vue-i18n", () => ({
 
 vi.mock("vue-router", () => ({
   useRouter: () => ({ push: mockRouterPush, replace: vi.fn(() => Promise.resolve()) }),
-  useRoute: () => ({ query: {} }),
+  // This suite exercises the stream-mode paths. The dashboard now defaults to
+  // Agent scope and only `?type=stream` (NOT a saved preference) opts into
+  // Stream mode, so drive stream mode through the URL the way the component reads it.
+  useRoute: () => ({ query: { type: "stream" } }),
 }));
 
 // Partial-mock vuex so `createStore` (used by `src/stores/index.ts`)
@@ -177,10 +180,8 @@ beforeEach(() => {
   // Reset localStorage between tests so the dashboard's stream
   // initialisation doesn't bleed across cases.
   localStorage.clear();
-  // The dashboard defaults to Agent scope now ("the AI module is
-  // agent-centric"); this suite exercises the stream-mode paths, so opt into
-  // stream mode the way a returning user would — the persisted preference.
-  localStorage.setItem("llmInsights_filterMode", "stream");
+  // Stream mode is opted into via `?type=stream` in the useRoute mock above
+  // (the dashboard no longer reads a saved mode preference on init).
   // Default streams response.
   mockGetStreams.mockResolvedValue({
     list: [
