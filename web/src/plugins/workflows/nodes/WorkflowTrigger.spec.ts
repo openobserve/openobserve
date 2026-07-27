@@ -40,10 +40,10 @@ import { workflowObj } from "@/plugins/workflows/useWorkflowCanvas";
 import { TRIGGER_META_VARS } from "@/plugins/workflows/alertFields";
 import { buildTestSampleText } from "@/plugins/workflows/testSample";
 import { INCIDENT_EVENT_TYPES } from "@/plugins/workflows/incidentSample";
-import WorkflowAlertTrigger from "./WorkflowAlertTrigger.vue";
+import WorkflowTrigger from "./WorkflowTrigger.vue";
 
 function createWrapper() {
-  return mount(WorkflowAlertTrigger, {
+  return mount(WorkflowTrigger, {
     global: {
       plugins: [i18n, store],
       stubs: {
@@ -72,7 +72,7 @@ function createWrapper() {
   });
 }
 
-describe("WorkflowAlertTrigger", () => {
+describe("WorkflowTrigger", () => {
   beforeEach(() => {
     workflowObj.currentSelectedNodeData = null;
   });

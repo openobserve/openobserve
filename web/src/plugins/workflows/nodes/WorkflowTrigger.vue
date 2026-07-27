@@ -15,15 +15,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <!--
-  Alert Trigger node body (drawer content only — chrome lives in
-  WorkflowNodeDrawer). There's nothing to configure: the trigger kind is chosen
-  at workflow creation and alert association is handled from the alert side. So
-  this is a read-only *Outputs* reference of the payload the trigger emits when a
-  linked alert fires, so users know which fields they can use downstream.
+  Trigger node body (drawer content only — chrome lives in WorkflowNodeDrawer),
+  for EVERY trigger kind. There's nothing to configure: the kind is chosen at
+  workflow creation. So this is a read-only *Outputs* reference of the payload
+  the trigger emits, so users know which fields they can use downstream.
 
-  Payload shape (matches the alert template vars the backend substitutes in
-  service/alerts/alert.rs `process_dest_template`):
-    { "meta": { ...fixed alert fields... }, "data": [ { ...matched row... } ] }
+  Everything is resolved from the trigger registry (triggers.ts) by kind:
+  - Alert Fired → a single { meta, data[] } sample.
+  - Incident Event (kinds with `commonMetaKeys`) → a split view: a stable common
+    block + an event_type picker revealing each event's extra fields.
 
   submit() just carries the trigger_kind through (persisted in node.meta by
   WorkflowEditor); there are no editable fields.

@@ -52,8 +52,8 @@ const { triggerSubmit, conditionSubmit, functionSubmit, destinationSubmit, makeB
     }),
   }));
 
-vi.mock("@/plugins/workflows/nodes/WorkflowAlertTrigger.vue", () =>
-  makeBodyStub("WorkflowAlertTrigger", () => triggerSubmit()),
+vi.mock("@/plugins/workflows/nodes/WorkflowTrigger.vue", () =>
+  makeBodyStub("WorkflowTrigger", () => triggerSubmit()),
 );
 vi.mock("@/plugins/workflows/nodes/WorkflowCondition.vue", () =>
   makeBodyStub("WorkflowCondition", () => conditionSubmit()),
@@ -177,7 +177,7 @@ describe("WorkflowNodeDrawer", () => {
 
   describe("body switching", () => {
     it.each([
-      ["workflow_trigger", "WorkflowAlertTrigger"],
+      ["workflow_trigger", "WorkflowTrigger"],
       ["condition", "WorkflowCondition"],
       ["function", "WorkflowFunction"],
       ["destination", "WorkflowDestination"],
