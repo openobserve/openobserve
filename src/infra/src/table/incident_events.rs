@@ -21,11 +21,63 @@ use crate::{
     table::entity::incident_events,
 };
 
+/// Encode events for storage, surfacing failures instead of writing a null column.
+///
+/// `unwrap_or_default()` here would persist JSON `null`, erasing the timeline on a write
+/// that was meant to extend it. Propagating the error aborts the surrounding transaction
+/// and leaves the existing row untouched.
+fn encode_events(events: &[IncidentEvent]) -> Result<serde_json::Value, sea_orm::DbErr> {
+    serde_json::to_value(events)
+        .map_err(|e| sea_orm::DbErr::Custom(format!("serialize incident events: {e}")))
+}
+
+/// Decode a stored `events` JSON column into events.
+///
+/// Decodes element-wise rather than parsing the array as a whole: one malformed entry must
+/// not discard the entire timeline. Every caller that decodes then writes back (`append`,
+/// `record_alert`) would otherwise persist the truncated list, turning a transient read
+/// failure into permanent data loss.
+///
+/// Unknown-but-well-formed event types are preserved by `IncidentEventType::Unknown`, so
+/// they survive a read/write cycle on an older node during a rolling deploy.
+fn decode_events(org_id: &str, incident_id: &str, raw: &serde_json::Value) -> Vec<IncidentEvent> {
+    let Some(items) = raw.as_array() else {
+        if !raw.is_null() {
+            log::error!(
+                "[INCIDENTS] events column for {org_id}/{incident_id} is not an array; \
+                 ignoring stored value"
+            );
+        }
+        return vec![];
+    };
+
+    let mut events = Vec::with_capacity(items.len());
+    let mut dropped = 0usize;
+    for item in items {
+        match serde_json::from_value::<IncidentEvent>(item.clone()) {
+            Ok(event) => events.push(event),
+            Err(e) => {
+                dropped += 1;
+                log::error!(
+                    "[INCIDENTS] skipping undecodable event for {org_id}/{incident_id}: {e}"
+                );
+            }
+        }
+    }
+    if dropped > 0 {
+        log::error!(
+            "[INCIDENTS] dropped {dropped} of {} events for {org_id}/{incident_id}",
+            items.len()
+        );
+    }
+    events
+}
+
 /// Initialize events row for a new incident with a Created event
 pub async fn init(org_id: &str, incident_id: &str) -> Result<(), sea_orm::DbErr> {
     let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let event = IncidentEvent::created();
-    let events_json = serde_json::to_value(vec![event]).unwrap_or_default();
+    let events_json = encode_events(&[event])?;
 
     let model = incident_events::ActiveModel {
         org_id: Set(org_id.to_string()),
@@ -46,11 +98,7 @@ pub async fn get(org_id: &str, incident_id: &str) -> Result<Vec<IncidentEvent>, 
         .await?;
 
     match row {
-        Some(model) => {
-            let events: Vec<IncidentEvent> =
-                serde_json::from_value(model.events.clone()).unwrap_or_default();
-            Ok(events)
-        }
+        Some(model) => Ok(decode_events(org_id, incident_id, &model.events)),
         None => Ok(vec![]),
     }
 }
@@ -72,17 +120,17 @@ pub async fn append(
 
     match row {
         Some(model) => {
-            let mut events: Vec<IncidentEvent> =
-                serde_json::from_value(model.events.clone()).unwrap_or_default();
+            let mut events = decode_events(org_id, incident_id, &model.events);
             events.push(event);
+            let events_json = encode_events(&events)?;
 
             let mut active: incident_events::ActiveModel = model.into();
-            active.events = Set(serde_json::to_value(events).unwrap_or_default());
+            active.events = Set(events_json);
             active.update(&txn).await?;
         }
         None => {
             // Row doesn't exist yet (incident created before events table)
-            let events_json = serde_json::to_value(vec![event]).unwrap_or_default();
+            let events_json = encode_events(&[event])?;
             let model = incident_events::ActiveModel {
                 org_id: Set(org_id.to_string()),
                 incident_id: Set(incident_id.to_string()),
@@ -118,8 +166,7 @@ pub async fn record_alert(
 
     match row {
         Some(model) => {
-            let mut events: Vec<IncidentEvent> =
-                serde_json::from_value(model.events.clone()).unwrap_or_default();
+            let mut events = decode_events(org_id, incident_id, &model.events);
 
             // Scan backwards through the trailing block of Alert events.
             // If a matching alert_id is found within that block, increment it.
@@ -140,9 +187,10 @@ pub async fn record_alert(
             if !compacted {
                 events.push(IncidentEvent::alert(alert_id, alert_name, triggered_at));
             }
+            let events_json = encode_events(&events)?;
 
             let mut active: incident_events::ActiveModel = model.into();
-            active.events = Set(serde_json::to_value(events).unwrap_or_default());
+            active.events = Set(events_json);
             active.update(&txn).await?;
         }
         None => {
@@ -151,7 +199,7 @@ pub async fn record_alert(
             let model = incident_events::ActiveModel {
                 org_id: Set(org_id.to_string()),
                 incident_id: Set(incident_id.to_string()),
-                events: Set(serde_json::to_value(events).unwrap_or_default()),
+                events: Set(encode_events(&events)?),
             };
             model.insert(&txn).await?;
         }
