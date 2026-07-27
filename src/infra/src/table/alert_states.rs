@@ -1290,12 +1290,20 @@ mod tests {
     const RACE_ROUNDS: usize = 60;
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
-    async fn test_a_stale_failure_never_wins_a_race_against_a_success() {
-        // The attempt anchor under contention. Both callbacks belong to ONE
-        // episode, so the episode guard cannot separate them — only the
-        // enqueue-time delivery-state anchor can. If the failure lands after
-        // the success, it must be refused; a group that was paged must never
-        // read as NotifyFailed and re-page next cycle.
+    async fn test_racing_callbacks_leave_a_coherent_row() {
+        // Two callbacks for one episode, racing.
+        //
+        // Named for what it can actually distinguish. It does NOT verify the
+        // attempt anchor: measured by deleting the anchor predicates from the
+        // SQL, this test still passes. Both orderings end at the same
+        // observable row — success-then-failure with a BROKEN anchor looks
+        // exactly like failure-then-success with a correct one — so the
+        // guarantee is simply not recoverable from the final state. It is
+        // asserted deterministically instead, in
+        // `test_an_older_same_episode_failure_cannot_land_after_a_newer_success`.
+        //
+        // What it does establish: whatever the interleaving, the row is never
+        // left internally inconsistent.
         let db = test_db().await;
 
         for round in 0..RACE_ROUNDS {
@@ -1439,6 +1447,91 @@ mod tests {
                 read.last_seen,
                 Some(7_777),
                 "round {round}: the callback rolled the observation back (row={read:?})"
+            );
+        }
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn test_a_failure_callback_never_rolls_back_a_concurrent_evaluation() {
+        // The write-preservation invariant for the FAILURE path, which writes
+        // different columns from the success path and so needs its own
+        // coverage.
+        //
+        // The shape that has to stay correct: the callback decides from a row
+        // it read, and the failure's contract is expressed as a whole
+        // `AlertState`. Persisting that snapshot wholesale — which the ordinary
+        // state upsert does — would write back `last_seen` and `level_at` as
+        // they were before a concurrent evaluation committed. Rolling back
+        // `last_seen` is not cosmetic: it is M-7's disappearance clock, so an
+        // unlucky callback could age a live group toward resolution.
+        //
+        // Discriminating power, measured: LOW. Adding `last_seen` to the
+        // failure path's SET clause does NOT make this fail, because the
+        // callback's read and write share one SQLite transaction and the
+        // stale-snapshot window never opens. What this pins is the INVARIANT
+        // (observation columns survive a delivery callback) rather than the
+        // mechanism enforcing it; it would catch a non-transactional
+        // implementation, and it documents which columns each writer owns.
+        let db = test_db().await;
+
+        for round in 0..RACE_ROUNDS {
+            let alert_id = unique_alert_id(&format!("race-failure-writes-{round}"));
+            persist_with(
+                db,
+                &update_of(group_row(&alert_id, "g1", AlertLevel::Critical, 1_000)),
+            )
+            .await
+            .unwrap();
+
+            // Same episode, so the callback stays legitimate; only the
+            // observation columns move underneath it.
+            let episode = DeliveryEpisode {
+                level: AlertLevel::Critical,
+                level_since: 1_000,
+                notified_at_enqueue: (None, None),
+            };
+            let mut refreshed = group_row(&alert_id, "g1", AlertLevel::Critical, 1_000);
+            refreshed.last_seen = Some(8_888);
+            refreshed.level_at = Some(8_888);
+
+            let evaluation =
+                tokio::spawn(async move { persist_with(db, &update_of(refreshed)).await });
+            let cb_id = alert_id.clone();
+            let callback = tokio::spawn(async move {
+                advance_delivery_state_with(
+                    db,
+                    &cb_id,
+                    "g1",
+                    episode,
+                    DeliveryOutcome::Failed { at: 1_600 },
+                )
+                .await
+            });
+            evaluation.await.unwrap().unwrap();
+            assert!(
+                callback.await.unwrap().unwrap(),
+                "round {round}: the callback's episode was current"
+            );
+
+            let read = get_with(db, &alert_id, "g1").await.unwrap().unwrap();
+
+            // Deliberately NOT asserted: that the row still reads
+            // `NotifyFailed`. The outcome axis is EVALUATION's — it is in the
+            // upsert's conflict list — so an evaluation landing after the
+            // callback legitimately supersedes the failure with its own
+            // observation. In production that is the cross-cycle reconciliation
+            // the design relies on (a failure recorded this cycle is replaced by
+            // next cycle's observed outcome). Only the columns the two writers
+            // do NOT share are invariant, and those are what this checks.
+            assert_eq!(
+                read.last_seen,
+                Some(8_888),
+                "round {round}: the callback rolled M-7's clock back (row={read:?})"
+            );
+            assert_eq!(
+                read.level_at,
+                Some(8_888),
+                "round {round}: the callback rolled the freshness clock back (row={read:?})"
             );
         }
     }
