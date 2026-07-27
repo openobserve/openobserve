@@ -103,6 +103,45 @@ fn row_group_key(alert: &Alert, row: &Map<String, Value>) -> Option<String> {
     Some(config::meta::alerts::grouping::group_key(&labels))
 }
 
+/// What one pass of [`apply_deduplication`] decided.
+pub struct DeduplicationOutcome {
+    /// The rows that survived deduplication and should be notified on.
+    pub rows: Vec<Map<String, Value>>,
+    /// Whether deduplication actually ran (it is opt-in per alert).
+    pub applied: bool,
+    /// Fingerprints RESERVED by this pass — recorded as seen but not yet
+    /// confirmed as delivered (§5.5 MN-6).
+    ///
+    /// The caller must pass these to [`confirm_notification_sent`] once the
+    /// notification actually goes out. Until it does, they do not suppress:
+    /// that is what lets a failed send be retried instead of being swallowed
+    /// as a duplicate for the rest of the window.
+    pub reserved: Vec<String>,
+}
+
+/// Confirm reservations whose notification was delivered (§5.5 MN-6).
+///
+/// Called only after a successful send. Anything left unconfirmed is treated
+/// as a delivery that never happened, so the next evaluation is allowed
+/// through — no retry bookkeeping required.
+pub async fn confirm_notification_sent(
+    db: &DatabaseConnection,
+    fingerprints: &[String],
+) -> Result<(), sea_orm::DbErr> {
+    if fingerprints.is_empty() {
+        return Ok(());
+    }
+    alert_dedup_state::Entity::update_many()
+        .col_expr(
+            alert_dedup_state::Column::NotificationSent,
+            sea_orm::sea_query::Expr::value(true),
+        )
+        .filter(alert_dedup_state::Column::Fingerprint.is_in(fingerprints.to_vec()))
+        .exec(db)
+        .await?;
+    Ok(())
+}
+
 /// Get or create deduplication state
 pub async fn get_dedup_state(
     db: &DatabaseConnection,
@@ -218,11 +257,18 @@ pub async fn apply_deduplication(
     alert: &Alert,
     result_rows: Vec<Map<String, Value>>,
     level: Option<config::meta::alerts::level::AlertLevel>,
-) -> Result<(Vec<Map<String, Value>>, bool), sea_orm::DbErr> {
+) -> Result<DeduplicationOutcome, sea_orm::DbErr> {
     // Check if per-alert deduplication is enabled
     let dedup_config = match &alert.deduplication {
         Some(config) if config.enabled => config,
-        _ => return Ok((result_rows, false)), // Deduplication disabled, return all rows
+        // Deduplication disabled, return all rows
+        _ => {
+            return Ok(DeduplicationOutcome {
+                rows: result_rows,
+                applied: false,
+                reserved: Vec::new(),
+            });
+        }
     };
 
     // Get semantic groups from system_settings — the single source of truth
@@ -245,7 +291,11 @@ pub async fn apply_deduplication(
         level,
     )
     .await
-    .map(|result| (result, true))
+    .map(|(rows, reserved)| DeduplicationOutcome {
+        rows,
+        applied: true,
+        reserved,
+    })
 }
 
 /// Enterprise implementation of apply_deduplication
@@ -257,7 +307,7 @@ async fn apply_deduplication_impl(
     org_config: Option<&GlobalDeduplicationConfig>,
     semantic_groups: &[config::meta::correlation::FieldAlias],
     level: Option<config::meta::alerts::level::AlertLevel>,
-) -> Result<Vec<Map<String, Value>>, sea_orm::DbErr> {
+) -> Result<(Vec<Map<String, Value>>, Vec<String>), sea_orm::DbErr> {
     let now = o2_enterprise::enterprise::alerts::dedup::current_timestamp_micros();
     let alert_id = alert.get_unique_key();
     let org_id = &alert.org_id;
@@ -269,6 +319,8 @@ async fn apply_deduplication_impl(
     );
 
     let mut deduplicated_rows = Vec::new();
+    // Reserved but unconfirmed until the notification actually lands.
+    let mut reserved = Vec::new();
 
     for row in result_rows {
         let fingerprint = calculate_fingerprint(
@@ -280,9 +332,21 @@ async fn apply_deduplication_impl(
             level,
         );
 
-        // Check if this fingerprint exists and is within time window
+        // A reservation suppresses only once a delivery has CONFIRMED it
+        // (§5.5 MN-6). Recording the fingerprint when a row merely *passes*
+        // dedup — which is what happens below — means a send that then fails
+        // is suppressed as a duplicate on every later evaluation while
+        // `last_seen_at` keeps extending the window: one transient webhook
+        // error swallows the page for the whole window. `notification_sent`
+        // has existed on this table since the feature shipped and was never
+        // read; it is the confirm flag.
         let should_send = match get_dedup_state(db, &fingerprint).await? {
-            Some(existing_state) if is_within_window(&existing_state, time_window_minutes) => {
+            Some(existing_state)
+                if config::meta::alerts::deduplication::reservation_suppresses(
+                    existing_state.notification_sent,
+                    is_within_window(&existing_state, time_window_minutes),
+                ) =>
+            {
                 // Within window - update occurrence count but don't send
                 if let Err(e) = save_dedup_state(
                     db,
@@ -366,8 +430,9 @@ async fn apply_deduplication_impl(
             );
 
             deduplicated_rows.push(row);
+            reserved.push(fingerprint);
         }
     }
 
-    Ok(deduplicated_rows)
+    Ok((deduplicated_rows, reserved))
 }

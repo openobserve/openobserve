@@ -360,6 +360,32 @@ async fn dispatch_per_group(
     Some((delivered, failed, errors))
 }
 
+/// Confirm this evaluation's dedup reservations once a notification landed
+/// (§5.5 MN-6).
+///
+/// Unconfirmed reservations do not suppress, so skipping this on failure is
+/// exactly what allows the next evaluation through. Best-effort: failing to
+/// confirm costs at most one duplicate notification, while failing the
+/// evaluation over it would cost the alert.
+async fn confirm_dedup_reservations(fingerprints: &[String], delivered: bool) {
+    if !delivered || fingerprints.is_empty() {
+        return;
+    }
+    #[cfg(feature = "enterprise")]
+    {
+        let db = infra::db::ORM_CLIENT
+            .get_or_init(infra::db::connect_to_orm)
+            .await;
+        if let Err(e) =
+            crate::alerts::deduplication::confirm_notification_sent(db, fingerprints).await
+        {
+            log::warn!("[SCHEDULER] could not confirm dedup reservations: {e}");
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    let _ = fingerprints;
+}
+
 pub async fn handle_triggers(
     trace_id: &str,
     trigger: db::scheduler::Trigger,
@@ -1049,6 +1075,11 @@ async fn handle_alert_triggers(
     // group plan itself, before sending, so the alert-level state write at the
     // end of this function must not run and clobber the delivery callbacks.
     let mut multi_alert_dispatched = false;
+    // Dedup fingerprints reserved by this evaluation, confirmed only after a
+    // successful send (§5.5 MN-6). Only ever assigned on the enterprise path,
+    // where deduplication runs at all.
+    #[cfg_attr(not(feature = "enterprise"), allow(unused_mut))]
+    let mut dedup_reservations: Vec<String> = Vec::new();
     let mut trigger_data_stream: TriggerData = TriggerData {
         _timestamp: now,
         org: trigger.org.clone(),
@@ -1438,6 +1469,11 @@ async fn handle_alert_triggers(
                     grouping_config.group_wait_seconds,
                     grouping_config.max_group_size,
                     eval_level,
+                    // Alert-level batch: multi-alerts never reach here (they
+                    // dispatch per group instead), so there is no group
+                    // identity to carry. Per-group batching is the post-v1
+                    // enhancement specified in §5.5.
+                    None,
                 );
 
                 // Whether the batch handoff counts as a DELIVERY for the
@@ -1518,7 +1554,13 @@ async fn handle_alert_triggers(
             )
             .await
             {
-                Ok((deduplicated_data, deduplicated)) => {
+                Ok(outcome) => {
+                    let (deduplicated_data, deduplicated) = (outcome.rows, outcome.applied);
+                    // Reserved, NOT yet suppressing. Confirmed only once the
+                    // notification actually goes out (§5.5 MN-6), so a send
+                    // that fails is retried rather than swallowed as a
+                    // duplicate for the rest of the window.
+                    dedup_reservations = outcome.reserved;
                     if deduplicated_data.is_empty() && deduplicated {
                         log::debug!(
                             "[SCHEDULER trace_id {scheduler_trace_id}] All alert results deduplicated for org: {}, module_key: {}",
@@ -1718,6 +1760,7 @@ async fn handle_alert_triggers(
                 // the group counts as delivered.
                 trigger_data_stream.error = Some(group_errors.join("; "));
             }
+            confirm_dedup_reservations(&dedup_reservations, _delivered > 0).await;
             record_delivery(&mut trigger_data);
             trigger_data.period_end_time = if should_store_last_end_time {
                 Some(trigger_results.end_time)
@@ -1742,6 +1785,9 @@ async fn handle_alert_triggers(
                 .await
             {
                 Ok((success_msg, err_msg)) => {
+                    // At least one destination delivered, so the reservations
+                    // this evaluation made are now real suppressions.
+                    confirm_dedup_reservations(&dedup_reservations, true).await;
                     let success_msg = success_msg.trim().to_owned();
                     let err_msg = err_msg.trim().to_owned();
                     if !err_msg.is_empty() {

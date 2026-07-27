@@ -33,6 +33,10 @@ static PENDING_BATCHES: Lazy<Arc<DashMap<String, PendingBatch>>> =
 #[derive(Clone, Debug)]
 pub struct PendingBatch {
     pub fingerprint: String,
+    /// Group identity for a per-group batch (§5.5). `None` for an ordinary
+    /// alert-level batch. Every entry shares the batch's fingerprint, and the
+    /// group is part of that fingerprint, so one batch is always one group.
+    pub group_labels: Option<std::collections::BTreeMap<String, String>>,
     pub org_id: String,
     pub alerts: Vec<BatchedAlert>,
     pub timer_started_at: i64,
@@ -62,10 +66,12 @@ impl PendingBatch {
         group_wait_seconds: i64,
         max_group_size: usize,
         level: Option<config::meta::alerts::level::AlertLevel>,
+        group_labels: Option<std::collections::BTreeMap<String, String>>,
     ) -> Self {
         let now = Utc::now().timestamp_micros();
         Self {
             fingerprint,
+            group_labels,
             org_id,
             alerts: vec![BatchedAlert {
                 alert,
@@ -117,6 +123,10 @@ pub fn add_to_batch(
     group_wait_seconds: i64,
     max_group_size: usize,
     level: Option<config::meta::alerts::level::AlertLevel>,
+    // Group identity when this is a per-group batch (§5.5). Every entry
+    // sharing a fingerprint shares a group, because the group is part of the
+    // fingerprint — so this is set once, when the batch is created.
+    group_labels: Option<std::collections::BTreeMap<String, String>>,
 ) -> bool {
     let mut batch_ready = false;
     let mut is_new_batch = false;
@@ -169,6 +179,7 @@ pub fn add_to_batch(
                 group_wait_seconds,
                 max_group_size,
                 level,
+                group_labels,
             )
         });
 
@@ -393,6 +404,10 @@ pub async fn send_grouped_notification(
             // A batch aggregates several evaluations; no single exact count
             // describes it — `{alert_count}` falls back to the row total.
             None,
+            // Group identity for a batched per-group send (M-4). Every entry
+            // in a batch shares one fingerprint, and the group component is
+            // part of that fingerprint, so the whole batch is one group.
+            batch.group_labels.as_ref(),
         )
         .await
     {
