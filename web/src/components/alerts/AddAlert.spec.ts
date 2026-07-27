@@ -1089,6 +1089,43 @@ describe("AddAlert Component", () => {
       expect(wrapper.vm.formData.trigger_condition.timezone).toBe('Asia/Kolkata');
     });
 
+    it('leaves a normal IANA timezone unchanged when opening an existing alert (no over-heal)', async () => {
+      const wrapper = mount(AddAlert, {
+        global: {
+          provide: { store },
+          plugins: [i18n, router],
+        },
+        props: {
+          isUpdated: true,
+          modelValue: {
+            name: 'normal_alert',
+            stream_type: 'logs',
+            stream_name: 's',
+            is_real_time: false,
+            tz_offset: -300,
+            query_condition: { type: 'custom', conditions: { or: [] }, aggregation: null },
+            trigger_condition: {
+              period: 1,
+              operator: '>=',
+              frequency: 1,
+              cron: '0 0 * * * *',
+              threshold: 1,
+              silence: 1,
+              frequency_type: 'cron',
+              timezone: 'America/New_York',
+            },
+            destinations: [],
+            context_attributes: {},
+            enabled: true,
+          },
+          destinations: [{ name: 'email' }],
+        },
+      });
+      await flushPromises();
+
+      expect(wrapper.vm.formData.trigger_condition.timezone).toBe('America/New_York');
+    });
+
   });
 
   describe('getFormattedCondition and generateWhereClause edge cases (V2 format)', () => {
