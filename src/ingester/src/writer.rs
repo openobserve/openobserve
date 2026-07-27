@@ -132,8 +132,8 @@ fn get_table_idx(thread_id: usize, org_id: &str, stream_name: &str) -> usize {
     if let Some(idx) = MEM_TABLE_INDIVIDUAL_STREAMS.get(stream_name) {
         *idx
     } else if get_config().common.feature_shared_memtable_enabled {
-        // When shared memtable is enabled, hash by thread_id and org_id
-        let hash_key = format!("{thread_id}_{org_id}");
+        // When shared memtable is enabled, hash by org_id and stream_name
+        let hash_key = format!("{org_id}_{stream_name}");
         let hash_id = gxhash::new().sum64(&hash_key);
         hash_id as usize % (WRITERS.len() - MEM_TABLE_INDIVIDUAL_STREAMS.len())
     } else {
