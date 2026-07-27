@@ -20,9 +20,9 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use config::meta::search::Request;
+use openobserve_api_common::extractors::Headers;
 #[cfg(feature = "cloud")]
 use openobserve_core::organization::is_org_in_free_trial_period;
-use openobserve_http_common::extractors::Headers;
 #[cfg(feature = "enterprise")]
 use {
     crate::common::{

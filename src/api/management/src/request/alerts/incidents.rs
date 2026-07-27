@@ -20,8 +20,8 @@ use axum::{
     extract::{Path, Query},
     response::Response,
 };
+use openobserve_api_common::extractors::Headers;
 use openobserve_core::auth::UserEmail;
-use openobserve_http_common::extractors::Headers;
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 

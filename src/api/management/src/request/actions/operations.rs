@@ -15,13 +15,11 @@
 use axum::{extract::Path, response::Response};
 #[cfg(feature = "enterprise")]
 use {
-    crate::{
-        common::utils::http::get_or_create_trace_id,
-        handler::http::{extractors::Headers, models::action::TestActionRequest},
-    },
+    crate::{common::utils::http::get_or_create_trace_id, models::action::TestActionRequest},
     axum::Json,
     itertools::Itertools,
     o2_enterprise::enterprise::actions::{action_manager::trigger_action, meta::TriggerSource},
+    openobserve_api_common::extractors::Headers,
     openobserve_core::auth::{UserEmail, check_permissions},
     tracing::{Level, span},
 };

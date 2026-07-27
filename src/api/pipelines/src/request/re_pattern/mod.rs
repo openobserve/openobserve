@@ -21,16 +21,14 @@ use axum::{
 #[cfg(feature = "vectorscan")]
 use db::authz::{remove_ownership, set_ownership};
 use infra::table::re_pattern::PatternEntry;
+use openobserve_api_common::extractors::Headers;
 use openobserve_core::auth::UserEmail;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 #[cfg(feature = "vectorscan")]
-use crate::{common::meta::authz::Authz, handler::http::request::BulkDeleteResponse};
-use crate::{
-    common::meta::http::HttpResponse as MetaHttpResponse,
-    handler::http::{extractors::Headers, request::BulkDeleteRequest},
-};
+use crate::{common::meta::authz::Authz, request::BulkDeleteResponse};
+use crate::{common::meta::http::HttpResponse as MetaHttpResponse, request::BulkDeleteRequest};
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct PatternCreateRequest {

@@ -27,8 +27,8 @@ use config::{
     },
     utils::time::now_micros,
 };
+use openobserve_api_common::extractors::Headers;
 use openobserve_core::{alerts::alert::get_by_id, auth::UserEmail};
-use openobserve_http_common::extractors::Headers;
 use search_service as SearchService;
 use search_service::query_range::get_settings_max_query_range;
 use serde::{Deserialize, Serialize};
@@ -464,7 +464,7 @@ pub async fn get_alert_history(
                     .get("alerts")
                     .map_or("alerts", |model| model.key);
 
-                match openobserve_http_common::auth::validator::list_objects_for_user(
+                match openobserve_api_common::auth::validator::list_objects_for_user(
                     &org_id,
                     user_id,
                     "GET",
@@ -806,7 +806,7 @@ pub async fn get_all_anomaly_history(
             let alert_object_type = o2_openfga::meta::mapping::OFGA_MODELS
                 .get("alerts")
                 .map_or("alerts", |m| m.key);
-            match openobserve_http_common::auth::validator::list_objects_for_user(
+            match openobserve_api_common::auth::validator::list_objects_for_user(
                 &org_id,
                 user_id,
                 "GET",

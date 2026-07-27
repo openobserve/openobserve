@@ -21,10 +21,10 @@ use axum::{
     http::StatusCode,
     response::Response,
 };
+use openobserve_api_common::extractors::Headers;
 #[cfg(feature = "enterprise")]
 use openobserve_core::auth::check_permissions;
 use openobserve_core::{alerts::destinations, auth::UserEmail, http::destination_error_response};
-use openobserve_http_common::extractors::Headers;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -427,7 +427,7 @@ pub async fn list_destinations(
     #[cfg(feature = "enterprise")]
     {
         let user_id = &user_email.user_id;
-        match openobserve_http_common::auth::validator::list_objects_for_user(
+        match openobserve_api_common::auth::validator::list_objects_for_user(
             &org_id,
             user_id,
             "GET",

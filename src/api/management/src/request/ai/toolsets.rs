@@ -25,12 +25,11 @@ use o2_enterprise::enterprise::ai::toolsets::{
     ToolsetCreateRequest, ToolsetKind, ToolsetListResponse, ToolsetResponse, ToolsetUpdateRequest,
     validate_data,
 };
+use openobserve_api_common::extractors::Headers;
 use openobserve_core::auth::UserEmail;
 use serde::Deserialize;
 
-use crate::{
-    common::meta::http::HttpResponse as MetaHttpResponse, handler::http::extractors::Headers,
-};
+use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 
 // ---------------------------------------------------------------------------
 // Create

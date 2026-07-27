@@ -4,6 +4,16 @@
 // it under the terms of the GNU Affero General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+//! Telemetry ingestion HTTP APIs.
 
 #![recursion_limit = "256"]
 
@@ -12,14 +22,3 @@ use common;
 use openobserve_core as service;
 
 pub mod request;
-
-#[doc(hidden)]
-pub mod handler {
-    pub mod http {
-        #[cfg(feature = "enterprise")]
-        pub use openobserve_http_common::auth;
-        pub use openobserve_http_common::extractors;
-
-        pub use crate::request;
-    }
-}

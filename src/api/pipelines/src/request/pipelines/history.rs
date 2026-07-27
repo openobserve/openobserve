@@ -30,6 +30,9 @@ use config::{
 };
 #[cfg(feature = "enterprise")]
 use o2_openfga::{config::get_config as get_openfga_config, meta::mapping::OFGA_MODELS};
+#[cfg(feature = "enterprise")]
+use openobserve_api_common::auth::validator::list_objects_for_user;
+use openobserve_api_common::extractors::Headers;
 use openobserve_core::{auth::UserEmail, pipeline::list_user_pipelines};
 use search_service as SearchService;
 use search_service::query_range::get_settings_max_query_range;
@@ -37,11 +40,8 @@ use serde::{Deserialize, Serialize};
 use tracing::{Instrument, Span};
 use utoipa::ToSchema;
 
-#[cfg(feature = "enterprise")]
-use crate::handler::http::auth::validator::list_objects_for_user;
-use crate::{
-    common::{meta::http::HttpResponse as MetaHttpResponse, utils::http::get_or_create_trace_id},
-    handler::http::extractors::Headers,
+use crate::common::{
+    meta::http::HttpResponse as MetaHttpResponse, utils::http::get_or_create_trace_id,
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

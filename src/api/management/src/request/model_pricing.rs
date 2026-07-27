@@ -26,7 +26,7 @@ use db::model_pricing;
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "enterprise")]
 use {
-    crate::handler::http::extractors::Headers,
+    openobserve_api_common::extractors::Headers,
     openobserve_core::auth::{UserEmail, check_permissions},
 };
 

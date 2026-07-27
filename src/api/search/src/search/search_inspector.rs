@@ -28,8 +28,8 @@ use config::{
     utils::time::now_micros,
 };
 use hashbrown::HashMap;
+use openobserve_api_common::extractors::Headers;
 use openobserve_core::auth::UserEmail;
-use openobserve_http_common::extractors::Headers;
 use search::{inspector::*, sql::visitor::cipher_key::get_cipher_key_names};
 use search_service::query_range::get_settings_max_query_range;
 use serde_json;

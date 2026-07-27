@@ -17,7 +17,7 @@ pub mod mcp;
 pub mod ratelimit;
 
 pub use openobserve_api_ingest::request::{
-    CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO, clusters, logs, metrics, rum, status, stream,
+    CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO, clusters, logs, metrics, rum,
 };
 #[cfg(feature = "cloud")]
 pub use openobserve_api_management::request::cloud;
@@ -29,7 +29,7 @@ pub use openobserve_api_management::request::{
 };
 pub use openobserve_api_management::request::{
     actions, gen_ai, keys, kv, model_pricing, service_accounts, service_streams, short_url,
-    sourcemaps, synthetics,
+    sourcemaps, status, stream, synthetics,
 };
 #[cfg(feature = "enterprise")]
 pub use openobserve_api_management::request::{ai, anomaly_detection, workflows};

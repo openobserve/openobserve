@@ -21,8 +21,8 @@ use config::{
     utils::json,
 };
 use hashbrown::HashMap;
+use openobserve_api_common::extractors::Headers;
 use openobserve_core::auth::UserEmail;
-use openobserve_http_common::extractors::Headers;
 use search_service as SearchService;
 use serde::Serialize;
 use tracing::{Instrument, Span};

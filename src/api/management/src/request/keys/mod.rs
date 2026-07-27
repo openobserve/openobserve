@@ -17,16 +17,14 @@ use axum::{extract::Path, response::Response};
 use common::meta::http::HttpResponse as MetaHttpResponse;
 #[cfg(feature = "enterprise")]
 use {
-    crate::handler::http::{
-        extractors::Headers,
-        request::{BulkDeleteRequest, BulkDeleteResponse},
-    },
+    crate::request::{BulkDeleteRequest, BulkDeleteResponse},
     axum::{Json, http::StatusCode, response::IntoResponse},
     common::meta::authz::Authz,
     config::utils::time::now_micros,
     db::authz::{remove_ownership, set_ownership},
     infra::table::cipher::CipherEntry,
     o2_enterprise::enterprise::cipher::{Cipher, CipherData, http_repr::merge_updates},
+    openobserve_api_common::extractors::Headers,
     openobserve_cipher::enterprise::{KeyAddRequest, KeyGetResponse, KeyInfo, KeyListResponse},
     openobserve_core::auth::{UserEmail, check_permissions},
 };

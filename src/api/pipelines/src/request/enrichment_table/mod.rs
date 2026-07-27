@@ -620,7 +620,7 @@ pub async fn save_enrichment_table_from_url(
 )]
 pub async fn get_all_enrichment_table_statuses(
     Path(org_id): Path<String>,
-    crate::handler::http::extractors::Headers(_user_email): crate::handler::http::extractors::Headers<
+    openobserve_api_common::extractors::Headers(_user_email): openobserve_api_common::extractors::Headers<
         openobserve_core::auth::UserEmail,
     >,
 ) -> Response {
@@ -638,7 +638,7 @@ pub async fn get_all_enrichment_table_statuses(
     let permitted_tables: Option<Vec<String>> = {
         use o2_openfga::meta::mapping::OFGA_MODELS;
 
-        match crate::handler::http::auth::validator::list_objects_for_user(
+        match openobserve_api_common::auth::validator::list_objects_for_user(
             &org_id,
             &_user_email.user_id,
             "GET",

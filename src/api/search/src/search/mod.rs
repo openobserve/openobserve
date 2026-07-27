@@ -41,10 +41,10 @@ use db::enrichment_table;
 use error_utils::map_error_to_http_response;
 use hashbrown::HashMap;
 use http::HeaderMap;
+use openobserve_api_common::extractors::Headers;
 use openobserve_core::auth::UserEmail;
 #[cfg(feature = "cloud")]
 use openobserve_core::organization::is_org_in_free_trial_period;
-use openobserve_http_common::extractors::Headers;
 #[cfg(feature = "enterprise")]
 use search::sql::visitor::cipher_key::get_cipher_key_names;
 use search::{

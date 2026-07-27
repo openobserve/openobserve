@@ -31,19 +31,17 @@ use infra::table::compactor_manual_jobs::{
     CompactorManualJob, CompactorManualJobResEntry, CompactorManualJobStatusRes,
     Status as CompactorManualJobStatus,
 };
+use openobserve_api_common::extractors::Headers;
 use openobserve_core::{auth::UserEmail, stream as stream_orchestrator};
 use stream as stream_service;
 
-use crate::{
-    common::{
-        meta::{
-            self,
-            http::HttpResponse as MetaHttpResponse,
-            stream::{ListStream, StreamCreate, StreamDeleteFields, StreamUpdateFields},
-        },
-        utils::http::{get_stream_type_from_request, get_ts_from_request_with_key},
+use crate::common::{
+    meta::{
+        self,
+        http::HttpResponse as MetaHttpResponse,
+        stream::{ListStream, StreamCreate, StreamDeleteFields, StreamUpdateFields},
     },
-    handler::http::extractors::Headers,
+    utils::http::{get_stream_type_from_request, get_ts_from_request_with_key},
 };
 
 /// GetSchema
@@ -494,7 +492,7 @@ pub async fn list(
 
         if let Some(s_type) = &stream_type {
             let stream_type_str = s_type.to_string();
-            match crate::handler::http::auth::validator::list_objects_for_user(
+            match openobserve_api_common::auth::validator::list_objects_for_user(
                 &org_id,
                 &_user_email.user_id,
                 "GET",

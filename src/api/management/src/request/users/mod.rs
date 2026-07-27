@@ -29,11 +29,11 @@ use config::{
     meta::user::UserRole,
     utils::{base64, json, password::validate_password_strength},
 };
+use openobserve_api_common::extractors::Headers;
 use openobserve_core::{
     auth::{UserEmail, generate_presigned_url, is_valid_email},
     users,
 };
-use openobserve_http_common::extractors::Headers;
 use serde::Serialize;
 #[cfg(feature = "enterprise")]
 use {
@@ -616,8 +616,7 @@ pub async fn authentication(
             return unauthorized_error(resp);
         }
     }
-    match openobserve_http_common::auth::validator::validate_user(&auth.name, &auth.password).await
-    {
+    match openobserve_api_common::auth::validator::validate_user(&auth.name, &auth.password).await {
         Ok(v) => {
             if v.is_valid {
                 resp.status = true;
@@ -776,7 +775,7 @@ pub async fn get_auth(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        use openobserve_http_common::auth::validator::ID_TOKEN_HEADER;
+        use openobserve_api_common::auth::validator::ID_TOKEN_HEADER;
 
         use crate::common::meta::user::AuthTokensExt;
 
@@ -849,7 +848,7 @@ pub async fn get_auth(
             };
 
             use o2_dex::service::auth::get_user_from_token;
-            use openobserve_http_common::auth::validator::{
+            use openobserve_api_common::auth::validator::{
                 validate_user, validate_user_for_query_params,
             };
 
@@ -1087,8 +1086,8 @@ pub async fn decline_invitation(
     Path(token): Path<String>,
 ) -> Response {
     use db;
+    use openobserve_api_common::auth::jwt;
     use openobserve_core::organization;
-    use openobserve_http_common::auth::jwt;
 
     let user_id = user_email.user_id.as_str();
 

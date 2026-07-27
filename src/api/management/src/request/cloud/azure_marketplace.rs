@@ -16,12 +16,12 @@
 use axum::{extract::Path, response::Response};
 use config::meta::user::UserRole;
 use o2_enterprise::enterprise::cloud::{billing_group, billings};
+use openobserve_api_common::extractors::Headers;
 use openobserve_core::auth::UserEmail;
 use serde::{Deserialize, Serialize};
 
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
-    handler::http::extractors::Headers,
     service::{organization, users},
 };
 

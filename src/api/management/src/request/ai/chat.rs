@@ -28,7 +28,7 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
 };
-use openobserve_http_common::X_O2_ASSISTANT_SESSION_ID;
+use openobserve_api_common::{X_O2_ASSISTANT_SESSION_ID, extractors::Headers};
 use serde::Deserialize;
 #[cfg(feature = "enterprise")]
 use {
@@ -46,10 +46,7 @@ use {
 
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
-    handler::http::{
-        extractors::Headers,
-        models::ai::{PromptRequest, PromptResponse},
-    },
+    models::ai::{PromptRequest, PromptResponse},
 };
 
 /// Determine agent type based on context.

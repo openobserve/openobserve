@@ -21,10 +21,10 @@ use axum::{
 use config::meta::dashboards::Dashboard;
 use db::dashboards as dashboards_db;
 use hashbrown::HashMap;
+use openobserve_api_common::extractors::Headers;
 #[cfg(feature = "enterprise")]
 use openobserve_core::auth::check_permissions;
 use openobserve_core::{auth::UserEmail, dashboards};
-use openobserve_http_common::extractors::Headers;
 
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,

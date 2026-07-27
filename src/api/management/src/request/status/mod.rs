@@ -48,6 +48,7 @@ use infra::{
         STREAM_STATS_EXISTS,
     },
 };
+use openobserve_api_common::extractors::Headers;
 use openobserve_core::{auth::UserEmail, cache::STREAM_EXECUTABLE_PIPELINES};
 use search::{
     datafusion::{storage::file_statistics_cache, udf::DEFAULT_FUNCTIONS},
@@ -58,10 +59,6 @@ use time;
 use utoipa::ToSchema;
 #[cfg(feature = "enterprise")]
 use {
-    crate::handler::http::auth::{
-        jwt::process_token,
-        validator::{ID_TOKEN_HEADER, PKCE_STATE_ORG, get_user_email_from_auth_str},
-    },
     audit::audit,
     common::utils::jwt::verify_decode_token,
     config::{ider, utils::time::now_micros},
@@ -80,14 +77,15 @@ use {
     o2_openfga::config::{
         get_config as get_openfga_config, refresh_config as refresh_openfga_config,
     },
+    openobserve_api_common::auth::{
+        jwt::process_token,
+        validator::{ID_TOKEN_HEADER, PKCE_STATE_ORG, get_user_email_from_auth_str},
+    },
 };
 
-use crate::{
-    common::meta::{
-        http::HttpResponse as MetaHttpResponse,
-        user::{AuthTokens, AuthTokensExt},
-    },
-    handler::http::extractors::Headers,
+use crate::common::meta::{
+    http::HttpResponse as MetaHttpResponse,
+    user::{AuthTokens, AuthTokensExt},
 };
 
 /// Macro to conditionally select a value based on the "enterprise" feature flag.

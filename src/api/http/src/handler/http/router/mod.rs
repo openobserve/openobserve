@@ -24,12 +24,12 @@ use axum::{
     routing::{delete, get, patch, post, put},
 };
 use config::get_config;
+use openobserve_api_common::X_O2_ASSISTANT_SESSION_ID;
 use openobserve_api_management::request::{
     alerts, authz, dashboards, folders, organization, users,
 };
 use openobserve_api_search::{promql, search, traces};
 use openobserve_core::auth::AuthExtractor;
-use openobserve_http_common::X_O2_ASSISTANT_SESSION_ID;
 use tower_http::{
     cors::{AllowOrigin, CorsLayer},
     decompression::RequestDecompressionLayer,

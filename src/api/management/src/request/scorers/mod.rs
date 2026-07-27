@@ -19,13 +19,13 @@ use axum::{
 };
 use db::authz::{remove_ownership, set_ownership};
 #[cfg(feature = "enterprise")]
+use openobserve_api_common::extractors::Headers;
+#[cfg(feature = "enterprise")]
 use openobserve_core::auth::{UserEmail, is_ofga_object_visible};
 
-#[cfg(feature = "enterprise")]
-use crate::handler::http::extractors::Headers;
 use crate::{
     common::meta::{authz::Authz, http::HttpResponse as MetaHttpResponse},
-    handler::http::models::scorers::{
+    models::scorers::{
         ListScorerVersionsResponseBody, ListScorersQuery, ListScorersResponseBody,
         LlmJudgeOutputSchemaRequestBody, LlmJudgeOutputSchemaResponseBody, ScorerRequestBody,
         ScorerResponseBody, ScorerTestRequestBody, ScorerTestResponseBody, ScorerUpdateRequestBody,
@@ -84,7 +84,7 @@ pub async fn list_scorers(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     let permitted_objects = {
-        match crate::handler::http::auth::validator::list_objects_for_user(
+        match openobserve_api_common::auth::validator::list_objects_for_user(
             &org_id,
             &user_email.user_id,
             "GET",

@@ -21,17 +21,15 @@ use axum::{
     response::Response,
 };
 use config::{ider, meta::pipeline::Pipeline};
+use openobserve_api_common::extractors::Headers;
 use openobserve_core::auth::UserEmail;
 #[cfg(feature = "enterprise")]
 use openobserve_core::auth::check_permissions;
 
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
-    handler::http::{
-        extractors::Headers,
-        models::pipelines::{PipelineBulkEnableRequest, PipelineBulkEnableResponse, PipelineList},
-        request::{BulkDeleteRequest, BulkDeleteResponse},
-    },
+    models::pipelines::{PipelineBulkEnableRequest, PipelineBulkEnableResponse, PipelineList},
+    request::{BulkDeleteRequest, BulkDeleteResponse},
     service::pipeline,
 };
 
@@ -176,7 +174,7 @@ pub async fn list_pipelines(
     {
         use o2_openfga::meta::mapping::OFGA_MODELS;
 
-        match crate::handler::http::auth::validator::list_objects_for_user(
+        match openobserve_api_common::auth::validator::list_objects_for_user(
             &org_id,
             &user_email.user_id,
             "GET",
@@ -213,7 +211,7 @@ pub async fn list_pipelines(
             .map(|error| {
                 (
                     error.pipeline_id.clone(),
-                    crate::handler::http::models::pipelines::PipelineErrorInfo {
+                    crate::models::pipelines::PipelineErrorInfo {
                         last_error_timestamp: error.last_error_timestamp,
                         error_summary: error.error_summary,
                         node_errors: error.node_errors,
@@ -252,7 +250,7 @@ pub async fn list_pipelines(
         ("pipeline_id" = String, Path, description = "Pipeline ID"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = inline(crate::handler::http::models::pipelines::Pipeline)),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(crate::models::pipelines::Pipeline)),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -286,7 +284,7 @@ pub async fn get_pipeline(Path((org_id, pipeline_id)): Path<(String, String)>) -
 
     // Get last error info
     let last_error = match db::pipeline_errors::get_by_pipeline_id(&pipeline_id).await {
-        Ok(Some(error)) => Some(crate::handler::http::models::pipelines::PipelineErrorInfo {
+        Ok(Some(error)) => Some(crate::models::pipelines::PipelineErrorInfo {
             last_error_timestamp: error.last_error_timestamp,
             error_summary: error.error_summary,
             node_errors: error.node_errors,
@@ -294,7 +292,7 @@ pub async fn get_pipeline(Path((org_id, pipeline_id)): Path<(String, String)>) -
         _ => None,
     };
 
-    MetaHttpResponse::json(crate::handler::http::models::pipelines::Pipeline::from(
+    MetaHttpResponse::json(crate::models::pipelines::Pipeline::from(
         meta_pipeline,
         paused_at,
         last_error,

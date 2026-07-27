@@ -22,12 +22,11 @@ use o2_enterprise::enterprise::license::{
     LICENSE_DB_KEY, License, check_license, get_license, ingestion_limit_exceeded_count,
     ingestion_used, license_expired,
 };
+use openobserve_api_common::extractors::Headers;
 use openobserve_core::auth::UserEmail;
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    common::meta::http::HttpResponse as MetaHttpResponse, handler::http::extractors::Headers,
-};
+use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 
 #[derive(Serialize, Deserialize)]
 struct LicenseResponse {
@@ -73,7 +72,7 @@ async fn check_license_permission(user_id: &str, method: &str) -> Result<(), any
             Some(v) => v,
             None => return Err(anyhow::anyhow!("Unauthorized access to license")),
         };
-        if !crate::handler::http::auth::validator::check_permissions(
+        if !openobserve_api_common::auth::validator::check_permissions(
             user_id,
             AuthExtractor {
                 auth: "".to_string(),

@@ -17,9 +17,9 @@ use axum::{extract::Path, response::Response};
 use config::meta::folder::Folder;
 use db::folders::{self, FolderError};
 #[cfg(feature = "enterprise")]
-use openobserve_core::auth::UserEmail;
+use openobserve_api_common::extractors::Headers;
 #[cfg(feature = "enterprise")]
-use openobserve_http_common::extractors::Headers;
+use openobserve_core::auth::UserEmail;
 
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,

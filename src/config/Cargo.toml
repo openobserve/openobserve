@@ -87,7 +87,6 @@ vrl.workspace = true
 vortex = { workspace = true }
 
 [dev-dependencies]
-arrow = { workspace = true, features = ["prettyprint"] }
 expect-test.workspace = true
 float-cmp.workspace = true
 

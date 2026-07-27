@@ -18,6 +18,8 @@ use axum::{
     response::Response,
 };
 #[cfg(feature = "enterprise")]
+use openobserve_api_common::extractors::Headers;
+#[cfg(feature = "enterprise")]
 use openobserve_core::auth::UserEmail;
 #[cfg(test)]
 use openobserve_core::llm_evaluations::eval_jobs::EvalJobError;
@@ -25,11 +27,9 @@ use openobserve_core::llm_evaluations::eval_jobs::{
     self, ManualEvalJobRequestBody, ManualEvalJobResponseBody,
 };
 
-#[cfg(feature = "enterprise")]
-use crate::handler::http::extractors::Headers;
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
-    handler::http::models::eval_jobs::{
+    models::eval_jobs::{
         EvalJobRequestBody, EvalJobResponseBody, EvalJobStatusActionResponseBody,
         ListEvalJobsQuery, ListEvalJobsResponseBody,
     },
@@ -63,7 +63,7 @@ pub async fn list_eval_jobs(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     let permitted_objects = {
-        match crate::handler::http::auth::validator::list_objects_for_user(
+        match openobserve_api_common::auth::validator::list_objects_for_user(
             &org_id,
             &user_email.user_id,
             "GET",

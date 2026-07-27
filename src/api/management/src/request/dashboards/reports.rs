@@ -25,13 +25,13 @@ use config::meta::{
     triggers::{Trigger, TriggerModule},
 };
 use db::scheduler;
+use openobserve_api_common::extractors::Headers;
 #[cfg(feature = "enterprise")]
 use openobserve_core::auth::check_permissions;
 use openobserve_core::{
     auth::UserEmail,
     dashboards::reports::{self, ReportError},
 };
-use openobserve_http_common::extractors::Headers;
 use serde::Deserialize;
 
 use crate::{
@@ -196,7 +196,7 @@ pub async fn list_reports(
     // Get List of allowed objects
     #[cfg(feature = "enterprise")]
     {
-        match openobserve_http_common::auth::validator::list_objects_for_user(
+        match openobserve_api_common::auth::validator::list_objects_for_user(
             &org_id,
             &user_email.user_id,
             "GET",
@@ -577,7 +577,7 @@ pub async fn list_reports_v2(
     let mut _permitted = None;
     #[cfg(feature = "enterprise")]
     {
-        match openobserve_http_common::auth::validator::list_objects_for_user(
+        match openobserve_api_common::auth::validator::list_objects_for_user(
             &org_id,
             &user_email.user_id,
             "GET",

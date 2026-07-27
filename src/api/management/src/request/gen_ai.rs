@@ -29,6 +29,7 @@ pub use o2_enterprise::enterprise::llm_evaluations::agents::{
     AgentListQuery, ClearAgentRegistryQuery, ClearAgentRegistryResponse, GenAiAgentListItem,
     GenAiAgentListResponse,
 };
+use openobserve_api_common::extractors::Headers;
 use openobserve_core::auth::UserEmail;
 #[cfg(feature = "enterprise")]
 use openobserve_core::auth::check_permissions;
@@ -37,9 +38,7 @@ use serde::{Deserialize, Serialize};
 #[cfg(not(feature = "enterprise"))]
 use utoipa::{IntoParams, ToSchema};
 
-use crate::{
-    common::meta::http::HttpResponse as MetaHttpResponse, handler::http::extractors::Headers,
-};
+use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 
 #[cfg(not(feature = "enterprise"))]
 #[derive(Debug, Deserialize, IntoParams)]

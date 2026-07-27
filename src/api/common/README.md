@@ -1,6 +1,6 @@
-# openobserve-http-common
+# openobserve-api-common
 
-`openobserve-http-common` contains HTTP building blocks shared by multiple independent API domain
+`openobserve-api-common` contains HTTP building blocks shared by multiple independent API domain
 crates.
 
 It currently provides:

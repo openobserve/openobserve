@@ -28,7 +28,7 @@ use proto::loki_rpc;
 
 use crate::{
     common::meta::loki::{LokiError, LokiPushRequest},
-    handler::http::request::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO},
+    request::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO},
     service::{ingestion::get_thread_id, logs},
 };
 

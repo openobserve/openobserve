@@ -17,8 +17,8 @@ use axum::{
     extract::{FromRequestParts, Path},
     response::{IntoResponse, Response},
 };
+use openobserve_api_common::extractors::Headers;
 use openobserve_core::auth::UserEmail;
-use openobserve_http_common::extractors::Headers;
 #[cfg(feature = "enterprise")]
 use {
     o2_enterprise::enterprise::common::config::get_config as get_o2_config,

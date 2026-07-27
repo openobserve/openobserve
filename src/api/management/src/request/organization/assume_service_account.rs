@@ -23,9 +23,9 @@ use axum::{
 // generation)
 pub use config::meta::session::{AssumeServiceAccountRequest, AssumeServiceAccountResponse};
 #[cfg(feature = "enterprise")]
-use openobserve_core::auth::{AuthExtractor, UserEmail};
+use openobserve_api_common::extractors::Headers;
 #[cfg(feature = "enterprise")]
-use openobserve_http_common::extractors::Headers;
+use openobserve_core::auth::{AuthExtractor, UserEmail};
 
 #[cfg(feature = "enterprise")]
 use crate::common::meta::http::HttpResponse as MetaHttpResponse;

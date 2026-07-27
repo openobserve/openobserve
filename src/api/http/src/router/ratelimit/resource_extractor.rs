@@ -28,7 +28,7 @@ use o2_ratelimit::{
     },
     middleware::{ExtractorRule, ExtractorRuleResult},
 };
-use openobserve_http_common::auth::validator::get_user_email_from_auth_str;
+use openobserve_api_common::auth::validator::get_user_email_from_auth_str;
 use regex::Regex;
 use utoipa::OpenApi;
 

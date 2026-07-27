@@ -16,8 +16,8 @@
 #[cfg(feature = "enterprise")]
 use axum::response::IntoResponse;
 use axum::{Json, extract::Path, response::Response};
+use openobserve_api_common::extractors::Headers;
 use openobserve_core::auth::UserEmail;
-use openobserve_http_common::extractors::Headers;
 #[cfg(feature = "enterprise")]
 use {o2_dex::meta::auth::RoleRequest, openobserve_core::auth::check_permissions};
 
@@ -59,7 +59,7 @@ pub async fn create_role(
     Path(org_id): Path<String>,
     Json(user_req): Json<UserRoleRequest>,
 ) -> Response {
-    use openobserve_http_common::auth::jwt::format_role_name_only;
+    use openobserve_api_common::auth::jwt::format_role_name_only;
 
     use crate::common::meta::user::is_standard_role;
 
@@ -312,7 +312,7 @@ pub async fn get_roles(
     let mut permitted;
     // Get List of allowed objects
 
-    match openobserve_http_common::auth::validator::list_objects_for_user(
+    match openobserve_api_common::auth::validator::list_objects_for_user(
         &org_id,
         &user_email.user_id,
         "GET",
@@ -801,7 +801,7 @@ pub async fn create_group(
     Path(org_id): Path<String>,
     Json(user_group): Json<UserGroup>,
 ) -> Response {
-    use openobserve_http_common::auth::jwt::format_role_name_only;
+    use openobserve_api_common::auth::jwt::format_role_name_only;
 
     let mut user_grp = user_group;
     user_grp.name = format_role_name_only(user_grp.name.trim());
@@ -947,7 +947,7 @@ pub async fn get_groups(
     let mut permitted;
     // Get List of allowed objects
 
-    match openobserve_http_common::auth::validator::list_objects_for_user(
+    match openobserve_api_common::auth::validator::list_objects_for_user(
         &org_id,
         &user_email.user_id,
         "GET",

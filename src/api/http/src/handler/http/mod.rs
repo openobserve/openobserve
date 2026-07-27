@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use openobserve_http_common::auth;
+use openobserve_api_common::auth;
 pub mod models;
 pub mod request;
 pub mod router;

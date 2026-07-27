@@ -20,16 +20,14 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use config::meta::function::{FunctionList, TestVRLRequest, Transform};
+use openobserve_api_common::extractors::Headers;
 use openobserve_core::auth::UserEmail;
 #[cfg(feature = "enterprise")]
 use openobserve_core::auth::check_permissions;
 
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
-    handler::http::{
-        extractors::Headers,
-        request::{BulkDeleteRequest, BulkDeleteResponse},
-    },
+    request::{BulkDeleteRequest, BulkDeleteResponse},
     service::functions::FunctionDeleteError,
 };
 
@@ -110,7 +108,7 @@ pub async fn list_functions(
     // Get List of allowed objects
     #[cfg(feature = "enterprise")]
     {
-        match crate::handler::http::auth::validator::list_objects_for_user(
+        match openobserve_api_common::auth::validator::list_objects_for_user(
             &org_id,
             &user_email.user_id,
             "GET",

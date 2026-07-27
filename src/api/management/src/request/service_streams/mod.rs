@@ -19,13 +19,12 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
 };
+use openobserve_api_common::extractors::Headers;
 use openobserve_core::auth::UserEmail;
 #[cfg(feature = "enterprise")]
 use openobserve_core::auth::check_permissions;
 
-use crate::{
-    common::meta::http::HttpResponse as MetaHttpResponse, handler::http::extractors::Headers,
-};
+use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 
 /// GET /api/{org_id}/service_streams/_analytics
 ///

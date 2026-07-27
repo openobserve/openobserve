@@ -9,8 +9,8 @@ Its main domains are:
 - PromQL APIs.
 - Trace query APIs.
 
-The crate depends on `openobserve-http-common` for shared HTTP types and on `openobserve-core` for
+The crate depends on `openobserve-api-common` for shared HTTP types and on `openobserve-core` for
 application services. It does not depend on any other API crate. Routing and top-level OpenAPI
-composition remain in `openobserve-http`.
+composition remain in `openobserve-api-http`.
 
 This is an internal workspace crate and is not published independently.

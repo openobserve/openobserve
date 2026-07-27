@@ -28,6 +28,7 @@ use config::meta::{
 use db::scheduler;
 use hashbrown::HashMap;
 use infra::db::{ORM_CLIENT, connect_to_orm};
+use openobserve_api_common::extractors::Headers;
 use openobserve_core::{
     alerts::{
         ConditionListExt,
@@ -36,7 +37,6 @@ use openobserve_core::{
     },
     auth::UserEmail,
 };
-use openobserve_http_common::extractors::Headers;
 use svix_ksuid::Ksuid;
 #[cfg(feature = "enterprise")]
 use {

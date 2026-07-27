@@ -71,6 +71,7 @@ cron.workspace = true
 dashmap.workspace = true
 datafusion.workspace = true
 arrow.workspace = true
+arrow-json.workspace = true
 arrow-schema.workspace = true
 flate2.workspace = true
 futures.workspace = true
@@ -84,6 +85,8 @@ o2_enterprise = { workspace = true, optional = true, default-features = false }
 o2_openfga = { workspace = true, optional = true }
 opentelemetry.workspace = true
 opentelemetry-proto.workspace = true
+parking_lot.workspace = true
+prometheus.workspace = true
 promql-parser.workspace = true
 prost.workspace = true
 prost-wkt-types.workspace = true
@@ -111,3 +114,7 @@ infra.workspace = true
 ingester.workspace = true
 chromiumoxide.workspace = true
 lettre.workspace = true
+futures-util.workspace = true
+
+[dev-dependencies]
+multer.workspace = true

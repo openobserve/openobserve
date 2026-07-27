@@ -23,7 +23,7 @@ use o2_enterprise::enterprise::cloud::{billing_group, billings};
 use super::IntoHttpResponse;
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
-    handler::http::models::billings::GetOrgUsageResponseBody, service::org_usage,
+    models::billings::GetOrgUsageResponseBody, service::org_usage,
 };
 
 /// GetUsageData

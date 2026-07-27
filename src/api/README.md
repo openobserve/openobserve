@@ -6,7 +6,8 @@ All API-facing crates live under this directory:
 - `grpc`: gRPC services and server transport.
 - `http`: HTTP routing, OpenAPI, middleware, and composition of the domain crates.
 - `ingest`: telemetry ingestion APIs.
-- `management`: control-plane APIs such as alerts, dashboards, users, and organizations.
+- `management`: control-plane APIs such as alerts, dashboards, users, organizations,
+  streams, and platform/node status.
 - `pipelines`: pipelines, functions, enrichment tables, and transformation configuration.
 - `search`: search, PromQL, trace-query, and log-pattern extraction APIs.
 

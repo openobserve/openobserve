@@ -20,14 +20,13 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use common::meta::http::HttpResponse as MetaHttpResponse;
-use serde::Deserialize;
-
 // Used only inside #[cfg(feature = "enterprise")] handler bodies.
 #[cfg(feature = "enterprise")]
-use crate::{
-    handler::http::extractors::Headers,
-    service::auth::{UserEmail, check_permissions},
-};
+use openobserve_api_common::extractors::Headers;
+use serde::Deserialize;
+
+#[cfg(feature = "enterprise")]
+use crate::service::auth::{UserEmail, check_permissions};
 
 // ── Local query / body types ──────────────────────────────────────────────────
 

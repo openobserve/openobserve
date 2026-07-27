@@ -32,13 +32,13 @@ use config::{
     utils::time::now_micros,
 };
 use infra::table::workflows::{Workflow, WorkflowRunErrors};
+use openobserve_api_common::extractors::Headers;
 use openobserve_core::auth::UserEmail;
 use search_service::{self as SearchService, query_range::get_settings_max_query_range};
 use serde::{Deserialize, Serialize};
 
 use crate::{
     common::{meta::http::HttpResponse as MetaHttpResponse, utils::http::get_or_create_trace_id},
-    handler::http::extractors::Headers,
     service::workflows::{self, InputMap, WorkflowTriggerType},
 };
 
@@ -178,7 +178,7 @@ pub async fn list_workflows(
     {
         use o2_openfga::meta::mapping::OFGA_MODELS;
 
-        match crate::handler::http::auth::validator::list_objects_for_user(
+        match openobserve_api_common::auth::validator::list_objects_for_user(
             &org_id,
             &_user_email.user_id,
             "GET",

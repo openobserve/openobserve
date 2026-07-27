@@ -30,6 +30,7 @@ use ingestion_common::{
     GCPIngestionRequest, HecResponse, HecStatus, IngestUser, IngestionRequest,
     KinesisFHIngestionResponse, KinesisFHRequest,
 };
+use openobserve_api_common::extractors::Headers;
 use openobserve_core::auth::UserEmail;
 #[cfg(feature = "cloud")]
 use openobserve_core::ingestion::check_ingestion_allowed;
@@ -38,10 +39,7 @@ use prost::Message;
 
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
-    handler::http::{
-        extractors::Headers,
-        request::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO},
-    },
+    request::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO},
     service::{
         ingestion::get_thread_id,
         logs::{self, otlp::handle_request},

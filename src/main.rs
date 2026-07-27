@@ -36,8 +36,8 @@ use config::{
 use db::{self, scheduler::TriggerModule::QueryRecommendations};
 use infra::runtime::{create_grpc_runtime, create_job_runtime};
 use openobserve::{cli::basic::cli, migration};
+use openobserve_api_http::handler::http::router::*;
 use openobserve_core::{bootstrap, metadata};
-use openobserve_http::handler::http::router::*;
 use openobserve_jobs::job;
 use opentelemetry::{KeyValue, global, trace::TracerProvider};
 use opentelemetry_otlp::{WithExportConfig, WithHttpConfig, WithTonicConfig};
@@ -388,7 +388,7 @@ async fn main() -> Result<(), anyhow::Error> {
     };
 
     // init http server
-    if let Err(e) = openobserve_http::server::run(web::ui_routes).await {
+    if let Err(e) = openobserve_api_http::server::run(web::ui_routes).await {
         log::error!("HTTP server runs failed: {e}");
     }
     log::info!("HTTP server stopped");
@@ -973,7 +973,7 @@ fn enable_tracing() -> Result<opentelemetry_sdk::trace::SdkTracerProvider, anyho
 #[cfg(feature = "enterprise")]
 async fn init_action_server() -> Result<(), anyhow::Error> {
     let cfg = get_config();
-    let haddr = openobserve_http::server::server_addr()?;
+    let haddr = openobserve_api_http::server::server_addr()?;
 
     // Setup the namespace
     o2_enterprise::enterprise::actions::action_deployer::init().await?;
@@ -988,10 +988,10 @@ async fn init_action_server() -> Result<(), anyhow::Error> {
     );
 
     // Build the router for action server
-    let app = openobserve_http::server::apply_common_middlewares(create_action_server_router())
+    let app = openobserve_api_http::server::apply_common_middlewares(create_action_server_router())
         .layer(TraceLayer::new_for_http());
 
-    openobserve_http::server::serve(haddr, app).await?;
+    openobserve_api_http::server::serve(haddr, app).await?;
 
     log::info!("HTTP server stopped");
 
@@ -1018,7 +1018,7 @@ pub fn create_action_server_router() -> axum::Router {
         middleware,
         routing::{get, post},
     };
-    use openobserve_http::handler::http::{request::action_server, router::cors_layer};
+    use openobserve_api_http::handler::http::{request::action_server, router::cors_layer};
 
     let cfg = get_config();
 
@@ -1036,7 +1036,7 @@ pub fn create_action_server_router() -> axum::Router {
                 .put(action_server::patch_action),
         )
         .layer(middleware::from_fn(
-            openobserve_http_common::auth::action_server::auth_middleware,
+            openobserve_api_common::auth::action_server::auth_middleware,
         ))
         .layer(cors_layer());
 
@@ -1081,8 +1081,10 @@ async fn init_enterprise() -> Result<(), anyhow::Error> {
 
     o2_enterprise::enterprise::pipeline::pipeline_file_server::PipelineFileServer::run().await?;
     if o2cfg.rate_limit.rate_limit_enabled && o2_openfga::config::get_config().enabled {
-        o2_ratelimit::init(openobserve_http::handler::http::router::openapi::openapi_info().await)
-            .await?;
+        o2_ratelimit::init(
+            openobserve_api_http::handler::http::router::openapi::openapi_info().await,
+        )
+        .await?;
     }
 
     Ok(())

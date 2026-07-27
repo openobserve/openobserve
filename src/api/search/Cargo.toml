@@ -14,7 +14,7 @@ enterprise = [
     "audit/enterprise",
     "dep:o2_enterprise",
     "dep:o2_openfga",
-    "openobserve-http-common/enterprise",
+    "openobserve-api-common/enterprise",
     "openobserve-core/enterprise",
     "promql-service/enterprise",
     "search_service/enterprise",
@@ -22,7 +22,7 @@ enterprise = [
 cloud = [
     "enterprise",
     "openobserve-core/cloud",
-    "openobserve-http-common/cloud",
+    "openobserve-api-common/cloud",
 ]
 vectorscan = [
     "openobserve-core/vectorscan",
@@ -34,7 +34,7 @@ vectorscan = [
 common.workspace = true
 audit.workspace = true
 db.workspace = true
-openobserve-http-common.workspace = true
+openobserve-api-common.workspace = true
 openobserve-core.workspace = true
 ingestion-common.workspace = true
 search.workspace = true

@@ -21,6 +21,7 @@ use axum::{
 };
 use config::{meta::user::UserRole, utils::rand::generate_random_string};
 use hashbrown::HashMap;
+use openobserve_api_common::extractors::Headers;
 use openobserve_core::auth::UserEmail;
 #[cfg(feature = "enterprise")]
 use openobserve_core::auth::check_permissions;
@@ -32,10 +33,7 @@ use crate::{
         service_account::{APIToken, ServiceAccountRequest, UpdateServiceAccountRequest},
         user::{UpdateUser, UserRequest, UserUpdateMode},
     },
-    handler::http::{
-        extractors::Headers,
-        request::{BulkDeleteRequest, BulkDeleteResponse},
-    },
+    request::{BulkDeleteRequest, BulkDeleteResponse},
     service::users,
 };
 
@@ -80,7 +78,7 @@ pub async fn list(Path(org_id): Path<String>, Headers(user_email): Headers<UserE
     // Get List of allowed objects
     #[cfg(feature = "enterprise")]
     {
-        match crate::handler::http::auth::validator::list_objects_for_user(
+        match openobserve_api_common::auth::validator::list_objects_for_user(
             &org_id,
             user_id,
             "GET",

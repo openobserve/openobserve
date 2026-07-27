@@ -39,10 +39,10 @@ use config::{
 use futures::stream::StreamExt;
 use hashbrown::HashMap;
 use log;
+use openobserve_api_common::extractors::Headers;
 use openobserve_core::auth::UserEmail;
 #[cfg(feature = "enterprise")]
 use openobserve_core::auth::check_permissions;
-use openobserve_http_common::extractors::Headers;
 use search::utils::is_permissable_function_error;
 use search_service::streaming::process_search_stream_request;
 use tokio::sync::mpsc;

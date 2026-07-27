@@ -19,6 +19,7 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
 };
+use openobserve_api_common::extractors::Headers;
 pub use openobserve_core::anomaly_detection::{
     CreateAnomalyConfigRequest, UpdateAnomalyConfigRequest,
 };
@@ -27,7 +28,7 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use crate::{
-    common::meta::http::HttpResponse as MetaHttpResponse, handler::http::extractors::Headers,
+    common::meta::http::HttpResponse as MetaHttpResponse,
     service::anomaly_detection as anomaly_service,
 };
 

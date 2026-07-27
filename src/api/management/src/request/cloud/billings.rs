@@ -23,6 +23,7 @@ use axum::{
 };
 use config::{get_config, utils::json};
 use o2_enterprise::enterprise::cloud::billings::{self as o2_cloud_billings};
+use openobserve_api_common::extractors::Headers;
 use openobserve_core::auth::UserEmail;
 
 use super::IntoHttpResponse;
@@ -31,12 +32,8 @@ use crate::{
         meta::{http::HttpResponse as MetaHttpResponse, telemetry},
         utils::redirect_response::RedirectResponseBuilder,
     },
-    handler::http::{
-        extractors::Headers,
-        models::billings::{
-            CheckoutSessionDetailRequestQuery, ListInvoicesResponseBody,
-            ListSubscriptionResponseBody,
-        },
+    models::billings::{
+        CheckoutSessionDetailRequestQuery, ListInvoicesResponseBody, ListSubscriptionResponseBody,
     },
     service::{
         organization,

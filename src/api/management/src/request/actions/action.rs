@@ -18,12 +18,13 @@ use axum::{
     extract::{Multipart, Path},
     response::Response,
 };
+use openobserve_api_common::extractors::Headers;
 use openobserve_core::auth::UserEmail;
 #[cfg(feature = "enterprise")]
 use {
     crate::{
         common::meta::authz::Authz,
-        handler::http::models::action::{GetActionDetailsResponse, GetActionInfoResponse},
+        models::action::{GetActionDetailsResponse, GetActionInfoResponse},
         service::organization::get_service_account_passcode,
     },
     bytes::Bytes,
@@ -45,10 +46,7 @@ use {
 
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
-    handler::http::{
-        extractors::Headers,
-        request::{BulkDeleteRequest, BulkDeleteResponse},
-    },
+    request::{BulkDeleteRequest, BulkDeleteResponse},
 };
 
 #[cfg(feature = "enterprise")]

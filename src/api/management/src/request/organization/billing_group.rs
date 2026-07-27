@@ -15,8 +15,8 @@
 
 use axum::{Json, extract::Path, response::Response};
 use o2_enterprise::enterprise::cloud::{billing_group, billing_invites, billing_invites::Status};
+use openobserve_api_common::extractors::Headers;
 use openobserve_core::auth::UserEmail;
-use openobserve_http_common::extractors::Headers;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 

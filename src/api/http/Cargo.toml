@@ -1,5 +1,5 @@
 [package]
-name = "openobserve-http"
+name = "openobserve-api-http"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -18,7 +18,7 @@ enterprise = [
     "openobserve-api-management/enterprise",
     "openobserve-api-pipelines/enterprise",
     "openobserve-api-search/enterprise",
-    "openobserve-http-common/enterprise",
+    "openobserve-api-common/enterprise",
     "openobserve-core/enterprise",
     "stream/enterprise",
 ]
@@ -29,7 +29,7 @@ cloud = [
     "openobserve-api-management/cloud",
     "openobserve-api-pipelines/cloud",
     "openobserve-api-search/cloud",
-    "openobserve-http-common/cloud",
+    "openobserve-api-common/cloud",
     "openobserve-core/cloud",
     "stream/cloud",
 ]
@@ -56,7 +56,7 @@ openobserve-api-ingest.workspace = true
 openobserve-api-management.workspace = true
 openobserve-api-pipelines.workspace = true
 openobserve-api-search.workspace = true
-openobserve-http-common.workspace = true
+openobserve-api-common.workspace = true
 openobserve-mcp.workspace = true
 axum.workspace = true
 axum-server.workspace = true

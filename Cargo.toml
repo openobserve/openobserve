@@ -14,7 +14,7 @@ keywords = [
     "open-source",
     "opensource",
 ]
-license = "AGPL-3.0-only"
+license = "AGPL-3.0"
 name = "openobserve"
 repository = "https://github.com/openobserve/openobserve/"
 version = "0.93.0"
@@ -25,7 +25,7 @@ publish = false
 default = []
 enterprise = [
     "audit/enterprise",
-    "openobserve-http/enterprise",
+    "openobserve-api-http/enterprise",
     "openobserve-api-grpc/enterprise",
     "openobserve-core/enterprise",
     "openobserve-jobs/enterprise",
@@ -35,7 +35,7 @@ enterprise = [
     "usage_reporting/enterprise",
 ]
 vectorscan = [
-    "openobserve-http/vectorscan",
+    "openobserve-api-http/vectorscan",
     "openobserve-api-grpc/vectorscan",
     "openobserve-core/vectorscan",
     "openobserve-jobs/vectorscan",
@@ -43,7 +43,7 @@ vectorscan = [
     "search_service/vectorscan",
 ]
 cloud = [
-    "openobserve-http/cloud",
+    "openobserve-api-http/cloud",
     "openobserve-api-grpc/cloud",
     "openobserve-core/cloud",
     "openobserve-jobs/cloud",
@@ -52,7 +52,7 @@ mimalloc = ["dep:mimalloc"]
 jemalloc = ["dep:tikv-jemallocator"]
 profiling = [
     "jemalloc",
-    "openobserve-http/profiling",
+    "openobserve-api-http/profiling",
     "dep:tikv-jemalloc-ctl",
     "dep:tikv-jemalloc-sys",
     "dep:jemalloc_pprof",
@@ -221,10 +221,10 @@ flight.workspace = true
 async-stream.workspace = true
 sourcemap.workspace = true
 audit.workspace = true
-openobserve-http.workspace = true
+openobserve-api-http.workspace = true
 openobserve-api-grpc.workspace = true
 web.workspace = true
-openobserve-http-common.workspace = true
+openobserve-api-common.workspace = true
 openobserve-core.workspace = true
 openobserve-node.workspace = true
 ingestion-common.workspace = true
@@ -303,7 +303,7 @@ resolver = "2"
 [workspace.package]
 version = "0.1.0"
 edition = "2024"
-license = "AGPL-3.0-only"
+license = "AGPL-3.0"
 
 [workspace.dependencies]
 config = { path = "src/config" }
@@ -337,13 +337,13 @@ usage_reporting = { path = "src/usage_reporting" }
 audit = { path = "src/audit" }
 promql = { path = "src/promql" }
 promql-service = { path = "src/promql_service" }
-openobserve-http = { path = "src/api/http" }
+openobserve-api-common = { path = "src/api/common" }
 openobserve-api-grpc = { path = "src/api/grpc" }
+openobserve-api-http = { path = "src/api/http" }
 openobserve-api-ingest = { path = "src/api/ingest" }
 openobserve-api-management = { path = "src/api/management" }
 openobserve-api-pipelines = { path = "src/api/pipelines" }
 openobserve-api-search = { path = "src/api/search" }
-openobserve-http-common = { path = "src/api/common" }
 openobserve-jobs = { path = "src/jobs" }
 openobserve-mcp = { path = "src/mcp" }
 o2_dex = { path = "src/enterprise/o2_dex" }
@@ -444,7 +444,7 @@ datafusion-proto = "54"
 datafusion-functions-aggregate-common = "54"
 datafusion-functions-json = { git = "https://github.com/openobserve/datafusion-functions-json", rev = "0df53d710425cc91cf109e77a050bbe1e374e4fe" }
 expect-test = "1.4"
-arrow = { version = "58", features = ["ipc_compression"] }
+arrow = { version = "58", features = ["ipc_compression", "prettyprint"] }
 arrow-flight = "58"
 arrow-json = "58"
 arrow-schema = { version = "58", features = ["serde"] }
@@ -591,8 +591,10 @@ utoipa-swagger-ui = { version = "9", features = ["axum", "vendored"] }
 uuid = { version = "1.20", features = ["v7"] }
 vector-enrichment = { version = "0.1.0", package = "enrichment", git = "https://github.com/openobserve/vector", branch = "branch-v0.54" }
 vrl = { version = "0.31", features = [
+    "arbitrary",
     "value",
     "compiler",
+    "test",
 ] }
 x509-parser = "0.18.0"
 zip = "8.0"

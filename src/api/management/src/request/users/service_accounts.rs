@@ -25,7 +25,7 @@ use {
     config::utils::time::now_micros,
     o2_dex::{config::get_config as get_dex_config, service::auth::get_dex_jwks},
     o2_enterprise::enterprise::common::auditor::{AuditMessage, Protocol, ResponseMeta},
-    openobserve_http_common::auth::jwt::process_token,
+    openobserve_api_common::auth::jwt::process_token,
 };
 
 #[cfg(feature = "enterprise")]

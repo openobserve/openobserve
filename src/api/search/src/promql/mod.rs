@@ -27,8 +27,8 @@ use config::{
 use futures::StreamExt;
 use infra::errors;
 use ingestion_common::IngestUser;
+use openobserve_api_common::extractors::Headers;
 use openobserve_core::{auth::UserEmail, metrics};
-use openobserve_http_common::extractors::Headers;
 use promql_parser::parser;
 use promql_service as core_promql;
 #[cfg(feature = "enterprise")]

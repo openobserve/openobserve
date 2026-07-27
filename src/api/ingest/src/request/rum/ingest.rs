@@ -24,13 +24,13 @@ use axum::{
 use config::utils::json;
 use flate2::read::ZlibDecoder;
 use ingestion_common::{IngestUser, IngestionRequest};
+use openobserve_api_common::extractors::Headers;
 use openobserve_core::auth::UserEmail;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use crate::{
     common::meta::{http::HttpResponse as MetaHttpResponse, middleware_data::RumExtraData},
-    handler::http::extractors::Headers,
     service::logs,
 };
 

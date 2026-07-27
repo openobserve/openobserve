@@ -42,8 +42,8 @@ use config::{
 use futures::stream::StreamExt;
 use hashbrown::HashMap;
 use infra::errors;
+use openobserve_api_common::extractors::Headers;
 use openobserve_core::auth::UserEmail;
-use openobserve_http_common::extractors::Headers;
 use search_service::{
     self as SearchService, query_range::get_settings_max_query_range,
     streaming::process_search_stream_request_multi,

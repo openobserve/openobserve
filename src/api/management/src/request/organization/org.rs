@@ -24,11 +24,11 @@ use config::meta::cluster::NodeInfo;
 use db::user::is_root_user;
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
+use openobserve_api_common::extractors::Headers;
 use openobserve_core::{
     auth::{UserEmail, check_permissions},
     organization::{self, get_passcode, get_rum_token, update_passcode, update_rum_token},
 };
-use openobserve_http_common::extractors::Headers;
 #[cfg(feature = "cloud")]
 use {
     axum::body::Body,
