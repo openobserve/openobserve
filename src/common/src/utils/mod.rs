@@ -16,6 +16,7 @@
 pub mod http;
 pub mod jwt;
 pub mod redirect_response;
+pub mod sql;
 pub mod ssrf_guard;
 
 // TODO: in a separate PR combine this with jobs/mod duplication perhaps?
