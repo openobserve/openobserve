@@ -495,10 +495,12 @@ const useLogs = () => {
       (_field) => _field !== (store?.state?.zoConfig?.timestamp_column || "_timestamp"),
     );
 
-    // selectedStream array is coerced to its comma-joined string form as key
-    let colOrder = searchObj.data.resultGrid.colOrder[
-      searchObj.data.stream.selectedStream.join(",")
-    ].filter((_field) => _field !== (store?.state?.zoConfig?.timestamp_column || "_timestamp"));
+    // selectedStream array is coerced to its comma-joined string form as key.
+    // The entry may not exist yet: the table only reports a column order after
+    // the user actually reorders columns, so treat "no entry" as "no order".
+    let colOrder = (
+      searchObj.data.resultGrid.colOrder[searchObj.data.stream.selectedStream.join(",")] ?? []
+    ).filter((_field) => _field !== (store?.state?.zoConfig?.timestamp_column || "_timestamp"));
 
     // Skip reordering when colOrder is empty to prevent unstable sort in Firefox
     if (colOrder.length === 0) {

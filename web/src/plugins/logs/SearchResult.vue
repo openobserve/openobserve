@@ -2283,7 +2283,7 @@ export default defineComponent({
   height: 1.25rem !important;
   /* Definite width matching the w-4 expand cell — NOT 100%: a percent-width
      child inside the auto-layout table is circular, and Chromium resolves it
-     by inflating the table to its 500000px cap, pushing all data off-screen. */
+     by inflating the table to its 500000-pixel cap, pushing all data off-screen. */
   width: 1rem !important;
   min-height: 0 !important;
 }
