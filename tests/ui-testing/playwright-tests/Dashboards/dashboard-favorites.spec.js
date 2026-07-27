@@ -162,6 +162,17 @@ test.describe("dashboard favorites testcases", () => {
   });
 
   test.afterEach(async ({ page }) => {
+    // Un-favorite before deleting the folder. Deleting a folder does not
+    // prune favorites for the dashboards inside it, so without this, tests
+    // that favorite a dashboard but don't themselves delete it (add /
+    // persist-across-reload) leave a ghost favorite on the shared test
+    // account forever — best-effort since the dashboard/folder may already
+    // be gone if the test deleted it itself.
+    await pm.dashboardFolder.searchFolder(folderName).catch(() => {});
+    await pm.dashboardFolder.openFolderByName(folderName).catch(() => {});
+    await pm.dashboardFavorites.searchDashboard(dashboardName).catch(() => {});
+    await pm.dashboardFavorites.unfavoriteIfFavorited(dashboardName).catch(() => {});
+
     // Best-effort cleanup: the folder may already be gone if the test deleted
     // its dashboard, and a failing test should surface its own error rather
     // than a teardown error.

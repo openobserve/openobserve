@@ -150,6 +150,21 @@ export default class DashboardFavorites {
     );
   }
 
+  // Teardown helper: un-favorite if (and only if) still favorited, without
+  // throwing if the dashboard is already gone. Deleting a folder does not
+  // prune favorites for the dashboards inside it (a real app bug, tracked
+  // separately) — every test that favorites a dashboard but doesn't itself
+  // delete it would otherwise leave a ghost favorite behind forever on the
+  // shared test account. Call this before deleteFolder in afterEach.
+  async unfavoriteIfFavorited(dashboardName) {
+    const toggle = this.getFavoriteToggle(dashboardName);
+    if ((await toggle.count()) === 0) return;
+    const classAttr = (await toggle.getAttribute("class")) ?? "";
+    if (/text-favorite/.test(classAttr)) {
+      await toggle.click();
+    }
+  }
+
   // ── Presence assertions ────────────────────────────────────────────────
 
   async verifyDashboardVisible(dashboardName) {
