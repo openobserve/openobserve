@@ -77,9 +77,9 @@ pub enum MultiAlertError {
 impl std::fmt::Display for MultiAlertError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::NotGrouped => f.write_str(
-                "per-group alerting requires at least one group_by column",
-            ),
+            Self::NotGrouped => {
+                f.write_str("per-group alerting requires at least one group_by column")
+            }
             Self::CountGateNotAnyGroup => f.write_str(
                 "per-group alerting fires on any breaching group, so it cannot be combined with a \
                  group-count threshold; remove the count threshold or turn off per-group alerting",
@@ -2683,7 +2683,10 @@ mod tests {
 
         let parsed: Aggregation =
             serde_json::from_value(stored).expect("legacy JSON must still parse");
-        assert!(!parsed.multi_alert, "an alert must never opt in by accident");
+        assert!(
+            !parsed.multi_alert,
+            "an alert must never opt in by accident"
+        );
     }
 
     #[test]
@@ -2695,7 +2698,10 @@ mod tests {
         // changed when we deployed Feature 3" read as "all of them".
         let off = agg_cfg(Some(&["host"]), Operator::GreaterThanEquals, false);
         assert!(
-            serde_json::to_value(&off).unwrap().get("multi_alert").is_none(),
+            serde_json::to_value(&off)
+                .unwrap()
+                .get("multi_alert")
+                .is_none(),
             "a false flag must not be written"
         );
 
@@ -2710,8 +2716,7 @@ mod tests {
     #[test]
     fn test_multi_alert_survives_a_serde_roundtrip() {
         let on = agg_cfg(Some(&["host"]), Operator::GreaterThanEquals, true);
-        let back: Aggregation =
-            serde_json::from_str(&serde_json::to_string(&on).unwrap()).unwrap();
+        let back: Aggregation = serde_json::from_str(&serde_json::to_string(&on).unwrap()).unwrap();
         assert_eq!(back, on);
         assert!(back.multi_alert);
     }
@@ -2861,11 +2866,7 @@ mod tests {
                 .to_string()
                 .contains("warning group-count")
         );
-        assert!(
-            MultiAlertError::NotGrouped
-                .to_string()
-                .contains("group_by")
-        );
+        assert!(MultiAlertError::NotGrouped.to_string().contains("group_by"));
         assert!(
             MultiAlertError::OperatorNotOrderable
                 .to_string()
