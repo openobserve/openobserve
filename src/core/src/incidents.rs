@@ -157,13 +157,15 @@ async fn get_event_metadata(
     Ok(ret)
 }
 
-pub async fn append_event(
+// NOTE: This is specifically for sending event trigger without appending event in db
+// This should ideally avoided for anything except created event, has its handling for db
+// is different than other event types. For anything other than create event, we should use the
+// append_event fn below
+pub async fn send_incident_event_trigger(
     org_id: &str,
     incident_id: &str,
     event: IncidentEvent,
 ) -> Result<(), anyhow::Error> {
-    infra::table::incident_events::append(org_id, incident_id, event.clone()).await?;
-
     let workflows = match get_all_associations_for_trigger_type(
         org_id,
         &WorkflowTriggerType::IncidentEvent.to_string(),
@@ -202,6 +204,17 @@ pub async fn append_event(
         )
         .await?;
     }
+    Ok(())
+}
+
+pub async fn append_event(
+    org_id: &str,
+    incident_id: &str,
+    event: IncidentEvent,
+) -> Result<(), anyhow::Error> {
+    infra::table::incident_events::append(org_id, incident_id, event.clone()).await?;
+
+    send_incident_event_trigger(org_id, incident_id, event).await?;
 
     Ok(())
 }

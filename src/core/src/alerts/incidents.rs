@@ -24,7 +24,7 @@ use config::{
         alert::Alert,
         incidents::{
             AlertEdge, AlertNode, CorrelationReason, EdgeType, Incident, IncidentAlert,
-            IncidentCorrelationOutcome, IncidentTopology, IncidentWithAlerts,
+            IncidentCorrelationOutcome, IncidentEvent, IncidentTopology, IncidentWithAlerts,
         },
     },
     utils::json::{Map, Value},
@@ -804,6 +804,20 @@ async fn create_new_incident(
     if let Err(e) = infra::table::incident_events::init(org_id, &incident.id).await {
         log::error!(
             "[Incidents] Failed to init events for incident {}: {e}",
+            incident.id
+        );
+    }
+
+    // error in sending workflow trigger should not block the incident flow
+    if let Err(e) = crate::incidents::send_incident_event_trigger(
+        org_id,
+        &incident.id,
+        IncidentEvent::created(),
+    )
+    .await
+    {
+        log::error!(
+            "error triggering workflow for incident created for {org_id} incident id {} : {e}",
             incident.id
         );
     }
