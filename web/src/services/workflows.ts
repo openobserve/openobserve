@@ -23,13 +23,7 @@ const workflows = {
   },
 
   // Save a new workflow.
-  createWorkflow: ({
-    org_identifier,
-    data,
-  }: {
-    org_identifier: string;
-    data: object;
-  }) => {
+  createWorkflow: ({ org_identifier, data }: { org_identifier: string; data: object }) => {
     const url = `/api/${org_identifier}/workflows`;
     return http().post(url, data);
   },
@@ -49,13 +43,7 @@ const workflows = {
   },
 
   // Delete a workflow by id.
-  deleteWorkflow: ({
-    org_identifier,
-    id,
-  }: {
-    org_identifier: string;
-    id: string;
-  }) => {
+  deleteWorkflow: ({ org_identifier, id }: { org_identifier: string; id: string }) => {
     const url = `/api/${org_identifier}/workflows/${id}`;
     return http().delete(url);
   },

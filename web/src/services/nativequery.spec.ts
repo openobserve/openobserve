@@ -58,10 +58,7 @@ describe("nativequery service", () => {
 
       await nativeQueries.runquery(data, organization);
 
-      expect(mockHttpInstance.post).toHaveBeenCalledWith(
-        `/api/${organization}/_search`,
-        data
-      );
+      expect(mockHttpInstance.post).toHaveBeenCalledWith(`/api/${organization}/_search`, data);
     });
 
     it("should use the organization in the URL path", async () => {
@@ -72,10 +69,7 @@ describe("nativequery service", () => {
 
       await nativeQueries.runquery(data, organization);
 
-      expect(mockHttpInstance.post).toHaveBeenCalledWith(
-        `/api/production-org/_search`,
-        data
-      );
+      expect(mockHttpInstance.post).toHaveBeenCalledWith(`/api/production-org/_search`, data);
     });
 
     it("should send the data object as the POST body", async () => {
@@ -109,10 +103,7 @@ describe("nativequery service", () => {
 
       await nativeQueries.runquery(data, organization);
 
-      expect(mockHttpInstance.post).toHaveBeenCalledWith(
-        `/api/dev-org/_search`,
-        data
-      );
+      expect(mockHttpInstance.post).toHaveBeenCalledWith(`/api/dev-org/_search`, data);
     });
 
     it("should work with an empty data object", async () => {
@@ -123,10 +114,7 @@ describe("nativequery service", () => {
 
       await nativeQueries.runquery(data, organization);
 
-      expect(mockHttpInstance.post).toHaveBeenCalledWith(
-        `/api/org123/_search`,
-        {}
-      );
+      expect(mockHttpInstance.post).toHaveBeenCalledWith(`/api/org123/_search`, {});
     });
   });
 
@@ -136,7 +124,7 @@ describe("nativequery service", () => {
       mockHttpInstance.post.mockRejectedValue(error);
 
       await expect(
-        nativeQueries.runquery({ query: { sql: "SELECT *" } }, "org123")
+        nativeQueries.runquery({ query: { sql: "SELECT *" } }, "org123"),
       ).rejects.toThrow("Network error");
     });
 
@@ -145,7 +133,7 @@ describe("nativequery service", () => {
       mockHttpInstance.post.mockRejectedValue(error);
 
       await expect(
-        nativeQueries.runquery({ query: { sql: "INVALID QUERY" } }, "org123")
+        nativeQueries.runquery({ query: { sql: "INVALID QUERY" } }, "org123"),
       ).rejects.toThrow("Invalid SQL query");
     });
 
@@ -153,9 +141,7 @@ describe("nativequery service", () => {
       const error = new Error("Unauthorized");
       mockHttpInstance.post.mockRejectedValue(error);
 
-      await expect(
-        nativeQueries.runquery({}, "org123")
-      ).rejects.toThrow("Unauthorized");
+      await expect(nativeQueries.runquery({}, "org123")).rejects.toThrow("Unauthorized");
     });
   });
 });

@@ -102,17 +102,17 @@ describe("TablePaginationControls", () => {
 
     it("should render rows per page dropdown when pagination is enabled", () => {
       wrapper = createWrapper({ showPagination: true });
-      expect(
-        wrapper.find('[data-test="dashboard-table-rows-per-page-select"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-table-rows-per-page-select"]').exists()).toBe(
+        true,
+      );
       expect(wrapper.text()).toContain("Rows per page");
     });
 
     it("should not render rows per page dropdown when pagination is disabled", () => {
       wrapper = createWrapper({ showPagination: false });
-      expect(
-        wrapper.find('[data-test="dashboard-table-rows-per-page-select"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="dashboard-table-rows-per-page-select"]').exists()).toBe(
+        false,
+      );
     });
 
     it("should render count display", () => {
@@ -643,9 +643,7 @@ describe("TablePaginationControls", () => {
       expect(buttons.length).toBeGreaterThan(0);
 
       buttons.forEach((btn) => {
-        expect(
-          btn.attributes("role") || btn.element.tagName.toLowerCase(),
-        ).toBeTruthy();
+        expect(btn.attributes("role") || btn.element.tagName.toLowerCase()).toBeTruthy();
       });
     });
 
@@ -656,9 +654,7 @@ describe("TablePaginationControls", () => {
         isFirstPage: true,
       });
 
-      const firstPageBtn = wrapper.find(
-        '[data-test="dashboard-table-pagination-first-page"]',
-      );
+      const firstPageBtn = wrapper.find('[data-test="dashboard-table-pagination-first-page"]');
 
       expect(firstPageBtn.attributes("disabled")).toBeDefined();
     });
@@ -667,34 +663,24 @@ describe("TablePaginationControls", () => {
   describe("data-test attributes", () => {
     it("should render root div with data-test=dashboard-table-pagination-controls", () => {
       wrapper = createWrapper();
-      expect(
-        wrapper.find('[data-test="dashboard-table-pagination-controls"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-table-pagination-controls"]').exists()).toBe(true);
     });
 
     it("should render rows-per-page label with data-test=dashboard-table-rows-per-page-label when pagination enabled", () => {
       wrapper = createWrapper({ showPagination: true });
-      expect(
-        wrapper
-          .find('[data-test="dashboard-table-rows-per-page-label"]')
-          .exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-table-rows-per-page-label"]').exists()).toBe(true);
     });
 
     it("should not render rows-per-page label when pagination is disabled", () => {
       wrapper = createWrapper({ showPagination: false });
-      expect(
-        wrapper
-          .find('[data-test="dashboard-table-rows-per-page-label"]')
-          .exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="dashboard-table-rows-per-page-label"]').exists()).toBe(
+        false,
+      );
     });
 
     it("should render count display with data-test=dashboard-table-row-count", () => {
       wrapper = createWrapper();
-      expect(
-        wrapper.find('[data-test="dashboard-table-row-count"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-table-row-count"]').exists()).toBe(true);
     });
 
     it("should show correct count text in the dashboard-table-row-count element", () => {

@@ -44,12 +44,12 @@ use infra::{
 };
 use ingestion_common::IngestionRequest;
 use proto::cluster_rpc::IngestionType;
+use usage_reporting::publish_triggers_usage;
 use vrl::compiler::runtime::Runtime;
 
 use super::{
     db::alerts::alert,
-    pipeline::{batch_execution::ExecutablePipeline, store as pipeline},
-    self_reporting::publish_triggers_usage,
+    pipeline::{batch_execution::ExecutablePipeline, db as pipeline},
 };
 use crate::{
     alerts::alert::AlertExt,

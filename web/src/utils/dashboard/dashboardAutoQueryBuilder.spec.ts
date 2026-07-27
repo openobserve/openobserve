@@ -572,7 +572,7 @@ describe("dashboardAutoQueryBuilder", () => {
       };
       const result = buildSQLChartQuery(config);
       expect(result).toContain("SELECT");
-      expect(result).toContain("FROM \"logs\"");
+      expect(result).toContain('FROM "logs"');
       expect(result).toContain("GROUP BY status_alias");
     });
 
@@ -1128,7 +1128,7 @@ describe("dashboardAutoQueryBuilder", () => {
         dashboardPanelData: mockDashboardPanelData,
       };
       const result = buildSQLChartQuery(config);
-      expect(result).toContain("FROM \"logs\"");
+      expect(result).toContain('FROM "logs"');
       expect(result).toContain("INNER JOIN");
     });
 
@@ -1965,7 +1965,7 @@ describe("dashboardAutoQueryBuilder", () => {
     it("should build map chart query", () => {
       const result = mapChart(mockDashboardPanelData);
       expect(result).toContain("SELECT");
-      expect(result).toContain("FROM \"logs\"");
+      expect(result).toContain('FROM "logs"');
       expect(result).toContain("GROUP BY name_alias");
       expect(result).toContain("LIMIT 100");
     });
@@ -2080,7 +2080,7 @@ describe("dashboardAutoQueryBuilder", () => {
     it("should build geo map chart query", () => {
       const result = geoMapChart(mockDashboardPanelData);
       expect(result).toContain("SELECT");
-      expect(result).toContain("FROM \"locations\"");
+      expect(result).toContain('FROM "locations"');
       expect(result).toContain("GROUP BY lat_alias, lon_alias");
     });
 
@@ -2194,7 +2194,7 @@ describe("dashboardAutoQueryBuilder", () => {
     it("should build sankey chart query", () => {
       const result = sankeyChartQuery(mockDashboardPanelData);
       expect(result).toContain("SELECT");
-      expect(result).toContain("FROM \"flows\"");
+      expect(result).toContain('FROM "flows"');
       expect(result).toContain("GROUP BY source_alias, target_alias");
     });
 

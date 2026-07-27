@@ -177,9 +177,7 @@ export const useSearchBar = () => {
           const extractTablesFromNode = (node: any, depth: number = 0) => {
             if (!node || depth > MAX_RECURSION_DEPTH) {
               if (depth > MAX_RECURSION_DEPTH) {
-                console.warn(
-                  "Maximum recursion depth reached while parsing SQL query",
-                );
+                console.warn("Maximum recursion depth reached while parsing SQL query");
               }
               return;
             }
@@ -233,8 +231,7 @@ export const useSearchBar = () => {
             return stream.table;
           }),
         );
-        let nextTable: ExtendedParsedSQLResult | null | undefined =
-          parsedSQL._next;
+        let nextTable: ExtendedParsedSQLResult | null | undefined = parsedSQL._next;
         //this will handle the union queries
         while (nextTable) {
           // Map through each "from" array in the _next object, as it can contain multiple tables
@@ -266,10 +263,7 @@ export const useSearchBar = () => {
       }
 
       if (
-        !arraysMatch(
-          searchObj.data.stream.selectedStream,
-          newSelectedStreams,
-        ) &&
+        !arraysMatch(searchObj.data.stream.selectedStream, newSelectedStreams) &&
         isStreamFetched(searchObj.data.stream.streamType) &&
         isStreamExists(
           newSelectedStreams[newSelectedStreams.length - 1],
@@ -332,9 +326,7 @@ export const useSearchBar = () => {
       }
 
       // Update selected fields if needed
-      const streamFieldNames = new Set(
-        allStreamFields.map((item) => item.name),
-      );
+      const streamFieldNames = new Set(allStreamFields.map((item) => item.name));
       // Clear carried-over display columns; the post-search fill-rate check
       // then picks a fresh default FTS column for the new stream.
       searchObj.data.stream.selectedFields = [];
@@ -348,8 +340,7 @@ export const useSearchBar = () => {
 
       // Replace field list in query
       const fieldList =
-        searchObj.meta.quickMode &&
-        searchObj.data.stream.interestingFieldList.length > 0
+        searchObj.meta.quickMode && searchObj.data.stream.interestingFieldList.length > 0
           ? searchObj.data.stream.interestingFieldList
               .map((field: string) => quoteSqlIdentifierIfNeeded(field))
               .join(",")
@@ -390,10 +381,7 @@ export const useSearchBar = () => {
         };
         await extractFields();
         // In live mode, auto-run the query after fields are loaded
-        if (
-          store.state.zoConfig.auto_query_enabled &&
-          searchObj.meta.liveMode
-        ) {
+        if (store.state.zoConfig.auto_query_enabled && searchObj.meta.liveMode) {
           searchObj.meta.refreshHistogram = true;
           await handleQueryData();
         } else {
@@ -461,9 +449,7 @@ export const useSearchBar = () => {
       // Fire result_schema with cross_linking=true in parallel (for cross-linking feature)
       // Use buildSearch(true) to get the actual query (works for both sqlMode and non-sqlMode)
       const crossLinkStreamType = searchObj.data.stream.streamType || "logs";
-      if (
-        isCrossLinkingEnabledForStream(store.state.zoConfig, crossLinkStreamType)
-      ) {
+      if (isCrossLinkingEnabledForStream(store.state.zoConfig, crossLinkStreamType)) {
         const searchPayload = buildSearch(true);
         const crossLinkQuery = searchPayload?.query?.sql;
         // Store the built query so resolveCrossLinkUrl can use it (searchObj.data.query is empty in non-SQL mode)
@@ -508,9 +494,7 @@ export const useSearchBar = () => {
               };
               for (const res of responses) {
                 if (!res?.data?.cross_links) continue;
-                mergedLinks.stream_links.push(
-                  ...res.data.cross_links.stream_links,
-                );
+                mergedLinks.stream_links.push(...res.data.cross_links.stream_links);
                 // org_links are common across all streams, take from first response
                 if (mergedLinks.org_links.length === 0) {
                   mergedLinks.org_links = res.data.cross_links.org_links;
@@ -863,9 +847,7 @@ export const useSearchBar = () => {
       //   e,
       // );
       searchObj.loading = false;
-      showErrorNotification(
-        notificationMsg.value || "Error occurred during the search operation.",
-      );
+      showErrorNotification(notificationMsg.value || "Error occurred during the search operation.");
       notificationMsg.value = "";
     }
   };
@@ -908,16 +890,13 @@ export const useSearchBar = () => {
           .catch((error: any) => {
             toast({
               variant: "error",
-              message:
-                error.response?.data?.message ||
-                "Failed to cancel running query",
+              message: error.response?.data?.message || "Failed to cancel running query",
             });
           })
           .finally(() => {
-            searchObj.data.searchRequestTraceIds =
-              searchObj.data.searchRequestTraceIds.filter(
-                (id: string) => !tracesIds.includes(id),
-              );
+            searchObj.data.searchRequestTraceIds = searchObj.data.searchRequestTraceIds.filter(
+              (id: string) => !tracesIds.includes(id),
+            );
             resolve(true);
           });
       } catch (error) {

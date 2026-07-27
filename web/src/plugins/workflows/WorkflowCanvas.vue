@@ -82,7 +82,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #top>
         <ControlButton
           data-test="workflow-palette-collapse-btn"
-          :title="workflowObj.showNodePalette ? t('pipeline.collapseNodes') : t('pipeline.openNodes')"
+          :title="
+            workflowObj.showNodePalette ? t('pipeline.collapseNodes') : t('pipeline.openNodes')
+          "
           @click="workflowObj.showNodePalette = !workflowObj.showNodePalette"
         >
           <!-- » chevrons; mirrored in place to « once the rail is open. -->
@@ -122,16 +124,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          `transform-origin:0 0` (which scaled it toward the top-left). -->
     <div
       data-test="workflow-flow-start-node"
-      class="vue-flow__node vue-flow__node-input relative! origin-top! w-max whitespace-nowrap scale-[var(--ghost-zoom,1)] cursor-pointer!"
+      class="vue-flow__node vue-flow__node-input relative! w-max origin-top! scale-[var(--ghost-zoom,1)] cursor-pointer! whitespace-nowrap"
       :style="{ '--ghost-zoom': viewport.zoom }"
       @click="openTriggerPicker($event)"
     >
-      <FlowNodeCard
-        icon="add"
-        io-type="input"
-        :has-input="false"
-        :has-output="false"
-      >
+      <FlowNodeCard icon="add" io-type="input" :has-input="false" :has-output="false">
         <template #body>{{ t("workflow.chooseTrigger") }}</template>
       </FlowNodeCard>
     </div>
@@ -169,8 +166,7 @@ const {
   openTriggerPicker,
 } = useWorkflowCanvas();
 
-const { onNodesInitialized, setViewport, viewport, dimensions, findNode } =
-  useVueFlow();
+const { onNodesInitialized, setViewport, viewport, dimensions, findNode } = useVueFlow();
 
 const vueFlowRef = ref<any>(null);
 // Read-only inspection canvas (the Runs view) — disables node drag/connect and,
@@ -195,9 +191,7 @@ let centered = false;
 onNodesInitialized(() => {
   if (centered) return;
   const nodes = workflowObj.currentSelectedWorkflow.nodes;
-  const trigger = nodes.find(
-    (n: any) => n.data?.node_type === "workflow_trigger",
-  );
+  const trigger = nodes.find((n: any) => n.data?.node_type === "workflow_trigger");
   if (!trigger) return;
   const nodeW = findNode(trigger.id)?.dimensions?.width;
   const paneW = dimensions.value?.width;

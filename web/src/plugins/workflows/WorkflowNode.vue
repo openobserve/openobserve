@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           variant="ghost"
           size="icon"
-          class="min-w-5! w-5! h-5! p-0! rounded-default! bg-surface-overlay/95! border! border-status-negative! text-status-negative!"
+          class="rounded-default! bg-surface-overlay/95! border-status-negative! text-status-negative! h-5! w-5! min-w-5! border! p-0!"
           :data-test="`workflow-node-${data?.node_type}-delete-btn`"
           @click.stop="requestDeleteNode(id)"
         >
@@ -106,21 +106,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div
         v-else-if="testStatus === 'error'"
-        class="wf-test-badge wf-test-pop nodrag bg-status-negative text-white cursor-pointer transition-transform duration-150 hover:scale-110"
+        class="wf-test-badge wf-test-pop nodrag bg-status-negative cursor-pointer text-white transition-transform duration-150 hover:scale-110"
         :data-test="`workflow-node-${data?.node_type}-test-error`"
         @pointerdown.stop
         @click.stop="openResult"
       >
         <OIcon name="error" size="xs" />
-        <span v-if="errorCount > 1" class="wf-test-count bg-white text-status-negative">{{ errorCount }}</span>
+        <span v-if="errorCount > 1" class="wf-test-count text-status-negative bg-white">{{
+          errorCount
+        }}</span>
         <OTooltip side="top" align="center" :side-offset="8" max-width="360px">
           <template #content>
-            <div class="p-2 text-left flex flex-col gap-1">
-              <div
-                v-for="(m, i) in errorMessages"
-                :key="i"
-                class="text-xs leading-[1.35]"
-              >
+            <div class="flex flex-col gap-1 p-2 text-left">
+              <div v-for="(m, i) in errorMessages" :key="i" class="text-xs leading-[1.35]">
                 {{ m }}
               </div>
             </div>
@@ -128,7 +126,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OTooltip>
       </div>
     </template>
-
   </FlowNodeCard>
 </template>
 

@@ -124,9 +124,7 @@ describe("DashboardErrors", () => {
     it("renders the OSeparator", () => {
       wrapper = mountComponent(["Test error"]);
 
-      expect(
-        wrapper.find('[data-test="dashboard-error-separator"]').exists()
-      ).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-error-separator"]').exists()).toBe(true);
     });
 
     it("renders numeric and boolean error values as strings", () => {
@@ -310,7 +308,8 @@ describe("DashboardErrors", () => {
           stubs: {
             OSeparator: { template: '<hr data-test="dashboard-error-separator" />' },
             OIcon: {
-              template: '<span data-test="dashboard-error-icon" :data-name="name">{{ name }}</span>',
+              template:
+                '<span data-test="dashboard-error-icon" :data-name="name">{{ name }}</span>',
               props: ["name", "size"],
             },
           },

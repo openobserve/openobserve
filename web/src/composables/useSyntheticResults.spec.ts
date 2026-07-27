@@ -60,8 +60,7 @@ describe("useSyntheticResults", () => {
         },
       ]);
 
-    const { kpi, runs, loading, hasLoadedOnce, fetchAll } =
-      useSyntheticResults();
+    const { kpi, runs, loading, hasLoadedOnce, fetchAll } = useSyntheticResults();
 
     await fetchAll("mon-1", 1_700_000_000_000_000, 1_700_003_600_000_000);
 

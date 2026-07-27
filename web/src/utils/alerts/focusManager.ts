@@ -46,7 +46,7 @@ export class AlertFocusManager {
    * @param fieldId The field to focus
    * @param behavior Scroll behavior ('smooth' or 'auto')
    */
-  focusField(fieldId: string, behavior: ScrollBehavior = 'smooth') {
+  focusField(fieldId: string, behavior: ScrollBehavior = "smooth") {
     const field = this.fields.get(fieldId);
     if (!field) {
       console.warn(`Field "${fieldId}" not registered in focus manager`);
@@ -111,12 +111,12 @@ export class AlertFocusManager {
     setTimeout(() => {
       element.scrollIntoView({
         behavior,
-        block: 'center',
-        inline: 'nearest'
+        block: "center",
+        inline: "nearest",
       });
 
       // Add highlight class
-      element.classList.add('alert-field-highlight');
+      element.classList.add("alert-field-highlight");
     }, 50);
 
     // Clear any existing timeout
@@ -128,7 +128,7 @@ export class AlertFocusManager {
     // Remove highlight after duration
     const duration = field.highlightDuration || 2500;
     const timeout = window.setTimeout(() => {
-      element?.classList.remove('alert-field-highlight');
+      element?.classList.remove("alert-field-highlight");
       this.highlightTimeouts.delete(fieldId);
     }, duration);
 
@@ -149,14 +149,14 @@ export class AlertFocusManager {
     // Look for common input types
     const selectors = [
       'input:not([type="hidden"])',
-      'select',
-      'textarea',
-      '[contenteditable="true"]'
+      "select",
+      "textarea",
+      '[contenteditable="true"]',
     ];
 
     for (const selector of selectors) {
       const element = container.querySelector(selector) as HTMLElement;
-      if (element && !element.hasAttribute('disabled') && !element.hasAttribute('readonly')) {
+      if (element && !element.hasAttribute("disabled") && !element.hasAttribute("readonly")) {
         return element;
       }
     }
@@ -168,7 +168,7 @@ export class AlertFocusManager {
    * Clear all fields and timeouts
    */
   clear() {
-    this.highlightTimeouts.forEach(timeout => clearTimeout(timeout));
+    this.highlightTimeouts.forEach((timeout) => clearTimeout(timeout));
     this.highlightTimeouts.clear();
     this.fields.clear();
   }

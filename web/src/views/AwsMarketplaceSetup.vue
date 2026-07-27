@@ -15,8 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="aws-marketplace-setup min-h-screen bg-surface-base">
-    <div class="flex relative-position px-3 pt-2">
+  <div class="aws-marketplace-setup bg-surface-base min-h-screen">
+    <div class="relative-position flex px-3 pt-2">
       <img
         data-test="aws-marketplace-setup-logo"
         class="h-10"
@@ -29,45 +29,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </div>
 
-    <div class="max-w-125 mx-auto pt-15 p-6">
+    <div class="mx-auto max-w-125 p-6 pt-15">
       <!-- No Token Error -->
       <div v-if="state === 'no_token'" class="text-center">
-        <OIcon name="warning" style="width: 80px; height: 80px;" />
+        <OIcon name="warning" style="width: 80px; height: 80px" />
         <h5 class="mt-3">No Marketplace Token Found</h5>
         <p class="text-text-secondary">
           Please start the registration process from AWS Marketplace.
         </p>
-        <OButton
-          variant="primary"
-          size="sm-action"
-          class="mt-4"
-          @click="goToDashboard"
-        >Go to Dashboard</OButton>
+        <OButton variant="primary" size="sm-action" class="mt-4" @click="goToDashboard"
+          >Go to Dashboard</OButton
+        >
       </div>
 
       <!-- Error State -->
       <div v-else-if="state === 'error'" class="text-center">
-        <OIcon name="error" style="width: 80px; height: 80px;" />
+        <OIcon name="error" style="width: 80px; height: 80px" />
         <h5 class="mt-3">{{ errorMessage }}</h5>
-        <OButton
-          variant="primary"
-          size="sm-action"
-          class="mt-4"
-          @click="resetAndRetry"
-        >Try Again</OButton>
+        <OButton variant="primary" size="sm-action" class="mt-4" @click="resetAndRetry"
+          >Try Again</OButton
+        >
       </div>
 
       <!-- Org Selection/Creation -->
       <div v-else-if="state === 'select_org'" class="text-center">
-        <OIcon name="cloud" style="width: 60px; height: 60px;" />
+        <OIcon name="cloud" style="width: 60px; height: 60px" />
         <h4 class="mt-3">Complete AWS Marketplace Setup</h4>
         <p class="text-text-secondary mb-4">
           Link your AWS Marketplace subscription to an organization
         </p>
 
-        <div class="max-w-100 mx-auto">
+        <div class="mx-auto max-w-100">
           <!-- Create New Org -->
-          <OCard class="rounded-default transition-all duration-200 hover:shadow-[0_4px_12px_rgba(0,0,0,0.1)] mb-4">
+          <OCard
+            class="rounded-default mb-4 transition-all duration-200 hover:shadow-[0_4px_12px_rgba(0,0,0,0.1)]"
+          >
             <OCardSection role="body">
               <div class="text-xl font-semibold">Create New Organization</div>
               <p class="text-text-secondary">
@@ -94,7 +90,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   size="sm-action"
                   block
                   :loading="isSubmitting"
-                >Create &amp; Link</OButton>
+                  >Create &amp; Link</OButton
+                >
               </OForm>
             </OCardSection>
           </OCard>
@@ -106,9 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <OCardSection role="body">
               <div class="text-xl font-semibold">Link to Existing Organization</div>
-              <p class="text-text-secondary">
-                Link AWS billing to an existing organization
-              </p>
+              <p class="text-text-secondary">Link AWS billing to an existing organization</p>
               <OForm
                 id="aws-link-org-form"
                 :schema="awsLinkOrgSchema"
@@ -132,7 +127,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   size="sm-action"
                   block
                   :loading="isSubmitting"
-                >Link AWS Billing</OButton>
+                  >Link AWS Billing</OButton
+                >
               </OForm>
             </OCardSection>
           </OCard>
@@ -159,26 +155,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Success State -->
       <div v-else-if="state === 'success'" class="text-center">
-        <OIcon name="check-circle" style="width: 80px; height: 80px;" />
+        <OIcon name="check-circle" style="width: 80px; height: 80px" />
         <h4 class="mt-3">Subscription Activated!</h4>
-        <p class="text-text-secondary">
-          Your AWS Marketplace subscription is now active.
-        </p>
-        <OButton
-          variant="primary"
-          size="sm-action"
-          class="mt-4"
-          @click="goToDashboard"
-        >Go to Dashboard</OButton>
+        <p class="text-text-secondary">Your AWS Marketplace subscription is now active.</p>
+        <OButton variant="primary" size="sm-action" class="mt-4" @click="goToDashboard"
+          >Go to Dashboard</OButton
+        >
       </div>
 
       <!-- Payment Failed State -->
       <div v-else-if="state === 'payment_failed'" class="text-center">
-        <OIcon name="error" style="width: 80px; height: 80px;" />
+        <OIcon name="error" style="width: 80px; height: 80px" />
         <h5 class="mt-3">Payment Failed</h5>
         <p class="text-text-secondary">
-          There was an issue with your AWS Marketplace payment. Please check
-          your AWS account or contact AWS support.
+          There was an issue with your AWS Marketplace payment. Please check your AWS account or
+          contact AWS support.
         </p>
         <OButton
           as="a"
@@ -186,7 +177,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="primary"
           size="sm-action"
           class="mt-4"
-        >Contact Support</OButton>
+          >Contact Support</OButton
+        >
       </div>
     </div>
   </div>
@@ -231,9 +223,7 @@ type SetupState =
 
 export default defineComponent({
   name: "AwsMarketplaceSetup",
-  components: { OButton, OSpinner, OForm, OFormInput, OFormSelect,
-    OIcon, OCard, OCardSection,
-},
+  components: { OButton, OSpinner, OForm, OFormInput, OFormSelect, OIcon, OCard, OCardSection },
   setup() {
     const store = useStore();
     const { isDark } = useTheme();
@@ -246,22 +236,20 @@ export default defineComponent({
 
     const state = ref<SetupState>("select_org");
     const errorMessage = ref("");
-    const eligibleOrganizations = ref<{ identifier: string; name: string }[]>(
-      []
-    );
+    const eligibleOrganizations = ref<{ identifier: string; name: string }[]>([]);
     const token = ref("");
     const activatedOrgId = ref("");
     let pollInterval: ReturnType<typeof setInterval> | null = null;
 
     // Helper to get cookie value
     const getCookie = (name: string): string | null => {
-      const match = document.cookie.match(new RegExp('(^|; )' + name + '=([^;]+)'));
+      const match = document.cookie.match(new RegExp("(^|; )" + name + "=([^;]+)"));
       return match ? decodeURIComponent(match[2]) : null;
     };
 
     // Helper to delete cookie
     const deleteCookie = (name: string) => {
-      document.cookie = name + '=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+      document.cookie = name + "=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;";
     };
 
     onMounted(async () => {
@@ -315,8 +303,7 @@ export default defineComponent({
       } catch (error: any) {
         console.error("Failed to create organization:", error);
         state.value = "error";
-        errorMessage.value =
-          error.response?.data?.message || "Failed to create organization";
+        errorMessage.value = error.response?.data?.message || "Failed to create organization";
       }
     };
 
@@ -324,18 +311,13 @@ export default defineComponent({
     const linkToExistingOrg = async (value: AwsLinkOrgForm) => {
       state.value = "processing";
 
-      const org = eligibleOrganizations.value.find(
-        (o) => o.identifier === value.selectedOrg,
-      );
+      const org = eligibleOrganizations.value.find((o) => o.identifier === value.selectedOrg);
       await linkSubscription(value.selectedOrg, org?.name ?? value.selectedOrg);
     };
 
     const linkSubscription = async (orgId: string, orgLabel: string) => {
       try {
-        const response = await awsMarketplace.linkSubscription(
-          orgId,
-          token.value
-        );
+        const response = await awsMarketplace.linkSubscription(orgId, token.value);
 
         if (response.data.success) {
           // Clear the token cookie immediately after successful link
@@ -354,16 +336,11 @@ export default defineComponent({
       } catch (error: any) {
         console.error("Failed to link subscription:", error);
         state.value = "error";
-        errorMessage.value =
-          error.response?.data?.message || "Failed to link AWS subscription";
+        errorMessage.value = error.response?.data?.message || "Failed to link AWS subscription";
       }
     };
 
-    const startPolling = (
-      orgId: string,
-      customerIdentifier: string,
-      orgLabel: string,
-    ) => {
+    const startPolling = (orgId: string, customerIdentifier: string, orgLabel: string) => {
       let attempts = 0;
       const maxAttempts = 60; // 5 minutes at 5 second intervals
 
@@ -371,10 +348,7 @@ export default defineComponent({
         attempts++;
 
         try {
-          const response = await awsMarketplace.getActivationStatus(
-            orgId,
-            customerIdentifier
-          );
+          const response = await awsMarketplace.getActivationStatus(orgId, customerIdentifier);
 
           const status = response.data.status;
 
@@ -408,9 +382,7 @@ export default defineComponent({
     const goToDashboard = () => {
       router.push({
         path: "/",
-        query: activatedOrgId.value
-          ? { org_identifier: activatedOrgId.value }
-          : undefined,
+        query: activatedOrgId.value ? { org_identifier: activatedOrgId.value } : undefined,
       });
     };
 

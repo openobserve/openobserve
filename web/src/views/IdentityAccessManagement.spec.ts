@@ -29,7 +29,6 @@ vi.mock("@/composables/useIsMetaOrg", () => ({
   }),
 }));
 
-
 /** Helper: collect all items from sectionGroups (flattened, excluding hidden ones) */
 function visibleItems(sectionGroups: any[]): any[] {
   return sectionGroups.flatMap((g: any) =>
@@ -45,8 +44,7 @@ function allItems(sectionGroups: any[]): any[] {
 const defaultStubs = {
   RouterView: { template: "<div>Router View</div>" },
   OPageLayout: {
-    template:
-      '<div><slot name="sidebar" /><slot /></div>',
+    template: '<div><slot name="sidebar" /><slot /></div>',
   },
   SectionRail: true,
 };
@@ -154,9 +152,7 @@ describe("IdentityAccessManagement.vue Component", () => {
 
     it("should always include ingestionTokens item", () => {
       const items = allItems(wrapper.vm.sectionGroups);
-      const hasTokens = items.some(
-        (item: any) => item.key === "ingestionTokens",
-      );
+      const hasTokens = items.some((item: any) => item.key === "ingestionTokens");
       expect(hasTokens).toBe(true);
     });
 
@@ -315,8 +311,7 @@ describe("IdentityAccessManagement.vue Component", () => {
     });
 
     it("should handle isEnterprise flag", () => {
-      const isEnterprise =
-        config.isEnterprise === "true" || config.isCloud === "true";
+      const isEnterprise = config.isEnterprise === "true" || config.isCloud === "true";
       expect(typeof isEnterprise).toBe("boolean");
     });
 

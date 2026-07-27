@@ -25,36 +25,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     }"
     bleed
   >
-      <template #title>
-        <span data-test="add-action-script-title">{{
-          isEditingActionScript ? t("actions.update") : t("actions.add")
-        }}</span>
-      </template>
+    <template #title>
+      <span data-test="add-action-script-title">{{
+        isEditingActionScript ? t("actions.update") : t("actions.add")
+      }}</span>
+    </template>
 
     <!-- Inline (full-page) form. The footer Save lives INSIDE the <OForm>, so it
          is `type="submit"` and Enter submits natively — no `form-id` needed. -->
-    <OForm
-      :form="form"
-      v-slot="{ isSubmitting }"
-      class="w-full flex-1 min-h-0 flex flex-col"
-    >
-      <div class="w-full flex-1 min-h-0 px-2.5 pb-2.5 pt-1">
+    <OForm :form="form" v-slot="{ isSubmitting }" class="flex min-h-0 w-full flex-1 flex-col">
+      <div class="min-h-0 w-full flex-1 px-2.5 pt-1 pb-2.5">
         <div
           class="bg-card-glass-bg overflow-auto"
           style="max-height: calc(100vh - var(--navbar-height) - 157px)"
         >
-          <div
-            ref="addAlertFormRef"
-            class="px-4 pb-3"
-            style="width: 1024px"
-          >
-            <div
-              class="create-report-form"
-            >
-              <div
-                data-test="add-action-script-name-input-wrapper"
-                class="report-name-input pt-3"
-              >
+          <div ref="addAlertFormRef" class="px-4 pb-3" style="width: 1024px">
+            <div class="create-report-form">
+              <div data-test="add-action-script-name-input-wrapper" class="report-name-input pt-3">
                 <OFormInput
                   data-test="add-action-script-name-input"
                   name="name"
@@ -90,13 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </div>
 
-              <OStepper
-                v-model="step"
-                orientation="vertical"
-                animated
-                navigable
-                class="mb-3"
-              >
+              <OStepper v-model="step" orientation="vertical" animated navigable class="mb-3">
                 <OStep
                   data-test="add-action-script-step-1"
                   :name="1"
@@ -104,14 +85,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   icon="edit"
                   :done="step > 1"
                 >
-                  <div
-                    data-test="add-action-script-file-input"
-                    class="flex items-center"
-                  >
+                  <div data-test="add-action-script-file-input" class="flex items-center">
                     <OFormFile
-                      v-if="
-                        !isEditingActionScript || formData.fileNameToShow == ''
-                      "
+                      v-if="!isEditingActionScript || formData.fileNameToShow == ''"
                       name="codeZip"
                       :label="t('actions.zipFile')"
                       :required="!isEditingActionScript"
@@ -119,16 +95,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="add-action-script-file-input"
                     >
                       <template #hint>
-                        Note: Only .zip files are accepted and it may contain
-                        various resources such as .py, .txt and main.py file etc.
+                        Note: Only .zip files are accepted and it may contain various resources such
+                        as .py, .txt and main.py file etc.
                       </template>
                     </OFormFile>
 
-                    <div
-                      v-else-if="
-                        isEditingActionScript && formData.fileNameToShow != ''
-                      "
-                    >
+                    <div v-else-if="isEditingActionScript && formData.fileNameToShow != ''">
                       {{ formData.fileNameToShow }}
                       <OButton
                         data-test="add-action-script-edit-file-btn"
@@ -139,10 +111,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       /></OButton>
                     </div>
                     <div
-                      v-if="
-                        isEditingActionScript && formData.fileNameToShow == ''
-                      "
-                      class="pt-3 mt-1 pl-3"
+                      v-if="isEditingActionScript && formData.fileNameToShow == ''"
+                      class="mt-1 pt-3 pl-3"
                     >
                       <OButton
                         data-test="cancel-upload-new-btn-file"
@@ -153,14 +123,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       >
                     </div>
                   </div>
-                  <div class="flex gap-2 mt-8">
+                  <div class="mt-8 flex gap-2">
                     <OButton
                       data-test="add-action-script-step1-continue-btn"
                       variant="primary"
                       size="sm"
-                      @click="
-                        goToStep(['codeZip'], formType === 'scheduled' ? 2 : 3)
-                      "
+                      @click="goToStep(['codeZip'], formType === 'scheduled' ? 2 : 3)"
                       >Continue</OButton
                     >
                   </div>
@@ -178,16 +146,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div class="my-2 px-2">
                     <div
                       style="font-size: var(--text-sm)"
-                      class="font-bold text-text-secondary mb-2"
+                      class="text-text-secondary mb-2 font-bold"
                       data-test="add-action-script-frequency-title"
                     >
                       {{ t("actions.frequency") }} *
                     </div>
-                    <div class="p-1 rounded-default border border-card-glass-border w-fit">
-                      <template
-                        v-for="visual in frequencyTabs"
-                        :key="visual.value"
-                      >
+                    <div class="rounded-default border-card-glass-border w-fit border p-1">
+                      <template v-for="visual in frequencyTabs" :key="visual.value">
                         <OButton
                           :data-test="`add-action-script-schedule-frequency-${visual.value}-btn`"
                           variant="ghost"
@@ -202,7 +167,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                     <div
                       v-if="frequency.type === 'once'"
-                      class="flex justify-start items-center mt-3"
+                      class="mt-3 flex items-center justify-start"
                       data-test="add-action-script-frequency-info"
                     >
                       <OIcon name="event" size="sm" class="mr-2" />
@@ -219,7 +184,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           style="width: 320px"
                         >
                           <div
-                            class="mb-1 font-bold text-text-secondary"
+                            class="text-text-secondary mb-1 font-bold"
                             data-test="add-action-script-cron-expression-title"
                           >
                             {{ t("reports.cronExpression") + " *" }}
@@ -227,22 +192,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               data-test="add-action-script-cron-info"
                               name="info"
                               size="sm"
-                              class="ml-1 cursor-pointer text-text-muted"
+                              class="text-text-muted ml-1 cursor-pointer"
                             >
                               <OTooltip side="right" align="center">
                                 <template #content>
                                   <span style="font-size: var(--text-sm)">
                                     Pattern: * * * * * means every minute .
                                     <br />
-                                    Format: [Minute 0-59] [Hour 0-23] [Day of Month
-                                    1-31, 'L'] [Month 1-12] [Day of Week 0-7 or
-                                    '1L-7L', 0 and 7 for Sunday].
+                                    Format: [Minute 0-59] [Hour 0-23] [Day of Month 1-31, 'L']
+                                    [Month 1-12] [Day of Week 0-7 or '1L-7L', 0 and 7 for Sunday].
                                     <br />
-                                    Use '*' to represent any value, 'L' for the last
-                                    day/weekday. <br />
-                                    Example: 0 12 * * ? - Triggers at 12:00 PM
-                                    daily. It specifies minute, hour, day of month,
-                                    month, and day of week, respectively.
+                                    Use '*' to represent any value, 'L' for the last day/weekday.
+                                    <br />
+                                    Example: 0 12 * * ? - Triggers at 12:00 PM daily. It specifies
+                                    minute, hour, day of month, month, and day of week,
+                                    respectively.
                                   </span>
                                 </template>
                               </OTooltip>
@@ -268,13 +232,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             :loading="isFetchingServiceAccounts"
                             class="showLabelOnTop no-case mb-[2.4rem]"
                             disabled
-                            style="min-width: 250px !important; width: 250px !important;"
+                            style="min-width: 250px !important; width: 250px !important"
                           />
                         </div>
                       </div>
                     </template>
                   </div>
-                  <div class="flex gap-2 mt-4">
+                  <div class="mt-4 flex gap-2">
                     <OButton
                       data-test="add-action-script-step2-back-btn"
                       variant="outline"
@@ -304,19 +268,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div>
                       <div
                         data-test="add-action-script-service-account-title"
-                        class="mb-1 font-bold text-text-secondary"
+                        class="text-text-secondary mb-1 font-bold"
                       >
                         {{ t("actions.serviceAccount") + " *" }}
-                        <OIcon
-                          name="info"
-                          size="sm"
-                          class="ml-1 cursor-pointer text-text-muted"
-                        >
+                        <OIcon name="info" size="sm" class="text-text-muted ml-1 cursor-pointer">
                           <OTooltip side="right" align="center">
                             <template #content>
                               <span style="font-size: var(--text-sm)">
-                                Make sure service account has permissions to access
-                                Actions.
+                                Make sure service account has permissions to access Actions.
                               </span>
                             </template>
                           </OTooltip>
@@ -328,14 +287,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         required
                         :options="filteredServiceAccounts"
                         :loading="isFetchingServiceAccounts"
-                        class="py-2 no-case"
+                        class="no-case py-2"
                         labelKey="label"
                         valueKey="value"
-                        style="min-width: 250px !important; width: 250px !important;"
+                        style="min-width: 250px !important; width: 250px !important"
                       />
                     </div>
                   </div>
-                  <div class="flex gap-2 mt-4">
+                  <div class="mt-4 flex gap-2">
                     <OButton
                       data-test="add-action-script-step3-back-btn"
                       variant="outline"
@@ -369,7 +328,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="flex gap-2"
                     data-test="add-action-script-env-variable"
                   >
-                    <div class="w-5/12 ml-0">
+                    <div class="ml-0 w-5/12">
                       <OInput
                         :data-test="`add-action-script-header-${header['key']}-key-input`"
                         v-model="header.key"
@@ -377,7 +336,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         tabindex="0"
                       />
                     </div>
-                    <div class="w-5/12 ml-0 mb-2">
+                    <div class="mb-2 ml-0 w-5/12">
                       <OInput
                         :data-test="`add-action-script-header-${header['key']}-value-input`"
                         v-model="header.value"
@@ -385,7 +344,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         tabindex="0"
                       />
                     </div>
-                    <div class="w-1/6 ml-0">
+                    <div class="ml-0 w-1/6">
                       <OButton
                         :data-test="`add-action-script-header-${header['key']}-delete-btn`"
                         variant="ghost"
@@ -405,7 +364,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       /></OButton>
                     </div>
                   </div>
-                  <div class="flex gap-2 mt-4">
+                  <div class="mt-4 flex gap-2">
                     <OButton
                       data-test="add-action-script-step4-back-btn"
                       variant="outline"
@@ -416,15 +375,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </OStep>
               </OStepper>
-
             </div>
           </div>
         </div>
       </div>
       <div class="mx-2">
-        <div
-          class="flex justify-end gap-2 px-3 w-full py-2.5 bg-card-glass-bg sticky bottom-0 z-2"
-        >
+        <div class="bg-card-glass-bg sticky bottom-0 z-2 flex w-full justify-end gap-2 px-3 py-2.5">
           <OButton
             data-test="add-action-script-cancel-btn"
             variant="outline"
@@ -485,10 +441,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OStepper from "@/lib/navigation/Stepper/OStepper.vue";
 import OStep from "@/lib/navigation/Stepper/OStep.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import {
-  makeEditScriptSchema,
-  type EditScriptForm,
-} from "./EditScript.schema";
+import { makeEditScriptSchema, type EditScriptForm } from "./EditScript.schema";
 
 defineProps({
   report: {
@@ -533,7 +486,6 @@ const originalActionScriptData: Ref<string> = ref("");
 const step = ref(1);
 
 const formData = ref(defaultActionScript);
-
 
 const actionTypes = [
   {
@@ -611,8 +563,7 @@ const getCronError = (cron: string): string => {
       typeof intervalInSecs === "number" &&
       !isAboveMinRefreshInterval(intervalInSecs, store.state?.zoConfig)
     ) {
-      const minInterval =
-        Number(store.state?.zoConfig?.min_auto_refresh_interval) || 1;
+      const minInterval = Number(store.state?.zoConfig?.min_auto_refresh_interval) || 1;
       return `Frequency should be greater than ${minInterval - 1} seconds.`;
     }
   } catch {
@@ -642,16 +593,18 @@ const editScriptSchema = makeEditScriptSchema({
 // Dynamic (edit-prefill) defaults: projects the form-owned fields out of the
 // component's `formData` / `frequency`. Seeds useOForm at create; re-applied
 // via form.reset() when an edited record arrives async (see below).
-const editScriptDefaults = computed((): EditScriptForm => ({
-  name: formData.value.name ?? "",
-  description: formData.value.description ?? "",
-  type: formData.value.type ?? "scheduled",
-  service_account: formData.value.service_account ?? "",
-  timezone: formData.value.timezone ?? "UTC",
-  codeZip: (formData.value.codeZip as File | null) ?? null,
-  cron: frequency.value.cron ?? "",
-  frequencyType: frequency.value.type ?? "once",
-}));
+const editScriptDefaults = computed(
+  (): EditScriptForm => ({
+    name: formData.value.name ?? "",
+    description: formData.value.description ?? "",
+    type: formData.value.type ?? "scheduled",
+    service_account: formData.value.service_account ?? "",
+    timezone: formData.value.timezone ?? "UTC",
+    codeZip: (formData.value.codeZip as File | null) ?? null,
+    cron: frequency.value.cron ?? "",
+    frequencyType: frequency.value.type ?? "once",
+  }),
+);
 
 // Headless form (Rule ③ owner). defaultValues seed the blank create form; the
 // async edit record re-seeds via form.reset() below. onSubmit is deferred to
@@ -722,11 +675,7 @@ const goToStep = async (fields: string[], next: number) => {
 const issuePathToName = (path: readonly PropertyKey[]): string =>
   path.reduce<string>(
     (acc, seg) =>
-      typeof seg === "number"
-        ? `${acc}[${seg}]`
-        : acc
-          ? `${acc}.${String(seg)}`
-          : String(seg),
+      typeof seg === "number" ? `${acc}[${seg}]` : acc ? `${acc}.${String(seg)}` : String(seg),
     "",
   );
 
@@ -746,9 +695,7 @@ watch(
     const invalidNames = new Set(
       res.success ? [] : res.error.issues.map((i) => issuePathToName(i.path)),
     );
-    for (const name of Object.keys(
-      form.state.fieldMeta ?? {},
-    ) as FormFieldPath<EditScriptForm>[]) {
+    for (const name of Object.keys(form.state.fieldMeta ?? {}) as FormFieldPath<EditScriptForm>[]) {
       const meta = form.getFieldMeta(name);
       if (!meta) continue;
       const hasError = (meta.errors?.length ?? 0) > 0;
@@ -807,8 +754,7 @@ let timezoneOptions = Intl.supportedValuesOf("timeZone").map((tz: any) => {
   return tz;
 });
 
-const browserTime =
-  "Browser Time (" + Intl.DateTimeFormat().resolvedOptions().timeZone + ")";
+const browserTime = "Browser Time (" + Intl.DateTimeFormat().resolvedOptions().timeZone + ")";
 
 // Add the UTC option
 timezoneOptions.unshift("UTC");
@@ -825,8 +771,7 @@ const saveActionScript = async (value: EditScriptForm) => {
 
   // FormData is needed on create, or when editing WITH a newly-uploaded file.
   const useFormData =
-    !isEditingActionScript.value ||
-    (isEditingActionScript.value && !!value.codeZip);
+    !isEditingActionScript.value || (isEditingActionScript.value && !!value.codeZip);
   form = useFormData ? new FormData() : {};
 
   const commonFields: Record<string, any> = {
@@ -838,8 +783,7 @@ const saveActionScript = async (value: EditScriptForm) => {
     // Use the validated form value (frequencyType), not the component-owned
     // frequency.value.type — the schema's cron rule branches on frequencyType,
     // so the payload must agree with what was validated.
-    execution_details:
-      value.type === "scheduled" ? value.frequencyType : value.type,
+    execution_details: value.type === "scheduled" ? value.frequencyType : value.type,
     service_account: value.service_account,
   };
 
@@ -854,25 +798,19 @@ const saveActionScript = async (value: EditScriptForm) => {
 
   // Add environment variables if present (component-owned dynamic array).
   if (environmentalVariables.value.length > 0) {
-    const environment_variables = environmentalVariables.value.reduce(
-      (acc: any, curr: any) => {
-        if (curr.key) {
-          acc[curr.key] = curr.value;
-        }
-        return acc;
-      },
-      {},
-    );
+    const environment_variables = environmentalVariables.value.reduce((acc: any, curr: any) => {
+      if (curr.key) {
+        acc[curr.key] = curr.value;
+      }
+      return acc;
+    }, {});
     commonFields.environment_variables = environment_variables;
   }
 
   // Populate form (either FormData or plain object)
   Object.entries(commonFields).forEach(([key, val]) => {
     if (useFormData) {
-      (form as FormData).append(
-        key,
-        typeof val === "object" ? JSON.stringify(val) : val,
-      );
+      (form as FormData).append(key, typeof val === "object" ? JSON.stringify(val) : val);
     } else {
       (form as Record<string, any>)[key] = val;
     }
@@ -889,29 +827,20 @@ const saveActionScript = async (value: EditScriptForm) => {
   }
 
   const updateAction =
-    isEditingActionScript.value && !value.codeZip
-      ? actions.update
-      : actions.create;
+    isEditingActionScript.value && !value.codeZip ? actions.update : actions.create;
 
   const dismiss = toast({
     variant: "loading",
     message: "Please wait...",
     timeout: 0,
   });
-  const actionId: string = (router.currentRoute.value.query?.id ||
-    "") as string;
+  const actionId: string = (router.currentRoute.value.query?.id || "") as string;
 
-  return updateAction(
-    store.state.selectedOrganization.identifier,
-    actionId,
-    form,
-  )
+  return updateAction(store.state.selectedOrganization.identifier, actionId, form)
     .then(() => {
       toast({
         variant: "success",
-        message: `Action ${
-          isEditingActionScript.value ? "updated" : "saved"
-        } successfully.`,
+        message: `Action ${isEditingActionScript.value ? "updated" : "saved"} successfully.`,
       });
       goToActionScripts();
       emit("getActionScripts");
@@ -923,9 +852,7 @@ const saveActionScript = async (value: EditScriptForm) => {
           variant: "error",
           message:
             error?.response?.data?.message ||
-            `Error while ${
-              isEditingActionScript.value ? "updating" : "saving"
-            } Action.`,
+            `Error while ${isEditingActionScript.value ? "updating" : "saving"} Action.`,
         });
       }
     })
@@ -968,11 +895,9 @@ const setupEditingActionScript = async (report: any) => {
   }
   if (Object.keys(formData.value.environment_variables).length) {
     environmentalVariables.value = [];
-    Object.entries(formData.value.environment_variables).forEach(
-      ([key, value]: [string, any]) => {
-        addApiHeader(key, value);
-      },
-    );
+    Object.entries(formData.value.environment_variables).forEach(([key, value]: [string, any]) => {
+      addApiHeader(key, value);
+    });
   }
 };
 
@@ -985,8 +910,7 @@ const openCancelDialog = () => {
   // snapshot still catches the file-name display + env-var deletes, which remain
   // component-owned. Show the confirm if EITHER changed.
   const formEdited = form.state.isDirty;
-  const formDataEdited =
-    originalActionScriptData.value !== JSON.stringify(formData.value);
+  const formDataEdited = originalActionScriptData.value !== JSON.stringify(formData.value);
   if (!formEdited && !formDataEdited) {
     goToActionScripts();
     return;
@@ -1000,9 +924,7 @@ const editFileToUpload = () => {
   formData.value.fileNameToShow = "";
 };
 const cancelUploadingNewFile = () => {
-  formData.value.fileNameToShow = JSON.parse(
-    originalActionScriptData.value,
-  ).zip_file_name;
+  formData.value.fileNameToShow = JSON.parse(originalActionScriptData.value).zip_file_name;
 };
 const addApiHeader = (key: string = "", value: string = "") => {
   environmentalVariables.value.push({
@@ -1015,12 +937,8 @@ const deleteApiHeader = (header: any) => {
   environmentalVariables.value = environmentalVariables.value.filter(
     (_header) => _header.uuid !== header.uuid,
   );
-  if (
-    (formData.value.environment_variables as { [key: string]: any })[header.key]
-  ) {
-    delete (formData.value.environment_variables as { [key: string]: any })[
-      header.key
-    ];
+  if ((formData.value.environment_variables as { [key: string]: any })[header.key]) {
+    delete (formData.value.environment_variables as { [key: string]: any })[header.key];
   }
 
   if (!environmentalVariables.value.length) addApiHeader();
@@ -1035,8 +953,7 @@ const handleActionScript = async () => {
     isEditingActionScript.value = true;
     isFetchingActionScript.value = true;
 
-    const actionId: string = (router.currentRoute.value.query?.id ||
-      "") as string;
+    const actionId: string = (router.currentRoute.value.query?.id || "") as string;
     actions
       .get_by_id(store.state.selectedOrganization.identifier, actionId)
       .then(async (res: any) => {
@@ -1066,9 +983,7 @@ const handleActionScript = async () => {
   }
 };
 
-const filteredServiceAccounts: Ref<{ label: string; value: string }[]> = ref(
-  [],
-);
+const filteredServiceAccounts: Ref<{ label: string; value: string }[]> = ref([]);
 const isFetchingServiceAccounts = ref(false);
 
 const serviceAccountsOptions: any[] = [];
@@ -1076,20 +991,14 @@ const serviceAccountsOptions: any[] = [];
 const getServiceAccounts = async () => {
   isFetchingServiceAccounts.value = true;
   try {
-    const res = await service_accounts.list(
-      store.state.selectedOrganization.identifier,
-    );
-    serviceAccountsOptions.push(
-      ...res.data.data.map((account: any) => account.email),
-    );
+    const res = await service_accounts.list(store.state.selectedOrganization.identifier);
+    serviceAccountsOptions.push(...res.data.data.map((account: any) => account.email));
     filteredServiceAccounts.value = [...serviceAccountsOptions];
   } catch (err: any) {
     if (err.response?.status != 403) {
       toast({
         variant: "error",
-        message:
-          err.response?.data?.message ||
-          "Error while fetching service accounts.",
+        message: err.response?.data?.message || "Error while fetching service accounts.",
       });
     }
   } finally {

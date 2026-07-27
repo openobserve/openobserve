@@ -296,9 +296,7 @@ describe("useSearchBar Composable", () => {
       mockGetAllFunctions.mockRejectedValue(new Error("Network error"));
 
       await wrapper.vm.getFunctions();
-      expect(mockShowErrorNotification).toHaveBeenCalledWith(
-        "Error while fetching functions",
-      );
+      expect(mockShowErrorNotification).toHaveBeenCalledWith("Error while fetching functions");
     });
   });
 
@@ -326,9 +324,7 @@ describe("useSearchBar Composable", () => {
       mockGetAllActions.mockRejectedValue(new Error("Network error"));
 
       await wrapper.vm.getActions();
-      expect(mockShowErrorNotification).toHaveBeenCalledWith(
-        "Error while fetching actions",
-      );
+      expect(mockShowErrorNotification).toHaveBeenCalledWith("Error while fetching actions");
     });
   });
 

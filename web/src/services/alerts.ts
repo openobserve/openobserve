@@ -51,23 +51,10 @@ const alerts = {
     }
     return http().get(url);
   },
-  create: (
-    org_identifier: string,
-    stream_name: string,
-    stream_type: string,
-    data: any,
-  ) => {
-    return http().post(
-      `/api/${org_identifier}/${stream_name}/alerts?type=${stream_type}`,
-      data,
-    );
+  create: (org_identifier: string, stream_name: string, stream_type: string, data: any) => {
+    return http().post(`/api/${org_identifier}/${stream_name}/alerts?type=${stream_type}`, data);
   },
-  update: (
-    org_identifier: string,
-    stream_name: string,
-    stream_type: string,
-    data: any,
-  ) => {
+  update: (org_identifier: string, stream_name: string, stream_type: string, data: any) => {
     return http().put(
       `/api/${org_identifier}/${stream_name}/alerts/${encodeURIComponent(
         data.name,
@@ -75,26 +62,13 @@ const alerts = {
       data,
     );
   },
-  get_with_name: (
-    org_identifier: string,
-    stream_name: string,
-    alert_name: string,
-  ) => {
+  get_with_name: (org_identifier: string, stream_name: string, alert_name: string) => {
     return http().get(
-      `/api/${org_identifier}/${stream_name}/alerts/${encodeURIComponent(
-        alert_name,
-      )}`,
+      `/api/${org_identifier}/${stream_name}/alerts/${encodeURIComponent(alert_name)}`,
     );
   },
-  delete: (
-    org_identifier: string,
-    stream_name: string,
-    alert_name: string,
-    type: string,
-  ) => {
-    let url = `/api/${org_identifier}/${stream_name}/alerts/${encodeURIComponent(
-      alert_name,
-    )}`;
+  delete: (org_identifier: string, stream_name: string, alert_name: string, type: string) => {
+    let url = `/api/${org_identifier}/${stream_name}/alerts/${encodeURIComponent(alert_name)}`;
     if (type != "") {
       url += "?type=" + type;
     }
@@ -138,11 +112,7 @@ const alerts = {
     }
     return http().put(url, data);
   },
-  delete_by_alert_id: (
-    org_identifier: string,
-    alert_id: string,
-    folder_id?: any,
-  ) => {
+  delete_by_alert_id: (org_identifier: string, alert_id: string, folder_id?: any) => {
     let url = `/api/v2/${org_identifier}/alerts/${alert_id}`;
     if (folder_id) {
       url += `?folder=${folder_id}`;
@@ -175,11 +145,7 @@ const alerts = {
     }
     return http().delete(url, { data });
   },
-  get_by_alert_id: (
-    org_identifier: string,
-    alert_id: string,
-    folder_id?: any,
-  ) => {
+  get_by_alert_id: (org_identifier: string, alert_id: string, folder_id?: any) => {
     let url = `/api/v2/${org_identifier}/alerts/${alert_id}`;
     if (folder_id) {
       url += `?folder=${folder_id}`;
@@ -187,11 +153,7 @@ const alerts = {
     return http().get(url);
   },
   //this endpoint is not used as we are using the common service to move the alerts across folders
-  move_to_another_folder: (
-    org_identifier: string,
-    data: any,
-    folder_id?: any,
-  ) => {
+  move_to_another_folder: (org_identifier: string, data: any, folder_id?: any) => {
     let url = `/api/v2/${org_identifier}/alerts/move`;
     if (folder_id) {
       url += `?folder=${folder_id}`;
@@ -227,30 +189,23 @@ const alerts = {
     return http().get(`/api/${org_identifier}/alerts/deduplication/semantic-groups`);
   },
   previewSemanticGroupsDiff: (org_identifier: string, groups: any[]) => {
-    return http().post(`/api/${org_identifier}/alerts/deduplication/semantic-groups/preview-diff`, groups);
+    return http().post(
+      `/api/${org_identifier}/alerts/deduplication/semantic-groups/preview-diff`,
+      groups,
+    );
   },
   saveSemanticGroups: (org_identifier: string, groups: any[]) => {
     return http().put(`/api/${org_identifier}/alerts/deduplication/semantic-groups`, groups);
   },
-  trigger_alert: (
-    org_identifier: string,
-    alert_id: string,
-    folder_id?: string,
-  ) => {
+  trigger_alert: (org_identifier: string, alert_id: string, folder_id?: string) => {
     let url = `/api/v2/${org_identifier}/alerts/${alert_id}/trigger`;
     if (folder_id) {
       url += `?folder=${folder_id}`;
     }
     return http().patch(url);
   },
-  generate_sql: (
-    org_identifier: string,
-    data: any,
-  ) => {
-    return http().post(
-      `/api/v2/${org_identifier}/alerts/generate_sql`,
-      data,
-    );
+  generate_sql: (org_identifier: string, data: any) => {
+    return http().post(`/api/v2/${org_identifier}/alerts/generate_sql`, data);
   },
   // POST /api/v2/{org}/alerts/{id}/clone — clones regular alert or anomaly config
   clone_by_id: (

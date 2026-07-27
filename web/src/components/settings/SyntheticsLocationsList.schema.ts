@@ -28,6 +28,4 @@ export const makeSyntheticsLocationFormSchema = (t: (_key: string) => string) =>
       }
     });
 
-export type SyntheticsLocationForm = z.infer<
-  ReturnType<typeof makeSyntheticsLocationFormSchema>
->;
+export type SyntheticsLocationForm = z.infer<ReturnType<typeof makeSyntheticsLocationFormSchema>>;

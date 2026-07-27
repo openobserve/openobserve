@@ -23,21 +23,13 @@ export interface CategoryCount {
   count: number;
 }
 
-function valueOf<T = any>(
-  row: any,
-  camel: string,
-  snake: string,
-): T | undefined {
+function valueOf<T = any>(row: any, camel: string, snake: string): T | undefined {
   if (row == null) return undefined;
   return row[camel] ?? row[snake];
 }
 
 export function healthyBooleanValue(config: ScoreConfig): boolean | null {
-  const threshold = valueOf<any>(
-    config,
-    "healthyThreshold",
-    "healthy_threshold",
-  );
+  const threshold = valueOf<any>(config, "healthyThreshold", "healthy_threshold");
   const healthy = threshold?.healthy_value ?? threshold?.healthyValue;
   if (healthy === true || healthy === "true") return true;
   if (healthy === false || healthy === "false") return false;
@@ -45,13 +37,8 @@ export function healthyBooleanValue(config: ScoreConfig): boolean | null {
 }
 
 export function healthyCategories(config: ScoreConfig): string[] {
-  const threshold = valueOf<any>(
-    config,
-    "healthyThreshold",
-    "healthy_threshold",
-  );
-  const categories =
-    threshold?.healthy_categories ?? threshold?.healthyCategories;
+  const threshold = valueOf<any>(config, "healthyThreshold", "healthy_threshold");
+  const categories = threshold?.healthy_categories ?? threshold?.healthyCategories;
   return Array.isArray(categories) ? categories.map(String) : [];
 }
 
@@ -68,17 +55,13 @@ export function qualitySummaryForConfig(
       threshold.unhealthyExpr != null &&
       aggregate.numericUnhealthy != null &&
       aggregate.numericValues > 0
-        ? ((aggregate.numericValues - aggregate.numericUnhealthy) /
-            aggregate.numericValues) *
-          100
+        ? ((aggregate.numericValues - aggregate.numericUnhealthy) / aggregate.numericValues) * 100
         : null;
     return {
       qualityValue: aggregate.avgNumeric,
       qualityFormat: "number",
       qualityLabel:
-        healthyRate == null
-          ? "Average"
-          : `Average · ${healthyRate.toFixed(1)}% healthy`,
+        healthyRate == null ? "Average" : `Average · ${healthyRate.toFixed(1)}% healthy`,
     };
   }
 

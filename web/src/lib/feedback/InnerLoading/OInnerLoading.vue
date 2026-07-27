@@ -24,10 +24,7 @@ withDefaults(defineProps<InnerLoadingProps>(), {
       :aria-label="label ?? 'Loading'"
     >
       <OSpinner variant="ring" :size="size" />
-      <span
-        v-if="label"
-        class="text-xs text-inner-loading-label select-none"
-      >
+      <span v-if="label" class="text-inner-loading-label text-xs select-none">
         {{ label }}
       </span>
     </div>

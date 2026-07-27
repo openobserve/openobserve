@@ -13,7 +13,7 @@ defineSlots<SelectGroupSlots>();
   <SelectGroup>
     <SelectLabel
       v-if="label"
-      class="px-3 py-1 text-xs font-semibold text-select-group-label select-none"
+      class="text-select-group-label px-3 py-1 text-xs font-semibold select-none"
     >
       {{ label }}
     </SelectLabel>

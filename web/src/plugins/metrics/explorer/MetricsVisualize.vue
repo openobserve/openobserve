@@ -116,15 +116,7 @@ export default defineComponent({
 
     // A metrics-appropriate subset — the chart types that make sense for a
     // PromQL time series. Mirrors the logs visualize constraint.
-    const allowedChartTypes = [
-      "area",
-      "area-stacked",
-      "bar",
-      "h-bar",
-      "line",
-      "scatter",
-      "table",
-    ];
+    const allowedChartTypes = ["area", "area-stacked", "bar", "h-bar", "line", "scatter", "table"];
 
     // Same defaults the metrics editor route applies: a line chart driven by a
     // promql query, with the query bar shown so the user can type PromQL.
@@ -132,9 +124,7 @@ export default defineComponent({
       resetDashboardPanelData();
       dashboardPanelData.data.queries[0].fields.stream_type = "metrics";
       if (store.state.zoConfig?.auto_query_enabled) {
-        const persisted = restoreMetricsStream(
-          store.state.selectedOrganization?.identifier,
-        );
+        const persisted = restoreMetricsStream(store.state.selectedOrganization?.identifier);
         if (persisted) {
           dashboardPanelData.data.queries[0].fields.stream = persisted;
         }

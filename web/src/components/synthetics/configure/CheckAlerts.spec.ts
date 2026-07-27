@@ -60,7 +60,9 @@ const STUBS = {
 
 // ── Mocks ────────────────────────────────────────────────────────────────────
 
-const mockResolve = vi.fn().mockReturnValue({ href: "/alerts/destinations?action=add&org_identifier=default" });
+const mockResolve = vi
+  .fn()
+  .mockReturnValue({ href: "/alerts/destinations?action=add&org_identifier=default" });
 const mockWindowOpen = vi.fn();
 
 vi.mock("vue-i18n", () => ({
@@ -89,10 +91,7 @@ import CheckAlerts from "./CheckAlerts.vue";
 
 // ── Mount factory ────────────────────────────────────────────────────────────
 
-function mountCheckAlerts(
-  checkOverrides: Partial<BrowserCheck> = {},
-  destinations: string[] = [],
-) {
+function mountCheckAlerts(checkOverrides: Partial<BrowserCheck> = {}, destinations: string[] = []) {
   const check = { ...mockMonitorHttp, ...checkOverrides } as BrowserCheck;
   return mount(CheckAlerts, {
     props: { check, destinations },
@@ -120,40 +119,29 @@ describe("CheckAlerts", () => {
     });
 
     it("should display failure threshold from check data", () => {
-      wrapper = mountCheckAlerts(
-        { alertIfFails: 3 },
-        ["dest-1"],
-      );
+      wrapper = mountCheckAlerts({ alertIfFails: 3 }, ["dest-1"]);
 
-      const thresholdInput = wrapper.find(
-        '[data-test="synthetics-check-alerts-threshold-input"]',
-      );
+      const thresholdInput = wrapper.find('[data-test="synthetics-check-alerts-threshold-input"]');
       expect(thresholdInput.exists()).toBe(true);
       expect(thresholdInput.attributes("value")).toBe("3");
     });
 
     it("should display cooldown from check data", () => {
-      wrapper = mountCheckAlerts(
-        { cooldownMins: 5 },
-        ["dest-1"],
-      );
+      wrapper = mountCheckAlerts({ cooldownMins: 5 }, ["dest-1"]);
 
-      const cooldownInput = wrapper.find(
-        '[data-test="synthetics-check-alerts-cooldown-input"]',
-      );
+      const cooldownInput = wrapper.find('[data-test="synthetics-check-alerts-cooldown-input"]');
       expect(cooldownInput.exists()).toBe(true);
       expect(cooldownInput.attributes("value")).toBe("5");
     });
 
     it("should select destinations from check.notifications.destinations", () => {
-      wrapper = mountCheckAlerts(
-        { notifications: { destinations: ["dest-1", "dest-2"] } },
-        ["dest-1", "dest-2", "dest-3"],
-      );
+      wrapper = mountCheckAlerts({ notifications: { destinations: ["dest-1", "dest-2"] } }, [
+        "dest-1",
+        "dest-2",
+        "dest-3",
+      ]);
 
-      const select = wrapper.find(
-        '[data-test="synthetics-check-alerts-destinations-select"]',
-      );
+      const select = wrapper.find('[data-test="synthetics-check-alerts-destinations-select"]');
       expect(select.exists()).toBe(true);
 
       // The stub renders <option> with :selected attribute
@@ -165,14 +153,9 @@ describe("CheckAlerts", () => {
     it("should not show destination validation error on mount even when destinations are empty", () => {
       // destinationError starts as false — the component only shows the error
       // after user interaction (onDestinationsChange or computed setter)
-      wrapper = mountCheckAlerts(
-        { notifications: { destinations: [] } },
-        ["dest-1"],
-      );
+      wrapper = mountCheckAlerts({ notifications: { destinations: [] } }, ["dest-1"]);
 
-      expect(wrapper.text()).not.toContain(
-        "synthetics.scheduleAlert.destinationRequired",
-      );
+      expect(wrapper.text()).not.toContain("synthetics.scheduleAlert.destinationRequired");
     });
   });
 
@@ -180,14 +163,9 @@ describe("CheckAlerts", () => {
 
   describe("failure threshold input", () => {
     it("should emit update:check with updated alertIfFails when input changes", async () => {
-      wrapper = mountCheckAlerts(
-        { alertIfFails: 3 },
-        ["dest-1"],
-      );
+      wrapper = mountCheckAlerts({ alertIfFails: 3 }, ["dest-1"]);
 
-      const thresholdInput = wrapper.find(
-        '[data-test="synthetics-check-alerts-threshold-input"]',
-      );
+      const thresholdInput = wrapper.find('[data-test="synthetics-check-alerts-threshold-input"]');
       await thresholdInput.setValue("2");
 
       const emitted = wrapper.emitted("update:check");
@@ -199,16 +177,15 @@ describe("CheckAlerts", () => {
 
   describe("destinations selection", () => {
     it("should emit update:check with updated destinations when selection changes", () => {
-      wrapper = mountCheckAlerts(
-        { notifications: { destinations: ["dest-1"] } },
-        ["dest-1", "dest-2", "dest-3"],
-      );
+      wrapper = mountCheckAlerts({ notifications: { destinations: ["dest-1"] } }, [
+        "dest-1",
+        "dest-2",
+        "dest-3",
+      ]);
 
       // Emulate OSelect emitting a new array via update:modelValue.
       // We trigger the select change event directly on the <select> element.
-      const selectEl = wrapper.find(
-        '[data-test="synthetics-check-alerts-destinations-select"]',
-      );
+      const selectEl = wrapper.find('[data-test="synthetics-check-alerts-destinations-select"]');
 
       // Select "dest-3" in addition to already-selected "dest-1"
       // In a real multi-select, all selected options are in selectedOptions.
@@ -259,9 +236,7 @@ describe("CheckAlerts", () => {
     it("should call window.open with the correct URL when clicked", async () => {
       wrapper = mountCheckAlerts(mockMonitorHttp, ["dest-1"]);
 
-      const addBtn = wrapper.find(
-        '[data-test="synthetics-check-alerts-add-destination-btn"]',
-      );
+      const addBtn = wrapper.find('[data-test="synthetics-check-alerts-add-destination-btn"]');
       expect(addBtn.exists()).toBe(true);
 
       await addBtn.trigger("click");
@@ -275,9 +250,7 @@ describe("CheckAlerts", () => {
     it("should call router.resolve with the correct arguments", async () => {
       wrapper = mountCheckAlerts(mockMonitorHttp, ["dest-1"]);
 
-      const addBtn = wrapper.find(
-        '[data-test="synthetics-check-alerts-add-destination-btn"]',
-      );
+      const addBtn = wrapper.find('[data-test="synthetics-check-alerts-add-destination-btn"]');
       await addBtn.trigger("click");
 
       expect(mockResolve).toHaveBeenCalledWith({
@@ -292,14 +265,9 @@ describe("CheckAlerts", () => {
 
   describe("cooldown input", () => {
     it("should emit update:check with updated cooldownMins when input changes", async () => {
-      wrapper = mountCheckAlerts(
-        { cooldownMins: 5 },
-        ["dest-1"],
-      );
+      wrapper = mountCheckAlerts({ cooldownMins: 5 }, ["dest-1"]);
 
-      const cooldownInput = wrapper.find(
-        '[data-test="synthetics-check-alerts-cooldown-input"]',
-      );
+      const cooldownInput = wrapper.find('[data-test="synthetics-check-alerts-cooldown-input"]');
       await cooldownInput.setValue("15");
 
       const emitted = wrapper.emitted("update:check");
@@ -308,5 +276,4 @@ describe("CheckAlerts", () => {
       expect(lastEmit.cooldownMins).toBe(15);
     });
   });
-
 });

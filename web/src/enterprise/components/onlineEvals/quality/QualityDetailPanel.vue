@@ -1,6 +1,6 @@
 ﻿<template>
   <section
-    class="flex flex-col gap-3 px-5 pt-4 pb-6 min-h-full overflow-auto"
+    class="flex min-h-full flex-col gap-3 overflow-auto px-5 pt-4 pb-6"
     data-test="quality-detail-panel"
   >
     <!-- Title row + type badge + version + description moved up into the
@@ -8,11 +8,11 @@
          from the KPI tiles without a duplicated identification block. -->
 
     <div
-      class="flex flex-wrap items-center justify-between gap-2 rounded-default border border-border-default bg-surface-base px-3 py-2"
+      class="rounded-default border-border-default bg-surface-base flex flex-wrap items-center justify-between gap-2 border px-3 py-2"
       data-test="quality-detail-scope-filter"
     >
       <div>
-        <div class="text-2xs font-semibold text-text-heading">
+        <div class="text-2xs text-text-heading font-semibold">
           {{ t("onlineEvals.quality.scopes.filterLabel") }}
         </div>
         <div class="text-3xs text-text-secondary">
@@ -34,7 +34,7 @@
         >
           <span>{{ t(`onlineEvals.quality.scopes.${option.id}`) }}</span>
           <span
-            class="ml-1 rounded-full bg-surface-subtle px-1.5 py-0.5 text-3xs leading-none text-text-secondary [font-variant-numeric:tabular-nums]"
+            class="bg-surface-subtle text-3xs text-text-secondary ml-1 rounded-full px-1.5 py-0.5 leading-none [font-variant-numeric:tabular-nums]"
           >
             {{ compactCount(option.count) }}
           </span>
@@ -46,7 +46,7 @@
          keeps the selected chip and the visible data from briefly disagreeing. -->
     <div
       v-if="isLoading"
-      class="flex flex-col items-center gap-2 rounded-default border border-dashed border-border-default px-3 py-7 text-center text-xs text-text-secondary"
+      class="rounded-default border-border-default text-text-secondary flex flex-col items-center gap-2 border border-dashed px-3 py-7 text-center text-xs"
     >
       <OSpinner size="sm" />
       <span>{{ t("onlineEvals.quality.detail.loading") }}</span>
@@ -70,19 +70,14 @@
 
     <template v-else>
       <div
-        class="flex flex-wrap items-center justify-between gap-2 rounded-default border border-border-default bg-surface-base px-3 py-2.5"
+        class="rounded-default border-border-default bg-surface-base flex flex-wrap items-center justify-between gap-2 border px-3 py-2.5"
         data-test="quality-detail-health-summary"
       >
         <div class="min-w-0">
-          <div
-            class="text-3xs font-semibold uppercase tracking-wide text-text-secondary"
-          >
+          <div class="text-3xs text-text-secondary font-semibold tracking-wide uppercase">
             {{ t("onlineEvals.quality.detail.health.title") }}
           </div>
-          <div
-            class="mt-0.5 truncate text-2xs text-text-secondary"
-            :title="healthSummary"
-          >
+          <div class="text-2xs text-text-secondary mt-0.5 truncate" :title="healthSummary">
             {{ healthSummary }}
           </div>
         </div>
@@ -97,22 +92,18 @@
         <!-- KPI tiles reuse the exact card layout + text styles as the LLM
            Sessions detail page (.kpi-card) so the AI module stays visually
            consistent across pages. -->
-        <div
-          class="grid grid-cols-[repeat(auto-fit,minmax(11.25rem,1fr))] gap-2.5"
-        >
+        <div class="grid grid-cols-[repeat(auto-fit,minmax(11.25rem,1fr))] gap-2.5">
           <div
             v-for="kpi in kpis"
             :key="kpi.id"
-            class="flex flex-col gap-1 rounded-surface border border-border-default bg-surface-base px-[0.875rem] pt-[0.625rem] pb-[0.625rem] transition-shadow duration-200 hover:shadow-sm"
+            class="rounded-surface border-border-default bg-surface-base flex flex-col gap-1 border px-[0.875rem] pt-[0.625rem] pb-[0.625rem] transition-shadow duration-200 hover:shadow-sm"
             :data-test="`quality-detail-kpi-${kpi.id}`"
           >
-            <div class="text-2xs font-semibold text-text-secondary">
+            <div class="text-2xs text-text-secondary font-semibold">
               {{ kpiTitle(kpi) }}
             </div>
             <div class="flex items-baseline gap-[0.2rem]">
-              <span
-                class="text-2xl font-bold leading-none text-text-heading"
-              >
+              <span class="text-text-heading text-2xl leading-none font-bold">
                 {{ formatKpi(kpi) }}
               </span>
             </div>
@@ -121,14 +112,12 @@
 
         <section
           v-if="dataType === 'numeric'"
-          class="card-container rounded-default border border-border-default bg-surface-base px-[0.875rem] py-3 pb-[0.875rem]"
+          class="card-container rounded-default border-border-default bg-surface-base border px-[0.875rem] py-3 pb-[0.875rem]"
         >
           <header class="mb-1.5">
-            <h4 class="m-0 text-compact font-semibold text-text-heading">
+            <h4 class="text-compact text-text-heading m-0 font-semibold">
               {{ t("onlineEvals.quality.detail.trendTitle") }}
-              <span class="text-2xs font-normal text-text-secondary"
-                >— {{ config.name }}</span
-              >
+              <span class="text-2xs text-text-secondary font-normal">— {{ config.name }}</span>
             </h4>
           </header>
           <div class="h-[16.25rem]">
@@ -140,13 +129,11 @@
               :y-max="numericRange?.max ?? null"
               :legend-avg="t('onlineEvals.quality.detail.legendAvg')"
               :legend-p95="t('onlineEvals.quality.detail.legendP95')"
-              :legend-threshold-fmt="
-                t('onlineEvals.quality.detail.legendThreshold')
-              "
+              :legend-threshold-fmt="t('onlineEvals.quality.detail.legendThreshold')"
             />
             <p
               v-else
-              class="m-0 flex h-full items-center justify-center text-xs text-text-secondary"
+              class="text-text-secondary m-0 flex h-full items-center justify-center text-xs"
             >
               {{ t("onlineEvals.quality.detail.noData") }}
             </p>
@@ -155,10 +142,10 @@
 
         <section
           v-if="dataType === 'numeric'"
-          class="card-container rounded-default border border-border-default bg-surface-base px-[0.875rem] py-3 pb-[0.875rem]"
+          class="card-container rounded-default border-border-default bg-surface-base border px-[0.875rem] py-3 pb-[0.875rem]"
         >
           <header class="mb-1.5">
-            <h4 class="m-0 text-compact font-semibold text-text-heading">
+            <h4 class="text-compact text-text-heading m-0 font-semibold">
               {{ t("onlineEvals.quality.detail.distributionTitle") }}
             </h4>
           </header>
@@ -168,13 +155,11 @@
               :buckets="numericDistribution"
               :threshold="numericThreshold"
               :legend-healthy="t('onlineEvals.quality.detail.legendHealthy')"
-              :legend-unhealthy="
-                t('onlineEvals.quality.detail.legendUnhealthy')
-              "
+              :legend-unhealthy="t('onlineEvals.quality.detail.legendUnhealthy')"
             />
             <p
               v-else
-              class="m-0 flex h-full items-center justify-center text-xs text-text-secondary"
+              class="text-text-secondary m-0 flex h-full items-center justify-center text-xs"
             >
               {{ t("onlineEvals.quality.detail.noData") }}
             </p>
@@ -183,14 +168,12 @@
 
         <section
           v-if="dataType === 'boolean'"
-          class="card-container rounded-default border border-border-default bg-surface-base px-[0.875rem] py-3 pb-[0.875rem]"
+          class="card-container rounded-default border-border-default bg-surface-base border px-[0.875rem] py-3 pb-[0.875rem]"
         >
           <header class="mb-1.5">
-            <h4 class="m-0 text-compact font-semibold text-text-heading">
+            <h4 class="text-compact text-text-heading m-0 font-semibold">
               {{ booleanRateTitle }}
-              <span class="text-2xs font-normal text-text-secondary"
-                >— {{ config.name }}</span
-              >
+              <span class="text-2xs text-text-secondary font-normal">— {{ config.name }}</span>
             </h4>
           </header>
           <div class="h-[16.25rem]">
@@ -202,7 +185,7 @@
             />
             <p
               v-else
-              class="m-0 flex h-full items-center justify-center text-xs text-text-secondary"
+              class="text-text-secondary m-0 flex h-full items-center justify-center text-xs"
             >
               {{ t("onlineEvals.quality.detail.noData") }}
             </p>
@@ -211,10 +194,10 @@
 
         <section
           v-if="dataType === 'boolean'"
-          class="card-container rounded-default border border-border-default bg-surface-base px-[0.875rem] py-3 pb-[0.875rem]"
+          class="card-container rounded-default border-border-default bg-surface-base border px-[0.875rem] py-3 pb-[0.875rem]"
         >
           <header class="mb-1.5">
-            <h4 class="m-0 text-compact font-semibold text-text-heading">
+            <h4 class="text-compact text-text-heading m-0 font-semibold">
               {{ t("onlineEvals.quality.detail.trueFalseTitle") }}
             </h4>
           </header>
@@ -236,7 +219,7 @@
             />
             <p
               v-else
-              class="m-0 flex h-full items-center justify-center text-xs text-text-secondary"
+              class="text-text-secondary m-0 flex h-full items-center justify-center text-xs"
             >
               {{ t("onlineEvals.quality.detail.noData") }}
             </p>
@@ -245,10 +228,10 @@
 
         <section
           v-if="dataType === 'categorical'"
-          class="card-container rounded-default border border-border-default bg-surface-base px-[0.875rem] py-3 pb-[0.875rem]"
+          class="card-container rounded-default border-border-default bg-surface-base border px-[0.875rem] py-3 pb-[0.875rem]"
         >
           <header class="mb-1.5">
-            <h4 class="m-0 text-compact font-semibold text-text-heading">
+            <h4 class="text-compact text-text-heading m-0 font-semibold">
               {{ t("onlineEvals.quality.detail.categoryDistributionTitle") }}
             </h4>
           </header>
@@ -260,7 +243,7 @@
             />
             <p
               v-else
-              class="m-0 flex h-full items-center justify-center text-xs text-text-secondary"
+              class="text-text-secondary m-0 flex h-full items-center justify-center text-xs"
             >
               {{ t("onlineEvals.quality.detail.noData") }}
             </p>
@@ -364,18 +347,12 @@ const emit = defineEmits<{
 const { t } = useI18n();
 
 const threshold = computed(() => thresholdForConfig(props.config));
-const unhealthyKpi = computed(() =>
-  props.kpis.find((kpi) => kpi.id === "unhealthy"),
-);
-const healthStatus = computed<
-  "healthy" | "unhealthy" | "noThreshold" | "noData"
->(() => {
+const unhealthyKpi = computed(() => props.kpis.find((kpi) => kpi.id === "unhealthy"));
+const healthStatus = computed<"healthy" | "unhealthy" | "noThreshold" | "noData">(() => {
   if (threshold.value.unhealthyExpr == null) return "noThreshold";
   if (!props.hasScores) return "noData";
   const unhealthy = unhealthyKpi.value?.value;
-  return typeof unhealthy === "number" && unhealthy > 0
-    ? "unhealthy"
-    : "healthy";
+  return typeof unhealthy === "number" && unhealthy > 0 ? "unhealthy" : "healthy";
 });
 
 const healthSummary = computed(() => {
@@ -397,10 +374,7 @@ const healthSummary = computed(() => {
 const scopeOptions = computed(() => [
   {
     id: "all" as const,
-    count:
-      props.scopeCounts.span +
-      props.scopeCounts.trace +
-      props.scopeCounts.session,
+    count: props.scopeCounts.span + props.scopeCounts.trace + props.scopeCounts.session,
   },
   { id: "span" as const, count: props.scopeCounts.span },
   { id: "trace" as const, count: props.scopeCounts.trace },
@@ -425,9 +399,7 @@ const emptyTitle = computed(() => {
   });
 });
 
-const booleanRateHasThreshold = computed(
-  () => healthyBooleanValue(props.config) != null,
-);
+const booleanRateHasThreshold = computed(() => healthyBooleanValue(props.config) != null);
 
 const booleanRateTitle = computed(() =>
   t(
@@ -463,9 +435,7 @@ const booleanCounts = computed(() => ({
 }));
 
 const healthyCategories = computed<string[]>(() => {
-  const ht: any =
-    (props.config as any).healthyThreshold ??
-    (props.config as any).healthy_threshold;
+  const ht: any = (props.config as any).healthyThreshold ?? (props.config as any).healthy_threshold;
   return ht?.healthy_categories || ht?.healthyCategories || [];
 });
 

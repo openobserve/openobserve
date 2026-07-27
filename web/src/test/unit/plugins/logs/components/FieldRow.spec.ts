@@ -27,7 +27,6 @@ vi.mock("vuex", () => ({
   }),
 }));
 
-
 describe("FieldRow.vue", () => {
   const defaultProps = {
     field: {
@@ -152,7 +151,9 @@ describe("FieldRow.vue", () => {
         },
       });
 
-      const addBtn = wrapper.find('[data-test="log-search-index-list-filter-_timestamp-field-btn"]');
+      const addBtn = wrapper.find(
+        '[data-test="log-search-index-list-filter-_timestamp-field-btn"]',
+      );
       expect(addBtn.exists()).toBe(false);
     });
 
@@ -187,7 +188,9 @@ describe("FieldRow.vue", () => {
       const addIcon = wrapper.find('[data-test="log-search-index-list-add-status-field-btn"]');
       expect(addIcon.exists()).toBe(true);
 
-      const removeIcon = wrapper.find('[data-test="log-search-index-list-remove-status-field-btn"]');
+      const removeIcon = wrapper.find(
+        '[data-test="log-search-index-list-remove-status-field-btn"]',
+      );
       expect(removeIcon.exists()).toBe(false);
     });
 
@@ -205,7 +208,9 @@ describe("FieldRow.vue", () => {
       const addIcon = wrapper.find('[data-test="log-search-index-list-add-status-field-btn"]');
       expect(addIcon.exists()).toBe(false);
 
-      const removeIcon = wrapper.find('[data-test="log-search-index-list-remove-status-field-btn"]');
+      const removeIcon = wrapper.find(
+        '[data-test="log-search-index-list-remove-status-field-btn"]',
+      );
       expect(removeIcon.exists()).toBe(true);
     });
 
@@ -235,7 +240,9 @@ describe("FieldRow.vue", () => {
         },
       });
 
-      const removeIcon = wrapper.find('[data-test="log-search-index-list-remove-status-field-btn"]');
+      const removeIcon = wrapper.find(
+        '[data-test="log-search-index-list-remove-status-field-btn"]',
+      );
       await removeIcon.trigger("click");
 
       expect(wrapper.emitted("toggle-field")).toBeTruthy();
@@ -254,7 +261,9 @@ describe("FieldRow.vue", () => {
         },
       });
 
-      const icons = wrapper.findAll('[data-test="log-search-index-list-interesting-status-field-btn"]');
+      const icons = wrapper.findAll(
+        '[data-test="log-search-index-list-interesting-status-field-btn"]',
+      );
       expect(icons.length).toBe(0);
     });
 
@@ -269,7 +278,9 @@ describe("FieldRow.vue", () => {
         },
       });
 
-      const icons = wrapper.findAll('[data-test="log-search-index-list-interesting-status-field-btn"]');
+      const icons = wrapper.findAll(
+        '[data-test="log-search-index-list-interesting-status-field-btn"]',
+      );
       expect(icons.length).toBeGreaterThan(0);
     });
 
@@ -325,16 +336,11 @@ describe("FieldRow.vue", () => {
       });
 
       // Interesting icon is rendered directly inside OFieldRow
-      const icon = wrapper.find(
-        '[data-test="log-search-index-list-interesting-status-field-btn"]',
-      );
+      const icon = wrapper.find('[data-test="log-search-index-list-interesting-status-field-btn"]');
       await icon.trigger("click");
 
       expect(wrapper.emitted("toggle-interesting")).toBeTruthy();
-      expect(wrapper.emitted("toggle-interesting")?.[0]).toEqual([
-        defaultProps.field,
-        false,
-      ]);
+      expect(wrapper.emitted("toggle-interesting")?.[0]).toEqual([defaultProps.field, false]);
     });
 
     it("should not show interesting icon for timestamp column", () => {
@@ -352,7 +358,9 @@ describe("FieldRow.vue", () => {
         },
       });
 
-      const icons = wrapper.findAll('[data-test="log-search-index-list-interesting-_timestamp-field-btn"]');
+      const icons = wrapper.findAll(
+        '[data-test="log-search-index-list-interesting-_timestamp-field-btn"]',
+      );
       expect(icons.length).toBe(0);
     });
   });
@@ -371,9 +379,7 @@ describe("FieldRow.vue", () => {
       });
 
       // Interesting icon is rendered directly inside OFieldRow (no .field_label wrapper)
-      const icon = wrapper.find(
-        '[data-test="log-search-index-list-interesting-status-field-btn"]',
-      );
+      const icon = wrapper.find('[data-test="log-search-index-list-interesting-status-field-btn"]');
       expect(icon.exists()).toBe(true);
     });
 
@@ -390,9 +396,7 @@ describe("FieldRow.vue", () => {
       });
 
       // Interesting icon is rendered directly inside OFieldRow (no .field_label wrapper)
-      const icon = wrapper.find(
-        '[data-test="log-search-index-list-interesting-status-field-btn"]',
-      );
+      const icon = wrapper.find('[data-test="log-search-index-list-interesting-status-field-btn"]');
       expect(icon.exists()).toBe(true);
     });
   });
@@ -426,7 +430,9 @@ describe("FieldRow.vue", () => {
       });
 
       // Timestamp column has no action buttons rendered in the #actions slot
-      const filterBtn = wrapper.find('[data-test="log-search-index-list-filter-_timestamp-field-btn"]');
+      const filterBtn = wrapper.find(
+        '[data-test="log-search-index-list-filter-_timestamp-field-btn"]',
+      );
       expect(filterBtn.exists()).toBe(false);
     });
   });

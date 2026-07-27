@@ -26,9 +26,7 @@ vi.mock("@/stores", () => ({
 // Imports (after mocks so they pick up the mocked modules)
 // ---------------------------------------------------------------------------
 
-import useDurationPercentiles, {
-  parseDurationWhereClause,
-} from "./useDurationPercentiles";
+import useDurationPercentiles, { parseDurationWhereClause } from "./useDurationPercentiles";
 import { b64EncodeUnicode } from "@/utils/zincutils";
 
 // ---------------------------------------------------------------------------
@@ -39,9 +37,7 @@ let parser: any;
 
 async function getParser() {
   if (parser) return parser;
-  const mod = await import(
-    "@openobserve/node-sql-parser/build/datafusionsql"
-  );
+  const mod = await import("@openobserve/node-sql-parser/build/datafusionsql");
   parser = new mod.default.Parser();
   return parser;
 }
@@ -64,11 +60,7 @@ describe("parseDurationWhereClause", () => {
     });
 
     it("should return original string when parser is undefined", () => {
-      const result = parseDurationWhereClause(
-        "duration >= '1ms'",
-        undefined,
-        "s",
-      );
+      const result = parseDurationWhereClause("duration >= '1ms'", undefined, "s");
       expect(result).toBe("duration >= '1ms'");
     });
 
@@ -102,38 +94,22 @@ describe("parseDurationWhereClause", () => {
     });
 
     it("should convert 'msec' alias correctly", () => {
-      const result = parseDurationWhereClause(
-        "duration >= '1.50msec'",
-        p,
-        "x",
-      );
+      const result = parseDurationWhereClause("duration >= '1.50msec'", p, "x");
       expect(result).toBe("duration >= 1500");
     });
 
     it("should convert 'msecs' alias correctly", () => {
-      const result = parseDurationWhereClause(
-        "duration >= '1.50msecs'",
-        p,
-        "x",
-      );
+      const result = parseDurationWhereClause("duration >= '1.50msecs'", p, "x");
       expect(result).toBe("duration >= 1500");
     });
 
     it("should convert 'millisecond' alias correctly", () => {
-      const result = parseDurationWhereClause(
-        "duration >= '1.50millisecond'",
-        p,
-        "x",
-      );
+      const result = parseDurationWhereClause("duration >= '1.50millisecond'", p, "x");
       expect(result).toBe("duration >= 1500");
     });
 
     it("should convert 'milliseconds' alias correctly", () => {
-      const result = parseDurationWhereClause(
-        "duration >= '1.50milliseconds'",
-        p,
-        "x",
-      );
+      const result = parseDurationWhereClause("duration >= '1.50milliseconds'", p, "x");
       expect(result).toBe("duration >= 1500");
     });
   });
@@ -150,38 +126,22 @@ describe("parseDurationWhereClause", () => {
     });
 
     it("should convert 'secs' alias correctly", () => {
-      const result = parseDurationWhereClause(
-        "duration >= '2.50secs'",
-        p,
-        "x",
-      );
+      const result = parseDurationWhereClause("duration >= '2.50secs'", p, "x");
       expect(result).toBe("duration >= 2500000");
     });
 
     it("should convert 'second' alias correctly", () => {
-      const result = parseDurationWhereClause(
-        "duration >= '2.50second'",
-        p,
-        "x",
-      );
+      const result = parseDurationWhereClause("duration >= '2.50second'", p, "x");
       expect(result).toBe("duration >= 2500000");
     });
 
     it("should convert 'seconds' alias correctly", () => {
-      const result = parseDurationWhereClause(
-        "duration >= '2.50seconds'",
-        p,
-        "x",
-      );
+      const result = parseDurationWhereClause("duration >= '2.50seconds'", p, "x");
       expect(result).toBe("duration >= 2500000");
     });
 
     it("should convert duration >= '2 seconds' with space between number and unit", () => {
-      const result = parseDurationWhereClause(
-        "duration >= '2 seconds'",
-        p,
-        "x",
-      );
+      const result = parseDurationWhereClause("duration >= '2 seconds'", p, "x");
       expect(result).toBe("duration >= 2000000");
     });
   });
@@ -195,22 +155,14 @@ describe("parseDurationWhereClause", () => {
 
   describe("unknown unit", () => {
     it("should return error object when unit is unrecognised", () => {
-      const result = parseDurationWhereClause(
-        "duration >= '5 lightyears'",
-        p,
-        "x",
-      );
+      const result = parseDurationWhereClause("duration >= '5 lightyears'", p, "x");
       expect(result).toEqual({ error: 'Unknown duration unit: "lightyears"' });
     });
   });
 
   describe("non-duration fields", () => {
     it("should pass through a non-duration field unchanged", () => {
-      const result = parseDurationWhereClause(
-        "service_name = 'foo'",
-        p,
-        "x",
-      );
+      const result = parseDurationWhereClause("service_name = 'foo'", p, "x");
       expect(result).toBe("service_name = 'foo'");
     });
   });
@@ -305,18 +257,16 @@ describe("useDurationPercentiles", () => {
 
     it("should reset percentiles to null before each fetch", async () => {
       // Simulate a successful fetch that populates percentiles
-      mockFetchQueryDataWithHttpStream.mockImplementationOnce(
-        (_payload: any, handlers: any) => {
-          handlers.data(_payload, {
-            type: "search_response_hits",
-            content: {
-              results: {
-                hits: [{ p25: 100, p50: 200, p75: 300, p95: 400, p99: 500 }],
-              },
+      mockFetchQueryDataWithHttpStream.mockImplementationOnce((_payload: any, handlers: any) => {
+        handlers.data(_payload, {
+          type: "search_response_hits",
+          content: {
+            results: {
+              hits: [{ p25: 100, p50: 200, p75: 300, p95: 400, p99: 500 }],
             },
-          });
-        },
-      );
+          },
+        });
+      });
 
       const { fetchPercentiles, percentiles } = useDurationPercentiles();
       fetchPercentiles(BASE_PAYLOAD);
@@ -373,17 +323,14 @@ describe("useDurationPercentiles", () => {
     it("should populate percentiles and set isLoading to false", async () => {
       const hits = [{ p25: 100, p50: 200, p75: 300, p95: 400, p99: 500 }];
 
-      mockFetchQueryDataWithHttpStream.mockImplementationOnce(
-        (_payload: any, handlers: any) => {
-          handlers.data(_payload, {
-            type: "search_response_hits",
-            content: { results: { hits } },
-          });
-        },
-      );
+      mockFetchQueryDataWithHttpStream.mockImplementationOnce((_payload: any, handlers: any) => {
+        handlers.data(_payload, {
+          type: "search_response_hits",
+          content: { results: { hits } },
+        });
+      });
 
-      const { fetchPercentiles, percentiles, isLoading } =
-        useDurationPercentiles();
+      const { fetchPercentiles, percentiles, isLoading } = useDurationPercentiles();
       fetchPercentiles(BASE_PAYLOAD);
       await flushPromises();
 
@@ -399,17 +346,14 @@ describe("useDurationPercentiles", () => {
     });
 
     it("should keep percentiles null when hits array is empty", async () => {
-      mockFetchQueryDataWithHttpStream.mockImplementationOnce(
-        (_payload: any, handlers: any) => {
-          handlers.data(_payload, {
-            type: "search_response_hits",
-            content: { results: { hits: [] } },
-          });
-        },
-      );
+      mockFetchQueryDataWithHttpStream.mockImplementationOnce((_payload: any, handlers: any) => {
+        handlers.data(_payload, {
+          type: "search_response_hits",
+          content: { results: { hits: [] } },
+        });
+      });
 
-      const { fetchPercentiles, percentiles, isLoading } =
-        useDurationPercentiles();
+      const { fetchPercentiles, percentiles, isLoading } = useDurationPercentiles();
       fetchPercentiles(BASE_PAYLOAD);
       await flushPromises();
 
@@ -426,14 +370,12 @@ describe("useDurationPercentiles", () => {
     });
 
     it("should treat missing percentile fields as null in the hits row", async () => {
-      mockFetchQueryDataWithHttpStream.mockImplementationOnce(
-        (_payload: any, handlers: any) => {
-          handlers.data(_payload, {
-            type: "search_response_hits",
-            content: { results: { hits: [{ p25: 100 }] } },
-          });
-        },
-      );
+      mockFetchQueryDataWithHttpStream.mockImplementationOnce((_payload: any, handlers: any) => {
+        handlers.data(_payload, {
+          type: "search_response_hits",
+          content: { results: { hits: [{ p25: 100 }] } },
+        });
+      });
 
       const { fetchPercentiles, percentiles } = useDurationPercentiles();
       fetchPercentiles(BASE_PAYLOAD);
@@ -450,11 +392,9 @@ describe("useDurationPercentiles", () => {
 
   describe("on error callback", () => {
     it("should set errMsg and isLoading to false", async () => {
-      mockFetchQueryDataWithHttpStream.mockImplementationOnce(
-        (_payload: any, handlers: any) => {
-          handlers.error(_payload, { message: "Server error" });
-        },
-      );
+      mockFetchQueryDataWithHttpStream.mockImplementationOnce((_payload: any, handlers: any) => {
+        handlers.error(_payload, { message: "Server error" });
+      });
 
       const { fetchPercentiles, errMsg, isLoading } = useDurationPercentiles();
       fetchPercentiles(BASE_PAYLOAD);
@@ -467,11 +407,9 @@ describe("useDurationPercentiles", () => {
 
   describe("on complete callback", () => {
     it("should set isLoading to false", async () => {
-      mockFetchQueryDataWithHttpStream.mockImplementationOnce(
-        (_payload: any, handlers: any) => {
-          handlers.complete(_payload, {});
-        },
-      );
+      mockFetchQueryDataWithHttpStream.mockImplementationOnce((_payload: any, handlers: any) => {
+        handlers.complete(_payload, {});
+      });
 
       const { fetchPercentiles, isLoading } = useDurationPercentiles();
       fetchPercentiles(BASE_PAYLOAD);
@@ -483,8 +421,7 @@ describe("useDurationPercentiles", () => {
 
   describe("cancelFetch", () => {
     it("should call cancelStreamQueryBasedOnRequestId and set isLoading to false", async () => {
-      const { fetchPercentiles, cancelFetch, isLoading } =
-        useDurationPercentiles();
+      const { fetchPercentiles, cancelFetch, isLoading } = useDurationPercentiles();
 
       fetchPercentiles(BASE_PAYLOAD);
       expect(isLoading.value).toBe(true);

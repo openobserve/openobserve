@@ -5,22 +5,21 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import { nextTick } from "vue";
 
-
 // Mock services
 vi.mock("@/services/search", () => ({
   default: {
     get_scheduled_search_list: vi.fn(),
     cancel_scheduled_search: vi.fn(),
     retry_scheduled_search: vi.fn(),
-    delete_scheduled_search: vi.fn()
-  }
+    delete_scheduled_search: vi.fn(),
+  },
 }));
 
 vi.mock("@/aws-exports", () => ({
   default: {
     isEnterprise: "true",
-    API_ENDPOINT: "http://localhost:5080"
-  }
+    API_ENDPOINT: "http://localhost:5080",
+  },
 }));
 
 vi.mock("@/composables/useLogs/searchState", () => ({
@@ -28,10 +27,10 @@ vi.mock("@/composables/useLogs/searchState", () => ({
     searchObj: {
       meta: { jobId: null },
       data: {
-        datetime: { type: 'relative' }
-      }
-    }
-  })
+        datetime: { type: "relative" },
+      },
+    },
+  }),
 }));
 
 // Mock vue-router
@@ -40,10 +39,10 @@ const mockRouter = {
     value: {
       query: { org_identifier: "test-org" },
       params: {},
-      path: '/search-schedulers'
-    }
+      path: "/search-schedulers",
+    },
   },
-  push: vi.fn()
+  push: vi.fn(),
 };
 
 vi.mock("vue-router", () => ({
@@ -51,8 +50,8 @@ vi.mock("vue-router", () => ({
   useRoute: () => ({
     query: { org_identifier: "test-org" },
     params: {},
-    path: '/search-schedulers'
-  })
+    path: "/search-schedulers",
+  }),
 }));
 
 // Mock Toast — vi.hoisted runs before hoisted vi.mock factories, avoiding TDZ errors
@@ -69,9 +68,7 @@ vi.mock("@/utils/date", () => ({
   formatDate: vi.fn(() => "2024-01-01T10:00:00Z"),
   // The component imports this now instead of re-declaring it; the shared
   // implementation is tested in date.spec.ts, so here we only assert the wiring.
-  convertUnixToDateFormat: vi.fn((us: any) =>
-    us ? "2024-01-01T10:00:00Z" : "",
-  ),
+  convertUnixToDateFormat: vi.fn((us: any) => (us ? "2024-01-01T10:00:00Z" : "")),
 }));
 
 // Mock utils
@@ -86,8 +83,8 @@ vi.mock("@/utils/zincutils", () => ({
 // Mock navigator.clipboard
 Object.assign(navigator, {
   clipboard: {
-    writeText: vi.fn(() => Promise.resolve())
-  }
+    writeText: vi.fn(() => Promise.resolve()),
+  },
 });
 
 describe("SearchSchedulersList Component", () => {
@@ -97,18 +94,18 @@ describe("SearchSchedulersList Component", () => {
   beforeEach(async () => {
     // Reset mocks
     vi.clearAllMocks();
-    
+
     // Setup search service mock
     const { default: searchServiceMock } = await import("@/services/search");
     searchService = searchServiceMock;
 
     searchService.get_scheduled_search_list.mockResolvedValue({
-      data: []
+      data: [],
     });
 
     wrapper = mount(SearchSchedulersList, {
       props: {
-        isClicked: false
+        isClicked: false,
       },
       global: {
         plugins: [i18n],
@@ -116,24 +113,24 @@ describe("SearchSchedulersList Component", () => {
           store,
         },
         stubs: {
-          'OIcon': true,
-          'DateTime': {
+          OIcon: true,
+          DateTime: {
             template: '<div class="mock-datetime"></div>',
             methods: {
-              setAbsoluteTime: vi.fn()
-            }
+              setAbsoluteTime: vi.fn(),
+            },
           },
-          'AppTabs': true,
-          'QueryEditor': true,
-          'ConfirmDialog': true,
-          'NoData': true,
-          'TenstackTable': true,
-          'QTablePagination': true,
-          'JsonPreview': true
+          AppTabs: true,
+          QueryEditor: true,
+          ConfirmDialog: true,
+          NoData: true,
+          TenstackTable: true,
+          QTablePagination: true,
+          JsonPreview: true,
         },
         mocks: {
-          $router: mockRouter
-        }
+          $router: mockRouter,
+        },
       },
     });
 
@@ -156,7 +153,7 @@ describe("SearchSchedulersList Component", () => {
     });
 
     it("should initialize with correct default props", () => {
-      expect(wrapper.props('isClicked')).toBe(false);
+      expect(wrapper.props("isClicked")).toBe(false);
     });
 
     it("should initialize with correct default data", () => {
@@ -183,7 +180,7 @@ describe("SearchSchedulersList Component", () => {
         expect.arrayContaining([
           expect.objectContaining({ label: "Query / Function", value: "query" }),
           expect.objectContaining({ label: "More Details", value: "more_details" }),
-        ])
+        ]),
       );
     });
 
@@ -192,7 +189,7 @@ describe("SearchSchedulersList Component", () => {
         valueType: "relative",
         relativeTimePeriod: "15m",
         startTime: 0,
-        endTime: 0
+        endTime: 0,
       });
     });
   });
@@ -205,7 +202,7 @@ describe("SearchSchedulersList Component", () => {
     });
 
     it("should have correct prop types", () => {
-      expect(typeof wrapper.props('isClicked')).toBe('boolean');
+      expect(typeof wrapper.props("isClicked")).toBe("boolean");
     });
 
     it("should initialize with correct isLoading state", () => {
@@ -233,17 +230,19 @@ describe("SearchSchedulersList Component", () => {
     });
 
     it("should set correct alignment for different columns", () => {
-      const mockData = [{
-        user_id: "test",
-        duration: "1s",
-        status: "finished",
-      }];
+      const mockData = [
+        {
+          user_id: "test",
+          duration: "1s",
+          status: "finished",
+        },
+      ];
       const columns = wrapper.vm.generateColumns(mockData);
 
-      const userIdColumn = columns.find(col => col.id === "user_id");
-      const actionsColumn = columns.find(col => col.id === "actions");
-      const durationColumn = columns.find(col => col.id === "duration");
-      const statusColumn = columns.find(col => col.id === "status");
+      const userIdColumn = columns.find((col) => col.id === "user_id");
+      const actionsColumn = columns.find((col) => col.id === "actions");
+      const durationColumn = columns.find((col) => col.id === "duration");
+      const statusColumn = columns.find((col) => col.id === "status");
 
       expect(userIdColumn.meta.align).toBe("left");
       expect(actionsColumn.meta.align).toBe("center");
@@ -252,15 +251,17 @@ describe("SearchSchedulersList Component", () => {
     });
 
     it("should set sortable correctly for different columns", () => {
-      const mockData = [{
-        user_id: "test",
-        status: "finished",
-      }];
+      const mockData = [
+        {
+          user_id: "test",
+          status: "finished",
+        },
+      ];
       const columns = wrapper.vm.generateColumns(mockData);
 
-      const userIdColumn = columns.find(col => col.id === "user_id");
-      const actionsColumn = columns.find(col => col.id === "actions");
-      const statusColumn = columns.find(col => col.id === "status");
+      const userIdColumn = columns.find((col) => col.id === "user_id");
+      const actionsColumn = columns.find((col) => col.id === "actions");
+      const statusColumn = columns.find((col) => col.id === "status");
 
       expect(userIdColumn.sortable).toBe(true);
       expect(actionsColumn.sortable).toBeUndefined();
@@ -276,30 +277,30 @@ describe("SearchSchedulersList Component", () => {
         end_time: 2000000,
         started_at: 1000500,
         ended_at: 2000500,
-        other_field: "ignored"
+        other_field: "ignored",
       };
-      
+
       const filtered = wrapper.vm.filterRow(mockRow);
-      
+
       expect(filtered).toEqual({
         trace_id: "abc123",
         start_time: 1000000,
         end_time: 2000000,
         started_at: 1000500,
-        ended_at: 2000500
+        ended_at: 2000500,
       });
     });
 
     it("should handle missing fields gracefully", () => {
       const mockRow = {
         trace_id: "abc123",
-        other_field: "ignored"
+        other_field: "ignored",
       };
-      
+
       const filtered = wrapper.vm.filterRow(mockRow);
-      
+
       expect(filtered).toEqual({
-        trace_id: "abc123"
+        trace_id: "abc123",
       });
     });
 
@@ -445,8 +446,8 @@ describe("SearchSchedulersList Component", () => {
       const mockData = [{ id: "1", user_id: "test" }];
       const columns = wrapper.vm.generateColumns(mockData);
 
-      const sortableColumns = columns.filter(col => col.sortable === true);
-      const sortableIds = sortableColumns.map(col => col.id);
+      const sortableColumns = columns.filter((col) => col.sortable === true);
+      const sortableIds = sortableColumns.map((col) => col.id);
       expect(sortableIds).toEqual(["user_id", "created_at", "start_time"]);
     });
 
@@ -454,9 +455,7 @@ describe("SearchSchedulersList Component", () => {
       const mockData = [{ id: "1", user_id: "test" }];
       const columns = wrapper.vm.generateColumns(mockData);
 
-      const nonSortableIds = columns
-        .filter(col => col.sortable !== true)
-        .map(col => col.id);
+      const nonSortableIds = columns.filter((col) => col.sortable !== true).map((col) => col.id);
       expect(nonSortableIds).toEqual(expect.arrayContaining(["duration", "status", "actions"]));
     });
   });
@@ -467,7 +466,10 @@ describe("SearchSchedulersList Component", () => {
     });
 
     it("should copy text to clipboard successfully", async () => {
-      await wrapper.vm.copyToClipboard("test text", { successMessage: "Query Copied Successfully!", timeout: 5000 });
+      await wrapper.vm.copyToClipboard("test text", {
+        successMessage: "Query Copied Successfully!",
+        timeout: 5000,
+      });
 
       expect(navigator.clipboard.writeText).toHaveBeenCalledWith("test text");
       expect(mockToast).toHaveBeenCalledWith({
@@ -490,7 +492,10 @@ describe("SearchSchedulersList Component", () => {
     });
 
     it("should handle different content types", async () => {
-      await wrapper.vm.copyToClipboard("function code", { successMessage: "Function Copied Successfully!", timeout: 5000 });
+      await wrapper.vm.copyToClipboard("function code", {
+        successMessage: "Function Copied Successfully!",
+        timeout: 5000,
+      });
 
       expect(mockToast).toHaveBeenCalledWith({
         variant: "success",
@@ -502,13 +507,15 @@ describe("SearchSchedulersList Component", () => {
 
   describe("Expand/Collapse Functionality", () => {
     it("should expand row and set query when onExpandedIdsChange is called", () => {
-      wrapper.vm.dataToBeLoaded = [{
-        trace_id: "test-uuid",
-        start_time: 1000,
-        end_time: 2000,
-        started_at: 1500,
-        ended_at: 2500,
-      }];
+      wrapper.vm.dataToBeLoaded = [
+        {
+          trace_id: "test-uuid",
+          start_time: 1000,
+          end_time: 2000,
+          started_at: 1500,
+          ended_at: 2500,
+        },
+      ];
 
       wrapper.vm.onExpandedIdsChange(["test-uuid"]);
 
@@ -517,11 +524,13 @@ describe("SearchSchedulersList Component", () => {
     });
 
     it("should collapse row and clear query when onExpandedIdsChange is called with empty array", () => {
-      wrapper.vm.dataToBeLoaded = [{
-        trace_id: "test-uuid",
-        start_time: 1000,
-        end_time: 2000,
-      }];
+      wrapper.vm.dataToBeLoaded = [
+        {
+          trace_id: "test-uuid",
+          start_time: 1000,
+          end_time: 2000,
+        },
+      ];
 
       wrapper.vm.onExpandedIdsChange(["test-uuid"]);
       expect(wrapper.vm.expandedIds).toEqual(["test-uuid"]);
@@ -552,7 +561,7 @@ describe("SearchSchedulersList Component", () => {
       id: "job-123",
       user_id: "test@example.com",
       status: 1,
-      sql: "SELECT * FROM logs"
+      sql: "SELECT * FROM logs",
     };
 
     beforeEach(() => {
@@ -561,14 +570,14 @@ describe("SearchSchedulersList Component", () => {
 
     it("should set up delete confirmation", () => {
       wrapper.vm.confirmDeleteJob(mockJob);
-      
+
       expect(wrapper.vm.confirmDelete).toBe(true);
       expect(wrapper.vm.toBeDeletedJob).toEqual(mockJob);
     });
 
     it("should set up cancel confirmation", () => {
       wrapper.vm.confirmCancelJob(mockJob);
-      
+
       expect(wrapper.vm.confirmCancel).toBe(true);
       expect(wrapper.vm.toBeCancelled).toEqual(mockJob);
     });
@@ -584,25 +593,24 @@ describe("SearchSchedulersList Component", () => {
     });
 
     it("should have delete, cancel and retry functions", () => {
-      expect(typeof wrapper.vm.deleteSearchJob).toBe('function');
-      expect(typeof wrapper.vm.cancelSearchJob).toBe('function');
-      expect(typeof wrapper.vm.retrySearchJob).toBe('function');
+      expect(typeof wrapper.vm.deleteSearchJob).toBe("function");
+      expect(typeof wrapper.vm.cancelSearchJob).toBe("function");
+      expect(typeof wrapper.vm.retrySearchJob).toBe("function");
     });
   });
-
 
   describe("DateTime Management", () => {
     it("should update datetime correctly", async () => {
       const mockDateTime = {
         valueType: "absolute",
         startTime: 1000000,
-        endTime: 2000000
+        endTime: 2000000,
       };
-      
+
       wrapper.vm.searchDateTimeRef = { setAbsoluteTime: vi.fn() };
-      
+
       await wrapper.vm.updateDateTime(mockDateTime);
-      
+
       expect(wrapper.vm.dateTimeToBeSent).toEqual(mockDateTime);
       expect(wrapper.vm.searchDateTimeRef.setAbsoluteTime).toHaveBeenCalledWith(1000000, 2000000);
     });
@@ -612,13 +620,13 @@ describe("SearchSchedulersList Component", () => {
         valueType: "relative",
         relativeTimePeriod: "1h",
         startTime: 0,
-        endTime: 0
+        endTime: 0,
       };
-      
+
       wrapper.vm.searchDateTimeRef = { setAbsoluteTime: vi.fn() };
-      
+
       await wrapper.vm.updateDateTime(mockDateTime);
-      
+
       expect(wrapper.vm.dateTimeToBeSent).toEqual(mockDateTime);
     });
   });
@@ -626,28 +634,28 @@ describe("SearchSchedulersList Component", () => {
   describe("Computed Properties", () => {
     it("should calculate delay message for seconds", () => {
       store.state.zoConfig.usage_publish_interval = 30;
-      
+
       const delayMsg = wrapper.vm.delayMessage;
       expect(delayMsg).toBe("60 seconds");
     });
 
     it("should calculate delay message for minutes", () => {
       store.state.zoConfig.usage_publish_interval = 180;
-      
+
       const delayMsg = wrapper.vm.delayMessage;
       expect(delayMsg).toBe("3 minute(s)");
     });
 
     it("should handle exactly 60 seconds", () => {
       store.state.zoConfig.usage_publish_interval = 60;
-      
+
       const delayMsg = wrapper.vm.delayMessage;
       expect(delayMsg).toBe("60 seconds");
     });
 
     it("should handle large intervals", () => {
       store.state.zoConfig.usage_publish_interval = 7200;
-      
+
       const delayMsg = wrapper.vm.delayMessage;
       expect(delayMsg).toBe("120 minute(s)");
     });
@@ -662,11 +670,11 @@ describe("SearchSchedulersList Component", () => {
         org_id: "test-org",
         toBeStoredStartTime: 1000000,
         toBeStoredEndTime: 2000000,
-        duration: "1 second"
+        duration: "1 second",
       };
 
       await wrapper.vm.goToLogs(mockRow);
-      
+
       expect(mockRouter.push).toHaveBeenCalledWith({
         path: "/logs",
         query: expect.objectContaining({
@@ -676,8 +684,8 @@ describe("SearchSchedulersList Component", () => {
           type: "search_scheduler",
           org_identifier: "test-org",
           from: 1000000,
-          to: 2000000
-        })
+          to: 2000000,
+        }),
       });
       expect(mockToast).toHaveBeenCalledWith({
         variant: "success",
@@ -693,11 +701,11 @@ describe("SearchSchedulersList Component", () => {
         org_id: "test-org",
         toBeStoredStartTime: 1000000,
         toBeStoredEndTime: 2000000,
-        duration: "1 second"
+        duration: "1 second",
       };
 
       await wrapper.vm.goToLogs(mockRow);
-      
+
       const callArgs = mockRouter.push.mock.calls[0][0];
       expect(callArgs.query.stream).toBe("stream1,stream2");
     });
@@ -711,7 +719,7 @@ describe("SearchSchedulersList Component", () => {
         toBeStoredStartTime: 1000000,
         toBeStoredEndTime: 2000000,
         duration: "1 second",
-        function: "test function content"
+        function: "test function content",
       };
 
       await wrapper.vm.goToLogs(mockRow);
@@ -729,7 +737,7 @@ describe("SearchSchedulersList Component", () => {
         toBeStoredStartTime: 1000000,
         toBeStoredEndTime: 2000000,
         duration: "1 second",
-        function: "function transform(row) { return row; }"
+        function: "function transform(row) { return row; }",
       };
 
       await wrapper.vm.goToLogs(mockRow);
@@ -747,7 +755,7 @@ describe("SearchSchedulersList Component", () => {
         org_id: "test-org",
         toBeStoredStartTime: 1000000,
         toBeStoredEndTime: 2000000,
-        duration: "1 second"
+        duration: "1 second",
       };
 
       await wrapper.vm.goToLogs(mockRow);
@@ -766,7 +774,7 @@ describe("SearchSchedulersList Component", () => {
         toBeStoredStartTime: 1000000,
         toBeStoredEndTime: 2000000,
         duration: "1 second",
-        function: ""
+        function: "",
       };
 
       await wrapper.vm.goToLogs(mockRow);
@@ -776,7 +784,7 @@ describe("SearchSchedulersList Component", () => {
     });
 
     it("should set job ID correctly in fetchSearchResults", () => {
-      const mockRow = { 
+      const mockRow = {
         id: "job-123",
         duration: "1 second",
         sql: "SELECT * FROM logs",
@@ -784,14 +792,14 @@ describe("SearchSchedulersList Component", () => {
         stream_type: "logs",
         org_id: "test-org",
         toBeStoredStartTime: 1000000,
-        toBeStoredEndTime: 2000000
+        toBeStoredEndTime: 2000000,
       };
-      
+
       // Mock the goToLogs function to avoid navigation issues
       wrapper.vm.goToLogs = vi.fn();
-      
+
       wrapper.vm.fetchSearchResults(mockRow);
-      
+
       expect(wrapper.vm.searchObj.meta.jobId).toBe("job-123");
     });
   });
@@ -801,9 +809,9 @@ describe("SearchSchedulersList Component", () => {
       // Mock config to be non-enterprise
       const configMock = await import("@/aws-exports");
       configMock.default.isEnterprise = "false";
-      
+
       const result = await wrapper.vm.fetchSearchHistory();
-      
+
       expect(result).toBeUndefined();
       expect(searchService.get_scheduled_search_list).not.toHaveBeenCalled();
     });
@@ -811,7 +819,7 @@ describe("SearchSchedulersList Component", () => {
 
   describe("Data Processing Functions", () => {
     it("should have fetchSearchHistory function", () => {
-      expect(typeof wrapper.vm.fetchSearchHistory).toBe('function');
+      expect(typeof wrapper.vm.fetchSearchHistory).toBe("function");
     });
 
     it("should have correct data structure for processing", () => {
@@ -820,12 +828,12 @@ describe("SearchSchedulersList Component", () => {
     });
 
     it("should have generateColumns function", () => {
-      expect(typeof wrapper.vm.generateColumns).toBe('function');
+      expect(typeof wrapper.vm.generateColumns).toBe("function");
     });
 
     it("should have data processing utilities", () => {
-      expect(typeof wrapper.vm.calculateDuration).toBe('function');
-      expect(typeof wrapper.vm.convertUnixToDateFormat).toBe('function');
+      expect(typeof wrapper.vm.calculateDuration).toBe("function");
+      expect(typeof wrapper.vm.convertUnixToDateFormat).toBe("function");
     });
   });
 
@@ -849,22 +857,22 @@ describe("SearchSchedulersList Component", () => {
     });
 
     it("should have utility functions available", () => {
-      expect(typeof wrapper.vm.copyToClipboard).toBe('function');
-      expect(typeof wrapper.vm.updateDateTime).toBe('function');
-      expect(typeof wrapper.vm.onExpandedIdsChange).toBe('function');
+      expect(typeof wrapper.vm.copyToClipboard).toBe("function");
+      expect(typeof wrapper.vm.updateDateTime).toBe("function");
+      expect(typeof wrapper.vm.onExpandedIdsChange).toBe("function");
     });
 
     it("should have loading and result tracking", () => {
-      expect(typeof wrapper.vm.isLoading).toBe('boolean');
-      expect(typeof wrapper.vm.resultTotal).toBe('number');
-      expect(typeof wrapper.vm.showSearchResults).toBe('boolean');
+      expect(typeof wrapper.vm.isLoading).toBe("boolean");
+      expect(typeof wrapper.vm.resultTotal).toBe("number");
+      expect(typeof wrapper.vm.showSearchResults).toBe("boolean");
     });
 
     it("should have confirmation state management", () => {
-      expect(typeof wrapper.vm.confirmDelete).toBe('boolean');
-      expect(typeof wrapper.vm.confirmCancel).toBe('boolean');
-      expect(typeof wrapper.vm.toBeDeletedJob).toBe('object');
-      expect(typeof wrapper.vm.toBeCancelled).toBe('object');
+      expect(typeof wrapper.vm.confirmDelete).toBe("boolean");
+      expect(typeof wrapper.vm.confirmCancel).toBe("boolean");
+      expect(typeof wrapper.vm.toBeDeletedJob).toBe("object");
+      expect(typeof wrapper.vm.toBeCancelled).toBe("object");
     });
   });
 });

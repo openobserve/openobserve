@@ -31,7 +31,6 @@ vi.mock("@/services/model_pricing", () => ({
 // Component import must come after all vi.mock() declarations.
 import TestModelMatchDialog from "./TestModelMatchDialog.vue";
 
-
 // ── Stubs ────────────────────────────────────────────────────────────────────
 
 // Stub ODialog so tests are deterministic (no Portal/Reka teleport)
@@ -140,7 +139,7 @@ function mountDialog(props: Record<string, unknown> = {}) {
         ODialog: ODialogStub,
         OButton: OButtonStub,
         OInput: OInputStub,
-        "OIcon": QIconStub,
+        OIcon: QIconStub,
         OBadge: OBadgeStub,
       },
     },
@@ -230,7 +229,7 @@ describe("TestModelMatchDialog", () => {
             ODialog: ODialogStub,
             OButton: OButtonStub,
             OInput: OInputStub,
-            "OIcon": QIconStub,
+            OIcon: QIconStub,
             OBadge: OBadgeStub,
           },
         },
@@ -268,9 +267,7 @@ describe("TestModelMatchDialog", () => {
   describe("body states", () => {
     it("renders the empty state when testModelName is empty", () => {
       wrapper = mountDialog({ modelValue: true });
-      expect(wrapper.find('[data-test="test-match-empty"]').exists()).toBe(
-        true,
-      );
+      expect(wrapper.find('[data-test="test-match-empty"]').exists()).toBe(true);
       expect(wrapper.text()).toContain("Enter a model name to test matching");
     });
 
@@ -278,9 +275,7 @@ describe("TestModelMatchDialog", () => {
       wrapper = mountDialog({ modelValue: true });
       (wrapper.vm as any).testModelName = "gpt-4";
       await nextTick();
-      expect(wrapper.find('[data-test="test-match-waiting"]').exists()).toBe(
-        true,
-      );
+      expect(wrapper.find('[data-test="test-match-waiting"]').exists()).toBe(true);
       expect(wrapper.text()).toContain('Click "Test Match" to see results');
     });
 
@@ -290,9 +285,7 @@ describe("TestModelMatchDialog", () => {
       (wrapper.vm as any).testResult = { matched: null };
       await nextTick();
 
-      expect(
-        wrapper.find('[data-test="test-match-no-result"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="test-match-no-result"]').exists()).toBe(true);
       expect(wrapper.text()).toContain("No Match Found");
       expect(wrapper.text()).toContain('No rule matched "gpt-4".');
     });
@@ -319,9 +312,7 @@ describe("TestModelMatchDialog", () => {
         tier: "Default",
       };
       await nextTick();
-      expect(wrapper.find('[data-test="test-match-result"]').exists()).toBe(
-        true,
-      );
+      expect(wrapper.find('[data-test="test-match-result"]').exists()).toBe(true);
       expect(wrapper.text()).toContain("Match Found");
     });
   });
@@ -329,18 +320,14 @@ describe("TestModelMatchDialog", () => {
   describe("input clear button", () => {
     it("does not render the clear button when input is empty", () => {
       wrapper = mountDialog({ modelValue: true });
-      expect(wrapper.find('[data-test="test-match-clear-btn"]').exists()).toBe(
-        false,
-      );
+      expect(wrapper.find('[data-test="test-match-clear-btn"]').exists()).toBe(false);
     });
 
     it("renders the clear button when input has a value", async () => {
       wrapper = mountDialog({ modelValue: true });
       (wrapper.vm as any).testModelName = "gpt-4";
       await nextTick();
-      expect(wrapper.find('[data-test="test-match-clear-btn"]').exists()).toBe(
-        true,
-      );
+      expect(wrapper.find('[data-test="test-match-clear-btn"]').exists()).toBe(true);
     });
 
     it("clears the input when clearAndFocus is invoked", async () => {
@@ -634,9 +621,7 @@ describe("TestModelMatchDialog", () => {
       await nextTick();
       const rows = (wrapper.vm as any).pricingRows;
       expect(rows).toHaveLength(2);
-      const byKey = Object.fromEntries(
-        rows.map((r: any) => [r.key, r.rate]),
-      );
+      const byKey = Object.fromEntries(rows.map((r: any) => [r.key, r.rate]));
       expect(byKey.input).toBeCloseTo(10);
       expect(byKey.output).toBeCloseTo(30);
     });
@@ -749,9 +734,7 @@ describe("TestModelMatchDialog", () => {
       };
       await nextTick();
       // The "Default" fallback should be rendered as the tier name
-      expect(wrapper.find('[data-test="test-match-result"]').text()).toContain(
-        "Default",
-      );
+      expect(wrapper.find('[data-test="test-match-result"]').text()).toContain("Default");
     });
 
     it("renders the no-pricing message when matched tier has no prices", async () => {

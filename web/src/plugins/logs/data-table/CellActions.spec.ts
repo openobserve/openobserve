@@ -40,7 +40,7 @@ const globalStubs = {
   NotEqualIcon: { template: "<svg />" },
   O2AIContextAddBtn: {
     name: "O2AIContextAddBtn",
-    template: '<div @click="$emit(\'send-to-ai-chat\', \'test\')" />',
+    template: "<div @click=\"$emit('send-to-ai-chat', 'test')\" />",
     emits: ["send-to-ai-chat"],
   },
 };
@@ -74,9 +74,7 @@ describe("CellActions", () => {
     try {
       mountComponent();
       const warnings = warn.mock.calls.map((c) => String(c[0] ?? ""));
-      expect(
-        warnings.filter((w) => w.includes("Missing required prop")),
-      ).toEqual([]);
+      expect(warnings.filter((w) => w.includes("Missing required prop"))).toEqual([]);
     } finally {
       warn.mockRestore();
     }

@@ -25,7 +25,6 @@ vi.mock("@/utils/zincutils", () => ({
   getImageURL: vi.fn((url: string) => `mocked-${url}`),
 }));
 
-
 // Mock vue-router
 const mockPush = vi.fn();
 const mockReplace = vi.fn();
@@ -321,9 +320,7 @@ describe("SettingsIndex.vue", () => {
       // Create wrapper with dark theme via store override
       wrapper = createWrapper({ theme: "dark" });
       // The regex_patterns item uses regexIcon internally - verify via sectionGroups
-      const allItems = wrapper.vm.sectionGroups.flatMap(
-        (g: any) => g.items ?? [],
-      );
+      const allItems = wrapper.vm.sectionGroups.flatMap((g: any) => g.items ?? []);
       // regex_patterns item may be undefined if not enterprise (isEnterprise defaults to 'false')
       // so this test just verifies the structure is accessible without throwing
       expect(Array.isArray(allItems)).toBe(true);
@@ -375,9 +372,7 @@ describe("SettingsIndex.vue", () => {
       mockRouter.currentRoute.value.name = "general";
       wrapper = createWrapper();
       const groups = wrapper.vm.sectionGroups;
-      const destGroup = groups.find(
-        (g: any) => g.label === "Destinations & Templates",
-      );
+      const destGroup = groups.find((g: any) => g.label === "Destinations & Templates");
       expect(destGroup).toBeDefined();
       const keys = destGroup.items.map((i: any) => i.key);
       expect(keys).toContain("alert_destinations");

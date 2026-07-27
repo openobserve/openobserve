@@ -15,10 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
-    class="flex flex-col min-h-0"
-    :data-test="`metrics-explorer-${mode}-panel`"
-  >
+  <div class="flex min-h-0 flex-col" :data-test="`metrics-explorer-${mode}-panel`">
     <!-- The rail's own search — narrows the facet LIST, not the grid. Its own
          inline ✕ clears the SEARCH TEXT only. Clearing the selected FILTERS is a
          separate, explicitly-labelled row below, so the two are never confused. -->
@@ -42,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          discoverable. Distinct from the search box's own inline ✕, which clears
          the search text. -->
     <div class="flex items-center justify-between gap-2 px-3 pb-2">
-      <span class="text-xs text-text-secondary tabular-nums">
+      <span class="text-text-secondary text-xs tabular-nums">
         {{ t("metrics.explorer.facets.selectedCount", { count: selected.size }) }}
       </span>
       <OButton
@@ -60,13 +57,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       role="group"
       :aria-label="title"
-      class="flex-1 min-h-0 overflow-y-auto px-1 pb-2"
+      class="min-h-0 flex-1 overflow-y-auto px-1 pb-2"
       :data-test="`metrics-explorer-${mode}-facets`"
     >
       <div
         v-for="facet in visibleFacets"
         :key="facet.id"
-        class="flex items-center justify-between gap-2 px-2 py-1 rounded-default hover:bg-surface-subtle"
+        class="rounded-default hover:bg-surface-subtle flex items-center justify-between gap-2 px-2 py-1"
         :class="{ 'bg-surface-subtle': selected.has(facet.id) }"
       >
         <OCheckbox
@@ -83,9 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:model-value="toggle(facet.id)"
         >
           <template #label>
-            <span class="truncate text-xs" :title="facet.label">{{
-              facet.label
-            }}</span>
+            <span class="truncate text-xs" :title="facet.label">{{ facet.label }}</span>
           </template>
         </OCheckbox>
 
@@ -150,11 +145,7 @@ const search = ref("");
 const isPrefix = computed(() => props.mode === "prefix");
 
 const title = computed(() =>
-  t(
-    isPrefix.value
-      ? "metrics.explorer.filterByPrefix"
-      : "metrics.explorer.filterBySuffix",
-  ),
+  t(isPrefix.value ? "metrics.explorer.filterByPrefix" : "metrics.explorer.filterBySuffix"),
 );
 
 const searchPlaceholder = computed(() =>

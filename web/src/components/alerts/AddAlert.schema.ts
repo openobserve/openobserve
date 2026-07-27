@@ -95,9 +95,7 @@ export type AdvancedForm = z.infer<ReturnType<typeof createAdvancedSchema>>;
 export const deduplicationSchema = z.object({
   enabled: z.boolean().optional(),
   fingerprint_fields: z.array(z.string()).optional(),
-  time_window_minutes: z
-    .union([z.number(), z.string(), z.undefined()])
-    .optional(),
+  time_window_minutes: z.union([z.number(), z.string(), z.undefined()]).optional(),
 });
 export type DeduplicationForm = z.infer<typeof deduplicationSchema>;
 
@@ -129,114 +127,108 @@ export const makeAddAlertSchema = (
 ) =>
   z
     .looseObject({
-    name: z.string().optional(),
-    stream_type: z.string().optional(),
-    stream_name: z.string().optional(),
-    is_real_time: z.string().optional(),
-    destinations: z.array(z.string()).optional(),
-    creates_incident: z.boolean().optional(),
-    trigger_condition: z.looseObject({}).optional(),
-    query_condition: z.looseObject({}).optional(),
-    logGroupBy: z.array(z.string()).optional(),
-    // Step-B fields (Advanced / Deduplication tabs). Permissive pass-throughs,
-    // not validated — the superRefine below adds no issues for them.
-    context_attributes: contextAttributesSchema.optional(),
-    deduplication: deduplicationSchema.optional(),
-    template: z.string().optional(),
-    description: z.string().optional(),
-    row_template: z.string().optional(),
-    row_template_type: z.string().optional(),
-    // Required by the composed queryConfigSchema; QueryConfig keeps it fresh.
-    _meta: z.looseObject({}).optional(),
-  })
-  .superRefine((val: any, ctx) => {
-    const mode = val.is_real_time;
+      name: z.string().optional(),
+      stream_type: z.string().optional(),
+      stream_name: z.string().optional(),
+      is_real_time: z.string().optional(),
+      destinations: z.array(z.string()).optional(),
+      creates_incident: z.boolean().optional(),
+      trigger_condition: z.looseObject({}).optional(),
+      query_condition: z.looseObject({}).optional(),
+      logGroupBy: z.array(z.string()).optional(),
+      // Step-B fields (Advanced / Deduplication tabs). Permissive pass-throughs,
+      // not validated — the superRefine below adds no issues for them.
+      context_attributes: contextAttributesSchema.optional(),
+      deduplication: deduplicationSchema.optional(),
+      template: z.string().optional(),
+      description: z.string().optional(),
+      row_template: z.string().optional(),
+      row_template_type: z.string().optional(),
+      // Required by the composed queryConfigSchema; QueryConfig keeps it fresh.
+      _meta: z.looseObject({}).optional(),
+    })
+    .superRefine((val: any, ctx) => {
+      const mode = val.is_real_time;
 
-    // ANOMALY branch: the detection-config fields are validated by
-    // AnomalyDetectionConfig's own OForm; only `name` lives on THIS form. No
-    // special-chars refine here — that rule is alert-only.
-    if (mode === "anomaly") {
+      // ANOMALY branch: the detection-config fields are validated by
+      // AnomalyDetectionConfig's own OForm; only `name` lives on THIS form. No
+      // special-chars refine here — that rule is alert-only.
+      if (mode === "anomaly") {
+        if (isBlank(val.name)) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["name"],
+            message: t("alerts.anomalyNameRequired"),
+          });
+        }
+        return;
+      }
+
+      // Topbar: name required + no special chars, stream type/name required.
       if (isBlank(val.name)) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["name"],
-          message: t("alerts.anomalyNameRequired"),
+          message: t("alerts.nameRequired"),
         });
-      }
-      return;
-    }
-
-    // Topbar: name required + no special chars, stream type/name required.
-    if (isBlank(val.name)) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["name"],
-        message: t("alerts.nameRequired"),
-      });
-    } else if (ALERT_NAME_UNSUPPORTED_CHARS.test(String(val.name))) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["name"],
-        message: t("alerts.nameNoSpecialChars"),
-      });
-    }
-    if (isBlank(val.stream_type)) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["stream_type"],
-        message: t("alerts.validation.streamTypeRequired"),
-      });
-    }
-    if (isBlank(val.stream_name)) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["stream_name"],
-        message: t("alerts.validation.streamNameRequired"),
-      });
-    }
-
-    // QueryConfig rules. Delegate to the exported schema and re-home every issue
-    // at its exact nested path so the descendant OForm* fields surface them. Its
-    // superRefine self-gates realtime vs scheduled via `_meta.isRealTime`.
-    const qc = makeQueryConfigSchema(t).safeParse(val);
-    if (!qc.success) {
-      for (const issue of qc.error.issues) {
+      } else if (ALERT_NAME_UNSUPPORTED_CHARS.test(String(val.name))) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          path: issue.path as (string | number)[],
-          message: issue.message,
+          path: ["name"],
+          message: t("alerts.nameNoSpecialChars"),
         });
       }
-    }
-
-    // AlertSettings rules. Period is enforced ≥ 1 for scheduled only; realtime
-    // keeps period rule-free (createAlertSettingsSchema toggles it). silence ≥ 0
-    // + destinations ≥ 1 apply in both non-anomaly modes.
-    const isRealTime = mode === "true";
-    const as = createAlertSettingsSchema(
-      t,
-      isRealTime,
-      allowWorkflows,
-    ).safeParse(val);
-    if (!as.success) {
-      for (const issue of as.error.issues) {
+      if (isBlank(val.stream_type)) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          path: issue.path as (string | number)[],
-          message: issue.message,
+          path: ["stream_type"],
+          message: t("alerts.validation.streamTypeRequired"),
         });
       }
-    }
-  });
+      if (isBlank(val.stream_name)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["stream_name"],
+          message: t("alerts.validation.streamNameRequired"),
+        });
+      }
+
+      // QueryConfig rules. Delegate to the exported schema and re-home every issue
+      // at its exact nested path so the descendant OForm* fields surface them. Its
+      // superRefine self-gates realtime vs scheduled via `_meta.isRealTime`.
+      const qc = makeQueryConfigSchema(t).safeParse(val);
+      if (!qc.success) {
+        for (const issue of qc.error.issues) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: issue.path as (string | number)[],
+            message: issue.message,
+          });
+        }
+      }
+
+      // AlertSettings rules. Period is enforced ≥ 1 for scheduled only; realtime
+      // keeps period rule-free (createAlertSettingsSchema toggles it). silence ≥ 0
+      // + destinations ≥ 1 apply in both non-anomaly modes.
+      const isRealTime = mode === "true";
+      const as = createAlertSettingsSchema(t, isRealTime, allowWorkflows).safeParse(val);
+      if (!as.success) {
+        for (const issue of as.error.issues) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: issue.path as (string | number)[],
+            message: issue.message,
+          });
+        }
+      }
+    });
 
 export type AddAlertForm = z.infer<ReturnType<typeof makeAddAlertSchema>>;
 
 /** A complete, valid `_meta` block for the form defaults (before QueryConfig
  *  mounts and takes over via its syncMeta watcher). Mirrors QueryConfig's
  *  initialMeta for a fresh custom/logs/scheduled alert. */
-export const defaultAddAlertMeta = (
-  overrides: Partial<QueryConfigMeta> = {},
-): QueryConfigMeta => ({
+export const defaultAddAlertMeta = (overrides: Partial<QueryConfigMeta> = {}): QueryConfigMeta => ({
   tab: "custom",
   isRealTime: "false",
   isEventBased: true,

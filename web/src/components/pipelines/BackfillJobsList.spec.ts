@@ -155,17 +155,13 @@ describe("BackfillJobsList – mount and structure", () => {
   it("renders data-test='backfill-jobs-list-page'", async () => {
     const wrapper = createWrapper();
     await flushPromises();
-    expect(
-      wrapper.find('[data-test="backfill-jobs-list-page"]').exists()
-    ).toBe(true);
+    expect(wrapper.find('[data-test="backfill-jobs-list-page"]').exists()).toBe(true);
   });
 
   it.skip("renders data-test='backfill-jobs-back-btn' (removed — back button no longer exists in component)", async () => {
     const wrapper = createWrapper();
     await flushPromises();
-    expect(
-      wrapper.find('[data-test="backfill-jobs-back-btn"]').exists()
-    ).toBe(true);
+    expect(wrapper.find('[data-test="backfill-jobs-back-btn"]').exists()).toBe(true);
   });
 
   it("renders data-test='status-filter'", async () => {
@@ -195,9 +191,7 @@ describe("BackfillJobsList – mount and structure", () => {
   it("renders data-test='backfill-jobs-table'", async () => {
     const wrapper = createWrapper();
     await flushPromises();
-    expect(
-      wrapper.find('[data-test="backfill-jobs-table"]').exists()
-    ).toBe(true);
+    expect(wrapper.find('[data-test="backfill-jobs-table"]').exists()).toBe(true);
   });
 });
 
@@ -211,7 +205,7 @@ describe("BackfillJobsList – loadJobs on mount", () => {
     createWrapper();
     await flushPromises();
     expect(backfillService.listBackfillJobs).toHaveBeenCalledWith(
-      expect.objectContaining({ org_id: "default" })
+      expect.objectContaining({ org_id: "default" }),
     );
   });
 
@@ -268,9 +262,7 @@ describe("BackfillJobsList – filteredJobs computed", () => {
     const filtered = (wrapper.vm as any).filteredJobs as BackfillJob[];
     // j1 (running), j2 (waiting→running), j3 (pending→running) should match
     expect(filtered.length).toBe(3);
-    expect(filtered.map((j) => j.job_id)).toEqual(
-      expect.arrayContaining(["j1", "j2", "j3"])
-    );
+    expect(filtered.map((j) => j.job_id)).toEqual(expect.arrayContaining(["j1", "j2", "j3"]));
   });
 
   it("filters by pipelineId", async () => {
@@ -501,9 +493,7 @@ describe("BackfillJobsList – loadPipelineOptions", () => {
     await flushPromises();
     const options = (wrapper.vm as any).pipelineOptions as any[];
     expect(options).toHaveLength(2);
-    expect(options.map((o: any) => o.value)).toEqual(
-      expect.arrayContaining(["pipe-1", "pipe-2"])
-    );
+    expect(options.map((o: any) => o.value)).toEqual(expect.arrayContaining(["pipe-1", "pipe-2"]));
   });
 });
 
@@ -580,7 +570,7 @@ describe("BackfillJobsList – Error ODialog migration", () => {
         pipeline_id: "pipe-err",
         pipeline_name: "Err Pipe",
         error: "kaboom",
-      })
+      }),
     );
     await nextTick();
     const dialog = wrapper.find('[data-test="o-dialog-stub"]');

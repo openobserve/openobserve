@@ -179,8 +179,16 @@ export const BADGE_GROUPS = {
     shape: "pill",
     values: {
       logs: { variant: "blue-soft", icon: "search", labelKey: "settings.correlation.logs" },
-      metrics: { variant: "purple-soft", icon: "bar-chart", labelKey: "settings.correlation.metrics" },
-      traces: { variant: "teal-soft", icon: "account-tree", labelKey: "settings.correlation.traces" },
+      metrics: {
+        variant: "purple-soft",
+        icon: "bar-chart",
+        labelKey: "settings.correlation.metrics",
+      },
+      traces: {
+        variant: "teal-soft",
+        icon: "account-tree",
+        labelKey: "settings.correlation.traces",
+      },
       metadata: { variant: "default-soft", icon: "info" },
       enrichmenttables: { variant: "amber-soft", icon: "database", label: "Enrichment" },
       index: { variant: "cyan-soft", icon: "database" },
@@ -629,7 +637,11 @@ export const BADGE_GROUPS = {
     shape: "pill",
     values: {
       system: { variant: "primary-outline", size: "sm", label: "system" },
-      managed: { variant: "default-outline", size: "md", labelKey: "serviceAccounts.row.managedBy" },
+      managed: {
+        variant: "default-outline",
+        size: "md",
+        labelKey: "serviceAccounts.row.managedBy",
+      },
     },
     fallback: { variant: "default-outline" },
   },
@@ -935,7 +947,10 @@ export const BADGE_GROUPS = {
     mode: "plain",
     shape: "pill",
     values: {
-      notdeclared: { variant: "default-soft", labelKey: "onlineEvals.scoreConfig.detail.noThreshold" },
+      notdeclared: {
+        variant: "default-soft",
+        labelKey: "onlineEvals.scoreConfig.detail.noThreshold",
+      },
     },
     fallback: { variant: "default-soft" },
   },
@@ -1136,9 +1151,18 @@ export const BADGE_GROUPS = {
     mode: "plain",
     shape: "pill",
     values: {
-      servicediscovery: { variant: "primary-soft", labelKey: "alerts.incidents.correlationServiceDiscovery" },
-      primarymatch: { variant: "primary-soft", labelKey: "alerts.incidents.correlationPrimaryMatch" },
-      secondarymatch: { variant: "warning-soft", labelKey: "alerts.incidents.correlationSecondaryMatch" },
+      servicediscovery: {
+        variant: "primary-soft",
+        labelKey: "alerts.incidents.correlationServiceDiscovery",
+      },
+      primarymatch: {
+        variant: "primary-soft",
+        labelKey: "alerts.incidents.correlationPrimaryMatch",
+      },
+      secondarymatch: {
+        variant: "warning-soft",
+        labelKey: "alerts.incidents.correlationSecondaryMatch",
+      },
       alertid: { variant: "default-soft", labelKey: "alerts.incidents.correlationAlertId" },
     },
     fallback: { variant: "default-soft" },
@@ -1287,12 +1311,12 @@ export const BADGE_GROUPS = {
     shape: "pill",
     size: "sm",
     values: {
-      http:    { variant: "blue-soft",    label: "HTTP" },
-      browser: { variant: "purple-soft",  label: "Browser" },
-      api:     { variant: "success-soft", label: "API" },
-      tcp:     { variant: "orange-soft",  label: "TCP" },
-      ping:    { variant: "default-soft", label: "Ping" },
-      dns:     { variant: "amber-soft",   label: "DNS" },
+      http: { variant: "blue-soft", label: "HTTP" },
+      browser: { variant: "purple-soft", label: "Browser" },
+      api: { variant: "success-soft", label: "API" },
+      tcp: { variant: "orange-soft", label: "TCP" },
+      ping: { variant: "default-soft", label: "Ping" },
+      dns: { variant: "amber-soft", label: "DNS" },
     },
   },
 
@@ -1430,7 +1454,12 @@ function genericEntry(value: unknown): BadgeValueConfig {
 
 /** Soft fallback palette for dimension keys not present in the registry. */
 const DIMENSION_FALLBACK_VARIANTS: BadgeVariant[] = [
-  "default-soft", "amber-soft", "purple-soft", "blue-soft", "teal-soft", "indigo-soft",
+  "default-soft",
+  "amber-soft",
+  "purple-soft",
+  "blue-soft",
+  "teal-soft",
+  "indigo-soft",
 ];
 
 /**
@@ -1450,7 +1479,7 @@ export function dimensionVariant(key: string): BadgeVariant {
   }
   let hash = 0;
   for (let i = 0; i < key.length; i++) {
-    hash = ((hash << 5) - hash) + key.charCodeAt(i);
+    hash = (hash << 5) - hash + key.charCodeAt(i);
     hash = hash & hash;
   }
   return DIMENSION_FALLBACK_VARIANTS[Math.abs(hash) % DIMENSION_FALLBACK_VARIANTS.length];

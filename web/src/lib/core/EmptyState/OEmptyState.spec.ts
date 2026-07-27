@@ -24,16 +24,13 @@ import store from "@/test/unit/helpers/store";
 // .vue files are loaded and we never rely on their internal rendering.
 const illustrationsProxy = vi.hoisted(
   () =>
-    new Proxy(
-      {} as Record<string, unknown>,
-      {
-        get: () => ({
-          name: "IllustrationStub",
-          props: ["width", "animated"],
-          template: '<div data-test="illustration-stub"></div>',
-        }),
-      },
-    ),
+    new Proxy({} as Record<string, unknown>, {
+      get: () => ({
+        name: "IllustrationStub",
+        props: ["width", "animated"],
+        template: '<div data-test="illustration-stub"></div>',
+      }),
+    }),
 );
 
 vi.mock("./illustrations", () => ({
@@ -315,11 +312,7 @@ describe("OEmptyState", () => {
       // Assert — the three "no-dashboards" actions with their English labels
       const cards = wrapper.findAll('[data-test="empty-state-action-card-stub"]');
       const labels = cards.map((c) => c.attributes("data-label"));
-      expect(labels).toEqual([
-        "New dashboard",
-        "Import dashboard",
-        "Browse templates",
-      ]);
+      expect(labels).toEqual(["New dashboard", "Import dashboard", "Browse templates"]);
     });
 
     it("does not render action cards when hideAction is true", () => {

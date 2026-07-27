@@ -58,6 +58,12 @@ const forwardedAttrs = computed(() => {
 const childAnchorRef = ref<HTMLSpanElement | null>(null);
 const parentEl = ref<Element | null>(null);
 const childOpen = ref(false);
+// Lazy-mount guard: the reka tooltip tree (Provider/Root/Portal/Content — ~6
+// components + floating-ui setup) is NOT rendered until the parent is first
+// hovered. This is the whole perf story for long/virtualized tables: a row that
+// is only scrolled past, never hovered, pays nothing for its tooltips. Once a
+// tooltip has been opened we keep it mounted so repeat hovers are instant.
+const childActivated = ref(false);
 let cleanupFn: (() => void) | null = null;
 // Pending open timer for the hover delay (child mode). Wrapper mode gets its
 // delay for free from reka's `delay-duration`; child mode wires its own hover
@@ -106,16 +112,21 @@ onMounted(() => {
     if (parentEl.value) {
       // Open after `props.delay` ms of hover (matching wrapper mode); leaving
       // before then cancels the pending open so a quick pass-over shows nothing.
+      // Mount the reka tree (if not already) and open it. Deferring the mount to
+      // here — the first hover, after the delay — is what keeps un-hovered rows
+      // cheap.
+      const activateAndOpen = () => {
+        childActivated.value = true;
+        childOpen.value = true;
+        childShowTimer = null;
+      };
       const show = () => {
         if (props.disabled) return;
         if (childShowTimer) clearTimeout(childShowTimer);
         if (props.delay > 0) {
-          childShowTimer = setTimeout(() => {
-            childOpen.value = true;
-            childShowTimer = null;
-          }, props.delay);
+          childShowTimer = setTimeout(activateAndOpen, props.delay);
         } else {
-          childOpen.value = true;
+          activateAndOpen();
         }
       };
       const hide = () => {
@@ -160,9 +171,9 @@ const effectiveSideOffset = computed(() => props.sideOffset);
 const contentStyle = computed(() => ({
   maxWidth: props.maxWidth,
   filter: [
-    'drop-shadow(0 0 1px rgba(0,0,0,0.15))',
-    'drop-shadow(0 4px 12px rgba(0,0,0,0.14))',
-  ].join(' '),
+    "drop-shadow(0 0 1px rgba(0,0,0,0.15))",
+    "drop-shadow(0 4px 12px rgba(0,0,0,0.14))",
+  ].join(" "),
 }));
 
 const contentClasses = computed(() => [
@@ -209,27 +220,21 @@ const contentClasses = computed(() => [
           :style="contentStyle"
           :class="contentClasses"
         >
-          <span :class="(shortcut || shortcutId) ? 'inline-flex items-center gap-1.5' : ''">
+          <span :class="shortcut || shortcutId ? 'inline-flex items-center gap-1.5' : ''">
             <slot name="content">{{ content }}</slot>
-            <OShortcut
-              v-if="shortcut || shortcutId"
-              :keys="shortcut"
-              :id="shortcutId"
-            />
+            <OShortcut v-if="shortcut || shortcutId" :keys="shortcut" :id="shortcutId" />
           </span>
-          <TooltipArrow
-            :width="10"
-            :height="5"
-            :class="'fill-surface-overlay'"
-          />
+          <TooltipArrow :width="10" :height="5" :class="'fill-surface-overlay'" />
         </TooltipContent>
       </TooltipPortal>
     </TooltipRoot>
   </TooltipProvider>
 
-  <!-- ── Child mode: no default slot, attaches to parent element as its tooltip -->
+  <!-- ── Child mode: no default slot, attaches to parent element as its tooltip.
+       The reka tree is mounted lazily (v-if) on first hover — see childActivated
+       — so un-hovered rows in a long/virtualized table cost next to nothing. -->
   <template v-else>
-    <TooltipProvider>
+    <TooltipProvider v-if="childActivated">
       <TooltipRoot
         :delay-duration="0"
         :open="disabled ? false : childOpen"
@@ -245,7 +250,7 @@ const contentClasses = computed(() => [
         <TooltipTrigger
           as="span"
           :reference="parentEl ?? undefined"
-          style="display:none"
+          style="display: none"
           aria-hidden="true"
         />
         <TooltipPortal>
@@ -261,25 +266,17 @@ const contentClasses = computed(() => [
             @mouseenter="onContentEnter"
             @mouseleave="onContentLeave"
           >
-            <span :class="(shortcut || shortcutId) ? 'inline-flex items-center gap-1.5' : ''">
+            <span :class="shortcut || shortcutId ? 'inline-flex items-center gap-1.5' : ''">
               <slot name="content">{{ content }}</slot>
-              <OShortcut
-              v-if="shortcut || shortcutId"
-              :keys="shortcut"
-              :id="shortcutId"
-            />
+              <OShortcut v-if="shortcut || shortcutId" :keys="shortcut" :id="shortcutId" />
             </span>
-            <TooltipArrow
-              :width="10"
-              :height="5"
-              :class="'fill-surface-overlay'"
-            />
+            <TooltipArrow :width="10" :height="5" :class="'fill-surface-overlay'" />
           </TooltipContent>
         </TooltipPortal>
       </TooltipRoot>
     </TooltipProvider>
     <!-- Anchor placeholder: inserted at the real DOM position to resolve parentElement.
          `style="display:none"` is required, not decorative — see the note above. -->
-    <span ref="childAnchorRef" style="display:none" aria-hidden="true" />
+    <span ref="childAnchorRef" style="display: none" aria-hidden="true" />
   </template>
 </template>

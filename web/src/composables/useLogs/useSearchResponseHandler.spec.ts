@@ -185,9 +185,7 @@ describe("useSearchResponseHandler", () => {
     mockState = createMockState();
 
     // Clear the shared searchPartitionMap
-    Object.keys(mockSearchPartitionMap).forEach(
-      (key) => delete mockSearchPartitionMap[key],
-    );
+    Object.keys(mockSearchPartitionMap).forEach((key) => delete mockSearchPartitionMap[key]);
 
     vi.clearAllMocks();
 
@@ -256,9 +254,7 @@ describe("useSearchResponseHandler", () => {
 
       responseHandler.setCancelSearchError();
 
-      expect(Array.isArray(mockState.searchObj.data.queryResults.hits)).toBe(
-        true,
-      );
+      expect(Array.isArray(mockState.searchObj.data.queryResults.hits)).toBe(true);
     });
 
     it("should clear error when no hits", () => {
@@ -374,9 +370,7 @@ describe("useSearchResponseHandler", () => {
       expect(mockState.searchObj.data.countErrorMsg).toContain(
         "Error while retrieving total events",
       );
-      expect(mockState.searchObj.data.countErrorMsg).toContain(
-        "TraceID: trace-pc",
-      );
+      expect(mockState.searchObj.data.countErrorMsg).toContain("TraceID: trace-pc");
     });
 
     it("should handle histogram error", () => {
@@ -393,13 +387,9 @@ describe("useSearchResponseHandler", () => {
 
       responseHandler.handleSearchError(request, error as any);
 
-      expect(mockState.searchObj.data.histogram.errorMsg).toContain(
-        "Histogram failed",
-      );
+      expect(mockState.searchObj.data.histogram.errorMsg).toContain("Histogram failed");
       expect(mockState.searchObj.data.histogram.errorCode).toBe(404);
-      expect(mockState.searchObj.data.histogram.errorDetail).toBe(
-        "Data not found",
-      );
+      expect(mockState.searchObj.data.histogram.errorDetail).toBe("Data not found");
     });
   });
 
@@ -428,10 +418,7 @@ describe("useSearchResponseHandler", () => {
         },
       };
 
-      responseHandler.handleSearchResponse(
-        metadataPayload as any,
-        metadataResponse as any,
-      );
+      responseHandler.handleSearchResponse(metadataPayload as any, metadataResponse as any);
 
       // Now test the hits response
       const payload = {
@@ -586,9 +573,7 @@ describe("useSearchResponseHandler", () => {
 
       responseHandler.handleFunctionError(queryReq as any, response);
 
-      expect(mockState.searchObj.data.functionError).toBe(
-        "Invalid function syntax",
-      );
+      expect(mockState.searchObj.data.functionError).toBe("Invalid function syntax");
     });
 
     it("should update datetime when function error has new time range", () => {
@@ -703,11 +688,7 @@ describe("useSearchResponseHandler", () => {
   describe("trimPageCountExtraHit", () => {
     it("should trim last hit when at page boundary", () => {
       // Use mockState directly
-      mockState.searchObj.data.queryResults.hits = [
-        { id: 1 },
-        { id: 2 },
-        { id: 3 },
-      ];
+      mockState.searchObj.data.queryResults.hits = [{ id: 1 }, { id: 2 }, { id: 3 }];
 
       const queryReq = { query: { size: 3, from: 0 } };
 

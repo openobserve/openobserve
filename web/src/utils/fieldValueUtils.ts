@@ -72,8 +72,7 @@ export const extractValuesFromHits = (
       // are useless as autocomplete suggestions — skip them.
       if (value.length === 0 || value.length > MAX_VALUE_LENGTH) continue;
       // These are JavaScript serialisation artifacts, not real field values.
-      if (value === "null" || value === "undefined" || value === "NaN")
-        continue;
+      if (value === "null" || value === "undefined" || value === "NaN") continue;
 
       if (!fieldSets.has(field)) fieldSets.set(field, new Set());
       fieldSets.get(field)!.add(value);

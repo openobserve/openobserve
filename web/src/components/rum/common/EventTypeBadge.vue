@@ -15,12 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OTag
-    type="rumEventType"
-    :value="type"
-    class="mr-1.5"
-    :data-test="dataTest"
-  />
+  <OTag type="rumEventType" :value="type" class="mr-1.5" :data-test="dataTest" />
 </template>
 
 <script setup lang="ts">

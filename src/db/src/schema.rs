@@ -19,7 +19,8 @@ use arrow_schema::{DataType, Field, Schema};
 use bytes::Bytes;
 use common::meta::stream::StreamSchema;
 use config::{
-    cluster::LOCAL_NODE_ID, ider::SnowflakeIdGenerator, meta::stream::StreamType, utils::json,
+    O2_INGEST_TS_COL_NAME, cluster::LOCAL_NODE_ID, ider::SnowflakeIdGenerator,
+    meta::stream::StreamType, utils::json,
 };
 use hashbrown::{HashMap, HashSet};
 use infra::schema::{
@@ -113,12 +114,13 @@ pub async fn set_stream_is_llm(
     update_setting(org_id, stream_name, stream_type, metadata).await
 }
 
-/// Ensure gen_ai_* schema fields are present in a stream's Arrow schema.
+/// Ensure LLM query fields are present in a stream's Arrow schema.
 ///
-/// This adds any missing gen_ai_* fields from [`GEN_AI_SCHEMA_FIELDS`] into the
-/// stream's Arrow schema so they are available at ingestion time. For streams
-/// with User-Defined Schema already enabled, it also appends those fields to
-/// `defined_schema_fields`; non-UDS streams are left non-UDS.
+/// This adds the internal ingest timestamp and any missing gen_ai_* fields from
+/// [`GEN_AI_SCHEMA_FIELDS`] into the stream's Arrow schema so they are available
+/// at ingestion and query time. For streams with User-Defined Schema already
+/// enabled, only the gen_ai_* fields are appended to `defined_schema_fields`;
+/// the ingest timestamp remains an implicit internal field.
 ///
 /// Handles the case where a stream was already marked as an LLM stream but has
 /// only legacy `llm_*` fields — calling this ensures the newer `gen_ai_*`
@@ -138,15 +140,18 @@ async fn ensure_gen_ai_fields_in_schema_inner(
     update_defined_schema_fields: bool,
 ) -> Result<(), anyhow::Error> {
     let schema_cache = infra::schema::get_cache(org_id, stream_name, stream_type).await?;
-    let missing_fields: Vec<Field> = GEN_AI_SCHEMA_FIELDS
+    let mut missing_fields: Vec<Field> = GEN_AI_SCHEMA_FIELDS
         .iter()
         .filter(|f| !schema_cache.contains_field(f.name()))
         .cloned()
         .collect();
+    if !schema_cache.contains_field(O2_INGEST_TS_COL_NAME) {
+        missing_fields.push(Field::new(O2_INGEST_TS_COL_NAME, DataType::Int64, true));
+    }
 
     if !missing_fields.is_empty() {
-        let gen_ai_schema = Schema::new(missing_fields);
-        merge(org_id, stream_name, stream_type, &gen_ai_schema, None).await?;
+        let llm_schema = Schema::new(missing_fields);
+        merge(org_id, stream_name, stream_type, &llm_schema, None).await?;
     }
     if update_defined_schema_fields {
         ensure_gen_ai_fields_in_defined_schema_fields(org_id, stream_name, stream_type).await?;
@@ -512,7 +517,6 @@ pub async fn cache() -> Result<(), anyhow::Error> {
         }
         let mut w = STREAM_SETTINGS.write().await;
         w.insert(item_key.to_string(), settings);
-        infra::schema::set_stream_settings_atomic(w.clone());
         drop(w);
         let mut w = STREAM_SCHEMAS_LATEST.write().await;
         w.insert(
@@ -542,6 +546,11 @@ pub async fn cache() -> Result<(), anyhow::Error> {
             log::info!("Stream schemas Cached progress: {}/{}", i, keys.len());
         }
     }
+    // sync the atomic cache once after the loop; cloning the settings map per
+    // stream inside the loop is O(n^2) and stalls startup with many streams
+    let w = STREAM_SETTINGS.read().await;
+    infra::schema::set_stream_settings_atomic(w.clone());
+    drop(w);
     log::info!("Stream schemas Cached {keys_num} streams");
     Ok(())
 }
@@ -750,6 +759,7 @@ mod tests {
         assert!(fields.contains(&"gen_ai_usage_cache_read_input_tokens".to_string()));
         assert!(fields.contains(&"gen_ai_usage_cache_creation_input_tokens".to_string()));
         assert!(fields.contains(&"gen_ai_usage_cost_net_cache_impact".to_string()));
+        assert!(!fields.contains(&O2_INGEST_TS_COL_NAME.to_string()));
     }
 
     #[test]

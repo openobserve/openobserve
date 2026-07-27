@@ -1,74 +1,112 @@
-// Copyright 2026 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+-->
 <template>
   <OPageLayout
-    :title="detail?.label || t('synthetics.privateLocations.detail.title')"
     icon="location-on"
-    :back="{ label: t('synthetics.privateLocations.detail.back'), to: { name: 'synthetics', query: { section: 'private' } } }"
+    :back="{
+      label: t('synthetics.privateLocations.detail.back'),
+      to: { name: 'synthetics', query: { section: 'private' } },
+    }"
     bleed
   >
-      <template #title-trail>
-        <OBadge v-if="detail" :variant="statusVariant(detail.status)" :dot="true" size="sm">
-          {{ t(`synthetics.privateLocations.status.${detail.status}`) }}
-        </OBadge>
-      </template>
-      <template #actions>
-        <OButton
-          variant="outline"
-          size="sm"
-          icon-left="content-copy"
-          :disabled="!detail"
-          data-test="synthetics-private-location-detail-setup-btn"
-          @click="openSetup()"
-        >
-          {{ t("synthetics.privateLocations.copySetupCmd") }}
-        </OButton>
-        <OButton
-          variant="outline"
-          size="icon-sm"
-          icon-left="refresh"
-          :loading="loading"
-          :title="t('common.refresh')"
-          data-test="synthetics-private-location-detail-refresh-btn"
-          @click="load"
-        />
-      </template>
+    <template #title>
+      <span class="inline-flex min-w-0 items-center gap-2">
+        <span class="truncate">{{
+          detail?.label || t("synthetics.privateLocations.detail.title")
+        }}</span>
+        <BetaBadge />
+      </span>
+    </template>
+    <template #title-trail>
+      <OBadge v-if="detail" :variant="statusVariant(detail.status)" :dot="true" size="sm">
+        {{ t(`synthetics.privateLocations.status.${detail.status}`) }}
+      </OBadge>
+    </template>
+    <template #actions>
+      <OButton
+        variant="outline"
+        size="sm"
+        icon-left="content-copy"
+        :disabled="!detail"
+        data-test="synthetics-private-location-detail-setup-btn"
+        @click="openSetup()"
+      >
+        {{ t("synthetics.privateLocations.copySetupCmd") }}
+      </OButton>
+      <OButton
+        variant="outline"
+        size="icon-sm"
+        icon-left="refresh"
+        :loading="loading"
+        :title="t('common.refresh')"
+        data-test="synthetics-private-location-detail-refresh-btn"
+        @click="load"
+      />
+    </template>
 
-    <div class="flex-1 min-h-0 overflow-y-auto">
+    <div class="min-h-0 flex-1 overflow-y-auto">
       <div v-if="detail" class="flex flex-col gap-6 p-6">
         <!-- Summary strip -->
-        <div class="flex flex-wrap items-center gap-6 rounded-default border border-border-default bg-surface-subtle px-4 py-3 text-sm">
+        <div
+          class="rounded-default border-border-default bg-surface-subtle flex flex-wrap items-center gap-6 border px-4 py-3 text-sm"
+        >
           <div class="flex flex-col">
-            <span class="text-xs text-text-muted">{{ t("synthetics.privateLocations.table.agents") }}</span>
+            <span class="text-text-muted text-xs">{{
+              t("synthetics.privateLocations.table.agents")
+            }}</span>
             <span class="font-medium">{{ detail.live_agents }}/{{ detail.agents_total }}</span>
           </div>
           <div class="flex flex-col">
-            <span class="text-xs text-text-muted">{{ t("synthetics.privateLocations.table.checks") }}</span>
+            <span class="text-text-muted text-xs">{{
+              t("synthetics.privateLocations.table.checks")
+            }}</span>
             <span class="font-medium">{{ detail.monitors_count }}</span>
           </div>
           <div class="flex flex-col">
-            <span class="text-xs text-text-muted">{{ t("synthetics.privateLocations.table.checksPerMin") }}</span>
+            <span class="text-text-muted text-xs">{{
+              t("synthetics.privateLocations.table.checksPerMin")
+            }}</span>
             <span class="font-medium">~{{ detail.checks_per_min }}</span>
           </div>
           <div v-if="detail.version" class="flex flex-col">
-            <span class="text-xs text-text-muted">{{ t("synthetics.privateLocations.detail.version") }}</span>
+            <span class="text-text-muted text-xs">{{
+              t("synthetics.privateLocations.detail.version")
+            }}</span>
             <span class="font-medium">v{{ detail.version }}</span>
           </div>
           <div class="flex flex-col">
-            <span class="text-xs text-text-muted">{{ t("synthetics.privateLocations.detail.pool") }}</span>
+            <span class="text-text-muted text-xs">{{
+              t("synthetics.privateLocations.detail.pool")
+            }}</span>
             <span class="font-mono text-xs">{{ detail.pool }}</span>
           </div>
           <div v-if="detail.last_seen_at" class="flex flex-col">
-            <span class="text-xs text-text-muted">{{ t("synthetics.privateLocations.table.lastSeen") }}</span>
+            <span class="text-text-muted text-xs">{{
+              t("synthetics.privateLocations.table.lastSeen")
+            }}</span>
             <span class="font-medium">{{ formatTimeAgoUs(detail.last_seen_at) }}</span>
           </div>
         </div>
 
         <!-- Agents (read-only, self-registered) -->
         <div class="flex flex-col gap-2">
-          <h3 class="text-sm font-medium text-text-heading">
+          <h3 class="text-text-heading text-sm font-medium">
             {{ t("synthetics.privateLocations.detail.agentsTitle") }}
           </h3>
-          <p class="text-xs text-text-muted">
+          <p class="text-text-muted text-xs">
             {{ t("synthetics.privateLocations.detail.agentsSubtitle") }}
           </p>
           <OTable
@@ -112,7 +150,7 @@
                   variant="ghost"
                   size="icon-sm"
                   icon-left="content-copy"
-                  :title="t('synthetics.privateLocations.detail.recoverAgent')"
+                  :title="t('synthetics.privateLocations.detail.restartConfig')"
                   :data-test="`synthetics-private-location-agent-recover-btn-${(row as any).id}`"
                   @click="openSetup((row as any).name)"
                 />
@@ -123,7 +161,7 @@
 
         <!-- Assigned checks -->
         <div class="flex flex-col gap-2">
-          <h3 class="text-sm font-medium text-text-heading">
+          <h3 class="text-text-heading text-sm font-medium">
             {{ t("synthetics.privateLocations.detail.checksTitle") }}
           </h3>
           <OTable
@@ -194,6 +232,7 @@ import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { resolveBadge } from "@/lib/core/Badge/badgeGroups";
+import BetaBadge from "@/components/common/BetaBadge.vue";
 import AgentSetupDrawer from "@/components/synthetic-monitoring/AgentSetupDrawer.vue";
 import syntheticsService from "@/services/synthetics";
 import type { AgentSetup, SyntheticLocationDetail } from "@/types/synthetics";
@@ -238,10 +277,7 @@ const statusVariant = (status: string) =>
 async function load() {
   loading.value = true;
   try {
-    const res = await syntheticsService.getLocation(
-      orgIdentifier.value,
-      String(route.params.id),
-    );
+    const res = await syntheticsService.getLocation(orgIdentifier.value, String(route.params.id));
     detail.value = res.data as SyntheticLocationDetail;
   } catch (err) {
     detail.value = null;
@@ -258,7 +294,12 @@ const openMonitor = (row: { id: string; name: string }) => {
   router.push({
     name: "synthetic-monitor-results",
     params: { id: row.id },
-    query: { name: row.name, ...(typeof orgIdentifier === "string" && orgIdentifier ? { org_identifier: orgIdentifier } : {}) },
+    query: {
+      name: row.name,
+      ...(typeof orgIdentifier === "string" && orgIdentifier
+        ? { org_identifier: orgIdentifier }
+        : {}),
+    },
   });
 };
 

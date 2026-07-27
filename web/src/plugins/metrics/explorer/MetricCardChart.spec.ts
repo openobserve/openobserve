@@ -94,9 +94,7 @@ describe("MetricCardChart builds the panel schema from its props", () => {
     await wrapper.setProps({ bucketUnit: "milliseconds" });
     await nextTick();
 
-    expect(panelProp(wrapper, "panelSchema").config.bucket_unit).toBe(
-      "milliseconds",
-    );
+    expect(panelProp(wrapper, "panelSchema").config.bucket_unit).toBe("milliseconds");
   });
 
   it("puts the queries into the schema and updates them", async () => {
@@ -108,16 +106,12 @@ describe("MetricCardChart builds the panel schema from its props", () => {
     });
     await nextTick();
 
-    expect(panelProp(wrapper, "panelSchema").queries[0].query).toBe(
-      "sum(rate(up[5m]))",
-    );
+    expect(panelProp(wrapper, "panelSchema").queries[0].query).toBe("sum(rate(up[5m]))");
   });
 
   it("pins the x-axis to the queried range (injected, non-streaming data)", () => {
     const wrapper = mountChart();
-    expect(panelProp(wrapper, "panelSchema").config.pin_x_axis_to_range).toBe(
-      true,
-    );
+    expect(panelProp(wrapper, "panelSchema").config.pin_x_axis_to_range).toBe(true);
   });
 
   it("connects across null gaps so a sparse line is not fragmented", () => {

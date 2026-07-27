@@ -217,8 +217,7 @@ Op4: memory=50B`;
     });
 
     it("should extract multiple metrics from single line", () => {
-      const planText =
-        "SortExec: elapsed_compute=10ms, output_rows=100, memory=2MB, spill_count=0";
+      const planText = "SortExec: elapsed_compute=10ms, output_rows=100, memory=2MB, spill_count=0";
 
       const result = parseQueryPlanTree(planText);
 
@@ -417,18 +416,14 @@ FileSink`;
     });
 
     it("should collapse when fields exceed threshold", () => {
-      const planText =
-        "Projection: [field1, field2, field3, field4, field5, field6, field7]";
+      const planText = "Projection: [field1, field2, field3, field4, field5, field6, field7]";
       const result = collapseProjections(planText, 5);
 
-      expect(result).toBe(
-        "Projection: [field1, field2, field3, ... 4 more]"
-      );
+      expect(result).toBe("Projection: [field1, field2, field3, ... 4 more]");
     });
 
     it("should use default threshold of 5", () => {
-      const planText =
-        "Projection: [f1, f2, f3, f4, f5, f6, f7, f8]";
+      const planText = "Projection: [f1, f2, f3, f4, f5, f6, f7, f8]";
       const result = collapseProjections(planText);
 
       expect(result).toBe("Projection: [f1, f2, f3, ... 5 more]");
@@ -450,9 +445,7 @@ FileSink`;
         'Projection: ["field1", "field, with, comma", "field3", "field4", "field5", "field6"]';
       const result = collapseProjections(planText, 5);
 
-      expect(result).toBe(
-        'Projection: ["field1", "field, with, comma", "field3", ... 3 more]'
-      );
+      expect(result).toBe('Projection: ["field1", "field, with, comma", "field3", ... 3 more]');
     });
 
     it("should handle complex expressions with multiple levels of nesting", () => {
@@ -461,7 +454,7 @@ FileSink`;
       const result = collapseProjections(planText, 5);
 
       expect(result).toBe(
-        "Projection: [field1, CASE WHEN x > 0 THEN (a + b) ELSE (c - d) END, field3, ... 4 more]"
+        "Projection: [field1, CASE WHEN x > 0 THEN (a + b) ELSE (c - d) END, field3, ... 4 more]",
       );
     });
 
@@ -510,13 +503,10 @@ FilterExec: output_rows=100`;
     });
 
     it("should handle projection with suffix content", () => {
-      const planText =
-        "Projection: [f1, f2, f3, f4, f5, f6, f7], output_rows=100";
+      const planText = "Projection: [f1, f2, f3, f4, f5, f6, f7], output_rows=100";
       const result = collapseProjections(planText, 5);
 
-      expect(result).toBe(
-        "Projection: [f1, f2, f3, ... 4 more], output_rows=100"
-      );
+      expect(result).toBe("Projection: [f1, f2, f3, ... 4 more], output_rows=100");
     });
 
     it("should handle lines without projection", () => {
@@ -529,8 +519,7 @@ TableScan`;
     });
 
     it("should handle fields with spaces", () => {
-      const planText =
-        "Projection: [field 1, field 2, field 3, field 4, field 5, field 6]";
+      const planText = "Projection: [field 1, field 2, field 3, field 4, field 5, field 6]";
       const result = collapseProjections(planText, 5);
 
       expect(result).toBe("Projection: [field 1, field 2, field 3, ... 3 more]");
@@ -549,9 +538,7 @@ TableScan`;
       const planText = "SortExec: memory=2TB";
       const tree = parseQueryPlanTree(planText);
 
-      expect(tree.children[0].metrics.memory_bytes).toBe(
-        2 * 1024 * 1024 * 1024 * 1024
-      );
+      expect(tree.children[0].metrics.memory_bytes).toBe(2 * 1024 * 1024 * 1024 * 1024);
     });
 
     it("should handle decimal values in time and memory", () => {

@@ -36,7 +36,7 @@ describe("OProgressBar", () => {
     it("applies bg-progress-bar-default for variant=default", () => {
       const wrapper = mount(OProgressBar, { props: { value: 0.5 } });
       expect(wrapper.find("[role='progressbar'] div").classes()).toContain(
-        "bg-progress-bar-default"
+        "bg-progress-bar-default",
       );
     });
 
@@ -45,7 +45,7 @@ describe("OProgressBar", () => {
         props: { value: 0.9, variant: "warning" },
       });
       expect(wrapper.find("[role='progressbar'] div").classes()).toContain(
-        "bg-progress-bar-warning"
+        "bg-progress-bar-warning",
       );
     });
 
@@ -54,7 +54,7 @@ describe("OProgressBar", () => {
         props: { value: 1, variant: "danger" },
       });
       expect(wrapper.find("[role='progressbar'] div").classes()).toContain(
-        "bg-progress-bar-danger"
+        "bg-progress-bar-danger",
       );
     });
   });
@@ -66,9 +66,7 @@ describe("OProgressBar", () => {
     sizes.forEach((size) => {
       it(`applies ${expected[size]} for size="${size}"`, () => {
         const wrapper = mount(OProgressBar, { props: { value: 0.5, size } });
-        expect(wrapper.find("[role='progressbar']").classes()).toContain(
-          expected[size]
-        );
+        expect(wrapper.find("[role='progressbar']").classes()).toContain(expected[size]);
       });
     });
   });
@@ -97,9 +95,7 @@ describe("OProgressBar", () => {
 
     it("sets aria-valuenow to rounded percentage integer", () => {
       const wrapper = mount(OProgressBar, { props: { value: 0.73 } });
-      expect(
-        wrapper.find("[role='progressbar']").attributes("aria-valuenow")
-      ).toBe("73");
+      expect(wrapper.find("[role='progressbar']").attributes("aria-valuenow")).toBe("73");
     });
 
     it("sets aria-valuemin=0 and aria-valuemax=100", () => {

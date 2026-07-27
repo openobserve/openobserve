@@ -43,7 +43,15 @@ export interface HistogramQueryPayload {
 }
 
 export interface WebSocketSearchResponse {
-  type: "search_response" | "cancel_response" | "error" | "end" | "progress" | "event_progress" | "search_response_metadata" | "search_response_hits";
+  type:
+    | "search_response"
+    | "cancel_response"
+    | "error"
+    | "end"
+    | "progress"
+    | "event_progress"
+    | "search_response_metadata"
+    | "search_response_hits";
   content: {
     // Present on "event_progress" responses (streaming progress percent 0-100)
     percent?: number;

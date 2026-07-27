@@ -20,7 +20,6 @@ import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import SummaryList from "./SummaryList.vue";
 
-
 const node = document.createElement("div");
 node.setAttribute("id", "app");
 document.body.appendChild(node);
@@ -36,7 +35,7 @@ describe("SummaryList.vue", () => {
       numOfQueries: 5,
       duration: 2.5,
       queryRange: 3600,
-      trace_ids: ["trace1", "trace2"]
+      trace_ids: ["trace1", "trace2"],
     },
     {
       row_id: "2",
@@ -45,8 +44,8 @@ describe("SummaryList.vue", () => {
       numOfQueries: 3,
       duration: 1.2,
       queryRange: 1800,
-      trace_ids: ["trace3", "trace4"]
-    }
+      trace_ids: ["trace3", "trace4"],
+    },
   ];
   const mockSelectedRows: any[] = [];
 
@@ -67,15 +66,26 @@ describe("SummaryList.vue", () => {
         plugins: [i18n, router],
         stubs: {
           NoData: {
-            template: '<div data-test="no-data">No Data</div>'
+            template: '<div data-test="no-data">No Data</div>',
           },
           OTable: {
-            name: 'OTable',
-            props: ['data', 'columns', 'rowKey', 'selectedIds', 'selection', 'pagination', 'pageSize', 'pageSizeOptions', 'showGlobalFilter'],
-            emits: ['update:selected-ids', 'row-click'],
-            template: '<div data-test="o-table-stub"><slot name="cell-actions" :row="{}" /><slot name="cell-duration" :row="{}" /><slot name="cell-queryRange" :row="{}" /><slot name="empty" /><slot name="bottom" /></div>'
-          }
-        }
+            name: "OTable",
+            props: [
+              "data",
+              "columns",
+              "rowKey",
+              "selectedIds",
+              "selection",
+              "pagination",
+              "pageSize",
+              "pageSizeOptions",
+              "showGlobalFilter",
+            ],
+            emits: ["update:selected-ids", "row-click"],
+            template:
+              '<div data-test="o-table-stub"><slot name="cell-actions" :row="{}" /><slot name="cell-duration" :row="{}" /><slot name="cell-queryRange" :row="{}" /><slot name="empty" /><slot name="bottom" /></div>',
+          },
+        },
       },
     });
     await flushPromises();
@@ -123,7 +133,9 @@ describe("SummaryList.vue", () => {
   it("should initialize deleteDialog with correct default values", () => {
     expect(wrapper.vm.deleteDialog.show).toBe(false);
     expect(wrapper.vm.deleteDialog.title).toBe("Delete Running Query");
-    expect(wrapper.vm.deleteDialog.message).toBe("Are you sure you want to delete this running query?");
+    expect(wrapper.vm.deleteDialog.message).toBe(
+      "Are you sure you want to delete this running query?",
+    );
     expect(wrapper.vm.deleteDialog.data).toBe(null);
   });
 
@@ -149,8 +161,8 @@ describe("SummaryList.vue", () => {
   it("should emit delete:queries with trace_ids when confirmDeleteAction is called", () => {
     const mockProps = {
       row: {
-        trace_ids: ["trace1", "trace2"]
-      }
+        trace_ids: ["trace1", "trace2"],
+      },
     };
 
     wrapper.vm.confirmDeleteAction(mockProps);
@@ -162,7 +174,7 @@ describe("SummaryList.vue", () => {
   // Test 15: Test confirmDeleteAction with empty trace_ids
   it("should emit empty array when trace_ids is undefined", () => {
     const mockProps = {
-      row: {}
+      row: {},
     };
 
     wrapper.vm.confirmDeleteAction(mockProps);
@@ -203,7 +215,7 @@ describe("SummaryList.vue", () => {
       "update:selectedRows",
       "delete:queries",
       "clear:filters",
-      "refresh"
+      "refresh",
     ];
     expect(wrapper.vm.$options.emits).toEqual(expectedEmits);
   });
@@ -293,13 +305,20 @@ describe("SummaryList.vue", () => {
   // Test 33: Test component has correct setup function return values
   it("should return all required values from setup function", () => {
     const setupReturnKeys = [
-      "t", "columns", "confirmDeleteAction", "deleteDialog", "pageSizeOptions",
-      "showListSchemaDialog", "loadingState",
-      "isMetaOrg", "selectedRow",
-      "handleMultiQueryCancel", "getAllUserQueries"
+      "t",
+      "columns",
+      "confirmDeleteAction",
+      "deleteDialog",
+      "pageSizeOptions",
+      "showListSchemaDialog",
+      "loadingState",
+      "isMetaOrg",
+      "selectedRow",
+      "handleMultiQueryCancel",
+      "getAllUserQueries",
     ];
 
-    setupReturnKeys.forEach(key => {
+    setupReturnKeys.forEach((key) => {
       expect(wrapper.vm[key]).toBeDefined();
     });
   });

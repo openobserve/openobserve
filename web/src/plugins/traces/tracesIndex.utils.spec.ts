@@ -6,10 +6,7 @@
 // every branch without a real Date.now() dependency.
 
 import { describe, it, expect, vi } from "vitest";
-import {
-  computeInsightsTimeRange,
-  EMPTY_INSIGHTS_TIME_RANGE,
-} from "./tracesIndex.utils";
+import { computeInsightsTimeRange, EMPTY_INSIGHTS_TIME_RANGE } from "./tracesIndex.utils";
 
 // ===========================================================================
 // Null / empty input
@@ -24,9 +21,7 @@ describe("computeInsightsTimeRange — null / undefined input", () => {
   });
 
   it("returns {0,0} when dt is undefined", () => {
-    expect(computeInsightsTimeRange(undefined, () => null)).toEqual(
-      EMPTY_INSIGHTS_TIME_RANGE,
-    );
+    expect(computeInsightsTimeRange(undefined, () => null)).toEqual(EMPTY_INSIGHTS_TIME_RANGE);
   });
 
   // The function returns a fresh object each time so callers can safely
@@ -49,10 +44,7 @@ describe("computeInsightsTimeRange — relative", () => {
   // string and its result is propagated through.
   it("delegates to getConsumableRelativeTime when period is set", () => {
     const spy = vi.fn(() => ({ startTime: 1_000_000, endTime: 2_000_000 }));
-    const result = computeInsightsTimeRange(
-      { type: "relative", relativeTimePeriod: "12h" },
-      spy,
-    );
+    const result = computeInsightsTimeRange({ type: "relative", relativeTimePeriod: "12h" }, spy);
     expect(spy).toHaveBeenCalledWith("12h");
     expect(result).toEqual({ startTime: 1_000_000, endTime: 2_000_000 });
   });
@@ -61,14 +53,8 @@ describe("computeInsightsTimeRange — relative", () => {
   it("returns {0,0} when relativeTimePeriod is missing", () => {
     const spy = vi.fn();
     const r1 = computeInsightsTimeRange({ type: "relative" }, spy);
-    const r2 = computeInsightsTimeRange(
-      { type: "relative", relativeTimePeriod: null },
-      spy,
-    );
-    const r3 = computeInsightsTimeRange(
-      { type: "relative", relativeTimePeriod: "" },
-      spy,
-    );
+    const r2 = computeInsightsTimeRange({ type: "relative", relativeTimePeriod: null }, spy);
+    const r3 = computeInsightsTimeRange({ type: "relative", relativeTimePeriod: "" }, spy);
     expect(r1).toEqual(EMPTY_INSIGHTS_TIME_RANGE);
     expect(r2).toEqual(EMPTY_INSIGHTS_TIME_RANGE);
     expect(r3).toEqual(EMPTY_INSIGHTS_TIME_RANGE);
@@ -133,10 +119,7 @@ describe("computeInsightsTimeRange — absolute", () => {
 
   // Type unspecified → falls through to absolute branch (defensive).
   it("treats missing dt.type as absolute", () => {
-    const result = computeInsightsTimeRange(
-      { startTime: 100, endTime: 200 },
-      () => null,
-    );
+    const result = computeInsightsTimeRange({ startTime: 100, endTime: 200 }, () => null);
     expect(result).toEqual({ startTime: 100, endTime: 200 });
   });
 
@@ -161,10 +144,10 @@ describe("computeInsightsTimeRange — resolver returning {0,0}", () => {
   // Some resolvers return {0,0} for a known-bad period instead of null.
   // The function should pass that through (not falsy-coerce).
   it("passes through resolver's {0,0} result", () => {
-    const result = computeInsightsTimeRange(
-      { type: "relative", relativeTimePeriod: "0s" },
-      () => ({ startTime: 0, endTime: 0 }),
-    );
+    const result = computeInsightsTimeRange({ type: "relative", relativeTimePeriod: "0s" }, () => ({
+      startTime: 0,
+      endTime: 0,
+    }));
     expect(result).toEqual({ startTime: 0, endTime: 0 });
   });
 });

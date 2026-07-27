@@ -391,12 +391,8 @@ describe("usePanelEditor", () => {
   describe("updateVrlFunctionFieldList", () => {
     it("should filter out alias fields and update vrlFunctionFieldList", () => {
       // Setup with x and y fields that have aliases
-      dashboardPanelData.data.queries[0].fields.x = [
-        { alias: "timestamp", isDerived: false },
-      ];
-      dashboardPanelData.data.queries[0].fields.y = [
-        { alias: "count", isDerived: false },
-      ];
+      dashboardPanelData.data.queries[0].fields.x = [{ alias: "timestamp", isDerived: false }];
+      dashboardPanelData.data.queries[0].fields.y = [{ alias: "count", isDerived: false }];
       dashboardPanelData.data.queries[0].customQuery = false;
 
       const { updateVrlFunctionFieldList } = usePanelEditor(options);
@@ -437,9 +433,7 @@ describe("usePanelEditor", () => {
     });
 
     it("should be case insensitive when filtering aliases", () => {
-      dashboardPanelData.data.queries[0].fields.x = [
-        { alias: "Timestamp", isDerived: false },
-      ];
+      dashboardPanelData.data.queries[0].fields.x = [{ alias: "Timestamp", isDerived: false }];
       dashboardPanelData.data.queries[0].customQuery = false;
 
       const { updateVrlFunctionFieldList } = usePanelEditor(options);
@@ -525,12 +519,8 @@ describe("usePanelEditor", () => {
     });
 
     it("should NOT filter out derived fields (isDerived: true)", () => {
-      dashboardPanelData.data.queries[0].fields.x = [
-        { alias: "derivedField", isDerived: true },
-      ];
-      dashboardPanelData.data.queries[0].fields.y = [
-        { alias: "normalField", isDerived: false },
-      ];
+      dashboardPanelData.data.queries[0].fields.x = [{ alias: "derivedField", isDerived: true }];
+      dashboardPanelData.data.queries[0].fields.y = [{ alias: "normalField", isDerived: false }];
       dashboardPanelData.data.queries[0].customQuery = false;
 
       const { updateVrlFunctionFieldList } = usePanelEditor(options);
@@ -563,9 +553,7 @@ describe("usePanelEditor", () => {
     });
 
     it("should filter out z-axis fields", () => {
-      dashboardPanelData.data.queries[0].fields.z = [
-        { alias: "z_value", isDerived: false },
-      ];
+      dashboardPanelData.data.queries[0].fields.z = [{ alias: "z_value", isDerived: false }];
       dashboardPanelData.data.queries[0].customQuery = false;
 
       const { updateVrlFunctionFieldList } = usePanelEditor(options);
@@ -601,9 +589,7 @@ describe("usePanelEditor", () => {
     it("should filter axis aliases even when customQuery is true", () => {
       // Axis field aliases (x/y/z/breakdown) are always filtered, in both
       // builder and custom mode.
-      dashboardPanelData.data.queries[0].fields.x = [
-        { alias: "timestamp", isDerived: false },
-      ];
+      dashboardPanelData.data.queries[0].fields.x = [{ alias: "timestamp", isDerived: false }];
       dashboardPanelData.data.queries[0].customQuery = true;
       dashboardPanelData.meta.queryFields[0] = {
         customQueryFields: [],
@@ -637,9 +623,7 @@ describe("usePanelEditor", () => {
         },
       });
 
-      dashboardPanelData.data.queries[0].fields.x = [
-        { alias: "x_alias_q1", isDerived: false },
-      ];
+      dashboardPanelData.data.queries[0].fields.x = [{ alias: "x_alias_q1", isDerived: false }];
 
       const { updateVrlFunctionFieldList } = usePanelEditor(options);
 
@@ -649,12 +633,12 @@ describe("usePanelEditor", () => {
       ]);
 
       // Per-query VRL fields are stored in the meta.queryFields cache.
-      expect(
-        dashboardPanelData.meta.queryFields[0].vrlFunctionFieldList,
-      ).toEqual([{ name: "q1_vrl", type: "Utf8" }]);
-      expect(
-        dashboardPanelData.meta.queryFields[1].vrlFunctionFieldList,
-      ).toEqual([{ name: "q2_vrl", type: "Utf8" }]);
+      expect(dashboardPanelData.meta.queryFields[0].vrlFunctionFieldList).toEqual([
+        { name: "q1_vrl", type: "Utf8" },
+      ]);
+      expect(dashboardPanelData.meta.queryFields[1].vrlFunctionFieldList).toEqual([
+        { name: "q2_vrl", type: "Utf8" },
+      ]);
       expect(dashboardPanelData.meta.stream.vrlFunctionFieldList).toEqual([
         { name: "q1_vrl", type: "Utf8" },
       ]);
@@ -677,16 +661,11 @@ describe("usePanelEditor", () => {
           filter: { conditions: [] },
         },
       });
-      dashboardPanelData.data.queries[0].vrlFunctionFieldList = [
-        { name: "q1_vrl", type: "Utf8" },
-      ];
+      dashboardPanelData.data.queries[0].vrlFunctionFieldList = [{ name: "q1_vrl", type: "Utf8" }];
 
       const { updateVrlFunctionFieldList } = usePanelEditor(options);
 
-      updateVrlFunctionFieldList([
-        ["q1_vrl"],
-        ["q2_vrl"],
-      ]);
+      updateVrlFunctionFieldList([["q1_vrl"], ["q2_vrl"]]);
 
       expect(dashboardPanelData.meta.stream.vrlFunctionFieldList).toEqual([
         { name: "q1_vrl", type: "Utf8" },
@@ -905,12 +884,8 @@ describe("usePanelEditor", () => {
 
       updateDateTime(newDateTime);
 
-      expect(dashboardPanelData.meta.dateTime.start_time).toEqual(
-        new Date("2024-02-01T00:00:00Z")
-      );
-      expect(dashboardPanelData.meta.dateTime.end_time).toEqual(
-        new Date("2024-02-02T00:00:00Z")
-      );
+      expect(dashboardPanelData.meta.dateTime.start_time).toEqual(new Date("2024-02-01T00:00:00Z"));
+      expect(dashboardPanelData.meta.dateTime.end_time).toEqual(new Date("2024-02-02T00:00:00Z"));
     });
 
     it("should handle string timestamps", () => {
@@ -1014,8 +989,7 @@ describe("usePanelEditor", () => {
     });
 
     it("should handle runQuery followed by error handling", () => {
-      const { runQuery, handleChartApiError, chartData, errorMessage } =
-        usePanelEditor(options);
+      const { runQuery, handleChartApiError, chartData, errorMessage } = usePanelEditor(options);
 
       // Run query
       runQuery();
@@ -1157,9 +1131,7 @@ describe("usePanelEditor", () => {
       const { runQuery } = usePanelEditor(options);
       runQuery();
 
-      expect(dashboardPanelData.meta.dateTime.start_time).toEqual(
-        new Date("2024-03-01")
-      );
+      expect(dashboardPanelData.meta.dateTime.start_time).toEqual(new Date("2024-03-01"));
     });
   });
 

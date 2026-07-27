@@ -43,10 +43,7 @@ export interface ConfigOptions {
 // Pure filter helpers (exported so they can be unit-tested independently)
 // ---------------------------------------------------------------------------
 
-export function filterOption(
-  option: ConfigOption | undefined,
-  normalizedQuery: string,
-): boolean {
+export function filterOption(option: ConfigOption | undefined, normalizedQuery: string): boolean {
   if (!option || option.visible === false) return false;
   if (!normalizedQuery) return true;
   const labels = Array.isArray(option.label) ? option.label : [option.label];
@@ -58,9 +55,7 @@ export function filterSection(
   normalizedQuery: string,
 ): boolean {
   if (!sectionOptions) return false;
-  return Object.values(sectionOptions).some((opt) =>
-    filterOption(opt, normalizedQuery),
-  );
+  return Object.values(sectionOptions).some((opt) => filterOption(opt, normalizedQuery));
 }
 
 // ---------------------------------------------------------------------------
@@ -122,8 +117,7 @@ export function useConfigPanel(
           !!promqlMode.value &&
           dashboardPanelData.data.type === "table" &&
           (dashboardPanelData.data.config?.promql_table_mode === "all" ||
-            dashboardPanelData.data.config?.promql_table_mode ===
-              "expanded_timeseries"),
+            dashboardPanelData.data.config?.promql_table_mode === "expanded_timeseries"),
       },
       "hidden-columns": {
         label: t("dashboard.hiddenColumns"),
@@ -131,8 +125,7 @@ export function useConfigPanel(
           !!promqlMode.value &&
           dashboardPanelData.data.type === "table" &&
           (dashboardPanelData.data.config?.promql_table_mode === "all" ||
-            dashboardPanelData.data.config?.promql_table_mode ===
-              "expanded_timeseries"),
+            dashboardPanelData.data.config?.promql_table_mode === "expanded_timeseries"),
       },
       "sticky-first-column": {
         label: t("dashboard.stickyFirstColumn"),
@@ -140,8 +133,7 @@ export function useConfigPanel(
           !!promqlMode.value &&
           dashboardPanelData.data.type === "table" &&
           (dashboardPanelData.data.config?.promql_table_mode === "all" ||
-            dashboardPanelData.data.config?.promql_table_mode ===
-              "expanded_timeseries"),
+            dashboardPanelData.data.config?.promql_table_mode === "expanded_timeseries"),
       },
       "sticky-columns": {
         label: t("dashboard.stickyColumns"),
@@ -149,8 +141,7 @@ export function useConfigPanel(
           !!promqlMode.value &&
           dashboardPanelData.data.type === "table" &&
           (dashboardPanelData.data.config?.promql_table_mode === "all" ||
-            dashboardPanelData.data.config?.promql_table_mode ===
-              "expanded_timeseries"),
+            dashboardPanelData.data.config?.promql_table_mode === "expanded_timeseries"),
       },
       "configure-column-order": {
         label: t("dashboard.configureColumnOrder"),
@@ -158,8 +149,7 @@ export function useConfigPanel(
           !!promqlMode.value &&
           dashboardPanelData.data.type === "table" &&
           (dashboardPanelData.data.config?.promql_table_mode === "all" ||
-            dashboardPanelData.data.config?.promql_table_mode ===
-              "expanded_timeseries"),
+            dashboardPanelData.data.config?.promql_table_mode === "expanded_timeseries"),
       },
     },
     geographic: {
@@ -167,8 +157,7 @@ export function useConfigPanel(
         label: t("dashboard.configSectionGeographic"),
         visible:
           !!promqlMode.value &&
-          (dashboardPanelData.data.type === "geomap" ||
-            dashboardPanelData.data.type === "maps"),
+          (dashboardPanelData.data.type === "geomap" || dashboardPanelData.data.type === "maps"),
       },
     },
     legend: {
@@ -187,8 +176,7 @@ export function useConfigPanel(
       "legend-size": {
         label: [t("common.legendWidth"), t("dashboard.legendHeight")],
         visible:
-          shouldShowLegendWidth(dashboardPanelData) ||
-          shouldShowLegendHeight(dashboardPanelData),
+          shouldShowLegendWidth(dashboardPanelData) || shouldShowLegendHeight(dashboardPanelData),
       },
       "chart-align": {
         label: t("dashboard.chartAlign"),
@@ -220,9 +208,8 @@ export function useConfigPanel(
         label: t("dashboard.queryLimit"),
         visible:
           !promqlMode.value &&
-          !dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ]?.customQuery,
+          !dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+            ?.customQuery,
       },
       "top-results": {
         label: t("dashboard.showTopNValues"),
@@ -326,17 +313,11 @@ export function useConfigPanel(
     pivotTable: {
       "pivot-show-row-totals": {
         label: t("dashboard.pivotShowRowTotals"),
-        visible:
-          !promqlMode.value &&
-          dashboardPanelData.data.type === "table" &&
-          isPivotMode.value,
+        visible: !promqlMode.value && dashboardPanelData.data.type === "table" && isPivotMode.value,
       },
       "pivot-show-col-totals": {
         label: t("dashboard.pivotShowColTotals"),
-        visible:
-          !promqlMode.value &&
-          dashboardPanelData.data.type === "table" &&
-          isPivotMode.value,
+        visible: !promqlMode.value && dashboardPanelData.data.type === "table" && isPivotMode.value,
       },
       "pivot-sticky-row-totals": {
         label: t("dashboard.pivotStickyRowTotals"),
@@ -373,8 +354,7 @@ export function useConfigPanel(
       "map-config": {
         label: t("dashboard.configSectionMap"),
         visible:
-          dashboardPanelData.data.type === "geomap" ||
-          dashboardPanelData.data.type === "maps",
+          dashboardPanelData.data.type === "geomap" || dashboardPanelData.data.type === "maps",
       },
     },
     gauge: {
@@ -395,14 +375,11 @@ export function useConfigPanel(
       "trellis-columns": {
         label: t("dashboard.numOfColumns"),
         visible:
-          showTrellisConfig.value &&
-          dashboardPanelData.data.config.trellis?.layout === "custom",
+          showTrellisConfig.value && dashboardPanelData.data.config.trellis?.layout === "custom",
       },
       "trellis-group-by": {
         label: t("dashboard.groupMultiYAxisTrellis"),
-        visible:
-          showTrellisConfig.value &&
-          dashboardPanelData.data.config.trellis?.layout != null,
+        visible: showTrellisConfig.value && dashboardPanelData.data.config.trellis?.layout != null,
       },
     },
     colors: {
@@ -414,10 +391,7 @@ export function useConfigPanel(
     drilldown: {
       drilldown: {
         label: t("dashboard.drilldown"),
-        visible: shouldShowDrilldown(
-          dashboardPanelData,
-          dashboardPanelDataPageKey as string,
-        ),
+        visible: shouldShowDrilldown(dashboardPanelData, dashboardPanelDataPageKey as string),
       },
     },
     comparison: {
@@ -450,13 +424,9 @@ export function useConfigPanel(
   const expandedSections = ref<Record<string, boolean>>({
     ...DEFAULT_EXPANDED_SECTIONS,
   });
-  const beforeSearchExpandedSections = ref<Record<string, boolean> | null>(
-    null,
-  );
+  const beforeSearchExpandedSections = ref<Record<string, boolean> | null>(null);
 
-  const normalizedSearchQuery = computed(() =>
-    (searchQuery.value ?? "").trim().toLowerCase(),
-  );
+  const normalizedSearchQuery = computed(() => (searchQuery.value ?? "").trim().toLowerCase());
 
   const saveExpansionState = () => {
     beforeSearchExpandedSections.value = { ...expandedSections.value };
@@ -480,21 +450,14 @@ export function useConfigPanel(
   // ── Bound filter helpers ──────────────────────────────────────────────────
 
   const isConfigOptionVisible = (sectionId: SectionId, optionId: string): boolean =>
-    filterOption(
-      configOptions.value[sectionId]?.[optionId],
-      normalizedSearchQuery.value,
-    );
+    filterOption(configOptions.value[sectionId]?.[optionId], normalizedSearchQuery.value);
 
   const isSectionVisible = (sectionId: SectionId): boolean =>
-    filterSection(
-      configOptions.value[sectionId],
-      normalizedSearchQuery.value,
-    );
+    filterSection(configOptions.value[sectionId], normalizedSearchQuery.value);
 
   // ── Expand / collapse ─────────────────────────────────────────────────────
 
-  const isExpanded = (key: string): boolean =>
-    expandedSections.value[key] ?? false;
+  const isExpanded = (key: string): boolean => expandedSections.value[key] ?? false;
 
   const toggleSection = (sectionId: SectionId) => {
     expandedSections.value[sectionId] = !isExpanded(sectionId);
@@ -516,9 +479,7 @@ export function useConfigPanel(
     });
   };
 
-  const anySectionVisible = computed(() =>
-    ORDERED_SECTION_IDS.some((id) => isSectionVisible(id)),
-  );
+  const anySectionVisible = computed(() => ORDERED_SECTION_IDS.some((id) => isSectionVisible(id)));
 
   return {
     searchQuery,

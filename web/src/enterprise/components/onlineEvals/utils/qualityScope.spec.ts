@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  emptyScopeCounts,
-  qualityScopeWhere,
-  scopeCountsFromRow,
-} from "./qualityScope";
+import { emptyScopeCounts, qualityScopeWhere, scopeCountsFromRow } from "./qualityScope";
 
 describe("qualityScope", () => {
   it("leaves the combined view unfiltered", () => {

@@ -15,65 +15,70 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OCard class="flex flex-col shadow-none border border-card-glass-border bg-card-glass-bg rounded-default w-full h-full dark:bg-surface-base dark:border-border-default">
+  <OCard
+    class="border-card-glass-border bg-card-glass-bg rounded-default dark:bg-surface-base dark:border-border-default flex h-full w-full flex-col border shadow-none"
+  >
     <div class="flex items-center justify-between px-3 py-2">
       <div>
-        <h3 class="pt-2 text-base font-semibold leading-6 text-text-heading m-0">
+        <h3 class="text-text-heading m-0 pt-2 text-base leading-6 font-semibold">
           {{ t("billing.enterpriseLabel") }}
         </h3>
-        <p class="mt-2 text-sm font-normal leading-[1.125rem] text-text-secondary m-0">
+        <p class="text-text-secondary m-0 mt-2 text-sm leading-[1.125rem] font-normal">
           {{ t("billing.enterpriseSubtitle") }}
         </p>
       </div>
-      <OTag
-        type="billingTag"
-        value="discount"
-        class="mt-2"
-      />
+      <OTag type="billingTag" value="discount" class="mt-2" />
     </div>
 
     <OSeparator class="my-2" />
 
-    <div class="px-3 pt-2 h-137.5">
-      <h4 class="text-compact font-semibold leading-[0.983rem] text-text-heading m-0">{{ t("billing.features") }}</h4>
-      <p class="mb-3 mt-1 text-compact font-normal leading-[1.125rem] text-text-secondary m-0">
+    <div class="h-137.5 px-3 pt-2">
+      <h4 class="text-compact text-text-heading m-0 leading-[0.983rem] font-semibold">
+        {{ t("billing.features") }}
+      </h4>
+      <p class="text-compact text-text-secondary m-0 mt-1 mb-3 leading-[1.125rem] font-normal">
         {{ t("billing.included") }}
       </p>
 
       <div
         v-if="pricingError && !features?.length"
-        class="flex items-center mb-2 text-status-error-text"
+        class="text-status-error-text mb-2 flex items-center"
       >
         <OIcon name="warning" size="sm" class="mr-2" />
-        <span class="text-base leading-[1.375rem] text-text-body"
+        <span class="text-text-body text-base leading-[1.375rem]"
           >Failed to load pricing details. Please refresh the page.</span
         >
       </div>
       <div
         v-for="(feature, index) in features"
         :key="index"
-        class="flex items-center justify-between mb-2"
+        class="mb-2 flex items-center justify-between"
       >
         <div class="flex items-center">
           <OIcon
             v-if="feature.is_parent"
             name="check-circle"
             size="md"
-            class="mr-2 text-status-positive check-icon"
+            class="text-status-positive check-icon mr-2"
           />
-          <div class="text-base leading-[1.375rem] text-text-body" :class="{ 'ml-6': !feature.is_parent }">{{ feature.name }}</div>
+          <div
+            class="text-text-body text-base leading-[1.375rem]"
+            :class="{ 'ml-6': !feature.is_parent }"
+          >
+            {{ feature.name }}
+          </div>
         </div>
-        <div class="text-base leading-[1.375rem] text-text-body font-bold">{{ feature.price }}</div>
+        <div class="text-text-body text-base leading-[1.375rem] font-bold">{{ feature.price }}</div>
       </div>
     </div>
 
     <OSeparator />
 
-    <p class="px-3 pt-2 text-compact font-normal leading-[1.125rem] text-text-secondary m-0">
+    <p class="text-compact text-text-secondary m-0 px-3 pt-2 leading-[1.125rem] font-normal">
       {{ t("billing.enterpriseNote") }}
     </p>
 
-    <div class="flex justify-between p-3 mt-4.5">
+    <div class="mt-4.5 flex justify-between p-3">
       <OButton variant="primary" size="sm-action" class="w-full" @click="contactSales">
         {{ t("billing.contactLabel") }}
       </OButton>

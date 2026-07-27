@@ -13,9 +13,7 @@ export const makeGeneralSettingsSchema = (t: (_key: string) => string) =>
     showDynamicFilters: z.boolean(),
   });
 
-export type GeneralSettingsForm = z.infer<
-  ReturnType<typeof makeGeneralSettingsSchema>
->;
+export type GeneralSettingsForm = z.infer<ReturnType<typeof makeGeneralSettingsSchema>>;
 
 // Static pre-load blank defaults for the form. The async edit-data load
 // re-seeds via `form.reset(...)`; this only covers the initial blank state.

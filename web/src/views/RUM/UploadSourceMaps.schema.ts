@@ -15,14 +15,8 @@ import { z } from "zod";
 
 export const makeUploadSourceMapsSchema = (t: (_key: string) => string) =>
   z.object({
-    service: z
-      .string()
-      .trim()
-      .min(1, t("rum.uploadSourceMapsForm.serviceRequired")),
-    version: z
-      .string()
-      .trim()
-      .min(1, t("rum.uploadSourceMapsForm.versionRequired")),
+    service: z.string().trim().min(1, t("rum.uploadSourceMapsForm.serviceRequired")),
+    version: z.string().trim().min(1, t("rum.uploadSourceMapsForm.versionRequired")),
     environment: z.string().optional().default(""),
     file: z
       .instanceof(File)
@@ -38,6 +32,4 @@ export const makeUploadSourceMapsSchema = (t: (_key: string) => string) =>
       }),
   });
 
-export type UploadSourceMapsForm = z.infer<
-  ReturnType<typeof makeUploadSourceMapsSchema>
->;
+export type UploadSourceMapsForm = z.infer<ReturnType<typeof makeUploadSourceMapsSchema>>;

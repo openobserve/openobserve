@@ -29,29 +29,28 @@ import { getFieldsFromQuery } from "@/utils/query/sqlUtils";
 import { searchState } from "@/composables/useLogs/searchState";
 
 // Mock CSS.supports for test environment
-Object.defineProperty(global, 'CSS', {
+Object.defineProperty(global, "CSS", {
   value: {
     supports: () => false,
-    escape: () => '',
+    escape: () => "",
     // Add other required CSS properties as needed with dummy values
-  }
+  },
 });
 
 const node = document.createElement("div");
 node.setAttribute("id", "app");
 document.body.appendChild(node);
 
-
 // Mock the sqlUtils module
 vi.mock("@/utils/query/sqlUtils", () => ({
   buildSqlQuery: vi.fn(),
   getFieldsFromQuery: vi.fn(),
   isSimpleSelectAllQuery: vi.fn((query) => {
-    if (!query || typeof query !== 'string') return false;
-    const normalizedQuery = query.trim().replace(/\s+/g, ' ');
+    if (!query || typeof query !== "string") return false;
+    const normalizedQuery = query.trim().replace(/\s+/g, " ");
     const selectAllPattern = /^select\s+\*\s+from\s+/i;
     return selectAllPattern.test(normalizedQuery);
-  })
+  }),
 }));
 vi.mock("@/composables/useDashboardPanelData", () => ({
   default: () => ({
@@ -73,8 +72,8 @@ vi.mock("@/composables/useDashboardPanelData", () => ({
               weight: null,
               name: null,
               value_for_maps: null,
-            }
-          }
+            },
+          },
         ],
         id: "",
         type: "bar",
@@ -192,30 +191,28 @@ vi.mock("@/composables/useDashboardPanelData", () => ({
     },
     validatePanel: vi.fn(),
     generateLabelFromName: (name: string) => name,
-    resetDashboardPanelData: vi.fn()
-  })
-
+    resetDashboardPanelData: vi.fn(),
+  }),
 }));
-vi.mock('@/composables/useLogs', async () => {
+vi.mock("@/composables/useLogs", async () => {
   // Import the real module
-  const actual = await vi.importActual<typeof import('@/composables/useLogs')>(
-    '@/composables/useLogs'
-  )
+  const actual =
+    await vi.importActual<typeof import("@/composables/useLogs")>("@/composables/useLogs");
 
   return {
     ...actual,
     // Only mock clearSearchObject
-    clearSearchObj: vi.fn()
-  }
-})
+    clearSearchObj: vi.fn(),
+  };
+});
 
-vi.mock('@/composables/useLogs/usePatterns', () => ({
+vi.mock("@/composables/useLogs/usePatterns", () => ({
   default: () => ({
     extractPatterns: vi.fn().mockResolvedValue(undefined),
     patternsState: { value: { patterns: null, loading: false, error: null, lastQuery: null } },
   }),
   patternsState: { value: { patterns: null, loading: false, error: null, lastQuery: null } },
-}))
+}));
 
 import config from "@/aws-exports";
 import segment from "@/services/segment_analytics";
@@ -236,9 +233,9 @@ describe("Logs Index", async () => {
       },
     };
     // swallow vuex dispatches for namespaced modules not present in test helper
-    vi.spyOn(store, 'dispatch').mockResolvedValue(undefined as any);
+    vi.spyOn(store, "dispatch").mockResolvedValue(undefined as any);
     // default safe mock to avoid destructuring errors in watchers
-    (getFieldsFromQuery as Mock).mockResolvedValue({ fields: [], filters: [], streamName: '' });
+    (getFieldsFromQuery as Mock).mockResolvedValue({ fields: [], filters: [], streamName: "" });
 
     wrapper = mount(Index, {
       attachTo: "#app",
@@ -258,24 +255,18 @@ describe("Logs Index", async () => {
     // vi.clearAllMocks();
   });
 
-
   it("Should hide index list when showFields is false.", async () => {
-
-
     wrapper.vm.searchObj.meta.showFields = false;
     await flushPromises();
-    expect(
-      wrapper.find('[data-test="logs-search-index-list"]').exists()
-    ).toBeFalsy();
+    expect(wrapper.find('[data-test="logs-search-index-list"]').exists()).toBeFalsy();
   });
-
 
   it("Should transform non-SQL query to SQL format when SQL mode is enabled", async () => {
     // Setup initial state
     wrapper.vm.searchObj.data.stream.selectedStream = ["stream1"];
     wrapper.vm.searchObj.data.stream.selectedStreamFields = [
       { name: "field1" },
-      { name: "field2" }
+      { name: "field2" },
     ];
     wrapper.vm.searchObj.data.stream.interestingFieldList = ["field1", "field2"];
     wrapper.vm.searchObj.meta.quickMode = true;
@@ -288,8 +279,12 @@ describe("Logs Index", async () => {
     await flushPromises();
 
     // Verify the query was transformed correctly
-    expect(wrapper.vm.searchObj.data.query).toBe('SELECT field1,field2 FROM "stream1" WHERE field2 > 5');
-    expect(wrapper.vm.searchObj.data.editorValue).toBe('SELECT field1,field2 FROM "stream1" WHERE field2 > 5');
+    expect(wrapper.vm.searchObj.data.query).toBe(
+      'SELECT field1,field2 FROM "stream1" WHERE field2 > 5',
+    );
+    expect(wrapper.vm.searchObj.data.editorValue).toBe(
+      'SELECT field1,field2 FROM "stream1" WHERE field2 > 5',
+    );
   });
 
   it("Should keep non-reserved fields unquoted when converting to SQL mode", async () => {
@@ -312,10 +307,11 @@ describe("Logs Index", async () => {
 
   it("Should modify SQL query when adding/removing interesting fields", async () => {
     // Mock the removeFieldByName function
-    const removeFieldByNameSpy = vi.spyOn(wrapper.vm, 'removeFieldByName')
+    const removeFieldByNameSpy = vi
+      .spyOn(wrapper.vm, "removeFieldByName")
       .mockImplementation((...args: any[]) => {
         const [data, fieldName] = args;
-        if (fieldName === '*') {
+        if (fieldName === "*") {
           return data;
         }
         return data.filter((item: any) => item.expr?.column !== fieldName);
@@ -326,16 +322,16 @@ describe("Logs Index", async () => {
       columns: [
         {
           expr: { type: "column_ref", column: "field1" },
-          type: "expr"
-        }
+          type: "expr",
+        },
       ],
       from: [{ table: "my_stream1" }],
       where: {
         type: "binary_expr",
         operator: ">",
         left: { type: "column_ref", column: "field1" },
-        right: { type: "number", value: 5 }
-      }
+        right: { type: "number", value: 5 },
+      },
     };
 
     // Mock for adding field2
@@ -345,62 +341,74 @@ describe("Logs Index", async () => {
         ...mockProcessedSQL.columns,
         {
           expr: { type: "column_ref", column: "field2" },
-          type: "expr"
-        }
-      ]
+          type: "expr",
+        },
+      ],
     };
 
-    const processInterestingFiledInSQLQuerySpy = vi.spyOn(wrapper.vm, 'processInterestingFiledInSQLQuery')
-      .mockImplementationOnce(() => mockProcessedSQLWithField2)  // First call (adding field2)
-      .mockImplementationOnce(() => mockProcessedSQL);          // Second call (removing field2)
+    const processInterestingFiledInSQLQuerySpy = vi
+      .spyOn(wrapper.vm, "processInterestingFiledInSQLQuery")
+      .mockImplementationOnce(() => mockProcessedSQLWithField2) // First call (adding field2)
+      .mockImplementationOnce(() => mockProcessedSQL); // Second call (removing field2)
 
     // Setup initial state
     wrapper.vm.searchObj.data.stream.selectedStream = ["my_stream1"];
     wrapper.vm.searchObj.data.query = 'SELECT field1 FROM "my_stream1" WHERE field1 > 5';
     wrapper.vm.searchObj.data.editorValue = wrapper.vm.searchObj.data.query;
     wrapper.vm.searchObj.data.streamResults = {
-      list: [{
-        name: "my_stream1",
-        schema: [
-          { name: "field1" },
-          { name: "field2" }
-        ]
-      }]
+      list: [
+        {
+          name: "my_stream1",
+          schema: [{ name: "field1" }, { name: "field2" }],
+        },
+      ],
     };
 
     // Add a new field (field2) to the query
-    await wrapper.vm.setInterestingFieldInSQLQuery({
-      "name": "field2",
-      "ftsKey": false,
-      "isSchemaField": true,
-      "group": "my_stream1",
-      "streams": [
-        "my_stream1"
-      ],
-      "showValues": true,
-      "isInterestingField": true
-    }, false);
+    await wrapper.vm.setInterestingFieldInSQLQuery(
+      {
+        name: "field2",
+        ftsKey: false,
+        isSchemaField: true,
+        group: "my_stream1",
+        streams: ["my_stream1"],
+        showValues: true,
+        isInterestingField: true,
+      },
+      false,
+    );
     await flushPromises();
 
     // Verify field was added to the query
-    expect(wrapper.vm.searchObj.data.query).toBe('SELECT field1, field2 FROM "my_stream1" WHERE field1 > 5');
-    expect(wrapper.vm.searchObj.data.editorValue).toBe('SELECT field1, field2 FROM "my_stream1" WHERE field1 > 5');
+    expect(wrapper.vm.searchObj.data.query).toBe(
+      'SELECT field1, field2 FROM "my_stream1" WHERE field1 > 5',
+    );
+    expect(wrapper.vm.searchObj.data.editorValue).toBe(
+      'SELECT field1, field2 FROM "my_stream1" WHERE field1 > 5',
+    );
 
     // Remove an existing field (field2) from the query
-    await wrapper.vm.setInterestingFieldInSQLQuery({
-      "name": "field2",
-      "ftsKey": false,
-      "isSchemaField": true,
-      "group": "my_stream1",
-      "streams": ["my_stream1"],
-      "showValues": true,
-      "isInterestingField": true
-    }, true);
+    await wrapper.vm.setInterestingFieldInSQLQuery(
+      {
+        name: "field2",
+        ftsKey: false,
+        isSchemaField: true,
+        group: "my_stream1",
+        streams: ["my_stream1"],
+        showValues: true,
+        isInterestingField: true,
+      },
+      true,
+    );
     await flushPromises();
 
     // Verify field was removed from the query
-    expect(wrapper.vm.searchObj.data.query).toBe('SELECT field1 FROM "my_stream1" WHERE field1 > 5');
-    expect(wrapper.vm.searchObj.data.editorValue).toBe('SELECT field1 FROM "my_stream1" WHERE field1 > 5');
+    expect(wrapper.vm.searchObj.data.query).toBe(
+      'SELECT field1 FROM "my_stream1" WHERE field1 > 5',
+    );
+    expect(wrapper.vm.searchObj.data.editorValue).toBe(
+      'SELECT field1 FROM "my_stream1" WHERE field1 > 5',
+    );
 
     // Cleanup
     processInterestingFiledInSQLQuerySpy.mockRestore();
@@ -417,34 +425,39 @@ describe("Logs Index", async () => {
     wrapper.vm.searchObj.data.editorValue = wrapper.vm.searchObj.data.query;
 
     // Mock setQuery function
-    const setQuerySpy = vi.spyOn(wrapper.vm, 'setQuery');
-    const updateUrlQueryParamsSpy = vi.spyOn(wrapper.vm, 'updateUrlQueryParams');
+    const setQuerySpy = vi.spyOn(wrapper.vm, "setQuery");
+    const updateUrlQueryParamsSpy = vi.spyOn(wrapper.vm, "updateUrlQueryParams");
 
     // Call handleQuickModeChange
     await wrapper.vm.handleQuickModeChange();
     await flushPromises();
 
     // Verify the query was updated with interesting fields
-    expect(wrapper.vm.searchObj.data.query).toBe('SELECT timestamp,level,message FROM "my_stream1" WHERE level = "error"');
+    expect(wrapper.vm.searchObj.data.query).toBe(
+      'SELECT timestamp,level,message FROM "my_stream1" WHERE level = "error"',
+    );
     expect(setQuerySpy).toHaveBeenCalledWith(true);
     expect(updateUrlQueryParamsSpy).toHaveBeenCalled();
 
     // Test with empty interesting fields list
     wrapper.vm.searchObj.data.stream.interestingFieldList = [];
-    wrapper.vm.searchObj.data.query = 'SELECT field1,field2 FROM "my_stream1" WHERE level = "error"';
+    wrapper.vm.searchObj.data.query =
+      'SELECT field1,field2 FROM "my_stream1" WHERE level = "error"';
 
     await wrapper.vm.handleQuickModeChange();
     await flushPromises();
 
     // Verify query reverts to SELECT * when no interesting fields
-    expect(wrapper.vm.searchObj.data.query).toBe('SELECT * FROM "my_stream1" WHERE level = "error"');
+    expect(wrapper.vm.searchObj.data.query).toBe(
+      'SELECT * FROM "my_stream1" WHERE level = "error"',
+    );
 
     // Cleanup
     setQuerySpy.mockRestore();
     updateUrlQueryParamsSpy.mockRestore();
   });
 
-  it('Should quote only reserved newly added interesting fields after enabling quick mode in SQL mode', async () => {
+  it("Should quote only reserved newly added interesting fields after enabling quick mode in SQL mode", async () => {
     wrapper.vm.searchObj.meta.sqlMode = true;
     wrapper.vm.searchObj.meta.quickMode = true;
     wrapper.vm.searchObj.data.stream.selectedStream = ["my_stream1"];
@@ -454,10 +467,7 @@ describe("Logs Index", async () => {
     wrapper.vm.searchObj.data.streamResults.list = [
       {
         name: "my_stream1",
-        schema: [
-          { name: "field1" },
-          { name: "user" },
-        ],
+        schema: [{ name: "field1" }, { name: "user" }],
       },
     ];
 
@@ -479,7 +489,9 @@ describe("Logs Index", async () => {
     await flushPromises();
 
     expect(wrapper.vm.searchObj.data.query).toContain('SELECT field1, "user" FROM "my_stream1"');
-    expect(wrapper.vm.searchObj.data.editorValue).toContain('SELECT field1, "user" FROM "my_stream1"');
+    expect(wrapper.vm.searchObj.data.editorValue).toContain(
+      'SELECT field1, "user" FROM "my_stream1"',
+    );
   });
 
   it.skip("Should properly set fields and conditions for dashboard panel", async () => {
@@ -487,7 +499,8 @@ describe("Logs Index", async () => {
     wrapper.vm.searchObj.meta.sqlMode = true;
     wrapper.vm.searchObj.data.stream.streamType = "logs";
     wrapper.vm.searchObj.data.stream.selectedStream = ["my_stream1"];
-    wrapper.vm.searchObj.data.query = 'SELECT histogram(_timestamp) as x_axis_1, count(_timestamp) as y_axis_1, level FROM "my_stream1" WHERE level = "error"';
+    wrapper.vm.searchObj.data.query =
+      'SELECT histogram(_timestamp) as x_axis_1, count(_timestamp) as y_axis_1, level FROM "my_stream1" WHERE level = "error"';
 
     // Mock store state
     store.state.zoConfig.timestamp_column = "_timestamp";
@@ -497,26 +510,25 @@ describe("Logs Index", async () => {
       {
         column: "_timestamp",
         alias: "x_axis_1",
-        aggregationFunction: "histogram"
+        aggregationFunction: "histogram",
       },
       {
         column: "_timestamp",
         alias: "y_axis_1",
-        aggregationFunction: "count"
+        aggregationFunction: "count",
       },
       {
         column: "level",
         alias: null,
-        aggregationFunction: null
-      }
+        aggregationFunction: null,
+      },
     ];
 
     (getFieldsFromQuery as Mock).mockResolvedValue({
       fields: mockFields,
       filters: [{ column: "level", operator: "=", value: "error" }],
-      streamName: "my_stream1"
+      streamName: "my_stream1",
     });
-
 
     // Call setFieldsAndConditions
     await wrapper.vm.setFieldsAndConditions();
@@ -535,7 +547,7 @@ describe("Logs Index", async () => {
       column: "_timestamp",
       alias: "x_axis_1",
       aggregationFunction: "histogram",
-      label: "Timestamp"
+      label: "Timestamp",
     });
 
     // Check y-axis fields (should contain count field)
@@ -544,7 +556,7 @@ describe("Logs Index", async () => {
       column: "_timestamp",
       alias: "y_axis_1",
       aggregationFunction: "count",
-      label: "Timestamp"
+      label: "Timestamp",
     });
 
     // Check breakdown fields (should contain level field)
@@ -553,19 +565,17 @@ describe("Logs Index", async () => {
       column: "level",
       alias: "level",
       aggregationFunction: null,
-      label: "Level"
+      label: "Level",
     });
 
     // Check filters
-    expect(panelData.filter).toEqual([
-      { column: "level", operator: "=", value: "error" }
-    ]);
+    expect(panelData.filter).toEqual([{ column: "level", operator: "=", value: "error" }]);
 
     // Test with no fields returned
     (getFieldsFromQuery as Mock).mockResolvedValueOnce({
       fields: [],
       filters: [],
-      streamName: "my_stream1"
+      streamName: "my_stream1",
     });
 
     // Reset dashboard panel data
@@ -575,7 +585,7 @@ describe("Logs Index", async () => {
       x: [],
       y: [],
       breakdown: [],
-      filter: []
+      filter: [],
     };
 
     // Call setFieldsAndConditions again
@@ -592,7 +602,7 @@ describe("Logs Index", async () => {
     // Verify getFieldsFromQuery was called with correct parameters
     expect(getFieldsFromQuery).toHaveBeenCalledWith(
       'SELECT histogram(_timestamp) as x_axis_1, count(_timestamp) as y_axis_1, level FROM "my_stream1" WHERE level = "error"',
-      "_timestamp"
+      "_timestamp",
     );
   });
 
@@ -615,7 +625,7 @@ describe("Logs Index", async () => {
   });
 
   it("Should dispatch resize event on onSplitterUpdate", async () => {
-    const spy = vi.spyOn(window, 'dispatchEvent');
+    const spy = vi.spyOn(window, "dispatchEvent");
     wrapper.vm.onSplitterUpdate();
     expect(spy).toHaveBeenCalledWith(expect.any(Event));
     spy.mockRestore();
@@ -665,9 +675,8 @@ describe("Logs Index", async () => {
     expect(wrapper.vm.areStreamsPresent).toBe(true);
   });
 
-
   it("Should resize on splitter model change", async () => {
-    const spy = vi.spyOn(window, 'dispatchEvent');
+    const spy = vi.spyOn(window, "dispatchEvent");
     wrapper.vm.splitterModel = 11;
     await flushPromises();
     expect(spy).toHaveBeenCalledWith(expect.any(Event));
@@ -680,11 +689,11 @@ describe("Logs Index", async () => {
 
     // Navigate to history view
     await wrapper.vm.router.push({
-      name: 'logs',
+      name: "logs",
       query: {
-        action: 'history',
-        org_identifier: store.state.selectedOrganization.identifier
-      }
+        action: "history",
+        org_identifier: store.state.selectedOrganization.identifier,
+      },
     });
 
     // Wait for all async operations and route changes
@@ -695,10 +704,10 @@ describe("Logs Index", async () => {
 
     // Navigate back to normal view
     await wrapper.vm.router.push({
-      name: 'logs',
+      name: "logs",
       query: {
-        org_identifier: store.state.selectedOrganization.identifier
-      }
+        org_identifier: store.state.selectedOrganization.identifier,
+      },
     });
 
     // Wait for all async operations and route changes
@@ -709,22 +718,21 @@ describe("Logs Index", async () => {
     expect(wrapper.vm.showSearchScheduler).toBe(false);
   }, 10000);
 
-
   it("Should call router.push on redirectBackToLogs", async () => {
-    const pushSpy = vi.spyOn(wrapper.vm.router, 'push');
+    const pushSpy = vi.spyOn(wrapper.vm.router, "push");
     wrapper.vm.redirectBackToLogs();
-    expect(pushSpy).toHaveBeenCalledWith(expect.objectContaining({ name: 'logs' }));
+    expect(pushSpy).toHaveBeenCalledWith(expect.objectContaining({ name: "logs" }));
   });
 
   it("Should call router.push and set showSearchHistory on showSearchHistoryfn", async () => {
-    const pushSpy = vi.spyOn(wrapper.vm.router, 'push');
+    const pushSpy = vi.spyOn(wrapper.vm.router, "push");
     wrapper.vm.showSearchHistoryfn();
-    expect(pushSpy).toHaveBeenCalledWith(expect.objectContaining({ name: 'logs' }));
+    expect(pushSpy).toHaveBeenCalledWith(expect.objectContaining({ name: "logs" }));
     expect(wrapper.vm.showSearchHistory).toBe(true);
   });
 
   it("Should close search history and refresh histogram", async () => {
-    const backSpy = vi.spyOn(wrapper.vm.router, 'back').mockImplementation(() => {});
+    const backSpy = vi.spyOn(wrapper.vm.router, "back").mockImplementation(() => {});
     wrapper.vm.showSearchHistory = true;
 
     wrapper.vm.closeSearchHistoryfn();
@@ -733,7 +741,7 @@ describe("Logs Index", async () => {
   });
 
   it("Should close search scheduler and navigate back", async () => {
-    const backSpy = vi.spyOn(wrapper.vm.router, 'back').mockImplementation(() => {});
+    const backSpy = vi.spyOn(wrapper.vm.router, "back").mockImplementation(() => {});
     wrapper.vm.showSearchScheduler = true;
 
     wrapper.vm.closeSearchSchedulerFn();
@@ -744,14 +752,14 @@ describe("Logs Index", async () => {
   it("Should set histogram date using searchBarRef", async () => {
     const setCustomDate = vi.fn();
     wrapper.vm.searchBarRef = { dateTimeRef: { setCustomDate } } as any;
-    const date = { startTime: '2020-01-01', endTime: '2020-01-02' };
+    const date = { startTime: "2020-01-01", endTime: "2020-01-02" };
     wrapper.vm.setHistogramDate(date);
-    expect(setCustomDate).toHaveBeenCalledWith('absolute', date);
+    expect(setCustomDate).toHaveBeenCalledWith("absolute", date);
   });
 
   it("Should handle chart API error and populate errors list", async () => {
-    wrapper.vm.handleChartApiError('some-error');
-    expect(wrapper.vm.visualizeErrorData.errors).toEqual(['some-error']);
+    wrapper.vm.handleChartApiError("some-error");
+    expect(wrapper.vm.visualizeErrorData.errors).toEqual(["some-error"]);
   });
 
   it("Should watch runQuery and trigger runQueryFn when true", async () => {
@@ -765,8 +773,8 @@ describe("Logs Index", async () => {
   });
 
   it("Should watch fullSQLMode true -> setQuery & updateUrl; false -> reset and maybe getQueryData", async () => {
-    const setQuerySpy = vi.spyOn(wrapper.vm, 'setQuery');
-    const updateSpy = vi.spyOn(wrapper.vm, 'updateUrlQueryParams');
+    const setQuerySpy = vi.spyOn(wrapper.vm, "setQuery");
+    const updateSpy = vi.spyOn(wrapper.vm, "updateUrlQueryParams");
 
     // Trigger true branch
     wrapper.vm.searchObj.shouldIgnoreWatcher = false;
@@ -788,8 +796,8 @@ describe("Logs Index", async () => {
   });
 
   it("fullSQLMode true -> must NOT overwrite the restored query while a URL/share-link restore is in progress (shouldIgnoreWatcher guard)", async () => {
-    const setQuerySpy = vi.spyOn(wrapper.vm, 'setQuery');
-    const updateSpy = vi.spyOn(wrapper.vm, 'updateUrlQueryParams');
+    const setQuerySpy = vi.spyOn(wrapper.vm, "setQuery");
+    const updateSpy = vi.spyOn(wrapper.vm, "updateUrlQueryParams");
 
     // Simulate restoreUrlQueryParams(): it raises shouldIgnoreWatcher and sets the
     // SQL query itself, then flips SQL mode ON. The watcher must stand down so it
@@ -813,11 +821,11 @@ describe("Logs Index", async () => {
     const originalIsCloud = config.isCloud;
     try {
       (segment as any).track = vi.fn();
-      (config as any).isCloud = 'true';
+      (config as any).isCloud = "true";
 
       wrapper.vm.searchObj.loading = false;
       wrapper.vm.searchObj.runQuery = false;
-      wrapper.vm.searchObj.data.stream.selectedStream = ['s1'];
+      wrapper.vm.searchObj.data.stream.selectedStream = ["s1"];
       wrapper.vm.searchObj.meta.showQuery = true;
       wrapper.vm.searchObj.meta.showHistogram = true;
       wrapper.vm.searchObj.meta.sqlMode = false;
@@ -828,8 +836,8 @@ describe("Logs Index", async () => {
       expect(wrapper.vm.searchObj.loading).toBe(true);
       expect(wrapper.vm.searchObj.runQuery).toBe(true);
       expect((segment as any).track).toHaveBeenCalledWith(
-        'Button Click',
-        expect.objectContaining({ button: 'Search Data' })
+        "Button Click",
+        expect.objectContaining({ button: "Search Data" }),
       );
     } finally {
       (config as any).isCloud = originalIsCloud;
@@ -837,20 +845,20 @@ describe("Logs Index", async () => {
   });
 
   it("Should emit sendToAiChat event with payload", async () => {
-    wrapper.vm.sendToAiChat({ foo: 'bar' });
-    expect(wrapper.emitted('sendToAiChat')?.[0]?.[0]).toEqual({ foo: 'bar' });
+    wrapper.vm.sendToAiChat({ foo: "bar" });
+    expect(wrapper.emitted("sendToAiChat")?.[0]?.[0]).toEqual({ foo: "bar" });
   });
 
   it("removeFieldByName should remove matching column_ref and aggr_func entries", () => {
     const cols = [
-      { expr: { type: 'column_ref', column: '*' } },
-      { expr: { type: 'column_ref', column: 'f1' } },
-      { expr: { type: 'aggr_func', args: { expr: { column: { value: 'f2' } } } } },
+      { expr: { type: "column_ref", column: "*" } },
+      { expr: { type: "column_ref", column: "f1" } },
+      { expr: { type: "aggr_func", args: { expr: { column: { value: "f2" } } } } },
     ];
-    const result = wrapper.vm.removeFieldByName(cols, 'f1');
-    expect(result.find((c: any) => c.expr?.column === 'f1')).toBeUndefined();
-    const result2 = wrapper.vm.removeFieldByName(result, 'f2');
-    expect(result2.find((c: any) => c.expr?.args?.expr?.column?.value === 'f2')).toBeUndefined();
+    const result = wrapper.vm.removeFieldByName(cols, "f1");
+    expect(result.find((c: any) => c.expr?.column === "f1")).toBeUndefined();
+    const result2 = wrapper.vm.removeFieldByName(result, "f2");
+    expect(result2.find((c: any) => c.expr?.args?.expr?.column?.value === "f2")).toBeUndefined();
   });
 
   /**
@@ -871,7 +879,9 @@ describe("Logs Index", async () => {
         wrapper.vm.searchObj.data.transformType = "function";
 
         // Verify the VRL content is set
-        expect(wrapper.vm.searchObj.data.tempFunctionContent).toBe(".parsed = parse_json!(.message)");
+        expect(wrapper.vm.searchObj.data.tempFunctionContent).toBe(
+          ".parsed = parse_json!(.message)",
+        );
         expect(wrapper.vm.searchObj.data.transformType).toBe("function");
 
         // The actual encoding happens in the component during visualization toggle
@@ -1047,9 +1057,7 @@ describe("Logs Index", async () => {
       // The watcher should treat ai_chat_query same as search_history_re_apply
       const validTypes = ["search_history_re_apply", "ai_chat_query"];
       validTypes.forEach((type) => {
-        expect(
-          type === "search_history_re_apply" || type === "ai_chat_query"
-        ).toBe(true);
+        expect(type === "search_history_re_apply" || type === "ai_chat_query").toBe(true);
       });
     });
 
@@ -1063,11 +1071,7 @@ describe("Logs Index", async () => {
 
       // Simulate the logic from the watcher
       let datetimeType = "relative";
-      if (
-        type === "ai_chat_query" &&
-        queryParams.from &&
-        queryParams.to
-      ) {
+      if (type === "ai_chat_query" && queryParams.from && queryParams.to) {
         datetimeType = "absolute";
       }
 
@@ -1082,11 +1086,7 @@ describe("Logs Index", async () => {
       };
 
       let datetimeType = "relative";
-      if (
-        type === "ai_chat_query" &&
-        (queryParams as any).from &&
-        (queryParams as any).to
-      ) {
+      if (type === "ai_chat_query" && (queryParams as any).from && (queryParams as any).to) {
         datetimeType = "absolute";
       }
 
@@ -1104,11 +1104,7 @@ describe("Logs Index", async () => {
 
       // search_history_re_apply always uses relative, even when from/to present
       let datetimeType = "relative";
-      if (
-        type === "ai_chat_query" &&
-        queryParams.from &&
-        queryParams.to
-      ) {
+      if (type === "ai_chat_query" && queryParams.from && queryParams.to) {
         datetimeType = "absolute";
       }
 
@@ -1148,7 +1144,7 @@ describe("Logs Index", async () => {
         wrapper.vm.searchObj.meta.logsVisualizeToggle = "logs";
         await flushPromises();
         // The thirdLevel section should be visible for 'logs' toggle
-        const thirdLevel = wrapper.find('#thirdLevel');
+        const thirdLevel = wrapper.find("#thirdLevel");
         expect(thirdLevel.exists()).toBe(true);
       });
 
@@ -1211,8 +1207,7 @@ describe("Logs Index", async () => {
 
       it("should sync only WHERE clause on onBuildQueryGenerated when SQL mode is OFF", async () => {
         wrapper.vm.searchObj.meta.sqlMode = false;
-        const testQuery =
-          'SELECT histogram(_timestamp) FROM "logs" WHERE level = \'ERROR\'';
+        const testQuery = "SELECT histogram(_timestamp) FROM \"logs\" WHERE level = 'ERROR'";
         wrapper.vm.onBuildQueryGenerated(testQuery);
         await flushPromises();
 

@@ -38,8 +38,7 @@ const buildTimeRangeContext = (datetimeObj: any) => {
   };
 
   if (datetimeObj.type === "relative") {
-    const relativeTimePeriod =
-      datetimeObj.relativeTimePeriod || datetimeObj.relative_period;
+    const relativeTimePeriod = datetimeObj.relativeTimePeriod || datetimeObj.relative_period;
     const calculatedTime = getConsumableRelativeTime(relativeTimePeriod);
 
     return {
@@ -65,26 +64,21 @@ const buildTimeRangeContext = (datetimeObj: any) => {
  * @param searchObj - The traces search object from useTraces composable
  * @param store - The Vuex store instance
  */
-export const createTracesContextProvider = (
-  searchObj: any,
-  store: any
-): ContextProvider => {
+export const createTracesContextProvider = (searchObj: any, store: any): ContextProvider => {
   return {
     async getContext(): Promise<PageContext> {
       try {
-        const selectedStream =
-          searchObj.data?.stream?.selectedStream?.value || "";
+        const selectedStream = searchObj.data?.stream?.selectedStream?.value || "";
 
         // Build selected trace context if user is viewing a specific trace
         const traceDetails = searchObj.data?.traceDetails;
-        const selectedTrace =
-          traceDetails?.selectedTrace?.trace_id
-            ? {
-                traceId: traceDetails.selectedTrace.trace_id,
-                traceStartTime: traceDetails.selectedTrace.trace_start_time,
-                traceEndTime: traceDetails.selectedTrace.trace_end_time,
-              }
-            : undefined;
+        const selectedTrace = traceDetails?.selectedTrace?.trace_id
+          ? {
+              traceId: traceDetails.selectedTrace.trace_id,
+              traceStartTime: traceDetails.selectedTrace.trace_start_time,
+              traceEndTime: traceDetails.selectedTrace.trace_end_time,
+            }
+          : undefined;
 
         return {
           currentPage: "traces",
@@ -106,8 +100,7 @@ export const createTracesContextProvider = (
           ...(selectedTrace && { selectedTrace }),
 
           // Organization
-          organization_identifier:
-            store?.state?.selectedOrganization?.identifier || "",
+          organization_identifier: store?.state?.selectedOrganization?.identifier || "",
 
           // Current timestamp (microseconds)
           request_timestamp: Date.now() * 1000,
@@ -118,8 +111,7 @@ export const createTracesContextProvider = (
           currentPage: "traces",
           selectedStreams: [],
           streamType: "traces",
-          organization_identifier:
-            store?.state?.selectedOrganization?.identifier || "",
+          organization_identifier: store?.state?.selectedOrganization?.identifier || "",
           request_timestamp: Date.now() * 1000,
           error: "Failed to extract full context",
         };

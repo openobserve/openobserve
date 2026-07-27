@@ -97,15 +97,12 @@ const useErrorIssuesData = () => {
   // Supersede in-flight runs: only the latest fetchAll may commit results.
   let runId = 0;
 
-  const issuesTruncated = computed(
-    () => issues.value.length >= ISSUES_LIMIT,
-  );
+  const issuesTruncated = computed(() => issues.value.length >= ISSUES_LIMIT);
 
   const kpis = computed(() => {
     const { totalErrors, errorSessions, usersAffected } = errorTotals.value;
     const { totalSessions, totalUsers } = denominators.value;
-    const crashFreePct =
-      totalSessions > 0 ? (1 - errorSessions / totalSessions) * 100 : null;
+    const crashFreePct = totalSessions > 0 ? (1 - errorSessions / totalSessions) * 100 : null;
     return {
       totalErrors,
       uniqueIssues: issues.value.length,
@@ -115,8 +112,7 @@ const useErrorIssuesData = () => {
       crashFreePct,
       usersAffected,
       totalUsers,
-      newIssues: issues.value.filter((issue) => issue.status === "new")
-        .length,
+      newIssues: issues.value.filter((issue) => issue.status === "new").length,
       deployVersion: latestDeploy.value?.version ?? null,
     };
   });
@@ -124,9 +120,7 @@ const useErrorIssuesData = () => {
   const deploySpikeFactor = computed(() => {
     if (!latestDeploy.value || !chartSeries.value.length) return null;
     const deployTs = latestDeploy.value.firstSeen;
-    const deployIndex = chartSeries.value.findIndex(
-      (bucket) => bucket.ts >= deployTs,
-    );
+    const deployIndex = chartSeries.value.findIndex((bucket) => bucket.ts >= deployTs);
     return computeDeploySpikeFactor(
       chartSeries.value.map((bucket) => bucket.handled + bucket.unhandled),
       deployIndex,
@@ -149,8 +143,7 @@ const useErrorIssuesData = () => {
     } as any);
     // buildQueryPayload encodes its template SQL before we override it, so
     // the replacement must be re-encoded when base64 mode is active.
-    req.query.sql =
-      req.encoding === "base64" ? b64EncodeUnicode(sql) : sql;
+    req.query.sql = req.encoding === "base64" ? b64EncodeUnicode(sql) : sql;
     req.query.from = 0;
     req.query.size = size;
     delete req.aggs;
@@ -225,12 +218,7 @@ const useErrorIssuesData = () => {
       })
       .then((hits) => {
         if (currentRun !== runId) return;
-        const pivoted = pivotTrends(
-          hits,
-          params.startTime,
-          params.endTime,
-          intervalMicros,
-        );
+        const pivoted = pivotTrends(hits, params.startTime, params.endTime, intervalMicros);
         // A message shared by several signatures resolves siblings too.
         trendBuckets.value = {
           ...trendBuckets.value,
@@ -260,8 +248,7 @@ const useErrorIssuesData = () => {
       userQuery: params.userQuery,
       service: params.service,
     };
-    const interval = getTimeInterval(params.startTime, params.endTime)
-      .interval;
+    const interval = getTimeInterval(params.startTime, params.endTime).interval;
     const intervalMicros = intervalToMicros(interval);
 
     isLoadingIssues.value = true;
@@ -273,14 +260,13 @@ const useErrorIssuesData = () => {
     trendContext = { ctx, params, interval, intervalMicros };
     trendInFlight.clear();
 
-    const [issuesR, chartR, kpisR, denomR, deploysR] =
-      await Promise.allSettled([
-        runSearch(buildIssuesSql(ctx), params, ISSUES_LIMIT),
-        runSearch(buildErrorsHistogramSql(ctx, interval), params, 2000),
-        runSearch(buildErrorKpisSql(ctx), params, 10),
-        runSearch(buildDenominatorsSql(ctx), params, 10),
-        runSearch(buildDeploysSql(ctx), params, 10),
-      ]);
+    const [issuesR, chartR, kpisR, denomR, deploysR] = await Promise.allSettled([
+      runSearch(buildIssuesSql(ctx), params, ISSUES_LIMIT),
+      runSearch(buildErrorsHistogramSql(ctx, interval), params, 2000),
+      runSearch(buildErrorKpisSql(ctx), params, 10),
+      runSearch(buildDenominatorsSql(ctx), params, 10),
+      runSearch(buildDeploysSql(ctx), params, 10),
+    ]);
     if (currentRun !== runId) return;
 
     // Deploys resolve before issues: status derivation needs the deploy ts.
@@ -330,9 +316,7 @@ const useErrorIssuesData = () => {
         ...hit,
         events: Number(hit.events) || 0,
         users_affected:
-          hit.users_affected !== undefined
-            ? Number(hit.users_affected) || 0
-            : undefined,
+          hit.users_affected !== undefined ? Number(hit.users_affected) || 0 : undefined,
         status: computeIssueStatus(
           Number(hit.first_seen) || 0,
           deployTs,
@@ -345,8 +329,7 @@ const useErrorIssuesData = () => {
       lastQueryError.value = (issuesR.reason as any)?.response?.data ?? null;
       toast({
         message:
-          (issuesR.reason as any)?.response?.data?.message ||
-          "Error while fetching error events",
+          (issuesR.reason as any)?.response?.data?.message || "Error while fetching error events",
         variant: "error",
       });
     }
@@ -354,12 +337,7 @@ const useErrorIssuesData = () => {
 
     chartSeries.value =
       chartR.status === "fulfilled"
-        ? pivotStackedHistogram(
-            chartR.value,
-            params.startTime,
-            params.endTime,
-            intervalMicros,
-          )
+        ? pivotStackedHistogram(chartR.value, params.startTime, params.endTime, intervalMicros)
         : [];
     isLoadingChart.value = false;
 

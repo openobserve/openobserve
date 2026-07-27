@@ -118,138 +118,99 @@ describe("useNLQuery", () => {
     });
 
     it("returns false for SQL SELECT statement", () => {
-      expect(
-        useNLQuery().detectNaturalLanguage("SELECT * FROM logs", "sql"),
-      ).toBe(false);
+      expect(useNLQuery().detectNaturalLanguage("SELECT * FROM logs", "sql")).toBe(false);
     });
 
     it("returns false when first word is FROM", () => {
-      expect(
-        useNLQuery().detectNaturalLanguage("FROM logs WHERE level = 'error'", "sql"),
-      ).toBe(false);
+      expect(useNLQuery().detectNaturalLanguage("FROM logs WHERE level = 'error'", "sql")).toBe(
+        false,
+      );
     });
 
     it("returns false for SQL comments (--)", () => {
-      expect(
-        useNLQuery().detectNaturalLanguage("-- this is a comment", "sql"),
-      ).toBe(false);
+      expect(useNLQuery().detectNaturalLanguage("-- this is a comment", "sql")).toBe(false);
     });
 
     it("returns false when text starts with WHERE", () => {
-      expect(
-        useNLQuery().detectNaturalLanguage("WHERE level = 'error'", "sql"),
-      ).toBe(false);
+      expect(useNLQuery().detectNaturalLanguage("WHERE level = 'error'", "sql")).toBe(false);
     });
 
     it("returns false for field=value comparison pattern", () => {
-      expect(
-        useNLQuery().detectNaturalLanguage("level = 'error'", "sql"),
-      ).toBe(false);
+      expect(useNLQuery().detectNaturalLanguage("level = 'error'", "sql")).toBe(false);
     });
 
     it("returns false for LIKE operator", () => {
-      expect(
-        useNLQuery().detectNaturalLanguage("field LIKE '%pattern%'", "sql"),
-      ).toBe(false);
+      expect(useNLQuery().detectNaturalLanguage("field LIKE '%pattern%'", "sql")).toBe(false);
     });
 
     it("returns false for IS NULL operator", () => {
-      expect(
-        useNLQuery().detectNaturalLanguage("field IS NULL", "sql"),
-      ).toBe(false);
+      expect(useNLQuery().detectNaturalLanguage("field IS NULL", "sql")).toBe(false);
     });
 
     it("returns true for plain natural language sentence", () => {
-      expect(
-        useNLQuery().detectNaturalLanguage(
-          "show me errors from the last hour",
-          "sql",
-        ),
-      ).toBe(true);
+      expect(useNLQuery().detectNaturalLanguage("show me errors from the last hour", "sql")).toBe(
+        true,
+      );
     });
 
     it("returns true for a question in natural language", () => {
       expect(
-        useNLQuery().detectNaturalLanguage(
-          "what happened to the service last night",
-          "sql",
-        ),
+        useNLQuery().detectNaturalLanguage("what happened to the service last night", "sql"),
       ).toBe(true);
     });
 
     // PromQL-specific
     it("returns false for PromQL simple metric name", () => {
-      expect(
-        useNLQuery().detectNaturalLanguage("cpu_usage", "promql"),
-      ).toBe(false);
+      expect(useNLQuery().detectNaturalLanguage("cpu_usage", "promql")).toBe(false);
     });
 
     it("returns false for PromQL with range selector", () => {
-      expect(
-        useNLQuery().detectNaturalLanguage("http_requests_total[5m]", "promql"),
-      ).toBe(false);
+      expect(useNLQuery().detectNaturalLanguage("http_requests_total[5m]", "promql")).toBe(false);
     });
 
     it("returns false for PromQL aggregation function", () => {
-      expect(
-        useNLQuery().detectNaturalLanguage("sum(http_requests_total)", "promql"),
-      ).toBe(false);
+      expect(useNLQuery().detectNaturalLanguage("sum(http_requests_total)", "promql")).toBe(false);
     });
 
     it("returns false for PromQL metric with label selector", () => {
-      expect(
-        useNLQuery().detectNaturalLanguage(
-          'http_requests_total{job="api"}',
-          "promql",
-        ),
-      ).toBe(false);
+      expect(useNLQuery().detectNaturalLanguage('http_requests_total{job="api"}', "promql")).toBe(
+        false,
+      );
     });
 
     it("returns false for PromQL rate function", () => {
-      expect(
-        useNLQuery().detectNaturalLanguage("rate(http_requests_total[5m])", "promql"),
-      ).toBe(false);
+      expect(useNLQuery().detectNaturalLanguage("rate(http_requests_total[5m])", "promql")).toBe(
+        false,
+      );
     });
 
     // VRL-specific
     it("returns false for VRL with dot accessor", () => {
-      expect(
-        useNLQuery().detectNaturalLanguage(".level = 'error'", "vrl"),
-      ).toBe(false);
+      expect(useNLQuery().detectNaturalLanguage(".level = 'error'", "vrl")).toBe(false);
     });
 
     // JavaScript-specific
     it("returns false for JavaScript const declaration", () => {
-      expect(
-        useNLQuery().detectNaturalLanguage("const x = 5", "javascript"),
-      ).toBe(false);
+      expect(useNLQuery().detectNaturalLanguage("const x = 5", "javascript")).toBe(false);
     });
 
     it("returns false for JavaScript function declaration", () => {
-      expect(
-        useNLQuery().detectNaturalLanguage("function foo() {}", "js"),
-      ).toBe(false);
+      expect(useNLQuery().detectNaturalLanguage("function foo() {}", "js")).toBe(false);
     });
 
     // Quick-mode function detection
     it("returns false when text contains a quick-mode function like match_all(", () => {
-      expect(
-        useNLQuery().detectNaturalLanguage("match_all('error')", "sql"),
-      ).toBe(false);
+      expect(useNLQuery().detectNaturalLanguage("match_all('error')", "sql")).toBe(false);
     });
 
     it("returns false when text contains str_match(", () => {
-      expect(
-        useNLQuery().detectNaturalLanguage("str_match(level, 'error')", "sql"),
-      ).toBe(false);
+      expect(useNLQuery().detectNaturalLanguage("str_match(level, 'error')", "sql")).toBe(false);
     });
 
     // Recursion depth guard
     it("handles deeply nested parentheses without stack overflow", () => {
-      const deeplyNested = "(" .repeat(12) + "cpu_usage" + ")".repeat(12);
-      expect(() =>
-        useNLQuery().detectNaturalLanguage(deeplyNested, "promql"),
-      ).not.toThrow();
+      const deeplyNested = "(".repeat(12) + "cpu_usage" + ")".repeat(12);
+      expect(() => useNLQuery().detectNaturalLanguage(deeplyNested, "promql")).not.toThrow();
     });
   });
 
@@ -258,20 +219,12 @@ describe("useNLQuery", () => {
   // -------------------------------------------------------------------------
   describe("transformToSQL", () => {
     it("prepends SQL comment (--) for sql language", () => {
-      const result = useNLQuery().transformToSQL(
-        "show errors",
-        "SELECT * FROM logs",
-        "sql",
-      );
+      const result = useNLQuery().transformToSQL("show errors", "SELECT * FROM logs", "sql");
       expect(result).toBe("-- show errors\nSELECT * FROM logs");
     });
 
     it("prepends hash (#) comment for promql language", () => {
-      const result = useNLQuery().transformToSQL(
-        "cpu usage",
-        "cpu_usage",
-        "promql",
-      );
+      const result = useNLQuery().transformToSQL("cpu usage", "cpu_usage", "promql");
       expect(result).toBe("# cpu usage\ncpu_usage");
     });
 
@@ -285,11 +238,7 @@ describe("useNLQuery", () => {
     });
 
     it("prepends // comment for javascript language", () => {
-      const result = useNLQuery().transformToSQL(
-        "do something",
-        "const x = 1;",
-        "javascript",
-      );
+      const result = useNLQuery().transformToSQL("do something", "const x = 1;", "javascript");
       expect(result).toBe("// do something\nconst x = 1;");
     });
 
@@ -304,11 +253,7 @@ describe("useNLQuery", () => {
     });
 
     it("handles multi-line natural language correctly", () => {
-      const result = useNLQuery().transformToSQL(
-        "line one\nline two",
-        "SELECT 1",
-        "sql",
-      );
+      const result = useNLQuery().transformToSQL("line one\nline two", "SELECT 1", "sql");
       expect(result).toBe("-- line one\n-- line two\nSELECT 1");
     });
   });

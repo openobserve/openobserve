@@ -100,8 +100,7 @@ describe("OverrideConfigPopup", () => {
           ODialog: ODialogStub,
           OButton: OButtonStub,
           OSelect: {
-            template:
-              '<select :data-test="$attrs[\'data-test\']"><slot /></select>',
+            template: "<select :data-test=\"$attrs['data-test']\"><slot /></select>",
             props: ["modelValue", "options"],
             emits: ["update:modelValue"],
           },
@@ -189,9 +188,7 @@ describe("OverrideConfigPopup", () => {
         columns: [{ label: "", alias: "kubernetes_namespace", isNumeric: false }],
         overrideConfig: { overrideConfigs: [] },
       });
-      const opt = wrapper.vm.availableToAdd.find(
-        (o: any) => o.value === "kubernetes_namespace",
-      );
+      const opt = wrapper.vm.availableToAdd.find((o: any) => o.value === "kubernetes_namespace");
       expect(opt).toBeTruthy();
       expect(opt.label).toBe("kubernetes_namespace");
     });

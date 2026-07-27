@@ -19,7 +19,6 @@ import { nextTick } from "vue";
 import { createI18n } from "vue-i18n";
 import CustomNode from "./CustomNode.vue";
 
-
 // ---------------------------------------------------------------------------
 // i18n
 // ---------------------------------------------------------------------------
@@ -65,8 +64,7 @@ vi.mock("@/aws-exports", () => ({
 }));
 
 vi.mock("@/utils/pipelines/constants", () => ({
-  defaultDestinationNodeWarningMessage:
-    "This is the default destination node.",
+  defaultDestinationNodeWarningMessage: "This is the default destination node.",
 }));
 
 const mockPush = vi.fn();
@@ -172,7 +170,7 @@ function buildPipelineObj(overrides: Record<string, any> = {}) {
 
 function createWrapper(
   propsOverrides: Record<string, unknown> = {},
-  pipelineObjOverrides: Record<string, any> = {}
+  pipelineObjOverrides: Record<string, any> = {},
 ) {
   mockPipelineObj = buildPipelineObj(pipelineObjOverrides);
 
@@ -272,76 +270,56 @@ describe("CustomNode.vue", () => {
   // =========================================================================
   describe("Handle rendering", () => {
     it("renders target (input) Handle for output io_type", () => {
-      wrapper = createWrapper(
-        {
-          data: { node_type: "stream", stream_type: "logs", stream_name: "s" },
-          io_type: "output",
-        }
-      );
+      wrapper = createWrapper({
+        data: { node_type: "stream", stream_type: "logs", stream_name: "s" },
+        io_type: "output",
+      });
       const handles = wrapper.findAllComponents({ name: "Handle" });
-      const targetHandle = handles.find(
-        (h: any) => h.props("type") === "target"
-      );
+      const targetHandle = handles.find((h: any) => h.props("type") === "target");
       expect(targetHandle).toBeDefined();
     });
 
     it("renders target (input) Handle for default io_type", () => {
       wrapper = createWrapper();
       const handles = wrapper.findAllComponents({ name: "Handle" });
-      const targetHandle = handles.find(
-        (h: any) => h.props("type") === "target"
-      );
+      const targetHandle = handles.find((h: any) => h.props("type") === "target");
       expect(targetHandle).toBeDefined();
     });
 
     it("does NOT render target Handle for input io_type", () => {
-      wrapper = createWrapper(
-        {
-          data: { node_type: "query", stream_type: "logs", stream_name: "s" },
-          io_type: "input",
-        }
-      );
+      wrapper = createWrapper({
+        data: { node_type: "query", stream_type: "logs", stream_name: "s" },
+        io_type: "input",
+      });
       const handles = wrapper.findAllComponents({ name: "Handle" });
-      const targetHandle = handles.find(
-        (h: any) => h.props("type") === "target"
-      );
+      const targetHandle = handles.find((h: any) => h.props("type") === "target");
       expect(targetHandle).toBeUndefined();
     });
 
     it("renders source (output) Handle for input io_type", () => {
-      wrapper = createWrapper(
-        {
-          data: { node_type: "query", stream_type: "logs", stream_name: "s" },
-          io_type: "input",
-        }
-      );
+      wrapper = createWrapper({
+        data: { node_type: "query", stream_type: "logs", stream_name: "s" },
+        io_type: "input",
+      });
       const handles = wrapper.findAllComponents({ name: "Handle" });
-      const sourceHandle = handles.find(
-        (h: any) => h.props("type") === "source"
-      );
+      const sourceHandle = handles.find((h: any) => h.props("type") === "source");
       expect(sourceHandle).toBeDefined();
     });
 
     it("renders source (output) Handle for default io_type", () => {
       wrapper = createWrapper();
       const handles = wrapper.findAllComponents({ name: "Handle" });
-      const sourceHandle = handles.find(
-        (h: any) => h.props("type") === "source"
-      );
+      const sourceHandle = handles.find((h: any) => h.props("type") === "source");
       expect(sourceHandle).toBeDefined();
     });
 
     it("does NOT render source Handle for output io_type", () => {
-      wrapper = createWrapper(
-        {
-          data: { node_type: "stream", stream_type: "logs", stream_name: "s" },
-          io_type: "output",
-        }
-      );
+      wrapper = createWrapper({
+        data: { node_type: "stream", stream_type: "logs", stream_name: "s" },
+        io_type: "output",
+      });
       const handles = wrapper.findAllComponents({ name: "Handle" });
-      const sourceHandle = handles.find(
-        (h: any) => h.props("type") === "source"
-      );
+      const sourceHandle = handles.find((h: any) => h.props("type") === "source");
       expect(sourceHandle).toBeUndefined();
     });
 
@@ -350,9 +328,7 @@ describe("CustomNode.vue", () => {
         data: { node_type: "stream", stream_type: "logs", stream_name: "s" },
         io_type: "output",
       });
-      expect(
-        wrapper.find('[data-test="pipeline-node-output-input-handle"]').exists()
-      ).toBe(true);
+      expect(wrapper.find('[data-test="pipeline-node-output-input-handle"]').exists()).toBe(true);
     });
 
     it("sets data-test on the output handle using io_type", () => {
@@ -360,9 +336,7 @@ describe("CustomNode.vue", () => {
         data: { node_type: "query", stream_type: "logs", stream_name: "s" },
         io_type: "input",
       });
-      expect(
-        wrapper.find('[data-test="pipeline-node-input-output-handle"]').exists()
-      ).toBe(true);
+      expect(wrapper.find('[data-test="pipeline-node-input-output-handle"]').exists()).toBe(true);
     });
   });
 
@@ -373,11 +347,7 @@ describe("CustomNode.vue", () => {
         data: { node_type: "function", name: "myFunc", after_flatten: false },
         io_type: "default",
       });
-      expect(
-        wrapper
-          .find('[data-test="pipeline-node-default-function-node"]')
-          .exists()
-      ).toBe(true);
+      expect(wrapper.find('[data-test="pipeline-node-default-function-node"]').exists()).toBe(true);
     });
 
     it("shows the function name", () => {
@@ -409,11 +379,7 @@ describe("CustomNode.vue", () => {
         data: { node_type: "function", name: "f", after_flatten: false },
         io_type: "default",
       });
-      expect(
-        wrapper
-          .find('[data-test="pipeline-node-default-stream-node"]')
-          .exists()
-      ).toBe(false);
+      expect(wrapper.find('[data-test="pipeline-node-default-stream-node"]').exists()).toBe(false);
     });
   });
 
@@ -424,9 +390,7 @@ describe("CustomNode.vue", () => {
         data: { node_type: "stream", stream_type: "logs", stream_name: "my-stream" },
         io_type: "output",
       });
-      expect(
-        wrapper.find('[data-test="pipeline-node-output-stream-node"]').exists()
-      ).toBe(true);
+      expect(wrapper.find('[data-test="pipeline-node-output-stream-node"]').exists()).toBe(true);
     });
 
     it("shows stream_type and stream_name as plain string", () => {
@@ -458,11 +422,9 @@ describe("CustomNode.vue", () => {
         data: { node_type: "remote_stream", destination_name: "external-sink" },
         io_type: "output",
       });
-      expect(
-        wrapper
-          .find('[data-test="pipeline-node-output-remote-stream-node"]')
-          .exists()
-      ).toBe(true);
+      expect(wrapper.find('[data-test="pipeline-node-output-remote-stream-node"]').exists()).toBe(
+        true,
+      );
     });
 
     it("shows the destination_name", () => {
@@ -481,9 +443,7 @@ describe("CustomNode.vue", () => {
         data: { node_type: "query", stream_type: "logs", stream_name: "my-logs" },
         io_type: "input",
       });
-      expect(
-        wrapper.find('[data-test="pipeline-node-input-query-node"]').exists()
-      ).toBe(true);
+      expect(wrapper.find('[data-test="pipeline-node-input-query-node"]').exists()).toBe(true);
     });
 
     it("shows stream_type and stream_name", () => {
@@ -503,76 +463,89 @@ describe("CustomNode.vue", () => {
         data: { node_type: "condition", condition: null },
         io_type: "default",
       });
-      expect(
-        wrapper
-          .find('[data-test="pipeline-node-default-condition-node"]')
-          .exists()
-      ).toBe(true);
+      expect(wrapper.find('[data-test="pipeline-node-default-condition-node"]').exists()).toBe(
+        true,
+      );
     });
   });
 
   // =========================================================================
   describe("computed: hasNodeError", () => {
     it("returns false when last_error is null", () => {
-      wrapper = createWrapper({}, {
-        currentSelectedPipeline: { nodes: [], edges: [], last_error: null },
-      });
+      wrapper = createWrapper(
+        {},
+        {
+          currentSelectedPipeline: { nodes: [], edges: [], last_error: null },
+        },
+      );
       const vm = wrapper.vm as any;
       expect(vm.hasNodeError).toBe(false);
     });
 
     it("returns false when last_error has no node_errors", () => {
-      wrapper = createWrapper({}, {
-        currentSelectedPipeline: {
-          nodes: [],
-          edges: [],
-          last_error: { node_errors: null },
+      wrapper = createWrapper(
+        {},
+        {
+          currentSelectedPipeline: {
+            nodes: [],
+            edges: [],
+            last_error: { node_errors: null },
+          },
         },
-      });
+      );
       const vm = wrapper.vm as any;
       expect(vm.hasNodeError).toBe(false);
     });
 
     it("returns false when node_errors does not contain current node id", () => {
-      wrapper = createWrapper({ id: "node-1" }, {
-        currentSelectedPipeline: {
-          nodes: [],
-          edges: [],
-          last_error: { node_errors: { "other-node": { errors: [], error_count: 1 } } },
+      wrapper = createWrapper(
+        { id: "node-1" },
+        {
+          currentSelectedPipeline: {
+            nodes: [],
+            edges: [],
+            last_error: { node_errors: { "other-node": { errors: [], error_count: 1 } } },
+          },
         },
-      });
+      );
       const vm = wrapper.vm as any;
       expect(vm.hasNodeError).toBeFalsy();
     });
 
     it("returns truthy when node_errors contains the current node id", () => {
-      wrapper = createWrapper({ id: "node-1" }, {
-        currentSelectedPipeline: {
-          nodes: [],
-          edges: [],
-          last_error: {
-            node_errors: {
-              "node-1": { errors: ["something went wrong"], error_count: 1 },
+      wrapper = createWrapper(
+        { id: "node-1" },
+        {
+          currentSelectedPipeline: {
+            nodes: [],
+            edges: [],
+            last_error: {
+              node_errors: {
+                "node-1": { errors: ["something went wrong"], error_count: 1 },
+              },
             },
           },
         },
-      });
+      );
       const vm = wrapper.vm as any;
       expect(vm.hasNodeError).toBeTruthy();
     });
 
     it("renders error badge when hasNodeError is truthy", () => {
-      wrapper = createWrapper({ id: "node-1" }, {
-        currentSelectedPipeline: {
-          nodes: [],
-          edges: [],
-          last_error: {
-            node_errors: {
-              "node-1": { errors: ["err"], error_count: 1 },
+      wrapper = createWrapper(
+        { id: "node-1" },
+        {
+          currentSelectedPipeline: {
+            nodes: [],
+            edges: [],
+            last_error: {
+              node_errors: {
+                "node-1": { errors: ["err"], error_count: 1 },
+              },
             },
           },
         },
-      });
+      );
       expect(wrapper.find('[data-test="pipeline-node-error-badge"]').exists()).toBe(true);
     });
 
@@ -591,40 +564,46 @@ describe("CustomNode.vue", () => {
     });
 
     it("returns error text joining all errors with double newline", () => {
-      wrapper = createWrapper({ id: "node-1" }, {
-        currentSelectedPipeline: {
-          nodes: [],
-          edges: [],
-          last_error: {
-            node_errors: {
-              "node-1": {
-                errors: ["error one", "error two"],
-                error_count: 2,
+      wrapper = createWrapper(
+        { id: "node-1" },
+        {
+          currentSelectedPipeline: {
+            nodes: [],
+            edges: [],
+            last_error: {
+              node_errors: {
+                "node-1": {
+                  errors: ["error one", "error two"],
+                  error_count: 2,
+                },
               },
             },
           },
         },
-      });
+      );
       const vm = wrapper.vm as any;
       expect(vm.getNodeErrorInfo).toContain("error one");
       expect(vm.getNodeErrorInfo).toContain("error two");
     });
 
     it("appends overflow message when error_count exceeds errors array length", () => {
-      wrapper = createWrapper({ id: "node-1" }, {
-        currentSelectedPipeline: {
-          nodes: [],
-          edges: [],
-          last_error: {
-            node_errors: {
-              "node-1": {
-                errors: ["error one"],
-                error_count: 5,
+      wrapper = createWrapper(
+        { id: "node-1" },
+        {
+          currentSelectedPipeline: {
+            nodes: [],
+            edges: [],
+            last_error: {
+              node_errors: {
+                "node-1": {
+                  errors: ["error one"],
+                  error_count: 5,
+                },
               },
             },
           },
         },
-      });
+      );
       const vm = wrapper.vm as any;
       expect(vm.getNodeErrorInfo).toContain("and 4 more errors");
     });
@@ -642,10 +621,7 @@ describe("CustomNode.vue", () => {
     });
 
     it("renders legacy plain-string errors", () => {
-      wrapper = createWrapper(
-        { id: "node-1" },
-        errorsFixture(["error one", "error two"]),
-      );
+      wrapper = createWrapper({ id: "node-1" }, errorsFixture(["error one", "error two"]));
       expect((wrapper.vm as any).getNodeErrorInfo).toBe("error one\n\nerror two");
     });
 
@@ -665,10 +641,7 @@ describe("CustomNode.vue", () => {
     });
 
     it("survives a row that mixes both shapes", () => {
-      wrapper = createWrapper(
-        { id: "node-1" },
-        errorsFixture(["error one", ["error two", null]]),
-      );
+      wrapper = createWrapper({ id: "node-1" }, errorsFixture(["error one", ["error two", null]]));
       expect((wrapper.vm as any).getNodeErrorInfo).toBe("error one\n\nerror two");
     });
   });
@@ -745,9 +718,7 @@ describe("CustomNode.vue", () => {
     it("handles V1 backend OR format", () => {
       const vm = wrapper.vm as any;
       const conditionData = {
-        or: [
-          { column: "x", operator: "=", value: "y" },
-        ],
+        or: [{ column: "x", operator: "=", value: "y" }],
       };
       const result = vm.getTruncatedConditions(conditionData);
       expect(typeof result).toBe("string");
@@ -756,9 +727,7 @@ describe("CustomNode.vue", () => {
     it("handles V1 backend AND format", () => {
       const vm = wrapper.vm as any;
       const conditionData = {
-        and: [
-          { column: "a", operator: "!=", value: "b" },
-        ],
+        and: [{ column: "a", operator: "!=", value: "b" }],
       };
       const result = vm.getTruncatedConditions(conditionData);
       expect(typeof result).toBe("string");
@@ -766,9 +735,7 @@ describe("CustomNode.vue", () => {
 
     it("handles V0 array format", () => {
       const vm = wrapper.vm as any;
-      const conditionData = [
-        { column: "field", operator: "=", value: "val" },
-      ];
+      const conditionData = [{ column: "field", operator: "=", value: "val" }];
       const result = vm.getTruncatedConditions(conditionData);
       expect(result).toContain("field");
     });
@@ -792,9 +759,7 @@ describe("CustomNode.vue", () => {
   describe("hover state management", () => {
     it("sets showButtons to true on mouseenter of function node", async () => {
       wrapper = createWrapper();
-      const nodeEl = wrapper.find(
-        '[data-test="pipeline-node-default-function-node"]'
-      );
+      const nodeEl = wrapper.find('[data-test="pipeline-node-default-function-node"]');
       await nodeEl.trigger("mouseenter");
       const vm = wrapper.vm as any;
       expect(vm.showButtons).toBe(true);
@@ -807,18 +772,17 @@ describe("CustomNode.vue", () => {
     });
 
     it("calls updateEdgeColors with correct color on mouseenter", async () => {
-      wrapper = createWrapper({}, {
-        currentSelectedPipeline: {
-          nodes: [],
-          edges: [
-            { source: "node-1", style: {}, markerEnd: {} },
-          ],
-          last_error: null,
+      wrapper = createWrapper(
+        {},
+        {
+          currentSelectedPipeline: {
+            nodes: [],
+            edges: [{ source: "node-1", style: {}, markerEnd: {} }],
+            last_error: null,
+          },
         },
-      });
-      const nodeEl = wrapper.find(
-        '[data-test="pipeline-node-default-function-node"]'
       );
+      const nodeEl = wrapper.find('[data-test="pipeline-node-default-function-node"]');
       await nodeEl.trigger("mouseenter");
       const edge = mockPipelineObj.currentSelectedPipeline.edges[0];
       expect(edge.style.stroke).toBe("#f59e0b"); // default color
@@ -832,9 +796,7 @@ describe("CustomNode.vue", () => {
       const vm = wrapper.vm as any;
       vm.showButtons = true;
       await nextTick();
-      const deleteBtn = wrapper.find(
-        '[data-test="pipeline-node-default-delete-btn"]'
-      );
+      const deleteBtn = wrapper.find('[data-test="pipeline-node-default-delete-btn"]');
       if (deleteBtn.exists()) {
         expect(deleteBtn.findComponent({ name: "OTooltip" }).exists()).toBe(true);
       }
@@ -848,13 +810,16 @@ describe("CustomNode.vue", () => {
         id: "node-1",
         data: { node_type: "function", name: "fn" },
       };
-      wrapper = createWrapper({}, {
-        currentSelectedPipeline: {
-          nodes: [testNode],
-          edges: [],
-          last_error: null,
+      wrapper = createWrapper(
+        {},
+        {
+          currentSelectedPipeline: {
+            nodes: [testNode],
+            edges: [],
+            last_error: null,
+          },
         },
-      });
+      );
       const vm = wrapper.vm as any;
       vm.editNode("node-1");
       await nextTick();
@@ -866,13 +831,16 @@ describe("CustomNode.vue", () => {
         id: "node-1",
         data: { node_type: "function", name: "fn" },
       };
-      wrapper = createWrapper({}, {
-        currentSelectedPipeline: {
-          nodes: [testNode],
-          edges: [],
-          last_error: null,
+      wrapper = createWrapper(
+        {},
+        {
+          currentSelectedPipeline: {
+            nodes: [testNode],
+            edges: [],
+            last_error: null,
+          },
         },
-      });
+      );
       const vm = wrapper.vm as any;
       vm.editNode("node-1");
       await nextTick();
@@ -884,13 +852,16 @@ describe("CustomNode.vue", () => {
         id: "node-1",
         data: { node_type: "function", name: "fn" },
       };
-      wrapper = createWrapper({}, {
-        currentSelectedPipeline: {
-          nodes: [testNode],
-          edges: [],
-          last_error: null,
+      wrapper = createWrapper(
+        {},
+        {
+          currentSelectedPipeline: {
+            nodes: [testNode],
+            edges: [],
+            last_error: null,
+          },
         },
-      });
+      );
       const vm = wrapper.vm as any;
       vm.editNode("node-1");
       await nextTick();
@@ -910,11 +881,9 @@ describe("CustomNode.vue", () => {
             edges: [],
             last_error: null,
           },
-        }
+        },
       );
-      const nodeEl = wrapper.find(
-        '[data-test="pipeline-node-default-function-node"]'
-      );
+      const nodeEl = wrapper.find('[data-test="pipeline-node-default-function-node"]');
       await nodeEl.trigger("click");
       expect(mockPipelineObj.dialog.show).toBe(true);
     });
@@ -977,9 +946,7 @@ describe("CustomNode.vue", () => {
       vm.deleteNode("node-1");
       await nextTick();
       expect(vm.confirmDialogMeta.warningMessage).toBeTruthy();
-      expect(vm.confirmDialogMeta.warningMessage).toContain(
-        "default destination node"
-      );
+      expect(vm.confirmDialogMeta.warningMessage).toContain("default destination node");
     });
 
     it("does NOT set warningMessage for non-default destination node", async () => {
@@ -1022,28 +989,31 @@ describe("CustomNode.vue", () => {
             name: "myFunc",
             org_identifier: "test-org",
           }),
-        })
+        }),
       );
     });
 
     it("includes the error info in the query when getNodeErrorInfo is non-null", () => {
-      wrapper = createWrapper({ id: "node-1" }, {
-        currentSelectedPipeline: {
-          nodes: [],
-          edges: [],
-          last_error: {
-            node_errors: {
-              "node-1": { errors: ["oops"], error_count: 1 },
+      wrapper = createWrapper(
+        { id: "node-1" },
+        {
+          currentSelectedPipeline: {
+            nodes: [],
+            edges: [],
+            last_error: {
+              node_errors: {
+                "node-1": { errors: ["oops"], error_count: 1 },
+              },
             },
           },
         },
-      });
+      );
       const vm = wrapper.vm as any;
       vm.navigateToFunction("myFunc");
       expect(mockPush).toHaveBeenCalledWith(
         expect.objectContaining({
           query: expect.objectContaining({ error: expect.any(String) }),
-        })
+        }),
       );
     });
   });
@@ -1073,46 +1043,51 @@ describe("CustomNode.vue", () => {
   // =========================================================================
   describe("updateEdgeColors", () => {
     it("updates stroke of edges that originate from the given nodeId", () => {
-      wrapper = createWrapper({}, {
-        currentSelectedPipeline: {
-          nodes: [],
-          edges: [
-            { source: "node-1", style: {}, markerEnd: {} },
-            { source: "node-2", style: {}, markerEnd: {} },
-          ],
-          last_error: null,
+      wrapper = createWrapper(
+        {},
+        {
+          currentSelectedPipeline: {
+            nodes: [],
+            edges: [
+              { source: "node-1", style: {}, markerEnd: {} },
+              { source: "node-2", style: {}, markerEnd: {} },
+            ],
+            last_error: null,
+          },
         },
-      });
+      );
       const vm = wrapper.vm as any;
       vm.updateEdgeColors("node-1", "#ff0000", false);
-      expect(mockPipelineObj.currentSelectedPipeline.edges[0].style.stroke).toBe(
-        "#ff0000"
-      );
+      expect(mockPipelineObj.currentSelectedPipeline.edges[0].style.stroke).toBe("#ff0000");
       // node-2 edge should not be changed
-      expect(
-        mockPipelineObj.currentSelectedPipeline.edges[1].style.stroke
-      ).toBeUndefined();
+      expect(mockPipelineObj.currentSelectedPipeline.edges[1].style.stroke).toBeUndefined();
     });
 
     it("resets edge stroke to grey when reset=true", () => {
-      wrapper = createWrapper({}, {
-        currentSelectedPipeline: {
-          nodes: [],
-          edges: [{ source: "node-1", style: { stroke: "#ff0000" }, markerEnd: {} }],
-          last_error: null,
+      wrapper = createWrapper(
+        {},
+        {
+          currentSelectedPipeline: {
+            nodes: [],
+            edges: [{ source: "node-1", style: { stroke: "#ff0000" }, markerEnd: {} }],
+            last_error: null,
+          },
         },
-      });
+      );
       const vm = wrapper.vm as any;
       vm.updateEdgeColors("node-1", null, true);
       expect(mockPipelineObj.currentSelectedPipeline.edges[0].style.stroke).toBe(
-        "var(--color-grey-500)"
+        "var(--color-grey-500)",
       );
     });
 
     it("does nothing when currentSelectedPipeline has no edges", () => {
-      wrapper = createWrapper({}, {
-        currentSelectedPipeline: { nodes: [], edges: null, last_error: null },
-      });
+      wrapper = createWrapper(
+        {},
+        {
+          currentSelectedPipeline: { nodes: [], edges: null, last_error: null },
+        },
+      );
       // Should not throw
       const vm = wrapper.vm as any;
       expect(() => vm.updateEdgeColors("node-1", "#f00", false)).not.toThrow();
@@ -1123,9 +1098,7 @@ describe("CustomNode.vue", () => {
   describe("ConfirmDialog integration", () => {
     it("renders ConfirmDialog component", () => {
       wrapper = createWrapper();
-      expect(wrapper.findComponent({ name: "ConfirmDialog" }).exists()).toBe(
-        true
-      );
+      expect(wrapper.findComponent({ name: "ConfirmDialog" }).exists()).toBe(true);
     });
 
     it("calls resetConfirmDialog when cancel is clicked", async () => {
@@ -1164,9 +1137,7 @@ describe("CustomNode.vue", () => {
         const vm = wrapper.vm as any;
         vm.showButtons = true;
         await nextTick();
-        const deleteBtn = wrapper.find(
-          `[data-test="pipeline-node-${ioType}-delete-btn"]`
-        );
+        const deleteBtn = wrapper.find(`[data-test="pipeline-node-${ioType}-delete-btn"]`);
         expect(deleteBtn.exists()).toBe(true);
       });
     });

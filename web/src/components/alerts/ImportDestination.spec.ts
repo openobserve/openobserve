@@ -86,7 +86,14 @@ const mockI18n = createI18n({
 // ─── BaseImport stub ─────────────────────────────────────────────────────────
 const BaseImportStub = {
   template: '<div><slot name="output-content"></slot></div>',
-  props: ["title", "testPrefix", "isImporting", "editorHeights", "containerClass", "containerStyle"],
+  props: [
+    "title",
+    "testPrefix",
+    "isImporting",
+    "editorHeights",
+    "containerClass",
+    "containerStyle",
+  ],
   emits: ["back", "cancel", "import"],
   setup(_props: any, { expose }: any) {
     const jsonArrayOfObj = ref<any[]>([]);
@@ -272,7 +279,14 @@ describe("ImportDestination", () => {
 
     it("returns true for a valid http destination", async () => {
       const result = await wrapper.vm.validateDestinationInputs(
-        { name: "new-dest", type: "http", url: "https://x.com", method: "post", template: "template1", skip_tls_verify: false },
+        {
+          name: "new-dest",
+          type: "http",
+          url: "https://x.com",
+          method: "post",
+          template: "template1",
+          skip_tls_verify: false,
+        },
         1,
       );
       expect(result).toBe(true);
@@ -294,7 +308,14 @@ describe("ImportDestination", () => {
 
     it("returns false for a duplicate destination name", async () => {
       const result = await wrapper.vm.validateDestinationInputs(
-        { name: "existing-dest", type: "http", url: "https://x.com", method: "post", template: "template1", skip_tls_verify: false },
+        {
+          name: "existing-dest",
+          type: "http",
+          url: "https://x.com",
+          method: "post",
+          template: "template1",
+          skip_tls_verify: false,
+        },
         1,
       );
       expect(result).toBe(false);
@@ -310,7 +331,13 @@ describe("ImportDestination", () => {
 
     it("returns false for http missing skip_tls_verify", async () => {
       const result = await wrapper.vm.validateDestinationInputs(
-        { name: "new-dest", type: "http", url: "https://x.com", method: "post", template: "template1" },
+        {
+          name: "new-dest",
+          type: "http",
+          url: "https://x.com",
+          method: "post",
+          template: "template1",
+        },
         1,
       );
       expect(result).toBe(false);
@@ -318,7 +345,14 @@ describe("ImportDestination", () => {
 
     it("returns false for http with invalid (non-boolean) skip_tls_verify", async () => {
       const result = await wrapper.vm.validateDestinationInputs(
-        { name: "new-dest", type: "http", url: "https://x.com", method: "post", template: "template1", skip_tls_verify: "yes" as any },
+        {
+          name: "new-dest",
+          type: "http",
+          url: "https://x.com",
+          method: "post",
+          template: "template1",
+          skip_tls_verify: "yes" as any,
+        },
         1,
       );
       expect(result).toBe(false);
@@ -326,7 +360,15 @@ describe("ImportDestination", () => {
 
     it("returns false for http with invalid headers (array instead of object)", async () => {
       const result = await wrapper.vm.validateDestinationInputs(
-        { name: "new-dest", type: "http", url: "https://x.com", method: "post", template: "template1", skip_tls_verify: false, headers: ["bad"] as any },
+        {
+          name: "new-dest",
+          type: "http",
+          url: "https://x.com",
+          method: "post",
+          template: "template1",
+          skip_tls_verify: false,
+          headers: ["bad"] as any,
+        },
         1,
       );
       expect(result).toBe(false);
@@ -334,7 +376,13 @@ describe("ImportDestination", () => {
 
     it("returns false for email with a url field present", async () => {
       const result = await wrapper.vm.validateDestinationInputs(
-        { name: "e-dest", type: "email", url: "https://x.com", template: "email-template", emails: ["a@b.com"] },
+        {
+          name: "e-dest",
+          type: "email",
+          url: "https://x.com",
+          template: "email-template",
+          emails: ["a@b.com"],
+        },
         1,
       );
       expect(result).toBe(false);
@@ -350,7 +398,12 @@ describe("ImportDestination", () => {
 
     it("returns false for email with non-string items in emails array", async () => {
       const result = await wrapper.vm.validateDestinationInputs(
-        { name: "e-dest", type: "email", template: "email-template", emails: ["a@b.com", 123 as any] },
+        {
+          name: "e-dest",
+          type: "email",
+          template: "email-template",
+          emails: ["a@b.com", 123 as any],
+        },
         1,
       );
       expect(result).toBe(false);
@@ -389,15 +442,19 @@ describe("ImportDestination", () => {
     it("validateDestinationInputs surfaces a template_name error for a missing template (single validation source)", async () => {
       wrapper.vm.destinationErrorsToDisplay = [];
       const result = await wrapper.vm.validateDestinationInputs(
-        { name: "no-tpl", type: "http", url: "https://x.com", method: "post", skip_tls_verify: false },
+        {
+          name: "no-tpl",
+          type: "http",
+          url: "https://x.com",
+          method: "post",
+          skip_tls_verify: false,
+        },
         1,
       );
       expect(result).toBe(false);
       const flatErrors = wrapper.vm.destinationErrorsToDisplay.flat();
       expect(
-        flatErrors.some(
-          (e: any) => typeof e === "object" && e.field === "template_name",
-        ),
+        flatErrors.some((e: any) => typeof e === "object" && e.field === "template_name"),
       ).toBe(true);
     });
   });
@@ -491,7 +548,14 @@ describe("ImportDestination", () => {
       vi.mocked(destService.default.create).mockResolvedValueOnce(true as any);
 
       const result = await wrapper.vm.processJsonObject(
-        { name: "new-dest", type: "http", url: "https://x.com", method: "post", template: "template1", skip_tls_verify: false },
+        {
+          name: "new-dest",
+          type: "http",
+          url: "https://x.com",
+          method: "post",
+          template: "template1",
+          skip_tls_verify: false,
+        },
         1,
       );
       expect(result).toBe(true);
@@ -509,7 +573,14 @@ describe("ImportDestination", () => {
       vi.mocked(destService.default.create).mockResolvedValueOnce(true as any);
 
       const result = await wrapper.vm.processJsonObject(
-        { name: "new-dest", type: "http", url: "https://x.com", method: "post", template: "template1", skip_tls_verify: false },
+        {
+          name: "new-dest",
+          type: "http",
+          url: "https://x.com",
+          method: "post",
+          template: "template1",
+          skip_tls_verify: false,
+        },
         2,
       );
       expect(result).toBe(false);
@@ -523,25 +594,21 @@ describe("ImportDestination", () => {
         [{ field: "destination_name", message: "name error" }],
       ];
       await wrapper.vm.$nextTick();
-      expect(
-        wrapper.find('[data-test="destination-import-error-0-0"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="destination-import-error-0-0"]').exists()).toBe(true);
     });
 
     it("renders the creation title when destinationCreators is non-empty", async () => {
       wrapper.vm.destinationCreators = [{ message: "ok", success: true }];
       await wrapper.vm.$nextTick();
-      expect(
-        wrapper.find('[data-test="destination-import-creation-title"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="destination-import-creation-title"]').exists()).toBe(true);
     });
 
     it("renders individual creation result messages", async () => {
       wrapper.vm.destinationCreators = [{ message: "created", success: true }];
       await wrapper.vm.$nextTick();
-      expect(
-        wrapper.find('[data-test="destination-import-creation-0-message"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="destination-import-creation-0-message"]').exists()).toBe(
+        true,
+      );
     });
 
     it("renders the name correction input for destination_name field errors", async () => {
@@ -549,39 +616,25 @@ describe("ImportDestination", () => {
         [{ field: "destination_name", message: "name conflict" }],
       ];
       await wrapper.vm.$nextTick();
-      expect(
-        wrapper.find('[data-test="destination-import-name-input"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="destination-import-name-input"]').exists()).toBe(true);
     });
 
     it("renders the url correction input for url field errors", async () => {
-      wrapper.vm.destinationErrorsToDisplay = [
-        [{ field: "url", message: "url required" }],
-      ];
+      wrapper.vm.destinationErrorsToDisplay = [[{ field: "url", message: "url required" }]];
       await wrapper.vm.$nextTick();
-      expect(
-        wrapper.find('[data-test="destination-import-url-input"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="destination-import-url-input"]').exists()).toBe(true);
     });
 
     it("renders the type correction select for type field errors", async () => {
-      wrapper.vm.destinationErrorsToDisplay = [
-        [{ field: "type", message: "invalid type" }],
-      ];
+      wrapper.vm.destinationErrorsToDisplay = [[{ field: "type", message: "invalid type" }]];
       await wrapper.vm.$nextTick();
-      expect(
-        wrapper.find('[data-test="destination-import-type-input"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="destination-import-type-input"]').exists()).toBe(true);
     });
 
     it("renders the method correction select for method field errors", async () => {
-      wrapper.vm.destinationErrorsToDisplay = [
-        [{ field: "method", message: "invalid method" }],
-      ];
+      wrapper.vm.destinationErrorsToDisplay = [[{ field: "method", message: "invalid method" }]];
       await wrapper.vm.$nextTick();
-      expect(
-        wrapper.find('[data-test="destination-import-method-input"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="destination-import-method-input"]').exists()).toBe(true);
     });
 
     it("renders the template correction select for template_name field errors", async () => {
@@ -589,9 +642,7 @@ describe("ImportDestination", () => {
         [{ field: "template_name", message: "template missing" }],
       ];
       await wrapper.vm.$nextTick();
-      expect(
-        wrapper.find('[data-test="destination-import-template-input"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="destination-import-template-input"]').exists()).toBe(true);
     });
 
     it("renders the emails correction input for email_input field errors", async () => {
@@ -599,19 +650,13 @@ describe("ImportDestination", () => {
         [{ field: "email_input", message: "emails required" }],
       ];
       await wrapper.vm.$nextTick();
-      expect(
-        wrapper.find('[data-test="destination-import-emails-input"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="destination-import-emails-input"]').exists()).toBe(true);
     });
 
     it("renders the action correction select for action_id field errors", async () => {
-      wrapper.vm.destinationErrorsToDisplay = [
-        [{ field: "action_id", message: "action missing" }],
-      ];
+      wrapper.vm.destinationErrorsToDisplay = [[{ field: "action_id", message: "action missing" }]];
       await wrapper.vm.$nextTick();
-      expect(
-        wrapper.find('[data-test="destination-import-action-input"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="destination-import-action-input"]').exists()).toBe(true);
     });
 
     it("renders plain text for unknown-field string errors", async () => {

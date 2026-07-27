@@ -62,7 +62,13 @@ function makeMockContext(overrides: Partial<any> = {}): any {
     },
     panelSchema: {
       type: "h-bar",
-      config: { unit: "default", unit_custom: "", decimals: 2, axis_label_truncate_width: 120, trellis: { layout: null } },
+      config: {
+        unit: "default",
+        unit_custom: "",
+        decimals: 2,
+        axis_label_truncate_width: 120,
+        trellis: { layout: null },
+      },
       queries: [{ fields: { y: [{ label: "Value" }], breakdown: [] }, customQuery: false }],
     },
     store: { state: { theme: "light", zoConfig: { timestamp_column: "_timestamp" } } },

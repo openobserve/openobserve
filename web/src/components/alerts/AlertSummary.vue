@@ -15,25 +15,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div data-test="alerts-alert-summary" class="h-full flex flex-col relative">
-    <div data-test="alerts-alert-summary-content" class="text-compact leading-[2.2] flex-1 min-h-0 overflow-y-auto p-4 flex flex-col" ref="summaryContainer" @scroll="checkIfShouldShowScrollButton">
-      <p v-if="summaryText" data-test="alerts-alert-summary-text" class="summary-text m-0 whitespace-pre-line tracking-[0.03em]" v-html="DOMPurify.sanitize(summaryText)" @click="handleSummaryClick"></p>
-      <div v-else data-test="alerts-alert-summary-empty-state" class="flex flex-col items-center justify-center h-full min-h-30 gap-2 p-4">
+  <div data-test="alerts-alert-summary" class="relative flex h-full flex-col">
+    <div
+      data-test="alerts-alert-summary-content"
+      class="text-compact flex min-h-0 flex-1 flex-col overflow-y-auto p-4 leading-[2.2]"
+      ref="summaryContainer"
+      @scroll="checkIfShouldShowScrollButton"
+    >
+      <p
+        v-if="summaryText"
+        data-test="alerts-alert-summary-text"
+        class="summary-text m-0 tracking-[0.03em] whitespace-pre-line"
+        v-html="DOMPurify.sanitize(summaryText)"
+        @click="handleSummaryClick"
+      ></p>
+      <div
+        v-else
+        data-test="alerts-alert-summary-empty-state"
+        class="flex h-full min-h-30 flex-col items-center justify-center gap-2 p-4"
+      >
         <OIcon name="article" size="lg" class="opacity-20" />
-        <span class="text-compact font-medium text-center opacity-50">{{ t('alerts.summary.configureAlert') || 'Configure your alert to see a summary' }}</span>
+        <span class="text-compact text-center font-medium opacity-50">{{
+          t("alerts.summary.configureAlert") || "Configure your alert to see a summary"
+        }}</span>
       </div>
     </div>
 
     <!-- Scroll to bottom button -->
     <div
       v-show="showScrollToBottom"
-      class="absolute bottom-5 right-5 z-1000 transition-all duration-300 pointer-events-none"
+      class="pointer-events-none absolute right-5 bottom-5 z-1000 transition-all duration-300"
     >
       <OButton
         round
         variant="ghost"
         size="icon-circle-sm"
-        class="scroll-to-bottom-btn transition-all duration-300 ease-[ease] pointer-events-auto backdrop-blur-sm shadow-[0_2px_8px_rgba(0,0,0,0.2)] border-2! border-theme-accent! text-theme-accent! bg-[rgba(255,255,255,0.95)]! dark:bg-[rgba(30,30,30,0.9)]! hover:scale-110 hover:shadow-[0_4px_12px_rgba(0,0,0,0.3)] hover:bg-white! hover:opacity-80 dark:hover:bg-[rgba(40,40,40,0.95)]! dark:hover:opacity-80 active:scale-100"
+        class="scroll-to-bottom-btn border-theme-accent! text-theme-accent! pointer-events-auto border-2! bg-[rgba(255,255,255,0.95)]! shadow-[0_2px_8px_rgba(0,0,0,0.2)] backdrop-blur-sm transition-all duration-300 ease-[ease] hover:scale-110 hover:bg-white! hover:opacity-80 hover:shadow-[0_4px_12px_rgba(0,0,0,0.3)] active:scale-100 dark:bg-[rgba(30,30,30,0.9)]! dark:hover:bg-[rgba(40,40,40,0.95)]! dark:hover:opacity-80"
         @click="scrollToBottomSmooth"
       >
         <OIcon name="arrow-downward" size="sm" />
@@ -44,12 +61,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, ref, nextTick, watch, onMounted } from 'vue';
-import { useI18n } from 'vue-i18n';
-import OButton from '@/lib/core/Button/OButton.vue';
-import OTooltip from '@/lib/overlay/Tooltip/OTooltip.vue';
-import DOMPurify from 'dompurify';
-import { generateAlertSummary } from '@/utils/alerts/alertSummaryGenerator';
+import { computed, ref, nextTick, watch, onMounted } from "vue";
+import { useI18n } from "vue-i18n";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import DOMPurify from "dompurify";
+import { generateAlertSummary } from "@/utils/alerts/alertSummaryGenerator";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 const { t } = useI18n();
@@ -57,41 +74,48 @@ const { t } = useI18n();
 const props = defineProps({
   formData: {
     type: Object,
-    required: true
+    required: true,
   },
   destinations: {
     type: Array,
-    default: () => []
+    default: () => [],
   },
   focusManager: {
     type: Object,
-    required: false
+    required: false,
   },
   wizardStep: {
     type: Number,
     required: false,
-    default: 1
+    default: 1,
   },
   previewQuery: {
     type: String,
-    default: ''
+    default: "",
   },
   generatedSqlQuery: {
     type: String,
-    default: ''
-  }
+    default: "",
+  },
 });
 
 const summaryContainer = ref<HTMLElement | null>(null);
 const showScrollToBottom = ref(false);
 
 const summaryText = computed(() => {
-  return generateAlertSummary(props.formData, props.destinations, t, undefined, props.previewQuery, props.generatedSqlQuery);
+  return generateAlertSummary(
+    props.formData,
+    props.destinations,
+    t,
+    undefined,
+    props.previewQuery,
+    props.generatedSqlQuery,
+  );
 });
 
 const handleSummaryClick = (event: MouseEvent) => {
   const target = event.target as HTMLElement;
-  const focusTarget = target.getAttribute('data-focus-target');
+  const focusTarget = target.getAttribute("data-focus-target");
 
   if (focusTarget && props.focusManager) {
     props.focusManager.focusField(focusTarget);
@@ -115,7 +139,7 @@ const scrollToBottomSmooth = async () => {
   if (summaryContainer.value) {
     summaryContainer.value.scrollTo({
       top: summaryContainer.value.scrollHeight,
-      behavior: 'smooth'
+      behavior: "smooth",
     });
     // Hide the button immediately when user clicks it
     showScrollToBottom.value = false;

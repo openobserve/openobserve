@@ -5,9 +5,7 @@ type Translate = (key: string) => string;
 function isJsonObject(value: string): boolean {
   try {
     const parsed = JSON.parse(value || "{}");
-    return Boolean(
-      parsed && typeof parsed === "object" && !Array.isArray(parsed),
-    );
+    return Boolean(parsed && typeof parsed === "object" && !Array.isArray(parsed));
   } catch {
     return false;
   }

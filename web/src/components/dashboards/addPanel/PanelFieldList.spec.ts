@@ -21,7 +21,6 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 
-
 // ── Mock data ──────────────────────────────────────────────────────────
 
 const mockStreamResults = [
@@ -197,16 +196,12 @@ describe("FieldList", () => {
 
     it("should render stream type dropdown", () => {
       wrapper = mountComponent();
-      expect(
-        wrapper.find('[data-test="index-dropdown-stream_type"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="index-dropdown-stream_type"]').exists()).toBe(true);
     });
 
     it("should render stream dropdown", () => {
       wrapper = mountComponent();
-      expect(
-        wrapper.find('[data-test="index-dropdown-stream"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="index-dropdown-stream"]').exists()).toBe(true);
     });
 
     it("should render OFieldList", () => {
@@ -220,23 +215,17 @@ describe("FieldList", () => {
   describe("Stream Type Selection", () => {
     it("should show stream type dropdown for dashboard page", () => {
       wrapper = mountComponent({ pageKey: "dashboard" });
-      expect(
-        wrapper.find('[data-test="index-dropdown-stream_type"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="index-dropdown-stream_type"]').exists()).toBe(true);
     });
 
     it("should hide stream type dropdown for metrics page", () => {
       wrapper = mountComponent({ pageKey: "metrics" });
-      expect(
-        wrapper.find('[data-test="index-dropdown-stream_type"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="index-dropdown-stream_type"]').exists()).toBe(false);
     });
 
     it("should render stream type dropdown for logs page (readonly)", () => {
       wrapper = mountComponent({ pageKey: "logs" });
-      const dropdown = wrapper.find(
-        '[data-test="index-dropdown-stream_type"]',
-      );
+      const dropdown = wrapper.find('[data-test="index-dropdown-stream_type"]');
       expect(dropdown.exists()).toBe(true);
     });
 
@@ -259,8 +248,7 @@ describe("FieldList", () => {
   // ── Stream List Loading ─────────────────────────────────────────────
 
   describe("Stream List Loading", () => {
-    const currentFields = () =>
-      mockReturn.dashboardPanelData.data.queries[0].fields;
+    const currentFields = () => mockReturn.dashboardPanelData.data.queries[0].fields;
 
     it("loads the stream list for the current stream type on mount", async () => {
       wrapper = mountComponent();
@@ -268,9 +256,7 @@ describe("FieldList", () => {
 
       expect(mockGetStreams).toHaveBeenCalledTimes(1);
       expect(mockGetStreams).toHaveBeenCalledWith("logs", false);
-      expect(mockReturn.dashboardPanelData.meta.stream.streamResultsType).toBe(
-        "logs",
-      );
+      expect(mockReturn.dashboardPanelData.meta.stream.streamResultsType).toBe("logs");
     });
 
     it("reloads the stream list when the stream type changes", async () => {
@@ -282,9 +268,7 @@ describe("FieldList", () => {
       await flushPromises();
 
       expect(mockGetStreams).toHaveBeenCalledWith("metrics", false);
-      expect(mockReturn.dashboardPanelData.meta.stream.streamResultsType).toBe(
-        "metrics",
-      );
+      expect(mockReturn.dashboardPanelData.meta.stream.streamResultsType).toBe("metrics");
     });
 
     it("does not refetch the stream list when only the selected stream changes", async () => {
@@ -303,9 +287,7 @@ describe("FieldList", () => {
       // First (logs) request stays pending; the second (metrics) resolves first.
       let resolveLogs: (v: any) => void = () => {};
       mockGetStreams
-        .mockImplementationOnce(
-          () => new Promise((resolve) => (resolveLogs = resolve)),
-        )
+        .mockImplementationOnce(() => new Promise((resolve) => (resolveLogs = resolve)))
         .mockImplementationOnce(() =>
           Promise.resolve({
             list: [{ name: "system_metrics", stream_type: "metrics" }],
@@ -317,21 +299,15 @@ describe("FieldList", () => {
       await flushPromises();
 
       // metrics already won
-      expect(mockReturn.dashboardPanelData.meta.stream.streamResultsType).toBe(
-        "metrics",
-      );
+      expect(mockReturn.dashboardPanelData.meta.stream.streamResultsType).toBe("metrics");
 
       // the late logs response must not overwrite it (stream type is now metrics)
       resolveLogs({ list: [{ name: "app_logs", stream_type: "logs" }] });
       await flushPromises();
 
-      expect(mockReturn.dashboardPanelData.meta.stream.streamResultsType).toBe(
-        "metrics",
-      );
+      expect(mockReturn.dashboardPanelData.meta.stream.streamResultsType).toBe("metrics");
       expect(
-        mockReturn.dashboardPanelData.meta.stream.streamResults.map(
-          (s: any) => s.name,
-        ),
+        mockReturn.dashboardPanelData.meta.stream.streamResults.map((s: any) => s.name),
       ).toEqual(["system_metrics"]);
     });
   });
@@ -457,9 +433,7 @@ describe("FieldList", () => {
         {
           name: "testGroup",
           stream_alias: "testGroup",
-          schema: [
-            { name: "test_field", type: "Utf8" },
-          ],
+          schema: [{ name: "test_field", type: "Utf8" }],
           settings: {},
         },
       ];
@@ -471,16 +445,10 @@ describe("FieldList", () => {
       await flushPromises();
 
       // X and Y buttons should exist for 'bar' chart type
-      expect(wrapper.find('[data-test="dashboard-add-x-data"]').exists()).toBe(
-        true,
-      );
-      expect(wrapper.find('[data-test="dashboard-add-y-data"]').exists()).toBe(
-        true,
-      );
+      expect(wrapper.find('[data-test="dashboard-add-x-data"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-add-y-data"]').exists()).toBe(true);
       // B button should exist for bar chart
-      expect(wrapper.find('[data-test="dashboard-add-b-data"]').exists()).toBe(
-        true,
-      );
+      expect(wrapper.find('[data-test="dashboard-add-b-data"]').exists()).toBe(true);
     });
 
     it("should show +Y/+X swapped labels for h-bar charts", async () => {
@@ -525,9 +493,7 @@ describe("FieldList", () => {
       wrapper = mountComponent();
       await flushPromises();
 
-      expect(wrapper.find('[data-test="dashboard-add-p-data"]').exists()).toBe(
-        true,
-      );
+      expect(wrapper.find('[data-test="dashboard-add-p-data"]').exists()).toBe(true);
     });
 
     it("should show +Z button for heatmap chart type", async () => {
@@ -546,9 +512,7 @@ describe("FieldList", () => {
       wrapper = mountComponent();
       await flushPromises();
 
-      expect(wrapper.find('[data-test="dashboard-add-z-data"]').exists()).toBe(
-        true,
-      );
+      expect(wrapper.find('[data-test="dashboard-add-z-data"]').exists()).toBe(true);
     });
 
     it("should hide standard action buttons for geomap chart type", async () => {
@@ -568,19 +532,11 @@ describe("FieldList", () => {
       await flushPromises();
 
       // Standard buttons should not exist for geomap
-      expect(
-        wrapper.find('[data-test="dashboard-add-x-data"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="dashboard-add-x-data"]').exists()).toBe(false);
       // Geomap buttons should exist
-      expect(
-        wrapper.find('[data-test="dashboard-add-latitude-data"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="dashboard-add-longitude-data"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="dashboard-add-weight-data"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-add-latitude-data"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-add-longitude-data"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-add-weight-data"]').exists()).toBe(true);
     });
 
     it("should show maps action buttons", async () => {
@@ -626,15 +582,9 @@ describe("FieldList", () => {
       wrapper = mountComponent();
       await flushPromises();
 
-      expect(
-        wrapper.find('[data-test="dashboard-add-source-data"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="dashboard-add-target-data"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="dashboard-add-value-data"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-add-source-data"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-add-target-data"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-add-value-data"]').exists()).toBe(true);
     });
 
     it("should hide action buttons for custom_chart chart type", async () => {
@@ -653,12 +603,8 @@ describe("FieldList", () => {
       wrapper = mountComponent();
       await flushPromises();
 
-      expect(
-        wrapper.find('[data-test="dashboard-add-x-data"]').exists(),
-      ).toBe(false);
-      expect(
-        wrapper.find('[data-test="dashboard-add-y-data"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="dashboard-add-x-data"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="dashboard-add-y-data"]').exists()).toBe(false);
     });
 
     it("should disable action buttons when isAddXAxisNotAllowed", async () => {
@@ -697,9 +643,7 @@ describe("FieldList", () => {
       wrapper = mountComponent();
       await flushPromises();
 
-      const filterBtn = wrapper.find(
-        '[data-test="dashboard-add-filter-data"]',
-      );
+      const filterBtn = wrapper.find('[data-test="dashboard-add-filter-data"]');
       expect(filterBtn.exists()).toBe(true);
     });
   });
@@ -722,9 +666,7 @@ describe("FieldList", () => {
       wrapper = mountComponent();
       await flushPromises();
 
-      const groupHeader = wrapper.find(
-        '[data-test="o-field-list-group-myGroup"]',
-      );
+      const groupHeader = wrapper.find('[data-test="o-field-list-group-myGroup"]');
       expect(groupHeader.exists()).toBe(true);
       expect(groupHeader.text()).toContain("myGroup");
     });
@@ -752,12 +694,8 @@ describe("FieldList", () => {
       await flushPromises();
 
       // Both fields should be rendered
-      expect(
-        wrapper.find('[data-test="o-field-list-row-custom_field"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="o-field-list-row-stream_field"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="o-field-list-row-custom_field"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="o-field-list-row-stream_field"]').exists()).toBe(true);
     });
 
     it("should show action buttons for custom query fields", async () => {
@@ -779,9 +717,7 @@ describe("FieldList", () => {
       await flushPromises();
 
       // Action buttons exist (they're hover-revealed but present in DOM)
-      expect(
-        wrapper.find('[data-test="dashboard-add-x-data"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-add-x-data"]').exists()).toBe(true);
     });
   });
 
@@ -809,13 +745,9 @@ describe("FieldList", () => {
       await flushPromises();
 
       // _timestamp and _all should be rendered along with defined schema fields
-      const timestampRow = wrapper.find(
-        '[data-test="o-field-list-row-_timestamp"]',
-      );
+      const timestampRow = wrapper.find('[data-test="o-field-list-row-_timestamp"]');
       const allRow = wrapper.find('[data-test="o-field-list-row-_all"]');
-      const fieldARow = wrapper.find(
-        '[data-test="o-field-list-row-field_a"]',
-      );
+      const fieldARow = wrapper.find('[data-test="o-field-list-row-field_a"]');
 
       expect(timestampRow.exists()).toBe(true);
       expect(allRow.exists()).toBe(true);
@@ -949,9 +881,7 @@ describe("FieldList", () => {
 
       // Without `immediate` this never ran, and the dropdown had no options.
       expect(mockGetStreams).toHaveBeenCalledWith("metrics", false);
-      expect(mockReturn.dashboardPanelData.meta.stream.streamResults).toEqual(
-        mockStreamResults,
-      );
+      expect(mockReturn.dashboardPanelData.meta.stream.streamResults).toEqual(mockStreamResults);
     });
 
     it("still fetches when the stream arrives AFTER mount (the real edit case)", async () => {

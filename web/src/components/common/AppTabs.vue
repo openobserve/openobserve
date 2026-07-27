@@ -15,11 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OToggleGroup
-    v-if="show"
-    :model-value="activeTab"
-    @update:model-value="onSelect"
-  >
+  <OToggleGroup v-if="show" :model-value="activeTab" @update:model-value="onSelect">
     <OToggleGroupItem
       v-for="tab in visibleTabs"
       :key="tab.value"
@@ -31,13 +27,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :data-test="`tab-${tab.value}`"
     >
       <template v-if="tab.icon" #icon-left>
-        <OIcon v-if="typeof tab.icon === 'string'" :name="(tab.icon as any)" size="sm" />
+        <OIcon v-if="typeof tab.icon === 'string'" :name="tab.icon as any" size="sm" />
         <component v-else :is="tab.icon" class="size-3.5 shrink-0" />
       </template>
       {{ tab.label }}
       <span
         v-if="tab.dirty"
-        class="ml-1.5 w-2 h-2 rounded-full bg-button-primary shrink-0"
+        class="bg-button-primary ml-1.5 h-2 w-2 shrink-0 rounded-full"
         :title="dirtyTitle"
         :data-test="`tab-${tab.value}-dirty-dot`"
         aria-hidden="true"
@@ -85,12 +81,10 @@ const props = withDefaults(
     show: true,
     size: "sm",
     dirtyTitle: "",
-  }
+  },
 );
 
-const visibleTabs = computed(() =>
-  (props.tabs as Tab[]).filter((t) => !t.hide)
-);
+const visibleTabs = computed(() => (props.tabs as Tab[]).filter((t) => !t.hide));
 
 const onSelect = (value: unknown) => {
   if (!value) return;

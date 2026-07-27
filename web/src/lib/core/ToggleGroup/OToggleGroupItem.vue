@@ -4,10 +4,7 @@ import type {
   ToggleGroupItemSlots,
   ToggleGroupContext,
 } from "./OToggleGroup.types";
-import {
-  ToggleGroupAnimatedKey,
-  TOGGLE_GROUP_CONTEXT_KEY,
-} from "./OToggleGroup.types";
+import { ToggleGroupAnimatedKey, TOGGLE_GROUP_CONTEXT_KEY } from "./OToggleGroup.types";
 import { ToggleGroupItem } from "reka-ui";
 import { computed, inject, type ComputedRef } from "vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -28,9 +25,7 @@ const slots = defineSlots<ToggleGroupItemSlots>();
 
 // An item may be used standalone (no OToggleGroup parent), so the context is
 // optional and every read below is guarded.
-const context = inject<ComputedRef<ToggleGroupContext> | undefined>(
-  TOGGLE_GROUP_CONTEXT_KEY,
-);
+const context = inject<ComputedRef<ToggleGroupContext> | undefined>(TOGGLE_GROUP_CONTEXT_KEY);
 
 /**
  * Values round-trip through the DOM `dataset` as strings, so drag comparisons
@@ -57,9 +52,7 @@ const isDropTarget = computed<boolean>(
 const dropIndicatorClass = computed<string>(() => {
   const before = context?.value.dropBefore ?? true;
   if (context?.value.isVertical) {
-    return before
-      ? "top-0 left-1 right-1 h-0.5"
-      : "bottom-0 left-1 right-1 h-0.5";
+    return before ? "top-0 left-1 right-1 h-0.5" : "bottom-0 left-1 right-1 h-0.5";
   }
   return before ? "left-0 top-1 bottom-1 w-0.5" : "right-0 top-1 bottom-1 w-0.5";
 });
@@ -71,10 +64,7 @@ const sizeClasses: Record<NonNullable<ToggleGroupItemProps["size"]>, string> = {
 };
 
 // Icon size mirrors the toggle size
-const iconSize: Record<
-  NonNullable<ToggleGroupItemProps["size"]>,
-  "xs" | "sm" | "md"
-> = {
+const iconSize: Record<NonNullable<ToggleGroupItemProps["size"]>, "xs" | "sm" | "md"> = {
   md: "md",
   sm: "sm",
   xs: "xs",
@@ -100,7 +90,7 @@ const iconSize: Record<
         'bg-toggle-item-bg text-toggle-item-text font-medium whitespace-nowrap',
         'rounded-default',
         'transition-all duration-150',
-        'outline-none cursor-pointer',
+        'cursor-pointer outline-none',
         // Hover (inactive only) — scoped to data-state=off so hovering the
         // active item never repaints over the sliding indicator / active fill.
         'data-[state=off]:hover:bg-toggle-item-hover-bg',
@@ -112,7 +102,7 @@ const iconSize: Record<
         // Sit above the sliding indicator so the icon/label stay readable.
         isAnimated && 'relative z-10',
         // Focus ring
-        'focus-visible:ring-2 focus-visible:ring-toggle-focus-ring focus-visible:ring-inset',
+        'focus-visible:ring-toggle-focus-ring focus-visible:ring-2 focus-visible:ring-inset',
         // Disabled — cursor is on the wrapper span; pointer-events-none prevents hover/active styles
         'data-disabled:text-toggle-item-disabled data-disabled:opacity-60',
         'data-disabled:pointer-events-none',
@@ -128,7 +118,7 @@ const iconSize: Record<
       <span
         v-if="isDropTarget"
         aria-hidden="true"
-        class="absolute rounded-full bg-toggle-drop-indicator pointer-events-none z-20"
+        class="bg-toggle-drop-indicator pointer-events-none absolute z-20 rounded-full"
         :class="dropIndicatorClass"
       />
       <!-- Drag handle — shown only in reorderable mode to signal the item can be
@@ -137,7 +127,7 @@ const iconSize: Record<
         v-if="isReorderable"
         name="drag-indicator"
         :size="iconSize[props.size]"
-        class="shrink-0 opacity-40 -ml-0.5"
+        class="-ml-0.5 shrink-0 opacity-40"
         aria-hidden="true"
       />
       <!-- Slot takes precedence; falls back to `icon-left` prop -->

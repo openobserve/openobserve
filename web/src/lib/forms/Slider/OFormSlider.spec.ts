@@ -18,8 +18,7 @@ describe("OFormSlider", () => {
     wrapper = mount(OForm, {
       props: { defaultValues: { volume: 25 } },
       slots: {
-        default: () =>
-          h(OFormSlider, { name: "volume", label: "Volume", min: 0, max: 100 }),
+        default: () => h(OFormSlider, { name: "volume", label: "Volume", min: 0, max: 100 }),
       },
       global: { components: { OFormSlider } },
     });
@@ -31,8 +30,7 @@ describe("OFormSlider", () => {
     wrapper = mount(OForm, {
       props: { defaultValues: { volume: 35 } },
       slots: {
-        default: () =>
-          h(OFormSlider, { name: "volume", min: 0, max: 100 }),
+        default: () => h(OFormSlider, { name: "volume", min: 0, max: 100 }),
       },
       global: { components: { OFormSlider } },
     });
@@ -47,8 +45,7 @@ describe("OFormSlider", () => {
         schema: z.object({ volume: z.number().max(80, "Too loud") }),
       },
       slots: {
-        default: () =>
-          h(OFormSlider, { name: "volume", min: 0, max: 100 }),
+        default: () => h(OFormSlider, { name: "volume", min: 0, max: 100 }),
       },
       global: { components: { OFormSlider } },
     });

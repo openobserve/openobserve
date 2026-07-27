@@ -93,18 +93,14 @@ describe("ODrawer", () => {
     const wrapper = mount(ODrawer, {
       props: { open: true, persistent: true, title: "Persistent" },
     });
-    expect(
-      wrapper.find('button[aria-label="Close drawer"]').exists(),
-    ).toBe(true);
+    expect(wrapper.find('button[aria-label="Close drawer"]').exists()).toBe(true);
   });
 
   it("hides the close button when showClose=false even with persistent=true", () => {
     const wrapper = mount(ODrawer, {
       props: { open: true, persistent: true, title: "Persistent", showClose: false },
     });
-    expect(
-      wrapper.find('button[aria-label="Close drawer"]').exists(),
-    ).toBe(false);
+    expect(wrapper.find('button[aria-label="Close drawer"]').exists()).toBe(false);
   });
 
   it("applies right-side classes by default", () => {
@@ -230,10 +226,7 @@ describe("ODrawer", () => {
         props: { open: true, title: "Test" },
       });
       const panel = findDrawerPanel(wrapper);
-      await panel.vm.$emit(
-        "escapeKeyDown",
-        new KeyboardEvent("keydown", { key: "Escape" }),
-      );
+      await panel.vm.$emit("escapeKeyDown", new KeyboardEvent("keydown", { key: "Escape" }));
       const emitted = wrapper.emitted("update:open");
       expect(emitted).toBeTruthy();
       expect(emitted?.[0]).toEqual([false]);
@@ -244,10 +237,7 @@ describe("ODrawer", () => {
         props: { open: true, title: "Test", persistent: true },
       });
       const panel = findDrawerPanel(wrapper);
-      await panel.vm.$emit(
-        "escapeKeyDown",
-        new KeyboardEvent("keydown", { key: "Escape" }),
-      );
+      await panel.vm.$emit("escapeKeyDown", new KeyboardEvent("keydown", { key: "Escape" }));
       expect(wrapper.emitted("update:open")).toBeFalsy();
     });
   });

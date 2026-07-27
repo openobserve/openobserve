@@ -41,9 +41,7 @@ vi.mock("@/composables/useTraces", () => ({
 }));
 
 vi.mock("@/utils/traces/convertTraceData", () => ({
-  getServiceIconDataUrl: vi
-    .fn()
-    .mockReturnValue("data:image/svg+xml;base64,TEST"),
+  getServiceIconDataUrl: vi.fn().mockReturnValue("data:image/svg+xml;base64,TEST"),
 }));
 
 import TraceServiceCell from "./TraceServiceCell.vue";
@@ -68,19 +66,26 @@ describe("TraceServiceCell", () => {
 
   describe("rendering", () => {
     it("mounts without errors", () => {
-      wrapper = mount(TraceServiceCell, { props: { item: makeItem() }, global: { plugins: [store] } });
+      wrapper = mount(TraceServiceCell, {
+        props: { item: makeItem() },
+        global: { plugins: [store] },
+      });
       expect(wrapper.exists()).toBe(true);
     });
 
     it("renders the service row container", () => {
-      wrapper = mount(TraceServiceCell, { props: { item: makeItem() }, global: { plugins: [store] } });
-      expect(wrapper.find('[data-test="trace-row-service"]').exists()).toBe(
-        true,
-      );
+      wrapper = mount(TraceServiceCell, {
+        props: { item: makeItem() },
+        global: { plugins: [store] },
+      });
+      expect(wrapper.find('[data-test="trace-row-service"]').exists()).toBe(true);
     });
 
     it("renders service name", () => {
-      wrapper = mount(TraceServiceCell, { props: { item: makeItem() }, global: { plugins: [store] } });
+      wrapper = mount(TraceServiceCell, {
+        props: { item: makeItem() },
+        global: { plugins: [store] },
+      });
       const name = wrapper.find('[data-test="trace-row-service-name"]');
       expect(name.exists()).toBe(true);
       expect(name.text()).toBe("frontend");
@@ -89,7 +94,10 @@ describe("TraceServiceCell", () => {
     // TraceServiceCell only renders service name and icon.
     // Operation name is rendered by a separate column cell — not this component.
     it.skip("renders operation name", () => {
-      wrapper = mount(TraceServiceCell, { props: { item: makeItem() }, global: { plugins: [store] } });
+      wrapper = mount(TraceServiceCell, {
+        props: { item: makeItem() },
+        global: { plugins: [store] },
+      });
       const op = wrapper.find('[data-test="trace-row-operation-name"]');
       expect(op.exists()).toBe(true);
       expect(op.text()).toBe("GET /api/v1/users");
@@ -98,20 +106,27 @@ describe("TraceServiceCell", () => {
 
   describe("service icon", () => {
     it("should render the service icon img", () => {
-      wrapper = mount(TraceServiceCell, { props: { item: makeItem() }, global: { plugins: [store] } });
-      expect(
-        wrapper.find('[data-test="trace-row-service-icon"]').exists(),
-      ).toBe(true);
+      wrapper = mount(TraceServiceCell, {
+        props: { item: makeItem() },
+        global: { plugins: [store] },
+      });
+      expect(wrapper.find('[data-test="trace-row-service-icon"]').exists()).toBe(true);
     });
 
     it("should set the icon src from getServiceIconDataUrl", () => {
-      wrapper = mount(TraceServiceCell, { props: { item: makeItem() }, global: { plugins: [store] } });
+      wrapper = mount(TraceServiceCell, {
+        props: { item: makeItem() },
+        global: { plugins: [store] },
+      });
       const img = wrapper.find('[data-test="trace-row-service-icon"]');
       expect(img.attributes("src")).toBe("data:image/svg+xml;base64,TEST");
     });
 
     it("should call getServiceIconDataUrl with service name and color", () => {
-      wrapper = mount(TraceServiceCell, { props: { item: makeItem() }, global: { plugins: [store] } });
+      wrapper = mount(TraceServiceCell, {
+        props: { item: makeItem() },
+        global: { plugins: [store] },
+      });
       expect(vi.mocked(getServiceIconDataUrl)).toHaveBeenCalledWith(
         "frontend",
         expect.any(Boolean),
@@ -140,9 +155,7 @@ describe("TraceServiceCell", () => {
         },
         global: { plugins: [store] },
       });
-      expect(
-        wrapper.find('[data-test="trace-row-extra-services"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="trace-row-extra-services"]').exists()).toBe(false);
     });
 
     it("does not count root service as an extra service", () => {
@@ -155,9 +168,7 @@ describe("TraceServiceCell", () => {
         },
         global: { plugins: [store] },
       });
-      expect(
-        wrapper.find('[data-test="trace-row-extra-services"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="trace-row-extra-services"]').exists()).toBe(false);
     });
   });
 
@@ -167,12 +178,8 @@ describe("TraceServiceCell", () => {
         props: { item: { service_name: "frontend", operation_name: "op" } },
         global: { plugins: [store] },
       });
-      expect(wrapper.find('[data-test="trace-row-service-name"]').text()).toBe(
-        "frontend",
-      );
-      expect(
-        wrapper.find('[data-test="trace-row-extra-services"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="trace-row-service-name"]').text()).toBe("frontend");
+      expect(wrapper.find('[data-test="trace-row-extra-services"]').exists()).toBe(false);
     });
 
     it("handles empty services object", () => {
@@ -180,9 +187,7 @@ describe("TraceServiceCell", () => {
         props: { item: makeItem({ services: {} }) },
         global: { plugins: [store] },
       });
-      expect(
-        wrapper.find('[data-test="trace-row-extra-services"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="trace-row-extra-services"]').exists()).toBe(false);
     });
   });
 });

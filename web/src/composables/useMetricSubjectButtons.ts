@@ -77,7 +77,7 @@ export const SUBJECT_BUTTONS_BY_SET: Record<string, SubjectButtonSpec[]> = {
   // matched_set_id is `normalize_category_to_id(group)` on the backend, so for
   // semantic groups whose `group` field is "Kubernetes" the id is "kubernetes".
   kubernetes: [
-    { id: "pod",  semanticIds: ["k8s-pod-name"],  label: "Pod", defaultActive: true },
+    { id: "pod", semanticIds: ["k8s-pod-name"], label: "Pod", defaultActive: true },
     {
       id: "node",
       semanticIds: ["k8s-node-name"],
@@ -88,18 +88,23 @@ export const SUBJECT_BUTTONS_BY_SET: Record<string, SubjectButtonSpec[]> = {
   ],
   aws: [
     { id: "ecs-task", semanticIds: ["aws-ecs-task"], label: "ECS Task", defaultActive: true },
-    { id: "function", semanticIds: ["faas-name"],    label: "Function" },
-    { id: "host",     semanticIds: ["host"],         label: "Host" },
+    { id: "function", semanticIds: ["faas-name"], label: "Function" },
+    { id: "host", semanticIds: ["host"], label: "Host" },
   ],
   gcp: [
-    { id: "instance",  semanticIds: ["gcp-instance"],  label: "Instance", defaultActive: true },
+    { id: "instance", semanticIds: ["gcp-instance"], label: "Instance", defaultActive: true },
     { id: "cloud-run", semanticIds: ["gcp-cloud-run"], label: "Cloud Run" },
-    { id: "function",  semanticIds: ["faas-name"],     label: "Function" },
+    { id: "function", semanticIds: ["faas-name"], label: "Function" },
   ],
   azure: [
-    { id: "resource-group", semanticIds: ["azure-resource-group"], label: "Resource Group", defaultActive: true },
-    { id: "role",           semanticIds: ["azure-cloud-role"],     label: "Role" },
-    { id: "function",       semanticIds: ["faas-name"],            label: "Function" },
+    {
+      id: "resource-group",
+      semanticIds: ["azure-resource-group"],
+      label: "Resource Group",
+      defaultActive: true,
+    },
+    { id: "role", semanticIds: ["azure-cloud-role"], label: "Role" },
+    { id: "function", semanticIds: ["faas-name"], label: "Function" },
   ],
 };
 
@@ -151,10 +156,7 @@ const MIN_TOKEN_LENGTH = 3;
 export function extractMetricTokens(fields: string[]): string[] {
   const tokens = new Set<string>();
   for (const raw of fields) {
-    const stripped = raw
-      .replace(STRIP_PREFIXES, "")
-      .replace(STRIP_SUFFIXES, "")
-      .toLowerCase();
+    const stripped = raw.replace(STRIP_PREFIXES, "").replace(STRIP_SUFFIXES, "").toLowerCase();
     if (stripped.length >= MIN_TOKEN_LENGTH) tokens.add(stripped);
   }
   return [...tokens];
@@ -166,16 +168,10 @@ export function extractMetricTokens(fields: string[]): string[] {
  */
 export function tokenToPatterns(token: string): RegExp[] {
   const escaped = token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  return [
-    new RegExp(`^${escaped}[_.]`, "i"),
-    new RegExp(`\\b${escaped}\\b`, "i"),
-  ];
+  return [new RegExp(`^${escaped}[_.]`, "i"), new RegExp(`\\b${escaped}\\b`, "i")];
 }
 
-function patternsForSemanticGroups(
-  semanticIds: string[],
-  semanticGroups: FieldAlias[],
-): RegExp[] {
+function patternsForSemanticGroups(semanticIds: string[], semanticGroups: FieldAlias[]): RegExp[] {
   const tokens = new Set<string>();
   for (const semanticId of semanticIds) {
     const group = semanticGroups.find((g) => g.id === semanticId);
@@ -206,10 +202,7 @@ export function buildSubjectButtons(
   if (!specs?.length) return [];
   return specs
     .map((spec) => {
-      const patterns = patternsForSemanticGroups(
-        spec.semanticIds,
-        semanticGroups,
-      );
+      const patterns = patternsForSemanticGroups(spec.semanticIds, semanticGroups);
       const poolPatterns = spec.poolSemanticIds
         ? patternsForSemanticGroups(spec.poolSemanticIds, semanticGroups)
         : patterns;
@@ -259,10 +252,7 @@ export function buildWorkloadChipEntries(
       const group = semanticGroups.find((g) => g.id === semanticId);
       if (!group) continue;
       const hit = group.fields.find(
-        (f) =>
-          sourceRow[f] !== undefined &&
-          sourceRow[f] !== null &&
-          String(sourceRow[f]) !== "",
+        (f) => sourceRow[f] !== undefined && sourceRow[f] !== null && String(sourceRow[f]) !== "",
       );
       if (hit) {
         out[semanticId] = {
@@ -295,10 +285,7 @@ export function buildWorkloadChipDimensions(
 /**
  * Test whether a stream name matches any of the patterns.
  */
-export function streamMatchesPatterns(
-  streamName: string,
-  patterns: RegExp[],
-): boolean {
+export function streamMatchesPatterns(streamName: string, patterns: RegExp[]): boolean {
   return patterns.some((p) => p.test(streamName));
 }
 
@@ -333,9 +320,7 @@ export function getSubjectSelectionState(
     (acc, s) => acc + (selectedNames.has(s.stream_name) ? 1 : 0),
     0,
   );
-  if (selectedCount === 0)
-    return { state: "none", relevantCount: relevant.length };
-  if (selectedCount === relevant.length)
-    return { state: "all", relevantCount: relevant.length };
+  if (selectedCount === 0) return { state: "none", relevantCount: relevant.length };
+  if (selectedCount === relevant.length) return { state: "all", relevantCount: relevant.length };
   return { state: "partial", relevantCount: relevant.length };
 }

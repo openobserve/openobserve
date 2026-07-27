@@ -101,35 +101,32 @@ export default function usePatterns() {
       // console.log("[Patterns] API Response:", response.data);
 
       // Transform patterns to match UI expectations
-      const transformedPatterns = response.data.patterns.map(
-        (pattern: any) => ({
-          ...pattern,
-          // Use the actual template field from backend (with SDR types like <:IP>, <:NUM>)
-          // description field is the simplified, human-readable version
-          template: pattern.template || pattern.description,
-          // Calculate percentage if not present
-          percentage:
-            pattern.percentage ||
-            (pattern.frequency / response.data.statistics.total_logs_analyzed) *
-              100,
-          // Ensure count is available (same as frequency)
-          count: pattern.frequency,
-          // Ensure sample_logs maps to examples
-          sample_logs: pattern.examples?.map((ex: any) => ex.log || ex) || [],
-          // Statistical context for anomaly explanation tooltips
-          z_score: pattern.z_score ?? 0,
-          avg_frequency: pattern.avg_frequency ?? 0,
-          // Per-wildcard value distributions for hover tooltips
-          wildcard_values: pattern.wildcard_values ?? [],
-          // Per-pattern volume sparkline + dominant service (enterprise backend;
-          // absent on older backends → safe empty defaults).
-          time_buckets: pattern.time_buckets ?? [],
-          service: pattern.service ?? null,
-          service_other_count: pattern.service_other_count ?? 0,
-          // Dominant status/level read from the log's severity/level field.
-          level: pattern.level ?? null,
-        }),
-      );
+      const transformedPatterns = response.data.patterns.map((pattern: any) => ({
+        ...pattern,
+        // Use the actual template field from backend (with SDR types like <:IP>, <:NUM>)
+        // description field is the simplified, human-readable version
+        template: pattern.template || pattern.description,
+        // Calculate percentage if not present
+        percentage:
+          pattern.percentage ||
+          (pattern.frequency / response.data.statistics.total_logs_analyzed) * 100,
+        // Ensure count is available (same as frequency)
+        count: pattern.frequency,
+        // Ensure sample_logs maps to examples
+        sample_logs: pattern.examples?.map((ex: any) => ex.log || ex) || [],
+        // Statistical context for anomaly explanation tooltips
+        z_score: pattern.z_score ?? 0,
+        avg_frequency: pattern.avg_frequency ?? 0,
+        // Per-wildcard value distributions for hover tooltips
+        wildcard_values: pattern.wildcard_values ?? [],
+        // Per-pattern volume sparkline + dominant service (enterprise backend;
+        // absent on older backends → safe empty defaults).
+        time_buckets: pattern.time_buckets ?? [],
+        service: pattern.service ?? null,
+        service_other_count: pattern.service_other_count ?? 0,
+        // Dominant status/level read from the log's severity/level field.
+        level: pattern.level ?? null,
+      }));
 
       // Store transformed patterns
       patternsState.value.patterns = {
@@ -149,8 +146,7 @@ export default function usePatterns() {
       }
       console.error("[Patterns] Error extracting patterns:", error);
       patternsState.value.error =
-        error?.response?.data?.message ||
-        "Error extracting patterns. Please try again.";
+        error?.response?.data?.message || "Error extracting patterns. Please try again.";
       throw error;
     } finally {
       patternsState.value.loading = false;

@@ -14,10 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { toRaw, markRaw } from "vue";
-import {
-  detectChunkingDirection,
-  shouldPrependChunk,
-} from "@/utils/dashboard/chunkingDirection";
+import { detectChunkingDirection, shouldPrependChunk } from "@/utils/dashboard/chunkingDirection";
 
 /**
  * Composable that encapsulates all streaming search response event handlers
@@ -86,15 +83,9 @@ export const usePanelSearchHandlers = ({
         const shouldPrepend = shouldPrependChunk(buffer.isLTR, buffer.orderAsc);
 
         if (shouldPrepend) {
-          state.data[queryIndex] = markRaw([
-            ...allNewHits,
-            ...toRaw(state.data[queryIndex] ?? []),
-          ]);
+          state.data[queryIndex] = markRaw([...allNewHits, ...toRaw(state.data[queryIndex] ?? [])]);
         } else {
-          state.data[queryIndex] = markRaw([
-            ...toRaw(state.data[queryIndex] ?? []),
-            ...allNewHits,
-          ]);
+          state.data[queryIndex] = markRaw([...toRaw(state.data[queryIndex] ?? []), ...allNewHits]);
         }
       }
 
@@ -142,10 +133,7 @@ export const usePanelSearchHandlers = ({
     }
 
     // Detect chunking direction on first chunk for this query
-    if (
-      !state.resultMetaData[queryIndex] ||
-      state.resultMetaData[queryIndex].length === 0
-    ) {
+    if (!state.resultMetaData[queryIndex] || state.resultMetaData[queryIndex].length === 0) {
       // time_offset may be at content.results.time_offset (search_response)
       // or at content.time_offset (search_response_metadata format)
       const direction = detectChunkingDirection(
@@ -168,15 +156,12 @@ export const usePanelSearchHandlers = ({
     }
 
     const isLTR = chunkingLeftToRight.get(queryIndex) ?? false;
-    const orderAsc =
-      searchRes?.content?.results?.order_by?.toLowerCase() === "asc";
+    const orderAsc = searchRes?.content?.results?.order_by?.toLowerCase() === "asc";
     const shouldPrepend = shouldPrependChunk(isLTR, orderAsc);
 
     // if streaming aggs, replace the state data
     if (streaming_aggs) {
-      state.data[queryIndex] = markRaw([
-        ...(searchRes?.content?.results?.hits ?? {}),
-      ]);
+      state.data[queryIndex] = markRaw([...(searchRes?.content?.results?.hits ?? {})]);
     } else if (shouldPrepend) {
       state.data[queryIndex] = markRaw([
         ...(searchRes?.content?.results?.hits ?? {}),
@@ -249,17 +234,12 @@ export const usePanelSearchHandlers = ({
       state.data[queryIndex] = [];
     }
 
-    const lastPartitionIndex = Math.max(
-      (state?.resultMetaData?.[queryIndex]?.length ?? 0) - 1,
-      0,
-    );
+    const lastPartitionIndex = Math.max((state?.resultMetaData?.[queryIndex]?.length ?? 0) - 1, 0);
     // is streaming aggs
     const streaming_aggs =
-      state?.resultMetaData?.[queryIndex]?.[lastPartitionIndex]
-        ?.streaming_aggs ?? false;
+      state?.resultMetaData?.[queryIndex]?.[lastPartitionIndex]?.streaming_aggs ?? false;
     const orderAsc =
-      state?.resultMetaData?.[queryIndex]?.[lastPartitionIndex]
-        ?.order_by?.toLowerCase() === "asc";
+      state?.resultMetaData?.[queryIndex]?.[lastPartitionIndex]?.order_by?.toLowerCase() === "asc";
 
     const hits = searchRes?.content?.results?.hits ?? [];
 

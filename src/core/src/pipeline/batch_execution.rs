@@ -53,11 +53,9 @@ use transform::{
     QUERY_FUNCTIONS, apply_vrl_fn, compile_vrl_function,
     js::{JSRuntimeConfig, apply_js_fn, compile_js_function},
 };
+use usage_reporting::publish_error;
 
-use crate::{
-    alerts::{ConditionExt, ConditionGroupExt},
-    self_reporting::publish_error,
-};
+use crate::alerts::{ConditionExt, ConditionGroupExt};
 
 // Global batch buffer for accumulating remote stream records
 #[cfg(feature = "enterprise")]

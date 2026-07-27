@@ -32,45 +32,31 @@ describe("ScorerPromptVariableGuide", () => {
 
     for (const variable of ["input", "output", "statistics", "spans", "steps"]) {
       expect(
-        wrapper
-          .find(`[data-test="scorer-form-prompt-variable-chip-${variable}"]`)
-          .exists(),
+        wrapper.find(`[data-test="scorer-form-prompt-variable-chip-${variable}"]`).exists(),
       ).toBe(true);
     }
     // The per-scope matrix is reference material — it lives behind Learn more.
-    expect(
-      wrapper.find('[data-test="scorer-form-prompt-variable-detail"]').exists(),
-    ).toBe(false);
+    expect(wrapper.find('[data-test="scorer-form-prompt-variable-detail"]').exists()).toBe(false);
   });
 
   it("describes all five prompt variables and their scope behavior", async () => {
     const wrapper = mountGuide();
-    await wrapper
-      .get('[data-test="scorer-form-prompt-variable-learn-more"]')
-      .trigger("click");
+    await wrapper.get('[data-test="scorer-form-prompt-variable-learn-more"]').trigger("click");
 
-    expect(
-      wrapper.find('[data-test="scorer-form-prompt-variable-table"]').exists(),
-    ).toBe(true);
-    expect(wrapper.find('[data-test="o2-table"]').text()).toContain(
-      "Prompt variable",
-    );
+    expect(wrapper.find('[data-test="scorer-form-prompt-variable-table"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="o2-table"]').text()).toContain("Prompt variable");
     expect(wrapper.find('[data-test="o2-table"]').text()).toContain("Span");
     expect(wrapper.find('[data-test="o2-table"]').text()).toContain("Trace");
     expect(wrapper.find('[data-test="o2-table"]').text()).toContain("Session");
-    expect(
-      wrapper.find('[data-test="scorer-form-prompt-variable-guide"]').text(),
-    ).toContain("Available Prompt Variables");
-    expect(
-      wrapper
-        .find('[data-test="scorer-form-prompt-variable-inputOutput"]')
-        .text(),
-    ).toContain("{{ input }}");
-    expect(
-      wrapper
-        .find('[data-test="scorer-form-prompt-variable-inputOutput"]')
-        .text(),
-    ).toContain("{{ output }}");
+    expect(wrapper.find('[data-test="scorer-form-prompt-variable-guide"]').text()).toContain(
+      "Available Prompt Variables",
+    );
+    expect(wrapper.find('[data-test="scorer-form-prompt-variable-inputOutput"]').text()).toContain(
+      "{{ input }}",
+    );
+    expect(wrapper.find('[data-test="scorer-form-prompt-variable-inputOutput"]').text()).toContain(
+      "{{ output }}",
+    );
     const tableText = wrapper.find('[data-test="o2-table"]').text();
     expect(tableText).toContain("{{ statistics }}");
     expect(tableText).toContain("Trace metrics:");
@@ -82,9 +68,7 @@ describe("ScorerPromptVariableGuide", () => {
     expect(tableText).toContain("Span Selector required");
 
     // Design-doc vocabulary must not reach the user.
-    const guideText = wrapper
-      .find('[data-test="scorer-form-prompt-variable-guide"]')
-      .text();
+    const guideText = wrapper.find('[data-test="scorer-form-prompt-variable-guide"]').text();
     for (const jargon of ["View Component", "bounded", "The design defines"]) {
       expect(guideText).not.toContain(jargon);
     }
@@ -92,12 +76,8 @@ describe("ScorerPromptVariableGuide", () => {
 
   it("explains that array variables do not support indexed template access", async () => {
     const wrapper = mountGuide();
-    await wrapper
-      .get('[data-test="scorer-form-prompt-variable-learn-more"]')
-      .trigger("click");
-    const indexNote = wrapper
-      .find('[data-test="scorer-form-prompt-variable-index-note"]')
-      .text();
+    await wrapper.get('[data-test="scorer-form-prompt-variable-learn-more"]').trigger("click");
+    const indexNote = wrapper.find('[data-test="scorer-form-prompt-variable-index-note"]').text();
 
     expect(indexNote).toContain("{{ spans }}");
     expect(indexNote).toContain("{{ steps }}");

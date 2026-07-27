@@ -170,8 +170,18 @@ describe("promqlChartSeriesProps", () => {
 
     it("all common chart types return valid objects", () => {
       const types = [
-        "bar", "line", "scatter", "pie", "donut", "h-bar",
-        "area", "stacked", "area-stacked", "gauge", "metric", "h-stacked",
+        "bar",
+        "line",
+        "scatter",
+        "pie",
+        "donut",
+        "h-bar",
+        "area",
+        "stacked",
+        "area-stacked",
+        "gauge",
+        "metric",
+        "h-stacked",
       ];
       types.forEach((type) => {
         const result = getPropsByChartTypeForSeries(type);

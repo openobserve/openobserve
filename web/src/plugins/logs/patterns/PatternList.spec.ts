@@ -51,7 +51,8 @@ describe("PatternList", () => {
   const OVirtualScrollStub = {
     name: "OVirtualScroll",
     props: ["items", "overscan", "scrollTarget"],
-    template: '<div data-test-stub="o-virtual-scroll"><slot v-for="(item, index) in items" :key="index" :item="item" :index="index" /></div>',
+    template:
+      '<div data-test-stub="o-virtual-scroll"><slot v-for="(item, index) in items" :key="index" :item="item" :index="index" /></div>',
   };
   const OSpinnerStub = {
     name: "OSpinner",
@@ -71,8 +72,7 @@ describe("PatternList", () => {
         provide: { store },
         stubs: {
           PatternCard: {
-            template:
-              '<div :data-test="`pattern-card-stub-${index}`"><slot></slot></div>',
+            template: '<div :data-test="`pattern-card-stub-${index}`"><slot></slot></div>',
             props: ["pattern", "index"],
           },
           OVirtualScroll: OVirtualScrollStub,
@@ -111,20 +111,14 @@ describe("PatternList", () => {
       await wrapper.vm.$emit("add-to-search", mockPatterns[0], "include");
 
       expect(wrapper.emitted("add-to-search")).toBeTruthy();
-      expect(wrapper.emitted("add-to-search")![0]).toEqual([
-        mockPatterns[0],
-        "include",
-      ]);
+      expect(wrapper.emitted("add-to-search")![0]).toEqual([mockPatterns[0], "include"]);
     });
 
     it("should emit add-to-search event with exclude action", async () => {
       await wrapper.vm.$emit("add-to-search", mockPatterns[1], "exclude");
 
       expect(wrapper.emitted("add-to-search")).toBeTruthy();
-      expect(wrapper.emitted("add-to-search")![0]).toEqual([
-        mockPatterns[1],
-        "exclude",
-      ]);
+      expect(wrapper.emitted("add-to-search")![0]).toEqual([mockPatterns[1], "exclude"]);
     });
 
     it("should emit create-alert event when triggered", async () => {
@@ -192,12 +186,8 @@ describe("PatternList", () => {
 
     it("should display helpful suggestion text", () => {
       const emptyText = wrapper.text();
-      expect(emptyText).toContain(
-        "Try increasing the time range or selecting a different stream",
-      );
-      expect(emptyText).toContain(
-        "Pattern extraction works best with at least 1,000 logs",
-      );
+      expect(emptyText).toContain("Try increasing the time range or selecting a different stream");
+      expect(emptyText).toContain("Pattern extraction works best with at least 1,000 logs");
     });
 
     it("should not display total logs analyzed when not provided", () => {
@@ -269,8 +259,9 @@ describe("PatternList", () => {
   describe("Table Header", () => {
     it("should render the Pattern column header", () => {
       // i18n key search.patternColumnHeader is rendered
-      expect(wrapper.find(".flex.items-center.border-b").exists() ||
-        wrapper.text().length > 0).toBe(true);
+      expect(
+        wrapper.find(".flex.items-center.border-b").exists() || wrapper.text().length > 0,
+      ).toBe(true);
     });
 
     it("should render the Occurrence column header text via i18n", () => {
@@ -355,10 +346,7 @@ describe("PatternList", () => {
       const lastIndex = mockPatterns.length - 1;
       await wrapper.vm.$emit("open-details", mockPatterns[lastIndex], lastIndex);
       expect(wrapper.emitted("open-details")).toBeTruthy();
-      expect(wrapper.emitted("open-details")![0]).toEqual([
-        mockPatterns[lastIndex],
-        lastIndex,
-      ]);
+      expect(wrapper.emitted("open-details")![0]).toEqual([mockPatterns[lastIndex], lastIndex]);
     });
   });
 

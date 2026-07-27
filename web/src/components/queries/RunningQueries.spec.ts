@@ -33,7 +33,6 @@ vi.mock("@/composables/useIsMetaOrg", () => ({
   default: () => ({ isMetaOrg: true }),
 }));
 
-
 const node = document.createElement("div");
 node.setAttribute("id", "app");
 document.body.appendChild(node);
@@ -66,7 +65,7 @@ describe("RunningQueries", () => {
       search_event_context: {
         dashboard_name: "MyDashboard",
         dashboard_folder: "MyDashboardFolder",
-      }
+      },
     },
     {
       trace_id: "trace-2",
@@ -116,7 +115,7 @@ describe("RunningQueries", () => {
       search_event_context: {
         alert_name: "MyALert",
         alert_key: "/alerts/_meta/logs/default/MyAlert",
-      }
+      },
     },
   ];
 
@@ -128,7 +127,7 @@ describe("RunningQueries", () => {
     };
 
     vi.clearAllMocks();
-    
+
     // Mock successful API response
     (SearchService.get_running_queries as any).mockResolvedValue({
       data: {
@@ -147,20 +146,42 @@ describe("RunningQueries", () => {
           $store: store,
         },
         stubs: {
-          "OIcon": true,
+          OIcon: true,
           "confirm-dialog": true,
           "query-list": true,
           "running-queries-list": true,
           "summary-list": true,
           ODrawer: {
             name: "ODrawer",
-            props: ["open", "size", "showClose", "title", "subTitle", "width", "persistent", "primaryButtonLabel", "secondaryButtonLabel", "neutralButtonLabel"],
+            props: [
+              "open",
+              "size",
+              "showClose",
+              "title",
+              "subTitle",
+              "width",
+              "persistent",
+              "primaryButtonLabel",
+              "secondaryButtonLabel",
+              "neutralButtonLabel",
+            ],
             emits: ["update:open", "close", "click:primary", "click:secondary", "click:neutral"],
             template: '<div data-test="o-drawer-stub" v-if="open"><slot /></div>',
           },
           ODialog: {
             name: "ODialog",
-            props: ["open", "size", "showClose", "title", "subTitle", "width", "persistent", "primaryButtonLabel", "secondaryButtonLabel", "neutralButtonLabel"],
+            props: [
+              "open",
+              "size",
+              "showClose",
+              "title",
+              "subTitle",
+              "width",
+              "persistent",
+              "primaryButtonLabel",
+              "secondaryButtonLabel",
+              "neutralButtonLabel",
+            ],
             emits: ["update:open", "close", "click:primary", "click:secondary", "click:neutral"],
             template: '<div data-test="o-dialog-stub" v-if="open"><slot /></div>',
           },
@@ -200,7 +221,7 @@ describe("RunningQueries", () => {
   it("should call refreshData and update lastRefreshed", () => {
     // Test that refreshData updates lastRefreshed with a proper time format
     wrapper.vm.refreshData();
-    
+
     expect(wrapper.vm.lastRefreshed).toBeTruthy();
     expect(wrapper.vm.lastRefreshed).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} UTC$/);
   });
@@ -222,7 +243,7 @@ describe("RunningQueries", () => {
   it("should calculate duration correctly", () => {
     const createdAt = Date.now() * 1000 - 5000000; // 5 seconds ago
     const duration = wrapper.vm.getDuration(createdAt);
-    
+
     expect(duration).toHaveProperty("durationInSeconds");
     expect(duration).toHaveProperty("duration");
     expect(duration.durationInSeconds).toBeGreaterThan(0);
@@ -233,7 +254,7 @@ describe("RunningQueries", () => {
     const startTime = 1640995200000000;
     const endTime = 1640995260000000; // 60 seconds later
     const range = wrapper.vm.queryRange(startTime, endTime);
-    
+
     expect(range).toHaveProperty("queryRangeInSeconds");
     expect(range).toHaveProperty("duration");
     expect(range.queryRangeInSeconds).toBe(60);
@@ -263,7 +284,7 @@ describe("RunningQueries", () => {
   it("should open schema dialog with correct data", () => {
     const rowData = { test: "data" };
     wrapper.vm.listSchema(rowData);
-    
+
     expect(wrapper.vm.schemaData).toEqual(rowData);
     expect(wrapper.vm.showListSchemaDialog).toBe(true);
   });
@@ -272,7 +293,7 @@ describe("RunningQueries", () => {
   it("should update pagination settings", () => {
     const newPagination = { label: "50", value: 50 };
     wrapper.vm.changePagination(newPagination);
-    
+
     expect(wrapper.vm.selectedPerPage).toBe(50);
     expect(wrapper.vm.pagination.rowsPerPage).toBe(50);
   });
@@ -281,7 +302,7 @@ describe("RunningQueries", () => {
   it("should show delete dialog with correct data", () => {
     const row = { trace_id: "test-trace-id" };
     wrapper.vm.confirmDeleteAction(row);
-    
+
     expect(wrapper.vm.deleteDialog.show).toBe(true);
     expect(wrapper.vm.deleteDialog.data).toEqual(["test-trace-id"]);
   });
@@ -290,7 +311,7 @@ describe("RunningQueries", () => {
   it("should change query tab", () => {
     wrapper.vm.onChangeQueryTab("all");
     expect(wrapper.vm.selectedQueryTypeTab).toBe("all");
-    
+
     wrapper.vm.onChangeQueryTab("summary");
     expect(wrapper.vm.selectedQueryTypeTab).toBe("summary");
   });
@@ -299,7 +320,7 @@ describe("RunningQueries", () => {
   it("should change search type", () => {
     wrapper.vm.onChangeSearchType("ui");
     expect(wrapper.vm.selectedSearchType).toBe("ui");
-    
+
     wrapper.vm.onChangeSearchType("Others");
     expect(wrapper.vm.selectedSearchType).toBe("Others");
   });
@@ -311,7 +332,7 @@ describe("RunningQueries", () => {
       search_type_label: "dashboards",
     };
     wrapper.vm.filterUserQueries(row);
-    
+
     expect(wrapper.vm.selectedQueryTypeTab).toBe("all");
     expect(wrapper.vm.selectedSearchField).toBe("all");
     expect(wrapper.vm.selectedSearchType).toBe("dashboards");
@@ -322,20 +343,17 @@ describe("RunningQueries", () => {
   it("should handle multi query cancel with provided traceIds", () => {
     const traceIds = ["trace1", "trace2"];
     wrapper.vm.handleMultiQueryCancel(traceIds);
-    
+
     expect(wrapper.vm.deleteDialog.show).toBe(true);
     expect(wrapper.vm.deleteDialog.data).toEqual(traceIds);
   });
 
   // Test 17: handleMultiQueryCancel function without traceIds
   it("should handle multi query cancel without traceIds", () => {
-    wrapper.vm.selectedRow.summary = [
-      { trace_id: "trace1" },
-      { trace_ids: ["trace2", "trace3"] },
-    ];
+    wrapper.vm.selectedRow.summary = [{ trace_id: "trace1" }, { trace_ids: ["trace2", "trace3"] }];
     wrapper.vm.selectedQueryTypeTab = "summary";
     wrapper.vm.handleMultiQueryCancel();
-    
+
     expect(wrapper.vm.deleteDialog.show).toBe(true);
     expect(wrapper.vm.deleteDialog.data).toContain("trace1");
   });
@@ -343,7 +361,7 @@ describe("RunningQueries", () => {
   // Test 18: getRunningQueries success
   it("should fetch running queries successfully", async () => {
     await wrapper.vm.getRunningQueries();
-    
+
     expect(SearchService.get_running_queries).toHaveBeenCalledWith("test-org");
     expect(wrapper.vm.queries).toHaveLength(3);
     expect(wrapper.vm.resultTotal).toBe(3);
@@ -354,13 +372,10 @@ describe("RunningQueries", () => {
     wrapper.vm.deleteDialog.data = ["trace-1"];
     wrapper.vm.selectedQueryTypeTab = "all";
     (SearchService.delete_running_queries as any).mockResolvedValue({});
-    
+
     await wrapper.vm.deleteQuery();
-    
-    expect(SearchService.delete_running_queries).toHaveBeenCalledWith(
-      "test-org",
-      ["trace-1"]
-    );
+
+    expect(SearchService.delete_running_queries).toHaveBeenCalledWith("test-org", ["trace-1"]);
     expect(wrapper.vm.selectedRow.all).toEqual([]);
     expect(wrapper.vm.deleteDialog.show).toBe(false);
   });
@@ -371,9 +386,9 @@ describe("RunningQueries", () => {
     (SearchService.delete_running_queries as any).mockRejectedValue({
       response: { data: { message: "Delete Error" } },
     });
-    
+
     await wrapper.vm.deleteQuery();
-    
+
     expect(wrapper.vm.deleteDialog.show).toBe(false);
   });
 
@@ -381,7 +396,7 @@ describe("RunningQueries", () => {
   it("should generate queries summary correctly", () => {
     wrapper.vm.queries = mockQueries;
     const summary = wrapper.vm.getRunningQueriesSummary();
-    
+
     expect(Array.isArray(summary)).toBe(true);
     expect(summary.length).toBeGreaterThan(0);
     expect(summary[0]).toHaveProperty("user_id");
@@ -401,7 +416,7 @@ describe("RunningQueries", () => {
     wrapper.vm.queries = mockQueries;
     wrapper.vm.selectedQueryTypeTab = "summary";
     wrapper.vm.runningQueriesSummary = [{ test: "summary" }];
-    
+
     await wrapper.vm.$nextTick();
     expect(wrapper.vm.baseFilteredQueries).toEqual([{ test: "summary" }]);
   });
@@ -410,7 +425,7 @@ describe("RunningQueries", () => {
   it("should return correct baseFilteredQueries for all tab", async () => {
     wrapper.vm.queries = mockQueries;
     wrapper.vm.selectedQueryTypeTab = "all";
-    
+
     await wrapper.vm.$nextTick();
     expect(wrapper.vm.baseFilteredQueries).toEqual(mockQueries);
   });
@@ -420,17 +435,21 @@ describe("RunningQueries", () => {
     wrapper.vm.queries = mockQueries;
     wrapper.vm.selectedQueryTypeTab = "all";
     wrapper.vm.selectedSearchType = "dashboards";
-    
+
     await wrapper.vm.$nextTick();
     const filtered = wrapper.vm.searchTypeFiltered;
-    expect(filtered.every((q: any) => q.search_type_label === "dashboards" || q.search_type === "dashboards")).toBe(true);
+    expect(
+      filtered.every(
+        (q: any) => q.search_type_label === "dashboards" || q.search_type === "dashboards",
+      ),
+    ).toBe(true);
   });
 
   // Test 27: fieldFiltered computed property with no filter
   it("should return all queries when no filter is applied", async () => {
     wrapper.vm.queries = mockQueries;
     wrapper.vm.filterQuery = "";
-    
+
     await wrapper.vm.$nextTick();
     expect(wrapper.vm.fieldFiltered.length).toBe(wrapper.vm.searchTypeFiltered.length);
   });
@@ -439,7 +458,7 @@ describe("RunningQueries", () => {
   it("should filter queries by user_id", async () => {
     wrapper.vm.queries = mockQueries;
     wrapper.vm.filterQuery = "user@example.com";
-    
+
     await wrapper.vm.$nextTick();
     const filtered = wrapper.vm.fieldFiltered;
     expect(filtered.some((q: any) => q.user_id?.includes("user@example.com"))).toBe(true);
@@ -449,7 +468,7 @@ describe("RunningQueries", () => {
   it("should return fieldFiltered when selectedSearchField is all", async () => {
     wrapper.vm.selectedSearchField = "all";
     wrapper.vm.queries = mockQueries;
-    
+
     await wrapper.vm.$nextTick();
     expect(wrapper.vm.filteredRows).toEqual(wrapper.vm.fieldFiltered);
   });
@@ -459,7 +478,7 @@ describe("RunningQueries", () => {
     wrapper.vm.selectedSearchField = "exec_duration";
     wrapper.vm.filterQuery = "gt_1s";
     wrapper.vm.queries = mockQueries;
-    
+
     await wrapper.vm.$nextTick();
     expect(Array.isArray(wrapper.vm.filteredRows)).toBe(true);
   });
@@ -469,7 +488,7 @@ describe("RunningQueries", () => {
     wrapper.vm.selectedSearchField = "query_range";
     wrapper.vm.filterQuery = "gt_1m";
     wrapper.vm.queries = mockQueries;
-    
+
     await wrapper.vm.$nextTick();
     expect(Array.isArray(wrapper.vm.filteredRows)).toBe(true);
   });
@@ -477,7 +496,7 @@ describe("RunningQueries", () => {
   // Test 32: otherFieldOptions computed property for exec_duration
   it("should return exec_duration options", async () => {
     wrapper.vm.selectedSearchField = "exec_duration";
-    
+
     await wrapper.vm.$nextTick();
     const options = wrapper.vm.otherFieldOptions;
     expect(options.length).toBeGreaterThan(0);
@@ -488,7 +507,7 @@ describe("RunningQueries", () => {
   // Test 33: otherFieldOptions computed property for query_range
   it("should return query_range options", async () => {
     wrapper.vm.selectedSearchField = "query_range";
-    
+
     await wrapper.vm.$nextTick();
     const options = wrapper.vm.otherFieldOptions;
     expect(options.length).toBeGreaterThan(0);
@@ -498,7 +517,7 @@ describe("RunningQueries", () => {
   // Test 34: otherFieldOptions computed property for other fields
   it("should return empty array for other fields", async () => {
     wrapper.vm.selectedSearchField = "all";
-    
+
     await wrapper.vm.$nextTick();
     expect(wrapper.vm.otherFieldOptions).toEqual([]);
   });
@@ -508,7 +527,7 @@ describe("RunningQueries", () => {
     wrapper.vm.queries = mockQueries;
     wrapper.vm.runningQueriesSummary = wrapper.vm.getRunningQueriesSummary();
     wrapper.vm.selectedQueryTypeTab = "summary";
-    
+
     await wrapper.vm.$nextTick();
     const rows = wrapper.vm.summaryRows;
     expect(Array.isArray(rows)).toBe(true);
@@ -519,7 +538,7 @@ describe("RunningQueries", () => {
   it("should format query rows correctly", async () => {
     wrapper.vm.queries = mockQueries;
     wrapper.vm.selectedQueryTypeTab = "all";
-    
+
     await wrapper.vm.$nextTick();
     const rows = wrapper.vm.rowsQuery;
     expect(Array.isArray(rows)).toBe(true);
@@ -534,7 +553,7 @@ describe("RunningQueries", () => {
   it("should filter query by search type tab", () => {
     const query1 = { search_type: "dashboards", search_type_label: "dashboards" };
     const query2 = { search_type: "ui", search_type_label: "ui" };
-    
+
     wrapper.vm.selectedSearchType = "dashboards";
     expect(wrapper.vm.filterQueryBySearchTypeTab(query1)).toBe(true);
     expect(wrapper.vm.filterQueryBySearchTypeTab(query2)).toBe(false);
@@ -552,7 +571,7 @@ describe("RunningQueries", () => {
       search_type: "dashboards",
       search_type_label: "dashboards",
     };
-    
+
     expect(wrapper.vm.filterQueryCriteria.user_id(query, "test")).toBe(true);
     expect(wrapper.vm.filterQueryCriteria.org_id(query, "test")).toBe(true);
     expect(wrapper.vm.filterQueryCriteria.stream_type(query, "logs")).toBe(true);
@@ -567,7 +586,7 @@ describe("RunningQueries", () => {
   it("should reset filterQuery when selectedSearchField changes", async () => {
     wrapper.vm.filterQuery = "test";
     wrapper.vm.selectedSearchField = "exec_duration";
-    
+
     await wrapper.vm.$nextTick();
     expect(wrapper.vm.filterQuery).toBe("");
   });
@@ -576,7 +595,7 @@ describe("RunningQueries", () => {
   it("should update resultTotal when filterQuery changes", async () => {
     wrapper.vm.queries = mockQueries;
     wrapper.vm.filterQuery = "user@example.com";
-    
+
     await wrapper.vm.$nextTick();
     expect(wrapper.vm.resultTotal).toBeGreaterThanOrEqual(0);
   });
@@ -586,7 +605,7 @@ describe("RunningQueries", () => {
     const columns = wrapper.vm.columns;
     expect(Array.isArray(columns)).toBe(true);
     expect(columns.length).toBeGreaterThan(0);
-    
+
     const columnNames = columns.map((col: any) => col.name);
     expect(columnNames).toContain("user_id");
     expect(columnNames).toContain("actions");
@@ -652,7 +671,7 @@ describe("RunningQueries", () => {
     wrapper.vm.selectedSearchField = "exec_duration";
     wrapper.vm.filterQuery = "lt_1s";
     wrapper.vm.queries = mockQueries;
-    
+
     await wrapper.vm.$nextTick();
     expect(Array.isArray(wrapper.vm.filteredRows)).toBe(true);
   });
@@ -720,10 +739,10 @@ describe("RunningQueries", () => {
         query: { start_time: 1640995200000000, end_time: 1640995320000000 },
       },
     ];
-    
+
     wrapper.vm.queries = complexQueries;
     const summary = wrapper.vm.getRunningQueriesSummary();
-    
+
     expect(summary.length).toBe(1);
     expect(summary[0].numOfQueries).toBe(2);
     expect(summary[0].trace_ids).toEqual(["trace-1", "trace-2"]);

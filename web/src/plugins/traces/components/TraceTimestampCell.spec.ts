@@ -18,7 +18,6 @@ import { mount, VueWrapper } from "@vue/test-utils";
 
 import TraceTimestampCell from "./TraceTimestampCell.vue";
 
-
 describe("TraceTimestampCell", () => {
   let wrapper: VueWrapper;
 
@@ -38,30 +37,26 @@ describe("TraceTimestampCell", () => {
     });
 
     it("should render the timestamp container", () => {
-      expect(
-        wrapper.find('[data-test="trace-row-timestamp"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="trace-row-timestamp"]').exists()).toBe(true);
     });
 
     it("should render the timestamp span", () => {
-      expect(
-        wrapper.find('[data-test="trace-row-timestamp-day"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="trace-row-timestamp-day"]').exists()).toBe(true);
     });
 
     it("should display the value prop", () => {
-      expect(
-        wrapper.find('[data-test="trace-row-timestamp-day"]').text(),
-      ).toBe("2026-03-07 12:00:00");
+      expect(wrapper.find('[data-test="trace-row-timestamp-day"]').text()).toBe(
+        "2026-03-07 12:00:00",
+      );
     });
   });
 
   describe("reactivity", () => {
     it("should update when value prop changes", async () => {
       await wrapper.setProps({ value: "2026-03-08 08:30:00" });
-      expect(
-        wrapper.find('[data-test="trace-row-timestamp-day"]').text(),
-      ).toBe("2026-03-08 08:30:00");
+      expect(wrapper.find('[data-test="trace-row-timestamp-day"]').text()).toBe(
+        "2026-03-08 08:30:00",
+      );
     });
   });
 

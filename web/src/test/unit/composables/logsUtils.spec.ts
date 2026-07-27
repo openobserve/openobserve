@@ -96,8 +96,7 @@ describe("logsUtils - checkTimestampAlias (Fixed Implementation)", () => {
     });
 
     it("should return false for multiple fields where one uses invalid timestamp alias", () => {
-      const query =
-        "SELECT _timestamp, user_id, created_at AS _timestamp FROM logs";
+      const query = "SELECT _timestamp, user_id, created_at AS _timestamp FROM logs";
       mockSearchObj.data.query = query;
 
       const result = logsUtilsInstance.checkTimestampAlias(query);
@@ -648,7 +647,8 @@ describe("logsUtils - checkTimestampAlias (Fixed Implementation)", () => {
 
     describe("Histogram function with different quote formats", () => {
       it("should return false for histogram with double-quoted timestamp alias", () => {
-        const query = 'SELECT histogram(_timestamp) as "_timestamp", count(kubernetes_namespace_name) as "y_axis_1", kubernetes_namespace_name as "breakdown_1" FROM "ks" GROUP BY _timestamp, breakdown_1 ORDER BY _timestamp ASC';
+        const query =
+          'SELECT histogram(_timestamp) as "_timestamp", count(kubernetes_namespace_name) as "y_axis_1", kubernetes_namespace_name as "breakdown_1" FROM "ks" GROUP BY _timestamp, breakdown_1 ORDER BY _timestamp ASC';
         mockSearchObj.data.query = query;
 
         const result = logsUtilsInstance.checkTimestampAlias(query);
@@ -656,7 +656,8 @@ describe("logsUtils - checkTimestampAlias (Fixed Implementation)", () => {
       });
 
       it("should return false for histogram with single-quoted timestamp alias", () => {
-        const query = "SELECT histogram(_timestamp) as '_timestamp', count(kubernetes_namespace_name) as \"y_axis_1\", kubernetes_namespace_name as \"breakdown_1\" FROM \"ks\" GROUP BY _timestamp, breakdown_1 ORDER BY _timestamp ASC";
+        const query =
+          'SELECT histogram(_timestamp) as \'_timestamp\', count(kubernetes_namespace_name) as "y_axis_1", kubernetes_namespace_name as "breakdown_1" FROM "ks" GROUP BY _timestamp, breakdown_1 ORDER BY _timestamp ASC';
         mockSearchObj.data.query = query;
 
         const result = logsUtilsInstance.checkTimestampAlias(query);
@@ -664,7 +665,8 @@ describe("logsUtils - checkTimestampAlias (Fixed Implementation)", () => {
       });
 
       it("should return false for histogram with unquoted timestamp alias", () => {
-        const query = 'SELECT histogram(_timestamp) as _timestamp, count(kubernetes_namespace_name) as "y_axis_1", kubernetes_namespace_name as "breakdown_1" FROM "ks" GROUP BY _timestamp, breakdown_1 ORDER BY _timestamp ASC';
+        const query =
+          'SELECT histogram(_timestamp) as _timestamp, count(kubernetes_namespace_name) as "y_axis_1", kubernetes_namespace_name as "breakdown_1" FROM "ks" GROUP BY _timestamp, breakdown_1 ORDER BY _timestamp ASC';
         mockSearchObj.data.query = query;
 
         const result = logsUtilsInstance.checkTimestampAlias(query);
@@ -672,7 +674,8 @@ describe("logsUtils - checkTimestampAlias (Fixed Implementation)", () => {
       });
 
       it("should return true for valid histogram query without timestamp alias", () => {
-        const query = 'SELECT histogram(_timestamp) as "time_bucket", count(kubernetes_namespace_name) as "y_axis_1", kubernetes_namespace_name as "breakdown_1" FROM "ks" GROUP BY time_bucket, breakdown_1 ORDER BY time_bucket ASC';
+        const query =
+          'SELECT histogram(_timestamp) as "time_bucket", count(kubernetes_namespace_name) as "y_axis_1", kubernetes_namespace_name as "breakdown_1" FROM "ks" GROUP BY time_bucket, breakdown_1 ORDER BY time_bucket ASC';
         mockSearchObj.data.query = query;
 
         const result = logsUtilsInstance.checkTimestampAlias(query);
@@ -706,7 +709,8 @@ describe("logsUtils - checkTimestampAlias (Fixed Implementation)", () => {
       });
 
       it("should return false for DATE_TRUNC with double-quoted timestamp alias", () => {
-        const query = 'SELECT DATE_TRUNC(\'hour\', log_time) AS "_timestamp", COUNT(*) FROM logs GROUP BY DATE_TRUNC(\'hour\', log_time)';
+        const query =
+          "SELECT DATE_TRUNC('hour', log_time) AS \"_timestamp\", COUNT(*) FROM logs GROUP BY DATE_TRUNC('hour', log_time)";
         mockSearchObj.data.query = query;
 
         const result = logsUtilsInstance.checkTimestampAlias(query);
@@ -714,7 +718,8 @@ describe("logsUtils - checkTimestampAlias (Fixed Implementation)", () => {
       });
 
       it("should return false for DATE_TRUNC with single-quoted timestamp alias", () => {
-        const query = "SELECT DATE_TRUNC('hour', log_time) AS '_timestamp', COUNT(*) FROM logs GROUP BY DATE_TRUNC('hour', log_time)";
+        const query =
+          "SELECT DATE_TRUNC('hour', log_time) AS '_timestamp', COUNT(*) FROM logs GROUP BY DATE_TRUNC('hour', log_time)";
         mockSearchObj.data.query = query;
 
         const result = logsUtilsInstance.checkTimestampAlias(query);
@@ -1007,7 +1012,8 @@ describe("logsUtils - checkTimestampAlias (Fixed Implementation)", () => {
     });
 
     it("should handle UNION ALL BY NAME query with multiple streams", () => {
-      const query = 'SELECT job,level FROM "default" UNION ALL BY NAME SELECT job,level FROM "default12"';
+      const query =
+        'SELECT job,level FROM "default" UNION ALL BY NAME SELECT job,level FROM "default12"';
       mockSearchObj.data.query = query;
 
       const parsedSQL = logsUtilsInstance.fnParsedSQL(query);
@@ -1047,7 +1053,8 @@ describe("logsUtils - checkTimestampAlias (Fixed Implementation)", () => {
     it("should handle UNION query in openFilterCreator context", () => {
       // Simulate the scenario when user clicks expand on a field
       // with UNION query active
-      const query = 'SELECT job,level FROM "default" UNION ALL BY NAME SELECT job,level FROM "default12"';
+      const query =
+        'SELECT job,level FROM "default" UNION ALL BY NAME SELECT job,level FROM "default12"';
       mockSearchObj.data.query = query;
 
       // Parse the query
@@ -1055,8 +1062,8 @@ describe("logsUtils - checkTimestampAlias (Fixed Implementation)", () => {
 
       // Verify parsing returns a result (even if empty)
       expect(parsedSQL).toBeDefined();
-      expect(parsedSQL).toHaveProperty('columns');
-      expect(parsedSQL).toHaveProperty('from');
+      expect(parsedSQL).toHaveProperty("columns");
+      expect(parsedSQL).toHaveProperty("from");
 
       // Unparse the SQL (simulating openFilterCreator flow)
       const unparsedSQL = logsUtilsInstance.fnUnparsedSQL(parsedSQL);
@@ -1082,7 +1089,8 @@ describe("logsUtils - checkTimestampAlias (Fixed Implementation)", () => {
     });
 
     it("should handle UNION ALL with WHERE clauses", () => {
-      const query = 'SELECT job,level FROM "default" WHERE level=\'error\' UNION ALL SELECT job,level FROM "default12" WHERE level=\'error\'';
+      const query =
+        "SELECT job,level FROM \"default\" WHERE level='error' UNION ALL SELECT job,level FROM \"default12\" WHERE level='error'";
       mockSearchObj.data.query = query;
 
       const parsedSQL = logsUtilsInstance.fnParsedSQL(query);
@@ -1093,7 +1101,8 @@ describe("logsUtils - checkTimestampAlias (Fixed Implementation)", () => {
     });
 
     it("should handle UNION with ORDER BY clause", () => {
-      const query = 'SELECT job,level FROM "default" UNION ALL SELECT job,level FROM "default12" ORDER BY level';
+      const query =
+        'SELECT job,level FROM "default" UNION ALL SELECT job,level FROM "default12" ORDER BY level';
       mockSearchObj.data.query = query;
 
       const parsedSQL = logsUtilsInstance.fnParsedSQL(query);
@@ -1104,7 +1113,8 @@ describe("logsUtils - checkTimestampAlias (Fixed Implementation)", () => {
     });
 
     it("should handle multiple UNION operations", () => {
-      const query = 'SELECT job FROM "default" UNION ALL SELECT job FROM "default12" UNION ALL SELECT job FROM "default13"';
+      const query =
+        'SELECT job FROM "default" UNION ALL SELECT job FROM "default12" UNION ALL SELECT job FROM "default13"';
       mockSearchObj.data.query = query;
 
       const parsedSQL = logsUtilsInstance.fnParsedSQL(query);

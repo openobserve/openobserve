@@ -21,24 +21,23 @@ import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import config from "@/aws-exports";
 
-
 // Mock shortURL service
-vi.mock('@/services/short_url', () => ({
+vi.mock("@/services/short_url", () => ({
   default: {
     create: vi.fn().mockResolvedValue({
-      data: { short_url: 'http://short.url/abc123' }
-    })
-  }
+      data: { short_url: "http://short.url/abc123" },
+    }),
+  },
 }));
 
 // Mock addPanel utility
-vi.mock('@/utils/commons', () => ({
-  addPanel: vi.fn().mockResolvedValue(undefined)
+vi.mock("@/utils/commons", () => ({
+  addPanel: vi.fn().mockResolvedValue(undefined),
 }));
 
 // Mock the toast helper (the component now uses toast() not q.notify()).
 const toastMock = vi.fn(() => vi.fn());
-vi.mock('@/lib/feedback/Toast/useToast', () => ({
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toast: (...args: any[]) => toastMock(...args),
 }));
 
@@ -96,24 +95,24 @@ const mockPanelData = {
   queries: [
     {
       query: "SELECT * FROM test",
-      queryType: "sql"
-    }
+      queryType: "sql",
+    },
   ],
   layout: {
     x: 0,
     y: 0,
     w: 6,
-    h: 4
+    h: 4,
   },
-  panels: [{ tabId: "default-tab" }]
+  panels: [{ tabId: "default-tab" }],
 };
 
 const mockSearchResponse = {
   data: {
     hits: [],
     total: 0,
-    took: 10
-  }
+    took: 10,
+  },
 };
 
 describe("PanelContainer", () => {
@@ -122,40 +121,42 @@ describe("PanelContainer", () => {
   const defaultProps = {
     data: mockPanelData,
     searchData: mockSearchResponse,
-    variablesData: { 
+    variablesData: {
       values: [],
-      isLoading: false 
+      isLoading: false,
     },
-    currentVariablesData: { 
+    currentVariablesData: {
       values: [],
-      isLoading: false 
+      isLoading: false,
     },
     DateTime: {
-      start_time: new Date('2023-01-01T00:00:00Z'),
-      end_time: new Date('2023-01-01T23:59:59Z')
+      start_time: new Date("2023-01-01T00:00:00Z"),
+      end_time: new Date("2023-01-01T23:59:59Z"),
     },
     selectedTimeDate: {
-      start_time: new Date('2023-01-01T00:00:00Z'),
-      end_time: new Date('2023-01-01T23:59:59Z'),
-      type: 'relative'
+      start_time: new Date("2023-01-01T00:00:00Z"),
+      end_time: new Date("2023-01-01T23:59:59Z"),
+      type: "relative",
     },
     viewOnly: false,
     width: 400,
     height: 300,
     metaData: {
-      queries: [{ 
-        query: "SELECT * FROM test",
-        variables: []
-      }]
+      queries: [
+        {
+          query: "SELECT * FROM test",
+          variables: [],
+        },
+      ],
     },
     forceLoad: false,
-    searchType: 'logs',
-    dashboardId: 'test-dashboard-id',
-    folderId: 'test-folder-id',
+    searchType: "logs",
+    dashboardId: "test-dashboard-id",
+    folderId: "test-folder-id",
     reportId: null,
-    runId: 'test-run-id',
-    tabId: 'test-tab-id',
-    tabName: 'Test Tab'
+    runId: "test-run-id",
+    tabId: "test-tab-id",
+    tabName: "Test Tab",
   };
 
   beforeEach(() => {
@@ -167,23 +168,23 @@ describe("PanelContainer", () => {
     (store.state as any).zoConfig = { quick_mode_enabled: false };
 
     // Mock window methods
-    Object.defineProperty(window, 'ResizeObserver', {
+    Object.defineProperty(window, "ResizeObserver", {
       writable: true,
       value: vi.fn().mockImplementation(() => ({
         observe: vi.fn(),
         unobserve: vi.fn(),
         disconnect: vi.fn(),
-      }))
+      })),
     });
 
     // Mock window.location
-    Object.defineProperty(window, 'location', {
+    Object.defineProperty(window, "location", {
       writable: true,
       value: {
-        origin: 'http://localhost:3000',
-        pathname: '/web/dashboards',
-        href: 'http://localhost:3000/web/dashboards'
-      }
+        origin: "http://localhost:3000",
+        pathname: "/web/dashboards",
+        href: "http://localhost:3000/web/dashboards",
+      },
     });
   });
 
@@ -197,20 +198,20 @@ describe("PanelContainer", () => {
     return mount(PanelContainer, {
       props: {
         ...defaultProps,
-        ...props
+        ...props,
       },
       global: {
         plugins: [i18n, store, router],
         stubs: {
           ODialog: ODialogStub,
-          'ChartRenderer': { template: '<div data-test="chart-renderer"></div>' },
-          'TableRenderer': { template: '<div data-test="table-renderer"></div>' },
-          'ViewPanel': { template: '<div data-test="view-panel"></div>' },
-          'QueryInspector': {
-            name: 'QueryInspector',
+          ChartRenderer: { template: '<div data-test="chart-renderer"></div>' },
+          TableRenderer: { template: '<div data-test="table-renderer"></div>' },
+          ViewPanel: { template: '<div data-test="view-panel"></div>' },
+          QueryInspector: {
+            name: "QueryInspector",
             inheritAttrs: false,
-            props: ['open', 'metaData', 'data'],
-            emits: ['update:open', 'close'],
+            props: ["open", "metaData", "data"],
+            emits: ["update:open", "close"],
             template: `<div
               data-test="query-inspector"
               :data-open="String(open)"
@@ -220,31 +221,31 @@ describe("PanelContainer", () => {
           // component, which never resolves synchronously in tests. Stub
           // it directly so the legends-wiring tests can find it via
           // findComponent({ name: 'ShowLegendsPopup' }).
-          'ShowLegendsPopup': {
-            name: 'ShowLegendsPopup',
+          ShowLegendsPopup: {
+            name: "ShowLegendsPopup",
             inheritAttrs: false,
-            props: ['open', 'panelData'],
-            emits: ['update:open'],
+            props: ["open", "panelData"],
+            emits: ["update:open"],
             template: `<div
               data-test="panel-container-legends-dialog"
               :data-open="String(open)"
             ></div>`,
           },
-          'PanelSchemaRenderer': {
-            name: 'PanelSchemaRenderer',
+          PanelSchemaRenderer: {
+            name: "PanelSchemaRenderer",
             template: '<div data-test="panel-schema-renderer"></div>',
-            props: ['panelSchema', 'selectedTimeObj', 'width', 'height'],
-            emits: ['show-legends']
+            props: ["panelSchema", "selectedTimeObj", "width", "height"],
+            emits: ["show-legends"],
           },
-          'SinglePanelMove': {
+          SinglePanelMove: {
             template: '<div data-test="single-panel-move"></div>',
-            props: ['title', 'message']
+            props: ["title", "message"],
           },
-          'RelativeTime': {
-            template: '<span>relative time</span>',
-            props: ['timestamp', 'fullTimePrefix']
+          RelativeTime: {
+            template: "<span>relative time</span>",
+            props: ["timestamp", "fullTimePrefix"],
           },
-          'PanelErrorButtons': {
+          PanelErrorButtons: {
             template: `<div>
               <button v-if="error" data-test="panel-error-data" class="warning">
                 <span data-test="panel-error-tooltip">{{ error }}</span>
@@ -269,22 +270,31 @@ describe("PanelContainer", () => {
                 <RelativeTime :timestamp="lastTriggeredAt" />
               </span>
             </div>`,
-            props: ['error', 'maxQueryRangeWarning', 'limitNumberOfSeriesWarningMessage', 'isCachedDataDifferWithCurrentTimeRange', 'isPartialData', 'isPanelLoading', 'lastTriggeredAt', 'viewOnly']
-          }
+            props: [
+              "error",
+              "maxQueryRangeWarning",
+              "limitNumberOfSeriesWarningMessage",
+              "isCachedDataDifferWithCurrentTimeRange",
+              "isPartialData",
+              "isPanelLoading",
+              "lastTriggeredAt",
+              "viewOnly",
+            ],
+          },
         },
         mocks: {
           $t: (key: string) => key,
           $route: {
             params: {},
             query: {
-              dashboard: 'test-dashboard',
-              folder: 'default',
-              tab: 'default-tab'
-            }
+              dashboard: "test-dashboard",
+              folder: "default",
+              tab: "default-tab",
+            },
           },
-          $router: { push: vi.fn(), replace: vi.fn() }
-        }
-      }
+          $router: { push: vi.fn(), replace: vi.fn() },
+        },
+      },
     });
   };
 
@@ -308,7 +318,6 @@ describe("PanelContainer", () => {
 
       expect(wrapper.find('[data-test="dashboard-panel-drag"]').exists()).toBe(false);
     });
-
   });
 
   describe("Panel Header", () => {
@@ -317,14 +326,14 @@ describe("PanelContainer", () => {
 
       const header = wrapper.find('[data-test="dashboard-panel-header"]');
       expect(header.text()).toBe("Test Panel");
-      expect(header.attributes('title')).toBe("Test Panel");
+      expect(header.attributes("title")).toBe("Test Panel");
     });
 
     it("should show description tooltip on hover when description exists", async () => {
       wrapper = createWrapper();
-      
+
       // Trigger mouseover to show hover state
-      await wrapper.find('[data-test="dashboard-panel-container"]').trigger('mouseover');
+      await wrapper.find('[data-test="dashboard-panel-container"]').trigger("mouseover");
 
       expect(wrapper.find('[data-test="dashboard-panel-description-info"]').exists()).toBe(true);
     });
@@ -332,8 +341,8 @@ describe("PanelContainer", () => {
     it("should hide description tooltip when no description", async () => {
       const panelWithoutDescription = { ...mockPanelData, description: "" };
       wrapper = createWrapper({ data: panelWithoutDescription });
-      
-      await wrapper.find('[data-test="dashboard-panel-container"]').trigger('mouseover');
+
+      await wrapper.find('[data-test="dashboard-panel-container"]').trigger("mouseover");
 
       expect(wrapper.find('[data-test="dashboard-panel-description-info"]').exists()).toBe(false);
     });
@@ -342,45 +351,45 @@ describe("PanelContainer", () => {
   describe("Panel Controls", () => {
     it("should show fullscreen button on hover when not view-only", async () => {
       wrapper = createWrapper({ viewOnly: false });
-      
-      await wrapper.find('[data-test="dashboard-panel-container"]').trigger('mouseover');
+
+      await wrapper.find('[data-test="dashboard-panel-container"]').trigger("mouseover");
 
       expect(wrapper.find('[data-test="dashboard-panel-fullscreen-btn"]').exists()).toBe(true);
     });
 
     it("should hide fullscreen button in view-only mode", async () => {
       wrapper = createWrapper({ viewOnly: true });
-      
-      await wrapper.find('[data-test="dashboard-panel-container"]').trigger('mouseover');
+
+      await wrapper.find('[data-test="dashboard-panel-container"]').trigger("mouseover");
 
       expect(wrapper.find('[data-test="dashboard-panel-fullscreen-btn"]').exists()).toBe(false);
     });
 
     it("should hide controls on mouse leave", async () => {
       wrapper = createWrapper({ viewOnly: false });
-      
-      await wrapper.find('[data-test="dashboard-panel-container"]').trigger('mouseover');
+
+      await wrapper.find('[data-test="dashboard-panel-container"]').trigger("mouseover");
       expect(wrapper.find('[data-test="dashboard-panel-fullscreen-btn"]').exists()).toBe(true);
-      
-      await wrapper.find('[data-test="dashboard-panel-container"]').trigger('mouseleave');
+
+      await wrapper.find('[data-test="dashboard-panel-container"]').trigger("mouseleave");
       expect(wrapper.find('[data-test="dashboard-panel-fullscreen-btn"]').exists()).toBe(false);
     });
 
     it("should open fullscreen view when fullscreen button is clicked", async () => {
       wrapper = createWrapper();
-      
-      await wrapper.find('[data-test="dashboard-panel-container"]').trigger('mouseover');
-      await wrapper.find('[data-test="dashboard-panel-fullscreen-btn"]').trigger('click');
 
-      expect(wrapper.emitted('onViewPanel')).toBeTruthy();
-      expect(wrapper.emitted('onViewPanel')[0]).toEqual([mockPanelData.id]);
+      await wrapper.find('[data-test="dashboard-panel-container"]').trigger("mouseover");
+      await wrapper.find('[data-test="dashboard-panel-fullscreen-btn"]').trigger("click");
+
+      expect(wrapper.emitted("onViewPanel")).toBeTruthy();
+      expect(wrapper.emitted("onViewPanel")[0]).toEqual([mockPanelData.id]);
     });
   });
 
   describe("Error States", () => {
     it("should show error button when error data exists", async () => {
       wrapper = createWrapper();
-      
+
       // Simulate error by calling the onError method
       await wrapper.vm.onError("Query execution failed");
 
@@ -396,14 +405,14 @@ describe("PanelContainer", () => {
     it("should show error tooltip with correct message", async () => {
       wrapper = createWrapper();
       const errorMessage = "Query execution failed";
-      
+
       // Simulate error by calling the onError method
       await wrapper.vm.onError(errorMessage);
       await wrapper.vm.$nextTick();
 
       const errorBtn = wrapper.find('[data-test="panel-error-data"]');
       expect(errorBtn.exists()).toBe(true);
-      
+
       const tooltip = errorBtn.find('[data-test="panel-error-tooltip"]');
       if (tooltip.exists()) {
         expect(tooltip.text().trim()).toBe(errorMessage);
@@ -418,43 +427,53 @@ describe("PanelContainer", () => {
     it("should show dependent ad-hoc variable warning", async () => {
       // Create conditions for dependentAdHocVariable to be true
       const variablesData = {
-        values: [{
-          type: 'dynamic_filters',
-          name: 'testVariable',
-          value: [{ operator: 'eq', name: 'field1', value: 'value1' }]
-        }],
-        isLoading: false
+        values: [
+          {
+            type: "dynamic_filters",
+            name: "testVariable",
+            value: [{ operator: "eq", name: "field1", value: "value1" }],
+          },
+        ],
+        isLoading: false,
       };
-      
+
       const metaData = {
-        queries: [{ 
-          query: "SELECT * FROM test",
-          variables: [] // Empty variables will make dependentAdHocVariable true
-        }]
+        queries: [
+          {
+            query: "SELECT * FROM test",
+            variables: [], // Empty variables will make dependentAdHocVariable true
+          },
+        ],
       };
 
       wrapper = createWrapper({ variablesData, metaData });
       await wrapper.vm.metaDataValue(metaData);
       await wrapper.vm.$nextTick();
 
-      expect(wrapper.find('[data-test="dashboard-panel-dependent-adhoc-variable-btn"]').exists()).toBe(true);
+      expect(
+        wrapper.find('[data-test="dashboard-panel-dependent-adhoc-variable-btn"]').exists(),
+      ).toBe(true);
     });
 
     it("should hide dependent ad-hoc variable warning when false", () => {
       wrapper = createWrapper();
 
-      expect(wrapper.find('[data-test="dashboard-panel-dependent-adhoc-variable-btn"]').exists()).toBe(false);
+      expect(
+        wrapper.find('[data-test="dashboard-panel-dependent-adhoc-variable-btn"]').exists(),
+      ).toBe(false);
     });
 
     it("should show query range warning when max query range exceeded", async () => {
       wrapper = createWrapper();
-      
+
       // Simulate the result metadata update that would show warnings
-      await wrapper.vm.handleResultMetadataUpdate([{
-        function_error: "Query 1 exceeded limit",
-        new_start_time: "2023-01-01T00:00:00Z",
-        new_end_time: "2023-01-01T23:59:59Z"
-      }]);
+      await wrapper.vm.handleResultMetadataUpdate([
+        {
+          function_error: "Query 1 exceeded limit",
+          new_start_time: "2023-01-01T00:00:00Z",
+          new_end_time: "2023-01-01T23:59:59Z",
+        },
+      ]);
       await wrapper.vm.$nextTick();
 
       expect(wrapper.find('[data-test="panel-max-duration-warning"]').exists()).toBe(true);
@@ -492,31 +511,31 @@ describe("PanelContainer", () => {
   describe("Panel State Management", () => {
     it("should track hover state correctly", async () => {
       wrapper = createWrapper();
-      
+
       expect(wrapper.vm.isCurrentlyHoveredPanel).toBe(false);
-      
-      await wrapper.find('[data-test="dashboard-panel-container"]').trigger('mouseover');
+
+      await wrapper.find('[data-test="dashboard-panel-container"]').trigger("mouseover");
       expect(wrapper.vm.isCurrentlyHoveredPanel).toBe(true);
-      
-      await wrapper.find('[data-test="dashboard-panel-container"]').trigger('mouseleave');
+
+      await wrapper.find('[data-test="dashboard-panel-container"]').trigger("mouseleave");
       expect(wrapper.vm.isCurrentlyHoveredPanel).toBe(false);
     });
 
     it("should handle panel modification requests", async () => {
       wrapper = createWrapper();
-      
-      await wrapper.vm.onPanelModifyClick('ViewPanel');
-      
-      expect(wrapper.emitted('onViewPanel')).toBeTruthy();
-      expect(wrapper.emitted('onViewPanel')[0]).toEqual([mockPanelData.id]);
+
+      await wrapper.vm.onPanelModifyClick("ViewPanel");
+
+      expect(wrapper.emitted("onViewPanel")).toBeTruthy();
+      expect(wrapper.emitted("onViewPanel")[0]).toEqual([mockPanelData.id]);
     });
 
     it("should emit panel events", async () => {
       wrapper = createWrapper();
-      const routerPushSpy = vi.spyOn(wrapper.vm.$router, 'push');
-      
-      await wrapper.vm.onPanelModifyClick('EditPanel');
-      
+      const routerPushSpy = vi.spyOn(wrapper.vm.$router, "push");
+
+      await wrapper.vm.onPanelModifyClick("EditPanel");
+
       // EditPanel calls router.push, not emit, so let's check the router was called
       expect(routerPushSpy).toHaveBeenCalled();
     });
@@ -525,29 +544,29 @@ describe("PanelContainer", () => {
   describe("Responsive Behavior", () => {
     it("should handle component mounting", () => {
       wrapper = createWrapper();
-      
+
       expect(wrapper.exists()).toBe(true);
       expect(wrapper.find('[data-test="dashboard-panel-container"]').exists()).toBe(true);
     });
 
     it("should cleanup on unmount", () => {
       wrapper = createWrapper();
-      
+
       expect(() => wrapper.unmount()).not.toThrow();
     });
   });
 
   describe("Props Validation", () => {
     it("should handle missing panel data gracefully", () => {
-      const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-      
+      const consoleWarnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
       // Create minimal valid data to avoid null reference
       const minimalData = { ...mockPanelData, title: null };
-      wrapper = createWrapper({ 
+      wrapper = createWrapper({
         data: minimalData,
-        variablesData: { values: [], isLoading: false }
+        variablesData: { values: [], isLoading: false },
       });
-      
+
       expect(wrapper.exists()).toBe(true);
       consoleWarnSpy.mockRestore();
     });
@@ -560,9 +579,9 @@ describe("PanelContainer", () => {
     });
 
     it("should handle empty variables data", () => {
-      wrapper = createWrapper({ 
+      wrapper = createWrapper({
         variablesData: { values: [], isLoading: false },
-        currentVariablesData: { values: [], isLoading: false }
+        currentVariablesData: { values: [], isLoading: false },
       });
 
       expect(wrapper.exists()).toBe(true);
@@ -579,14 +598,14 @@ describe("PanelContainer", () => {
     it("should show dropdown menu in non-view-only mode", () => {
       wrapper = createWrapper({ viewOnly: false });
 
-      const dropdown = wrapper.findComponent({ name: 'ODropdown' });
+      const dropdown = wrapper.findComponent({ name: "ODropdown" });
       expect(dropdown.exists()).toBe(true);
     });
 
     it("should hide dropdown menu in view-only mode", () => {
       wrapper = createWrapper({ viewOnly: true });
 
-      const dropdown = wrapper.findComponent({ name: 'ODropdown' });
+      const dropdown = wrapper.findComponent({ name: "ODropdown" });
       expect(dropdown.exists()).toBe(false);
     });
   });
@@ -605,8 +624,8 @@ describe("PanelContainer", () => {
     it("should handle variable updates", async () => {
       wrapper = createWrapper();
       const newVariablesData = {
-        values: [{ name: 'test', value: 'new value' }],
-        isLoading: false
+        values: [{ name: "test", value: "new value" }],
+        isLoading: false,
       };
 
       await wrapper.setProps({ variablesData: newVariablesData });
@@ -624,10 +643,10 @@ describe("PanelContainer", () => {
       await wrapper.vm.$nextTick();
 
       // Check that emitted event exists
-      expect(wrapper.emitted('refreshPanelRequest')).toBeTruthy();
-      expect(wrapper.emitted('refreshPanelRequest')[0]).toEqual([mockPanelData.id, false]);
+      expect(wrapper.emitted("refreshPanelRequest")).toBeTruthy();
+      expect(wrapper.emitted("refreshPanelRequest")[0]).toEqual([mockPanelData.id, false]);
       // Check that update:runId was emitted
-      expect(wrapper.emitted('update:runId')).toBeTruthy();
+      expect(wrapper.emitted("update:runId")).toBeTruthy();
     });
 
     it("should refresh panel without cache when flag is true", async () => {
@@ -636,20 +655,20 @@ describe("PanelContainer", () => {
       await wrapper.vm.onRefreshPanel(true);
       await wrapper.vm.$nextTick();
 
-      expect(wrapper.emitted('refreshPanelRequest')).toBeTruthy();
-      expect(wrapper.emitted('refreshPanelRequest')[0]).toEqual([mockPanelData.id, true]);
+      expect(wrapper.emitted("refreshPanelRequest")).toBeTruthy();
+      expect(wrapper.emitted("refreshPanelRequest")[0]).toEqual([mockPanelData.id, true]);
     });
 
     it("should not refresh if panel is already loading", async () => {
       wrapper = createWrapper();
 
       wrapper.vm.isPanelLoading = true;
-      const emitCountBefore = wrapper.emitted('refreshPanelRequest')?.length || 0;
+      const emitCountBefore = wrapper.emitted("refreshPanelRequest")?.length || 0;
 
       await wrapper.vm.onRefreshPanel(false);
       await wrapper.vm.$nextTick();
 
-      const emitCountAfter = wrapper.emitted('refreshPanelRequest')?.length || 0;
+      const emitCountAfter = wrapper.emitted("refreshPanelRequest")?.length || 0;
       expect(emitCountAfter).toBe(emitCountBefore);
     });
 
@@ -676,22 +695,22 @@ describe("PanelContainer", () => {
 
     it("should show warning color when variables data updated", async () => {
       const variablesData = {
-        values: [{ name: 'testVar', value: 'value1', type: 'constant' }],
-        isLoading: false
+        values: [{ name: "testVar", value: "value1", type: "constant" }],
+        isLoading: false,
       };
       const currentVariablesData = {
-        values: [{ name: 'testVar', value: 'value2', type: 'constant' }],
-        isLoading: false
+        values: [{ name: "testVar", value: "value2", type: "constant" }],
+        isLoading: false,
       };
       const panelWithVariable = {
         ...mockPanelData,
-        queries: [{ query: 'SELECT * FROM test WHERE field = ${testVar}' }]
+        queries: [{ query: "SELECT * FROM test WHERE field = ${testVar}" }],
       };
 
       wrapper = createWrapper({
         data: panelWithVariable,
         variablesData,
-        currentVariablesData
+        currentVariablesData,
       });
       await wrapper.vm.$nextTick();
 
@@ -703,7 +722,7 @@ describe("PanelContainer", () => {
     it("should open delete confirmation dialog", async () => {
       wrapper = createWrapper();
 
-      await wrapper.vm.onPanelModifyClick('DeletePanel');
+      await wrapper.vm.onPanelModifyClick("DeletePanel");
       await wrapper.vm.$nextTick();
 
       expect(wrapper.vm.confirmDeletePanelDialog).toBe(true);
@@ -714,8 +733,8 @@ describe("PanelContainer", () => {
 
       await wrapper.vm.deletePanelDialog();
 
-      expect(wrapper.emitted('onDeletePanel')).toBeTruthy();
-      expect(wrapper.emitted('onDeletePanel')[0]).toEqual([mockPanelData.id]);
+      expect(wrapper.emitted("onDeletePanel")).toBeTruthy();
+      expect(wrapper.emitted("onDeletePanel")[0]).toEqual([mockPanelData.id]);
     });
 
     it("should show delete option in dropdown menu", async () => {
@@ -730,7 +749,7 @@ describe("PanelContainer", () => {
     it("should open move panel dialog", async () => {
       wrapper = createWrapper();
 
-      await wrapper.vm.onPanelModifyClick('MovePanel');
+      await wrapper.vm.onPanelModifyClick("MovePanel");
       await wrapper.vm.$nextTick();
 
       expect(wrapper.vm.confirmMovePanelDialog).toBe(true);
@@ -738,12 +757,12 @@ describe("PanelContainer", () => {
 
     it("should emit onMovePanel with correct tab id", async () => {
       wrapper = createWrapper();
-      const targetTabId = 'target-tab-123';
+      const targetTabId = "target-tab-123";
 
       await wrapper.vm.movePanelDialog(targetTabId);
 
-      expect(wrapper.emitted('onMovePanel')).toBeTruthy();
-      expect(wrapper.emitted('onMovePanel')[0]).toEqual([mockPanelData.id, targetTabId]);
+      expect(wrapper.emitted("onMovePanel")).toBeTruthy();
+      expect(wrapper.emitted("onMovePanel")[0]).toEqual([mockPanelData.id, targetTabId]);
     });
 
     it("should show move option in dropdown menu", () => {
@@ -756,7 +775,7 @@ describe("PanelContainer", () => {
 
   describe("Duplicate Panel", () => {
     it("should duplicate panel and navigate to edit page", async () => {
-      const routerPushSpy = vi.spyOn(router, 'push').mockResolvedValue(undefined as any);
+      const routerPushSpy = vi.spyOn(router, "push").mockResolvedValue(undefined as any);
 
       wrapper = createWrapper();
 
@@ -776,7 +795,7 @@ describe("PanelContainer", () => {
         expect.objectContaining({
           variant: "loading",
           message: "Please wait...",
-        })
+        }),
       );
 
       await flushPromises();
@@ -784,9 +803,9 @@ describe("PanelContainer", () => {
 
     it("should handle duplication click from dropdown", async () => {
       wrapper = createWrapper();
-      const duplicateSpy = vi.spyOn(wrapper.vm, 'onDuplicatePanel');
+      const duplicateSpy = vi.spyOn(wrapper.vm, "onDuplicatePanel");
 
-      await wrapper.vm.onPanelModifyClick('DuplicatePanel');
+      await wrapper.vm.onPanelModifyClick("DuplicatePanel");
 
       expect(duplicateSpy).toHaveBeenCalledWith(mockPanelData);
     });
@@ -803,10 +822,10 @@ describe("PanelContainer", () => {
     it("should navigate to create alert page with panel data", async () => {
       const panelWithStream = {
         ...mockPanelData,
-        queries: [{ query: 'SELECT * FROM test', fields: { stream: 'test-stream' } }]
+        queries: [{ query: "SELECT * FROM test", fields: { stream: "test-stream" } }],
       };
       wrapper = createWrapper({ data: panelWithStream });
-      await wrapper.vm.metaDataValue({ queries: [{ query: 'SELECT * FROM test' }] });
+      await wrapper.vm.metaDataValue({ queries: [{ query: "SELECT * FROM test" }] });
 
       // Simply check that the method can be called without error
       expect(() => wrapper.vm.createAlertFromPanel()).not.toThrow();
@@ -821,15 +840,15 @@ describe("PanelContainer", () => {
 
       expect(toastMock).toHaveBeenCalledWith(
         expect.objectContaining({
-          variant: 'error'
-        })
+          variant: "error",
+        }),
       );
     });
 
     it("should show error when query has no stream", async () => {
       const panelWithoutStream = {
         ...mockPanelData,
-        queries: [{ query: 'SELECT * FROM test', fields: {} }]
+        queries: [{ query: "SELECT * FROM test", fields: {} }],
       };
       wrapper = createWrapper({ data: panelWithoutStream });
       toastMock.mockClear();
@@ -838,33 +857,33 @@ describe("PanelContainer", () => {
 
       expect(toastMock).toHaveBeenCalledWith(
         expect.objectContaining({
-          variant: 'error'
-        })
+          variant: "error",
+        }),
       );
     });
 
     it("should show warning for unsupported panel types", async () => {
       const unsupportedPanel = {
         ...mockPanelData,
-        type: 'markdown',
-        queries: [{ query: 'SELECT * FROM test', fields: { stream: 'test-stream' } }]
+        type: "markdown",
+        queries: [{ query: "SELECT * FROM test", fields: { stream: "test-stream" } }],
       };
       wrapper = createWrapper({ data: unsupportedPanel });
-      await wrapper.vm.metaDataValue({ queries: [{ query: 'SELECT * FROM test' }] });
+      await wrapper.vm.metaDataValue({ queries: [{ query: "SELECT * FROM test" }] });
       toastMock.mockClear();
 
       await wrapper.vm.createAlertFromPanel();
 
       expect(toastMock).toHaveBeenCalledWith(
         expect.objectContaining({
-          variant: 'warning'
-        })
+          variant: "warning",
+        }),
       );
     });
 
     it("should show create alert option only when queries exist", async () => {
       const metaDataWithQueries = {
-        queries: [{ query: 'SELECT * FROM test' }]
+        queries: [{ query: "SELECT * FROM test" }],
       };
       wrapper = createWrapper({ metaData: metaDataWithQueries });
       await wrapper.vm.metaDataValue(metaDataWithQueries);
@@ -876,9 +895,9 @@ describe("PanelContainer", () => {
 
     it("should handle CreateAlert click from dropdown", async () => {
       wrapper = createWrapper();
-      const createAlertSpy = vi.spyOn(wrapper.vm, 'createAlertFromPanel');
+      const createAlertSpy = vi.spyOn(wrapper.vm, "createAlertFromPanel");
 
-      await wrapper.vm.onPanelModifyClick('CreateAlert');
+      await wrapper.vm.onPanelModifyClick("CreateAlert");
 
       expect(createAlertSpy).toHaveBeenCalled();
     });
@@ -887,24 +906,28 @@ describe("PanelContainer", () => {
   describe("Go to Logs Functionality", () => {
     it("should construct logs URL and open in new tab", async () => {
       global.open = vi.fn();
-      const windowOpenSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+      const windowOpenSpy = vi.spyOn(window, "open").mockImplementation(() => null);
 
       const panelWithQuery = {
         ...mockPanelData,
-        queries: [{
-          query: 'SELECT * FROM test',
-          fields: { stream: 'test-stream', stream_type: 'logs' },
-          vrlFunctionQuery: ''
-        }]
+        queries: [
+          {
+            query: "SELECT * FROM test",
+            fields: { stream: "test-stream", stream_type: "logs" },
+            vrlFunctionQuery: "",
+          },
+        ],
       };
 
       wrapper = createWrapper({ data: panelWithQuery });
       await wrapper.vm.metaDataValue({
-        queries: [{
-          query: 'SELECT * FROM test',
-          startTime: 1672531200000,
-          endTime: 1672617599000
-        }]
+        queries: [
+          {
+            query: "SELECT * FROM test",
+            startTime: 1672531200000,
+            endTime: 1672617599000,
+          },
+        ],
       });
 
       await wrapper.vm.onLogPanel();
@@ -914,7 +937,7 @@ describe("PanelContainer", () => {
     });
 
     it("should handle missing query data gracefully", async () => {
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
       wrapper = createWrapper({ data: { ...mockPanelData, queries: [] } });
 
@@ -924,33 +947,33 @@ describe("PanelContainer", () => {
     });
 
     it("should show go to logs option only for SQL queries", () => {
-      const sqlPanel = { ...mockPanelData, queryType: 'sql' };
+      const sqlPanel = { ...mockPanelData, queryType: "sql" };
       wrapper = createWrapper({ data: sqlPanel });
 
       // Check queryType instead of DOM
-      expect(wrapper.props().data.queryType).toBe('sql');
+      expect(wrapper.props().data.queryType).toBe("sql");
     });
 
     it("should disable go to logs for non-SQL queries", () => {
-      const promqlPanel = { ...mockPanelData, queryType: 'promql' };
+      const promqlPanel = { ...mockPanelData, queryType: "promql" };
       wrapper = createWrapper({ data: promqlPanel });
 
       // Check queryType instead of DOM
-      expect(wrapper.props().data.queryType).toBe('promql');
+      expect(wrapper.props().data.queryType).toBe("promql");
     });
   });
 
   describe("Download Functionality", () => {
     it("should download data as CSV", async () => {
       const metaDataWithQueries = {
-        queries: [{ query: 'SELECT * FROM test' }]
+        queries: [{ query: "SELECT * FROM test" }],
       };
       wrapper = createWrapper({ metaData: metaDataWithQueries });
       await wrapper.vm.metaDataValue(metaDataWithQueries);
 
       const downloadCSVSpy = vi.fn();
       wrapper.vm.PanleSchemaRendererRef = {
-        downloadDataAsCSV: downloadCSVSpy
+        downloadDataAsCSV: downloadCSVSpy,
       };
 
       // Call the method directly
@@ -961,14 +984,14 @@ describe("PanelContainer", () => {
 
     it("should download data as JSON", async () => {
       const metaDataWithQueries = {
-        queries: [{ query: 'SELECT * FROM test' }]
+        queries: [{ query: "SELECT * FROM test" }],
       };
       wrapper = createWrapper({ metaData: metaDataWithQueries });
       await wrapper.vm.metaDataValue(metaDataWithQueries);
 
       const downloadJSONSpy = vi.fn();
       wrapper.vm.PanleSchemaRendererRef = {
-        downloadDataAsJSON: downloadJSONSpy
+        downloadDataAsJSON: downloadJSONSpy,
       };
 
       // Call the method directly
@@ -979,7 +1002,7 @@ describe("PanelContainer", () => {
 
     it("should show download options only when queries exist", async () => {
       const metaDataWithQueries = {
-        queries: [{ query: 'SELECT * FROM test' }]
+        queries: [{ query: "SELECT * FROM test" }],
       };
       wrapper = createWrapper({ metaData: metaDataWithQueries });
       await wrapper.vm.metaDataValue(metaDataWithQueries);
@@ -992,15 +1015,19 @@ describe("PanelContainer", () => {
     it("should hide download options when no queries", () => {
       wrapper = createWrapper({ metaData: { queries: [] } });
 
-      expect(wrapper.find('[data-test="dashboard-panel-download-as-csv-btn"]').exists()).toBe(false);
-      expect(wrapper.find('[data-test="dashboard-panel-download-as-json-btn"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="dashboard-panel-download-as-csv-btn"]').exists()).toBe(
+        false,
+      );
+      expect(wrapper.find('[data-test="dashboard-panel-download-as-json-btn"]').exists()).toBe(
+        false,
+      );
     });
   });
 
   describe("Query Inspector", () => {
     it("should open query inspector dialog", async () => {
       const metaDataWithQueries = {
-        queries: [{ query: 'SELECT * FROM test' }]
+        queries: [{ query: "SELECT * FROM test" }],
       };
       wrapper = createWrapper({ metaData: metaDataWithQueries });
       await wrapper.vm.metaDataValue(metaDataWithQueries);
@@ -1014,7 +1041,7 @@ describe("PanelContainer", () => {
 
     it("should show query inspector option only when queries exist", async () => {
       const metaDataWithQueries = {
-        queries: [{ query: 'SELECT * FROM test' }]
+        queries: [{ query: "SELECT * FROM test" }],
       };
       wrapper = createWrapper({ metaData: metaDataWithQueries });
       await wrapper.vm.metaDataValue(metaDataWithQueries);
@@ -1026,19 +1053,23 @@ describe("PanelContainer", () => {
 
     it("should open query inspector via dependent adhoc variable button", async () => {
       const variablesData = {
-        values: [{
-          type: 'dynamic_filters',
-          name: 'testVariable',
-          value: [{ operator: 'eq', name: 'field1', value: 'value1' }]
-        }],
-        isLoading: false
+        values: [
+          {
+            type: "dynamic_filters",
+            name: "testVariable",
+            value: [{ operator: "eq", name: "field1", value: "value1" }],
+          },
+        ],
+        isLoading: false,
       };
 
       const metaData = {
-        queries: [{
-          query: "SELECT * FROM test",
-          variables: []
-        }]
+        queries: [
+          {
+            query: "SELECT * FROM test",
+            variables: [],
+          },
+        ],
       };
 
       wrapper = createWrapper({ variablesData, metaData });
@@ -1046,7 +1077,7 @@ describe("PanelContainer", () => {
       await wrapper.vm.$nextTick();
 
       const adhocBtn = wrapper.find('[data-test="dashboard-panel-dependent-adhoc-variable-btn"]');
-      await adhocBtn.trigger('click');
+      await adhocBtn.trigger("click");
 
       expect(wrapper.vm.showViewPanel).toBe(true);
     });
@@ -1056,10 +1087,10 @@ describe("PanelContainer", () => {
     it("should emit onEditLayout event", async () => {
       wrapper = createWrapper();
 
-      await wrapper.vm.onPanelModifyClick('EditLayout');
+      await wrapper.vm.onPanelModifyClick("EditLayout");
 
-      expect(wrapper.emitted('onEditLayout')).toBeTruthy();
-      expect(wrapper.emitted('onEditLayout')[0]).toEqual([mockPanelData.id]);
+      expect(wrapper.emitted("onEditLayout")).toBeTruthy();
+      expect(wrapper.emitted("onEditLayout")[0]).toEqual([mockPanelData.id]);
     });
 
     it("should show edit layout option in dropdown", () => {
@@ -1073,22 +1104,22 @@ describe("PanelContainer", () => {
   describe("Variables Data Management", () => {
     it("should detect when dependent variables have changed", async () => {
       const variablesData = {
-        values: [{ name: 'testVar', value: 'value1', type: 'constant' }],
-        isLoading: false
+        values: [{ name: "testVar", value: "value1", type: "constant" }],
+        isLoading: false,
       };
       const currentVariablesData = {
-        values: [{ name: 'testVar', value: 'value2', type: 'constant' }],
-        isLoading: false
+        values: [{ name: "testVar", value: "value2", type: "constant" }],
+        isLoading: false,
       };
       const panelWithVariable = {
         ...mockPanelData,
-        queries: [{ query: 'SELECT * FROM test WHERE field = ${testVar}' }]
+        queries: [{ query: "SELECT * FROM test WHERE field = ${testVar}" }],
       };
 
       wrapper = createWrapper({
         data: panelWithVariable,
         variablesData,
-        currentVariablesData
+        currentVariablesData,
       });
       await wrapper.vm.$nextTick();
 
@@ -1097,17 +1128,17 @@ describe("PanelContainer", () => {
 
     it("should return false when no dependent variables", async () => {
       const variablesData = {
-        values: [{ name: 'otherVar', value: 'value1', type: 'constant' }],
-        isLoading: false
+        values: [{ name: "otherVar", value: "value1", type: "constant" }],
+        isLoading: false,
       };
       const currentVariablesData = {
-        values: [{ name: 'otherVar', value: 'value2', type: 'constant' }],
-        isLoading: false
+        values: [{ name: "otherVar", value: "value2", type: "constant" }],
+        isLoading: false,
       };
 
       wrapper = createWrapper({
         variablesData,
-        currentVariablesData
+        currentVariablesData,
       });
       await wrapper.vm.$nextTick();
 
@@ -1116,22 +1147,22 @@ describe("PanelContainer", () => {
 
     it("should handle array value comparison for variables", async () => {
       const variablesData = {
-        values: [{ name: 'testVar', value: ['val1', 'val2'], type: 'constant' }],
-        isLoading: false
+        values: [{ name: "testVar", value: ["val1", "val2"], type: "constant" }],
+        isLoading: false,
       };
       const currentVariablesData = {
-        values: [{ name: 'testVar', value: ['val1', 'val3'], type: 'constant' }],
-        isLoading: false
+        values: [{ name: "testVar", value: ["val1", "val3"], type: "constant" }],
+        isLoading: false,
       };
       const panelWithVariable = {
         ...mockPanelData,
-        queries: [{ query: 'SELECT * FROM test WHERE field IN (${testVar})' }]
+        queries: [{ query: "SELECT * FROM test WHERE field IN (${testVar})" }],
       };
 
       wrapper = createWrapper({
         data: panelWithVariable,
         variablesData,
-        currentVariablesData
+        currentVariablesData,
       });
       await wrapper.vm.$nextTick();
 
@@ -1141,22 +1172,22 @@ describe("PanelContainer", () => {
     it("should ignore dynamic_filters in dependent variables check", async () => {
       const variablesData = {
         values: [
-          { name: 'filterVar', value: [], type: 'dynamic_filters' },
-          { name: 'testVar', value: 'value1', type: 'constant' }
+          { name: "filterVar", value: [], type: "dynamic_filters" },
+          { name: "testVar", value: "value1", type: "constant" },
         ],
-        isLoading: false
+        isLoading: false,
       };
       const currentVariablesData = {
         values: [
-          { name: 'filterVar', value: [], type: 'dynamic_filters' },
-          { name: 'testVar', value: 'value1', type: 'constant' }
+          { name: "filterVar", value: [], type: "dynamic_filters" },
+          { name: "testVar", value: "value1", type: "constant" },
         ],
-        isLoading: false
+        isLoading: false,
       };
 
       wrapper = createWrapper({
         variablesData,
-        currentVariablesData
+        currentVariablesData,
       });
       await wrapper.vm.$nextTick();
 
@@ -1181,7 +1212,7 @@ describe("PanelContainer", () => {
       wrapper = createWrapper();
 
       const panelRenderer = wrapper.findComponent('[data-test="panel-schema-renderer"]');
-      await panelRenderer.vm.$emit('loading-state-change', true);
+      await panelRenderer.vm.$emit("loading-state-change", true);
 
       expect(wrapper.vm.isPanelLoading).toBe(true);
     });
@@ -1191,7 +1222,7 @@ describe("PanelContainer", () => {
     it("should update metadata", async () => {
       wrapper = createWrapper();
       const newMetadata = {
-        queries: [{ query: 'SELECT * FROM new_table' }]
+        queries: [{ query: "SELECT * FROM new_table" }],
       };
 
       await wrapper.vm.metaDataValue(newMetadata);
@@ -1202,11 +1233,11 @@ describe("PanelContainer", () => {
     it("should handle metadata updates from PanelSchemaRenderer", async () => {
       wrapper = createWrapper();
       const newMetadata = {
-        queries: [{ query: 'SELECT * FROM updated' }]
+        queries: [{ query: "SELECT * FROM updated" }],
       };
 
       const panelRenderer = wrapper.findComponent('[data-test="panel-schema-renderer"]');
-      await panelRenderer.vm.$emit('metadata-update', newMetadata);
+      await panelRenderer.vm.$emit("metadata-update", newMetadata);
 
       expect(wrapper.vm.metaData).toEqual(newMetadata);
     });
@@ -1280,7 +1311,11 @@ describe("PanelContainer", () => {
       await wrapper.vm.handleIsCachedDataDifferWithCurrentTimeRangeUpdate(true);
       await wrapper.vm.$nextTick();
 
-      expect(wrapper.find('[data-test="panel-is-cached-data-differ-with-current-time-range-warning"]').exists()).toBe(true);
+      expect(
+        wrapper
+          .find('[data-test="panel-is-cached-data-differ-with-current-time-range-warning"]')
+          .exists(),
+      ).toBe(true);
     });
 
     it("should hide cached data warning when not different", async () => {
@@ -1289,7 +1324,11 @@ describe("PanelContainer", () => {
       await wrapper.vm.handleIsCachedDataDifferWithCurrentTimeRangeUpdate(false);
       await wrapper.vm.$nextTick();
 
-      expect(wrapper.find('[data-test="panel-is-cached-data-differ-with-current-time-range-warning"]').exists()).toBe(false);
+      expect(
+        wrapper
+          .find('[data-test="panel-is-cached-data-differ-with-current-time-range-warning"]')
+          .exists(),
+      ).toBe(false);
     });
   });
 
@@ -1301,7 +1340,9 @@ describe("PanelContainer", () => {
       await wrapper.vm.handleLimitNumberOfSeriesWarningMessageUpdate(warningMessage);
       await wrapper.vm.$nextTick();
 
-      expect(wrapper.find('[data-test="panel-limit-number-of-series-warning"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="panel-limit-number-of-series-warning"]').exists()).toBe(
+        true,
+      );
     });
 
     it("should hide limit series warning when no message", async () => {
@@ -1310,13 +1351,15 @@ describe("PanelContainer", () => {
       await wrapper.vm.handleLimitNumberOfSeriesWarningMessageUpdate("");
       await wrapper.vm.$nextTick();
 
-      expect(wrapper.find('[data-test="panel-limit-number-of-series-warning"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="panel-limit-number-of-series-warning"]').exists()).toBe(
+        false,
+      );
     });
   });
 
   describe("RunId Management", () => {
     it("should initialize runId from props", () => {
-      const testRunId = 'test-run-123';
+      const testRunId = "test-run-123";
       wrapper = createWrapper({ runId: testRunId });
 
       expect(wrapper.vm.runId).toBe(testRunId);
@@ -1324,18 +1367,18 @@ describe("PanelContainer", () => {
 
     it("should generate new runId if not provided", () => {
       // When runId is not provided, component generates one
-      wrapper = createWrapper({ runId: '' });
+      wrapper = createWrapper({ runId: "" });
 
       // The component should have a runId
       expect(wrapper.vm.runId).toBeDefined();
     });
 
     it("should update runId when prop changes", async () => {
-      wrapper = createWrapper({ runId: 'initial-run-id' });
+      wrapper = createWrapper({ runId: "initial-run-id" });
 
-      await wrapper.setProps({ runId: 'new-run-id' });
+      await wrapper.setProps({ runId: "new-run-id" });
 
-      expect(wrapper.vm.runId).toBe('new-run-id');
+      expect(wrapper.vm.runId).toBe("new-run-id");
     });
 
     it("should emit new runId when refreshing", async () => {
@@ -1345,31 +1388,31 @@ describe("PanelContainer", () => {
       await wrapper.vm.onRefreshPanel(false);
       await wrapper.vm.$nextTick();
 
-      expect(wrapper.emitted('update:runId')).toBeTruthy();
-      expect(wrapper.emitted('update:runId')[0][0]).not.toBe(initialRunId);
+      expect(wrapper.emitted("update:runId")).toBeTruthy();
+      expect(wrapper.emitted("update:runId")[0][0]).not.toBe(initialRunId);
     });
   });
 
   describe("Refresh Without Cache", () => {
     it("should show refresh without cache option in enterprise mode", () => {
       // Mock config
-      (config as any).isEnterprise = 'true';
+      (config as any).isEnterprise = "true";
 
       wrapper = createWrapper();
 
       // Check config value instead of DOM
-      expect(config.isEnterprise).toBe('true');
+      expect(config.isEnterprise).toBe("true");
 
       // Reset
       (config as any).isEnterprise = undefined;
     });
 
     it("should handle refresh without cache click", async () => {
-      (config as any).isEnterprise = 'true';
+      (config as any).isEnterprise = "true";
       wrapper = createWrapper();
 
-      const refreshSpy = vi.spyOn(wrapper.vm, 'onRefreshPanel');
-      await wrapper.vm.onPanelModifyClick('Refresh');
+      const refreshSpy = vi.spyOn(wrapper.vm, "onRefreshPanel");
+      await wrapper.vm.onPanelModifyClick("Refresh");
 
       expect(refreshSpy).toHaveBeenCalledWith(true);
     });
@@ -1381,25 +1424,25 @@ describe("PanelContainer", () => {
     // rather than a per-component dark-mode class. We assert the panel bar
     // uses the theme-aware token class and renders consistently in both themes.
     it("should use theme-aware token classes on the panel bar in dark mode", async () => {
-      store.state.theme = 'dark';
+      store.state.theme = "dark";
       wrapper = createWrapper();
       await wrapper.vm.$nextTick();
 
       const qBar = wrapper.find('[data-test="dashboard-panel-bar"]');
       expect(qBar.exists()).toBe(true);
-      expect(qBar.classes()).toContain('border-border-default');
-      expect(qBar.classes()).not.toContain('dark-mode');
+      expect(qBar.classes()).toContain("border-border-default");
+      expect(qBar.classes()).not.toContain("dark-mode");
     });
 
     it("should use the same theme-aware token classes in light mode", async () => {
-      store.state.theme = 'light';
+      store.state.theme = "light";
       wrapper = createWrapper();
       await wrapper.vm.$nextTick();
 
       const qBar = wrapper.find('[data-test="dashboard-panel-bar"]');
       expect(qBar.exists()).toBe(true);
-      expect(qBar.classes()).toContain('border-border-default');
-      expect(qBar.classes()).not.toContain('dark-mode');
+      expect(qBar.classes()).toContain("border-border-default");
+      expect(qBar.classes()).not.toContain("dark-mode");
     });
   });
 
@@ -1424,7 +1467,7 @@ describe("PanelContainer", () => {
 
     it("should cleanup PanelSchemaRenderer ref on unmount", () => {
       wrapper = createWrapper();
-      wrapper.vm.PanleSchemaRendererRef = { some: 'ref' };
+      wrapper.vm.PanleSchemaRendererRef = { some: "ref" };
 
       wrapper.unmount();
 
@@ -1438,39 +1481,39 @@ describe("PanelContainer", () => {
       const zoomData = { start: 100, end: 200 };
 
       const panelRenderer = wrapper.findComponent('[data-test="panel-schema-renderer"]');
-      await panelRenderer.vm.$emit('updated:data-zoom', zoomData);
+      await panelRenderer.vm.$emit("updated:data-zoom", zoomData);
 
-      expect(wrapper.emitted('updated:data-zoom')).toBeTruthy();
-      expect(wrapper.emitted('updated:data-zoom')[0]).toEqual([zoomData]);
+      expect(wrapper.emitted("updated:data-zoom")).toBeTruthy();
+      expect(wrapper.emitted("updated:data-zoom")[0]).toEqual([zoomData]);
     });
 
     it("should emit update:initial-variable-values event", async () => {
       wrapper = createWrapper();
-      const variableValues = { var1: 'value1' };
+      const variableValues = { var1: "value1" };
 
       const panelRenderer = wrapper.findComponent('[data-test="panel-schema-renderer"]');
-      await panelRenderer.vm.$emit('update:initial-variable-values', variableValues);
+      await panelRenderer.vm.$emit("update:initial-variable-values", variableValues);
 
-      expect(wrapper.emitted('update:initial-variable-values')).toBeTruthy();
+      expect(wrapper.emitted("update:initial-variable-values")).toBeTruthy();
     });
 
     it("should emit contextmenu event", async () => {
       wrapper = createWrapper();
-      const contextMenuEvent = new Event('contextmenu');
+      const contextMenuEvent = new Event("contextmenu");
 
       const panelRenderer = wrapper.findComponent('[data-test="panel-schema-renderer"]');
-      await panelRenderer.vm.$emit('contextmenu', contextMenuEvent);
+      await panelRenderer.vm.$emit("contextmenu", contextMenuEvent);
 
-      expect(wrapper.emitted('contextmenu')).toBeTruthy();
+      expect(wrapper.emitted("contextmenu")).toBeTruthy();
     });
 
     it("should emit refresh event from SinglePanelMove", async () => {
       wrapper = createWrapper();
 
       const panelMove = wrapper.findComponent('[data-test="single-panel-move"]');
-      await panelMove.vm.$emit('refresh');
+      await panelMove.vm.$emit("refresh");
 
-      expect(wrapper.emitted('refresh')).toBeTruthy();
+      expect(wrapper.emitted("refresh")).toBeTruthy();
     });
   });
 
@@ -1516,31 +1559,37 @@ describe("PanelContainer", () => {
     it("should hide dropdown menu when simplifiedPanelView is true", () => {
       wrapper = createWrapper({ simplifiedPanelView: true });
 
-      expect(wrapper.findComponent({ name: 'ODropdown' }).exists()).toBe(false);
+      expect(wrapper.findComponent({ name: "ODropdown" }).exists()).toBe(false);
     });
 
     it("should show dropdown menu when simplifiedPanelView is false", () => {
       wrapper = createWrapper({ simplifiedPanelView: false, viewOnly: false });
 
-      expect(wrapper.findComponent({ name: 'ODropdown' }).exists()).toBe(true);
+      expect(wrapper.findComponent({ name: "ODropdown" }).exists()).toBe(true);
     });
 
     it("should show direct delete button when simplifiedPanelView is true and not viewOnly", () => {
       wrapper = createWrapper({ simplifiedPanelView: true, viewOnly: false });
 
-      expect(wrapper.find(`[data-test="dashboard-delete-panel-${mockPanelData.title}-btn"]`).exists()).toBe(true);
+      expect(
+        wrapper.find(`[data-test="dashboard-delete-panel-${mockPanelData.title}-btn"]`).exists(),
+      ).toBe(true);
     });
 
     it("should hide direct delete button when simplifiedPanelView is false", () => {
       wrapper = createWrapper({ simplifiedPanelView: false, viewOnly: false });
 
-      expect(wrapper.find(`[data-test="dashboard-delete-panel-${mockPanelData.title}-btn"]`).exists()).toBe(false);
+      expect(
+        wrapper.find(`[data-test="dashboard-delete-panel-${mockPanelData.title}-btn"]`).exists(),
+      ).toBe(false);
     });
 
     it("should hide direct delete button when viewOnly is true even if simplifiedPanelView is true", () => {
       wrapper = createWrapper({ simplifiedPanelView: true, viewOnly: true });
 
-      expect(wrapper.find(`[data-test="dashboard-delete-panel-${mockPanelData.title}-btn"]`).exists()).toBe(false);
+      expect(
+        wrapper.find(`[data-test="dashboard-delete-panel-${mockPanelData.title}-btn"]`).exists(),
+      ).toBe(false);
     });
 
     it("should hide refresh button when simplifiedPanelView is true", () => {
@@ -1552,7 +1601,7 @@ describe("PanelContainer", () => {
     it("should hide description info icon when simplifiedPanelView is true on hover", async () => {
       wrapper = createWrapper({ simplifiedPanelView: true });
 
-      await wrapper.find('[data-test="dashboard-panel-container"]').trigger('mouseover');
+      await wrapper.find('[data-test="dashboard-panel-container"]').trigger("mouseover");
 
       expect(wrapper.find('[data-test="dashboard-panel-description-info"]').exists()).toBe(false);
     });
@@ -1560,7 +1609,7 @@ describe("PanelContainer", () => {
     it("should hide fullscreen button when simplifiedPanelView is true on hover", async () => {
       wrapper = createWrapper({ simplifiedPanelView: true });
 
-      await wrapper.find('[data-test="dashboard-panel-container"]').trigger('mouseover');
+      await wrapper.find('[data-test="dashboard-panel-container"]').trigger("mouseover");
 
       expect(wrapper.find('[data-test="dashboard-panel-fullscreen-btn"]').exists()).toBe(false);
     });
@@ -1570,8 +1619,7 @@ describe("PanelContainer", () => {
     // The QueryInspector child now owns its own ODialog internally, so the
     // contract from PanelContainer's perspective is the `open` prop and
     // `update:open` event on the QueryInspector stub.
-    const findQueryInspector = (w: any) =>
-      w.findComponent({ name: "QueryInspector" });
+    const findQueryInspector = (w: any) => w.findComponent({ name: "QueryInspector" });
 
     // Helper: ShowLegendsPopup is the legends dialog wrapper rendered by
     // PanelContainer. We find it by component name (it's loaded async in

@@ -15,7 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <ODialog data-test="add-user-dialog"
+  <ODialog
+    data-test="add-user-dialog"
     :open="open"
     size="md"
     :title="beingUpdated ? t('user.editUser') : t('user.add')"
@@ -26,167 +27,163 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @update:open="$emit('update:open', $event)"
   >
     <div class="w-full">
-        <OForm
-          id="add-user-form"
-          :form="form"
-        >
-          <p class="mt-2 truncate" v-if="!existingUser">
-            {{ t("user.email") }} : <strong>{{ formEmail }}</strong>
-          </p>
-          <p class="mt-2 truncate" v-if="!existingUser && !beingUpdated">
-            {{ t("user.roles") }} : <strong>{{ formRole }}</strong>
-          </p>
-          <p
-            class="mt-2 truncate"
-            v-if="!existingUser && !beingUpdated && formCustomRole?.length"
-          >
-            {{ t("user.customRole") }} :
-            <strong>{{ formCustomRole.join(", ") }}</strong>
-          </p>
+      <OForm id="add-user-form" :form="form">
+        <p class="mt-2 truncate" v-if="!existingUser">
+          {{ t("user.email") }} : <strong>{{ formEmail }}</strong>
+        </p>
+        <p class="mt-2 truncate" v-if="!existingUser && !beingUpdated">
+          {{ t("user.roles") }} : <strong>{{ formRole }}</strong>
+        </p>
+        <p class="mt-2 truncate" v-if="!existingUser && !beingUpdated && formCustomRole?.length">
+          {{ t("user.customRole") }} :
+          <strong>{{ formCustomRole.join(", ") }}</strong>
+        </p>
+        <OFormInput
+          v-if="existingUser && !beingUpdated"
+          name="email"
+          :label="t('user.email')"
+          required
+          class="showLabelOnTop"
+          :maxlength="100"
+          data-test="user-email-field"
+        />
+
+        <div v-if="!beingUpdated && !existingUser" class="mt-2">
           <OFormInput
-            v-if="existingUser && !beingUpdated"
-            name="email"
-            :label="t('user.email')"
+            :type="isPwd ? 'password' : 'text'"
+            name="password"
+            :label="t('user.password')"
             required
             class="showLabelOnTop"
-            :maxlength="100"
-            data-test="user-email-field"
-          />
+            data-test="user-password-field"
+          >
+            <template #icon-right>
+              <OIcon
+                :name="isPwd ? 'visibility-off' : 'visibility'"
+                size="sm"
+                class="cursor-pointer"
+                @click="isPwd = !isPwd"
+              />
+            </template>
+          </OFormInput>
+        </div>
 
-          <div v-if="!beingUpdated && !existingUser" class="mt-2">
-            <OFormInput
-              :type="isPwd ? 'password' : 'text'"
-              name="password"
-              :label="t('user.password')"
-              required
-              class="showLabelOnTop"
-              data-test="user-password-field"
-            >
-              <template #icon-right>
-                <OIcon
-                  :name="isPwd ? 'visibility-off' : 'visibility'" size="sm"
-                  class="cursor-pointer"
-                  @click="isPwd = !isPwd"
-                />
-              </template>
-            </OFormInput>
-          </div>
+        <OFormInput
+          v-if="!existingUser && !isCloud"
+          name="first_name"
+          :label="t('user.firstName')"
+          class="showLabelOnTop mt-2"
+          data-test="user-first-name-field"
+        />
+
+        <OFormInput
+          v-if="!existingUser && !isCloud"
+          name="last_name"
+          :label="t('user.lastName')"
+          class="showLabelOnTop mt-2"
+          data-test="user-last-name-field"
+        />
+        <OFormSelect
+          v-if="
+            (existingUser || beingUpdated) &&
+            userRole !== 'member' &&
+            store.state.userInfo.email !== formEmail
+          "
+          name="role"
+          :label="t('user.role')"
+          required
+          :options="roles"
+          class="showLabelOnTop mt-2"
+          data-test="user-role-field"
+        />
+        <OFormSelect
+          v-if="
+            (existingUser || beingUpdated) &&
+            userRole !== 'member' &&
+            store.state.userInfo.email !== formEmail &&
+            (config.isEnterprise == 'true' || config.isCloud == 'true')
+          "
+          name="custom_role"
+          :label="t('user.customRole')"
+          :options="filterdOption"
+          class="showLabelOnTop mt-2"
+          multiple
+          data-test="user-custom-role-field"
+          :disable="
+            isCloud ? filterdOption.length === 0 : filterdOption.length === 0 || !!isExternalUser
+          "
+          :hint="
+            isCloud
+              ? filterdOption.length === 0
+                ? t('user.noCustomRolesHint')
+                : ''
+              : isExternalUser
+                ? t('user.externalUserCustomRoleHint')
+                : filterdOption.length === 0
+                  ? t('user.noCustomRolesHint')
+                  : ''
+          "
+        />
+        <div v-if="beingUpdated && !isCloud" class="mt-2">
+          <OFormSwitch
+            name="change_password"
+            :label="t('user.changePassword')"
+            size="lg"
+            data-test="user-change-password-field"
+          />
 
           <OFormInput
-            v-if="!existingUser && !isCloud"
-            name="first_name"
-            :label="t('user.firstName')"
-            class="showLabelOnTop mt-2"
-            data-test="user-first-name-field"
-          />
-
-          <OFormInput
-            v-if="!existingUser && !isCloud"
-            name="last_name"
-            :label="t('user.lastName')"
-            class="showLabelOnTop mt-2"
-            data-test="user-last-name-field"
-          />
-          <OFormSelect
             v-if="
-              (existingUser || beingUpdated) &&
-              userRole !== 'member' &&
-              store.state.userInfo.email !== formEmail
+              changePassword && (userRole == 'member' || store.state.userInfo.email == formEmail)
             "
-            name="role"
-            :label="t('user.role')"
+            :type="isOldPwd ? 'password' : 'text'"
+            name="old_password"
+            :label="t('user.oldPassword')"
             required
-            :options="roles"
             class="showLabelOnTop mt-2"
-            data-test="user-role-field"
-          />
-          <OFormSelect
-            v-if="
-              (existingUser || beingUpdated) &&
-              userRole !== 'member' &&
-              store.state.userInfo.email !== formEmail &&
-              (config.isEnterprise == 'true' || config.isCloud == 'true')
-            "
-            name="custom_role"
-            :label="t('user.customRole')"
-            :options="filterdOption"
-            class="showLabelOnTop mt-2"
-            multiple
-            data-test="user-custom-role-field"
-            :disable="isCloud ? filterdOption.length === 0 : (filterdOption.length === 0 || !!isExternalUser)"
-            :hint="
-              isCloud
-                ? (filterdOption.length === 0 ? t('user.noCustomRolesHint') : '')
-                : isExternalUser
-                  ? t('user.externalUserCustomRoleHint')
-                  : filterdOption.length === 0
-                    ? t('user.noCustomRolesHint')
-                    : ''
-            "
-          />
-          <div v-if="beingUpdated && !isCloud" class="mt-2">
-            <OFormSwitch
-              name="change_password"
-              :label="t('user.changePassword')"
-              size="lg"
-              data-test="user-change-password-field"
-            />
+            data-test="user-old-passoword-field"
+          >
+            <template #icon-right>
+              <OIcon
+                :name="isOldPwd ? 'visibility-off' : 'visibility'"
+                size="sm"
+                class="cursor-pointer"
+                @click="isOldPwd = !isOldPwd"
+              />
+            </template>
+          </OFormInput>
 
-            <OFormInput
-              v-if="
-                changePassword &&
-                (userRole == 'member' ||
-                  store.state.userInfo.email == formEmail)
-              "
-              :type="isOldPwd ? 'password' : 'text'"
-              name="old_password"
-              :label="t('user.oldPassword')"
-              required
-              class="showLabelOnTop mt-2"
-              data-test="user-old-passoword-field"
-            >
-              <template #icon-right>
-                <OIcon
-                  :name="isOldPwd ? 'visibility-off' : 'visibility'" size="sm"
-                  class="cursor-pointer"
-                  @click="isOldPwd = !isOldPwd"
-                />
-              </template>
-            </OFormInput>
-
-            <OFormInput
-              v-if="changePassword"
-              :type="isNewPwd ? 'password' : 'text'"
-              name="new_password"
-              :label="t('user.newPassword')"
-              required
-              class="showLabelOnTop mt-2"
-              data-test="user-new-password-field"
-            >
-              <template #icon-right>
-                <OIcon
-                  :name="isNewPwd ? 'visibility-off' : 'visibility'" size="sm"
-                  class="cursor-pointer"
-                  @click="isNewPwd = !isNewPwd"
-                />
-              </template>
-            </OFormInput>
-          </div>
           <OFormInput
-            v-if="
-              !beingUpdated &&
-              userRole != 'member' &&
-              organization == 'other'
-            "
-            name="other_organization"
-            :label="t('user.otherOrganization')"
+            v-if="changePassword"
+            :type="isNewPwd ? 'password' : 'text'"
+            name="new_password"
+            :label="t('user.newPassword')"
+            required
             class="showLabelOnTop mt-2"
-            :maxlength="100"
-          />
-        </OForm>
+            data-test="user-new-password-field"
+          >
+            <template #icon-right>
+              <OIcon
+                :name="isNewPwd ? 'visibility-off' : 'visibility'"
+                size="sm"
+                class="cursor-pointer"
+                @click="isNewPwd = !isNewPwd"
+              />
+            </template>
+          </OFormInput>
+        </div>
+        <OFormInput
+          v-if="!beingUpdated && userRole != 'member' && organization == 'other'"
+          name="other_organization"
+          :label="t('user.otherOrganization')"
+          class="showLabelOnTop mt-2"
+          :maxlength="100"
+        />
+      </OForm>
     </div>
   </ODialog>
-  <ODialog data-test="add-user-logout-confirm-dialog"
+  <ODialog
+    data-test="add-user-logout-confirm-dialog"
     v-model:open="logout_confirm"
     persistent
     size="xs"
@@ -195,10 +192,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:primary="signout"
   >
     <div class="flex items-center gap-3">
-      <div class="bg-accent text-text-inverse inline-flex items-center justify-center w-10 h-10 rounded-full shrink-0">
+      <div
+        class="bg-accent text-text-inverse inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full"
+      >
         <OIcon name="info" size="sm" />
       </div>
-      <span>{{ t('iam.addUser.changePasswordLogoutMessage') }}</span>
+      <span>{{ t("iam.addUser.changePasswordLogoutMessage") }}</span>
     </div>
   </ODialog>
 </template>
@@ -244,13 +243,7 @@ const defaultValue: any = () => {
 
 export default defineComponent({
   name: "ComponentAddUpdateUser",
-  components: { ODialog,
-    OIcon,
-    OForm,
-    OFormInput,
-    OFormSelect,
-    OFormSwitch,
-},
+  components: { ODialog, OIcon, OForm, OFormInput, OFormSelect, OFormSwitch },
   props: {
     open: {
       type: Boolean,
@@ -326,8 +319,7 @@ export default defineComponent({
 
     // `custom_role` is an Enterprise/Cloud-only concept — the field is rendered
     // and hydrated (getUserRoles) ONLY under this flag.
-    const supportsCustomRole =
-      config.isEnterprise == "true" || config.isCloud == "true";
+    const supportsCustomRole = config.isEnterprise == "true" || config.isCloud == "true";
 
     // Decide whether to send `custom_role`:
     //   • OSS → never (the field is Enterprise/Cloud-only).
@@ -336,8 +328,7 @@ export default defineComponent({
     //     selected roles (length > 0).
     const includeCustomRole = (value: AddUserForm) =>
       supportsCustomRole &&
-      (beingUpdated.value ||
-        (Array.isArray(value.custom_role) && value.custom_role.length > 0));
+      (beingUpdated.value || (Array.isArray(value.custom_role) && value.custom_role.length > 0));
 
     // The save handler reads the VALIDATED `value` only. Non-form context (org,
     // the original edit record) comes from the refs above. OForm awaits it, so
@@ -374,23 +365,14 @@ export default defineComponent({
           delete payload.new_password;
         }
         try {
-          const res: any = await userServiece.update(
-            payload,
-            selectedOrg,
-            userEmail,
-          );
+          const res: any = await userServiece.update(payload, selectedOrg, userEmail);
           if (
             value.change_password == true &&
             loggedInUserEmail.value === props.modelValue?.email
           ) {
             logout_confirm.value = true;
           } else {
-            emit(
-              "updated",
-              res.data,
-              { ...payload, email: userEmail },
-              "updated",
-            );
+            emit("updated", res.data, { ...payload, email: userEmail }, "updated");
             emit("update:open", false);
           }
         } catch (err: any) {
@@ -520,8 +502,7 @@ export default defineComponent({
         existingUser.value = false;
         // Row data from the users list doesn't include `organization`; fall back
         // to the active org so the subsequent PUT lands on the right endpoint.
-        organization.value =
-          newVal.organization || store.state.selectedOrganization.identifier;
+        organization.value = newVal.organization || store.state.selectedOrganization.identifier;
         // Keep the full original record (org_member_id, is_external, …) to
         // round-trip on save — it is non-form context, NOT a form mirror.
         editRecord.value = {
@@ -625,9 +606,11 @@ export default defineComponent({
           return;
         }
         update(() => {
-          const needle = val.toLowerCase()
-          filterdOption.value = props.customRoles.filter((v:any) => v.toLowerCase().indexOf(needle) > -1)
-        })
+          const needle = val.toLowerCase();
+          filterdOption.value = props.customRoles.filter(
+            (v: any) => v.toLowerCase().indexOf(needle) > -1,
+          );
+        });
       },
       track,
     };

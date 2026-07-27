@@ -20,10 +20,9 @@ import i18n from "@/locales";
 import { nextTick } from "vue";
 import { createRouter, createWebHistory } from "vue-router";
 
-
 // Mock toast
 const mockToastFn = vi.fn(() => vi.fn()); // toast returns dismiss function
-vi.mock('@/lib/feedback/Toast/useToast', () => ({
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toast: (...args: any[]) => mockToastFn(...args),
 }));
 
@@ -55,7 +54,7 @@ vi.mock("@/components/cipherkeys/AddCipherKey.vue", () => ({
     name: "AddCipherKey",
     template: "<div data-test='add-cipher-key'></div>",
     emits: ["cancel:hideform"],
-  }
+  },
 }));
 
 vi.mock("@/components/shared/grid/Pagination.vue", () => ({
@@ -85,7 +84,7 @@ vi.mock("@/components/ConfirmDialog.vue", () => ({
     </div>`,
     props: ["title", "message", "modelValue"],
     emits: ["update:ok", "update:cancel", "update:modelValue"],
-  }
+  },
 }));
 
 // Import mocked service
@@ -109,16 +108,29 @@ beforeEach(async () => {
   router = createRouter({
     history: createWebHistory(),
     routes: [
-      { path: '/', name: 'settings', component: CipherKeys },
-      { path: '/organizations/:orgId/settings/cipherkeys', name: 'cipherKeys', component: CipherKeys, props: true },
-      { path: '/organizations/:orgId/settings/cipherkeys/add', name: 'add-cipher-key', component: CipherKeys },
-      { path: '/organizations/:orgId/settings/cipherkeys/edit/:keyId', name: 'edit-cipher-key', component: CipherKeys },
+      { path: "/", name: "settings", component: CipherKeys },
+      {
+        path: "/organizations/:orgId/settings/cipherkeys",
+        name: "cipherKeys",
+        component: CipherKeys,
+        props: true,
+      },
+      {
+        path: "/organizations/:orgId/settings/cipherkeys/add",
+        name: "add-cipher-key",
+        component: CipherKeys,
+      },
+      {
+        path: "/organizations/:orgId/settings/cipherkeys/edit/:keyId",
+        name: "edit-cipher-key",
+        component: CipherKeys,
+      },
     ],
   });
-  await router.push('/');
-  
+  await router.push("/");
+
   // Spy on router.push
-  vi.spyOn(router, 'push');
+  vi.spyOn(router, "push");
 });
 
 const createWrapper = (props = {}, options = {}) => {
@@ -179,7 +191,7 @@ const createWrapperAndWait = async (options = {}) => {
   // Wait for component to mount and data to load
   await wrapper.vm.$nextTick();
   // Give additional time for async data loading
-  await new Promise(resolve => setTimeout(resolve, 50));
+  await new Promise((resolve) => setTimeout(resolve, 50));
   await wrapper.vm.$nextTick();
   return wrapper;
 };
@@ -212,12 +224,12 @@ describe("CipherKeys", () => {
     router.currentRoute.value.query = {};
     router.currentRoute.value.params = { orgId: "test-org" };
     mockCipherKeysService.list.mockResolvedValue(mockCipherKeysData);
-    
+
     // Ensure mock data is properly structured
     mockCipherKeysService.list.mockImplementation(() => {
       return Promise.resolve(mockCipherKeysData);
     });
-    
+
     // Reset router spy
     if (router.push.mockClear) {
       router.push.mockClear();
@@ -253,7 +265,7 @@ describe("CipherKeys", () => {
       const wrapper = createWrapper();
       await nextTick();
       await wrapper.vm.$nextTick();
-      
+
       expect(wrapper.vm.tabledata).toHaveLength(2);
       expect(wrapper.vm.tabledata[0]).toEqual({
         name: "test-key-1",
@@ -271,7 +283,7 @@ describe("CipherKeys", () => {
 
       createWrapper();
       await nextTick();
-      await new Promise(resolve => setTimeout(resolve, 0));
+      await new Promise((resolve) => setTimeout(resolve, 0));
 
       expect(mockToastFn).toHaveBeenCalledTimes(2);
       expect(mockToastFn).toHaveBeenCalledWith({
@@ -294,7 +306,7 @@ describe("CipherKeys", () => {
 
       createWrapper();
       await nextTick();
-      await new Promise(resolve => setTimeout(resolve, 0));
+      await new Promise((resolve) => setTimeout(resolve, 0));
 
       expect(mockToastFn).toHaveBeenCalledTimes(1);
       expect(mockToastFn).toHaveBeenCalledWith({
@@ -336,10 +348,10 @@ describe("CipherKeys", () => {
   describe("Add cipher key functionality", () => {
     it("should show add cipher key dialog when add button is clicked", async () => {
       const wrapper = createWrapper();
-      
+
       // Call the method directly to test behavior
       await wrapper.vm.addCipherKey({});
-      
+
       expect(router.push).toHaveBeenCalledWith({
         query: {
           action: "add",
@@ -379,7 +391,7 @@ describe("CipherKeys", () => {
     it("should navigate to edit route when edit button is clicked", async () => {
       const wrapper = createWrapper();
       await nextTick();
-      
+
       const testRow = { name: "test-key-1" };
       await wrapper.vm.editCipherKey(testRow);
 
@@ -407,7 +419,7 @@ describe("CipherKeys", () => {
     it("should show confirmation dialog when delete button is clicked", async () => {
       const wrapper = createWrapper();
       const testRow = { name: "test-key-1" };
-      
+
       await wrapper.vm.confirmDeleteCipherKey(testRow);
       await nextTick();
 
@@ -419,9 +431,9 @@ describe("CipherKeys", () => {
       const wrapper = createWrapper();
       wrapper.vm.confirmDelete = { visible: true, data: { name: "test-key-1" } };
       await wrapper.vm.$nextTick();
-      
+
       await wrapper.vm.cancelDeleteCipherKey();
-      
+
       expect(wrapper.vm.confirmDelete.visible).toBe(false);
       expect(wrapper.vm.confirmDelete.data).toBe(null);
     });
@@ -435,10 +447,7 @@ describe("CipherKeys", () => {
 
       await wrapper.vm.deleteCipherKey();
 
-      expect(mockCipherKeysService.delete).toHaveBeenCalledWith(
-        "test-org",
-        "test-key-1"
-      );
+      expect(mockCipherKeysService.delete).toHaveBeenCalledWith("test-org", "test-key-1");
       expect(mockToastFn).toHaveBeenCalledWith({
         variant: "success",
         message: "Cipher Key deleted successfully",
@@ -573,7 +582,6 @@ describe("CipherKeys", () => {
     });
   });
 
-
   describe("Router query handling", () => {
     it("should show add dialog when query action is add", async () => {
       router.currentRoute.value.query = { action: "add" };
@@ -603,8 +611,8 @@ describe("CipherKeys", () => {
   describe("Accessibility", () => {
     it("should have proper data-test attributes for interactive elements", () => {
       const wrapper = createWrapper();
-      
-      expect(wrapper.find('.app-page-header h1').exists()).toBe(true);
+
+      expect(wrapper.find(".app-page-header h1").exists()).toBe(true);
     });
 
     it("should render action buttons with proper data-test attributes", async () => {
@@ -615,7 +623,7 @@ describe("CipherKeys", () => {
       const testRow = { name: "test-key-1" };
       const editTestAttr = `cipherkey-list-${testRow.name}-update`;
       const deleteTestAttr = `cipherkey-list-${testRow.name}-delete`;
-      
+
       expect(editTestAttr).toBe("cipherkey-list-test-key-1-update");
       expect(deleteTestAttr).toBe("cipherkey-list-test-key-1-delete");
     });
@@ -624,10 +632,10 @@ describe("CipherKeys", () => {
   describe("Edge cases", () => {
     it("should handle empty cipher keys list", async () => {
       mockCipherKeysService.list.mockResolvedValue({ data: { keys: [] } });
-      
+
       const wrapper = createWrapper();
       await nextTick();
-      await new Promise(resolve => setTimeout(resolve, 0));
+      await new Promise((resolve) => setTimeout(resolve, 0));
 
       expect(wrapper.vm.tabledata).toHaveLength(0);
       expect(wrapper.vm.resultTotal).toBe(0);
@@ -658,9 +666,9 @@ describe("CipherKeys", () => {
           ],
         },
       };
-      
+
       mockCipherKeysService.list.mockResolvedValue(incompleteData);
-      
+
       const wrapper = createWrapper();
       await nextTick();
       await wrapper.vm.$nextTick();

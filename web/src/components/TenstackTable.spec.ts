@@ -100,7 +100,6 @@ vi.stubGlobal("CSS", { supports: () => false });
 
 import TenstackTable from "@/components/TenstackTable.vue";
 
-
 // ---------------------------------------------------------------------------
 // Fixtures
 // ---------------------------------------------------------------------------
@@ -116,10 +115,7 @@ const baseRows = [
   { _timestamp: 3000, name: "gamma", status: "warn" },
 ];
 
-function mountTable(
-  props: Record<string, any> = {},
-  slots: Record<string, any> = {},
-): VueWrapper {
+function mountTable(props: Record<string, any> = {}, slots: Record<string, any> = {}): VueWrapper {
   return mount(TenstackTable, {
     props: {
       columns: baseColumns,
@@ -183,12 +179,8 @@ describe("TenstackTable", () => {
 
     it("should display the header text for each column", () => {
       wrapper = mountTable();
-      expect(wrapper.find('[data-test="o2-table-th-name"]').text()).toContain(
-        "NAME",
-      );
-      expect(
-        wrapper.find('[data-test="o2-table-th-status"]').text(),
-      ).toContain("STATUS");
+      expect(wrapper.find('[data-test="o2-table-th-name"]').text()).toContain("NAME");
+      expect(wrapper.find('[data-test="o2-table-th-status"]').text()).toContain("STATUS");
     });
   });
 
@@ -197,42 +189,28 @@ describe("TenstackTable", () => {
     it("should render one tr for each row provided", () => {
       wrapper = mountTable();
       // Rows are keyed by _timestamp in data-test
-      expect(
-        wrapper.find('[data-test="o2-table-detail-1000"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="o2-table-detail-2000"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="o2-table-detail-3000"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="o2-table-detail-1000"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="o2-table-detail-2000"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="o2-table-detail-3000"]').exists()).toBe(true);
     });
 
     it("should render cell content for each column", () => {
       wrapper = mountTable();
       // First row, name column
-      const nameCell = wrapper.find(
-        '[data-test="o2-table-column-0-name"]',
-      );
+      const nameCell = wrapper.find('[data-test="o2-table-column-0-name"]');
       expect(nameCell.exists()).toBe(true);
       expect(nameCell.text()).toContain("alpha");
     });
 
     it("should render cells for all columns in the first row", () => {
       wrapper = mountTable();
-      expect(
-        wrapper.find('[data-test="o2-table-column-0-name"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="o2-table-column-0-status"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="o2-table-column-0-name"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="o2-table-column-0-status"]').exists()).toBe(true);
     });
 
     it("should render no data rows when rows is empty", () => {
       wrapper = mountTable({ rows: [] });
-      expect(
-        wrapper.find('[data-test="o2-table-detail-1000"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="o2-table-detail-1000"]').exists()).toBe(false);
     });
   });
 
@@ -261,11 +239,7 @@ describe("TenstackTable", () => {
         sortOrder: "desc",
         sortFieldMap: {},
       });
-      expect(
-        wrapper
-          .find('[data-test-sort-state="active"]')
-          .exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test-sort-state="active"]').exists()).toBe(true);
     });
 
     it("should show the inactive sort icon for non-active sortable columns", () => {
@@ -277,9 +251,7 @@ describe("TenstackTable", () => {
         sortFieldMap: {},
       });
       // timestamp column is not active
-      const inactiveIcons = wrapper.findAll(
-        '[data-test-sort-state="inactive"]',
-      );
+      const inactiveIcons = wrapper.findAll('[data-test-sort-state="inactive"]');
       expect(inactiveIcons.length).toBeGreaterThan(0);
     });
 
@@ -288,12 +260,8 @@ describe("TenstackTable", () => {
         columns: sortableColumns,
         rows: [],
       });
-      expect(
-        wrapper.find('[data-test-sort-state="active"]').exists(),
-      ).toBe(false);
-      expect(
-        wrapper.find('[data-test-sort-state="inactive"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test-sort-state="active"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test-sort-state="inactive"]').exists()).toBe(false);
     });
 
     it("should resolve the active column via sortFieldMap", () => {
@@ -312,9 +280,7 @@ describe("TenstackTable", () => {
         sortFieldMap: { timestamp: "start_time" },
       });
       // timestamp maps to start_time which equals sortBy → active icon
-      expect(
-        wrapper.find('[data-test-sort-state="active"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test-sort-state="active"]').exists()).toBe(true);
     });
   });
 
@@ -322,9 +288,7 @@ describe("TenstackTable", () => {
   describe("loading state", () => {
     it("should show the skeleton loading body when loading=true and no rows", () => {
       wrapper = mountTable({ rows: [], loading: true });
-      expect(
-        wrapper.find('[data-test="tenstack-table-skeleton-body"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="tenstack-table-skeleton-body"]').exists()).toBe(true);
     });
 
     it("should not show the skeleton body when a custom loading slot is provided", () => {
@@ -332,16 +296,12 @@ describe("TenstackTable", () => {
         { rows: [], loading: true },
         { loading: '<div data-test="custom-loading-slot">Loading…</div>' },
       );
-      expect(
-        wrapper.find('[data-test="tenstack-table-skeleton-body"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="tenstack-table-skeleton-body"]').exists()).toBe(false);
     });
 
     it("should show the skeleton body when loading=true (follows O2 pattern)", () => {
       wrapper = mountTable({ loading: true });
-      expect(
-        wrapper.find('[data-test="tenstack-table-skeleton-body"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="tenstack-table-skeleton-body"]').exists()).toBe(true);
     });
 
     it("should render a custom loading slot when loading=true and rows is empty", () => {
@@ -349,9 +309,7 @@ describe("TenstackTable", () => {
         { rows: [], loading: true },
         { loading: '<div data-test="custom-loading-slot">Loading…</div>' },
       );
-      expect(
-        wrapper.find('[data-test="custom-loading-slot"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="custom-loading-slot"]').exists()).toBe(true);
     });
 
     it("should not show the loading indicator when rows exist", () => {
@@ -359,9 +317,7 @@ describe("TenstackTable", () => {
         { loading: true },
         { loading: '<div data-test="custom-loading-slot">Loading…</div>' },
       );
-      expect(
-        wrapper.find('[data-test="custom-loading-slot"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="custom-loading-slot"]').exists()).toBe(false);
     });
 
     it("should show the loading-banner slot when loading=true and rows exist", () => {
@@ -392,10 +348,7 @@ describe("TenstackTable", () => {
     });
 
     it("should not render the empty slot when rows are present", () => {
-      wrapper = mountTable(
-        {},
-        { empty: '<div data-test="empty-state">No results</div>' },
-      );
+      wrapper = mountTable({}, { empty: '<div data-test="empty-state">No results</div>' });
       expect(wrapper.find('[data-test="empty-state"]').exists()).toBe(false);
     });
 
@@ -440,23 +393,17 @@ describe("TenstackTable", () => {
   describe("functionErrorMsg prop", () => {
     it("should render the function error row when functionErrorMsg is non-empty", () => {
       wrapper = mountTable({ functionErrorMsg: "VRL script failed" });
-      expect(
-        wrapper.find('[data-test="o2-table-function-error"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="o2-table-function-error"]').exists()).toBe(true);
     });
 
     it("should not render the function error row when functionErrorMsg is empty", () => {
       wrapper = mountTable({ functionErrorMsg: "" });
-      expect(
-        wrapper.find('[data-test="o2-table-function-error"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="o2-table-function-error"]').exists()).toBe(false);
     });
 
     it("should show the expand toggle button when functionErrorMsg is non-empty", () => {
       wrapper = mountTable({ functionErrorMsg: "some vrl error" });
-      expect(
-        wrapper.find('[data-test="table-row-expand-menu"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="table-row-expand-menu"]').exists()).toBe(true);
     });
 
     it("should expand the error detail when the expand button is clicked", async () => {
@@ -503,25 +450,17 @@ describe("TenstackTable", () => {
 
     it("should render the close button for a closable column header", () => {
       wrapper = mountTable({ columns: closableColumns });
-      expect(
-        wrapper
-          .find('[data-test="o2-table-th-remove-SEVERITY-btn"]')
-          .exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="o2-table-th-remove-SEVERITY-btn"]').exists()).toBe(true);
     });
 
     it("should not render a close button for a non-closable column", () => {
       wrapper = mountTable({ columns: closableColumns });
-      expect(
-        wrapper.find('[data-test="o2-table-th-remove-NAME-btn"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="o2-table-th-remove-NAME-btn"]').exists()).toBe(false);
     });
 
     it("should emit closeColumn with the column definition when the close button is clicked", async () => {
       wrapper = mountTable({ columns: closableColumns });
-      await wrapper
-        .find('[data-test="o2-table-th-remove-SEVERITY-btn"]')
-        .trigger("click");
+      await wrapper.find('[data-test="o2-table-th-remove-SEVERITY-btn"]').trigger("click");
       expect(wrapper.emitted("closeColumn")).toBeTruthy();
       const payload = wrapper.emitted("closeColumn")![0][0] as any;
       expect(payload.id).toBe("severity");
@@ -545,9 +484,7 @@ describe("TenstackTable", () => {
         sortOrder: "asc",
         sortFieldMap: {},
       });
-      await wrapper
-        .find('[data-test="o2-table-th-sort-duration"]')
-        .trigger("click");
+      await wrapper.find('[data-test="o2-table-th-sort-duration"]').trigger("click");
       expect(wrapper.emitted("sort-change")).toBeTruthy();
       expect(wrapper.emitted("sort-change")![0]).toEqual(["duration", "desc"]);
     });
@@ -567,9 +504,7 @@ describe("TenstackTable", () => {
         sortOrder: "desc",
         sortFieldMap: {},
       });
-      await wrapper
-        .find('[data-test="o2-table-th-sort-duration"]')
-        .trigger("click");
+      await wrapper.find('[data-test="o2-table-th-sort-duration"]').trigger("click");
       expect(wrapper.emitted("sort-change")![0]).toEqual(["duration", "asc"]);
     });
 
@@ -588,9 +523,7 @@ describe("TenstackTable", () => {
         sortOrder: "asc",
         sortFieldMap: {},
       });
-      await wrapper
-        .find('[data-test="o2-table-th-sort-duration"]')
-        .trigger("click");
+      await wrapper.find('[data-test="o2-table-th-sort-duration"]').trigger("click");
       expect(wrapper.emitted("sort-change")![0]).toEqual(["duration", "desc"]);
     });
 
@@ -609,9 +542,7 @@ describe("TenstackTable", () => {
         sortOrder: "asc",
         sortFieldMap: { timestamp: "start_time" },
       });
-      await wrapper
-        .find('[data-test="o2-table-th-sort-timestamp"]')
-        .trigger("click");
+      await wrapper.find('[data-test="o2-table-th-sort-timestamp"]').trigger("click");
       expect(wrapper.emitted("sort-change")![0]).toEqual(["start_time", "desc"]);
     });
 
@@ -627,9 +558,7 @@ describe("TenstackTable", () => {
         ],
         rows: [],
       });
-      await wrapper
-        .find('[data-test="o2-table-th-sort-duration"]')
-        .trigger("click");
+      await wrapper.find('[data-test="o2-table-th-sort-duration"]').trigger("click");
       expect(wrapper.emitted("sort-change")).toBeFalsy();
     });
   });
@@ -735,8 +664,7 @@ describe("TenstackTable", () => {
           ],
         },
         {
-          "cell-name": ({ item }: any) =>
-            h("span", { "data-test": "custom-cell" }, item.name),
+          "cell-name": ({ item }: any) => h("span", { "data-test": "custom-cell" }, item.name),
         },
       );
       const cells = wrapper.findAll('[data-test="custom-cell"]');
@@ -790,9 +718,7 @@ describe("TenstackTable", () => {
       wrapper = mountTable({ showPagination: false });
       // virtual scroll renders rows via virtualizer mock (3 rows)
       // o2-table-detail-* elements are rendered via virtual scroll path
-      expect(
-        wrapper.find('[data-test="o2-table-detail-1000"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="o2-table-detail-1000"]').exists()).toBe(true);
     });
 
     it("should pass pagination info through the bottom slot when provided", () => {
@@ -885,9 +811,7 @@ describe("TenstackTable", () => {
   // ── enableCellCopy prop ───────────────────────────────────────────────────
   describe("enableCellCopy prop", () => {
     it("should render copy buttons when enableCellCopy=true and dashboard mode", () => {
-      const dashCols = [
-        { name: "name", label: "NAME", field: "name", align: "left" },
-      ];
+      const dashCols = [{ name: "name", label: "NAME", field: "name", align: "left" }];
       wrapper = mountTable({
         columns: dashCols,
         rows: [{ name: "alpha" }],
@@ -899,9 +823,7 @@ describe("TenstackTable", () => {
     });
 
     it("should not render copy buttons when enableCellCopy=false", () => {
-      const dashCols = [
-        { name: "name", label: "NAME", field: "name", align: "left" },
-      ];
+      const dashCols = [{ name: "name", label: "NAME", field: "name", align: "left" }];
       wrapper = mountTable({
         columns: dashCols,
         rows: [{ name: "alpha" }],
@@ -918,16 +840,12 @@ describe("TenstackTable", () => {
     it("should add wrap-enabled class to root when wrap=true", () => {
       wrapper = mountTable({ wrap: true });
       // Use combined selector: the root div has BOTH the static class and the dynamic one
-      expect(
-        wrapper.find(".my-sticky-virtscroll-table.wrap-enabled").exists(),
-      ).toBe(true);
+      expect(wrapper.find(".my-sticky-virtscroll-table.wrap-enabled").exists()).toBe(true);
     });
 
     it("should not add wrap-enabled class when wrap=false", () => {
       wrapper = mountTable({ wrap: false });
-      expect(
-        wrapper.find(".my-sticky-virtscroll-table.wrap-enabled").exists(),
-      ).toBe(false);
+      expect(wrapper.find(".my-sticky-virtscroll-table.wrap-enabled").exists()).toBe(false);
     });
   });
 
@@ -935,20 +853,12 @@ describe("TenstackTable", () => {
   describe("stickyRowTotals wrapper class", () => {
     it("should add pivot-sticky-totals class when stickyRowTotals=true", () => {
       wrapper = mountTable({ stickyRowTotals: true });
-      expect(
-        wrapper
-          .find(".my-sticky-virtscroll-table.pivot-sticky-totals")
-          .exists(),
-      ).toBe(true);
+      expect(wrapper.find(".my-sticky-virtscroll-table.pivot-sticky-totals").exists()).toBe(true);
     });
 
     it("should not add pivot-sticky-totals class when stickyRowTotals=false", () => {
       wrapper = mountTable({ stickyRowTotals: false });
-      expect(
-        wrapper
-          .find(".my-sticky-virtscroll-table.pivot-sticky-totals")
-          .exists(),
-      ).toBe(false);
+      expect(wrapper.find(".my-sticky-virtscroll-table.pivot-sticky-totals").exists()).toBe(false);
     });
   });
 
@@ -956,9 +866,7 @@ describe("TenstackTable", () => {
   describe("tbody relative class", () => {
     it("should have relative on tbody when useVirtualScroll=true and showPagination=false", () => {
       wrapper = mountTable();
-      expect(
-        wrapper.find('[data-test="o2-table-body"]').classes(),
-      ).toContain("relative");
+      expect(wrapper.find('[data-test="o2-table-body"]').classes()).toContain("relative");
     });
 
     it("should not have relative on tbody when useVirtualScroll=false", () => {
@@ -967,16 +875,12 @@ describe("TenstackTable", () => {
         rows: [],
         useVirtualScroll: false,
       });
-      expect(
-        wrapper.find('[data-test="o2-table-body"]').classes(),
-      ).not.toContain("relative");
+      expect(wrapper.find('[data-test="o2-table-body"]').classes()).not.toContain("relative");
     });
 
     it("should not have relative on tbody when showPagination=true", () => {
       wrapper = mountTable({ showPagination: true });
-      expect(
-        wrapper.find('[data-test="o2-table-body"]').classes(),
-      ).not.toContain("relative");
+      expect(wrapper.find('[data-test="o2-table-body"]').classes()).not.toContain("relative");
     });
   });
 
@@ -1029,9 +933,7 @@ describe("TenstackTable", () => {
         useVirtualScroll: false,
         pivotHeaderLevels: oneLevel,
       });
-      expect(wrapper.find('[data-test="o2-table-th-region"]').exists()).toBe(
-        false,
-      );
+      expect(wrapper.find('[data-test="o2-table-th-region"]').exists()).toBe(false);
     });
 
     it("should render pivot value headers for leaf levels", () => {
@@ -1118,9 +1020,7 @@ describe("TenstackTable", () => {
       const totalLevel = [
         {
           isLeaf: true,
-          cells: [
-            { label: "Total", colspan: 1, hasBorder: true, _isTotalHeader: true },
-          ],
+          cells: [{ label: "Total", colspan: 1, hasBorder: true, _isTotalHeader: true }],
         },
       ];
       wrapper = mountTable({
@@ -1218,17 +1118,17 @@ describe("TenstackTable", () => {
 
       // When sorted by spans desc, the order should be: gamma(20), alpha(10), beta(5)
       const sortedRows = [
-        { _timestamp: 3000, name: "gamma", spans: 20 },  // First after sorting
+        { _timestamp: 3000, name: "gamma", spans: 20 }, // First after sorting
         { _timestamp: 1000, name: "alpha", spans: 10 },
         { _timestamp: 2000, name: "beta", spans: 5 },
       ];
 
       wrapper = mountTable({
         columns: sortableCols,
-        rows: sortedRows,  // Pass the server-sorted rows
-        sortBy: "spans",   // Indicate we're sorted by spans
+        rows: sortedRows, // Pass the server-sorted rows
+        sortBy: "spans", // Indicate we're sorted by spans
         sortOrder: "desc", // Descending order
-        sortFieldMap: {},  // No field mapping needed
+        sortFieldMap: {}, // No field mapping needed
         useVirtualScroll: true, // Use virtual scroll (default but explicit)
       });
 
@@ -1245,7 +1145,7 @@ describe("TenstackTable", () => {
       expect(emittedRow).toMatchObject({
         _timestamp: 3000,
         name: "gamma",
-        spans: 20
+        spans: 20,
       });
       expect(emittedRow.name).not.toBe("alpha"); // Should NOT be the original first row
     });
@@ -1275,7 +1175,12 @@ describe("TenstackTable", () => {
       let slotProps: any = null;
       const w = mountTable(
         { showPagination: true, rowsPerPage: 1, ...propsOverride },
-        { bottom: (props: any) => { slotProps = props; return []; } },
+        {
+          bottom: (props: any) => {
+            slotProps = props;
+            return [];
+          },
+        },
       );
       return { w, getProps: () => slotProps };
     }
@@ -1376,7 +1281,12 @@ describe("TenstackTable", () => {
       let slotProps: any = null;
       mountTable(
         { showPagination, rowsPerPage },
-        { bottom: (props: any) => { slotProps = props; return []; } },
+        {
+          bottom: (props: any) => {
+            slotProps = props;
+            return [];
+          },
+        },
       );
       return slotProps?.paginationOptions ?? [];
     }
@@ -1502,9 +1412,7 @@ describe("TenstackTable", () => {
     });
 
     it("should copy the raw value unchanged when the column has no format function", async () => {
-      const cols = [
-        { name: "label", label: "LABEL", field: "label", align: "left" },
-      ];
+      const cols = [{ name: "label", label: "LABEL", field: "label", align: "left" }];
       wrapper = mountTable({
         columns: cols,
         rows: [{ label: "plain-text" }],
@@ -1597,7 +1505,9 @@ describe("TenstackTable", () => {
       // Two copy buttons: index 0 = "region" cell, index 1 = "ts" cell.
       const copyBtns = wrapper.findAll('[data-test="dashboard-table-cell-copy-btn"]');
       expect(copyBtns.length).toBeGreaterThanOrEqual(2);
-      await wrapper.findAll('[data-test="dashboard-table-cell-copy-btn"] button')[1].trigger("click");
+      await wrapper
+        .findAll('[data-test="dashboard-table-cell-copy-btn"] button')[1]
+        .trigger("click");
       await flushPromises();
 
       expect(mockCopyToClipboard).toHaveBeenCalledWith(FORMATTED, {
@@ -1631,7 +1541,9 @@ describe("TenstackTable", () => {
       });
       await flushPromises();
 
-      await wrapper.findAll('[data-test="dashboard-table-cell-copy-btn"] button')[1].trigger("click");
+      await wrapper
+        .findAll('[data-test="dashboard-table-cell-copy-btn"] button')[1]
+        .trigger("click");
       await flushPromises();
 
       const copiedValue = mockCopyToClipboard.mock.calls[0][0] as string;
@@ -1675,7 +1587,9 @@ describe("TenstackTable", () => {
       // (region is index 0, ts right-aligned is index 1).
       const copyBtns = wrapper.findAll('[data-test="dashboard-table-cell-copy-btn"]');
       expect(copyBtns.length).toBeGreaterThanOrEqual(2);
-      await wrapper.findAll('[data-test="dashboard-table-cell-copy-btn"] button')[1].trigger("click");
+      await wrapper
+        .findAll('[data-test="dashboard-table-cell-copy-btn"] button')[1]
+        .trigger("click");
       await flushPromises();
 
       expect(mockCopyToClipboard).toHaveBeenCalledWith(FORMATTED, {

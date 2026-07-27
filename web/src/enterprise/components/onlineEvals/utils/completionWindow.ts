@@ -50,9 +50,7 @@ export interface DurationParts {
  * user-facing text and belong in i18n (`common.hr` / `common.min` /
  * `common.sec`), so only the component may assemble the final wording.
  */
-export function durationPartsFromSecs(
-  value: string | number,
-): DurationParts | null {
+export function durationPartsFromSecs(value: string | number): DurationParts | null {
   const input = String(value).trim();
   if (!input) return null;
 
@@ -81,12 +79,9 @@ export function completionWindowConfigFromJob(
 
   return {
     idleWindowSecs: Number(
-      valueOf<any>(config, "idleWindowSecs", "idle_window_secs") ??
-        defaults.idleWindowSecs,
+      valueOf<any>(config, "idleWindowSecs", "idle_window_secs") ?? defaults.idleWindowSecs,
     ),
-    maxAgeSecs: Number(
-      valueOf<any>(config, "maxAgeSecs", "max_age_secs") ?? defaults.maxAgeSecs,
-    ),
+    maxAgeSecs: Number(valueOf<any>(config, "maxAgeSecs", "max_age_secs") ?? defaults.maxAgeSecs),
     endSignal: valueOf(config, "endSignal", "end_signal") ?? null,
   };
 }

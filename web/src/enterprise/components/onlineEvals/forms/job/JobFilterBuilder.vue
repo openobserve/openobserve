@@ -3,20 +3,20 @@
        mb-* here stacked on top of that and left an oversized hole beneath the
        filter (worst in the Span Selector drawer, gap-5 + mb-4). -->
   <div>
-    <div class="flex flex-col gap-0.5 mb-2">
+    <div class="mb-2 flex flex-col gap-0.5">
       <span
-        class="text-compact leading-tight font-medium text-input-label-text"
+        class="text-compact text-input-label-text leading-tight font-medium"
         data-test="job-condition-builder-title"
         >{{ t(`onlineEvals.job.${purpose}.title`) }}</span
       >
       <span
-        class="text-xs text-input-help-text leading-none"
+        class="text-input-help-text text-xs leading-none"
         data-test="job-condition-builder-hint"
         >{{ t(`onlineEvals.job.${purpose}.hint.${targetScope}`) }}</span
       >
     </div>
     <div
-      class="min-w-0 [&_.el-border]:ml-0! [&_.el-border]:w-full [&_.el-border]:max-w-full [&_.el-border]:border-border-default [&_.group-container]:w-full [&>.el-border]:mt-0!"
+      class="[&_.el-border]:border-border-default min-w-0 [&_.el-border]:ml-0! [&_.el-border]:w-full [&_.el-border]:max-w-full [&_.group-container]:w-full [&>.el-border]:mt-0!"
     >
       <FilterGroup
         :group="group"
@@ -74,9 +74,7 @@ const streamFields = computed(() =>
   props.streamFields?.length ? props.streamFields : DEFAULT_JOB_STREAM_FIELDS,
 );
 const streamFieldsMap = computed(() =>
-  Object.fromEntries(
-    streamFields.value.map((field) => [field.value, { type: field.type }]),
-  ),
+  Object.fromEntries(streamFields.value.map((field) => [field.value, { type: field.type }])),
 );
 
 // Main job filters are form-owned. Completion and span-selector filters remain
@@ -85,12 +83,9 @@ const formGroup =
   form && props.namePrefix
     ? form.useStore((s: any) => s.values?.[props.namePrefix as string])
     : computed(() => undefined);
-const group = computed(() =>
-  props.namePrefix ? formGroup.value : props.group,
-);
+const group = computed(() => (props.namePrefix ? formGroup.value : props.group));
 
-const clonedFormTree = () =>
-  cloneDeep(form.state.values?.[props.namePrefix as string]);
+const clonedFormTree = () => cloneDeep(form.state.values?.[props.namePrefix as string]);
 
 function handleUpdate(updatedGroup: any) {
   const isFormMode = Boolean(form && props.namePrefix);
@@ -99,10 +94,7 @@ function handleUpdate(updatedGroup: any) {
   const ctx = { formData: { query_condition: { conditions } } };
   updateAlertConditionGroup(updatedGroup, ctx);
   if (isFormMode) {
-    form.setFieldValue(
-      props.namePrefix,
-      ctx.formData.query_condition.conditions,
-    );
+    form.setFieldValue(props.namePrefix, ctx.formData.query_condition.conditions);
   } else {
     emit("update:group", ctx.formData.query_condition.conditions);
   }
@@ -115,10 +107,7 @@ function handleRemove(groupId: string) {
   const ctx = { formData: { query_condition: { conditions } } };
   removeAlertConditionGroup(groupId, conditions, ctx);
   if (isFormMode) {
-    form.setFieldValue(
-      props.namePrefix,
-      ctx.formData.query_condition.conditions,
-    );
+    form.setFieldValue(props.namePrefix, ctx.formData.query_condition.conditions);
   } else {
     emit("update:group", ctx.formData.query_condition.conditions);
   }

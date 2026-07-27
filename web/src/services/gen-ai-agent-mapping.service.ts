@@ -71,9 +71,7 @@ const genAiAgentMappingService = {
         end_time: endTime,
       },
     });
-    const agents = Array.isArray(response.data?.agents)
-      ? response.data.agents
-      : [];
+    const agents = Array.isArray(response.data?.agents) ? response.data.agents : [];
     return {
       agents: agents
         .filter(
@@ -92,9 +90,7 @@ const genAiAgentMappingService = {
     };
   },
   get: async (orgIdentifier: string) => {
-    const response = await http().get(
-      `/api/${orgIdentifier}/settings/gen_ai/agent_mapping`,
-    );
+    const response = await http().get(`/api/${orgIdentifier}/settings/gen_ai/agent_mapping`);
     return normalizeConfig(response.data);
   },
   save: async (orgIdentifier: string, config: GenAiAgentMappingConfig) => {
@@ -104,17 +100,11 @@ const genAiAgentMappingService = {
     );
     return normalizeConfig(response.data);
   },
-  clearRegistry: async (
-    orgIdentifier: string,
-  ): Promise<ClearGenAiAgentRegistryResponse> => {
-    const response = await http().delete(
-      `/api/${orgIdentifier}/settings/gen_ai/agent_registry`,
-    );
+  clearRegistry: async (orgIdentifier: string): Promise<ClearGenAiAgentRegistryResponse> => {
+    const response = await http().delete(`/api/${orgIdentifier}/settings/gen_ai/agent_registry`);
     return {
       source_stream:
-        typeof response.data?.source_stream === "string"
-          ? response.data.source_stream
-          : null,
+        typeof response.data?.source_stream === "string" ? response.data.source_stream : null,
       source_stream_type:
         typeof response.data?.source_stream_type === "string"
           ? response.data.source_stream_type

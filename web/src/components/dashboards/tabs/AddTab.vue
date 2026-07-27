@@ -15,7 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <ODialog data-test="dashboard-tab-settings-add-tab-dialog"
+  <ODialog
+    data-test="dashboard-tab-settings-add-tab-dialog"
     :open="open"
     size="sm"
     :title="editMode ? t('dashboard.editTab') : t('dashboard.newTab')"
@@ -26,7 +27,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:secondary="$emit('update:open', false)"
   >
     <div>
-      <OForm id="add-tab-form" ref="addTabForm" :schema="addTabSchema" :default-values="addTabDefaults" @submit="onSubmit">
+      <OForm
+        id="add-tab-form"
+        ref="addTabForm"
+        :schema="addTabSchema"
+        :default-values="addTabDefaults"
+        @submit="onSubmit"
+      >
         <OFormInput
           name="name"
           :label="t('dashboard.name')"
@@ -103,9 +110,11 @@ export default defineComponent({
     // OForm reads `defaultValues` once at mount, and ODialog remounts the body on
     // open — so this computed seeds `name` each time the dialog opens (edit → the
     // tab's name, create → blank). No local model / no manual reset needed.
-    const addTabDefaults = computed((): AddTabForm => ({
-      name: props.editMode ? editingTab.value?.name ?? "" : "",
-    }));
+    const addTabDefaults = computed(
+      (): AddTabForm => ({
+        name: props.editMode ? (editingTab.value?.name ?? "") : "",
+      }),
+    );
 
     // Edit data arrives ASYNC (getDashboard may hit the API) after the dialog has
     // mounted, so `:default-values` has already been read. Per the playbook
@@ -119,9 +128,7 @@ export default defineComponent({
           props.folderId ?? route.query.folder ?? "default",
         );
         editingTab.value = JSON.parse(
-          JSON.stringify(
-            dashboardData?.tabs?.find((tab: any) => tab.tabId === props.tabId),
-          ),
+          JSON.stringify(dashboardData?.tabs?.find((tab: any) => tab.tabId === props.tabId)),
         );
         addTabForm.value?.form.reset({ name: editingTab.value?.name ?? "" });
       }
@@ -138,59 +145,59 @@ export default defineComponent({
       // The @submit payload is the source of truth for `name`; the loaded
       // `editingTab` carries the rest (panels/tabId) in edit mode.
       try {
-          //if edit mode
-          if (props.editMode) {
-            // only allowed to edit name
-            const updatedTab = await editTab(
-              store,
-              props.dashboardId,
-              props.folderId ?? route.query.folder ?? "default",
-              editingTab.value?.tabId,
-              { ...editingTab.value, name: value.name },
-            );
+        //if edit mode
+        if (props.editMode) {
+          // only allowed to edit name
+          const updatedTab = await editTab(
+            store,
+            props.dashboardId,
+            props.folderId ?? route.query.folder ?? "default",
+            editingTab.value?.tabId,
+            { ...editingTab.value, name: value.name },
+          );
 
-            // emit refresh to rerender
-            emit("refresh", updatedTab);
-            emit("update:open", false);
+          // emit refresh to rerender
+          emit("refresh", updatedTab);
+          emit("update:open", false);
 
-            showPositiveNotification(t("dashboard.addTab.tabUpdatedSuccessfully"));
-          }
-          //else new tab
-          else {
-            const newTab = await addTab(
-              store,
-              props.dashboardId,
-              props.folderId ?? route.query.folder ?? "default",
-              { name: value.name, panels: [] },
-            );
-
-            // emit refresh to rerender
-            emit("refresh", newTab);
-            emit("update:open", false);
-
-            showPositiveNotification(t("dashboard.addTab.tabAddedSuccessfully"));
-          }
-      } catch (error: any) {
-          if (error?.response?.status === 409) {
-            showConfictErrorNotificationWithRefreshBtn(
-              error?.response?.data?.message ??
-                error?.message ??
-                (props.editMode
-                  ? t("dashboard.addTab.failedToUpdateTab")
-                  : t("dashboard.addTab.failedToAddTab")),
-            );
-          } else {
-            showErrorNotification(
-              error?.message ??
-                (props.editMode
-                  ? t("dashboard.addTab.failedToUpdateTab")
-                  : t("dashboard.addTab.failedToAddTab")),
-              {
-                timeout: 2000,
-              },
-            );
-          }
+          showPositiveNotification(t("dashboard.addTab.tabUpdatedSuccessfully"));
         }
+        //else new tab
+        else {
+          const newTab = await addTab(
+            store,
+            props.dashboardId,
+            props.folderId ?? route.query.folder ?? "default",
+            { name: value.name, panels: [] },
+          );
+
+          // emit refresh to rerender
+          emit("refresh", newTab);
+          emit("update:open", false);
+
+          showPositiveNotification(t("dashboard.addTab.tabAddedSuccessfully"));
+        }
+      } catch (error: any) {
+        if (error?.response?.status === 409) {
+          showConfictErrorNotificationWithRefreshBtn(
+            error?.response?.data?.message ??
+              error?.message ??
+              (props.editMode
+                ? t("dashboard.addTab.failedToUpdateTab")
+                : t("dashboard.addTab.failedToAddTab")),
+          );
+        } else {
+          showErrorNotification(
+            error?.message ??
+              (props.editMode
+                ? t("dashboard.addTab.failedToUpdateTab")
+                : t("dashboard.addTab.failedToAddTab")),
+            {
+              timeout: 2000,
+            },
+          );
+        }
+      }
     };
 
     return {

@@ -72,9 +72,7 @@ const SUBS = {
 
 // Imported lazily inside tests so the mocked aws-exports value is picked up.
 const buildCard = async () =>
-  (await import("@/components/ingestion/setupCard/content/kubernetes")).default(
-    SUBS,
-  );
+  (await import("@/components/ingestion/setupCard/content/kubernetes")).default(SUBS);
 
 describe("kubernetesCard builder", () => {
   beforeEach(() => {
@@ -84,17 +82,8 @@ describe("kubernetesCard builder", () => {
   it("builds the Kubernetes card metadata and step flow", async () => {
     const card = await buildCard();
     expect(card.provider.name).toBe("Kubernetes");
-    expect(card.provider.metaBadges).toEqual([
-      "Logs",
-      "Metrics",
-      "Events",
-      "Traces",
-    ]);
-    expect(card.steps.map((s) => s.id)).toEqual([
-      "install",
-      "instrument",
-      "verify",
-    ]);
+    expect(card.provider.metaBadges).toEqual(["Logs", "Metrics", "Events", "Traces"]);
+    expect(card.steps.map((s) => s.id)).toEqual(["install", "instrument", "verify"]);
     expect(card.detect).toMatchObject({
       streamType: "logs",
       streamName: "default",
@@ -161,15 +150,11 @@ describe("kubernetesCard builder", () => {
     expect(install.code?.raw).toContain("--o2-url=");
     // With no variants to carry it, the installer note (and the jump link to
     // the advanced section) moves onto the step itself.
-    expect(install.note).toContain(
-      "[Advanced Installation (Manual Steps)](#advanced)",
-    );
+    expect(install.note).toContain("[Advanced Installation (Manual Steps)](#advanced)");
   });
 
   it("points the internal variant at the cluster-local router", async () => {
-    const internal = (await buildCard()).steps[0].variants!.find(
-      (v) => v.id === "internal",
-    )!;
+    const internal = (await buildCard()).steps[0].variants!.find((v) => v.id === "internal")!;
     expect(internal.code.raw).toContain(
       "--internal-endpoint=http://o2-openobserve-router.openobserve.svc.cluster.local:5080",
     );
@@ -197,13 +182,7 @@ describe("kubernetesCard builder", () => {
     const step = (await buildCard()).steps.find((s) => s.id === "instrument")!;
     // Not required — the chip renders "Optional" off the absent `required`.
     expect(step.required).toBeUndefined();
-    expect(step.variants?.map((v) => v.id)).toEqual([
-      "java",
-      "dotnet",
-      "nodejs",
-      "python",
-      "go",
-    ]);
+    expect(step.variants?.map((v) => v.id)).toEqual(["java", "dotnet", "nodejs", "python", "go"]);
     expect(step.variants!.every((v) => !!v.icon)).toBe(true);
 
     const java = step.variants!.find((v) => v.id === "java")!;
@@ -215,9 +194,7 @@ describe("kubernetesCard builder", () => {
 
     // Go's eBPF instrumentation additionally needs the in-container binary path.
     const go = step.variants!.find((v) => v.id === "go")!;
-    expect(go.code.raw).toContain(
-      "instrumentation.opentelemetry.io/otel-go-auto-target-exe",
-    );
+    expect(go.code.raw).toContain("instrumentation.opentelemetry.io/otel-go-auto-target-exe");
   });
 
   it("anchors detection on the verify step with a valid SQL filter", async () => {
@@ -236,9 +213,7 @@ describe("kubernetesCard builder", () => {
     const card = await buildCard();
     const urls = (card.docLinks ?? []).map((l) => l.url);
     expect(urls).toContain("https://github.com/openobserve/hotcommerce");
-    expect(urls).toContain(
-      "https://github.com/open-telemetry/opentelemetry-operator",
-    );
+    expect(urls).toContain("https://github.com/open-telemetry/opentelemetry-operator");
   });
 
   it("carries troubleshooting guidance without markdown link syntax", async () => {
@@ -259,9 +234,7 @@ describe("KubernetesConfig.vue", () => {
   });
 
   it("renders the shared setup card for the kubernetes slug", () => {
-    expect(getDataSourceCard("kubernetes", SUBS)?.provider.name).toBe(
-      "Kubernetes",
-    );
+    expect(getDataSourceCard("kubernetes", SUBS)?.provider.name).toBe("Kubernetes");
     wrapper = mount(KubernetesConfig, {
       global: { plugins: [mockStore, mockI18n] },
     });

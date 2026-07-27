@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <span class="inline-flex gap-1 items-center" data-test="frustration-event-badge-wrapper">
+  <span class="inline-flex items-center gap-1" data-test="frustration-event-badge-wrapper">
     <OTag
       v-for="(type, index) in frustrationTypes"
       :key="index"
@@ -44,6 +44,5 @@ const tooltips: Record<string, string> = {
   error_tap: "Tap triggered a JavaScript error",
 };
 
-const getTooltipText = (type: string) =>
-  tooltips[type] || `Frustration signal: ${type}`;
+const getTooltipText = (type: string) => tooltips[type] || `Frustration signal: ${type}`;
 </script>

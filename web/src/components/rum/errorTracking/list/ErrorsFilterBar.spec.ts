@@ -165,9 +165,7 @@ const OSelectStub = {
 const defaultCounts = { new: 3, ongoing: 7, unhandled: 12, handled: 5 };
 const defaultServices = ["auth-service", "payment-service"];
 
-function mountFilterBar(
-  props: Record<string, unknown> = {},
-): VueWrapper {
+function mountFilterBar(props: Record<string, unknown> = {}): VueWrapper {
   return mount(ErrorsFilterBar, {
     props: {
       status: "all",
@@ -206,57 +204,31 @@ describe("ErrorsFilterBar", () => {
 
   describe("rendering", () => {
     it("renders the root filter bar element", () => {
-      expect(wrapper.find('[data-test="rum-errors-filter-bar"]').exists()).toBe(
-        true,
-      );
+      expect(wrapper.find('[data-test="rum-errors-filter-bar"]').exists()).toBe(true);
     });
 
     it("renders the status toggle group with All, New, and Ongoing items", () => {
-      expect(
-        wrapper.find('[data-test="rum-errors-filter-status-all"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="rum-errors-filter-status-new"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper
-          .find('[data-test="rum-errors-filter-status-ongoing"]')
-          .exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="rum-errors-filter-status-all"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="rum-errors-filter-status-new"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="rum-errors-filter-status-ongoing"]').exists()).toBe(true);
     });
 
     it("renders the type toggle group with All, Unhandled, and Handled items", () => {
-      expect(
-        wrapper.find('[data-test="rum-errors-filter-type-all"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper
-          .find('[data-test="rum-errors-filter-type-unhandled"]')
-          .exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="rum-errors-filter-type-handled"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="rum-errors-filter-type-all"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="rum-errors-filter-type-unhandled"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="rum-errors-filter-type-handled"]').exists()).toBe(true);
     });
 
     it("renders the service select element", () => {
-      expect(
-        wrapper
-          .find('[data-test="rum-errors-filter-service-select"]')
-          .exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="rum-errors-filter-service-select"]').exists()).toBe(true);
     });
 
     it("renders a label element for the service select", () => {
-      expect(wrapper.find('label[for="rum-errors-filter-service"]').exists()).toBe(
-        true,
-      );
+      expect(wrapper.find('label[for="rum-errors-filter-service"]').exists()).toBe(true);
     });
 
     it("service label contains 'Service' text", () => {
-      expect(
-        wrapper.find('label[for="rum-errors-filter-service"]').text(),
-      ).toContain("Service");
+      expect(wrapper.find('label[for="rum-errors-filter-service"]').text()).toContain("Service");
     });
   });
 
@@ -266,27 +238,23 @@ describe("ErrorsFilterBar", () => {
 
   describe("count labels in toggle items", () => {
     it("includes count 3 in the New status chip text", () => {
-      expect(
-        wrapper.find('[data-test="rum-errors-filter-status-new"]').text(),
-      ).toContain("· 3");
+      expect(wrapper.find('[data-test="rum-errors-filter-status-new"]').text()).toContain("· 3");
     });
 
     it("includes count 7 in the Ongoing status chip text", () => {
-      expect(
-        wrapper.find('[data-test="rum-errors-filter-status-ongoing"]').text(),
-      ).toContain("· 7");
+      expect(wrapper.find('[data-test="rum-errors-filter-status-ongoing"]').text()).toContain(
+        "· 7",
+      );
     });
 
     it("includes count 12 in the Unhandled type chip text", () => {
-      expect(
-        wrapper.find('[data-test="rum-errors-filter-type-unhandled"]').text(),
-      ).toContain("· 12");
+      expect(wrapper.find('[data-test="rum-errors-filter-type-unhandled"]').text()).toContain(
+        "· 12",
+      );
     });
 
     it("includes count 5 in the Handled type chip text", () => {
-      expect(
-        wrapper.find('[data-test="rum-errors-filter-type-handled"]').text(),
-      ).toContain("· 5");
+      expect(wrapper.find('[data-test="rum-errors-filter-type-handled"]').text()).toContain("· 5");
     });
 
     it("updates New count chip when counts.new prop changes", async () => {
@@ -294,41 +262,32 @@ describe("ErrorsFilterBar", () => {
         counts: { ...defaultCounts, new: 99 },
       });
 
-      expect(
-        wrapper.find('[data-test="rum-errors-filter-status-new"]').text(),
-      ).toContain("· 99");
+      expect(wrapper.find('[data-test="rum-errors-filter-status-new"]').text()).toContain("· 99");
     });
 
     it("New status item contains status label 'New' followed by count", () => {
-      const text = wrapper
-        .find('[data-test="rum-errors-filter-status-new"]')
-        .text();
+      const text = wrapper.find('[data-test="rum-errors-filter-status-new"]').text();
 
       expect(text).toContain("New");
       expect(text).toContain("3");
     });
 
     it("Ongoing status item contains status label 'Ongoing' followed by count", () => {
-      const text = wrapper
-        .find('[data-test="rum-errors-filter-status-ongoing"]')
-        .text();
+      const text = wrapper.find('[data-test="rum-errors-filter-status-ongoing"]').text();
 
       expect(text).toContain("Ongoing");
       expect(text).toContain("7");
     });
 
     it("Unhandled type item contains type label 'Unhandled' followed by count", () => {
-      const text = wrapper
-        .find('[data-test="rum-errors-filter-type-unhandled"]')
-        .text();
+      const text = wrapper.find('[data-test="rum-errors-filter-type-unhandled"]').text();
 
       expect(text).toContain("Unhandled");
       expect(text).toContain("12");
     });
 
     it("Handled type item contains type label 'Handled' followed by count", () => {
-      const text = wrapper
-        .find('[data-test="rum-errors-filter-type-handled"]').text();
+      const text = wrapper.find('[data-test="rum-errors-filter-type-handled"]').text();
 
       expect(text).toContain("Handled");
       expect(text).toContain("5");
@@ -341,18 +300,14 @@ describe("ErrorsFilterBar", () => {
 
   describe("status toggle interactions", () => {
     it("emits update:status with 'new' when the New item is clicked", async () => {
-      await wrapper
-        .find('[data-test="rum-errors-filter-status-new"]')
-        .trigger("click");
+      await wrapper.find('[data-test="rum-errors-filter-status-new"]').trigger("click");
 
       expect(wrapper.emitted("update:status")).toBeTruthy();
       expect(wrapper.emitted("update:status")![0]).toEqual(["new"]);
     });
 
     it("emits update:status with 'ongoing' when the Ongoing item is clicked", async () => {
-      await wrapper
-        .find('[data-test="rum-errors-filter-status-ongoing"]')
-        .trigger("click");
+      await wrapper.find('[data-test="rum-errors-filter-status-ongoing"]').trigger("click");
 
       expect(wrapper.emitted("update:status")![0]).toEqual(["ongoing"]);
     });
@@ -396,18 +351,14 @@ describe("ErrorsFilterBar", () => {
 
   describe("type toggle interactions", () => {
     it("emits update:type with 'unhandled' when the Unhandled item is clicked", async () => {
-      await wrapper
-        .find('[data-test="rum-errors-filter-type-unhandled"]')
-        .trigger("click");
+      await wrapper.find('[data-test="rum-errors-filter-type-unhandled"]').trigger("click");
 
       expect(wrapper.emitted("update:type")).toBeTruthy();
       expect(wrapper.emitted("update:type")![0]).toEqual(["unhandled"]);
     });
 
     it("emits update:type with 'handled' when the Handled item is clicked", async () => {
-      await wrapper
-        .find('[data-test="rum-errors-filter-type-handled"]')
-        .trigger("click");
+      await wrapper.find('[data-test="rum-errors-filter-type-handled"]').trigger("click");
 
       expect(wrapper.emitted("update:type")![0]).toEqual(["handled"]);
     });
@@ -415,9 +366,7 @@ describe("ErrorsFilterBar", () => {
     it("emits update:type with 'all' when the All type item is clicked", async () => {
       const w = mountFilterBar({ type: "handled" });
 
-      await w
-        .find('[data-test="rum-errors-filter-type-all"]')
-        .trigger("click");
+      await w.find('[data-test="rum-errors-filter-type-all"]').trigger("click");
 
       expect(w.emitted("update:type")![0]).toEqual(["all"]);
 
@@ -439,9 +388,7 @@ describe("ErrorsFilterBar", () => {
 
   describe("service select", () => {
     it("renders an 'All' option in the service select", () => {
-      const select = wrapper.find(
-        '[data-test="rum-errors-filter-service-select"] select',
-      );
+      const select = wrapper.find('[data-test="rum-errors-filter-service-select"] select');
       const options = select.findAll("option");
 
       expect(options[0].text()).toBe("All");
@@ -451,9 +398,7 @@ describe("ErrorsFilterBar", () => {
     });
 
     it("renders one option per entry in the services prop", () => {
-      const select = wrapper.find(
-        '[data-test="rum-errors-filter-service-select"] select',
-      );
+      const select = wrapper.find('[data-test="rum-errors-filter-service-select"] select');
       const options = select.findAll("option");
 
       // 1 "All" option + 2 services
@@ -461,27 +406,21 @@ describe("ErrorsFilterBar", () => {
     });
 
     it("renders auth-service as an option in the select", () => {
-      const select = wrapper.find(
-        '[data-test="rum-errors-filter-service-select"] select',
-      );
+      const select = wrapper.find('[data-test="rum-errors-filter-service-select"] select');
 
       const texts = select.findAll("option").map((o) => o.text());
       expect(texts).toContain("auth-service");
     });
 
     it("renders payment-service as an option in the select", () => {
-      const select = wrapper.find(
-        '[data-test="rum-errors-filter-service-select"] select',
-      );
+      const select = wrapper.find('[data-test="rum-errors-filter-service-select"] select');
 
       const texts = select.findAll("option").map((o) => o.text());
       expect(texts).toContain("payment-service");
     });
 
     it("emits update:service with service name when a service is selected", async () => {
-      const select = wrapper.find(
-        '[data-test="rum-errors-filter-service-select"] select',
-      );
+      const select = wrapper.find('[data-test="rum-errors-filter-service-select"] select');
 
       await select.setValue("auth-service");
 
@@ -492,9 +431,7 @@ describe("ErrorsFilterBar", () => {
     it("emits update:service with empty string when 'All' is selected", async () => {
       const w = mountFilterBar({ service: "auth-service" });
 
-      const select = w.find(
-        '[data-test="rum-errors-filter-service-select"] select',
-      );
+      const select = w.find('[data-test="rum-errors-filter-service-select"] select');
 
       await select.setValue("");
 
@@ -506,9 +443,7 @@ describe("ErrorsFilterBar", () => {
     it("shows only All option when services array is empty", () => {
       const w = mountFilterBar({ services: [] });
 
-      const select = w.find(
-        '[data-test="rum-errors-filter-service-select"] select',
-      );
+      const select = w.find('[data-test="rum-errors-filter-service-select"] select');
       const options = select.findAll("option");
 
       expect(options).toHaveLength(1);
@@ -520,9 +455,7 @@ describe("ErrorsFilterBar", () => {
     it("renders a single service plus All when services has one entry", () => {
       const w = mountFilterBar({ services: ["my-service"] });
 
-      const select = w.find(
-        '[data-test="rum-errors-filter-service-select"] select',
-      );
+      const select = w.find('[data-test="rum-errors-filter-service-select"] select');
       const options = select.findAll("option");
 
       expect(options).toHaveLength(2);
@@ -539,9 +472,7 @@ describe("ErrorsFilterBar", () => {
     it("updates the services list when services prop changes", async () => {
       await wrapper.setProps({ services: ["new-svc-a", "new-svc-b", "new-svc-c"] });
 
-      const select = wrapper.find(
-        '[data-test="rum-errors-filter-service-select"] select',
-      );
+      const select = wrapper.find('[data-test="rum-errors-filter-service-select"] select');
       const texts = select.findAll("option").map((o) => o.text());
 
       expect(texts).toContain("new-svc-a");
@@ -554,9 +485,9 @@ describe("ErrorsFilterBar", () => {
         counts: { ...defaultCounts, unhandled: 55 },
       });
 
-      expect(
-        wrapper.find('[data-test="rum-errors-filter-type-unhandled"]').text(),
-      ).toContain("· 55");
+      expect(wrapper.find('[data-test="rum-errors-filter-type-unhandled"]').text()).toContain(
+        "· 55",
+      );
     });
   });
 
@@ -571,9 +502,7 @@ describe("ErrorsFilterBar", () => {
       });
 
       expect(w.find('[data-test="rum-errors-filter-bar"]').exists()).toBe(true);
-      expect(
-        w.find('[data-test="rum-errors-filter-status-new"]').text(),
-      ).toContain("· 0");
+      expect(w.find('[data-test="rum-errors-filter-status-new"]').text()).toContain("· 0");
 
       w.unmount();
     });
@@ -583,9 +512,7 @@ describe("ErrorsFilterBar", () => {
         counts: { new: 10000, ongoing: 0, unhandled: 0, handled: 0 },
       });
 
-      expect(
-        w.find('[data-test="rum-errors-filter-status-new"]').text(),
-      ).toContain("· 10000");
+      expect(w.find('[data-test="rum-errors-filter-status-new"]').text()).toContain("· 10000");
 
       w.unmount();
     });
@@ -595,9 +522,7 @@ describe("ErrorsFilterBar", () => {
         services: ["api-gateway_v2", "web-app.prod"],
       });
 
-      const select = w.find(
-        '[data-test="rum-errors-filter-service-select"] select',
-      );
+      const select = w.find('[data-test="rum-errors-filter-service-select"] select');
       const texts = select.findAll("option").map((o) => o.text());
 
       expect(texts).toContain("api-gateway_v2");
@@ -609,9 +534,7 @@ describe("ErrorsFilterBar", () => {
     it("handles unicode service names gracefully", () => {
       const w = mountFilterBar({ services: ["サービス-A", "сервис-B"] });
 
-      const select = w.find(
-        '[data-test="rum-errors-filter-service-select"] select',
-      );
+      const select = w.find('[data-test="rum-errors-filter-service-select"] select');
       const texts = select.findAll("option").map((o) => o.text());
 
       expect(texts).toContain("サービス-A");
@@ -621,17 +544,13 @@ describe("ErrorsFilterBar", () => {
 
     it("All status chip text contains only 'All' without a count", () => {
       // The "All" status item has no count appended in the template
-      const text = wrapper
-        .find('[data-test="rum-errors-filter-status-all"]')
-        .text();
+      const text = wrapper.find('[data-test="rum-errors-filter-status-all"]').text();
 
       expect(text.trim()).toBe("All");
     });
 
     it("All type chip text contains only 'All' without a count", () => {
-      const text = wrapper
-        .find('[data-test="rum-errors-filter-type-all"]')
-        .text();
+      const text = wrapper.find('[data-test="rum-errors-filter-type-all"]').text();
 
       expect(text.trim()).toBe("All");
     });
@@ -653,18 +572,14 @@ describe("ErrorsFilterBar", () => {
     });
 
     it("emits only update:status and not update:type when a status item is clicked", async () => {
-      await wrapper
-        .find('[data-test="rum-errors-filter-status-new"]')
-        .trigger("click");
+      await wrapper.find('[data-test="rum-errors-filter-status-new"]').trigger("click");
 
       expect(wrapper.emitted("update:status")).toBeTruthy();
       expect(wrapper.emitted("update:type")).toBeFalsy();
     });
 
     it("emits only update:type and not update:status when a type item is clicked", async () => {
-      await wrapper
-        .find('[data-test="rum-errors-filter-type-handled"]')
-        .trigger("click");
+      await wrapper.find('[data-test="rum-errors-filter-type-handled"]').trigger("click");
 
       expect(wrapper.emitted("update:type")).toBeTruthy();
       expect(wrapper.emitted("update:status")).toBeFalsy();

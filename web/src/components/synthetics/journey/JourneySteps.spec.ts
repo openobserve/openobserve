@@ -139,7 +139,7 @@ describe("JourneySteps", () => {
       await flushPromises();
 
       // Verify action icons are rendered with correct names
-      const icons = wrapper.findAll('[data-icon-name]');
+      const icons = wrapper.findAll("[data-icon-name]");
       const iconNames = icons.map((i) => i.attributes("data-icon-name"));
       expect(iconNames).toContain("open-in-browser"); // navigate
       expect(iconNames).toContain("ads-click"); // click
@@ -190,7 +190,9 @@ describe("JourneySteps", () => {
       // Action buttons should not be rendered
       expect(wrapper.find('[data-test="synthetics-journey-step-insert-btn"]').exists()).toBe(false);
       expect(wrapper.find('[data-test="synthetics-journey-step-delete-btn"]').exists()).toBe(false);
-      expect(wrapper.find('[data-test="synthetics-journey-step-duplicate-btn"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="synthetics-journey-step-duplicate-btn"]').exists()).toBe(
+        false,
+      );
     });
 
     it("should show action buttons when readonly is false", async () => {
@@ -205,7 +207,9 @@ describe("JourneySteps", () => {
       // Action buttons should be rendered for each row
       expect(wrapper.find('[data-test="synthetics-journey-step-insert-btn"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="synthetics-journey-step-delete-btn"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="synthetics-journey-step-duplicate-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="synthetics-journey-step-duplicate-btn"]').exists()).toBe(
+        true,
+      );
     });
 
     it("should default to showing action buttons when readonly is not specified", async () => {
@@ -404,7 +408,9 @@ describe("JourneySteps", () => {
 
       // In results mode, action buttons should NOT be present
       expect(wrapper.find('[data-test="synthetics-journey-step-delete-btn"]').exists()).toBe(false);
-      expect(wrapper.find('[data-test="synthetics-journey-step-duplicate-btn"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="synthetics-journey-step-duplicate-btn"]').exists()).toBe(
+        false,
+      );
       expect(wrapper.find('[data-test="synthetics-journey-step-insert-btn"]').exists()).toBe(false);
     });
   });
@@ -413,9 +419,7 @@ describe("JourneySteps", () => {
 
   describe("step name fallback", () => {
     it("should use action label as name when step name is empty", async () => {
-      const steps = [
-        makeStep({ id: "step-1", action: "navigate", name: "" }),
-      ];
+      const steps = [makeStep({ id: "step-1", action: "navigate", name: "" })];
       wrapper = mount(JourneySteps, {
         props: { data: steps, mode: "editor" },
         global: { stubs: STUBS },

@@ -45,9 +45,7 @@ describe("OInnerLoading", () => {
       props: { showing: true, label: "Fetching values..." },
       global: { stubs: { transition: false } },
     });
-    expect(wrapper.find("[role='status']").attributes("aria-label")).toBe(
-      "Fetching values..."
-    );
+    expect(wrapper.find("[role='status']").attributes("aria-label")).toBe("Fetching values...");
   });
 
   it("defaults aria-label to 'Loading' when no label", () => {
@@ -55,9 +53,7 @@ describe("OInnerLoading", () => {
       props: { showing: true },
       global: { stubs: { transition: false } },
     });
-    expect(wrapper.find("[role='status']").attributes("aria-label")).toBe(
-      "Loading"
-    );
+    expect(wrapper.find("[role='status']").attributes("aria-label")).toBe("Loading");
   });
 
   it("applies absolute+inset-0 overlay positioning", () => {

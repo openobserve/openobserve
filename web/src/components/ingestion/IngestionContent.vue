@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   detail pages at once.
 -->
 <template>
-  <div class="p-3 flex flex-col gap-4 text-sm">
+  <div class="flex flex-col gap-4 p-3 text-sm">
     <slot />
   </div>
 </template>

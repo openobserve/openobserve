@@ -15,24 +15,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="rounded-default px-4 pt-3 overflow-auto" style="min-height: inherit">
+  <div class="rounded-default overflow-auto px-4 pt-3" style="min-height: inherit">
     <!-- Page title is supplied by the parent Billing.vue OPageHeader; no local title here. -->
     <!-- Managed billing empty state for child orgs -->
     <div
       v-if="isChildOrg"
-      class="flex flex-col items-center justify-center text-center min-h-[calc(100vh-var(--navbar-height)-200px)] py-12 px-6"
+      class="flex min-h-[calc(100vh-var(--navbar-height)-200px)] flex-col items-center justify-center px-6 py-12 text-center"
       data-test="plans-managed-billing-panel"
     >
-      <div class="w-25 h-25 rounded-full border border-dashed border-[color-mix(in_srgb,var(--color-primary-600)_30%,transparent)] flex items-center justify-center mb-7">
-        <div class="w-17 h-17 rounded-full bg-[color-mix(in_srgb,var(--color-primary-600)_10%,transparent)] border-[1.5px] border-[color-mix(in_srgb,var(--color-primary-600)_24%,transparent)] border-solid flex items-center justify-center">
+      <div
+        class="mb-7 flex h-25 w-25 items-center justify-center rounded-full border border-dashed border-[color-mix(in_srgb,var(--color-primary-600)_30%,transparent)]"
+      >
+        <div
+          class="flex h-17 w-17 items-center justify-center rounded-full border-[1.5px] border-solid border-[color-mix(in_srgb,var(--color-primary-600)_24%,transparent)] bg-[color-mix(in_srgb,var(--color-primary-600)_10%,transparent)]"
+        >
           <OIcon name="account-balance" size="lg" class="text-accent opacity-85" />
         </div>
       </div>
 
-      <div class="text-xl font-bold tracking-[-0.2px] mb-2.5">
+      <div class="mb-2.5 text-xl font-bold tracking-[-0.2px]">
         {{ t("billing.billingGroup.plansManagedTitle") }}
       </div>
-      <div class="text-sm leading-[1.65] opacity-65 max-w-110 mb-6">
+      <div class="mb-6 max-w-110 text-sm leading-[1.65] opacity-65">
         {{
           t("billing.billingGroup.plansManagedDescription", {
             name: membership?.payer_org_name,
@@ -41,16 +45,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }}
       </div>
 
-      <div class="flex items-center gap-2 flex-wrap justify-center mb-8">
-        <span class="inline-flex items-center gap-1.25 text-xs font-medium opacity-85 bg-[color-mix(in_srgb,currentColor_6%,transparent)] border border-(--color-card-glass-border,rgba(0,0,0,0.1)) rounded-full py-1 px-3">
+      <div class="mb-8 flex flex-wrap items-center justify-center gap-2">
+        <span
+          class="inline-flex items-center gap-1.25 rounded-full border border-(--color-card-glass-border,rgba(0,0,0,0.1)) bg-[color-mix(in_srgb,currentColor_6%,transparent)] px-3 py-1 text-xs font-medium opacity-85"
+        >
           <OIcon name="receipt-long" size="xs" />
           {{ t("billing.billingGroup.chipConsolidatedBill") }}
         </span>
-        <span class="inline-flex items-center gap-1.25 text-xs font-medium opacity-85 bg-[color-mix(in_srgb,currentColor_6%,transparent)] border border-(--color-card-glass-border,rgba(0,0,0,0.1)) rounded-full py-1 px-3">
+        <span
+          class="inline-flex items-center gap-1.25 rounded-full border border-(--color-card-glass-border,rgba(0,0,0,0.1)) bg-[color-mix(in_srgb,currentColor_6%,transparent)] px-3 py-1 text-xs font-medium opacity-85"
+        >
           <OIcon name="lock" size="xs" />
           {{ t("billing.billingGroup.chipPlanManaged") }}
         </span>
-        <span class="inline-flex items-center gap-1.25 text-xs font-medium opacity-85 bg-[color-mix(in_srgb,currentColor_6%,transparent)] border border-(--color-card-glass-border,rgba(0,0,0,0.1)) rounded-full py-1 px-3">
+        <span
+          class="inline-flex items-center gap-1.25 rounded-full border border-(--color-card-glass-border,rgba(0,0,0,0.1)) bg-[color-mix(in_srgb,currentColor_6%,transparent)] px-3 py-1 text-xs font-medium opacity-85"
+        >
           <OIcon name="description" size="xs" />
           {{ t("billing.billingGroup.chipNoInvoices") }}
         </span>
@@ -58,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <OButton
         variant="primary"
-        class="h-10 py-0 px-6 font-semibold"
+        class="h-10 px-6 py-0 font-semibold"
         data-test="plans-view-org-group-btn"
         @click="goToOrgGroup"
       >
@@ -69,72 +79,89 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OButton>
     </div>
     <template v-else>
-    <trial-period class="mb-3" currentPage="billing"></trial-period>
-    <!-- AI Credits card -->
-    <div v-if="aiUsage" class="grid grid-cols-1 gap-4 w-full mb-4">
-      <div class="bg-card-glass-bg border border-card-glass-border rounded-default p-4 shadow-none transition-shadow duration-200 hover:shadow-[0_1px_3px_rgba(0,0,0,0.1)] dark:bg-surface-base dark:border-border-default">
-        <div class="min-h-full rounded-default transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] text-center flex flex-col justify-between">
-          <div class="flex flex-col justify-between">
-            <div class="flex justify-between items-center">
-              <div class="text-base font-medium leading-5 text-text-heading text-left">{{ t("billing.aiCredits") }}</div>
-              <div class="opacity-80">
-                <img :src="aiIcon" />
+      <TrialPeriod class="mb-3" currentPage="billing"></TrialPeriod>
+      <!-- AI Credits card -->
+      <div v-if="aiUsage" class="mb-4 grid w-full grid-cols-1 gap-4">
+        <div
+          class="bg-card-glass-bg border-card-glass-border rounded-default dark:bg-surface-base dark:border-border-default border p-4 shadow-none transition-shadow duration-200 hover:shadow-[0_1px_3px_rgba(0,0,0,0.1)]"
+        >
+          <div
+            class="rounded-default flex min-h-full flex-col justify-between text-center transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]"
+          >
+            <div class="flex flex-col justify-between">
+              <div class="flex items-center justify-between">
+                <div class="text-text-heading text-left text-base leading-5 font-medium">
+                  {{ t("billing.aiCredits") }}
+                </div>
+                <div class="opacity-80">
+                  <img :src="aiIcon" />
+                </div>
               </div>
+              <OTag type="aiMode" :value="aiUsage.mode" class="mt-2" style="width: fit-content" />
             </div>
-            <OTag
-              type="aiMode"
-              :value="aiUsage.mode"
-              class="mt-2"
-              style="width: fit-content;"
-            />
-          </div>
-          <div class="mt-3 mb-2">
-            <OProgressBar
-              :value="aiUsageRatio"
-              size="sm"
-              :variant="aiUsageRatio >= 1 ? 'danger' : aiUsageRatio >= 0.9 ? 'warning' : 'default'"
-            />
-          </div>
-          <div class="text-2xl font-semibold leading-7 text-text-body text-left flex items-end">
-            {{ aiUsage.credits_used }} / {{ aiUsage.credits_limit }} credits used
-          </div>
-          <div v-if="aiUsage.mode === 'exhausted'" class="text-status-error-text mt-2" style="font-size: var(--text-compact);">
-            {{ t(aiUsage.requires_additional_credits ? "billing.aiContractExhaustedMessage" : "billing.aiExhaustedMessage") }}
-          </div>
-          <div v-else-if="aiUsage.mode === 'pay_as_you_go'" class="text-info mt-2" style="font-size: var(--text-compact);">
-            {{ t("billing.aiPaygMessage") }}
+            <div class="mt-3 mb-2">
+              <OProgressBar
+                :value="aiUsageRatio"
+                size="sm"
+                :variant="
+                  aiUsageRatio >= 1 ? 'danger' : aiUsageRatio >= 0.9 ? 'warning' : 'default'
+                "
+              />
+            </div>
+            <div class="text-text-body flex items-end text-left text-2xl leading-7 font-semibold">
+              {{ aiUsage.credits_used }} / {{ aiUsage.credits_limit }} credits used
+            </div>
+            <div
+              v-if="aiUsage.mode === 'exhausted'"
+              class="text-status-error-text mt-2"
+              style="font-size: var(--text-compact)"
+            >
+              {{
+                t(
+                  aiUsage.requires_additional_credits
+                    ? "billing.aiContractExhaustedMessage"
+                    : "billing.aiExhaustedMessage",
+                )
+              }}
+            </div>
+            <div
+              v-else-if="aiUsage.mode === 'pay_as_you_go'"
+              class="text-info mt-2"
+              style="font-size: var(--text-compact)"
+            >
+              {{ t("billing.aiPaygMessage") }}
+            </div>
           </div>
         </div>
       </div>
-    </div>
-    <div
-      v-if="
-        store.state.selectedOrganization.hasOwnProperty('note') &&
-        store.state.selectedOrganization.note
-      "
-      class="flex justify-start items-center gap-2 text-status-error-text text-xl font-semibold pl-6 pb-4"
-    >
-      <OIcon name="warning" size="sm" class="pt-2" />
-      >{{ store.state.selectedOrganization.note }}
-    </div>
-    <div v-if="loading" class="text-xl font-semibold font-medium text-center">
-      <OSpinner size="md" class="mx-auto block text-center mt-3" />
-    </div>
-    <div v-else class="grid grid-cols-2 gap-3 mt-3">
-      <pro-plan
-        :planType="planType"
-        :billingProvider="billingProvider"
-        :subscriptionType="subscriptionType"
-        :features="proPlanFeatures"
-        :pricingError="pricingError"
-        @update:proSubscription="onLoadSubscription(config.paidPlan)"
-        @update:cancelSubscription="onUnsubscribe"
-      ></pro-plan>
-      <enterprise-plan
-        :features="enterprisePlanFeatures"
-        :pricingError="pricingError"
-      ></enterprise-plan>
-    </div>
+      <div
+        v-if="
+          store.state.selectedOrganization.hasOwnProperty('note') &&
+          store.state.selectedOrganization.note
+        "
+        class="text-status-error-text flex items-center justify-start gap-2 pb-4 pl-6 text-xl font-semibold"
+      >
+        <OIcon name="warning" size="sm" class="pt-2" />
+        >{{ store.state.selectedOrganization.note }}
+      </div>
+      <div v-if="loading" class="text-center text-xl font-medium font-semibold">
+        <OSpinner size="md" class="mx-auto mt-3 block text-center" />
+      </div>
+      <div v-else class="mt-3 grid grid-cols-2 gap-3">
+        <ProPlan
+          :planType="planType"
+          :billingProvider="billingProvider"
+          :subscriptionType="subscriptionType"
+          :features="proPlanFeatures"
+          :pricingError="pricingError"
+          @update:proSubscription="onLoadSubscription(config.paidPlan)"
+          @update:cancelSubscription="onUnsubscribe"
+        ></ProPlan>
+        <EnterprisePlan
+          :features="enterprisePlanFeatures"
+          :pricingError="pricingError"
+        ></EnterprisePlan>
+      </div>
     </template>
   </div>
 </template>
@@ -189,9 +216,7 @@ export default defineComponent({
     },
     fetchMembership() {
       if (config.isCloud !== "true") return;
-      BillingService.get_billing_group_membership(
-        this.store.state.selectedOrganization.identifier
-      )
+      BillingService.get_billing_group_membership(this.store.state.selectedOrganization.identifier)
         .then((res: any) => {
           this.membership = res.data?.membership ?? null;
         })
@@ -200,9 +225,7 @@ export default defineComponent({
         });
     },
     fetchAiUsage() {
-      BillingService.get_ai_usage(
-        this.store.state.selectedOrganization.identifier
-      )
+      BillingService.get_ai_usage(this.store.state.selectedOrganization.identifier)
         .then((res: any) => {
           this.aiUsage = res.data;
         })
@@ -222,20 +245,14 @@ export default defineComponent({
             is_parent: !f.isSubItem,
           }));
         const payAsYouGo =
-          cloudPlans.find((p: any) =>
-            p.title?.toLowerCase().includes("pay as you go"),
-          ) ?? cloudPlans[0];
+          cloudPlans.find((p: any) => p.title?.toLowerCase().includes("pay as you go")) ??
+          cloudPlans[0];
         const enterprise =
-          cloudPlans.find((p: any) =>
-            p.title?.toLowerCase().includes("enterprise"),
-          ) ?? cloudPlans[1];
+          cloudPlans.find((p: any) => p.title?.toLowerCase().includes("enterprise")) ??
+          cloudPlans[1];
 
-        const proFeatures = payAsYouGo?.features
-          ? mapFeatures(payAsYouGo.features)
-          : [];
-        const entFeatures = enterprise?.features
-          ? mapFeatures(enterprise.features)
-          : [];
+        const proFeatures = payAsYouGo?.features ? mapFeatures(payAsYouGo.features) : [];
+        const entFeatures = enterprise?.features ? mapFeatures(enterprise.features) : [];
 
         const diff = proFeatures.length - entFeatures.length + 3;
         const paddedEntFeatures =
@@ -259,9 +276,7 @@ export default defineComponent({
     onLoadSubscription(planType: string) {
       this.proLoading = true;
       if (this.listSubscriptionResponse.card != undefined) {
-        BillingService.resume_subscription(
-          this.store.state.selectedOrganization.identifier,
-        )
+        BillingService.resume_subscription(this.store.state.selectedOrganization.identifier)
           .then(async () => {
             await this.loadSubscription();
           })
@@ -274,10 +289,7 @@ export default defineComponent({
             });
           });
       } else {
-        BillingService.get_hosted_url(
-          this.store.state.selectedOrganization.identifier,
-          planType,
-        )
+        BillingService.get_hosted_url(this.store.state.selectedOrganization.identifier, planType)
           .then((res) => {
             window.location.href = res.data.url;
           })
@@ -294,10 +306,7 @@ export default defineComponent({
       this.onChangePaymentDetail(this.currentPlanDetail.customer_id);
     },
     onChangePaymentDetail(customer_id: string) {
-      BillingService.get_session_url(
-        this.store.state.selectedOrganization.identifier,
-        customer_id,
-      )
+      BillingService.get_session_url(this.store.state.selectedOrganization.identifier, customer_id)
         .then((res) => {
           // this.updatePaymentResponse = res.data.data.url;
           // setInterval(this.retrieveHostedPage, 5000);
@@ -336,10 +345,7 @@ export default defineComponent({
             useLocalOrganization(localOrg.value);
             this.store.dispatch("setSelectedOrganization", localOrg.value);
           }
-        } else if (
-          this.billingProvider === "" ||
-          this.billingProvider === "stripe"
-        ) {
+        } else if (this.billingProvider === "" || this.billingProvider === "stripe") {
           // Only show subscribe prompt for Stripe orgs without subscription
           toast({
             variant: "warning",
@@ -390,7 +396,7 @@ export default defineComponent({
     const aiIcon = computed(() =>
       isDark.value
         ? getImageURL("images/common/ai_icon_dark.svg")
-        : getImageURL("images/common/ai_icon_gradient.svg")
+        : getImageURL("images/common/ai_icon_gradient.svg"),
     );
     const aiUsageRatio = computed(() => {
       if (!aiUsage.value || !aiUsage.value.credits_limit) return 0;

@@ -26,7 +26,6 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toast: vi.fn(),
 }));
 
-
 // ---------------------------------------------------------------------------
 // Module mocks
 // ---------------------------------------------------------------------------
@@ -39,9 +38,9 @@ vi.mock("@/composables/useStreams", () => ({
     getStream: vi.fn().mockResolvedValue({
       schema: [
         { name: "_timestamp", type: "datetime" },
-        { name: "message",    type: "string"   },
-        { name: "level",      type: "string"   },
-        { name: "source",     type: "string"   },
+        { name: "message", type: "string" },
+        { name: "level", type: "string" },
+        { name: "source", type: "string" },
       ],
     }),
     getStreams: vi.fn(),
@@ -54,7 +53,7 @@ vi.mock("@/composables/useQuery", () => ({
       query: {
         sql: "SELECT * FROM logs",
         start_time: 1_000_000_000,
-        end_time:   2_000_000_000,
+        end_time: 2_000_000_000,
       },
       aggs: {},
     }),
@@ -70,8 +69,8 @@ vi.mock("@/utils/zincutils", async (importOriginal) => {
   };
 });
 
-const mockAddNode             = vi.fn();
-const mockDeletePipelineNode  = vi.fn();
+const mockAddNode = vi.fn();
+const mockDeletePipelineNode = vi.fn();
 
 vi.mock("@/plugins/pipelines/useDnD", () => ({
   default: vi.fn(),
@@ -113,21 +112,33 @@ function createWrapper(props: any = {}, pipelineObjOverrides: any = {}) {
           name: "ScheduledPipeline",
           template: '<div class="scheduled-pipeline-stub"></div>',
           props: [
-            "columns", "conditions", "alertData", "disableThreshold",
-            "disableVrlFunction", "isValidSqlQuery", "disableQueryTypeSelection",
-            "expandedLogs", "validatingSqlQuery",
+            "columns",
+            "conditions",
+            "alertData",
+            "disableThreshold",
+            "disableVrlFunction",
+            "isValidSqlQuery",
+            "disableQueryTypeSelection",
+            "expandedLogs",
+            "validatingSqlQuery",
           ],
           emits: [
-            "validate-sql", "submit:form", "cancel:form", "delete:node",
-            "update:fullscreen", "update:stream_type", "expandLog", "update:delay",
+            "validate-sql",
+            "submit:form",
+            "cancel:form",
+            "delete:node",
+            "update:fullscreen",
+            "update:stream_type",
+            "expandLog",
+            "update:delay",
           ],
         },
         ConfirmDialog: true,
       },
     },
     props: {
-      streamName:   "test-stream",
-      streamType:   "logs",
+      streamName: "test-stream",
+      streamType: "logs",
       streamRoutes: {},
       editingRoute: null,
       ...props,
@@ -184,7 +195,10 @@ describe("Query Component", () => {
       await flushPromises();
       expect(wrapper.vm.streamRoute.conditions).toHaveLength(1);
       expect(wrapper.vm.streamRoute.conditions[0]).toEqual({
-        column: "", operator: "", value: "", id: "mock-uuid",
+        column: "",
+        operator: "",
+        value: "",
+        id: "mock-uuid",
       });
     });
 
@@ -193,7 +207,9 @@ describe("Query Component", () => {
       await flushPromises();
       expect(wrapper.vm.streamRoute.context_attributes).toHaveLength(1);
       expect(wrapper.vm.streamRoute.context_attributes[0]).toMatchObject({
-        key: "", value: "", id: "mock-uuid",
+        key: "",
+        value: "",
+        id: "mock-uuid",
       });
     });
 
@@ -241,18 +257,32 @@ describe("Query Component", () => {
       const nodeData = {
         name: "existing-query",
         stream_type: "metrics",
-        query_condition: { type: "sql", sql: "SELECT * FROM m", aggregation: null, promql_condition: null },
-        trigger_condition: { period: 30, frequency_type: "minutes", cron: "", frequency: 30, timezone: "UTC" },
+        query_condition: {
+          type: "sql",
+          sql: "SELECT * FROM m",
+          aggregation: null,
+          promql_condition: null,
+        },
+        trigger_condition: {
+          period: 30,
+          frequency_type: "minutes",
+          cron: "",
+          frequency: 30,
+          timezone: "UTC",
+        },
         delay: 5,
         conditions: [],
         context_attributes: [],
         description: "test desc",
         enabled: false,
       };
-      const wrapper = createWrapper({}, {
-        isEditNode: true,
-        currentSelectedNodeData: { data: nodeData },
-      });
+      const wrapper = createWrapper(
+        {},
+        {
+          isEditNode: true,
+          currentSelectedNodeData: { data: nodeData },
+        },
+      );
       await flushPromises();
       expect(wrapper.vm.streamRoute.stream_type).toBe("metrics");
       expect(wrapper.vm.streamRoute.delay).toBe(5);
@@ -336,18 +366,18 @@ describe("Query Component", () => {
   // and not a schema field — the live drawer doesn't edit streamRoute.name).
   describe("Stream Name Validation (isValidStreamName)", () => {
     const cases = [
-      { name: "valid123",        expected: true  },
-      { name: "valid_name",      expected: true  },
-      { name: "valid-name",      expected: true  },
-      { name: "valid.name",      expected: true  },
-      { name: "valid@name",      expected: true  },
-      { name: "valid+name",      expected: true  },
-      { name: "valid=name",      expected: true  },
-      { name: "valid,name",      expected: true  },
-      { name: "invalid!name",    expected: false },
-      { name: "invalid#name",    expected: false },
-      { name: "invalid$name",    expected: false },
-      { name: "",                expected: false },
+      { name: "valid123", expected: true },
+      { name: "valid_name", expected: true },
+      { name: "valid-name", expected: true },
+      { name: "valid.name", expected: true },
+      { name: "valid@name", expected: true },
+      { name: "valid+name", expected: true },
+      { name: "valid=name", expected: true },
+      { name: "valid,name", expected: true },
+      { name: "invalid!name", expected: false },
+      { name: "invalid#name", expected: false },
+      { name: "invalid$name", expected: false },
+      { name: "", expected: false },
     ];
     cases.forEach(({ name, expected }) => {
       it(`isValidStreamName for "${name}" is ${expected}`, async () => {
@@ -468,9 +498,7 @@ describe("Query Component", () => {
     it("removeVariable with unknown id leaves array unchanged", async () => {
       const wrapper = createWrapper();
       await flushPromises();
-      wrapper.vm.form.setFieldValue("context_attributes", [
-        { key: "k", value: "v", id: "id1" },
-      ]);
+      wrapper.vm.form.setFieldValue("context_attributes", [{ key: "k", value: "v", id: "id1" }]);
       await nextTick();
       wrapper.vm.removeVariable({ id: "does-not-exist" });
       await nextTick();
@@ -530,7 +558,7 @@ describe("Query Component", () => {
       expect(toast).toHaveBeenCalledWith(
         expect.objectContaining({
           message: `Invalid SQL Query: ${errMsg}`,
-        })
+        }),
       );
     });
 
@@ -546,9 +574,7 @@ describe("Query Component", () => {
       await wrapper.vm.validateSqlQuery();
       await flushPromises();
       expect(wrapper.vm.isValidSqlQuery).toBe(false);
-      expect(toast).toHaveBeenCalledWith(
-        expect.objectContaining({ message: "Invalid SQL Query" })
-      );
+      expect(toast).toHaveBeenCalledWith(expect.objectContaining({ message: "Invalid SQL Query" }));
     });
 
     it("skips search call entirely for promql query type", async () => {
@@ -570,7 +596,7 @@ describe("Query Component", () => {
       await wrapper.vm.validateSqlQuery();
       await flushPromises();
       expect(searchService.search).toHaveBeenCalledWith(
-        expect.objectContaining({ page_type: "metrics" })
+        expect.objectContaining({ page_type: "metrics" }),
       );
     });
 
@@ -583,7 +609,7 @@ describe("Query Component", () => {
       await wrapper.vm.validateSqlQuery();
       await flushPromises();
       expect(searchService.search).not.toHaveBeenCalledWith(
-        expect.objectContaining({ page_type: "logs" })
+        expect.objectContaining({ page_type: "logs" }),
       );
     });
 
@@ -595,7 +621,7 @@ describe("Query Component", () => {
       await wrapper.vm.validateSqlQuery();
       await flushPromises();
       expect(searchService.search).toHaveBeenCalledWith(
-        expect.objectContaining({ validate: true })
+        expect.objectContaining({ validate: true }),
       );
     });
   });
@@ -656,9 +682,7 @@ describe("Query Component", () => {
       wrapper.vm.openCancelDialog();
       expect(wrapper.vm.dialog.show).toBe(true);
       expect(wrapper.vm.dialog.title).toBe("Discard Changes");
-      expect(wrapper.vm.dialog.message).toBe(
-        "Are you sure you want to cancel routing changes?"
-      );
+      expect(wrapper.vm.dialog.message).toBe("Are you sure you want to cancel routing changes?");
     });
 
     it("openCancelDialog directly closes when no changes were made", async () => {
@@ -688,9 +712,7 @@ describe("Query Component", () => {
       wrapper.vm.openDeleteDialog();
       expect(wrapper.vm.dialog.show).toBe(true);
       expect(wrapper.vm.dialog.title).toBe("Delete Node");
-      expect(wrapper.vm.dialog.message).toBe(
-        "Are you sure you want to delete stream routing?"
-      );
+      expect(wrapper.vm.dialog.message).toBe("Are you sure you want to delete stream routing?");
     });
 
     it("openDeleteDialog ok callback deletes node and emits cancel:hideform", async () => {
@@ -765,9 +787,7 @@ describe("Query Component", () => {
       await flushPromises();
       (searchService.search as any).mockResolvedValueOnce({ hits: [] });
       await submit(wrapper);
-      expect(mockAddNode).toHaveBeenCalledWith(
-        expect.objectContaining({ node_type: "query" })
-      );
+      expect(mockAddNode).toHaveBeenCalledWith(expect.objectContaining({ node_type: "query" }));
     });
 
     it("converts period string to integer in payload", async () => {
@@ -803,7 +823,7 @@ describe("Query Component", () => {
             sql: "",
             promql_condition: { column: "value", operator: ">=", value: 0 },
           }),
-        })
+        }),
       );
     });
 
@@ -819,9 +839,7 @@ describe("Query Component", () => {
       wrapper.vm.form.setFieldValue("query_condition.type", "sql");
       await submit(wrapper);
       expect(wrapper.vm.form.state.isValid).toBe(true);
-      expect(mockAddNode).toHaveBeenCalledWith(
-        expect.objectContaining({ tz_offset: -300 })
-      );
+      expect(mockAddNode).toHaveBeenCalledWith(expect.objectContaining({ tz_offset: -300 }));
     });
 
     it("does NOT include tz_offset for minutes frequency type", async () => {
@@ -870,17 +888,26 @@ describe("Query Component", () => {
         name: "edit-q",
         stream_type: "metrics",
         query_condition: { type: "sql", sql: "", aggregation: null, promql_condition: null },
-        trigger_condition: { period: 5, frequency_type: "cron", cron: "* * * * *", frequency: 5, timezone: "UTC" },
+        trigger_condition: {
+          period: 5,
+          frequency_type: "cron",
+          cron: "* * * * *",
+          frequency: 5,
+          timezone: "UTC",
+        },
         delay: 2,
         conditions: [],
         context_attributes: [],
         description: "",
         enabled: true,
       };
-      const wrapper = createWrapper({}, {
-        isEditNode: true,
-        currentSelectedNodeData: { data: editData },
-      });
+      const wrapper = createWrapper(
+        {},
+        {
+          isEditNode: true,
+          currentSelectedNodeData: { data: editData },
+        },
+      );
       await flushPromises();
       const result = wrapper.vm.getDefaultStreamRoute();
       expect(result.name).toBe("edit-q");

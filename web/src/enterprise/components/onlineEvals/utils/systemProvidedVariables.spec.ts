@@ -17,15 +17,20 @@ describe("systemProvidedVariablesForScope", () => {
   });
 
   it("provides the complete bounded view for trace targets", () => {
-    expect(
-      systemProvidedVariablesForScope("trace").map(({ name }) => name),
-    ).toEqual(["input", "output", "statistics", "spans", "steps"]);
+    expect(systemProvidedVariablesForScope("trace").map(({ name }) => name)).toEqual([
+      "input",
+      "output",
+      "statistics",
+      "spans",
+      "steps",
+    ]);
   });
 
   it("provides statistics and steps for session targets", () => {
-    expect(
-      systemProvidedVariablesForScope("session").map(({ name }) => name),
-    ).toEqual(["statistics", "steps"]);
+    expect(systemProvidedVariablesForScope("session").map(({ name }) => name)).toEqual([
+      "statistics",
+      "steps",
+    ]);
     expect(isSystemProvidedVariable("session", "input")).toBe(false);
     expect(isSystemProvidedVariable("session", "spans")).toBe(false);
   });

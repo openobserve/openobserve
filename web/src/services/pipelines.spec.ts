@@ -50,21 +50,19 @@ describe("pipelines service", () => {
 
       await pipelines.getPipelines(org_identifier);
 
-      expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/${org_identifier}/pipelines`
-      );
+      expect(mockHttpInstance.get).toHaveBeenCalledWith(`/api/${org_identifier}/pipelines`);
     });
 
     it("should use the org_identifier in the URL path", async () => {
       const org_identifier = "production-org";
 
-      mockHttpInstance.get.mockResolvedValue({ data: { list: [{ id: "p1", name: "my-pipeline" }] } });
+      mockHttpInstance.get.mockResolvedValue({
+        data: { list: [{ id: "p1", name: "my-pipeline" }] },
+      });
 
       await pipelines.getPipelines(org_identifier);
 
-      expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/production-org/pipelines`
-      );
+      expect(mockHttpInstance.get).toHaveBeenCalledWith(`/api/production-org/pipelines`);
     });
   });
 
@@ -80,7 +78,7 @@ describe("pipelines service", () => {
       await pipelines.getPipeline(params);
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/${params.org_identifier}/pipelines/${params.name}`
+        `/api/${params.org_identifier}/pipelines/${params.name}`,
       );
     });
 
@@ -95,7 +93,7 @@ describe("pipelines service", () => {
       await pipelines.getPipeline(params);
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/staging-org/pipelines/logs-enrichment`
+        `/api/staging-org/pipelines/logs-enrichment`,
       );
     });
   });
@@ -112,7 +110,7 @@ describe("pipelines service", () => {
       await pipelines.toggleState(org_identifier, pipeline_id, enable, from_now);
 
       expect(mockHttpInstance.put).toHaveBeenCalledWith(
-        `/api/${org_identifier}/pipelines/${pipeline_id}/enable?value=${enable}&from_now=${from_now}`
+        `/api/${org_identifier}/pipelines/${pipeline_id}/enable?value=${enable}&from_now=${from_now}`,
       );
     });
 
@@ -127,7 +125,7 @@ describe("pipelines service", () => {
       await pipelines.toggleState(org_identifier, pipeline_id, enable, from_now);
 
       expect(mockHttpInstance.put).toHaveBeenCalledWith(
-        `/api/org123/pipelines/pipeline-002/enable?value=false&from_now=true`
+        `/api/org123/pipelines/pipeline-002/enable?value=false&from_now=true`,
       );
     });
 
@@ -159,7 +157,7 @@ describe("pipelines service", () => {
 
       expect(mockHttpInstance.post).toHaveBeenCalledWith(
         `/api/${org_identifier}/pipelines/bulk/enable?value=${enable}`,
-        data
+        data,
       );
     });
 
@@ -174,7 +172,7 @@ describe("pipelines service", () => {
 
       expect(mockHttpInstance.post).toHaveBeenCalledWith(
         `/api/staging-org/pipelines/bulk/enable?value=false`,
-        data
+        data,
       );
     });
 
@@ -204,7 +202,7 @@ describe("pipelines service", () => {
       await pipelines.deletePipeline(params);
 
       expect(mockHttpInstance.delete).toHaveBeenCalledWith(
-        `/api/${params.org_id}/pipelines/${params.pipeline_id}`
+        `/api/${params.org_id}/pipelines/${params.pipeline_id}`,
       );
     });
 
@@ -219,7 +217,7 @@ describe("pipelines service", () => {
       await pipelines.deletePipeline(params);
 
       expect(mockHttpInstance.delete).toHaveBeenCalledWith(
-        `/api/production-org/pipelines/pipe-xyz-999`
+        `/api/production-org/pipelines/pipe-xyz-999`,
       );
     });
   });
@@ -235,7 +233,7 @@ describe("pipelines service", () => {
 
       expect(mockHttpInstance.delete).toHaveBeenCalledWith(
         `/api/${org_identifier}/pipelines/bulk`,
-        { data }
+        { data },
       );
     });
 
@@ -270,7 +268,7 @@ describe("pipelines service", () => {
 
       expect(mockHttpInstance.post).toHaveBeenCalledWith(
         `/api/${params.org_identifier}/pipelines`,
-        params.data
+        params.data,
       );
     });
 
@@ -306,7 +304,7 @@ describe("pipelines service", () => {
 
       expect(mockHttpInstance.put).toHaveBeenCalledWith(
         `/api/${params.org_identifier}/pipelines`,
-        params.data
+        params.data,
       );
     });
 
@@ -320,10 +318,7 @@ describe("pipelines service", () => {
 
       await pipelines.updatePipeline(params);
 
-      expect(mockHttpInstance.put).toHaveBeenCalledWith(
-        `/api/staging-org/pipelines`,
-        params.data
-      );
+      expect(mockHttpInstance.put).toHaveBeenCalledWith(`/api/staging-org/pipelines`, params.data);
     });
 
     it("should pass the data object as the PUT body", async () => {
@@ -349,9 +344,7 @@ describe("pipelines service", () => {
 
       await pipelines.getPipelineStreams(org_identifier);
 
-      expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/${org_identifier}/pipelines/streams`
-      );
+      expect(mockHttpInstance.get).toHaveBeenCalledWith(`/api/${org_identifier}/pipelines/streams`);
     });
 
     it("should use the org_identifier in the URL path", async () => {
@@ -361,9 +354,7 @@ describe("pipelines service", () => {
 
       await pipelines.getPipelineStreams(org_identifier);
 
-      expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/production-org/pipelines/streams`
-      );
+      expect(mockHttpInstance.get).toHaveBeenCalledWith(`/api/production-org/pipelines/streams`);
     });
   });
 
@@ -380,7 +371,7 @@ describe("pipelines service", () => {
       mockHttpInstance.get.mockRejectedValue(error);
 
       await expect(
-        pipelines.getPipeline({ name: "missing-pipeline", org_identifier: "org123" })
+        pipelines.getPipeline({ name: "missing-pipeline", org_identifier: "org123" }),
       ).rejects.toThrow("Not found");
     });
 
@@ -389,7 +380,7 @@ describe("pipelines service", () => {
       mockHttpInstance.post.mockRejectedValue(error);
 
       await expect(
-        pipelines.createPipeline({ org_identifier: "org123", data: { name: "bad-pipeline" } })
+        pipelines.createPipeline({ org_identifier: "org123", data: { name: "bad-pipeline" } }),
       ).rejects.toThrow("Validation error");
     });
 
@@ -398,7 +389,7 @@ describe("pipelines service", () => {
       mockHttpInstance.put.mockRejectedValue(error);
 
       await expect(
-        pipelines.updatePipeline({ org_identifier: "org123", data: { name: "conflict-pipeline" } })
+        pipelines.updatePipeline({ org_identifier: "org123", data: { name: "conflict-pipeline" } }),
       ).rejects.toThrow("Conflict");
     });
 
@@ -407,7 +398,7 @@ describe("pipelines service", () => {
       mockHttpInstance.delete.mockRejectedValue(error);
 
       await expect(
-        pipelines.deletePipeline({ pipeline_id: "p1", org_id: "org123" })
+        pipelines.deletePipeline({ pipeline_id: "p1", org_id: "org123" }),
       ).rejects.toThrow("Forbidden");
     });
 
@@ -415,9 +406,9 @@ describe("pipelines service", () => {
       const error = new Error("Unauthorized");
       mockHttpInstance.put.mockRejectedValue(error);
 
-      await expect(
-        pipelines.toggleState("org123", "pipeline-001", true, false)
-      ).rejects.toThrow("Unauthorized");
+      await expect(pipelines.toggleState("org123", "pipeline-001", true, false)).rejects.toThrow(
+        "Unauthorized",
+      );
     });
 
     it("should propagate errors from getPipelineStreams", async () => {

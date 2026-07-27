@@ -1,6 +1,6 @@
 <template>
   <OForm
-    class="job-form flex flex-col flex-1 min-h-0 gap-2.5"
+    class="job-form flex min-h-0 flex-1 flex-col gap-2.5"
     :form="form"
     v-slot="{ isSubmitting }"
   >
@@ -15,358 +15,305 @@
       <template #title>
         <span data-test="job-form-title">
           {{
-            mode === "create"
-              ? t("onlineEvals.job.createTitle")
-              : t("onlineEvals.job.editTitle")
+            mode === "create" ? t("onlineEvals.job.createTitle") : t("onlineEvals.job.editTitle")
           }}
         </span>
       </template>
-      <template #actions>
-        <OButton
-          variant="ghost"
-          size="icon-sm"
-          icon-left="close"
-          :aria-label="t('onlineEvals.buttons.cancel')"
-          :title="t('onlineEvals.buttons.cancel')"
-          data-test="job-form-close-btn"
-          :disabled="isSubmitting"
-          @click="$emit('cancel')"
-        />
-      </template>
-
-    <div
-      class="flex min-h-0 flex-1 gap-2 overflow-hidden max-[68.75rem]:flex-col"
-    >
-      <div
-        class="flex min-h-0 min-w-0 flex-[6.5] flex-col gap-2 overflow-auto p-2 [&_textarea]:max-h-[12.5rem] [&_textarea]:overflow-y-auto max-[68.75rem]:flex-[1_1_auto]"
-      >
-        <!-- Details — job identity only. Kept separate from Evaluation Target
+      <div class="flex min-h-0 flex-1 gap-0 overflow-hidden max-[68.75rem]:flex-col">
+        <div
+          class="flex min-h-0 min-w-0 flex-[6.5] flex-col gap-2 overflow-auto p-2 max-[68.75rem]:flex-[1_1_auto] [&_textarea]:max-h-50 [&_textarea]:overflow-y-auto"
+        >
+          <!-- Details — job identity only. Kept separate from Evaluation Target
              so each heading actually describes its fields: naming the job and
              choosing what it reads are different decisions. -->
-        <section
-          class="card-container shrink-0 overflow-hidden rounded-default border border-border-default bg-surface-base"
-          data-test="job-form-details-section"
-        >
-          <div
-            class="flex items-center border-b border-border-default px-3 py-2.5"
+          <section
+            class="card-container rounded-default border-border-default bg-surface-base shrink-0 overflow-hidden border"
+            data-test="job-form-details-section"
           >
-            <div
-              class="mr-2 h-4 w-[0.1875rem] shrink-0 rounded-default bg-theme-accent"
-            />
-            <span
-              class="text-compact font-semibold tracking-[0.01em] text-text-heading"
-              >{{ t("onlineEvals.job.detailsSection") }}</span
-            >
-          </div>
-          <div class="flex flex-col gap-3 py-3.5 px-4">
-            <div>
-              <OFormInput
-                name="name"
-                :label="t('onlineEvals.job.nameLabel')"
-                :placeholder="t('onlineEvals.job.namePlaceholder')"
-                size="sm"
-                required
-                :disabled="mode === 'edit'"
-                data-test="job-form-name-input"
-              />
+            <div class="border-border-default flex items-center border-b px-3 py-2.5">
+              <div class="rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0" />
+              <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">{{
+                t("onlineEvals.job.detailsSection")
+              }}</span>
             </div>
+            <div class="flex flex-col gap-3 px-4 py-3.5">
+              <div>
+                <OFormInput
+                  name="name"
+                  :label="t('onlineEvals.job.nameLabel')"
+                  :placeholder="t('onlineEvals.job.namePlaceholder')"
+                  size="sm"
+                  required
+                  :disabled="mode === 'edit'"
+                  data-test="job-form-name-input"
+                />
+              </div>
 
-            <div class="[&_textarea]:max-h-[7.5rem]">
-              <OFormTextarea
-                name="description"
-                :label="t('onlineEvals.job.descriptionLabel')"
-                :placeholder="t('onlineEvals.job.descriptionPlaceholder')"
-                size="sm"
-                :rows="3"
-                data-test="job-form-description-input"
-              />
+              <div class="[&_textarea]:max-h-30">
+                <OFormTextarea
+                  name="description"
+                  :label="t('onlineEvals.job.descriptionLabel')"
+                  :placeholder="t('onlineEvals.job.descriptionPlaceholder')"
+                  size="sm"
+                  :rows="3"
+                  data-test="job-form-description-input"
+                />
+              </div>
             </div>
-          </div>
-        </section>
+          </section>
 
-        <!-- Evaluation Target -->
-        <section
-          class="card-container shrink-0 overflow-hidden rounded-default border border-border-default bg-surface-base"
-          data-test="job-form-target-section"
-        >
-          <div
-            class="flex items-center border-b border-border-default px-3 py-2.5"
+          <!-- Evaluation Target -->
+          <section
+            class="card-container rounded-default border-border-default bg-surface-base shrink-0 overflow-hidden border"
+            data-test="job-form-target-section"
           >
-            <div
-              class="mr-2 h-4 w-[0.1875rem] shrink-0 rounded-default bg-theme-accent"
-            />
-            <span
-              class="text-compact font-semibold tracking-[0.01em] text-text-heading"
-              >{{ t("onlineEvals.job.targetSection") }}</span
-            >
-          </div>
-          <div class="flex flex-col gap-3 py-3.5 px-4">
-            <div>
-              <OFormSelect
-                name="targetScope"
-                :label="t('onlineEvals.job.targetScopeLabel')"
-                :options="targetScopeOptions"
-                :help-text="
-                  t(`onlineEvals.job.targetScopeHelp.${formValues.targetScope}`)
-                "
-                size="md"
-                required
-                data-test="job-form-target-scope-select"
-              />
+            <div class="border-border-default flex items-center border-b px-3 py-2.5">
+              <div class="rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0" />
+              <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">{{
+                t("onlineEvals.job.targetSection")
+              }}</span>
             </div>
-
-            <div>
-              <OFormSelect
-                name="stream"
-                :label="t('onlineEvals.job.streamLabel')"
-                :options="streamOptions"
-                :placeholder="t('onlineEvals.job.streamPlaceholder')"
-                size="md"
-                required
-                :disabled="mode === 'edit'"
-                data-test="job-form-stream-select"
-              />
-            </div>
-          </div>
-        </section>
-
-        <!-- Filtering — before Sampling: the pipeline filters first, then
-             samples the matching subset (§OnlineEval-D15), so the form reads
-             in the same order the job actually executes. -->
-        <section
-          class="card-container shrink-0 overflow-hidden rounded-default border border-border-default bg-surface-base"
-          data-test="job-form-filtering-section"
-        >
-          <div
-            class="flex items-center border-b border-border-default px-3 py-2.5"
-          >
-            <div
-              class="mr-2 h-4 w-[0.1875rem] shrink-0 rounded-default bg-theme-accent"
-            />
-            <span
-              class="text-compact font-semibold tracking-[0.01em] text-text-heading"
-              >{{ t("onlineEvals.job.filteringSection") }}</span
-            >
-          </div>
-          <div class="flex flex-col gap-3 py-3.5 px-4">
-            <JobFilterBuilder
-              name-prefix="filterGroup"
-              :target-scope="formValues.targetScope"
-              :stream-fields="streamFields"
-              data-test="job-form-filter-builder"
-            />
-          </div>
-        </section>
-
-        <!-- Sampling -->
-        <section
-          class="card-container shrink-0 overflow-hidden rounded-default border border-border-default bg-surface-base"
-          data-test="job-form-sampling-section"
-        >
-          <div
-            class="flex items-center border-b border-border-default px-3 py-2.5"
-          >
-            <div
-              class="mr-2 h-4 w-[0.1875rem] shrink-0 rounded-default bg-theme-accent"
-            />
-            <span
-              class="text-compact font-semibold tracking-[0.01em] text-text-heading"
-              >{{ t("onlineEvals.job.stepper.sampling") }}</span
-            >
-          </div>
-          <div class="flex flex-col gap-3 py-3.5 px-4">
-            <div
-              class="grid grid-cols-2 gap-[0.875rem] max-[68.75rem]:grid-cols-1"
-            >
+            <div class="flex flex-col gap-3 px-4 py-3.5">
               <div>
                 <OFormSelect
-                  name="samplingMode"
-                  :label="t('onlineEvals.job.samplingModeLabel')"
-                  :options="samplingModeOptions"
-                  :help-text="t('onlineEvals.job.samplingHelp')"
+                  name="targetScope"
+                  :label="t('onlineEvals.job.targetScopeLabel')"
+                  :options="targetScopeOptions"
+                  :help-text="t(`onlineEvals.job.targetScopeHelp.${formValues.targetScope}`)"
                   size="md"
-                  data-test="job-form-sampling-mode-select"
+                  required
+                  data-test="job-form-target-scope-select"
                 />
               </div>
 
               <div>
-                <OFormInput
-                  name="samplingValue"
-                  :label="t('onlineEvals.job.samplingValueLabel')"
-                  type="number"
-                  min="0"
-                  max="1"
-                  step="0.01"
-                  size="sm"
-                  :required="formValues.samplingMode !== 'all'"
-                  :disabled="formValues.samplingMode === 'all'"
-                  :help-text="samplingValueHelp"
-                  data-test="job-form-sampling-value-input"
+                <OFormSelect
+                  name="stream"
+                  :label="t('onlineEvals.job.streamLabel')"
+                  :options="streamOptions"
+                  :placeholder="t('onlineEvals.job.streamPlaceholder')"
+                  size="md"
+                  required
+                  :disabled="mode === 'edit'"
+                  data-test="job-form-stream-select"
                 />
               </div>
             </div>
-          </div>
-        </section>
+          </section>
 
-        <!-- Scorers + Mapping -->
-        <section
-          class="card-container shrink-0 overflow-hidden rounded-default border border-border-default bg-surface-base"
-          data-test="job-form-scorers-section"
-        >
-          <div
-            class="flex items-center border-b border-border-default px-3 py-2.5"
+          <!-- Filtering — before Sampling: the pipeline filters first, then
+             samples the matching subset (§OnlineEval-D15), so the form reads
+             in the same order the job actually executes. -->
+          <section
+            class="card-container rounded-default border-border-default bg-surface-base shrink-0 overflow-hidden border"
+            data-test="job-form-filtering-section"
           >
-            <div
-              class="mr-2 h-4 w-[0.1875rem] shrink-0 rounded-default bg-theme-accent"
-            />
-            <span
-              class="text-compact font-semibold tracking-[0.01em] text-text-heading"
-              >{{ t("onlineEvals.job.scorersSection") }}</span
-            >
-          </div>
-          <div class="flex flex-col gap-3 py-3.5 px-4">
-            <JobScorerPicker
-              :model-value="formValues.scorerIds"
-              :target-scope="formValues.targetScope"
-              :scorers="scorers"
-              @update:model-value="form.setFieldValue('scorerIds', $event)"
-            />
+            <div class="border-border-default flex items-center border-b px-3 py-2.5">
+              <div class="rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0" />
+              <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">{{
+                t("onlineEvals.job.filteringSection")
+              }}</span>
+            </div>
+            <div class="flex flex-col gap-3 px-4 py-3.5">
+              <JobFilterBuilder
+                name-prefix="filterGroup"
+                :target-scope="formValues.targetScope"
+                :stream-fields="streamFields"
+                data-test="job-form-filter-builder"
+              />
+            </div>
+          </section>
 
-            <JobInputMapping
-              :target-scope="formValues.targetScope"
-              :selected-scorers="selectedScorers"
-              :input-mappings="inputMappings"
-              :span-selectors="spanSelectors"
-              :span-selector-bindings="spanSelectorBindings"
-              :stream-fields="streamFields"
-              @update:input-mappings="inputMappings = $event"
-              @update:span-selectors="spanSelectors = $event"
-              @update:span-selector-bindings="spanSelectorBindings = $event"
-            />
-          </div>
-        </section>
-
-        <!-- Trace/session completion -->
-        <section
-          v-if="formValues.targetScope !== 'span'"
-          class="card-container shrink-0 overflow-hidden rounded-default border border-border-default bg-surface-base"
-          data-test="job-form-completion-section"
-        >
-          <div
-            class="flex items-center border-b border-border-default px-3 py-2.5"
+          <!-- Sampling -->
+          <section
+            class="card-container rounded-default border-border-default bg-surface-base shrink-0 overflow-hidden border"
+            data-test="job-form-sampling-section"
           >
-            <div
-              class="mr-2 h-4 w-[0.1875rem] shrink-0 rounded-default bg-theme-accent"
-            />
-            <span
-              class="text-compact font-semibold tracking-[0.01em] text-text-heading"
-              >{{ t("onlineEvals.job.completionSection") }}</span
-            >
-          </div>
-          <div class="flex flex-col gap-3 py-3.5 px-4">
-            <div class="text-xs text-input-help-text leading-none">
-              {{
-                t(`onlineEvals.job.completionHelp.${formValues.targetScope}`)
-              }}
+            <div class="border-border-default flex items-center border-b px-3 py-2.5">
+              <div class="rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0" />
+              <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">{{
+                t("onlineEvals.job.stepper.sampling")
+              }}</span>
             </div>
-            <div
-              class="grid grid-cols-2 gap-[0.875rem] max-[68.75rem]:grid-cols-1"
-            >
-              <div>
-                <OFormInput
-                  name="idleWindowSecs"
-                  :label="t('onlineEvals.job.idleWindowLabel')"
-                  type="number"
-                  :min="MIN_COMPLETION_IDLE_WINDOW_SECS"
-                  size="sm"
-                  :help-text="idleWindowHelp"
-                  data-test="job-form-idle-window-input"
-                />
-              </div>
-              <div>
-                <OFormInput
-                  name="maxAgeSecs"
-                  :label="t('onlineEvals.job.maxAgeLabel')"
-                  type="number"
-                  min="1"
-                  size="sm"
-                  :help-text="maxAgeHelp"
-                  data-test="job-form-max-age-input"
-                />
+            <div class="flex flex-col gap-3 px-4 py-3.5">
+              <div class="grid grid-cols-2 gap-3.5 max-[68.75rem]:grid-cols-1">
+                <div>
+                  <OFormSelect
+                    name="samplingMode"
+                    :label="t('onlineEvals.job.samplingModeLabel')"
+                    :options="samplingModeOptions"
+                    :help-text="t('onlineEvals.job.samplingHelp')"
+                    size="md"
+                    data-test="job-form-sampling-mode-select"
+                  />
+                </div>
+
+                <div>
+                  <OFormInput
+                    name="samplingValue"
+                    :label="t('onlineEvals.job.samplingValueLabel')"
+                    type="number"
+                    min="0"
+                    max="1"
+                    step="0.01"
+                    size="sm"
+                    :required="formValues.samplingMode !== 'all'"
+                    :disabled="formValues.samplingMode === 'all'"
+                    :help-text="samplingValueHelp"
+                    data-test="job-form-sampling-value-input"
+                  />
+                </div>
               </div>
             </div>
-            <JobFilterBuilder
-              :target-scope="formValues.targetScope"
-              :group="endSignalGroup"
-              purpose="endSignal"
-              :stream-fields="streamFields"
-              data-test="job-form-end-signal-builder"
-              @update:group="endSignalGroup = $event"
-            />
-          </div>
-        </section>
+          </section>
+
+          <!-- Scorers + Mapping -->
+          <section
+            class="card-container rounded-default border-border-default bg-surface-base shrink-0 overflow-hidden border"
+            data-test="job-form-scorers-section"
+          >
+            <div class="border-border-default flex items-center border-b px-3 py-2.5">
+              <div class="rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0" />
+              <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">{{
+                t("onlineEvals.job.scorersSection")
+              }}</span>
+            </div>
+            <div class="flex flex-col gap-3 px-4 py-3.5">
+              <JobScorerPicker
+                :model-value="formValues.scorerIds"
+                :target-scope="formValues.targetScope"
+                :scorers="scorers"
+                @update:model-value="form.setFieldValue('scorerIds', $event)"
+              />
+
+              <JobInputMapping
+                :target-scope="formValues.targetScope"
+                :selected-scorers="selectedScorers"
+                :input-mappings="inputMappings"
+                :span-selectors="spanSelectors"
+                :span-selector-bindings="spanSelectorBindings"
+                :stream-fields="streamFields"
+                @update:input-mappings="inputMappings = $event"
+                @update:span-selectors="spanSelectors = $event"
+                @update:span-selector-bindings="spanSelectorBindings = $event"
+              />
+            </div>
+          </section>
+
+          <!-- Trace/session completion -->
+          <section
+            v-if="formValues.targetScope !== 'span'"
+            class="card-container rounded-default border-border-default bg-surface-base shrink-0 overflow-hidden border"
+            data-test="job-form-completion-section"
+          >
+            <div class="border-border-default flex items-center border-b px-3 py-2.5">
+              <div class="rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0" />
+              <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">{{
+                t("onlineEvals.job.completionSection")
+              }}</span>
+            </div>
+            <div class="flex flex-col gap-3 px-4 py-3.5">
+              <div class="text-input-help-text text-xs leading-none">
+                {{ t(`onlineEvals.job.completionHelp.${formValues.targetScope}`) }}
+              </div>
+              <div class="grid grid-cols-2 gap-3.5 max-[68.75rem]:grid-cols-1">
+                <div>
+                  <OFormInput
+                    name="idleWindowSecs"
+                    :label="t('onlineEvals.job.idleWindowLabel')"
+                    type="number"
+                    :min="MIN_COMPLETION_IDLE_WINDOW_SECS"
+                    size="sm"
+                    :help-text="idleWindowHelp"
+                    data-test="job-form-idle-window-input"
+                  />
+                </div>
+                <div>
+                  <OFormInput
+                    name="maxAgeSecs"
+                    :label="t('onlineEvals.job.maxAgeLabel')"
+                    type="number"
+                    min="1"
+                    size="sm"
+                    :help-text="maxAgeHelp"
+                    data-test="job-form-max-age-input"
+                  />
+                </div>
+              </div>
+              <JobFilterBuilder
+                :target-scope="formValues.targetScope"
+                :group="endSignalGroup"
+                purpose="endSignal"
+                :stream-fields="streamFields"
+                data-test="job-form-end-signal-builder"
+                @update:group="endSignalGroup = $event"
+              />
+            </div>
+          </section>
+        </div>
+
+        <JobPreviewPanel
+          :name="formValues.name"
+          :stream-type="formValues.streamType"
+          :target-scope="formValues.targetScope"
+          :mode="mode"
+          :stream="formValues.stream"
+          :filter-where="filterWhere"
+          :filter-ready="filterReady"
+        />
       </div>
 
-      <JobPreviewPanel
-        :name="formValues.name"
-        :stream-type="formValues.streamType"
-        :target-scope="formValues.targetScope"
-        :mode="mode"
-        :stream="formValues.stream"
-        :filter-where="filterWhere"
-        :filter-ready="filterReady"
-      />
-    </div>
-
-    <footer class="sticky bottom-0 flex items-center justify-end gap-2 px-5.5 py-3 bg-surface-base border-t border-border-default shrink-0 z-1">
-      <OButton
-        data-test="job-form-cancel-btn"
-        type="button"
-        variant="outline"
-        size="sm-action"
-        :disabled="isSubmitting"
-        @click="$emit('cancel')"
+      <footer
+        class="bg-surface-base border-border-default sticky bottom-0 z-1 flex shrink-0 items-center justify-end gap-2 border-t px-5.5 py-3"
       >
-        {{ t("onlineEvals.buttons.cancel") }}
-      </OButton>
-      <template v-if="mode === 'create'">
-        <!-- Both create actions submit through the form (so Enter + schema
-             validation apply); the click sets which one before the form submit
-             fires, and loading is form-driven (isSubmitting). -->
         <OButton
-          data-test="job-form-save-draft-btn"
-          type="submit"
+          data-test="job-form-cancel-btn"
+          type="button"
           variant="outline"
           size="sm-action"
-          :loading="isSubmitting && !activateOnSave"
-          :disabled="isSubmitting && activateOnSave"
-          @click="activateOnSave = false"
+          :disabled="isSubmitting"
+          @click="$emit('cancel')"
         >
-          {{ t("onlineEvals.buttons.saveAsDraft") }}
+          {{ t("onlineEvals.buttons.cancel") }}
         </OButton>
+        <template v-if="mode === 'create'">
+          <!-- Both create actions submit through the form (so Enter + schema
+             validation apply); the click sets which one before the form submit
+             fires, and loading is form-driven (isSubmitting). -->
+          <OButton
+            data-test="job-form-save-draft-btn"
+            type="submit"
+            variant="outline"
+            size="sm-action"
+            :loading="isSubmitting && !activateOnSave"
+            :disabled="isSubmitting && activateOnSave"
+            @click="activateOnSave = false"
+          >
+            {{ t("onlineEvals.buttons.saveAsDraft") }}
+          </OButton>
+          <OButton
+            data-test="job-form-save-activate-btn"
+            type="submit"
+            variant="primary"
+            size="sm-action"
+            :loading="isSubmitting && activateOnSave"
+            :disabled="isSubmitting && !activateOnSave"
+            @click="activateOnSave = true"
+          >
+            {{ t("onlineEvals.buttons.createAndActivate") }}
+          </OButton>
+        </template>
         <OButton
-          data-test="job-form-save-activate-btn"
+          v-else
+          data-test="job-form-save-btn"
           type="submit"
           variant="primary"
           size="sm-action"
-          :loading="isSubmitting && activateOnSave"
-          :disabled="isSubmitting && !activateOnSave"
-          @click="activateOnSave = true"
+          :loading="isSubmitting"
         >
-          {{ t("onlineEvals.buttons.createAndActivate") }}
+          {{ t("onlineEvals.buttons.save") }}
         </OButton>
-      </template>
-      <OButton
-        v-else
-        data-test="job-form-save-btn"
-        type="submit"
-        variant="primary"
-        size="sm-action"
-        :loading="isSubmitting"
-      >
-        {{ t("onlineEvals.buttons.save") }}
-      </OButton>
-    </footer>
+      </footer>
     </OPageLayout>
   </OForm>
 </template>
@@ -399,11 +346,7 @@ import {
   valueOf,
 } from "../utils/evalEntity";
 import { showError } from "../utils/evalFormat";
-import {
-  parseSamplingRate,
-  samplingRateForForm,
-  samplingRatePercent,
-} from "../utils/jobSampling";
+import { parseSamplingRate, samplingRateForForm, samplingRatePercent } from "../utils/jobSampling";
 import {
   buildJobFilterConditionPayload,
   buildOptionalJobConditionPayload,
@@ -469,9 +412,7 @@ const formValues = form.useStore((s: any) => s.values as JobForm);
 // form's `filterGroup` field (JobFilterBuilder renders FilterGroup in form mode
 // and writes structural changes straight to the form). Single source of truth,
 // no mirror ref. Drives the preview computeds below and the save payload.
-const filterGroup = form.useStore(
-  (s: any) => s.values.filterGroup ?? createEmptyJobFilterGroup(),
-);
+const filterGroup = form.useStore((s: any) => s.values.filterGroup ?? createEmptyJobFilterGroup());
 // The completion end-signal and mapping/selectors are composite working state
 // built into the payload at submit.
 const endSignalGroup = ref(initEndSignalGroup(props.row));
@@ -548,9 +489,7 @@ const maxAgeHelp = computed<string>(() => {
 
 // Pauses the match-count query while a condition is half-filled (column picked
 // but value still empty), so we don't query on every keystroke / partial edit.
-const filterReady = computed<boolean>(() =>
-  isJobFilterComplete(filterGroup.value),
-);
+const filterReady = computed<boolean>(() => isJobFilterComplete(filterGroup.value));
 
 const selectedScorers = computed(() =>
   formValues.value.scorerIds
@@ -569,9 +508,7 @@ const RESERVED_EVAL_SOURCE_STREAMS = new Set([
   "errors",
   "data_retention_usage",
 ]);
-const streamFields = ref<Array<{ label: string; value: string; type: string }>>(
-  [],
-);
+const streamFields = ref<Array<{ label: string; value: string; type: string }>>([]);
 
 const streamOptions = computed(() => {
   const opts = traceStreams.value.map((name) => ({ label: name, value: name }));
@@ -616,11 +553,7 @@ async function loadStreamFields() {
     return;
   }
   try {
-    const stream: any = await getStream(
-      formValues.value.stream,
-      "traces",
-      true,
-    );
+    const stream: any = await getStream(formValues.value.stream, "traces", true);
     streamFields.value = (stream?.schema || [])
       .map((field: any) => {
         const name = typeof field === "string" ? field : field?.name;
@@ -634,8 +567,7 @@ async function loadStreamFields() {
       .filter(
         (
           field: { label: string; value: string; type: string } | null,
-        ): field is { label: string; value: string; type: string } =>
-          field !== null,
+        ): field is { label: string; value: string; type: string } => field !== null,
       );
   } catch {
     streamFields.value = [];
@@ -705,8 +637,7 @@ function initForm(row: EvalJob | null): JobForm {
   }
   const targetScope = targetScopeOf(row);
   const completionWindowDefaults =
-    completionWindowDefaultsForScope(targetScope) ??
-    TRACE_COMPLETION_WINDOW_DEFAULTS;
+    completionWindowDefaultsForScope(targetScope) ?? TRACE_COMPLETION_WINDOW_DEFAULTS;
   const completionConfig = completionWindowConfigFromJob(row, targetScope);
   return {
     name: row.name,
@@ -714,34 +645,24 @@ function initForm(row: EvalJob | null): JobForm {
     stream: row.stream,
     streamType: streamTypeOf(row),
     targetScope,
-    idleWindowSecs:
-      completionConfig?.idleWindowSecs ??
-      completionWindowDefaults.idleWindowSecs,
-    maxAgeSecs:
-      completionConfig?.maxAgeSecs ?? completionWindowDefaults.maxAgeSecs,
+    idleWindowSecs: completionConfig?.idleWindowSecs ?? completionWindowDefaults.idleWindowSecs,
+    maxAgeSecs: completionConfig?.maxAgeSecs ?? completionWindowDefaults.maxAgeSecs,
     scorerIds: (row.scorers || []).map(scorerRefId),
     samplingMode: samplingModeOf(row),
-    samplingValue: samplingRateForForm(
-      valueOf(row, "samplingValue", "sampling_value"),
-    ),
+    samplingValue: samplingRateForForm(valueOf(row, "samplingValue", "sampling_value")),
     filterGroup: initFilterGroup(row),
   };
 }
 
 function initEndSignalGroup(row: EvalJob | null) {
   if (!row) return createEmptyJobFilterGroup();
-  const completionConfig = completionWindowConfigFromJob(
-    row,
-    targetScopeOf(row),
-  );
+  const completionConfig = completionWindowConfigFromJob(row, targetScopeOf(row));
   return normalizeJobFilterCondition(completionConfig?.endSignal);
 }
 
 function initFilterGroup(row: EvalJob | null) {
   if (!row) return createEmptyJobFilterGroup();
-  return normalizeJobFilterCondition(
-    valueOf(row, "filterCondition", "filter_condition"),
-  );
+  return normalizeJobFilterCondition(valueOf(row, "filterCondition", "filter_condition"));
 }
 
 function initInputMappings(row: EvalJob | null) {
@@ -755,13 +676,11 @@ function initInputMappings(row: EvalJob | null) {
 
 function initSpanSelectors(row: EvalJob | null): SpanSelector[] {
   if (!row) return [];
-  const selectors =
-    valueOf<any[]>(row, "spanSelectors", "span_selectors") || [];
+  const selectors = valueOf<any[]>(row, "spanSelectors", "span_selectors") || [];
   return selectors.map((selector: any) => ({
     id: selector.id,
     name: selector.name,
-    filterCondition:
-      selector.filterCondition ?? selector.filter_condition ?? {},
+    filterCondition: selector.filterCondition ?? selector.filter_condition ?? {},
     fieldMode: selector.fieldMode ?? selector.field_mode ?? "default",
     fields: Array.isArray(selector.fields) ? [...selector.fields] : [],
     maximumSpans: selector.maximumSpans ?? selector.maximum_spans ?? 5,
@@ -771,21 +690,15 @@ function initSpanSelectors(row: EvalJob | null): SpanSelector[] {
 function initSpanSelectorBindings(row: EvalJob | null) {
   if (!row) return {} as Record<string, string>;
   return {
-    ...(valueOf<Record<string, string>>(
-      row,
-      "spanSelectorBindings",
-      "span_selector_bindings",
-    ) || {}),
+    ...(valueOf<Record<string, string>>(row, "spanSelectorBindings", "span_selector_bindings") ||
+      {}),
   };
 }
 
 function initScorerVersions(row: EvalJob | null) {
   if (!row) return {} as Record<string, number | null>;
   return Object.fromEntries(
-    (row.scorers || []).map((scorer) => [
-      scorerRefId(scorer),
-      scorerRefVersion(scorer),
-    ]),
+    (row.scorers || []).map((scorer) => [scorerRefId(scorer), scorerRefVersion(scorer)]),
   );
 }
 
@@ -800,9 +713,7 @@ function syncMappings() {
   scorerVersions.value = nextVersions;
   const selected = new Set(formValues.value.scorerIds);
   spanSelectorBindings.value = Object.fromEntries(
-    Object.entries(spanSelectorBindings.value).filter(([scorerId]) =>
-      selected.has(scorerId),
-    ),
+    Object.entries(spanSelectorBindings.value).filter(([scorerId]) => selected.has(scorerId)),
   );
 }
 
@@ -816,10 +727,7 @@ async function onSubmit(value: JobForm) {
   // Scorer selection is validated here, not in the schema: surface the empty
   // case as a toast since JobScorerPicker renders no inline error.
   if (!value.scorerIds.length) {
-    showError(
-      new Error(t("onlineEvals.job.selectAtLeastOne")),
-      t("onlineEvals.job.saveError"),
-    );
+    showError(new Error(t("onlineEvals.job.selectAtLeastOne")), t("onlineEvals.job.saveError"));
     return;
   }
   // Mirrors the backend's validate_for_activation(): EVERY trace scorer needs a
@@ -828,8 +736,7 @@ async function onSubmit(value: JobForm) {
   // client-side message for a server rejection.
   if (
     value.targetScope === "trace" &&
-    (activateOnSave.value ||
-      (props.mode === "edit" && props.row?.status === "active")) &&
+    (activateOnSave.value || (props.mode === "edit" && props.row?.status === "active")) &&
     value.scorerIds.some((scorerId) => !spanSelectorBindings.value[scorerId])
   ) {
     showError(
@@ -865,17 +772,13 @@ async function onSubmit(value: JobForm) {
         value.targetScope as EvalTargetScope,
       ),
       spanSelectors: value.targetScope === "trace" ? spanSelectors.value : [],
-      spanSelectorBindings:
-        value.targetScope === "trace" ? spanSelectorBindings.value : {},
+      spanSelectorBindings: value.targetScope === "trace" ? spanSelectorBindings.value : {},
       ...completionConfigs,
       samplingMode: value.samplingMode as any,
       samplingValue:
         value.samplingMode === "all"
           ? null
-          : parseSamplingRate(
-              value.samplingValue ?? "",
-              t("onlineEvals.job.samplingValueLabel"),
-            ),
+          : parseSamplingRate(value.samplingValue ?? "", t("onlineEvals.job.samplingValueLabel")),
     };
 
     if (props.mode === "edit" && props.row) {
@@ -887,10 +790,7 @@ async function onSubmit(value: JobForm) {
         }),
       });
     } else {
-      const created = await onlineEvalsService.jobs.create(
-        props.orgId,
-        payload,
-      );
+      const created = await onlineEvalsService.jobs.create(props.orgId, payload);
       if (activateAfter && created?.id) {
         try {
           await onlineEvalsService.jobs.activate(props.orgId, created.id);

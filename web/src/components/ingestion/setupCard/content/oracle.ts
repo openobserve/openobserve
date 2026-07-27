@@ -18,10 +18,7 @@
 
 import { getImageURL } from "@/utils/zincutils";
 import type { CardSubstitutions, RichCardContent } from "../types";
-import {
-  collectorInstallStep,
-  writeConfigVariants,
-} from "./otelShared";
+import { collectorInstallStep, writeConfigVariants } from "./otelShared";
 
 const GRANT_SQL = `CREATE USER otel IDENTIFIED BY password123;
 GRANT CONNECT, RESOURCE TO otel;
@@ -105,8 +102,7 @@ export default function oracleCard(subs: CardSubstitutions): RichCardContent {
       {
         id: "verify",
         title: "Verify Data in OpenObserve",
-        description:
-          "Hit Test below, or check Streams for the `oracledb_*` metrics.",
+        description: "Hit Test below, or check Streams for the `oracledb_*` metrics.",
         chip: { kind: "traces", label: "Metrics" },
         completeOn: "detect",
         detectionAnchor: true,

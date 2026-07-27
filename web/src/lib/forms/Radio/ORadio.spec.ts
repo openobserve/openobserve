@@ -70,4 +70,3 @@ describe("ORadio", () => {
     expect(wrapper.find("button").classes()).toContain("size-3");
   });
 });
-

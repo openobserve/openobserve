@@ -61,9 +61,7 @@ describe("useNotifications composable", () => {
 
   describe("showConfictErrorNotificationWithRefreshBtn", () => {
     it("should add an error toast with timeout 0 and a Refresh action", () => {
-      notifications.showConfictErrorNotificationWithRefreshBtn(
-        "Conflict error occurred",
-      );
+      notifications.showConfictErrorNotificationWithRefreshBtn("Conflict error occurred");
       expect(toastRecords).toHaveLength(1);
       expect(toastRecords[0].variant).toBe("error");
       expect(toastRecords[0].timeout).toBe(0);
@@ -76,9 +74,7 @@ describe("useNotifications composable", () => {
         value: { reload: mockReload },
         writable: true,
       });
-      notifications.showConfictErrorNotificationWithRefreshBtn(
-        "Conflict error occurred",
-      );
+      notifications.showConfictErrorNotificationWithRefreshBtn("Conflict error occurred");
       toastRecords[0].action?.handler();
       expect(mockReload).toHaveBeenCalled();
     });

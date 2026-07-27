@@ -4,17 +4,16 @@ import DevOps from "@/components/ingestion/DevOps.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-
 // Mock services
 vi.mock("@/utils/zincutils", () => ({
   getImageURL: vi.fn((path) => `mock-${path}`),
-  verifyOrganizationStatus: vi.fn()
+  verifyOrganizationStatus: vi.fn(),
 }));
 
 vi.mock("@/aws-exports", () => ({
   default: {
-    API_ENDPOINT: "http://localhost:5080"
-  }
+    API_ENDPOINT: "http://localhost:5080",
+  },
 }));
 
 // Mock router
@@ -22,10 +21,10 @@ const mockRouter = {
   currentRoute: {
     value: {
       name: "devops",
-      query: {}
-    }
+      query: {},
+    },
   },
-  push: vi.fn()
+  push: vi.fn(),
 };
 
 vi.mock("vue-router", () => ({
@@ -35,7 +34,7 @@ vi.mock("vue-router", () => ({
 
 const mountOptions = {
   props: {
-    currOrgIdentifier: "test-org"
+    currOrgIdentifier: "test-org",
   },
   global: {
     plugins: [i18n],
@@ -44,8 +43,8 @@ const mountOptions = {
     },
     stubs: {
       DataSourceSidebarLayout: true,
-      'router-view': true
-    }
+      "router-view": true,
+    },
   },
 };
 
@@ -142,7 +141,10 @@ describe("DevOps Component", () => {
       // Check to object structure
       expect(firstTab.to).toHaveProperty("name");
       expect(firstTab.to).toHaveProperty("query");
-      expect(firstTab.to.query).toHaveProperty("org_identifier", store.state.selectedOrganization.identifier);
+      expect(firstTab.to.query).toHaveProperty(
+        "org_identifier",
+        store.state.selectedOrganization.identifier,
+      );
     });
 
     it("should generate correct icons for each tool", () => {
@@ -186,7 +188,7 @@ describe("DevOps Component", () => {
       const devopsTabs = wrapper.vm.devopsTabs;
       const cicdTools = ["jenkins", "github-actions"];
 
-      cicdTools.forEach(toolName => {
+      cicdTools.forEach((toolName) => {
         const hasTool = devopsTabs.some((tab: any) => tab.name === toolName);
         expect(hasTool).toBe(true);
       });
@@ -196,7 +198,7 @@ describe("DevOps Component", () => {
       const devopsTabs = wrapper.vm.devopsTabs;
       const iacTools = ["terraform", "ansible"];
 
-      iacTools.forEach(toolName => {
+      iacTools.forEach((toolName) => {
         const hasTool = devopsTabs.some((tab: any) => tab.name === toolName);
         expect(hasTool).toBe(true);
       });

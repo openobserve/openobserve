@@ -119,7 +119,10 @@
   border-radius: var(--radius-surface);
   background: var(--color-status-info-bg);
   box-shadow: 0 0.25rem 0.75rem color-mix(in srgb, var(--color-status-info-text) 10%, transparent);
-  transition: background 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+  transition:
+    background 0.3s ease,
+    box-shadow 0.3s ease,
+    border-color 0.3s ease;
   cursor: grab;
   min-height: 2.25rem;
   padding: 0.5rem 1rem;
@@ -138,8 +141,12 @@
   color: var(--color-text-body);
   border-radius: var(--radius-surface);
   background: var(--color-status-warning-bg);
-  box-shadow: 0 0.25rem 0.75rem color-mix(in srgb, var(--color-status-warning-text) 10%, transparent);
-  transition: background 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+  box-shadow: 0 0.25rem 0.75rem
+    color-mix(in srgb, var(--color-status-warning-text) 10%, transparent);
+  transition:
+    background 0.3s ease,
+    box-shadow 0.3s ease,
+    border-color 0.3s ease;
   cursor: grab;
   min-height: 2.25rem;
   padding: 0.5rem 1rem;

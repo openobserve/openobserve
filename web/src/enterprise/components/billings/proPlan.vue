@@ -15,64 +15,67 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OCard class="flex flex-col shadow-none border border-card-glass-border bg-card-glass-bg rounded-default w-full h-full dark:bg-surface-base dark:border-border-default">
+  <OCard
+    class="border-card-glass-border bg-card-glass-bg rounded-default dark:bg-surface-base dark:border-border-default flex h-full w-full flex-col border shadow-none"
+  >
     <div class="flex items-center justify-between px-3 py-2">
       <div>
-        <h3 class="pt-2 text-base font-semibold leading-6 text-text-heading m-0">{{ t("billing.proPlanLabel") }}</h3>
-        <p class="mt-2 text-sm font-normal leading-4.5 text-text-secondary m-0">
+        <h3 class="text-text-heading m-0 pt-2 text-base leading-6 font-semibold">
+          {{ t("billing.proPlanLabel") }}
+        </h3>
+        <p class="text-text-secondary m-0 mt-2 text-sm leading-4.5 font-normal">
           {{ t("billing.proPlanSubtitle") }}
         </p>
       </div>
-      <OTag
-        v-if="planType == planName"
-        type="billingTag"
-        value="subscribed"
-        class="mt-2"
-      />
+      <OTag v-if="planType == planName" type="billingTag" value="subscribed" class="mt-2" />
     </div>
 
     <OSeparator class="my-2" />
 
     <div class="px-3 py-2">
-      <h4 class="text-compact font-semibold leading-[0.983rem] text-text-heading m-0">{{ t("billing.features") }}</h4>
-      <p class="mb-3 mt-1 text-compact font-normal leading-4.5 text-text-secondary m-0">
+      <h4 class="text-compact text-text-heading m-0 leading-[0.983rem] font-semibold">
+        {{ t("billing.features") }}
+      </h4>
+      <p class="text-compact text-text-secondary m-0 mt-1 mb-3 leading-4.5 font-normal">
         {{ t("billing.included") }}
       </p>
 
       <div
         v-if="pricingError && !features?.length"
-        class="flex items-center mb-2 text-status-error-text"
+        class="text-status-error-text mb-2 flex items-center"
       >
         <OIcon name="warning" size="sm" class="mr-2" />
-        <span class="text-base leading-5.5 text-text-body"
+        <span class="text-text-body text-base leading-5.5"
           >Failed to load pricing details. Please refresh the page.</span
         >
       </div>
       <div
         v-for="(feature, index) in features"
         :key="index"
-        class="flex items-center justify-between mb-2"
+        class="mb-2 flex items-center justify-between"
       >
         <div class="flex items-center">
           <OIcon
             v-if="feature.is_parent"
             name="check-circle"
             size="md"
-            class="mr-2 text-status-positive check-icon"
+            class="text-status-positive check-icon mr-2"
           />
-          <div class="text-base leading-5.5 text-text-body" :class="{ 'ml-6': !feature.is_parent }">{{ feature.name }}</div>
+          <div class="text-text-body text-base leading-5.5" :class="{ 'ml-6': !feature.is_parent }">
+            {{ feature.name }}
+          </div>
         </div>
         <div
           v-if="feature.price !== ''"
-          class="mx-2 flex-1 h-0 opacity-40 border-t border-dotted border-border-default"
+          class="border-border-default mx-2 h-0 flex-1 border-t border-dotted opacity-40"
         ></div>
-        <div class="text-base leading-5.5 text-text-body font-bold">{{ feature.price }}</div>
+        <div class="text-text-body text-base leading-5.5 font-bold">{{ feature.price }}</div>
       </div>
     </div>
 
     <OSeparator />
 
-    <p class="px-3 pt-2 text-compact font-normal leading-4.5 text-text-secondary m-0">
+    <p class="text-compact text-text-secondary m-0 px-3 pt-2 leading-4.5 font-normal">
       {{ t("billing.unlimitedNote") }}<br />
       {{ t("billing.paymentNote") }}
     </p>
@@ -80,53 +83,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="flex justify-between p-3">
       <!-- AWS Marketplace billing - show managed externally message -->
       <div v-if="billingProvider === 'aws'" class="w-full text-center">
-        <OTag
-          type="billingManagement"
-          value="aws"
-          class="inline-flex items-center gap-1"
-        >
+        <OTag type="billingManagement" value="aws" class="inline-flex items-center gap-1">
           <template #icon>
             <OIcon name="check-circle" size="xs" />
           </template>
         </OTag>
-        <div class="text-xs text-text-secondary mt-2">
+        <div class="text-text-secondary mt-2 text-xs">
           Billing is handled through your AWS account
         </div>
       </div>
-      <div
-        v-else-if="billingProvider === 'azure'"
-        class="w-full text-center"
-      >
-        <OTag
-          type="billingManagement"
-          value="azure"
-          class="inline-flex items-center gap-1"
-        >
+      <div v-else-if="billingProvider === 'azure'" class="w-full text-center">
+        <OTag type="billingManagement" value="azure" class="inline-flex items-center gap-1">
           <template #icon>
             <OIcon name="check-circle" size="xs" />
           </template>
         </OTag>
-        <div class="text-xs text-text-secondary mt-2">
+        <div class="text-text-secondary mt-2 text-xs">
           Billing is handled through your Azure account
         </div>
       </div>
       <!-- External contract - billed offline, no Stripe portal to open -->
-      <div
-        v-else-if="subscriptionType === 'external-contract'"
-        class="w-full text-center"
-      >
-        <OTag
-          type="billingManagement"
-          value="contract"
-          class="inline-flex items-center gap-1"
-        >
+      <div v-else-if="subscriptionType === 'external-contract'" class="w-full text-center">
+        <OTag type="billingManagement" value="contract" class="inline-flex items-center gap-1">
           <template #icon>
             <OIcon name="description" size="xs" />
           </template>
         </OTag>
-        <div class="text-xs text-text-secondary mt-2">
-          Billing is handled through your contract — contact your account
-          manager for changes
+        <div class="text-text-secondary mt-2 text-xs">
+          Billing is handled through your contract — contact your account manager for changes
         </div>
       </div>
       <!-- Stripe billing - show subscribe/manage buttons -->
@@ -139,13 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         {{ btnCancelSubscription }}
       </OButton>
-      <OButton
-        v-else
-        variant="primary"
-        size="sm-action"
-        block
-        @click="onSubscribe"
-      >
+      <OButton v-else variant="primary" size="sm-action" block @click="onSubscribe">
         {{ btnSubscribe }}
       </OButton>
     </div>
@@ -164,13 +142,7 @@ import OCard from "@/lib/core/Card/OCard.vue";
 export default defineComponent({
   name: "proPlan",
   components: { OSeparator, OButton, OTag, OIcon, OCard },
-  props: [
-    "planType",
-    "billingProvider",
-    "subscriptionType",
-    "features",
-    "pricingError",
-  ],
+  props: ["planType", "billingProvider", "subscriptionType", "features", "pricingError"],
   setup(props, { emit }) {
     const { t } = useI18n();
     const planName = "pay-as-you-go";

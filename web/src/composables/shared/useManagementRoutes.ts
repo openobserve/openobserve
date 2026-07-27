@@ -33,11 +33,10 @@ const useManagementRoutes = () => {
         {
           path: "organization",
           name: "organizationSettings",
-          meta:{
+          meta: {
             title: "Organization Parameters",
           },
-          component: () =>
-            import("@/components/settings/OrganizationSettings.vue"),
+          component: () => import("@/components/settings/OrganizationSettings.vue"),
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
           },
@@ -45,7 +44,7 @@ const useManagementRoutes = () => {
         {
           path: "alert_destinations",
           name: "alertDestinations",
-          meta:{
+          meta: {
             title: "Alert Destinations",
           },
           component: AlertsDestinationList,
@@ -60,8 +59,7 @@ const useManagementRoutes = () => {
             keepAlive: true,
             title: "LLM Model Pricing",
           },
-          component: () =>
-            import("@/components/settings/ModelPricingList.vue"),
+          component: () => import("@/components/settings/ModelPricingList.vue"),
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
           },
@@ -72,8 +70,7 @@ const useManagementRoutes = () => {
           meta: {
             title: "Model Pricing Editor",
           },
-          component: () =>
-            import("@/components/settings/ModelPricingEditor.vue"),
+          component: () => import("@/components/settings/ModelPricingEditor.vue"),
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
           },
@@ -81,7 +78,7 @@ const useManagementRoutes = () => {
         {
           path: "templates",
           name: "alertTemplates",
-          meta:{
+          meta: {
             title: "Templates",
           },
           component: TemplateList,
@@ -100,8 +97,7 @@ const useManagementRoutes = () => {
     routes[0].children.push({
       path: "llm_providers",
       name: "llmProviders",
-      component: () =>
-        import("@/components/settings/LlmProvidersSettings.vue"),
+      component: () => import("@/components/settings/LlmProvidersSettings.vue"),
       meta: {
         title: "LLM Providers",
       },
@@ -112,8 +108,7 @@ const useManagementRoutes = () => {
     routes[0].children.push({
       path: "gen_ai_agent_mapping",
       name: "genAiAgentMapping",
-      component: () =>
-        import("@/components/settings/GenAiAgentMappingSettings.vue"),
+      component: () => import("@/components/settings/GenAiAgentMappingSettings.vue"),
       meta: {
         keepAlive: true,
         title: "GenAI Agent Mapping",
@@ -165,11 +160,10 @@ const useManagementRoutes = () => {
         {
           path: "pipeline_destinations",
           name: "pipelineDestinations",
-          meta:{
+          meta: {
             title: "Pipeline Destinations",
           },
-          component: () =>
-            import("@/components/alerts/PipelinesDestinationList.vue"),
+          component: () => import("@/components/alerts/PipelinesDestinationList.vue"),
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
           },
@@ -177,8 +171,7 @@ const useManagementRoutes = () => {
         {
           path: "storage_settings",
           name: "storageSettings",
-          component: () =>
-            import("@/components/settings/OrgStorageSettings.vue"),
+          component: () => import("@/components/settings/OrgStorageSettings.vue"),
           meta: {
             title: "Storage Settings",
           },
@@ -221,7 +214,6 @@ const useManagementRoutes = () => {
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
           },
-
         },
         {
           path: "synthetics_locations",
@@ -272,9 +264,9 @@ const useManagementRoutes = () => {
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
           },
-        }
-      ]
-    )
+        },
+      ],
+    );
   }
   return routes;
 };

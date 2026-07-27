@@ -33,10 +33,7 @@ export const detectChunkingDirection = (
   if (!firstChunkStart || !firstChunkEnd || !userStart || !userEnd) {
     return null;
   }
-  return (
-    Math.abs(firstChunkStart - userStart) <=
-    Math.abs(firstChunkEnd - userEnd)
-  );
+  return Math.abs(firstChunkStart - userStart) <= Math.abs(firstChunkEnd - userEnd);
 };
 
 /**
@@ -51,9 +48,6 @@ export const detectChunkingDirection = (
  * @param orderAsc - true if data within each chunk is ascending
  * @returns `true` if new data should be prepended, `false` if appended.
  */
-export const shouldPrependChunk = (
-  isLTR: boolean,
-  orderAsc: boolean,
-): boolean => {
+export const shouldPrependChunk = (isLTR: boolean, orderAsc: boolean): boolean => {
   return isLTR !== orderAsc;
 };

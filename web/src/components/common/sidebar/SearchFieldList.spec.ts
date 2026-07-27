@@ -21,9 +21,7 @@ const fieldValuesMocks = vi.hoisted(() => ({
   fetchFieldValues: vi.fn() as any,
   cancelFieldStream: vi.fn(),
   // Assigned by the factory once the module is first imported:
-  _setFieldState: null as
-    | ((fieldName: string, patch: Record<string, any>) => void)
-    | null,
+  _setFieldState: null as ((fieldName: string, patch: Record<string, any>) => void) | null,
   _reset: null as (() => void) | null,
 }));
 
@@ -125,7 +123,6 @@ const mockRouter = createRouter({
   routes: [{ path: "/", component: { template: "<div>Home</div>" } }],
 });
 
-
 describe("FieldList.vue Comprehensive Coverage", () => {
   let wrapper: VueWrapper;
   let mockStreamService: any;
@@ -149,34 +146,32 @@ describe("FieldList.vue Comprehensive Coverage", () => {
 
     // Wire fetchFieldValues to the streamService mock so existing test setup
     // (mockStreamService.mockResolvedValue / mockRejectedValue) keeps working.
-    fieldValuesMocks.fetchFieldValues.mockImplementation(
-      async (payload: any) => {
-        const fieldName = payload.fields[0];
-        try {
-          const response = await (streamService.fieldValues as any)(payload);
-          const hits = response?.data?.hits ?? [];
-          const values: any[] = [];
-          hits.forEach((hit: any) => {
-            (hit.values ?? []).forEach((v: any) => {
-              values.push({
-                key: v.zo_sql_key != null ? String(v.zo_sql_key) : "null",
-                count: String(v.zo_sql_num),
-              });
+    fieldValuesMocks.fetchFieldValues.mockImplementation(async (payload: any) => {
+      const fieldName = payload.fields[0];
+      try {
+        const response = await (streamService.fieldValues as any)(payload);
+        const hits = response?.data?.hits ?? [];
+        const values: any[] = [];
+        hits.forEach((hit: any) => {
+          (hit.values ?? []).forEach((v: any) => {
+            values.push({
+              key: v.zo_sql_key != null ? String(v.zo_sql_key) : "null",
+              count: String(v.zo_sql_num),
             });
           });
-          fieldValuesMocks._setFieldState?.(fieldName, {
-            values,
-            isLoading: false,
-          });
-        } catch {
-          fieldValuesMocks._setFieldState?.(fieldName, { isLoading: false });
-          mockNotify({
-            type: "negative",
-            message: `Error while fetching values for ${fieldName}`,
-          });
-        }
-      },
-    );
+        });
+        fieldValuesMocks._setFieldState?.(fieldName, {
+          values,
+          isLoading: false,
+        });
+      } catch {
+        fieldValuesMocks._setFieldState?.(fieldName, { isLoading: false });
+        mockNotify({
+          type: "negative",
+          message: `Error while fetching values for ${fieldName}`,
+        });
+      }
+    });
   });
 
   afterEach(() => {
@@ -558,10 +553,7 @@ describe("FieldList.vue Comprehensive Coverage", () => {
       vm.addSearchTerm("field_name='value'");
 
       expect(wrapper.emitted("event-emitted")).toBeTruthy();
-      expect(wrapper.emitted("event-emitted")[0]).toEqual([
-        "add-field",
-        "field_name='value'",
-      ]);
+      expect(wrapper.emitted("event-emitted")[0]).toEqual(["add-field", "field_name='value'"]);
     });
 
     it("should handle empty search term", () => {
@@ -595,14 +587,8 @@ describe("FieldList.vue Comprehensive Coverage", () => {
       vm.addSearchTerm("term2");
 
       expect(wrapper.emitted("event-emitted")).toHaveLength(2);
-      expect(wrapper.emitted("event-emitted")[0]).toEqual([
-        "add-field",
-        "term1",
-      ]);
-      expect(wrapper.emitted("event-emitted")[1]).toEqual([
-        "add-field",
-        "term2",
-      ]);
+      expect(wrapper.emitted("event-emitted")[0]).toEqual(["add-field", "term1"]);
+      expect(wrapper.emitted("event-emitted")[1]).toEqual(["add-field", "term2"]);
     });
   });
 
@@ -614,18 +600,14 @@ describe("FieldList.vue Comprehensive Coverage", () => {
       wrapper = createWrapper();
       const vm = wrapper.vm as any;
 
-      expect(vm.buildExpression("brand", "null", "include")).toBe(
-        "brand IS NULL",
-      );
+      expect(vm.buildExpression("brand", "null", "include")).toBe("brand IS NULL");
     });
 
     it("builds IS NOT NULL when excluding the null value", () => {
       wrapper = createWrapper();
       const vm = wrapper.vm as any;
 
-      expect(vm.buildExpression("brand", "null", "exclude")).toBe(
-        "brand IS NOT NULL",
-      );
+      expect(vm.buildExpression("brand", "null", "exclude")).toBe("brand IS NOT NULL");
     });
 
     it("parses IS NULL back to the 'null' key for include filters", () => {
@@ -753,9 +735,7 @@ describe("FieldList.vue Comprehensive Coverage", () => {
     });
 
     it("should render expansion item for non-fts fields with showValues", () => {
-      const fields = [
-        { name: "normal_field", ftsKey: false, showValues: true },
-      ];
+      const fields = [{ name: "normal_field", ftsKey: false, showValues: true }];
       wrapper = createWrapper({ fields });
 
       // The component uses OFieldList with expansion slots, not QExpansionItem
@@ -918,10 +898,7 @@ describe("FieldList.vue Comprehensive Coverage", () => {
       await addButton.trigger("click");
 
       expect(wrapper.emitted("event-emitted")).toBeTruthy();
-      expect(wrapper.emitted("event-emitted")[0]).toEqual([
-        "add-field",
-        "test_field=''",
-      ]);
+      expect(wrapper.emitted("event-emitted")[0]).toEqual(["add-field", "test_field=''"]);
     });
 
     it("should trigger copyContentValue when copy button is clicked", async () => {
@@ -1039,14 +1016,10 @@ describe("FieldList.vue Comprehensive Coverage", () => {
 
       // Add button has data-test with field name
       expect(
-        wrapper
-          .find('[data-test="log-search-index-list-filter-test_field-field-btn"]')
-          .exists(),
+        wrapper.find('[data-test="log-search-index-list-filter-test_field-field-btn"]').exists(),
       ).toBe(true);
       // Search input is provided by OFieldList (queried by placeholder)
-      expect(
-        wrapper.find('[placeholder="Search field"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[placeholder="Search field"]').exists()).toBe(true);
     });
 
     it("should provide proper titles for field names", () => {

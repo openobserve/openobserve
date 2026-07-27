@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   axis) is expressed as panel config the shared converter already understands.
 -->
 <template>
-  <div ref="chartPanelRef" class="w-full h-full" :style="{ height }">
+  <div ref="chartPanelRef" class="h-full w-full" :style="{ height }">
     <PanelSchemaRenderer
       :panel-schema="panelSchema"
       :selected-time-obj="selectedTimeObj"

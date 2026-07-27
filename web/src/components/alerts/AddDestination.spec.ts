@@ -129,23 +129,15 @@ async function toCustomHttp(w: any) {
 describe("AddDestination - rendering", () => {
   it("renders the title (create mode)", () => {
     wrapper = mountComp({ destination: null });
-    expect(wrapper.find('[data-test="add-destination-title"]').exists()).toBe(
-      true,
-    );
+    expect(wrapper.find('[data-test="add-destination-title"]').exists()).toBe(true);
   });
 
   it("renders url/method/cancel in custom mode", async () => {
     wrapper = mountComp();
     await toCustomHttp(wrapper);
-    expect(wrapper.find('[data-test="add-destination-url-input"]').exists()).toBe(
-      true,
-    );
-    expect(
-      wrapper.find('[data-test="add-destination-method-select"]').exists(),
-    ).toBe(true);
-    expect(
-      wrapper.find('[data-test="add-destination-cancel-btn"]').exists(),
-    ).toBe(true);
+    expect(wrapper.find('[data-test="add-destination-url-input"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="add-destination-method-select"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="add-destination-cancel-btn"]').exists()).toBe(true);
   });
 
   it("Save button stays enabled (R3 — no :disabled)", async () => {
@@ -328,9 +320,7 @@ describe("AddDestination - apiHeaders field array (Rule ①)", () => {
     await nextTick();
 
     // Delete the MIDDLE row (index 1 → key "kb").
-    await wrapper
-      .find('[data-test="add-destination-header-kb-delete-btn"]')
-      .trigger("click");
+    await wrapper.find('[data-test="add-destination-header-kb-delete-btn"]').trigger("click");
     await nextTick();
 
     // Read the RENDERED key inputs (OFormInput → OInput model-value), not the
@@ -355,9 +345,7 @@ describe("AddDestination - apiHeaders field array (Rule ①)", () => {
     form.setFieldValue("apiHeaders", [{ key: "only", value: "v" }]);
     await nextTick();
 
-    await wrapper
-      .find('[data-test="add-destination-header-only-delete-btn"]')
-      .trigger("click");
+    await wrapper.find('[data-test="add-destination-header-only-delete-btn"]').trigger("click");
     await nextTick();
 
     const rows = form.getFieldValue("apiHeaders");
@@ -396,9 +384,7 @@ describe("AddDestination - prebuilt (single form, no nested <form>)", () => {
     await nextTick();
     expect(wrapper.find('[data-test="prebuilt-form"]').exists()).toBe(true);
     // The credential input renders (it injected the parent form context).
-    expect(wrapper.find('[data-test="slack-webhook-url-input"]').exists()).toBe(
-      true,
-    );
+    expect(wrapper.find('[data-test="slack-webhook-url-input"]').exists()).toBe(true);
     // Exactly ONE <form> element — the nested prebuilt form is gone.
     expect(wrapper.findAll("form").length).toBe(1);
   });

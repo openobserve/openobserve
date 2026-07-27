@@ -25,11 +25,7 @@ vi.mock("@/utils/traces/useSpanServiceDetection", () => ({
   })),
 }));
 
-import {
-  useTraceProcessing,
-  formatDuration,
-  formatTimestamp,
-} from "./useTraceProcessing";
+import { useTraceProcessing, formatDuration, formatTimestamp } from "./useTraceProcessing";
 import { SpanKind, SpanStatus } from "@/ts/interfaces/traces/span.types";
 import type { ServiceDetectionConfig } from "@/ts/interfaces/traces/serviceDetection.types";
 
@@ -151,7 +147,11 @@ describe("useTraceProcessing", () => {
   describe("flattenSpanTree", () => {
     it("should return flat list including children", () => {
       const spans = ref([]);
-      const { buildSpanTree, flattenSpanTree } = useTraceProcessing(spans, emptySpanMap, defaultConfig);
+      const { buildSpanTree, flattenSpanTree } = useTraceProcessing(
+        spans,
+        emptySpanMap,
+        defaultConfig,
+      );
       const parent = makeSpan({ span_id: "parent", parent_span_id: "" });
       const child = makeSpan({
         span_id: "child",
@@ -167,7 +167,11 @@ describe("useTraceProcessing", () => {
 
     it("should skip collapsed children (isExpanded=false)", () => {
       const spans = ref([]);
-      const { buildSpanTree, flattenSpanTree } = useTraceProcessing(spans, emptySpanMap, defaultConfig);
+      const { buildSpanTree, flattenSpanTree } = useTraceProcessing(
+        spans,
+        emptySpanMap,
+        defaultConfig,
+      );
       const parent = makeSpan({ span_id: "parent", parent_span_id: "" });
       const child = makeSpan({
         span_id: "child",
@@ -197,7 +201,11 @@ describe("useTraceProcessing", () => {
 
     it("should return single span id for single span", () => {
       const spans = ref([]);
-      const { buildSpanTree, findCriticalPath } = useTraceProcessing(spans, emptySpanMap, defaultConfig);
+      const { buildSpanTree, findCriticalPath } = useTraceProcessing(
+        spans,
+        emptySpanMap,
+        defaultConfig,
+      );
       const span = makeSpan({ span_id: "root", duration: 1_000_000 });
       const tree = buildSpanTree([span]);
       const path = findCriticalPath(tree);
@@ -206,7 +214,11 @@ describe("useTraceProcessing", () => {
 
     it("should return path through longest duration branch", () => {
       const spans = ref([]);
-      const { buildSpanTree, findCriticalPath } = useTraceProcessing(spans, emptySpanMap, defaultConfig);
+      const { buildSpanTree, findCriticalPath } = useTraceProcessing(
+        spans,
+        emptySpanMap,
+        defaultConfig,
+      );
       const parent = makeSpan({ span_id: "parent", duration: 1_000_000 });
       const shortChild = makeSpan({
         span_id: "short",
@@ -237,7 +249,11 @@ describe("useTraceProcessing", () => {
 
     it("should calculate basic metadata for a single span", () => {
       const spans = ref([]);
-      const { buildSpanTree, calculateMetadata } = useTraceProcessing(spans, emptySpanMap, defaultConfig);
+      const { buildSpanTree, calculateMetadata } = useTraceProcessing(
+        spans,
+        emptySpanMap,
+        defaultConfig,
+      );
       const span = makeSpan({
         span_id: "root",
         service_name: "svc-a",
@@ -257,7 +273,11 @@ describe("useTraceProcessing", () => {
 
     it("should count error spans correctly", () => {
       const spans = ref([]);
-      const { buildSpanTree, calculateMetadata } = useTraceProcessing(spans, emptySpanMap, defaultConfig);
+      const { buildSpanTree, calculateMetadata } = useTraceProcessing(
+        spans,
+        emptySpanMap,
+        defaultConfig,
+      );
       const root = makeSpan({ span_id: "root", span_status: SpanStatus.OK });
       const error = makeSpan({
         span_id: "err",
@@ -275,7 +295,11 @@ describe("useTraceProcessing", () => {
 
     it("should count multiple services", () => {
       const spans = ref([]);
-      const { buildSpanTree, calculateMetadata } = useTraceProcessing(spans, emptySpanMap, defaultConfig);
+      const { buildSpanTree, calculateMetadata } = useTraceProcessing(
+        spans,
+        emptySpanMap,
+        defaultConfig,
+      );
       const span1 = makeSpan({ span_id: "s1", service_name: "svc-a" });
       const span2 = makeSpan({
         span_id: "s2",
@@ -293,7 +317,11 @@ describe("useTraceProcessing", () => {
 
     it("should identify top 5 slowest spans", () => {
       const spans = ref([]);
-      const { buildSpanTree, calculateMetadata } = useTraceProcessing(spans, emptySpanMap, defaultConfig);
+      const { buildSpanTree, calculateMetadata } = useTraceProcessing(
+        spans,
+        emptySpanMap,
+        defaultConfig,
+      );
       const root = makeSpan({ span_id: "root", duration: 1_000_000 });
       const spansArr = [root];
       for (let i = 0; i < 6; i++) {
@@ -315,8 +343,11 @@ describe("useTraceProcessing", () => {
   describe("calculateServiceBreakdown", () => {
     it("should return a breakdown per service", () => {
       const spans = ref([]);
-      const { buildSpanTree, calculateMetadata, calculateServiceBreakdown } =
-        useTraceProcessing(spans, emptySpanMap, defaultConfig);
+      const { buildSpanTree, calculateMetadata, calculateServiceBreakdown } = useTraceProcessing(
+        spans,
+        emptySpanMap,
+        defaultConfig,
+      );
       const span1 = makeSpan({
         span_id: "s1",
         service_name: "svc-a",
@@ -343,8 +374,11 @@ describe("useTraceProcessing", () => {
 
     it("should sort by total duration descending", () => {
       const spans = ref([]);
-      const { buildSpanTree, calculateMetadata, calculateServiceBreakdown } =
-        useTraceProcessing(spans, emptySpanMap, defaultConfig);
+      const { buildSpanTree, calculateMetadata, calculateServiceBreakdown } = useTraceProcessing(
+        spans,
+        emptySpanMap,
+        defaultConfig,
+      );
       const span1 = makeSpan({
         span_id: "s1",
         service_name: "slow-svc",
@@ -367,8 +401,11 @@ describe("useTraceProcessing", () => {
   describe("filterSpans", () => {
     it("should return all spans when filter is empty", () => {
       const spans = ref([]);
-      const { buildSpanTree, flattenSpanTree, filterSpans } =
-        useTraceProcessing(spans, emptySpanMap, defaultConfig);
+      const { buildSpanTree, flattenSpanTree, filterSpans } = useTraceProcessing(
+        spans,
+        emptySpanMap,
+        defaultConfig,
+      );
       const span = makeSpan({ span_id: "root" });
       const tree = buildSpanTree([span]);
       const flat = flattenSpanTree(tree);
@@ -378,8 +415,11 @@ describe("useTraceProcessing", () => {
 
     it("should filter by service name", () => {
       const spans = ref([]);
-      const { buildSpanTree, flattenSpanTree, filterSpans } =
-        useTraceProcessing(spans, emptySpanMap, defaultConfig);
+      const { buildSpanTree, flattenSpanTree, filterSpans } = useTraceProcessing(
+        spans,
+        emptySpanMap,
+        defaultConfig,
+      );
       const span1 = makeSpan({ span_id: "s1", service_name: "svc-a" });
       const span2 = makeSpan({
         span_id: "s2",
@@ -396,8 +436,11 @@ describe("useTraceProcessing", () => {
 
     it("should filter by error status", () => {
       const spans = ref([]);
-      const { buildSpanTree, flattenSpanTree, filterSpans } =
-        useTraceProcessing(spans, emptySpanMap, defaultConfig);
+      const { buildSpanTree, flattenSpanTree, filterSpans } = useTraceProcessing(
+        spans,
+        emptySpanMap,
+        defaultConfig,
+      );
       const ok = makeSpan({ span_id: "ok", span_status: SpanStatus.OK });
       const err = makeSpan({
         span_id: "err",
@@ -414,8 +457,11 @@ describe("useTraceProcessing", () => {
 
     it("should filter by searchText matching service name", () => {
       const spans = ref([]);
-      const { buildSpanTree, flattenSpanTree, filterSpans } =
-        useTraceProcessing(spans, emptySpanMap, defaultConfig);
+      const { buildSpanTree, flattenSpanTree, filterSpans } = useTraceProcessing(
+        spans,
+        emptySpanMap,
+        defaultConfig,
+      );
       const span = makeSpan({ span_id: "root", service_name: "my-unique-svc" });
       const tree = buildSpanTree([span]);
       const flat = flattenSpanTree(tree);
@@ -427,8 +473,11 @@ describe("useTraceProcessing", () => {
 
     it("should filter by min duration", () => {
       const spans = ref([]);
-      const { buildSpanTree, flattenSpanTree, filterSpans } =
-        useTraceProcessing(spans, emptySpanMap, defaultConfig);
+      const { buildSpanTree, flattenSpanTree, filterSpans } = useTraceProcessing(
+        spans,
+        emptySpanMap,
+        defaultConfig,
+      );
       const shortSpan = makeSpan({
         span_id: "short",
         duration: 100, // 0.1ms (100µs ÷ 1000 = 0.1ms)
@@ -448,8 +497,11 @@ describe("useTraceProcessing", () => {
 
     it("should filter by max duration", () => {
       const spans = ref([]);
-      const { buildSpanTree, flattenSpanTree, filterSpans } =
-        useTraceProcessing(spans, emptySpanMap, defaultConfig);
+      const { buildSpanTree, flattenSpanTree, filterSpans } = useTraceProcessing(
+        spans,
+        emptySpanMap,
+        defaultConfig,
+      );
       const shortSpan = makeSpan({
         span_id: "short",
         duration: 100_000, // 0.1ms
@@ -469,8 +521,11 @@ describe("useTraceProcessing", () => {
 
     it("should filter by attribute filters", () => {
       const spans = ref([]);
-      const { buildSpanTree, flattenSpanTree, filterSpans } =
-        useTraceProcessing(spans, emptySpanMap, defaultConfig);
+      const { buildSpanTree, flattenSpanTree, filterSpans } = useTraceProcessing(
+        spans,
+        emptySpanMap,
+        defaultConfig,
+      );
       const span1 = makeSpan({
         span_id: "s1",
         attributes: { env: "prod" },

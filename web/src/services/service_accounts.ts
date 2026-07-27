@@ -13,16 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
- 
 import http from "./http";
 
 const service_accounts = {
-  list: (
-    org_identifier: string,
-  ) => {
-    return http().get(
-      `/api/${org_identifier}/service_accounts`
-    );
+  list: (org_identifier: string) => {
+    return http().get(`/api/${org_identifier}/service_accounts`);
   },
   create: (data: any, org_identifier: string) => {
     return http().post(`/api/${org_identifier}/service_accounts`, data);
@@ -36,9 +31,8 @@ const service_accounts = {
   bulkDelete: (org_identifier: string, data: any) => {
     return http().delete(`/api/${org_identifier}/service_accounts/bulk`, { data });
   },
-  refresh_token : (org_identifier: string, user_email: string) => {
-    return http().put(`/api/${org_identifier}/service_accounts/${user_email}?rotateToken=true`,{});
-  }
-
+  refresh_token: (org_identifier: string, user_email: string) => {
+    return http().put(`/api/${org_identifier}/service_accounts/${user_email}?rotateToken=true`, {});
+  },
 };
 export default service_accounts;

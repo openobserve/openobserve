@@ -38,10 +38,7 @@ export const getSpanColor = (index: number): string => {
  * @param theme - 'light' or 'dark' theme (defaults to 'light')
  * @returns Hex color string
  */
-export const getSpanColorHex = (
-  index: number,
-  _theme: "light" | "dark" = "light",
-): string => {
+export const getSpanColorHex = (index: number, _theme: "light" | "dark" = "light"): string => {
   // Light/dark swap lives in the --color-trace-span-* tokens (base/dark css);
   // `_theme` kept for call-site compatibility, ignored — CSS owns the swap.
   const n = SPAN_COLOR_COUNT;
@@ -95,10 +92,7 @@ export const getServiceColorHex = (
  * @param opacity - Opacity value (0-1)
  * @returns RGB color string with alpha
  */
-export const getSpanColorWithOpacity = (
-  index: number,
-  opacity: number = 1,
-): string => {
+export const getSpanColorWithOpacity = (index: number, opacity: number = 1): string => {
   const colorIndex = ((index - 1) % 50) + 1;
   return `color-mix(in srgb, var(--color-span-${colorIndex}) ${opacity * 100}%, transparent)`;
 };
@@ -109,14 +103,10 @@ export const getSpanColorWithOpacity = (
  * @param theme - 'light' or 'dark' theme (defaults to 'light')
  * @returns Array of hex color strings
  */
-export const getAllSpanColors = (
-  _theme: "light" | "dark" = "light",
-): string[] => {
+export const getAllSpanColors = (_theme: "light" | "dark" = "light"): string[] => {
   // Tokens own the light/dark swap; reversed to maintain existing behavior.
   const n = SPAN_COLOR_COUNT;
-  return Array.from({ length: n }, (_v, i) =>
-    chartColor(`--color-trace-span-${i + 1}`),
-  ).reverse();
+  return Array.from({ length: n }, (_v, i) => chartColor(`--color-trace-span-${i + 1}`)).reverse();
 };
 
 /**
@@ -136,9 +126,7 @@ export const traceUIColors = {
  * @param serviceNames - Array of service names
  * @returns Map of service name to color
  */
-export const generateServiceColorMap = (
-  serviceNames: string[],
-): Map<string, string> => {
+export const generateServiceColorMap = (serviceNames: string[]): Map<string, string> => {
   const colorMap = new Map<string, string>();
   const usedColors = new Set<number>();
 

@@ -16,30 +16,22 @@ describe("ODateRangeCalendar", () => {
 
   it("should render the calendar root", () => {
     wrapper = mount(ODateRangeCalendar, { attachTo: document.body });
-    expect(wrapper.find('[data-test="daterangecalendar-root"]').exists()).toBe(
-      true,
-    );
+    expect(wrapper.find('[data-test="daterangecalendar-root"]').exists()).toBe(true);
   });
 
   it("should render prev navigation button", () => {
     wrapper = mount(ODateRangeCalendar, { attachTo: document.body });
-    expect(wrapper.find('[data-test="daterangecalendar-prev"]').exists()).toBe(
-      true,
-    );
+    expect(wrapper.find('[data-test="daterangecalendar-prev"]').exists()).toBe(true);
   });
 
   it("should render next navigation button", () => {
     wrapper = mount(ODateRangeCalendar, { attachTo: document.body });
-    expect(wrapper.find('[data-test="daterangecalendar-next"]').exists()).toBe(
-      true,
-    );
+    expect(wrapper.find('[data-test="daterangecalendar-next"]').exists()).toBe(true);
   });
 
   it("should render the month heading", () => {
     wrapper = mount(ODateRangeCalendar, { attachTo: document.body });
-    expect(
-      wrapper.find('[data-test="daterangecalendar-heading"]').exists(),
-    ).toBe(true);
+    expect(wrapper.find('[data-test="daterangecalendar-heading"]').exists()).toBe(true);
   });
 
   it("should render day cells for the current month", () => {
@@ -169,8 +161,6 @@ describe("ODateRangeCalendar", () => {
       });
     }).not.toThrow();
 
-    expect(wrapper.find('[data-test="daterangecalendar-root"]').exists()).toBe(
-      true,
-    );
+    expect(wrapper.find('[data-test="daterangecalendar-root"]').exists()).toBe(true);
   });
 });

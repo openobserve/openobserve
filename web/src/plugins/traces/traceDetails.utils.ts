@@ -46,8 +46,6 @@
  */
 export function resolveSessionId(spans: any[] | null | undefined): string {
   if (!spans?.length) return "";
-  const s: any = spans.find(
-    (sp: any) => sp?.gen_ai_conversation_id || sp?.session_id,
-  );
+  const s: any = spans.find((sp: any) => sp?.gen_ai_conversation_id || sp?.session_id);
   return s ? String(s.gen_ai_conversation_id || s.session_id || "") : "";
 }

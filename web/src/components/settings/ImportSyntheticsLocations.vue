@@ -17,7 +17,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OPageLayout
     :title="t('synthetics.locations.importTitle')"
-    :back="{ label: t('synthetics.locations.title'), onClick: handleBack, dataTest: 'synthetics-locations-import-back-btn' }"
+    :back="{
+      label: t('synthetics.locations.title'),
+      onClick: handleBack,
+      dataTest: 'synthetics-locations-import-back-btn',
+    }"
     bleed
   >
     <template #actions>
@@ -26,7 +30,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="sm-action"
         @click="handleBack"
         data-test="synthetics-locations-import-cancel-btn"
-      >{{ t('function.cancel') }}</OButton>
+        >{{ t("function.cancel") }}</OButton
+      >
       <OButton
         variant="primary"
         size="sm-action"
@@ -35,18 +40,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :loading="isImporting"
         :disabled="isImporting || !parsedLocations.length"
         data-test="synthetics-locations-import-json-btn"
-      >{{ t('dashboard.import') }}</OButton>
+        >{{ t("dashboard.import") }}</OButton
+      >
     </template>
 
-    <div class="flex flex-1 min-h-0 gap-0">
+    <div class="flex min-h-0 flex-1 gap-0">
       <!-- Left: JSON input area -->
-      <div class="flex-1 min-h-0 flex flex-col p-4">
-        <div class="text-sm font-semibold text-text-heading mb-2">
-          {{ t('synthetics.locations.importJsonLabel') }}
+      <div class="flex min-h-0 flex-1 flex-col p-4">
+        <div class="text-text-heading mb-2 text-sm font-semibold">
+          {{ t("synthetics.locations.importJsonLabel") }}
         </div>
         <textarea
           v-model="jsonString"
-          class="flex-1 min-h-0 w-full resize-none rounded-default border border-input-border bg-input-bg p-3 text-sm font-mono"
+          class="rounded-default border-input-border bg-input-bg min-h-0 w-full flex-1 resize-none border p-3 font-mono text-sm"
           :placeholder="t('synthetics.locations.importPlaceholder')"
           data-test="synthetics-locations-import-json-input"
           @input="scheduleParse"
@@ -58,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="triggerFileUpload"
             data-test="synthetics-locations-import-file-btn"
           >
-            {{ t('synthetics.locations.uploadFile') }}
+            {{ t("synthetics.locations.uploadFile") }}
           </OButton>
           <input
             ref="fileInputRef"
@@ -71,21 +77,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Right: preview & results -->
-      <div class="flex-1 min-h-0 flex flex-col border-l border-border-default p-4">
-        <div class="text-sm font-semibold text-text-heading mb-2">
-          {{ t('synthetics.locations.preview') }}
-          <span v-if="parsedLocations.length" class="text-text-secondary font-normal ml-1">
+      <div class="border-border-default flex min-h-0 flex-1 flex-col border-l p-4">
+        <div class="text-text-heading mb-2 text-sm font-semibold">
+          {{ t("synthetics.locations.preview") }}
+          <span v-if="parsedLocations.length" class="text-text-secondary ml-1 font-normal">
             ({{ parsedLocations.length }})
           </span>
         </div>
         <OSeparator class="mb-2 shrink-0" />
 
         <!-- Validation errors -->
-        <div v-if="validationErrors.length" class="shrink-0 mb-3">
+        <div v-if="validationErrors.length" class="mb-3 shrink-0">
           <div
             v-for="(err, idx) in validationErrors"
             :key="idx"
-            class="text-sm text-status-negative py-1"
+            class="text-status-negative py-1 text-sm"
             :data-test="`synthetics-locations-import-error-${idx}`"
           >
             {{ err }}
@@ -93,36 +99,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Preview list -->
-        <div class="flex-1 min-h-0 overflow-auto">
+        <div class="min-h-0 flex-1 overflow-auto">
           <div
             v-for="(loc, idx) in parsedLocations"
             :key="idx"
-            class="flex items-center gap-2 py-1.5 text-sm border-b border-border-subtle"
+            class="border-border-subtle flex items-center gap-2 border-b py-1.5 text-sm"
           >
             <span class="text-text-secondary w-6 text-xs">{{ idx + 1 }}.</span>
-            <span class="font-medium">{{ loc.label || '-' }}</span>
-            <span class="text-text-secondary text-xs">{{ loc.id || '-' }}</span>
+            <span class="font-medium">{{ loc.label || "-" }}</span>
+            <span class="text-text-secondary text-xs">{{ loc.id || "-" }}</span>
             <span class="text-text-secondary text-xs">({{ loc.provider }})</span>
           </div>
-          <div
-            v-if="!parsedLocations.length"
-            class="text-sm text-text-secondary py-4"
-          >
-            {{ t('synthetics.locations.noPreview') }}
+          <div v-if="!parsedLocations.length" class="text-text-secondary py-4 text-sm">
+            {{ t("synthetics.locations.noPreview") }}
           </div>
         </div>
 
         <!-- Import results -->
-        <div v-if="importResults.length" class="shrink-0 mt-3">
+        <div v-if="importResults.length" class="mt-3 shrink-0">
           <OSeparator class="mb-2" />
           <div
             v-for="(result, idx) in importResults"
             :key="idx"
-            class="text-sm py-1"
+            class="py-1 text-sm"
             :class="result.ok ? 'text-green' : 'text-status-negative'"
             :data-test="`synthetics-locations-import-result-${idx}`"
           >
-            {{ result.ok ? '✓' : '✗' }} {{ result.label || result.id }}
+            {{ result.ok ? "✓" : "✗" }} {{ result.label || result.id }}
             <span v-if="!result.ok" class="text-xs"> — {{ result.error }}</span>
           </div>
         </div>
@@ -214,9 +217,7 @@ export default defineComponent({
           });
         }
       } catch (e: any) {
-        validationErrors.value.push(
-          e.message || t("synthetics.locations.invalidJson"),
-        );
+        validationErrors.value.push(e.message || t("synthetics.locations.invalidJson"));
       }
     };
 
@@ -255,9 +256,7 @@ export default defineComponent({
         }
       } catch (error: any) {
         toast({
-          message:
-            error?.response?.data?.message ||
-            t("synthetics.locations.importFailed"),
+          message: error?.response?.data?.message || t("synthetics.locations.importFailed"),
           variant: "error",
         });
       } finally {

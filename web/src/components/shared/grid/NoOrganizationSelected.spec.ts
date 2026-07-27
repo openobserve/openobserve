@@ -3,9 +3,8 @@ import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import NoOrganizationSelected from "@/components/shared/grid/NoOrganizationSelected.vue";
 import i18n from "@/locales";
 
-
 vi.mock("@/utils/zincutils", () => ({
-  getImageURL: vi.fn((path) => `/mocked/${path}`)
+  getImageURL: vi.fn((path) => `/mocked/${path}`),
 }));
 
 describe("NoOrganizationSelected", () => {
@@ -32,7 +31,7 @@ describe("NoOrganizationSelected", () => {
   it("should display the organization selection image", () => {
     const image = wrapper.find('[data-test="no-organization-selected-image"]');
     expect(image.exists()).toBe(true);
-    expect(image.attributes('src')).toBe('/mocked/images/common/selectOrganization.svg');
+    expect(image.attributes("src")).toBe("/mocked/images/common/selectOrganization.svg");
   });
 
   it("should display no organization selected message", () => {
@@ -57,29 +56,29 @@ describe("NoOrganizationSelected", () => {
   });
 
   it("should have correct CSS classes", () => {
-    expect(wrapper.classes()).toContain('w-full');
-    expect(wrapper.classes()).toContain('flex');
-    expect(wrapper.classes()).toContain('flex-col');
-    expect(wrapper.classes()).toContain('items-center');
-    expect(wrapper.classes()).toContain('justify-center');
-    expect(wrapper.classes()).toContain('gap-2');
+    expect(wrapper.classes()).toContain("w-full");
+    expect(wrapper.classes()).toContain("flex");
+    expect(wrapper.classes()).toContain("flex-col");
+    expect(wrapper.classes()).toContain("items-center");
+    expect(wrapper.classes()).toContain("justify-center");
+    expect(wrapper.classes()).toContain("gap-2");
   });
 
   it("should have correct font size styling", () => {
     // Was inline `style="font-size: 1.5rem"`; now the `text-2xl` utility (1.5rem).
-    expect(wrapper.classes()).toContain('text-2xl');
-    expect(wrapper.attributes('style')).toBeUndefined();
+    expect(wrapper.classes()).toContain("text-2xl");
+    expect(wrapper.attributes("style")).toBeUndefined();
   });
 
   it("should apply correct styling to no organization selected text", () => {
     const noOrgText = wrapper.find('[data-test="no-organization-selected-title"]');
     expect(noOrgText.exists()).toBe(true);
-    expect(noOrgText.classes()).toContain('font-semibold');
+    expect(noOrgText.classes()).toContain("font-semibold");
   });
 
   it("should apply correct styling to select organization message", () => {
     const selectOrgMsg = wrapper.find('[data-test="no-organization-selected-message"]');
     expect(selectOrgMsg.exists()).toBe(true);
-    expect(selectOrgMsg.classes()).toContain('font-normal');
+    expect(selectOrgMsg.classes()).toContain("font-normal");
   });
 });

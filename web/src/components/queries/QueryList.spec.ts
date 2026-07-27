@@ -21,17 +21,16 @@ import { timestampToTimezoneDate, durationFormatter } from "@/utils/zincutils";
 import { getUnitValue } from "@/utils/dashboard/convertDataIntoUnitValue";
 import { createI18n } from "vue-i18n";
 
-
 const i18n = createI18n({
   locale: "en-us",
   allowComposition: true,
   messages: {
     "en-us": {
       queries: {
-        queryList: "Query List"
-      }
-    }
-  }
+        queryList: "Query List",
+      },
+    },
+  },
 });
 
 // Mock utility functions
@@ -46,7 +45,7 @@ vi.mock("@/utils/dashboard/convertDataIntoUnitValue", () => ({
 
 describe("QueryList", () => {
   let wrapper: any = null;
-  
+
   const mockQueryData = [
     {
       trace_id: "test-trace-123",
@@ -56,14 +55,14 @@ describe("QueryList", () => {
       stream_type: "logs",
       sql: "SELECT * FROM logs",
       start_time: 1640995200000000, // Jan 1, 2022 in microseconds
-      end_time: 1640995260000000,   // Jan 1, 2022 + 1 minute in microseconds
-      created_at: 1640995100000000,  // Jan 1, 2022 - 100 seconds in microseconds
+      end_time: 1640995260000000, // Jan 1, 2022 + 1 minute in microseconds
+      created_at: 1640995100000000, // Jan 1, 2022 - 100 seconds in microseconds
       records: 1000,
       files: 5,
       original_size: 1048576, // 1MB in bytes
       compressed_size: 524288, // 512KB in bytes
       search_type: "dashboards",
-      query_source: "MyDashboard"
+      query_source: "MyDashboard",
     },
     {
       trace_id: "test-trace-456",
@@ -80,30 +79,30 @@ describe("QueryList", () => {
       original_size: undefined,
       compressed_size: undefined,
       search_type: "alerts",
-      query_source: "MyAlert"
-    }
+      query_source: "MyAlert",
+    },
   ];
 
   const mockProps = {
     schemaData: {},
     metaData: {
-      queries: mockQueryData
-    }
+      queries: mockQueryData,
+    },
   };
 
   beforeEach(() => {
     vi.clearAllMocks();
-    
+
     // Setup mock returns
     (timestampToTimezoneDate as any).mockReturnValue("2022-01-01 00:00:00");
     (durationFormatter as any).mockReturnValue("5 minutes");
     (getUnitValue as any).mockReturnValue({ value: "1.0", unit: "MB" });
-    
+
     wrapper = mount(QueryList, {
       props: mockProps,
       global: {
-        plugins: [store, i18n]
-      }
+        plugins: [store, i18n],
+      },
     });
   });
 
@@ -128,8 +127,8 @@ describe("QueryList", () => {
     const wrapperNoData = mount(QueryList, {
       props: { schemaData: {} },
       global: {
-        plugins: [store, i18n]
-      }
+        plugins: [store, i18n],
+      },
     });
     expect(wrapperNoData.vm.queryData).toEqual([]);
     wrapperNoData.unmount();
@@ -142,8 +141,6 @@ describe("QueryList", () => {
   it("should expose getRows function", () => {
     expect(typeof wrapper.vm.getRows).toBe("function");
   });
-
-
 
   describe("getRows function", () => {
     beforeEach(() => {
@@ -176,7 +173,7 @@ describe("QueryList", () => {
       expect(timestampToTimezoneDate).toHaveBeenCalledWith(
         1640995200000, // microseconds divided by 1000 = milliseconds
         store.state.timezone,
-        "yyyy-MM-dd HH:mm:ss"
+        "yyyy-MM-dd HH:mm:ss",
       );
     });
 
@@ -187,7 +184,7 @@ describe("QueryList", () => {
       expect(timestampToTimezoneDate).toHaveBeenCalledWith(
         1640995260000, // microseconds divided by 1000 = milliseconds
         store.state.timezone,
-        "yyyy-MM-dd HH:mm:ss"
+        "yyyy-MM-dd HH:mm:ss",
       );
     });
 
@@ -265,12 +262,12 @@ describe("QueryList", () => {
       // Test that the component properly formats sizes when getUnitValue provides values
       const query = mockQueryData[0];
       const rows = wrapper.vm.getRows(query);
-      
+
       // Check that the Original Size row exists and has content
       expect(rows[14][0]).toBe("Original Size");
       expect(typeof rows[14][1]).toBe("string");
-      
-      // Check that the Compressed Size row exists and has content  
+
+      // Check that the Compressed Size row exists and has content
       expect(rows[15][0]).toBe("Compressed Size");
       expect(typeof rows[15][1]).toBe("string");
     });
@@ -278,9 +275,9 @@ describe("QueryList", () => {
     it("should properly structure all row data", () => {
       const query = mockQueryData[0];
       const rows = wrapper.vm.getRows(query);
-      
+
       // Verify all rows have the expected structure [label, value]
-      rows.forEach(row => {
+      rows.forEach((row) => {
         expect(Array.isArray(row)).toBe(true);
         expect(row.length).toBe(2);
         expect(typeof row[0]).toBe("string"); // Label should be string
@@ -311,7 +308,7 @@ describe("QueryList", () => {
     expect(timestampToTimezoneDate).toHaveBeenCalledWith(
       expect.any(Number),
       store.state.timezone,
-      "yyyy-MM-dd HH:mm:ss"
+      "yyyy-MM-dd HH:mm:ss",
     );
   });
 
@@ -319,23 +316,13 @@ describe("QueryList", () => {
     const query = mockQueryData[0];
     wrapper.vm.getRows(query);
 
-    expect(getUnitValue).toHaveBeenCalledWith(
-      query.original_size,
-      "megabytes",
-      "",
-      2
-    );
+    expect(getUnitValue).toHaveBeenCalledWith(query.original_size, "megabytes", "", 2);
   });
 
   it("should call getUnitValue with correct parameters for compressed size", () => {
     const query = mockQueryData[0];
     wrapper.vm.getRows(query);
 
-    expect(getUnitValue).toHaveBeenCalledWith(
-      query.compressed_size,
-      "megabytes",
-      "",
-      2
-    );
+    expect(getUnitValue).toHaveBeenCalledWith(query.compressed_size, "megabytes", "", 2);
   });
 });

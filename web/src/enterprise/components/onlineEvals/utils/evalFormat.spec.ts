@@ -97,10 +97,7 @@ describe("extractTemplateVariables", () => {
   });
 
   it("tolerates inconsistent whitespace inside the braces", () => {
-    expect(extractTemplateVariables("{{input}} {{ output  }}")).toEqual([
-      "input",
-      "output",
-    ]);
+    expect(extractTemplateVariables("{{input}} {{ output  }}")).toEqual(["input", "output"]);
   });
 
   it("deduplicates repeated variables", () => {

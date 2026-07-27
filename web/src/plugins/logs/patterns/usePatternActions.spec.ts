@@ -102,10 +102,7 @@ vi.mock("./patternUtils", () => ({
 
 // -- Import after mocks --
 import { usePatternActions } from "./usePatternActions";
-import {
-  extractConstantsFromPattern,
-  buildPatternAlertData,
-} from "./patternUtils";
+import { extractConstantsFromPattern, buildPatternAlertData } from "./patternUtils";
 
 describe("usePatternActions", () => {
   beforeEach(() => {
@@ -120,8 +117,7 @@ describe("usePatternActions", () => {
 
   describe("openPatternDetails", () => {
     it("should set selectedPattern and showPatternDetails", () => {
-      const { openPatternDetails, selectedPattern, showPatternDetails } =
-        usePatternActions();
+      const { openPatternDetails, selectedPattern, showPatternDetails } = usePatternActions();
       const pattern = { template: "test", pattern_id: "p1" };
 
       openPatternDetails(pattern, 0);
@@ -133,8 +129,7 @@ describe("usePatternActions", () => {
 
   describe("navigatePatternDetail", () => {
     it("should navigate to next pattern", () => {
-      const { openPatternDetails, navigatePatternDetail, selectedPattern } =
-        usePatternActions();
+      const { openPatternDetails, navigatePatternDetail, selectedPattern } = usePatternActions();
       openPatternDetails({ template: "first", pattern_id: "p1" }, 0);
 
       navigatePatternDetail(true, false);
@@ -144,8 +139,7 @@ describe("usePatternActions", () => {
     });
 
     it("should navigate to previous pattern", () => {
-      const { openPatternDetails, navigatePatternDetail, selectedPattern } =
-        usePatternActions();
+      const { openPatternDetails, navigatePatternDetail, selectedPattern } = usePatternActions();
       openPatternDetails({ template: "first", pattern_id: "p1" }, 1);
 
       navigatePatternDetail(false, true);
@@ -154,8 +148,7 @@ describe("usePatternActions", () => {
     });
 
     it("should not navigate beyond the first pattern when going prev", () => {
-      const { openPatternDetails, navigatePatternDetail, selectedPattern } =
-        usePatternActions();
+      const { openPatternDetails, navigatePatternDetail, selectedPattern } = usePatternActions();
       openPatternDetails({ template: "first", pattern_id: "p1" }, 0);
 
       navigatePatternDetail(false, true);
@@ -164,8 +157,7 @@ describe("usePatternActions", () => {
     });
 
     it("should not navigate beyond the last pattern when going next", () => {
-      const { openPatternDetails, navigatePatternDetail, selectedPattern } =
-        usePatternActions();
+      const { openPatternDetails, navigatePatternDetail, selectedPattern } = usePatternActions();
       openPatternDetails({ template: "second", pattern_id: "p2" }, 1);
 
       navigatePatternDetail(true, false);
@@ -207,10 +199,7 @@ describe("usePatternActions", () => {
 
   describe("addPatternToSearch", () => {
     it("should build filter from constants and set addToFilter", () => {
-      vi.mocked(extractConstantsFromPattern).mockReturnValue([
-        "User logged in",
-        "from address",
-      ]);
+      vi.mocked(extractConstantsFromPattern).mockReturnValue(["User logged in", "from address"]);
       const { addPatternToSearch } = usePatternActions();
 
       addPatternToSearch({ template: "User <*> from <:IP>" }, "include");
@@ -222,23 +211,16 @@ describe("usePatternActions", () => {
     });
 
     it("should wrap with NOT for exclude action", () => {
-      vi.mocked(extractConstantsFromPattern).mockReturnValue([
-        "User logged in",
-      ]);
+      vi.mocked(extractConstantsFromPattern).mockReturnValue(["User logged in"]);
       const { addPatternToSearch } = usePatternActions();
 
       addPatternToSearch({ template: "User <*> from <:IP>" }, "exclude");
 
-      expect(mockSearchObj.data.stream.addToFilter).toBe(
-        "NOT match_all('User logged in')",
-      );
+      expect(mockSearchObj.data.stream.addToFilter).toBe("NOT match_all('User logged in')");
     });
 
     it("should wrap multiple clauses with NOT (...) for exclude action", () => {
-      vi.mocked(extractConstantsFromPattern).mockReturnValue([
-        "User logged in",
-        "from address",
-      ]);
+      vi.mocked(extractConstantsFromPattern).mockReturnValue(["User logged in", "from address"]);
       const { addPatternToSearch } = usePatternActions();
 
       addPatternToSearch({ template: "User <*> from <:IP>" }, "exclude");
@@ -254,9 +236,7 @@ describe("usePatternActions", () => {
 
       addPatternToSearch({ template: "<*>" }, "include");
 
-      expect(mockToast).toHaveBeenCalledWith(
-        expect.objectContaining({ variant: "warning" }),
-      );
+      expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ variant: "warning" }));
       expect(mockSearchObj.data.stream.addToFilter).toBe("");
     });
   });
@@ -267,9 +247,7 @@ describe("usePatternActions", () => {
 
       addWildcardValueToSearch("192.168.1.1", "include");
 
-      expect(mockSearchObj.data.stream.addToFilter).toBe(
-        "match_all('192.168.1.1')",
-      );
+      expect(mockSearchObj.data.stream.addToFilter).toBe("match_all('192.168.1.1')");
       expect(mockSearchObj.meta.logsVisualizeToggle).toBe("logs");
     });
 
@@ -278,18 +256,14 @@ describe("usePatternActions", () => {
 
       addWildcardValueToSearch("error_message", "exclude");
 
-      expect(mockSearchObj.data.stream.addToFilter).toBe(
-        "NOT match_all('error_message')",
-      );
+      expect(mockSearchObj.data.stream.addToFilter).toBe("NOT match_all('error_message')");
     });
   });
 
   describe("createAlertFromPattern", () => {
     beforeEach(() => {
       // Provide constants so alert creation proceeds
-      vi.mocked(extractConstantsFromPattern).mockReturnValue([
-        "User logged in",
-      ]);
+      vi.mocked(extractConstantsFromPattern).mockReturnValue(["User logged in"]);
       // Re-set buildPatternAlertData return value (cleared by outer beforeEach vi.clearAllMocks)
       vi.mocked(buildPatternAlertData).mockReturnValue({
         streamName: "test-stream",
@@ -324,9 +298,7 @@ describe("usePatternActions", () => {
 
       createAlertFromPattern({ template: "User <*> logged in" });
 
-      expect(mockToast).toHaveBeenCalledWith(
-        expect.objectContaining({ variant: "warning" }),
-      );
+      expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ variant: "warning" }));
       expect(mockRouterPush).not.toHaveBeenCalled();
     });
 
@@ -336,9 +308,7 @@ describe("usePatternActions", () => {
 
       createAlertFromPattern({ template: "<*>" });
 
-      expect(mockToast).toHaveBeenCalledWith(
-        expect.objectContaining({ variant: "warning" }),
-      );
+      expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ variant: "warning" }));
       expect(mockRouterPush).not.toHaveBeenCalled();
     });
 
@@ -351,10 +321,7 @@ describe("usePatternActions", () => {
         pattern_id: "p1",
       });
 
-      expect(setItemSpy).toHaveBeenCalledWith(
-        "patternData",
-        expect.any(String),
-      );
+      expect(setItemSpy).toHaveBeenCalledWith("patternData", expect.any(String));
     });
   });
 });

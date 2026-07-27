@@ -62,10 +62,7 @@ class EvalTemplateService {
   /**
    * Get a specific template by UUID
    */
-  async getTemplate(
-    orgId: string,
-    templateId: string,
-  ): Promise<TemplateResponse> {
+  async getTemplate(orgId: string, templateId: string): Promise<TemplateResponse> {
     try {
       const url = `${this.getBaseURL(orgId)}/${templateId}`;
       const response = await http().get(url);
@@ -79,10 +76,7 @@ class EvalTemplateService {
   /**
    * Create a new evaluation template
    */
-  async createTemplate(
-    orgId: string,
-    request: CreateTemplateRequest,
-  ): Promise<TemplateResponse> {
+  async createTemplate(orgId: string, request: CreateTemplateRequest): Promise<TemplateResponse> {
     try {
       const url = this.getBaseURL(orgId);
       const response = await http().post(url, request);
@@ -127,10 +121,7 @@ class EvalTemplateService {
   /**
    * Get usage statistics for a template by UUID
    */
-  async getTemplateStats(
-    orgId: string,
-    templateId: string,
-  ): Promise<TemplateStats> {
+  async getTemplateStats(orgId: string, templateId: string): Promise<TemplateStats> {
     try {
       const url = `${this.getBaseURL(orgId)}/${templateId}/stats`;
       const response = await http().get(url);
@@ -151,7 +142,9 @@ class EvalTemplateService {
     try {
       const url = this.getBaseURL(orgId);
       const response = await http().get(url);
-      return (response.data || []).filter((t: TemplateResponse) => t.response_type === responseType);
+      return (response.data || []).filter(
+        (t: TemplateResponse) => t.response_type === responseType,
+      );
     } catch (error) {
       console.error("Failed to get templates for comparison:", error);
       throw error;

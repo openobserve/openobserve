@@ -20,25 +20,22 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 // inside factories without triggering the "Cannot access before initialization"
 // TDZ error that affects regular `const` declarations.
 // ─────────────────────────────────────────────────────────────────────────────
-const { mockStore, mockShowErrorNotification, mockB64EncodeUnicode } =
-  vi.hoisted(() => {
-    const mockStore = {
-      state: {
-        zoConfig: {
-          timestamp_column: "_timestamp",
-          sql_base64_enabled: false,
-        },
-        selectedOrganization: {
-          identifier: "test-org",
-        },
+const { mockStore, mockShowErrorNotification, mockB64EncodeUnicode } = vi.hoisted(() => {
+  const mockStore = {
+    state: {
+      zoConfig: {
+        timestamp_column: "_timestamp",
+        sql_base64_enabled: false,
       },
-    };
-    const mockShowErrorNotification = vi.fn();
-    const mockB64EncodeUnicode = vi.fn(
-      (s: string) => btoa(unescape(encodeURIComponent(s)))
-    );
-    return { mockStore, mockShowErrorNotification, mockB64EncodeUnicode };
-  });
+      selectedOrganization: {
+        identifier: "test-org",
+      },
+    },
+  };
+  const mockShowErrorNotification = vi.fn();
+  const mockB64EncodeUnicode = vi.fn((s: string) => btoa(unescape(encodeURIComponent(s))));
+  return { mockStore, mockShowErrorNotification, mockB64EncodeUnicode };
+});
 
 vi.mock("vuex", () => ({
   useStore: vi.fn(() => mockStore),

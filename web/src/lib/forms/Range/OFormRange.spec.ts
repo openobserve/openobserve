@@ -36,8 +36,7 @@ describe("OFormRange", () => {
     wrapper = mount(OForm, {
       props: { defaultValues: { priceRange: { min: 15, max: 65 } } },
       slots: {
-        default: () =>
-          h(OFormRange, { name: "priceRange", min: 0, max: 100 }),
+        default: () => h(OFormRange, { name: "priceRange", min: 0, max: 100 }),
       },
       global: { components: { OFormRange } },
     });
@@ -94,8 +93,7 @@ describe("OFormRange", () => {
         }),
       },
       slots: {
-        default: () =>
-          h(OFormRange, { name: "priceRange", min: 0, max: 100 }),
+        default: () => h(OFormRange, { name: "priceRange", min: 0, max: 100 }),
       },
       global: { components: { OFormRange } },
     });

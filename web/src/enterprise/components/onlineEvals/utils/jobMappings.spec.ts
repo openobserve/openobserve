@@ -63,9 +63,7 @@ describe("defaultJobMappingValue", () => {
   it("maps well-known scorer variables to OTel trace fields", () => {
     expect(defaultJobMappingValue("input")).toBe("{{gen_ai_input_messages}}");
     expect(defaultJobMappingValue("output")).toBe("{{gen_ai_output_messages}}");
-    expect(defaultJobMappingValue("context")).toBe(
-      "{{gen_ai_system_instructions}}",
-    );
+    expect(defaultJobMappingValue("context")).toBe("{{gen_ai_system_instructions}}");
     expect(defaultJobMappingValue("metadata")).toBe("{{attributes}}");
     expect(defaultJobMappingValue("trace.id")).toBe("{{trace_id}}");
     expect(defaultJobMappingValue("span.id")).toBe("{{span_id}}");
@@ -97,10 +95,7 @@ describe("jobMappingVariablesForScorer", () => {
 
   it("tolerates a missing existing mapping (undefined)", () => {
     const s = scorer({ variables: ["input", "output"] });
-    expect(jobMappingVariablesForScorer(s, undefined)).toEqual([
-      "input",
-      "output",
-    ]);
+    expect(jobMappingVariablesForScorer(s, undefined)).toEqual(["input", "output"]);
   });
 });
 

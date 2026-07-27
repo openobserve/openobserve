@@ -4,13 +4,11 @@
  * @param {Set<string>} variableNames - set of variable names to search for (optional)
  * @returns {string[]} - array of variable names found in the string
  */
-export const extractVariableNames = (
-  str: string,
-  variableNames?: Set<string>
-): string[] => {
+export const extractVariableNames = (str: string, variableNames?: Set<string>): string[] => {
   // Match $<variable_name>, ${<variable_name>}, and {{<variable_name>}} (with optional :format)
   // Supports optional whitespace inside braces: {{ var }}, ${ var }, {{ var : csv }}
-  const regex = /(?:\$\{\s*([a-zA-Z0-9_-]+)\s*(?::\s*[a-zA-Z]+\s*)?\})|(?:\$([a-zA-Z0-9_-]+))|(?:\{\{\s*([a-zA-Z0-9_-]+)\s*(?::\s*[a-zA-Z]+\s*)?\}\})/g;
+  const regex =
+    /(?:\$\{\s*([a-zA-Z0-9_-]+)\s*(?::\s*[a-zA-Z]+\s*)?\})|(?:\$([a-zA-Z0-9_-]+))|(?:\{\{\s*([a-zA-Z0-9_-]+)\s*(?::\s*[a-zA-Z]+\s*)?\}\})/g;
   const names: string[] = [];
   let match: RegExpExecArray | null;
   // loop over all matches
@@ -33,14 +31,12 @@ export const extractVariableNames = (
  *  - childVariables: list of variables that depend on the key variable
  */
 export const buildVariablesDependencyGraph = (
-  variables: { name: string; type: string; query_data: any }[]
+  variables: { name: string; type: string; query_data: any }[],
 ) => {
   let graph: any = {};
 
   // Create a set of variable names
-  let variablesNameList = new Set(
-    variables.map((variable: { name: string }) => variable.name)
-  );
+  let variablesNameList = new Set(variables.map((variable: { name: string }) => variable.name));
 
   // Initialize the graph with empty arrays
   for (let item of variables) {
@@ -60,28 +56,19 @@ export const buildVariablesDependencyGraph = (
 
       // 1. Check stream field for variable references
       if (item.query_data?.stream) {
-        const streamDeps = extractVariableNames(
-          item.query_data.stream,
-          variablesNameList
-        );
+        const streamDeps = extractVariableNames(item.query_data.stream, variablesNameList);
         streamDeps.forEach((dep: string) => allDependencies.add(dep));
       }
 
       // 2. Check field field for variable references
       if (item.query_data?.field) {
-        const fieldDeps = extractVariableNames(
-          item.query_data.field,
-          variablesNameList
-        );
+        const fieldDeps = extractVariableNames(item.query_data.field, variablesNameList);
         fieldDeps.forEach((dep: string) => allDependencies.add(dep));
       }
 
       // 3. Check filter values for variable references (existing logic)
       for (let filter of item?.query_data?.filter ?? []) {
-        const filterDeps = extractVariableNames(
-          filter.value,
-          variablesNameList
-        );
+        const filterDeps = extractVariableNames(filter.value, variablesNameList);
         filterDeps.forEach((dep: string) => allDependencies.add(dep));
       }
 
@@ -119,7 +106,7 @@ export const isGraphHasCycleUtil = (
   visited: any,
   recStack: any,
   graph: any,
-  path: any
+  path: any,
 ) => {
   // If node is not visited then recur for all the vertices
   // adjacent to this vertex
@@ -136,10 +123,7 @@ export const isGraphHasCycleUtil = (
 
       // if child is not visited and not part of recursion stack
       // if child is already visited and part of recursion stack. so it means there is a cycle in the graph
-      if (
-        !visited[child] &&
-        isGraphHasCycleUtil(child, visited, recStack, graph, path)
-      ) {
+      if (!visited[child] && isGraphHasCycleUtil(child, visited, recStack, graph, path)) {
         return true;
       } else if (recStack[child]) {
         return true;
@@ -218,7 +202,7 @@ const getVariableKey = (
   name: string,
   scope: "global" | "tabs" | "panels",
   tabId?: string,
-  panelId?: string
+  panelId?: string,
 ): string => {
   if (scope === "global") {
     return `${name}@global`;
@@ -237,7 +221,7 @@ const getVariableKey = (
  */
 const isValidDependency = (
   parent: { scope: string; tabId?: string; panelId?: string },
-  child: { scope: string; tabId?: string; panelId?: string }
+  child: { scope: string; tabId?: string; panelId?: string },
 ): boolean => {
   // Global can be parent of anything
   if (parent.scope === "global") return true;
@@ -273,7 +257,7 @@ const resolveParentVariable = (
   childTabId: string | undefined,
   childPanelId: string | undefined,
   allVariables: VariableRuntimeState[],
-  panelTabMapping: Record<string, string>
+  panelTabMapping: Record<string, string>,
 ): string | null => {
   // Resolution order (child looking for parent):
   // 1. If child is global: Look in global only
@@ -281,58 +265,40 @@ const resolveParentVariable = (
   // 3. If child is panel: Look in same panel, then parent tab, then global
 
   if (childScope === "global") {
-    const parent = allVariables.find(
-      (v) => v.name === parentName && v.scope === "global"
-    );
+    const parent = allVariables.find((v) => v.name === parentName && v.scope === "global");
     return parent ? getVariableKey(parent.name, parent.scope) : null;
   }
 
   if (childScope === "tabs") {
     // Check same tab first
     let parent = allVariables.find(
-      (v) =>
-        v.name === parentName && v.scope === "tabs" && v.tabId === childTabId
+      (v) => v.name === parentName && v.scope === "tabs" && v.tabId === childTabId,
     );
     if (parent) return getVariableKey(parent.name, parent.scope, parent.tabId);
 
     // Fall back to global
-    parent = allVariables.find(
-      (v) => v.name === parentName && v.scope === "global"
-    );
+    parent = allVariables.find((v) => v.name === parentName && v.scope === "global");
     return parent ? getVariableKey(parent.name, parent.scope) : null;
   }
 
   if (childScope === "panels") {
     // Check same panel first
     let parent = allVariables.find(
-      (v) =>
-        v.name === parentName &&
-        v.scope === "panels" &&
-        v.panelId === childPanelId
+      (v) => v.name === parentName && v.scope === "panels" && v.panelId === childPanelId,
     );
-    if (parent)
-      return getVariableKey(
-        parent.name,
-        parent.scope,
-        undefined,
-        parent.panelId
-      );
+    if (parent) return getVariableKey(parent.name, parent.scope, undefined, parent.panelId);
 
     // Check parent tab (need to know which tab the panel belongs to)
     const panelTabId = panelTabMapping[childPanelId!];
     if (panelTabId) {
       parent = allVariables.find(
-        (v) =>
-          v.name === parentName && v.scope === "tabs" && v.tabId === panelTabId
+        (v) => v.name === parentName && v.scope === "tabs" && v.tabId === panelTabId,
       );
-      if (parent)
-        return getVariableKey(parent.name, parent.scope, parent.tabId);
+      if (parent) return getVariableKey(parent.name, parent.scope, parent.tabId);
     }
 
     // Fall back to global
-    parent = allVariables.find(
-      (v) => v.name === parentName && v.scope === "global"
-    );
+    parent = allVariables.find((v) => v.name === parentName && v.scope === "global");
     return parent ? getVariableKey(parent.name, parent.scope) : null;
   }
 
@@ -347,18 +313,13 @@ const resolveParentVariable = (
  */
 export const buildScopedDependencyGraph = (
   variables: VariableRuntimeState[],
-  panelTabMapping: Record<string, string>
+  panelTabMapping: Record<string, string>,
 ): ScopedDependencyGraph => {
   const graph: ScopedDependencyGraph = {};
 
   // Step 1: Initialize nodes
   variables.forEach((variable) => {
-    const key = getVariableKey(
-      variable.name,
-      variable.scope,
-      variable.tabId,
-      variable.panelId
-    );
+    const key = getVariableKey(variable.name, variable.scope, variable.tabId, variable.panelId);
     graph[key] = {
       parents: [],
       children: [],
@@ -374,7 +335,7 @@ export const buildScopedDependencyGraph = (
       variable.name,
       variable.scope,
       variable.tabId,
-      variable.panelId
+      variable.panelId,
     );
 
     if (variable.type === "query_values") {
@@ -410,7 +371,7 @@ export const buildScopedDependencyGraph = (
           variable.tabId,
           variable.panelId,
           variables,
-          panelTabMapping
+          panelTabMapping,
         );
 
         if (parentKey) {
@@ -424,9 +385,7 @@ export const buildScopedDependencyGraph = (
               graph[parentKey].children.push(childKey);
             }
           } else {
-            throw new Error(
-              `Invalid dependency: ${childKey} cannot depend on ${parentKey}`
-            );
+            throw new Error(`Invalid dependency: ${childKey} cannot depend on ${parentKey}`);
           }
         }
       });
@@ -441,16 +400,11 @@ export const buildScopedDependencyGraph = (
  * @param graph - scoped dependency graph
  * @returns array representing cycle path if found, null otherwise
  */
-export const detectCyclesInScopedGraph = (
-  graph: ScopedDependencyGraph
-): string[] | null => {
+export const detectCyclesInScopedGraph = (graph: ScopedDependencyGraph): string[] | null => {
   const visited = new Set<string>();
   const recStack = new Set<string>();
 
-  const dfsDetectCycle = (
-    nodeKey: string,
-    path: string[]
-  ): string[] | null => {
+  const dfsDetectCycle = (nodeKey: string, path: string[]): string[] | null => {
     if (!visited.has(nodeKey)) {
       visited.add(nodeKey);
       recStack.add(nodeKey);

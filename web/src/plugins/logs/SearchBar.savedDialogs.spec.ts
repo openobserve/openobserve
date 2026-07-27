@@ -30,14 +30,8 @@ import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
-import {
-  makeSavedViewSchema,
-  type SavedViewForm,
-} from "./SearchBar.SavedView.schema";
-import {
-  makeSavedFunctionSchema,
-  type SavedFunctionForm,
-} from "./SearchBar.SavedFunction.schema";
+import { makeSavedViewSchema, type SavedViewForm } from "./SearchBar.SavedView.schema";
+import { makeSavedFunctionSchema, type SavedFunctionForm } from "./SearchBar.SavedFunction.schema";
 
 const t = (k: string) => k;
 const savedViewSchema = makeSavedViewSchema(t);
@@ -190,8 +184,7 @@ describe("SavedView dialog — real OForm", () => {
     },
   });
 
-  const getForm = (w: any) =>
-    (w.findComponent({ name: "OForm" }).vm as any).form;
+  const getForm = (w: any) => (w.findComponent({ name: "OForm" }).vm as any).form;
 
   it("create: blocks submit on empty name", async () => {
     const w = mount(Harness, { props: { mode: "create" } });
@@ -253,8 +246,7 @@ describe("SavedFunction dialog — real OForm", () => {
     },
   });
 
-  const getForm = (w: any) =>
-    (w.findComponent({ name: "OForm" }).vm as any).form;
+  const getForm = (w: any) => (w.findComponent({ name: "OForm" }).vm as any).form;
 
   it("create: blocks submit on empty name", async () => {
     const w = mount(Harness, { props: { mode: "create" } });
@@ -311,9 +303,7 @@ describe("SavedFunction dialog — mode toggle clears the name", () => {
         schema: savedFunctionSchema,
         onSubmit: () => {},
       });
-      const mode = form.useStore(
-        (s) => (s.values.isSavedFunctionAction as string) ?? "create",
-      );
+      const mode = form.useStore((s) => (s.values.isSavedFunctionAction as string) ?? "create");
       // Same watch SearchBar.vue installs in setup().
       watch(mode, () => {
         form.setFieldValue("savedFunctionName", "", {

@@ -18,11 +18,7 @@
 
 import { getImageURL } from "@/utils/zincutils";
 import type { CardSubstitutions, RichCardContent } from "../types";
-import {
-  collectorInstallStep,
-  writeConfigVariants,
-  sharedToolIcons,
-} from "./otelShared";
+import { collectorInstallStep, writeConfigVariants, sharedToolIcons } from "./otelShared";
 
 const USER_SQL = `CREATE USER 'otel'@'localhost' IDENTIFIED BY 'yourpassword';
 GRANT SELECT, PROCESS, REPLICATION CLIENT ON *.* TO 'otel'@'localhost';
@@ -77,8 +73,7 @@ export default function mysqlCard(subs: CardSubstitutions): RichCardContent {
       {
         id: "prepare",
         title: "Prepare MySQL",
-        description:
-          "Create the monitoring user — run it in a SQL client, **not** your shell.",
+        description: "Create the monitoring user — run it in a SQL client, **not** your shell.",
         chip: { kind: "terminal", label: "Terminal" },
         completeOn: "copy",
         variants: [
@@ -136,8 +131,7 @@ export default function mysqlCard(subs: CardSubstitutions): RichCardContent {
       {
         id: "verify",
         title: "Verify Data in OpenObserve",
-        description:
-          "Hit Test below, or check Streams for the `mysql_*` metrics.",
+        description: "Hit Test below, or check Streams for the `mysql_*` metrics.",
         chip: { kind: "traces", label: "Metrics" },
         completeOn: "detect",
         detectionAnchor: true,

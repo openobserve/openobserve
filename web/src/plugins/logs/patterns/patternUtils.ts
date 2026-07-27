@@ -13,10 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import {
-  extractStatusFromTemplate,
-  extractStatusFromLog,
-} from "@/utils/logs/statusParser";
+import { extractStatusFromTemplate, extractStatusFromLog } from "@/utils/logs/statusParser";
 
 /**
  * Extract constant (non-variable) string segments from a pattern template.
@@ -44,12 +41,7 @@ export const extractConstantsFromPattern = (template: string): string[] => {
   return constants;
 };
 
-export type PatternSeverityKey =
-  | "error"
-  | "warning"
-  | "info"
-  | "debug"
-  | "uncategorized";
+export type PatternSeverityKey = "error" | "warning" | "info" | "debug" | "uncategorized";
 
 /**
  * Single source of truth for the log-level keywords the pattern feature
@@ -120,8 +112,7 @@ const SEVERITY_TEXT_CLASS: Record<PatternSeverityKey, string> = {
   uncategorized: "text-text-secondary",
 };
 
-export const severityTextClass = (key: PatternSeverityKey): string =>
-  SEVERITY_TEXT_CLASS[key];
+export const severityTextClass = (key: PatternSeverityKey): string => SEVERITY_TEXT_CLASS[key];
 
 /**
  * Severity text-color class for a single level keyword found inside template
@@ -152,9 +143,7 @@ const DROP_FACTOR = 0.5;
  * trend instead of silently showing nothing. For >= 5 buckets this is identical
  * to a fixed last-4/rest split.
  */
-export const patternTrendBadge = (
-  buckets?: number[] | null,
-): PatternTrendKind | null => {
+export const patternTrendBadge = (buckets?: number[] | null): PatternTrendKind | null => {
   if (!buckets || buckets.length < 2) return null;
   const recentCount = Math.min(4, buckets.length - 1); // baseline always >= 1
   const recent = buckets.slice(-recentCount);
@@ -223,8 +212,7 @@ export const formatBucketDuration = (
   t: (key: string, named: Record<string, unknown>) => string,
 ): string => {
   const s = Math.max(1, Math.round(seconds));
-  if (s % 86400 === 0)
-    return t("logs.patternList.durationDays", { n: s / 86400 });
+  if (s % 86400 === 0) return t("logs.patternList.durationDays", { n: s / 86400 });
   if (s % 3600 === 0) return t("logs.patternList.durationHours", { n: s / 3600 });
   if (s % 60 === 0) return t("logs.patternList.durationMinutes", { n: s / 60 });
   return t("logs.patternList.durationSeconds", { n: s });
@@ -259,16 +247,11 @@ export const escapeForMatchAll = (str: string): string => {
  * Build a SQL query for a pattern against a given stream.
  * Returns a SELECT * with match_all() WHERE clauses for each constant segment.
  */
-export const buildPatternSqlQuery = (
-  template: string,
-  streamName: string,
-): string => {
+export const buildPatternSqlQuery = (template: string, streamName: string): string => {
   const constants = extractConstantsFromPattern(template);
   let sql = `SELECT * FROM '${streamName}'`;
   if (constants.length > 0) {
-    const conditions = constants.map(
-      (c) => `match_all('${escapeForMatchAll(c)}')`,
-    );
+    const conditions = constants.map((c) => `match_all('${escapeForMatchAll(c)}')`);
     sql += ` WHERE ${conditions.join(" AND ")}`;
   }
   return sql;

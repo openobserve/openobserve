@@ -18,7 +18,6 @@ import { mount, flushPromises } from "@vue/test-utils";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-
 vi.mock("@/services/alerts", () => ({
   default: {
     getOrganizationDeduplicationConfig: vi.fn().mockResolvedValue({

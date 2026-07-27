@@ -18,7 +18,6 @@ import { mount } from "@vue/test-utils";
 import CustomHTMLEditor from "@/components/dashboards/addPanel/CustomHTMLEditor.vue";
 import i18n from "@/locales";
 
-
 describe("CustomHTMLEditor", () => {
   let wrapper: any;
 
@@ -26,8 +25,8 @@ describe("CustomHTMLEditor", () => {
     modelValue: "<h1>Test HTML</h1>",
     initialVariableValues: {
       user: "admin",
-      region: "us-east-1"
-    }
+      region: "us-east-1",
+    },
   };
 
   beforeEach(() => {
@@ -44,18 +43,18 @@ describe("CustomHTMLEditor", () => {
     return mount(CustomHTMLEditor, {
       props: {
         ...defaultProps,
-        ...props
+        ...props,
       },
       global: {
         plugins: [i18n],
         stubs: {
-          'CodeQueryEditor': true,
-          'HTMLRenderer': true
+          CodeQueryEditor: true,
+          HTMLRenderer: true,
         },
         mocks: {
-          $t: (key: string) => key
-        }
-      }
+          $t: (key: string) => key,
+        },
+      },
     });
   };
 
@@ -63,7 +62,9 @@ describe("CustomHTMLEditor", () => {
     it("should render HTML editor container", () => {
       wrapper = createWrapper();
 
-      expect(wrapper.find('[data-test="dashboard-custom-html-editor-container"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-custom-html-editor-container"]').exists()).toBe(
+        true,
+      );
     });
 
     it("should render splitter component", () => {
@@ -109,13 +110,13 @@ describe("CustomHTMLEditor", () => {
       const variables = { user: "test", env: "dev" };
       wrapper = createWrapper({ initialVariableValues: variables });
 
-      expect(wrapper.props('initialVariableValues')).toEqual(variables);
+      expect(wrapper.props("initialVariableValues")).toEqual(variables);
     });
 
     it("should handle empty initialVariableValues", () => {
       wrapper = createWrapper({ initialVariableValues: {} });
 
-      expect(wrapper.props('initialVariableValues')).toEqual({});
+      expect(wrapper.props("initialVariableValues")).toEqual({});
     });
 
     it("should handle undefined initialVariableValues", () => {
@@ -123,25 +124,25 @@ describe("CustomHTMLEditor", () => {
         return mount(CustomHTMLEditor, {
           props: {
             ...defaultProps,
-            initialVariableValues: undefined
+            initialVariableValues: undefined,
           },
           global: {
             plugins: [i18n],
             stubs: {
-              'CodeQueryEditor': true,
-              'HTMLRenderer': true
+              CodeQueryEditor: true,
+              HTMLRenderer: true,
             },
             mocks: {
-              $t: (key: string) => key
-            }
-          }
+              $t: (key: string) => key,
+            },
+          },
         });
       };
 
       wrapper = createWrapperOverride();
 
       // The component prop should be undefined, but Vue's default value takes precedence
-      expect(wrapper.props('initialVariableValues')).toEqual({});
+      expect(wrapper.props("initialVariableValues")).toEqual({});
     });
   });
 
@@ -164,17 +165,17 @@ describe("CustomHTMLEditor", () => {
     it("should have layoutSplitterUpdated method", () => {
       wrapper = createWrapper();
 
-      expect(typeof wrapper.vm.layoutSplitterUpdated).toBe('function');
+      expect(typeof wrapper.vm.layoutSplitterUpdated).toBe("function");
     });
 
     it("should dispatch resize event when splitter is updated", () => {
       wrapper = createWrapper();
 
-      const dispatchEventSpy = vi.spyOn(window, 'dispatchEvent');
+      const dispatchEventSpy = vi.spyOn(window, "dispatchEvent");
       wrapper.vm.layoutSplitterUpdated();
 
       expect(dispatchEventSpy).toHaveBeenCalledWith(expect.any(Event));
-      expect(dispatchEventSpy.mock.calls[0][0].type).toBe('resize');
+      expect(dispatchEventSpy.mock.calls[0][0].type).toBe("resize");
 
       dispatchEventSpy.mockRestore();
     });
@@ -200,7 +201,7 @@ describe("CustomHTMLEditor", () => {
     it("should have onEditorValueChange method", () => {
       wrapper = createWrapper();
 
-      expect(typeof wrapper.vm.onEditorValueChange).toBe('function');
+      expect(typeof wrapper.vm.onEditorValueChange).toBe("function");
     });
 
     it("should emit update:modelValue when content changes", () => {
@@ -209,8 +210,8 @@ describe("CustomHTMLEditor", () => {
       const newHTML = "<span>New Content</span>";
       wrapper.vm.onEditorValueChange(newHTML);
 
-      expect(wrapper.emitted('update:modelValue')).toBeTruthy();
-      expect(wrapper.emitted('update:modelValue')[0]).toEqual([newHTML]);
+      expect(wrapper.emitted("update:modelValue")).toBeTruthy();
+      expect(wrapper.emitted("update:modelValue")[0]).toEqual([newHTML]);
     });
   });
 
@@ -234,10 +235,10 @@ describe("CustomHTMLEditor", () => {
       wrapper = createWrapper();
 
       const newHTML = "<div>Editor Update</div>";
-      const codeEditor = wrapper.findComponent({ name: 'CodeQueryEditor' });
-      
+      const codeEditor = wrapper.findComponent({ name: "CodeQueryEditor" });
+
       if (codeEditor.exists()) {
-        await codeEditor.vm.$emit('update:query', newHTML);
+        await codeEditor.vm.$emit("update:query", newHTML);
         expect(wrapper.vm.htmlContent).toBe(newHTML);
       }
     });
@@ -248,9 +249,9 @@ describe("CustomHTMLEditor", () => {
       const htmlContent = "<p>Renderer Test</p>";
       wrapper = createWrapper({ modelValue: htmlContent });
 
-      const htmlRenderer = wrapper.findComponent({ name: 'HTMLRenderer' });
+      const htmlRenderer = wrapper.findComponent({ name: "HTMLRenderer" });
       if (htmlRenderer.exists()) {
-        expect(htmlRenderer.props('htmlContent')).toBe(htmlContent);
+        expect(htmlRenderer.props("htmlContent")).toBe(htmlContent);
       }
     });
 
@@ -258,9 +259,9 @@ describe("CustomHTMLEditor", () => {
       const variables = { test: "value", num: 123 };
       wrapper = createWrapper({ initialVariableValues: variables });
 
-      const htmlRenderer = wrapper.findComponent({ name: 'HTMLRenderer' });
+      const htmlRenderer = wrapper.findComponent({ name: "HTMLRenderer" });
       if (htmlRenderer.exists()) {
-        expect(htmlRenderer.props('variablesData')).toEqual(variables);
+        expect(htmlRenderer.props("variablesData")).toEqual(variables);
       }
     });
 
@@ -271,9 +272,9 @@ describe("CustomHTMLEditor", () => {
       wrapper.vm.htmlContent = newHTML;
       await wrapper.vm.$nextTick();
 
-      const htmlRenderer = wrapper.findComponent({ name: 'HTMLRenderer' });
+      const htmlRenderer = wrapper.findComponent({ name: "HTMLRenderer" });
       if (htmlRenderer.exists()) {
-        expect(htmlRenderer.props('htmlContent')).toBe(newHTML);
+        expect(htmlRenderer.props("htmlContent")).toBe(newHTML);
       }
     });
   });
@@ -282,14 +283,14 @@ describe("CustomHTMLEditor", () => {
     it("should have correct component name", () => {
       wrapper = createWrapper();
 
-      expect(wrapper.vm.$options.name).toBe('CustomHTMLEditor');
+      expect(wrapper.vm.$options.name).toBe("CustomHTMLEditor");
     });
 
     it("should have all required methods", () => {
       wrapper = createWrapper();
 
-      expect(typeof wrapper.vm.layoutSplitterUpdated).toBe('function');
-      expect(typeof wrapper.vm.onEditorValueChange).toBe('function');
+      expect(typeof wrapper.vm.layoutSplitterUpdated).toBe("function");
+      expect(typeof wrapper.vm.onEditorValueChange).toBe("function");
     });
 
     it("should have all required data properties", () => {
@@ -314,9 +315,9 @@ describe("CustomHTMLEditor", () => {
       const container = wrapper.find('[data-test="dashboard-custom-html-editor-container"]');
 
       // Sizing/overflow moved from an inline style to Tailwind utilities.
-      expect(container.classes()).toContain('w-full');
-      expect(container.classes()).toContain('h-full');
-      expect(container.classes()).toContain('overflow-hidden');
+      expect(container.classes()).toContain("w-full");
+      expect(container.classes()).toContain("h-full");
+      expect(container.classes()).toContain("overflow-hidden");
     });
 
     it("should render splitter with correct configuration", () => {
@@ -342,8 +343,8 @@ describe("CustomHTMLEditor", () => {
     it("should handle splitter updates", () => {
       wrapper = createWrapper();
 
-      const mockDispatchEvent = vi.spyOn(window, 'dispatchEvent');
-      
+      const mockDispatchEvent = vi.spyOn(window, "dispatchEvent");
+
       wrapper.vm.layoutSplitterUpdated();
 
       expect(mockDispatchEvent).toHaveBeenCalled();
@@ -357,8 +358,8 @@ describe("CustomHTMLEditor", () => {
       wrapper.vm.onEditorValueChange(newContent);
 
       expect(wrapper.vm.htmlContent).toBe(newContent);
-      expect(wrapper.emitted('update:modelValue')).toBeTruthy();
-      expect(wrapper.emitted('update:modelValue')[0]).toEqual([newContent]);
+      expect(wrapper.emitted("update:modelValue")).toBeTruthy();
+      expect(wrapper.emitted("update:modelValue")[0]).toEqual([newContent]);
     });
   });
 
@@ -377,7 +378,7 @@ describe("CustomHTMLEditor", () => {
 
     it("should handle component unmounting gracefully", () => {
       wrapper = createWrapper();
-      
+
       expect(wrapper.exists()).toBe(true);
       expect(() => wrapper.unmount()).not.toThrow();
     });
@@ -409,26 +410,26 @@ describe("CustomHTMLEditor", () => {
       const complexVariables = {
         user: {
           name: "John Doe",
-          id: 123
+          id: 123,
         },
         settings: ["option1", "option2"],
-        isActive: true
+        isActive: true,
       };
 
       wrapper = createWrapper({ initialVariableValues: complexVariables });
 
-      const htmlRenderer = wrapper.findComponent({ name: 'HTMLRenderer' });
+      const htmlRenderer = wrapper.findComponent({ name: "HTMLRenderer" });
       if (htmlRenderer.exists()) {
-        expect(htmlRenderer.props('variablesData')).toEqual(complexVariables);
+        expect(htmlRenderer.props("variablesData")).toEqual(complexVariables);
       }
     });
 
     it("should handle null variables", () => {
       wrapper = createWrapper({ initialVariableValues: null });
 
-      const htmlRenderer = wrapper.findComponent({ name: 'HTMLRenderer' });
+      const htmlRenderer = wrapper.findComponent({ name: "HTMLRenderer" });
       if (htmlRenderer.exists()) {
-        expect(htmlRenderer.props('variablesData')).toBe(null);
+        expect(htmlRenderer.props("variablesData")).toBe(null);
       }
     });
   });
@@ -443,7 +444,7 @@ describe("CustomHTMLEditor", () => {
 
       // The component initializes htmlContent from props.modelValue but doesn't watch for changes
       // This test verifies the prop was set, even if internal state doesn't auto-update
-      expect(wrapper.props('modelValue')).toBe(newHTML);
+      expect(wrapper.props("modelValue")).toBe(newHTML);
     });
 
     it("should react to initialVariableValues prop changes", async () => {
@@ -452,9 +453,9 @@ describe("CustomHTMLEditor", () => {
       const newVariables = { newVar: "newValue" };
       await wrapper.setProps({ initialVariableValues: newVariables });
 
-      const htmlRenderer = wrapper.findComponent({ name: 'HTMLRenderer' });
+      const htmlRenderer = wrapper.findComponent({ name: "HTMLRenderer" });
       if (htmlRenderer.exists()) {
-        expect(htmlRenderer.props('variablesData')).toEqual(newVariables);
+        expect(htmlRenderer.props("variablesData")).toEqual(newVariables);
       }
     });
 
@@ -462,7 +463,7 @@ describe("CustomHTMLEditor", () => {
       wrapper = createWrapper();
 
       const originalSplitter = wrapper.vm.splitterModel;
-      
+
       await wrapper.setProps({ modelValue: "<p>Updated</p>" });
 
       expect(wrapper.vm.splitterModel).toBe(originalSplitter);
@@ -474,13 +475,13 @@ describe("CustomHTMLEditor", () => {
       wrapper = createWrapper();
 
       const updates = ["<p>1</p>", "<p>2</p>", "<p>3</p>", "<p>4</p>", "<p>5</p>"];
-      
-      updates.forEach(content => {
+
+      updates.forEach((content) => {
         wrapper.vm.onEditorValueChange(content);
       });
 
       expect(wrapper.vm.htmlContent).toBe("<p>5</p>");
-      expect(wrapper.emitted('update:modelValue')).toHaveLength(5);
+      expect(wrapper.emitted("update:modelValue")).toHaveLength(5);
     });
 
     it("should handle debounced editor updates", () => {
@@ -503,7 +504,7 @@ describe("CustomHTMLEditor", () => {
       wrapper.vm.onEditorValueChange(updatedHTML);
 
       expect(wrapper.vm.htmlContent).toBe(updatedHTML);
-      expect(wrapper.emitted('update:modelValue')).toBeTruthy();
+      expect(wrapper.emitted("update:modelValue")).toBeTruthy();
 
       wrapper.vm.splitterModel = 70;
       wrapper.vm.layoutSplitterUpdated();
@@ -515,7 +516,7 @@ describe("CustomHTMLEditor", () => {
       wrapper = createWrapper();
 
       wrapper.vm.onEditorValueChange("<p>Editor Change</p>");
-      
+
       await wrapper.setProps({ modelValue: "<p>Prop Change</p>" });
 
       // Since the component doesn't watch props changes, editor change takes precedence

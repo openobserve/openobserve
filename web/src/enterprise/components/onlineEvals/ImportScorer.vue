@@ -6,7 +6,7 @@ the Free Software Foundation, either version 3 of the License, or
 (at your option) any later version. -->
 
 <template>
-  <base-import
+  <BaseImport
     ref="baseImportRef"
     :title="t('onlineEvals.scorer.import.title')"
     test-prefix="scorer"
@@ -18,30 +18,30 @@ the Free Software Foundation, either version 3 of the License, or
     @import="importJson"
   >
     <template #output-content>
-      <div class="w-full h-full flex flex-col" style="min-width: 380px">
+      <div class="flex h-full w-full flex-col" style="min-width: 380px">
         <div
           v-if="errors.length"
-          class="text-center text-sm font-semibold text-text-heading py-3 shrink-0"
+          class="text-text-heading shrink-0 py-3 text-center text-sm font-semibold"
           data-test="scorer-import-errors-title"
         >
           {{ t("onlineEvals.scorer.import.errors.title") }}
         </div>
         <div
           v-else
-          class="text-center text-sm font-semibold text-text-heading py-3 shrink-0"
+          class="text-text-heading shrink-0 py-3 text-center text-sm font-semibold"
           data-test="scorer-import-output-title"
         >
           {{ t("onlineEvals.scorer.import.outputMessages") }}
         </div>
         <OSeparator class="mt-1 shrink-0" />
 
-        <div class="flex-1 min-h-0 overflow-auto">
-          <div v-if="errors.length" class="p-2.5 mb-2.5">
+        <div class="min-h-0 flex-1 overflow-auto">
+          <div v-if="errors.length" class="mb-2.5 p-2.5">
             <div class="error-list">
               <div
                 v-for="(err, errIdx) in errors"
                 :key="`${err.itemIndex}-${err.field}-${errIdx}`"
-                class="py-1.25 px-0 text-sm"
+                class="px-0 py-1.25 text-sm"
                 :data-test="`scorer-import-error-${err.itemIndex}-${err.field}`"
               >
                 <span
@@ -132,8 +132,11 @@ the Free Software Foundation, either version 3 of the License, or
             </div>
           </div>
 
-          <div v-if="creators.length" class="p-2.5 mb-2.5">
-            <div class="section-title text-text-heading text-base mb-2.5 uppercase" data-test="scorer-import-creation-title">
+          <div v-if="creators.length" class="mb-2.5 p-2.5">
+            <div
+              class="section-title text-text-heading mb-2.5 text-base uppercase"
+              data-test="scorer-import-creation-title"
+            >
               {{ t("onlineEvals.scorer.import.creation") }}
             </div>
             <div
@@ -144,21 +147,21 @@ the Free Software Foundation, either version 3 of the License, or
             >
               <div
                 :class="{
-                  'py-1.25 px-0 text-sm font-bold': true,
+                  'px-0 py-1.25 text-sm font-bold': true,
                   'text-status-success-text': c.status === 'success',
                   'text-error-600': c.status === 'error',
                   'text-text-secondary': c.status === 'exists',
                 }"
                 :data-test="`scorer-import-creation-${i}-message`"
               >
-                <pre class="whitespace-pre-wrap font-[inherit] m-0">{{ c.message }}</pre>
+                <pre class="m-0 font-[inherit] whitespace-pre-wrap">{{ c.message }}</pre>
               </div>
             </div>
           </div>
         </div>
       </div>
     </template>
-  </base-import>
+  </BaseImport>
 </template>
 
 <script setup lang="ts">
@@ -205,7 +208,9 @@ const scoreConfigs = toRef(props, "scoreConfigs");
 const providers = toRef(props, "providers");
 
 const errors = ref<ScorerImportError[]>([]);
-const creators = ref<Array<{ name: string; status: "success" | "error" | "exists"; message: string }>>([]);
+const creators = ref<
+  Array<{ name: string; status: "success" | "error" | "exists"; message: string }>
+>([]);
 
 // Inline-fixer state, indexed by itemIndex in the imported batch.
 const nameFixers = reactive<Record<number, string>>({});
@@ -340,7 +345,10 @@ async function importJson({ jsonStr, jsonArray }: { jsonStr: string; jsonArray: 
       const raw: any = rawItems[e.itemIndex] ?? {};
       const scorer = raw.scorer ?? raw;
 
-      if ((e.field === "name" || e.field === "nameConflict") && nameFixers[e.itemIndex] === undefined) {
+      if (
+        (e.field === "name" || e.field === "nameConflict") &&
+        nameFixers[e.itemIndex] === undefined
+      ) {
         nameFixers[e.itemIndex] = typeof raw.name === "string" ? raw.name : "";
       }
       if (e.field === "type" && typeFixers[e.itemIndex] === undefined) {

@@ -19,11 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
        `error` banner stays reserved for hard failures. -->
   <OBanner
     :variant="insight.kind === 'frustration' ? 'warning' : 'error-soft'"
-    :icon="
-      insight.kind === 'frustration'
-        ? 'sentiment-very-dissatisfied'
-        : 'error-outline'
-    "
+    :icon="insight.kind === 'frustration' ? 'sentiment-very-dissatisfied' : 'error-outline'"
     dense
     inline-actions
     data-test="rum-sessions-insight-banner"
@@ -38,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template v-if="insight.kind === 'error'">
           <button
             type="button"
-            class="text-current text-compact font-medium underline underline-offset-3 hover:opacity-75"
+            class="text-compact font-medium text-current underline underline-offset-3 hover:opacity-75"
             data-test="rum-sessions-insight-filter-btn"
             @click="emit('filter')"
           >
@@ -46,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </button>
           <button
             type="button"
-            class="text-current text-compact font-medium underline underline-offset-3 hover:opacity-75"
+            class="text-compact font-medium text-current underline underline-offset-3 hover:opacity-75"
             data-test="rum-sessions-insight-open-error-tracking-btn"
             @click="emit('open-error-tracking')"
           >
@@ -56,7 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <button
           v-else
           type="button"
-          class="text-current text-compact font-medium underline underline-offset-3 hover:opacity-75"
+          class="text-compact font-medium text-current underline underline-offset-3 hover:opacity-75"
           data-test="rum-sessions-insight-apply-btn"
           @click="emit('apply')"
         >
@@ -106,8 +102,7 @@ const viewPath = computed(() => {
   }
 });
 
-const truncate = (text: string, max = 120) =>
-  text.length > max ? `${text.slice(0, max)}…` : text;
+const truncate = (text: string, max = 120) => (text.length > max ? `${text.slice(0, max)}…` : text);
 
 const message = computed(() => {
   if (props.insight.kind === "frustration") {
@@ -134,4 +129,3 @@ const message = computed(() => {
   });
 });
 </script>
-

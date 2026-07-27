@@ -40,7 +40,6 @@ vi.mock("@/composables/dashboard/useDashboardPanel", () => ({
   })),
 }));
 
-
 describe("ValueMapping", () => {
   let wrapper: any;
 
@@ -95,11 +94,9 @@ describe("ValueMapping", () => {
       wrapper = createWrapper();
 
       // Info tooltip button was removed from this component in config redesign (PR #10917).
-      expect(
-        wrapper
-          .find('[data-test="dashboard-addpanel-config-drilldown-info"]')
-          .exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="dashboard-addpanel-config-drilldown-info"]').exists()).toBe(
+        false,
+      );
     });
 
     it("should render tooltip component", () => {
@@ -108,20 +105,16 @@ describe("ValueMapping", () => {
       // Info tooltip was removed from this component in config redesign (PR #10917);
       // verify the component still mounts without errors.
       expect(wrapper.exists()).toBe(true);
-      expect(
-        wrapper
-          .find('[data-test="dashboard-addpanel-config-drilldown-info"]')
-          .exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="dashboard-addpanel-config-drilldown-info"]').exists()).toBe(
+        false,
+      );
     });
 
     it("should render add/edit button", () => {
       wrapper = createWrapper();
 
       expect(
-        wrapper
-          .find('[data-test="dashboard-addpanel-config-value-mapping-add-btn"]')
-          .exists(),
+        wrapper.find('[data-test="dashboard-addpanel-config-value-mapping-add-btn"]').exists(),
       ).toBe(true);
     });
   });
@@ -131,9 +124,7 @@ describe("ValueMapping", () => {
       mockDashboardPanelData.data.config.mappings = [];
       wrapper = createWrapper();
 
-      const button = wrapper.find(
-        '[data-test="dashboard-addpanel-config-value-mapping-add-btn"]',
-      );
+      const button = wrapper.find('[data-test="dashboard-addpanel-config-value-mapping-add-btn"]');
       expect(button.text().trim()).toBe("Add Value Mapping");
     });
 
@@ -143,9 +134,7 @@ describe("ValueMapping", () => {
       ];
       wrapper = createWrapper();
 
-      const button = wrapper.find(
-        '[data-test="dashboard-addpanel-config-value-mapping-add-btn"]',
-      );
+      const button = wrapper.find('[data-test="dashboard-addpanel-config-value-mapping-add-btn"]');
       expect(button.text().trim()).toBe("Edit Value Mapping");
     });
 
@@ -154,21 +143,15 @@ describe("ValueMapping", () => {
       mockDashboardPanelData.data.config.mappings = [];
       wrapper = createWrapper();
 
-      let button = wrapper.find(
-        '[data-test="dashboard-addpanel-config-value-mapping-add-btn"]',
-      );
+      let button = wrapper.find('[data-test="dashboard-addpanel-config-value-mapping-add-btn"]');
       expect(button.text().trim()).toBe("Add Value Mapping");
 
       // Test with non-empty mappings
       wrapper.unmount();
-      mockDashboardPanelData.data.config.mappings = [
-        { value: "1", text: "Active" },
-      ];
+      mockDashboardPanelData.data.config.mappings = [{ value: "1", text: "Active" }];
       wrapper = createWrapper();
 
-      button = wrapper.find(
-        '[data-test="dashboard-addpanel-config-value-mapping-add-btn"]',
-      );
+      button = wrapper.find('[data-test="dashboard-addpanel-config-value-mapping-add-btn"]');
       expect(button.text().trim()).toBe("Edit Value Mapping");
     });
   });
@@ -183,9 +166,7 @@ describe("ValueMapping", () => {
     it("should show dialog when button is clicked", async () => {
       wrapper = createWrapper();
 
-      const button = wrapper.find(
-        '[data-test="dashboard-addpanel-config-value-mapping-add-btn"]',
-      );
+      const button = wrapper.find('[data-test="dashboard-addpanel-config-value-mapping-add-btn"]');
       await button.trigger("click");
 
       expect(wrapper.vm.showValueMappingPopUp).toBe(true);
@@ -297,9 +278,7 @@ describe("ValueMapping", () => {
 
       wrapper.vm.saveValueMappingConfig(complexMappings);
 
-      expect(mockDashboardPanelData.data.config.mappings).toEqual(
-        complexMappings,
-      );
+      expect(mockDashboardPanelData.data.config.mappings).toEqual(complexMappings);
     });
   });
 
@@ -329,9 +308,7 @@ describe("ValueMapping", () => {
 
       wrapper = createWrapper();
 
-      expect(mockDashboardPanelData.data.config.mappings).toEqual(
-        existingMappings,
-      );
+      expect(mockDashboardPanelData.data.config.mappings).toEqual(existingMappings);
     });
   });
 
@@ -354,9 +331,7 @@ describe("ValueMapping", () => {
     it("should pass :open=true to ValueMappingPopUp once opened", async () => {
       wrapper = createWrapper();
 
-      const button = wrapper.find(
-        '[data-test="dashboard-addpanel-config-value-mapping-add-btn"]',
-      );
+      const button = wrapper.find('[data-test="dashboard-addpanel-config-value-mapping-add-btn"]');
       await button.trigger("click");
 
       const popup = wrapper.findComponent({ name: "ValueMappingPopUp" });
@@ -393,9 +368,7 @@ describe("ValueMapping", () => {
 
   describe("Data Deep Copy", () => {
     it("should pass deep copy of mappings to popup", async () => {
-      const originalMappings = [
-        { value: "1", text: "Original", nested: { prop: "test" } },
-      ];
+      const originalMappings = [{ value: "1", text: "Original", nested: { prop: "test" } }];
       mockDashboardPanelData.data.config.mappings = originalMappings;
 
       wrapper = createWrapper();
@@ -449,29 +422,21 @@ describe("ValueMapping", () => {
       mockDashboardPanelData.data.config.mappings = [];
       wrapper = createWrapper();
 
-      let button = wrapper.find(
-        '[data-test="dashboard-addpanel-config-value-mapping-add-btn"]',
-      );
+      let button = wrapper.find('[data-test="dashboard-addpanel-config-value-mapping-add-btn"]');
       expect(button.text().trim()).toBe("Add Value Mapping");
 
       // Save new mappings
       wrapper.vm.saveValueMappingConfig([{ value: "1", text: "Test" }]);
 
       // Verify mappings were saved
-      expect(mockDashboardPanelData.data.config.mappings).toEqual([
-        { value: "1", text: "Test" },
-      ]);
+      expect(mockDashboardPanelData.data.config.mappings).toEqual([{ value: "1", text: "Test" }]);
     });
 
     it("should handle clearing mappings correctly", () => {
-      mockDashboardPanelData.data.config.mappings = [
-        { value: "1", text: "Test" },
-      ];
+      mockDashboardPanelData.data.config.mappings = [{ value: "1", text: "Test" }];
       wrapper = createWrapper();
 
-      let button = wrapper.find(
-        '[data-test="dashboard-addpanel-config-value-mapping-add-btn"]',
-      );
+      let button = wrapper.find('[data-test="dashboard-addpanel-config-value-mapping-add-btn"]');
       expect(button.text().trim()).toBe("Edit Value Mapping");
 
       // Clear mappings

@@ -34,22 +34,8 @@ vi.mock("@/composables/useTraces", () => ({
     updatedLocalLogFilterField: vi.fn(),
   }),
   DEFAULT_TRACE_COLUMNS: {
-    traces: [
-      "service_name",
-      "operation_name",
-      "duration",
-      "spans",
-      "status",
-      "service_latency",
-    ],
-    spans: [
-      "service_name",
-      "operation_name",
-      "duration",
-      "status",
-      "status_code",
-      "method",
-    ],
+    traces: ["service_name", "operation_name", "duration", "spans", "status", "service_latency"],
+    spans: ["service_name", "operation_name", "duration", "status", "status_code", "method"],
   },
 }));
 
@@ -96,10 +82,7 @@ vi.mock("@/utils/zincutils", async (importOriginal: any) => {
     b64EncodeUnicode: vi.fn().mockImplementation((str: string) => btoa(str)),
     mergeRoutes: vi
       .fn()
-      .mockImplementation((route1: any, route2: any) => [
-        ...(route1 || []),
-        ...(route2 || []),
-      ]),
+      .mockImplementation((route1: any, route2: any) => [...(route1 || []), ...(route2 || [])]),
   };
 });
 
@@ -242,8 +225,7 @@ function mountIndexList(props: Record<string, unknown> = {}) {
           ],
         },
         FieldExpansion: {
-          template:
-            '<div data-test="field-expansion">Field Expansion</div>',
+          template: '<div data-test="field-expansion">Field Expansion</div>',
           props: [
             "field",
             "fieldValues",
@@ -339,23 +321,17 @@ describe("IndexList Component", () => {
     });
 
     it("should render stream select dropdown", () => {
-      const streamSelect = wrapper.find(
-        '[data-test="log-search-index-list-select-stream"]',
-      );
+      const streamSelect = wrapper.find('[data-test="log-search-index-list-select-stream"]');
       expect(streamSelect.exists()).toBe(true);
     });
 
     it("should render fields table", () => {
-      const fieldsTable = wrapper.find(
-        '[data-test="log-search-index-list-fields-table"]',
-      );
+      const fieldsTable = wrapper.find('[data-test="log-search-index-list-fields-table"]');
       expect(fieldsTable.exists()).toBe(true);
     });
 
     it("should render GroupedFieldList for field display", () => {
-      const groupedFieldList = wrapper.find(
-        '[data-test="grouped-field-list"]',
-      );
+      const groupedFieldList = wrapper.find('[data-test="grouped-field-list"]');
       expect(groupedFieldList.exists()).toBe(true);
     });
   });
@@ -364,9 +340,7 @@ describe("IndexList Component", () => {
     it("should receive fieldList prop correctly", () => {
       expect(wrapper.props("fieldList")).toHaveLength(4);
       expect((wrapper.props("fieldList") as any[])[0].name).toBe("field1");
-      expect((wrapper.props("fieldList") as any[])[1].name).toBe(
-        "service_name",
-      );
+      expect((wrapper.props("fieldList") as any[])[1].name).toBe("service_name");
     });
 
     it("should have searchObj available", () => {
@@ -394,9 +368,7 @@ describe("IndexList Component", () => {
 
   describe("Stream Selection", () => {
     it("should show correct stream in dropdown", () => {
-      const streamSelect = wrapper.find(
-        '[data-test="log-search-index-list-select-stream"]',
-      );
+      const streamSelect = wrapper.find('[data-test="log-search-index-list-select-stream"]');
       expect(streamSelect.exists()).toBe(true);
     });
   });
@@ -497,27 +469,15 @@ describe("IndexList Component", () => {
 
   describe("Accessibility — data-test attributes", () => {
     it("should have data-test on stream select", () => {
-      expect(
-        wrapper
-          .find('[data-test="log-search-index-list-select-stream"]')
-          .exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="log-search-index-list-select-stream"]').exists()).toBe(true);
     });
 
     it("should have data-test on fields table", () => {
-      expect(
-        wrapper
-          .find('[data-test="log-search-index-list-fields-table"]')
-          .exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="log-search-index-list-fields-table"]').exists()).toBe(true);
     });
 
     it("should have data-test on GroupedFieldList", () => {
-      expect(
-        wrapper
-          .find('[data-test="grouped-field-list"]')
-          .exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="grouped-field-list"]').exists()).toBe(true);
     });
   });
 
@@ -563,9 +523,7 @@ describe("IndexList Component", () => {
 
     it("should set enableVisibility: false for service_name (locked trace column)", () => {
       const normalized: any[] = wrapper.vm.normalizedFieldList;
-      const serviceNameField = normalized.find(
-        (f: any) => f.name === "service_name",
-      );
+      const serviceNameField = normalized.find((f: any) => f.name === "service_name");
       expect(serviceNameField).toBeDefined();
       expect(serviceNameField.enableVisibility).toBe(false);
     });
@@ -628,15 +586,11 @@ describe("IndexList Component", () => {
     });
 
     it("should lock service_name", () => {
-      expect(wrapper.vm.TRACES_LOCKED_FIELD_NAMES.has("service_name")).toBe(
-        true,
-      );
+      expect(wrapper.vm.TRACES_LOCKED_FIELD_NAMES.has("service_name")).toBe(true);
     });
 
     it("should lock operation_name", () => {
-      expect(wrapper.vm.TRACES_LOCKED_FIELD_NAMES.has("operation_name")).toBe(
-        true,
-      );
+      expect(wrapper.vm.TRACES_LOCKED_FIELD_NAMES.has("operation_name")).toBe(true);
     });
 
     it("should lock duration", () => {
@@ -649,9 +603,7 @@ describe("IndexList Component", () => {
 
     it("should lock span_status (mapped from 'status' column ID)", () => {
       // The column ID "status" maps to field name "span_status"
-      expect(wrapper.vm.TRACES_LOCKED_FIELD_NAMES.has("span_status")).toBe(
-        true,
-      );
+      expect(wrapper.vm.TRACES_LOCKED_FIELD_NAMES.has("span_status")).toBe(true);
     });
 
     it("should NOT lock the raw 'status' column ID — only span_status", () => {
@@ -659,15 +611,11 @@ describe("IndexList Component", () => {
     });
 
     it("should lock service_latency", () => {
-      expect(wrapper.vm.TRACES_LOCKED_FIELD_NAMES.has("service_latency")).toBe(
-        true,
-      );
+      expect(wrapper.vm.TRACES_LOCKED_FIELD_NAMES.has("service_latency")).toBe(true);
     });
 
     it("should NOT lock an arbitrary custom field", () => {
-      expect(wrapper.vm.TRACES_LOCKED_FIELD_NAMES.has("custom_field")).toBe(
-        false,
-      );
+      expect(wrapper.vm.TRACES_LOCKED_FIELD_NAMES.has("custom_field")).toBe(false);
     });
   });
 
@@ -798,9 +746,7 @@ describe("IndexList Component", () => {
       const newStream = { label: "new_stream", value: "new_stream" };
       wrapper.vm.searchObj.data.stream.streamLists = [newStream];
       await wrapper.vm.onStreamChange("new_stream");
-      expect(wrapper.vm.searchObj.data.stream.selectedStream).toEqual(
-        newStream,
-      );
+      expect(wrapper.vm.searchObj.data.stream.selectedStream).toEqual(newStream);
     });
   });
 

@@ -14,10 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it } from "vitest";
-import {
-  toDetectionFunctionSql,
-  buildAnomalyPreviewSql,
-} from "./anomalySqlBuilder";
+import { toDetectionFunctionSql, buildAnomalyPreviewSql } from "./anomalySqlBuilder";
 
 // ─── toDetectionFunctionSql ──────────────────────────────────────────────────
 
@@ -45,17 +42,13 @@ describe("toDetectionFunctionSql", () => {
   });
 
   it("wraps unknown function with field", () => {
-    expect(toDetectionFunctionSql("some_custom_fn", "col")).toBe(
-      "some_custom_fn(col)",
-    );
+    expect(toDetectionFunctionSql("some_custom_fn", "col")).toBe("some_custom_fn(col)");
   });
 
   // ── Percentile functions (unwrapped form) ─────────────────────────────────
 
   it("converts p50 to approx_percentile_cont", () => {
-    expect(toDetectionFunctionSql("p50", "duration")).toBe(
-      "approx_percentile_cont(duration, 0.5)",
-    );
+    expect(toDetectionFunctionSql("p50", "duration")).toBe("approx_percentile_cont(duration, 0.5)");
   });
 
   it("converts p75 to approx_percentile_cont", () => {
@@ -65,9 +58,7 @@ describe("toDetectionFunctionSql", () => {
   });
 
   it("converts p90 to approx_percentile_cont", () => {
-    expect(toDetectionFunctionSql("p90", "duration")).toBe(
-      "approx_percentile_cont(duration, 0.9)",
-    );
+    expect(toDetectionFunctionSql("p90", "duration")).toBe("approx_percentile_cont(duration, 0.9)");
   });
 
   it("converts p95 to approx_percentile_cont", () => {
@@ -109,17 +100,13 @@ describe("toDetectionFunctionSql", () => {
   });
 
   it("converts already-wrapped p50(bytes) from API", () => {
-    expect(toDetectionFunctionSql("p50(bytes)", "*")).toBe(
-      "approx_percentile_cont(bytes, 0.5)",
-    );
+    expect(toDetectionFunctionSql("p50(bytes)", "*")).toBe("approx_percentile_cont(bytes, 0.5)");
   });
 
   // ── Case insensitivity ────────────────────────────────────────────────────
 
   it("handles uppercase P90", () => {
-    expect(toDetectionFunctionSql("P90", "duration")).toBe(
-      "approx_percentile_cont(duration, 0.9)",
-    );
+    expect(toDetectionFunctionSql("P90", "duration")).toBe("approx_percentile_cont(duration, 0.9)");
   });
 
   it("handles mixed-case P95(Duration) from API", () => {
@@ -135,9 +122,7 @@ describe("toDetectionFunctionSql", () => {
   });
 
   it("uses * when field is missing for percentile", () => {
-    expect(toDetectionFunctionSql("p95", "")).toBe(
-      "approx_percentile_cont(*, 0.95)",
-    );
+    expect(toDetectionFunctionSql("p95", "")).toBe("approx_percentile_cont(*, 0.95)");
   });
 
   it("handles field with special characters", () => {
@@ -145,16 +130,12 @@ describe("toDetectionFunctionSql", () => {
   });
 
   it("handles field with quotes", () => {
-    expect(toDetectionFunctionSql("avg", '"end_time"')).toBe(
-      'avg("end_time")',
-    );
+    expect(toDetectionFunctionSql("avg", '"end_time"')).toBe('avg("end_time")');
   });
 
   it("handles unknown percentile name like p99_9", () => {
     // only p50/p75/p90/p95/p99 are in the map
-    expect(toDetectionFunctionSql("p99_9", "duration")).toBe(
-      "p99_9(duration)",
-    );
+    expect(toDetectionFunctionSql("p99_9", "duration")).toBe("p99_9(duration)");
   });
 
   it("handles percentile with complex field expression", () => {
@@ -165,9 +146,9 @@ describe("toDetectionFunctionSql", () => {
 
   it("does not treat approx_percentile_cont as needing wrapping", () => {
     // If someone already sends the full function name, wrap it normally
-    expect(
-      toDetectionFunctionSql("approx_percentile_cont", "duration"),
-    ).toBe("approx_percentile_cont(duration)");
+    expect(toDetectionFunctionSql("approx_percentile_cont", "duration")).toBe(
+      "approx_percentile_cont(duration)",
+    );
   });
 
   // ── Match existing behavior in alertQueryBuilder.ts ───────────────────────
@@ -282,9 +263,7 @@ describe("buildAnomalyPreviewSql", () => {
       training_window_days: 14,
       histogram_interval: "5m",
     });
-    expect(result).toContain(
-      "approx_percentile_cont(duration, 0.95) AS value",
-    );
+    expect(result).toContain("approx_percentile_cont(duration, 0.95) AS value");
   });
 
   it("generates SQL with p90 as approx_percentile_cont", () => {
@@ -296,9 +275,7 @@ describe("buildAnomalyPreviewSql", () => {
       training_window_days: 7,
       histogram_interval: "1m",
     });
-    expect(result).toContain(
-      "approx_percentile_cont(latency, 0.9) AS value",
-    );
+    expect(result).toContain("approx_percentile_cont(latency, 0.9) AS value");
   });
 
   it("generates SQL with p99 as approx_percentile_cont", () => {
@@ -309,9 +286,7 @@ describe("buildAnomalyPreviewSql", () => {
       detection_function_field: "response_time",
       training_window_days: 30,
     });
-    expect(result).toContain(
-      "approx_percentile_cont(response_time, 0.99) AS value",
-    );
+    expect(result).toContain("approx_percentile_cont(response_time, 0.99) AS value");
   });
 
   // ── Regular aggregation functions ─────────────────────────────────────────
@@ -438,9 +413,7 @@ describe("buildAnomalyPreviewSql", () => {
       training_window_days: 7,
       histogram_interval: "10m",
     });
-    expect(result).toContain(
-      "approx_percentile_cont(duration, 0.9) AS value",
-    );
+    expect(result).toContain("approx_percentile_cont(duration, 0.9) AS value");
   });
 
   // ── Full SQL structure ────────────────────────────────────────────────────

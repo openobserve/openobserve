@@ -18,7 +18,6 @@ import { mount, flushPromises } from "@vue/test-utils";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-
 import SemanticGroupItem from "@/components/alerts/SemanticGroupItem.vue";
 
 const makeGroup = (overrides: Record<string, any> = {}) => ({
@@ -51,7 +50,6 @@ describe("SemanticGroupItem - rendering", () => {
     expect(w.find('[data-test="semantic-group-display-input"]').exists()).toBe(true);
   });
 
-
   it("renders the delete button", async () => {
     const w = await mountComp();
     expect(w.find('[data-test="semantic-group-remove-group-btn"]').exists()).toBe(true);
@@ -72,7 +70,6 @@ describe("SemanticGroupItem - rendering", () => {
     expect(w.text()).not.toContain("ID:");
   });
 });
-
 
 describe("SemanticGroupItem - delete", () => {
   it("emits delete when delete button is clicked", async () => {
@@ -123,8 +120,7 @@ describe("SemanticGroupItem - schema validation (real OForm)", () => {
 // only. So they pass while the field stays silent for a real user. These drive
 // the actual blur, the way pre-migration `handleDisplayBlur` was reached.
 describe("SemanticGroupItem - required cue on blur (real user path)", () => {
-  const displayInput = (w: any) =>
-    w.find('[data-test="semantic-group-display-input"] input');
+  const displayInput = (w: any) => w.find('[data-test="semantic-group-display-input"] input');
 
   it("blurring an empty display shows 'Name is required'", async () => {
     const w = await mountComp({ group: makeGroup({ display: "" }) });

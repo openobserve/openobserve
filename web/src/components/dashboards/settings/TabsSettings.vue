@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 
 <template>
-  <div class="flex flex-col h-full" data-test="dashboard-tab-settings">
+  <div class="flex h-full flex-col" data-test="dashboard-tab-settings">
     <DashboardHeader :title="t('dashboard.tabSettingsTitle')">
       <template #right>
         <OButton
@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <template #cell-drag>
           <div
-            class="tab-drag-handle flex items-center justify-center cursor-move"
+            class="tab-drag-handle flex cursor-move items-center justify-center"
             data-test="dashboard-tab-settings-drag-handle"
           >
             <OIcon name="drag-indicator" size="sm" />
@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div v-else class="flex items-center gap-1">
             <input
               v-model="editTabObj.data.name"
-              class="flex-1 border border-theme-accent rounded-default p-1 outline-none min-w-0 focus:border-section-accent-secondary bg-input-bg"
+              class="border-theme-accent rounded-default focus:border-section-accent-secondary bg-input-bg min-w-0 flex-1 border p-1 outline-none"
               data-test="dashboard-tab-settings-tab-name-edit"
             />
             <OButton
@@ -141,12 +141,7 @@ import Sortable from "sortablejs";
 import { useI18n } from "vue-i18n";
 import DashboardHeader from "./common/DashboardHeader.vue";
 import { useStore } from "vuex";
-import {
-  deleteTab,
-  editTab,
-  getDashboard,
-  updateDashboard,
-} from "@/utils/commons";
+import { deleteTab, editTab, getDashboard, updateDashboard } from "@/utils/commons";
 import { useRoute } from "vue-router";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -307,9 +302,7 @@ export default defineComponent({
               t("dashboard.tabsSettings.tabReorderFailed"),
           );
         } else {
-          showErrorNotification(
-            error?.message ?? t("dashboard.tabsSettings.tabReorderFailed"),
-          );
+          showErrorNotification(error?.message ?? t("dashboard.tabsSettings.tabReorderFailed"));
         }
         emit("refresh");
         await getDashboardData();
@@ -319,11 +312,7 @@ export default defineComponent({
     const editItem = (tabId: any) => {
       editTabId.value = tabId;
       editTabObj.data = JSON.parse(
-        JSON.stringify(
-          currentDashboardData.data.tabs.find(
-            (tab: any) => tab.tabId === tabId,
-          ),
-        ),
+        JSON.stringify(currentDashboardData.data.tabs.find((tab: any) => tab.tabId === tabId)),
       );
     };
 
@@ -355,9 +344,7 @@ export default defineComponent({
               t("dashboard.tabsSettings.tabUpdationFailed"),
           );
         } else {
-          showErrorNotification(
-            error?.message ?? t("dashboard.tabsSettings.tabUpdationFailed"),
-          );
+          showErrorNotification(error?.message ?? t("dashboard.tabsSettings.tabUpdationFailed"));
         }
 
         emit("refresh");
@@ -407,9 +394,7 @@ export default defineComponent({
               t("dashboard.tabsSettings.tabDeletionFailed"),
           );
         } else {
-          showErrorNotification(
-            error?.message ?? t("dashboard.tabsSettings.tabDeletionFailed"),
-            {
+          showErrorNotification(error?.message ?? t("dashboard.tabsSettings.tabDeletionFailed"), {
             timeout: 2000,
           });
         }

@@ -144,9 +144,7 @@ describe("AlertTargetsSelect", () => {
       const wrapper = createWrapper({
         destinationOptions: [{ value: "slack" } as any],
       });
-      expect(select(wrapper).props("options")).toEqual([
-        { label: "slack", value: "dest:slack" },
-      ]);
+      expect(select(wrapper).props("options")).toEqual([{ label: "slack", value: "dest:slack" }]);
     });
 
     it("tolerates null/undefined option lists", () => {
@@ -166,15 +164,9 @@ describe("AlertTargetsSelect", () => {
   describe("selection change (splitting the tagged values)", () => {
     it("splits a mixed selection back into destinations + workflows", async () => {
       const wrapper = createWrapper({ workflowsEnabled: true });
-      select(wrapper).vm.$emit("update:modelValue", [
-        "dest:slack",
-        "wf:wf-1",
-        "dest:email",
-      ]);
+      select(wrapper).vm.$emit("update:modelValue", ["dest:slack", "wf:wf-1", "dest:email"]);
       await wrapper.vm.$nextTick();
-      expect(wrapper.emitted("update:destinations")?.[0]).toEqual([
-        ["slack", "email"],
-      ]);
+      expect(wrapper.emitted("update:destinations")?.[0]).toEqual([["slack", "email"]]);
       expect(wrapper.emitted("update:workflows")?.[0]).toEqual([["wf-1"]]);
     });
 
@@ -206,9 +198,7 @@ describe("AlertTargetsSelect", () => {
       const wrapper = createWrapper();
       select(wrapper).vm.$emit("update:modelValue", ["dest:dest:weird"]);
       await wrapper.vm.$nextTick();
-      expect(wrapper.emitted("update:destinations")?.[0]).toEqual([
-        ["dest:weird"],
-      ]);
+      expect(wrapper.emitted("update:destinations")?.[0]).toEqual([["dest:weird"]]);
     });
   });
 
@@ -226,41 +216,32 @@ describe("AlertTargetsSelect", () => {
       // user picks the WORKFLOW first, then the destination
       select(wrapper).vm.$emit("update:modelValue", ["wf:wf-1", "dest:slack"]);
       await wrapper.vm.$nextTick();
-      expect(select(wrapper).props("modelValue")).toEqual([
-        "wf:wf-1",
-        "dest:slack",
-      ]);
+      expect(select(wrapper).props("modelValue")).toEqual(["wf:wf-1", "dest:slack"]);
 
       // parent echoes the split fields back as props (destinations-first order)
       await wrapper.setProps({ destinations: ["slack"], workflows: ["wf-1"] });
       await wrapper.vm.$nextTick();
 
       // same SET → the watch must NOT reassign → click order is preserved
-      expect(select(wrapper).props("modelValue")).toEqual([
-        "wf:wf-1",
-        "dest:slack",
-      ]);
+      expect(select(wrapper).props("modelValue")).toEqual(["wf:wf-1", "dest:slack"]);
     });
 
     it("DOES re-sync when the incoming set genuinely differs (external edit load)", async () => {
       const wrapper = createWrapper({ workflowsEnabled: true });
       await wrapper.setProps({ destinations: ["slack", "email"], workflows: [] });
       await wrapper.vm.$nextTick();
-      expect(select(wrapper).props("modelValue")).toEqual([
-        "dest:slack",
-        "dest:email",
-      ]);
+      expect(select(wrapper).props("modelValue")).toEqual(["dest:slack", "dest:email"]);
     });
   });
 
   describe("collapsible groups gate", () => {
     it("enables collapsible groups only in enterprise", () => {
-      expect(
-        select(createWrapper({ workflowsEnabled: true })).props("collapsibleGroups"),
-      ).toBe(true);
-      expect(
-        select(createWrapper({ workflowsEnabled: false })).props("collapsibleGroups"),
-      ).toBe(false);
+      expect(select(createWrapper({ workflowsEnabled: true })).props("collapsibleGroups")).toBe(
+        true,
+      );
+      expect(select(createWrapper({ workflowsEnabled: false })).props("collapsibleGroups")).toBe(
+        false,
+      );
     });
   });
 
@@ -280,25 +261,19 @@ describe("AlertTargetsSelect", () => {
   describe("empty slot", () => {
     it("OSS: says no destinations are available", () => {
       const wrapper = createWrapper({ workflowsEnabled: false });
-      expect(wrapper.find(".o-select-empty").text()).toBe(
-        "No destinations available",
-      );
+      expect(wrapper.find(".o-select-empty").text()).toBe("No destinations available");
     });
 
     it("enterprise: says no destinations OR workflows are available", () => {
       const wrapper = createWrapper({ workflowsEnabled: true });
-      expect(wrapper.find(".o-select-empty").text()).toBe(
-        "No Destinations Or Workflows Available",
-      );
+      expect(wrapper.find(".o-select-empty").text()).toBe("No Destinations Or Workflows Available");
     });
   });
 
   describe("action buttons", () => {
     it("emits refresh", async () => {
       const wrapper = createWrapper();
-      await wrapper
-        .find('[data-test="alert-settings-refresh-destinations-btn"]')
-        .trigger("click");
+      await wrapper.find('[data-test="alert-settings-refresh-destinations-btn"]').trigger("click");
       expect(wrapper.emitted("refresh")).toHaveLength(1);
     });
 
@@ -310,9 +285,7 @@ describe("AlertTargetsSelect", () => {
 
     it("hides the Create Workflow button in OSS", () => {
       const wrapper = createWrapper({ workflowsEnabled: false });
-      expect(wrapper.find('[data-test="create-workflow-btn"]').exists()).toBe(
-        false,
-      );
+      expect(wrapper.find('[data-test="create-workflow-btn"]').exists()).toBe(false);
     });
 
     it("shows and emits create-workflow in enterprise", async () => {
@@ -333,9 +306,7 @@ describe("AlertTargetsSelect", () => {
   // must degrade the list, never the page.
   describe("resilience to malformed option/selection data", () => {
     it("renders (does not throw) when destinationOptions contains undefined", () => {
-      expect(() =>
-        createWrapper({ destinationOptions: [undefined, null, "slack"] }),
-      ).not.toThrow();
+      expect(() => createWrapper({ destinationOptions: [undefined, null, "slack"] })).not.toThrow();
     });
 
     it("drops the bad entries and keeps the good ones", () => {
@@ -369,9 +340,7 @@ describe("AlertTargetsSelect", () => {
         workflowOptions: [undefined],
         workflowsEnabled: true,
       });
-      const rows = (select(wrapper).props("options") as any[]).filter(
-        (o) => !o.header,
-      );
+      const rows = (select(wrapper).props("options") as any[]).filter((o) => !o.header);
       expect(rows).toEqual([]);
     });
 
@@ -381,10 +350,7 @@ describe("AlertTargetsSelect", () => {
         workflows: [null, "wf-1"] as any,
         workflowsEnabled: true,
       });
-      expect(select(wrapper).props("modelValue")).toEqual([
-        "dest:slack",
-        "wf:wf-1",
-      ]);
+      expect(select(wrapper).props("modelValue")).toEqual(["dest:slack", "wf:wf-1"]);
     });
 
     it("ignores non-string values coming back from the control", async () => {
@@ -395,9 +361,7 @@ describe("AlertTargetsSelect", () => {
         undefined,
         "wf:wf-1",
       ]);
-      expect(wrapper.emitted("update:destinations")!.at(-1)).toEqual([
-        ["slack"],
-      ]);
+      expect(wrapper.emitted("update:destinations")!.at(-1)).toEqual([["slack"]]);
       expect(wrapper.emitted("update:workflows")!.at(-1)).toEqual([["wf-1"]]);
     });
   });

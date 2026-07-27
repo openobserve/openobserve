@@ -59,17 +59,11 @@ const initDB = (): Promise<IDBDatabase> => {
  * Falls back to a synchronous djb2 hash in environments without crypto.subtle.
  * The result is cached after first computation.
  */
-const computeUserOrgKey = async (
-  userEmail: string,
-  orgIdentifier: string,
-): Promise<string> => {
+const computeUserOrgKey = async (userEmail: string, orgIdentifier: string): Promise<string> => {
   const raw = `${userEmail}:${orgIdentifier}`;
 
   if (typeof crypto !== "undefined" && crypto.subtle) {
-    const buf = await crypto.subtle.digest(
-      "SHA-256",
-      new TextEncoder().encode(raw),
-    );
+    const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(raw));
     return Array.from(new Uint8Array(buf))
       .map((b) => b.toString(16).padStart(2, "0"))
       .join("");
@@ -97,10 +91,7 @@ const computeUserOrgKey = async (
  *   immediately without re-mounting the component.
  * @param getOrgIdentifier - Getter returning the current org identifier.
  */
-export function useChatHistory(
-  getUserEmail: () => string,
-  getOrgIdentifier: () => string,
-) {
+export function useChatHistory(getUserEmail: () => string, getOrgIdentifier: () => string) {
   // Cache the last computed hash alongside the raw input that produced it.
   // When the org or user changes the raw string changes, triggering a new hash.
   let _cachedRaw: string | null = null;
@@ -154,9 +145,7 @@ export function useChatHistory(
           content: msg.content,
         };
         if (msg.contentBlocks && msg.contentBlocks.length > 0) {
-          serialized.contentBlocks = JSON.parse(
-            JSON.stringify(msg.contentBlocks),
-          );
+          serialized.contentBlocks = JSON.parse(JSON.stringify(msg.contentBlocks));
         }
         if (msg.images && msg.images.length > 0) {
           serialized.images = JSON.parse(JSON.stringify(msg.images));
@@ -208,20 +197,16 @@ export function useChatHistory(
       const store = transaction.objectStore(STORE_NAME);
       const index = store.index("userOrgKey");
 
-      const history = await new Promise<ChatHistoryEntry[]>(
-        (resolve, reject) => {
-          const request = index.getAll(IDBKeyRange.only(userOrgKey));
-          request.onsuccess = () => {
-            const results = (request.result as ChatHistoryEntry[]).sort(
-              (a, b) =>
-                new Date(b.timestamp).getTime() -
-                new Date(a.timestamp).getTime(),
-            );
-            resolve(results);
-          };
-          request.onerror = () => reject(request.error);
-        },
-      );
+      const history = await new Promise<ChatHistoryEntry[]>((resolve, reject) => {
+        const request = index.getAll(IDBKeyRange.only(userOrgKey));
+        request.onsuccess = () => {
+          const results = (request.result as ChatHistoryEntry[]).sort(
+            (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
+          );
+          resolve(results);
+        };
+        request.onerror = () => reject(request.error);
+      });
 
       // Prune old entries beyond MAX_HISTORY_ITEMS (only for this user+org)
       if (history.length > MAX_HISTORY_ITEMS) {
@@ -264,10 +249,7 @@ export function useChatHistory(
         request.onsuccess = () => {
           const record = request.result as ChatHistoryEntry | undefined;
           // Verify ownership — reject records belonging to another user+org
-          if (
-            !record ||
-            (record.userOrgKey && record.userOrgKey !== userOrgKey)
-          ) {
+          if (!record || (record.userOrgKey && record.userOrgKey !== userOrgKey)) {
             resolve(null);
             return;
           }
@@ -301,10 +283,7 @@ export function useChatHistory(
         const getRequest = store.get(chatId);
         getRequest.onsuccess = () => {
           const record = getRequest.result as ChatHistoryEntry | undefined;
-          if (
-            !record ||
-            (record.userOrgKey && record.userOrgKey !== userOrgKey)
-          ) {
+          if (!record || (record.userOrgKey && record.userOrgKey !== userOrgKey)) {
             resolve(false);
             return;
           }
@@ -342,8 +321,7 @@ export function useChatHistory(
       return new Promise((resolve, reject) => {
         const request = index.openCursor(IDBKeyRange.only(userOrgKey));
         request.onsuccess = (event: Event) => {
-          const cursor = (event.target as IDBRequest)
-            .result as IDBCursorWithValue;
+          const cursor = (event.target as IDBRequest).result as IDBCursorWithValue;
           if (cursor) {
             cursor.delete();
             cursor.continue();
@@ -370,10 +348,7 @@ export function useChatHistory(
    * @param newTitle - The new title
    * @returns true if update succeeded
    */
-  const updateChatTitle = async (
-    chatId: number,
-    newTitle: string,
-  ): Promise<boolean> => {
+  const updateChatTitle = async (chatId: number, newTitle: string): Promise<boolean> => {
     try {
       const [db, userOrgKey] = await Promise.all([initDB(), getUserOrgKey()]);
       const transaction = db.transaction(STORE_NAME, "readwrite");
@@ -396,10 +371,7 @@ export function useChatHistory(
           };
         };
         getRequest.onerror = () => {
-          console.error(
-            "Error retrieving chat for title update:",
-            getRequest.error,
-          );
+          console.error("Error retrieving chat for title update:", getRequest.error);
           reject(getRequest.error);
         };
       });

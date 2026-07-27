@@ -36,9 +36,7 @@ export const makeBillingGroupInviteSchema = (
       }
     });
 
-export type BillingGroupInviteForm = z.infer<
-  ReturnType<typeof makeBillingGroupInviteSchema>
->;
+export type BillingGroupInviteForm = z.infer<ReturnType<typeof makeBillingGroupInviteSchema>>;
 
 export const billingGroupInviteDefaults = (): BillingGroupInviteForm => ({
   inviteOrgId: "",

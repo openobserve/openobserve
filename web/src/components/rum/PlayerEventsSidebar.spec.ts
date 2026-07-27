@@ -46,7 +46,16 @@ const stubs = {
         <input :value="modelValue" @input="$emit('update:model-value', $event.target.value)" />
       </div>
     `,
-    props: ["modelValue", "size", "filled", "borderless", "dense", "clearable", "debounce", "placeholder"],
+    props: [
+      "modelValue",
+      "size",
+      "filled",
+      "borderless",
+      "dense",
+      "clearable",
+      "debounce",
+      "placeholder",
+    ],
     emits: ["update:model-value"],
   },
   OSelect: {
@@ -58,7 +67,19 @@ const stubs = {
       </div>
     `,
     inheritAttrs: false,
-    props: ["modelValue", "options", "behavior", "multiple", "filled", "borderless", "dense", "emit-value", "size", "labelKey", "valueKey"],
+    props: [
+      "modelValue",
+      "options",
+      "behavior",
+      "multiple",
+      "filled",
+      "borderless",
+      "dense",
+      "emit-value",
+      "size",
+      "labelKey",
+      "valueKey",
+    ],
     emits: ["update:model-value"],
   },
   OSeparator: {
@@ -260,7 +281,9 @@ describe("PlayerEventsSidebar", () => {
     });
 
     it("should display browser and OS text in metadata", () => {
-      expect(wrapper.find('[data-test="event-metadata"]').text()).toContain("Chrome 120, Windows 10");
+      expect(wrapper.find('[data-test="event-metadata"]').text()).toContain(
+        "Chrome 120, Windows 10",
+      );
     });
 
     it("should render settings icon in metadata when tags tab is active", () => {
@@ -351,9 +374,7 @@ describe("PlayerEventsSidebar", () => {
     it("should provide title attribute equal to event name on event name element", () => {
       const firstEventName = wrapper.find('[data-test="event-name"]');
 
-      expect(firstEventName.attributes("title")).toBe(
-        "TypeError: Cannot read property 'foo'",
-      );
+      expect(firstEventName.attributes("title")).toBe("TypeError: Cannot read property 'foo'");
     });
 
     it("should provide title attributes for all visible event name elements", () => {
@@ -371,12 +392,7 @@ describe("PlayerEventsSidebar", () => {
 
   describe("Event Filtering", () => {
     it("should have all 4 event types selected by default", () => {
-      expect(wrapper.vm.selectedEventTypes).toEqual([
-        "error",
-        "action",
-        "view",
-        "frustration",
-      ]);
+      expect(wrapper.vm.selectedEventTypes).toEqual(["error", "action", "view", "frustration"]);
     });
 
     it("should have correct event type options list", () => {
@@ -395,7 +411,9 @@ describe("PlayerEventsSidebar", () => {
       await wrapper.vm.$nextTick();
 
       expect(wrapper.findAll('[data-test^="player-event-row"]')).toHaveLength(1);
-      expect(wrapper.find('[data-test^="player-event-row"]').text()).toContain("Button click on submit");
+      expect(wrapper.find('[data-test^="player-event-row"]').text()).toContain(
+        "Button click on submit",
+      );
     });
 
     it("should show only error event when selectedEventTypes is set to error only", async () => {
@@ -413,7 +431,9 @@ describe("PlayerEventsSidebar", () => {
       await wrapper.vm.$nextTick();
 
       expect(wrapper.findAll('[data-test^="player-event-row"]')).toHaveLength(1);
-      expect(wrapper.find('[data-test^="player-event-row"]').text()).toContain("Button click on submit");
+      expect(wrapper.find('[data-test^="player-event-row"]').text()).toContain(
+        "Button click on submit",
+      );
     });
 
     it("should show all 3 events when search value is null", async () => {
@@ -747,7 +767,9 @@ describe("PlayerEventsSidebar", () => {
       await wrapper.setProps({ events: [mockEventsWithFrustrations[0]] });
 
       expect(wrapper.findAll('[data-test^="player-event-row"]')).toHaveLength(1);
-      expect(wrapper.find('[data-test^="player-event-row"]').text()).toContain("click on Submit Button");
+      expect(wrapper.find('[data-test^="player-event-row"]').text()).toContain(
+        "click on Submit Button",
+      );
     });
 
     it("should handle events with multiple frustration types without errors", () => {

@@ -150,9 +150,7 @@ describe("CommunitySlackInvite", () => {
       await nextTick();
 
       // Assert
-      expect(
-        wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open"),
-      ).toBe("true");
+      expect(wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open")).toBe("true");
     });
 
     it("shows dialog as closed when PENDING_KEY is not set", () => {
@@ -162,9 +160,7 @@ describe("CommunitySlackInvite", () => {
       wrapper = buildWrapper();
 
       // Assert
-      expect(
-        wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open"),
-      ).toBe("false");
+      expect(wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open")).toBe("false");
     });
 
     it("renders the localized title text inside an h2", () => {
@@ -175,12 +171,10 @@ describe("CommunitySlackInvite", () => {
       wrapper = buildWrapper();
 
       // Assert
-      expect(
-        wrapper.find('[data-test="community-slack-invite-title"]').text(),
-      ).toBe("Join the OpenObserve community on Slack");
-      expect(
-        wrapper.find('[data-test="community-slack-invite-title"]').element.tagName,
-      ).toBe("H2");
+      expect(wrapper.find('[data-test="community-slack-invite-title"]').text()).toBe(
+        "Join the OpenObserve community on Slack",
+      );
+      expect(wrapper.find('[data-test="community-slack-invite-title"]').element.tagName).toBe("H2");
     });
 
     it("renders the localized description text", () => {
@@ -191,9 +185,9 @@ describe("CommunitySlackInvite", () => {
       wrapper = buildWrapper();
 
       // Assert
-      expect(
-        wrapper.find('[data-test="community-slack-invite-description"]').text(),
-      ).toContain("Learn, ask questions");
+      expect(wrapper.find('[data-test="community-slack-invite-description"]').text()).toContain(
+        "Learn, ask questions",
+      );
     });
 
     it("renders the Join Slack button with localized label", () => {
@@ -217,9 +211,7 @@ describe("CommunitySlackInvite", () => {
       wrapper = buildWrapper();
 
       // Assert
-      const laterBtn = wrapper.find(
-        '[data-test="community-slack-invite-maybe-later-btn"]',
-      );
+      const laterBtn = wrapper.find('[data-test="community-slack-invite-maybe-later-btn"]');
       expect(laterBtn.exists()).toBe(true);
       expect(laterBtn.text()).toBe("Maybe later");
     });
@@ -232,9 +224,7 @@ describe("CommunitySlackInvite", () => {
       wrapper = buildWrapper();
 
       // Assert
-      expect(
-        wrapper.find('[data-test="o-dialog-stub"]').attributes("data-size"),
-      ).toBe("sm");
+      expect(wrapper.find('[data-test="o-dialog-stub"]').attributes("data-size")).toBe("sm");
     });
 
     it("renders 3 benefit items", () => {
@@ -245,15 +235,9 @@ describe("CommunitySlackInvite", () => {
       wrapper = buildWrapper();
 
       // Assert
-      expect(
-        wrapper.find('[data-test="community-slack-invite-benefit-0"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="community-slack-invite-benefit-1"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="community-slack-invite-benefit-2"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="community-slack-invite-benefit-0"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="community-slack-invite-benefit-1"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="community-slack-invite-benefit-2"]').exists()).toBe(true);
     });
 
     it("renders each benefit with its localized text", () => {
@@ -264,15 +248,15 @@ describe("CommunitySlackInvite", () => {
       wrapper = buildWrapper();
 
       // Assert
-      expect(
-        wrapper.find('[data-test="community-slack-invite-benefit-0"]').text(),
-      ).toContain("Answers from the core team");
-      expect(
-        wrapper.find('[data-test="community-slack-invite-benefit-1"]').text(),
-      ).toContain("Setup help");
-      expect(
-        wrapper.find('[data-test="community-slack-invite-benefit-2"]').text(),
-      ).toContain("Early word on releases");
+      expect(wrapper.find('[data-test="community-slack-invite-benefit-0"]').text()).toContain(
+        "Answers from the core team",
+      );
+      expect(wrapper.find('[data-test="community-slack-invite-benefit-1"]').text()).toContain(
+        "Setup help",
+      );
+      expect(wrapper.find('[data-test="community-slack-invite-benefit-2"]').text()).toContain(
+        "Early word on releases",
+      );
     });
 
     it("does not call window.open on initial render", () => {
@@ -299,9 +283,7 @@ describe("CommunitySlackInvite", () => {
       wrapper = buildWrapper();
 
       // Assert
-      expect(
-        wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open"),
-      ).toBe("false");
+      expect(wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open")).toBe("false");
     });
 
     it("does not set PENDING_KEY for non-Cloud first-time login", () => {
@@ -340,9 +322,7 @@ describe("CommunitySlackInvite", () => {
       await nextTick();
 
       // Assert
-      expect(
-        wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open"),
-      ).toBe("true");
+      expect(wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open")).toBe("true");
     });
   });
 
@@ -380,9 +360,7 @@ describe("CommunitySlackInvite", () => {
       wrapper = buildWrapper();
 
       // Assert — PENDING_KEY was set but dialog is still closed
-      expect(
-        wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open"),
-      ).toBe("false");
+      expect(wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open")).toBe("false");
     });
 
     it("adds o2:onboarding-complete listener on first login in Cloud", () => {
@@ -406,18 +384,14 @@ describe("CommunitySlackInvite", () => {
       wrapper = buildWrapper();
 
       // Assert — closed before event
-      expect(
-        wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open"),
-      ).toBe("false");
+      expect(wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open")).toBe("false");
 
       // Act — dispatch the onboarding-complete event
       window.dispatchEvent(new Event("o2:onboarding-complete"));
       await wrapper.vm.$nextTick();
 
       // Assert — now open
-      expect(
-        wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open"),
-      ).toBe("true");
+      expect(wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open")).toBe("true");
     });
 
     it("does not open dialog after onboarding event if already seen", async () => {
@@ -432,9 +406,7 @@ describe("CommunitySlackInvite", () => {
       await wrapper.vm.$nextTick();
 
       // Assert
-      expect(
-        wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open"),
-      ).toBe("false");
+      expect(wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open")).toBe("false");
     });
   });
 
@@ -451,9 +423,7 @@ describe("CommunitySlackInvite", () => {
       await nextTick();
 
       // Assert — opens immediately via maybeShow()
-      expect(
-        wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open"),
-      ).toBe("true");
+      expect(wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open")).toBe("true");
     });
 
     it("does not open dialog if PENDING_KEY is absent", () => {
@@ -463,9 +433,7 @@ describe("CommunitySlackInvite", () => {
       wrapper = buildWrapper();
 
       // Assert
-      expect(
-        wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open"),
-      ).toBe("false");
+      expect(wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open")).toBe("false");
     });
 
     it("does not open dialog if PENDING_KEY is set but user has already seen it", () => {
@@ -477,9 +445,7 @@ describe("CommunitySlackInvite", () => {
       wrapper = buildWrapper();
 
       // Assert
-      expect(
-        wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open"),
-      ).toBe("false");
+      expect(wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open")).toBe("false");
     });
   });
 
@@ -516,17 +482,13 @@ describe("CommunitySlackInvite", () => {
     it("closes the dialog after clicking Join Slack", async () => {
       // Arrange
       const joinBtn = wrapper.find('[data-test="community-slack-invite-join-btn"]');
-      expect(
-        wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open"),
-      ).toBe("true");
+      expect(wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open")).toBe("true");
 
       // Act
       await joinBtn.trigger("click");
 
       // Assert
-      expect(
-        wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open"),
-      ).toBe("false");
+      expect(wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open")).toBe("false");
     });
 
     it("sets seen key in localStorage after clicking Join Slack", async () => {
@@ -562,24 +524,18 @@ describe("CommunitySlackInvite", () => {
 
     it("closes the dialog when Maybe later is clicked", async () => {
       // Arrange
-      const laterBtn = wrapper.find(
-        '[data-test="community-slack-invite-maybe-later-btn"]',
-      );
+      const laterBtn = wrapper.find('[data-test="community-slack-invite-maybe-later-btn"]');
 
       // Act
       await laterBtn.trigger("click");
 
       // Assert
-      expect(
-        wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open"),
-      ).toBe("false");
+      expect(wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open")).toBe("false");
     });
 
     it("sets seen key in localStorage when Maybe later is clicked", async () => {
       // Arrange
-      const laterBtn = wrapper.find(
-        '[data-test="community-slack-invite-maybe-later-btn"]',
-      );
+      const laterBtn = wrapper.find('[data-test="community-slack-invite-maybe-later-btn"]');
 
       // Act
       await laterBtn.trigger("click");
@@ -590,9 +546,7 @@ describe("CommunitySlackInvite", () => {
 
     it("removes PENDING_KEY when Maybe later is clicked", async () => {
       // Arrange
-      const laterBtn = wrapper.find(
-        '[data-test="community-slack-invite-maybe-later-btn"]',
-      );
+      const laterBtn = wrapper.find('[data-test="community-slack-invite-maybe-later-btn"]');
 
       // Act
       await laterBtn.trigger("click");
@@ -603,9 +557,7 @@ describe("CommunitySlackInvite", () => {
 
     it("does NOT call window.open when Maybe later is clicked", async () => {
       // Arrange
-      const laterBtn = wrapper.find(
-        '[data-test="community-slack-invite-maybe-later-btn"]',
-      );
+      const laterBtn = wrapper.find('[data-test="community-slack-invite-maybe-later-btn"]');
 
       // Act
       await laterBtn.trigger("click");
@@ -632,9 +584,7 @@ describe("CommunitySlackInvite", () => {
       await closeBtn.trigger("click");
 
       // Assert
-      expect(
-        wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open"),
-      ).toBe("false");
+      expect(wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open")).toBe("false");
     });
 
     it("sets seen key in localStorage when close button is clicked", async () => {
@@ -678,9 +628,7 @@ describe("CommunitySlackInvite", () => {
       await dialogStub.vm.$emit("update:open", false);
 
       // Assert
-      expect(
-        wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open"),
-      ).toBe("false");
+      expect(wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open")).toBe("false");
       expect(localStorage.getItem(SEEN_KEY)).toBe("true");
     });
 
@@ -692,9 +640,7 @@ describe("CommunitySlackInvite", () => {
       await dialogStub.vm.$emit("update:open", true);
 
       // Assert — dialog stays open, seen key NOT written
-      expect(
-        wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open"),
-      ).toBe("true");
+      expect(wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open")).toBe("true");
       expect(localStorage.getItem(SEEN_KEY)).toBeNull();
     });
   });
@@ -785,9 +731,9 @@ describe("CommunitySlackInvite", () => {
       wrapper = buildWrapper();
 
       // Assert
-      expect(
-        wrapper.find('[data-test="community-slack-invite-members-text"]').text(),
-      ).toBe("Engineers and the OpenObserve team, active every day");
+      expect(wrapper.find('[data-test="community-slack-invite-members-text"]').text()).toBe(
+        "Engineers and the OpenObserve team, active every day",
+      );
     });
 
     it("shows member count text when slack_member_count is a positive number", () => {
@@ -802,9 +748,9 @@ describe("CommunitySlackInvite", () => {
       wrapper = buildWrapper();
 
       // Assert
-      expect(
-        wrapper.find('[data-test="community-slack-invite-members-text"]').text(),
-      ).toContain("4,200+");
+      expect(wrapper.find('[data-test="community-slack-invite-members-text"]').text()).toContain(
+        "4,200+",
+      );
     });
 
     it("shows member count without '+' suffix when count is below 100", () => {
@@ -819,9 +765,7 @@ describe("CommunitySlackInvite", () => {
       wrapper = buildWrapper();
 
       // Assert
-      const text = wrapper
-        .find('[data-test="community-slack-invite-members-text"]')
-        .text();
+      const text = wrapper.find('[data-test="community-slack-invite-members-text"]').text();
       expect(text).toContain("50");
       expect(text).not.toContain("+");
     });
@@ -838,9 +782,9 @@ describe("CommunitySlackInvite", () => {
       wrapper = buildWrapper();
 
       // Assert
-      expect(
-        wrapper.find('[data-test="community-slack-invite-members-text"]').text(),
-      ).toBe("Engineers and the OpenObserve team, active every day");
+      expect(wrapper.find('[data-test="community-slack-invite-members-text"]').text()).toBe(
+        "Engineers and the OpenObserve team, active every day",
+      );
     });
 
     it("falls back to community note when slack_member_count is negative", () => {
@@ -855,9 +799,9 @@ describe("CommunitySlackInvite", () => {
       wrapper = buildWrapper();
 
       // Assert
-      expect(
-        wrapper.find('[data-test="community-slack-invite-members-text"]').text(),
-      ).toBe("Engineers and the OpenObserve team, active every day");
+      expect(wrapper.find('[data-test="community-slack-invite-members-text"]').text()).toBe(
+        "Engineers and the OpenObserve team, active every day",
+      );
     });
 
     it("floors member count to nearest 100 (e.g. 1999 → 1900+)", () => {
@@ -872,9 +816,7 @@ describe("CommunitySlackInvite", () => {
       wrapper = buildWrapper();
 
       // Assert
-      const text = wrapper
-        .find('[data-test="community-slack-invite-members-text"]')
-        .text();
+      const text = wrapper.find('[data-test="community-slack-invite-members-text"]').text();
       expect(text).toContain("1,900+");
       expect(text).not.toContain("1,999");
     });
@@ -893,9 +835,7 @@ describe("CommunitySlackInvite", () => {
       await closeBtn.trigger("click");
 
       // Assert — the exact keyed entry was written
-      expect(
-        localStorage.getItem(`communitySlackInviteSeen:${USER_EMAIL}`),
-      ).toBe("true");
+      expect(localStorage.getItem(`communitySlackInviteSeen:${USER_EMAIL}`)).toBe("true");
     });
 
     it("uses 'anonymous' seenKey when userInfo has no email", async () => {
@@ -909,9 +849,7 @@ describe("CommunitySlackInvite", () => {
       await closeBtn.trigger("click");
 
       // Assert — falls back to "anonymous"
-      expect(
-        localStorage.getItem("communitySlackInviteSeen:anonymous"),
-      ).toBe("true");
+      expect(localStorage.getItem("communitySlackInviteSeen:anonymous")).toBe("true");
     });
   });
 
@@ -973,9 +911,7 @@ describe("CommunitySlackInvite", () => {
       wrapper = buildWrapper();
 
       // Assert — 100 floors to 100, and n >= 100 so "+" is appended
-      const text = wrapper
-        .find('[data-test="community-slack-invite-members-text"]')
-        .text();
+      const text = wrapper.find('[data-test="community-slack-invite-members-text"]').text();
       expect(text).toContain("100+");
     });
 
@@ -991,9 +927,7 @@ describe("CommunitySlackInvite", () => {
       wrapper = buildWrapper();
 
       // Assert — floored to 1,000,000, shows commas and "+"
-      const text = wrapper
-        .find('[data-test="community-slack-invite-members-text"]')
-        .text();
+      const text = wrapper.find('[data-test="community-slack-invite-members-text"]').text();
       expect(text).toContain("1,000,000+");
     });
 
@@ -1009,9 +943,9 @@ describe("CommunitySlackInvite", () => {
       expect(() => {
         wrapper = buildWrapper();
       }).not.toThrow();
-      expect(
-        wrapper.find('[data-test="community-slack-invite-members-text"]').text(),
-      ).toBe("Engineers and the OpenObserve team, active every day");
+      expect(wrapper.find('[data-test="community-slack-invite-members-text"]').text()).toBe(
+        "Engineers and the OpenObserve team, active every day",
+      );
     });
   });
 });

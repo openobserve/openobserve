@@ -88,9 +88,7 @@ describe("DataSourceSidebarLayout.vue", () => {
       const bordered = wrapper
         .findAll("div")
         .find(
-          (d) =>
-            d.classes().includes("border-r") &&
-            d.classes().includes("border-border-default"),
+          (d) => d.classes().includes("border-r") && d.classes().includes("border-border-default"),
         );
       expect(bordered).toBeTruthy();
     });
@@ -134,9 +132,7 @@ describe("DataSourceSidebarLayout.vue", () => {
 
   describe("Filtering", () => {
     const setFilter = async (value: string) => {
-      wrapper
-        .findComponent(OSearchInput)
-        .vm.$emit("update:modelValue", value);
+      wrapper.findComponent(OSearchInput).vm.$emit("update:modelValue", value);
       await nextTick();
     };
 

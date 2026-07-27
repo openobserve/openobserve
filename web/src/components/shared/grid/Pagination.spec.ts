@@ -5,17 +5,16 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import { createRouter, createWebHistory } from "vue-router";
 
-
 vi.mock("@/utils/zincutils", () => ({
-  getImageURL: vi.fn((path) => `/mocked/${path}`)
+  getImageURL: vi.fn((path) => `/mocked/${path}`),
 }));
 
 const mockRouter = createRouter({
   history: createWebHistory(),
   routes: [
     { path: "/", component: { template: "<div>Home</div>" } },
-    { path: "/logs", name: "logs", component: { template: "<div>Logs</div>" } }
-  ]
+    { path: "/logs", name: "logs", component: { template: "<div>Logs</div>" } },
+  ],
 });
 
 describe("Pagination", () => {
@@ -50,7 +49,7 @@ describe("Pagination", () => {
         position: "bottom",
         maxRecordToReturn: 1000,
         perPageOptions: [10, 20, 50, 100],
-        ...props
+        ...props,
       },
       global: {
         plugins: [i18n, mockRouter],
@@ -69,9 +68,9 @@ describe("Pagination", () => {
 
   it("should have correct props", () => {
     wrapper = createWrapper({ maxRecordToReturn: 2000 });
-    expect(wrapper.props('scope')).toBeDefined();
-    expect(wrapper.props('maxRecordToReturn')).toBe(2000);
-    expect(wrapper.props('position')).toBe("bottom");
+    expect(wrapper.props("scope")).toBeDefined();
+    expect(wrapper.props("maxRecordToReturn")).toBe(2000);
+    expect(wrapper.props("position")).toBe("bottom");
   });
 
   it("should render without errors", () => {

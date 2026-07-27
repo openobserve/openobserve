@@ -28,11 +28,7 @@ import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import type { IllustrationName } from "./illustrations";
 
 /** Tone of an empty state — drives subtle styling and signals intent. */
-export type EmptyStateVariant =
-  | "create"
-  | "no-results"
-  | "error"
-  | "neutral";
+export type EmptyStateVariant = "create" | "no-results" | "error" | "neutral";
 
 /** A rich action card (icon + title + description) shown in an empty state. */
 export interface EmptyStateAction {

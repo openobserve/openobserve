@@ -54,13 +54,7 @@ const builderGroup = ref({ filterType: "group", conditions: [] });
 
 const ConditionBuilderStub = {
   name: "ConditionBuilder",
-  props: [
-    "fields",
-    "initialConditions",
-    "module",
-    "allowCustomColumns",
-    "normalizeOperators",
-  ],
+  props: ["fields", "initialConditions", "module", "allowCustomColumns", "normalizeOperators"],
   template: '<div class="condition-builder-stub"><slot name="guidelines" /></div>',
   computed: {
     conditionGroup: () => builderGroup.value,
@@ -152,9 +146,9 @@ describe("Condition.vue (drawer chrome)", () => {
       isEditNode: true,
       currentSelectedNodeData: { data: { conditions: saved } },
     });
-    expect(
-      wrapper.findComponent({ name: "ConditionBuilder" }).props("initialConditions"),
-    ).toEqual(saved);
+    expect(wrapper.findComponent({ name: "ConditionBuilder" }).props("initialConditions")).toEqual(
+      saved,
+    );
   });
 
   it("renders the pipeline guidelines into the builder's slot", () => {
@@ -196,12 +190,12 @@ describe("Condition.vue (drawer chrome)", () => {
   });
 
   it("shows delete only when editing a node", () => {
-    expect(
-      createWrapper({ isEditNode: false }).find('[data-test="delete-btn"]').exists(),
-    ).toBe(false);
-    expect(
-      createWrapper({ isEditNode: true }).find('[data-test="delete-btn"]').exists(),
-    ).toBe(true);
+    expect(createWrapper({ isEditNode: false }).find('[data-test="delete-btn"]').exists()).toBe(
+      false,
+    );
+    expect(createWrapper({ isEditNode: true }).find('[data-test="delete-btn"]').exists()).toBe(
+      true,
+    );
   });
 
   // ── Cancel (discard-changes prompt) ─────────────────────────────────────

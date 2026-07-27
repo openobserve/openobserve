@@ -53,17 +53,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="function-picker"
-    class="w-full flex flex-col gap-4"
+    class="flex w-full flex-col gap-4"
     :class="createNewFunction ? 'h-full min-h-0 gap-0' : ''"
   >
     <OSpinner v-if="loading" size="md" class="mx-auto my-8" />
 
     <template v-else>
       <!-- create / pick toggle -->
-      <div
-        class="flex items-center gap-3"
-        :class="createNewFunction ? 'px-4 pt-4 shrink-0' : ''"
-      >
+      <div class="flex items-center gap-3" :class="createNewFunction ? 'shrink-0 px-4 pt-4' : ''">
         <OSwitch
           v-model="createNewFunction"
           :label="t('flow.function.createNew')"
@@ -76,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              its function is being associated with a "pipeline". -->
         <div
           v-if="createNewFunction"
-          class="text-sm text-text-secondary"
+          class="text-text-secondary text-sm"
           data-test="create-function-note"
         >
           ({{
@@ -88,10 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- inline function editor (full-width; its own toolbar owns save/cancel) -->
-      <div
-        v-if="createNewFunction"
-        class="flow-add-function flex-1 min-h-0 w-full"
-      >
+      <div v-if="createNewFunction" class="flow-add-function min-h-0 w-full flex-1">
         <!-- ALWAYS a fresh function. AddFunction's `is-updated` means "editing an
              EXISTING function" and disables its name input (`:disable-name`), so
              it must never be fed our `isUpdating` — that flag means "editing the
@@ -137,31 +131,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                flat token surface — a gradient can't be expressed in tokens, and
                the flat fill matches the rest of the app's card headers. -->
           <OCard
-            class="function-definition-card border border-border-default bg-surface-base rounded-default overflow-hidden shadow-[0_0.125rem_0.25rem_color-mix(in_srgb,var(--color-black)_5%,transparent)]"
+            class="function-definition-card border-border-default bg-surface-base rounded-default overflow-hidden border shadow-[0_0.125rem_0.25rem_color-mix(in_srgb,var(--color-black)_5%,transparent)]"
           >
-            <OCardSection
-              role="header"
-              class="border-b border-b-border-default bg-surface-subtle"
-            >
-              <div class="text-base font-semibold text-text-heading">
+            <OCardSection role="header" class="border-b-border-default bg-surface-subtle border-b">
+              <div class="text-text-heading text-base font-semibold">
                 {{ t("function.function_definition") }}
               </div>
             </OCardSection>
             <OSeparator />
             <OCardSection class="p-0">
               <div
-                class="function-code-container max-h-[15.625rem] overflow-y-auto relative bg-surface-subtle border border-border-default"
+                class="function-code-container bg-surface-subtle border-border-default relative max-h-[15.625rem] overflow-y-auto border"
               >
                 <pre
-                  class="font-mono bg-transparent m-0 p-4 text-compact leading-normal whitespace-pre-wrap break-words border-0 font-normal cursor-default select-text text-text-code"
-                >{{ selectedDefinition }}</pre>
+                  class="text-compact text-text-code m-0 cursor-default border-0 bg-transparent p-4 font-mono leading-normal font-normal break-words whitespace-pre-wrap select-text"
+                  >{{ selectedDefinition }}</pre
+                >
               </div>
             </OCardSection>
           </OCard>
         </div>
 
         <!-- After-Flattening (RAF/RBF) toggle + guidelines -->
-        <div v-if="showFlatten" class="w-full flex flex-col gap-3">
+        <div v-if="showFlatten" class="flex w-full flex-col gap-3">
           <OFormSwitch
             name="afterFlattening"
             :label="t('flow.function.flatten')"
@@ -175,22 +167,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                (warning-50, ~#fefce8) is near-white, so without the border the
                callout blends into the page and reads as unstyled — the canonical
                warning banners (logstream/schema, settings/*) all carry it. -->
-          <div class="bg-banner-warning-bg border border-banner-warning-border text-banner-warning-text w-full rounded-default p-3 flex flex-col gap-2">
+          <div
+            class="bg-banner-warning-bg border-banner-warning-border text-banner-warning-text rounded-default flex w-full flex-col gap-2 border p-3"
+          >
             <div class="text-sm">
               {{ t("flow.function.guidelinesTitle") }}
             </div>
             <div class="flex flex-col gap-1 text-sm">
               <div class="flex items-start gap-2">
-                <OIcon name="info" size="sm" class="shrink-0 mt-0.5 text-status-warning-text" />
+                <OIcon name="info" size="sm" class="text-status-warning-text mt-0.5 shrink-0" />
                 <span>
-                  <span class="font-bold text-text-link">{{ t("flow.function.rbf") }}</span>
+                  <span class="text-text-link font-bold">{{ t("flow.function.rbf") }}</span>
                   {{ t("flow.function.rbfDesc") }}
                 </span>
               </div>
               <div class="flex items-start gap-2">
-                <OIcon name="info" size="sm" class="shrink-0 mt-0.5 text-status-warning-text" />
+                <OIcon name="info" size="sm" class="text-status-warning-text mt-0.5 shrink-0" />
                 <span>
-                  <span class="font-bold text-text-link">{{ t("flow.function.raf") }}</span>
+                  <span class="text-text-link font-bold">{{ t("flow.function.raf") }}</span>
                   {{ t("flow.function.rafDesc") }}
                 </span>
               </div>
@@ -203,14 +197,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts" setup>
-import {
-  computed,
-  defineAsyncComponent,
-  nextTick,
-  onMounted,
-  ref,
-  watch,
-} from "vue";
+import { computed, defineAsyncComponent, nextTick, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
@@ -231,9 +218,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import functionsService from "@/services/jstransform";
 import { isJsFunction } from "@/utils/functionLanguage";
 
-const AddFunction = defineAsyncComponent(
-  () => import("@/components/functions/AddFunction.vue"),
-);
+const AddFunction = defineAsyncComponent(() => import("@/components/functions/AddFunction.vue"));
 
 const props = withDefaults(
   defineProps<{
@@ -305,13 +290,9 @@ const form = useOForm<AssociateFunctionForm>({
 });
 
 // Reactive view of the SAME form (no mirror ref).
-const selectedFunction = form.useStore(
-  (s: any) => s.values?.selectedFunction ?? "",
-);
+const selectedFunction = form.useStore((s: any) => s.values?.selectedFunction ?? "");
 
-const selectedDefinition = computed(
-  () => functionDefs.value[selectedFunction.value] || "",
-);
+const selectedDefinition = computed(() => functionDefs.value[selectedFunction.value] || "");
 
 // Only functions written in the host's language are selectable: a pipeline runs
 // VRL, a workflow node runs JS. Offering the other kind would let a user attach a

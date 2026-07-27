@@ -5,7 +5,6 @@ import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
 
-
 const mockReplace = vi.fn();
 const mockCurrentRoute = { value: { name: "ai-integrations" } };
 const mockRoute = { name: "ai-integrations" };
@@ -24,8 +23,22 @@ vi.mock("vue-router", () => ({
 // (reusing route ai-openai-python) and the original is removed (no duplicate).
 vi.mock("@/components/ingestion/ai/content/manifest", () => ({
   manifestIntegrations: [
-    { slug: "codex", name: "OpenAI Codex", category: "frameworks", order: 1, docURL: "", keywords: ["codex"] },
-    { slug: "openai", name: "OpenAI", category: "model-providers", order: 1, docURL: "https://example.com/openai", keywords: ["openai"] },
+    {
+      slug: "codex",
+      name: "OpenAI Codex",
+      category: "frameworks",
+      order: 1,
+      docURL: "",
+      keywords: ["codex"],
+    },
+    {
+      slug: "openai",
+      name: "OpenAI",
+      category: "model-providers",
+      order: 1,
+      docURL: "https://example.com/openai",
+      keywords: ["openai"],
+    },
   ],
   manifestCategories: [
     { slug: "frameworks", label: "AI Frameworks & Agents", order: 1 },
@@ -43,7 +56,7 @@ describe("AIIntegrations", () => {
       global: {
         plugins: [store, i18n],
         stubs: {
-          "OIcon": true,
+          OIcon: true,
           "router-view": true,
         },
       },
@@ -67,23 +80,15 @@ describe("AIIntegrations", () => {
     });
 
     it("should render the search input", () => {
-      expect(
-        wrapper.find('[data-test="ai-integrations-search-input"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="ai-integrations-search-input"]').exists()).toBe(true);
     });
 
     it("should render category tabs", () => {
-      expect(
-        wrapper
-          .find('[data-test="ai-integrations-category-frameworks"]')
-          .exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="ai-integrations-category-frameworks"]').exists()).toBe(true);
     });
 
     it("should render integration tabs", () => {
-      expect(
-        wrapper.find('[data-test="ai-integrations-item-codex"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="ai-integrations-item-codex"]').exists()).toBe(true);
     });
   });
 

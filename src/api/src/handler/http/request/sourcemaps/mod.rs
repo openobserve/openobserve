@@ -23,7 +23,7 @@ use axum::{
 };
 use db::sourcemaps as db_sourcemaps;
 use infra::table::source_maps::FileType;
-use openobserve_core::sourcemaps::{self as sv_sourcemaps, TranslatedStack};
+use openobserve_sourcemaps::{self as sv_sourcemaps, TranslatedStack};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 

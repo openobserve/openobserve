@@ -15,19 +15,13 @@ let measureTextCtx: CanvasRenderingContext2D | null | undefined;
  * @param {string} fontSize - The font size of the text.
  * @return {number} The width of the text in pixels.
  */
-export const calculateWidthText = (
-  text: string,
-  fontSize: string = "12px",
-): number => {
+export const calculateWidthText = (text: string, fontSize: string = "12px"): number => {
   if (!text) return 0;
 
   if (measureTextCtx === undefined) {
     try {
       const canvas = document.createElement("canvas");
-      measureTextCtx =
-        typeof canvas.getContext === "function"
-          ? canvas.getContext("2d")
-          : null;
+      measureTextCtx = typeof canvas.getContext === "function" ? canvas.getContext("2d") : null;
     } catch {
       measureTextCtx = null;
     }
@@ -96,10 +90,7 @@ export const calculateOptimalFontSize = (
   let maxFontSize = 90; // Set a maximum possible font size
 
   if (canvasHeight !== undefined && canvasHeight > 0) {
-    maxFontSize = Math.max(
-      minFontSize,
-      Math.min(maxFontSize, Math.floor(canvasHeight / 1.2)),
-    );
+    maxFontSize = Math.max(minFontSize, Math.min(maxFontSize, Math.floor(canvasHeight / 1.2)));
   }
 
   let optimalFontSize = minFontSize;
@@ -119,6 +110,9 @@ export const calculateOptimalFontSize = (
   return optimalFontSize; // Return the largest font size that fits
 };
 
+// x-axis tick-label band below the plot edge (12px font + 8px axisLabel margin)
+export const X_AXIS_TICK_LABEL_BAND = 20;
+
 /**
  * Widens the ECharts grid's left inset to the measured pixel width of the
  * widest formatted y-axis label. ECharts' containLabel under-measures rendered
@@ -133,8 +127,7 @@ export const applyMeasuredYAxisLeftInset = (options: any): void => {
   const yAxis = options?.yAxis;
 
   // Arrays are gauge/trellis layouts that manage their own left spacing.
-  const isPlainObject = (v: any) =>
-    v && typeof v === "object" && !Array.isArray(v);
+  const isPlainObject = (v: any) => v && typeof v === "object" && !Array.isArray(v);
   if (!isPlainObject(grid) || !isPlainObject(yAxis)) return;
   if (yAxis.type !== "value") return;
 
@@ -154,6 +147,9 @@ export const applyMeasuredYAxisLeftInset = (options: any): void => {
 
   if (widest > 0) {
     options.grid.left = widest;
+    if (grid.containLabel === true && typeof grid.bottom === "number") {
+      grid.bottom += X_AXIS_TICK_LABEL_BAND;
+    }
     options.grid.containLabel = false;
   }
 };
@@ -188,8 +184,7 @@ export const calculateDynamicNameGap = (
   // When a label of width W is rotated by angle ╬╕:
   // - The vertical height = W * sin(╬╕) + fontSize * cos(╬╕)
   const verticalHeight =
-    labelWidth * Math.sin(rotationInRadians) +
-    fontSize * Math.cos(rotationInRadians);
+    labelWidth * Math.sin(rotationInRadians) + fontSize * Math.cos(rotationInRadians);
 
   // Calculate nameGap: vertical height + axis label margin + small buffer (8px)
   // The buffer ensures there's slight spacing between longest label tip and axis name
@@ -227,8 +222,7 @@ export const calculateRotatedLabelBottomSpace = (
 
   // Calculate the vertical height occupied by rotated label
   const verticalHeight =
-    labelWidth * Math.sin(rotationInRadians) +
-    fontSize * Math.cos(rotationInRadians);
+    labelWidth * Math.sin(rotationInRadians) + fontSize * Math.cos(rotationInRadians);
 
   if (hasAxisName) {
     // If there's an axis name, nameGap already covers the label height.

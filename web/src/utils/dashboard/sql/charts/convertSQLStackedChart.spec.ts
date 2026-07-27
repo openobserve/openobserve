@@ -55,7 +55,15 @@ function makeMockContext(overrides: Partial<any> = {}): any {
 
   return {
     options: {
-      xAxis: [{ data: ["Jan", "Feb", "Mar"], axisLabel: { rotate: 0, width: 120, margin: 5 }, axisTick: {}, nameGap: 25, name: "" }],
+      xAxis: [
+        {
+          data: ["Jan", "Feb", "Mar"],
+          axisLabel: { rotate: 0, width: 120, margin: 5 },
+          axisTick: {},
+          nameGap: 25,
+          name: "",
+        },
+      ],
       yAxis: [{ data: [], axisLabel: { width: 80 }, name: "" }],
       series: [],
       tooltip: { axisPointer: {}, textStyle: {} },

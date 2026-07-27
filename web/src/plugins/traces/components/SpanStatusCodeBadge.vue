@@ -80,9 +80,7 @@ const displayValue = computed(() => {
   return null;
 });
 
-const badgeType = computed(() =>
-  source.value === "grpc" ? "spanStatus" : "httpStatus",
-);
+const badgeType = computed(() => (source.value === "grpc" ? "spanStatus" : "httpStatus"));
 
 const badgeValue = computed(() => {
   if (source.value === "http") return httpStatusBucket(props.code);

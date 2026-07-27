@@ -17,45 +17,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <!-- The severity spine is drawn by the table row (get-row-status-color),
        matching the sessions page — no in-cell border. -->
-  <div class="flex flex-col gap-0.5 min-w-0" data-test="rum-error-issue-cell">
-    <div class="flex items-baseline gap-1 min-w-0">
+  <div class="flex min-w-0 flex-col gap-0.5" data-test="rum-error-issue-cell">
+    <div class="flex min-w-0 items-baseline gap-1">
       <span
-        class="font-semibold shrink-0"
-        :class="
-          isUnhandled
-            ? 'text-severity-error-color'
-            : 'text-severity-warning-color'
-        "
+        class="shrink-0 font-semibold"
+        :class="isUnhandled ? 'text-severity-error-color' : 'text-severity-warning-color'"
         data-test="rum-error-issue-cell-type"
         >{{ issue.error_type || t("rum.error") }}:</span
       >
       <span
-        class="font-semibold truncate min-w-0 text-text-body"
+        class="text-text-body min-w-0 truncate font-semibold"
         :title="issue.error_message"
         data-test="rum-error-issue-cell-message"
         >{{ issue.error_message }}</span
       >
     </div>
 
-    <div class="flex items-center gap-1.5 min-w-0 overflow-hidden">
+    <div class="flex min-w-0 items-center gap-1.5 overflow-hidden">
       <OTag
         v-if="issue.error_handling"
         :label="issue.error_handling"
         :variant="isUnhandled ? 'error-outline' : 'warning-outline'"
         size="xs"
         shape="rounded"
-        class="uppercase shrink-0"
+        class="shrink-0 uppercase"
         data-test="rum-error-issue-cell-handling-tag"
       />
       <code
         v-if="topFrame"
-        class="truncate min-w-0"
+        class="min-w-0 truncate"
         :title="topFrame.line !== null ? `${topFrame.file}:${topFrame.line}` : topFrame.file"
         data-test="rum-error-issue-cell-frame"
         >{{ topFrame.file
-        }}<template v-if="topFrame.line !== null"
-          >:{{ topFrame.line }}</template
-        ></code
+        }}<template v-if="topFrame.line !== null">:{{ topFrame.line }}</template></code
       >
       <OTag
         v-if="route"
@@ -66,12 +60,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="shrink-0"
         data-test="rum-error-issue-cell-route-tag"
       />
-      <small
-        v-if="issue.service"
-        class="truncate"
-        data-test="rum-error-issue-cell-service"
-        >{{ issue.service }}</small
-      >
+      <small v-if="issue.service" class="truncate" data-test="rum-error-issue-cell-service">{{
+        issue.service
+      }}</small>
     </div>
   </div>
 </template>

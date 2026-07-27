@@ -60,13 +60,7 @@ describe("TimeSeriesConverter", () => {
 
   describe("supportedTypes", () => {
     it("should support line, area, area-stacked, bar, and scatter types", () => {
-      expect(converter.supportedTypes).toEqual([
-        "line",
-        "area",
-        "area-stacked",
-        "bar",
-        "scatter",
-      ]);
+      expect(converter.supportedTypes).toEqual(["line", "area", "area-stacked", "bar", "scatter"]);
     });
   });
 
@@ -97,12 +91,7 @@ describe("TimeSeriesConverter", () => {
         config: {},
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.series).toHaveLength(1);
       expect(result.series[0].type).toBe("line");
@@ -112,9 +101,7 @@ describe("TimeSeriesConverter", () => {
     it("should apply line thickness", () => {
       const processedData: ProcessedPromQLData[] = [
         {
-          series: [
-            { name: "series1", values: [[1, "10"]], data: { "1": "10" } },
-          ],
+          series: [{ name: "series1", values: [[1, "10"]], data: { "1": "10" } }],
           timestamps: [[1, "00:00:00"]],
           queryIndex: 0,
         },
@@ -125,12 +112,7 @@ describe("TimeSeriesConverter", () => {
         config: { line_thickness: 3 },
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.series[0].lineStyle.width).toBe(3);
     });
@@ -138,9 +120,7 @@ describe("TimeSeriesConverter", () => {
     it("should use default line thickness", () => {
       const processedData: ProcessedPromQLData[] = [
         {
-          series: [
-            { name: "series1", values: [[1, "10"]], data: { "1": "10" } },
-          ],
+          series: [{ name: "series1", values: [[1, "10"]], data: { "1": "10" } }],
           timestamps: [[1, "00:00:00"]],
           queryIndex: 0,
         },
@@ -151,12 +131,7 @@ describe("TimeSeriesConverter", () => {
         config: {},
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.series[0].lineStyle.width).toBe(1.5);
     });
@@ -164,9 +139,7 @@ describe("TimeSeriesConverter", () => {
     it("should apply smooth interpolation by default", () => {
       const processedData: ProcessedPromQLData[] = [
         {
-          series: [
-            { name: "series1", values: [[1, "10"]], data: { "1": "10" } },
-          ],
+          series: [{ name: "series1", values: [[1, "10"]], data: { "1": "10" } }],
           timestamps: [[1, "00:00:00"]],
           queryIndex: 0,
         },
@@ -177,12 +150,7 @@ describe("TimeSeriesConverter", () => {
         config: {},
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.series[0].smooth).toBe(true);
       expect(result.series[0].step).toBe(false);
@@ -191,9 +159,7 @@ describe("TimeSeriesConverter", () => {
     it("should apply linear interpolation when specified", () => {
       const processedData: ProcessedPromQLData[] = [
         {
-          series: [
-            { name: "series1", values: [[1, "10"]], data: { "1": "10" } },
-          ],
+          series: [{ name: "series1", values: [[1, "10"]], data: { "1": "10" } }],
           timestamps: [[1, "00:00:00"]],
           queryIndex: 0,
         },
@@ -204,12 +170,7 @@ describe("TimeSeriesConverter", () => {
         config: { line_interpolation: "linear" },
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.series[0].smooth).toBe(false);
     });
@@ -217,9 +178,7 @@ describe("TimeSeriesConverter", () => {
     it("should apply step-start interpolation", () => {
       const processedData: ProcessedPromQLData[] = [
         {
-          series: [
-            { name: "series1", values: [[1, "10"]], data: { "1": "10" } },
-          ],
+          series: [{ name: "series1", values: [[1, "10"]], data: { "1": "10" } }],
           timestamps: [[1, "00:00:00"]],
           queryIndex: 0,
         },
@@ -230,12 +189,7 @@ describe("TimeSeriesConverter", () => {
         config: { line_interpolation: "step-start" },
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.series[0].step).toBe("start");
     });
@@ -243,9 +197,7 @@ describe("TimeSeriesConverter", () => {
     it("should apply step-end interpolation", () => {
       const processedData: ProcessedPromQLData[] = [
         {
-          series: [
-            { name: "series1", values: [[1, "10"]], data: { "1": "10" } },
-          ],
+          series: [{ name: "series1", values: [[1, "10"]], data: { "1": "10" } }],
           timestamps: [[1, "00:00:00"]],
           queryIndex: 0,
         },
@@ -256,12 +208,7 @@ describe("TimeSeriesConverter", () => {
         config: { line_interpolation: "step-end" },
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.series[0].step).toBe("end");
     });
@@ -269,9 +216,7 @@ describe("TimeSeriesConverter", () => {
     it("should apply step-middle interpolation", () => {
       const processedData: ProcessedPromQLData[] = [
         {
-          series: [
-            { name: "series1", values: [[1, "10"]], data: { "1": "10" } },
-          ],
+          series: [{ name: "series1", values: [[1, "10"]], data: { "1": "10" } }],
           timestamps: [[1, "00:00:00"]],
           queryIndex: 0,
         },
@@ -282,12 +227,7 @@ describe("TimeSeriesConverter", () => {
         config: { line_interpolation: "step-middle" },
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.series[0].step).toBe("middle");
     });
@@ -295,9 +235,7 @@ describe("TimeSeriesConverter", () => {
     it("should hide symbols by default", () => {
       const processedData: ProcessedPromQLData[] = [
         {
-          series: [
-            { name: "series1", values: [[1, "10"]], data: { "1": "10" } },
-          ],
+          series: [{ name: "series1", values: [[1, "10"]], data: { "1": "10" } }],
           timestamps: [[1, "00:00:00"]],
           queryIndex: 0,
         },
@@ -308,12 +246,7 @@ describe("TimeSeriesConverter", () => {
         config: {},
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.series[0].showSymbol).toBe(false);
     });
@@ -321,9 +254,7 @@ describe("TimeSeriesConverter", () => {
     it("should show symbols when configured", () => {
       const processedData: ProcessedPromQLData[] = [
         {
-          series: [
-            { name: "series1", values: [[1, "10"]], data: { "1": "10" } },
-          ],
+          series: [{ name: "series1", values: [[1, "10"]], data: { "1": "10" } }],
           timestamps: [[1, "00:00:00"]],
           queryIndex: 0,
         },
@@ -334,12 +265,7 @@ describe("TimeSeriesConverter", () => {
         config: { show_symbol: true },
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.series[0].showSymbol).toBe(true);
     });
@@ -347,9 +273,7 @@ describe("TimeSeriesConverter", () => {
     it("should not connect nulls by default", () => {
       const processedData: ProcessedPromQLData[] = [
         {
-          series: [
-            { name: "series1", values: [[1, "10"]], data: { "1": "10" } },
-          ],
+          series: [{ name: "series1", values: [[1, "10"]], data: { "1": "10" } }],
           timestamps: [[1, "00:00:00"]],
           queryIndex: 0,
         },
@@ -360,12 +284,7 @@ describe("TimeSeriesConverter", () => {
         config: {},
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.series[0].connectNulls).toBe(false);
     });
@@ -373,9 +292,7 @@ describe("TimeSeriesConverter", () => {
     it("should connect nulls when configured", () => {
       const processedData: ProcessedPromQLData[] = [
         {
-          series: [
-            { name: "series1", values: [[1, "10"]], data: { "1": "10" } },
-          ],
+          series: [{ name: "series1", values: [[1, "10"]], data: { "1": "10" } }],
           timestamps: [[1, "00:00:00"]],
           queryIndex: 0,
         },
@@ -386,12 +303,7 @@ describe("TimeSeriesConverter", () => {
         config: { connect_nulls: true },
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.series[0].connectNulls).toBe(true);
     });
@@ -401,9 +313,7 @@ describe("TimeSeriesConverter", () => {
     it("should convert to area chart", () => {
       const processedData: ProcessedPromQLData[] = [
         {
-          series: [
-            { name: "series1", values: [[1, "10"]], data: { "1": "10" } },
-          ],
+          series: [{ name: "series1", values: [[1, "10"]], data: { "1": "10" } }],
           timestamps: [[1, "00:00:00"]],
           queryIndex: 0,
         },
@@ -414,12 +324,7 @@ describe("TimeSeriesConverter", () => {
         config: {},
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.series[0].type).toBe("line");
       expect(result.series[0].areaStyle).toBeDefined();
@@ -428,9 +333,7 @@ describe("TimeSeriesConverter", () => {
     it("should apply line thickness for area", () => {
       const processedData: ProcessedPromQLData[] = [
         {
-          series: [
-            { name: "series1", values: [[1, "10"]], data: { "1": "10" } },
-          ],
+          series: [{ name: "series1", values: [[1, "10"]], data: { "1": "10" } }],
           timestamps: [[1, "00:00:00"]],
           queryIndex: 0,
         },
@@ -441,12 +344,7 @@ describe("TimeSeriesConverter", () => {
         config: { line_thickness: 2.5 },
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.series[0].lineStyle.width).toBe(2.5);
     });
@@ -470,12 +368,7 @@ describe("TimeSeriesConverter", () => {
         config: {},
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.series[0].stack).toBe("Total");
       expect(result.series[1].stack).toBe("Total");
@@ -487,9 +380,7 @@ describe("TimeSeriesConverter", () => {
     it("should convert to bar chart", () => {
       const processedData: ProcessedPromQLData[] = [
         {
-          series: [
-            { name: "series1", values: [[1, "10"]], data: { "1": "10" } },
-          ],
+          series: [{ name: "series1", values: [[1, "10"]], data: { "1": "10" } }],
           timestamps: [[1, "00:00:00"]],
           queryIndex: 0,
         },
@@ -500,12 +391,7 @@ describe("TimeSeriesConverter", () => {
         config: {},
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.series[0].type).toBe("bar");
     });
@@ -513,9 +399,7 @@ describe("TimeSeriesConverter", () => {
     it("should apply bar width", () => {
       const processedData: ProcessedPromQLData[] = [
         {
-          series: [
-            { name: "series1", values: [[1, "10"]], data: { "1": "10" } },
-          ],
+          series: [{ name: "series1", values: [[1, "10"]], data: { "1": "10" } }],
           timestamps: [[1, "00:00:00"]],
           queryIndex: 0,
         },
@@ -526,12 +410,7 @@ describe("TimeSeriesConverter", () => {
         config: { bar_width: 20 },
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.series[0].barWidth).toBe(20);
     });
@@ -541,9 +420,7 @@ describe("TimeSeriesConverter", () => {
     it("should convert to scatter chart", () => {
       const processedData: ProcessedPromQLData[] = [
         {
-          series: [
-            { name: "series1", values: [[1, "10"]], data: { "1": "10" } },
-          ],
+          series: [{ name: "series1", values: [[1, "10"]], data: { "1": "10" } }],
           timestamps: [[1, "00:00:00"]],
           queryIndex: 0,
         },
@@ -554,12 +431,7 @@ describe("TimeSeriesConverter", () => {
         config: {},
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.series[0].type).toBe("scatter");
     });
@@ -567,9 +439,7 @@ describe("TimeSeriesConverter", () => {
     it("should apply symbol size", () => {
       const processedData: ProcessedPromQLData[] = [
         {
-          series: [
-            { name: "series1", values: [[1, "10"]], data: { "1": "10" } },
-          ],
+          series: [{ name: "series1", values: [[1, "10"]], data: { "1": "10" } }],
           timestamps: [[1, "00:00:00"]],
           queryIndex: 0,
         },
@@ -580,12 +450,7 @@ describe("TimeSeriesConverter", () => {
         config: { symbol_size: 15 },
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.series[0].symbolSize).toBe(15);
     });
@@ -595,9 +460,7 @@ describe("TimeSeriesConverter", () => {
     it("should hide labels by default", () => {
       const processedData: ProcessedPromQLData[] = [
         {
-          series: [
-            { name: "series1", values: [[1, "10"]], data: { "1": "10" } },
-          ],
+          series: [{ name: "series1", values: [[1, "10"]], data: { "1": "10" } }],
           timestamps: [[1, "00:00:00"]],
           queryIndex: 0,
         },
@@ -608,12 +471,7 @@ describe("TimeSeriesConverter", () => {
         config: {},
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.series[0].label.show).toBe(false);
     });
@@ -621,9 +479,7 @@ describe("TimeSeriesConverter", () => {
     it("should show labels when position is set", () => {
       const processedData: ProcessedPromQLData[] = [
         {
-          series: [
-            { name: "series1", values: [[1, "10"]], data: { "1": "10" } },
-          ],
+          series: [{ name: "series1", values: [[1, "10"]], data: { "1": "10" } }],
           timestamps: [[1, "00:00:00"]],
           queryIndex: 0,
         },
@@ -639,12 +495,7 @@ describe("TimeSeriesConverter", () => {
         },
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.series[0].label.show).toBe(true);
       expect(result.series[0].label.position).toBe("top");
@@ -656,9 +507,7 @@ describe("TimeSeriesConverter", () => {
     it("should add mark lines when configured", () => {
       const processedData: ProcessedPromQLData[] = [
         {
-          series: [
-            { name: "series1", values: [[1, "10"]], data: { "1": "10" } },
-          ],
+          series: [{ name: "series1", values: [[1, "10"]], data: { "1": "10" } }],
           timestamps: [[1, "00:00:00"]],
           queryIndex: 0,
         },
@@ -680,12 +529,7 @@ describe("TimeSeriesConverter", () => {
         },
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.series[0].markLine.data).toHaveLength(1);
       expect(result.series[0].markLine.data[0].yAxis).toBe(50);
@@ -695,9 +539,7 @@ describe("TimeSeriesConverter", () => {
     it("should handle xAxis mark lines", () => {
       const processedData: ProcessedPromQLData[] = [
         {
-          series: [
-            { name: "series1", values: [[1, "10"]], data: { "1": "10" } },
-          ],
+          series: [{ name: "series1", values: [[1, "10"]], data: { "1": "10" } }],
           timestamps: [[1, "00:00:00"]],
           queryIndex: 0,
         },
@@ -715,12 +557,7 @@ describe("TimeSeriesConverter", () => {
         },
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.series[0].markLine.data[0].xAxis).toBe(1609459200000);
       expect(result.series[0].markLine.data[0].yAxis).toBeNull();
@@ -729,9 +566,7 @@ describe("TimeSeriesConverter", () => {
     it("should skip mark lines with show=false", () => {
       const processedData: ProcessedPromQLData[] = [
         {
-          series: [
-            { name: "series1", values: [[1, "10"]], data: { "1": "10" } },
-          ],
+          series: [{ name: "series1", values: [[1, "10"]], data: { "1": "10" } }],
           timestamps: [[1, "00:00:00"]],
           queryIndex: 0,
         },
@@ -747,12 +582,7 @@ describe("TimeSeriesConverter", () => {
         },
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.series[0].markLine.data).toHaveLength(1);
     });
@@ -760,9 +590,7 @@ describe("TimeSeriesConverter", () => {
     it("should use default mark line styling", () => {
       const processedData: ProcessedPromQLData[] = [
         {
-          series: [
-            { name: "series1", values: [[1, "10"]], data: { "1": "10" } },
-          ],
+          series: [{ name: "series1", values: [[1, "10"]], data: { "1": "10" } }],
           timestamps: [[1, "00:00:00"]],
           queryIndex: 0,
         },
@@ -775,12 +603,7 @@ describe("TimeSeriesConverter", () => {
         },
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.series[0].markLine.data[0].lineStyle.color).toBe("#FF0000");
       expect(result.series[0].markLine.data[0].lineStyle.type).toBe("solid");
@@ -792,9 +615,7 @@ describe("TimeSeriesConverter", () => {
     it("should apply series color", () => {
       const processedData: ProcessedPromQLData[] = [
         {
-          series: [
-            { name: "series1", values: [[1, "10"]], data: { "1": "10" } },
-          ],
+          series: [{ name: "series1", values: [[1, "10"]], data: { "1": "10" } }],
           timestamps: [[1, "00:00:00"]],
           queryIndex: 0,
         },
@@ -805,12 +626,7 @@ describe("TimeSeriesConverter", () => {
         config: {},
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.series[0].itemStyle.color).toBe("#FF0000");
     });
@@ -823,9 +639,7 @@ describe("TimeSeriesConverter", () => {
 
       const processedData: ProcessedPromQLData[] = [
         {
-          series: [
-            { name: "series1", values: [[1, "10"]], data: { "1": "10" } },
-          ],
+          series: [{ name: "series1", values: [[1, "10"]], data: { "1": "10" } }],
           timestamps: [[1, "00:00:00"]],
           queryIndex: 0,
         },
@@ -836,12 +650,7 @@ describe("TimeSeriesConverter", () => {
         config: {},
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.series[0].itemStyle.color).toBeUndefined();
     });
@@ -873,9 +682,7 @@ describe("TimeSeriesConverter", () => {
     it("should configure axes", () => {
       const processedData: ProcessedPromQLData[] = [
         {
-          series: [
-            { name: "series1", values: [[1, "10"]], data: { "1": "10" } },
-          ],
+          series: [{ name: "series1", values: [[1, "10"]], data: { "1": "10" } }],
           timestamps: [[1, "00:00:00"]],
           queryIndex: 0,
         },
@@ -886,12 +693,7 @@ describe("TimeSeriesConverter", () => {
         config: {},
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.xAxis).toBeDefined();
       expect(result.yAxis).toBeDefined();
@@ -907,12 +709,7 @@ describe("TimeSeriesConverter", () => {
         config: {},
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.series).toEqual([]);
     });
@@ -920,9 +717,7 @@ describe("TimeSeriesConverter", () => {
     it("should handle chartPanelRef", () => {
       const processedData: ProcessedPromQLData[] = [
         {
-          series: [
-            { name: "series1", values: [[1, "10"]], data: { "1": "10" } },
-          ],
+          series: [{ name: "series1", values: [[1, "10"]], data: { "1": "10" } }],
           timestamps: [[1, "00:00:00"]],
           queryIndex: 0,
         },

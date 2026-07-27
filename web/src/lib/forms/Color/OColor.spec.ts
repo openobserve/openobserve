@@ -41,23 +41,17 @@ describe("OColor", () => {
 
   it("should make the hex input read-only when readonly is true", () => {
     wrapper = mount(OColor, { props: { readonly: true } });
-    expect(
-      wrapper.find("input[type='text']").attributes("readonly"),
-    ).toBeDefined();
+    expect(wrapper.find("input[type='text']").attributes("readonly")).toBeDefined();
   });
 
   it("should make the hex input editable by default", () => {
     wrapper = mount(OColor);
-    expect(
-      wrapper.find("input[type='text']").attributes("readonly"),
-    ).toBeUndefined();
+    expect(wrapper.find("input[type='text']").attributes("readonly")).toBeUndefined();
   });
 
   it("should disable the input when disabled is true", () => {
     wrapper = mount(OColor, { props: { disabled: true } });
-    expect(
-      wrapper.find("input[type='text']").attributes("disabled"),
-    ).toBeDefined();
+    expect(wrapper.find("input[type='text']").attributes("disabled")).toBeDefined();
   });
 
   it("should render the error message", () => {

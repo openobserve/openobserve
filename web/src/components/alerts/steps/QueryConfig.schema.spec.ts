@@ -28,9 +28,7 @@ const CONDITION_REQUIRED_MESSAGE = t("alerts.validation.fieldRequired");
 const THRESHOLD_REQUIRED_MESSAGE = t("alerts.validation.thresholdPositive");
 const FREQUENCY_REQUIRED_MESSAGE = t("alerts.validation.frequencyPositive");
 const CONDITION_VALUE_REQUIRED_MESSAGE = t("alerts.validation.fieldRequired");
-const AGGREGATION_COLUMN_REQUIRED_MESSAGE = t(
-  "alerts.validation.aggregationColumnRequired",
-);
+const AGGREGATION_COLUMN_REQUIRED_MESSAGE = t("alerts.validation.aggregationColumnRequired");
 const PROMQL_OPERATOR_REQUIRED_MESSAGE = t("alerts.validation.fieldRequired");
 const PROMQL_VALUE_REQUIRED_MESSAGE = t("alerts.validation.fieldRequired");
 
@@ -46,10 +44,7 @@ const leaf = (overrides: Record<string, unknown> = {}) => ({
   ...overrides,
 });
 
-const group = (
-  conditions: unknown[],
-  overrides: Record<string, unknown> = {},
-) => ({
+const group = (conditions: unknown[], overrides: Record<string, unknown> = {}) => ({
   filterType: "group",
   logicalOperator: "AND",
   groupId: "group-id",
@@ -65,15 +60,11 @@ describe("QueryConfig.schema — conditions tree", () => {
     it("passes an EMPTY tree — no rows adds no issues (alerts save with zero conditions)", () => {
       expect(conditionsTreeSchema.safeParse(group([])).success).toBe(true);
       // A root with no conditions key at all is also clean.
-      expect(
-        conditionsTreeSchema.safeParse({ filterType: "group" }).success,
-      ).toBe(true);
+      expect(conditionsTreeSchema.safeParse({ filterType: "group" }).success).toBe(true);
     });
 
     it("passes a complete condition row", () => {
-      expect(conditionsTreeSchema.safeParse(group([leaf()])).success).toBe(
-        true,
-      );
+      expect(conditionsTreeSchema.safeParse(group([leaf()])).success).toBe(true);
     });
 
     it("fails a partial row at the RIGHT nested paths (column + value empty on row 1)", () => {
@@ -94,9 +85,7 @@ describe("QueryConfig.schema — conditions tree", () => {
     });
 
     it("fails a missing operator at its exact path", () => {
-      const result = conditionsTreeSchema.safeParse(
-        group([leaf({ operator: "" })]),
-      );
+      const result = conditionsTreeSchema.safeParse(group([leaf({ operator: "" })]));
       expect(result.success).toBe(false);
       const issues = issuesOf(result);
       expect(issues).toHaveLength(1);
@@ -107,16 +96,12 @@ describe("QueryConfig.schema — conditions tree", () => {
     });
 
     it("value is ZERO-SAFE: numeric 0 passes", () => {
-      expect(
-        conditionsTreeSchema.safeParse(group([leaf({ value: 0 })])).success,
-      ).toBe(true);
+      expect(conditionsTreeSchema.safeParse(group([leaf({ value: 0 })])).success).toBe(true);
     });
 
     it('value fails ONLY on undefined / null / ""', () => {
       for (const bad of ["", null, undefined]) {
-        const result = conditionsTreeSchema.safeParse(
-          group([leaf({ value: bad })]),
-        );
+        const result = conditionsTreeSchema.safeParse(group([leaf({ value: bad })]));
         expect(result.success).toBe(false);
         const issues = issuesOf(result);
         expect(issues).toHaveLength(1);
@@ -126,9 +111,7 @@ describe("QueryConfig.schema — conditions tree", () => {
         });
       }
       // Other falsy-but-present values pass (zero-safe, not truthy-required).
-      expect(
-        conditionsTreeSchema.safeParse(group([leaf({ value: false })])).success,
-      ).toBe(true);
+      expect(conditionsTreeSchema.safeParse(group([leaf({ value: false })])).success).toBe(true);
     });
 
     it("recurses into nested groups — issue paths carry the exact nested indices", () => {
@@ -173,10 +156,9 @@ describe("QueryConfig.schema — conditions tree", () => {
     });
 
     it("adds no issues for an empty tree under the basePath", () => {
-      expect(
-        hostSchema.safeParse({ query_condition: { conditions: group([]) } })
-          .success,
-      ).toBe(true);
+      expect(hostSchema.safeParse({ query_condition: { conditions: group([]) } }).success).toBe(
+        true,
+      );
     });
   });
 
@@ -221,8 +203,7 @@ describe("QueryConfig.schema — conditions tree", () => {
 
     const parse = (overrides: Record<string, any> = {}) =>
       queryConfigSchema.safeParse(form(overrides));
-    const paths = (r: any) =>
-      r.success ? [] : r.error.issues.map((i: any) => i.path.join("."));
+    const paths = (r: any) => (r.success ? [] : r.error.issues.map((i: any) => i.path.join(".")));
 
     it("a valid scheduled count alert passes", () => {
       expect(parse().success).toBe(true);
@@ -259,10 +240,9 @@ describe("QueryConfig.schema — conditions tree", () => {
     it("blocks empty frequency when not cron", () => {
       const r = parse({ _ui: { checkEvery: "" } });
       expect(paths(r)).toContain("_ui.checkEvery");
-      expect(
-        r.error!.issues.find((i: any) => i.path.join(".") === "_ui.checkEvery")!
-          .message,
-      ).toBe(FREQUENCY_REQUIRED_MESSAGE);
+      expect(r.error!.issues.find((i: any) => i.path.join(".") === "_ui.checkEvery")!.message).toBe(
+        FREQUENCY_REQUIRED_MESSAGE,
+      );
     });
 
     it("does NOT require frequency in cron mode (cronError owns it)", () => {
@@ -276,8 +256,7 @@ describe("QueryConfig.schema — conditions tree", () => {
     // ── Org min-frequency floor (R5 RESTORE) ────────────────────────────────
     // Pre-migration AlertSettings.validateFrequency compared the STORED minutes
     // against ceil(min_auto_refresh_interval / 60) and blocked save.
-    const FLOOR_MSG = (mins: number) =>
-      "Minimum frequency should be " + mins + " minutes";
+    const FLOOR_MSG = (mins: number) => "Minimum frequency should be " + mins + " minutes";
 
     it("blocks a frequency below the org floor (minutes mode)", () => {
       // 300s → floor 5 min. Display 3 min < 5.
@@ -287,10 +266,9 @@ describe("QueryConfig.schema — conditions tree", () => {
         _meta: { minAutoRefreshInterval: 300 },
       });
       expect(paths(r)).toContain("_ui.checkEvery");
-      expect(
-        r.error!.issues.find((i: any) => i.path.join(".") === "_ui.checkEvery")!
-          .message,
-      ).toBe(FLOOR_MSG(5));
+      expect(r.error!.issues.find((i: any) => i.path.join(".") === "_ui.checkEvery")!.message).toBe(
+        FLOOR_MSG(5),
+      );
     });
 
     it("uses ceil() for a non-whole-minute org floor (90s → 2 minutes)", () => {
@@ -299,10 +277,9 @@ describe("QueryConfig.schema — conditions tree", () => {
         trigger_condition: { frequency: 1 },
         _meta: { minAutoRefreshInterval: 90 },
       });
-      expect(
-        r.error!.issues.find((i: any) => i.path.join(".") === "_ui.checkEvery")!
-          .message,
-      ).toBe(FLOOR_MSG(2));
+      expect(r.error!.issues.find((i: any) => i.path.join(".") === "_ui.checkEvery")!.message).toBe(
+        FLOOR_MSG(2),
+      );
     });
 
     it("allows a frequency exactly AT the org floor", () => {
@@ -349,11 +326,9 @@ describe("QueryConfig.schema — conditions tree", () => {
         query_condition: { promql_condition: { operator: "", value: 5 } },
       });
       expect(paths(r)).toContain("query_condition.promql_condition.operator");
-      expect(
-        r.error!.issues.find((i: any) =>
-          i.path.join(".").endsWith("operator"),
-        )!.message,
-      ).toBe(PROMQL_OPERATOR_REQUIRED_MESSAGE);
+      expect(r.error!.issues.find((i: any) => i.path.join(".").endsWith("operator"))!.message).toBe(
+        PROMQL_OPERATOR_REQUIRED_MESSAGE,
+      );
     });
 
     it("PromQL: value is ZERO-SAFE — 0 PASSES", () => {
@@ -372,10 +347,9 @@ describe("QueryConfig.schema — conditions tree", () => {
           query_condition: { promql_condition: { operator: ">=", value: bad } },
         });
         expect(paths(r)).toContain("query_condition.promql_condition.value");
-        expect(
-          r.error!.issues.find((i: any) => i.path.join(".").endsWith("value"))!
-            .message,
-        ).toBe(PROMQL_VALUE_REQUIRED_MESSAGE);
+        expect(r.error!.issues.find((i: any) => i.path.join(".").endsWith("value"))!.message).toBe(
+          PROMQL_VALUE_REQUIRED_MESSAGE,
+        );
       }
     });
 
@@ -383,9 +357,7 @@ describe("QueryConfig.schema — conditions tree", () => {
       const r = parse({
         query_condition: { promql_condition: { operator: "", value: "" } },
       });
-      expect(paths(r)).not.toContain(
-        "query_condition.promql_condition.operator",
-      );
+      expect(paths(r)).not.toContain("query_condition.promql_condition.operator");
       expect(paths(r)).not.toContain("query_condition.promql_condition.value");
     });
 
@@ -394,9 +366,7 @@ describe("QueryConfig.schema — conditions tree", () => {
         _meta: { tab: "sql" },
         query_condition: { promql_condition: { operator: "", value: "" } },
       });
-      expect(paths(r)).not.toContain(
-        "query_condition.promql_condition.operator",
-      );
+      expect(paths(r)).not.toContain("query_condition.promql_condition.operator");
     });
 
     // ── Measure column (RESTORE of the red highlight main drew via
@@ -424,10 +394,9 @@ describe("QueryConfig.schema — conditions tree", () => {
     it("custom measure: blocks an empty aggregation column", () => {
       const r = parse(withColumn(""));
       expect(paths(r)).toContain("query_condition.aggregation.having.column");
-      expect(
-        r.error!.issues.find((i: any) => i.path.join(".").endsWith("column"))!
-          .message,
-      ).toBe(AGGREGATION_COLUMN_REQUIRED_MESSAGE);
+      expect(r.error!.issues.find((i: any) => i.path.join(".").endsWith("column"))!.message).toBe(
+        AGGREGATION_COLUMN_REQUIRED_MESSAGE,
+      );
     });
 
     // Parity with the old `!col || col.trim() === ''` predicate.
@@ -515,10 +484,9 @@ describe("QueryConfig.schema — conditions tree", () => {
         },
       });
       expect(paths(r)).toContain("query_condition.aggregation.having.value");
-      expect(
-        r.error!.issues.find((i: any) => i.path.join(".").endsWith("value"))!
-          .message,
-      ).toBe(CONDITION_VALUE_REQUIRED_MESSAGE);
+      expect(r.error!.issues.find((i: any) => i.path.join(".").endsWith("value"))!.message).toBe(
+        CONDITION_VALUE_REQUIRED_MESSAGE,
+      );
     });
 
     // PARITY (pre-migration AlertSettings.validate(): "if any are added, they
@@ -594,7 +562,12 @@ describe("QueryConfig.schema — conditions tree", () => {
 
     it("custom measure with a group-by + value passes", () => {
       const r = parse({
-        _meta: { selectedFunction: "avg", aggregationEnabled: true, isEventBased: true, hasGroupBy: true },
+        _meta: {
+          selectedFunction: "avg",
+          aggregationEnabled: true,
+          isEventBased: true,
+          hasGroupBy: true,
+        },
         logGroupBy: ["field1"],
         query_condition: {
           aggregation: {
@@ -627,9 +600,7 @@ describe("QueryConfig.schema — conditions tree", () => {
           conditions: group([leaf({ column: "" })]),
         },
       });
-      expect(paths(r)).toContain(
-        "query_condition.conditions.conditions.0.column",
-      );
+      expect(paths(r)).toContain("query_condition.conditions.conditions.0.column");
     });
 
     it("conditions tree is validated even in realtime custom mode", () => {
@@ -637,9 +608,7 @@ describe("QueryConfig.schema — conditions tree", () => {
         _meta: { isRealTime: "true" },
         query_condition: { conditions: group([leaf({ value: "" })]) },
       });
-      expect(paths(r)).toContain(
-        "query_condition.conditions.conditions.0.value",
-      );
+      expect(paths(r)).toContain("query_condition.conditions.conditions.0.value");
     });
   });
 

@@ -15,13 +15,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="flex flex-col h-full p-0">
+  <div class="flex h-full flex-col p-0">
     <!-- Full-page Import View -->
     <ImportModelPricing
       v-if="showImportModelPricingPage"
-      :existing-models="
-        models.filter((m: any) => !isReadOnly(m)).map((m: any) => m.name)
-      "
+      :existing-models="models.filter((m: any) => !isReadOnly(m)).map((m: any) => m.name)"
       @cancel:hideform="showImportModelPricingPage = false"
       @update:list="fetchModels"
     />
@@ -36,342 +34,329 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :subtitle="t('settings.modelPricingList.subtitle')"
       bleed
     >
-        <template #title>
-          {{ t("modelPricing.header") }}
-          <OButton
-            variant="ghost"
-            size="icon-sm"
-            class="-ml-1"
-            data-test="model-pricing-info-btn"
-          >
-            <OIcon name="info-outline" size="sm" />
-            <OTooltip :content="t('modelPricing.matchingPriorityTooltip')" />
-          </OButton>
-        </template>
-        <template #actions>
-          <OButton
-            variant="outline"
-            size="sm"
-            :loading="refreshing"
-            @click="refreshBuiltIn"
-            data-test="model-pricing-refresh-btn"
-          >
-            {{ t("modelPricing.refresh") }}
-          </OButton>
-          <OButton
-            variant="outline"
-            size="sm"
-            @click="showTestMatchDialog = true"
-            data-test="model-pricing-test-match-btn"
-          >
-            {{ t("modelPricing.testBtn") }}
-          </OButton>
-          <OButton
-            variant="outline"
-            size="sm"
-            @click="openImport"
-            data-test="model-pricing-import-btn"
-          >
-            {{ t("modelPricing.importBtn") }}
-          </OButton>
-          <OButton
-            variant="primary"
-            size="sm"
-            @click="openEditor(null)"
-            data-test="model-pricing-add-btn"
-          >
-            {{ t("modelPricing.newModel") }}
-          </OButton>
-        </template>
+      <template #title>
+        {{ t("modelPricing.header") }}
+        <OButton variant="ghost" size="icon-sm" class="-ml-1" data-test="model-pricing-info-btn">
+          <OIcon name="info-outline" size="sm" />
+          <OTooltip :content="t('modelPricing.matchingPriorityTooltip')" />
+        </OButton>
+      </template>
+      <template #actions>
+        <OButton
+          variant="outline"
+          size="sm"
+          :loading="refreshing"
+          @click="refreshBuiltIn"
+          data-test="model-pricing-refresh-btn"
+        >
+          {{ t("modelPricing.refresh") }}
+        </OButton>
+        <OButton
+          variant="outline"
+          size="sm"
+          @click="showTestMatchDialog = true"
+          data-test="model-pricing-test-match-btn"
+        >
+          {{ t("modelPricing.testBtn") }}
+        </OButton>
+        <OButton
+          variant="outline"
+          size="sm"
+          @click="openImport"
+          data-test="model-pricing-import-btn"
+        >
+          {{ t("modelPricing.importBtn") }}
+        </OButton>
+        <OButton
+          variant="primary"
+          size="sm"
+          @click="openEditor(null)"
+          data-test="model-pricing-add-btn"
+        >
+          {{ t("modelPricing.newModel") }}
+        </OButton>
+      </template>
 
       <!-- List Table -->
-      <div class="bg-card-glass-bg flex-1 min-h-0 overflow-hidden">
-      <OTable
-        ref="qTableRef"
-        :frame="false"
-        data-test="model-pricing-list-table"
-        :data="filteredModels"
-        :columns="columns"
-        row-key="id"
-        :loading="loading"
-        :selected-ids="selectedIds"
-        selection="multiple"
-        pagination="client"
-        :page-size="20"
-        :page-size-options="[20, 50, 100, 250, 500]"
-        sorting="client"
-        filter-mode="client"
-        :default-columns="false"
-        :enable-column-resize="true"
-        :persist-columns="true"
-        table-id="settings-model-pricing"
-        :show-global-filter="false"
-        tree
-        tree-column-id="name"
-        :get-row-warning="(row: any) => !!(row.children?.length && shadowingParentNames.has(row.name))"
-        @update:selected-ids="handleSelectedIdsUpdate"
-      >
-        <!-- Toolbar: Built-in/Custom tabs + search -->
-        <template #toolbar>
-          <div class="flex items-center gap-2 w-full">
-            <div class="app-tabs-container h-9">
-              <app-tabs
-                class="tabs-selection-container"
-                :tabs="tabOptions"
-                v-model:active-tab="selectedTab"
-                @update:active-tab="onTabChange"
+      <div class="bg-card-glass-bg min-h-0 flex-1 overflow-hidden">
+        <OTable
+          ref="qTableRef"
+          :frame="false"
+          data-test="model-pricing-list-table"
+          :data="filteredModels"
+          :columns="columns"
+          row-key="id"
+          :loading="loading"
+          :selected-ids="selectedIds"
+          selection="multiple"
+          pagination="client"
+          :page-size="20"
+          :page-size-options="[20, 50, 100, 250, 500]"
+          sorting="client"
+          filter-mode="client"
+          :default-columns="false"
+          :enable-column-resize="true"
+          :persist-columns="true"
+          table-id="settings-model-pricing"
+          :show-global-filter="false"
+          tree
+          tree-column-id="name"
+          :get-row-warning="
+            (row: any) => !!(row.children?.length && shadowingParentNames.has(row.name))
+          "
+          @update:selected-ids="handleSelectedIdsUpdate"
+        >
+          <!-- Toolbar: Built-in/Custom tabs + search -->
+          <template #toolbar>
+            <div class="flex w-full items-center gap-2">
+              <div class="app-tabs-container h-9">
+                <AppTabs
+                  class="tabs-selection-container"
+                  :tabs="tabOptions"
+                  v-model:active-tab="selectedTab"
+                  @update:active-tab="onTabChange"
+                />
+              </div>
+              <OSearchInput
+                v-model="filterQuery"
+                class="ml-auto w-64"
+                :placeholder="t('modelPricing.searchPlaceholder')"
               />
             </div>
-            <OSearchInput
-              v-model="filterQuery"
-              class="ml-auto w-64"
-              :placeholder="t('modelPricing.searchPlaceholder')"
-            />
-          </div>
-        </template>
-        <template #toolbar-trailing>
-          <OButton
-            variant="outline"
-            size="icon-sm"
-            icon-left="refresh"
-            :loading="loading"
-            data-test="model-pricing-list-refresh-btn"
-            @click="fetchModels"
-          >
-            <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="modelPricingRefresh" />
-          </OButton>
-        </template>
-        <template #tree-warning="{ row }">
-          <div class="flex items-center gap-2 py-1 text-sm leading-none">
-            <OIcon name="warning-amber" size="sm" class="text-status-warning-text opacity-85" />
-            <span class="leading-tight">
-              {{
-                t("modelPricing.shadowedWarningBanner", { name: row.name })
-              }}
-            </span>
-          </div>
-        </template>
-        <template #cell-name="{ row }">
-          <div class="flex items-center flex-nowrap relative z-2 min-h-6">
-            <span
-              v-if="getSource(row) === 'built_in'"
-              class="shrink-0 cursor-default inline-flex mr-1"
-            >
-              <img
-                :src="ooLogo"
-                class="w-4 h-4"
-                alt="OpenObserve"
-              />
-              <OTooltip side="top" align="center" :content="t('modelPricing.sourceBuiltIn')" />
-            </span>
-            <span
-              v-else-if="
-                getSource(row) === 'meta_org' ||
-                (getSource(row) === 'org' &&
-                  row.org_id !== orgIdentifier)
-              "
-              class="shrink-0 cursor-default inline-flex mr-1"
-            >
-              <OIcon
-                name="corporate-fare"
-                size="sm"
-                class="text-text-secondary"
-               />
-              <OTooltip side="top" align="center" :content="t('modelPricing.sourceInherited')" />
-            </span>
-            <span
-              v-else
-              class="shrink-0 cursor-default inline-flex mr-1"
-            >
-              <OIcon
-                name="person"
-                size="sm"
-                class="text-text-secondary"
-               />
-              <OTooltip side="top" align="center" :content="t('modelPricing.sourceCustom')" />
-            </span>
-            <div class="truncate w-full block">{{ row.name }}</div>
-          </div>
-        </template>
-        <template #cell-match_pattern="{ row }">
-          <div class="flex items-center gap-1 min-w-0">
-            <code
-              class="text-xs block max-w-full bg-surface-subtle border border-card-glass-border py-0.5 px-1.5 rounded-default text-inherit"
-              :class="{ 'opacity-50 [text-decoration:line-through] [text-decoration-color:currentColor]': isChildRow(row) }"
-              >{{ row.match_pattern }}</code
-            >
-            <OIcon
-              v-if="isChildRow(row)"
-              name="warning-amber"
-              size="xs"
-              class="shrink-0 text-status-warning-text opacity-85"
-            >
-              <OTooltip side="top" align="center" :content="t('modelPricing.shadowedTooltip', { name: getParentName(row) })" />
-            </OIcon>
-          </div>
-        </template>
-        <template #cell-pricing="{ row }">
-          <div class="flex flex-wrap gap-1">
-            <template
-              v-if="
-                getDefaultTier(row) &&
-                Object.keys(getDefaultTier(row).prices || {}).length
-              "
-            >
-              <ODimensionChip
-                v-for="(price, key) in getVisiblePrices(row)"
-                :key="key"
-                :dim-key="key as string"
-                :key-label="formatPriceKey(key as string)"
-                :value="formatPerMillion(price as number)"
-              />
-              <OTag
-                v-if="getOverflowCount(row) > 0"
-                type="countChip"
-                value="neutral"
-                clickable
-                @click.stop="openPricingDialog(row)"
-              >
-                +{{ getOverflowCount(row) }}
-                {{ t("modelPricing.overflowMore") }}
-                <OTooltip>
-                  <template #content>
-                    <div class="min-w-60">
-                      <div class="font-bold text-compact mb-0.75">
-                        {{ row.name }}
-                      </div>
-                      <table class="w-full border-collapse">
-                        <thead>
-                          <tr>
-                            <th class="text-2xs font-semibold text-table-header-text bg-table-header-bg text-left pt-0 pb-1 pl-0 pr-4 border-b border-table-header-border">{{ t("modelPricing.usageType") }}</th>
-                            <th class="text-2xs font-semibold text-table-header-text bg-table-header-bg text-right pt-0 pb-1 pl-0 pr-0 border-b border-table-header-border">
-                              {{ t("modelPricing.colPricingSimple") }}
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          <tr
-                            v-for="[key, price] in sortedPriceEntries(
-                              getDefaultTier(row)?.prices || {},
-                            )"
-                            :key="key"
-                          >
-                            <td class="text-xs py-0.5 pl-0 pr-4">{{ formatPriceKey(key) }}</td>
-                            <td class="text-xs py-0.5 pl-0 pr-0 text-right font-medium">{{ formatPerMillion(price) }}</td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
-                  </template>
-                </OTooltip>
-              </OTag>
-            </template>
-            <span v-else class="text-text-muted">&mdash;</span>
-          </div>
-        </template>
-        <template #cell-actions="{ row }">
-          <div class="flex items-center gap-1 justify-end">
-            <template v-if="!isReadOnly(row)">
-              <OButton
-                :variant="
-                  row.enabled ? 'ghost-destructive' : 'ghost-success'
-                "
-                size="icon-sm"
-                :title="
-                  row.enabled
-                    ? t('modelPricing.actionDisable')
-                    : t('modelPricing.actionEnable')
-                "
-                @click.stop="toggleEnabled(row, !row.enabled)"
-                data-test="model-pricing-toggle-btn"
-                :data-row-action="row.enabled ? 'pause' : 'resume'"
-                :icon-left="row.enabled ? 'pause' : 'play-arrow'"
-              />
-              <OButton
-                variant="ghost"
-                size="icon-sm"
-                :title="t('modelPricing.actionEdit')"
-                @click.stop="openEditor(row)"
-                data-test="model-pricing-edit-btn"
-                data-row-action="edit"
-                icon-left="edit"
-              />
-              <OButton
-                variant="ghost-destructive"
-                size="icon-sm"
-                :title="t('modelPricing.actionDelete')"
-                @click.stop="confirmDelete(row)"
-                data-test="model-pricing-delete-btn"
-                data-row-action="delete"
-                icon-left="delete"
-              />
-              <OButton
-                variant="ghost"
-                size="icon-sm"
-                :title="t('modelPricing.actionDuplicate')"
-                @click.stop="duplicateModel(row)"
-                data-test="model-pricing-duplicate-btn"
-                data-row-action="duplicate"
-                icon-left="content-copy"
-              />
-            </template>
-            <template v-else>
-              <OButton
-                variant="ghost"
-                size="icon-sm"
-                :title="t('modelPricing.actionClone')"
-                @click.stop="duplicateModel(row)"
-                data-test="model-pricing-clone-btn"
-                data-row-action="duplicate"
-                icon-left="content-copy"
-              />
-            </template>
-          </div>
-        </template>
-
-        <template #empty>
-          <OEmptyState
-            size="hero"
-            preset="no-model-pricing"
-            :filtered="isFiltered"
-            data-test="model-pricing-empty-state"
-            @action="(id) => id === 'clear-filters' ? clearFilters() : openEditor(null)"
-          />
-        </template>
-
-        <template #bottom>
-          <div class="flex items-center w-full h-12 gap-x-2">
-            <div
-              class="text-xs font-normal flex items-center w-25"
-            >
-              {{ t("modelPricing.modelsCount", { count: resultTotal }) }}
-            </div>
+          </template>
+          <template #toolbar-trailing>
             <OButton
-              v-if="selectedCount > 0"
-              data-test="model-pricing-export-selected-btn"
               variant="outline"
-              size="sm"
-              @click="exportSelected"
+              size="icon-sm"
+              icon-left="refresh"
+              :loading="loading"
+              data-test="model-pricing-list-refresh-btn"
+              @click="fetchModels"
             >
-              <template #icon-left
-                ><OIcon name="download" size="xs"
-              /></template>
-              {{ t("modelPricing.exportSelected", { count: selectedCount }) }}
+              <OTooltip
+                side="bottom"
+                :content="t('common.refresh')"
+                shortcut-id="modelPricingRefresh"
+              />
             </OButton>
-            <OButton
-              v-if="selectedCount > 0 && selectedIdsOnlyContainsOwn"
-              data-test="model-pricing-delete-selected-btn"
-              variant="outline-destructive"
-              size="sm"
-              :loading="bulkDeleteLoading"
-              @click="confirmDeleteSelected"
-              icon-left="delete"
-            >
-              {{ t("modelPricing.deleteSelected", { count: selectedCount }) }}
-            </OButton>
-          </div>
-        </template>
-      </OTable>
+          </template>
+          <template #tree-warning="{ row }">
+            <div class="flex items-center gap-2 py-1 text-sm leading-none">
+              <OIcon name="warning-amber" size="sm" class="text-status-warning-text opacity-85" />
+              <span class="leading-tight">
+                {{ t("modelPricing.shadowedWarningBanner", { name: row.name }) }}
+              </span>
+            </div>
+          </template>
+          <template #cell-name="{ row }">
+            <div class="relative z-2 flex min-h-6 flex-nowrap items-center">
+              <span
+                v-if="getSource(row) === 'built_in'"
+                class="mr-1 inline-flex shrink-0 cursor-default"
+              >
+                <img :src="ooLogo" class="h-4 w-4" alt="OpenObserve" />
+                <OTooltip side="top" align="center" :content="t('modelPricing.sourceBuiltIn')" />
+              </span>
+              <span
+                v-else-if="
+                  getSource(row) === 'meta_org' ||
+                  (getSource(row) === 'org' && row.org_id !== orgIdentifier)
+                "
+                class="mr-1 inline-flex shrink-0 cursor-default"
+              >
+                <OIcon name="corporate-fare" size="sm" class="text-text-secondary" />
+                <OTooltip side="top" align="center" :content="t('modelPricing.sourceInherited')" />
+              </span>
+              <span v-else class="mr-1 inline-flex shrink-0 cursor-default">
+                <OIcon name="person" size="sm" class="text-text-secondary" />
+                <OTooltip side="top" align="center" :content="t('modelPricing.sourceCustom')" />
+              </span>
+              <div class="block w-full truncate">{{ row.name }}</div>
+            </div>
+          </template>
+          <template #cell-match_pattern="{ row }">
+            <div class="flex min-w-0 items-center gap-1">
+              <code
+                class="bg-surface-subtle border-card-glass-border rounded-default block max-w-full border px-1.5 py-0.5 text-xs text-inherit"
+                :class="{
+                  '[text-decoration-color:currentColor] opacity-50 [text-decoration:line-through]':
+                    isChildRow(row),
+                }"
+                >{{ row.match_pattern }}</code
+              >
+              <OIcon
+                v-if="isChildRow(row)"
+                name="warning-amber"
+                size="xs"
+                class="text-status-warning-text shrink-0 opacity-85"
+              >
+                <OTooltip
+                  side="top"
+                  align="center"
+                  :content="t('modelPricing.shadowedTooltip', { name: getParentName(row) })"
+                />
+              </OIcon>
+            </div>
+          </template>
+          <template #cell-pricing="{ row }">
+            <div class="flex flex-wrap gap-1">
+              <template
+                v-if="getDefaultTier(row) && Object.keys(getDefaultTier(row).prices || {}).length"
+              >
+                <ODimensionChip
+                  v-for="(price, key) in getVisiblePrices(row)"
+                  :key="key"
+                  :dim-key="key as string"
+                  :key-label="formatPriceKey(key as string)"
+                  :value="formatPerMillion(price as number)"
+                />
+                <OTag
+                  v-if="getOverflowCount(row) > 0"
+                  type="countChip"
+                  value="neutral"
+                  clickable
+                  @click.stop="openPricingDialog(row)"
+                >
+                  +{{ getOverflowCount(row) }}
+                  {{ t("modelPricing.overflowMore") }}
+                  <OTooltip>
+                    <template #content>
+                      <div class="min-w-60">
+                        <div class="text-compact mb-0.75 font-bold">
+                          {{ row.name }}
+                        </div>
+                        <table class="w-full border-collapse">
+                          <thead>
+                            <tr>
+                              <th
+                                class="text-2xs text-table-header-text bg-table-header-bg border-table-header-border border-b pt-0 pr-4 pb-1 pl-0 text-left font-semibold"
+                              >
+                                {{ t("modelPricing.usageType") }}
+                              </th>
+                              <th
+                                class="text-2xs text-table-header-text bg-table-header-bg border-table-header-border border-b pt-0 pr-0 pb-1 pl-0 text-right font-semibold"
+                              >
+                                {{ t("modelPricing.colPricingSimple") }}
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr
+                              v-for="[key, price] in sortedPriceEntries(
+                                getDefaultTier(row)?.prices || {},
+                              )"
+                              :key="key"
+                            >
+                              <td class="py-0.5 pr-4 pl-0 text-xs">{{ formatPriceKey(key) }}</td>
+                              <td class="py-0.5 pr-0 pl-0 text-right text-xs font-medium">
+                                {{ formatPerMillion(price) }}
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </template>
+                  </OTooltip>
+                </OTag>
+              </template>
+              <span v-else class="text-text-muted">&mdash;</span>
+            </div>
+          </template>
+          <template #cell-actions="{ row }">
+            <div class="flex items-center justify-end gap-1">
+              <template v-if="!isReadOnly(row)">
+                <OButton
+                  :variant="row.enabled ? 'ghost-destructive' : 'ghost-success'"
+                  size="icon-sm"
+                  :title="
+                    row.enabled ? t('modelPricing.actionDisable') : t('modelPricing.actionEnable')
+                  "
+                  @click.stop="toggleEnabled(row, !row.enabled)"
+                  data-test="model-pricing-toggle-btn"
+                  :data-row-action="row.enabled ? 'pause' : 'resume'"
+                  :icon-left="row.enabled ? 'pause' : 'play-arrow'"
+                />
+                <OButton
+                  variant="ghost"
+                  size="icon-sm"
+                  :title="t('modelPricing.actionEdit')"
+                  @click.stop="openEditor(row)"
+                  data-test="model-pricing-edit-btn"
+                  data-row-action="edit"
+                  icon-left="edit"
+                />
+                <OButton
+                  variant="ghost-destructive"
+                  size="icon-sm"
+                  :title="t('modelPricing.actionDelete')"
+                  @click.stop="confirmDelete(row)"
+                  data-test="model-pricing-delete-btn"
+                  data-row-action="delete"
+                  icon-left="delete"
+                />
+                <OButton
+                  variant="ghost"
+                  size="icon-sm"
+                  :title="t('modelPricing.actionDuplicate')"
+                  @click.stop="duplicateModel(row)"
+                  data-test="model-pricing-duplicate-btn"
+                  data-row-action="duplicate"
+                  icon-left="content-copy"
+                />
+              </template>
+              <template v-else>
+                <OButton
+                  variant="ghost"
+                  size="icon-sm"
+                  :title="t('modelPricing.actionClone')"
+                  @click.stop="duplicateModel(row)"
+                  data-test="model-pricing-clone-btn"
+                  data-row-action="duplicate"
+                  icon-left="content-copy"
+                />
+              </template>
+            </div>
+          </template>
+
+          <template #empty>
+            <OEmptyState
+              size="hero"
+              preset="no-model-pricing"
+              :filtered="isFiltered"
+              data-test="model-pricing-empty-state"
+              @action="(id) => (id === 'clear-filters' ? clearFilters() : openEditor(null))"
+            />
+          </template>
+
+          <template #bottom>
+            <div class="flex h-12 w-full items-center gap-x-2">
+              <div class="flex w-25 items-center text-xs font-normal">
+                {{ t("modelPricing.modelsCount", { count: resultTotal }) }}
+              </div>
+              <OButton
+                v-if="selectedCount > 0"
+                data-test="model-pricing-export-selected-btn"
+                variant="outline"
+                size="sm"
+                @click="exportSelected"
+              >
+                <template #icon-left><OIcon name="download" size="xs" /></template>
+                {{ t("modelPricing.exportSelected", { count: selectedCount }) }}
+              </OButton>
+              <OButton
+                v-if="selectedCount > 0 && selectedIdsOnlyContainsOwn"
+                data-test="model-pricing-delete-selected-btn"
+                variant="outline-destructive"
+                size="sm"
+                :loading="bulkDeleteLoading"
+                @click="confirmDeleteSelected"
+                icon-left="delete"
+              >
+                {{ t("modelPricing.deleteSelected", { count: selectedCount }) }}
+              </OButton>
+            </div>
+          </template>
+        </OTable>
       </div>
     </OPageLayout>
     <!-- end v-if="!showImportModelPricingPage" -->
@@ -388,74 +373,65 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Source (built-in / inherited / custom) indicator trails on the right. -->
       <template #header-right>
         <span
-            v-if="getSource(pricingDialogRow) === 'built_in'"
-            class="shrink-0 cursor-default inline-flex"
-          >
-            <img
-              :src="ooLogo"
-              class="w-4.5 h-4.5"
-              alt="OpenObserve"
-            />
-            <OTooltip side="top" align="center" :content="t('modelPricing.sourceBuiltIn')" />
-          </span>
-          <span
-            v-else-if="
-              pricingDialogRow &&
-              (getSource(pricingDialogRow) === 'meta_org' ||
-                (getSource(pricingDialogRow) === 'org' &&
-                  pricingDialogRow.org_id !== orgIdentifier))
-            "
-            class="shrink-0 cursor-default inline-flex"
-          >
-            <OIcon
-              name="corporate-fare"
-              size="sm"
-              class="text-text-secondary"
-             />
-            <OTooltip side="top" align="center" :content="t('modelPricing.sourceInherited')" />
-          </span>
-          <span
-            v-else
-            class="shrink-0 cursor-default inline-flex"
-          >
-            <OIcon
-              name="person"
-              size="sm"
-              class="text-text-secondary"
-             />
-            <OTooltip side="top" align="center" :content="t('modelPricing.sourceCustom')" />
-          </span>
+          v-if="getSource(pricingDialogRow) === 'built_in'"
+          class="inline-flex shrink-0 cursor-default"
+        >
+          <img :src="ooLogo" class="h-4.5 w-4.5" alt="OpenObserve" />
+          <OTooltip side="top" align="center" :content="t('modelPricing.sourceBuiltIn')" />
+        </span>
+        <span
+          v-else-if="
+            pricingDialogRow &&
+            (getSource(pricingDialogRow) === 'meta_org' ||
+              (getSource(pricingDialogRow) === 'org' && pricingDialogRow.org_id !== orgIdentifier))
+          "
+          class="inline-flex shrink-0 cursor-default"
+        >
+          <OIcon name="corporate-fare" size="sm" class="text-text-secondary" />
+          <OTooltip side="top" align="center" :content="t('modelPricing.sourceInherited')" />
+        </span>
+        <span v-else class="inline-flex shrink-0 cursor-default">
+          <OIcon name="person" size="sm" class="text-text-secondary" />
+          <OTooltip side="top" align="center" :content="t('modelPricing.sourceCustom')" />
+        </span>
       </template>
 
       <div class="flex-1 overflow-y-auto">
         <div v-if="pricingDialogRow">
           <div class="mb-4">
-            <div class="text-xs font-semibold mb-1.5 text-text-secondary">
+            <div class="text-text-secondary mb-1.5 text-xs font-semibold">
               {{ t("modelPricing.colPattern") }}
             </div>
-            <code class="text-xs block bg-surface-subtle border border-card-glass-border py-0.5 px-1.5 rounded-default text-inherit text-compact px-2.5 py-1.5 whitespace-pre-wrap break-all max-h-75 overflow-y-auto">{{
-              pricingDialogRow.match_pattern
-            }}</code>
+            <code
+              class="bg-surface-subtle border-card-glass-border rounded-default text-compact block max-h-75 overflow-y-auto border px-1.5 px-2.5 py-0.5 py-1.5 text-xs break-all whitespace-pre-wrap text-inherit"
+              >{{ pricingDialogRow.match_pattern }}</code
+            >
           </div>
           <OSeparator class="mb-4" />
 
           <div>
-            <div class="text-xs font-semibold mb-1.5 text-text-secondary mt-2 pricing-section-label">
+            <div
+              class="text-text-secondary pricing-section-label mt-2 mb-1.5 text-xs font-semibold"
+            >
               {{ t("modelPricing.colPricing") }}
             </div>
             <div
-              v-if="
-                sortedPriceEntries(
-                  getDefaultTier(pricingDialogRow)?.prices || {},
-                ).length
-              "
-              class="mt-2 border border-card-glass-border rounded-default overflow-hidden"
+              v-if="sortedPriceEntries(getDefaultTier(pricingDialogRow)?.prices || {}).length"
+              class="border-card-glass-border rounded-default mt-2 overflow-hidden border"
             >
               <table class="w-full border-collapse">
                 <thead>
                   <tr>
-                    <th class="text-2xs font-semibold text-table-header-text text-left py-1.5 px-3.5 bg-table-header-bg border-b border-table-header-border">{{ t("modelPricing.usageType") }}</th>
-                    <th class="text-2xs font-semibold text-table-header-text text-right py-1.5 px-3.5 bg-table-header-bg border-b border-table-header-border">{{ t("modelPricing.colPricing") }}</th>
+                    <th
+                      class="text-2xs text-table-header-text bg-table-header-bg border-table-header-border border-b px-3.5 py-1.5 text-left font-semibold"
+                    >
+                      {{ t("modelPricing.usageType") }}
+                    </th>
+                    <th
+                      class="text-2xs text-table-header-text bg-table-header-bg border-table-header-border border-b px-3.5 py-1.5 text-right font-semibold"
+                    >
+                      {{ t("modelPricing.colPricing") }}
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -466,8 +442,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :key="key"
                     class="last:[&>td]:border-b-0"
                   >
-                    <td class="text-compact py-2 px-3.5 border-b border-table-row-divider">{{ formatPriceKey(key) }}</td>
-                    <td class="text-compact py-2 px-3.5 border-b border-table-row-divider text-right font-semibold">{{ formatPerMillion(price) }}</td>
+                    <td class="text-compact border-table-row-divider border-b px-3.5 py-2">
+                      {{ formatPriceKey(key) }}
+                    </td>
+                    <td
+                      class="text-compact border-table-row-divider border-b px-3.5 py-2 text-right font-semibold"
+                    >
+                      {{ formatPerMillion(price) }}
+                    </td>
                   </tr>
                 </tbody>
               </table>
@@ -478,7 +460,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </ODrawer>
 
-    <confirm-dialog
+    <ConfirmDialog
       v-model="confirmDialogMeta.show"
       :title="confirmDialogMeta.title"
       :message="confirmDialogMeta.message"
@@ -510,7 +492,7 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
-import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
@@ -660,9 +642,7 @@ function isReadOnly(model: any): boolean {
 // True when the search box or a non-"all" tab is narrowing the list. Drives
 // OEmptyState's `:filtered` so an empty result reads as "No model pricing found"
 // (with Clear filters) rather than the first-run "create your first" card.
-const isFiltered = computed(
-  () => !!filterQuery.value.trim() || selectedTab.value !== "all",
-);
+const isFiltered = computed(() => !!filterQuery.value.trim() || selectedTab.value !== "all");
 
 function clearFilters() {
   filterQuery.value = "";
@@ -675,17 +655,14 @@ const filteredModels = computed(() => {
     const search = filterQuery.value.toLowerCase();
     items = items.filter(
       (m: any) =>
-        m.name.toLowerCase().includes(search) ||
-        m.match_pattern.toLowerCase().includes(search),
+        m.name.toLowerCase().includes(search) || m.match_pattern.toLowerCase().includes(search),
     );
   }
 
   // Tab filtering
   const tab = selectedTab.value;
   if (tab === "org") {
-    items = items.filter(
-      (m: any) => getSource(m) === "org" && m.org_id === orgIdentifier.value,
-    );
+    items = items.filter((m: any) => getSource(m) === "org" && m.org_id === orgIdentifier.value);
   } else if (tab === "inherited") {
     items = items.filter(
       (m: any) =>
@@ -726,9 +703,7 @@ function getDefaultTier(model: any) {
 
 const PRICE_KEY_ORDER = ["input", "output"];
 
-function sortedPriceEntries(
-  prices: Record<string, number>,
-): [string, number][] {
+function sortedPriceEntries(prices: Record<string, number>): [string, number][] {
   return Object.entries(prices).sort(([a], [b]) => {
     const ai = PRICE_KEY_ORDER.indexOf(a);
     const bi = PRICE_KEY_ORDER.indexOf(b);
@@ -744,9 +719,7 @@ const MAX_VISIBLE_PRICES = 2;
 function getVisiblePrices(model: any): Record<string, number> {
   const tier = getDefaultTier(model);
   if (!tier?.prices) return {};
-  return Object.fromEntries(
-    sortedPriceEntries(tier.prices).slice(0, MAX_VISIBLE_PRICES),
-  );
+  return Object.fromEntries(sortedPriceEntries(tier.prices).slice(0, MAX_VISIBLE_PRICES));
 }
 
 /** How many prices are hidden behind the overflow "+N" chip. */
@@ -757,9 +730,7 @@ function getOverflowCount(model: any): number {
   return Math.max(0, total - MAX_VISIBLE_PRICES);
 }
 
-const orgIdentifier = computed(
-  () => store.state.selectedOrganization?.identifier || "",
-);
+const orgIdentifier = computed(() => store.state.selectedOrganization?.identifier || "");
 
 const ooLogo = computed(() =>
   isDark.value
@@ -769,8 +740,7 @@ const ooLogo = computed(() =>
 
 function notifyError(prefix: string, e: any) {
   if (e?.response?.status === 403) return;
-  const msg =
-    e?.response?.data?.message || e?.message || t("modelPricing.errUnknown");
+  const msg = e?.response?.data?.message || e?.message || t("modelPricing.errUnknown");
   toast({
     variant: "error",
     message: `${prefix}: ${msg}`,
@@ -810,8 +780,7 @@ async function toggleEnabled(model: any, enabled: boolean) {
     const updated = { ...clean, enabled };
     await modelPricingService.update(orgIdentifier.value, model.id, updated);
     await fetchModels();
-    const displayName =
-      model.name.length > 30 ? model.name.slice(0, 30) + "…" : model.name;
+    const displayName = model.name.length > 30 ? model.name.slice(0, 30) + "…" : model.name;
     const message = enabled
       ? t("modelPricing.modelEnabledNotif", { name: displayName })
       : t("modelPricing.modelDisabledNotif", { name: displayName });
@@ -880,9 +849,7 @@ async function refreshBuiltIn() {
 }
 
 function exportSelected() {
-  const selected = allModels.value.filter((m: any) =>
-    selectedIds.value.includes(m.id),
-  );
+  const selected = allModels.value.filter((m: any) => selectedIds.value.includes(m.id));
   if (selected.length === 0) {
     toast({
       variant: "warning",
@@ -961,6 +928,11 @@ onActivated(() => {
 });
 
 useShortcuts([
-  { id: "modelPricingRefresh", handler: () => { if (!isInputFocused()) fetchModels(); } },
+  {
+    id: "modelPricingRefresh",
+    handler: () => {
+      if (!isInputFocused()) fetchModels();
+    },
+  },
 ]);
 </script>

@@ -123,9 +123,7 @@ export default defineComponent({
       },
     ];
 
-    const histogramIntervalModel = ref<string | null>(
-      props.modelValue ?? null,
-    );
+    const histogramIntervalModel = ref<string | null>(props.modelValue ?? null);
 
     // on modelvalue change, update the model
     watch(
@@ -143,4 +141,3 @@ export default defineComponent({
   },
 });
 </script>
-

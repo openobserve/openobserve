@@ -28,32 +28,24 @@ export const makeGeneralSettingsSchema = (t: (_key: string) => string) =>
     scrape_interval: z
       .any()
       .refine((v) => !isEmpty(v), {
-        message:
-          t("settings.scrapeIntervalRequired") || "Scrape interval is required",
+        message: t("settings.scrapeIntervalRequired") || "Scrape interval is required",
       })
+      .refine((v) => isEmpty(v) || (!Number.isNaN(Number(v)) && Number(v) >= 0), {
+        message:
+          t("settings.scrapeIntervalPositive") || "Scrape interval must be a positive number",
+      }),
+    // Optional — only range-checked (1000..1000000) when a value is present.
+    max_series_per_query: z
+      .any()
       .refine(
-        (v) => isEmpty(v) || (!Number.isNaN(Number(v)) && Number(v) >= 0),
+        (v) =>
+          isEmpty(v) || (!Number.isNaN(Number(v)) && Number(v) >= 1000 && Number(v) <= 1000000),
         {
           message:
-            t("settings.scrapeIntervalPositive") ||
-            "Scrape interval must be a positive number",
+            t("settings.maxSeriesPerQueryValidation") ||
+            "Max series per query must be between 1000 and 1000000",
         },
       ),
-    // Optional — only range-checked (1000..1000000) when a value is present.
-    max_series_per_query: z.any().refine(
-      (v) =>
-        isEmpty(v) ||
-        (!Number.isNaN(Number(v)) &&
-          Number(v) >= 1000 &&
-          Number(v) <= 1000000),
-      {
-        message:
-          t("settings.maxSeriesPerQueryValidation") ||
-          "Max series per query must be between 1000 and 1000000",
-      },
-    ),
   });
 
-export type GeneralSettingsForm = z.infer<
-  ReturnType<typeof makeGeneralSettingsSchema>
->;
+export type GeneralSettingsForm = z.infer<ReturnType<typeof makeGeneralSettingsSchema>>;

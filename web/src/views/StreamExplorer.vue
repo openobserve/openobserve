@@ -30,7 +30,7 @@
         @pagination-change="onPaginationChange"
       >
         <template #empty>
-          <no-data />
+          <NoData />
         </template>
       </OTable>
     </div>
@@ -182,15 +182,12 @@ function buildSearch() {
       },
     };
 
-    var timestamps:
-      | {
-          startTime: number;
-          endTime: number;
-        }
-      | null =
+    var timestamps: {
+      startTime: number;
+      endTime: number;
+    } | null =
       queryData.value.dateTime.type === "relative"
-        ? getConsumableRelativeTime(queryData.value.dateTime.relativeTimePeriod) ||
-          null
+        ? getConsumableRelativeTime(queryData.value.dateTime.relativeTimePeriod) || null
         : cloneDeep(queryData.value.dateTime);
 
     if (streamData?.value?.stream_type === "enrichment_tables") {

@@ -13,7 +13,9 @@ vi.mock("@/views/Dashboards/RenderDashboardCharts.vue", () => ({
     template: '<div data-test="render-dashboard-charts"><slot /></div>',
     props: ["viewOnly", "dashboardData", "currentTimeObj", "searchType"],
     emits: ["variablesManagerReady"],
-    setup() { return { layoutUpdate: vi.fn() }; },
+    setup() {
+      return { layoutUpdate: vi.fn() };
+    },
   },
 }));
 
@@ -66,7 +68,9 @@ function createWrapper(props: Record<string, any> = {}) {
           template: '<div data-test="render-dashboard-charts"><slot /></div>',
           props: ["viewOnly", "dashboardData", "currentTimeObj", "searchType"],
           emits: ["variablesManagerReady"],
-          setup() { return { layoutUpdate: vi.fn() }; },
+          setup() {
+            return { layoutUpdate: vi.fn() };
+          },
         },
         OSpinner: { template: '<div data-test="spinner" />' },
       },

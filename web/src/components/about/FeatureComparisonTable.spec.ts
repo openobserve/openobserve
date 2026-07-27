@@ -78,9 +78,7 @@ describe("FeatureComparisonTable", () => {
       },
     });
 
-    expect(wrapper.text()).toContain(
-      "You're currently using OpenObserve Open Source Edition",
-    );
+    expect(wrapper.text()).toContain("You're currently using OpenObserve Open Source Edition");
   });
 
   it("should display enterprise message when build type is enterprise", () => {
@@ -99,9 +97,7 @@ describe("FeatureComparisonTable", () => {
       },
     });
 
-    expect(wrapper.text()).toContain(
-      "You're using OpenObserve Enterprise Edition",
-    );
+    expect(wrapper.text()).toContain("You're using OpenObserve Enterprise Edition");
   });
 
   it("should mark the current edition card as active for opensource build", () => {
@@ -111,7 +107,9 @@ describe("FeatureComparisonTable", () => {
       },
     });
 
-    const activeCards = wrapper.findAll('[data-test="feature-comparison-table-edition-card"][data-test-active="true"]');
+    const activeCards = wrapper.findAll(
+      '[data-test="feature-comparison-table-edition-card"][data-test-active="true"]',
+    );
     expect(activeCards).toHaveLength(1);
   });
 
@@ -131,7 +129,9 @@ describe("FeatureComparisonTable", () => {
       },
     });
 
-    const activeCards = wrapper.findAll('[data-test="feature-comparison-table-edition-card"][data-test-active="true"]');
+    const activeCards = wrapper.findAll(
+      '[data-test="feature-comparison-table-edition-card"][data-test-active="true"]',
+    );
     expect(activeCards).toHaveLength(1);
   });
 
@@ -223,12 +223,8 @@ describe("FeatureComparisonTable", () => {
     });
 
     // Cloud should not show opensource or enterprise-specific messages
-    expect(wrapper.text()).not.toContain(
-      "You're currently using OpenObserve Open Source Edition",
-    );
-    expect(wrapper.text()).not.toContain(
-      "You're using OpenObserve Enterprise Edition",
-    );
+    expect(wrapper.text()).not.toContain("You're currently using OpenObserve Open Source Edition");
+    expect(wrapper.text()).not.toContain("You're using OpenObserve Enterprise Edition");
   });
 
   it("should render edition card footer rows with license and support info", () => {
@@ -261,7 +257,9 @@ describe("FeatureComparisonTable", () => {
       },
     });
 
-    const currentBtn = wrapper.find('[data-test="feature-comparison-table-cta-btn"][data-test-cta="current"]');
+    const currentBtn = wrapper.find(
+      '[data-test="feature-comparison-table-cta-btn"][data-test-cta="current"]',
+    );
     expect(currentBtn.exists()).toBe(true);
     expect((currentBtn.element as HTMLButtonElement).disabled).toBe(true);
   });
@@ -273,7 +271,9 @@ describe("FeatureComparisonTable", () => {
       },
     });
 
-    const actionLinks = wrapper.findAll('[data-test="feature-comparison-table-cta-btn"][data-test-cta="action"]');
+    const actionLinks = wrapper.findAll(
+      '[data-test="feature-comparison-table-cta-btn"][data-test-cta="action"]',
+    );
     // opensource is current → 2 action links remain
     expect(actionLinks).toHaveLength(2);
     actionLinks.forEach((link) => {

@@ -17,44 +17,46 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import { convertPanelData } from "./convertPanelData";
 
 vi.mock("./convertPromQLData", () => ({
-  convertPromQLData: vi.fn().mockResolvedValue({ series: [], xAxis: [] })
+  convertPromQLData: vi.fn().mockResolvedValue({ series: [], xAxis: [] }),
 }));
 
 vi.mock("./convertSQLData", () => ({
   convertMultiSQLData: vi.fn().mockResolvedValue({ series: [], xAxis: [] }),
-  convertSQLData: vi.fn().mockResolvedValue({ series: [], xAxis: [] })
+  convertSQLData: vi.fn().mockResolvedValue({ series: [], xAxis: [] }),
 }));
 
 vi.mock("./convertTableData", () => ({
-  convertTableData: vi.fn().mockReturnValue({ columns: [], rows: [] })
+  convertTableData: vi.fn().mockReturnValue({ columns: [], rows: [] }),
 }));
 
 vi.mock("./convertPivotTableData", () => ({
-  convertPivotTableData: vi.fn().mockReturnValue({ columns: [], rows: [], pivoted: true })
+  convertPivotTableData: vi.fn().mockReturnValue({ columns: [], rows: [], pivoted: true }),
 }));
 
 vi.mock("./convertGeoMapData", () => ({
-  convertGeoMapData: vi.fn().mockReturnValue({ geoData: [] })
+  convertGeoMapData: vi.fn().mockReturnValue({ geoData: [] }),
 }));
 
 vi.mock("./convertMapsData", () => ({
-  convertMapsData: vi.fn().mockReturnValue({ mapData: [] })
+  convertMapsData: vi.fn().mockReturnValue({ mapData: [] }),
 }));
 
 vi.mock("./convertSankeyData", () => ({
-  convertSankeyData: vi.fn().mockReturnValue({ nodes: [], links: [] })
+  convertSankeyData: vi.fn().mockReturnValue({ nodes: [], links: [] }),
 }));
 
 vi.mock("./convertCustomChartData", () => ({
   runJavaScriptCode: vi.fn().mockResolvedValue({ customData: [] }),
-  validateUserCode: vi.fn().mockReturnValue(null)
+  validateUserCode: vi.fn().mockReturnValue(null),
 }));
 
 describe("convertPanelData", () => {
   const mockStore = {
-    state: { selectedOrganization: { identifier: "test-org" } }
+    state: { selectedOrganization: { identifier: "test-org" } },
   };
-  const mockChartPanelRef = { value: { getBoundingClientRect: () => ({ width: 800, height: 400 }) } };
+  const mockChartPanelRef = {
+    value: { getBoundingClientRect: () => ({ width: 800, height: 400 }) },
+  };
   const mockHoveredSeriesState = { value: null };
   const mockResultMetaData = {};
   const mockMetadata = {};
@@ -76,17 +78,27 @@ describe("convertPanelData", () => {
 
   describe("Chart Types", () => {
     const chartTypes = [
-      "area", "area-stacked", "bar", "h-bar", "stacked",
-      "heatmap", "h-stacked", "line", "pie", "donut",
-      "scatter", "metric", "gauge"
+      "area",
+      "area-stacked",
+      "bar",
+      "h-bar",
+      "stacked",
+      "heatmap",
+      "h-stacked",
+      "line",
+      "pie",
+      "donut",
+      "scatter",
+      "metric",
+      "gauge",
     ];
 
-    chartTypes.forEach(type => {
+    chartTypes.forEach((type) => {
       it(`should handle ${type} chart type with SQL query`, async () => {
         const panelSchema = {
           type,
           queryType: "sql",
-          queries: [{ query: "SELECT * FROM test", fields: mockQueryFields }]
+          queries: [{ query: "SELECT * FROM test", fields: mockQueryFields }],
         };
 
         const result = await convertPanelData(
@@ -98,19 +110,19 @@ describe("convertPanelData", () => {
           mockResultMetaData,
           mockMetadata,
           mockChartPanelStyle,
-          mockAnnotations
+          mockAnnotations,
         );
 
         expect(result.chartType).toBe(type);
-        expect(result).toHaveProperty('series');
-        expect(result).toHaveProperty('xAxis');
+        expect(result).toHaveProperty("series");
+        expect(result).toHaveProperty("xAxis");
       });
 
       it(`should handle ${type} chart type with PromQL query`, async () => {
         const panelSchema = {
           type,
           queryType: "promql",
-          queries: [{ query: "up", fields: mockQueryFields }]
+          queries: [{ query: "up", fields: mockQueryFields }],
         };
 
         const { convertPromQLData } = await import("./convertPromQLData");
@@ -123,7 +135,7 @@ describe("convertPanelData", () => {
           mockResultMetaData,
           mockMetadata,
           mockChartPanelStyle,
-          mockAnnotations
+          mockAnnotations,
         );
 
         expect(convertPromQLData).toHaveBeenCalledWith(
@@ -146,7 +158,7 @@ describe("convertPanelData", () => {
     it("should handle table chart type", async () => {
       const panelSchema = {
         type: "table",
-        queries: [{ query: "SELECT * FROM test" }]
+        queries: [{ query: "SELECT * FROM test" }],
       };
 
       const { convertTableData } = await import("./convertTableData");
@@ -159,13 +171,13 @@ describe("convertPanelData", () => {
         mockResultMetaData,
         mockMetadata,
         mockChartPanelStyle,
-        mockAnnotations
+        mockAnnotations,
       );
 
       expect(convertTableData).toHaveBeenCalledWith(panelSchema, mockData, mockStore);
       expect(result.chartType).toBe("table");
-      expect(result).toHaveProperty('columns');
-      expect(result).toHaveProperty('rows');
+      expect(result).toHaveProperty("columns");
+      expect(result).toHaveProperty("rows");
     });
   });
 
@@ -173,7 +185,7 @@ describe("convertPanelData", () => {
     it("should handle geomap chart type", async () => {
       const panelSchema = {
         type: "geomap",
-        queries: [{ query: "SELECT lat, lon FROM locations" }]
+        queries: [{ query: "SELECT lat, lon FROM locations" }],
       };
 
       const { convertGeoMapData } = await import("./convertGeoMapData");
@@ -186,12 +198,12 @@ describe("convertPanelData", () => {
         mockResultMetaData,
         mockMetadata,
         mockChartPanelStyle,
-        mockAnnotations
+        mockAnnotations,
       );
 
       expect(convertGeoMapData).toHaveBeenCalledWith(panelSchema, mockData);
       expect(result.chartType).toBe("geomap");
-      expect(result).toHaveProperty('geoData');
+      expect(result).toHaveProperty("geoData");
     });
   });
 
@@ -199,7 +211,7 @@ describe("convertPanelData", () => {
     it("should handle maps chart type", async () => {
       const panelSchema = {
         type: "maps",
-        queries: [{ query: "SELECT region, value FROM data" }]
+        queries: [{ query: "SELECT region, value FROM data" }],
       };
 
       const { convertMapsData } = await import("./convertMapsData");
@@ -212,12 +224,12 @@ describe("convertPanelData", () => {
         mockResultMetaData,
         mockMetadata,
         mockChartPanelStyle,
-        mockAnnotations
+        mockAnnotations,
       );
 
       expect(convertMapsData).toHaveBeenCalledWith(panelSchema, mockData);
       expect(result.chartType).toBe("maps");
-      expect(result).toHaveProperty('mapData');
+      expect(result).toHaveProperty("mapData");
     });
   });
 
@@ -225,7 +237,7 @@ describe("convertPanelData", () => {
     it("should handle sankey chart type", async () => {
       const panelSchema = {
         type: "sankey",
-        queries: [{ query: "SELECT source, target, value FROM flows" }]
+        queries: [{ query: "SELECT source, target, value FROM flows" }],
       };
 
       const { convertSankeyData } = await import("./convertSankeyData");
@@ -238,13 +250,13 @@ describe("convertPanelData", () => {
         mockResultMetaData,
         mockMetadata,
         mockChartPanelStyle,
-        mockAnnotations
+        mockAnnotations,
       );
 
       expect(convertSankeyData).toHaveBeenCalledWith(panelSchema, mockData);
       expect(result.chartType).toBe("sankey");
-      expect(result).toHaveProperty('nodes');
-      expect(result).toHaveProperty('links');
+      expect(result).toHaveProperty("nodes");
+      expect(result).toHaveProperty("links");
     });
   });
 
@@ -252,7 +264,7 @@ describe("convertPanelData", () => {
     it("should handle custom chart type with data", async () => {
       const panelSchema = {
         type: "custom_chart",
-        queries: [{ query: "SELECT * FROM test" }]
+        queries: [{ query: "SELECT * FROM test" }],
       };
 
       const { runJavaScriptCode } = await import("./convertCustomChartData");
@@ -265,18 +277,18 @@ describe("convertPanelData", () => {
         mockResultMetaData,
         mockMetadata,
         mockChartPanelStyle,
-        mockAnnotations
+        mockAnnotations,
       );
 
       expect(runJavaScriptCode).toHaveBeenCalledWith(panelSchema, mockData);
       expect(result.chartType).toBe("custom_chart");
-      expect(result).toHaveProperty('customData');
+      expect(result).toHaveProperty("customData");
     });
 
     it("should handle custom chart type with no data", async () => {
       const panelSchema = {
         type: "custom_chart",
-        queries: [{ query: "" }]
+        queries: [{ query: "" }],
       };
       const emptyData = [];
 
@@ -290,15 +302,15 @@ describe("convertPanelData", () => {
           mockResultMetaData,
           mockMetadata,
           mockChartPanelStyle,
-          mockAnnotations
-        )
+          mockAnnotations,
+        ),
       ).rejects.toThrow("No data found");
     });
 
     it("should handle custom chart type with invalid JavaScript result", async () => {
       const panelSchema = {
         type: "custom_chart",
-        queries: [{ query: "SELECT * FROM test" }]
+        queries: [{ query: "SELECT * FROM test" }],
       };
 
       const { runJavaScriptCode } = await import("./convertCustomChartData");
@@ -313,7 +325,7 @@ describe("convertPanelData", () => {
         mockResultMetaData,
         mockMetadata,
         mockChartPanelStyle,
-        mockAnnotations
+        mockAnnotations,
       );
 
       expect(result.chartType).toBe("custom_chart");
@@ -323,7 +335,7 @@ describe("convertPanelData", () => {
     it("should handle custom chart with empty data array but has query", async () => {
       const panelSchema = {
         type: "custom_chart",
-        queries: [{ query: "SELECT * FROM test" }]
+        queries: [{ query: "SELECT * FROM test" }],
       };
       const emptyData = [];
 
@@ -336,7 +348,7 @@ describe("convertPanelData", () => {
         mockResultMetaData,
         mockMetadata,
         mockChartPanelStyle,
-        mockAnnotations
+        mockAnnotations,
       );
 
       // Falls through to default case
@@ -346,7 +358,7 @@ describe("convertPanelData", () => {
     it("should handle custom chart with data array but empty first element", async () => {
       const panelSchema = {
         type: "custom_chart",
-        queries: [{ query: "SELECT * FROM test" }]
+        queries: [{ query: "SELECT * FROM test" }],
       };
       const dataWithEmptyFirstElement = [[]];
 
@@ -359,7 +371,7 @@ describe("convertPanelData", () => {
         mockResultMetaData,
         mockMetadata,
         mockChartPanelStyle,
-        mockAnnotations
+        mockAnnotations,
       );
 
       // Falls through to default case
@@ -369,7 +381,7 @@ describe("convertPanelData", () => {
     it("should handle custom chart with whitespace-only query", async () => {
       const panelSchema = {
         type: "custom_chart",
-        queries: [{ query: "   " }]
+        queries: [{ query: "   " }],
       };
       const emptyData = [];
 
@@ -383,14 +395,14 @@ describe("convertPanelData", () => {
           mockResultMetaData,
           mockMetadata,
           mockChartPanelStyle,
-          mockAnnotations
-        )
+          mockAnnotations,
+        ),
       ).rejects.toThrow("No data found");
     });
 
     it("should handle custom chart with missing queries", async () => {
       const panelSchema = {
-        type: "custom_chart"
+        type: "custom_chart",
       };
       const emptyData = [];
 
@@ -403,7 +415,7 @@ describe("convertPanelData", () => {
         mockResultMetaData,
         mockMetadata,
         mockChartPanelStyle,
-        mockAnnotations
+        mockAnnotations,
       );
 
       // Falls through to default case
@@ -413,7 +425,7 @@ describe("convertPanelData", () => {
     it("should handle custom chart with empty queries array", async () => {
       const panelSchema = {
         type: "custom_chart",
-        queries: []
+        queries: [],
       };
       const emptyData = [];
 
@@ -426,7 +438,7 @@ describe("convertPanelData", () => {
         mockResultMetaData,
         mockMetadata,
         mockChartPanelStyle,
-        mockAnnotations
+        mockAnnotations,
       );
 
       // Falls through to default case
@@ -436,7 +448,7 @@ describe("convertPanelData", () => {
     it("should handle custom chart with string result from JavaScript", async () => {
       const panelSchema = {
         type: "custom_chart",
-        queries: [{ query: "SELECT * FROM test" }]
+        queries: [{ query: "SELECT * FROM test" }],
       };
 
       const { runJavaScriptCode } = await import("./convertCustomChartData");
@@ -451,7 +463,7 @@ describe("convertPanelData", () => {
         mockResultMetaData,
         mockMetadata,
         mockChartPanelStyle,
-        mockAnnotations
+        mockAnnotations,
       );
 
       expect(result.chartType).toBe("custom_chart");
@@ -461,7 +473,7 @@ describe("convertPanelData", () => {
     it("should handle custom chart with number result from JavaScript", async () => {
       const panelSchema = {
         type: "custom_chart",
-        queries: [{ query: "SELECT * FROM test" }]
+        queries: [{ query: "SELECT * FROM test" }],
       };
 
       const { runJavaScriptCode } = await import("./convertCustomChartData");
@@ -476,7 +488,7 @@ describe("convertPanelData", () => {
         mockResultMetaData,
         mockMetadata,
         mockChartPanelStyle,
-        mockAnnotations
+        mockAnnotations,
       );
 
       expect(result.chartType).toBe("custom_chart");
@@ -486,7 +498,7 @@ describe("convertPanelData", () => {
     it("should handle custom chart with boolean result from JavaScript", async () => {
       const panelSchema = {
         type: "custom_chart",
-        queries: [{ query: "SELECT * FROM test" }]
+        queries: [{ query: "SELECT * FROM test" }],
       };
 
       const { runJavaScriptCode } = await import("./convertCustomChartData");
@@ -501,7 +513,7 @@ describe("convertPanelData", () => {
         mockResultMetaData,
         mockMetadata,
         mockChartPanelStyle,
-        mockAnnotations
+        mockAnnotations,
       );
 
       expect(result.chartType).toBe("custom_chart");
@@ -513,77 +525,7 @@ describe("convertPanelData", () => {
     it("should return empty object for unknown chart type", async () => {
       const panelSchema = {
         type: "unknown_type",
-        queries: [{ query: "SELECT * FROM test" }]
-      };
-
-      const result = await convertPanelData(
-        panelSchema,
-        mockData,
-        mockStore,
-        mockChartPanelRef,
-        mockHoveredSeriesState,
-        mockResultMetaData,
-        mockMetadata,
-        mockChartPanelStyle,
-        mockAnnotations
-      );
-
-      expect(result).toEqual({});
-    });
-  });
-
-  describe("Error Handling", () => {
-    it("should handle SQL conversion errors gracefully", async () => {
-      const panelSchema = {
-        type: "bar",
-        queryType: "sql",
-        queries: [{ query: "INVALID SQL", fields: mockQueryFields }]
-      };
-
-      const { convertMultiSQLData } = await import("./convertSQLData");
-      vi.mocked(convertMultiSQLData).mockRejectedValueOnce(new Error("SQL Error"));
-
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-
-      const result = await convertPanelData(
-        panelSchema,
-        mockData,
-        mockStore,
-        mockChartPanelRef,
-        mockHoveredSeriesState,
-        mockResultMetaData,
-        mockMetadata,
-        mockChartPanelStyle,
-        mockAnnotations
-      );
-
-      expect(consoleSpy).toHaveBeenCalled();
-      expect(result).toEqual({});
-      
-      consoleSpy.mockRestore();
-    });
-
-    it("should handle missing panel schema", async () => {
-      const result = await convertPanelData(
-        { type: 'unknown' },
-        mockData,
-        mockStore,
-        mockChartPanelRef,
-        mockHoveredSeriesState,
-        mockResultMetaData,
-        mockMetadata,
-        mockChartPanelStyle,
-        mockAnnotations
-      );
-
-      expect(result).toEqual({});
-    });
-
-    it("should handle loading state", async () => {
-      const panelSchema = {
-        type: "line",
-        queryType: "sql",
-        queries: [{ query: "SELECT * FROM test", fields: mockQueryFields }]
+        queries: [{ query: "SELECT * FROM test" }],
       };
 
       const result = await convertPanelData(
@@ -596,7 +538,77 @@ describe("convertPanelData", () => {
         mockMetadata,
         mockChartPanelStyle,
         mockAnnotations,
-        true
+      );
+
+      expect(result).toEqual({});
+    });
+  });
+
+  describe("Error Handling", () => {
+    it("should handle SQL conversion errors gracefully", async () => {
+      const panelSchema = {
+        type: "bar",
+        queryType: "sql",
+        queries: [{ query: "INVALID SQL", fields: mockQueryFields }],
+      };
+
+      const { convertMultiSQLData } = await import("./convertSQLData");
+      vi.mocked(convertMultiSQLData).mockRejectedValueOnce(new Error("SQL Error"));
+
+      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      const result = await convertPanelData(
+        panelSchema,
+        mockData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockResultMetaData,
+        mockMetadata,
+        mockChartPanelStyle,
+        mockAnnotations,
+      );
+
+      expect(consoleSpy).toHaveBeenCalled();
+      expect(result).toEqual({});
+
+      consoleSpy.mockRestore();
+    });
+
+    it("should handle missing panel schema", async () => {
+      const result = await convertPanelData(
+        { type: "unknown" },
+        mockData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockResultMetaData,
+        mockMetadata,
+        mockChartPanelStyle,
+        mockAnnotations,
+      );
+
+      expect(result).toEqual({});
+    });
+
+    it("should handle loading state", async () => {
+      const panelSchema = {
+        type: "line",
+        queryType: "sql",
+        queries: [{ query: "SELECT * FROM test", fields: mockQueryFields }],
+      };
+
+      const result = await convertPanelData(
+        panelSchema,
+        mockData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockResultMetaData,
+        mockMetadata,
+        mockChartPanelStyle,
+        mockAnnotations,
+        true,
       );
 
       expect(result.chartType).toBe("line");
@@ -608,7 +620,7 @@ describe("convertPanelData", () => {
       const panelSchema = {
         type: "area",
         queryType: "sql",
-        queries: [{ query: "SELECT time, value FROM metrics", fields: mockQueryFields }]
+        queries: [{ query: "SELECT time, value FROM metrics", fields: mockQueryFields }],
       };
 
       const { convertMultiSQLData } = await import("./convertSQLData");
@@ -622,7 +634,7 @@ describe("convertPanelData", () => {
         mockResultMetaData,
         mockMetadata,
         mockChartPanelStyle,
-        mockAnnotations
+        mockAnnotations,
       );
 
       expect(convertMultiSQLData).toHaveBeenCalledWith(
@@ -643,13 +655,13 @@ describe("convertPanelData", () => {
       const sqlPanelSchema = {
         type: "line",
         queryType: "sql",
-        queries: [{ query: "SELECT * FROM test", fields: mockQueryFields }]
+        queries: [{ query: "SELECT * FROM test", fields: mockQueryFields }],
       };
 
       const promqlPanelSchema = {
         type: "line",
         queryType: "promql",
-        queries: [{ query: "up", fields: mockQueryFields }]
+        queries: [{ query: "up", fields: mockQueryFields }],
       };
 
       const { convertMultiSQLData } = await import("./convertSQLData");
@@ -664,7 +676,7 @@ describe("convertPanelData", () => {
         mockResultMetaData,
         mockMetadata,
         mockChartPanelStyle,
-        mockAnnotations
+        mockAnnotations,
       );
 
       await convertPanelData(
@@ -676,7 +688,7 @@ describe("convertPanelData", () => {
         mockResultMetaData,
         mockMetadata,
         mockChartPanelStyle,
-        mockAnnotations
+        mockAnnotations,
       );
 
       expect(convertMultiSQLData).toHaveBeenCalled();
@@ -688,7 +700,7 @@ describe("convertPanelData", () => {
     it("should handle panel schema with null type", async () => {
       const panelSchema = {
         type: null,
-        queries: [{ query: "SELECT * FROM test" }]
+        queries: [{ query: "SELECT * FROM test" }],
       };
 
       const result = await convertPanelData(
@@ -700,7 +712,7 @@ describe("convertPanelData", () => {
         mockResultMetaData,
         mockMetadata,
         mockChartPanelStyle,
-        mockAnnotations
+        mockAnnotations,
       );
 
       expect(result).toEqual({});
@@ -708,7 +720,7 @@ describe("convertPanelData", () => {
 
     it("should handle panel schema with undefined type", async () => {
       const panelSchema = {
-        queries: [{ query: "SELECT * FROM test" }]
+        queries: [{ query: "SELECT * FROM test" }],
       };
 
       const result = await convertPanelData(
@@ -720,7 +732,7 @@ describe("convertPanelData", () => {
         mockResultMetaData,
         mockMetadata,
         mockChartPanelStyle,
-        mockAnnotations
+        mockAnnotations,
       );
 
       expect(result).toEqual({});
@@ -738,7 +750,7 @@ describe("convertPanelData", () => {
         mockResultMetaData,
         mockMetadata,
         mockChartPanelStyle,
-        mockAnnotations
+        mockAnnotations,
       );
 
       expect(result).toEqual({});
@@ -755,15 +767,15 @@ describe("convertPanelData", () => {
           mockResultMetaData,
           mockMetadata,
           mockChartPanelStyle,
-          mockAnnotations
-        )
+          mockAnnotations,
+        ),
       ).rejects.toThrow("Cannot read properties of null (reading 'type')");
     });
 
     it("should handle SQL charts without queryType specified", async () => {
       const panelSchema = {
         type: "line",
-        queries: [{ query: "SELECT * FROM test", fields: mockQueryFields }]
+        queries: [{ query: "SELECT * FROM test", fields: mockQueryFields }],
       };
 
       const { convertMultiSQLData } = await import("./convertSQLData");
@@ -776,7 +788,7 @@ describe("convertPanelData", () => {
         mockResultMetaData,
         mockMetadata,
         mockChartPanelStyle,
-        mockAnnotations
+        mockAnnotations,
       );
 
       expect(convertMultiSQLData).toHaveBeenCalled();
@@ -788,7 +800,7 @@ describe("convertPanelData", () => {
         type: "gauge",
         queryType: "promql",
         fields: { stream_type: "metrics" },
-        queries: [{ query: "up", fields: mockQueryFields }]
+        queries: [{ query: "up", fields: mockQueryFields }],
       };
 
       const { convertPromQLData } = await import("./convertPromQLData");
@@ -801,7 +813,7 @@ describe("convertPanelData", () => {
         mockResultMetaData,
         mockMetadata,
         mockChartPanelStyle,
-        mockAnnotations
+        mockAnnotations,
       );
 
       expect(convertPromQLData).toHaveBeenCalled();
@@ -811,7 +823,7 @@ describe("convertPanelData", () => {
     it("should handle custom chart with undefined result from JavaScript", async () => {
       const panelSchema = {
         type: "custom_chart",
-        queries: [{ query: "SELECT * FROM test" }]
+        queries: [{ query: "SELECT * FROM test" }],
       };
 
       const { runJavaScriptCode } = await import("./convertCustomChartData");
@@ -826,7 +838,7 @@ describe("convertPanelData", () => {
         mockResultMetaData,
         mockMetadata,
         mockChartPanelStyle,
-        mockAnnotations
+        mockAnnotations,
       );
 
       expect(result.chartType).toBe("custom_chart");
@@ -836,7 +848,7 @@ describe("convertPanelData", () => {
     it("should handle custom chart with array result from JavaScript", async () => {
       const panelSchema = {
         type: "custom_chart",
-        queries: [{ query: "SELECT * FROM test" }]
+        queries: [{ query: "SELECT * FROM test" }],
       };
 
       const arrayResult = [1, 2, 3];
@@ -852,7 +864,7 @@ describe("convertPanelData", () => {
         mockResultMetaData,
         mockMetadata,
         mockChartPanelStyle,
-        mockAnnotations
+        mockAnnotations,
       );
 
       expect(result.chartType).toBe("custom_chart");
@@ -863,7 +875,7 @@ describe("convertPanelData", () => {
       const panelSchema = {
         type: "Area",
         queryType: "sql",
-        queries: [{ query: "SELECT * FROM test" }]
+        queries: [{ query: "SELECT * FROM test" }],
       };
 
       const result = await convertPanelData(
@@ -875,7 +887,7 @@ describe("convertPanelData", () => {
         mockResultMetaData,
         mockMetadata,
         mockChartPanelStyle,
-        mockAnnotations
+        mockAnnotations,
       );
 
       // Should fall to default case since "Area" != "area"
@@ -886,7 +898,7 @@ describe("convertPanelData", () => {
       const panelSchema = {
         type: "area",
         queryType: "sql",
-        queries: [{ query: "SELECT * FROM test", fields: mockQueryFields }]
+        queries: [{ query: "SELECT * FROM test", fields: mockQueryFields }],
       };
 
       const { convertMultiSQLData } = await import("./convertSQLData");
@@ -901,7 +913,7 @@ describe("convertPanelData", () => {
         mockMetadata,
         mockChartPanelStyle,
         mockAnnotations,
-        true
+        true,
       );
 
       expect(convertMultiSQLData).toHaveBeenCalledWith(
@@ -922,7 +934,7 @@ describe("convertPanelData", () => {
       const panelSchema = {
         type: "line",
         queryType: "promql",
-        queries: [{ query: "up", fields: mockQueryFields }]
+        queries: [{ query: "up", fields: mockQueryFields }],
       };
 
       const metaData = { value: [{ step: 15 }] };
@@ -938,7 +950,7 @@ describe("convertPanelData", () => {
         mockMetadata,
         mockChartPanelStyle,
         mockAnnotations,
-        true
+        true,
       );
 
       expect(convertPromQLData).toHaveBeenCalledWith(
@@ -958,7 +970,7 @@ describe("convertPanelData", () => {
       const panelSchema = {
         type: "bar",
         queryType: "sql",
-        queries: [{ query: "SELECT * FROM test", fields: mockQueryFields }]
+        queries: [{ query: "SELECT * FROM test", fields: mockQueryFields }],
       };
 
       const { convertMultiSQLData } = await import("./convertSQLData");
@@ -993,7 +1005,7 @@ describe("convertPanelData", () => {
     it("should handle all parameters with null/undefined values", async () => {
       const panelSchema = {
         type: "table",
-        queries: [{ query: "SELECT * FROM test" }]
+        queries: [{ query: "SELECT * FROM test" }],
       };
 
       const result = await convertPanelData(
@@ -1005,7 +1017,7 @@ describe("convertPanelData", () => {
         null,
         null,
         null,
-        null
+        null,
       );
 
       expect(result.chartType).toBe("table");
@@ -1017,7 +1029,7 @@ describe("convertPanelData", () => {
       const panelSchema = {
         type: "table",
         queryType: "promql",
-        queries: [{ query: "up" }]
+        queries: [{ query: "up" }],
       };
 
       const { convertPromQLData } = await import("./convertPromQLData");
@@ -1030,7 +1042,7 @@ describe("convertPanelData", () => {
         mockResultMetaData,
         mockMetadata,
         mockChartPanelStyle,
-        mockAnnotations
+        mockAnnotations,
       );
 
       expect(convertPromQLData).toHaveBeenCalled();
@@ -1043,7 +1055,7 @@ describe("convertPanelData", () => {
       const panelSchema = {
         type: "geomap",
         queryType: "promql",
-        queries: [{ query: "up" }]
+        queries: [{ query: "up" }],
       };
 
       const { convertPromQLData } = await import("./convertPromQLData");
@@ -1056,7 +1068,7 @@ describe("convertPanelData", () => {
         mockResultMetaData,
         mockMetadata,
         mockChartPanelStyle,
-        mockAnnotations
+        mockAnnotations,
       );
 
       expect(convertPromQLData).toHaveBeenCalled();
@@ -1069,7 +1081,7 @@ describe("convertPanelData", () => {
       const panelSchema = {
         type: "maps",
         queryType: "promql",
-        queries: [{ query: "up" }]
+        queries: [{ query: "up" }],
       };
 
       const { convertPromQLData } = await import("./convertPromQLData");
@@ -1082,7 +1094,7 @@ describe("convertPanelData", () => {
         mockResultMetaData,
         mockMetadata,
         mockChartPanelStyle,
-        mockAnnotations
+        mockAnnotations,
       );
 
       expect(convertPromQLData).toHaveBeenCalled();
@@ -1094,14 +1106,16 @@ describe("convertPanelData", () => {
     it("should use convertPivotTableData when x, y, and breakdown fields present", async () => {
       const panelSchema = {
         type: "table",
-        queries: [{
-          query: "SELECT * FROM test",
-          fields: {
-            x: [{ column: "date" }],
-            y: [{ column: "count" }],
-            breakdown: [{ column: "region" }],
-          }
-        }]
+        queries: [
+          {
+            query: "SELECT * FROM test",
+            fields: {
+              x: [{ column: "date" }],
+              y: [{ column: "count" }],
+              breakdown: [{ column: "region" }],
+            },
+          },
+        ],
       };
 
       const { convertPivotTableData } = await import("./convertPivotTableData");
@@ -1114,7 +1128,7 @@ describe("convertPanelData", () => {
         mockResultMetaData,
         mockMetadata,
         mockChartPanelStyle,
-        mockAnnotations
+        mockAnnotations,
       );
 
       expect(convertPivotTableData).toHaveBeenCalledWith(panelSchema, mockData, mockStore);
@@ -1124,14 +1138,16 @@ describe("convertPanelData", () => {
     it("should use convertTableData when breakdown is empty (not pivot)", async () => {
       const panelSchema = {
         type: "table",
-        queries: [{
-          query: "SELECT * FROM test",
-          fields: {
-            x: [{ column: "date" }],
-            y: [{ column: "count" }],
-            breakdown: [],
-          }
-        }]
+        queries: [
+          {
+            query: "SELECT * FROM test",
+            fields: {
+              x: [{ column: "date" }],
+              y: [{ column: "count" }],
+              breakdown: [],
+            },
+          },
+        ],
       };
 
       const { convertTableData } = await import("./convertTableData");
@@ -1144,7 +1160,7 @@ describe("convertPanelData", () => {
         mockResultMetaData,
         mockMetadata,
         mockChartPanelStyle,
-        mockAnnotations
+        mockAnnotations,
       );
 
       expect(convertTableData).toHaveBeenCalled();
@@ -1154,7 +1170,7 @@ describe("convertPanelData", () => {
     it("should use convertTableData when fields are missing", async () => {
       const panelSchema = {
         type: "table",
-        queries: [{ query: "SELECT * FROM test" }]
+        queries: [{ query: "SELECT * FROM test" }],
       };
 
       const { convertTableData } = await import("./convertTableData");
@@ -1167,7 +1183,7 @@ describe("convertPanelData", () => {
         mockResultMetaData,
         mockMetadata,
         mockChartPanelStyle,
-        mockAnnotations
+        mockAnnotations,
       );
 
       expect(convertTableData).toHaveBeenCalled();
@@ -1180,7 +1196,7 @@ describe("convertPanelData", () => {
       const panelSchema = {
         type: "custom_chart",
         queryType: "promql",
-        queries: [{ query: "up" }]
+        queries: [{ query: "up" }],
       };
       const promqlData = [{ result: [{ metric: {}, values: [[1, "1"]] }] }];
 
@@ -1194,7 +1210,7 @@ describe("convertPanelData", () => {
         mockResultMetaData,
         mockMetadata,
         mockChartPanelStyle,
-        mockAnnotations
+        mockAnnotations,
       );
 
       expect(runJavaScriptCode).toHaveBeenCalledWith(panelSchema, promqlData);

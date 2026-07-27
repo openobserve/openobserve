@@ -144,12 +144,7 @@ describe("useEvalJobRuns — KPI refresh", () => {
 
   it("filters evaluator KPIs inline on attributes_target_agent_id when agent is selected", async () => {
     mockExecuteQuery.mockResolvedValue([]);
-    useEvalJobRuns(
-      ref<string | null>("job-1"),
-      ref(DEFAULT_WINDOW),
-      ref(false),
-      ref(AGENT_FILTER),
-    );
+    useEvalJobRuns(ref<string | null>("job-1"), ref(DEFAULT_WINDOW), ref(false), ref(AGENT_FILTER));
     await flushAsync();
 
     const sql = mockExecuteQuery.mock.calls[0][0];
@@ -185,13 +180,9 @@ describe("useEvalJobRuns — table refresh (lazy)", () => {
     // hits. Both LIMIT 200; only the failures query filters on status.
     expect(mockExecuteQuery).toHaveBeenCalledTimes(2);
     const sqls = mockExecuteQuery.mock.calls.map((c) => c[0]);
-    const failuresSql = sqls.find((s) =>
-      s.includes("attributes_status IN ('error', 'timeout')"),
-    );
+    const failuresSql = sqls.find((s) => s.includes("attributes_status IN ('error', 'timeout')"));
     const runsSql = sqls.find(
-      (s) =>
-        s.includes("LIMIT 200") &&
-        !s.includes("attributes_status IN ('error', 'timeout')"),
+      (s) => s.includes("LIMIT 200") && !s.includes("attributes_status IN ('error', 'timeout')"),
     );
     expect(failuresSql).toContain("LIMIT 200");
     expect(runsSql).toBeTruthy();
@@ -200,9 +191,7 @@ describe("useEvalJobRuns — table refresh (lazy)", () => {
   });
 
   it("clears runs + failures when tableEnabled flips back to false", async () => {
-    mockExecuteQuery.mockResolvedValueOnce([
-      { total_runs: 1, success_runs: 1 },
-    ]);
+    mockExecuteQuery.mockResolvedValueOnce([{ total_runs: 1, success_runs: 1 }]);
     mockExecuteQuery.mockResolvedValueOnce([
       {
         span_id: "span-1",
@@ -238,9 +227,7 @@ describe("useEvalJobRuns — score extraction from attributes_response", () => {
   // populated so the Runs table can show the score regardless of dimension
   // type.
   it("extracts numeric scores from value_numeric", async () => {
-    mockExecuteQuery.mockResolvedValueOnce([
-      { total_runs: 1, success_runs: 1 },
-    ]);
+    mockExecuteQuery.mockResolvedValueOnce([{ total_runs: 1, success_runs: 1 }]);
     mockExecuteQuery.mockResolvedValueOnce([
       {
         span_id: "span-1",
@@ -250,11 +237,7 @@ describe("useEvalJobRuns — score extraction from attributes_response", () => {
     ]);
     mockExecuteQuery.mockResolvedValueOnce([]);
 
-    const { runs } = useEvalJobRuns(
-      ref<string | null>("job-1"),
-      ref(DEFAULT_WINDOW),
-      ref(true),
-    );
+    const { runs } = useEvalJobRuns(ref<string | null>("job-1"), ref(DEFAULT_WINDOW), ref(true));
     await flushAsync();
 
     expect(runs.value[0].scoreNumeric).toBe(0.87);
@@ -262,9 +245,7 @@ describe("useEvalJobRuns — score extraction from attributes_response", () => {
   });
 
   it("extracts boolean scores from value_boolean", async () => {
-    mockExecuteQuery.mockResolvedValueOnce([
-      { total_runs: 1, success_runs: 1 },
-    ]);
+    mockExecuteQuery.mockResolvedValueOnce([{ total_runs: 1, success_runs: 1 }]);
     mockExecuteQuery.mockResolvedValueOnce([
       {
         span_id: "span-1",
@@ -274,11 +255,7 @@ describe("useEvalJobRuns — score extraction from attributes_response", () => {
     ]);
     mockExecuteQuery.mockResolvedValueOnce([]);
 
-    const { runs } = useEvalJobRuns(
-      ref<string | null>("job-1"),
-      ref(DEFAULT_WINDOW),
-      ref(true),
-    );
+    const { runs } = useEvalJobRuns(ref<string | null>("job-1"), ref(DEFAULT_WINDOW), ref(true));
     await flushAsync();
 
     expect(runs.value[0].scoreBoolean).toBe(true);
@@ -286,9 +263,7 @@ describe("useEvalJobRuns — score extraction from attributes_response", () => {
   });
 
   it("extracts categorical scores from value_categorical", async () => {
-    mockExecuteQuery.mockResolvedValueOnce([
-      { total_runs: 1, success_runs: 1 },
-    ]);
+    mockExecuteQuery.mockResolvedValueOnce([{ total_runs: 1, success_runs: 1 }]);
     mockExecuteQuery.mockResolvedValueOnce([
       {
         span_id: "span-1",
@@ -298,11 +273,7 @@ describe("useEvalJobRuns — score extraction from attributes_response", () => {
     ]);
     mockExecuteQuery.mockResolvedValueOnce([]);
 
-    const { runs } = useEvalJobRuns(
-      ref<string | null>("job-1"),
-      ref(DEFAULT_WINDOW),
-      ref(true),
-    );
+    const { runs } = useEvalJobRuns(ref<string | null>("job-1"), ref(DEFAULT_WINDOW), ref(true));
     await flushAsync();
 
     expect(runs.value[0].scoreCategorical).toBe("good");
@@ -312,9 +283,7 @@ describe("useEvalJobRuns — score extraction from attributes_response", () => {
   // Older judges write `score` / `passed` / `category` keys. Defensive code
   // surfaces those too so we don't show "—" for legacy rows.
   it("accepts legacy field aliases (score / passed / category)", async () => {
-    mockExecuteQuery.mockResolvedValueOnce([
-      { total_runs: 3, success_runs: 3 },
-    ]);
+    mockExecuteQuery.mockResolvedValueOnce([{ total_runs: 3, success_runs: 3 }]);
     mockExecuteQuery.mockResolvedValueOnce([
       { span_id: "s1", attributes_response: '{"score": 0.5}' },
       { span_id: "s2", attributes_response: '{"passed": false}' },
@@ -322,11 +291,7 @@ describe("useEvalJobRuns — score extraction from attributes_response", () => {
     ]);
     mockExecuteQuery.mockResolvedValueOnce([]);
 
-    const { runs } = useEvalJobRuns(
-      ref<string | null>("job-1"),
-      ref(DEFAULT_WINDOW),
-      ref(true),
-    );
+    const { runs } = useEvalJobRuns(ref<string | null>("job-1"), ref(DEFAULT_WINDOW), ref(true));
     await flushAsync();
 
     expect(runs.value[0].scoreNumeric).toBe(0.5);
@@ -335,38 +300,26 @@ describe("useEvalJobRuns — score extraction from attributes_response", () => {
   });
 
   it("displays '—' when no recognisable score field is present", async () => {
-    mockExecuteQuery.mockResolvedValueOnce([
-      { total_runs: 1, success_runs: 1 },
-    ]);
+    mockExecuteQuery.mockResolvedValueOnce([{ total_runs: 1, success_runs: 1 }]);
     mockExecuteQuery.mockResolvedValueOnce([
       { span_id: "s1", attributes_response: '{"reasoning": "plain text"}' },
     ]);
     mockExecuteQuery.mockResolvedValueOnce([]);
 
-    const { runs } = useEvalJobRuns(
-      ref<string | null>("job-1"),
-      ref(DEFAULT_WINDOW),
-      ref(true),
-    );
+    const { runs } = useEvalJobRuns(ref<string | null>("job-1"), ref(DEFAULT_WINDOW), ref(true));
     await flushAsync();
 
     expect(runs.value[0].scoreDisplay).toBe("—");
   });
 
   it("tolerates non-JSON attributes_response strings", async () => {
-    mockExecuteQuery.mockResolvedValueOnce([
-      { total_runs: 1, success_runs: 1 },
-    ]);
+    mockExecuteQuery.mockResolvedValueOnce([{ total_runs: 1, success_runs: 1 }]);
     mockExecuteQuery.mockResolvedValueOnce([
       { span_id: "s1", attributes_response: "this is plain text" },
     ]);
     mockExecuteQuery.mockResolvedValueOnce([]);
 
-    const { runs } = useEvalJobRuns(
-      ref<string | null>("job-1"),
-      ref(DEFAULT_WINDOW),
-      ref(true),
-    );
+    const { runs } = useEvalJobRuns(ref<string | null>("job-1"), ref(DEFAULT_WINDOW), ref(true));
     await flushAsync();
 
     expect(runs.value[0].scoreDisplay).toBe("—");
@@ -375,9 +328,7 @@ describe("useEvalJobRuns — score extraction from attributes_response", () => {
 
 describe("useEvalJobRuns — failures query", () => {
   it("restricts the failures query to failed statuses and maps the hits", async () => {
-    mockExecuteQuery.mockResolvedValueOnce([
-      { total_runs: 1, success_runs: 0 },
-    ]); // KPI
+    mockExecuteQuery.mockResolvedValueOnce([{ total_runs: 1, success_runs: 0 }]); // KPI
     mockExecuteQuery.mockResolvedValueOnce([]); // runs
     mockExecuteQuery.mockResolvedValueOnce([
       {
@@ -403,9 +354,7 @@ describe("useEvalJobRuns — failures query", () => {
     const failuresSql = mockExecuteQuery.mock.calls
       .map((c) => c[0])
       .find(
-        (s) =>
-          s.includes("attributes_status IN ('error', 'timeout')") &&
-          s.includes("LIMIT 200"),
+        (s) => s.includes("attributes_status IN ('error', 'timeout')") && s.includes("LIMIT 200"),
       );
     expect(failuresSql).toBeTruthy();
 
@@ -450,9 +399,7 @@ describe("useEvalJobRuns — reactivity", () => {
   });
 
   it("clears KPIs to empty when jobId becomes null", async () => {
-    mockExecuteQuery.mockResolvedValueOnce([
-      { total_runs: 10, success_runs: 10 },
-    ]);
+    mockExecuteQuery.mockResolvedValueOnce([{ total_runs: 10, success_runs: 10 }]);
     const jobId = ref<string | null>("job-1");
     const { kpis } = useEvalJobRuns(jobId, ref(DEFAULT_WINDOW), ref(false));
     await flushAsync();
@@ -468,20 +415,14 @@ describe("useEvalJobRuns — error handling", () => {
   it("KPI query errors do not throw — they leave KPIs at empty state", async () => {
     mockExecuteQuery.mockRejectedValueOnce(new Error("network"));
 
-    const { kpis } = useEvalJobRuns(
-      ref<string | null>("job-1"),
-      ref(DEFAULT_WINDOW),
-      ref(false),
-    );
+    const { kpis } = useEvalJobRuns(ref<string | null>("job-1"), ref(DEFAULT_WINDOW), ref(false));
     await flushAsync();
 
     expect(kpis.value.totalRuns).toBeNull();
   });
 
   it("Runs / failures query errors do not throw — they leave tables empty", async () => {
-    mockExecuteQuery.mockResolvedValueOnce([
-      { total_runs: 1, success_runs: 1 },
-    ]);
+    mockExecuteQuery.mockResolvedValueOnce([{ total_runs: 1, success_runs: 1 }]);
     mockExecuteQuery.mockRejectedValueOnce(new Error("network"));
     mockExecuteQuery.mockRejectedValueOnce(new Error("network"));
 

@@ -65,9 +65,9 @@ describe("useLLMStreamQuery — executeQueryOnce", () => {
     mockSearch.mockResolvedValueOnce({ data: { hits: [{ id: "latest" }] } });
     const { executeQueryOnce } = useLLMStreamQuery();
 
-    await expect(
-      executeQueryOnce("SELECT * FROM x LIMIT 25", 100, 200, "logs"),
-    ).resolves.toEqual([{ id: "latest" }]);
+    await expect(executeQueryOnce("SELECT * FROM x LIMIT 25", 100, 200, "logs")).resolves.toEqual([
+      { id: "latest" },
+    ]);
 
     expect(mockSearch).toHaveBeenCalledWith({
       org_identifier: "test-org",

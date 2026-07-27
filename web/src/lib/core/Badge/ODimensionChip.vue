@@ -35,19 +35,13 @@ withDefaults(
 </script>
 
 <template>
-  <span class="inline-flex min-w-0 max-w-full">
-    <OTag
-      :variant="dimensionVariant(dimKey)"
-      shape="rounded"
-      class="min-w-0 !p-0 overflow-hidden"
-    >
-      <span class="inline-flex items-stretch min-w-0">
-        <span
-          class="ps-2.5 pe-1 py-1.5 shrink-0 whitespace-nowrap bg-current/8 opacity-90"
-        >{{ keyLabel ?? dimKey }}</span>
-        <span
-          class="ps-1 pe-2.5 py-1.5 truncate min-w-0 font-semibold"
-        >{{ value }}</span>
+  <span class="inline-flex max-w-full min-w-0">
+    <OTag :variant="dimensionVariant(dimKey)" shape="rounded" class="min-w-0 overflow-hidden !p-0">
+      <span class="inline-flex min-w-0 items-stretch">
+        <span class="shrink-0 bg-current/8 py-1.5 ps-2.5 pe-1 whitespace-nowrap opacity-90">{{
+          keyLabel ?? dimKey
+        }}</span>
+        <span class="min-w-0 truncate py-1.5 ps-1 pe-2.5 font-semibold">{{ value }}</span>
       </span>
     </OTag>
     <OTooltip v-if="tooltip" :delay="300" :content="`${dimKey}=${value}`" />

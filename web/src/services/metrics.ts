@@ -1,9 +1,7 @@
 import http from "./http";
 
 const formatPromqlQuery = ({ org_identifier = "", query = "" }) => {
-  return http().get(
-    `/api/${org_identifier}/prometheus/api/v1/format_query?query=${query}`
-  );
+  return http().get(`/api/${org_identifier}/prometheus/api/v1/format_query?query=${query}`);
 };
 
 const get_promql_series = ({
@@ -66,9 +64,7 @@ const labelValues = ({
 }) => {
   const url = `/api/${org_identifier}/prometheus/api/v1/label/${encodeURIComponent(
     label,
-  )}/values?match[]=${encodeURIComponent(
-    match,
-  )}&start=${start_time}&end=${end_time}`;
+  )}/values?match[]=${encodeURIComponent(match)}&start=${start_time}&end=${end_time}`;
   return signal ? http().get(url, { signal }) : http().get(url);
 };
 
@@ -91,9 +87,7 @@ const metadata = ({
   if (metric) params.set("metric", metric);
   if (limit != null) params.set("limit", String(limit));
   const qs = params.toString();
-  return http().get(
-    `/api/${org_identifier}/prometheus/api/v1/metadata${qs ? `?${qs}` : ""}`,
-  );
+  return http().get(`/api/${org_identifier}/prometheus/api/v1/metadata${qs ? `?${qs}` : ""}`);
 };
 
 export default {

@@ -33,7 +33,7 @@
          behavior tables — it stays a summary stat). -->
     <div
       v-if="costSummary"
-      class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-text-secondary"
+      class="text-text-secondary flex flex-wrap items-center gap-x-4 gap-y-1 text-xs"
       data-test="agent-node-behavior-cost"
     >
       <span>
@@ -52,7 +52,7 @@
 
     <!-- Looping tools for this agent -->
     <div class="flex flex-col gap-1.5">
-      <div class="text-xs font-semibold text-text-heading">
+      <div class="text-text-heading text-xs font-semibold">
         {{ t("aiObservability.behavior.loopsTitle") }}
       </div>
       <OTable
@@ -72,7 +72,7 @@
 
     <!-- Failure classes for this agent -->
     <div class="flex flex-col gap-1.5">
-      <div class="text-xs font-semibold text-text-heading">
+      <div class="text-text-heading text-xs font-semibold">
         {{ t("aiObservability.behavior.failuresTitle") }}
       </div>
       <OTable
@@ -87,12 +87,16 @@
         :page-size="5"
         :empty-message="t('aiObservability.behavior.noFailures')"
         @row-click="(r: any) => openDetail('failure', r)"
-      />
+      >
+        <template #cell-failClass="{ row }">
+          <OTag variant="warning-soft" size="sm">{{ row.failClass }}</OTag>
+        </template>
+      </OTable>
     </div>
 
     <div
       v-if="disabledHint"
-      class="text-xs text-text-secondary italic"
+      class="text-text-secondary text-xs italic"
       data-test="agent-node-behavior-disabled"
     >
       {{ disabledHint }}
@@ -114,11 +118,10 @@ import { ref, computed, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import AgentSignalDetailPanel from "./AgentSignalDetailPanel.vue";
-import agentSignalsService, {
-  type AgentSignalRecord,
-} from "@/services/agent_signals";
+import agentSignalsService, { type AgentSignalRecord } from "@/services/agent_signals";
 
 const props = defineProps<{
   /** The clicked agent's resolved name (from the graph node identity). */
@@ -137,9 +140,7 @@ const disabledHint = ref("");
 const detailOpen = ref(false);
 const detailRow = ref<any>(null);
 
-const orgId = computed(
-  () => store.state.selectedOrganization?.identifier as string,
-);
+const orgId = computed(() => store.state.selectedOrganization?.identifier as string);
 
 /** Only this agent's signals — the drawer/page already resolve agent names the
  *  same way, so a name match is the scoping key (see design §4b id-vs-name note). */
@@ -187,10 +188,7 @@ const costSummary = computed(() => {
   };
 });
 
-const openDetail = (
-  signalType: "loop" | "failure",
-  row: Record<string, any>,
-) => {
+const openDetail = (signalType: "loop" | "failure", row: Record<string, any>) => {
   detailRow.value = { signalType, ...row };
   detailOpen.value = true;
 };

@@ -94,15 +94,16 @@ vi.mock("@/composables/rum/useTraceCorrelation", () => ({
 const globalStubs = {
   OButton: {
     name: "OButton",
-    template: '<button :disabled="disabled || undefined" v-bind="$attrs" @click="!disabled && $emit(\'click\', $event)" @keydown="$emit(\'keydown\', $event)"><slot /></button>',
+    template:
+      '<button :disabled="disabled || undefined" v-bind="$attrs" @click="!disabled && $emit(\'click\', $event)" @keydown="$emit(\'keydown\', $event)"><slot /></button>',
     props: ["variant", "size", "disabled", "iconLeft"],
     emits: ["click", "keydown"],
     inheritAttrs: false,
   },
   OSpinner: { template: '<div data-test="spinner" />' },
-  OIcon: { name: "OIcon", template: '<span />', props: ["name", "size"] },
-  OTooltip: { template: '<span />', props: ["content"] },
-  OSeparator: { template: '<hr />' },
+  OIcon: { name: "OIcon", template: "<span />", props: ["name", "size"] },
+  OTooltip: { template: "<span />", props: ["content"] },
+  OSeparator: { template: "<hr />" },
 };
 
 // ---------------------------------------------------------------------------
@@ -199,7 +200,9 @@ describe("TraceCorrelationCard", () => {
 
     it("renders trace-id-text element when traceId is provided", () => {
       // Assert
-      expect(wrapper.find('[data-test="trace-correlation-card-trace-id-text"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="trace-correlation-card-trace-id-text"]').exists()).toBe(
+        true,
+      );
     });
 
     it("displays span ID section when spanId is provided", () => {
@@ -288,7 +291,9 @@ describe("TraceCorrelationCard", () => {
       await flushPromises();
 
       // Assert
-      expect(wrapper.find('[data-test="trace-correlation-card-trace-id-text"]').text()).toBe("short-id");
+      expect(wrapper.find('[data-test="trace-correlation-card-trace-id-text"]').text()).toBe(
+        "short-id",
+      );
     });
   });
 
@@ -795,7 +800,10 @@ describe("TraceCorrelationCard", () => {
 
     it("shows missing trace notice when backend_spans is empty", async () => {
       // Arrange
-      mockCorrelationDataRef.value = createMockCorrelationData({ backend_spans: [], has_backend_trace: false });
+      mockCorrelationDataRef.value = createMockCorrelationData({
+        backend_spans: [],
+        has_backend_trace: false,
+      });
       mockBackendSpanCount.value = 0;
       mockHasBackendTrace.value = false;
       await nextTick();

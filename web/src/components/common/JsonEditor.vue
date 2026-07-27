@@ -1,14 +1,12 @@
 <template>
-  <div
-    class="h-[calc(100vh-3.75rem)] flex min-h-0 dark:bg-surface-base"
-  >
-    <div class="flex flex-col flex-1 min-h-0 min-w-0">
-      <div class="flex flex-col flex-1 min-h-0">
-        <query-editor
+  <div class="dark:bg-surface-base flex h-[calc(100vh-3.75rem)] min-h-0">
+    <div class="flex min-h-0 min-w-0 flex-1 flex-col">
+      <div class="flex min-h-0 flex-1 flex-col">
+        <QueryEditor
           data-test="common-json-editor"
           ref="queryEditorRef"
           editor-id="common-json-editor"
-          class="flex-1 min-h-0 h-full"
+          class="h-full min-h-0 flex-1"
           :debounceTime="300"
           v-model:query="jsonContent"
           language="json"
@@ -20,9 +18,9 @@
       <div
         v-if="localValidationErrors.length > 0"
         data-test="common-json-editor-validation-errors"
-        class="p-3 text-status-error-text shrink-0 max-h-50 overflow-y-auto"
+        class="text-status-error-text max-h-50 shrink-0 overflow-y-auto p-3"
       >
-        <div class="font-bold mb-2">Please fix the following issues:</div>
+        <div class="mb-2 font-bold">Please fix the following issues:</div>
         <ul class="ml-3">
           <li v-for="(error, index) in localValidationErrors" :key="index">
             {{ error }}
@@ -30,26 +28,25 @@
         </ul>
       </div>
 
-      <div class="flex justify-end gap-2 p-3 shrink-0">
+      <div class="flex shrink-0 justify-end gap-2 p-3">
         <OButton
           variant="outline"
           size="sm-action"
           @click="$emit('close')"
           data-test="json-editor-cancel"
-        >{{ t('common.cancel') }}</OButton>
+          >{{ t("common.cancel") }}</OButton
+        >
         <OButton
           variant="primary"
           size="sm-action"
           @click="saveChanges"
           data-test="json-editor-save"
-        >{{ t('common.save') }}</OButton>
+          >{{ t("common.save") }}</OButton
+        >
       </div>
     </div>
     <!-- o2aichat enabled -->
-    <div
-      v-if="store.state.isAiChatEnabled"
-      class="ml-2 w-[25vw] h-full"
-    >
+    <div v-if="store.state.isAiChatEnabled" class="ml-2 h-full w-[25vw]">
       <O2AIChat
         class="h-full"
         :is-open="store.state.isAiChatEnabled"
@@ -72,7 +69,7 @@ import useTheme from "@/composables/useTheme";
 export default defineComponent({
   name: "JsonEditor",
   components: {
-    QueryEditor: defineAsyncComponent(() => import('@/components/CodeQueryEditor.vue')),
+    QueryEditor: defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue")),
     O2AIChat,
     OButton,
   },
@@ -98,7 +95,7 @@ export default defineComponent({
       type: Boolean,
       required: false,
       default: false,
-    }
+    },
   },
   emits: ["close", "saveJson"],
   setup(props, { emit }) {
@@ -114,13 +111,23 @@ export default defineComponent({
     // Define protected fields based on type
     const getProtectedFields = (type: string) => {
       switch (type) {
-        case 'pipelines':
-          return ['pipeline_id', 'org', 'name'];
-        case 'alerts': {
-          const baseFields = ['id', 'name', 'org_id', 'last_triggered_at', 'last_satisfied_at', 'owner', 'last_edited_by', 'createdAt', 'updatedAt'];
+        case "pipelines":
+          return ["pipeline_id", "org", "name"];
+        case "alerts": {
+          const baseFields = [
+            "id",
+            "name",
+            "org_id",
+            "last_triggered_at",
+            "last_satisfied_at",
+            "owner",
+            "last_edited_by",
+            "createdAt",
+            "updatedAt",
+          ];
           // If editing an existing alert, also protect stream-related fields
           if (props.isEditing) {
-            return [...baseFields, 'stream_name', 'stream_type', 'is_real_time'];
+            return [...baseFields, "stream_name", "stream_type", "is_real_time"];
           }
           return baseFields;
         }
@@ -138,7 +145,7 @@ export default defineComponent({
         const protectedFieldChanges: string[] = [];
 
         // Check for changes in protected fields
-        protectedFields.value.forEach(field => {
+        protectedFields.value.forEach((field) => {
           if (storedFields.value[field] && newContent[field] !== storedFields.value[field]) {
             protectedFieldChanges.push(field);
           }
@@ -147,14 +154,17 @@ export default defineComponent({
         if (protectedFieldChanges.length > 0) {
           // Add validation errors for changed protected fields
           localValidationErrors.value = [
-            ...localValidationErrors.value.filter(err => !err.startsWith('Cannot modify')),
-            ...protectedFieldChanges.map(field => `Cannot modify ${field} field directly , will be reverted to the original value`)
+            ...localValidationErrors.value.filter((err) => !err.startsWith("Cannot modify")),
+            ...protectedFieldChanges.map(
+              (field) =>
+                `Cannot modify ${field} field directly , will be reverted to the original value`,
+            ),
           ];
 
           // Revert the changes by restoring protected fields
           const revertedContent = {
             ...newContent,
-            ...storedFields.value
+            ...storedFields.value,
           };
 
           // Update the editor content with reverted changes
@@ -166,15 +176,17 @@ export default defineComponent({
         jsonContent.value = value;
 
         // Clear any previous protected field validation errors
-        localValidationErrors.value = localValidationErrors.value.filter(err => !err.startsWith('Cannot modify'));
+        localValidationErrors.value = localValidationErrors.value.filter(
+          (err) => !err.startsWith("Cannot modify"),
+        );
       } catch (error) {
-        localValidationErrors.value = ['Invalid JSON format'];
+        localValidationErrors.value = ["Invalid JSON format"];
       }
     };
 
     onMounted(() => {
       // Store initial values of protected fields based on type
-      protectedFields.value.forEach(field => {
+      protectedFields.value.forEach((field) => {
         if (props.data[field]) {
           storedFields.value[field] = props.data[field];
         }
@@ -186,57 +198,57 @@ export default defineComponent({
     //we need to merge the stored fields with the parsed content
     //and then emit the saveJson event
 
-      const saveChanges = () => {
-        try {
-          const parsedContent = JSON.parse(jsonContent.value);
-          // Merge back the stored fields
-          const finalContent = {
-            ...parsedContent,
-            ...storedFields.value
-          };
+    const saveChanges = () => {
+      try {
+        const parsedContent = JSON.parse(jsonContent.value);
+        // Merge back the stored fields
+        const finalContent = {
+          ...parsedContent,
+          ...storedFields.value,
+        };
 
-          emit("saveJson", JSON.stringify(finalContent));
-        } catch (error) {
-          localValidationErrors.value = ['Invalid JSON format'];
-        }
-      };
+        emit("saveJson", JSON.stringify(finalContent));
+      } catch (error) {
+        localValidationErrors.value = ["Invalid JSON format"];
+      }
+    };
 
-      watch(
-        () => props.data,
-        (newVal) => {
-          // Update stored fields based on type
-          protectedFields.value.forEach(field => {
-            storedFields.value[field] = newVal[field] || storedFields.value[field];
-          });
+    watch(
+      () => props.data,
+      (newVal) => {
+        // Update stored fields based on type
+        protectedFields.value.forEach((field) => {
+          storedFields.value[field] = newVal[field] || storedFields.value[field];
+        });
 
-          // Show complete data in editor
-          jsonContent.value = JSON.stringify(newVal, null, 2);
-        },
-      );
-      //whenever any errors happens at the time of validating the pipeline ,
-      //we need to show the errors in the json editor
-      //so we need to watch the validationErrors array
-      watch(
-        () => props.validationErrors,
-        (newErrors) => {
-          localValidationErrors.value = newErrors;
-        },
-        { immediate: true, deep: true }
-      );
-      const toggleAIChat = () => {
+        // Show complete data in editor
+        jsonContent.value = JSON.stringify(newVal, null, 2);
+      },
+    );
+    //whenever any errors happens at the time of validating the pipeline ,
+    //we need to show the errors in the json editor
+    //so we need to watch the validationErrors array
+    watch(
+      () => props.validationErrors,
+      (newErrors) => {
+        localValidationErrors.value = newErrors;
+      },
+      { immediate: true, deep: true },
+    );
+    const toggleAIChat = () => {
       const isEnabled = !store.state.isAiChatEnabled;
       store.dispatch("setIsAiChatEnabled", isEnabled);
-    }
-      const isHovered = ref(false);
-      const getBtnLogo = computed(() => {
+    };
+    const isHovered = ref(false);
+    const getBtnLogo = computed(() => {
       if (isHovered.value || store.state.isAiChatEnabled) {
-        return getImageURL('images/common/ai_icon_dark.svg')
+        return getImageURL("images/common/ai_icon_dark.svg");
       }
 
       return isDark.value
-        ? getImageURL('images/common/ai_icon_dark.svg')
-        : getImageURL('images/common/ai_icon_gradient.svg')
-    })
+        ? getImageURL("images/common/ai_icon_dark.svg")
+        : getImageURL("images/common/ai_icon_gradient.svg");
+    });
 
     return {
       t,

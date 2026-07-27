@@ -128,8 +128,9 @@ export function useMetricsCorrelationDashboard() {
     const subjectOverrides: Record<string, string> = {};
     const semanticGroups = config.semanticGroups ?? [];
     const streamSchema: Set<string> = new Set(
-      (config.metricSchemas?.[stream.stream_name]?.schema as Array<{ name: string }> | undefined)
-        ?.map((c) => c.name) ?? [],
+      (
+        config.metricSchemas?.[stream.stream_name]?.schema as Array<{ name: string }> | undefined
+      )?.map((c) => c.name) ?? [],
     );
     for (const [semanticId, value] of Object.entries(config.matchedDimensions)) {
       if (!value || value === SELECT_ALL_VALUE) continue;
@@ -140,9 +141,7 @@ export function useMetricsCorrelationDashboard() {
       // the group ID (dashes → underscores), e.g. "k8s-node-name" → "k8s_node_name".
       const groupIdAsField = semanticId.replace(/-/g, "_");
       const fallback = group.fields.find((f) => f === groupIdAsField) ?? group.fields[0];
-      const hit = streamSchema.size > 0
-        ? group.fields.find((f) => streamSchema.has(f))
-        : fallback;
+      const hit = streamSchema.size > 0 ? group.fields.find((f) => streamSchema.has(f)) : fallback;
       if (hit) subjectOverrides[hit] = value;
     }
 
@@ -321,9 +320,7 @@ ORDER BY x_axis_1`;
       streamName = config.sourceStream;
 
       // Try to find matching stream in API response
-      const matchingStream = streams?.find(
-        (s) => s.stream_name === config.sourceStream,
-      );
+      const matchingStream = streams?.find((s) => s.stream_name === config.sourceStream);
       if (matchingStream) {
         // Use filters from API response (best case - backend computed correct field names)
         filters = matchingStream.filters ?? {};
@@ -349,11 +346,7 @@ ORDER BY x_axis_1`;
     const whereConditions = Object.entries(filters)
       .filter(([field, value]) => {
         // Only include string values, skip internal fields, and skip SELECT_ALL_VALUE wildcards
-        return (
-          typeof value === "string" &&
-          !field.startsWith("_") &&
-          value !== SELECT_ALL_VALUE
-        );
+        return typeof value === "string" && !field.startsWith("_") && value !== SELECT_ALL_VALUE;
       })
       .map(([field, value]) => {
         const quotedField = /[^a-zA-Z0-9_]/.test(field) ? `"${field.replace(/"/g, '""')}"` : field;

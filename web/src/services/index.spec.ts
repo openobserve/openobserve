@@ -57,16 +57,14 @@ describe("index service", () => {
     it("should append ?fetchSchema= when schema is true and type is empty", async () => {
       await indexService.nameList("test-org", "", true);
 
-      expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        "/api/test-org/streams?fetchSchema=true"
-      );
+      expect(mockHttpInstance.get).toHaveBeenCalledWith("/api/test-org/streams?fetchSchema=true");
     });
 
     it("should append both type and fetchSchema when both are provided", async () => {
       await indexService.nameList("test-org", "metrics", true);
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        "/api/test-org/streams?type=metrics&fetchSchema=true"
+        "/api/test-org/streams?type=metrics&fetchSchema=true",
       );
     });
 
@@ -96,9 +94,7 @@ describe("index service", () => {
 
         await indexService.nameList("test-org", type, false);
 
-        expect(mockHttpInstance.get).toHaveBeenCalledWith(
-          `/api/test-org/streams?type=${type}`
-        );
+        expect(mockHttpInstance.get).toHaveBeenCalledWith(`/api/test-org/streams?type=${type}`);
       }
     });
 
@@ -118,9 +114,7 @@ describe("index service", () => {
 
         await indexService.nameList(org, "logs", false);
 
-        expect(mockHttpInstance.get).toHaveBeenCalledWith(
-          `/api/${org}/streams?type=logs`
-        );
+        expect(mockHttpInstance.get).toHaveBeenCalledWith(`/api/${org}/streams?type=logs`);
       }
     });
 
@@ -146,7 +140,7 @@ describe("index service", () => {
       mockHttpInstance.get.mockRejectedValue(new Error("Network error"));
 
       await expect(indexService.nameList("test-org", "logs", false)).rejects.toThrow(
-        "Network error"
+        "Network error",
       );
     });
   });
@@ -155,17 +149,13 @@ describe("index service", () => {
     it("should call GET /api/{org}/{stream}/schema with no query params when type is empty", async () => {
       await indexService.schema("test-org", "my-stream", "");
 
-      expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        "/api/test-org/my-stream/schema"
-      );
+      expect(mockHttpInstance.get).toHaveBeenCalledWith("/api/test-org/my-stream/schema");
     });
 
     it("should append ?type= when type is non-empty", async () => {
       await indexService.schema("test-org", "my-stream", "logs");
 
-      expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        "/api/test-org/my-stream/schema?type=logs"
-      );
+      expect(mockHttpInstance.get).toHaveBeenCalledWith("/api/test-org/my-stream/schema?type=logs");
     });
 
     it("should handle different stream types", async () => {
@@ -178,7 +168,7 @@ describe("index service", () => {
         await indexService.schema("test-org", "my-stream", type);
 
         expect(mockHttpInstance.get).toHaveBeenCalledWith(
-          `/api/test-org/my-stream/schema?type=${type}`
+          `/api/test-org/my-stream/schema?type=${type}`,
         );
       }
     });
@@ -197,9 +187,7 @@ describe("index service", () => {
 
         await indexService.schema(org, stream, "logs");
 
-        expect(mockHttpInstance.get).toHaveBeenCalledWith(
-          `/api/${org}/${stream}/schema?type=logs`
-        );
+        expect(mockHttpInstance.get).toHaveBeenCalledWith(`/api/${org}/${stream}/schema?type=logs`);
       }
     });
 
@@ -225,7 +213,7 @@ describe("index service", () => {
       mockHttpInstance.get.mockRejectedValue(new Error("Stream not found"));
 
       await expect(indexService.schema("test-org", "missing-stream", "logs")).rejects.toThrow(
-        "Stream not found"
+        "Stream not found",
       );
     });
 
@@ -233,9 +221,9 @@ describe("index service", () => {
       const notFoundError = { response: { status: 404, data: { error: "Stream not found" } } };
       mockHttpInstance.get.mockRejectedValue(notFoundError);
 
-      await expect(
-        indexService.schema("test-org", "missing-stream", "logs")
-      ).rejects.toEqual(notFoundError);
+      await expect(indexService.schema("test-org", "missing-stream", "logs")).rejects.toEqual(
+        notFoundError,
+      );
     });
   });
 
@@ -247,7 +235,7 @@ describe("index service", () => {
 
       expect(mockHttpInstance.put).toHaveBeenCalledWith(
         "/api/test-org/streams/my-stream/settings",
-        data
+        data,
       );
     });
 
@@ -258,7 +246,7 @@ describe("index service", () => {
 
       expect(mockHttpInstance.put).toHaveBeenCalledWith(
         "/api/test-org/streams/my-stream/settings?type=logs",
-        data
+        data,
       );
     });
 
@@ -273,7 +261,7 @@ describe("index service", () => {
 
       expect(mockHttpInstance.put).toHaveBeenCalledWith(
         "/api/test-org/streams/my-stream/settings?type=logs",
-        data
+        data,
       );
     });
 
@@ -289,7 +277,7 @@ describe("index service", () => {
 
         expect(mockHttpInstance.put).toHaveBeenCalledWith(
           `/api/test-org/streams/my-stream/settings?type=${type}`,
-          data
+          data,
         );
       }
     });
@@ -310,7 +298,7 @@ describe("index service", () => {
 
         expect(mockHttpInstance.put).toHaveBeenCalledWith(
           `/api/${org}/streams/${stream}/settings?type=logs`,
-          data
+          data,
         );
       }
     });
@@ -338,7 +326,7 @@ describe("index service", () => {
 
       expect(mockHttpInstance.put).toHaveBeenCalledWith(
         "/api/test-org/streams/my-stream/settings?type=logs",
-        {}
+        {},
       );
     });
 
@@ -346,7 +334,7 @@ describe("index service", () => {
       mockHttpInstance.put.mockRejectedValue(new Error("Settings update failed"));
 
       await expect(
-        indexService.updateSettings("test-org", "my-stream", "logs", {})
+        indexService.updateSettings("test-org", "my-stream", "logs", {}),
       ).rejects.toThrow("Settings update failed");
     });
 
@@ -357,7 +345,9 @@ describe("index service", () => {
       mockHttpInstance.put.mockRejectedValue(badRequestError);
 
       await expect(
-        indexService.updateSettings("test-org", "my-stream", "logs", { partitions: [{ field: "" }] })
+        indexService.updateSettings("test-org", "my-stream", "logs", {
+          partitions: [{ field: "" }],
+        }),
       ).rejects.toEqual(badRequestError);
     });
   });
@@ -370,17 +360,14 @@ describe("index service", () => {
         full_text_search_keys: ["message"],
       });
 
-      expect(mockHttpInstance.get).toHaveBeenNthCalledWith(
-        1,
-        "/api/prod-org/streams?type=logs"
-      );
+      expect(mockHttpInstance.get).toHaveBeenNthCalledWith(1, "/api/prod-org/streams?type=logs");
       expect(mockHttpInstance.get).toHaveBeenNthCalledWith(
         2,
-        "/api/prod-org/app-logs/schema?type=logs"
+        "/api/prod-org/app-logs/schema?type=logs",
       );
       expect(mockHttpInstance.put).toHaveBeenCalledWith(
         "/api/prod-org/streams/app-logs/settings?type=logs",
-        { full_text_search_keys: ["message"] }
+        { full_text_search_keys: ["message"] },
       );
     });
 

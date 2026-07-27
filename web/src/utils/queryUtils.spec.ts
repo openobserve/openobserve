@@ -13,9 +13,7 @@ vi.mock("vuex", () => ({
 }));
 
 vi.mock("@/utils/timezone", () => ({
-  getFunctionErrorMessage: vi.fn(
-    (msg: string) => `${msg} (Data returned for: start to end)`,
-  ),
+  getFunctionErrorMessage: vi.fn((msg: string) => `${msg} (Data returned for: start to end)`),
 }));
 
 // Imports AFTER mocks
@@ -741,9 +739,7 @@ describe("getCronIntervalInMinutes", () => {
   });
 
   it("throws for invalid cron expression", () => {
-    expect(() => getCronIntervalInMinutes("bad cron")).toThrow(
-      "Invalid cron expression",
-    );
+    expect(() => getCronIntervalInMinutes("bad cron")).toThrow("Invalid cron expression");
   });
 });
 
@@ -753,21 +749,15 @@ describe("getCronIntervalInMinutes", () => {
 
 describe("isAboveMinRefreshInterval", () => {
   it("returns true when value equals min_auto_refresh_interval", () => {
-    expect(isAboveMinRefreshInterval(5, { min_auto_refresh_interval: 5 })).toBe(
-      true,
-    );
+    expect(isAboveMinRefreshInterval(5, { min_auto_refresh_interval: 5 })).toBe(true);
   });
 
   it("returns true when value is above min_auto_refresh_interval", () => {
-    expect(isAboveMinRefreshInterval(10, { min_auto_refresh_interval: 5 })).toBe(
-      true,
-    );
+    expect(isAboveMinRefreshInterval(10, { min_auto_refresh_interval: 5 })).toBe(true);
   });
 
   it("returns false when value is below min_auto_refresh_interval", () => {
-    expect(isAboveMinRefreshInterval(3, { min_auto_refresh_interval: 5 })).toBe(
-      false,
-    );
+    expect(isAboveMinRefreshInterval(3, { min_auto_refresh_interval: 5 })).toBe(false);
   });
 
   it("defaults min interval to 1 when config prop is missing", () => {
@@ -882,12 +872,7 @@ describe("processQueryMetadataErrors", () => {
 
     const result = processQueryMetadataErrors(metadata);
 
-    expect(getFunctionErrorMessage).toHaveBeenCalledWith(
-      "Error A",
-      1_000_000,
-      2_000_000,
-      "UTC",
-    );
+    expect(getFunctionErrorMessage).toHaveBeenCalledWith("Error A", 1_000_000, 2_000_000, "UTC");
     expect(result).toContain("Error A");
   });
 
@@ -917,12 +902,7 @@ describe("processQueryMetadataErrors", () => {
 
     const result = processQueryMetadataErrors(metadata, "UTC");
 
-    expect(getFunctionErrorMessage).toHaveBeenCalledWith(
-      "Flat error",
-      3_000_000,
-      4_000_000,
-      "UTC",
-    );
+    expect(getFunctionErrorMessage).toHaveBeenCalledWith("Flat error", 3_000_000, 4_000_000, "UTC");
     expect(result).toContain("Flat error");
   });
 
@@ -941,7 +921,9 @@ describe("processQueryMetadataErrors", () => {
         { function_error: "Duplicate error", new_start_time: 1, new_end_time: 2 },
       ],
     ];
-    vi.mocked(getFunctionErrorMessage).mockReturnValue("Duplicate error (Data returned for: start to end)");
+    vi.mocked(getFunctionErrorMessage).mockReturnValue(
+      "Duplicate error (Data returned for: start to end)",
+    );
 
     const result = processQueryMetadataErrors(metadata);
 

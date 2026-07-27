@@ -4,24 +4,22 @@
 -->
 <template>
   <div
-    class="flame-graph-view flex flex-col h-full bg-white w-full bg-card-glass-bg!"
+    class="flame-graph-view bg-card-glass-bg! flex h-full w-full flex-col bg-white"
     style="min-height: 400px"
   >
     <!-- Upper area: controls + ruler + chart -->
-    <div class="flex flex-col flex-1 min-h-0">
+    <div class="flex min-h-0 flex-1 flex-col">
       <!-- Controls Bar -->
       <div
-        class="px-6 py-3 border-b border-border-default flex items-center justify-between bg-card-glass-bg!"
+        class="border-border-default bg-card-glass-bg! flex items-center justify-between border-b px-6 py-3"
       >
         <div class="flex items-center space-x-4">
-          <div
-            class="text-xs font-bold text-text-secondary"
-          >
+          <div class="text-text-secondary text-xs font-bold">
             <span class="text-text-body">{{ totalSpans }}</span>
-            {{ t('traces.flameGraphView.spans') }}
+            {{ t("traces.flameGraphView.spans") }}
             <span class="mx-2">•</span>
             <span class="text-text-body">{{ maxDepth }}</span>
-            {{ t('traces.flameGraphView.depth') }}
+            {{ t("traces.flameGraphView.depth") }}
           </div>
         </div>
       </div>
@@ -29,33 +27,27 @@
       <!-- Ruler + chart: outer flex column, mousemove for cursor badge on ruler -->
       <div
         data-test="flame-graph-view-chart-wrapper"
-        class="flex flex-col flex-1 min-h-0"
+        class="flex min-h-0 flex-1 flex-col"
         @mousemove="handleChartMouseMove"
         @mouseleave="cursorVisible = false"
       >
         <!-- Timeline Ruler — stays fixed above the scrollable chart -->
-        <div
-          class="relative bg-card-glass-bg select-none flex-shrink-0"
-          style="height: 1.5rem"
-        >
+        <div class="bg-card-glass-bg relative flex-shrink-0 select-none" style="height: 1.5rem">
           <!-- Static tick labels -->
           <span
             v-for="(tick, index) in timelineTicks"
             :key="'lbl-' + index"
-            class="absolute text-3xs text-text-secondary leading-none whitespace-nowrap"
+            class="text-3xs text-text-secondary absolute leading-none whitespace-nowrap"
             style="top: 50%; padding-left: 3px"
             :style="{ left: tick.left, transform: tick.transform }"
             >{{ tick.label }}</span
           >
 
           <!-- Static tick marks — skip first and last -->
-          <template
-            v-for="(tick, index) in timelineTicks"
-            :key="'tic-' + index"
-          >
+          <template v-for="(tick, index) in timelineTicks" :key="'tic-' + index">
             <div
               v-if="index > 0 && index < timelineTicks.length - 1"
-              class="absolute w-px bottom-0 h-full bg-separator"
+              class="bg-separator absolute bottom-0 h-full w-px"
               :style="{ left: tick.left, transform: 'translateX(-50%)' }"
             ></div>
           </template>
@@ -63,12 +55,12 @@
           <!-- Cursor time badge with downward arrow -->
           <div
             v-if="cursorVisible"
-            class="absolute pointer-events-none flex flex-col items-center z-20"
+            class="pointer-events-none absolute z-20 flex flex-col items-center"
             style="top: 2px; transform: translateX(-50%)"
             :style="{ left: cursorX + 'px' }"
           >
             <div
-              class="text-3xs text-white px-1.5 py-0.5 rounded-default whitespace-nowrap font-medium"
+              class="text-3xs rounded-default px-1.5 py-0.5 font-medium whitespace-nowrap text-white"
               style="background: rgba(30, 30, 30, 0.9); line-height: 1.4"
             >
               {{ cursorTimeLabel }}
@@ -87,10 +79,7 @@
         </div>
 
         <!-- Scrollable chart area: grows to fit all rows, scrolls vertically -->
-        <div
-          ref="chartScrollRef"
-          class="flex-1 overflow-y-auto overflow-x-hidden relative min-h-0"
-        >
+        <div ref="chartScrollRef" class="relative min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
           <div
             :style="{
               height: chartContentHeight + 'px',
@@ -108,11 +97,8 @@
             <!-- Vertical cursor line -->
             <div
               v-if="cursorVisible"
-              class="absolute top-0 bottom-0 pointer-events-none z-10"
-              style="
-                width: 1px;
-                background: rgba(80, 80, 80, 0.6);
-              "
+              class="pointer-events-none absolute top-0 bottom-0 z-10"
+              style="width: 1px; background: rgba(80, 80, 80, 0.6)"
               :style="{ left: cursorX + 'px' }"
             ></div>
           </div>
@@ -125,8 +111,8 @@
         class="absolute inset-0 flex items-center justify-center bg-white"
         style="top: 60px"
       >
-        <div class="text-center text-text-secondary">
-          <div class="text-sm">{{ t('traces.flameGraphView.noSpansToDisplay') }}</div>
+        <div class="text-text-secondary text-center">
+          <div class="text-sm">{{ t("traces.flameGraphView.noSpansToDisplay") }}</div>
         </div>
       </div>
     </div>
@@ -134,7 +120,7 @@
     <!-- Resize handle -->
     <div
       v-if="sidebarVisible"
-      class="h-1 cursor-row-resize bg-border-default hover:bg-accent flex-shrink-0 transition-colors"
+      class="bg-border-default hover:bg-accent h-1 flex-shrink-0 cursor-row-resize transition-colors"
       style="min-height: 4px"
       data-test="flame-graph-resizer"
       @mousedown="startResize"
@@ -144,7 +130,7 @@
     <div
       v-if="sidebarVisible"
       data-test="trace-details-flame-graph-sidebar"
-      class="border-t border-t-solid border-t-card-glass-border bg-card-glass-bg! flex-shrink-0 overflow-hidden"
+      class="border-t-solid border-t-card-glass-border bg-card-glass-bg! flex-shrink-0 overflow-hidden border-t"
       :style="{ height: bottomPanelHeight + 'px' }"
     >
       <TraceDetailsSidebar
@@ -181,7 +167,7 @@ const ChartRenderer = defineAsyncComponent(
 );
 
 const TraceDetailsSidebar = defineAsyncComponent(
-  () => import("@/plugins/traces/TraceDetailsSidebar.vue")
+  () => import("@/plugins/traces/TraceDetailsSidebar.vue"),
 );
 
 // Props
@@ -213,9 +199,7 @@ const emit = defineEmits<{
   close: [];
   "select-span": [spanId: string];
   "add-filter": [payload: { field: string; value: string; operator: "=" | "!=" }];
-  "apply-filter-immediately": [
-    payload: { field: string; value: string; operator: "=" | "!=" },
-  ];
+  "apply-filter-immediately": [payload: { field: string; value: string; operator: "=" | "!=" }];
   "open-trace": [];
 }>();
 
@@ -228,10 +212,7 @@ const cursorX = ref(0);
 const cursorTimeLabel = ref("");
 const sidebarVisible = ref(false);
 const sidebarActiveTab = ref("attributes");
-const {
-  value: bottomPanelHeight,
-  onMouseDown: startResize,
-} = useResizer({
+const { value: bottomPanelHeight, onMouseDown: startResize } = useResizer({
   direction: "vertical",
   initialValue: 360,
   minValue: 200,
@@ -267,10 +248,7 @@ const timelineTicks = computed(() => {
   return [0, 0.25, 0.5, 0.75, 1].map((fraction) => ({
     label: formatDuration(duration * fraction),
     left: `calc(${GRID_LEFT}px + ${fraction} * (100% - ${totalPad}px))`,
-    transform:
-      fraction === 1
-        ? "translateX(-100%) translateY(-50%)"
-        : "translateY(-50%)",
+    transform: fraction === 1 ? "translateX(-100%) translateY(-50%)" : "translateY(-50%)",
   }));
 });
 
@@ -296,8 +274,7 @@ const computeVisualRows = (
 
   for (const span of spans) {
     if (span.parent_span_id && spanIds.has(span.parent_span_id)) {
-      if (!childrenMap.has(span.parent_span_id))
-        childrenMap.set(span.parent_span_id, []);
+      if (!childrenMap.has(span.parent_span_id)) childrenMap.set(span.parent_span_id, []);
       childrenMap.get(span.parent_span_id)!.push(span);
     } else {
       roots.push(span);
@@ -318,9 +295,7 @@ const computeVisualRows = (
     while (true) {
       const occupants = rowOccupancy[candidate];
       if (!occupants) break;
-      const overlaps = occupants.some(
-        (o) => spanStart < o.end && o.start < spanEnd,
-      );
+      const overlaps = occupants.some((o) => spanStart < o.end && o.start < spanEnd);
       if (!overlaps) break;
       candidate++;
     }
@@ -377,11 +352,7 @@ const flameGraphDataAndDepth = computed(() => {
       ],
       itemStyle: {
         color: getOrSetServiceColor(span.resolvedIdentity) || "#9CA3AF",
-        borderColor: isSelected
-          ? "#2563EB"
-          : span.hasError
-            ? "#EF4444"
-            : "#ffffff",
+        borderColor: isSelected ? "#2563EB" : span.hasError ? "#EF4444" : "#ffffff",
         borderWidth: isSelected ? 3 : span.hasError ? 2 : 1,
       },
       emphasis: {
@@ -413,28 +384,25 @@ const chartOptions = computed(() => {
       },
       formatter: (params: any) => {
         const span = params.data.spanData as EnrichedSpan;
-        const percentage = (
-          (span.durationMs / props.traceDuration) *
-          100
-        ).toFixed(2);
+        const percentage = ((span.durationMs / props.traceDuration) * 100).toFixed(2);
 
         return `
           <div style="padding: 4px 0;">
             <div style="font-weight: bold; margin-bottom: 6px;">${escapeHtml(span.operationName)}</div>
             <div style="font-size: var(--text-2xs); line-height: 1.6;">
               <div style="display: flex; justify-content: space-between; gap: 16px;">
-                <span style="color: var(--color-flame-tooltip-label);">${t('traces.flameGraphView.service')}</span>
+                <span style="color: var(--color-flame-tooltip-label);">${t("traces.flameGraphView.service")}</span>
                 <span>${escapeHtml(span.serviceName)}</span>
               </div>
               <div style="display: flex; justify-content: space-between; gap: 16px;">
-                <span style="color: var(--color-flame-tooltip-label);">${t('traces.flameGraphView.duration')}</span>
+                <span style="color: var(--color-flame-tooltip-label);">${t("traces.flameGraphView.duration")}</span>
                 <span>${formatDuration(span.durationMs)}</span>
               </div>
               <div style="display: flex; justify-content: space-between; gap: 16px;">
-                <span style="color: var(--color-flame-tooltip-label);">${t('traces.flameGraphView.percentOfTrace')}</span>
+                <span style="color: var(--color-flame-tooltip-label);">${t("traces.flameGraphView.percentOfTrace")}</span>
                 <span>${percentage}%</span>
               </div>
-              ${span.hasError ? `<div style="color: var(--color-flame-tooltip-error); margin-top: 4px;">${t('traces.flameGraphView.hasErrors')}</div>` : ""}
+              ${span.hasError ? `<div style="color: var(--color-flame-tooltip-error); margin-top: 4px;">${t("traces.flameGraphView.hasErrors")}</div>` : ""}
             </div>
           </div>
         `;
@@ -446,10 +414,7 @@ const chartOptions = computed(() => {
       top: 10,
       bottom: 10,
       containLabel: false,
-      height:
-        maxRow > 0
-          ? maxRow * (BLOCK_HEIGHT + BLOCK_PADDING) + BLOCK_HEIGHT
-          : BLOCK_HEIGHT,
+      height: maxRow > 0 ? maxRow * (BLOCK_HEIGHT + BLOCK_PADDING) + BLOCK_HEIGHT : BLOCK_HEIGHT,
     },
     xAxis: {
       type: "value",
@@ -496,12 +461,9 @@ const chartOptions = computed(() => {
             emphasis: {
               style: {
                 stroke: data[params.dataIndex].emphasis.itemStyle.borderColor,
-                lineWidth:
-                  data[params.dataIndex].emphasis.itemStyle.borderWidth,
-                shadowBlur:
-                  data[params.dataIndex].emphasis.itemStyle.shadowBlur,
-                shadowColor:
-                  data[params.dataIndex].emphasis.itemStyle.shadowColor,
+                lineWidth: data[params.dataIndex].emphasis.itemStyle.borderWidth,
+                shadowBlur: data[params.dataIndex].emphasis.itemStyle.shadowBlur,
+                shadowColor: data[params.dataIndex].emphasis.itemStyle.shadowColor,
               },
             },
             textContent:
@@ -538,10 +500,7 @@ const chartData = computed(() => ({
 // Height of the chart canvas — enough to show all rows without clipping
 const chartContentHeight = computed(() => {
   const { maxRow } = flameGraphDataAndDepth.value;
-  const gridH =
-    maxRow > 0
-      ? maxRow * (BLOCK_HEIGHT + BLOCK_PADDING) + BLOCK_HEIGHT
-      : BLOCK_HEIGHT;
+  const gridH = maxRow > 0 ? maxRow * (BLOCK_HEIGHT + BLOCK_PADDING) + BLOCK_HEIGHT : BLOCK_HEIGHT;
   return gridH + 20; // 20 = grid.top(10) + grid.bottom(10)
 });
 
@@ -552,10 +511,7 @@ const handleChartMouseMove = (event: any) => {
   const rect = event.currentTarget.getBoundingClientRect();
   const offsetX = event.clientX - rect.left;
   const gridWidth = rect.width - GRID_LEFT - GRID_RIGHT;
-  const fraction = Math.max(
-    0,
-    Math.min(1, (offsetX - GRID_LEFT) / gridWidth),
-  );
+  const fraction = Math.max(0, Math.min(1, (offsetX - GRID_LEFT) / gridWidth));
 
   cursorX.value = offsetX;
   cursorTimeLabel.value = formatDuration(fraction * props.traceDuration);
@@ -602,5 +558,4 @@ watch(
 );
 
 // Resizer is now handled by useResizer composable
-
 </script>

@@ -32,12 +32,7 @@ export function jobMappingVariablesForScorer(
   scorer: Scorer,
   existingMapping: Record<string, string> | undefined,
 ) {
-  return [
-    ...new Set([
-      ...scorerTemplateVariables(scorer),
-      ...Object.keys(existingMapping || {}),
-    ]),
-  ];
+  return [...new Set([...scorerTemplateVariables(scorer), ...Object.keys(existingMapping || {})])];
 }
 
 export function buildJobInputMappingPayload(
@@ -51,10 +46,7 @@ export function buildJobInputMappingPayload(
     const cleanMapping = Object.fromEntries(
       Object.entries(inputMappings[scorerId] || {})
         .map(([key, value]) => [key.trim(), value.trim()])
-        .filter(
-          ([key, value]) =>
-            key && value && !isSystemProvidedVariable(targetScope, key),
-        ),
+        .filter(([key, value]) => key && value && !isSystemProvidedVariable(targetScope, key)),
     );
 
     if (Object.keys(cleanMapping).length) payload[scorerId] = cleanMapping;
@@ -63,17 +55,9 @@ export function buildJobInputMappingPayload(
   return Object.keys(payload).length ? payload : null;
 }
 
-export function normalizeJobInputMappings(
-  value: any,
-  selectedScorerIds: string[],
-) {
+export function normalizeJobInputMappings(value: any, selectedScorerIds: string[]) {
   const parsedValue = parseMaybeJson(value);
-  if (
-    !parsedValue ||
-    typeof parsedValue !== "object" ||
-    Array.isArray(parsedValue)
-  )
-    return {};
+  if (!parsedValue || typeof parsedValue !== "object" || Array.isArray(parsedValue)) return {};
 
   const entries = Object.entries(parsedValue);
   const hasPerScorerShape = entries.some(
@@ -81,22 +65,14 @@ export function normalizeJobInputMappings(
       mapping &&
       typeof mapping === "object" &&
       !Array.isArray(mapping) &&
-      Object.values(mapping).every(
-        (fieldValue) => typeof fieldValue === "string",
-      ),
+      Object.values(mapping).every((fieldValue) => typeof fieldValue === "string"),
   );
 
   if (hasPerScorerShape) {
     return Object.fromEntries(
       entries
-        .filter(
-          ([, mapping]) =>
-            mapping && typeof mapping === "object" && !Array.isArray(mapping),
-        )
-        .map(([scorerId, mapping]) => [
-          scorerId,
-          { ...(mapping as Record<string, string>) },
-        ]),
+        .filter(([, mapping]) => mapping && typeof mapping === "object" && !Array.isArray(mapping))
+        .map(([scorerId, mapping]) => [scorerId, { ...(mapping as Record<string, string>) }]),
     );
   }
 
@@ -104,9 +80,7 @@ export function normalizeJobInputMappings(
     entries.filter(([, mappingValue]) => typeof mappingValue === "string"),
   ) as Record<string, string>;
 
-  return Object.fromEntries(
-    selectedScorerIds.map((scorerId) => [scorerId, { ...flatMapping }]),
-  );
+  return Object.fromEntries(selectedScorerIds.map((scorerId) => [scorerId, { ...flatMapping }]));
 }
 
 export function syncJobInputMappings(
@@ -125,8 +99,7 @@ export function syncJobInputMappings(
 
     if (scorer) {
       scorerTemplateVariables(scorer).forEach((variable) => {
-        if (mapping[variable] === undefined)
-          mapping[variable] = defaultJobMappingValue(variable);
+        if (mapping[variable] === undefined) mapping[variable] = defaultJobMappingValue(variable);
       });
     }
 

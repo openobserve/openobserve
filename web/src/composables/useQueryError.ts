@@ -33,14 +33,7 @@
  */
 
 import DOMPurify from "dompurify";
-import {
-  computed,
-  ref,
-  type ComputedRef,
-  type Ref,
-  type MaybeRefOrGetter,
-  toValue,
-} from "vue";
+import { computed, ref, type ComputedRef, type Ref, type MaybeRefOrGetter, toValue } from "vue";
 import { useI18n } from "vue-i18n";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -197,17 +190,14 @@ export function useQueryError(input: QueryErrorInput): QueryErrorResult {
   const detailBody = computed<string>(() => {
     const msg = cleanMessage.value;
     const dotIdx = msg.indexOf(". ");
-    const remainder =
-      dotIdx > 0 && dotIdx < 160 ? msg.slice(dotIdx + 2).trim() : "";
+    const remainder = dotIdx > 0 && dotIdx < 160 ? msg.slice(dotIdx + 2).trim() : "";
     const parts = [remainder, rawDetail.value].filter(Boolean);
     return parts.join("\n\n");
   });
 
   const hasDetail = computed(() => detailBody.value.length > 0);
 
-  const hasAnyContent = computed(
-    () => !!(cleanMessage.value || rawDetail.value || traceId.value),
-  );
+  const hasAnyContent = computed(() => !!(cleanMessage.value || rawDetail.value || traceId.value));
 
   // ── Classification ─────────────────────────────────────────────────────
 

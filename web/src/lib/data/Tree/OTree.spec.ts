@@ -34,9 +34,7 @@ describe("OTree", () => {
     // gridTemplateRows: '0fr' when collapsed. Asserting on the style is the
     // correct behavioral check — it verifies the expand/collapse mechanism,
     // not mere DOM presence.
-    const childrenContainers = wrapper.findAll(
-      '[role="treeitem"] > div:last-child',
-    );
+    const childrenContainers = wrapper.findAll('[role="treeitem"] > div:last-child');
     // Every parent node's children wrapper must start collapsed (0fr)
     childrenContainers.forEach((container) => {
       expect(container.attributes("style")).toContain("grid-template-rows: 0fr");

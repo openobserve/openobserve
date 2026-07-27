@@ -151,9 +151,7 @@ export default defineComponent({
       await getTabOptions();
       // set selectedMoveTabId to first tab from move tab options
       selectedMoveTabId.value =
-        moveTabOptions.value.length > 0
-          ? (moveTabOptions.value[0] as any).value
-          : null;
+        moveTabOptions.value.length > 0 ? (moveTabOptions.value[0] as any).value : null;
     });
 
     const onCancel = () => {
@@ -181,4 +179,3 @@ export default defineComponent({
   },
 });
 </script>
-

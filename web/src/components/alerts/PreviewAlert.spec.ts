@@ -415,7 +415,8 @@ describe("PreviewAlert - cleanAggregationQuery", () => {
 
   it("exposes cleanAggregationQuery internally (internal test via refreshData)", async () => {
     const w = await mountComp({
-      query: "SELECT histogram(_timestamp) AS zo_sql_key, count(*) AS zo_sql_val FROM stream GROUP BY zo_sql_key HAVING zo_sql_val >= 10",
+      query:
+        "SELECT histogram(_timestamp) AS zo_sql_key, count(*) AS zo_sql_val FROM stream GROUP BY zo_sql_key HAVING zo_sql_val >= 10",
       selectedTab: "custom",
       isAggregationEnabled: true,
       formData: {

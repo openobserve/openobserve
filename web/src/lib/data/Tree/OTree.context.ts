@@ -24,5 +24,4 @@ export interface TreeContext {
   toggleExpanded(key: TreeNodeKey): void;
 }
 
-export const TREE_CONTEXT_KEY: InjectionKey<TreeContext> =
-  Symbol("OTreeContext");
+export const TREE_CONTEXT_KEY: InjectionKey<TreeContext> = Symbol("OTreeContext");

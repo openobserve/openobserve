@@ -75,7 +75,6 @@ vi.mock("@/composables/useStreams", () => ({
   })),
 }));
 
-
 describe("RealUserMonitoring.vue", () => {
   let store: any;
   let router: any;
@@ -140,7 +139,10 @@ describe("RealUserMonitoring.vue", () => {
     it("should show loading spinner when RUM status is being checked", async () => {
       let resolveGetStream: any;
       mockGetStream.mockImplementation(
-        () => new Promise((resolve) => { resolveGetStream = resolve; })
+        () =>
+          new Promise((resolve) => {
+            resolveGetStream = resolve;
+          }),
       );
 
       const wrapper = mount(RealUserMonitoring, {
@@ -148,7 +150,7 @@ describe("RealUserMonitoring.vue", () => {
           plugins: [store, router, i18n],
           stubs: {
             "router-view": true,
-            "OIcon": true,
+            OIcon: true,
             AppTabs: true,
           },
         },
@@ -158,9 +160,7 @@ describe("RealUserMonitoring.vue", () => {
       await wrapper.vm.$nextTick();
 
       expect(wrapper.find('[data-test="rum-loading-indicator"]').exists()).toBe(true);
-      expect(wrapper.text()).toContain(
-        "Hold on tight, we're loading RUM data."
-      );
+      expect(wrapper.text()).toContain("Hold on tight, we're loading RUM data.");
 
       // Resolve the promise
       resolveGetStream(null);
@@ -177,7 +177,7 @@ describe("RealUserMonitoring.vue", () => {
           plugins: [store, router, i18n],
           stubs: {
             "router-view": true,
-            "OIcon": true,
+            OIcon: true,
             AppTabs: true,
           },
         },
@@ -197,7 +197,7 @@ describe("RealUserMonitoring.vue", () => {
           plugins: [store, router, i18n],
           stubs: {
             "router-view": true,
-            "OIcon": true,
+            OIcon: true,
             AppTabs: true,
           },
         },
@@ -248,7 +248,7 @@ describe("RealUserMonitoring.vue", () => {
           plugins: [store, router, i18n],
           stubs: {
             "router-view": true,
-            "OIcon": true,
+            OIcon: true,
             AppTabs: {
               template:
                 '<div class="app-tabs"><slot v-for="tab in tabs" :name="tab.value" /></div>',
@@ -260,7 +260,7 @@ describe("RealUserMonitoring.vue", () => {
               emits: ["update:modelValue", "change"],
             },
             OTab: {
-              template: '<div></div>',
+              template: "<div></div>",
               props: ["name", "label"],
             },
           },
@@ -282,7 +282,7 @@ describe("RealUserMonitoring.vue", () => {
             "router-view": {
               template: '<div class="router-view"><slot /></div>',
             },
-            "OIcon": true,
+            OIcon: true,
             AppTabs: true,
           },
         },
@@ -306,11 +306,10 @@ describe("RealUserMonitoring.vue", () => {
           plugins: [store, router, i18n],
           stubs: {
             "router-view": {
-              template:
-                '<component :is="Component" v-bind="$attrs" v-slot="{ Component }" />',
+              template: '<component :is="Component" v-bind="$attrs" v-slot="{ Component }" />',
               components: { component: childComponentStub },
             },
-            "OIcon": true,
+            OIcon: true,
             AppTabs: true,
           },
         },
@@ -319,11 +318,7 @@ describe("RealUserMonitoring.vue", () => {
       await flushPromises();
 
       expect(mockGetStream).toHaveBeenCalledWith("_rumdata", "logs", false);
-      expect(mockGetStream).toHaveBeenCalledWith(
-        "_sessionreplay",
-        "logs",
-        false
-      );
+      expect(mockGetStream).toHaveBeenCalledWith("_sessionreplay", "logs", false);
     });
 
     it("should load schema when RUM is enabled", async () => {
@@ -334,7 +329,7 @@ describe("RealUserMonitoring.vue", () => {
           plugins: [store, router, i18n],
           stubs: {
             "router-view": true,
-            "OIcon": true,
+            OIcon: true,
             AppTabs: true,
           },
         },
@@ -369,7 +364,7 @@ describe("RealUserMonitoring.vue", () => {
           plugins: [store, router, i18n],
           stubs: {
             "router-view": true,
-            "OIcon": true,
+            OIcon: true,
             AppTabs: true,
           },
         },
@@ -389,7 +384,7 @@ describe("RealUserMonitoring.vue", () => {
           plugins: [store, router, i18n],
           stubs: {
             "router-view": true,
-            "OIcon": true,
+            OIcon: true,
             AppTabs: true,
           },
         },
@@ -408,7 +403,7 @@ describe("RealUserMonitoring.vue", () => {
           plugins: [store, router, i18n],
           stubs: {
             "router-view": true,
-            "OIcon": true,
+            OIcon: true,
             AppTabs: true,
           },
         },
@@ -427,7 +422,7 @@ describe("RealUserMonitoring.vue", () => {
           plugins: [store, router, i18n],
           stubs: {
             "router-view": true,
-            "OIcon": true,
+            OIcon: true,
             AppTabs: true,
           },
         },
@@ -517,7 +512,7 @@ describe("RealUserMonitoring.vue", () => {
           plugins: [store, router, i18n],
           stubs: {
             "router-view": true,
-            "OIcon": true,
+            OIcon: true,
             AppTabs: true,
           },
         },

@@ -14,10 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect } from "vitest";
-import {
-  ALERT_PAYLOAD_FIELDS,
-  TRIGGER_META_VARS,
-} from "@/plugins/workflows/alertFields";
+import { ALERT_PAYLOAD_FIELDS, TRIGGER_META_VARS } from "@/plugins/workflows/alertFields";
 import en from "@/locales/languages/en-US.json";
 
 /** Resolve a dotted i18n key against the en.json translation tree. */
@@ -157,12 +154,8 @@ describe("alertFields", () => {
     });
 
     it("carries two runtime-only columns beyond the trigger meta schema", () => {
-      const fromSchema = new Set(
-        TRIGGER_META_VARS.map((v) => v.ref.replace(/^meta\./, "meta_")),
-      );
-      const extra = ALERT_PAYLOAD_FIELDS.map((f) => f.value).filter(
-        (v) => !fromSchema.has(v),
-      );
+      const fromSchema = new Set(TRIGGER_META_VARS.map((v) => v.ref.replace(/^meta\./, "meta_")));
+      const extra = ALERT_PAYLOAD_FIELDS.map((f) => f.value).filter((v) => !fromSchema.has(v));
       expect(extra.sort()).toEqual(["meta_alert_trigger_time", "meta_alert_url"]);
     });
 

@@ -279,6 +279,10 @@ jobs:
         working-directory: web
         run: npm ci
 
+      - name: Prettier format check (any unformatted file fails)
+        working-directory: web
+        run: npm run format:check
+
       - name: Type-check (any error fails)
         working-directory: web
         run: npm run type-check:app

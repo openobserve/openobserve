@@ -175,9 +175,7 @@ describe("DestinationTestResult - failure state", () => {
       result: makeResult({ success: false, error: "detail error" }),
     });
 
-    expect(
-      wrapper.find('[data-test="test-failure-details-expansion"]').exists(),
-    ).toBe(true);
+    expect(wrapper.find('[data-test="test-failure-details-expansion"]').exists()).toBe(true);
   });
 
   it("does not show collapsible expansion when there is no error or responseBody", async () => {
@@ -186,9 +184,7 @@ describe("DestinationTestResult - failure state", () => {
     });
 
     // OCollapsible is rendered only when result.error || result.responseBody
-    expect(
-      wrapper.find('[data-test="test-failure-details-expansion"]').exists(),
-    ).toBe(false);
+    expect(wrapper.find('[data-test="test-failure-details-expansion"]').exists()).toBe(false);
   });
 
   it("does not show success or idle when failure", async () => {

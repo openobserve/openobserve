@@ -110,9 +110,7 @@ describe("FieldExpansion.vue", () => {
 
     it("renders expand button with data-test", () => {
       const wrapper = createWrapper();
-      expect(
-        wrapper.find('[data-test="log-search-expand-status-field-btn"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="log-search-expand-status-field-btn"]').exists()).toBe(true);
     });
 
     it("renders FieldValuesPanel with mapped field values", () => {
@@ -205,9 +203,7 @@ describe("FieldExpansion.vue", () => {
     it("shows add icon when field is not selected", () => {
       const wrapper = createWrapper({ selectedFields: [] });
 
-      const addIcon = wrapper.find(
-        '[data-test="log-search-index-list-add-status-field-btn"]',
-      );
+      const addIcon = wrapper.find('[data-test="log-search-index-list-add-status-field-btn"]');
       expect(addIcon.exists()).toBe(true);
 
       const removeIcon = wrapper.find(
@@ -219,9 +215,7 @@ describe("FieldExpansion.vue", () => {
     it("shows remove icon when field is selected", () => {
       const wrapper = createWrapper({ selectedFields: ["status"] });
 
-      const addIcon = wrapper.find(
-        '[data-test="log-search-index-list-add-status-field-btn"]',
-      );
+      const addIcon = wrapper.find('[data-test="log-search-index-list-add-status-field-btn"]');
       expect(addIcon.exists()).toBe(false);
 
       const removeIcon = wrapper.find(
@@ -233,15 +227,11 @@ describe("FieldExpansion.vue", () => {
     it("emits toggle-field when add icon is clicked", async () => {
       const wrapper = createWrapper({ selectedFields: [] });
 
-      const addIcon = wrapper.find(
-        '[data-test="log-search-index-list-add-status-field-btn"]',
-      );
+      const addIcon = wrapper.find('[data-test="log-search-index-list-add-status-field-btn"]');
       await addIcon.trigger("click");
 
       expect(wrapper.emitted("toggle-field")).toBeTruthy();
-      expect(wrapper.emitted("toggle-field")?.[0]).toEqual([
-        defaultProps.field,
-      ]);
+      expect(wrapper.emitted("toggle-field")?.[0]).toEqual([defaultProps.field]);
     });
 
     it("emits toggle-field when remove icon is clicked", async () => {
@@ -265,9 +255,7 @@ describe("FieldExpansion.vue", () => {
         },
       });
 
-      const icon = wrapper.find(
-        '[data-test="log-search-index-list-interesting-status-field-btn"]',
-      );
+      const icon = wrapper.find('[data-test="log-search-index-list-interesting-status-field-btn"]');
       expect(icon.exists()).toBe(true);
     });
 
@@ -279,9 +267,7 @@ describe("FieldExpansion.vue", () => {
         },
       });
 
-      const icon = wrapper.find(
-        '[data-test="log-search-index-list-interesting-status-field-btn"]',
-      );
+      const icon = wrapper.find('[data-test="log-search-index-list-interesting-status-field-btn"]');
       expect(icon.exists()).toBe(true);
     });
 
@@ -293,9 +279,7 @@ describe("FieldExpansion.vue", () => {
         },
       });
 
-      const icon = wrapper.find(
-        '[data-test="log-search-index-list-interesting-status-field-btn"]',
-      );
+      const icon = wrapper.find('[data-test="log-search-index-list-interesting-status-field-btn"]');
       await icon.trigger("click");
 
       expect(wrapper.emitted("toggle-interesting")).toBeTruthy();
@@ -306,9 +290,7 @@ describe("FieldExpansion.vue", () => {
     it("emits add-to-filter when filter button is clicked", async () => {
       const wrapper = createWrapper();
 
-      const filterBtn = wrapper.find(
-        '[data-test="log-search-index-list-filter-status-field-btn"]',
-      );
+      const filterBtn = wrapper.find('[data-test="log-search-index-list-filter-status-field-btn"]');
       expect(filterBtn.exists()).toBe(true);
       await filterBtn.trigger("click");
 
@@ -323,10 +305,7 @@ describe("FieldExpansion.vue", () => {
       await trigger.trigger("click");
 
       expect(wrapper.emitted("before-show")).toBeTruthy();
-      expect(wrapper.emitted("before-show")?.[0]).toEqual([
-        null,
-        defaultProps.field,
-      ]);
+      expect(wrapper.emitted("before-show")?.[0]).toEqual([null, defaultProps.field]);
     });
 
     it("stays collapsed when expanded prop is false", () => {
@@ -344,18 +323,14 @@ describe("FieldExpansion.vue", () => {
     it("shows interesting field icon when showQuickMode is true", () => {
       const wrapper = createWrapper({ showQuickMode: true });
 
-      const icon = wrapper.find(
-        '[data-test="log-search-index-list-interesting-status-field-btn"]',
-      );
+      const icon = wrapper.find('[data-test="log-search-index-list-interesting-status-field-btn"]');
       expect(icon.exists()).toBe(true);
     });
 
     it("hides interesting field icon when showQuickMode is false", () => {
       const wrapper = createWrapper({ showQuickMode: false });
 
-      const icon = wrapper.find(
-        '[data-test="log-search-index-list-interesting-status-field-btn"]',
-      );
+      const icon = wrapper.find('[data-test="log-search-index-list-interesting-status-field-btn"]');
       expect(icon.exists()).toBe(false);
     });
   });

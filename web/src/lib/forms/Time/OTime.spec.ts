@@ -46,9 +46,7 @@ describe("OTime", () => {
       attachTo: document.body,
       props: { errorMessage: "Required" },
     });
-    expect(wrapper.find('[role="group"]').attributes("aria-invalid")).toBe(
-      "true",
-    );
+    expect(wrapper.find('[role="group"]').attributes("aria-invalid")).toBe("true");
   });
 
   it("should render help text when no error", () => {
@@ -138,17 +136,13 @@ describe("OTime", () => {
     wrapper = mount(OTime, { attachTo: document.body });
     await wrapper.find('[aria-label="Open time picker"]').trigger("click");
     await flushPromises();
-    expect(
-      document.body.querySelector('[data-test="otime-clock-face"]'),
-    ).toBeTruthy();
+    expect(document.body.querySelector('[data-test="otime-clock-face"]')).toBeTruthy();
   });
 
   it("should render a Close button in the popup", async () => {
     wrapper = mount(OTime, { attachTo: document.body });
     await wrapper.find('[aria-label="Open time picker"]').trigger("click");
     await flushPromises();
-    expect(
-      document.body.querySelector('[data-test="otime-close"]'),
-    ).toBeTruthy();
+    expect(document.body.querySelector('[data-test="otime-close"]')).toBeTruthy();
   });
 });

@@ -7,11 +7,7 @@ type OpenHandler = (event: Event, socketId: string) => void;
 type CloseHandler = (event: CloseEvent, socketId: string) => void;
 type ErrorHandler = (event: Event, socketId: string) => void;
 
-type WebSocketHandler =
-  | MessageHandler
-  | OpenHandler
-  | CloseHandler
-  | ErrorHandler;
+type WebSocketHandler = MessageHandler | OpenHandler | CloseHandler | ErrorHandler;
 type HandlerMap = Record<string, WebSocketHandler[]>;
 
 // Store WebSocket instances and their handlers by socketId
@@ -79,18 +75,11 @@ const sendMessage = (socketId: string, message: string) => {
   if (socket && socket.readyState === WebSocket.OPEN) {
     socket.send(message);
   } else {
-    console.error(
-      `WebSocket ${socketId} is not open. Ready state is:`,
-      socket?.readyState,
-    );
+    console.error(`WebSocket ${socketId} is not open. Ready state is:`, socket?.readyState);
   }
 };
 
-const addHandler = (
-  handlersMap: HandlerMap,
-  socketId: string,
-  handler: WebSocketHandler,
-) => {
+const addHandler = (handlersMap: HandlerMap, socketId: string, handler: WebSocketHandler) => {
   if (typeof handler !== "function") {
     throw new Error("Handler must be a function");
   }
@@ -99,11 +88,7 @@ const addHandler = (
   handlersMap[socketId].push(handler);
 };
 
-const removeHandler = (
-  handlersMap: HandlerMap,
-  socketId: string,
-  handler: WebSocketHandler,
-) => {
+const removeHandler = (handlersMap: HandlerMap, socketId: string, handler: WebSocketHandler) => {
   if (typeof handler !== "function") {
     throw new Error("Handler must be a function");
   }
@@ -117,9 +102,12 @@ const removeHandler = (
 
 const closeSocket = (socketId: string) => {
   const socket = sockets[socketId];
-  if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) {
-      // sendMessage(socketId, JSON.stringify({ type: "close" }));
-      socket.close(1000, "search cancelled");
+  if (
+    socket &&
+    (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)
+  ) {
+    // sendMessage(socketId, JSON.stringify({ type: "close" }));
+    socket.close(1000, "search cancelled");
   }
 };
 
@@ -134,7 +122,7 @@ const useWebSocket = () => {
   const cleanupSocket = (socketId: string) => {
     const socket = sockets[socketId];
 
-    if(!socket) {
+    if (!socket) {
       console.error("Cleanup socket failed, socket not found", socketId);
       return;
     }

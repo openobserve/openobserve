@@ -56,11 +56,7 @@ describe("captureFromSearchHits", () => {
     const hits = Array.from({ length: 150 }, (_, i) => ({ status: `${i}` }));
     captureFromSearchHits(ctx, hits, []);
     await vi.runAllTimersAsync();
-    expect(extractValuesFromHits).toHaveBeenCalledWith(
-      hits.slice(0, 100),
-      [],
-      expect.any(Number),
-    );
+    expect(extractValuesFromHits).toHaveBeenCalledWith(hits.slice(0, 100), [], expect.any(Number));
   });
 
   it("calls mergeMultipleValues with correct composite keys", async () => {
@@ -107,10 +103,7 @@ describe("captureFromValuesApi", () => {
   });
 
   it("calls mergeValues with correct key and values", async () => {
-    captureFromValuesApi(ctx, "status", [
-      { key: "200" },
-      { key: "404" },
-    ]);
+    captureFromValuesApi(ctx, "status", [{ key: "200" }, { key: "404" }]);
     await vi.runAllTimersAsync();
     expect(fieldValueDB.mergeValues).toHaveBeenCalledWith(
       "myorg|logs|http_logs|status",

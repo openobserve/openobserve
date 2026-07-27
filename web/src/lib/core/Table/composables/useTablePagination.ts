@@ -20,9 +20,7 @@ export function useTablePagination<TData>(
   const isServerMode = computed(() => props.pagination === "server");
   const isEnabled = computed(() => props.pagination !== "none");
 
-  const pageSizeOptions = computed(() =>
-    props.pageSizeOptions ?? [20, 50, 100, 250, 500],
-  );
+  const pageSizeOptions = computed(() => props.pageSizeOptions ?? [20, 50, 100, 250, 500]);
 
   // In client mode, allow the parent to force a specific page by passing currentPage.
   // This lets callers reset to page 1 on filter/search changes without relying on

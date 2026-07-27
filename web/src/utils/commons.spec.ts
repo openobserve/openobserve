@@ -127,7 +127,9 @@ describe("Commons Utility Functions", () => {
 
       const result = await modifySQLQuery(currentTimeObj, querySQL, timestampColumn);
 
-      expect(result).toContain("time_range(_timestamp,'2023-01-01T12:00:00Z', '2023-01-01T12:00:00Z')");
+      expect(result).toContain(
+        "time_range(_timestamp,'2023-01-01T12:00:00Z', '2023-01-01T12:00:00Z')",
+      );
       expect(result).toContain("WHERE");
       expect(result).toContain("level = 'error'");
     });
@@ -137,14 +139,17 @@ describe("Commons Utility Functions", () => {
         start_time: "2023-01-01T00:00:00Z",
         end_time: "2023-01-01T23:59:59Z",
       };
-      const querySQL = "SELECT * FROM logs WHERE time_range(_timestamp,'old_start','old_end') AND level = 'error'";
+      const querySQL =
+        "SELECT * FROM logs WHERE time_range(_timestamp,'old_start','old_end') AND level = 'error'";
       const timestampColumn = "_timestamp";
 
       const result = await modifySQLQuery(currentTimeObj, querySQL, timestampColumn);
 
       expect(result).not.toContain("old_start");
       expect(result).not.toContain("old_end");
-      expect(result).toContain("time_range(_timestamp,'2023-01-01T12:00:00Z', '2023-01-01T12:00:00Z')");
+      expect(result).toContain(
+        "time_range(_timestamp,'2023-01-01T12:00:00Z', '2023-01-01T12:00:00Z')",
+      );
     });
 
     it.skip("should return original query when no WHERE clause and no existing time_range", async () => {
@@ -165,12 +170,15 @@ describe("Commons Utility Functions", () => {
         start_time: "2023-01-01T00:00:00Z",
         end_time: "2023-01-01T23:59:59Z",
       };
-      const querySQL = "SELECT * FROM logs WHERE time_range(_timestamp, '2023-01-01', '2023-01-02') AND user_id = 123";
+      const querySQL =
+        "SELECT * FROM logs WHERE time_range(_timestamp, '2023-01-01', '2023-01-02') AND user_id = 123";
       const timestampColumn = "_timestamp";
 
       const result = await modifySQLQuery(currentTimeObj, querySQL, timestampColumn);
 
-      expect(result).toContain("time_range(_timestamp,'2023-01-01T12:00:00Z', '2023-01-01T12:00:00Z')");
+      expect(result).toContain(
+        "time_range(_timestamp,'2023-01-01T12:00:00Z', '2023-01-01T12:00:00Z')",
+      );
       expect(result).toContain("user_id = 123");
     });
   });
@@ -315,7 +323,7 @@ describe("Commons Utility Functions", () => {
         "",
         "test-org",
         folderId,
-        ""
+        "",
       );
       expect(mockStore.dispatch).toHaveBeenCalledWith("setAllDashboardList", expect.any(Object));
     });
@@ -379,7 +387,7 @@ describe("Commons Utility Functions", () => {
             expect.objectContaining({ created: "2023-01-02T00:00:00Z" }),
             expect.objectContaining({ created: "2023-01-01T00:00:00Z" }),
           ]),
-        })
+        }),
       );
     });
   });
@@ -421,9 +429,7 @@ describe("Commons Utility Functions", () => {
       const type = "dashboards";
       const mockResponse = {
         data: {
-          list: [
-            { folderId: "folder1", name: "Folder 1", description: "Folder 1" },
-          ],
+          list: [{ folderId: "folder1", name: "Folder 1", description: "Folder 1" }],
         },
       };
 
@@ -868,9 +874,9 @@ describe("Commons Utility Functions", () => {
 
       mockStore.state.organizationData.allDashboardData[dashboardId] = mockDashboard;
 
-      await expect(
-        addVariable(mockStore, dashboardId, variableData, folderId)
-      ).rejects.toThrow("Variable with same name already exists");
+      await expect(addVariable(mockStore, dashboardId, variableData, folderId)).rejects.toThrow(
+        "Variable with same name already exists",
+      );
     });
   });
 
@@ -944,7 +950,7 @@ describe("Commons Utility Functions", () => {
       mockStore.state.organizationData.allDashboardData[dashboardId] = mockDashboard;
 
       await expect(
-        updateVariable(mockStore, dashboardId, variableName, variableData, folderId)
+        updateVariable(mockStore, dashboardId, variableName, variableData, folderId),
       ).rejects.toThrow("Variable with same name already exists");
     });
   });
@@ -1198,7 +1204,14 @@ describe("Commons Utility Functions", () => {
         data: { version: 1, v1: mockDashboard, hash: 123 },
       });
 
-      await movePanelToAnotherTab(mockStore, dashboardId, panelId, folderId, currentTabId, moveToTabId);
+      await movePanelToAnotherTab(
+        mockStore,
+        dashboardId,
+        panelId,
+        folderId,
+        currentTabId,
+        moveToTabId,
+      );
 
       expect(mockDashboard.tabs[0].panels).toHaveLength(0); // Panel removed from original tab
       expect(mockDashboard.tabs[1].panels).toHaveLength(2); // Panel added to target tab
@@ -1393,10 +1406,7 @@ describe("Commons Utility Functions", () => {
         });
         // …AND the legacy list refreshed for SelectFolderDropdown.
         expect(dashboardService.list_Folders).toHaveBeenCalledWith("test-org");
-        expect(mockStore.dispatch).toHaveBeenCalledWith(
-          "setFolders",
-          newFolderList.data.list,
-        );
+        expect(mockStore.dispatch).toHaveBeenCalledWith("setFolders", newFolderList.data.list);
       });
 
       it("updateFolderByType('dashboards') refreshes the legacy folders list too", async () => {
@@ -1405,10 +1415,7 @@ describe("Commons Utility Functions", () => {
         await updateFolderByType(mockStore, "zzzz", { name: "zzzz2" }, "dashboards");
 
         expect(dashboardService.list_Folders).toHaveBeenCalledWith("test-org");
-        expect(mockStore.dispatch).toHaveBeenCalledWith(
-          "setFolders",
-          newFolderList.data.list,
-        );
+        expect(mockStore.dispatch).toHaveBeenCalledWith("setFolders", newFolderList.data.list);
       });
 
       it("deleteFolderByIdByType('dashboards') refreshes the legacy folders list too", async () => {
@@ -1417,10 +1424,7 @@ describe("Commons Utility Functions", () => {
         await deleteFolderByIdByType(mockStore, "zzzz", "dashboards");
 
         expect(dashboardService.list_Folders).toHaveBeenCalledWith("test-org");
-        expect(mockStore.dispatch).toHaveBeenCalledWith(
-          "setFolders",
-          newFolderList.data.list,
-        );
+        expect(mockStore.dispatch).toHaveBeenCalledWith("setFolders", newFolderList.data.list);
       });
 
       it("does NOT touch the legacy dashboards list for other types", async () => {
@@ -1431,10 +1435,7 @@ describe("Commons Utility Functions", () => {
         await createFolderByType(mockStore, { name: "alert folder" }, "alerts");
 
         expect(dashboardService.list_Folders).not.toHaveBeenCalled();
-        expect(mockStore.dispatch).not.toHaveBeenCalledWith(
-          "setFolders",
-          expect.anything(),
-        );
+        expect(mockStore.dispatch).not.toHaveBeenCalledWith("setFolders", expect.anything());
       });
     });
   });
@@ -1450,7 +1451,12 @@ describe("Commons Utility Functions", () => {
 
       await moveDashboardToAnotherFolder(mockStore, dashboardIds, from, to);
 
-      expect(dashboardService.move_Dashboard).toHaveBeenCalledWith("test-org", dashboardIds, from, to);
+      expect(dashboardService.move_Dashboard).toHaveBeenCalledWith(
+        "test-org",
+        dashboardIds,
+        from,
+        to,
+      );
     });
   });
 
@@ -1464,7 +1470,12 @@ describe("Commons Utility Functions", () => {
 
       await moveModuleToAnotherFolder(mockStore, data, type, folder_id);
 
-      expect(commonService.move_across_folders).toHaveBeenCalledWith("test-org", type, data, folder_id);
+      expect(commonService.move_across_folders).toHaveBeenCalledWith(
+        "test-org",
+        type,
+        data,
+        folder_id,
+      );
     });
   });
 });

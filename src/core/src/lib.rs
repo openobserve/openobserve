@@ -24,7 +24,6 @@ pub mod auth;
 pub mod authz;
 pub mod bootstrap;
 pub mod cache;
-pub mod cluster_info;
 pub mod dashboards;
 use ::common;
 use ::db;
@@ -32,8 +31,6 @@ pub mod error_suggest;
 use ::db::folders;
 pub mod functions;
 pub mod functions_cache;
-pub mod github;
-pub mod grpc;
 pub mod http;
 #[cfg(feature = "enterprise")]
 pub mod incidents;
@@ -45,13 +42,9 @@ pub mod llm_evaluations;
 pub mod logs;
 pub mod metadata;
 pub mod metrics;
-pub mod model_pricing;
-pub mod node;
 #[cfg(feature = "enterprise")]
 pub mod ofga;
 pub mod org_cleanup;
-#[cfg(feature = "enterprise")]
-pub mod org_storage_providers;
 #[cfg(feature = "cloud")]
 pub mod org_usage;
 pub mod organization;
@@ -60,20 +53,15 @@ pub mod pipeline;
 pub mod providers;
 #[cfg(feature = "enterprise")]
 pub mod ratelimit;
-pub mod runtime_metrics;
-pub mod schema_watcher;
 use search_service as search;
 pub mod self_reporting;
 pub mod service;
 pub mod session;
 pub mod short_url;
-pub mod sourcemaps;
 pub mod stream;
 pub mod stream_utils;
 pub mod synthetics;
 pub mod system_settings;
-pub use tantivy_utils::index_builder as tantivy;
-pub mod tls;
 pub mod traces;
 #[cfg(feature = "cloud")]
 pub mod trial_quota;

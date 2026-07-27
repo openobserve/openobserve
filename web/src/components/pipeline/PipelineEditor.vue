@@ -15,8 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="w-full h-full flex flex-col min-h-0">
-    <div class="flex-1 min-h-0 flex flex-col bg-card-glass-bg">
+  <div class="flex h-full min-h-0 w-full flex-col">
+    <div class="bg-card-glass-bg flex min-h-0 flex-1 flex-col">
       <!-- The shell (Functions.vue) renders the "Pipelines › <name>" breadcrumb
            header; we contribute the editor actions to it via the portal and the
            pipeline name for NEW pipelines (edit mode shows it in the breadcrumb). -->
@@ -70,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            table): a fixed-width flush rail on the left and a fluid pane on the
            right. Both sides are h-full off the flex row, so the editor fills
            whatever the shell gives it instead of guessing at viewport maths. -->
-      <div class="flex-1 flex min-h-0">
+      <div class="flex min-h-0 flex-1">
         <!-- Left: docked node palette (shared with Workflows). Same component
              drives both editors, so the two palettes can never drift apart. -->
         <NodePalette
@@ -90,11 +90,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              node and the edge-help toast. Without it they anchored to some
              ancestor further up, so the start node sat at a different height
              than the workflow canvas's, which IS positioned. -->
-        <div class="flex-1 min-w-0 h-full">
+        <div class="h-full min-w-0 flex-1">
           <div
             id="pipelineChartContainer"
             ref="chartContainerRef"
-            class="relative pipeline-chart-container o2vf_node h-full w-full overflow-hidden bg-surface-subtle dark:bg-transparent"
+            class="pipeline-chart-container o2vf_node bg-surface-subtle relative h-full w-full overflow-hidden dark:bg-transparent"
             v-show="!pipelineObj.dialog.show || pipelineObj.dialog.name != 'query'"
           >
             <PipelineFlow />
@@ -144,7 +144,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @pick="onStepPick"
     @close="closeStepPicker"
   />
-  <ODrawer data-test="pipeline-editor-json-editor-drawer"
+  <ODrawer
+    data-test="pipeline-editor-json-editor-drawer"
     bleed
     v-model:open="showJsonEditorDialog"
     :width="70"
@@ -157,12 +158,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="icon-toolbar"
         @click="toggleJsonEditorAIChat"
         data-test="menu-link-ai-item"
-        class="group [background:var(--color-gradient-ai-subtle)]! text-ai-accent! dark:text-white! [transition:background_0.3s_ease,box-shadow_0.3s_ease,color_0.3s_ease] dark:shadow-[0_0.25rem_0.75rem_0_color-mix(in_srgb,var(--color-ai-accent)_20%,transparent)] hover:[background:var(--color-gradient-ai)]! hover:text-white! hover:shadow-[0_0.25rem_0.75rem_0_color-mix(in_srgb,var(--color-ai-accent)_35%,transparent)] dark:hover:shadow-[0_0.25rem_0.75rem_0_color-mix(in_srgb,var(--color-ai-accent)_35%,transparent)]"
+        class="group text-ai-accent! [background:var(--color-gradient-ai-subtle)]! [transition:background_0.3s_ease,box-shadow_0.3s_ease,color_0.3s_ease] hover:text-white! hover:shadow-[0_0.25rem_0.75rem_0_color-mix(in_srgb,var(--color-ai-accent)_35%,transparent)] hover:[background:var(--color-gradient-ai)]! dark:text-white! dark:shadow-[0_0.25rem_0.75rem_0_color-mix(in_srgb,var(--color-ai-accent)_20%,transparent)] dark:hover:shadow-[0_0.25rem_0.75rem_0_color-mix(in_srgb,var(--color-ai-accent)_35%,transparent)]"
         :class="store.state.isAiChatEnabled ? 'ai-btn-active' : ''"
         @mouseenter="isJsonEditorAiHovered = true"
         @mouseleave="isJsonEditorAiHovered = false"
       >
-        <img :src="jsonEditorAiBtnLogo" class="header-icon size-5 [transition:transform_0.6s_ease] group-hover:rotate-180 group-hover:brightness-0 group-hover:invert group-hover:[transition:filter_0.3s_ease]" />
+        <img
+          :src="jsonEditorAiBtnLogo"
+          class="header-icon size-5 [transition:transform_0.6s_ease] group-hover:rotate-180 group-hover:brightness-0 group-hover:invert group-hover:[transition:filter_0.3s_ease]"
+        />
       </OButton>
     </template>
     <JsonEditor
@@ -174,7 +178,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @saveJson="savePipelineJson"
     />
   </ODrawer>
-  <confirm-dialog
+  <ConfirmDialog
     :title="confirmDialogMeta.title"
     :message="confirmDialogMeta.message"
     @update:ok="confirmDialogMeta.onConfirm()"
@@ -234,7 +238,7 @@ import { MarkerType, useVueFlow } from "@vue-flow/core";
 import ExternalDestination from "./NodeForm/ExternalDestination.vue";
 import { contextRegistry, createPipelinesContextProvider } from "@/composables/contextProviders";
 import JsonEditor from "../common/JsonEditor.vue";
-import { validatePipeline as validatePipelineUtil } from '../../utils/validatePipeline';
+import { validatePipeline as validatePipelineUtil } from "../../utils/validatePipeline";
 import { useReo } from "@/services/reodotdev_analytics";
 
 const functionImage = getImageURL("images/pipeline/transform_function.png");
@@ -249,9 +253,7 @@ import usePipelines from "@/composables/usePipelines";
 import config from "@/aws-exports";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
-const PipelineFlow = defineAsyncComponent(
-  () => import("@/plugins/pipelines/PipelineFlow.vue"),
-);
+const PipelineFlow = defineAsyncComponent(() => import("@/plugins/pipelines/PipelineFlow.vue"));
 
 interface Routing {
   [key: string]: RouteCondition[];
@@ -367,8 +369,14 @@ const nodeTypes: any = [
 ];
 const functions = ref<{ [key: string]: Function }>({});
 
-const { pipelineObj, resetPipelineData, addNodeAfter, addSourceNode, closeStepPicker, onDragStart } =
-  useDragAndDrop();
+const {
+  pipelineObj,
+  resetPipelineData,
+  addNodeAfter,
+  addSourceNode,
+  closeStepPicker,
+  onDragStart,
+} = useDragAndDrop();
 
 // Items for the shared step picker: the downstream-addable node types
 // (Transform + Destination; sources aren't "added after" a node).
@@ -384,16 +392,14 @@ const sourceDescriptions: Record<string, string> = {
 
 const stepItems = computed(() =>
   (pipelineObj.nodeTypes || [])
-    .filter((n: any) =>
-      !n.isSectionHeader &&
-      (isSourceStep.value ? n.io_type === "input" : n.io_type !== "input"),
+    .filter(
+      (n: any) =>
+        !n.isSectionHeader && (isSourceStep.value ? n.io_type === "input" : n.io_type !== "input"),
     )
     .map((n: any) => ({
       key: `${n.subtype}-${n.io_type}`,
       title: n.label,
-      description: sourceDescriptions[n.subtype]
-        ? t(sourceDescriptions[n.subtype])
-        : n.tooltip,
+      description: sourceDescriptions[n.subtype] ? t(sourceDescriptions[n.subtype]) : n.tooltip,
       icon: n.icon,
       // Soft badge tokens, not raw hex: the old literals had no dark variant, so
       // these tints stayed light-mode colours on a dark canvas.
@@ -427,7 +433,6 @@ const functionOptions = ref<string[]>([]);
 const pipelineDestinationsList = ref<any[]>([]);
 const usedStreamsListResponse = ref<any[]>([]);
 
-
 const streamRoutes = ref<{ [key: string]: any }>({});
 
 const editingStreamRouteName = ref<string>("");
@@ -449,14 +454,14 @@ const associatedFunctions: Ref<string[]> = ref([]);
 const isJsonEditorAiHovered = ref(false);
 const jsonEditorAiBtnLogo = computed(() => {
   if (isJsonEditorAiHovered.value || store.state.isAiChatEnabled) {
-    return getImageURL('images/common/ai_icon_dark.svg');
+    return getImageURL("images/common/ai_icon_dark.svg");
   }
   return isDark.value
-    ? getImageURL('images/common/ai_icon_dark.svg')
-    : getImageURL('images/common/ai_icon_gradient.svg');
+    ? getImageURL("images/common/ai_icon_dark.svg")
+    : getImageURL("images/common/ai_icon_gradient.svg");
 });
 const toggleJsonEditorAIChat = () => {
-  store.dispatch('setIsAiChatEnabled', !store.state.isAiChatEnabled);
+  store.dispatch("setIsAiChatEnabled", !store.state.isAiChatEnabled);
 };
 
 const { t } = useI18n();
@@ -471,9 +476,7 @@ const { track } = useReo();
 // first save attempt). `currentSelectedPipeline.name` stays the PERSISTED field
 // — the save payload, JSON editor and FlowChart all read it — so the two are
 // kept mirrored by the guarded watches below (guards break the echo loop).
-const isCreatePipeline = computed(
-  () => router.currentRoute.value.name === "createPipeline",
-);
+const isCreatePipeline = computed(() => router.currentRoute.value.name === "createPipeline");
 
 const metaForm = useOForm<PipelineMetaForm>({
   defaultValues: pipelineMetaDefaults(),
@@ -534,18 +537,18 @@ watch(
           query: "Add Query Node",
           condition: "Add Condition Node",
           function: "Add Function Node",
-          remote_stream: "Add Remote Stream Node"
+          remote_stream: "Add Remote Stream Node",
         };
         buttonName = nodeTypeMap[pipelineObj.dialog.name] || `Add ${pipelineObj.dialog.name}`;
       }
 
       track("Button Click", {
         button: buttonName,
-        page: "Pipeline Editor"
+        page: "Pipeline Editor",
       });
     }
   },
-  { immediate: false }
+  { immediate: false },
 );
 
 onBeforeMount(() => {
@@ -571,23 +574,23 @@ onBeforeMount(() => {
 });
 
 // Initialize Vue Flow composables
-const { getSelectedEdges, removeEdges } = useVueFlow()
+const { getSelectedEdges, removeEdges } = useVueFlow();
 
 onMounted(async () => {
   window.addEventListener("beforeunload", beforeUnloadHandler);
 
   // Add keyboard handler for edge deletion
   const handleKeydown = (event: KeyboardEvent) => {
-    if (event.key === 'Delete' || event.key === 'Backspace') {
-      const selectedEdges = getSelectedEdges.value
+    if (event.key === "Delete" || event.key === "Backspace") {
+      const selectedEdges = getSelectedEdges.value;
 
       if (selectedEdges.length > 0) {
-        event.preventDefault()
-        const edgeIds = selectedEdges.map(edge => edge.id)
-        removeEdges(edgeIds)
+        event.preventDefault();
+        const edgeIds = selectedEdges.map((edge) => edge.id);
+        removeEdges(edgeIds);
       }
     }
-  }
+  };
 
   window.addEventListener("keydown", handleKeydown);
 
@@ -607,18 +610,18 @@ onMounted(async () => {
   // Replace the promise with the resolved array for later synchronous reads.
   pipelineObj.usedStreams = usedStreamsListResponse.value;
   const { path, query } = router.currentRoute.value;
-    if (path.includes("edit") && !query.id) {
-      router.push({
-        name:"pipelines",
-        query:{
-          org_identifier: store.state.selectedOrganization.identifier
-        }
-      })
-    }
+  if (path.includes("edit") && !query.id) {
+    router.push({
+      name: "pipelines",
+      query: {
+        org_identifier: store.state.selectedOrganization.identifier,
+      },
+    });
+  }
 
   // Setup pipelines context provider
   setupPipelinesContextProvider();
-  });
+});
 
 onUnmounted(() => {
   window.removeEventListener("beforeunload", beforeUnloadHandler);
@@ -643,8 +646,7 @@ onBeforeRouteLeave((to, from, next) => {
   // else continue to warn user
   if (
     (from.path === "/pipeline/pipelines/edit" && pipelineObj.dirtyFlag) ||
-    (from.path === "/pipeline/pipelines/add" &&
-      pipelineObj.currentSelectedPipeline.nodes.length)
+    (from.path === "/pipeline/pipelines/add" && pipelineObj.currentSelectedPipeline.nodes.length)
   ) {
     // Cancel this navigation; show a Vue dialog instead of window.confirm
     // (browsers often suppress window.confirm during navigation events).
@@ -732,14 +734,7 @@ const getFunctions = () => {
   // if (Object.keys(functions.value).length) return;
   isFetchingFunctions.value = true;
   return functionsService
-    .list(
-      1,
-      100000,
-      "name",
-      false,
-      "",
-      store.state.selectedOrganization.identifier,
-    )
+    .list(1, 100000, "name", false, "", store.state.selectedOrganization.identifier)
     .then((res) => {
       functions.value = {};
       functionOptions.value = [];
@@ -798,7 +793,7 @@ const savePipeline = async () => {
       message: t("pipeline.sourceNodeRequired"),
       variant: "warning",
     });
-    if(showJsonEditorDialog.value == true){
+    if (showJsonEditorDialog.value == true) {
       validationErrors.value = [t("pipeline.sourceNodeRequired")];
     }
     return;
@@ -807,7 +802,7 @@ const savePipeline = async () => {
       message: t("pipeline.destinationNodeRequired"),
       variant: "warning",
     });
-    if(showJsonEditorDialog.value == true){
+    if (showJsonEditorDialog.value == true) {
       validationErrors.value = [t("pipeline.destinationNodeRequired")];
     }
     return;
@@ -832,14 +827,13 @@ const savePipeline = async () => {
     }
   }
 
-  pipelineObj.currentSelectedPipeline.org =
-    store.state.selectedOrganization.identifier;
+  pipelineObj.currentSelectedPipeline.org = store.state.selectedOrganization.identifier;
   if (findMissingEdges()) {
     toast({
       message: t("pipeline.connectAllNodes"),
       variant: "warning",
     });
-    if(showJsonEditorDialog.value == true){
+    if (showJsonEditorDialog.value == true) {
       validationErrors.value = [t("pipeline.connectAllNodes")];
     }
     return;
@@ -890,8 +884,8 @@ const onSubmitPipeline = async () => {
   //   isPipelineSaving.value = false;
   //   return;
   // }
-  if(showJsonEditorDialog.value == false){
-    if(!validatePipeline()){
+  if (showJsonEditorDialog.value == false) {
+    if (!validatePipeline()) {
       isPipelineSaving.value = false;
       return;
     }
@@ -899,8 +893,8 @@ const onSubmitPipeline = async () => {
   const dismiss = toast({
     message: t("pipeline.savingPipeline"),
     variant: "loading",
-      timeout: 0,
-});
+    timeout: 0,
+  });
 
   const saveOperation = pipelineObj.isEditPipeline
     ? pipelineService.updatePipeline({
@@ -922,33 +916,30 @@ const onSubmitPipeline = async () => {
           query: {
             org_identifier: store.state.selectedOrganization.identifier,
           },
-      });
-      toast({
-        message: t("pipeline.pipelineUpdated"),
-        variant: "success",
-      });
-      }
-      else if (!pipelineObj.isEditPipeline && showJsonEditorDialog.value == false) {
+        });
+        toast({
+          message: t("pipeline.pipelineUpdated"),
+          variant: "success",
+        });
+      } else if (!pipelineObj.isEditPipeline && showJsonEditorDialog.value == false) {
         showJsonEditorDialog.value = false;
         router.push({
           name: "pipelines",
           query: {
             org_identifier: store.state.selectedOrganization.identifier,
           },
-      });
+        });
         toast({
           message: t("pipeline.pipelineSaved"),
           variant: "success",
         });
-      }
-      else if(pipelineObj.isEditPipeline && showJsonEditorDialog.value == true){
+      } else if (pipelineObj.isEditPipeline && showJsonEditorDialog.value == true) {
         showJsonEditorDialog.value = false;
         toast({
           message: t("pipeline.pipelineUpdated"),
           variant: "success",
         });
-      }
-      else{
+      } else {
         showJsonEditorDialog.value = false;
         router.push({
           name: "pipelines",
@@ -961,33 +952,30 @@ const onSubmitPipeline = async () => {
           variant: "success",
         });
       }
-
-
     })
     .catch((error) => {
       if (pipelineObj.isEditPipeline) {
         pipelineObj.isEditPipeline = true;
       }
 
-      if (
-        error.response?.data?.message === "Invalid Pipeline: empty edges list"
-      ) {
+      if (error.response?.data?.message === "Invalid Pipeline: empty edges list") {
         toast({
           message: t("pipeline.connectAllNodesShort"),
           variant: "warning",
         });
-        if(showJsonEditorDialog.value == true){
+        if (showJsonEditorDialog.value == true) {
           validationErrors.value = [t("pipeline.connectAllNodes")];
         }
       } else {
         if (error.response.status != 403) {
           toast({
-            message:
-              error.response?.data?.message || t("pipeline.errorSavingPipeline"),
+            message: error.response?.data?.message || t("pipeline.errorSavingPipeline"),
             variant: "error",
           });
-          if(showJsonEditorDialog.value == true){
-            validationErrors.value = [error.response?.data?.message || t("pipeline.errorSavingPipeline")];
+          if (showJsonEditorDialog.value == true) {
+            validationErrors.value = [
+              error.response?.data?.message || t("pipeline.errorSavingPipeline"),
+            ];
           }
         }
       }
@@ -996,17 +984,16 @@ const onSubmitPipeline = async () => {
       isPipelineSaving.value = false;
       dismiss();
     });
-    track("Button Click", {
-      button: "Save Pipeline",
-      page: "Add Pipeline"
-    });
+  track("Button Click", {
+    button: "Save Pipeline",
+    page: "Add Pipeline",
+  });
 };
 
 const openCancelDialog = () => {
   if (
     pipelineObj.dirtyFlag ||
-    (!pipelineObj.isEditPipeline &&
-      pipelineObj.currentSelectedPipeline.nodes.length > 1)
+    (!pipelineObj.isEditPipeline && pipelineObj.currentSelectedPipeline.nodes.length > 1)
   ) {
     confirmDialogMeta.value.show = true;
     confirmDialogMeta.value.title = t("common.cancelChanges");
@@ -1021,7 +1008,7 @@ const openCancelDialog = () => {
       });
       track("Button Click", {
         button: "Cancel Pipeline",
-        page: "Add Pipeline"
+        page: "Add Pipeline",
       });
     };
   } else {
@@ -1060,14 +1047,10 @@ const findMissingEdges = () => {
   const unconnectedNodes = nodes.filter((node: any) => {
     if (node.type === "default") {
       // Check for both incoming and outgoing edges
-      return (
-        !incomingConnections.has(node.id) || !outgoingConnections.has(node.id)
-      );
+      return !incomingConnections.has(node.id) || !outgoingConnections.has(node.id);
     } else {
       // Check for at least one connection (incoming or outgoing)
-      return (
-        !incomingConnections.has(node.id) && !outgoingConnections.has(node.id)
-      );
+      return !incomingConnections.has(node.id) && !outgoingConnections.has(node.id);
     }
   });
 
@@ -1127,8 +1110,7 @@ const beforeUnloadHandler = (e: any) => {
   //check is data updated or not
   if (
     pipelineObj.dirtyFlag ||
-    (pipelineObj.currentSelectedPipeline.nodes.length > 1 &&
-      !pipelineObj.isEditPipeline)
+    (pipelineObj.currentSelectedPipeline.nodes.length > 1 && !pipelineObj.isEditPipeline)
   ) {
     // Display a confirmation message
     const confirmMessage = t("pipeline.unsavedMessage");
@@ -1147,22 +1129,33 @@ const savePipelineJson = async (json: string) => {
     const parsedPipeline = JSON.parse(json);
     let streamList: any = [];
     let usedStreamsList: any = [];
-    if(pipelineObj.currentSelectedPipeline.source.source_type === "realtime"){
-      try{
+    if (pipelineObj.currentSelectedPipeline.source.source_type === "realtime") {
+      try {
         //there are couple of scenarios that we need to take care of
         //if user gets error that this stream is not there
         //2. we dont know if user selects scheduled or realtime right so we need to do this check at the time of saving only
         //3. TODO: store these list in the store so that unnecessary api calls will be avoided.
-        const streamsListResponse: any = await getStreams(parsedPipeline.source.stream_type || "logs", false);
+        const streamsListResponse: any = await getStreams(
+          parsedPipeline.source.stream_type || "logs",
+          false,
+        );
         streamList = streamsListResponse.list.map((stream: any) => stream.name);
-        usedStreamsList = usedStreamsListResponse.value.filter((stream: any) => stream.stream_type == parsedPipeline.source.stream_type).map((stream: any) => stream.stream_name);
-      }
-      catch(error){
-        console.log(error, 'error')
+        usedStreamsList = usedStreamsListResponse.value
+          .filter((stream: any) => stream.stream_type == parsedPipeline.source.stream_type)
+          .map((stream: any) => stream.stream_name);
+      } catch (error) {
+        console.log(error, "error");
       }
     }
 
-    const validationResult = validatePipelineUtil(parsedPipeline, { streamList: streamList, usedStreamsList: usedStreamsList, originalPipeline: pipelineObj.currentSelectedPipeline, pipelineDestinations: pipelineDestinationsList.value, functionsList: functionOptions.value, selectedOrgId: store.state.selectedOrganization.identifier });
+    const validationResult = validatePipelineUtil(parsedPipeline, {
+      streamList: streamList,
+      usedStreamsList: usedStreamsList,
+      originalPipeline: pipelineObj.currentSelectedPipeline,
+      pipelineDestinations: pipelineDestinationsList.value,
+      functionsList: functionOptions.value,
+      selectedOrgId: store.state.selectedOrganization.identifier,
+    });
 
     if (!validationResult.isValid) {
       // Set validation errors to be displayed in the JsonEditor
@@ -1181,7 +1174,7 @@ const savePipelineJson = async (json: string) => {
     savePipeline();
   } catch (error) {
     // Handle JSON parsing errors
-    validationErrors.value = ['Invalid JSON format'];
+    validationErrors.value = ["Invalid JSON format"];
   }
 };
 
@@ -1196,8 +1189,8 @@ const savePipelineJson = async (json: string) => {
 const setupPipelinesContextProvider = () => {
   const provider = createPipelinesContextProvider(pipelineObj, store);
 
-  contextRegistry.register('pipelines', provider);
-  contextRegistry.setActive('pipelines');
+  contextRegistry.register("pipelines", provider);
+  contextRegistry.setActive("pipelines");
 };
 
 /**
@@ -1208,9 +1201,9 @@ const setupPipelinesContextProvider = () => {
  */
 const cleanupPipelinesContextProvider = () => {
   // Only unregister the pipelines provider, keep default provider
-  contextRegistry.unregister('pipelines');
+  contextRegistry.unregister("pipelines");
   // Reset to no active provider, so it falls back to default
-  contextRegistry.setActive('');
+  contextRegistry.setActive("");
 };
 
 // [END] Pipelines Context Provider Setup

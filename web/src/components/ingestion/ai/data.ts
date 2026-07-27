@@ -1,10 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
 
-import {
-  manifestIntegrations,
-  manifestCategories,
-  type ManifestEntry,
-} from "./content/manifest";
+import { manifestIntegrations, manifestCategories, type ManifestEntry } from "./content/manifest";
 import { resolveAICardLogo, getAICardLogos } from "./content";
 
 export interface AIIntegration {
@@ -55,8 +51,7 @@ const realCategories: AICategory[] = [
         slug: "autogen",
         name: "AutoGen",
         routeName: "ai-autogen",
-        docURL:
-          "https://openobserve.ai/docs/integration/ai/frameworks/autogen/",
+        docURL: "https://openobserve.ai/docs/integration/ai/frameworks/autogen/",
         keywords: ["autogen", "microsoft", "multi-agent"],
       },
       {
@@ -70,8 +65,7 @@ const realCategories: AICategory[] = [
         slug: "claude-agent-sdk",
         name: "Claude Agent SDK",
         routeName: "ai-claude-agent-sdk",
-        docURL:
-          "https://openobserve.ai/docs/integration/ai/frameworks/claude-agent-sdk/",
+        docURL: "https://openobserve.ai/docs/integration/ai/frameworks/claude-agent-sdk/",
         keywords: ["claude", "agent", "sdk", "anthropic"],
       },
       {
@@ -92,24 +86,21 @@ const realCategories: AICategory[] = [
         slug: "google-adk",
         name: "Google ADK",
         routeName: "ai-google-adk",
-        docURL:
-          "https://openobserve.ai/docs/integration/ai/frameworks/google-adk/",
+        docURL: "https://openobserve.ai/docs/integration/ai/frameworks/google-adk/",
         keywords: ["google", "adk", "agent development kit"],
       },
       {
         slug: "haystack",
         name: "Haystack",
         routeName: "ai-haystack",
-        docURL:
-          "https://openobserve.ai/docs/integration/ai/frameworks/haystack/",
+        docURL: "https://openobserve.ai/docs/integration/ai/frameworks/haystack/",
         keywords: ["haystack", "deepset", "nlp", "rag"],
       },
       {
         slug: "instructor",
         name: "Instructor",
         routeName: "ai-instructor",
-        docURL:
-          "https://openobserve.ai/docs/integration/ai/frameworks/instructor/",
+        docURL: "https://openobserve.ai/docs/integration/ai/frameworks/instructor/",
         keywords: ["instructor", "structured", "output", "pydantic"],
       },
       {
@@ -123,64 +114,56 @@ const realCategories: AICategory[] = [
         slug: "langchain",
         name: "LangChain",
         routeName: "ai-langchain",
-        docURL:
-          "https://openobserve.ai/docs/integration/ai/frameworks/langchain/",
+        docURL: "https://openobserve.ai/docs/integration/ai/frameworks/langchain/",
         keywords: ["langchain", "lang", "chain", "llm"],
       },
       {
         slug: "deepagents",
         name: "LangChain DeepAgents",
         routeName: "ai-deepagents",
-        docURL:
-          "https://openobserve.ai/docs/integration/ai/frameworks/deepagents/",
+        docURL: "https://openobserve.ai/docs/integration/ai/frameworks/deepagents/",
         keywords: ["deepagents", "deep agents", "langchain"],
       },
       {
         slug: "langgraph",
         name: "LangGraph",
         routeName: "ai-langgraph",
-        docURL:
-          "https://openobserve.ai/docs/integration/ai/frameworks/langgraph/",
+        docURL: "https://openobserve.ai/docs/integration/ai/frameworks/langgraph/",
         keywords: ["langgraph", "graph", "workflow", "langchain"],
       },
       {
         slug: "langserve",
         name: "Langserve",
         routeName: "ai-langserve",
-        docURL:
-          "https://openobserve.ai/docs/integration/ai/frameworks/langserve/",
+        docURL: "https://openobserve.ai/docs/integration/ai/frameworks/langserve/",
         keywords: ["langserve", "serve", "deploy", "langchain"],
       },
       {
         slug: "litellm-sdk",
         name: "LiteLLM SDK",
         routeName: "ai-litellm-sdk",
-        docURL:
-          "https://openobserve.ai/docs/integration/ai/frameworks/litellm/",
+        docURL: "https://openobserve.ai/docs/integration/ai/frameworks/litellm/",
         keywords: ["litellm", "lite", "llm", "sdk"],
       },
       {
         slug: "livekit",
         name: "LiveKit",
         routeName: "ai-livekit",
-        docURL:
-          "https://openobserve.ai/docs/integration/ai/frameworks/livekit/",
+        docURL: "https://openobserve.ai/docs/integration/ai/frameworks/livekit/",
         keywords: ["livekit", "live", "realtime", "voice"],
       },
       {
         slug: "llamaindex",
         name: "LlamaIndex",
         routeName: "ai-llamaindex",
-        docURL:
-          "https://openobserve.ai/docs/integration/ai/frameworks/llamaindex/",
+        docURL: "https://openobserve.ai/docs/integration/ai/frameworks/llamaindex/",
         keywords: ["llamaindex", "llama", "index", "rag"],
       },
       {
         slug: "llamaindex-workflows",
         name: "LlamaIndex Workflows",
         routeName: "ai-llamaindex-workflows",
-        docURL:
-          "https://openobserve.ai/docs/integration/ai/frameworks/llamaindex-workflows/",
+        docURL: "https://openobserve.ai/docs/integration/ai/frameworks/llamaindex-workflows/",
         keywords: ["llamaindex", "workflows", "llama"],
       },
       {
@@ -194,48 +177,42 @@ const realCategories: AICategory[] = [
         slug: "microsoft-agent-framework",
         name: "Microsoft Agent Framework",
         routeName: "ai-microsoft-agent-framework",
-        docURL:
-          "https://openobserve.ai/docs/integration/ai/frameworks/microsoft-agent-framework/",
+        docURL: "https://openobserve.ai/docs/integration/ai/frameworks/microsoft-agent-framework/",
         keywords: ["microsoft", "agent", "framework"],
       },
       {
         slug: "mirascope",
         name: "Mirascope",
         routeName: "ai-mirascope",
-        docURL:
-          "https://openobserve.ai/docs/integration/ai/frameworks/mirascope/",
+        docURL: "https://openobserve.ai/docs/integration/ai/frameworks/mirascope/",
         keywords: ["mirascope", "ai"],
       },
       {
         slug: "openai-agents",
         name: "OpenAI Agents",
         routeName: "ai-openai-agents",
-        docURL:
-          "https://openobserve.ai/docs/integration/ai/frameworks/openai-agents/",
+        docURL: "https://openobserve.ai/docs/integration/ai/frameworks/openai-agents/",
         keywords: ["openai", "agents", "agent sdk"],
       },
       {
         slug: "pipecat",
         name: "Pipecat",
         routeName: "ai-pipecat",
-        docURL:
-          "https://openobserve.ai/docs/integration/ai/frameworks/pipecat/",
+        docURL: "https://openobserve.ai/docs/integration/ai/frameworks/pipecat/",
         keywords: ["pipecat", "pipe", "voice", "realtime"],
       },
       {
         slug: "pydantic-ai",
         name: "Pydantic AI",
         routeName: "ai-pydantic-ai",
-        docURL:
-          "https://openobserve.ai/docs/integration/ai/frameworks/pydantic-ai/",
+        docURL: "https://openobserve.ai/docs/integration/ai/frameworks/pydantic-ai/",
         keywords: ["pydantic", "ai", "validation"],
       },
       {
         slug: "quarkus-langchain4j",
         name: "Quarkus LangChain4j",
         routeName: "ai-quarkus-langchain4j",
-        docURL:
-          "https://openobserve.ai/docs/integration/ai/frameworks/quarkus-langchain4j/",
+        docURL: "https://openobserve.ai/docs/integration/ai/frameworks/quarkus-langchain4j/",
         keywords: ["quarkus", "langchain4j", "java", "langchain"],
       },
       {
@@ -249,72 +226,63 @@ const realCategories: AICategory[] = [
         slug: "restate",
         name: "Restate",
         routeName: "ai-restate",
-        docURL:
-          "https://openobserve.ai/docs/integration/ai/frameworks/restate/",
+        docURL: "https://openobserve.ai/docs/integration/ai/frameworks/restate/",
         keywords: ["restate", "durable", "execution"],
       },
       {
         slug: "semantic-kernel",
         name: "Semantic Kernel",
         routeName: "ai-semantic-kernel",
-        docURL:
-          "https://openobserve.ai/docs/integration/ai/frameworks/semantic-kernel/",
+        docURL: "https://openobserve.ai/docs/integration/ai/frameworks/semantic-kernel/",
         keywords: ["semantic", "kernel", "microsoft", "sdk"],
       },
       {
         slug: "smolagents",
         name: "SmolAgents",
         routeName: "ai-smolagents",
-        docURL:
-          "https://openobserve.ai/docs/integration/ai/frameworks/smolagents/",
+        docURL: "https://openobserve.ai/docs/integration/ai/frameworks/smolagents/",
         keywords: ["smolagents", "smol", "huggingface"],
       },
       {
         slug: "spring-ai",
         name: "Spring AI",
         routeName: "ai-spring-ai",
-        docURL:
-          "https://openobserve.ai/docs/integration/ai/frameworks/spring-ai/",
+        docURL: "https://openobserve.ai/docs/integration/ai/frameworks/spring-ai/",
         keywords: ["spring", "ai", "java", "spring boot"],
       },
       {
         slug: "strands-agents",
         name: "Strands Agents",
         routeName: "ai-strands-agents",
-        docURL:
-          "https://openobserve.ai/docs/integration/ai/frameworks/strands-agents/",
+        docURL: "https://openobserve.ai/docs/integration/ai/frameworks/strands-agents/",
         keywords: ["strands", "agents"],
       },
       {
         slug: "swiftide",
         name: "Swiftide",
         routeName: "ai-swiftide",
-        docURL:
-          "https://openobserve.ai/docs/integration/ai/frameworks/swiftide/",
+        docURL: "https://openobserve.ai/docs/integration/ai/frameworks/swiftide/",
         keywords: ["swiftide", "swift", "rag"],
       },
       {
         slug: "temporal",
         name: "Temporal",
         routeName: "ai-temporal",
-        docURL:
-          "https://openobserve.ai/docs/integration/ai/frameworks/temporal/",
+        docURL: "https://openobserve.ai/docs/integration/ai/frameworks/temporal/",
         keywords: ["temporal", "workflow", "durable execution"],
       },
       {
         slug: "vercel-ai-sdk",
         name: "Vercel AI SDK",
         routeName: "ai-vercel-ai-sdk",
-        docURL:
-          "https://openobserve.ai/docs/integration/ai/frameworks/vercel-ai-sdk/",
+        docURL: "https://openobserve.ai/docs/integration/ai/frameworks/vercel-ai-sdk/",
         keywords: ["vercel", "ai", "sdk", "nextjs"],
       },
       {
         slug: "voltagent",
         name: "VoltAgent",
         routeName: "ai-voltagent",
-        docURL:
-          "https://openobserve.ai/docs/integration/ai/frameworks/voltagent/",
+        docURL: "https://openobserve.ai/docs/integration/ai/frameworks/voltagent/",
         keywords: ["voltagent", "volt", "agent"],
       },
     ],
@@ -327,8 +295,7 @@ const realCategories: AICategory[] = [
         slug: "anthropic-python",
         name: "Anthropic (Python)",
         routeName: "ai-anthropic-python",
-        docURL:
-          "https://openobserve.ai/docs/integration/ai/providers/anthropic/",
+        docURL: "https://openobserve.ai/docs/integration/ai/providers/anthropic/",
         keywords: ["anthropic", "python", "claude", "model provider"],
         contentSlug: "anthropic",
       },
@@ -336,30 +303,21 @@ const realCategories: AICategory[] = [
         slug: "anthropic-jsts",
         name: "Anthropic (JS/TS)",
         routeName: "ai-anthropic-jsts",
-        docURL:
-          "https://openobserve.ai/docs/integration/ai/providers/anthropic-js/",
-        keywords: [
-          "anthropic",
-          "javascript",
-          "typescript",
-          "claude",
-          "model provider",
-        ],
+        docURL: "https://openobserve.ai/docs/integration/ai/providers/anthropic-js/",
+        keywords: ["anthropic", "javascript", "typescript", "claude", "model provider"],
       },
       {
         slug: "byteplus",
         name: "BytePlus",
         routeName: "ai-byteplus",
-        docURL:
-          "https://openobserve.ai/docs/integration/ai/providers/byteplus/",
+        docURL: "https://openobserve.ai/docs/integration/ai/providers/byteplus/",
         keywords: ["byteplus", "bytedance", "model provider"],
       },
       {
         slug: "cerebras",
         name: "Cerebras",
         routeName: "ai-cerebras",
-        docURL:
-          "https://openobserve.ai/docs/integration/ai/providers/cerebras/",
+        docURL: "https://openobserve.ai/docs/integration/ai/providers/cerebras/",
         keywords: ["cerebras", "model provider", "inference"],
       },
       {
@@ -373,40 +331,35 @@ const realCategories: AICategory[] = [
         slug: "cometapi",
         name: "CometAPI",
         routeName: "ai-cometapi",
-        docURL:
-          "https://openobserve.ai/docs/integration/ai/providers/cometapi/",
+        docURL: "https://openobserve.ai/docs/integration/ai/providers/cometapi/",
         keywords: ["cometapi", "comet", "model provider"],
       },
       {
         slug: "databricks",
         name: "Databricks",
         routeName: "ai-databricks",
-        docURL:
-          "https://openobserve.ai/docs/integration/ai/providers/databricks/",
+        docURL: "https://openobserve.ai/docs/integration/ai/providers/databricks/",
         keywords: ["databricks", "model provider", "spark"],
       },
       {
         slug: "deepseek",
         name: "DeepSeek",
         routeName: "ai-deepseek",
-        docURL:
-          "https://openobserve.ai/docs/integration/ai/providers/deepseek/",
+        docURL: "https://openobserve.ai/docs/integration/ai/providers/deepseek/",
         keywords: ["deepseek", "deep", "seek", "model provider"],
       },
       {
         slug: "fireworks",
         name: "Fireworks AI",
         routeName: "ai-fireworks",
-        docURL:
-          "https://openobserve.ai/docs/integration/ai/providers/fireworks/",
+        docURL: "https://openobserve.ai/docs/integration/ai/providers/fireworks/",
         keywords: ["fireworks", "fire", "model provider", "inference"],
       },
       {
         slug: "google-gemini",
         name: "Google Gemini",
         routeName: "ai-google-gemini",
-        docURL:
-          "https://openobserve.ai/docs/integration/ai/providers/google-gemini/",
+        docURL: "https://openobserve.ai/docs/integration/ai/providers/google-gemini/",
         keywords: ["google", "gemini", "model provider"],
         contentSlug: "gemini",
       },
@@ -421,15 +374,8 @@ const realCategories: AICategory[] = [
         slug: "huggingface",
         name: "Hugging Face",
         routeName: "ai-huggingface",
-        docURL:
-          "https://openobserve.ai/docs/integration/ai/providers/huggingface/",
-        keywords: [
-          "huggingface",
-          "hugging",
-          "face",
-          "model provider",
-          "transformers",
-        ],
+        docURL: "https://openobserve.ai/docs/integration/ai/providers/huggingface/",
+        keywords: ["huggingface", "hugging", "face", "model provider", "transformers"],
       },
       {
         slug: "mistral",
@@ -464,30 +410,21 @@ const realCategories: AICategory[] = [
         slug: "openai-jsts",
         name: "OpenAI (JS/TS)",
         routeName: "ai-openai-jsts",
-        docURL:
-          "https://openobserve.ai/docs/integration/ai/providers/openai-js/",
-        keywords: [
-          "openai",
-          "javascript",
-          "typescript",
-          "gpt",
-          "model provider",
-        ],
+        docURL: "https://openobserve.ai/docs/integration/ai/providers/openai-js/",
+        keywords: ["openai", "javascript", "typescript", "gpt", "model provider"],
       },
       {
         slug: "openai-assistants",
         name: "OpenAI Assistants API",
         routeName: "ai-openai-assistants",
-        docURL:
-          "https://openobserve.ai/docs/integration/ai/providers/openai-assistants/",
+        docURL: "https://openobserve.ai/docs/integration/ai/providers/openai-assistants/",
         keywords: ["openai", "assistants", "api", "model provider"],
       },
       {
         slug: "together-ai",
         name: "Together AI",
         routeName: "ai-together-ai",
-        docURL:
-          "https://openobserve.ai/docs/integration/ai/providers/together-ai/",
+        docURL: "https://openobserve.ai/docs/integration/ai/providers/together-ai/",
         keywords: ["together", "ai", "model provider", "inference"],
       },
       {
@@ -501,8 +438,7 @@ const realCategories: AICategory[] = [
         slug: "xai-grok",
         name: "xAI Grok",
         routeName: "ai-xai-grok",
-        docURL:
-          "https://openobserve.ai/docs/integration/ai/providers/xai-grok/",
+        docURL: "https://openobserve.ai/docs/integration/ai/providers/xai-grok/",
         keywords: ["xai", "grok", "elon", "model provider"],
       },
     ],
@@ -522,16 +458,14 @@ const realCategories: AICategory[] = [
         slug: "kong-gateway",
         name: "Kong Gateway",
         routeName: "ai-kong-gateway",
-        docURL:
-          "https://openobserve.ai/docs/integration/ai/gateways/kong-gateway/",
+        docURL: "https://openobserve.ai/docs/integration/ai/gateways/kong-gateway/",
         keywords: ["kong", "gateway", "api"],
       },
       {
         slug: "litellm-proxy",
         name: "LiteLLM Proxy",
         routeName: "ai-litellm-proxy",
-        docURL:
-          "https://openobserve.ai/docs/integration/ai/gateways/litellm-proxy/",
+        docURL: "https://openobserve.ai/docs/integration/ai/gateways/litellm-proxy/",
         keywords: ["litellm", "proxy", "gateway", "llm"],
         contentSlug: "litellm",
       },
@@ -539,8 +473,7 @@ const realCategories: AICategory[] = [
         slug: "openrouter",
         name: "OpenRouter",
         routeName: "ai-openrouter",
-        docURL:
-          "https://openobserve.ai/docs/integration/ai/gateways/openrouter/",
+        docURL: "https://openobserve.ai/docs/integration/ai/gateways/openrouter/",
         keywords: ["openrouter", "router", "gateway"],
       },
       {
@@ -554,8 +487,7 @@ const realCategories: AICategory[] = [
         slug: "vercel-ai-gateway",
         name: "Vercel AI Gateway",
         routeName: "ai-vercel-ai-gateway",
-        docURL:
-          "https://openobserve.ai/docs/integration/ai/gateways/vercel-ai-gateway/",
+        docURL: "https://openobserve.ai/docs/integration/ai/gateways/vercel-ai-gateway/",
         keywords: ["vercel", "ai", "gateway"],
       },
     ],
@@ -568,8 +500,7 @@ const realCategories: AICategory[] = [
         slug: "codename-goose",
         name: "Codename Goose",
         routeName: "ai-codename-goose",
-        docURL:
-          "https://openobserve.ai/docs/integration/ai/no-code/codename-goose/",
+        docURL: "https://openobserve.ai/docs/integration/ai/no-code/codename-goose/",
         keywords: ["codename", "goose", "no-code"],
       },
       {
@@ -651,8 +582,7 @@ const realCategories: AICategory[] = [
         slug: "claude-code",
         name: "Claude Code",
         routeName: "ai-claude-code",
-        docURL:
-          "https://openobserve.ai/docs/integration/ai/claude-code-tracing/",
+        docURL: "https://openobserve.ai/docs/integration/ai/claude-code-tracing/",
         keywords: ["claude", "code", "cli", "anthropic", "tracing"],
       },
       {
@@ -749,10 +679,7 @@ const titleCase = (slug: string): string =>
 const existingByContentSlug = new Map<string, AIIntegration>();
 for (const category of realCategories) {
   for (const integration of category.integrations) {
-    existingByContentSlug.set(
-      integration.contentSlug ?? integration.slug,
-      integration,
-    );
+    existingByContentSlug.set(integration.contentSlug ?? integration.slug, integration);
   }
 }
 
@@ -771,10 +698,7 @@ const toCard = (entry: ManifestEntry): AIIntegration => {
     // URL as-is.) `logo_dark`/`logoDark` is the optional dark-mode variant.
     // Falling back to the frontmatter means a single `logo:` in the md shows in
     // both the sidebar menu and the card hero — one authoring spot.
-    logo:
-      resolveAICardLogo(entry.slug, entry.logo) ||
-      fmLogos.logo ||
-      existing?.logo,
+    logo: resolveAICardLogo(entry.slug, entry.logo) || fmLogos.logo || existing?.logo,
     logoDark:
       resolveAICardLogo(entry.slug, entry.logoDark ?? (entry as any).logo_dark) ||
       fmLogos.logoDark ||
@@ -786,9 +710,7 @@ const toCard = (entry: ManifestEntry): AIIntegration => {
 // existing routes they claimed, so we can remove those originals.
 const cardsByCategory = new Map<string, AIIntegration[]>();
 const claimedRouteNames = new Set<string>();
-for (const entry of [...manifestIntegrations].sort(
-  (a, b) => (a.order ?? 0) - (b.order ?? 0),
-)) {
+for (const entry of [...manifestIntegrations].sort((a, b) => (a.order ?? 0) - (b.order ?? 0))) {
   const card = toCard(entry);
   claimedRouteNames.add(card.routeName);
   const list = cardsByCategory.get(entry.category) ?? [];
@@ -796,9 +718,7 @@ for (const entry of [...manifestIntegrations].sort(
   cardsByCategory.set(entry.category, list);
 }
 
-const categoryLabel = new Map(
-  manifestCategories.map((c) => [c.slug, c.label] as const),
-);
+const categoryLabel = new Map(manifestCategories.map((c) => [c.slug, c.label] as const));
 
 // Build a tab: manifest cards on top, then the remaining (unclaimed) catalog
 // entries. Returns null if the tab would be empty.
@@ -806,9 +726,7 @@ const buildCategory = (slug: string): AICategory | null => {
   const cards = cardsByCategory.get(slug) ?? [];
   const real = realCategories.find((c) => c.slug === slug);
   if (real) {
-    const remaining = real.integrations.filter(
-      (i) => !claimedRouteNames.has(i.routeName),
-    );
+    const remaining = real.integrations.filter((i) => !claimedRouteNames.has(i.routeName));
     return { slug: real.slug, name: real.name, integrations: [...cards, ...remaining] };
   }
   if (!cards.length) return null;

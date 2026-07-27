@@ -23,10 +23,7 @@ const props = defineProps<{
 // Same injection OTableBodyCell uses — under horizontal scroll the real cells
 // may grow past their size var, so capping maxWidth here (when the body doesn't)
 // would make columns visibly widen the moment data arrives.
-const horizontalScroll = inject<{ value: boolean } | null>(
-  "o2TableHorizontalScroll",
-  null,
-);
+const horizontalScroll = inject<{ value: boolean } | null>("o2TableHorizontalScroll", null);
 
 const BASE_WIDTHS = [55, 70, 60, 45, 65, 50, 75, 40, 58, 68, 48, 62];
 const JITTER = [0, 6, -4, 3, -2, 5, -3, 2, -5, 4, -1, 6];
@@ -53,8 +50,7 @@ const isActionCol = (col: Column<any, any>): boolean => {
   return !!def.isAction || !!(def.meta as any)?.isAction || col.id === "actions";
 };
 
-const isSpacerCol = (col: Column<any, any>): boolean =>
-  !!(defOf(col).meta as any)?.spacer;
+const isSpacerCol = (col: Column<any, any>): boolean => !!(defOf(col).meta as any)?.spacer;
 
 // Mirror OTableBodyCell's horizontal padding exactly: the invisible spacer must
 // be able to reach 0 width, and compact columns are px-1.
@@ -140,35 +136,34 @@ const alignClassFor = (col: Column<any, any>): string => {
     <tr
       v-for="r in rowCount"
       :key="`o2-skel-${r}`"
-      class="o2-skel-row opacity-0 [animation:o2-skel-row-in_320ms_ease-out_forwards]"
+      class="o2-skel-row [animation:o2-skel-row-in_320ms_ease-out_forwards] opacity-0"
       :style="{
         animationDelay: `${(r - 1) * 40}ms`,
         height: 'var(--table-row-height, 2.25rem)',
       }"
     >
       <!-- Expand chevron placeholder — matches OTableBodyRow exactly -->
-      <td
-        v-if="expansionEnabled"
-        class="w-4 min-w-4 px-0 text-center align-middle"
-      />
+      <td v-if="expansionEnabled" class="w-4 min-w-4 px-0 text-center align-middle" />
 
       <!-- Selection checkbox placeholder — matches OTableBodyRow exactly -->
       <td
         v-if="selectionEnabled"
         class="text-left align-middle"
-        :style="{ width: TABLE_CHECKBOX_COL_SIZE + 'px', minWidth: TABLE_CHECKBOX_COL_SIZE + 'px', maxWidth: TABLE_CHECKBOX_COL_SIZE + 'px', paddingLeft: 'var(--spacing-table-edge)' }"
+        :style="{
+          width: TABLE_CHECKBOX_COL_SIZE + 'px',
+          minWidth: TABLE_CHECKBOX_COL_SIZE + 'px',
+          maxWidth: TABLE_CHECKBOX_COL_SIZE + 'px',
+          paddingLeft: 'var(--spacing-table-edge)',
+        }"
       >
         <span
-          class="inline-block h-3.5 w-3.5 rounded-default border border-skeleton-base"
+          class="rounded-default border-skeleton-base inline-block h-3.5 w-3.5 border"
           aria-hidden="true"
         />
       </td>
 
       <!-- Drag handle placeholder -->
-      <td
-        v-if="enableRowReorder"
-        class="w-4 min-w-4 px-0 text-center align-middle"
-      />
+      <td v-if="enableRowReorder" class="w-4 min-w-4 px-0 text-center align-middle" />
 
       <!-- Data cells — class, data-test & style mirror OTableBodyCell exactly.
            The data-test prefix matters: OTable's edge-inset rule is keyed on
@@ -184,24 +179,24 @@ const alignClassFor = (col: Column<any, any>): string => {
           'align-middle',
           alignClassFor(col),
           isActionCol(col) ? 'w-0 whitespace-nowrap' : '',
-          bordered ? 'border-b border-table-row-divider' : '',
+          bordered ? 'border-table-row-divider border-b' : '',
         ]"
         :style="cellStyle(col)"
       >
         <!-- Action column → N placeholders, each in the REAL button footprint
              (w-8 h-8) so the cell measures identically to the loaded row. -->
-        <span
-          v-if="isActionCol(col)"
-          class="inline-flex items-center gap-1 align-middle"
-        >
+        <span v-if="isActionCol(col)" class="inline-flex items-center gap-1 align-middle">
           <span
             v-for="a in actionCountFor(col)"
             :key="`a-${r}-${c}-${a}`"
-            class="inline-flex items-center justify-center shrink-0 w-8 h-8"
+            class="inline-flex h-8 w-8 shrink-0 items-center justify-center"
             aria-hidden="true"
           >
             <span
-              :class="['o2-skel-pill inline-block [background:linear-gradient(90deg,var(--color-skeleton-base)_0%,var(--color-skeleton-highlight)_50%,var(--color-skeleton-base)_100%)] [background-size:200%_100%] [animation:o2-skel-shimmer_1.5s_ease-in-out_infinite]', actionDimsFor(col)]"
+              :class="[
+                'o2-skel-pill inline-block [animation:o2-skel-shimmer_1.5s_ease-in-out_infinite] [background-size:200%_100%] [background:linear-gradient(90deg,var(--color-skeleton-base)_0%,var(--color-skeleton-highlight)_50%,var(--color-skeleton-base)_100%)]',
+                actionDimsFor(col),
+              ]"
             />
           </span>
         </span>
@@ -212,7 +207,7 @@ const alignClassFor = (col: Column<any, any>): string => {
         <!-- Data column → chunky rounded-default bar with shimmer; td text-align positions it -->
         <span
           v-else
-          class="o2-skel-pill inline-block h-3 rounded-default align-middle [background:linear-gradient(90deg,var(--color-skeleton-base)_0%,var(--color-skeleton-highlight)_50%,var(--color-skeleton-base)_100%)] [background-size:200%_100%] [animation:o2-skel-shimmer_1.5s_ease-in-out_infinite]"
+          class="o2-skel-pill rounded-default inline-block h-3 [animation:o2-skel-shimmer_1.5s_ease-in-out_infinite] [background-size:200%_100%] align-middle [background:linear-gradient(90deg,var(--color-skeleton-base)_0%,var(--color-skeleton-highlight)_50%,var(--color-skeleton-base)_100%)]"
           :style="{ width: `${cellWidth(r - 1, c)}%` }"
           aria-hidden="true"
         />

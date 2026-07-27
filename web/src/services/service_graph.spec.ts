@@ -50,7 +50,7 @@ describe("service_graph service", () => {
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
         "/api/test-org/traces/service_graph/topology/current",
-        { params: {} }
+        { params: {} },
       );
     });
 
@@ -63,7 +63,7 @@ describe("service_graph service", () => {
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
         "/api/test-org/traces/service_graph/topology/current",
-        { params: { stream_name: "my-stream" } }
+        { params: { stream_name: "my-stream" } },
       );
     });
 
@@ -76,7 +76,7 @@ describe("service_graph service", () => {
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
         "/api/test-org/traces/service_graph/topology/current",
-        { params: {} }
+        { params: {} },
       );
     });
 
@@ -89,7 +89,7 @@ describe("service_graph service", () => {
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
         "/api/test-org/traces/service_graph/topology/current",
-        { params: { start_time: 1700000000 } }
+        { params: { start_time: 1700000000 } },
       );
     });
 
@@ -102,7 +102,7 @@ describe("service_graph service", () => {
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
         "/api/test-org/traces/service_graph/topology/current",
-        { params: { end_time: 1700003600 } }
+        { params: { end_time: 1700003600 } },
       );
     });
 
@@ -123,7 +123,7 @@ describe("service_graph service", () => {
             start_time: 1700000000,
             end_time: 1700003600,
           },
-        }
+        },
       );
     });
 
@@ -135,7 +135,7 @@ describe("service_graph service", () => {
         await serviceGraphService.getCurrentTopology(org);
         expect(mockHttpInstance.get).toHaveBeenCalledWith(
           `/api/${org}/traces/service_graph/topology/current`,
-          { params: {} }
+          { params: {} },
         );
       }
     });
@@ -143,9 +143,9 @@ describe("service_graph service", () => {
     it("should propagate errors", async () => {
       mockHttpInstance.get.mockRejectedValue(new Error("Service unavailable"));
 
-      await expect(
-        serviceGraphService.getCurrentTopology("test-org")
-      ).rejects.toThrow("Service unavailable");
+      await expect(serviceGraphService.getCurrentTopology("test-org")).rejects.toThrow(
+        "Service unavailable",
+      );
     });
   });
 
@@ -157,7 +157,7 @@ describe("service_graph service", () => {
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
         "/api/test-org/traces/service_graph/edge/history",
-        { params: {} }
+        { params: {} },
       );
     });
 
@@ -170,7 +170,7 @@ describe("service_graph service", () => {
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
         "/api/test-org/traces/service_graph/edge/history",
-        { params: { client_service: "frontend" } }
+        { params: { client_service: "frontend" } },
       );
     });
 
@@ -183,7 +183,7 @@ describe("service_graph service", () => {
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
         "/api/test-org/traces/service_graph/edge/history",
-        { params: { server_service: "backend-api" } }
+        { params: { server_service: "backend-api" } },
       );
     });
 
@@ -196,7 +196,7 @@ describe("service_graph service", () => {
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
         "/api/test-org/traces/service_graph/edge/history",
-        { params: { start_time: 1700000000 } }
+        { params: { start_time: 1700000000 } },
       );
     });
 
@@ -209,7 +209,7 @@ describe("service_graph service", () => {
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
         "/api/test-org/traces/service_graph/edge/history",
-        { params: { end_time: 1700003600 } }
+        { params: { end_time: 1700003600 } },
       );
     });
 
@@ -222,7 +222,7 @@ describe("service_graph service", () => {
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
         "/api/test-org/traces/service_graph/edge/history",
-        { params: { stream_name: "traces-stream" } }
+        { params: { stream_name: "traces-stream" } },
       );
     });
 
@@ -235,7 +235,7 @@ describe("service_graph service", () => {
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
         "/api/test-org/traces/service_graph/edge/history",
-        { params: {} }
+        { params: {} },
       );
     });
 
@@ -260,7 +260,7 @@ describe("service_graph service", () => {
             end_time: 1700003600,
             stream_name: "default-traces",
           },
-        }
+        },
       );
     });
 
@@ -271,7 +271,7 @@ describe("service_graph service", () => {
         serviceGraphService.getEdgeHistory("test-org", {
           client_service: "svc-a",
           server_service: "svc-b",
-        })
+        }),
       ).rejects.toThrow("Not found");
     });
   });
@@ -287,10 +287,10 @@ describe("service_graph service", () => {
         })
         .mockResolvedValueOnce({ data: { history: [{ ts: 1700000100 }] } });
 
-      const topology = await serviceGraphService.getCurrentTopology(
-        "test-org",
-        { startTime: 1700000000, endTime: 1700003600 }
-      );
+      const topology = await serviceGraphService.getCurrentTopology("test-org", {
+        startTime: 1700000000,
+        endTime: 1700003600,
+      });
       const edgeHistory = await serviceGraphService.getEdgeHistory("test-org", {
         client_service: "svc-a",
         server_service: "svc-b",

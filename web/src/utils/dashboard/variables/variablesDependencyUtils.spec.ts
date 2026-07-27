@@ -17,7 +17,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildVariablesDependencyGraph,
   extractVariableNames,
-  isGraphHasCycle
+  isGraphHasCycle,
 } from "./variablesDependencyUtils";
 
 describe("Variables Dependency Utils", () => {
@@ -63,7 +63,7 @@ describe("Variables Dependency Utils", () => {
     it("should build empty graph for empty variables list", () => {
       const variables = [];
       const graph = buildVariablesDependencyGraph(variables);
-      
+
       expect(graph).toEqual({});
     });
 
@@ -72,9 +72,9 @@ describe("Variables Dependency Utils", () => {
         { name: "region", type: "constant", query_data: null },
         { name: "env", type: "textbox", query_data: null },
       ];
-      
+
       const graph = buildVariablesDependencyGraph(variables);
-      
+
       expect(graph).toEqual({
         region: { parentVariables: [], childVariables: [] },
         env: { parentVariables: [], childVariables: [] },
@@ -83,18 +83,18 @@ describe("Variables Dependency Utils", () => {
 
     it("should build graph for query_values variables with dependencies", () => {
       const variables = [
-        { 
-          name: "region", 
-          type: "query_values", 
-          query_data: { 
-            filter: [{ value: "field='$env'" }] 
-          } 
+        {
+          name: "region",
+          type: "query_values",
+          query_data: {
+            filter: [{ value: "field='$env'" }],
+          },
         },
         { name: "env", type: "constant", query_data: null },
       ];
-      
+
       const graph = buildVariablesDependencyGraph(variables);
-      
+
       // region depends on env, so env should be in region's parentVariables
       expect(graph.region.parentVariables).toContain("env");
       // Due to the implementation bug, non-query_values variables get their childVariables reset
@@ -105,24 +105,26 @@ describe("Variables Dependency Utils", () => {
 
     it("should handle variables with multiple dependencies", () => {
       const variables = [
-        { 
-          name: "service", 
-          type: "query_values", 
-          query_data: { 
+        {
+          name: "service",
+          type: "query_values",
+          query_data: {
             filter: [
               { value: "region='$region' AND env='$env'" },
-              { value: "namespace='$namespace'" }
-            ] 
-          } 
+              { value: "namespace='$namespace'" },
+            ],
+          },
         },
         { name: "region", type: "constant", query_data: null },
         { name: "env", type: "textbox", query_data: null },
         { name: "namespace", type: "custom", query_data: null },
       ];
-      
+
       const graph = buildVariablesDependencyGraph(variables);
-      
-      expect(graph.service.parentVariables).toEqual(expect.arrayContaining(["region", "env", "namespace"]));
+
+      expect(graph.service.parentVariables).toEqual(
+        expect.arrayContaining(["region", "env", "namespace"]),
+      );
       // Due to implementation bug, non-query_values variables get childVariables reset to []
       expect(graph.region.childVariables).toEqual([]);
       expect(graph.env.childVariables).toEqual([]);
@@ -131,18 +133,18 @@ describe("Variables Dependency Utils", () => {
 
     it("should handle complex variable names with hyphens and underscores", () => {
       const variables = [
-        { 
-          name: "k8s-namespace", 
-          type: "query_values", 
-          query_data: { 
-            filter: [{ value: "cluster='$k8s_cluster_name'" }] 
-          } 
+        {
+          name: "k8s-namespace",
+          type: "query_values",
+          query_data: {
+            filter: [{ value: "cluster='$k8s_cluster_name'" }],
+          },
         },
         { name: "k8s_cluster_name", type: "constant", query_data: null },
       ];
-      
+
       const graph = buildVariablesDependencyGraph(variables);
-      
+
       expect(graph["k8s-namespace"].parentVariables).toContain("k8s_cluster_name");
       // Due to implementation bug, non-query_values variables get childVariables reset
       expect(graph["k8s_cluster_name"].childVariables).toEqual([]);
@@ -150,34 +152,34 @@ describe("Variables Dependency Utils", () => {
 
     it("should handle variables that reference themselves", () => {
       const variables = [
-        { 
-          name: "region", 
-          type: "query_values", 
-          query_data: { 
-            filter: [{ value: "region!='$region'" }] 
-          } 
+        {
+          name: "region",
+          type: "query_values",
+          query_data: {
+            filter: [{ value: "region!='$region'" }],
+          },
         },
       ];
-      
+
       const graph = buildVariablesDependencyGraph(variables);
-      
+
       expect(graph.region.parentVariables).toContain("region");
       expect(graph.region.childVariables).toContain("region");
     });
 
     it("should ignore non-existent variable references", () => {
       const variables = [
-        { 
-          name: "region", 
-          type: "query_values", 
-          query_data: { 
-            filter: [{ value: "field='$nonexistent' AND other='$alsonotexist'" }] 
-          } 
+        {
+          name: "region",
+          type: "query_values",
+          query_data: {
+            filter: [{ value: "field='$nonexistent' AND other='$alsonotexist'" }],
+          },
         },
       ];
-      
+
       const graph = buildVariablesDependencyGraph(variables);
-      
+
       expect(graph.region.parentVariables).toEqual([]);
       expect(graph.region.childVariables).toEqual([]);
     });
@@ -188,9 +190,9 @@ describe("Variables Dependency Utils", () => {
         { name: "env", type: "query_values", query_data: undefined },
         { name: "service", type: "query_values", query_data: {} },
       ];
-      
+
       const graph = buildVariablesDependencyGraph(variables);
-      
+
       expect(graph.region.parentVariables).toEqual([]);
       expect(graph.env.parentVariables).toEqual([]);
       expect(graph.service.parentVariables).toEqual([]);
@@ -198,32 +200,32 @@ describe("Variables Dependency Utils", () => {
 
     it("should handle variables with empty filter array", () => {
       const variables = [
-        { 
-          name: "region", 
-          type: "query_values", 
-          query_data: { filter: [] } 
+        {
+          name: "region",
+          type: "query_values",
+          query_data: { filter: [] },
         },
       ];
-      
+
       const graph = buildVariablesDependencyGraph(variables);
-      
+
       expect(graph.region.parentVariables).toEqual([]);
     });
 
     it("should handle duplicate variable references in same filter", () => {
       const variables = [
-        { 
-          name: "service", 
-          type: "query_values", 
-          query_data: { 
-            filter: [{ value: "region='$region' OR fallback_region='$region'" }] 
-          } 
+        {
+          name: "service",
+          type: "query_values",
+          query_data: {
+            filter: [{ value: "region='$region' OR fallback_region='$region'" }],
+          },
         },
         { name: "region", type: "constant", query_data: null },
       ];
-      
+
       const graph = buildVariablesDependencyGraph(variables);
-      
+
       // Should have region only once in parentVariables despite multiple references
       expect(graph.service.parentVariables).toEqual(["region"]);
       // Due to implementation bug, non-query_values variables get childVariables reset
@@ -235,27 +237,24 @@ describe("Variables Dependency Utils", () => {
         { name: "env", type: "constant", query_data: null },
         { name: "region", type: "textbox", query_data: null },
         { name: "cluster", type: "custom", query_data: null },
-        { 
-          name: "namespace", 
-          type: "query_values", 
-          query_data: { 
-            filter: [
-              { value: "environment='$env'" },
-              { value: "region='$region'" }
-            ] 
-          } 
+        {
+          name: "namespace",
+          type: "query_values",
+          query_data: {
+            filter: [{ value: "environment='$env'" }, { value: "region='$region'" }],
+          },
         },
-        { 
-          name: "pod", 
-          type: "query_values", 
-          query_data: { 
-            filter: [{ value: "namespace='$namespace' AND cluster='$cluster'" }] 
-          } 
+        {
+          name: "pod",
+          type: "query_values",
+          query_data: {
+            filter: [{ value: "namespace='$namespace' AND cluster='$cluster'" }],
+          },
         },
       ];
-      
+
       const graph = buildVariablesDependencyGraph(variables);
-      
+
       expect(graph.namespace.parentVariables).toEqual(expect.arrayContaining(["env", "region"]));
       expect(graph.pod.parentVariables).toEqual(expect.arrayContaining(["namespace", "cluster"]));
       // Non-query_values variables get childVariables populated by later query_values variables
@@ -271,7 +270,7 @@ describe("Variables Dependency Utils", () => {
     it("should return null for empty graph", () => {
       const graph = {};
       const result = isGraphHasCycle(graph);
-      
+
       expect(result).toBeNull();
     });
 
@@ -281,9 +280,9 @@ describe("Variables Dependency Utils", () => {
         b: { parentVariables: ["a"], childVariables: ["c"] },
         c: { parentVariables: ["b"], childVariables: [] },
       };
-      
+
       const result = isGraphHasCycle(graph);
-      
+
       expect(result).toBeNull();
     });
 
@@ -293,9 +292,9 @@ describe("Variables Dependency Utils", () => {
         b: { parentVariables: [], childVariables: [] },
         c: { parentVariables: [], childVariables: [] },
       };
-      
+
       const result = isGraphHasCycle(graph);
-      
+
       expect(result).toBeNull();
     });
 
@@ -304,9 +303,9 @@ describe("Variables Dependency Utils", () => {
         a: { parentVariables: ["b"], childVariables: [] },
         b: { parentVariables: ["a"], childVariables: [] },
       };
-      
+
       const result = isGraphHasCycle(graph);
-      
+
       expect(result).not.toBeNull();
       expect(Array.isArray(result)).toBe(true);
     });
@@ -316,9 +315,9 @@ describe("Variables Dependency Utils", () => {
         a: { parentVariables: ["a"], childVariables: ["a"] },
         b: { parentVariables: [], childVariables: [] },
       };
-      
+
       const result = isGraphHasCycle(graph);
-      
+
       expect(result).not.toBeNull();
       expect(Array.isArray(result)).toBe(true);
     });
@@ -329,9 +328,9 @@ describe("Variables Dependency Utils", () => {
         b: { parentVariables: ["a"], childVariables: ["c"] },
         c: { parentVariables: ["b"], childVariables: ["a"] },
       };
-      
+
       const result = isGraphHasCycle(graph);
-      
+
       expect(result).not.toBeNull();
       expect(Array.isArray(result)).toBe(true);
     });
@@ -344,9 +343,9 @@ describe("Variables Dependency Utils", () => {
         d: { parentVariables: ["b"], childVariables: [] }, // d depends on b -> Creates cycle b->c->d->b
         e: { parentVariables: [], childVariables: [] },
       };
-      
+
       const result = isGraphHasCycle(graph);
-      
+
       expect(result).not.toBeNull();
       expect(Array.isArray(result)).toBe(true);
     });
@@ -362,9 +361,9 @@ describe("Variables Dependency Utils", () => {
         // Third component (isolated)
         z: { parentVariables: [], childVariables: [] },
       };
-      
+
       const result = isGraphHasCycle(graph);
-      
+
       expect(result).not.toBeNull();
       expect(Array.isArray(result)).toBe(true);
     });
@@ -373,26 +372,26 @@ describe("Variables Dependency Utils", () => {
   describe("Integration Tests", () => {
     it("should detect cycles in realistic variable dependency scenario", () => {
       const variables = [
-        { 
-          name: "region", 
-          type: "query_values", 
-          query_data: { 
-            filter: [{ value: "service='$service'" }] 
-          } 
+        {
+          name: "region",
+          type: "query_values",
+          query_data: {
+            filter: [{ value: "service='$service'" }],
+          },
         },
-        { 
-          name: "service", 
-          type: "query_values", 
-          query_data: { 
-            filter: [{ value: "region='$region'" }] 
-          } 
+        {
+          name: "service",
+          type: "query_values",
+          query_data: {
+            filter: [{ value: "region='$region'" }],
+          },
         },
         { name: "env", type: "constant", query_data: null },
       ];
-      
+
       const graph = buildVariablesDependencyGraph(variables);
       const hasCycle = isGraphHasCycle(graph);
-      
+
       expect(hasCycle).not.toBeNull();
       expect(Array.isArray(hasCycle)).toBe(true);
     });
@@ -400,39 +399,39 @@ describe("Variables Dependency Utils", () => {
     it("should handle complex dependency chain without cycles", () => {
       const variables = [
         { name: "env", type: "constant", query_data: null },
-        { 
-          name: "region", 
-          type: "query_values", 
-          query_data: { 
-            filter: [{ value: "environment='$env'" }] 
-          } 
+        {
+          name: "region",
+          type: "query_values",
+          query_data: {
+            filter: [{ value: "environment='$env'" }],
+          },
         },
-        { 
-          name: "cluster", 
-          type: "query_values", 
-          query_data: { 
-            filter: [{ value: "region='$region'" }] 
-          } 
+        {
+          name: "cluster",
+          type: "query_values",
+          query_data: {
+            filter: [{ value: "region='$region'" }],
+          },
         },
-        { 
-          name: "namespace", 
-          type: "query_values", 
-          query_data: { 
-            filter: [{ value: "cluster='$cluster'" }] 
-          } 
+        {
+          name: "namespace",
+          type: "query_values",
+          query_data: {
+            filter: [{ value: "cluster='$cluster'" }],
+          },
         },
-        { 
-          name: "service", 
-          type: "query_values", 
-          query_data: { 
-            filter: [{ value: "namespace='$namespace'" }] 
-          } 
+        {
+          name: "service",
+          type: "query_values",
+          query_data: {
+            filter: [{ value: "namespace='$namespace'" }],
+          },
         },
       ];
-      
+
       const graph = buildVariablesDependencyGraph(variables);
       const hasCycle = isGraphHasCycle(graph);
-      
+
       expect(hasCycle).toBeNull();
     });
 
@@ -440,25 +439,25 @@ describe("Variables Dependency Utils", () => {
       const variables = [
         { name: "env", type: "constant", query_data: null },
         { name: "region", type: "textbox", query_data: null },
-        { 
-          name: "service", 
-          type: "query_values", 
-          query_data: { 
+        {
+          name: "service",
+          type: "query_values",
+          query_data: {
             filter: [
               { value: "environment IN ('$env', 'staging') AND region LIKE '%$region%'" },
-              { value: "status != 'down' OR fallback_env = '$env'" }
-            ] 
-          } 
+              { value: "status != 'down' OR fallback_env = '$env'" },
+            ],
+          },
         },
       ];
-      
+
       const graph = buildVariablesDependencyGraph(variables);
-      
+
       expect(graph.service.parentVariables).toEqual(expect.arrayContaining(["env", "region"]));
       // Non-query_values variables get childVariables populated by query_values variables
       expect(graph.env.childVariables).toContain("service");
       expect(graph.region.childVariables).toContain("service");
-      
+
       const hasCycle = isGraphHasCycle(graph);
       expect(hasCycle).toBeNull();
     });
@@ -466,21 +465,21 @@ describe("Variables Dependency Utils", () => {
     it("should handle edge case with special characters in variable names", () => {
       const variables = [
         { name: "k8s-cluster_name", type: "constant", query_data: null },
-        { 
-          name: "pod-name", 
-          type: "query_values", 
-          query_data: { 
-            filter: [{ value: "cluster_name='$k8s-cluster_name'" }] 
-          } 
+        {
+          name: "pod-name",
+          type: "query_values",
+          query_data: {
+            filter: [{ value: "cluster_name='$k8s-cluster_name'" }],
+          },
         },
       ];
-      
+
       const graph = buildVariablesDependencyGraph(variables);
-      
+
       expect(graph["pod-name"].parentVariables).toContain("k8s-cluster_name");
       // Non-query_values variables get childVariables populated by query_values variables
       expect(graph["k8s-cluster_name"].childVariables).toContain("pod-name");
-      
+
       const hasCycle = isGraphHasCycle(graph);
       expect(hasCycle).toBeNull();
     });
@@ -491,14 +490,14 @@ describe("Variables Dependency Utils", () => {
       const variables = [
         null,
         undefined,
-        { name: "valid", type: "constant", query_data: null }
+        { name: "valid", type: "constant", query_data: null },
       ].filter(Boolean);
-      
+
       const graph = buildVariablesDependencyGraph(variables);
-      
+
       expect(graph.valid).toEqual({
         parentVariables: [],
-        childVariables: []
+        childVariables: [],
       });
     });
 
@@ -506,55 +505,58 @@ describe("Variables Dependency Utils", () => {
       const variables = [
         { name: "incomplete1" }, // missing type and query_data
         { type: "constant" }, // missing name
-        { name: "valid", type: "constant", query_data: null }
+        { name: "valid", type: "constant", query_data: null },
       ];
-      
+
       const graph = buildVariablesDependencyGraph(variables);
-      
+
       expect(graph.valid).toBeDefined();
       expect(graph.incomplete1).toBeDefined();
     });
 
     it("should handle malformed filter values", () => {
       const variables = [
-        { 
-          name: "service", 
-          type: "query_values", 
-          query_data: { 
+        {
+          name: "service",
+          type: "query_values",
+          query_data: {
             filter: [
               { value: null },
               { value: undefined },
               { value: "" },
-              { value: "valid='$env'" }
-            ] 
-          } 
+              { value: "valid='$env'" },
+            ],
+          },
         },
         { name: "env", type: "constant", query_data: null },
       ];
-      
+
       const graph = buildVariablesDependencyGraph(variables);
-      
+
       expect(graph.service.parentVariables).toContain("env");
     });
 
     it("should handle very large dependency graphs", () => {
       const variables = [];
-      
+
       // Create a large chain: var0 -> var1 -> var2 -> ... -> var99
       for (let i = 0; i < 100; i++) {
         const variable = {
           name: `var${i}`,
           type: i === 0 ? "constant" : "query_values",
-          query_data: i === 0 ? null : {
-            filter: [{ value: `field='$var${i-1}'` }]
-          }
+          query_data:
+            i === 0
+              ? null
+              : {
+                  filter: [{ value: `field='$var${i - 1}'` }],
+                },
         };
         variables.push(variable);
       }
-      
+
       const graph = buildVariablesDependencyGraph(variables);
       const hasCycle = isGraphHasCycle(graph);
-      
+
       expect(Object.keys(graph)).toHaveLength(100);
       expect(hasCycle).toBeNull();
     });
@@ -620,7 +622,7 @@ describe("Variables Dependency Utils", () => {
       const graph = buildVariablesDependencyGraph(variables);
 
       expect(graph.complexVar.parentVariables).toEqual(
-        expect.arrayContaining(["streamVar", "fieldVar", "statusVar"])
+        expect.arrayContaining(["streamVar", "fieldVar", "statusVar"]),
       );
       expect(graph.complexVar.parentVariables.length).toBe(3);
     });
@@ -684,7 +686,7 @@ describe("Variables Dependency Utils", () => {
       const graph = buildVariablesDependencyGraph(variables);
 
       expect(graph.multiFieldVar.parentVariables).toEqual(
-        expect.arrayContaining(["prefix", "suffix"])
+        expect.arrayContaining(["prefix", "suffix"]),
       );
       expect(graph.multiFieldVar.parentVariables.length).toBe(2);
     });
@@ -842,13 +844,13 @@ describe("Variables Dependency Utils", () => {
 
       // level2Combined should depend on all level1 variables
       expect(graph.level2Combined.parentVariables).toEqual(
-        expect.arrayContaining(["level1Stream", "level1Field", "level1Filter"])
+        expect.arrayContaining(["level1Stream", "level1Field", "level1Filter"]),
       );
       expect(graph.level2Combined.parentVariables.length).toBe(3);
 
       // root should have all level1 as children
       expect(graph.root.childVariables).toEqual(
-        expect.arrayContaining(["level1Stream", "level1Field", "level1Filter"])
+        expect.arrayContaining(["level1Stream", "level1Field", "level1Filter"]),
       );
     });
 

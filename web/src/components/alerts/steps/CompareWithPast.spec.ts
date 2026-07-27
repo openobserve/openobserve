@@ -22,7 +22,6 @@ import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import i18n from "@/locales";
 
-
 // Mock getUUID
 vi.mock("@/utils/zincutils", () => ({
   getUUID: vi.fn(() => "mock-uuid-" + Math.random()),
@@ -331,12 +330,16 @@ describe("CompareWithPast.vue", () => {
 
     it("should show correct tooltip for custom tab", async () => {
       await wrapper.setProps({ selectedTab: "custom" });
-      expect(wrapper.vm.comparisonDisabledTooltip).toContain("Comparison windows are only supported in SQL mode. Switch to SQL in the Alert Rules tab.");
+      expect(wrapper.vm.comparisonDisabledTooltip).toContain(
+        "Comparison windows are only supported in SQL mode. Switch to SQL in the Alert Rules tab.",
+      );
     });
 
     it("should show correct tooltip for promql tab", async () => {
       await wrapper.setProps({ selectedTab: "promql" });
-      expect(wrapper.vm.comparisonDisabledTooltip).toContain("Comparison windows are only supported in SQL mode. Switch to SQL in the Alert Rules tab.");
+      expect(wrapper.vm.comparisonDisabledTooltip).toContain(
+        "Comparison windows are only supported in SQL mode. Switch to SQL in the Alert Rules tab.",
+      );
     });
 
     it("should show empty tooltip for sql tab", async () => {
@@ -622,9 +625,7 @@ describe("CompareWithPast — descendant (bridged into ancestor OForm) mode", ()
         });
         // Feed the form's array back down as the prop (mirrors AddAlert's
         // :multiTimeRange="formData.query_condition.multi_time_range").
-        const rows = form.useStore(
-          (s: any) => s.values.query_condition.multi_time_range,
-        );
+        const rows = form.useStore((s: any) => s.values.query_condition.multi_time_range);
         return { form, rows };
       },
       template: `
@@ -658,16 +659,10 @@ describe("CompareWithPast — descendant (bridged into ancestor OForm) mode", ()
     host.findComponent(CompareWithPast).vm.addTimeShift();
     await flushPromises();
 
-    expect(parentForm.state.values.query_condition.multi_time_range.length).toBe(
-      1,
-    );
-    expect(
-      parentForm.state.values.query_condition.multi_time_range[0].offSet,
-    ).toBe("15m");
+    expect(parentForm.state.values.query_condition.multi_time_range.length).toBe(1);
+    expect(parentForm.state.values.query_condition.multi_time_range[0].offSet).toBe("15m");
     // form-owned in descendant mode → the bare-mode emit does NOT fire
-    expect(
-      host.findComponent(CompareWithPast).emitted("update:multiTimeRange"),
-    ).toBeFalsy();
+    expect(host.findComponent(CompareWithPast).emitted("update:multiTimeRange")).toBeFalsy();
   });
 
   it("deleting a NON-last window leaves the PARENT form + rendered pickers correct", async () => {
@@ -690,9 +685,7 @@ describe("CompareWithPast — descendant (bridged into ancestor OForm) mode", ()
     await flushPromises();
 
     expect(
-      parentForm.state.values.query_condition.multi_time_range.map(
-        (r: any) => r.offSet,
-      ),
+      parentForm.state.values.query_condition.multi_time_range.map((r: any) => r.offSet),
     ).toEqual(["15m", "45m"]);
     expect(renderedOffsets()).toEqual(["15m", "45m"]);
   });

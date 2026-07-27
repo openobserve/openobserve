@@ -7187,6 +7187,7 @@ dependencies = [
  "async-recursion",
  "async-stream",
  "async-trait",
+ "audit",
  "aws-sdk-sns",
  "axum",
  "axum-client-ip",
@@ -7245,6 +7246,7 @@ dependencies = [
  "openobserve-core",
  "openobserve-jobs",
  "openobserve-mcp",
+ "openobserve-node",
  "opentelemetry",
  "opentelemetry-otlp",
  "opentelemetry-proto",
@@ -7307,6 +7309,7 @@ dependencies = [
  "transform",
  "uaparser",
  "url",
+ "usage_reporting",
  "utoipa",
  "utoipa-swagger-ui",
  "version-compare",
@@ -7361,9 +7364,13 @@ dependencies = [
  "openobserve-api-common",
  "openobserve-api-management",
  "openobserve-api-query",
+ "openobserve-builtins",
  "openobserve-cipher",
  "openobserve-core",
  "openobserve-mcp",
+ "openobserve-node",
+ "openobserve-sourcemaps",
+ "openobserve-tls",
  "opentelemetry",
  "opentelemetry-proto",
  "parking_lot 0.12.5",
@@ -7393,6 +7400,7 @@ dependencies = [
  "tracing-opentelemetry",
  "transform",
  "url",
+ "usage_reporting",
  "utoipa",
  "utoipa-swagger-ui",
  "zip 8.2.0",
@@ -7434,6 +7442,8 @@ dependencies = [
  "o2_openfga",
  "openobserve-api-common",
  "openobserve-core",
+ "openobserve-node",
+ "openobserve-org-storage",
  "regex",
  "reqwest 0.13.2",
  "sea-orm",
@@ -7447,6 +7457,7 @@ dependencies = [
  "tracing",
  "transform",
  "url",
+ "usage_reporting",
  "utoipa",
  "vrl",
 ]
@@ -7492,6 +7503,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "openobserve-builtins"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bytes",
+ "chrono",
+ "config",
+ "infra",
+ "log",
+ "reqwest 0.13.2",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "tokio",
+ "utoipa",
+]
+
+[[package]]
 name = "openobserve-cipher"
 version = "0.1.0"
 dependencies = [
@@ -7513,8 +7542,6 @@ dependencies = [
  "arrow-schema",
  "async-trait",
  "audit",
- "aws-config",
- "aws-credential-types",
  "aws-sdk-sns",
  "axum",
  "base64 0.22.1",
@@ -7522,15 +7549,12 @@ dependencies = [
  "chromiumoxide",
  "chrono",
  "common",
- "compaction",
  "config",
  "cron",
- "csv",
  "dashmap",
  "datafusion",
  "db",
  "enrichment",
- "enrichment-data",
  "flate2",
  "futures",
  "futures-util",
@@ -7544,17 +7568,15 @@ dependencies = [
  "jsonwebtoken",
  "lettre",
  "log",
- "maxminddb",
  "md5",
  "multer",
  "o2_dex",
  "o2_enterprise",
  "o2_openfga",
- "object_store",
+ "openobserve-node",
  "opentelemetry",
  "opentelemetry-proto",
  "parking_lot 0.12.5",
- "parquet",
  "prometheus",
  "promql",
  "promql-parser",
@@ -7563,12 +7585,8 @@ dependencies = [
  "prost-wkt-types",
  "proto",
  "rand 0.10.1",
- "rayon",
- "rcgen",
  "regex",
  "reqwest 0.13.2",
- "rustls",
- "rustls-native-certs",
  "schema",
  "sea-orm",
  "search",
@@ -7576,11 +7594,8 @@ dependencies = [
  "serde",
  "serde_json",
  "snap",
- "sourcemap",
  "stream",
  "svix-ksuid",
- "tantivy",
- "tantivy_utils",
  "thiserror 2.0.18",
  "tiktoken-rs",
  "time",
@@ -7594,10 +7609,6 @@ dependencies = [
  "utoipa",
  "version-compare",
  "vrl",
- "wal",
- "webpki-roots 1.0.6",
- "x509-parser",
- "zip 8.2.0",
 ]
 
 [[package]]
@@ -7607,6 +7618,7 @@ dependencies = [
  "anyhow",
  "arrow",
  "arrow-schema",
+ "async-trait",
  "audit",
  "bytes",
  "chrono",
@@ -7624,7 +7636,10 @@ dependencies = [
  "o2_dex",
  "o2_enterprise",
  "o2_openfga",
+ "openobserve-builtins",
  "openobserve-core",
+ "openobserve-node",
+ "openobserve-org-storage",
  "prometheus",
  "promql-service",
  "proto",
@@ -7636,9 +7651,11 @@ dependencies = [
  "search_service",
  "serde_json",
  "stream",
+ "tantivy_utils",
  "tokio",
  "tonic",
  "transform",
+ "usage_reporting",
  "wal",
 ]
 
@@ -7659,6 +7676,79 @@ dependencies = [
  "tokio",
  "url",
  "utoipa",
+]
+
+[[package]]
+name = "openobserve-node"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "common",
+ "config",
+ "db",
+ "infra",
+ "log",
+ "prometheus",
+ "proto",
+ "tokio",
+ "tonic",
+]
+
+[[package]]
+name = "openobserve-org-storage"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "aws-config",
+ "aws-credential-types",
+ "bytes",
+ "chrono",
+ "config",
+ "hashbrown 0.16.1",
+ "infra",
+ "log",
+ "object_store",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
+name = "openobserve-sourcemaps"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bytes",
+ "chrono",
+ "config",
+ "db",
+ "hashbrown 0.16.1",
+ "infra",
+ "log",
+ "o2_enterprise",
+ "proto",
+ "sea-orm",
+ "serde",
+ "sourcemap",
+ "tokio",
+ "tonic",
+ "zip 8.2.0",
+]
+
+[[package]]
+name = "openobserve-tls"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "config",
+ "itertools 0.14.0",
+ "log",
+ "rcgen",
+ "reqwest 0.13.2",
+ "rustls",
+ "rustls-native-certs",
+ "webpki-roots 1.0.6",
+ "x509-parser",
 ]
 
 [[package]]
@@ -10086,13 +10176,16 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "arrow-schema",
+ "async-trait",
  "common",
  "config",
  "dashmap",
  "db",
  "hashbrown 0.16.1",
  "infra",
+ "ingester",
  "ingestion-common",
+ "itertools 0.14.0",
  "log",
  "serde_json",
  "tokio",
@@ -11225,7 +11318,6 @@ dependencies = [
  "common",
  "config",
  "db",
- "enrichment-data",
  "hashbrown 0.16.1",
  "infra",
  "log",

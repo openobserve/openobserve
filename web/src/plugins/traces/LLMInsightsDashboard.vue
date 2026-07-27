@@ -19,16 +19,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
        panels each carry their own `bg-card-glass-bg`. Wrapping them in
        another bg-card-glass-bg would render same-bg-on-same-bg and the
        inner cards would visually disappear (no border contrast). -->
-  <div
-    class="bg-transparent h-full flex flex-col"
-  >
+  <div class="flex h-full flex-col bg-transparent">
     <!-- Toolbar: Stream/Agent mode tab (left) + the matching picker (right) —
          hidden when no streams are available. Padding lives on the toolbar +
          scroll area (not the root) so the scrollbar hugs the content-area edge
          instead of floating inside a padded box. -->
     <div
       v-if="availableStreams.length > 0"
-      class="flex items-center gap-3 px-page-edge py-2 border-b border-border-default"
+      class="px-page-edge border-border-default flex items-center gap-3 border-b py-2"
     >
       <!-- Scope control — left-aligned Stream/Agent bar directly under the
            header, matching Agent Graph / Agent Behavior / Sessions so every AI
@@ -41,8 +39,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="llm-insights-filter-mode"
         @update:model-value="onFilterModeChange"
       >
-        <OToggleGroupItem value="agent" size="sm">{{ t('traces.lLMInsightsDashboard.agent') }}</OToggleGroupItem>
-        <OToggleGroupItem value="stream" size="sm">{{ t('traces.lLMInsightsDashboard.stream') }}</OToggleGroupItem>
+        <OToggleGroupItem value="agent" size="sm">{{
+          t("traces.lLMInsightsDashboard.agent")
+        }}</OToggleGroupItem>
+        <OToggleGroupItem value="stream" size="sm">{{
+          t("traces.lLMInsightsDashboard.stream")
+        }}</OToggleGroupItem>
       </OToggleGroup>
 
       <!-- Picker: Stream tab → stream picker; Agent tab → agent picker. -->
@@ -58,19 +60,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :options="availableStreams.map((s) => ({ label: s, value: s }))"
           labelKey="label"
           valueKey="value"
-          class="w-full rounded-default"
+          class="rounded-default w-full"
           @update:model-value="onStreamChange"
         />
       </div>
-      <div
-        v-else
-        data-test="llm-insights-agent-selector"
-        class="w-56 flex-shrink-0"
-      >
+      <div v-else data-test="llm-insights-agent-selector" class="w-56 flex-shrink-0">
         <!-- Hold a picker-shaped skeleton until the agents list lands the first
              time, so the dropdown doesn't flash an empty "Agent" picker before
              its options exist. -->
-        <OSkeleton type="text" v-if="!agentsLoaded" class="w-full h-8.5" />
+        <OSkeleton type="text" v-if="!agentsLoaded" class="h-8.5 w-full" />
         <OSelect
           v-else
           v-model="activeAgent"
@@ -79,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :options="agentSelectOptions"
           labelKey="label"
           valueKey="value"
-          class="w-full rounded-default"
+          class="rounded-default w-full"
           @update:model-value="onAgentChange"
         />
       </div>
@@ -92,7 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <LLMInsightsSkeleton
       v-if="!streamsLoaded || switching"
       :hide-toolbar="streamsLoaded"
-      class="flex-1 px-page-edge"
+      class="px-page-edge flex-1"
     />
 
     <!-- Generic error state — kept separate because a failed request is a
@@ -119,14 +117,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          the preset's "Instrument with OpenTelemetry" call to action. -->
     <div
       v-else-if="isEmpty"
-      class="flex-1 min-h-0 flex items-center justify-center px-page-edge"
+      class="px-page-edge flex min-h-0 flex-1 items-center justify-center"
       data-test="llm-insights-empty"
     >
-      <OEmptyState
-        size="hero"
-        preset="no-llm-insights"
-        @action="onEmptyAction"
-      />
+      <OEmptyState size="hero" preset="no-llm-insights" @action="onEmptyAction" />
     </div>
 
     <!-- Agent tab with no agents in the window — its own empty state (reuses
@@ -134,7 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          back to the Stream tab. -->
     <div
       v-else-if="agentEmpty"
-      class="flex-1 min-h-0 flex items-center justify-center px-page-edge"
+      class="px-page-edge flex min-h-0 flex-1 items-center justify-center"
       data-test="llm-insights-agent-empty"
     >
       <OEmptyState
@@ -150,25 +144,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Dashboard content — scrollable panel area. Horizontal padding lives
          here (inside the scroll container) so the scrollbar sits at the
          content-area edge with content padded away from it. -->
-    <div v-else class="flex-1 overflow-y-auto px-page-edge pb-3">
+    <div v-else class="px-page-edge flex-1 overflow-y-auto pb-3">
       <!-- KPI strip: keep a skeleton until the first KPI result lands so the
            cards never flash zeros. The panels below render regardless, so
            their queries fire in parallel with the KPI fetch. -->
-      <LLMInsightsSkeleton
-        v-if="loading || !hasLoadedOnce"
-        kpi-only
-        class="mb-2.5"
-      />
+      <LLMInsightsSkeleton v-if="loading || !hasLoadedOnce" kpi-only class="mb-2.5" />
       <!-- KPI Cards Row -->
-      <KpiCardRow
-        v-else
-        :columns="5"
-        class="mt-2.5 mb-2.5"
-      >
+      <KpiCardRow v-else :columns="5" class="mt-2.5 mb-2.5">
         <div
           v-for="card in kpiCards"
           :key="card.label"
-          class="bg-card-glass-bg rounded-default flex flex-col px-3.5 py-2.5 gap-1 min-h-32.5 border border-border-default"
+          class="bg-card-glass-bg rounded-default border-border-default flex min-h-32.5 flex-col gap-1 border px-3.5 py-2.5"
         >
           <!-- P95 rides its own (slower) query — skeleton the WHOLE card while
                it loads, matching the initial strip skeleton tile (see
@@ -176,33 +162,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                showing a chart before the number reads as ready, so we hold both. -->
           <template v-if="card.loading">
             <div class="flex flex-col gap-1">
-              <OSkeleton type="text" class="w-[60%] h-3" />
-              <OSkeleton type="text" class="w-[55%] h-5.5" />
+              <OSkeleton type="text" class="h-3 w-[60%]" />
+              <OSkeleton type="text" class="h-5.5 w-[55%]" />
             </div>
-            <div class="flex items-end gap-[0.15rem] h-8 mt-auto">
-              <OSkeleton type="text" v-for="bar in 16" :key="bar" :style="{ height: `${30 + ((bar * 23) % 65)}%` }" class="w-full" />
+            <div class="mt-auto flex h-8 items-end gap-[0.15rem]">
+              <OSkeleton
+                type="text"
+                v-for="bar in 16"
+                :key="bar"
+                :style="{ height: `${30 + ((bar * 23) % 65)}%` }"
+                class="w-full"
+              />
             </div>
           </template>
           <template v-else>
             <div class="flex flex-col gap-1">
-              <div class="flex items-center justify-between gap-2 mb-1">
-                <div class="text-2xs leading-normal font-semibold text-text-secondary min-w-0 truncate">
+              <div class="mb-1 flex items-center justify-between gap-2">
+                <div
+                  class="text-2xs text-text-secondary min-w-0 truncate leading-normal font-semibold"
+                >
                   {{ card.label }}
                 </div>
                 <span
-                  class="inline-flex items-center justify-center shrink-0 w-6 h-6 rounded-default bg-surface-subtle text-text-secondary"
+                  class="rounded-default bg-surface-subtle text-text-secondary inline-flex h-6 w-6 shrink-0 items-center justify-center"
                 >
                   <OIcon :name="card.icon" size="sm" />
                 </span>
               </div>
               <div class="flex items-baseline gap-[0.2rem]">
-                <span class="text-2xl font-bold leading-none text-text-secondary">
+                <span class="text-text-secondary text-2xl leading-none font-bold">
                   {{ card.value }}
                 </span>
-                <span
-                  v-if="card.unit"
-                  class="text-compact font-semibold text-text-secondary"
-                >
+                <span v-if="card.unit" class="text-compact text-text-secondary font-semibold">
                   {{ card.unit }}
                 </span>
               </div>
@@ -271,11 +262,7 @@ import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { useLLMInsights } from "./composables/useLLMInsights";
-import {
-  splitNumberWithUnit,
-  splitDuration,
-  splitCost,
-} from "./llmInsightsDashboard.utils";
+import { splitNumberWithUnit, splitDuration, splitCost } from "./llmInsightsDashboard.utils";
 import KpiSparkline from "./KpiSparkline.vue";
 import KpiCardRow from "@/components/common/KpiCardRow.vue";
 import LLMSchemaPanel from "./LLMSchemaPanel.vue";
@@ -294,11 +281,7 @@ import useStreams from "@/composables/useStreams";
 import genAiAgentMappingService, {
   type GenAiAgentListItem,
 } from "@/services/gen-ai-agent-mapping.service";
-import {
-  ALL_AGENTS_VALUE,
-  agentOptionKey,
-  buildAgentTraceFilter,
-} from "./llmAgentFilter";
+import { ALL_AGENTS_VALUE, agentOptionKey, buildAgentTraceFilter } from "./llmAgentFilter";
 
 const { getStreams } = useStreams();
 const { t } = useI18n();
@@ -391,9 +374,7 @@ const agentSelectOptions = computed(() =>
 // The full agent object behind the current selection (null when none).
 const selectedAgent = computed<GenAiAgentListItem | null>(() => {
   if (activeAgent.value === ALL_AGENTS_VALUE) return null;
-  return (
-    agents.value.find((a) => agentOptionKey(a) === activeAgent.value) ?? null
-  );
+  return agents.value.find((a) => agentOptionKey(a) === activeAgent.value) ?? null;
 });
 
 // The effective stream + agent the whole dashboard queries on:
@@ -402,9 +383,7 @@ const selectedAgent = computed<GenAiAgentListItem | null>(() => {
 //    (→ direct canonical-agent filter). Deriving the stream from the agent is the whole
 //    point: we don't ask the user to pick a stream AND an agent separately.
 const effectiveStream = computed(() =>
-  filterMode.value === "agent"
-    ? (selectedAgent.value?.source_stream ?? "")
-    : activeStream.value,
+  filterMode.value === "agent" ? (selectedAgent.value?.source_stream ?? "") : activeStream.value,
 );
 const effectiveAgent = computed<GenAiAgentListItem | null>(() =>
   filterMode.value === "agent" ? selectedAgent.value : null,
@@ -435,15 +414,8 @@ const agentFilterClause = computed(() =>
 const PANEL_CACHE_FOLDER = "ai-llm-insights";
 const panelCacheDashboardId = computed(() => {
   const agentKey =
-    filterMode.value === "agent"
-      ? (effectiveAgent.value?.name ?? "_none")
-      : "_stream";
-  return selectionKey(
-    effectiveStream.value,
-    agentKey,
-    props.startTime,
-    props.endTime,
-  );
+    filterMode.value === "agent" ? (effectiveAgent.value?.name ?? "_none") : "_stream";
+  return selectionKey(effectiveStream.value, agentKey, props.startTime, props.endTime);
 });
 // PanelSchemaRenderer (via its annotation composable) calls getDashboard() on
 // mount, which hits the network for any dashboardId not already in the Vuex
@@ -479,10 +451,7 @@ watch(panelCacheDashboardId, (id) => ensurePanelCacheStub(id), {
 // dedicated empty state (vs. the generic "no LLM data" one). Only true once the
 // list has actually loaded, so we don't flash it before the first fetch.
 const agentEmpty = computed(
-  () =>
-    filterMode.value === "agent" &&
-    agentsLoaded.value &&
-    agents.value.length === 0,
+  () => filterMode.value === "agent" && agentsLoaded.value && agents.value.length === 0,
 );
 
 // Reflect the current filter in the URL so the view is shareable / survives a
@@ -532,9 +501,7 @@ async function loadTraceStreams() {
   try {
     const res: any = await getStreams("traces", false, false);
     const list = res?.list || [];
-    const llmStreams = list.filter(
-      (stream: any) => stream?.settings?.is_llm_stream !== false,
-    );
+    const llmStreams = list.filter((stream: any) => stream?.settings?.is_llm_stream !== false);
     availableStreams.value = llmStreams.map((stream: any) => stream.name);
     if (!availableStreams.value.includes(activeStream.value)) {
       activeStream.value = availableStreams.value[0] || "";
@@ -571,9 +538,7 @@ async function loadAgents(startTime?: number, endTime?: number) {
     // getDashboard a store lookup in every case.
     ensurePanelCacheStub(`${activeStream.value}::_stream::${start}-${end}`);
     for (const agent of agents.value) {
-      ensurePanelCacheStub(
-        `${agent.source_stream}::${agent.name}::${start}-${end}`,
-      );
+      ensurePanelCacheStub(`${agent.source_stream}::${agent.name}::${start}-${end}`);
     }
     if (
       activeAgent.value !== ALL_AGENTS_VALUE &&
@@ -650,15 +615,13 @@ const kpiCards = computed<KpiCard[]>(() => {
   const traces = splitNumberWithUnit(kpi.value.traceCount);
   const p95 = splitDuration(kpi.value.p95DurationMicros);
   const errorRate =
-    kpi.value.traceCount > 0
-      ? (kpi.value.errorCount / kpi.value.traceCount) * 100
-      : 0;
+    kpi.value.traceCount > 0 ? (kpi.value.errorCount / kpi.value.traceCount) * 100 : 0;
 
   // Cost comes straight from SUM(gen_ai_usage_cost) on the KPI summary.
   // If it's 0, either there are no LLM spans in the window or the SDK
   // isn't emitting cost; either way we render "$0".
   const costCard: KpiCard = {
-    label: t('traces.lLMInsightsDashboard.totalCost'),
+    label: t("traces.lLMInsightsDashboard.totalCost"),
     icon: "payments",
     ...splitCost(kpi.value.totalCost),
     sparkData: sparklines.value.cost,
@@ -668,7 +631,7 @@ const kpiCards = computed<KpiCard[]>(() => {
   return [
     costCard,
     {
-      label: t('traces.lLMInsightsDashboard.totalTokens'),
+      label: t("traces.lLMInsightsDashboard.totalTokens"),
       icon: "tag",
       value: tokens.value,
       unit: tokens.unit,
@@ -676,7 +639,7 @@ const kpiCards = computed<KpiCard[]>(() => {
       sparkColor: "#a855f7",
     },
     {
-      label: t('traces.lLMInsightsDashboard.totalTraces'),
+      label: t("traces.lLMInsightsDashboard.totalTraces"),
       icon: "account-tree",
       value: traces.value,
       unit: traces.unit,
@@ -684,7 +647,7 @@ const kpiCards = computed<KpiCard[]>(() => {
       sparkColor: "#3b82f6",
     },
     {
-      label: t('traces.lLMInsightsDashboard.p95Latency'),
+      label: t("traces.lLMInsightsDashboard.p95Latency"),
       icon: "schedule",
       value: p95.value,
       unit: p95.unit,
@@ -693,7 +656,7 @@ const kpiCards = computed<KpiCard[]>(() => {
       loading: p95Loading.value,
     },
     {
-      label: t('traces.lLMInsightsDashboard.errorRate'),
+      label: t("traces.lLMInsightsDashboard.errorRate"),
       icon: "error",
       value: errorRate.toFixed(1),
       unit: "%",
@@ -709,9 +672,7 @@ const kpiCards = computed<KpiCard[]>(() => {
 // stream+agent+window scope and restored on a tab toggle / same-window revisit.
 function kpiCacheKey(start: number, end: number): string {
   const agentKey =
-    filterMode.value === "agent"
-      ? (effectiveAgent.value?.name ?? "_none")
-      : "_stream";
+    filterMode.value === "agent" ? (effectiveAgent.value?.name ?? "_none") : "_stream";
   return selectionKey(effectiveStream.value, agentKey, start, end);
 }
 
@@ -719,11 +680,7 @@ function kpiCacheKey(start: number, end: number): string {
 // parent keeps in sync via `recomputeInsightsTimeRange`). Stream selector
 // changes, refresh button, and onMounted all funnel through here. `force`
 // (manual refresh) bypasses the KPI cache and pulls fresh numbers.
-async function loadInsights(
-  startTime?: number,
-  endTime?: number,
-  opts?: { force?: boolean },
-) {
+async function loadInsights(startTime?: number, endTime?: number, opts?: { force?: boolean }) {
   try {
     const force = opts?.force ?? false;
     const start = startTime ?? props.startTime;
@@ -744,9 +701,7 @@ async function loadInsights(
       // Resolve an agent name carried in the URL to its concrete (stream-scoped)
       // selection now that the list exists.
       if (pendingAgentName.value) {
-        const match = agents.value.find(
-          (a) => a.name === pendingAgentName.value,
-        );
+        const match = agents.value.find((a) => a.name === pendingAgentName.value);
         if (match) activeAgent.value = agentOptionKey(match);
         pendingAgentName.value = null;
       }
@@ -801,9 +756,7 @@ async function loadInsights(
   }
 }
 
-function onFilterModeChange(
-  mode: boolean | AcceptableValue | AcceptableValue[],
-) {
+function onFilterModeChange(mode: boolean | AcceptableValue | AcceptableValue[]) {
   const next = mode === "agent" ? "agent" : "stream";
   if (next === filterMode.value) return;
   filterMode.value = next;

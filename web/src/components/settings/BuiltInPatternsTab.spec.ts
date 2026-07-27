@@ -19,7 +19,6 @@ import { createStore } from "vuex";
 import { createI18n } from "vue-i18n";
 import BuiltInPatternsTab from "./BuiltInPatternsTab.vue";
 
-
 // --- Mock services ---
 vi.mock("@/services/regex_pattern", () => ({
   default: {

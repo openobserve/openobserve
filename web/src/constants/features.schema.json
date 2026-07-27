@@ -35,24 +35,15 @@
             "properties": {
               "opensource": {
                 "description": "Availability in Open Source edition (boolean or i18n key)",
-                "oneOf": [
-                  { "type": "boolean" },
-                  { "type": "string", "pattern": "^[a-z_\\.]+$" }
-                ]
+                "oneOf": [{ "type": "boolean" }, { "type": "string", "pattern": "^[a-z_\\.]+$" }]
               },
               "enterprise": {
                 "description": "Availability in Enterprise edition (boolean or i18n key)",
-                "oneOf": [
-                  { "type": "boolean" },
-                  { "type": "string", "pattern": "^[a-z_\\.]+$" }
-                ]
+                "oneOf": [{ "type": "boolean" }, { "type": "string", "pattern": "^[a-z_\\.]+$" }]
               },
               "cloud": {
                 "description": "Availability in Cloud edition (boolean or i18n key)",
-                "oneOf": [
-                  { "type": "boolean" },
-                  { "type": "string", "pattern": "^[a-z_\\.]+$" }
-                ]
+                "oneOf": [{ "type": "boolean" }, { "type": "string", "pattern": "^[a-z_\\.]+$" }]
               }
             },
             "additionalProperties": false

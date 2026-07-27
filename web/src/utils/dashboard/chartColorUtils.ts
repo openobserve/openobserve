@@ -13,10 +13,7 @@ import { getColorPalette } from "./colorPalette";
  */
 export const applySeriesColorMappings = (
   series: any[],
-  colorBySeries:
-    | Array<{ value: string; color: string | null }>
-    | undefined
-    | null,
+  colorBySeries: Array<{ value: string; color: string | null }> | undefined | null,
   theme: string,
 ): void => {
   if (!Array.isArray(series) || !colorBySeries?.length) return;
@@ -34,8 +31,7 @@ export const applySeriesColorMappings = (
 
   const usedColors = new Set<string>(configuredColors);
 
-  const getSeriesColor = (s: any): string | undefined =>
-    s?.color ?? s?.itemStyle?.color;
+  const getSeriesColor = (s: any): string | undefined => s?.color ?? s?.itemStyle?.color;
   const setSeriesColor = (s: any, clr: string) => {
     if (!s) return;
     if (s.color !== undefined) s.color = clr;
@@ -55,10 +51,7 @@ export const applySeriesColorMappings = (
   });
 
   // Generate a unique non-conflicting color
-  const generateUniqueColor = (
-    used: Set<string>,
-    themeName: string,
-  ): string => {
+  const generateUniqueColor = (used: Set<string>, themeName: string): string => {
     const palette = getColorPalette(themeName);
     for (const c of palette) {
       if (!used.has(c)) return c;
@@ -110,9 +103,7 @@ export const getContrastColor = (
   }
 
   // Normalize input (support hex, rgb, rgba)
-  const normalizeColor = (
-    color: string,
-  ): { r: number; g: number; b: number } => {
+  const normalizeColor = (color: string): { r: number; g: number; b: number } => {
     // Remove spaces and convert to lowercase
     color = color.replace(/\s/g, "").toLowerCase();
 

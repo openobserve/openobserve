@@ -230,9 +230,7 @@ describe("SyntheticsLocationForm", () => {
     // providerValue is initialized from locationFormDefaults.provider = "custom"
     expect(wrapper.vm.providerValue).toBe("custom");
 
-    const customInput = wrapper.find(
-      '[data-test="synthetics-location-custom-provider-input"]',
-    );
+    const customInput = wrapper.find('[data-test="synthetics-location-custom-provider-input"]');
     expect(customInput.exists()).toBe(true);
   });
 
@@ -243,9 +241,7 @@ describe("SyntheticsLocationForm", () => {
     wrapper = createWrapper({ isEdit: false });
     expect(wrapper.vm.providerValue).toBe("aws");
 
-    const customInput = wrapper.find(
-      '[data-test="synthetics-location-custom-provider-input"]',
-    );
+    const customInput = wrapper.find('[data-test="synthetics-location-custom-provider-input"]');
     expect(customInput.exists()).toBe(false);
   });
 
@@ -256,9 +252,7 @@ describe("SyntheticsLocationForm", () => {
     });
     expect(wrapper.vm.providerValue).toBe("aws");
 
-    const customInput = wrapper.find(
-      '[data-test="synthetics-location-custom-provider-input"]',
-    );
+    const customInput = wrapper.find('[data-test="synthetics-location-custom-provider-input"]');
     expect(customInput.exists()).toBe(false);
   });
 
@@ -457,25 +451,15 @@ describe("SyntheticsLocationForm", () => {
   it("renders all expected data-test attributes", () => {
     wrapper = createWrapper();
 
-    expect(
-      wrapper.find('[data-test="synthetics-location-form-drawer"]').exists(),
-    ).toBe(true);
-    expect(
-      wrapper.find('[data-test="synthetics-location-provider-select"]').exists(),
-    ).toBe(true);
+    expect(wrapper.find('[data-test="synthetics-location-form-drawer"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="synthetics-location-provider-select"]').exists()).toBe(true);
     // customProvider is hidden for non-custom provider
-    expect(
-      wrapper.find('[data-test="synthetics-location-custom-provider-input"]').exists(),
-    ).toBe(false);
-    expect(
-      wrapper.find('[data-test="synthetics-location-region-input"]').exists(),
-    ).toBe(true);
-    expect(
-      wrapper.find('[data-test="synthetics-location-label-input"]').exists(),
-    ).toBe(true);
-    expect(
-      wrapper.find('[data-test="synthetics-location-enabled-toggle"]').exists(),
-    ).toBe(true);
+    expect(wrapper.find('[data-test="synthetics-location-custom-provider-input"]').exists()).toBe(
+      false,
+    );
+    expect(wrapper.find('[data-test="synthetics-location-region-input"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="synthetics-location-label-input"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="synthetics-location-enabled-toggle"]').exists()).toBe(true);
   });
 
   // ── Provider options ───────────────────────────────────────────────────────

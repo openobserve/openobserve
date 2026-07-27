@@ -31,7 +31,6 @@ import store from "@/test/unit/helpers/store";
 import IncidentTimeline from "@/components/alerts/IncidentTimeline.vue";
 import incidentsService from "@/services/incidents";
 
-
 const makeEvent = (overrides: Record<string, any> = {}) => ({
   type: "Alert",
   timestamp: 1700000000000000,
@@ -242,13 +241,17 @@ describe("IncidentTimeline - getEventBadgeColor", () => {
   it("returns red for SeverityUpgrade", async () => {
     const w = await mountComp();
     await flushPromises();
-    expect((w.vm as any).getEventBadgeColor({ type: "SeverityUpgrade" })).toBe("var(--color-error-500)");
+    expect((w.vm as any).getEventBadgeColor({ type: "SeverityUpgrade" })).toBe(
+      "var(--color-error-500)",
+    );
   });
 
   it("returns purple for ai_analysis_begin", async () => {
     const w = await mountComp();
     await flushPromises();
-    expect((w.vm as any).getEventBadgeColor({ type: "ai_analysis_begin" })).toBe("var(--color-ai-accent)");
+    expect((w.vm as any).getEventBadgeColor({ type: "ai_analysis_begin" })).toBe(
+      "var(--color-ai-accent)",
+    );
   });
 
   it("returns gray for unknown type", async () => {
@@ -414,7 +417,11 @@ describe("IncidentTimeline - submitComment", () => {
     w.vm.commentText = "test comment";
     await (w.vm as any).submitComment();
     await flushPromises();
-    expect(incidentsService.postComment).toHaveBeenCalledWith("default", "incident-1", "test comment");
+    expect(incidentsService.postComment).toHaveBeenCalledWith(
+      "default",
+      "incident-1",
+      "test comment",
+    );
   });
 
   it("clears commentText after successful submit", async () => {

@@ -82,14 +82,7 @@ export default function linuxCard(subs: CardSubstitutions): RichCardContent {
         chip: { kind: "traces", label: "Metrics" },
         completeOn: "detect",
         detectionAnchor: true,
-        pills: [
-          "System Logs",
-          "journald",
-          "CPU",
-          "Memory",
-          "Disk",
-          "Network",
-        ],
+        pills: ["System Logs", "journald", "CPU", "Memory", "Disk", "Network"],
       },
     ],
     detect: hostMetricsDetect,
@@ -100,9 +93,7 @@ export default function linuxCard(subs: CardSubstitutions): RichCardContent {
       fixLang: "bash",
       fixSnippet: `sudo systemctl status openobserve-agent
 sudo journalctl -u openobserve-agent -n 50 --no-pager`,
-      troubleshooting: sharedAgentTroubleshooting(
-        "`sudo systemctl status openobserve-agent`",
-      ),
+      troubleshooting: sharedAgentTroubleshooting("`sudo systemctl status openobserve-agent`"),
       uninstall: agentUninstall("linux"),
     },
     docUrl: "https://github.com/openobserve/agents",

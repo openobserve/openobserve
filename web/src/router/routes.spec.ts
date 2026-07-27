@@ -265,9 +265,7 @@ describe("router/routes (singleton)", () => {
     });
 
     it("should include a /cb callback route", () => {
-      const route = allRoutes.find(
-        (r) => r.name === "callback" || r.path === "/cb",
-      );
+      const route = allRoutes.find((r) => r.name === "callback" || r.path === "/cb");
       expect(route).toBeDefined();
     });
 
@@ -427,9 +425,7 @@ describe("router/routes (singleton)", () => {
   // -------------------------------------------------------------------------
   describe("route name uniqueness", () => {
     it("should not contain duplicate route names", () => {
-      const names = allRoutes
-        .filter((r) => r.name)
-        .map((r) => r.name as string);
+      const names = allRoutes.filter((r) => r.name).map((r) => r.name as string);
       const uniqueNames = new Set(names);
       expect(names.length).toBe(uniqueNames.size);
     });

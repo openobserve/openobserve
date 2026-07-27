@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :title="drawerTitle"
     @update:open="onOpenChange"
   >
-    <div class="flex flex-col gap-3 p-4 h-full min-h-0">
+    <div class="flex h-full min-h-0 flex-col gap-3 p-4">
       <!-- status — the drawer only opens for error nodes, so it's always Errored -->
       <div class="flex items-center justify-end">
         <OBadge variant="error-soft" size="sm">
@@ -47,17 +47,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         ref="ioContainerRef"
         data-test="workflow-step-io-container"
-        class="flex gap-2 flex-1 min-h-0"
+        class="flex min-h-0 flex-1 gap-2"
         :class="{
-          'bg-surface-subtle p-3 h-screen max-h-screen items-stretch':
-            isFullscreen,
+          'bg-surface-subtle h-screen max-h-screen items-stretch p-3': isFullscreen,
         }"
       >
         <!-- Input -->
-        <div class="flex flex-col h-full min-w-0 w-1/2">
-          <div
-            class="text-text-body text-sm mb-2 font-bold flex items-center justify-between"
-          >
+        <div class="flex h-full w-1/2 min-w-0 flex-col">
+          <div class="text-text-body mb-2 flex items-center justify-between text-sm font-bold">
             <div>{{ t("workflow.test.stepResult.input") }}</div>
             <div class="flex items-center gap-1">
               <OButton
@@ -66,10 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :title="fullscreenTitle"
                 @click="toggleFullscreen"
               >
-                <OIcon
-                  :name="isFullscreen ? 'fullscreen-exit' : 'fullscreen'"
-                  size="xs"
-                />
+                <OIcon :name="isFullscreen ? 'fullscreen-exit' : 'fullscreen'" size="xs" />
               </OButton>
               <OButton
                 variant="outline"
@@ -85,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Test mode: input is EDITABLE and Replay re-runs from this step with
                it. History mode: read-only per-node input captured for the run. -->
           <div
-            class="flex-1 min-h-0 border border-border-default rounded-default overflow-hidden bg-code-bg"
+            class="border-border-default rounded-default bg-code-bg min-h-0 flex-1 overflow-hidden border"
           >
             <CodeQueryEditor
               editor-id="workflow-step-input"
@@ -99,17 +93,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             v-if="!isHistory && editableInput && inputInvalid"
             data-test="workflow-step-result-input-error"
-            class="text-xs leading-snug text-input-error-text mt-1"
+            class="text-input-error-text mt-1 text-xs leading-snug"
           >
             {{ t("workflow.test.invalidJson") }}
           </div>
         </div>
 
         <!-- Output -->
-        <div class="flex flex-col h-full min-w-0 w-1/2">
-          <div
-            class="text-text-body text-sm mb-2 font-bold flex items-center justify-between"
-          >
+        <div class="flex h-full w-1/2 min-w-0 flex-col">
+          <div class="text-text-body mb-2 flex items-center justify-between text-sm font-bold">
             <div>{{ t("workflow.test.stepResult.output") }}</div>
             <div class="flex items-center gap-1">
               <OButton
@@ -118,10 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :title="fullscreenTitle"
                 @click="toggleFullscreen"
               >
-                <OIcon
-                  :name="isFullscreen ? 'fullscreen-exit' : 'fullscreen'"
-                  size="xs"
-                />
+                <OIcon :name="isFullscreen ? 'fullscreen-exit' : 'fullscreen'" size="xs" />
               </OButton>
               <OButton
                 variant="outline"
@@ -135,18 +124,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
           <div
-            class="flex-1 min-h-0 border border-border-default rounded-default overflow-hidden bg-code-bg"
+            class="border-border-default rounded-default bg-code-bg min-h-0 flex-1 overflow-hidden border"
           >
             <!-- The step errored — show the error message(s) as the output. -->
             <div
               v-if="errorMessages.length"
-              class="h-full overflow-auto px-3 py-2.5 flex flex-col gap-1.5"
+              class="flex h-full flex-col gap-1.5 overflow-auto px-3 py-2.5"
             >
               <div
                 v-for="(m, i) in errorMessages"
                 :key="i"
                 data-test="workflow-step-result-error-line"
-                class="text-xs leading-snug whitespace-pre-wrap text-status-error-text"
+                class="text-status-error-text text-xs leading-snug whitespace-pre-wrap"
               >
                 {{ m }}
               </div>
@@ -154,7 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               v-else
               data-test="workflow-step-result-no-output"
-              class="h-full flex items-center justify-center p-8 text-center italic text-sm text-text-secondary"
+              class="text-text-secondary flex h-full items-center justify-center p-8 text-center text-sm italic"
             >
               {{ t("workflow.test.stepResult.noOutput") }}
             </div>
@@ -165,7 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Custom footer so the Replay button can carry a hover tooltip. -->
     <template #footer>
-      <div class="flex items-center justify-end gap-2 w-full">
+      <div class="flex w-full items-center justify-end gap-2">
         <OButton variant="outline" size="sm-action" @click="close">
           {{ t("common.close") }}
         </OButton>
@@ -221,9 +210,7 @@ const nodeId = computed(() => workflowObj.testRun.resultDrawer.nodeId);
 const result = computed<any>(() => workflowObj.testRun.result);
 
 const node = computed<any>(() =>
-  (workflowObj.currentSelectedWorkflow?.nodes || []).find(
-    (n: any) => n.id === nodeId.value,
-  ),
+  (workflowObj.currentSelectedWorkflow?.nodes || []).find((n: any) => n.id === nodeId.value),
 );
 
 // Title = node type + its detail (e.g. "Function - error_fn"), capped at 30 chars.

@@ -18,9 +18,7 @@ export const ALL_AGENTS_VALUE = "__all__";
  * preferred over name because names are display labels.
  */
 export function agentOptionKey(agent: GenAiAgentListItem): string {
-  return `${agent.source_stream_type}/${agent.source_stream}/${
-    agent.id ?? agent.name
-  }`;
+  return `${agent.source_stream_type}/${agent.source_stream}/${agent.id ?? agent.name}`;
 }
 
 function sqlQuote(value: string): string {

@@ -1,0 +1,21 @@
+[package]
+name = "openobserve-node"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+anyhow.workspace = true
+common.workspace = true
+config.workspace = true
+db.workspace = true
+infra.workspace = true
+log.workspace = true
+prometheus.workspace = true
+proto.workspace = true
+tokio.workspace = true
+tonic.workspace = true

@@ -66,8 +66,7 @@ describe("UploadSourceMaps", () => {
     return wrapper;
   };
 
-  const getForm = (w: any) =>
-    (w.findComponent({ name: "OForm" }).vm as any).form;
+  const getForm = (w: any) => (w.findComponent({ name: "OForm" }).vm as any).form;
 
   const submit = async (w: any) => {
     await getForm(w).handleSubmit();
@@ -82,12 +81,8 @@ describe("UploadSourceMaps", () => {
   it("renders the page with the dropzone + native file input", async () => {
     const wrapper = await mountPage();
     expect(wrapper.findComponent({ name: "OForm" }).exists()).toBe(true);
-    expect(
-      wrapper.find('[data-test="rum-upload-source-maps-file-dropzone"]').exists(),
-    ).toBe(true);
-    expect(
-      wrapper.find('[data-test="rum-upload-source-maps-file-input"]').exists(),
-    ).toBe(true);
+    expect(wrapper.find('[data-test="rum-upload-source-maps-file-dropzone"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="rum-upload-source-maps-file-input"]').exists()).toBe(true);
   });
 
   it("prefills service/version/environment from the route query", async () => {
@@ -131,10 +126,7 @@ describe("UploadSourceMaps", () => {
       const form = getForm(wrapper);
       form.setFieldValue("service", "checkout");
       form.setFieldValue("version", "1.0.0");
-      form.setFieldValue(
-        "file",
-        new File(["x"], "map.txt", { type: "text/plain" }),
-      );
+      form.setFieldValue("file", new File(["x"], "map.txt", { type: "text/plain" }));
       await submit(wrapper);
 
       expect(form.state.isValid).toBe(false);
@@ -157,9 +149,7 @@ describe("UploadSourceMaps", () => {
 
       expect(form.state.isValid).toBe(true);
       expect(sourcemapsService.uploadSourceMaps).toHaveBeenCalledTimes(1);
-      const [orgId, formDataArg] = (
-        sourcemapsService.uploadSourceMaps as any
-      ).mock.calls[0];
+      const [orgId, formDataArg] = (sourcemapsService.uploadSourceMaps as any).mock.calls[0];
       expect(orgId).toBe("test-org");
       expect(formDataArg).toBeInstanceOf(FormData);
       expect(formDataArg.get("service")).toBe("checkout");
@@ -168,9 +158,7 @@ describe("UploadSourceMaps", () => {
       expect(formDataArg.get("file")).toBeInstanceOf(File);
 
       // Success navigates back to the SourceMaps list.
-      expect(pushSpy).toHaveBeenCalledWith(
-        expect.objectContaining({ name: "SourceMaps" }),
-      );
+      expect(pushSpy).toHaveBeenCalledWith(expect.objectContaining({ name: "SourceMaps" }));
     });
 
     it("uploads with an empty environment (environment is optional)", async () => {
@@ -187,8 +175,7 @@ describe("UploadSourceMaps", () => {
 
       expect(form.state.isValid).toBe(true);
       expect(sourcemapsService.uploadSourceMaps).toHaveBeenCalledTimes(1);
-      const formDataArg = (sourcemapsService.uploadSourceMaps as any).mock
-        .calls[0][1];
+      const formDataArg = (sourcemapsService.uploadSourceMaps as any).mock.calls[0][1];
       expect(formDataArg.get("env")).toBe("");
     });
   });

@@ -14,10 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect } from "vitest";
-import {
-  detectChunkingDirection,
-  shouldPrependChunk,
-} from "./chunkingDirection";
+import { detectChunkingDirection, shouldPrependChunk } from "./chunkingDirection";
 
 describe("detectChunkingDirection", () => {
   it("returns true (LTR) when first chunk start matches user start", () => {
@@ -67,14 +64,9 @@ describe("detectChunkingDirection", () => {
     // LTR: first chunk starts at user start
     const userStart = 1776324119965000;
     const userEnd = 1776327719965000;
-    expect(
-      detectChunkingDirection(
-        1776324119965000,
-        1776324300000000,
-        userStart,
-        userEnd,
-      ),
-    ).toBe(true);
+    expect(detectChunkingDirection(1776324119965000, 1776324300000000, userStart, userEnd)).toBe(
+      true,
+    );
 
     // RTL: first chunk ends at user end
     expect(

@@ -35,13 +35,8 @@ export const useSearchAround = () => {
 
   const { extractFields, updateGridColumns, filterHitsColumns } = useStreamFields();
   const { generateHistogramData, generateHistogramSkeleton } = useHistogram();
-  const {
-    fnParsedSQL,
-    fnUnparsedSQL,
-    addTraceId,
-    removeTraceId,
-    shouldAddFunctionToSearch,
-  } = logsUtils();
+  const { fnParsedSQL, fnUnparsedSQL, addTraceId, removeTraceId, shouldAddFunctionToSearch } =
+    logsUtils();
 
   /**
    * Performs a search around operation to fetch logs data around a specific timestamp or log entry.
@@ -77,9 +72,7 @@ export const useSearchAround = () => {
       if (searchObj.meta.sqlMode === true) {
         const parsedSQL = fnParsedSQL(query);
         parsedSQL.where = null;
-        sqlContext.push(
-          b64EncodeUnicode(fnUnparsedSQL(parsedSQL).replace(/`/g, '"')) ?? "",
-        );
+        sqlContext.push(b64EncodeUnicode(fnUnparsedSQL(parsedSQL).replace(/`/g, '"')) ?? "");
       } else {
         const parseQuery = [query];
         let queryFunctions = "";
@@ -92,13 +85,10 @@ export const useSearchAround = () => {
           queryContext = queryContext.replace("[FIELD_LIST]", "*");
         }
 
-        const streamsData: string[] =
-          searchObj.data.stream.selectedStream.filter(
-            (streamName: string) =>
-              !searchObj.data.stream.missingStreamMultiStreamFilter.includes(
-                streamName,
-              ),
-          );
+        const streamsData: string[] = searchObj.data.stream.selectedStream.filter(
+          (streamName: string) =>
+            !searchObj.data.stream.missingStreamMultiStreamFilter.includes(streamName),
+        );
 
         let finalQuery = "";
         streamsData.forEach((streamName: string) => {
@@ -108,10 +98,7 @@ export const useSearchAround = () => {
           let streamField: StreamField;
           for (const field of searchObj.data.stream.interestingFieldList) {
             for (streamField of searchObj.data.stream.selectedStreamFields) {
-              if (
-                streamField?.name === field &&
-                streamField?.streams.indexOf(streamName) > -1
-              ) {
+              if (streamField?.name === field && streamField?.streams.indexOf(streamName) > -1) {
                 listOfFields.push(field);
               }
             }
@@ -136,18 +123,13 @@ export const useSearchAround = () => {
       }
 
       let actionId = "";
-      if (
-        searchObj.data.transformType === "action" &&
-        searchObj.data.selectedTransform?.id
-      ) {
+      if (searchObj.data.transformType === "action" && searchObj.data.selectedTransform?.id) {
         actionId = searchObj.data.selectedTransform.id;
       }
 
       let streamName = "";
       if (searchObj.data.stream.selectedStream.length > 1) {
-        streamName =
-          b64EncodeUnicode(searchObj.data.stream.selectedStream.join(",")) ||
-          "";
+        streamName = b64EncodeUnicode(searchObj.data.stream.selectedStream.join(",")) || "";
       } else {
         streamName = searchObj.data.stream.selectedStream[0];
       }
@@ -165,16 +147,10 @@ export const useSearchAround = () => {
           query_context: sqlContext,
           query_fn: queryFunction,
           stream_type: searchObj.data.stream.streamType,
-          regions: Object.prototype.hasOwnProperty.call(
-            searchObj.meta,
-            "regions",
-          )
+          regions: Object.prototype.hasOwnProperty.call(searchObj.meta, "regions")
             ? searchObj.meta.regions.join(",")
             : "",
-          clusters: Object.prototype.hasOwnProperty.call(
-            searchObj.meta,
-            "clusters",
-          )
+          clusters: Object.prototype.hasOwnProperty.call(searchObj.meta, "clusters")
             ? searchObj.meta.clusters.join(",")
             : "",
           action_id: actionId,
@@ -212,12 +188,7 @@ export const useSearchAround = () => {
           if (error.response !== undefined) {
             searchObj.data.errorMsg = error.response.data.error;
             searchObj.data.errorDetail = error.response.data.error_detail ?? "";
-            if (
-              Object.prototype.hasOwnProperty.call(
-                error.response.data,
-                "trace_id",
-              )
-            ) {
+            if (Object.prototype.hasOwnProperty.call(error.response.data, "trace_id")) {
               traceId = error.response.data?.trace_id || "";
             }
           } else {
@@ -227,9 +198,7 @@ export const useSearchAround = () => {
             }
           }
 
-          const customMessage = logsErrorMessage(
-            error.response?.data?.code || 0,
-          );
+          const customMessage = logsErrorMessage(error.response?.data?.code || 0);
           searchObj.data.errorCode = error.response?.data?.code || 0;
           if (customMessage !== "") {
             searchObj.data.errorMsg = customMessage;
@@ -244,9 +213,7 @@ export const useSearchAround = () => {
 
           if (traceId) {
             searchObj.data.errorMsg +=
-              " <br><span class='text-subtitle1'>TraceID:" +
-              traceId +
-              "</span>";
+              " <br><span class='text-subtitle1'>TraceID:" + traceId + "</span>";
           }
         })
         .finally(() => {
@@ -255,8 +222,7 @@ export const useSearchAround = () => {
         });
     } catch (error: unknown) {
       searchObj.loading = false;
-      const errorMessage =
-        error instanceof Error ? error.message : "Unknown error occurred";
+      const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
       showErrorNotification(`Error while fetching data: ${errorMessage}`);
     }
   };

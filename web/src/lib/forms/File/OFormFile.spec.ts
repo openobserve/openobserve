@@ -42,13 +42,11 @@ describe("OFormFile", () => {
         }),
       },
       slots: {
-        default: () =>
-          h(OFormFile, { name: "resume", "data-test": "resume-file" }),
+        default: () => h(OFormFile, { name: "resume", "data-test": "resume-file" }),
       },
       global: { components: { OFormFile } },
     });
-    const input = wrapper.find("input[type='file']")
-      .element as HTMLInputElement;
+    const input = wrapper.find("input[type='file']").element as HTMLInputElement;
     Object.defineProperty(input, "files", {
       value: [makeFile("a.txt", 100)],
       configurable: true,

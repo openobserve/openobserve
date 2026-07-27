@@ -54,7 +54,6 @@ vi.mock("@/plugins/workflows/useWorkflowCanvas", async () => {
   };
 });
 
-
 vi.mock("@/components/workflows/WorkflowView.vue", () => ({
   default: {
     name: "WorkflowView",
@@ -121,11 +120,21 @@ const globalStubs = {
       '<input class="o-input" v-bind="$attrs" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />' +
       "</span>",
   },
-  OTag: { name: "OTag", props: ["value", "variant"], template: '<span class="o-tag">{{ value }}</span>' },
+  OTag: {
+    name: "OTag",
+    props: ["value", "variant"],
+    template: '<span class="o-tag">{{ value }}</span>',
+  },
   OBadge: { name: "OBadge", template: '<span class="o-badge"><slot /></span>' },
   OIcon: { name: "OIcon", props: ["name", "size"], template: '<i class="o-icon" />' },
-  OTooltip: { name: "OTooltip", template: '<span class="o-tooltip"><slot name="content" /></span>' },
-  ODropdown: { name: "ODropdown", template: '<div class="o-dropdown"><slot name="trigger" /><slot /></div>' },
+  OTooltip: {
+    name: "OTooltip",
+    template: '<span class="o-tooltip"><slot name="content" /></span>',
+  },
+  ODropdown: {
+    name: "ODropdown",
+    template: '<div class="o-dropdown"><slot name="trigger" /><slot /></div>',
+  },
   ODropdownItem: {
     name: "ODropdownItem",
     emits: ["select"],
@@ -144,12 +153,14 @@ const globalStubs = {
     emits: ["update:ok", "update:cancel", "update:modelValue"],
     template: '<div data-test="confirm-dialog-stub" :data-open="String(modelValue)" />',
   },
-  PageLayout: { name: "PageLayout", template: '<div class="page-layout"><slot name="header" /><slot /></div>' },
+  PageLayout: {
+    name: "PageLayout",
+    template: '<div class="page-layout"><slot name="header" /><slot /></div>',
+  },
   OPageHeader: {
     name: "OPageHeader",
     props: ["title", "subtitle", "icon"],
-    template:
-      '<div class="app-page-header"><slot name="title" /><slot name="actions" /></div>',
+    template: '<div class="app-page-header"><slot name="title" /><slot name="actions" /></div>',
   },
   // Renders the child-route slot with a fake editor component so the
   // `<component :is="Component" @saved="getWorkflows" />` binding is exercised.
@@ -331,22 +342,17 @@ describe("WorkflowsList", () => {
     it("declares the expected columns in order", async () => {
       wrapper = mountList();
       await flushPromises();
-      expect(table(wrapper).props("columns").map((c: any) => c.id)).toEqual([
-        "#",
-        "name",
-        "description",
-        "trigger",
-        "updated_at",
-        "actions",
-      ]);
+      expect(
+        table(wrapper)
+          .props("columns")
+          .map((c: any) => c.id),
+      ).toEqual(["#", "name", "description", "trigger", "updated_at", "actions"]);
     });
 
     it("marks the actions column as an action column", async () => {
       wrapper = mountList();
       await flushPromises();
-      const actions = (table(wrapper).props("columns") as any[]).find(
-        (c) => c.id === "actions",
-      );
+      const actions = (table(wrapper).props("columns") as any[]).find((c) => c.id === "actions");
       expect(actions.isAction).toBe(true);
       expect(actions.sortable).toBe(false);
     });
@@ -355,8 +361,7 @@ describe("WorkflowsList", () => {
   // ── search ─────────────────────────────────────────────────────────────────
 
   describe("search", () => {
-    const search = (w: any) =>
-      w.find('[data-test="workflow-list-search-input"]');
+    const search = (w: any) => w.find('[data-test="workflow-list-search-input"]');
 
     it("filters by name (case-insensitive)", async () => {
       wrapper = mountList();
@@ -409,9 +414,7 @@ describe("WorkflowsList", () => {
       listWorkflows.mockResolvedValue({ data: [] });
       wrapper = mountList();
       await flushPromises();
-      expect(
-        wrapper.findComponent({ name: "OEmptyState" }).props("filtered"),
-      ).toBe(false);
+      expect(wrapper.findComponent({ name: "OEmptyState" }).props("filtered")).toBe(false);
     });
 
     it("clears the filter from the empty state's clear-filters action", async () => {
@@ -464,9 +467,7 @@ describe("WorkflowsList", () => {
     it("hydrates the shared editor state and routes to the editor on Edit", async () => {
       wrapper = mountList();
       await flushPromises();
-      await wrapper
-        .find('[data-test="workflow-list-workflow-1-edit"]')
-        .trigger("click");
+      await wrapper.find('[data-test="workflow-list-workflow-1-edit"]').trigger("click");
 
       expect(mockHydrate).toHaveBeenCalledTimes(1);
       expect(mockHydrate.mock.calls[0][0].id).toBe("wf-1");

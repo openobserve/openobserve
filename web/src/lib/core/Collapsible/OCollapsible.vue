@@ -1,15 +1,7 @@
 <script setup lang="ts">
-import type {
-  OCollapsibleProps,
-  OCollapsibleEmits,
-  OCollapsibleSlots,
-} from "./OCollapsible.types";
+import type { OCollapsibleProps, OCollapsibleEmits, OCollapsibleSlots } from "./OCollapsible.types";
 import { useCollapsibleGroup } from "./useCollapsibleGroup";
-import {
-  CollapsibleRoot,
-  CollapsibleTrigger,
-  CollapsibleContent,
-} from "reka-ui";
+import { CollapsibleRoot, CollapsibleTrigger, CollapsibleContent } from "reka-ui";
 import { ref, computed, watch, useSlots } from "vue";
 import OIcon from "../Icon/OIcon.vue";
 import { iconRegistry } from "../Icon/OIcon.icons";
@@ -87,32 +79,28 @@ watch(
 </script>
 
 <template>
-  <CollapsibleRoot
-    :open="isOpen"
-    @update:open="handleOpenChange"
-    v-bind="$attrs"
-  >
+  <CollapsibleRoot :open="isOpen" @update:open="handleOpenChange" v-bind="$attrs">
     <!-- Trigger -->
     <CollapsibleTrigger
       :class="[
-        'w-full flex items-center gap-2 text-start cursor-pointer select-none',
+        'flex w-full cursor-pointer items-center gap-2 text-start select-none',
         'transition-colors duration-150 outline-none',
         'hover:bg-collapsible-trigger-hover-bg active:bg-collapsible-trigger-active-bg',
-        'focus-visible:ring-2 focus-visible:ring-collapsible-trigger-focus-ring focus-visible:ring-offset-1',
+        'focus-visible:ring-collapsible-trigger-focus-ring focus-visible:ring-2 focus-visible:ring-offset-1',
         variant === 'config'
           ? [
-              'group px-3 py-0 min-h-9 rounded-none',
+              'group min-h-9 rounded-none px-3 py-0',
               // z-20 keeps the sticky header above section content while
               // scrolling — OToggleGroup items are positioned at z-10, so a
               // z-10 header would tie and let the toggle bleed over it.
-              'sticky top-11 z-20 bg-surface-panel',
+              'bg-surface-panel sticky top-11 z-20',
               'border-l-2 border-l-transparent',
               'data-[state=open]:bg-collapsible-trigger-open-bg',
               'data-[state=open]:border-l-collapsible-open-accent',
             ]
           : variant === 'sidebar'
-            ? 'px-3 py-0 min-h-9 rounded-none'
-            : 'px-2 py-2 rounded-default',
+            ? 'min-h-9 rounded-none px-3 py-0'
+            : 'rounded-default px-2 py-2',
         triggerClass,
       ]"
     >
@@ -125,39 +113,37 @@ watch(
       <template v-if="variant === 'config'">
         <OIcon
           v-if="icon && isOIcon"
-          :name="(icon as any)"
+          :name="icon as any"
           size="sm"
-          class="text-collapsible-icon shrink-0 group-data-[state=open]:text-collapsible-icon-open"
+          class="text-collapsible-icon group-data-[state=open]:text-collapsible-icon-open shrink-0"
         />
         <span
           v-else-if="icon"
-          class="material-icons-outlined text-icon-sm text-collapsible-icon shrink-0 group-data-[state=open]:text-collapsible-icon-open"
+          class="material-icons-outlined text-icon-sm text-collapsible-icon group-data-[state=open]:text-collapsible-icon-open shrink-0"
           aria-hidden="true"
           >{{ icon }}</span
         >
 
         <span
           v-if="hasCustomTrigger"
-          class="flex flex-1 items-center gap-2 min-w-0 group-data-[state=open]:text-collapsible-icon-open"
+          class="group-data-[state=open]:text-collapsible-icon-open flex min-w-0 flex-1 items-center gap-2"
         >
           <slot name="trigger" :open="isOpen" />
         </span>
-        <span v-else class="flex flex-col flex-1 min-w-0">
+        <span v-else class="flex min-w-0 flex-1 flex-col">
           <span
-            class="font-medium text-collapsible-label truncate text-compact group-data-[state=open]:text-collapsible-icon-open"
+            class="text-collapsible-label text-compact group-data-[state=open]:text-collapsible-icon-open truncate font-medium"
             >{{ label }}</span
           >
-          <span
-            v-if="caption"
-            class="text-xs text-collapsible-caption truncate"
-            >{{ caption }}</span
-          >
+          <span v-if="caption" class="text-collapsible-caption truncate text-xs">{{
+            caption
+          }}</span>
         </span>
 
         <OIcon
           name="chevron-right"
           size="sm"
-          class="shrink-0 text-collapsible-icon transition-transform duration-200 group-data-[state=open]:text-collapsible-icon-open"
+          class="text-collapsible-icon group-data-[state=open]:text-collapsible-icon-open shrink-0 transition-transform duration-200"
           :class="isOpen ? 'rotate-90' : 'rotate-0'"
         />
       </template>
@@ -182,7 +168,7 @@ watch(
         <template v-else>
           <OIcon
             v-if="icon && isOIcon"
-            :name="(icon as any)"
+            :name="icon as any"
             size="md"
             class="text-collapsible-icon shrink-0"
           />
@@ -193,19 +179,17 @@ watch(
             >{{ icon }}</span
           >
 
-          <span class="flex flex-col flex-1 min-w-0">
+          <span class="flex min-w-0 flex-1 flex-col">
             <span
               :class="[
-                'font-medium text-collapsible-label truncate',
+                'text-collapsible-label truncate font-medium',
                 variant === 'sidebar' ? 'text-compact' : 'text-sm',
               ]"
               >{{ label }}</span
             >
-            <span
-              v-if="caption"
-              class="text-xs text-collapsible-caption truncate"
-              >{{ caption }}</span
-            >
+            <span v-if="caption" class="text-collapsible-caption truncate text-xs">{{
+              caption
+            }}</span>
           </span>
 
           <!-- Right chevron — default variant only -->

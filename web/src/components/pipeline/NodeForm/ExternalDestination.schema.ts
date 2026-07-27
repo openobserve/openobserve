@@ -13,9 +13,7 @@ import { z } from "zod";
 
 export const makeExternalDestinationSchema = (t: (_key: string) => string) =>
   z.object({
-    selectedDestination: z
-      .string()
-      .min(1, t("pipeline.selectExternalDestination")),
+    selectedDestination: z.string().min(1, t("pipeline.selectExternalDestination")),
   });
 
 export type ExternalDestinationForm = {

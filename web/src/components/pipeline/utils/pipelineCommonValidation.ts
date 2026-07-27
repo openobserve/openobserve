@@ -1,6 +1,6 @@
 export function sanitizeStreamName(input: string): string | null {
-  if(input.length > 100){
-    return "";  // Return empty string for too long input
+  if (input.length > 100) {
+    return ""; // Return empty string for too long input
   }
   const regex = /\{[^{}]+\}/g;
   const parts: string[] = [];
@@ -26,10 +26,10 @@ export function sanitizeStreamName(input: string): string | null {
     parts.push(...sanitizeStaticPart(staticPart));
   }
 
-  return parts.join('');
+  return parts.join("");
 }
 
 // Only sanitize non-dynamic parts
 export function sanitizeStaticPart(str: string): string[] {
-  return str.split('').map(char => /[a-zA-Z0-9]/.test(char) ? char : '_');
-} 
+  return str.split("").map((char) => (/[a-zA-Z0-9]/.test(char) ? char : "_"));
+}

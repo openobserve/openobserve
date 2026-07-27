@@ -60,10 +60,10 @@ interface Manifest {
 // `manifest.json` — excluding `.fetch.json` — using endsWith WITHOUT a leading
 // slash (Vite's glob keys differ between dev and build), and (2) still require
 // an `integrations` array as a content guard.
-const files = import.meta.glob(
-  "@/assets/ai-datasource-content/generated/*.json",
-  { import: "default", eager: true },
-) as Record<string, Manifest>;
+const files = import.meta.glob("@/assets/ai-datasource-content/generated/*.json", {
+  import: "default",
+  eager: true,
+}) as Record<string, Manifest>;
 
 const manifest = Object.entries(files)
   .filter(([path]) => path.endsWith("manifest.json"))

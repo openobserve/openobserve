@@ -33,10 +33,7 @@ async function mountItemInMenu(
 
 describe("OContextMenuItem", () => {
   it("renders slot content", async () => {
-    const wrapper = await mountItemInMenu(
-      {},
-      { default: () => h("span", "Copy value") },
-    );
+    const wrapper = await mountItemInMenu({}, { default: () => h("span", "Copy value") });
     expect(wrapper.text()).toContain("Copy value");
   });
 
@@ -62,10 +59,7 @@ describe("OContextMenuItem", () => {
   });
 
   it("applies default variant classes", async () => {
-    const wrapper = await mountItemInMenu(
-      {},
-      { default: () => h("span", "Action") },
-    );
+    const wrapper = await mountItemInMenu({}, { default: () => h("span", "Action") });
     expect(wrapper.find(".text-dropdown-item-text").exists()).toBe(true);
   });
 
@@ -74,26 +68,18 @@ describe("OContextMenuItem", () => {
       { variant: "destructive" },
       { default: () => h("span", "Delete") },
     );
-    expect(wrapper.find(".text-dropdown-item-destructive-text").exists()).toBe(
-      true,
-    );
+    expect(wrapper.find(".text-dropdown-item-destructive-text").exists()).toBe(true);
   });
 
   it("emits select when clicked", async () => {
-    const wrapper = await mountItemInMenu(
-      {},
-      { default: () => h("span", "Copy") },
-    );
+    const wrapper = await mountItemInMenu({}, { default: () => h("span", "Copy") });
     const item = wrapper.findComponent(OContextMenuItem);
     await item.trigger("click");
     expect(item.emitted("select")).toBeTruthy();
   });
 
   it("does not emit select when disabled", async () => {
-    const wrapper = await mountItemInMenu(
-      { disabled: true },
-      { default: () => h("span", "Copy") },
-    );
+    const wrapper = await mountItemInMenu({ disabled: true }, { default: () => h("span", "Copy") });
     const item = wrapper.findComponent(OContextMenuItem);
     await item.trigger("click");
     expect(item.emitted("select")).toBeFalsy();

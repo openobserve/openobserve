@@ -20,18 +20,12 @@ import { useLocalOrganization, getPath } from "./zincutils";
 const selectedOrg = ref("");
 const orgOptions = ref([{ label: Number, value: String }]);
 
-export const getDefaultOrganization = async (
-  userInfo: any,
-  org_identifier: any,
-) => {
+export const getDefaultOrganization = async (userInfo: any, org_identifier: any) => {
   await organizationsService
     .os_list(0, 100000, "id", false, "", org_identifier)
     .then((res: any) => {
       const localOrg: any = useLocalOrganization();
-      if (
-        localOrg.value != null &&
-        localOrg.value.user_email !== userInfo.email
-      ) {
+      if (localOrg.value != null && localOrg.value.user_email !== userInfo.email) {
         localOrg.value = null;
         useLocalOrganization("");
       }

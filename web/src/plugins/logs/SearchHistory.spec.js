@@ -15,58 +15,58 @@ vi.mock("@/services/search", () => ({
   default: {
     get_history: vi.fn().mockResolvedValue({
       data: {
-        hits: []
-      }
-    })
-  }
+        hits: [],
+      },
+    }),
+  },
 }));
 
 // Mock useLogs composable
 vi.mock("@/composables/useLogs", () => ({
   default: () => {
-    const { ref } = require('vue');
+    const { ref } = require("vue");
     return {
       searchObj: ref({
         data: {
           datetime: {
-            type: 'relative'
-          }
-        }
+            type: "relative",
+          },
+        },
       }),
-      extractTimestamps: vi.fn().mockReturnValue({ from: 1000, to: 2000 })
+      extractTimestamps: vi.fn().mockReturnValue({ from: 1000, to: 2000 }),
     };
-  }
+  },
 }));
 
 // Mock vue-router
-vi.mock('vue-router', () => ({
+vi.mock("vue-router", () => ({
   useRouter: vi.fn(() => ({
     push: vi.fn(),
     currentRoute: {
       value: {
         query: {
-          org_identifier: 'test-org'
-        }
-      }
-    }
+          org_identifier: "test-org",
+        },
+      },
+    },
   })),
   useRoute: vi.fn(() => ({
     query: {
-      org_identifier: 'test-org'
+      org_identifier: "test-org",
     },
     params: {},
-    path: '/search-history'
-  }))
+    path: "/search-history",
+  })),
 }));
 
 // Mock vue-i18n
-vi.mock('vue-i18n', async (importOriginal) => {
+vi.mock("vue-i18n", async (importOriginal) => {
   const actual = await importOriginal();
   return {
     ...actual,
     useI18n: () => ({
-      t: (key) => key
-    })
+      t: (key) => key,
+    }),
   };
 });
 
@@ -80,17 +80,17 @@ describe("SearchHistory Component", () => {
     mockStore = {
       state: {
         selectedOrganization: {
-          identifier: "test-org"
+          identifier: "test-org",
         },
         userInfo: {
-          email: "test@example.com"
+          email: "test@example.com",
         },
         zoConfig: {
           usage_publish_interval: 60,
-          timestamp_column: "_timestamp"
+          timestamp_column: "_timestamp",
         },
-        timezone: "UTC"
-      }
+        timezone: "UTC",
+      },
     };
 
     // Setup router mock
@@ -100,10 +100,10 @@ describe("SearchHistory Component", () => {
       currentRoute: {
         value: {
           query: {
-            org_identifier: 'test-org'
-          }
-        }
-      }
+            org_identifier: "test-org",
+          },
+        },
+      },
     }));
 
     // Mount component with default props
@@ -122,31 +122,31 @@ describe("SearchHistory Component", () => {
           DateTime: {
             template: '<div class="mock-datetime"></div>',
             methods: {
-              setAbsoluteTime: vi.fn()
-            }
+              setAbsoluteTime: vi.fn(),
+            },
           },
           AppTabs: true,
           QueryEditor: true,
           TenstackTable: true,
-          NoData: true
+          NoData: true,
         },
         mocks: {
-          $router: { push: routerPushMock }
-        }
+          $router: { push: routerPushMock },
+        },
       },
       props: {
-        isClicked: false
-      }
+        isClicked: false,
+      },
     });
 
     // Initialize required data
     wrapper.vm.columnsToBeRendered = [];
     wrapper.vm.dataToBeLoaded = [];
     wrapper.vm.dateTimeToBeSent = {
-      valueType: 'relative',
-      relativeTimePeriod: '15m',
+      valueType: "relative",
+      relativeTimePeriod: "15m",
       startTime: 0,
-      endTime: 0
+      endTime: 0,
     };
   });
 
@@ -173,7 +173,7 @@ describe("SearchHistory Component", () => {
     });
 
     it("has correct table columns", () => {
-      const data = [{ some: 'data' }]; // Pass non-empty array to trigger column generation
+      const data = [{ some: "data" }]; // Pass non-empty array to trigger column generation
       const columns = wrapper.vm.generateColumns(data);
 
       expect(columns).toHaveLength(2);
@@ -190,30 +190,35 @@ describe("SearchHistory Component", () => {
 
     it("sets up correct initial data structure", () => {
       expect(wrapper.vm.dateTimeToBeSent).toEqual({
-        valueType: 'relative',
-        relativeTimePeriod: '15m',
+        valueType: "relative",
+        relativeTimePeriod: "15m",
         startTime: 0,
-        endTime: 0
+        endTime: 0,
       });
     });
   });
 
   describe("Data Fetching", () => {
     it("sets loading state correctly during fetch", async () => {
-      searchService.get_history.mockImplementation(() => 
-        new Promise(resolve => 
-          setTimeout(() => resolve({
-            data: {
-              hits: []
-            }
-          }), 100)
-        )
+      searchService.get_history.mockImplementation(
+        () =>
+          new Promise((resolve) =>
+            setTimeout(
+              () =>
+                resolve({
+                  data: {
+                    hits: [],
+                  },
+                }),
+              100,
+            ),
+          ),
       );
-      
+
       await wrapper.setProps({ isClicked: true });
-      
+
       await flushPromises();
-      await new Promise(resolve => setTimeout(resolve, 150)); // Wait for async operations
+      await new Promise((resolve) => setTimeout(resolve, 150)); // Wait for async operations
       expect(wrapper.vm.isLoading).toBe(false);
     });
   });
@@ -223,8 +228,8 @@ describe("SearchHistory Component", () => {
       const mockWriteText = vi.fn().mockResolvedValue(undefined);
       Object.assign(navigator, {
         clipboard: {
-          writeText: mockWriteText
-        }
+          writeText: mockWriteText,
+        },
       });
 
       const testSQL = "SELECT * FROM logs";
@@ -239,7 +244,6 @@ describe("SearchHistory Component", () => {
       expect(wrapper.vm.formatTime(60000)).toBe("60000.00 sec");
       expect(wrapper.vm.formatTime(3600000)).toBe("3600000.00 sec");
     });
-
   });
 
   describe("Navigation and Routing", () => {
@@ -250,11 +254,11 @@ describe("SearchHistory Component", () => {
         org_id: "test-org",
         toBeStoredStartTime: 1000,
         toBeStoredEndTime: 2000,
-        duration: "1 second"
+        duration: "1 second",
       };
 
       await wrapper.vm.goToLogs(mockRow);
-      
+
       expect(routerPushMock).toHaveBeenCalledWith(
         expect.objectContaining({
           path: "/logs",
@@ -262,9 +266,9 @@ describe("SearchHistory Component", () => {
             stream_type: "logs",
             stream: "test-stream",
             sql_mode: "true",
-            type: "search_history_re_apply"
-          })
-        })
+            type: "search_history_re_apply",
+          }),
+        }),
       );
     });
   });
@@ -274,28 +278,28 @@ describe("SearchHistory Component", () => {
       const newDateTime = {
         valueType: "absolute",
         startTime: 1000,
-        endTime: 2000
+        endTime: 2000,
       };
 
       wrapper.vm.dateTimeToBeSent = newDateTime;
       wrapper.vm.searchDateTimeRef = {
-        setAbsoluteTime: vi.fn()
+        setAbsoluteTime: vi.fn(),
       };
 
       await wrapper.vm.updateDateTime(newDateTime);
       await wrapper.vm.$nextTick();
-      
+
       expect(wrapper.vm.dateTimeToBeSent).toEqual(newDateTime);
       expect(wrapper.vm.searchDateTimeRef.setAbsoluteTime).toHaveBeenCalledWith(
         newDateTime.startTime,
-        newDateTime.endTime
+        newDateTime.endTime,
       );
     });
 
     it("handles relative time periods correctly", async () => {
       const relativeDateTime = {
         valueType: "relative",
-        relativeTimePeriod: "15m"
+        relativeTimePeriod: "15m",
       };
 
       await wrapper.vm.updateDateTime(relativeDateTime);
@@ -311,8 +315,6 @@ describe("SearchHistory Component", () => {
   });
 
   describe("Error Handling", () => {
-
-
     it("handles empty search history response", async () => {
       searchService.get_history.mockResolvedValue({ data: { hits: [] } });
 
@@ -344,7 +346,7 @@ describe("SearchHistory Component", () => {
             fn_editor: "true",
             functionContent: expect.any(String),
           }),
-        })
+        }),
       );
     });
 
@@ -365,7 +367,7 @@ describe("SearchHistory Component", () => {
           query: expect.objectContaining({
             fn_editor: "false",
           }),
-        })
+        }),
       );
     });
 
@@ -387,7 +389,7 @@ describe("SearchHistory Component", () => {
           query: expect.not.objectContaining({
             functionContent: expect.any(String),
           }),
-        })
+        }),
       );
     });
   });
@@ -416,7 +418,7 @@ describe("SearchHistory Component", () => {
 
   describe("Sorting", () => {
     it("has columns with sortable property", () => {
-      const columns = wrapper.vm.generateColumns([{ some: 'data' }]);
+      const columns = wrapper.vm.generateColumns([{ some: "data" }]);
       expect(columns.length).toBeGreaterThan(0);
       expect(columns[0].sortable).toBeDefined();
     });

@@ -14,7 +14,6 @@ enterprise = [
     "common/enterprise",
     "config/enterprise",
     "db/enterprise",
-    "enrichment-data/enterprise",
     "schema/enterprise",
 ]
 cloud = [
@@ -37,7 +36,6 @@ chrono.workspace = true
 common.workspace = true
 config.workspace = true
 db.workspace = true
-enrichment-data.workspace = true
 hashbrown.workspace = true
 infra.workspace = true
 log.workspace = true

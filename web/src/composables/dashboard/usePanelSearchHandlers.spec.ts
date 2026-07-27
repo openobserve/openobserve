@@ -877,10 +877,7 @@ describe("handleSearchResponse", () => {
     const { state, handlers, processApiError } = makeHandlers();
     state.loading = true;
 
-    handlers.handleSearchResponse(
-      {},
-      { type: "error", content: { message: "bad query" } },
-    );
+    handlers.handleSearchResponse({}, { type: "error", content: { message: "bad query" } });
 
     expect(state.loading).toBe(false);
     expect(state.loadingProgressPercentage).toBe(0);
@@ -902,10 +899,7 @@ describe("handleSearchResponse", () => {
   it("updates loadingProgressPercentage on event_progress", async () => {
     const { state, handlers } = makeHandlers();
 
-    handlers.handleSearchResponse(
-      {},
-      { type: "event_progress", content: { percent: 55 } },
-    );
+    handlers.handleSearchResponse({}, { type: "event_progress", content: { percent: 55 } });
 
     await Promise.resolve();
 
@@ -951,10 +945,7 @@ describe("handleSearchClose", () => {
     const { handlers, processApiError } = makeHandlers();
 
     // Code 1006 = abnormal closure
-    handlers.handleSearchClose(
-      { traceId: "t1" },
-      { type: "normal", code: 1006 },
-    );
+    handlers.handleSearchClose({ traceId: "t1" }, { type: "normal", code: 1006 });
 
     expect(processApiError).toHaveBeenCalled();
   });
@@ -962,10 +953,7 @@ describe("handleSearchClose", () => {
   it("does not call processApiError for clean close (code 1000)", () => {
     const { handlers, processApiError } = makeHandlers();
 
-    handlers.handleSearchClose(
-      { traceId: "t1" },
-      { type: "normal", code: 1000 },
-    );
+    handlers.handleSearchClose({ traceId: "t1" }, { type: "normal", code: 1000 });
 
     expect(processApiError).not.toHaveBeenCalled();
   });
@@ -987,10 +975,7 @@ describe("handleSearchError", () => {
   it("calls removeTraceId with payload.traceId", () => {
     const { handlers, removeTraceId } = makeHandlers();
 
-    handlers.handleSearchError(
-      { traceId: "err-trace" },
-      { content: { message: "err" } },
-    );
+    handlers.handleSearchError({ traceId: "err-trace" }, { content: { message: "err" } });
 
     expect(removeTraceId).toHaveBeenCalledWith("err-trace");
   });

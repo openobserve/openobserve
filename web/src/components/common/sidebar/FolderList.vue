@@ -17,67 +17,72 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div class="bg-surface-panel h-full flex flex-col pb-1 border-r border-border-default">
-      <div class="folder-header bg-transparent">
-        <div class="font-semibold text-sm text-text-heading pl-page-edge pr-1.5 py-2 flex items-center justify-between gap-2">
-          {{ t('dashboard.folders') }}
-          <div>
-            <OButton
-              variant="ghost"
-              size="icon"
-              @click.stop="addFolder"
-              data-test="dashboard-new-folder-btn"
-              title="Add Folder"
-            >
-              <OIcon name="add" size="sm" />
-            </OButton>
-          </div>
-        </div>
-        <!-- Search Input -->
-        <div class="px-1.5 pb-2">
-          <OSearchInput
-            v-model="searchQuery"
-            data-test="folder-search"
-            :placeholder="t('dashboard.searchFolder')"
-            clearable
-            class="w-full"
-          />
+  <div class="bg-surface-panel border-border-default flex h-full flex-col border-r pb-1">
+    <div class="folder-header bg-transparent">
+      <div
+        class="text-text-heading pl-page-edge flex items-center justify-between gap-2 py-2 pr-1.5 text-sm font-semibold"
+      >
+        {{ t("dashboard.folders") }}
+        <div>
+          <OButton
+            variant="ghost"
+            size="icon"
+            @click.stop="addFolder"
+            data-test="dashboard-new-folder-btn"
+            title="Add Folder"
+          >
+            <OIcon name="add" size="sm" />
+          </OButton>
         </div>
       </div>
-      <div class="folders-tabs flex-1 overflow-y-auto px-1.5">
-        <OTabs
-          orientation="vertical"
-          dense
-          v-model="activeFolderId"
-          data-test="dashboards-folder-tabs"
+      <!-- Search Input -->
+      <div class="px-1.5 pb-2">
+        <OSearchInput
+          v-model="searchQuery"
+          data-test="folder-search"
+          :placeholder="t('dashboard.searchFolder')"
+          clearable
+          class="w-full"
+        />
+      </div>
+    </div>
+    <div class="folders-tabs flex-1 overflow-y-auto px-1.5">
+      <OTabs
+        orientation="vertical"
+        dense
+        v-model="activeFolderId"
+        data-test="dashboards-folder-tabs"
       >
-          <OTab
+        <OTab
           v-for="tab in filteredTabs"
           :key="tab.folderId"
           :name="tab.folderId"
           class="test-class min-h-6"
           :data-test="`dashboard-folder-tab-${tab.folderId}`"
           @click="onTabClick(tab.folderId)"
+        >
+          <div
+            class="folder-item group/row flex min-h-6 w-full flex-nowrap items-center justify-between gap-2"
+            :data-test="`dashboard-folder-tab-name-${tab.name}`"
           >
-          <div class="folder-item w-full flex items-center justify-between flex-nowrap gap-2 min-h-6 group/row" :data-test="`dashboard-folder-tab-name-${tab.name}`">
-              <div class="flex items-center gap-1.5 flex-1 min-w-0">
-                <span class="folder-name min-w-0 text-left truncate" :title="tab.name" :data-test="`dashboard-folder-name-${tab.name}`">{{
-                tab.name
-                }}</span>
-                <OIcon
-                  v-if="tab.folderId === FAVORITES_FOLDER_ID"
-                  name="star"
-                  size="sm"
-                  class="shrink-0 text-favorite"
-                />
-              </div>
-              <div
-                v-if="
-                  tab.folderId.toLowerCase() != 'default' &&
-                  tab.folderId !== FAVORITES_FOLDER_ID
-                "
-                class="hidden group-hover/row:flex has-[[data-state=open]]:flex items-center shrink-0"
+            <div class="flex min-w-0 flex-1 items-center gap-1.5">
+              <span
+                class="folder-name min-w-0 truncate text-left"
+                :title="tab.name"
+                :data-test="`dashboard-folder-name-${tab.name}`"
+                >{{ tab.name }}</span
               >
+              <OIcon
+                v-if="tab.folderId === FAVORITES_FOLDER_ID"
+                name="star"
+                size="sm"
+                class="text-favorite shrink-0"
+              />
+            </div>
+            <div
+              v-if="tab.folderId.toLowerCase() != 'default' && tab.folderId !== FAVORITES_FOLDER_ID"
+              class="hidden shrink-0 items-center group-hover/row:flex has-[[data-state=open]]:flex"
+            >
               <ODropdown side="bottom" align="start">
                 <template #trigger>
                   <OButton
@@ -95,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <template #icon-left>
                     <OIcon name="edit" size="xs" />
                   </template>
-                  {{ t('common.edit') }}
+                  {{ t("common.edit") }}
                 </ODropdownItem>
                 <ODropdownItem
                   variant="destructive"
@@ -105,169 +110,165 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <template #icon-left>
                     <OIcon name="delete" size="xs" />
                   </template>
-                  {{ t('common.delete') }}
+                  {{ t("common.delete") }}
                 </ODropdownItem>
               </ODropdown>
-              </div>
+            </div>
           </div>
-          </OTab>
+        </OTab>
       </OTabs>
-      </div>
     </div>
-      <AddFolder
-          v-model:open="showAddFolderDialog"
-          @update:modelValue="updateFolderList"
-          :edit-mode="isFolderEditMode"
-          :folder-id="selectedFolderToEdit ?? 'default'"
-          :type="type"
-        />
-    <ConfirmDialog
+  </div>
+  <AddFolder
+    v-model:open="showAddFolderDialog"
+    @update:modelValue="updateFolderList"
+    :edit-mode="isFolderEditMode"
+    :folder-id="selectedFolderToEdit ?? 'default'"
+    :type="type"
+  />
+  <ConfirmDialog
     :title="t('dashboard.deleteFolder')"
     data-test="dashboard-confirm-delete-folder-dialog"
     :message="t('dashboard.deleteFolderMessage')"
     @update:ok="deleteFolder"
     @update:cancel="confirmDeleteFolderDialog = false"
     v-model="confirmDeleteFolderDialog"
-    />
-  </template>
+  />
+</template>
 
-
-
-  <script lang="ts">
+<script lang="ts">
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
-import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
-import OTab from '@/lib/navigation/Tabs/OTab.vue'
-import OButton from '@/lib/core/Button/OButton.vue';
-import ODropdown from '@/lib/overlay/Dropdown/ODropdown.vue';
-import ODropdownItem from '@/lib/overlay/Dropdown/ODropdownItem.vue';
-  // @ts-nocheck
-  import {
-    computed,
-    defineComponent,
-    onBeforeMount,
-    onBeforeUnmount,
-    onMounted,
-    ref,
-    watch,
-  } from "vue";
-  import { useStore } from "vuex";
-  import { useI18n } from "vue-i18n";
+import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import OTab from "@/lib/navigation/Tabs/OTab.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+// @ts-nocheck
+import {
+  computed,
+  defineComponent,
+  onBeforeMount,
+  onBeforeUnmount,
+  onMounted,
+  ref,
+  watch,
+} from "vue";
+import { useStore } from "vuex";
+import { useI18n } from "vue-i18n";
 
-  import dashboardService from "@/services/dashboards";
-  import { useRoute, useRouter } from "vue-router";
-  import { toRaw } from "vue";
-  import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
-  import ConfirmDialog from "@/components/ConfirmDialog.vue";
-  import {
-    deleteDashboardById,
-    deleteFolderById,
-    deleteFolderByIdByType,
-    getAllDashboards,
-    getAllDashboardsByFolderId,
-    getDashboard,
-    getFoldersList,
-    getFoldersListByType
-  } from "@/utils/commons";
+import dashboardService from "@/services/dashboards";
+import { useRoute, useRouter } from "vue-router";
+import { toRaw } from "vue";
+import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
+import ConfirmDialog from "@/components/ConfirmDialog.vue";
+import {
+  deleteDashboardById,
+  deleteFolderById,
+  deleteFolderByIdByType,
+  getAllDashboards,
+  getAllDashboardsByFolderId,
+  getDashboard,
+  getFoldersList,
+  getFoldersListByType,
+} from "@/utils/commons";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-  import AddFolder from "./AddFolder.vue";
-  import useNotifications from "@/composables/useNotifications";
-  import { FAVORITES_FOLDER_ID } from "@/composables/useFavoriteDashboards";
-  import { filter, forIn } from "lodash-es";
-  import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboardSchemaVersion";
-  import { useLoading } from "@/composables/useLoading";
-  import { useReo } from "@/services/reodotdev_analytics";
+import AddFolder from "./AddFolder.vue";
+import useNotifications from "@/composables/useNotifications";
+import { FAVORITES_FOLDER_ID } from "@/composables/useFavoriteDashboards";
+import { filter, forIn } from "lodash-es";
+import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboardSchemaVersion";
+import { useLoading } from "@/composables/useLoading";
+import { useReo } from "@/services/reodotdev_analytics";
 
 export default defineComponent({
-    name: "FolderList",
-    components: {
-      OIcon,
-      ConfirmDialog,
-      AddFolder,
-      OTabs,
-      OTab,
-      OButton,
-      OSearchInput,
-      ODropdown,
-      ODropdownItem,
+  name: "FolderList",
+  components: {
+    OIcon,
+    ConfirmDialog,
+    AddFolder,
+    OTabs,
+    OTab,
+    OButton,
+    OSearchInput,
+    ODropdown,
+    ODropdownItem,
+  },
+  props: {
+    type: {
+      type: String,
+      default: "alerts",
     },
-    props: {
-      type: {
-        type: String,
-        default: "alerts",
-      },
-      // Dashboards-only: prepends a fixed "Favorites" pseudo-folder entry at
-      // the top of the rail. Alerts/Reports keep the plain folder list.
-      showFavorites: {
-        type: Boolean,
-        default: false,
-      },
+    // Dashboards-only: prepends a fixed "Favorites" pseudo-folder entry at
+    // the top of the rail. Alerts/Reports keep the plain folder list.
+    showFavorites: {
+      type: Boolean,
+      default: false,
     },
-    emits: ['update:folders', 'update:activeFolderId'],
-    setup(props, { emit }) {
-      const store = useStore();
-      const { t } = useI18n();
-      const { showPositiveNotification, showErrorNotification } =
-      useNotifications();
-      const activeFolderId = ref("");
-      const showAddFolderDialog = ref(false);
-      const isFolderEditMode = ref(false);
-      const selectedFolderToEdit = ref(null);
-      const selectedFolderDelete = ref(null);
-      const confirmDeleteFolderDialog = ref(false);
-      const searchQuery = ref('');
-      const { track } = useReo();
+  },
+  emits: ["update:folders", "update:activeFolderId"],
+  setup(props, { emit }) {
+    const store = useStore();
+    const { t } = useI18n();
+    const { showPositiveNotification, showErrorNotification } = useNotifications();
+    const activeFolderId = ref("");
+    const showAddFolderDialog = ref(false);
+    const isFolderEditMode = ref(false);
+    const selectedFolderToEdit = ref(null);
+    const selectedFolderDelete = ref(null);
+    const confirmDeleteFolderDialog = ref(false);
+    const searchQuery = ref("");
+    const { track } = useReo();
 
+    const router = useRouter();
 
-      const router = useRouter();
+    onMounted(async () => {
+      if (!store.state.organizationData.foldersByType?.[props.type]) {
+        await getFoldersListByType(store, props.type);
+      }
+      if (router.currentRoute.value.query.folder) {
+        activeFolderId.value = router.currentRoute.value.query.folder as string;
+      } else if (!props.showFavorites) {
+        activeFolderId.value = "default";
+      }
+      // With showFavorites, the owning view decides the landing folder
+      // (favorites-first) and pushes it to the route; self-assigning
+      // "default" here would race that decision and clobber it. The route
+      // watcher below selects the tab once the owner has pushed.
+    });
 
-
-      onMounted(async () => {
-        if(!store.state.organizationData.foldersByType?.[props.type]) {
-          await getFoldersListByType(store, props.type);
-        }
-        if(router.currentRoute.value.query.folder) {
-          activeFolderId.value = router.currentRoute.value.query.folder as string;
-        }
-        else if (!props.showFavorites) {
-          activeFolderId.value = "default";
-        }
-        // With showFavorites, the owning view decides the landing folder
-        // (favorites-first) and pushes it to the route; self-assigning
-        // "default" here would race that decision and clobber it. The route
-        // watcher below selects the tab once the owner has pushed.
-      });
-
-      watch(()=> router.currentRoute.value.query.folder as string | undefined, (newVal)=> {
+    watch(
+      () => router.currentRoute.value.query.folder as string | undefined,
+      (newVal) => {
         activeFolderId.value = newVal || "default";
-      })
-      const addFolder = () => {
+      },
+    );
+    const addFolder = () => {
       isFolderEditMode.value = false;
       showAddFolderDialog.value = true;
       track("Button Click", {
         button: "Add Folder",
         page: "Folders",
       });
-     };
+    };
 
-      const updateFolderList = async (folders: any) => {
-        showAddFolderDialog.value = false;
-        isFolderEditMode.value = false;
-        emit('update:folders', folders);
-      };
-      const showDeleteFolderDialogFn = (folderId: any) => {
-        selectedFolderDelete.value = folderId;
-        confirmDeleteFolderDialog.value = true;
-      };
+    const updateFolderList = async (folders: any) => {
+      showAddFolderDialog.value = false;
+      isFolderEditMode.value = false;
+      emit("update:folders", folders);
+    };
+    const showDeleteFolderDialogFn = (folderId: any) => {
+      selectedFolderDelete.value = folderId;
+      confirmDeleteFolderDialog.value = true;
+    };
 
-      const deleteFolder = async () => {
+    const deleteFolder = async () => {
       if (selectedFolderDelete.value) {
         try {
           //delete folder
           await deleteFolderByIdByType(store, selectedFolderDelete.value, props.type);
 
           //check activeFolderId to be deleted
-          if (activeFolderId.value === selectedFolderDelete.value)
-            activeFolderId.value = "default";
+          if (activeFolderId.value === selectedFolderDelete.value) activeFolderId.value = "default";
 
           showPositiveNotification("Folder deleted successfully.", {
             timeout: 2000,
@@ -275,9 +276,7 @@ export default defineComponent({
         } catch (err) {
           const e = err as { response?: { data?: { message?: string } }; message?: string };
           showErrorNotification(
-            e?.response?.data?.message ||
-              e?.message ||
-              "Folder deletion failed",
+            e?.response?.data?.message || e?.message || "Folder deletion failed",
             {
               timeout: 2000,
             },
@@ -294,9 +293,12 @@ export default defineComponent({
       showAddFolderDialog.value = true;
     };
 
-    watch(()=> activeFolderId.value, (newVal)=> {
-      emit("update:activeFolderId", newVal);
-    })
+    watch(
+      () => activeFolderId.value,
+      (newVal) => {
+        emit("update:activeFolderId", newVal);
+      },
+    );
 
     // The v-model watcher above only fires on CHANGE. Clicking the folder that
     // is already active must still notify the parent (e.g. the dashboards list
@@ -309,15 +311,11 @@ export default defineComponent({
     };
 
     const filteredTabs = computed(() => {
-      const folders =
-        store.state.organizationData.foldersByType[props.type] ?? [];
+      const folders = store.state.organizationData.foldersByType[props.type] ?? [];
       // The Favorites pseudo-folder sits above everything, including Default,
       // and participates in the folder search like any other entry.
       const tabs = props.showFavorites
-        ? [
-            { folderId: FAVORITES_FOLDER_ID, name: t("dashboard.favorites") },
-            ...folders,
-          ]
+        ? [{ folderId: FAVORITES_FOLDER_ID, name: t("dashboard.favorites") }, ...folders]
         : folders;
       if (!searchQuery.value || searchQuery.value == "") {
         return tabs;
@@ -327,32 +325,28 @@ export default defineComponent({
       );
     });
 
-
-
-
-      return {
-        t,
-        activeFolderId,
-        showAddFolderDialog,
-        isFolderEditMode,
-        selectedFolderToEdit,
-        addFolder,
-        updateFolderList,
-        store,
-        deleteFolder,
-        selectedFolderDelete,
-        confirmDeleteFolderDialog,
-        showDeleteFolderDialogFn,
-        editFolder,
-        filteredTabs,
-        searchQuery,
-        onTabClick,
-        FAVORITES_FOLDER_ID,
-
-      };
-    },
-  });
-  </script>
+    return {
+      t,
+      activeFolderId,
+      showAddFolderDialog,
+      isFolderEditMode,
+      selectedFolderToEdit,
+      addFolder,
+      updateFolderList,
+      store,
+      deleteFolder,
+      selectedFolderDelete,
+      confirmDeleteFolderDialog,
+      showDeleteFolderDialogFn,
+      editFolder,
+      filteredTabs,
+      searchQuery,
+      onTabClick,
+      FAVORITES_FOLDER_ID,
+    };
+  },
+});
+</script>
 
 <style scoped>
 /* keep(lib-override:OTabs): targets OTabs' internal rendered DOM (.o-tabs,

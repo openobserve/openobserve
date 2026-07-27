@@ -159,15 +159,11 @@ export const PREDEFINED_THEMES: PredefinedTheme[] = [
 ];
 
 /** Find a predefined theme by its stable name. */
-export const getThemeByName = (
-  name: string | null | undefined,
-): PredefinedTheme | undefined =>
+export const getThemeByName = (name: string | null | undefined): PredefinedTheme | undefined =>
   name ? PREDEFINED_THEMES.find((t) => t.name === name) : undefined;
 
 /** Find a predefined theme by its legacy numeric id. */
-export const getThemeById = (
-  id: number | null | undefined,
-): PredefinedTheme | undefined =>
+export const getThemeById = (id: number | null | undefined): PredefinedTheme | undefined =>
   id == null ? undefined : PREDEFINED_THEMES.find((t) => t.id === id);
 
 /** The default/fallback theme (O2 Signature), with a safe fallback to the first theme. */
@@ -175,8 +171,7 @@ export const getDefaultTheme = (): PredefinedTheme =>
   getThemeByName(DEFAULT_THEME_NAME) ?? PREDEFINED_THEMES[0];
 
 /** Slugify a theme name into kebab-case for data-test attributes ("O2 Pulse" -> "o2-pulse"). */
-export const themeNameSlug = (name: string): string =>
-  name.toLowerCase().replace(/\s+/g, "-");
+export const themeNameSlug = (name: string): string => name.toLowerCase().replace(/\s+/g, "-");
 
 /**
  * User-facing label for a theme. The stored `name` is the persisted selection key
@@ -274,9 +269,7 @@ export const resolveThemeForMode = (input: ResolveThemeInput): ResolvedTheme => 
  *   - new `appliedLightThemeName` / `appliedDarkThemeName` hold a theme name or CUSTOM_THEME_NAME.
  * Safe to call repeatedly; it only acts when a legacy key is present and the new key is absent.
  */
-export const migrateLegacyThemeStorage = (
-  storage: Storage = localStorage,
-): void => {
+export const migrateLegacyThemeStorage = (storage: Storage = localStorage): void => {
   (["light", "dark"] as const).forEach((mode) => {
     const keys = THEME_STORAGE_KEYS[mode];
     const legacy = storage.getItem(keys.legacyApplied);

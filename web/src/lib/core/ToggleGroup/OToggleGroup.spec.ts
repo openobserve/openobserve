@@ -12,11 +12,7 @@ function mountGroup(
     props: groupProps,
     slots: {
       default: items.map((item) =>
-        h(
-          OToggleGroupItem,
-          { value: item.value, disabled: item.disabled },
-          () => item.label,
-        ),
+        h(OToggleGroupItem, { value: item.value, disabled: item.disabled }, () => item.label),
       ),
     },
   });
@@ -64,9 +60,7 @@ describe("OToggleGroup", () => {
   // --- Controlled value ---
 
   it("emits update:modelValue when an item is clicked", async () => {
-    const wrapper = mountGroup({ modelValue: "" }, [
-      { value: "left", label: "Left" },
-    ]);
+    const wrapper = mountGroup({ modelValue: "" }, [{ value: "left", label: "Left" }]);
     await wrapper.find("button").trigger("click");
     expect(wrapper.emitted("update:modelValue")).toBeDefined();
   });
@@ -199,10 +193,7 @@ describe("OToggleGroup", () => {
     });
 
     it("uses the vertical midpoint when orientation is vertical", async () => {
-      const wrapper = mountGroup(
-        { reorderable: true, orientation: "vertical" },
-        ITEMS,
-      );
+      const wrapper = mountGroup({ reorderable: true, orientation: "vertical" }, ITEMS);
       // Item spans y 0..20. x is deliberately past the horizontal midpoint to
       // prove the vertical axis is the one being consulted.
       await dragOnto(wrapper, "a", "c", { clientX: 90, clientY: 2 });

@@ -80,7 +80,11 @@ vi.mock("@vue-flow/core", async () => {
     },
     // The empty-canvas start node renders the shared FlowNodeCard, which
     // imports Handle + Position from this module.
-    Handle: { name: "Handle", props: ["id", "type", "position"], template: "<div class='mock-handle' />" },
+    Handle: {
+      name: "Handle",
+      props: ["id", "type", "position"],
+      template: "<div class='mock-handle' />",
+    },
     Position: { Top: "top", Right: "right", Bottom: "bottom", Left: "left" },
     useVueFlow: () => ({
       onNodesInitialized: (cb: any) => {
@@ -170,8 +174,7 @@ const triggerNode = (x = 100, y = 40) => ({
   data: { node_type: "workflow_trigger" },
 });
 
-const mountCanvas = () =>
-  mount(WorkflowCanvas as any, { global: { plugins: [i18n] } });
+const mountCanvas = () => mount(WorkflowCanvas as any, { global: { plugins: [i18n] } });
 
 const flow = (wrapper: any) => wrapper.findComponent({ name: "VueFlow" });
 
@@ -319,8 +322,7 @@ describe("WorkflowCanvas", () => {
   // The empty canvas now offers a clickable start node (which opens the trigger
   // picker) in place of the old hint text.
   describe("empty-canvas start node", () => {
-    const startNode = (w: any) =>
-      w.find('[data-test="workflow-flow-start-node"]');
+    const startNode = (w: any) => w.find('[data-test="workflow-flow-start-node"]');
 
     it("shows the start node when the canvas has no nodes", () => {
       wrapper = mountCanvas();

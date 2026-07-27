@@ -1,9 +1,5 @@
 <script setup lang="ts">
-import type {
-  ContextMenuProps,
-  ContextMenuEmits,
-  ContextMenuSlots,
-} from "./OContextMenu.types";
+import type { ContextMenuProps, ContextMenuEmits, ContextMenuSlots } from "./OContextMenu.types";
 import {
   ContextMenuRoot,
   ContextMenuTrigger,
@@ -11,10 +7,7 @@ import {
   ContextMenuContent,
 } from "reka-ui";
 import { onBeforeUnmount, ref, watch } from "vue";
-import {
-  setActiveOverlay,
-  clearActiveOverlay,
-} from "../Dropdown/ODropdown.context";
+import { setActiveOverlay, clearActiveOverlay } from "../Dropdown/ODropdown.context";
 
 const props = withDefaults(defineProps<ContextMenuProps>(), {
   disabled: false,
@@ -41,9 +34,7 @@ function handleOpenChange(open: boolean) {
 // on: an Escape keystroke on `window` (DismissableLayer binds it there).
 function closeSelf() {
   if (!isOpen.value || typeof window === "undefined") return;
-  window.dispatchEvent(
-    new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
-  );
+  window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
 }
 
 // Opening a context menu must dismiss any dropdown/select left open, and vice
@@ -97,13 +88,13 @@ onBeforeUnmount(() => {
         :class="[
           // Layout + stacking — overlay layer 6000 (clears header 2000; ties with
           // drawer/dialog content broken by later DOM order). See tokens/base.css.
-          'min-w-40 p-1 z-6000',
+          'z-6000 min-w-40 p-1',
           // Surface — a context menu is visually the same object as a dropdown
           // menu, so it deliberately shares the dropdown token set rather than
           // duplicating one that would have to be kept in sync.
-          'bg-dropdown-bg border border-dropdown-border rounded-default shadow-md',
+          'bg-dropdown-bg border-dropdown-border rounded-default border shadow-md',
           // Typography
-          'text-sm text-dropdown-item-text',
+          'text-dropdown-item-text text-sm',
           // Animation — same clip-path reveal as ODropdown, wiping away from
           // the pointer. Soft ease-out-expo in, quick wipe out.
           'data-[state=open]:animate-[o2-reveal-down-in_140ms_cubic-bezier(0.16,1,0.3,1)]',

@@ -15,9 +15,7 @@ const props = defineProps<FormFileProps>();
 const form = inject(FORM_CONTEXT_KEY, null);
 
 if (import.meta.env.DEV && !form) {
-  console.warn(
-    "[OFormFile] must be rendered inside <OForm>. No form context found.",
-  );
+  console.warn("[OFormFile] must be rendered inside <OForm>. No form context found.");
 }
 </script>
 
