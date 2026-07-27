@@ -93,11 +93,17 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
 
 vi.mock("@/utils/synthetics/buildPayload", () => ({
   mapResponseToBrowserCheck: vi.fn((data: any) => data),
-  buildCreateBrowserTestPayload: vi.fn((data: any) => data),
+  buildCreateBrowserTestPayload: vi.fn((data: any) => ({ ...data, type: "browser" })),
+  mapResponseToProtocolCheck: vi.fn((data: any) => ({ ...data, checkType: data.type })),
+  buildCreateProtocolCheckPayload: vi.fn((data: any) => ({ ...data, type: data.checkType })),
 }));
 
 import SyntheticMonitoring from "./SyntheticMonitoring.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import {
+  buildCreateBrowserTestPayload,
+  buildCreateProtocolCheckPayload,
+} from "@/utils/synthetics/buildPayload";
 
 // ── Test helpers ─────────────────────────────────────────────────────────
 
@@ -612,6 +618,38 @@ describe("SyntheticMonitoring", () => {
 
       expect((wrapper.vm as any).activeFolderId).toBe("f-9");
       expect(mockServiceList.mock.calls.length - listCallsAfterMount).toBe(1);
+    });
+
+    // buildCreateBrowserTestPayload hardcodes type: "browser", so a protocol
+    // check run through it would come back as a browser check.
+    describe("check type", () => {
+      const duplicateWithType = async (type: string) => {
+        mockServiceGet.mockResolvedValue({
+          data: { id: "m-1", name: "API health", type, schedule: {} },
+        });
+        wrapper = mountPage();
+        await flushPromises();
+        await openDuplicate();
+        findDialog().vm.$emit("click:primary");
+        await flushPromises();
+        return mockServiceCreate.mock.calls[0][1] as any;
+      };
+
+      it.each(["http", "tcp", "tls", "ssh"])("preserves a %s check's type", async (type) => {
+        const payload = await duplicateWithType(type);
+
+        expect(payload.type).toBe(type);
+        expect(vi.mocked(buildCreateProtocolCheckPayload)).toHaveBeenCalled();
+        expect(vi.mocked(buildCreateBrowserTestPayload)).not.toHaveBeenCalled();
+      });
+
+      it("uses the browser builder for a browser check", async () => {
+        const payload = await duplicateWithType("browser");
+
+        expect(payload.type).toBe("browser");
+        expect(vi.mocked(buildCreateBrowserTestPayload)).toHaveBeenCalled();
+        expect(vi.mocked(buildCreateProtocolCheckPayload)).not.toHaveBeenCalled();
+      });
     });
 
     // The API rejects a start in the past, and mapFrequencyToSchedule reports

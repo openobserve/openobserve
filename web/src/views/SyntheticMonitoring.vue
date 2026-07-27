@@ -333,6 +333,8 @@ import BetaBadge from "@/components/common/BetaBadge.vue";
 import {
   mapResponseToBrowserCheck,
   buildCreateBrowserTestPayload,
+  mapResponseToProtocolCheck,
+  buildCreateProtocolCheckPayload,
 } from "@/utils/synthetics/buildPayload";
 import {
   SYNTHETIC_CHECK_TYPES,
@@ -591,6 +593,8 @@ const duplicateFolder = ref(activeFolderId.value);
 // Full check fetched when the dialog opens — the duplicate is built from this,
 // so submitting stays instant and a failed fetch surfaces before the form is filled.
 const duplicateSource = ref<any>(null);
+// "browser" | "http" | "tcp" | "tls" | "ssh" — picks the mapper/payload builder.
+const duplicateSourceType = ref<string>("browser");
 const isDuplicating = ref(false);
 
 const openBulkDeleteConfirm = () => {
@@ -1084,7 +1088,15 @@ async function duplicateMonitor(m: any) {
       String(m.id),
       m.folderId ?? activeFolderId.value,
     );
-    duplicateSource.value = mapResponseToBrowserCheck(res.data as Record<string, unknown>);
+    const data = res.data as Record<string, unknown>;
+    // Browser and protocol (http/tcp/tls/ssh) checks have separate mappers and
+    // payload builders — the browser builder hardcodes type: "browser", so
+    // running a protocol check through it would silently convert it.
+    duplicateSourceType.value = String(data.type ?? "browser").toLowerCase();
+    duplicateSource.value =
+      duplicateSourceType.value === "browser"
+        ? mapResponseToBrowserCheck(data)
+        : mapResponseToProtocolCheck(data);
   } catch (err: any) {
     showDuplicateDialog.value = false;
     toast({
@@ -1118,7 +1130,10 @@ async function saveDuplicate() {
       schedule: rebaseScheduleStart(duplicateSource.value.schedule, duplicateSource.value.start),
     };
     delete (check as any).id;
-    const payload = buildCreateBrowserTestPayload(check);
+    const payload =
+      duplicateSourceType.value === "browser"
+        ? buildCreateBrowserTestPayload(check)
+        : buildCreateProtocolCheckPayload(check);
     await syntheticsService.create(orgIdentifier.value, payload, targetFolder);
     dismiss();
     toast({ variant: "success", message: t("synthetics.toast.duplicateSuccess") });
