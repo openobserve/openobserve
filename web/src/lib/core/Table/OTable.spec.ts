@@ -733,7 +733,7 @@ describe("OTable", () => {
     });
   });
 
-  describe("column close (G4)", () => {
+  describe("column close", () => {
     it("renders a close button only for meta.closable columns and emits close-column", async () => {
       wrapper = mount(OTable, {
         props: {
