@@ -484,7 +484,12 @@ describe("IncidentDetailDrawer.vue", () => {
     it("should trigger RCA analysis", async () => {
       await wrapper.vm.triggerRca();
 
-      expect(incidentsService.triggerRca).toHaveBeenCalledWith("default", "1");
+      expect(incidentsService.triggerRca).toHaveBeenCalledWith(
+        "default",
+        "1",
+        { build_on_previous: false },
+        expect.objectContaining({ signal: expect.anything() }),
+      );
     });
 
     it("should set loading state during RCA", async () => {
@@ -976,7 +981,12 @@ describe("IncidentDetailDrawer.vue", () => {
 
       await wrapper.vm.triggerRca();
 
-      expect(incidentsService.triggerRca).toHaveBeenCalledWith("org-456", expect.any(String));
+      expect(incidentsService.triggerRca).toHaveBeenCalledWith(
+        "org-456",
+        expect.any(String),
+        { build_on_previous: false },
+        expect.objectContaining({ signal: expect.anything() }),
+      );
     });
   });
 
@@ -1414,12 +1424,14 @@ describe("IncidentDetailDrawer.vue", () => {
       expect(wrapper.vm.analysisInFlight).toBe(false);
     });
 
-    it("handles API error gracefully and sets analysisInFlight to false", async () => {
+    it("handles API error gracefully and preserves last known analysisInFlight state", async () => {
       (incidentsService.getEvents as any).mockRejectedValue(new Error("fetch failed"));
       wrapper.vm.analysisInFlight = true; // set to true first
       await wrapper.vm.checkAnalysisInFlight("1");
       await flushPromises();
-      expect(wrapper.vm.analysisInFlight).toBe(false);
+      // A failed events fetch says nothing about the run — the last known in-flight
+      // state is preserved rather than being cleared to a phantom "not running".
+      expect(wrapper.vm.analysisInFlight).toBe(true);
     });
 
     it("calls getEvents with correct org and incidentId", async () => {
