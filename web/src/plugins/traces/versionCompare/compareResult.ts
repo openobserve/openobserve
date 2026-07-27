@@ -12,7 +12,10 @@ export interface MetricResult {
 }
 export interface CompareResult { metrics: MetricResult[]; enoughSample: boolean; nA: number; nB: number; }
 
-const pct = (a: number, b: number) => (b === 0 ? null : ((a - b) / b) * 100);
+// Percentage change FROM the baseline A TO the newer B — the view is framed
+// "from {a} to {b}", so the delta must be (B − A) / A. (Was (A − B) / B, which
+// reported the change backwards: a latency rise A→B showed as a negative %.)
+const pct = (a: number, b: number) => (a === 0 ? null : ((b - a) / a) * 100);
 
 export function buildCompareResult(
   kpiA: LLMKPI, kpiB: LLMKPI,
@@ -50,9 +53,12 @@ export function buildCompareResult(
     { key: "p50", a: percentile(samplesA.durations, 0.5), b: percentile(samplesB.durations, 0.5), deltaPct: null, ci: hasDurationSamples ? p50CI : null, verdict: hasDurationSamples ? classifyVerdict(p50CI, "up-worse", enoughSample) : "insufficient", flagged: true, associative },
     { key: "p95", a: percentile(samplesA.durations, 0.95), b: percentile(samplesB.durations, 0.95), deltaPct: null, ci: hasDurationSamples ? p95CI : null, verdict: hasDurationSamples ? classifyVerdict(p95CI, "up-worse", enoughSample) : "insufficient", flagged: true, associative },
     { key: "cost", a: costPerA, b: costPerB, deltaPct: pct(costPerA, costPerB), ci: hasCostSamples ? costCI : null, verdict: hasCostSamples ? classifyVerdict(costCI, "up-worse", enoughSample) : "insufficient", flagged: true, associative },
-    { key: "p99", a: percentile(samplesA.durations, 0.99), b: percentile(samplesB.durations, 0.99), deltaPct: null, ci: null, verdict: "nochange", flagged: false, associative },
+    { key: "p99", a: percentile(samplesA.durations, 0.99), b: percentile(samplesB.durations, 0.99), deltaPct: null, ci: null, verdict: "nochange", flagged: true, associative },
   ];
-  metrics.forEach(m => { if (m.deltaPct === null && m.ci) m.deltaPct = pct(m.a, m.b); });
+  // Backfill deltaPct from a/b for every metric that didn't set it inline (p50/
+  // p95 defer it to here; p99 has no CI but is still colored by direction), so
+  // the strip can color EVERY metric by the sign of its change.
+  metrics.forEach(m => { if (m.deltaPct === null) m.deltaPct = pct(m.a, m.b); });
   return { metrics, enoughSample, nA, nB };
 }
 
@@ -103,7 +109,7 @@ export function buildCompareResultFromEndpoint(
     { key: "p50", a: p50.a, b: p50.b, deltaPct: pct(p50.a, p50.b), ci: p50.insufficient ? null : p50CI, verdict: p50.insufficient ? "insufficient" : classifyVerdict(p50CI, "up-worse", enoughSample), flagged: true, associative },
     { key: "p95", a: p95.a, b: p95.b, deltaPct: pct(p95.a, p95.b), ci: p95.insufficient ? null : p95CI, verdict: p95.insufficient ? "insufficient" : classifyVerdict(p95CI, "up-worse", enoughSample), flagged: true, associative },
     { key: "cost", a: cost.a, b: cost.b, deltaPct: pct(cost.a, cost.b), ci: cost.insufficient ? null : costCI, verdict: cost.insufficient ? "insufficient" : classifyVerdict(costCI, "up-worse", enoughSample), flagged: true, associative },
-    { key: "p99", a: p99.a, b: p99.b, deltaPct: pct(p99.a, p99.b), ci: null, verdict: "nochange", flagged: false, associative },
+    { key: "p99", a: p99.a, b: p99.b, deltaPct: pct(p99.a, p99.b), ci: null, verdict: "nochange", flagged: true, associative },
   ];
   return { metrics, enoughSample, nA, nB };
 }

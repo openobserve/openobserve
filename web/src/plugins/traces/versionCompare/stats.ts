@@ -44,11 +44,16 @@ export function proportionDiffCI(errA: number, nA: number, errB: number, nB: num
 export type MetricDir = "up-worse" | "neutral";
 export type Verdict = "higher" | "lower" | "nochange" | "insufficient";
 
+// The verdict describes the NEWER version B relative to the baseline A (the view
+// is framed "from A to B"). The CI delta is oriented A − B, so `ci.lower > 0`
+// means A > B — i.e. B is LOWER than A → verdict "lower". `ci.upper < 0` means
+// A < B → B is HIGHER → "higher". (Returning "higher" for A>B, as before, labelled
+// a latency/cost regression as an improvement.)
 export function classifyVerdict(ci: DiffCI, dir: MetricDir, enoughSample: boolean): Verdict {
   if (!enoughSample) return "insufficient";
   if (dir === "neutral") return "nochange";
   if (ci.straddlesZero) return "nochange";
-  return ci.lower > 0 ? "higher" : "lower";
+  return ci.lower > 0 ? "lower" : "higher";
 }
 
 // stats.ts (part 2 — percentile/mean/bootstrap)

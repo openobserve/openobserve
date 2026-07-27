@@ -9,20 +9,23 @@ const kpi = (traceCount: number, errorCount: number, totalCost: number) => ({
 const disjointWin = { mode: "sinceRollout" as const, a: {start:0,end:1}, b:{start:2,end:3}, deltaMicros:1, limitedBy:null, overlap:"disjoint" as const, overlapFraction:0 };
 
 describe("buildCompareResult", () => {
-  it("suppresses ALL verdicts when either arm < MIN_SAMPLE", () => {
+  it("suppresses CI-backed verdicts when either arm < MIN_SAMPLE", () => {
     const r = buildCompareResult(kpi(42, 5, 1), kpi(88, 3, 1),
       { durations: [1,2,3], costs: [1] }, { durations: [1], costs: [1] }, disjointWin, 1);
     expect(r.enoughSample).toBe(false);
-    expect(r.metrics.every(m => !m.flagged || m.verdict === "insufficient")).toBe(true);
+    // Every CI-backed flagged metric drops to "insufficient". p99 is directional-
+    // only (no CI, verdict always "nochange"), so it's exempt from this rule.
+    expect(r.metrics.every(m => !m.flagged || m.key === "p99" || m.verdict === "insufficient")).toBe(true);
   });
-  it("flags exactly {errorRate,p50,p95,cost}; volume+p99 are display-only (verdict nochange, flagged false)", () => {
+  it("flags {errorRate,p50,p95,p99,cost} (all colored by direction); volume stays neutral", () => {
     const durs = Array.from({length: 500}, (_, i) => 100 + i);
     const r = buildCompareResult(kpi(500, 100, 50), kpi(500, 20, 30),
       { durations: durs, costs: durs }, { durations: durs.map(d=>d/2), costs: durs.map(d=>d/2) }, disjointWin, 9);
     const flagged = r.metrics.filter(m => m.flagged).map(m => m.key).sort();
-    expect(flagged).toEqual(["cost","errorRate","p50","p95"]);
+    expect(flagged).toEqual(["cost","errorRate","p50","p95","p99"]);
+    // p99 is directional-only — flagged, but no CI.
     expect(r.metrics.find(m=>m.key==="p99")!.ci).toBeNull();
-    expect(r.metrics.find(m=>m.key==="volume")!.ci).toBeNull();
+    expect(r.metrics.find(m=>m.key==="volume")!.flagged).toBe(false);
   });
   it("marks results associative in sinceRollout mode", () => {
     const durs = Array.from({length: 200}, (_, i) => i + 1);
@@ -69,9 +72,10 @@ describe("buildCompareResultFromEndpoint", () => {
     const p99 = r.metrics.find(m => m.key === "p99")!;
     expect(p99.a).toBe(500);
     expect(p99.b).toBe(400);
-    // p99 stays display-only — no CI/verdict even though the endpoint has a/b/delta.
+    // p99 is colored by direction (flagged) but carries NO CI — it's a directional
+    // signal only, not a significance-gated verdict.
     expect(p99.ci).toBeNull();
-    expect(p99.flagged).toBe(false);
+    expect(p99.flagged).toBe(true);
   });
 
   it("error-rate + volume are computed from KPI, NOT the endpoint (endpoint has no error-rate field)", () => {
@@ -97,10 +101,23 @@ describe("buildCompareResultFromEndpoint", () => {
     expect(r.metrics.find(m => m.key === "p50")!.verdict).toBe("nochange");
   });
 
-  it("straddles_zero:false with delta>0 on p95 (up-worse) -> verdict higher", () => {
+  it("p95 CI delta>0 (A>B, so B is LOWER) on an up-worse metric -> verdict lower (B improved)", () => {
+    // delta = A − B = 50 > 0 → B's latency is lower than A → an improvement.
     const endpoint = {
       p50: md(),
       p95: md({ straddles_zero: false, delta: 50, lo: 10, hi: 90 }),
+      p99: md(), cost: md(),
+    };
+    const r = buildCompareResultFromEndpoint(
+      kpi(500, 10, 5), kpi(500, 10, 5), endpoint, disjointWin,
+    );
+    expect(r.metrics.find(m => m.key === "p95")!.verdict).toBe("lower");
+  });
+
+  it("p95 CI delta<0 (A<B, so B is HIGHER) on an up-worse metric -> verdict higher (B regressed)", () => {
+    const endpoint = {
+      p50: md(),
+      p95: md({ straddles_zero: false, delta: -50, lo: -90, hi: -10 }),
       p99: md(), cost: md(),
     };
     const r = buildCompareResultFromEndpoint(

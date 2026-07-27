@@ -52,20 +52,22 @@ describe("VersionErrorDiff", () => {
     expect(sharedRow.text()).toContain("2");
   });
 
-  it("colors a worse shared delta (delta>0) as crit with an up arrow", () => {
+  it("colors a BETTER shared delta (count fell in B, delta>0) as good with a down arrow", () => {
+    // fullDiff default: count_a=5, count_b=2, delta=+3 → B has fewer errors → better.
     const wrapper = mountDiff(fullDiff());
     const delta = wrapper.find('[data-test="version-error-diff-delta-auth_error"]');
-    expect(delta.classes()).toContain("text-error-600");
-    expect(delta.text()).toBe("▲");
+    expect(delta.classes()).toContain("text-success-600");
+    expect(delta.text()).toBe("▼");
   });
 
-  it("colors a better shared delta (delta<0) as good with a down arrow", () => {
+  it("colors a WORSE shared delta (count rose in B, delta<0) as crit with an up arrow", () => {
+    // count_a=1, count_b=4, delta=−3 → B has MORE errors → worse.
     const wrapper = mountDiff(
       fullDiff({ shared: [{ fail_class: "auth_error", count_a: 1, count_b: 4, delta: -3 }] }),
     );
     const delta = wrapper.find('[data-test="version-error-diff-delta-auth_error"]');
-    expect(delta.classes()).toContain("text-success-600");
-    expect(delta.text()).toBe("▼");
+    expect(delta.classes()).toContain("text-error-600");
+    expect(delta.text()).toBe("▲");
   });
 
   it("colors an unchanged shared delta as neutral with a dash", () => {

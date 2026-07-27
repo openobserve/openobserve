@@ -69,20 +69,23 @@ describe("VersionDeltaStrip", () => {
     expect(delta.classes()).toContain("text-success-600");
   });
 
-  it("colors a straddle-zero / nochange verdict as neutral", () => {
+  it("colors every delta by DIRECTION — a drop is green regardless of CI significance", () => {
+    // deltaPct -2 (fell) → green. Coloring is purely directional now; the CI
+    // verdict no longer gates the color and there is no 'indicative' marker.
     const r = result([
-      metric({ key: "cost", a: 0.05, b: 0.051, deltaPct: -2, verdict: "nochange", flagged: true, ci: { delta: -0.001, lower: -0.01, upper: 0.008, straddlesZero: true } }),
+      metric({ key: "cost", a: 0.05, b: 0.049, deltaPct: -2, verdict: "nochange", flagged: true, ci: { delta: 0.001, lower: -0.008, upper: 0.01, straddlesZero: true } }),
     ]);
     const wrapper = mountStrip(r);
     const delta = wrapper.find('[data-test="version-delta-strip-delta-cost"]');
-    expect(delta.classes()).toContain("text-text-secondary");
-    expect(delta.classes()).not.toContain("text-error-600");
-    expect(delta.classes()).not.toContain("text-success-600");
+    expect(delta.classes()).toContain("text-success-600"); // fell → better
+    expect(wrapper.find('[data-test="version-delta-strip-indicative-cost"]').exists()).toBe(false);
   });
 
-  it("colors an insufficient-sample verdict as neutral and shows the indicative label", () => {
+  it("insufficient-sample (null delta, no data) stays neutral and shows the indicative label", () => {
+    // A genuinely dataless metric: deltaPct null → nothing to color; the
+    // 'indicative' label still flags that no confident read exists.
     const r = result([
-      metric({ key: "p50", a: 90, b: 95, deltaPct: -5, verdict: "insufficient", flagged: true, ci: { delta: -5, lower: -20, upper: 10, straddlesZero: true } }),
+      metric({ key: "p50", a: 0, b: 0, deltaPct: null, verdict: "insufficient", flagged: true, ci: null }),
     ]);
     const wrapper = mountStrip(r);
     const delta = wrapper.find('[data-test="version-delta-strip-delta-p50"]');
@@ -91,16 +94,15 @@ describe("VersionDeltaStrip", () => {
     expect(wrapper.find('[data-test="version-delta-strip-indicative-p50"]').text()).toBe("indicative");
   });
 
-  it("renders P99 (non-flagged) with value + delta but no verdict color, even with a higher verdict", () => {
+  it("P99 is colored by direction like the other latency metrics", () => {
+    // p99 500→300 (fell) → green. P99 is now a first-class directional metric,
+    // not a neutral display-only cell.
     const r = result([
-      metric({ key: "p99", a: 500, b: 300, deltaPct: 66.7, verdict: "higher", flagged: false, ci: null }),
+      metric({ key: "p99", a: 500, b: 300, deltaPct: -40, verdict: "nochange", flagged: true, ci: null }),
     ]);
     const wrapper = mountStrip(r);
     const delta = wrapper.find('[data-test="version-delta-strip-delta-p99"]');
-    expect(delta.exists()).toBe(true);
-    expect(delta.classes()).not.toContain("text-error-600");
-    expect(delta.classes()).not.toContain("text-success-600");
-    expect(delta.classes()).toContain("text-text-secondary");
+    expect(delta.classes()).toContain("text-success-600");
     expect(wrapper.find('[data-test="version-delta-strip-values-p99"]').text()).toContain("500");
   });
 

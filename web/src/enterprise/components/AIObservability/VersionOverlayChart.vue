@@ -183,13 +183,12 @@ const { t } = useI18n();
 const labelA = computed(() => props.versionA || t("aiObservability.overlayChart.seriesA"));
 const labelB = computed(() => props.versionB || t("aiObservability.overlayChart.seriesB"));
 const xAxisLabel = computed(() => {
-  if (props.mode !== "sinceRollout") return t("aiObservability.overlayChart.xAxisWallClock");
-  const byUnit: Record<string, string> = {
-    minutes: "aiObservability.overlayChart.xAxisSinceRolloutMinutes",
-    hours: "aiObservability.overlayChart.xAxisSinceRolloutHours",
-    days: "aiObservability.overlayChart.xAxisSinceRolloutDays",
-  };
-  return t(byUnit[props.xUnit] ?? "aiObservability.overlayChart.xAxisSinceRollout");
+  // Wall-clock (sameWallClock / manual): x is elapsed since a shared origin, so a
+  // later window sits further right. Rollout: x is elapsed since each version's
+  // own t₀ (both start at 0). Either way the unit (min/hours/days) is in the label.
+  const family = props.mode === "sinceRollout" ? "xAxisSinceRollout" : "xAxisWallClock";
+  const suffix = props.xUnit === "hours" ? "Hours" : props.xUnit === "days" ? "Days" : "Minutes";
+  return t(`aiObservability.overlayChart.${family}${suffix}`);
 });
 
 const panelSchema = computed(() =>

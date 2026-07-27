@@ -22,19 +22,22 @@ describe("proportionDiffCI (Newcombe)", () => {
 });
 
 describe("classifyVerdict", () => {
-  const clearWorse = { delta: 0.15, lower: 0.11, upper: 0.19, straddlesZero: false };
-  const clearBetter = { delta: -0.15, lower: -0.19, upper: -0.11, straddlesZero: false };
+  // CI delta is oriented A − B. The verdict describes the NEWER version B:
+  //   delta > 0 (A > B) → B is LOWER than A → verdict "lower" (better for up-worse).
+  //   delta < 0 (A < B) → B is HIGHER than A → verdict "higher" (worse).
+  const bLower = { delta: 0.15, lower: 0.11, upper: 0.19, straddlesZero: false }; // A>B
+  const bHigher = { delta: -0.15, lower: -0.19, upper: -0.11, straddlesZero: false }; // A<B
   const noisy = { delta: 0.02, lower: -0.03, upper: 0.07, straddlesZero: true };
-  it("up-worse metric, CI entirely positive, enough sample → higher (=worse)", () => {
-    expect(classifyVerdict(clearWorse, "up-worse", true)).toBe("higher");
+  it("up-worse metric, A>B (CI entirely positive) → lower (B improved)", () => {
+    expect(classifyVerdict(bLower, "up-worse", true)).toBe("lower");
   });
-  it("up-worse metric, CI entirely negative → lower (=better)", () => {
-    expect(classifyVerdict(clearBetter, "up-worse", true)).toBe("lower");
+  it("up-worse metric, A<B (CI entirely negative) → higher (B regressed)", () => {
+    expect(classifyVerdict(bHigher, "up-worse", true)).toBe("higher");
   });
   it("CI straddles zero → nochange regardless of point estimate", () => {
     expect(classifyVerdict(noisy, "up-worse", true)).toBe("nochange");
   });
   it("insufficient sample → insufficient, even with a clean CI", () => {
-    expect(classifyVerdict(clearWorse, "up-worse", false)).toBe("insufficient");
+    expect(classifyVerdict(bLower, "up-worse", false)).toBe("insufficient");
   });
 });

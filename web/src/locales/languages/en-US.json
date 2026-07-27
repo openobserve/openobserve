@@ -7818,7 +7818,10 @@
       "lowResolution": "Not enough time resolution to plot both versions in this window — narrow the date range (or switch to “Since each rollout”).",
       "xAxisSinceRolloutMinutes": "Minutes since rollout",
       "xAxisSinceRolloutHours": "Hours since rollout",
-      "xAxisSinceRolloutDays": "Days since rollout"
+      "xAxisSinceRolloutDays": "Days since rollout",
+      "xAxisWallClockMinutes": "Minutes (elapsed, wall-clock)",
+      "xAxisWallClockHours": "Hours (elapsed, wall-clock)",
+      "xAxisWallClockDays": "Days (elapsed, wall-clock)"
     },
     "errorDiff": {
       "title": "Failure changes",

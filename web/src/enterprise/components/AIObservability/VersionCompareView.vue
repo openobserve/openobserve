@@ -320,7 +320,14 @@ const deltaHours = computed(() =>
   props.windows ? Math.max(0, props.windows.deltaMicros / 3_600_000_000) : 0,
 );
 
-const overlayMode = computed<OverlayMode>(() => (align.value === "sameWallClock" ? "sameWallClock" : "sinceRollout"));
+// Manual joins sameWallClock on the REAL-TIME axis: the user explicitly picked
+// each window, so the chart must honour their actual temporal relationship (a
+// later-rolled-out version starts further right), not rebase both to x=0. Only
+// "since each rollout" rebases each series to its own t₀ for an early-life
+// overlay.
+const overlayMode = computed<OverlayMode>(() =>
+  align.value === "sinceRollout" ? "sinceRollout" : "sameWallClock",
+);
 
 // Overlay x-axis unit. The rebased x used to be raw fractional HOURS, so a
 // short-lived version rendered axis ticks like "0.0395787h" — unreadable and
@@ -339,29 +346,54 @@ const overlayXUnit = computed<XUnit>(() => {
   return { key: "days", perHour: 1 / 24 };
 });
 
-// Rebase each arm's sparkline buckets onto elapsed-x (in overlayXUnit) across
-// its resolved window (sinceRollout/manual) or the shared wall-clock window
-// (sameWallClock) — sparklines carry no per-bucket timestamp, so buckets are
-// evenly distributed across the window duration.
+// Shared origin for the wall-clock axis: the earlier of the two window starts.
+// A version whose window starts later is offset to the RIGHT by that real gap,
+// so the chart shows their true temporal relationship. Null in sinceRollout,
+// where each series is rebased to its own t₀ instead.
+const wallClockOrigin = computed<number | null>(() => {
+  if (overlayMode.value === "sinceRollout") return null;
+  const a = props.windows?.a.start;
+  const b = props.windows?.b.start;
+  if (a == null && b == null) return null;
+  return Math.min(a ?? Infinity, b ?? Infinity);
+});
+
+// Map an arm's sparkline buckets to overlay points. Sparklines carry no per-
+// bucket timestamp, so buckets are evenly distributed across the window.
+//   - sinceRollout (origin=null): x = elapsed since THIS window's start (both
+//     series begin at x=0 — an apples-to-apples early-life overlay).
+//   - wall-clock (origin set): x = elapsed since the SHARED origin, so a later
+//     window sits further right — the real timeline the user picked.
 function toOverlayPoints(
   series: LLMSparklineSeries | null,
   win: { start: number; end: number } | undefined,
   unit: XUnit,
+  origin: number | null,
 ): OverlayPoint[] {
   if (!series || !win) return [];
   const values = series.cost;
   if (!values.length) return [];
   const span = winHours(win) * unit.perHour;
+  // Wall-clock: how far THIS window's start sits past the shared origin.
+  const offset =
+    origin == null ? 0 : Math.max(0, (win.start - origin) / 3_600_000_000) * unit.perHour;
   return values.map((y, i) => ({
-    // Round x to 2 decimals: the axis is a value type, so an unrounded elapsed
-    // value renders as a full-precision float tick (e.g. "2.1920511627906976").
-    x: values.length > 1 ? Math.round(((i / (values.length - 1)) * span) * 100) / 100 : 0,
+    // Round x to 2 decimals: the axis is a value type, so an unrounded value
+    // renders as a full-precision float tick (e.g. "2.1920511627906976").
+    x:
+      values.length > 1
+        ? Math.round((offset + (i / (values.length - 1)) * span) * 100) / 100
+        : Math.round(offset * 100) / 100,
     y,
   }));
 }
 
-const overlaySeriesA = computed(() => toOverlayPoints(props.sparklinesA, props.windows?.a, overlayXUnit.value));
-const overlaySeriesB = computed(() => toOverlayPoints(props.sparklinesB, props.windows?.b, overlayXUnit.value));
+const overlaySeriesA = computed(() =>
+  toOverlayPoints(props.sparklinesA, props.windows?.a, overlayXUnit.value, wallClockOrigin.value),
+);
+const overlaySeriesB = computed(() =>
+  toOverlayPoints(props.sparklinesB, props.windows?.b, overlayXUnit.value, wallClockOrigin.value),
+);
 
 // A line chart needs >=2 points on at least one series to draw anything. When
 // both arms collapse to a single bucket (common in sameWallClock over a wide
