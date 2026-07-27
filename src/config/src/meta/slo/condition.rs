@@ -34,7 +34,7 @@ use utoipa::ToSchema;
 
 use super::{
     super::alerts::{Operator, level::AlertLevel},
-    coverage::Observation,
+    coverage::{Observation, UnobservedReason},
 };
 
 /// The two SLO-alert shapes Datadog offers.
@@ -216,6 +216,21 @@ pub fn default_short_window_secs(long_window_secs: i64, slice_interval_secs: i64
 
 /// Validate a condition against the SLO it references (SA-3 … SA-13).
 ///
+/// **Check order is part of the contract.** Many inputs violate more than one
+/// rule at once (a 7-minute window on a 5-minute-slice SLO is both a
+/// non-multiple *and* under two slices), and callers assert on specific
+/// variants, so the order is fixed here rather than left to the implementer:
+///
+/// 1. window presence matches the kind (`WindowsMismatchedForKind`)
+/// 2. operator is ascending (`OperatorNotAscending`)
+/// 3. thresholds are finite and positive (`ThresholdNotFinitePositive`)
+/// 4. kind-specific range (`BurnRateAboveMax` / `ErrorBudgetOutOfRange`)
+/// 5. warning is less severe (`WarningNotLessSevere`)
+/// 6. windows, in order: `LongWindowOutOfRange` → `WindowNotSliceMultiple` → `WindowTooFewSlices` →
+///    `ShortWindowExceedsLong` → `WindowExceedsSloWindow`
+/// 7. no count gate (`CountGateNotSupported`)
+/// 8. per-group requires grouping (`MultiAlertRequiresGroupedSlo`)
+///
 /// `count_gate_is_default` is supplied by the caller from the alert's
 /// `TriggerCondition`, so this stays free of the alert type.
 pub fn validate(
@@ -248,16 +263,54 @@ pub fn classify_value(value: f64, cond: &SloCondition) -> Option<AlertLevel> {
     todo!("condition::classify_value")
 }
 
+/// The outcome of classifying an SLO alert.
+///
+/// A two-variant enum rather than `Option<Option<AlertLevel>>` **on purpose**.
+/// The nested form spells "frozen" as an outer `None` and "healthy" as
+/// `Some(None)`, which any stray `.flatten()`, `.unwrap_or(None)` or `?`
+/// silently collapses into each other — and collapsing them in that direction
+/// is precisely the catastrophic bug this whole feature is built to avoid: a
+/// measurement outage reading as a recovery for every burn-rate alert in the
+/// org (D34). Here that mistake does not typecheck.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SloClassification {
+    /// Nothing was measured. The caller must leave `level`, `level_since` and
+    /// `level_at` untouched (§7.6) — the level rots, it does not reset.
+    Frozen(UnobservedReason),
+    /// A real measurement produced this level. `AlertLevel::Ok` here means
+    /// "observed and healthy", which is categorically different from `Frozen`.
+    Observed(AlertLevel),
+}
+
+impl SloClassification {
+    pub fn is_frozen(&self) -> bool {
+        matches!(self, Self::Frozen(_))
+    }
+
+    /// The level to record, or `None` when the state must not be touched.
+    pub fn level(&self) -> Option<AlertLevel> {
+        match self {
+            Self::Observed(level) => Some(*level),
+            Self::Frozen(_) => None,
+        }
+    }
+}
+
 /// Classify a burn-rate alert from both window observations (SA-9).
 ///
-/// Returns `None` when either window is unobserved — the caller must then
-/// freeze the level rather than treat it as `Ok` (SA-17/SA-18, §7.6).
+/// The level is the **less severe** of the two windows' classifications —
+/// Datadog's "must exceed in both windows" AND rule, generalized from a
+/// boolean to a level.
+///
+/// If either window is unobserved the result is [`SloClassification::Frozen`],
+/// carrying the **long** window's reason when both are unobserved (a stable
+/// precedence, so the UI copy does not flicker).
 pub fn classify_burn_rate(
     long: Observation,
     short: Observation,
     target: f64,
     cond: &SloCondition,
-) -> Option<Option<AlertLevel>> {
+) -> SloClassification {
     let _ = (long, short, target, cond);
     todo!("condition::classify_burn_rate")
 }
@@ -267,7 +320,7 @@ pub fn classify_error_budget(
     window: Observation,
     target: f64,
     cond: &SloCondition,
-) -> Option<Option<AlertLevel>> {
+) -> SloClassification {
     let _ = (window, target, cond);
     todo!("condition::classify_error_budget")
 }
@@ -282,7 +335,7 @@ pub fn governing_burn_rate(long: f64, short: f64) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::meta::slo::coverage::{Observation, UnobservedReason};
+    use crate::meta::slo::coverage::Observation;
 
     const HOUR: i64 = 3600;
     const DAY: i64 = 86_400;
@@ -590,10 +643,11 @@ mod tests {
 
     #[test]
     fn windows_must_be_exact_multiples_of_the_slice_interval() {
-        // 7 minutes is not a multiple of a 5-minute slice.
+        // 700s is not a multiple of a 300s slice — and is deliberately ABOVE
+        // the two-slice floor (600s) so only the multiple rule can fire.
         let c = SloCondition {
             long_window_secs: Some(HOUR),
-            short_window_secs: Some(7 * 60),
+            short_window_secs: Some(700),
             critical: 3.0,
             ..fast_burn()
         };
@@ -879,7 +933,7 @@ mod tests {
         let short = observed(100.0 - 1.50); // burn 15
         assert_eq!(
             classify_burn_rate(long, short, 99.9, &fast_burn()),
-            Some(Some(AlertLevel::Critical))
+            SloClassification::Observed(AlertLevel::Critical)
         );
     }
 
@@ -891,7 +945,7 @@ mod tests {
         let short = observed(100.0 - 0.01); // burn 0.1
         assert_eq!(
             classify_burn_rate(long, short, 99.9, &fast_burn()),
-            Some(None),
+            SloClassification::Observed(AlertLevel::Ok),
             "an elevated long window alone must not fire"
         );
     }
@@ -902,7 +956,7 @@ mod tests {
         let short = observed(100.0 - 1.60);
         assert_eq!(
             classify_burn_rate(long, short, 99.9, &fast_burn()),
-            Some(None)
+            SloClassification::Observed(AlertLevel::Ok)
         );
     }
 
@@ -914,7 +968,7 @@ mod tests {
         let short = observed(100.0 - 0.08); // recovered, burn 0.8
         assert_eq!(
             classify_burn_rate(long, short, 99.9, &fast_burn()),
-            Some(None)
+            SloClassification::Observed(AlertLevel::Ok)
         );
     }
 
@@ -932,7 +986,7 @@ mod tests {
         let short = observed(100.0 - 0.30);
         assert_eq!(
             classify_burn_rate(long, short, 99.9, &c),
-            Some(Some(AlertLevel::Warning)),
+            SloClassification::Observed(AlertLevel::Warning),
             "Critical ∧ Warning = Warning"
         );
     }
@@ -948,7 +1002,7 @@ mod tests {
         let short = observed(100.0 - 0.30);
         assert_eq!(
             classify_burn_rate(long, short, 99.9, &c),
-            Some(Some(AlertLevel::Warning))
+            SloClassification::Observed(AlertLevel::Warning)
         );
     }
 
@@ -958,8 +1012,8 @@ mod tests {
         let short = observed(100.0);
         assert_eq!(
             classify_burn_rate(long, short, 99.9, &fast_burn()),
-            Some(None),
-            "None means matched nothing = Ok, not `no level computed`"
+            SloClassification::Observed(AlertLevel::Ok),
+            "an observed healthy pair is Observed(Ok), never Frozen"
         );
     }
 
@@ -973,7 +1027,7 @@ mod tests {
         let short = observed(100.0);
         assert_eq!(
             classify_burn_rate(long, short, 99.9, &fast_burn()),
-            None,
+            SloClassification::Frozen(UnobservedReason::BelowCoverageFloor),
             "must be indistinguishable from `do not touch the level`"
         );
     }
@@ -982,18 +1036,38 @@ mod tests {
     fn an_unobserved_short_window_freezes_too() {
         let long = observed(100.0);
         let short = Observation::Unobserved(UnobservedReason::ZeroTotal);
-        assert_eq!(classify_burn_rate(long, short, 99.9, &fast_burn()), None);
+        assert_eq!(
+            classify_burn_rate(long, short, 99.9, &fast_burn()),
+            SloClassification::Frozen(UnobservedReason::ZeroTotal)
+        );
     }
 
     #[test]
     fn a_stale_watermark_freezes_the_alert() {
         let stale = Observation::Unobserved(UnobservedReason::StaleWatermark);
-        assert_eq!(classify_burn_rate(stale, stale, 99.9, &fast_burn()), None);
+        assert_eq!(
+            classify_burn_rate(stale, stale, 99.9, &fast_burn()),
+            SloClassification::Frozen(UnobservedReason::StaleWatermark)
+        );
     }
 
-    /// The distinction that makes the whole design safe, asserted directly.
+    /// When both windows are unobserved the reason must be stable, so the UI
+    /// copy does not flicker between passes.
     #[test]
-    fn freezing_and_ok_are_different_values() {
+    fn the_long_windows_reason_wins_when_both_are_unobserved() {
+        let long = Observation::Unobserved(UnobservedReason::StaleWatermark);
+        let short = Observation::Unobserved(UnobservedReason::ZeroTotal);
+        assert_eq!(
+            classify_burn_rate(long, short, 99.9, &fast_burn()),
+            SloClassification::Frozen(UnobservedReason::StaleWatermark)
+        );
+    }
+
+    /// The distinction that makes the whole design safe. With the old
+    /// `Option<Option<_>>` shape this was one `.flatten()` away from silently
+    /// turning a measurement outage into a fleet-wide recovery.
+    #[test]
+    fn freezing_and_healthy_are_different_and_only_one_yields_a_level() {
         let frozen = classify_burn_rate(
             Observation::Unobserved(UnobservedReason::BelowCoverageFloor),
             observed(100.0),
@@ -1001,9 +1075,16 @@ mod tests {
             &fast_burn(),
         );
         let healthy = classify_burn_rate(observed(100.0), observed(100.0), 99.9, &fast_burn());
+
         assert_ne!(frozen, healthy);
-        assert_eq!(frozen, None);
-        assert_eq!(healthy, Some(None));
+        assert!(frozen.is_frozen());
+        assert!(!healthy.is_frozen());
+        assert_eq!(
+            frozen.level(),
+            None,
+            "a frozen classification must yield no level to write"
+        );
+        assert_eq!(healthy.level(), Some(AlertLevel::Ok));
     }
 
     // ---- error budget classification ---------------------------------------
@@ -1013,19 +1094,18 @@ mod tests {
         // 99.8 against 99.9 = 200% consumed.
         assert_eq!(
             classify_error_budget(observed(99.8), 99.9, &budget_alert()),
-            Some(Some(AlertLevel::Critical))
+            SloClassification::Observed(AlertLevel::Critical)
         );
     }
 
     #[test]
     fn budget_consumption_in_the_warning_band_fires_warning() {
-        // 80% consumed: over the 75 warning, under the 90 critical.
-        let sli = 99.9 + (100.0 - 99.9) * (1.0 - 0.80) - 0.1 + 0.1; // see below
-        let _ = sli;
-        // consumed = 100 × (100 − sli) / (100 − target) = 80 => sli = 99.92
+        // consumed = 100 × (100 − sli) / (100 − target)
+        //          = 100 × 0.08 / 0.1 = 80% — over the 75 warning, under the
+        //          90 critical.
         assert_eq!(
             classify_error_budget(observed(99.92), 99.9, &budget_alert()),
-            Some(Some(AlertLevel::Warning))
+            SloClassification::Observed(AlertLevel::Warning)
         );
     }
 
@@ -1033,7 +1113,7 @@ mod tests {
     fn a_healthy_budget_classifies_as_ok() {
         assert_eq!(
             classify_error_budget(observed(100.0), 99.9, &budget_alert()),
-            Some(None)
+            SloClassification::Observed(AlertLevel::Ok)
         );
     }
 
@@ -1045,7 +1125,7 @@ mod tests {
                 99.9,
                 &budget_alert()
             ),
-            None
+            SloClassification::Frozen(UnobservedReason::BelowCoverageFloor)
         );
     }
 

@@ -77,8 +77,27 @@ pub struct IngestRangeParams {
 
 /// Compute the pass's `[start, end)`.
 ///
-/// `None` when there is nothing complete to do yet (`end <= start`), which is
-/// the normal outcome of a pass that fires inside the ingest delay.
+/// ```text
+/// end   = align_down(now - ingest_delay)          the last COMPLETE slice
+/// start = min(watermark_end, align_down(now) - K × slice)
+/// start = max(start, generation_reset_time)
+/// ```
+///
+/// `None` — the pass does nothing — **iff no new slice has closed**, i.e.
+/// `end <= watermark_end` (or the degenerate `end <= start`).
+///
+/// That condition is the whole reason this returns an `Option`, and it needs
+/// stating because the obvious alternative is wrong in both directions. With
+/// `K > 0` the range *always* reaches back K slices, so `start < end` holds
+/// unconditionally and a `end <= start` test alone could never fire — the job
+/// would re-query the same trailing slices on every scheduler tick, at up to
+/// `slice_interval / cadence` times the necessary query load. Gating on "did a
+/// slice close" costs nothing in late-data coverage: the trailing K slices are
+/// still recomputed at the next slice boundary, which is the soonest any of
+/// their values could matter.
+///
+/// A watermark ahead of `now` (clock skew) therefore also yields `None`, which
+/// is the safe response — never a backwards range.
 pub fn ingest_range(params: IngestRangeParams) -> Option<IngestRange> {
     let _ = params;
     todo!("window::ingest_range")
@@ -189,15 +208,25 @@ mod tests {
         assert_eq!(delayed.end, 6900, "a 60s delay drops the last slice");
     }
 
+    /// The pass is a no-op while no new slice has closed — otherwise a job
+    /// running faster than its slice interval re-queries the same trailing
+    /// slices every tick.
     #[test]
-    fn range_is_none_when_nothing_has_completed_yet() {
-        // The watermark is already at the last complete slice.
+    fn range_is_none_when_no_new_slice_has_closed() {
+        // end = align(7300 - 60) = 7200, which the watermark already covers.
         assert_eq!(ingest_range(params(7300, Some(7200), FIVE_MIN)), None);
     }
 
     #[test]
+    fn range_is_some_again_as_soon_as_one_slice_closes() {
+        // Same watermark, one slice later: end = align(7600-60) = 7500.
+        let r = ingest_range(params(7600, Some(7200), FIVE_MIN)).unwrap();
+        assert_eq!(r.end, 7500);
+    }
+
+    #[test]
     fn range_is_none_when_the_watermark_is_ahead_of_now() {
-        // Clock skew must not produce a backwards range.
+        // Clock skew must never produce a backwards range.
         assert_eq!(ingest_range(params(3600, Some(99_999), FIVE_MIN)), None);
     }
 
@@ -206,16 +235,31 @@ mod tests {
     #[test]
     fn range_reaches_back_k_slices_for_late_data() {
         let r = ingest_range(params(10_000, Some(9000), FIVE_MIN)).unwrap();
-        // now - delay = 9940 -> end = 9900. Back 3 slices = 8400.
+        // now - delay = 9940 -> end = 9900; align(now) - 3 slices = 9000,
+        // and the watermark is also 9000, so start is 9000.
         assert_eq!(r.end, 9900);
-        assert_eq!(r.start, 8400, "3 slices back from the end");
+        assert_eq!(r.start, 9000, "3 slices back from align(now)");
+    }
+
+    /// The recompute window must actually re-cover already-published slices,
+    /// otherwise late data is never picked up.
+    #[test]
+    fn the_recompute_window_reaches_behind_the_watermark() {
+        // A watermark well ahead of align(now) - K*slice: start is pulled back.
+        let r = ingest_range(params(10_000, Some(9_800), FIVE_MIN)).unwrap();
+        assert!(
+            r.start < 9_800,
+            "start {} must reach behind the watermark for late data",
+            r.start
+        );
+        assert_eq!(r.start, 9_000);
     }
 
     #[test]
     fn recompute_never_reaches_past_the_generation_reset() {
         let r = ingest_range(IngestRangeParams {
             generation_reset_time: 9600,
-            ..params(10_000, Some(9900), FIVE_MIN)
+            ..params(10_000, Some(9000), FIVE_MIN)
         })
         .unwrap();
         assert!(
@@ -301,6 +345,24 @@ mod tests {
     #[test]
     fn expected_slices_of_an_empty_window_is_zero() {
         assert_eq!(expected_slices(1000, 1000, FIVE_MIN), 0);
+    }
+
+    /// These are `pub` entry points, so a zero interval must be defined rather
+    /// than a divide-by-zero panic — validate_slo rejects it upstream, but the
+    /// functions must not be a landmine for a caller that skips validation.
+    #[test]
+    fn a_zero_slice_interval_does_not_panic() {
+        assert_eq!(align_down(1234, 0), 1234);
+        assert_eq!(expected_slices(0, 3600, 0), 0);
+        let r = IngestRange { start: 0, end: 900 };
+        assert_eq!(r.slice_count(0), 0);
+        assert!(r.slice_starts(0).is_empty());
+    }
+
+    #[test]
+    fn a_negative_slice_interval_does_not_panic() {
+        assert_eq!(align_down(1234, -60), 1234);
+        assert_eq!(expected_slices(0, 3600, -60), 0);
     }
 
     #[test]

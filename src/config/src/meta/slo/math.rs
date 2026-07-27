@@ -91,12 +91,12 @@ pub fn time_to_exhaust_secs(window_secs: i64, burn: f64) -> Option<i64> {
 mod tests {
     use super::*;
 
-    /// Tolerance for percentage comparisons. The §9 accuracy gate is 0.001
-    /// percentage points, so the unit tests hold themselves to the same bar.
+    /// The §9 accuracy gate is 0.001 percentage points; these are closed-form
+    /// identities, so the tests hold themselves several orders tighter.
     const EPS: f64 = 1e-9;
 
     fn close(a: f64, b: f64) -> bool {
-        (a - b).abs() < 1e-6
+        (a - b).abs() < EPS
     }
 
     // ---- sli ---------------------------------------------------------------
@@ -298,8 +298,12 @@ mod tests {
 
     // ---- cross-checks ------------------------------------------------------
 
-    /// Every suggested Datadog row should fire at roughly the documented
-    /// fraction of the budget: burn × long_window / slo_window = budget spent.
+    /// Every suggested Datadog row should spend the documented fraction of the
+    /// budget over its long window.
+    ///
+    /// Derived through `burn_rate` and `error_budget_consumed` rather than from
+    /// literals: an earlier version of this test did the arithmetic inline and
+    /// would have passed with every function in this module returning zero.
     #[test]
     fn datadog_suggested_rows_consume_the_documented_budget_fraction() {
         // (slo window days, burn, long window hours, documented budget %)
@@ -314,13 +318,40 @@ mod tests {
             (90.0, 10.8, 6.0, 3.0),
             (90.0, 4.5, 24.0, 5.0),
         ];
+        let target = 99.9;
         for (window_days, burn, long_hours, budget_pct) in rows {
-            let fraction = burn * (long_hours / 24.0) / window_days * 100.0;
+            // Invert the burn rate to the SLI that would produce it, then push
+            // that SLI back through the real functions.
+            let sli_v = 100.0 - burn * (100.0 - target);
             assert!(
-                (fraction - budget_pct).abs() < 0.35,
-                "burn {burn} over {long_hours}h of a {window_days}d SLO spends {fraction:.2}%, \
+                close(burn_rate(sli_v, target), burn),
+                "burn_rate did not round-trip for {burn}"
+            );
+
+            // Budget spent over the long window = consumed% × (long / window).
+            let consumed_over_window = error_budget_consumed(sli_v, target);
+            let fraction = consumed_over_window * (long_hours / 24.0) / window_days;
+            assert!(
+                (fraction - budget_pct).abs() < 1e-6,
+                "burn {burn} over {long_hours}h of a {window_days}d SLO spends {fraction:.4}%, \
                  Datadog documents {budget_pct}%"
             );
         }
+    }
+
+    /// The exhaustion helper must agree with the same rows: window ÷ burn.
+    #[test]
+    fn datadog_suggested_rows_exhaust_the_budget_over_their_long_window() {
+        // At burn B, the budget lasts window/B. Firing after `long` hours means
+        // the fraction spent is long / (window/B) — the check above, restated
+        // through time_to_exhaust_secs.
+        let window_secs = 30 * 86_400;
+        let secs = time_to_exhaust_secs(window_secs, 14.4).unwrap();
+        let spent_in_one_hour = 3600.0 / secs as f64;
+        assert!(
+            (spent_in_one_hour * 100.0 - 2.0).abs() < 0.01,
+            "expected ~2% of the budget in 1h, got {:.3}%",
+            spent_in_one_hour * 100.0
+        );
     }
 }

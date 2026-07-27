@@ -184,6 +184,24 @@ mod tests {
         assert_eq!(overall_time_slice(&[], 5), SliceVerdict::Unknown);
     }
 
+    /// More verdicts than expected must not invent phantom `Unknown`s — the
+    /// active set can lag a newly-appeared group by one pass.
+    #[test]
+    fn more_verdicts_than_expected_does_not_fabricate_absences() {
+        let v = [SliceVerdict::Good, SliceVerdict::Good, SliceVerdict::Good];
+        assert_eq!(
+            overall_time_slice(&v, 2),
+            SliceVerdict::Good,
+            "a group that reported early must not make the slice uncovered"
+        );
+    }
+
+    #[test]
+    fn a_bad_group_still_dominates_when_verdicts_exceed_expected() {
+        let v = [SliceVerdict::Good, SliceVerdict::Bad, SliceVerdict::Good];
+        assert_eq!(overall_time_slice(&v, 2), SliceVerdict::Bad);
+    }
+
     // ---- count overall -----------------------------------------------------
 
     #[test]

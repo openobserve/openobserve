@@ -260,13 +260,26 @@ mod tests {
         );
     }
 
+    /// The hash remains useful for diagnostics — a revert IS recognisable as
+    /// returning to a previous definition — it simply no longer drives
+    /// generation reuse (D59). This asserts the round trip, which the
+    /// duplicate-of-an-earlier-test it replaced did not.
     #[test]
-    fn a_revert_hashes_equal_to_the_original_even_though_it_rebuilds() {
-        // The hash is still useful for diagnostics; it just no longer drives
-        // generation reuse.
+    fn a_revert_is_recognisable_by_hash_even_though_it_still_rebuilds() {
         let a = count_def();
+        let mut b = count_def();
+        b.slice_interval_secs = 300;
+
+        let (ha, hb) = (definition_hash(&a), definition_hash(&b));
+        assert_ne!(ha, hb, "A and B are different definitions");
+
+        // Revert to A: the hash comes back, but the rebuild still happens.
         let a_again = count_def();
-        assert_eq!(definition_hash(&a), definition_hash(&a_again));
+        assert_eq!(definition_hash(&a_again), ha, "the hash round-trips");
+        assert!(
+            requires_new_generation(&b, &a_again),
+            "recognising the revert must NOT short-circuit the rebuild"
+        );
     }
 
     // ---- the CAS fence -----------------------------------------------------

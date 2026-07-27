@@ -423,17 +423,29 @@ mod tests {
         assert!(should_emit(Some((1.0, 2.0)), (0.0, 2.0)));
     }
 
-    /// The steady-state claim behind the §6b.4d volume numbers: a repeated
-    /// pass over unchanged data writes nothing.
+    /// The steady-state claim behind the §6b.4d volume numbers, exercised over
+    /// a realistic trailing-recompute window rather than by repetition: only
+    /// the slice whose value actually moved is re-emitted.
     #[test]
-    fn steady_state_emits_one_row_per_logical_slice() {
-        let previous = Some((10.0, 10.0));
-        let emitted = (0..5)
-            .filter(|_| should_emit(previous, (10.0, 10.0)))
-            .count();
-        assert_eq!(
-            emitted, 0,
-            "K passes over unchanged data must write nothing"
+    fn a_recompute_pass_emits_only_the_slices_that_changed() {
+        let previous = [(0, (10.0, 10.0)), (300, (9.0, 10.0)), (600, (10.0, 10.0))];
+        let recomputed = [(0, (10.0, 10.0)), (300, (9.0, 11.0)), (600, (10.0, 10.0))];
+        let emitted: Vec<i64> = previous
+            .iter()
+            .zip(recomputed.iter())
+            .filter(|((_, prev), (_, now))| should_emit(Some(*prev), *now))
+            .map(|((start, _), _)| *start)
+            .collect();
+        assert_eq!(emitted, vec![300], "only the slice that gained late data");
+    }
+
+    /// NaN must not make a slice re-emit forever — `NaN != NaN` under a naive
+    /// equality check, which would defeat write-on-change entirely.
+    #[test]
+    fn a_nan_value_does_not_re_emit_forever() {
+        assert!(
+            !should_emit(Some((f64::NAN, 10.0)), (f64::NAN, 10.0)),
+            "an unchanged NaN must compare as unchanged"
         );
     }
 }
