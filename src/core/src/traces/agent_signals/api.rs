@@ -214,20 +214,24 @@ fn aggregate_cost_hits(hits: &[serde_json::Value]) -> ArmAggregate {
 /// logic so double-processed rollup windows don't double-count failures.
 fn aggregate_failure_hits(hits: &[serde_json::Value]) -> std::collections::HashMap<String, u64> {
     let mut map: std::collections::HashMap<String, u64> = std::collections::HashMap::new();
-    // Dedup by window `_timestamp`: see `aggregate_cost_hits` for why. Hits
-    // arrive `_timestamp DESC`, so the FIRST row seen for a timestamp is the
-    // newest ingest — keep it, skip the rest.
-    let mut seen_windows: std::collections::HashSet<i64> = std::collections::HashSet::new();
+    // Dedup by `(_timestamp, fail_class)`, NOT by `_timestamp` alone. Unlike the
+    // cost pass (one row per window), the FAILURE pass writes ONE ROW PER
+    // fail_class within a window — all sharing that window's `_timestamp`. Keying
+    // dedup on `_timestamp` alone would keep only the first class of each window
+    // and silently drop the rest (collapsing e.g. 5 classes to 1). We still want
+    // to skip a genuinely double-processed window (same ts + same class emitted
+    // twice), so the composite key is correct: it drops true duplicates while
+    // keeping every distinct class. Hits arrive `_timestamp DESC`, so the first
+    // occurrence of a (ts, class) pair is the newest ingest — keep it, skip repeats.
+    let mut seen: std::collections::HashSet<(i64, String)> = std::collections::HashSet::new();
     for hit in hits {
         let ts = hit.get("_timestamp").and_then(|v| v.as_i64());
-        if let Some(ts) = ts
-            && !seen_windows.insert(ts)
-        {
-            continue; // duplicate window row — already counted the newest
-        }
         let fail_class = hit.get("fail_class").and_then(|v| v.as_str());
         let count = hit.get("count").and_then(|v| v.as_u64());
-        if let (Some(fail_class), Some(count)) = (fail_class, count) {
+        if let (Some(ts), Some(fail_class), Some(count)) = (ts, fail_class, count) {
+            if !seen.insert((ts, fail_class.to_string())) {
+                continue; // same window + same class already counted (double-processed)
+            }
             *map.entry(fail_class.to_string()).or_insert(0) += count;
         }
     }
@@ -575,5 +579,30 @@ mod compare_tests {
         assert_eq!(agg.get("timeout"), Some(&8), "timeout not double-counted");
         assert_eq!(agg.get("rate_limit"), Some(&2));
         assert_eq!(agg.len(), 2);
+    }
+
+    #[test]
+    fn aggregate_failure_hits_keeps_every_class_within_one_window() {
+        // The failure pass writes ONE ROW PER fail_class within a window, so many
+        // DISTINCT classes share the SAME `_timestamp`. Dedup must be keyed on
+        // (_timestamp, fail_class) — keying on `_timestamp` alone would collapse
+        // all these to a single class (the original bug: 5 classes → 1).
+        let hits = vec![
+            serde_json::json!({ "_timestamp": 5000, "fail_class": "auth_error", "count": 12 }),
+            serde_json::json!({ "_timestamp": 5000, "fail_class": "rate_limited", "count": 10 }),
+            serde_json::json!({ "_timestamp": 5000, "fail_class": "provider_error", "count": 8 }),
+            serde_json::json!({ "_timestamp": 5000, "fail_class": "context_window_exceeded", "count": 5 }),
+            serde_json::json!({ "_timestamp": 5000, "fail_class": "unclassified", "count": 9 }),
+            // A true duplicate (same window + same class, double-processed) is dropped.
+            serde_json::json!({ "_timestamp": 5000, "fail_class": "auth_error", "count": 12 }),
+        ];
+
+        let agg = aggregate_failure_hits(&hits);
+        assert_eq!(agg.len(), 5, "all five distinct classes in the window survive");
+        assert_eq!(agg.get("auth_error"), Some(&12), "duplicate (ts,class) not double-counted");
+        assert_eq!(agg.get("rate_limited"), Some(&10));
+        assert_eq!(agg.get("provider_error"), Some(&8));
+        assert_eq!(agg.get("context_window_exceeded"), Some(&5));
+        assert_eq!(agg.get("unclassified"), Some(&9));
     }
 }
