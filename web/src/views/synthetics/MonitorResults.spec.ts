@@ -150,6 +150,7 @@ function makeWrapper() {
             "overrideMonitorName",
             "overrideRunId",
             "overrideExecutionId",
+            "overrideMonitorType",
           ],
         },
         BetaBadge: {
@@ -265,6 +266,43 @@ describe("MonitorResults", () => {
       await flushPromises();
 
       expect(wrapper.find('[data-test="run-detail"]').exists()).toBe(true);
+    });
+
+    it("should pass an empty override-monitor-type to RunDetail until fetchCheck resolves", async () => {
+      let resolveFetch: (value: any) => void;
+      mockSyntheticsServiceGet.mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveFetch = resolve;
+          }),
+      );
+
+      wrapper = makeWrapper();
+      await flushPromises();
+
+      // fetchCheck() hasn't settled yet — RunDetail must not receive the
+      // possibly-stale "browser" default.
+      let runDetail = wrapper.findComponent('[data-test="run-detail"]');
+      expect(runDetail.props("overrideMonitorType")).toBe("");
+
+      resolveFetch!({ data: { type: "api", last_triggered_at: 0 } });
+      await flushPromises();
+
+      // fetchCheck() has now resolved with the real type.
+      runDetail = wrapper.findComponent('[data-test="run-detail"]');
+      expect(runDetail.props("overrideMonitorType")).toBe("api");
+    });
+
+    it("should resolve override-monitor-type to the default type when fetchCheck fails with a non-404 error", async () => {
+      mockSyntheticsServiceGet.mockRejectedValueOnce({ response: { status: 500 } });
+
+      wrapper = makeWrapper();
+      await flushPromises();
+
+      // The finally block still flips checkTypeReady even on a non-404
+      // error, exposing the untouched "browser" default.
+      const runDetail = wrapper.findComponent('[data-test="run-detail"]');
+      expect(runDetail.props("overrideMonitorType")).toBe("browser");
     });
   });
 
