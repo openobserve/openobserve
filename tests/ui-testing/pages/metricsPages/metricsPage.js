@@ -91,8 +91,15 @@ export class MetricsPage {
 
         // PromQL Table Chart locators
         this.promqlTableModeSelect = page.locator('[data-test="dashboard-config-promql-table-mode"]');
+        this.promqlTableModeTrigger = page.locator('[data-test="dashboard-config-promql-table-mode-trigger"]');
         this.promqlTableModePopover = page.locator('[data-test="dashboard-config-promql-table-mode-popover"]');
         this.promqlTableModeOptions = page.locator('[data-test="dashboard-config-promql-table-mode-option"]');
+        // Per-value factory (OSelect option convention, §4) — scoped to the popover so a
+        // stale teleported copy of the option list can never be matched.
+        this.promqlTableModeOptionByValue = (value) =>
+            this.promqlTableModePopover.locator(
+                `[data-test="dashboard-config-promql-table-mode-option"][data-test-value="${value}"]`
+            );
         this.promqlTableChart = page.locator('[data-test="promql-table-chart"]');
         // TenstackTable headers — data-test="o2-table-th-<columnId>"; we walk all headers in DOM order.
         this.promqlTableHeaders = page.locator(
@@ -2398,7 +2405,7 @@ export class MetricsPage {
      * Uses OSelect's `data-test-value` per ruleset §4.
      */
     async selectPromqlTableMode(modeValue) {
-        const trigger = this.page.locator('[data-test="dashboard-config-promql-table-mode-trigger"]');
+        const trigger = this.promqlTableModeTrigger;
         await trigger.waitFor({ state: 'visible', timeout: 5000 });
         // Bound the scroll to the element's own actionability window so it can never
         // hang on the default 30s timeout if layout is momentarily unstable.
@@ -2406,9 +2413,7 @@ export class MetricsPage {
         await trigger.click();
         await this.promqlTableModePopover.waitFor({ state: 'visible', timeout: 5000 });
         // Pick the option by its data-test-value (per AGENT_RULES §4 OSelectItem stamp).
-        const optionByValue = this.page.locator(
-            `[data-test="dashboard-config-promql-table-mode-option"][data-test-value="${modeValue}"]`
-        );
+        const optionByValue = this.promqlTableModeOptionByValue(modeValue);
         await optionByValue.first().waitFor({ state: 'visible', timeout: 5000 });
         await optionByValue.first().click();
         await this.promqlTableModePopover.waitFor({ state: 'hidden', timeout: 5000 });
