@@ -282,6 +282,60 @@ mod tests {
         );
     }
 
+    // ---- AST canonicalization ----------------------------------------------
+
+    fn count_def_with_scope(scope: &str) -> SloDefinition {
+        let mut d = count_def();
+        d.sli_config = SliConfig::Count {
+            source: CountSource::SingleQuery {
+                stream: "requests".into(),
+                stream_type: "logs".into(),
+                scope: Some(scope.into()),
+                good_expr: "status_code < 500".into(),
+            },
+        };
+        d
+    }
+
+    /// §6b.4a promises the hash is over the **canonical** form — expressions
+    /// re-rendered from their AST — so that reformatting a predicate does not
+    /// masquerade as a semantic change and trigger a 90-day rebuild.
+    #[test]
+    fn whitespace_only_predicate_edits_hash_identically() {
+        let a = count_def_with_scope("service = 'checkout'");
+        let b = count_def_with_scope("service   =    'checkout'");
+        assert_eq!(
+            definition_hash(&a),
+            definition_hash(&b),
+            "reformatting must not look like a semantic change"
+        );
+    }
+
+    #[test]
+    fn whitespace_only_predicate_edits_do_not_force_a_rebuild() {
+        let a = count_def_with_scope("service = 'checkout'");
+        let b = count_def_with_scope("  service = 'checkout'  ");
+        assert!(
+            !requires_new_generation(&a, &b),
+            "a cosmetic edit must not rebuild 90 days of history"
+        );
+    }
+
+    #[test]
+    fn a_semantic_predicate_edit_still_forces_a_rebuild() {
+        let a = count_def_with_scope("service = 'checkout'");
+        let b = count_def_with_scope("service = 'cart'");
+        assert!(requires_new_generation(&a, &b));
+    }
+
+    /// Canonicalization must not go so far as to erase meaning: these differ.
+    #[test]
+    fn logically_distinct_predicates_do_not_collide() {
+        let a = count_def_with_scope("a = 1 AND b = 2");
+        let b = count_def_with_scope("a = 1 OR b = 2");
+        assert_ne!(definition_hash(&a), definition_hash(&b));
+    }
+
     // ---- the CAS fence -----------------------------------------------------
 
     #[test]

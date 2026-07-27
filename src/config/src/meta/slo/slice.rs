@@ -53,7 +53,7 @@ pub struct SliceRow {
 }
 
 /// The commit state a reader checks rows against (§6b.4a).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CommitMarks {
     /// Forward barrier: rows at or after this are invisible.
     pub watermark_end: i64,
@@ -65,6 +65,15 @@ pub struct CommitMarks {
     /// Highest committed batch of the backfill writer, which owns
     /// `slice_start < reset_time`.
     pub committed_batch_rev_bf: i64,
+    /// Batches that were written but never committed and have since been
+    /// explicitly **abandoned** (D63). Their rows are invisible forever,
+    /// regardless of revision and regardless of whether anything replaced
+    /// them.
+    ///
+    /// Small and prunable: an entry can be dropped once retention has removed
+    /// every row carrying that number. Without it, a torn batch is published
+    /// the moment the high-water mark moves past its number.
+    pub abandoned_batch_revs: Vec<i64>,
 }
 
 /// Whether a row is visible to readers — the full two-sided barrier.
@@ -167,19 +176,36 @@ pub struct PendingBatch {
 /// any torn predecessor.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BatchPlan {
-    /// The number this attempt writes under. A torn batch's number is
-    /// **reused**, never skipped — so its orphans and the repair's rows share
-    /// a number and are separated by revision alone.
+    /// A **fresh** number — a torn batch's number is never reused (D63).
     pub batch_rev: i64,
     pub start: i64,
     pub end: i64,
-    /// Bypass write-on-change, so every key in the torn range gets a fresh
-    /// higher revision.
+    /// Bypass write-on-change so the repair re-establishes every key in the
+    /// torn range at this batch, rather than leaving keys represented only by
+    /// rows from a batch that is about to become invisible.
     pub force_emit: bool,
+    /// The torn batch to record as abandoned, in the same transaction that
+    /// commits this one.
+    pub abandon: Option<i64>,
 }
 
 /// Reconcile the range a pass wants with the repair a torn predecessor
-/// requires (D62).
+/// requires (D62, amended by D63).
+///
+/// An earlier version had the repair **reuse** the torn number, relying on the
+/// repair writing a higher revision for every affected key. That is not
+/// mechanically enforceable, for two reasons found in review:
+///
+/// * the retry cannot infer what revision the crashed attempt reached — the metadata that would
+///   have recorded it is exactly what failed to commit, so the retry would naturally allocate the
+///   *same* revision and produce an unbroken tie; and
+/// * force-emission cannot supersede an orphan whose correct replacement is **no row at all** — an
+///   uncovered time-slice bucket, or a key no longer in the active group set. `SliceRow` has no
+///   tombstone, so that orphan would remain the only row for its key and win by default.
+///
+/// Abandoning the number instead removes both problems: the torn rows are
+/// invisible because of *which batch wrote them*, not because something
+/// outranked them, so "the correct answer is no row" needs no representation.
 pub fn plan_batch(
     committed_batch_rev: i64,
     pending: Option<PendingBatch>,
@@ -187,6 +213,13 @@ pub fn plan_batch(
 ) -> BatchPlan {
     let _ = (committed_batch_rev, pending, desired);
     todo!("slice::plan_batch")
+}
+
+/// Whether an abandoned-batch entry can be dropped: no row carrying that
+/// number can still be within retention.
+pub fn abandonment_is_prunable(abandoned_batch_rev: i64, oldest_retained_batch_rev: i64) -> bool {
+    let _ = (abandoned_batch_rev, oldest_retained_batch_rev);
+    todo!("slice::abandonment_is_prunable")
 }
 
 /// Why an observation may not be persisted as a slice.
@@ -235,6 +268,7 @@ mod tests {
             reset_time: 5_000,
             committed_batch_rev_incr: 100,
             committed_batch_rev_bf: 50,
+            abandoned_batch_revs: vec![],
         }
     }
 
@@ -597,7 +631,7 @@ mod tests {
         );
     }
 
-    // ---- the batch manifest and repair protocol (D62) ----------------------
+    // ---- the batch manifest and repair protocol (D62/D63) ------------------
 
     fn torn(batch_rev: i64, start: i64, end: i64) -> PendingBatch {
         PendingBatch {
@@ -614,22 +648,23 @@ mod tests {
         assert_eq!(plan.batch_rev, 101);
         assert_eq!((plan.start, plan.end), (9_000, 9_900));
         assert!(!plan.force_emit);
+        assert_eq!(plan.abandon, None);
     }
 
-    /// A torn batch's number is REUSED. Skipping it is what retroactively
-    /// publishes its orphans when the mark later moves past.
+    /// D63, correcting D62: the torn number is **abandoned**, not reused.
+    /// Reuse relied on the repair out-revising every orphan, which the retry
+    /// cannot guarantee — it has no durable record of what revision the
+    /// crashed attempt reached.
     #[test]
-    fn a_torn_batch_number_is_reused_not_skipped() {
+    fn a_torn_batch_is_abandoned_and_a_fresh_number_allocated() {
         let plan = plan_batch(100, Some(torn(101, 8_700, 9_300)), (9_600, 9_900));
-        assert_eq!(
-            plan.batch_rev, 101,
-            "the repair must write under the torn number"
-        );
+        assert_eq!(plan.abandon, Some(101));
+        assert_eq!(plan.batch_rev, 102, "the torn number must not be reused");
     }
 
     /// The decisive case: recovery slower than the K-slice recompute window.
     /// The natural range has slid past the torn slices, so the plan must widen
-    /// to cover them or they are never repaired.
+    /// or those keys are never re-established under a visible batch.
     #[test]
     fn a_repair_covers_the_torn_range_even_after_the_window_slid_past() {
         let plan = plan_batch(100, Some(torn(101, 8_700, 9_300)), (10_200, 11_100));
@@ -648,10 +683,7 @@ mod tests {
     #[test]
     fn a_repair_forces_re_emission() {
         let plan = plan_batch(100, Some(torn(101, 8_700, 9_300)), (9_600, 9_900));
-        assert!(
-            plan.force_emit,
-            "an unchanged value must still be re-emitted during a repair"
-        );
+        assert!(plan.force_emit);
     }
 
     #[test]
@@ -660,35 +692,101 @@ mod tests {
         assert_eq!((plan.start, plan.end), (8_700, 9_900));
     }
 
-    /// End-to-end statement of the P0 this protocol exists to close: an orphan
-    /// from a torn attempt must never be the winning revision for its key.
-    #[test]
-    fn an_orphan_never_wins_after_the_repair_commits() {
-        // Committed state: slice 9000 at rev 4, batch 100.
-        let committed = row("g", 9_000, 10.0, 10.0, 4, 100);
-        // Torn attempt: batch 101 wrote a higher revision, then crashed.
-        let orphan = row("g", 9_000, 10.0, 12.0, 5, 101);
+    // ---- abandonment is what actually hides the orphans --------------------
 
-        // Recovery happens after the natural window has moved on.
+    #[test]
+    fn an_abandoned_batchs_rows_are_invisible_even_below_the_mark() {
+        let m = CommitMarks {
+            committed_batch_rev_incr: 102,
+            abandoned_batch_revs: vec![101],
+            ..marks()
+        };
+        assert!(
+            !is_visible(&row("g", 9_000, 1.0, 1.0, 5, 101), &m),
+            "101 <= 102 but 101 was abandoned"
+        );
+        assert!(is_visible(&row("g", 9_000, 1.0, 1.0, 4, 100), &m));
+        assert!(is_visible(&row("g", 9_000, 1.0, 1.0, 6, 102), &m));
+    }
+
+    /// The case reuse-plus-force-emit could not cover: the correct outcome for
+    /// this key is **no row at all** (an uncovered time-slice bucket, or a key
+    /// that left the active set). Force-emission has nothing to emit, so under
+    /// the old protocol the orphan stayed the only row and won by default.
+    /// Abandonment hides it for being from the wrong batch, so "no row" needs
+    /// no representation.
+    #[test]
+    fn an_orphan_disappears_even_when_nothing_replaces_it() {
+        let m = CommitMarks {
+            committed_batch_rev_incr: 102,
+            abandoned_batch_revs: vec![101],
+            ..marks()
+        };
+        let orphan_only = vec![row("ghost", 9_000, 300.0, 300.0, 5, 101)];
+        assert!(
+            visible_slices(orphan_only, &m, 1).is_empty(),
+            "a key represented ONLY by a torn batch must vanish, not survive"
+        );
+    }
+
+    /// End-to-end statement of the P0: after a crash and repair, no orphan is
+    /// observable — by revision or by default.
+    #[test]
+    fn no_orphan_survives_a_crash_and_repair() {
+        // Committed: slice 9000 at batch 100.
+        let committed = row("g", 9_000, 10.0, 10.0, 4, 100);
+        // Torn attempt 101 rewrote it, and also wrote a key that the repair
+        // will find no longer has any value at all.
+        let orphan_rewrite = row("g", 9_000, 10.0, 12.0, 5, 101);
+        let orphan_ghost = row("ghost", 9_000, 300.0, 300.0, 5, 101);
+
+        // Recovery, after the natural window has moved on.
         let plan = plan_batch(100, Some(torn(101, 9_000, 9_300)), (10_200, 11_100));
+        assert_eq!(plan.abandon, Some(101));
         assert!(plan.start <= 9_000 && plan.end > 9_000);
         assert!(plan.force_emit);
 
-        // The repair re-emits the key under the SAME batch number, at a higher
-        // revision than the orphan.
-        let repaired = row("g", 9_000, 10.0, 12.0, 6, plan.batch_rev);
-        assert_eq!(repaired.batch_rev, orphan.batch_rev);
-        assert!(repaired.rev > orphan.rev);
+        // The repair re-establishes the real key under the new batch. It emits
+        // nothing for `ghost`, which is correct and now safe.
+        let repaired = row("g", 9_000, 10.0, 12.0, 5, plan.batch_rev);
 
-        // After the repair commits, both are visible — and the repair wins.
-        let marks = CommitMarks {
+        let m = CommitMarks {
             watermark_end: 12_000,
             reset_time: 0,
             committed_batch_rev_incr: plan.batch_rev,
             committed_batch_rev_bf: 0,
+            abandoned_batch_revs: vec![plan.abandon.unwrap()],
         };
-        let out = visible_slices(vec![committed, orphan, repaired.clone()], &marks, 1);
-        assert_eq!(out.len(), 1);
-        assert_eq!(out[0], repaired, "the repair must win, not the orphan");
+        let out = visible_slices(
+            vec![committed, orphan_rewrite, orphan_ghost, repaired.clone()],
+            &m,
+            1,
+        );
+        assert_eq!(out.len(), 1, "only the repaired row should survive");
+        assert_eq!(out[0], repaired);
+    }
+
+    /// The repair does not need to out-revise the orphan, which is the whole
+    /// point — it cannot know what revision the crashed attempt reached.
+    #[test]
+    fn the_repair_need_not_outrank_the_orphans_revision() {
+        let m = CommitMarks {
+            committed_batch_rev_incr: 102,
+            abandoned_batch_revs: vec![101],
+            ..marks()
+        };
+        let orphan = row("g", 9_000, 1.0, 1.0, 99, 101); // absurdly high rev
+        let repair = row("g", 9_000, 2.0, 2.0, 5, 102); // lower rev, newer batch
+        let out = visible_slices(vec![orphan, repair.clone()], &m, 1);
+        assert_eq!(out, vec![repair]);
+    }
+
+    // ---- pruning the abandoned set -----------------------------------------
+
+    #[test]
+    fn an_abandonment_is_prunable_once_its_rows_have_aged_out() {
+        assert!(abandonment_is_prunable(101, 150));
+        assert!(!abandonment_is_prunable(101, 100));
+        assert!(!abandonment_is_prunable(101, 101));
     }
 }

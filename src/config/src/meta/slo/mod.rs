@@ -242,6 +242,10 @@ pub enum SloValidationError {
     GroupedRequiresCoarseSlice { slice_interval_secs: i64 },
     /// A time-slice comparator must have a severity direction.
     ComparatorNotOrderable(Operator),
+    /// A time-slice threshold must be a finite number — `NaN` compares false
+    /// against every value, so every slice classifies bad; `±inf` classifies
+    /// every slice the same way in the other direction.
+    ThresholdNotFinite(f64),
     /// The `alert` SLI type is gated on the S-16 availability ledger.
     AlertSliNotAvailable,
 }
@@ -274,6 +278,9 @@ impl std::fmt::Display for SloValidationError {
                 f,
                 "time-slice comparator `{op}` has no severity direction; use >, >=, < or <="
             ),
+            Self::ThresholdNotFinite(v) => {
+                write!(f, "time-slice threshold {v} must be a finite number")
+            }
             Self::AlertSliNotAvailable => f.write_str(
                 "the alert-based SLI type requires the measurement-availability ledger (S-16)",
             ),
@@ -364,20 +371,66 @@ impl std::fmt::Display for QuerySafetyError {
 
 impl std::error::Error for QuerySafetyError {}
 
-/// Parse a boolean predicate fragment (`scope`, `good_expr`) and re-render it
-/// from its AST.
+/// A user predicate that has been parsed and checked, carried as an **AST**
+/// rather than a string.
 ///
-/// The returned string — not the input — is what reaches the generated SQL.
-/// This is the whole safety boundary: a fragment that round-trips through a
-/// parser cannot smuggle a statement separator, a second statement, or a
-/// subquery past it.
-pub fn parse_predicate(field: &'static str, fragment: &str) -> Result<String, QuerySafetyError> {
+/// The distinction is the safety boundary. Returning a re-rendered `String`
+/// re-invites exactly what parsing was meant to prevent: the caller has to
+/// splice text into generated SQL, and every splice is a place to get operator
+/// precedence or quoting wrong. Holding the AST means the time bound and the
+/// user predicate are combined structurally — `AND`-ing two expression nodes —
+/// so a user predicate of `a = 1 OR b = 2` cannot silently widen the range
+/// filter the way `"{time} AND {user}"` string concatenation would.
+///
+/// Deliberately opaque: there is no public constructor from a string other
+/// than [`parse_predicate`], so an unvalidated fragment cannot be smuggled in.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ValidatedPredicate {
+    /// Rendering is for display and round-trip tests only — never for building
+    /// the query.
+    rendered: String,
+}
+
+impl ValidatedPredicate {
+    /// Display form. Not a query-construction primitive.
+    pub fn as_display(&self) -> &str {
+        &self.rendered
+    }
+}
+
+/// Parse a boolean predicate fragment (`scope`, `good_expr`) into a
+/// [`ValidatedPredicate`].
+///
+/// A fragment that round-trips through a parser cannot smuggle a statement
+/// separator, a second statement, or a subquery past it.
+pub fn parse_predicate(
+    field: &'static str,
+    fragment: &str,
+) -> Result<ValidatedPredicate, QuerySafetyError> {
     let _ = (field, fragment);
     todo!("parse_predicate")
 }
 
+/// Combine a slice-range bound with an optional user predicate **structurally**
+/// (`bound AND (user)`), preserving the user predicate's internal precedence.
+///
+/// This is the only supported way to apply a predicate to a generated query.
+pub fn conjoin_time_bound(
+    start_secs: i64,
+    end_secs: i64,
+    predicate: Option<&ValidatedPredicate>,
+) -> String {
+    let _ = (start_secs, end_secs, predicate);
+    todo!("conjoin_time_bound")
+}
+
 /// Validate a dual-query member: SELECT-only, and projecting exactly
 /// `slice_start`, the `group_by` columns, and one numeric `zo_slo_value`.
+///
+/// `slice_interval_secs` is required because the `histogram()` bucket width
+/// must equal the SLO's configured slice interval — a query bucketing at a
+/// different width produces rows that do not line up with the slice grid, and
+/// every coverage denominator downstream is computed from that grid.
 ///
 /// Returns the query's key columns, so the caller can compare the numerator's
 /// against the denominator's.
@@ -385,8 +438,9 @@ pub fn validate_count_query(
     field: &'static str,
     query: &CountQuery,
     group_by: &[String],
+    slice_interval_secs: i64,
 ) -> Result<Vec<String>, QuerySafetyError> {
-    let _ = (field, query, group_by);
+    let _ = (field, query, group_by, slice_interval_secs);
     todo!("validate_count_query")
 }
 
@@ -403,8 +457,9 @@ pub fn language_suits_stream(
 pub fn validate_query_safety(
     sli_config: &SliConfig,
     group_by: &[String],
+    slice_interval_secs: i64,
 ) -> Result<(), QuerySafetyError> {
-    let _ = (sli_config, group_by);
+    let _ = (sli_config, group_by, slice_interval_secs);
     todo!("validate_query_safety")
 }
 
@@ -417,7 +472,7 @@ pub fn validate_query_safety(
 /// 2. `window_secs` is a supported rolling window (S-3)
 /// 3. `slice_interval_secs` is 60 or 300 (S-4)
 /// 4. grouped SLOs are pinned to 300s slices (D30)
-/// 5. SLI-type specifics: comparator orderability, the S-16 gate
+/// 5. SLI-type specifics: comparator orderability, threshold finiteness, the S-16 gate
 pub fn validate_slo(
     definition: &SloDefinition,
     target: f64,
@@ -777,8 +832,44 @@ mod tests {
     #[test]
     fn a_plain_predicate_parses_and_round_trips() {
         let out = parse_predicate("good_expr", "status_code < 500").unwrap();
-        assert!(out.contains("status_code"));
-        assert!(out.contains("500"));
+        assert!(out.as_display().contains("status_code"));
+        assert!(out.as_display().contains("500"));
+    }
+
+    // ---- structural composition, not string splicing -----------------------
+
+    /// The reason a predicate is carried as an AST. `"{time} AND {user}"`
+    /// string concatenation with a user predicate of `a = 1 OR b = 2` binds as
+    /// `(time AND a = 1) OR b = 2`, which silently escapes the slice range —
+    /// rows outside `[start, end)` land in the batch.
+    #[test]
+    fn an_or_predicate_cannot_escape_the_time_bound() {
+        let p = parse_predicate("scope", "a = 1 OR b = 2").unwrap();
+        let sql = conjoin_time_bound(1_000, 2_000, Some(&p));
+        let or_pos = sql.find(" OR ").expect("the user predicate is present");
+        let close = sql[or_pos..]
+            .find(')')
+            .expect("the user predicate must be parenthesised");
+        assert!(close > 0, "OR must be enclosed, not left at top level");
+        // And both bounds survive.
+        assert!(sql.contains("1000") && sql.contains("2000"));
+    }
+
+    #[test]
+    fn a_time_bound_alone_is_well_formed() {
+        let sql = conjoin_time_bound(1_000, 2_000, None);
+        assert!(sql.contains("1000") && sql.contains("2000"));
+        assert!(!sql.contains("AND ()"), "no empty conjunct: {sql}");
+    }
+
+    #[test]
+    fn the_time_bound_is_half_open() {
+        let sql = conjoin_time_bound(1_000, 2_000, None);
+        assert!(sql.contains(">="), "start is inclusive: {sql}");
+        assert!(
+            sql.contains('<') && !sql.contains("<= 2000"),
+            "end must be exclusive: {sql}"
+        );
     }
 
     #[test]
@@ -866,6 +957,7 @@ mod tests {
                  count(*) AS zo_slo_value FROM requests GROUP BY slice_start, region",
             ),
             &["region".to_string()],
+            300,
         )
         .unwrap();
         assert_eq!(keys, vec!["slice_start".to_string(), "region".to_string()]);
@@ -874,7 +966,7 @@ mod tests {
     #[test]
     fn a_dual_query_member_that_is_not_a_select_is_rejected() {
         assert!(matches!(
-            validate_count_query("good", &cq("DELETE FROM requests"), &[]),
+            validate_count_query("good", &cq("DELETE FROM requests"), &[], 300),
             Err(QuerySafetyError::NotSelectOnly { .. })
         ));
     }
@@ -885,7 +977,8 @@ mod tests {
             validate_count_query(
                 "good",
                 &cq("SELECT histogram(_timestamp, '5 minute') AS slice_start FROM requests"),
-                &[]
+                &[],
+                300
             ),
             Err(QuerySafetyError::ProjectionMismatch { .. })
         ));
@@ -897,7 +990,8 @@ mod tests {
             validate_count_query(
                 "good",
                 &cq("SELECT count(*) AS zo_slo_value FROM requests"),
-                &[]
+                &[],
+                300
             ),
             Err(QuerySafetyError::ProjectionMismatch { .. })
         ));
@@ -910,7 +1004,8 @@ mod tests {
                 "good",
                 &cq("SELECT histogram(_timestamp, '5 minute') AS slice_start, \
                      count(*) AS zo_slo_value FROM requests"),
-                &["region".to_string()]
+                &["region".to_string()],
+                300
             ),
             Err(QuerySafetyError::ProjectionMismatch { .. })
         ));
@@ -925,7 +1020,8 @@ mod tests {
                 "good",
                 &cq("SELECT histogram(_timestamp, '5 minute') AS slice_start, \
                      count(*) AS zo_slo_value, now() AS surprise FROM requests"),
-                &[]
+                &[],
+                300
             ),
             Err(QuerySafetyError::ProjectionMismatch { .. })
         ));
@@ -947,8 +1043,68 @@ mod tests {
             },
         };
         assert!(matches!(
-            validate_query_safety(&cfg, &["region".to_string()]),
+            validate_query_safety(&cfg, &["region".to_string()], 300),
             Err(QuerySafetyError::KeySchemaMismatch { .. })
+        ));
+    }
+
+    /// The bucket width must equal the SLO's slice interval, or the rows do
+    /// not line up with the grid every coverage denominator is computed from.
+    #[test]
+    fn a_histogram_interval_other_than_the_slice_interval_is_rejected() {
+        assert!(matches!(
+            validate_count_query(
+                "good",
+                &cq("SELECT histogram(_timestamp, '1 minute') AS slice_start, \
+                     count(*) AS zo_slo_value FROM requests GROUP BY slice_start"),
+                &[],
+                300
+            ),
+            Err(QuerySafetyError::ProjectionMismatch { .. })
+        ));
+    }
+
+    #[test]
+    fn the_matching_histogram_interval_is_accepted_for_both_slice_widths() {
+        assert!(
+            validate_count_query(
+                "good",
+                &cq("SELECT histogram(_timestamp, '1 minute') AS slice_start, \
+                     count(*) AS zo_slo_value FROM requests GROUP BY slice_start"),
+                &[],
+                60
+            )
+            .is_ok()
+        );
+    }
+
+    #[test]
+    fn a_query_grouping_by_the_wrong_columns_is_rejected() {
+        assert!(matches!(
+            validate_count_query(
+                "good",
+                &cq(
+                    "SELECT histogram(_timestamp, '5 minute') AS slice_start, region, \
+                     count(*) AS zo_slo_value FROM requests GROUP BY slice_start"
+                ),
+                &["region".to_string()],
+                300
+            ),
+            Err(QuerySafetyError::ProjectionMismatch { .. })
+        ));
+    }
+
+    #[test]
+    fn a_non_numeric_zo_slo_value_is_rejected() {
+        assert!(matches!(
+            validate_count_query(
+                "good",
+                &cq("SELECT histogram(_timestamp, '5 minute') AS slice_start, \
+                     service AS zo_slo_value FROM requests GROUP BY slice_start, service"),
+                &[],
+                300
+            ),
+            Err(QuerySafetyError::ProjectionMismatch { .. })
         ));
     }
 
@@ -985,7 +1141,7 @@ mod tests {
                 good_expr: "status_code < 500".into(),
             },
         };
-        assert!(validate_query_safety(&bad, &[]).is_err());
+        assert!(validate_query_safety(&bad, &[], 300).is_err());
 
         let good = SliConfig::Count {
             source: CountSource::SingleQuery {
@@ -995,7 +1151,7 @@ mod tests {
                 good_expr: "status_code < 500".into(),
             },
         };
-        assert_eq!(validate_query_safety(&good, &[]), Ok(()));
+        assert_eq!(validate_query_safety(&good, &[], 300), Ok(()));
     }
 
     #[test]
@@ -1010,9 +1166,57 @@ mod tests {
             threshold: 500.0,
         };
         assert!(matches!(
-            validate_query_safety(&cfg, &[]),
+            validate_query_safety(&cfg, &[], 300),
             Err(QuerySafetyError::LanguageNotValidForStream { .. })
         ));
+    }
+
+    // ---- time-slice threshold finiteness ------------------------------------
+
+    /// The threshold decides whether every bucket is good or bad. `NaN`
+    /// compares false against everything, so every slice classifies bad;
+    /// `±inf` classifies every slice the same way in the other direction.
+    /// Either way the SLO reports a confident, uniform, wrong answer.
+    #[test]
+    fn a_non_finite_time_slice_threshold_is_rejected() {
+        for bad in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            let cfg = SliConfig::TimeSlice {
+                stream: "requests".into(),
+                stream_type: "logs".into(),
+                query_language: QueryLanguage::Sql,
+                query: "SELECT p95(duration_ms) AS zo_slo_value".into(),
+                scope: None,
+                comparator: Operator::LessThan,
+                threshold: bad,
+            };
+            let d = def(cfg, None, SLICE_60_SECS);
+            assert_eq!(
+                validate_slo(&d, 99.9, false),
+                Err(SloValidationError::ThresholdNotFinite(bad)),
+                "threshold {bad} accepted"
+            );
+        }
+    }
+
+    #[test]
+    fn a_finite_time_slice_threshold_is_accepted() {
+        for ok in [0.0, -5.0, 500.0, 1e9] {
+            let cfg = SliConfig::TimeSlice {
+                stream: "requests".into(),
+                stream_type: "logs".into(),
+                query_language: QueryLanguage::Sql,
+                query: "SELECT p95(duration_ms) AS zo_slo_value".into(),
+                scope: None,
+                comparator: Operator::LessThan,
+                threshold: ok,
+            };
+            let d = def(cfg, None, SLICE_60_SECS);
+            assert_eq!(
+                validate_slo(&d, 99.9, false),
+                Ok(()),
+                "threshold {ok} rejected"
+            );
+        }
     }
 
     // ---- target edge cases --------------------------------------------------
