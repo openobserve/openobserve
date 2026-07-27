@@ -292,6 +292,122 @@ pub const WINDOW_90D_SECS: i64 = 90 * 86_400;
 pub const SLICE_60_SECS: i64 = 60;
 pub const SLICE_300_SECS: i64 = 300;
 
+/// Why a user-supplied SQL fragment or query was rejected (§6b.7).
+///
+/// These fragments are re-rendered from a parsed AST and never
+/// string-interpolated into the generated query, so anything that does not
+/// parse to the expected shape must fail **at save**, not at ingest.
+#[derive(Debug, Clone, PartialEq)]
+pub enum QuerySafetyError {
+    /// Did not parse at all.
+    Unparseable { field: &'static str },
+    /// A predicate must be exactly one boolean expression — not a statement,
+    /// not several.
+    NotASingleExpression { field: &'static str },
+    /// Statement separators, which would let a fragment append a second
+    /// statement to the generated query.
+    ContainsStatementSeparator { field: &'static str },
+    /// Subqueries are not permitted in a scope or good-expression fragment.
+    ContainsSubquery { field: &'static str },
+    /// A function outside the allowlist.
+    FunctionNotAllowed { field: &'static str, name: String },
+    /// A dual-query member must be a single SELECT.
+    NotSelectOnly { field: &'static str },
+    /// The query must project `slice_start`, every `group_by` column, and
+    /// exactly one numeric `zo_slo_value` — nothing else.
+    ProjectionMismatch { field: &'static str, detail: String },
+    /// The numerator and denominator must agree on their key schema, or the
+    /// join that pairs them is undefined.
+    KeySchemaMismatch {
+        good: Vec<String>,
+        total: Vec<String>,
+    },
+    /// The query language must suit the stream type.
+    LanguageNotValidForStream {
+        stream_type: String,
+        query_language: QueryLanguage,
+    },
+}
+
+impl std::fmt::Display for QuerySafetyError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Unparseable { field } => write!(f, "{field} could not be parsed"),
+            Self::NotASingleExpression { field } => {
+                write!(f, "{field} must be exactly one boolean expression")
+            }
+            Self::ContainsStatementSeparator { field } => {
+                write!(f, "{field} must not contain a statement separator")
+            }
+            Self::ContainsSubquery { field } => write!(f, "{field} must not contain a subquery"),
+            Self::FunctionNotAllowed { field, name } => {
+                write!(f, "{field} uses function `{name}`, which is not allowed")
+            }
+            Self::NotSelectOnly { field } => write!(f, "{field} must be a single SELECT"),
+            Self::ProjectionMismatch { field, detail } => {
+                write!(f, "{field} has an invalid projection: {detail}")
+            }
+            Self::KeySchemaMismatch { good, total } => write!(
+                f,
+                "numerator keys {good:?} do not match denominator keys {total:?}"
+            ),
+            Self::LanguageNotValidForStream {
+                stream_type,
+                query_language,
+            } => write!(
+                f,
+                "{query_language:?} cannot be used against a `{stream_type}` stream"
+            ),
+        }
+    }
+}
+
+impl std::error::Error for QuerySafetyError {}
+
+/// Parse a boolean predicate fragment (`scope`, `good_expr`) and re-render it
+/// from its AST.
+///
+/// The returned string — not the input — is what reaches the generated SQL.
+/// This is the whole safety boundary: a fragment that round-trips through a
+/// parser cannot smuggle a statement separator, a second statement, or a
+/// subquery past it.
+pub fn parse_predicate(field: &'static str, fragment: &str) -> Result<String, QuerySafetyError> {
+    let _ = (field, fragment);
+    todo!("parse_predicate")
+}
+
+/// Validate a dual-query member: SELECT-only, and projecting exactly
+/// `slice_start`, the `group_by` columns, and one numeric `zo_slo_value`.
+///
+/// Returns the query's key columns, so the caller can compare the numerator's
+/// against the denominator's.
+pub fn validate_count_query(
+    field: &'static str,
+    query: &CountQuery,
+    group_by: &[String],
+) -> Result<Vec<String>, QuerySafetyError> {
+    let _ = (field, query, group_by);
+    todo!("validate_count_query")
+}
+
+/// Whether a query language can address a stream type.
+pub fn language_suits_stream(
+    stream_type: &str,
+    query_language: QueryLanguage,
+) -> Result<(), QuerySafetyError> {
+    let _ = (stream_type, query_language);
+    todo!("language_suits_stream")
+}
+
+/// Full query-safety validation for an SLI config (§6b.7), run at save.
+pub fn validate_query_safety(
+    sli_config: &SliConfig,
+    group_by: &[String],
+) -> Result<(), QuerySafetyError> {
+    let _ = (sli_config, group_by);
+    todo!("validate_query_safety")
+}
+
 /// Validate an SLO definition and target at save time.
 ///
 /// **Check order is part of the contract** — several inputs violate more than
@@ -328,8 +444,8 @@ mod tests {
 
     fn time_slice_config(comparator: Operator) -> SliConfig {
         SliConfig::TimeSlice {
-            stream: "http_metrics".into(),
-            stream_type: "metrics".into(),
+            stream: "requests".into(),
+            stream_type: "logs".into(),
             query_language: QueryLanguage::Sql,
             query: "SELECT p95(duration_ms) AS zo_slo_value".into(),
             scope: None,
@@ -652,6 +768,263 @@ mod tests {
     #[test]
     fn a_missing_content_block_fails_to_deserialize() {
         assert!(serde_json::from_str::<SliConfig>(r#"{"sli_type":"time_slice"}"#).is_err());
+    }
+
+    // ---- query safety (§6b.7) ----------------------------------------------
+
+    /// The safety boundary is "parse, then re-render from the AST". A fragment
+    /// that survives that cannot smuggle anything into the generated SQL.
+    #[test]
+    fn a_plain_predicate_parses_and_round_trips() {
+        let out = parse_predicate("good_expr", "status_code < 500").unwrap();
+        assert!(out.contains("status_code"));
+        assert!(out.contains("500"));
+    }
+
+    #[test]
+    fn a_statement_separator_is_rejected() {
+        assert!(matches!(
+            parse_predicate("scope", "a = 1; DROP TABLE users"),
+            Err(QuerySafetyError::ContainsStatementSeparator { .. })
+                | Err(QuerySafetyError::NotASingleExpression { .. })
+        ));
+    }
+
+    #[test]
+    fn a_trailing_separator_alone_is_still_rejected() {
+        assert!(parse_predicate("scope", "a = 1;").is_err());
+    }
+
+    #[test]
+    fn several_expressions_are_rejected() {
+        assert!(matches!(
+            parse_predicate("scope", "a = 1, b = 2"),
+            Err(QuerySafetyError::NotASingleExpression { .. })
+                | Err(QuerySafetyError::Unparseable { .. })
+        ));
+    }
+
+    #[test]
+    fn a_subquery_in_a_predicate_is_rejected() {
+        assert!(matches!(
+            parse_predicate("scope", "a IN (SELECT id FROM other)"),
+            Err(QuerySafetyError::ContainsSubquery { .. })
+        ));
+    }
+
+    #[test]
+    fn a_non_boolean_fragment_is_rejected() {
+        // A bare column is not a predicate.
+        assert!(parse_predicate("good_expr", "status_code").is_err());
+    }
+
+    #[test]
+    fn garbage_is_rejected_rather_than_passed_through() {
+        assert!(matches!(
+            parse_predicate("scope", "))) not sql ((("),
+            Err(QuerySafetyError::Unparseable { .. })
+        ));
+    }
+
+    #[test]
+    fn an_allowlisted_function_is_accepted() {
+        assert!(parse_predicate("scope", "lower(service) = 'checkout'").is_ok());
+    }
+
+    #[test]
+    fn a_function_outside_the_allowlist_is_rejected() {
+        assert!(matches!(
+            parse_predicate("scope", "pg_sleep(10) IS NOT NULL"),
+            Err(QuerySafetyError::FunctionNotAllowed { .. })
+        ));
+    }
+
+    /// An empty scope means "all rows" and must not be forced through the
+    /// parser as an empty predicate.
+    #[test]
+    fn an_empty_predicate_is_rejected_rather_than_treated_as_true() {
+        assert!(parse_predicate("scope", "").is_err());
+        assert!(parse_predicate("scope", "   ").is_err());
+    }
+
+    // ---- dual-query projection contract ------------------------------------
+
+    fn cq(sql: &str) -> CountQuery {
+        CountQuery {
+            stream: "requests".into(),
+            stream_type: "logs".into(),
+            sql: sql.into(),
+        }
+    }
+
+    #[test]
+    fn a_conforming_dual_query_member_is_accepted() {
+        let keys = validate_count_query(
+            "good",
+            &cq(
+                "SELECT histogram(_timestamp, '5 minute') AS slice_start, region, \
+                 count(*) AS zo_slo_value FROM requests GROUP BY slice_start, region",
+            ),
+            &["region".to_string()],
+        )
+        .unwrap();
+        assert_eq!(keys, vec!["slice_start".to_string(), "region".to_string()]);
+    }
+
+    #[test]
+    fn a_dual_query_member_that_is_not_a_select_is_rejected() {
+        assert!(matches!(
+            validate_count_query("good", &cq("DELETE FROM requests"), &[]),
+            Err(QuerySafetyError::NotSelectOnly { .. })
+        ));
+    }
+
+    #[test]
+    fn a_dual_query_member_missing_zo_slo_value_is_rejected() {
+        assert!(matches!(
+            validate_count_query(
+                "good",
+                &cq("SELECT histogram(_timestamp, '5 minute') AS slice_start FROM requests"),
+                &[]
+            ),
+            Err(QuerySafetyError::ProjectionMismatch { .. })
+        ));
+    }
+
+    #[test]
+    fn a_dual_query_member_missing_slice_start_is_rejected() {
+        assert!(matches!(
+            validate_count_query(
+                "good",
+                &cq("SELECT count(*) AS zo_slo_value FROM requests"),
+                &[]
+            ),
+            Err(QuerySafetyError::ProjectionMismatch { .. })
+        ));
+    }
+
+    #[test]
+    fn a_dual_query_member_missing_a_group_by_column_is_rejected() {
+        assert!(matches!(
+            validate_count_query(
+                "good",
+                &cq("SELECT histogram(_timestamp, '5 minute') AS slice_start, \
+                     count(*) AS zo_slo_value FROM requests"),
+                &["region".to_string()]
+            ),
+            Err(QuerySafetyError::ProjectionMismatch { .. })
+        ));
+    }
+
+    /// Extra projected columns are rejected too — the ingest job writes a
+    /// fixed row shape, so anything unexpected is silently dropped otherwise.
+    #[test]
+    fn a_dual_query_member_projecting_extra_columns_is_rejected() {
+        assert!(matches!(
+            validate_count_query(
+                "good",
+                &cq("SELECT histogram(_timestamp, '5 minute') AS slice_start, \
+                     count(*) AS zo_slo_value, now() AS surprise FROM requests"),
+                &[]
+            ),
+            Err(QuerySafetyError::ProjectionMismatch { .. })
+        ));
+    }
+
+    /// Without a matching key schema the join that pairs numerator to
+    /// denominator is undefined — good/total would be combined across
+    /// different groups.
+    #[test]
+    fn dual_queries_with_different_key_schemas_are_rejected() {
+        let cfg = SliConfig::Count {
+            source: CountSource::DualQuery {
+                good: cq(
+                    "SELECT histogram(_timestamp, '5 minute') AS slice_start, region, \
+                          count(*) AS zo_slo_value FROM a GROUP BY slice_start, region",
+                ),
+                total: cq("SELECT histogram(_timestamp, '5 minute') AS slice_start, \
+                           count(*) AS zo_slo_value FROM b GROUP BY slice_start"),
+            },
+        };
+        assert!(matches!(
+            validate_query_safety(&cfg, &["region".to_string()]),
+            Err(QuerySafetyError::KeySchemaMismatch { .. })
+        ));
+    }
+
+    // ---- stream / language compatibility -----------------------------------
+
+    #[test]
+    fn sql_addresses_a_logs_stream() {
+        assert_eq!(language_suits_stream("logs", QueryLanguage::Sql), Ok(()));
+    }
+
+    #[test]
+    fn promql_addresses_a_metrics_stream() {
+        assert_eq!(
+            language_suits_stream("metrics", QueryLanguage::PromQl),
+            Ok(())
+        );
+    }
+
+    #[test]
+    fn promql_cannot_address_a_logs_stream() {
+        assert!(matches!(
+            language_suits_stream("logs", QueryLanguage::PromQl),
+            Err(QuerySafetyError::LanguageNotValidForStream { .. })
+        ));
+    }
+
+    #[test]
+    fn query_safety_runs_over_the_whole_sli_config() {
+        let bad = SliConfig::Count {
+            source: CountSource::SingleQuery {
+                stream: "requests".into(),
+                stream_type: "logs".into(),
+                scope: Some("a = 1; DROP TABLE users".into()),
+                good_expr: "status_code < 500".into(),
+            },
+        };
+        assert!(validate_query_safety(&bad, &[]).is_err());
+
+        let good = SliConfig::Count {
+            source: CountSource::SingleQuery {
+                stream: "requests".into(),
+                stream_type: "logs".into(),
+                scope: Some("service = 'checkout'".into()),
+                good_expr: "status_code < 500".into(),
+            },
+        };
+        assert_eq!(validate_query_safety(&good, &[]), Ok(()));
+    }
+
+    #[test]
+    fn a_time_slice_config_with_a_mismatched_language_is_rejected() {
+        let cfg = SliConfig::TimeSlice {
+            stream: "http_metrics".into(),
+            stream_type: "metrics".into(),
+            query_language: QueryLanguage::Sql,
+            query: "SELECT p95(duration_ms) AS zo_slo_value".into(),
+            scope: None,
+            comparator: Operator::LessThan,
+            threshold: 500.0,
+        };
+        assert!(matches!(
+            validate_query_safety(&cfg, &[]),
+            Err(QuerySafetyError::LanguageNotValidForStream { .. })
+        ));
+    }
+
+    // ---- target edge cases --------------------------------------------------
+
+    #[test]
+    fn a_non_finite_target_is_rejected() {
+        for bad in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            assert!(
+                validate_slo(&ungrouped(), bad, false).is_err(),
+                "target {bad} accepted"
+            );
+        }
     }
 
     // ---- is_grouped ---------------------------------------------------------

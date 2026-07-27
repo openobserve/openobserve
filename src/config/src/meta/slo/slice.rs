@@ -126,9 +126,90 @@ pub fn fill_gaps(
 /// Re-emitting unconditionally makes the trailing-K recompute cost ~K physical
 /// rows per logical slice forever — at documented defaults that was ~8 billion
 /// rows over a 90-day window.
-pub fn should_emit(previous: Option<(f64, f64)>, recomputed: (f64, f64)) -> bool {
-    let _ = (previous, recomputed);
+///
+/// `force` is set while repairing a torn batch ([`plan_batch`]): the repair
+/// MUST re-emit every key in the torn range even when the value is unchanged,
+/// or an orphan row from the failed attempt is left as the highest revision
+/// for its key.
+pub fn should_emit(previous: Option<(f64, f64)>, recomputed: (f64, f64), force: bool) -> bool {
+    let _ = (previous, recomputed, force);
     todo!("slice::should_emit")
+}
+
+/// Which writer owns a batch. The two keep independent counters, and ownership
+/// of a row is decided by `slice_start` against `reset_time` (D58).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Writer {
+    Incremental,
+    Backfill,
+}
+
+/// A batch the writer intends to publish, persisted in the meta store
+/// **before** any columnar row is written (D62).
+///
+/// This exists because the committed high-water mark alone is not a sound
+/// barrier. A pass can write rows, crash before committing, and — if recovery
+/// takes longer than the K-slice recompute window — never revisit the affected
+/// slices. The next successful pass then advances the mark *past* the torn
+/// batch's number, retroactively publishing its rows, whose higher revisions
+/// win dedupe. The manifest is what lets recovery know which range must be
+/// repaired.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PendingBatch {
+    pub batch_rev: i64,
+    /// The range the torn attempt intended to cover, `[start, end)`.
+    pub start: i64,
+    pub end: i64,
+    pub writer: Writer,
+}
+
+/// What a pass must actually do, after reconciling its desired range against
+/// any torn predecessor.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BatchPlan {
+    /// The number this attempt writes under. A torn batch's number is
+    /// **reused**, never skipped — so its orphans and the repair's rows share
+    /// a number and are separated by revision alone.
+    pub batch_rev: i64,
+    pub start: i64,
+    pub end: i64,
+    /// Bypass write-on-change, so every key in the torn range gets a fresh
+    /// higher revision.
+    pub force_emit: bool,
+}
+
+/// Reconcile the range a pass wants with the repair a torn predecessor
+/// requires (D62).
+pub fn plan_batch(
+    committed_batch_rev: i64,
+    pending: Option<PendingBatch>,
+    desired: (i64, i64),
+) -> BatchPlan {
+    let _ = (committed_batch_rev, pending, desired);
+    todo!("slice::plan_batch")
+}
+
+/// Why an observation may not be persisted as a slice.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum ObservationError {
+    /// `NaN` or `±inf`. Poisons every downstream aggregate, comparison and
+    /// serialized status value.
+    NotFinite { field: &'static str, value: f64 },
+    /// Counts and seconds cannot be negative.
+    Negative { field: &'static str, value: f64 },
+    /// More good units than total — the SLI would exceed 100%.
+    GoodExceedsTotal { good: f64, total: f64 },
+}
+
+/// Reject a non-finite or incoherent observation at the **ingest boundary**,
+/// before it can reach a slice row.
+///
+/// Deliberately not `should_emit`'s job: making write-on-change tolerate `NaN`
+/// stops the row churning, but still lets invalid data into the stream, where
+/// it silently corrupts every window aggregate that touches it.
+pub fn validate_observation(good: f64, total: f64) -> Result<(), ObservationError> {
+    let _ = (good, total);
+    todo!("slice::validate_observation")
 }
 
 #[cfg(test)]
@@ -409,18 +490,25 @@ mod tests {
 
     #[test]
     fn a_first_observation_is_always_emitted() {
-        assert!(should_emit(None, (1.0, 2.0)));
+        assert!(should_emit(None, (1.0, 2.0), false));
     }
 
     #[test]
     fn an_unchanged_recompute_is_not_re_emitted() {
-        assert!(!should_emit(Some((1.0, 2.0)), (1.0, 2.0)));
+        assert!(!should_emit(Some((1.0, 2.0)), (1.0, 2.0), false));
     }
 
     #[test]
     fn a_changed_recompute_is_re_emitted() {
-        assert!(should_emit(Some((1.0, 2.0)), (1.0, 3.0)));
-        assert!(should_emit(Some((1.0, 2.0)), (0.0, 2.0)));
+        assert!(should_emit(Some((1.0, 2.0)), (1.0, 3.0), false));
+        assert!(should_emit(Some((1.0, 2.0)), (0.0, 2.0), false));
+    }
+
+    /// A repair pass must re-emit even unchanged values, or the torn
+    /// attempt's orphan stays the highest revision for that key.
+    #[test]
+    fn a_repair_pass_re_emits_unchanged_values() {
+        assert!(should_emit(Some((1.0, 2.0)), (1.0, 2.0), true));
     }
 
     /// The steady-state claim behind the §6b.4d volume numbers, exercised over
@@ -433,19 +521,174 @@ mod tests {
         let emitted: Vec<i64> = previous
             .iter()
             .zip(recomputed.iter())
-            .filter(|((_, prev), (_, now))| should_emit(Some(*prev), *now))
+            .filter(|((_, prev), (_, now))| should_emit(Some(*prev), *now, false))
             .map(|((start, _), _)| *start)
             .collect();
         assert_eq!(emitted, vec![300], "only the slice that gained late data");
     }
 
-    /// NaN must not make a slice re-emit forever — `NaN != NaN` under a naive
-    /// equality check, which would defeat write-on-change entirely.
+    /// Defence in depth only: `NaN` must be rejected at the ingest boundary
+    /// (see `validate_observation`), but if one ever reaches the trailing
+    /// buffer it must not make the slice churn forever — `NaN != NaN` under a
+    /// naive equality check would defeat write-on-change entirely.
     #[test]
     fn a_nan_value_does_not_re_emit_forever() {
         assert!(
-            !should_emit(Some((f64::NAN, 10.0)), (f64::NAN, 10.0)),
+            !should_emit(Some((f64::NAN, 10.0)), (f64::NAN, 10.0), false),
             "an unchanged NaN must compare as unchanged"
         );
+    }
+
+    // ---- ingest-boundary validation ---------------------------------------
+
+    #[test]
+    fn a_coherent_observation_is_accepted() {
+        assert_eq!(validate_observation(5.0, 10.0), Ok(()));
+        assert_eq!(
+            validate_observation(0.0, 0.0),
+            Ok(()),
+            "zero traffic is valid"
+        );
+        assert_eq!(validate_observation(10.0, 10.0), Ok(()));
+    }
+
+    #[test]
+    fn non_finite_observations_are_rejected_before_persistence() {
+        for bad in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            assert!(
+                matches!(
+                    validate_observation(bad, 10.0),
+                    Err(ObservationError::NotFinite { .. })
+                ),
+                "good={bad} accepted"
+            );
+            assert!(
+                matches!(
+                    validate_observation(1.0, bad),
+                    Err(ObservationError::NotFinite { .. })
+                ),
+                "total={bad} accepted"
+            );
+        }
+    }
+
+    #[test]
+    fn negative_observations_are_rejected() {
+        assert!(matches!(
+            validate_observation(-1.0, 10.0),
+            Err(ObservationError::Negative { .. })
+        ));
+        assert!(matches!(
+            validate_observation(1.0, -10.0),
+            Err(ObservationError::Negative { .. })
+        ));
+    }
+
+    /// More good units than total would put the SLI above 100% and the burn
+    /// rate below zero.
+    #[test]
+    fn more_good_than_total_is_rejected() {
+        assert_eq!(
+            validate_observation(11.0, 10.0),
+            Err(ObservationError::GoodExceedsTotal {
+                good: 11.0,
+                total: 10.0
+            })
+        );
+    }
+
+    // ---- the batch manifest and repair protocol (D62) ----------------------
+
+    fn torn(batch_rev: i64, start: i64, end: i64) -> PendingBatch {
+        PendingBatch {
+            batch_rev,
+            start,
+            end,
+            writer: Writer::Incremental,
+        }
+    }
+
+    #[test]
+    fn a_clean_pass_allocates_the_next_batch_number() {
+        let plan = plan_batch(100, None, (9_000, 9_900));
+        assert_eq!(plan.batch_rev, 101);
+        assert_eq!((plan.start, plan.end), (9_000, 9_900));
+        assert!(!plan.force_emit);
+    }
+
+    /// A torn batch's number is REUSED. Skipping it is what retroactively
+    /// publishes its orphans when the mark later moves past.
+    #[test]
+    fn a_torn_batch_number_is_reused_not_skipped() {
+        let plan = plan_batch(100, Some(torn(101, 8_700, 9_300)), (9_600, 9_900));
+        assert_eq!(
+            plan.batch_rev, 101,
+            "the repair must write under the torn number"
+        );
+    }
+
+    /// The decisive case: recovery slower than the K-slice recompute window.
+    /// The natural range has slid past the torn slices, so the plan must widen
+    /// to cover them or they are never repaired.
+    #[test]
+    fn a_repair_covers_the_torn_range_even_after_the_window_slid_past() {
+        let plan = plan_batch(100, Some(torn(101, 8_700, 9_300)), (10_200, 11_100));
+        assert!(
+            plan.start <= 8_700,
+            "plan start {} does not reach the torn range",
+            plan.start
+        );
+        assert!(
+            plan.end >= 11_100,
+            "plan end {} dropped the current range",
+            plan.end
+        );
+    }
+
+    #[test]
+    fn a_repair_forces_re_emission() {
+        let plan = plan_batch(100, Some(torn(101, 8_700, 9_300)), (9_600, 9_900));
+        assert!(
+            plan.force_emit,
+            "an unchanged value must still be re-emitted during a repair"
+        );
+    }
+
+    #[test]
+    fn a_repair_whose_range_already_contains_the_torn_range_does_not_widen() {
+        let plan = plan_batch(100, Some(torn(101, 9_000, 9_300)), (8_700, 9_900));
+        assert_eq!((plan.start, plan.end), (8_700, 9_900));
+    }
+
+    /// End-to-end statement of the P0 this protocol exists to close: an orphan
+    /// from a torn attempt must never be the winning revision for its key.
+    #[test]
+    fn an_orphan_never_wins_after_the_repair_commits() {
+        // Committed state: slice 9000 at rev 4, batch 100.
+        let committed = row("g", 9_000, 10.0, 10.0, 4, 100);
+        // Torn attempt: batch 101 wrote a higher revision, then crashed.
+        let orphan = row("g", 9_000, 10.0, 12.0, 5, 101);
+
+        // Recovery happens after the natural window has moved on.
+        let plan = plan_batch(100, Some(torn(101, 9_000, 9_300)), (10_200, 11_100));
+        assert!(plan.start <= 9_000 && plan.end > 9_000);
+        assert!(plan.force_emit);
+
+        // The repair re-emits the key under the SAME batch number, at a higher
+        // revision than the orphan.
+        let repaired = row("g", 9_000, 10.0, 12.0, 6, plan.batch_rev);
+        assert_eq!(repaired.batch_rev, orphan.batch_rev);
+        assert!(repaired.rev > orphan.rev);
+
+        // After the repair commits, both are visible — and the repair wins.
+        let marks = CommitMarks {
+            watermark_end: 12_000,
+            reset_time: 0,
+            committed_batch_rev_incr: plan.batch_rev,
+            committed_batch_rev_bf: 0,
+        };
+        let out = visible_slices(vec![committed, orphan, repaired.clone()], &marks, 1);
+        assert_eq!(out.len(), 1);
+        assert_eq!(out[0], repaired, "the repair must win, not the orphan");
     }
 }

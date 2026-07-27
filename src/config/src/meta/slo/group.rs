@@ -42,12 +42,22 @@ pub enum SliceVerdict {
 }
 
 /// The overall verdict for a time-slice SLO's slice: the three-valued MIN over
-/// the expected group set.
+/// the **expected group set**.
 ///
-/// `expected_len` is the size of the active set; any shortfall between it and
-/// `verdicts` is treated as `Unknown`.
-pub fn overall_time_slice(verdicts: &[SliceVerdict], expected_len: usize) -> SliceVerdict {
-    let _ = (verdicts, expected_len);
+/// Takes keyed observations and expected keys rather than a slice plus a
+/// count. A count cannot tell expected `{a, b}` from observed `{a, a}` or
+/// `{a, c}` — both have length 2 and would report `Good` while `b` went
+/// entirely unmeasured, inflating the exact overall row that S-9 depends on.
+///
+/// * every expected key missing from `observed` contributes `Unknown`
+/// * duplicate observations of one key collapse to their **worst** verdict
+/// * keys observed but not expected (a group appearing mid-window, before the active set catches
+///   up) do not fabricate absences and do not vote
+pub fn overall_time_slice(
+    observed: &[(String, SliceVerdict)],
+    expected: &[String],
+) -> SliceVerdict {
+    let _ = (observed, expected);
     todo!("group::overall_time_slice")
 }
 
@@ -106,25 +116,79 @@ mod tests {
 
     // ---- the three-valued overall -----------------------------------------
 
+    fn obs(pairs: &[(&str, SliceVerdict)]) -> Vec<(String, SliceVerdict)> {
+        pairs.iter().map(|(k, v)| ((*k).to_string(), *v)).collect()
+    }
+
+    fn keys(ks: &[&str]) -> Vec<String> {
+        ks.iter().map(|k| (*k).to_string()).collect()
+    }
+
     #[test]
     fn all_groups_good_makes_the_slice_good() {
-        let v = [SliceVerdict::Good; 3];
-        assert_eq!(overall_time_slice(&v, 3), SliceVerdict::Good);
+        let o = obs(&[
+            ("a", SliceVerdict::Good),
+            ("b", SliceVerdict::Good),
+            ("c", SliceVerdict::Good),
+        ]);
+        assert_eq!(
+            overall_time_slice(&o, &keys(&["a", "b", "c"])),
+            SliceVerdict::Good
+        );
     }
 
     #[test]
     fn any_bad_group_makes_the_slice_bad() {
-        let v = [SliceVerdict::Good, SliceVerdict::Bad, SliceVerdict::Good];
-        assert_eq!(overall_time_slice(&v, 3), SliceVerdict::Bad);
+        let o = obs(&[
+            ("a", SliceVerdict::Good),
+            ("b", SliceVerdict::Bad),
+            ("c", SliceVerdict::Good),
+        ]);
+        assert_eq!(
+            overall_time_slice(&o, &keys(&["a", "b", "c"])),
+            SliceVerdict::Bad
+        );
     }
 
     #[test]
     fn an_absent_group_makes_an_otherwise_good_slice_uncovered() {
-        let v = [SliceVerdict::Good, SliceVerdict::Good];
+        let o = obs(&[("a", SliceVerdict::Good), ("b", SliceVerdict::Good)]);
         assert_eq!(
-            overall_time_slice(&v, 3),
+            overall_time_slice(&o, &keys(&["a", "b", "c"])),
             SliceVerdict::Unknown,
-            "two of three measured, all good — cannot prove ALL groups were good"
+            "c was expected and never reported — `all groups good` is unprovable"
+        );
+    }
+
+    /// A count-based signature could not catch this: two observations of `a`
+    /// and none of `b` has the same length as one each.
+    #[test]
+    fn a_duplicated_group_does_not_stand_in_for_a_missing_one() {
+        let o = obs(&[("a", SliceVerdict::Good), ("a", SliceVerdict::Good)]);
+        assert_eq!(
+            overall_time_slice(&o, &keys(&["a", "b"])),
+            SliceVerdict::Unknown,
+            "b is unmeasured however many times a reported"
+        );
+    }
+
+    /// Likewise an unexpected key must not fill an expected one's slot.
+    #[test]
+    fn an_unexpected_group_does_not_stand_in_for_a_missing_one() {
+        let o = obs(&[("a", SliceVerdict::Good), ("zz", SliceVerdict::Good)]);
+        assert_eq!(
+            overall_time_slice(&o, &keys(&["a", "b"])),
+            SliceVerdict::Unknown
+        );
+    }
+
+    #[test]
+    fn duplicate_observations_of_one_key_collapse_to_the_worst() {
+        let o = obs(&[("a", SliceVerdict::Good), ("a", SliceVerdict::Bad)]);
+        assert_eq!(
+            overall_time_slice(&o, &keys(&["a"])),
+            SliceVerdict::Bad,
+            "a disagreeing duplicate must not be resolved optimistically"
         );
     }
 
@@ -134,9 +198,9 @@ mod tests {
     /// the overall read HIGHER than the group.
     #[test]
     fn a_proven_violation_beats_an_unmeasured_sibling() {
-        let v = [SliceVerdict::Bad, SliceVerdict::Unknown];
+        let o = obs(&[("a", SliceVerdict::Bad)]);
         assert_eq!(
-            overall_time_slice(&v, 2),
+            overall_time_slice(&o, &keys(&["a", "b"])),
             SliceVerdict::Bad,
             "absence must not mask a violation"
         );
@@ -145,19 +209,20 @@ mod tests {
     #[test]
     fn the_overall_never_exceeds_the_worst_group() {
         // Ten slices; group A is bad in slice 3; group B is absent in slice 3.
+        let expected = keys(&["a", "b"]);
         let mut a_good = 0;
         let mut overall_good = 0;
         let mut overall_measured = 0;
         for i in 0..10 {
-            let (a, b) = if i == 3 {
-                (SliceVerdict::Bad, SliceVerdict::Unknown)
+            let o = if i == 3 {
+                obs(&[("a", SliceVerdict::Bad)])
             } else {
-                (SliceVerdict::Good, SliceVerdict::Good)
+                obs(&[("a", SliceVerdict::Good), ("b", SliceVerdict::Good)])
             };
-            if a == SliceVerdict::Good {
+            if o.iter().any(|(k, v)| k == "a" && *v == SliceVerdict::Good) {
                 a_good += 1;
             }
-            match overall_time_slice(&[a, b], 2) {
+            match overall_time_slice(&o, &expected) {
                 SliceVerdict::Good => {
                     overall_good += 1;
                     overall_measured += 1;
@@ -176,30 +241,38 @@ mod tests {
 
     #[test]
     fn an_empty_expected_set_is_unknown_not_good() {
-        assert_eq!(overall_time_slice(&[], 0), SliceVerdict::Unknown);
+        assert_eq!(overall_time_slice(&[], &[]), SliceVerdict::Unknown);
     }
 
     #[test]
     fn every_group_absent_is_unknown() {
-        assert_eq!(overall_time_slice(&[], 5), SliceVerdict::Unknown);
+        assert_eq!(
+            overall_time_slice(&[], &keys(&["a", "b", "c"])),
+            SliceVerdict::Unknown
+        );
     }
 
-    /// More verdicts than expected must not invent phantom `Unknown`s — the
-    /// active set can lag a newly-appeared group by one pass.
+    /// A group that reported before the active set caught up must not make the
+    /// slice uncovered.
     #[test]
-    fn more_verdicts_than_expected_does_not_fabricate_absences() {
-        let v = [SliceVerdict::Good, SliceVerdict::Good, SliceVerdict::Good];
+    fn extra_observations_do_not_fabricate_absences() {
+        let o = obs(&[
+            ("a", SliceVerdict::Good),
+            ("b", SliceVerdict::Good),
+            ("c", SliceVerdict::Good),
+        ]);
         assert_eq!(
-            overall_time_slice(&v, 2),
-            SliceVerdict::Good,
-            "a group that reported early must not make the slice uncovered"
+            overall_time_slice(&o, &keys(&["a", "b"])),
+            SliceVerdict::Good
         );
     }
 
     #[test]
-    fn a_bad_group_still_dominates_when_verdicts_exceed_expected() {
-        let v = [SliceVerdict::Good, SliceVerdict::Bad, SliceVerdict::Good];
-        assert_eq!(overall_time_slice(&v, 2), SliceVerdict::Bad);
+    fn an_unexpected_group_does_not_vote_bad() {
+        // `zz` is not in the active set; its verdict must not drag the overall
+        // down before the roster admits it.
+        let o = obs(&[("a", SliceVerdict::Good), ("zz", SliceVerdict::Bad)]);
+        assert_eq!(overall_time_slice(&o, &keys(&["a"])), SliceVerdict::Good);
     }
 
     // ---- count overall -----------------------------------------------------

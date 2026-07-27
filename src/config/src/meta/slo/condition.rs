@@ -455,6 +455,39 @@ mod tests {
         }
     }
 
+    /// The same finiteness matrix as critical. A naive implementation that
+    /// only checks `warning < critical` accepts a negative or NaN warning,
+    /// because both compare "below" (or compare false and fall through).
+    #[test]
+    fn non_finite_and_non_positive_warnings_are_rejected() {
+        for bad in [0.0, -1.0, f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            let c = SloCondition {
+                critical: 14.4,
+                warning: Some(bad),
+                ..fast_burn()
+            };
+            assert!(
+                matches!(
+                    validate(&c, &slo_30d_60s(), true),
+                    Err(SloConditionError::ThresholdNotFinitePositive { .. })
+                ),
+                "warning {bad} was accepted"
+            );
+        }
+    }
+
+    #[test]
+    fn a_nan_warning_is_not_silently_accepted_by_the_ordering_check() {
+        // NaN < critical is false AND NaN >= critical is false, so an
+        // ordering-only implementation can fall through either branch.
+        let c = SloCondition {
+            critical: 14.4,
+            warning: Some(f64::NAN),
+            ..fast_burn()
+        };
+        assert!(validate(&c, &slo_30d_60s(), true).is_err());
+    }
+
     #[test]
     fn a_warning_below_critical_is_accepted() {
         let c = SloCondition {
@@ -800,11 +833,51 @@ mod tests {
         assert_eq!(default_short_window_secs(HOUR, 300), 600);
     }
 
+    /// A long window not divisible by 12 makes the raw `long / 12` land off
+    /// the slice grid; the default must round to a legal value, not emit an
+    /// invalid one.
+    #[test]
+    fn the_default_short_window_is_rounded_onto_the_slice_grid() {
+        // 3660s (1h1m) is a legal long window; 3660/12 = 305, not a multiple
+        // of 60.
+        let short = default_short_window_secs(3660, 60);
+        assert_eq!(short % 60, 0, "default short {short} is off the grid");
+        assert!(short >= 120, "default short {short} is under two slices");
+    }
+
     #[test]
     fn every_default_short_window_passes_validation() {
         for slice in [60, 300] {
             for long_h in [1, 6, 24, 48] {
                 let long = long_h * HOUR;
+                let short = default_short_window_secs(long, slice);
+                let c = SloCondition {
+                    long_window_secs: Some(long),
+                    short_window_secs: Some(short),
+                    critical: 3.0,
+                    ..fast_burn()
+                };
+                let slo = SloFacts {
+                    slice_interval_secs: slice,
+                    ..slo_30d_60s()
+                };
+                assert!(
+                    validate(&c, &slo, true).is_ok(),
+                    "default short {short}s for long {long}s @ {slice}s slices was invalid"
+                );
+            }
+        }
+    }
+
+    /// The same property over long windows that are awkward multiples — the
+    /// round set above happens to divide cleanly by 12 and hid the rounding.
+    #[test]
+    fn defaults_are_legal_for_awkward_long_windows_too() {
+        for slice in [60, 300] {
+            for long in [3660, 5400, 7 * HOUR, 25 * HOUR, 47 * HOUR] {
+                if long % slice != 0 {
+                    continue; // not a legal long window for this SLO anyway
+                }
                 let short = default_short_window_secs(long, slice);
                 let c = SloCondition {
                     long_window_secs: Some(long),
@@ -901,6 +974,27 @@ mod tests {
         assert!(
             validate_pair_budget(&c, &existing, 8).is_ok(),
             "an already-present pair costs nothing"
+        );
+    }
+
+    /// The cap counts DISTINCT pairs, not alert rows. Ten alerts sharing two
+    /// window pairs cost two aggregates per pass, not ten.
+    #[test]
+    fn the_cap_counts_distinct_pairs_not_alert_rows() {
+        let mut existing = Vec::new();
+        for _ in 0..10 {
+            existing.push((HOUR, 300));
+            existing.push((6 * HOUR, 1800));
+        }
+        let c = SloCondition {
+            long_window_secs: Some(24 * HOUR),
+            short_window_secs: Some(7200),
+            critical: 3.0,
+            ..fast_burn()
+        };
+        assert!(
+            validate_pair_budget(&c, &existing, 3).is_ok(),
+            "20 rows carrying 2 distinct pairs must leave room under a cap of 3"
         );
     }
 

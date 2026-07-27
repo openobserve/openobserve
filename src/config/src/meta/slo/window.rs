@@ -269,6 +269,46 @@ mod tests {
         );
     }
 
+    /// An unaligned reset would put `start` inside a bucket, so the histogram
+    /// emits a `slice_start` BELOW `start` — which then falls on the backfill
+    /// side of `reset_time` and is judged against the wrong committed mark.
+    #[test]
+    fn an_unaligned_generation_reset_still_yields_an_aligned_start() {
+        let r = ingest_range(IngestRangeParams {
+            generation_reset_time: 9601,
+            ..params(11_000, Some(9_000), FIVE_MIN)
+        })
+        .unwrap();
+        assert_eq!(
+            align_down(r.start, FIVE_MIN),
+            r.start,
+            "start {} is not on the slice grid",
+            r.start
+        );
+        assert!(
+            r.start >= 9601,
+            "start {} would scan data from before the generation began",
+            r.start
+        );
+    }
+
+    #[test]
+    fn an_unaligned_reset_never_emits_a_slice_owned_by_the_other_writer() {
+        let reset = 9601;
+        let r = ingest_range(IngestRangeParams {
+            generation_reset_time: reset,
+            ..params(11_000, Some(9_000), FIVE_MIN)
+        })
+        .unwrap();
+        for s in r.slice_starts(FIVE_MIN) {
+            assert!(
+                s >= reset,
+                "slice_start {s} is below reset_time {reset}, so the backfill \
+                 writer's mark would judge an incremental row"
+            );
+        }
+    }
+
     #[test]
     fn the_first_pass_of_a_generation_starts_at_the_reset_time() {
         let r = ingest_range(IngestRangeParams {
