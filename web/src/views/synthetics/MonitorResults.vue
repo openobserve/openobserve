@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="synthetic-monitor-results-edit-btn"
         @click="editMonitor"
       >
-        {{ t("synthetics.results.editMonitor") }}
+        {{ t("synthetics.results.editCheck") }}
       </OButton>
       <OButton
         variant="outline"
