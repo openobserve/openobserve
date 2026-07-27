@@ -11,8 +11,8 @@ import { useStore } from "vuex";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
-import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import ProtocolRunSummarySkeleton from "./ProtocolRunSummarySkeleton.vue";
 import useSyntheticResults from "@/composables/useSyntheticResults";
 import syntheticsService from "@/services/synthetics";
 import type { HttpAssertion } from "@/types/synthetics";
@@ -221,7 +221,7 @@ const showAssertions = computed(() => run.value?.type === "http" && assertionDef
     </template>
 
     <div class="px-page-edge min-h-0 flex-1 overflow-y-auto py-4">
-      <OSkeleton v-if="loading" class="h-80 w-full" />
+      <ProtocolRunSummarySkeleton v-if="loading" />
 
       <OEmptyState
         v-else-if="!run"
