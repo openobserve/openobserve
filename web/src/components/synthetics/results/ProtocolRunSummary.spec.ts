@@ -148,7 +148,7 @@ describe("ProtocolRunSummary", () => {
       wrapper = mountComponent();
       await flushPromises();
 
-      expect(wrapper.find('[data-test="oskeleton"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="synthetics-protocol-run-skeleton"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="oempty-state"]').exists()).toBe(false);
     });
   });

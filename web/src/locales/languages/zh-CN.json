@@ -9592,6 +9592,8 @@
       "modalSubtitle": "选择您要监控的内容",
       "modalTitle": "创建检查",
       "pageTitle": "新建 {label} 检查",
+      "saveAndContinue": "保存并继续",
+      "saveAndExit": "保存并退出",
       "saveCheck": "保存检查",
       "saveFailed": "保存检查失败。",
       "saved": "检查已成功保存。",

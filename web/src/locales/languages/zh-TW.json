@@ -9587,6 +9587,8 @@
       "modalSubtitle": "選擇您要監控的內容",
       "modalTitle": "建立檢查",
       "pageTitle": "新增 {label} 檢查",
+      "saveAndContinue": "儲存並繼續",
+      "saveAndExit": "儲存並離開",
       "saveCheck": "儲存檢查",
       "saveFailed": "儲存檢查失敗。",
       "saved": "檢查儲存成功。",
