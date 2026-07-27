@@ -17,8 +17,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!--
   EmptyHourglass — clean, object-only "waiting for data" illustration: an
   hourglass with sand trickling through the neck. No character. Brand-recoloured
-  (warning amber for the sand); CSS motion gated by `animated` +
-  prefers-reduced-motion.
+  (warning amber for the sand). Pure SMIL motion gated behind `animated`
+  (prefers-reduced-motion; OEmptyState wires this up automatically).
 -->
 <template>
   <svg
@@ -28,7 +28,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     xmlns="http://www.w3.org/2000/svg"
     role="img"
     aria-label="Waiting for data to arrive"
-    :class="['es-root', { 'es-static': !animated }]"
   >
     <circle cx="120" cy="90" r="68" fill="var(--color-primary-500)" opacity="0.05" />
     <ellipse cx="120" cy="160" rx="46" ry="8" fill="var(--color-primary-900)" opacity="0.1" />
@@ -101,83 +100,70 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <path d="M96 150 L144 150 L120 128 Z" fill="var(--color-warning-400)" />
 
     <!-- falling grains -->
-    <circle
-      class="es-grain es-grain-a [transform-box:view-box]"
-      cx="120"
-      cy="96"
-      r="2.4"
-      fill="var(--color-warning-500)"
-    />
-    <circle
-      class="es-grain es-grain-b [transform-box:view-box]"
-      cx="120"
-      cy="96"
-      r="2"
-      fill="var(--color-warning-500)"
-    />
-    <circle
-      class="es-grain es-grain-c [transform-box:view-box]"
-      cx="120"
-      cy="96"
-      r="2.4"
-      fill="var(--color-warning-600)"
-    />
+    <circle cx="120" cy="96" r="2.4" fill="var(--color-warning-500)">
+      <animateTransform
+        v-if="animated"
+        attributeName="transform"
+        type="translate"
+        values="0 0; 0 36"
+        keyTimes="0;1"
+        dur="1.5s"
+        repeatCount="indefinite"
+      />
+      <animate
+        v-if="animated"
+        attributeName="opacity"
+        values="0;1;1;0"
+        keyTimes="0;0.2;0.85;1"
+        dur="1.5s"
+        repeatCount="indefinite"
+      />
+    </circle>
+    <circle cx="120" cy="96" r="2" fill="var(--color-warning-500)">
+      <animateTransform
+        v-if="animated"
+        attributeName="transform"
+        type="translate"
+        values="0 0; 0 36"
+        keyTimes="0;1"
+        dur="1.5s"
+        repeatCount="indefinite"
+        begin="-0.5s"
+      />
+      <animate
+        v-if="animated"
+        attributeName="opacity"
+        values="0;1;1;0"
+        keyTimes="0;0.2;0.85;1"
+        dur="1.5s"
+        repeatCount="indefinite"
+        begin="-0.5s"
+      />
+    </circle>
+    <circle cx="120" cy="96" r="2.4" fill="var(--color-warning-600)">
+      <animateTransform
+        v-if="animated"
+        attributeName="transform"
+        type="translate"
+        values="0 0; 0 36"
+        keyTimes="0;1"
+        dur="1.5s"
+        repeatCount="indefinite"
+        begin="-1s"
+      />
+      <animate
+        v-if="animated"
+        attributeName="opacity"
+        values="0;1;1;0"
+        keyTimes="0;0.2;0.85;1"
+        dur="1.5s"
+        repeatCount="indefinite"
+        begin="-1s"
+      />
+    </circle>
   </svg>
 </template>
 
 <script setup lang="ts">
 withDefaults(defineProps<{ width?: number; animated?: boolean }>(), { width: 260, animated: true });
 </script>
-
-<style scoped>
-/* keep(keyframes): SVG illustration animation. Scoped on purpose: the
-   20 illustrations reused generic keyframe names (es-pulse, es-twinkle, …) with
-   DIFFERENT bodies from unscoped blocks — a global name collision where the
-   last-loaded illustration hijacked the others' animations. Vue rewrites scoped
-   keyframe names per component, which ends the collision. All selectors and the
-   es-static gate live in this file's own template. */
-@keyframes es-grain {
-  0% {
-    transform: translateY(0);
-    opacity: 0;
-  }
-  20% {
-    opacity: 1;
-  }
-  85% {
-    opacity: 1;
-  }
-  100% {
-    transform: translateY(36px);
-    opacity: 0;
-  }
-}
-
-/* Animations MUST start from this block, not from a template arbitrary utility:
-   Vue's scoped compiler rewrites `@keyframes es-grain` -> `es-grain-<hash>` and
-   rewrites `animation:` in THIS block to match, but it cannot rewrite a class
-   string in the template — an `[animation:es-grain_1.5s_...]` utility there would
-   reference a name that no longer exists, silently killing the motion. */
-.es-grain {
-  animation: es-grain 1.5s linear infinite;
-}
-.es-grain-b {
-  animation-delay: -0.5s;
-}
-.es-grain-c {
-  animation-delay: -1s;
-}
-
-/* Gates must out-specify the rules above. `:where()` adds 0 specificity, so a
-   `:where(.es-grain)` gate would score only (0,1,0) from the scoped attribute and
-   LOSE to `.es-grain[data-v]` (0,2,0) — plain selectors score (0,2,0) / (0,3,0)
-   and win. */
-.es-static .es-grain {
-  animation: none;
-}
-@media (prefers-reduced-motion: reduce) {
-  .es-grain {
-    animation: none;
-  }
-}
-</style>
