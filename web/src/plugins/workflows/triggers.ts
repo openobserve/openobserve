@@ -34,11 +34,7 @@
 
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import { buildTestSample } from "./testSample";
-import {
-  buildIncidentSample,
-  INCIDENT_EVENT_TYPES,
-  INCIDENT_COMMON_KEYS,
-} from "./incidentSample";
+import { buildIncidentSample, INCIDENT_EVENT_TYPES, INCIDENT_COMMON_KEYS } from "./incidentSample";
 import { ALERT_PAYLOAD_FIELDS } from "./alertFields";
 import type { WorkflowFieldOption } from "./alertFields";
 import { INCIDENT_PAYLOAD_FIELDS } from "./incidentFields";
@@ -157,8 +153,7 @@ export const triggerDef = (kind?: string): WorkflowTriggerDef =>
   BY_KIND.get(kind || "") ?? (BY_KIND.get(DEFAULT_TRIGGER_KIND) as WorkflowTriggerDef);
 
 /** The backend `trigger_type` enum value for a per-node trigger kind. */
-export const triggerTypeForKind = (kind?: string): string =>
-  triggerDef(kind).triggerType;
+export const triggerTypeForKind = (kind?: string): string => triggerDef(kind).triggerType;
 
 /** Kinds offered in the trigger picker (the empty-canvas start node). */
 export const enabledTriggers = (): WorkflowTriggerDef[] =>

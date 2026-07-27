@@ -29,8 +29,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   WorkflowEditor); there are no editable fields.
 -->
 <template>
-  <div data-test="workflow-trigger-body" class="w-full flex flex-col">
-    <p class="text-xs text-text-secondary leading-normal mb-3">
+  <div data-test="workflow-trigger-body" class="flex w-full flex-col">
+    <p class="text-text-secondary mb-3 text-xs leading-normal">
       {{ t(introKey) }}
     </p>
 
@@ -46,12 +46,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="workflow-trigger-sample-variant"
       />
 
-      <div class="text-xs font-semibold text-text-body mb-1">
+      <div class="text-text-body mb-1 text-xs font-semibold">
         {{ t("workflow.node.incidentCommonTitle") }}
       </div>
       <div
         data-test="workflow-trigger-common-structure"
-        class="w-full h-96 rounded-default border border-border-default overflow-hidden"
+        class="rounded-default border-border-default h-96 w-full overflow-hidden border"
       >
         <QueryEditor
           :key="selectedVariant + '-common'"
@@ -62,17 +62,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :show-line-numbers="false"
           :sticky-scroll="false"
           :query="commonText"
-          class="w-full h-full!"
+          class="h-full! w-full"
         />
       </div>
 
-      <div class="text-xs font-semibold text-text-body mt-4 mb-1">
+      <div class="text-text-body mt-4 mb-1 text-xs font-semibold">
         {{ t("workflow.node.incidentSpecificTitle") }}
       </div>
       <div
         v-if="hasSpecific"
         data-test="workflow-trigger-specific-structure"
-        class="w-full h-40 rounded-default border border-border-default overflow-hidden"
+        class="rounded-default border-border-default h-40 w-full overflow-hidden border"
       >
         <QueryEditor
           :key="selectedVariant + '-specific'"
@@ -83,13 +83,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :show-line-numbers="false"
           :sticky-scroll="false"
           :query="specificText"
-          class="w-full h-full!"
+          class="h-full! w-full"
         />
       </div>
       <p
         v-else
         data-test="workflow-trigger-no-extras"
-        class="text-xs text-text-secondary leading-normal italic"
+        class="text-text-secondary text-xs leading-normal italic"
       >
         {{ t("workflow.node.incidentNoExtraFields") }}
       </p>
@@ -100,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template v-else>
       <div
         data-test="workflow-trigger-structure"
-        class="w-full h-110 rounded-default border border-border-default overflow-hidden"
+        class="rounded-default border-border-default h-110 w-full overflow-hidden border"
       >
         <QueryEditor
           editor-id="workflow-trigger-payload"
@@ -110,13 +110,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :show-line-numbers="false"
           :sticky-scroll="false"
           :query="payloadText"
-          class="w-full h-full!"
+          class="h-full! w-full"
         />
       </div>
-      <p
-        v-if="noteKey"
-        class="text-xs text-text-secondary leading-normal mt-2 italic"
-      >
+      <p v-if="noteKey" class="text-text-secondary mt-2 text-xs leading-normal italic">
         {{ t(noteKey) }}
       </p>
     </template>
@@ -136,9 +133,7 @@ import {
 
 // Async like every other QueryEditor consumer — Monaco is already on this route
 // (Function node, Test dialog, Step Result drawer), so this adds no new chunk.
-const QueryEditor = defineAsyncComponent(
-  () => import("@/components/CodeQueryEditor.vue"),
-);
+const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
 
 const { t } = useI18n();
 
@@ -167,11 +162,8 @@ const isSplit = !!(commonKeys.length && variants.length);
 
 // The `meta` block of the selected variant's sample (`[{ meta, data }]`).
 const selectedMeta = computed<Record<string, unknown>>(() => {
-  const variant =
-    variants.find((v) => v.key === selectedVariant.value) ?? variants[0];
-  const sample = variant?.build() as
-    | [{ meta?: Record<string, unknown> }]
-    | undefined;
+  const variant = variants.find((v) => v.key === selectedVariant.value) ?? variants[0];
+  const sample = variant?.build() as [{ meta?: Record<string, unknown> }] | undefined;
   return sample?.[0]?.meta ?? {};
 });
 
@@ -191,9 +183,7 @@ const specificFields = computed<Record<string, unknown>>(() => {
   for (const k of Object.keys(meta)) if (!commonSet.has(k)) extras[k] = meta[k];
   return extras;
 });
-const specificText = computed(() =>
-  JSON.stringify(specificFields.value, null, 2),
-);
+const specificText = computed(() => JSON.stringify(specificFields.value, null, 2));
 const hasSpecific = computed(() => Object.keys(specificFields.value).length > 0);
 
 // Combined single-payload text for non-split kinds (Alert Fired).

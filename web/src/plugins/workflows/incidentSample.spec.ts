@@ -68,12 +68,8 @@ describe("INCIDENT_COMMON_KEYS ↔ common block (drift guard)", () => {
   // common block. This fails loudly if commonMeta() and INCIDENT_COMMON_KEYS
   // drift (order or membership) — which would mislabel the split view.
   it("equals the meta keys of an extra-less event, in order", () => {
-    const noExtrasEvent = INCIDENT_EVENTS.find(
-      (e) => Object.keys(e.extras).length === 0,
-    )!;
-    expect(Object.keys(metaOf(noExtrasEvent.type))).toEqual(
-      INCIDENT_COMMON_KEYS,
-    );
+    const noExtrasEvent = INCIDENT_EVENTS.find((e) => Object.keys(e.extras).length === 0)!;
+    expect(Object.keys(metaOf(noExtrasEvent.type))).toEqual(INCIDENT_COMMON_KEYS);
   });
 
   it("every event includes the full common block", () => {

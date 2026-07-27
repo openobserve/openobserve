@@ -772,9 +772,7 @@ describe("WorkflowEditor", () => {
         updated_at: 0,
         created_by: "",
       });
-      expect(data.workflow.edges).toEqual([
-        { id: "e1", source: triggerId, target: "d1" },
-      ]);
+      expect(data.workflow.edges).toEqual([{ id: "e1", source: triggerId, target: "d1" }]);
 
       const [trigger, destination] = data.workflow.nodes;
       // trigger: io_type from the VueFlow type, kind carried in meta

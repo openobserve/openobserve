@@ -112,7 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
        (the pipeline canvas has it on the container, so it inherits it there). -->
   <div
     v-if="needsTrigger && !readOnly"
-    class="o2vf_node absolute top-32 left-1/2 -translate-x-1/2 z-10"
+    class="o2vf_node absolute top-32 left-1/2 z-10 -translate-x-1/2"
   >
     <!-- Scaled by the LIVE viewport zoom: real nodes are drawn inside
          `.vue-flow__viewport`, which carries the canvas transform, so an

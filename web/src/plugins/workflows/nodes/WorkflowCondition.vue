@@ -75,10 +75,7 @@ import { ref } from "vue";
 import { useI18n } from "vue-i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ConditionBuilder from "@/components/flow/forms/ConditionBuilder.vue";
-import {
-  workflowObj,
-  currentTriggerKind,
-} from "@/plugins/workflows/useWorkflowCanvas";
+import { workflowObj, currentTriggerKind } from "@/plugins/workflows/useWorkflowCanvas";
 import { triggerDef } from "@/plugins/workflows/triggers";
 
 const { t } = useI18n();
@@ -88,8 +85,7 @@ const { t } = useI18n();
 // the user can still type any column via allow-custom-columns.
 const kind = currentTriggerKind();
 const fields = kind ? triggerDef(kind).conditionFields : [];
-const savedConditions =
-  workflowObj.currentSelectedNodeData?.data?.conditions ?? null;
+const savedConditions = workflowObj.currentSelectedNodeData?.data?.conditions ?? null;
 
 const builder = ref<any>(null);
 // The builder validates through its zod schema (async) and renders the error

@@ -419,9 +419,7 @@ describe("WorkflowNode", () => {
     it("offers delete on the trigger too (so its kind can be swapped)", async () => {
       wrapper = mountNode("t1", TRIGGER.data);
       await wrapper.trigger("mouseenter");
-      const actions = wrapper.find(
-        '[data-test="workflow-node-workflow_trigger-actions"]',
-      );
+      const actions = wrapper.find('[data-test="workflow-node-workflow_trigger-actions"]');
       expect(actions.element.style.display).not.toBe("none");
       await wrapper
         .find('[data-test="workflow-node-workflow_trigger-delete-btn"]')

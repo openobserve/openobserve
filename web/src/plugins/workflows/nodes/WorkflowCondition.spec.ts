@@ -99,9 +99,7 @@ describe("WorkflowCondition", () => {
     it("passes the incident payload fields for an incident trigger", () => {
       seedTrigger("incident_event");
       const wrapper = createWrapper();
-      const fields = wrapper
-        .findComponent({ name: "ConditionBuilder" })
-        .props("fields");
+      const fields = wrapper.findComponent({ name: "ConditionBuilder" }).props("fields");
       expect(fields).toEqual(INCIDENT_PAYLOAD_FIELDS);
       expect(fields.map((f: any) => f.value)).toContain("meta_event_type");
     });
@@ -109,9 +107,7 @@ describe("WorkflowCondition", () => {
     it("passes no fields when the workflow has no trigger", () => {
       workflowObj.currentSelectedWorkflow.nodes = [];
       const wrapper = createWrapper();
-      expect(
-        wrapper.findComponent({ name: "ConditionBuilder" }).props("fields"),
-      ).toEqual([]);
+      expect(wrapper.findComponent({ name: "ConditionBuilder" }).props("fields")).toEqual([]);
     });
 
     it("passes null initial-conditions when there is no selected node data", () => {

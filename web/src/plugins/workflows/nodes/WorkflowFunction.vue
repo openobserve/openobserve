@@ -36,10 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts" setup>
 import { ref, onBeforeUnmount } from "vue";
 import FunctionPicker from "@/components/flow/forms/FunctionPicker.vue";
-import {
-  workflowObj,
-  currentTriggerKind,
-} from "@/plugins/workflows/useWorkflowCanvas";
+import { workflowObj, currentTriggerKind } from "@/plugins/workflows/useWorkflowCanvas";
 import { triggerDef } from "@/plugins/workflows/triggers";
 
 const savedData: any = workflowObj.currentSelectedNodeData?.data || {};

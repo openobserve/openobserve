@@ -330,11 +330,7 @@ const onStepPick = (item: any) => {
   closeStepPicker();
   // The trigger has nothing before it, so it is placed rather than appended.
   if (mode === "trigger")
-    addTriggerNode(
-      item.nodeType || "workflow_trigger",
-      item.trigger_kind,
-      position,
-    );
+    addTriggerNode(item.nodeType || "workflow_trigger", item.trigger_kind, position);
   else addNodeAfter(source, handle, item.key);
 };
 
@@ -419,7 +415,7 @@ const buildPayload = () => {
   // Top-level `trigger_type` (AlertFired | IncidentEvent) is derived from the
   // graph's trigger kind, defaulting to AlertFired when no trigger is present.
   return {
-      workflow: {
+    workflow: {
       id: wf.id || "",
       org_id: "",
       name: (wf.name || "").trim(),

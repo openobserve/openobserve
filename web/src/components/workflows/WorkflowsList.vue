@@ -242,10 +242,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 
 import workflowService from "@/services/workflows";
-import {
-  hydrateWorkflow,
-  triggerDef,
-} from "@/plugins/workflows/useWorkflowCanvas";
+import { hydrateWorkflow, triggerDef } from "@/plugins/workflows/useWorkflowCanvas";
 
 const { t } = useI18n();
 const router = useRouter();
@@ -279,8 +276,7 @@ const triggerLabel = (wf: any): string => {
   if (!triggerNode) return "—";
   // Kind lives in data.trigger_kind (fresh) or meta.trigger_kind (from the API);
   // the registry resolves it to a label (and defaults for legacy/unset kinds).
-  const kind =
-    triggerNode.data?.trigger_kind || triggerNode.meta?.trigger_kind;
+  const kind = triggerNode.data?.trigger_kind || triggerNode.meta?.trigger_kind;
   return t(triggerDef(kind).labelKey);
 };
 

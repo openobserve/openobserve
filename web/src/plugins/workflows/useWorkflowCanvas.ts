@@ -452,10 +452,7 @@ export const hydrateWorkflow = (wf: any) => {
     if (node.data?.node_type === "workflow_trigger" && node.meta) {
       node.data = {
         ...node.data,
-        trigger_kind:
-          node.meta.trigger_kind ||
-          node.data.trigger_kind ||
-          DEFAULT_TRIGGER_KIND,
+        trigger_kind: node.meta.trigger_kind || node.data.trigger_kind || DEFAULT_TRIGGER_KIND,
       };
     }
     return node;

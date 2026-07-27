@@ -50,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #actions>
       <div
         v-show="showButtons"
-        class="absolute -top-7.5 right-0 flex gap-1.5 z-10 pt-1.25 px-1.25 pb-2.5"
+        class="absolute -top-7.5 right-0 z-10 flex gap-1.5 px-1.25 pt-1.25 pb-2.5"
         :data-test="`workflow-node-${data?.node_type}-actions`"
         @mouseenter="handleActionsEnter"
         @mouseleave="handleActionsLeave"
@@ -193,8 +193,7 @@ const nodeLabel = computed(() => {
   const fallback = meta.value ? t(meta.value.titleKey) : type;
   // The trigger card shows its KIND's title (Alert Trigger, Incident Trigger, …),
   // resolved from the registry so new kinds label themselves.
-  if (type === "workflow_trigger")
-    return t(triggerDef(data?.trigger_kind).nodeTitleKey);
+  if (type === "workflow_trigger") return t(triggerDef(data?.trigger_kind).nodeTitleKey);
   return nodeConfigDetail(data, 28) || fallback;
 });
 // Icon for this node type: the pipeline node image as an "img:<url>" string

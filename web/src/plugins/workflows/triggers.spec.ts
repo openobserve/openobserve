@@ -27,10 +27,7 @@ import {
   enabledTriggers,
   buildTriggerSampleText,
 } from "./triggers";
-import {
-  INCIDENT_EVENT_TYPES,
-  INCIDENT_COMMON_KEYS,
-} from "./incidentSample";
+import { INCIDENT_EVENT_TYPES, INCIDENT_COMMON_KEYS } from "./incidentSample";
 import { ALERT_PAYLOAD_FIELDS } from "./alertFields";
 import { INCIDENT_PAYLOAD_FIELDS } from "./incidentFields";
 
@@ -118,9 +115,7 @@ describe("trigger registry", () => {
     });
 
     it("exposes one sample variant per lifecycle event_type", () => {
-      expect(incident.sampleVariants?.map((v) => v.key)).toEqual(
-        INCIDENT_EVENT_TYPES,
-      );
+      expect(incident.sampleVariants?.map((v) => v.key)).toEqual(INCIDENT_EVENT_TYPES);
     });
 
     it("splits on the incident common keys", () => {

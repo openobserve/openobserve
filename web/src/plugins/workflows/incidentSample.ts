@@ -184,11 +184,8 @@ export const INCIDENT_EVENT_TYPES = INCIDENT_EVENTS.map((e) => e.type);
 
 // Sample payload for one event_type (defaults to the first event). Unknown types
 // fall back to the default so callers never get an empty payload.
-export const buildIncidentSample = (
-  eventType: string = DEFAULT_INCIDENT_EVENT,
-): unknown[] => {
-  const def =
-    INCIDENT_EVENTS.find((e) => e.type === eventType) ?? INCIDENT_EVENTS[0];
+export const buildIncidentSample = (eventType: string = DEFAULT_INCIDENT_EVENT): unknown[] => {
+  const def = INCIDENT_EVENTS.find((e) => e.type === eventType) ?? INCIDENT_EVENTS[0];
   const meta = { ...commonMeta(def.type, def.status, def.severity), ...def.extras };
   return [{ meta, data: [] }];
 };
