@@ -33,66 +33,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div class="flex flex-col gap-2.5" data-test="version-compare-view">
-    <!-- Compare bar. The per-arm Manual date windows live INSIDE the bar, under
-         each version picker (via the window-a/window-b slots) — so switching to
-         Manual swaps a caption for an editable picker in place, with no separate
-         full-width row appearing and shoving the metrics/chart down. -->
+    <!-- Compare bar: just the two version pickers (what am I comparing). The
+         alignment toggle + manual date windows live with the chart below, since
+         they reshape the chart's x-axis, not the version selection. -->
     <VersionCompareBar
       :versions="versionOptions"
       :a="selectedA"
       :b="selectedB"
-      :align="align"
       @update:a="onSelectA"
       @update:b="onSelectB"
-      @update:align="onAlignChange"
-      @exit="emit('exit')"
-    >
-      <!-- Fixed-height (h-8) slot so switching Since↔Manual never changes the row
-           height: the app-standard DateTime picker and the "auto:" caption both
-           occupy the same 2rem line, eliminating the layout shift. -->
-      <template #window-a>
-        <div class="flex h-8 w-full items-center">
-          <DateTime
-            v-if="align === 'manual'"
-            auto-apply
-            disable-relative
-            :default-type="'absolute'"
-            :default-absolute-time="manualDefaultA"
-            class="h-8 w-full"
-            data-test="version-compare-manual-a-window"
-            @on:date-change="(v: unknown) => onManualDateChange('a', v)"
-          />
-          <span
-            v-else-if="autoWindowA"
-            class="px-1 text-xs text-text-muted"
-            data-test="version-compare-auto-window-a"
-          >
-            {{ autoWindowA }}
-          </span>
-        </div>
-      </template>
-      <template #window-b>
-        <div class="flex h-8 w-full items-center">
-          <DateTime
-            v-if="align === 'manual'"
-            auto-apply
-            disable-relative
-            :default-type="'absolute'"
-            :default-absolute-time="manualDefaultB"
-            class="h-8 w-full"
-            data-test="version-compare-manual-b-window"
-            @on:date-change="(v: unknown) => onManualDateChange('b', v)"
-          />
-          <span
-            v-else-if="autoWindowB"
-            class="px-1 text-xs text-text-muted"
-            data-test="version-compare-auto-window-b"
-          >
-            {{ autoWindowB }}
-          </span>
-        </div>
-      </template>
-    </VersionCompareBar>
+    />
 
     <OContent class="flex flex-col gap-2.5">
       <VersionCompareBanner
@@ -161,6 +111,60 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ sampledNote }}
       </span>
 
+      <!-- Chart header: the Align toggle sits WITH the trend chart because that's
+           what it reshapes (the x-axis). Manual mode reveals the two per-arm date
+           pickers here too. Matches how o11y tools (Datadog/Grafana/Sentry) place
+           the overlay/align control on the chart, separate from entity selection. -->
+      <div v-if="windows" class="flex flex-col gap-2" data-test="version-compare-chart-header">
+        <div class="flex flex-wrap items-center gap-3">
+          <OToggleGroup
+            :model-value="align"
+            type="single"
+            data-test="version-compare-bar-align"
+            :label="t('aiObservability.versionCompare.bar.align')"
+            @update:model-value="(v: unknown) => onAlignChange(v as AlignMode)"
+          >
+            <OToggleGroupItem value="sinceRollout" size="sm">
+              {{ t("aiObservability.versionCompare.bar.alignSinceRollout") }}
+            </OToggleGroupItem>
+            <OToggleGroupItem value="sameWallClock" size="sm">
+              {{ t("aiObservability.versionCompare.bar.alignSameWallClock") }}
+            </OToggleGroupItem>
+            <OToggleGroupItem value="manual" size="sm">
+              {{ t("aiObservability.versionCompare.bar.alignManual") }}
+            </OToggleGroupItem>
+          </OToggleGroup>
+
+          <!-- Manual: per-arm editable date windows. In aligned modes, a compact
+               "auto: 8m" caption per arm instead (so the row height is stable). -->
+          <template v-if="align === 'manual'">
+            <DateTime
+              auto-apply
+              disable-relative
+              :default-type="'absolute'"
+              :default-absolute-time="manualDefaultA"
+              class="h-8"
+              data-test="version-compare-manual-a-window"
+              @on:date-change="(v: unknown) => onManualDateChange('a', v)"
+            />
+            <DateTime
+              auto-apply
+              disable-relative
+              :default-type="'absolute'"
+              :default-absolute-time="manualDefaultB"
+              class="h-8"
+              data-test="version-compare-manual-b-window"
+              @on:date-change="(v: unknown) => onManualDateChange('b', v)"
+            />
+          </template>
+          <span v-else class="text-xs text-text-muted" data-test="version-compare-auto-window">
+            <span class="text-accent">{{ armAMeta?.version ?? selectedA }}</span> {{ autoWindowA }}
+            <span class="mx-1 text-text-muted">·</span>
+            <span class="text-series-b">{{ armBMeta?.version ?? selectedB }}</span> {{ autoWindowB }}
+          </span>
+        </div>
+      </div>
+
       <OSkeleton
         v-if="loading && !windows"
         type="rect"
@@ -194,8 +198,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
+import { debounce } from "lodash-es";
 import { useI18n } from "vue-i18n";
 import OContent from "@/lib/core/Content/OContent.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import DateTime from "@/components/DateTime.vue";
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
 import VersionCompareBar from "./VersionCompareBar.vue";
@@ -423,21 +430,25 @@ function onSelectB(v: string) {
   requestRun();
 }
 function onAlignChange(v: AlignMode) {
+  const prev = align.value;
   align.value = v;
-  // Manual mode keeps the last good comparison on entry — the pickers are seeded
-  // to each arm's current auto window, and we only re-run when the user actually
-  // edits a picker (onManualDateChange). Running here (or on the DateTime's
-  // mount-time emit) would query half-initialized windows and render NaN/0.
-  if (v === "manual") {
-    // Each DateTime fires ONE `on:date-change` on mount (auto-apply seeding its
-    // default). Arm those two mount-emits to be swallowed so entering Manual
-    // doesn't trigger a run — DateTime's own `userChangedValue` is unreliable
-    // here (it's `true` on the mount emit, not `false`).
-    ignoreNextEmitA.value = true;
-    ignoreNextEmitB.value = true;
-    return;
-  }
-  requestRun();
+
+  // Manual mode keeps the last good comparison on entry — no re-run here. The
+  // pickers seed to each arm's current auto window; onManualDateChange only
+  // re-runs when the chosen windows actually DIFFER from what's applied (its
+  // idempotency guard), so the DateTime seed emits are inherently no-ops and
+  // entering Manual never refetches (no flicker).
+  if (v === "manual") return;
+
+  // Only re-query the metrics when the effective WINDOW actually changes. Only
+  // `sameWallClock` re-scopes both arms to the shared page window; sinceRollout
+  // and manual(unedited) use each arm's natural window, so switching BETWEEN
+  // those two (or from manual) leaves the KPI/error data identical — the align
+  // change is then purely a CHART rebasing (align/overlayMode are reactive, so
+  // the chart updates on its own). Re-running would needlessly refresh the panels
+  // above. So re-run only when entering or leaving wall-clock.
+  const touchesWallClock = v === "sameWallClock" || prev === "sameWallClock";
+  if (touchesWallClock) requestRun();
 }
 
 // ── Manual override ────────────────────────────────────────────────────────
@@ -446,10 +457,6 @@ function onAlignChange(v: AlignMode) {
 // rest of the app use, so the Manual controls look/behave consistently.
 const manualWinA = ref<{ start: number; end: number } | null>(null);
 const manualWinB = ref<{ start: number; end: number } | null>(null);
-// Swallow each picker's one mount-time `on:date-change` (the seeding emit) so
-// entering Manual never auto-runs with a half-initialized window.
-const ignoreNextEmitA = ref(false);
-const ignoreNextEmitB = ref(false);
 
 // DateTime emits { startTime, endTime } already in epoch µs (see its
 // getConsumableDateTime). Seed both pickers to each arm's resolved auto window so
@@ -466,23 +473,34 @@ const manualDefaultB = computed(() => ({
 function onManualDateChange(arm: "a" | "b", payload: unknown) {
   const p = payload as { startTime?: number; endTime?: number };
   if (p?.startTime == null || p?.endTime == null) return;
-  // Swallow the one mount-time seeding emit per picker (armed on entering Manual)
-  // so it doesn't trigger a run with a half-initialized window → NaN. Still record
-  // the seeded window so a later edit of the OTHER arm pins this one correctly.
-  const seedWin = { start: p.startTime, end: p.endTime };
-  if (arm === "a" && ignoreNextEmitA.value) { ignoreNextEmitA.value = false; manualWinA.value = seedWin; return; }
-  if (arm === "b" && ignoreNextEmitB.value) { ignoreNextEmitB.value = false; manualWinB.value = seedWin; return; }
   const win = { start: p.startTime, end: p.endTime };
   if (arm === "a") manualWinA.value = win;
   else manualWinB.value = win;
 
-  // Re-run with BOTH arms pinned — include the other arm's already-chosen (or
-  // seeded auto) window so a single edit never leaves the untouched arm querying
-  // an empty window (the NaN bug). Falls back to the auto default when unedited.
+  // Both arms pinned: the edited arm's window + the other arm's chosen-or-seeded
+  // window, so a single edit never leaves the untouched arm on an empty window.
   const winA = arm === "a" ? win : (manualWinA.value ?? { start: manualDefaultA.value.startTime, end: manualDefaultA.value.endTime });
   const winB = arm === "b" ? win : (manualWinB.value ?? { start: manualDefaultB.value.startTime, end: manualDefaultB.value.endTime });
-  requestRun({ a: winA, b: winB });
+  // Debounced so the BURST of DateTime mount emits (onMounted + a
+  // defaultAbsoluteTime watch, ×2 pickers) collapses into ONE settled run
+  // instead of 4 racing runs (the "populate/clear repeatedly + slow" thrash).
+  runManualDebounced(winA, winB);
 }
+
+// One settled run per burst. Deduped against the LAST window we ran with (not
+// props.windows — DateTime day-rounds the seed, so it never matches the exact
+// window and every seed would otherwise re-run). Entering Manual settles to the
+// seeded window == lastManualKey → no run; a real user edit changes it → one run.
+const lastManualKey = ref<string | null>(null);
+const runManualDebounced = debounce(
+  (winA: { start: number; end: number }, winB: { start: number; end: number }) => {
+    const key = `${winA.start}-${winA.end}|${winB.start}-${winB.end}`;
+    if (key === lastManualKey.value) return;
+    lastManualKey.value = key;
+    requestRun({ a: winA, b: winB });
+  },
+  250,
+);
 
 defineExpose({ align });
 </script>

@@ -60,10 +60,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @stream-change="onStreamChange"
     >
       <template #trailing>
-        <!-- Only offered when the selected agent actually has ≥2 versions to
-             compare. A disabled button reads as "broken"; hiding the affordance
-             when it can't apply is cleaner (ui-architect empty-affordance rule).
-             The tooltip explains the concept when the entry IS available. -->
+        <!-- Enter compare: only offered when the selected agent actually has ≥2
+             versions to compare. A disabled button reads as "broken"; hiding the
+             affordance when it can't apply is cleaner (ui-architect empty-affordance
+             rule). The tooltip explains the concept when the entry IS available. -->
         <OTooltip
           v-if="canCompare && !compareMode"
           :content="t('traces.lLMInsightsDashboard.compareEntryHint')"
@@ -78,6 +78,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t('traces.lLMInsightsDashboard.compareEntry') }}
           </OButton>
         </OTooltip>
+        <!-- Exit compare lives in the SAME spot as the enter affordance, so the
+             two toggle in place — the user leaves compare where they entered it. -->
+        <OButton
+          v-else-if="compareMode"
+          variant="outline"
+          size="sm"
+          icon-left="close"
+          data-test="llm-insights-compare-exit"
+          @click="exitCompareMode"
+        >
+          {{ t('aiObservability.versionCompare.bar.exit') }}
+        </OButton>
       </template>
     </AiScopeBar>
 
@@ -461,6 +473,9 @@ const canCompare = computed(() => {
 // not the page window) and re-enabled in sameWallClock (which the shared
 // picker drives). Mirrors the align mode owned by VersionCompareView.
 const compareAlign = ref<"sinceRollout" | "sameWallClock" | "manual">("sinceRollout");
+// The last A/B pair we called setPair() for. Used to skip the panel-blanking
+// setPair() on align-only re-runs (see onCompareRun) so the panels don't flicker.
+const lastComparePairKey = ref<string | null>(null);
 const compareDateDisabled = computed(
   () => compareMode.value && compareAlign.value !== "sameWallClock",
 );
@@ -484,6 +499,8 @@ function exitCompareMode() {
   compareVersionList.value = [];
   versionCompare.windows.value = null;
   versionCompare.result.value = null;
+  // Force a fresh setPair() (and its intentional blank) on the next compare entry.
+  lastComparePairKey.value = null;
 }
 
 async function onCompareRun(payload: {
@@ -494,7 +511,18 @@ async function onCompareRun(payload: {
 }) {
   compareAlign.value = payload.align;
   versionCompare.align.value = payload.align;
-  versionCompare.setPair(payload.a, payload.b);
+  // Only reset the pair when the A/B versions actually change. setPair() BLANKS
+  // result/errorDiff/windows (→ KPI skeletons, "0 traces", the failure panel
+  // unmounts) which is right when you switch agents/versions, but on an ALIGN-only
+  // re-run the pair is identical — blanking there is what made the panels flicker
+  // (disappear → reappear) on every align click. Keep the current results visible;
+  // run() overwrites them in place when the new data lands.
+  const key = (x: GenAiAgentListItem) => `${x.env ?? ""}@${x.version ?? ""}`;
+  const pairKey = `${key(payload.a)}|${key(payload.b)}`;
+  if (pairKey !== lastComparePairKey.value) {
+    lastComparePairKey.value = pairKey;
+    versionCompare.setPair(payload.a, payload.b);
+  }
   const sharedWindow =
     payload.align === "sameWallClock"
       ? { start: props.startTime, end: props.endTime }

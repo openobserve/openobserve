@@ -33,24 +33,7 @@ const OSelect = {
     "</div>",
 };
 
-const OToggleGroup = {
-  props: ["modelValue", "dataTest"],
-  emits: ["update:modelValue"],
-  template: '<div class="o-toggle-group" :data-test="dataTest"><slot /></div>',
-};
-
-const OToggleGroupItem = {
-  props: ["value"],
-  template: '<button class="o-toggle-item" :data-value="value" @click="$parent.$emit(\'update:modelValue\', value)"><slot /></button>',
-};
-
-const OButton = {
-  props: ["dataTest"],
-  emits: ["click"],
-  template: '<button class="o-button" :data-test="dataTest" @click="$emit(\'click\')"><slot /></button>',
-};
-
-const stubs = { OSelect, OToggleGroup, OToggleGroupItem, OButton };
+const stubs = { OSelect };
 
 const UNSET = "__unset__";
 
@@ -65,18 +48,18 @@ const mountBar = (overrides: Record<string, unknown> = {}) =>
       versions,
       a: "1.0.0",
       b: "1.5.0",
-      align: "sinceRollout",
       ...overrides,
     },
   });
 
 describe("VersionCompareBar", () => {
-  it("renders two version slots, align toggle, and exit button", () => {
+  it("renders the two version slots (align + exit moved out of the bar)", () => {
     const wrapper = mountBar();
     expect(wrapper.find('[data-test="version-compare-bar-a"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="version-compare-bar-b"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="version-compare-bar-align"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="version-compare-bar-exit"]').exists()).toBe(true);
+    // Align toggle and exit no longer live in the bar.
+    expect(wrapper.find('[data-test="version-compare-bar-align"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="version-compare-bar-exit"]').exists()).toBe(false);
   });
 
   it("excludes the UNSET sentinel from both slot option lists", () => {
@@ -98,20 +81,12 @@ describe("VersionCompareBar", () => {
     expect(wrapper.find('[data-test="version-compare-bar-same-hint"]').exists()).toBe(false);
   });
 
-  it("emits update:a / update:b / update:align / exit", async () => {
+  it("emits update:a / update:b when a version is picked", async () => {
     const wrapper = mountBar();
     await wrapper.find('[data-test="version-compare-bar-a"] .opt[data-value="1.5.0"]').trigger("click");
     expect(wrapper.emitted("update:a")?.[0]).toEqual(["1.5.0"]);
 
     await wrapper.find('[data-test="version-compare-bar-b"] .opt[data-value="1.0.0"]').trigger("click");
     expect(wrapper.emitted("update:b")?.[0]).toEqual(["1.0.0"]);
-
-    await wrapper
-      .find('[data-test="version-compare-bar-align"] .o-toggle-item[data-value="manual"]')
-      .trigger("click");
-    expect(wrapper.emitted("update:align")?.[0]).toEqual(["manual"]);
-
-    await wrapper.find('[data-test="version-compare-bar-exit"]').trigger("click");
-    expect(wrapper.emitted("exit")).toBeTruthy();
   });
 });

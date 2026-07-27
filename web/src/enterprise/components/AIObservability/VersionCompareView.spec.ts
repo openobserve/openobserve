@@ -26,26 +26,36 @@ const AGENT_A: GenAiAgentListItem = {
 };
 const AGENT_B: GenAiAgentListItem = { ...AGENT_A, id: "a2", version: "1.4.0" };
 
-function mountView(versionList: GenAiAgentListItem[] = [AGENT_A, AGENT_B]) {
+// A minimal non-null CompareWindows so the chart header (and thus the Align
+// toggle + manual pickers, which live with the chart) renders in tests.
+const WINDOWS = {
+  mode: "sinceRollout" as const,
+  a: { start: 1_700_000_000_000_000, end: 1_700_000_480_000_000 },
+  b: { start: 1_700_000_000_000_000, end: 1_700_000_480_000_000 },
+  deltaMicros: 480_000_000,
+  limitedBy: null,
+  overlap: "disjoint" as const,
+  overlapFraction: 0,
+};
+
+function mountView(
+  versionList: GenAiAgentListItem[] = [AGENT_A, AGENT_B],
+  windows: unknown = null,
+) {
   return mount(VersionCompareView, {
     props: {
       versionList,
       stream: "s",
-      windows: null,
+      windows,
       result: null,
       sparklinesA: null,
       sparklinesB: null,
     },
     global: {
       stubs: {
-        VersionCompareBar: {
-          ...stub("VersionCompareBar", ["update:a", "update:b", "update:align", "exit"]),
-          // Render the window-a/window-b slots: the per-arm Manual date pickers
-          // now live inside the bar (under each version picker), not in a
-          // separate row, so the stub must project those slots for the manual
-          // wiring tests to reach the ODateTimeRange controls.
-          template: `<div data-test="stub-VersionCompareBar"><slot /><slot name="window-a" /><slot name="window-b" /></div>`,
-        },
+        // The bar now holds ONLY the version pickers; align + manual windows moved
+        // to the chart header (rendered directly by the view, not via a slot).
+        VersionCompareBar: stub("VersionCompareBar", ["update:a", "update:b"]),
         VersionCompareBanner: stub("VersionCompareBanner"),
         VersionWindowCard: stub("VersionWindowCard"),
         VersionDeltaStrip: stub("VersionDeltaStrip"),
@@ -62,6 +72,15 @@ function mountView(versionList: GenAiAgentListItem[] = [AGENT_A, AGENT_B]) {
         OContent: { template: "<div><slot /></div>" },
         OCard: { template: "<div><slot /></div>" },
         OCardSection: { template: "<div><slot /></div>" },
+        // Align toggle now lives in the view's chart header. Stub renders its slot
+        // (so the DateTime pickers appear in manual mode) and re-emits selection.
+        OToggleGroup: {
+          name: "OToggleGroup",
+          props: ["modelValue", "type", "label"],
+          emits: ["update:model-value"],
+          template: `<div data-test="stub-align"><slot /></div>`,
+        },
+        OToggleGroupItem: { template: "<button><slot /></button>" },
         OInput: true,
       },
     },
@@ -94,12 +113,16 @@ describe("VersionCompareView — default version seeding", () => {
   });
 });
 
+// Switch to manual align via the chart-header toggle (OToggleGroup stub).
+async function enterManual(w: ReturnType<typeof mountView>) {
+  w.findComponent({ name: "OToggleGroup" }).vm.$emit("update:model-value", "manual");
+  await w.vm.$nextTick();
+}
+
 describe("VersionCompareView — manual override wiring (the app-standard DateTime path)", () => {
   it("uses the app-standard DateTime picker for each arm in manual mode", async () => {
-    const w = mountView();
-    // Switch the (stubbed) bar to manual mode.
-    w.findComponent({ name: "VersionCompareBar" }).vm.$emit("update:align", "manual");
-    await w.vm.$nextTick();
+    const w = mountView([AGENT_A, AGENT_B], WINDOWS);
+    await enterManual(w);
 
     const aWindow = w.find('[data-test="version-compare-manual-a-window"]');
     const bWindow = w.find('[data-test="version-compare-manual-b-window"]');
@@ -114,41 +137,49 @@ describe("VersionCompareView — manual override wiring (the app-standard DateTi
     expect(w.html()).not.toContain("datetime-local");
   });
 
-  it("swallows each picker's mount-time seed emit, then a real edit runs with BOTH arms pinned", async () => {
-    const w = mountView();
-    w.findComponent({ name: "VersionCompareBar" }).vm.$emit("update:align", "manual");
-    await w.vm.$nextTick();
+  it("collapses a BURST of DateTime mount emits into ONE debounced run (no populate/clear thrash)", async () => {
+    vi.useFakeTimers();
+    try {
+      const w = mountView([AGENT_A, AGENT_B], WINDOWS);
+      await enterManual(w);
 
-    const aPicker = w
-      .findAllComponents({ name: "DateTime" })
-      .find((c) => c.attributes("data-test") === "version-compare-manual-a-window")!;
-    const bPicker = w
-      .findAllComponents({ name: "DateTime" })
-      .find((c) => c.attributes("data-test") === "version-compare-manual-b-window")!;
+      const aPicker = w
+        .findAllComponents({ name: "DateTime" })
+        .find((c) => c.attributes("data-test") === "version-compare-manual-a-window")!;
+      const bPicker = w
+        .findAllComponents({ name: "DateTime" })
+        .find((c) => c.attributes("data-test") === "version-compare-manual-b-window")!;
 
-    // 1) Both pickers fire their mount-time seeding emit — these must be SWALLOWED
-    //    (no manual run yet; entering Manual keeps the last good comparison).
-    const runsBefore = (w.emitted("run") ?? []).length;
-    aPicker.vm.$emit("on:date-change", { startTime: 1, endTime: 2, valueType: "absolute" });
-    bPicker.vm.$emit("on:date-change", { startTime: 3, endTime: 4, valueType: "absolute" });
-    await w.vm.$nextTick();
-    // The last run (if any) is NOT a manual run — the seeds were swallowed.
-    const afterSeed = w.emitted("run") ?? [];
-    if (afterSeed.length > runsBefore) {
-      expect((afterSeed.at(-1)![0] as any).align).not.toBe("manual");
+      const runsBefore = (w.emitted("run") ?? []).length;
+      // DateTime fires its seed emit multiple times per picker on mount — a burst.
+      const start = new Date("2026-07-01T00:00:00").getTime() * 1000;
+      const end = new Date("2026-07-02T00:00:00").getTime() * 1000;
+      aPicker.vm.$emit("on:date-change", { startTime: start, endTime: end });
+      aPicker.vm.$emit("on:date-change", { startTime: start, endTime: end });
+      bPicker.vm.$emit("on:date-change", { startTime: start + 1, endTime: end });
+      aPicker.vm.$emit("on:date-change", { startTime: start, endTime: end });
+      // Before the debounce settles: NO run has fired yet.
+      expect((w.emitted("run") ?? []).length).toBe(runsBefore);
+
+      // After the debounce window: exactly ONE run for the whole burst.
+      vi.advanceTimersByTime(300);
+      await w.vm.$nextTick();
+      expect((w.emitted("run") ?? []).length).toBe(runsBefore + 1);
+
+      const payload = w.emitted("run")!.at(-1)![0] as any;
+      expect(payload.align).toBe("manual");
+      // Both arms pinned from the last settled emit values.
+      expect(payload.manual.a).toEqual({ start, end });
+      expect(payload.manual.b).toEqual({ start: start + 1, end });
+
+      // A repeat of the SAME window is deduped — no second run.
+      aPicker.vm.$emit("on:date-change", { startTime: start, endTime: end });
+      bPicker.vm.$emit("on:date-change", { startTime: start + 1, endTime: end });
+      vi.advanceTimersByTime(300);
+      await w.vm.$nextTick();
+      expect((w.emitted("run") ?? []).length).toBe(runsBefore + 1);
+    } finally {
+      vi.useRealTimers();
     }
-
-    // 2) A REAL user edit of arm A now runs, pinning BOTH arms (B at its seeded 3–4).
-    const start = new Date("2026-07-01T00:00:00").getTime() * 1000;
-    const end = new Date("2026-07-02T00:00:00").getTime() * 1000;
-    aPicker.vm.$emit("on:date-change", { startTime: start, endTime: end, valueType: "absolute" });
-    await w.vm.$nextTick();
-
-    const payload = w.emitted("run")!.at(-1)![0] as any;
-    expect(payload.align).toBe("manual");
-    expect(payload.manual.a.start).toBe(start);
-    expect(payload.manual.a.end).toBe(end);
-    // Arm B pinned to its swallowed seed (3–4), NOT left empty → no NaN.
-    expect(payload.manual.b).toEqual({ start: 3, end: 4 });
   });
 });

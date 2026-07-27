@@ -66,6 +66,26 @@ function isSameVariant(
  *   await vc.run("my_traces_stream");
  *   console.log(vc.result.value?.metrics);
  */
+// Structural equality for the resolved compare WINDOW BOUNDS. Used to keep the
+// `windows` ref referentially stable across an align switch that doesn't move
+// the bounds (e.g. Manual↔Since-rollout on equal-lifetime versions), so the arm
+// cards / chart header / overlay chart don't re-render and flicker. Deliberately
+// ignores `mode` — the chart's overlay mode derives from the `align` ref, not
+// from `windows.mode`, so a mode-only change must NOT force a windows reassign.
+function windowsEqual(x: CompareWindows | null, y: CompareWindows | null): boolean {
+  if (x === y) return true;
+  if (!x || !y) return false;
+  return (
+    x.a.start === y.a.start &&
+    x.a.end === y.a.end &&
+    x.b.start === y.b.start &&
+    x.b.end === y.b.end &&
+    x.deltaMicros === y.deltaMicros &&
+    x.limitedBy === y.limitedBy &&
+    x.overlap === y.overlap
+  );
+}
+
 export function useVersionCompare() {
   const store = useStore();
   const { t } = useI18n();
@@ -164,9 +184,6 @@ export function useVersionCompare() {
     sharedWindow?: { start: number; end: number },
   ): Promise<void> {
     if (!a.value || !b.value) return;
-    const __t0 = performance.now();
-    // eslint-disable-next-line no-console
-    console.warn("[compare-timing] run() start", { a: a.value.version, b: b.value.version, align: align.value });
 
     if (isUnset(a.value) || isUnset(b.value)) {
       if (isUnset(a.value)) armA.error.value = UNSET_ERROR;
@@ -204,7 +221,13 @@ export function useVersionCompare() {
     // manual branch already returns natural windows as the baseline.
     if (manualWindows?.a) resolved.a = manualWindows.a;
     if (manualWindows?.b) resolved.b = manualWindows.b;
-    windows.value = resolved;
+    // Keep the same object reference when the resolved windows are unchanged, so
+    // downstream consumers (arm cards, chart header, overlay-chart mode) don't
+    // re-render on a no-op align switch — only a genuine window change (e.g.
+    // toggling sameWallClock) reassigns and re-renders. Prevents the panel flicker.
+    if (!windowsEqual(windows.value, resolved)) {
+      windows.value = resolved;
+    }
 
     // sameWallClock: both arms query the SAME page window (when supplied) so
     // the comparison is a true wall-clock overlay, not each arm's disjoint
@@ -253,14 +276,11 @@ export function useVersionCompare() {
       .then((res: any) => res.data as CompareAgentVersionsResponse)
       .catch(() => null);
 
-    const __fetchStart = performance.now();
     const [, , endpointResponse] = await Promise.all([
       fetchAPromise,
       fetchBPromise,
       endpointPromise,
     ]);
-    // eslint-disable-next-line no-console
-    console.warn(`[compare-timing] fetch+endpoint (concurrent): ${(performance.now() - __fetchStart).toFixed(0)}ms`, { endpointReturned: !!endpointResponse });
 
     const useEndpoint =
       !!endpointResponse && endpointHasSufficientLatencyAndCost(endpointResponse);
@@ -275,12 +295,8 @@ export function useVersionCompare() {
       // No raw scan on this path — nothing to disclose as sample-capped.
       sampledNote.value = null;
       errorDiff.value = endpointResponse.error_diff ?? null;
-      // eslint-disable-next-line no-console
-      console.warn(`[compare-timing] TOTAL (fast sketch path): ${(performance.now() - __t0).toFixed(0)}ms`);
       return;
     }
-    // eslint-disable-next-line no-console
-    console.warn(`[compare-timing] endpoint insufficient → RAW-SAMPLE BOOTSTRAP FALLBACK (the slow path) at ${(performance.now() - __t0).toFixed(0)}ms`);
 
     // Fallback: the endpoint reported `insufficient` (or errored/threw) for
     // latency/cost — fall back to the raw-sample bootstrap path so nothing
@@ -309,16 +325,12 @@ export function useVersionCompare() {
       return { durations: [], costs: [] };
     });
 
-    const __sampleStart = performance.now();
     const [samplesA, samplesB] = await Promise.all([sampleAPromise, sampleBPromise]);
-    // eslint-disable-next-line no-console
-    console.warn(`[compare-timing] raw-sample fetch: ${(performance.now() - __sampleStart).toFixed(0)}ms`, { nA: samplesA.durations.length, nB: samplesB.durations.length });
 
     // Raw-sample fallback path has no error diff (only the sketch-merge
     // endpoint computes it).
     errorDiff.value = null;
 
-    const __bootStart = performance.now();
     result.value = buildCompareResult(
       armA.kpi.value,
       armB.kpi.value,
@@ -327,10 +339,6 @@ export function useVersionCompare() {
       resolved,
       1,
     );
-    // eslint-disable-next-line no-console
-    console.warn(`[compare-timing] bootstrap CI compute (SYNCHRONOUS, blocks main thread): ${(performance.now() - __bootStart).toFixed(0)}ms`);
-    // eslint-disable-next-line no-console
-    console.warn(`[compare-timing] TOTAL (raw-sample fallback path): ${(performance.now() - __t0).toFixed(0)}ms`);
 
     // Sample-cap disclosure: latency/cost intervals only ever see up to
     // SAMPLE_CAP randomly-sampled traces per arm, regardless of traceCount —
