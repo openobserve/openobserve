@@ -15,22 +15,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="flex flex-col justify-center gap-2 leading-tight min-w-0 h-full">
-    <div class="flex items-center flex-nowrap min-w-0">
+  <div class="flex h-full min-w-0 flex-col justify-center gap-2 leading-tight">
+    <div class="flex min-w-0 flex-nowrap items-center">
       <span
         v-if="column.country_iso_code"
         :class="`fi fi-${column.country_iso_code} mr-1.5 shrink-0`"
       />
-      <div class="text-xs truncate">{{ column.country || "Unknown" }}</div>
+      <div class="truncate text-xs">{{ column.country || "Unknown" }}</div>
     </div>
-    <div class="flex items-center flex-nowrap min-w-0 text-xs text-text-secondary">
+    <div class="text-text-secondary flex min-w-0 flex-nowrap items-center text-xs">
       <template v-for="(part, index) in detailParts" :key="`${index}-${part}`">
         <OIcon
           v-if="index > 0"
           data-test="circle-icon"
           name="circle"
           size="xs"
-          class="mx-1.5 text-icon-color shrink-0"
+          class="text-icon-color mx-1.5 shrink-0"
         />
         <span class="truncate">{{ part }}</span>
       </template>

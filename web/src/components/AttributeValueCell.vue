@@ -1,11 +1,6 @@
 <template>
-  <div class="flex items-center w-full">
-    <ODropdown
-      v-if="hasDropdownSlot"
-      v-model:open="isDropdownOpen"
-      side="bottom"
-      align="start"
-    >
+  <div class="flex w-full items-center">
+    <ODropdown v-if="hasDropdownSlot" v-model:open="isDropdownOpen" side="bottom" align="start">
       <template #trigger>
         <OButton
           data-test="attribute-value-cell-dropdown-btn"
@@ -20,7 +15,7 @@
         <slot name="dropdown" :field="field" :value="value" />
       </div>
     </ODropdown>
-    <span class="pl-1 truncate">{{ value }}</span>
+    <span class="truncate pl-1">{{ value }}</span>
   </div>
 </template>
 

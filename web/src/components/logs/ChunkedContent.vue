@@ -44,7 +44,7 @@ Usage:
     <!-- Load more button and info -->
     <div
       v-if="shouldShowLoadMore"
-      class="pt-2 [border-top:1px_solid_var(--color-card-glass-border)] mt-2 flex items-center gap-3"
+      class="mt-2 flex items-center gap-3 pt-2 [border-top:1px_solid_var(--color-card-glass-border)]"
     >
       <OButton
         :data-test="`load-more-btn-${fieldKey}`"
@@ -53,10 +53,20 @@ Usage:
         @click="handleLoadMore"
       >
         <OIcon name="expand-more" size="xs" class="mr-1" />
-        {{ t('logs.chunkedContent.loadMore', { loaded: chunkInfo.loadedSizeKB, total: chunkInfo.totalSizeKB }) }}
+        {{
+          t("logs.chunkedContent.loadMore", {
+            loaded: chunkInfo.loadedSizeKB,
+            total: chunkInfo.totalSizeKB,
+          })
+        }}
       </OButton>
-      <span class="text-sm font-medium text-theme-accent">
-        {{ t('logs.chunkedContent.showingChunk', { current: chunkInfo.currentChunk, total: chunkInfo.totalChunks }) }}
+      <span class="text-theme-accent text-sm font-medium">
+        {{
+          t("logs.chunkedContent.showingChunk", {
+            current: chunkInfo.currentChunk,
+            total: chunkInfo.totalChunks,
+          })
+        }}
       </span>
     </div>
   </div>
@@ -133,7 +143,7 @@ watch(
   () => {
     initializeIfNeeded();
   },
-  { deep: true }
+  { deep: true },
 );
 
 // Get visible content for current chunk state

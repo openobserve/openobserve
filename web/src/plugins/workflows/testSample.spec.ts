@@ -43,9 +43,7 @@ describe("buildTestSample", () => {
 
   it("prefills every meta field the Alert Trigger schema declares, in schema order", () => {
     const [firing] = buildTestSample() as [Envelope];
-    const expectedKeys = TRIGGER_META_VARS.map((v) =>
-      v.ref.replace(/^meta\./, ""),
-    );
+    const expectedKeys = TRIGGER_META_VARS.map((v) => v.ref.replace(/^meta\./, ""));
     expect(Object.keys(firing.meta)).toEqual(expectedKeys);
   });
 
@@ -69,9 +67,9 @@ describe("buildTestSample", () => {
   it("uses microsecond-epoch timestamps 10 minutes apart", () => {
     const [firing] = buildTestSample() as [Envelope];
     expect(firing.meta.alert_start_time).toBe(String(SAMPLE_TS));
-    expect(
-      Number(firing.meta.alert_end_time) - Number(firing.meta.alert_start_time),
-    ).toBe(600000000);
+    expect(Number(firing.meta.alert_end_time) - Number(firing.meta.alert_start_time)).toBe(
+      600000000,
+    );
   });
 
   it("emits every meta field as a string (the real payload's meta is a string:string map)", () => {
@@ -84,9 +82,7 @@ describe("buildTestSample", () => {
 
   it("uses a valid enum member for alert_type", () => {
     const [firing] = buildTestSample() as [Envelope];
-    const enumValues = TRIGGER_META_VARS.find(
-      (v) => v.ref === "meta.alert_type",
-    )?.enumValues;
+    const enumValues = TRIGGER_META_VARS.find((v) => v.ref === "meta.alert_type")?.enumValues;
     expect(enumValues).toContain(firing.meta.alert_type);
   });
 
@@ -110,17 +106,13 @@ describe("buildTestSample", () => {
     expect(a[0].data).not.toBe(b[0].data);
 
     a[0].meta.alert_name = "mutated";
-    expect((buildTestSample() as [Envelope])[0].meta.alert_name).toBe(
-      "High Error Rate",
-    );
+    expect((buildTestSample() as [Envelope])[0].meta.alert_name).toBe("High Error Rate");
   });
 });
 
 describe("buildTestSampleText", () => {
   it("is the pretty-printed JSON of buildTestSample()", () => {
-    expect(buildTestSampleText()).toBe(
-      JSON.stringify(buildTestSample(), null, 2),
-    );
+    expect(buildTestSampleText()).toBe(JSON.stringify(buildTestSample(), null, 2));
   });
 
   it("round-trips back to the sample object", () => {
@@ -279,9 +271,7 @@ describe("type-based fallbacks for unmapped meta fields", () => {
   });
 
   it("produces an empty meta block when the schema is empty", async () => {
-    const { buildTestSample: build, buildFlatTestSample: flat } = await loadWith(
-      [],
-    );
+    const { buildTestSample: build, buildFlatTestSample: flat } = await loadWith([]);
     expect((build() as any)[0].meta).toEqual({});
     expect(flat()).toEqual([
       {

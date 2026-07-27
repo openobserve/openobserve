@@ -14,11 +14,10 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use infra::table::scorers::ScorerType;
+use openobserve_core::llm_evaluations::scorers::schema_derivation::ExtraMetadataField;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use utoipa::ToSchema;
-
-use crate::service::llm_evaluations::scorers::schema_derivation::ExtraMetadataField;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, ToSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]

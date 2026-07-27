@@ -62,9 +62,9 @@ export function useTableKeyboard<TData>(
         event.preventDefault();
         if (focusedCell) {
           const rowEl = focusedCell.closest("tr");
-          const rowIndex = Array.from(
-            rowEl?.parentElement?.children ?? [],
-          ).indexOf(rowEl as Element);
+          const rowIndex = Array.from(rowEl?.parentElement?.children ?? []).indexOf(
+            rowEl as Element,
+          );
           if (rowIndex >= 0 && rowIndex < rows.length) {
             options?.onRowSelect?.(rows[rowIndex].original);
           }
@@ -100,16 +100,10 @@ export function useTableKeyboard<TData>(
     const rowIndex = rows.indexOf(row);
     const cellIndex = cells.indexOf(cell as Element);
 
-    const newRowIndex = Math.max(
-      0,
-      Math.min(rows.length - 1, rowIndex + rowDelta),
-    );
+    const newRowIndex = Math.max(0, Math.min(rows.length - 1, rowIndex + rowDelta));
     const newCellIndex = Math.max(
       0,
-      Math.min(
-        (rows[newRowIndex]?.children.length ?? 1) - 1,
-        cellIndex + colDelta,
-      ),
+      Math.min((rows[newRowIndex]?.children.length ?? 1) - 1, cellIndex + colDelta),
     );
 
     focusCell(newRowIndex, newCellIndex);

@@ -24,6 +24,7 @@ use config::{
     meta::gen_ai::GenAiAgentMappingConfig,
     utils::{json, time::parse_timestamp_micro_from_value},
 };
+use db::model_pricing::CachedModelPricing;
 
 use super::{
     attributes::{
@@ -37,7 +38,7 @@ use super::{
     },
     pricing,
 };
-use crate::{common::meta::traces::Event, service::db::model_pricing::CachedModelPricing};
+use crate::common::meta::traces::Event;
 
 /// Results of extracting span enrichment data from raw attributes.
 /// Captures all information needed before I/O attribute cleanup.
@@ -259,7 +260,7 @@ impl OtelIngestionProcessor {
         if is_generation_or_embedding(extracted.op_name) {
             let span_ts_micros = i64::try_from(span_start_nanos / 1_000).unwrap_or(i64::MAX);
             let matched_pricing = extracted.model_name.as_ref().and_then(|mn| {
-                crate::service::db::model_pricing::find_pricing_sync_at(
+                crate::db::model_pricing::find_pricing_sync_at(
                     org_pricing_entries,
                     mn,
                     Some(span_ts_micros),
@@ -295,7 +296,7 @@ impl OtelIngestionProcessor {
             if cost.is_empty() {
                 if let Some(pricing_def) = matched_pricing {
                     let result =
-                        crate::service::db::model_pricing::calculate_cost_from_definition_with_tier_usage(
+                        crate::db::model_pricing::calculate_cost_from_definition_with_tier_usage(
                             &pricing_def,
                             &billable_usage,
                             &tier_usage,

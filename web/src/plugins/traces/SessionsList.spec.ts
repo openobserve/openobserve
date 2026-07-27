@@ -94,14 +94,7 @@ vi.mock("vue-i18n", () => ({
 vi.mock("@/lib/core/Table/OTable.vue", () => ({
   default: {
     name: "OTable",
-    props: [
-      "data",
-      "columns",
-      "loading",
-      "rowKey",
-      "totalCount",
-      "footerTitle",
-    ],
+    props: ["data", "columns", "loading", "rowKey", "totalCount", "footerTitle"],
     emits: ["row-click"],
     // Mirrors the OTable contract the component relies on: a loading state, one
     // row per item, the `#empty` slot when there are no rows, and a footer that
@@ -200,7 +193,6 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import SessionsList from "./SessionsList.vue";
 
-
 const defaultProps = {
   streamName: "test-stream",
   startTime: 1000,
@@ -249,9 +241,7 @@ beforeEach(() => {
 
   // Default: streams load fine
   mockGetStreams.mockResolvedValue({
-    list: [
-      { name: "test-stream", settings: { is_llm_stream: true } },
-    ],
+    list: [{ name: "test-stream", settings: { is_llm_stream: true } }],
   });
   mockListAgents.mockResolvedValue({ agents: [] });
   mockFetchPage.mockImplementation(async () => {
@@ -287,9 +277,7 @@ describe("SessionsList — no LLM streams", () => {
 
     // With no LLM streams at all, the dedicated first-run empty state renders
     // on its own — the table (and its `#empty` slot) is not mounted.
-    expect(
-      wrapper.find("[data-test='sessions-empty-no-streams']").exists(),
-    ).toBe(true);
+    expect(wrapper.find("[data-test='sessions-empty-no-streams']").exists()).toBe(true);
   });
 });
 
@@ -340,9 +328,7 @@ describe("SessionsList — loading state", () => {
 
     const wrapper = await mountComponent();
     // The TenstackTable mock renders the loading slot when loading=true
-    expect(wrapper.find("[data-test='sessions-list-loading']").exists()).toBe(
-      true,
-    );
+    expect(wrapper.find("[data-test='sessions-list-loading']").exists()).toBe(true);
   });
 });
 
@@ -354,14 +340,7 @@ describe("SessionsList — sessions table", () => {
     const wrapper = await mountComponent();
     await refreshComponent(wrapper);
 
-    expect(mockFetchPage).toHaveBeenCalledWith(
-      "test-stream",
-      1000,
-      2000,
-      0,
-      20,
-      "",
-    );
+    expect(mockFetchPage).toHaveBeenCalledWith("test-stream", 1000, 2000, 0, 20, "");
   });
 
   it("should not load agents while refreshing when in stream mode", async () => {
@@ -414,15 +393,11 @@ describe("SessionsList — sessions table", () => {
 
   it("status badge shows 'error' status for error sessions", async () => {
     mockHasLoadedOnce.value = true;
-    mockSessions.value = [
-      makeSession({ sessionId: "sess-err", status: "error", errorCount: 1 }),
-    ];
+    mockSessions.value = [makeSession({ sessionId: "sess-err", status: "error", errorCount: 1 })];
     mockTotal.value = 1;
 
     const wrapper = await mountComponent();
-    const statusCell = wrapper.find(
-      '[data-test="sessions-list-status-sess-err"]',
-    );
+    const statusCell = wrapper.find('[data-test="sessions-list-status-sess-err"]');
     expect(statusCell.exists()).toBe(true);
     // Migrated to <OTag type="sessionStatus">: registry label + error-soft variant.
     expect(statusCell.text()).toContain("Error");
@@ -431,9 +406,7 @@ describe("SessionsList — sessions table", () => {
 
   it("token column renders input → output (Σ total) format", async () => {
     mockHasLoadedOnce.value = true;
-    mockSessions.value = [
-      makeSession({ inputTokens: 10, outputTokens: 20, tokens: 30 }),
-    ];
+    mockSessions.value = [makeSession({ inputTokens: 10, outputTokens: 20, tokens: 30 })];
     mockTotal.value = 1;
 
     const wrapper = await mountComponent();

@@ -102,9 +102,7 @@ export function applyGraphCollapse(
       nodes.filter((n) => state.hiddenKinds.has(kindOf(n))).map((n) => n.id),
     );
     nodes = nodes.filter((n) => !hiddenIds.has(n.id));
-    edges = edges.filter(
-      (e) => !hiddenIds.has(e.to) && !(e.from != null && hiddenIds.has(e.from)),
-    );
+    edges = edges.filter((e) => !hiddenIds.has(e.to) && !(e.from != null && hiddenIds.has(e.from)));
   }
 
   // 2. Decide which KINDS are collapsible at all (auto over threshold, or
@@ -112,8 +110,7 @@ export function applyGraphCollapse(
   //    foldable) or fully collapsed is decided per-group in step 3b — so
   //    expanding one caller's group never expands another caller's.
   const shouldCollapseAll =
-    state.mode === "collapsed" ||
-    (state.mode === "auto" && nodes.length > state.threshold);
+    state.mode === "collapsed" || (state.mode === "auto" && nodes.length > state.threshold);
   const collapsibleKinds = new Set<string>();
   if (state.mode !== "expanded" && shouldCollapseAll) {
     for (const k of DEP_KINDS) collapsibleKinds.add(k);
@@ -144,8 +141,13 @@ export function applyGraphCollapse(
     let g = groups.get(gid);
     if (!g) {
       g = {
-        id: gid, label: "", requests: 0, errors: 0,
-        service_type: kind, is_group: true, member_count: 0,
+        id: gid,
+        label: "",
+        requests: 0,
+        errors: 0,
+        service_type: kind,
+        is_group: true,
+        member_count: 0,
         group_caller: caller,
       };
       groups.set(gid, g);
@@ -177,7 +179,9 @@ export function applyGraphCollapse(
       ce.failed_requests += e.failed_requests || 0;
     } else {
       callerEdge.set(ck, {
-        ...e, from: caller, to: gid,
+        ...e,
+        from: caller,
+        to: gid,
         total_requests: e.total_requests || 0,
         failed_requests: e.failed_requests || 0,
         connection_type: kind,
@@ -191,7 +195,9 @@ export function applyGraphCollapse(
       me.failed_requests += e.failed_requests || 0;
     } else {
       memberEdge.set(mk, {
-        ...e, from: gid, to: depId,
+        ...e,
+        from: gid,
+        to: depId,
         total_requests: e.total_requests || 0,
         failed_requests: e.failed_requests || 0,
         connection_type: kind,

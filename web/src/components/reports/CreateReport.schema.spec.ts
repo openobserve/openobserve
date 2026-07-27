@@ -7,10 +7,7 @@
 // in superRefine.
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import {
-  getCronIntervalDifferenceInSeconds,
-  isAboveMinRefreshInterval,
-} from "@/utils/zincutils";
+import { getCronIntervalDifferenceInSeconds, isAboveMinRefreshInterval } from "@/utils/zincutils";
 import { makeCreateReportSchema } from "./CreateReport.schema";
 
 // Deterministic mocks for the resource-name + cron helpers (the schema imports
@@ -21,8 +18,7 @@ vi.mock("@/utils/zincutils", () => ({
   isAboveMinRefreshInterval: vi.fn(() => true),
 }));
 
-const t = (key: string) =>
-  key === "common.nameRequired" ? "Name is required" : key;
+const t = (key: string) => (key === "common.nameRequired" ? "Name is required" : key);
 
 const schema = makeCreateReportSchema(t, { min_auto_refresh_interval: 5 });
 
@@ -95,30 +91,22 @@ describe("CreateReport.schema", () => {
     });
 
     it("accepts a clean resource name", () => {
-      expect(errorPaths({ ...base(), name: "valid_report-1" })).not.toContain(
-        "name",
-      );
+      expect(errorPaths({ ...base(), name: "valid_report-1" })).not.toContain("name");
     });
   });
 
   // ── dashboard folder / dashboard / tabs: required (field-array row) ────────
   describe("dashboards[0] folder / dashboard / tabs (required)", () => {
     it("requires the folder", () => {
-      expect(errorPaths(withDash({ folder: "" }))).toContain(
-        "dashboards.0.folder",
-      );
+      expect(errorPaths(withDash({ folder: "" }))).toContain("dashboards.0.folder");
     });
 
     it("requires the dashboard", () => {
-      expect(errorPaths(withDash({ dashboard: "" }))).toContain(
-        "dashboards.0.dashboard",
-      );
+      expect(errorPaths(withDash({ dashboard: "" }))).toContain("dashboards.0.dashboard");
     });
 
     it("requires the tab", () => {
-      expect(errorPaths(withDash({ tabs: "" }))).toContain(
-        "dashboards.0.tabs",
-      );
+      expect(errorPaths(withDash({ tabs: "" }))).toContain("dashboards.0.tabs");
     });
 
     it("requires at least one dashboard row", () => {
@@ -130,17 +118,13 @@ describe("CreateReport.schema", () => {
   describe("dashboards[0].timerange", () => {
     it("requires a period for relative time ranges", () => {
       expect(
-        errorPaths(
-          withDash({ timerange: { type: "relative", period: "", from: 0, to: 0 } }),
-        ),
+        errorPaths(withDash({ timerange: { type: "relative", period: "", from: 0, to: 0 } })),
       ).toContain("dashboards.0.timerange");
     });
 
     it("requires from + to for absolute time ranges", () => {
       expect(
-        errorPaths(
-          withDash({ timerange: { type: "absolute", period: "", from: 0, to: 0 } }),
-        ),
+        errorPaths(withDash({ timerange: { type: "absolute", period: "", from: 0, to: 0 } })),
       ).toContain("dashboards.0.timerange");
     });
 
@@ -173,21 +157,15 @@ describe("CreateReport.schema", () => {
     });
 
     it("rejects an unparseable cron expression", () => {
-      vi.mocked(getCronIntervalDifferenceInSeconds).mockImplementationOnce(
-        () => {
-          throw new Error("Invalid cron expression");
-        },
-      );
-      expect(errorPaths({ ...cronBase(), cron: "not-a-cron" })).toContain(
-        "cron",
-      );
+      vi.mocked(getCronIntervalDifferenceInSeconds).mockImplementationOnce(() => {
+        throw new Error("Invalid cron expression");
+      });
+      expect(errorPaths({ ...cronBase(), cron: "not-a-cron" })).toContain("cron");
     });
 
     it("rejects a cron without exactly 6 fields", () => {
       // 5 fields — the mock still returns a number, so the field-count rule fires.
-      expect(errorPaths({ ...cronBase(), cron: "0 12 * * *" })).toContain(
-        "cron",
-      );
+      expect(errorPaths({ ...cronBase(), cron: "0 12 * * *" })).toContain("cron");
     });
 
     it("rejects a cron below the minimum refresh interval", () => {
@@ -196,9 +174,7 @@ describe("CreateReport.schema", () => {
     });
 
     it("does NOT require cron when not in cron mode", () => {
-      expect(errorPaths({ ...base(), frequencyType: "once", cron: "" })).not.toContain(
-        "cron",
-      );
+      expect(errorPaths({ ...base(), frequencyType: "once", cron: "" })).not.toContain("cron");
     });
   });
 
@@ -212,15 +188,11 @@ describe("CreateReport.schema", () => {
     });
 
     it("requires the interval in custom mode", () => {
-      expect(errorPaths({ ...customBase(), customInterval: 0 })).toContain(
-        "customInterval",
-      );
+      expect(errorPaths({ ...customBase(), customInterval: 0 })).toContain("customInterval");
     });
 
     it("requires the period in custom mode", () => {
-      expect(errorPaths({ ...customBase(), customPeriod: "" })).toContain(
-        "customPeriod",
-      );
+      expect(errorPaths({ ...customBase(), customPeriod: "" })).toContain("customPeriod");
     });
 
     it("accepts a valid custom interval + period", () => {
@@ -270,9 +242,9 @@ describe("CreateReport.schema", () => {
     });
 
     it("is NOT required for non-cron schedule-now", () => {
-      expect(
-        errorPaths({ ...base(), selectedTimeTab: "scheduleNow", timezone: "" }),
-      ).not.toContain("timezone");
+      expect(errorPaths({ ...base(), selectedTimeTab: "scheduleNow", timezone: "" })).not.toContain(
+        "timezone",
+      );
     });
   });
 
@@ -297,9 +269,7 @@ describe("CreateReport.schema", () => {
 
     it("rejects a malformed or empty date", () => {
       // DD-MM-YYYY (old free-typed format) is now invalid — the live control is ISO.
-      expect(errorPaths({ ...laterBase(), date: "31-01-2025" })).toContain(
-        "date",
-      );
+      expect(errorPaths({ ...laterBase(), date: "31-01-2025" })).toContain("date");
       expect(errorPaths({ ...laterBase(), date: "" })).toContain("date");
     });
 
@@ -343,15 +313,13 @@ describe("CreateReport.schema", () => {
 
     it("requires a valid email list", () => {
       expect(errorPaths({ ...base(), emails: "" })).toContain("emails");
-      expect(errorPaths({ ...base(), emails: "not-an-email" })).toContain(
-        "emails",
-      );
+      expect(errorPaths({ ...base(), emails: "not-an-email" })).toContain("emails");
     });
 
     it("accepts multiple emails separated by , or ;", () => {
-      expect(
-        errorPaths({ ...base(), emails: "a@b.com, c@d.com; e@f.com" }),
-      ).not.toContain("emails");
+      expect(errorPaths({ ...base(), emails: "a@b.com, c@d.com; e@f.com" })).not.toContain(
+        "emails",
+      );
     });
 
     it("does NOT require title/emails for a cached report", () => {

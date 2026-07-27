@@ -24,7 +24,7 @@ use hashbrown::HashMap;
 use promql_parser::parser::EvalStmt;
 use tokio::sync::{RwLock, Semaphore};
 
-use super::Engine;
+use super::engine::Engine;
 use crate::{
     DEFAULT_LOOKBACK, TableProvider, micros, micros_since_epoch,
     selector_visitor::MetricSelectorVisitor,

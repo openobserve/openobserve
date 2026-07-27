@@ -105,6 +105,17 @@ pub async fn list_visible(org_id: &str) -> Result<Vec<SyntheticsLocationRecord>,
     Ok(rows.into_iter().map(Into::into).collect())
 }
 
+/// All private rows across orgs — used by the staleness watcher.
+pub async fn list_private() -> Result<Vec<SyntheticsLocationRecord>, errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let rows = Entity::find()
+        .filter(Column::Kind.eq(KIND_PRIVATE))
+        .all(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+    Ok(rows.into_iter().map(Into::into).collect())
+}
+
 /// Find one location by id.
 pub async fn get(id: &str) -> Result<Option<SyntheticsLocationRecord>, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;

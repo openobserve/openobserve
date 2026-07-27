@@ -99,10 +99,7 @@ export function promqlSeedFor(
  * has been added but not yet filled in, which renders to nothing yet is still a
  * chip on screen that must not vanish.
  */
-export function isAutoSeededSlot(
-  dashboardPanelData: any,
-  overrides: SeedContext = {},
-): boolean {
+export function isAutoSeededSlot(dashboardPanelData: any, overrides: SeedContext = {}): boolean {
   const idx = dashboardPanelData.layout.currentQueryIndex;
   const slot = dashboardPanelData.data.queries?.[idx];
   if (!slot) return true;

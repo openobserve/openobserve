@@ -32,7 +32,7 @@ use promql_parser::{
 use rayon::iter::{IntoParallelIterator, IntoParallelRefMutIterator, ParallelIterator};
 
 use super::{
-    PromqlContext,
+    exec::PromqlContext,
     label_usage::labels_dropped_at_root,
     selector_loader::{LoadedMetrics, PartitionedMetrics, selector_load_data_from_datafusion},
 };

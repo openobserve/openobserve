@@ -147,18 +147,17 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
    */
   const injectedLoadingState = inject<any>("variablesAndPanelsDataLoadingState", null);
 
-  const variablesAndPanelsDataLoadingState = injectedLoadingState || reactive({
-    variablesData: {} as Record<string, boolean>,
-    panels: {} as Record<string, boolean>,
-    searchRequestTraceIds: {} as Record<string, string[]>,
-  });
+  const variablesAndPanelsDataLoadingState =
+    injectedLoadingState ||
+    reactive({
+      variablesData: {} as Record<string, boolean>,
+      panels: {} as Record<string, boolean>,
+      searchRequestTraceIds: {} as Record<string, string[]>,
+    });
 
   // Provide loading state for child components (either injected or newly created)
   // This ensures PanelSchemaRenderer can inject it
-  provide(
-    "variablesAndPanelsDataLoadingState",
-    variablesAndPanelsDataLoadingState,
-  );
+  provide("variablesAndPanelsDataLoadingState", variablesAndPanelsDataLoadingState);
 
   /** Computed array of search request trace IDs (for cancel functionality) */
   const searchRequestTraceIds: ComputedRef<string[]> = computed(() => {
@@ -181,12 +180,7 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
     setHoveredSeriesName: function (name: string) {
       hoveredSeriesState.value.hoveredSeriesName = name ?? "";
     },
-    setIndex: function (
-      dataIndex: number,
-      seriesIndex: number,
-      panelId: any,
-      hoveredTime?: any,
-    ) {
+    setIndex: function (dataIndex: number, seriesIndex: number, panelId: any, hoveredTime?: any) {
       hoveredSeriesState.value.dataIndex = dataIndex ?? -1;
       hoveredSeriesState.value.seriesIndex = seriesIndex ?? -1;
       hoveredSeriesState.value.panelId = panelId ?? -1;
@@ -220,8 +214,7 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
       dashboardPanelData.data.queries[0].fields?.breakdown?.length === 0 &&
       dashboardPanelData.data.queries[0].fields.y.length === 0 &&
       dashboardPanelData.data.queries[0].fields.z.length === 0 &&
-      dashboardPanelData.data.queries[0].fields.filter.conditions.length ===
-        0 &&
+      dashboardPanelData.data.queries[0].fields.filter.conditions.length === 0 &&
       dashboardPanelData.data.queries.length === 1
     );
   };
@@ -323,9 +316,7 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
         validatePanel(errors, true);
 
         if (errors.length) {
-          showErrorNotification(
-            "There are some errors, please fix them and try again",
-          );
+          showErrorNotification("There are some errors, please fix them and try again");
           // Do not return early — query still fires to allow partial results
         }
       }
@@ -421,10 +412,7 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
    * @param metadata - Query metadata
    */
   const handleResultMetadataUpdate = (metadata: any): void => {
-    maxQueryRangeWarning.value = processQueryMetadataErrors(
-      metadata,
-      store.state.timezone,
-    );
+    maxQueryRangeWarning.value = processQueryMetadataErrors(metadata, store.state.timezone);
   };
 
   /**
@@ -553,9 +541,7 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
         const filteredFieldList = fields
           .filter(
             (field: string) =>
-              !aliasList.some(
-                (alias: string) => alias.toLowerCase() === field.toLowerCase(),
-              ),
+              !aliasList.some((alias: string) => alias.toLowerCase() === field.toLowerCase()),
           )
           .map((field: string) => ({ name: field, type: "Utf8" }));
         getQueryFields(queryIndex).vrlFunctionFieldList = filteredFieldList;
@@ -563,8 +549,7 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
 
       // Sync active query's VRL fields to shared meta for the field selector UI
       const activeQf = dashboardPanelData.meta.queryFields[currentQueryIndex];
-      dashboardPanelData.meta.stream.vrlFunctionFieldList =
-        activeQf?.vrlFunctionFieldList ?? [];
+      dashboardPanelData.meta.stream.vrlFunctionFieldList = activeQf?.vrlFunctionFieldList ?? [];
       return;
     }
 
@@ -573,9 +558,7 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
     const filteredFieldList = (fieldList as string[])
       .filter(
         (field: any) =>
-          !aliasList.some(
-            (alias: string) => alias.toLowerCase() === field.toLowerCase(),
-          ),
+          !aliasList.some((alias: string) => alias.toLowerCase() === field.toLowerCase()),
       )
       .map((field: any) => ({ name: field, type: "Utf8" }));
 
@@ -707,8 +690,7 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
         dashboardPanelData.layout.querySplitter = 41;
       } else {
         if (expandedSplitterHeight.value !== null) {
-          dashboardPanelData.layout.querySplitter =
-            expandedSplitterHeight.value;
+          dashboardPanelData.layout.querySplitter = expandedSplitterHeight.value;
         }
       }
     },
@@ -727,12 +709,9 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
 
   // Watch loading state - update disable
   watch(variablesAndPanelsDataLoadingState, () => {
-    const panelsValues = Object.values(
-      variablesAndPanelsDataLoadingState.panels,
-    );
+    const panelsValues = Object.values(variablesAndPanelsDataLoadingState.panels);
     disable.value = panelsValues.some((item: any) => item === true);
   });
-
 
   // Check if externalChartData has actual VALUE (not just if the ref exists)
   // A ref is always truthy even if its value is undefined, so we must check .value

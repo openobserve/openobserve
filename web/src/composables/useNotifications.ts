@@ -5,10 +5,7 @@ import type { ToastOptions } from "@/lib/feedback/Toast/OToast.types";
 type NotificationOptions = Pick<ToastOptions, "timeout" | "position">;
 
 const useNotifications = () => {
-  const showErrorNotification = (
-    message: string,
-    options?: NotificationOptions,
-  ) => {
+  const showErrorNotification = (message: string, options?: NotificationOptions) => {
     return toast({ variant: "error", message, ...options });
   };
 
@@ -28,24 +25,15 @@ const useNotifications = () => {
     });
   };
 
-  const showAliasErrorForVisualization = (
-    message: string,
-    options?: NotificationOptions,
-  ) => {
+  const showAliasErrorForVisualization = (message: string, options?: NotificationOptions) => {
     return toast({ variant: "error", message, timeout: 0, ...options });
   };
 
-  const showPositiveNotification = (
-    message: string,
-    options?: NotificationOptions,
-  ) => {
+  const showPositiveNotification = (message: string, options?: NotificationOptions) => {
     return toast({ variant: "success", message, timeout: 5000, ...options });
   };
 
-  const showInfoNotification = (
-    message: string,
-    options?: NotificationOptions,
-  ) => {
+  const showInfoNotification = (message: string, options?: NotificationOptions) => {
     return toast({ variant: "info", message, timeout: 5000, ...options });
   };
 

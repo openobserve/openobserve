@@ -15,7 +15,7 @@
       <div class="metric-legends-title">
         <div class="label">{{ t("search.legendLabel") }}</div>
       </div>
-      <div class="border-t my-1 border-dropdown-separator" />
+      <div class="border-dropdown-separator my-1 border-t" />
       <div class="legends">
         <div class="grid grid-cols-2 gap-2.5">
           <div
@@ -36,7 +36,7 @@
 import { defineComponent } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import OButton from '@/lib/core/Button/OButton.vue';
+import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 

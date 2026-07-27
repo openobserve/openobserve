@@ -19,7 +19,6 @@
 pub mod action;
 #[cfg(feature = "enterprise")]
 pub mod ai;
-pub use openobserve_api_management::models::{alerts, dashboards, destinations, folders, reports};
 #[cfg(feature = "cloud")]
 pub mod billings;
 #[cfg(feature = "enterprise")]

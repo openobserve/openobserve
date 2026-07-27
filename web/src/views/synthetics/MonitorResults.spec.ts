@@ -41,6 +41,7 @@ vi.mock("vue-router", () => ({
     replace: mockRouterReplace,
   }),
   RouterLink: { name: "RouterLinkStub", template: "<a><slot /></a>" },
+  onBeforeRouteUpdate: vi.fn(),
 }));
 
 vi.mock("vuex", async (importOriginal) => {
@@ -65,6 +66,22 @@ vi.mock("@/utils/date", () => ({
   }),
 }));
 
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: vi.fn(() => vi.fn()),
+}));
+
+// Mock syntheticsService.get — called via bootstrap() when MonitorRuns emits
+// need-check-data (only when there are zero runs and no lastTriggeredAt).
+const mockSyntheticsServiceGet = vi.fn().mockResolvedValue({
+  data: { name: "Test Monitor", status: "healthy", last_triggered_at: 0 },
+});
+vi.mock("@/services/synthetics", () => ({
+  default: {
+    get: (...args: any[]) => mockSyntheticsServiceGet(...args),
+    run: vi.fn().mockResolvedValue({}),
+  },
+}));
+
 import MonitorResults from "./MonitorResults.vue";
 
 // ── Mount factory ──────────────────────────────────────────────────────────
@@ -76,7 +93,7 @@ function makeWrapper() {
         OPageHeader: {
           template: `
             <div data-test="app-page-header">
-              <span data-test="app-page-header-title">{{ title }}</span>
+              <slot name="title" />
               <span data-test="app-page-header-subtitle">{{ subtitle }}</span>
               <slot name="actions" />
             </div>
@@ -94,8 +111,7 @@ function makeWrapper() {
           ],
         },
         OButton: {
-          template:
-            '<button class="obutton-stub" @click="$emit(\'click\')"><slot /></button>',
+          template: '<button class="obutton-stub" @click="$emit(\'click\')"><slot /></button>',
           props: ["variant", "size", "iconLeft", "loading"],
         },
         OIcon: {
@@ -124,7 +140,7 @@ function makeWrapper() {
               <button data-test="trigger-jump-to-window" @click="$emit('jump-to-window', 1000, 2000)" />
             </div>
           `,
-          props: ["monitorId", "monitorName", "monitorStatus"],
+          props: ["monitorId", "monitorName", "monitorStatus", "lastTriggeredAt", "checkType"],
         },
         RunDetail: {
           template: '<div data-test="run-detail" />',
@@ -135,6 +151,9 @@ function makeWrapper() {
             "overrideRunId",
             "overrideExecutionId",
           ],
+        },
+        BetaBadge: {
+          template: '<span data-test="beta-badge">BETA</span>',
         },
       },
     },
@@ -169,26 +188,23 @@ describe("MonitorResults", () => {
       wrapper = makeWrapper();
       await flushPromises();
 
-      expect(
-        wrapper.find('[data-test="synthetic-monitor-results-page"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="synthetic-monitor-results-page"]').exists()).toBe(true);
     });
 
     it("should render OPageHeader with monitor name from route query", async () => {
       wrapper = makeWrapper();
       await flushPromises();
 
-      const title = wrapper.find('[data-test="app-page-header-title"]');
-      expect(title.text()).toBe("Test Monitor");
+      const header = wrapper.find('[data-test="app-page-header"]');
+      expect(header.text()).toContain("Test Monitor");
+      expect(wrapper.find('[data-test="beta-badge"]').exists()).toBe(true);
     });
 
     it("should render MonitorRuns child component", async () => {
       wrapper = makeWrapper();
       await flushPromises();
 
-      expect(
-        wrapper.find('[data-test="monitor-runs"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="monitor-runs"]').exists()).toBe(true);
     });
   });
 
@@ -197,24 +213,20 @@ describe("MonitorResults", () => {
       wrapper = makeWrapper();
       await flushPromises();
 
-      const editBtn = wrapper.find(
-        '[data-test="synthetic-monitor-results-edit-btn"]',
-      );
+      const editBtn = wrapper.find('[data-test="synthetic-monitor-results-edit-btn"]');
       expect(editBtn.exists()).toBe(true);
     });
 
-    it("should navigate to synthetic-new with edit query on click", async () => {
+    it("should navigate to synthetics-edit with id param on click", async () => {
       wrapper = makeWrapper();
       await flushPromises();
 
-      const editBtn = wrapper.find(
-        '[data-test="synthetic-monitor-results-edit-btn"]',
-      );
+      const editBtn = wrapper.find('[data-test="synthetic-monitor-results-edit-btn"]');
       await editBtn.trigger("click");
 
       expect(mockRouterPush).toHaveBeenCalledWith({
-        name: "synthetic-new",
-        query: { edit: "mon-1" },
+        name: "synthetics-edit",
+        params: { id: "mon-1" },
       });
     });
   });
@@ -252,9 +264,7 @@ describe("MonitorResults", () => {
       wrapper = makeWrapper();
       await flushPromises();
 
-      expect(
-        wrapper.find('[data-test="run-detail"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="run-detail"]').exists()).toBe(true);
     });
   });
 
@@ -283,9 +293,7 @@ describe("MonitorResults", () => {
       await flushPromises();
 
       // Should not throw — defaults to "degraded"
-      expect(
-        wrapper.find('[data-test="synthetic-monitor-results-page"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="synthetic-monitor-results-page"]').exists()).toBe(true);
     });
 
     it("should handle missing name gracefully with default title", async () => {
@@ -293,8 +301,8 @@ describe("MonitorResults", () => {
       wrapper = makeWrapper();
       await flushPromises();
 
-      const title = wrapper.find('[data-test="app-page-header-title"]');
-      expect(title.text()).toBe("synthetics.results.title");
+      const header = wrapper.find('[data-test="app-page-header"]');
+      expect(header.text()).toContain("synthetics.results.title");
     });
   });
 
@@ -308,8 +316,8 @@ describe("MonitorResults", () => {
       await editBtn.trigger("click");
 
       expect(mockRouterPush).toHaveBeenCalledWith({
-        name: "synthetic-new",
-        query: { edit: "mon-1" },
+        name: "synthetics-edit",
+        params: { id: "mon-1" },
       });
     });
 
@@ -321,9 +329,7 @@ describe("MonitorResults", () => {
       await refreshBtn.trigger("click");
 
       // Should not throw — refresh is called
-      expect(
-        wrapper.find('[data-test="synthetic-monitor-results-page"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="synthetic-monitor-results-page"]').exists()).toBe(true);
     });
   });
 });

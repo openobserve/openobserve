@@ -20,7 +20,6 @@ import JsonEditor from "@/components/common/JsonEditor.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-
 // ─── Mocks ───────────────────────────────────────────────────────────────────
 
 vi.mock("@/utils/zincutils", () => ({
@@ -339,21 +338,17 @@ describe("JsonEditor", () => {
     it("shows validation errors section when validationErrors is non-empty", async () => {
       wrapper = createWrapper({ validationErrors: ["Field 'id' is required"] });
       await nextTick();
-      expect(
-        wrapper
-          .find('[data-test="common-json-editor-validation-errors"]')
-          .exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="common-json-editor-validation-errors"]').exists()).toBe(
+        true,
+      );
       expect(wrapper.text()).toContain("Field 'id' is required");
     });
 
     it("hides validation errors section when validationErrors is empty", () => {
       wrapper = createWrapper({ validationErrors: [] });
-      expect(
-        wrapper
-          .find('[data-test="common-json-editor-validation-errors"]')
-          .exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="common-json-editor-validation-errors"]').exists()).toBe(
+        false,
+      );
     });
 
     it("renders multiple validation errors as list items", async () => {
@@ -361,9 +356,7 @@ describe("JsonEditor", () => {
         validationErrors: ["Error one", "Error two", "Error three"],
       });
       await nextTick();
-      const errors = wrapper.findAll(
-        '[data-test="common-json-editor-validation-errors"] li',
-      );
+      const errors = wrapper.findAll('[data-test="common-json-editor-validation-errors"] li');
       expect(errors.length).toBe(3);
     });
   });

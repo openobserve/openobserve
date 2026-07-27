@@ -17,7 +17,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div class="h-full w-full"
+  <div
+    class="h-full w-full"
     data-test="chart-renderer"
     ref="chartRef"
     id="chart"
@@ -75,10 +76,7 @@ echarts.use([
 // function-strings and an `o2_events` map, so its shape is intentionally open.
 type CustomChartData = Record<string, unknown> & {
   extras?: { panelId?: string | number };
-  o2_events?: Record<
-    string,
-    (params: echarts.ECElementEvent, chart: echarts.EChartsType) => void
-  >;
+  o2_events?: Record<string, (params: echarts.ECElementEvent, chart: echarts.EChartsType) => void>;
 };
 
 // Injected cross-panel hover state (provided by the dashboard grid).
@@ -114,10 +112,7 @@ export default defineComponent({
     const chartRef: Ref<HTMLElement | null> = ref(null);
     let chart: echarts.EChartsType | null = null;
 
-    const hoveredSeriesState = inject<HoveredSeriesState | null>(
-      "hoveredSeriesState",
-      null,
-    );
+    const hoveredSeriesState = inject<HoveredSeriesState | null>("hoveredSeriesState", null);
     const convertStringToFunction = (obj: unknown): unknown => {
       if (typeof obj === "string" && obj.startsWith("function")) {
         try {
@@ -127,10 +122,7 @@ export default defineComponent({
           // under strict TS, so narrow the shape without changing the value read.
           const message = (error as { message?: string }).message;
           emit({
-            message: t(
-              "dashboard.customChartRenderer.errorExecutingCodeWithMessage",
-              { message },
-            ),
+            message: t("dashboard.customChartRenderer.errorExecutingCodeWithMessage", { message }),
             code: "",
           } as unknown as EmitEvent);
         }
@@ -144,9 +136,7 @@ export default defineComponent({
         const result: Record<string, unknown> = {};
         for (const key in obj) {
           if (Object.prototype.hasOwnProperty.call(obj, key)) {
-            result[key] = convertStringToFunction(
-              (obj as Record<string, unknown>)[key],
-            ); // Recursively handle object properties
+            result[key] = convertStringToFunction((obj as Record<string, unknown>)[key]); // Recursively handle object properties
           }
         }
         return result;
@@ -183,9 +173,7 @@ export default defineComponent({
       }
 
       try {
-        const convertedData = convertStringToFunction(
-          props.data,
-        ) as CustomChartData;
+        const convertedData = convertStringToFunction(props.data) as CustomChartData;
         const safeChartOptions = deepSanitize(convertedData) as CustomChartData;
         chart.setOption(withChartFont(safeChartOptions));
 
@@ -214,8 +202,7 @@ export default defineComponent({
     };
 
     const handleMouseOver = () => {
-      if (hoveredSeriesState)
-        hoveredSeriesState.panelId = props.data.extras?.panelId;
+      if (hoveredSeriesState) hoveredSeriesState.panelId = props.data.extras?.panelId;
     };
 
     const handleMouseLeave = () => {

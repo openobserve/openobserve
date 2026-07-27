@@ -66,19 +66,12 @@ export function overlayNewDataOnOldOptions(
 
     if (qStartMs > 0 && qEndMs > 0) {
       for (const series of newOptions.series) {
-        if (
-          series?.name == null ||
-          !Array.isArray(series?.data) ||
-          !series?.data?.length
-        )
-          continue;
+        if (series?.name == null || !Array.isArray(series?.data) || !series?.data?.length) continue;
         const firstPoint = series.data[0];
         if (!Array.isArray(firstPoint) || firstPoint.length < 2) continue;
 
         const firstTs = toNumericTime(series.data[0]?.[0]);
-        const lastTs = toNumericTime(
-          series.data[series.data.length - 1]?.[0],
-        );
+        const lastTs = toNumericTime(series.data[series.data.length - 1]?.[0]);
 
         // Only add interval phantoms (one bucket before/after data edges)
         // to establish the correct min-interval for bar width.
@@ -125,14 +118,8 @@ export function overlayNewDataOnOldOptions(
   // Y-axis name label (e.g. "Metric_Name") to overlap tick labels mid-stream.
   // By taking max(old, new) we ensure nameGap only grows, never shrinks, during streaming.
   if (oldOptions.yAxis && newOptions.yAxis) {
-    const oldNameGap =
-      typeof oldOptions.yAxis.nameGap === "number"
-        ? oldOptions.yAxis.nameGap
-        : 0;
-    const newNameGap =
-      typeof newOptions.yAxis?.nameGap === "number"
-        ? newOptions.yAxis.nameGap
-        : 0;
+    const oldNameGap = typeof oldOptions.yAxis.nameGap === "number" ? oldOptions.yAxis.nameGap : 0;
+    const newNameGap = typeof newOptions.yAxis?.nameGap === "number" ? newOptions.yAxis.nameGap : 0;
     if (oldNameGap > newNameGap) {
       merged.yAxis = { ...newOptions.yAxis, nameGap: oldNameGap };
     }
@@ -170,9 +157,7 @@ export function overlayNewDataOnOldOptions(
     // Skip annotation series (no name — undefined/null, not empty string)
     if (newSeries?.name == null) continue;
 
-    const oldSeries = oldOptions.series.find(
-      (s: any) => s?.name === newSeries.name,
-    );
+    const oldSeries = oldOptions.series.find((s: any) => s?.name === newSeries.name);
     if (!oldSeries?.data?.length || !Array.isArray(oldSeries.data)) continue;
 
     // Skip non-time-series data (plain values, not [timestamp, value] pairs)
@@ -194,14 +179,11 @@ export function overlayNewDataOnOldOptions(
 
     if (isLTR) {
       // LTR: new data covers [queryStart → chunkEnd].
-      const lastNewTime = toNumericTime(
-        newSeries.data[newSeries.data.length - 1]?.[0],
-      );
+      const lastNewTime = toNumericTime(newSeries.data[newSeries.data.length - 1]?.[0]);
 
       if (!isNaN(lastNewTime)) {
         // Compute phantom timestamp (one interval after last new point).
-        const phantomTime =
-          intervalMs > 0 ? lastNewTime + intervalMs : 0;
+        const phantomTime = intervalMs > 0 ? lastNewTime + intervalMs : 0;
         const phantomInRange = phantomTime > 0 && phantomTime <= queryEndMs;
 
         // Collect stale old data AFTER last new timestamp,
@@ -222,10 +204,7 @@ export function overlayNewDataOnOldOptions(
         // Falls back to null when old data has no value at that timestamp
         // (null still contributes the timestamp for bar width derivation).
         if (phantomInRange) {
-          newSeries.data.push([
-            new Date(phantomTime),
-            phantomOldValue ?? null,
-          ]);
+          newSeries.data.push([new Date(phantomTime), phantomOldValue ?? null]);
         }
 
         // Append remaining stale old data
@@ -239,8 +218,7 @@ export function overlayNewDataOnOldOptions(
 
       if (!isNaN(firstNewTime)) {
         // Compute phantom timestamp (one interval before first new point).
-        const phantomTime =
-          intervalMs > 0 ? firstNewTime - intervalMs : 0;
+        const phantomTime = intervalMs > 0 ? firstNewTime - intervalMs : 0;
         const phantomInRange = phantomTime > 0 && phantomTime >= queryStartMs;
 
         // Collect stale old data BEFORE first new timestamp,
@@ -258,10 +236,7 @@ export function overlayNewDataOnOldOptions(
 
         // Add phantom with old data value for visual continuity & bar width.
         if (phantomInRange) {
-          newSeries.data = [
-            [new Date(phantomTime), phantomOldValue ?? null],
-            ...newSeries.data,
-          ];
+          newSeries.data = [[new Date(phantomTime), phantomOldValue ?? null], ...newSeries.data];
         }
 
         // Prepend remaining stale old data
@@ -301,15 +276,11 @@ export function overlayNewDataOnOldOptions(
     ) {
       continue;
     }
-    const existsInNew = merged.series.some(
-      (s: any) => s?.name === oldSeries.name,
-    );
+    const existsInNew = merged.series.some((s: any) => s?.name === oldSeries.name);
     if (!existsInNew) {
       const cloned = {
         ...oldSeries,
-        data: Array.isArray(oldSeries.data)
-          ? oldSeries.data.slice()
-          : oldSeries.data,
+        data: Array.isArray(oldSeries.data) ? oldSeries.data.slice() : oldSeries.data,
       };
 
       // Filter old data points to the user's query time range
@@ -347,9 +318,7 @@ export function overlayNewDataOnOldOptions(
 
   // Recalculate legend to include all visible series
   if (merged.legend) {
-    const allNames = merged.series
-      .filter((s: any) => s?.name)
-      .map((s: any) => s?.name);
+    const allNames = merged.series.filter((s: any) => s?.name).map((s: any) => s?.name);
     if (Array.isArray(merged.legend)) {
       merged.legend.forEach((l: any) => {
         if (l.data) l.data = allNames;
@@ -391,8 +360,7 @@ export function overlayNewDataOnOldOptions(
       const grid = merged.grid?.[0] || merged.grid || {};
       const gridLeft = typeof grid.left === "number" ? grid.left : 30;
       const gridRight = typeof grid.right === "number" ? grid.right : 20;
-      const gridTopVal =
-        typeof grid.top === "number" ? grid.top : parseInt(grid.top) || 10;
+      const gridTopVal = typeof grid.top === "number" ? grid.top : parseInt(grid.top) || 10;
       const gridBottom = typeof grid.bottom === "number" ? grid.bottom : 50;
 
       plotLeft = gridLeft;
@@ -413,25 +381,16 @@ export function overlayNewDataOnOldOptions(
         // so fresh data is on the RIGHT from boundaryTime to queryEnd.
         const freshFraction = Math.max(
           0,
-          Math.min(
-            1,
-            (isLTR ? boundaryMs - queryStartMs : queryEndMs - boundaryMs) /
-              totalRange,
-          ),
+          Math.min(1, (isLTR ? boundaryMs - queryStartMs : queryEndMs - boundaryMs) / totalRange),
         );
         const rawOverlayWidth = freshFraction * plotWidth;
-        const rawOverlayLeft = isLTR
-          ? plotLeft
-          : plotLeft + plotWidth - rawOverlayWidth;
+        const rawOverlayLeft = isLTR ? plotLeft : plotLeft + plotWidth - rawOverlayWidth;
 
         // Clamp to plot rect so the overlay never bleeds onto y-axis labels
         // (this can happen when _gridRect is stale or when fallback grid
         // coordinates underestimate the axis-label width).
         const plotRight = plotLeft + plotWidth;
-        const overlayLeft = Math.max(
-          plotLeft,
-          Math.min(plotRight, rawOverlayLeft),
-        );
+        const overlayLeft = Math.max(plotLeft, Math.min(plotRight, rawOverlayLeft));
         const overlayRight = Math.max(
           plotLeft,
           Math.min(plotRight, rawOverlayLeft + rawOverlayWidth),

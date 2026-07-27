@@ -48,7 +48,6 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import dashboardService from "@/services/dashboards";
 
-
 describe("AddDashboard", () => {
   let wrapper: any;
 
@@ -107,12 +106,8 @@ describe("AddDashboard", () => {
     it("should render the create dashboard form by default", () => {
       wrapper = createWrapper();
 
-      expect(
-        wrapper.find('[data-test="add-dashboard-name"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="add-dashboard-description"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="add-dashboard-name"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="add-dashboard-description"]').exists()).toBe(true);
     });
 
     it("should show folder selection when showFolderSelection is true", () => {
@@ -124,9 +119,7 @@ describe("AddDashboard", () => {
     it("should hide folder selection when showFolderSelection is false", () => {
       wrapper = createWrapper({ showFolderSelection: false });
 
-      expect(wrapper.find('[data-test="folder-dropdown"]').exists()).toBe(
-        false,
-      );
+      expect(wrapper.find('[data-test="folder-dropdown"]').exists()).toBe(false);
     });
   });
 
@@ -254,9 +247,7 @@ describe("AddDashboard", () => {
       await wrapper.vm.onSubmit({ name: "Test Dashboard", description: "" });
       await flushPromises();
 
-      expect(showPositiveNotificationMock).toHaveBeenCalledWith(
-        "Dashboard added successfully.",
-      );
+      expect(showPositiveNotificationMock).toHaveBeenCalledWith("Dashboard added successfully.");
     });
 
     it("should pass the currently selected folder id to the service", async () => {
@@ -294,9 +285,7 @@ describe("AddDashboard", () => {
 
   describe("Error Handling", () => {
     it("should show an error notification when dashboard creation rejects with a message", async () => {
-      vi.mocked(dashboardService.create).mockRejectedValueOnce(
-        new Error("Creation failed"),
-      );
+      vi.mocked(dashboardService.create).mockRejectedValueOnce(new Error("Creation failed"));
 
       wrapper = createWrapper();
       await wrapper.vm.onSubmit({ name: "Test Dashboard", description: "" });
@@ -313,9 +302,7 @@ describe("AddDashboard", () => {
       await wrapper.vm.onSubmit({ name: "Test Dashboard", description: "" });
       await flushPromises();
 
-      expect(showErrorNotificationMock).toHaveBeenCalledWith(
-        "Dashboard creation failed.",
-      );
+      expect(showErrorNotificationMock).toHaveBeenCalledWith("Dashboard creation failed.");
     });
   });
 

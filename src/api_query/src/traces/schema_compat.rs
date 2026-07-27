@@ -32,13 +32,14 @@
 use std::fmt;
 
 use arrow_schema::Schema;
-use config::meta::stream::StreamType;
-
-use crate::service::traces::otel::attributes::OtelAttributes;
-pub(crate) use crate::service::traces::schema_compat::{
-    GEN_AI_SENTINEL_COLUMN, OPTIONAL_GEN_AI_FIELDS, OPTIONAL_LLM_FIELDS, REQUIRED_GEN_AI_FIELDS,
-    REQUIRED_LLM_FIELDS,
+use config::meta::{
+    stream::StreamType,
+    traces::{
+        GEN_AI_SENTINEL_COLUMN, OPTIONAL_GEN_AI_FIELDS, OPTIONAL_LLM_FIELDS,
+        REQUIRED_GEN_AI_FIELDS, REQUIRED_LLM_FIELDS,
+    },
 };
+use openobserve_core::traces::otel::attributes::OtelAttributes;
 
 /// Column names that vary between the new and legacy LLM schemas.
 ///

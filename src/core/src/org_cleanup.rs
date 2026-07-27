@@ -13,7 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::spawn_pausable_job;
+use std::sync::Arc;
+
+use async_trait::async_trait;
+use config::{meta::stream::StreamType, spawn_pausable_job};
 use infra::{dist_lock, table::org_cleanup_tasks};
 
 const LOCK_KEY: &str = "/org_cleanup/worker_lock";
@@ -32,6 +35,26 @@ const ORDER_DELETE_SCHEDULER_TRIGGERS: i32 = 400;
 const ORDER_DELETE_USERS: i32 = 600;
 // Final step: remove the org record + OFGA tuples via the canonical delete path.
 const ORDER_DELETE_ORG_RECORD: i32 = 900;
+
+/// Deletes the physical data for a stream during organization cleanup.
+///
+/// The cleanup workflow owns orchestration and schema removal, while the binary
+/// wires in the data-lifecycle implementation used by its compactor.
+///
+/// Implementations must remove local-disk files, file_list rows, and dump files
+/// over the canonical (BASE_TIME, now) range — not a hand-rolled file_list scan
+/// with (0, i64::MAX), which query_for_dump rejects as invalid/overflowing.
+/// The compactor's `compaction::retention::delete_all` is the reference
+/// implementation.
+#[async_trait]
+pub trait StreamDataCleanup: Send + Sync {
+    async fn delete_stream_data(
+        &self,
+        org_id: &str,
+        stream_type: StreamType,
+        stream_name: &str,
+    ) -> Result<(), anyhow::Error>;
+}
 
 /// Grace-period length in days. Enterprise config; OSS builds have no grace period
 /// (deletion is cloud-only). `0` = delete immediately (legacy behavior).
@@ -72,7 +95,7 @@ pub fn fixed_steps(org_id: &str, org_name: &str) -> Vec<org_cleanup_tasks::NewCl
     .collect()
 }
 
-pub async fn run() -> Result<(), anyhow::Error> {
+pub async fn run(stream_data_cleanup: Arc<dyn StreamDataCleanup>) -> Result<(), anyhow::Error> {
     // A compactor that crashed mid-step leaves its task marked 'running'. Since
     // list_pending only returns pending/failed rows, such a task would never be
     // re-picked and the deletion would stall forever. Reset stale 'running' rows
@@ -88,12 +111,12 @@ pub async fn run() -> Result<(), anyhow::Error> {
     }
 
     spawn_pausable_job!("org_cleanup_worker", POLL_INTERVAL_SECS, {
-        run_once().await;
+        run_once(Arc::clone(&stream_data_cleanup)).await;
     });
     Ok(())
 }
 
-async fn run_once() {
+async fn run_once(stream_data_cleanup: Arc<dyn StreamDataCleanup>) {
     let locker = match dist_lock::lock(LOCK_KEY, 0).await {
         Ok(l) => l,
         Err(e) => {
@@ -125,7 +148,10 @@ async fn run_once() {
         .into_values()
         .map(|mut org_tasks| {
             org_tasks.sort_by_key(|t| t.step_order);
-            tokio::spawn(process_org_tasks(org_tasks))
+            tokio::spawn(process_org_tasks(
+                org_tasks,
+                Arc::clone(&stream_data_cleanup),
+            ))
         })
         .collect();
 
@@ -138,7 +164,10 @@ async fn run_once() {
     }
 }
 
-async fn process_org_tasks(tasks: Vec<org_cleanup_tasks::CleanupTask>) {
+async fn process_org_tasks(
+    tasks: Vec<org_cleanup_tasks::CleanupTask>,
+    stream_data_cleanup: Arc<dyn StreamDataCleanup>,
+) {
     for task in &tasks {
         let predecessors_done =
             match org_cleanup_tasks::list_by_org_status(&task.org_id, None).await {
@@ -198,7 +227,13 @@ async fn process_org_tasks(tasks: Vec<org_cleanup_tasks::CleanupTask>) {
             task.attempts + 1
         );
 
-        let result = execute_step(&task.org_id, &task.org_name, &task.step).await;
+        let result = execute_step(
+            &task.org_id,
+            &task.org_name,
+            &task.step,
+            stream_data_cleanup.as_ref(),
+        )
+        .await;
 
         match result {
             Ok(()) => {
@@ -238,9 +273,7 @@ async fn process_org_tasks(tasks: Vec<org_cleanup_tasks::CleanupTask>) {
 async fn emit_failed_alert(org_id: &str, _step: &str) {
     #[cfg(feature = "cloud")]
     {
-        use crate::service::self_reporting::cloud_events::{
-            CloudEvent, EventType, enqueue_cloud_event,
-        };
+        use crate::self_reporting::cloud_events::{CloudEvent, EventType, enqueue_cloud_event};
         enqueue_cloud_event(CloudEvent {
             event: EventType::OrgCleanupFailed,
             org_id: org_id.to_string(),
@@ -260,11 +293,16 @@ async fn emit_failed_alert(org_id: &str, _step: &str) {
     }
 }
 
-async fn execute_step(org_id: &str, org_name: &str, step: &str) -> Result<(), anyhow::Error> {
+async fn execute_step(
+    org_id: &str,
+    org_name: &str,
+    step: &str,
+    stream_data_cleanup: &dyn StreamDataCleanup,
+) -> Result<(), anyhow::Error> {
     if step == "delete_streams" {
         step_delete_streams(org_id, org_name).await
     } else if let Some(rest) = step.strip_prefix("delete_stream:") {
-        step_delete_stream(org_id, rest).await
+        step_delete_stream(org_id, rest, stream_data_cleanup).await
     } else if step == "delete_file_list" {
         step_delete_file_list(org_id).await
     } else if step == "delete_db_resources" {
@@ -281,7 +319,7 @@ async fn execute_step(org_id: &str, org_name: &str, step: &str) -> Result<(), an
 }
 
 async fn step_delete_streams(org_id: &str, org_name: &str) -> Result<(), anyhow::Error> {
-    let streams = crate::service::db::schema::list(org_id, None, false).await?;
+    let streams = crate::db::schema::list(org_id, None, false).await?;
 
     // Enqueue one sub-task per stream
     let sub_tasks: Vec<org_cleanup_tasks::NewCleanupTask> = streams
@@ -305,23 +343,23 @@ async fn step_delete_streams(org_id: &str, org_name: &str) -> Result<(), anyhow:
     Ok(())
 }
 
-async fn step_delete_stream(org_id: &str, type_and_name: &str) -> Result<(), anyhow::Error> {
-    use config::meta::stream::StreamType;
-
+async fn step_delete_stream(
+    org_id: &str,
+    type_and_name: &str,
+    stream_data_cleanup: &dyn StreamDataCleanup,
+) -> Result<(), anyhow::Error> {
     let (stream_type_str, stream_name) = type_and_name
         .split_once('/')
         .ok_or_else(|| anyhow::anyhow!("invalid stream key: {type_and_name}"))?;
 
     let stream_type = StreamType::from(stream_type_str);
 
-    // Reuse the compactor's stream-deletion primitive instead of hand-rolling a
-    // file_list scan. It removes local-disk files, file_list rows, and dump files
-    // over the canonical (BASE_TIME, now) range — avoiding the invalid/overflowing
-    // (0, i64::MAX) range that query_for_dump rejects.
-    crate::service::compact::retention::delete_all(org_id, stream_type, stream_name).await?;
+    stream_data_cleanup
+        .delete_stream_data(org_id, stream_type, stream_name)
+        .await?;
 
-    // Delete the schema entry (delete_all removes data, not the stream definition).
-    crate::service::db::schema::delete(org_id, stream_name, Some(stream_type)).await?;
+    // Delete the schema entry after the injected cleanup removes the stream data.
+    crate::db::schema::delete(org_id, stream_name, Some(stream_type)).await?;
 
     Ok(())
 }
@@ -342,10 +380,10 @@ async fn step_delete_file_list(org_id: &str) -> Result<(), anyhow::Error> {
 async fn delete_org_alerts(org_id: &str) -> Result<(), anyhow::Error> {
     use infra::db::{ORM_CLIENT, connect_to_orm};
     let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let alerts = crate::service::db::alerts::alert::list(org_id, None, None).await?;
+    let alerts = crate::db::alerts::alert::list(org_id, None, None).await?;
     for alert in alerts {
         let Some(alert_id) = alert.id else { continue };
-        crate::service::alerts::alert::delete_by_id(conn, org_id, alert_id)
+        crate::alerts::alert::delete_by_id(conn, org_id, alert_id)
             .await
             .map_err(|e| anyhow::anyhow!("alert {alert_id}: {e}"))?;
     }
@@ -369,7 +407,7 @@ async fn delete_org_cipher_keys(org_id: &str) -> Result<(), anyhow::Error> {
         };
         let keys = infra::table::cipher::list_filtered(filter, None).await?;
         for key in keys {
-            crate::service::db::keys::remove(org_id, EntryKind::CipherKey, &key.name)
+            crate::db::keys::remove(org_id, EntryKind::CipherKey, &key.name)
                 .await
                 .map_err(|e| anyhow::anyhow!("cipher key {}: {e}", key.name))?;
         }
@@ -380,12 +418,14 @@ async fn delete_org_cipher_keys(org_id: &str) -> Result<(), anyhow::Error> {
 }
 
 async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
+    #[cfg(feature = "cloud")]
+    use infra::table::trial_quota_usage;
     use infra::table::{
         action_scripts, alert_incidents, backfill_jobs, compactor_manual_jobs, dashboards,
         destinations, distinct_values, enrichment_table_urls, enrichment_tables, folders,
         incident_events, kv_store, org_ingestion_tokens, org_storage_providers, re_pattern,
         re_pattern_stream_map, reports, search_queue, service_streams, short_urls, system_settings,
-        templates, timed_annotations, trial_quota_usage,
+        templates, timed_annotations,
     };
 
     // FK-constrained children must be deleted before their parents.
@@ -465,6 +505,7 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     org_storage_providers::delete_by_org(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/org_storage_providers: {e}"))?;
+    #[cfg(feature = "cloud")]
     trial_quota_usage::delete_by_org(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/trial_quota_usage: {e}"))?;
@@ -484,7 +525,7 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     // leave those side effects (and stale cache entries) behind.
     let pipelines = infra::pipeline::list_by_org(org_id).await?;
     for p in pipelines {
-        crate::service::pipeline::delete_pipeline(&p.id)
+        crate::pipeline::delete_pipeline(&p.id)
             .await
             .map_err(|e| anyhow::anyhow!("step_delete_db_resources/pipeline {}: {e}", p.id))?;
     }
@@ -495,7 +536,7 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     let db = infra::db::get_db().await;
     let prefix = format!(
         "{}/{org_id}/",
-        crate::service::db::saved_view::SAVED_VIEWS_KEY_PREFIX
+        crate::db::saved_view::SAVED_VIEWS_KEY_PREFIX
     );
     // with_prefix=true (bulk delete all of the org's views); NO_NEED_WATCH matches
     // saved_view::delete_view — no point emitting watch events for a disappearing org.
@@ -517,7 +558,7 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     // so once the rows are gone the objects can no longer be located and would leak.
     // (search_jobs service is enterprise-only; OSS just drops the rows below.)
     #[cfg(feature = "enterprise")]
-    crate::service::search_jobs::delete_org_result_files(org_id)
+    search_service::search_jobs::delete_org_result_files(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/search_job_results: {e}"))?;
     infra::table::search_job::search_jobs::delete_by_org(org_id)
@@ -614,8 +655,8 @@ async fn step_delete_users(org_id: &str) -> Result<(), anyhow::Error> {
 async fn emit_status_audit(org_id: &str, actor: &str, from: &str, to: &str) {
     #[cfg(feature = "enterprise")]
     {
-        use crate::service::self_reporting::{audit, auditor};
-        audit(auditor::AuditMessage {
+        use o2_enterprise::enterprise::common::auditor;
+        audit::audit(auditor::AuditMessage {
             user_email: actor.to_string(),
             org_id: org_id.to_string(),
             _timestamp: config::utils::time::now_micros(),
@@ -635,14 +676,14 @@ async fn emit_status_audit(org_id: &str, actor: &str, from: &str, to: &str) {
 }
 
 pub async fn initiate_deletion(org_id: &str, initiated_by: &str) -> Result<(), anyhow::Error> {
-    use crate::service::db::org_status;
+    use crate::db::org_status;
 
     // The `default` and `_meta` orgs are system orgs and must never be deleted.
     // Guard here, at the single entry point, BEFORE any status mutation — otherwise
     // the org would be flipped to deleting/pending, blocked+hidden, and then the
     // terminal `remove_org` step would permanently fail on its own `default` guard,
     // leaving the org stuck in `deleting` forever.
-    if org_id == crate::common::meta::organization::DEFAULT_ORG || org_id == config::META_ORG_ID {
+    if org_id == config::DEFAULT_ORG || org_id == config::META_ORG_ID {
         return Err(anyhow::anyhow!("Cannot delete this organization"));
     }
 
@@ -720,9 +761,9 @@ async fn step_delete_org_record(org_id: &str) -> Result<(), anyhow::Error> {
     // calls — so OFGA tuple cleanup, super-cluster propagation, and the cloud
     // OrgDeleted event all happen exactly as they do for a direct delete. If the
     // delete handler ever grows a new side effect, this path inherits it for free.
-    crate::service::organization::remove_org(org_id).await?;
+    crate::organization::remove_org(org_id).await?;
     let _ = infra::table::org_cleanup_tasks::delete_by_org(org_id).await;
-    crate::service::db::org_status::evict(org_id).await?;
+    crate::db::org_status::evict(org_id).await?;
     emit_status_audit(org_id, "system", "deleting", "gone").await;
     Ok(())
 }
@@ -731,7 +772,7 @@ async fn step_delete_org_record(org_id: &str) -> Result<(), anyhow::Error> {
 /// any cleanup tasks, and unblock it across the cluster. No data was ever touched.
 /// `actor` is the email of the _meta/root user performing the resurrection (for audit).
 pub async fn resurrect_org(org_id: &str, actor: &str) -> Result<(), anyhow::Error> {
-    use crate::service::db::org_status;
+    use crate::db::org_status;
 
     let won = infra::table::organizations::set_status_if_with_deleted_at(
         org_id,
@@ -756,7 +797,7 @@ pub async fn resurrect_org(org_id: &str, actor: &str) -> Result<(), anyhow::Erro
 /// Promote every pending_deletion org whose grace window has elapsed to `deleting`
 /// and enqueue its cleanup tasks. Returns the number promoted.
 pub async fn promote_expired() -> Result<usize, anyhow::Error> {
-    use crate::service::db::org_status;
+    use crate::db::org_status;
 
     let grace_days = grace_period_days();
     if grace_days <= 0 {
@@ -768,9 +809,9 @@ pub async fn promote_expired() -> Result<usize, anyhow::Error> {
     // Reuse the status cache (synced from DB + coordinator) to find pending orgs
     // instead of scanning every org from the DB. The cache only holds
     // pending_deletion/deleting orgs, so this is already the small candidate set.
-    let pending_org_ids: Vec<String> = crate::common::infra::config::ORG_STATUS_CACHE
+    let pending_org_ids: Vec<String> = common::infra::config::ORG_STATUS_CACHE
         .iter()
-        .filter(|e| *e.value() == crate::common::meta::organization::OrgStatus::PendingDeletion)
+        .filter(|e| *e.value() == common::meta::organization::OrgStatus::PendingDeletion)
         .map(|e| e.key().clone())
         .collect();
 
@@ -857,6 +898,20 @@ pub async fn run_promotion_scheduler() -> Result<(), anyhow::Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    struct FailingStreamDataCleanup;
+
+    #[async_trait]
+    impl StreamDataCleanup for FailingStreamDataCleanup {
+        async fn delete_stream_data(
+            &self,
+            _org_id: &str,
+            _stream_type: StreamType,
+            _stream_name: &str,
+        ) -> Result<(), anyhow::Error> {
+            Err(anyhow::anyhow!("stream cleanup failed"))
+        }
+    }
 
     #[test]
     fn test_grace_period_days_non_negative() {
@@ -945,6 +1000,14 @@ mod tests {
         const { assert!(ORDER_DELETE_USERS < ORDER_DELETE_ORG_RECORD) };
     }
 
+    #[tokio::test]
+    async fn test_delete_stream_propagates_data_cleanup_error() {
+        let err = step_delete_stream("org", "logs/stream", &FailingStreamDataCleanup)
+            .await
+            .unwrap_err();
+        assert_eq!(err.to_string(), "stream cleanup failed");
+    }
+
     #[cfg(feature = "enterprise")]
     #[test]
     fn test_user_fga_role_mapping() {
@@ -1008,10 +1071,7 @@ mod tests {
     async fn test_initiate_deletion_refuses_system_orgs() {
         // `default` and `_meta` must never be deletable — the guard rejects before
         // any status mutation, so this holds even without a DB.
-        for sys_org in [
-            crate::common::meta::organization::DEFAULT_ORG,
-            config::META_ORG_ID,
-        ] {
+        for sys_org in [config::DEFAULT_ORG, config::META_ORG_ID] {
             let r = initiate_deletion(sys_org, "test@example.com").await;
             assert!(r.is_err(), "{sys_org} must not be deletable");
             assert!(

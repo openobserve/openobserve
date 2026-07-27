@@ -72,7 +72,14 @@ const mockI18n = createI18n({
 // ─── BaseImport stub ──────────────────────────────────────────────────────────
 const BaseImportStub = {
   template: '<div><slot name="output-content"></slot></div>',
-  props: ["title", "testPrefix", "isImporting", "editorHeights", "containerClass", "containerStyle"],
+  props: [
+    "title",
+    "testPrefix",
+    "isImporting",
+    "editorHeights",
+    "containerClass",
+    "containerStyle",
+  ],
   emits: ["back", "cancel", "import"],
   setup(_props: any, { expose }: any) {
     const jsonArrayOfObj = ref<any[]>([]);
@@ -265,38 +272,48 @@ describe("ImportTemplate", () => {
     });
 
     it("returns false and records error for missing name", async () => {
-      const result = await wrapper.vm.validateTemplateInputs(
-        { type: "http", body: '{"x":1}' },
-        1,
-      );
+      const result = await wrapper.vm.validateTemplateInputs({ type: "http", body: '{"x":1}' }, 1);
       expect(result).toBe(false);
       expect(wrapper.vm.templateErrorsToDisplay.length).toBeGreaterThan(0);
     });
 
     it("returns false for empty string name", async () => {
-      expect(await wrapper.vm.validateTemplateInputs({ name: "", type: "http", body: '{"x":1}' }, 1)).toBe(false);
+      expect(
+        await wrapper.vm.validateTemplateInputs({ name: "", type: "http", body: '{"x":1}' }, 1),
+      ).toBe(false);
     });
 
     it("returns false for whitespace-only name", async () => {
-      expect(await wrapper.vm.validateTemplateInputs({ name: "   ", type: "http", body: '{"x":1}' }, 1)).toBe(false);
+      expect(
+        await wrapper.vm.validateTemplateInputs({ name: "   ", type: "http", body: '{"x":1}' }, 1),
+      ).toBe(false);
     });
 
     it("returns false for non-string name", async () => {
-      expect(await wrapper.vm.validateTemplateInputs({ name: 42, type: "http", body: '{"x":1}' }, 1)).toBe(false);
+      expect(
+        await wrapper.vm.validateTemplateInputs({ name: 42, type: "http", body: '{"x":1}' }, 1),
+      ).toBe(false);
     });
 
     it("returns false for a duplicate template name", async () => {
       expect(
-        await wrapper.vm.validateTemplateInputs({ name: "existing-template", type: "http", body: '{"x":1}' }, 1),
+        await wrapper.vm.validateTemplateInputs(
+          { name: "existing-template", type: "http", body: '{"x":1}' },
+          1,
+        ),
       ).toBe(false);
     });
 
     it("returns false for invalid type", async () => {
-      expect(await wrapper.vm.validateTemplateInputs({ name: "t", type: "ftp", body: '{"x":1}' }, 1)).toBe(false);
+      expect(
+        await wrapper.vm.validateTemplateInputs({ name: "t", type: "ftp", body: '{"x":1}' }, 1),
+      ).toBe(false);
     });
 
     it("returns false for missing type", async () => {
-      expect(await wrapper.vm.validateTemplateInputs({ name: "t", body: '{"x":1}' }, 1)).toBe(false);
+      expect(await wrapper.vm.validateTemplateInputs({ name: "t", body: '{"x":1}' }, 1)).toBe(
+        false,
+      );
     });
 
     it("returns false for missing body", async () => {
@@ -304,19 +321,27 @@ describe("ImportTemplate", () => {
     });
 
     it("returns false for empty body", async () => {
-      expect(await wrapper.vm.validateTemplateInputs({ name: "t", type: "http", body: "" }, 1)).toBe(false);
+      expect(
+        await wrapper.vm.validateTemplateInputs({ name: "t", type: "http", body: "" }, 1),
+      ).toBe(false);
     });
 
     it("returns false for whitespace-only body", async () => {
-      expect(await wrapper.vm.validateTemplateInputs({ name: "t", type: "http", body: "   " }, 1)).toBe(false);
+      expect(
+        await wrapper.vm.validateTemplateInputs({ name: "t", type: "http", body: "   " }, 1),
+      ).toBe(false);
     });
 
     it("returns false for non-string body", async () => {
-      expect(await wrapper.vm.validateTemplateInputs({ name: "t", type: "http", body: 123 as any }, 1)).toBe(false);
+      expect(
+        await wrapper.vm.validateTemplateInputs({ name: "t", type: "http", body: 123 as any }, 1),
+      ).toBe(false);
     });
 
     it("returns false for invalid JSON in body", async () => {
-      expect(await wrapper.vm.validateTemplateInputs({ name: "t", type: "http", body: "not json" }, 1)).toBe(false);
+      expect(
+        await wrapper.vm.validateTemplateInputs({ name: "t", type: "http", body: "not json" }, 1),
+      ).toBe(false);
     });
 
     it("returns false for email type missing title", async () => {
@@ -327,19 +352,28 @@ describe("ImportTemplate", () => {
 
     it("returns false for email type with empty title", async () => {
       expect(
-        await wrapper.vm.validateTemplateInputs({ name: "t", type: "email", body: '{"x":1}', title: "" }, 1),
+        await wrapper.vm.validateTemplateInputs(
+          { name: "t", type: "email", body: '{"x":1}', title: "" },
+          1,
+        ),
       ).toBe(false);
     });
 
     it("returns false for email type with whitespace-only title", async () => {
       expect(
-        await wrapper.vm.validateTemplateInputs({ name: "t", type: "email", body: '{"x":1}', title: "   " }, 1),
+        await wrapper.vm.validateTemplateInputs(
+          { name: "t", type: "email", body: '{"x":1}', title: "   " },
+          1,
+        ),
       ).toBe(false);
     });
 
     it("returns false for email type with non-string title", async () => {
       expect(
-        await wrapper.vm.validateTemplateInputs({ name: "t", type: "email", body: '{"x":1}', title: 99 as any }, 1),
+        await wrapper.vm.validateTemplateInputs(
+          { name: "t", type: "email", body: '{"x":1}', title: 99 as any },
+          1,
+        ),
       ).toBe(false);
     });
 
@@ -433,7 +467,10 @@ describe("ImportTemplate", () => {
         response: { data: { message: "Conflict" } },
       });
 
-      const result = await wrapper.vm.createTemplate({ name: "t", type: "http", body: '{"x":1}' }, 1);
+      const result = await wrapper.vm.createTemplate(
+        { name: "t", type: "http", body: '{"x":1}' },
+        1,
+      );
 
       expect(result).toBe(false);
       expect(wrapper.vm.tempalteCreators[0].success).toBe(false);
@@ -444,7 +481,10 @@ describe("ImportTemplate", () => {
       const templateService = await import("@/services/alert_templates");
       vi.mocked(templateService.default.create).mockRejectedValueOnce(new Error("net"));
 
-      const result = await wrapper.vm.createTemplate({ name: "t", type: "http", body: '{"x":1}' }, 1);
+      const result = await wrapper.vm.createTemplate(
+        { name: "t", type: "http", body: '{"x":1}' },
+        1,
+      );
 
       expect(result).toBe(false);
       expect(wrapper.vm.tempalteCreators[0].message).toContain("Unknown Error");
@@ -506,41 +546,31 @@ describe("ImportTemplate", () => {
   // ─── Output section conditional rendering via v-if ────────────────────────
   describe("output-content slot — conditional branches", () => {
     it("renders error group items when templateErrorsToDisplay is non-empty", async () => {
-      wrapper.vm.templateErrorsToDisplay = [
-        [{ field: "template_name", message: "name conflict" }],
-      ];
+      wrapper.vm.templateErrorsToDisplay = [[{ field: "template_name", message: "name conflict" }]];
       await wrapper.vm.$nextTick();
       expect(wrapper.find('[data-test="template-import-error-0-0"]').exists()).toBe(true);
     });
 
     it("renders the name correction input for template_name field errors", async () => {
-      wrapper.vm.templateErrorsToDisplay = [
-        [{ field: "template_name", message: "name conflict" }],
-      ];
+      wrapper.vm.templateErrorsToDisplay = [[{ field: "template_name", message: "name conflict" }]];
       await wrapper.vm.$nextTick();
       expect(wrapper.find('[data-test="template-import-name-input"]').exists()).toBe(true);
     });
 
     it("renders the body correction input for body field errors", async () => {
-      wrapper.vm.templateErrorsToDisplay = [
-        [{ field: "body", message: "invalid body" }],
-      ];
+      wrapper.vm.templateErrorsToDisplay = [[{ field: "body", message: "invalid body" }]];
       await wrapper.vm.$nextTick();
       expect(wrapper.find('[data-test="template-import-body-input"]').exists()).toBe(true);
     });
 
     it("renders the type correction select for type field errors", async () => {
-      wrapper.vm.templateErrorsToDisplay = [
-        [{ field: "type", message: "invalid type" }],
-      ];
+      wrapper.vm.templateErrorsToDisplay = [[{ field: "type", message: "invalid type" }]];
       await wrapper.vm.$nextTick();
       expect(wrapper.find('[data-test="template-import-type-input"]').exists()).toBe(true);
     });
 
     it("renders the title correction input for title field errors", async () => {
-      wrapper.vm.templateErrorsToDisplay = [
-        [{ field: "title", message: "title required" }],
-      ];
+      wrapper.vm.templateErrorsToDisplay = [[{ field: "title", message: "title required" }]];
       await wrapper.vm.$nextTick();
       expect(wrapper.find('[data-test="template-import-title-input"]').exists()).toBe(true);
     });

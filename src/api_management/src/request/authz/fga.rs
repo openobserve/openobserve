@@ -16,18 +16,16 @@
 #[cfg(feature = "enterprise")]
 use axum::response::IntoResponse;
 use axum::{Json, extract::Path, response::Response};
+use openobserve_api_common::extractors::Headers;
+use openobserve_core::auth::UserEmail;
 #[cfg(feature = "enterprise")]
-use {crate::common::utils::auth::check_permissions, o2_dex::meta::auth::RoleRequest};
+use {o2_dex::meta::auth::RoleRequest, openobserve_core::auth::check_permissions};
 
 use crate::{
-    common::{
-        meta::{
-            http::HttpResponse as MetaHttpResponse,
-            user::{UserGroup, UserGroupRequest, UserRoleRequest},
-        },
-        utils::auth::UserEmail,
+    common::meta::{
+        http::HttpResponse as MetaHttpResponse,
+        user::{UserGroup, UserGroupRequest, UserRoleRequest},
     },
-    extractors::Headers,
     request::{BulkDeleteRequest, BulkDeleteResponse},
 };
 
@@ -954,7 +952,7 @@ pub async fn get_groups(
             permitted = list;
         }
         Err(e) => {
-            return crate::common::meta::http::HttpResponse::forbidden(e.to_string());
+            return common::meta::http::HttpResponse::forbidden(e.to_string());
         }
     }
     // Get List of allowed objects ends
@@ -1288,9 +1286,9 @@ mod tests {
     use std::collections::HashSet;
 
     use axum::http::StatusCode;
+    use common::meta::user::{UserGroup, UserGroupRequest, UserRoleRequest};
 
     use super::*;
-    use crate::common::meta::user::{UserGroup, UserGroupRequest, UserRoleRequest};
 
     fn extract_status_code(resp: &Response) -> StatusCode {
         resp.status()

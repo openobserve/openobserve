@@ -201,6 +201,19 @@ export interface RichCardExtras {
     description?: string;
     code: RichCardCode;
   };
+  /**
+   * How to remove what the install step added. Rendered as the last collapsed
+   * section, below troubleshooting — it is a rare, destructive action, so it stays
+   * out of the way of the setup flow while remaining discoverable on the page that
+   * installed the thing.
+   */
+  uninstall?: {
+    /** Accordion label, e.g. "Uninstall the Agent". */
+    label: string;
+    /** Optional paragraph above the code (inline markdown: **bold**, `code`). */
+    description?: string;
+    code: RichCardCode;
+  };
   troubleshooting?: { q: string; a: string }[];
 }
 

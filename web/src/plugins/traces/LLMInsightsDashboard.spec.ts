@@ -86,8 +86,7 @@ vi.mock("@/composables/useStreams", () => ({
 
 vi.mock("vue-i18n", () => ({
   useI18n: vi.fn(() => ({
-    t: (key: string, params?: Record<string, any>) =>
-      params ? key + JSON.stringify(params) : key,
+    t: (key: string, params?: Record<string, any>) => (params ? key + JSON.stringify(params) : key),
   })),
 }));
 
@@ -137,10 +136,10 @@ function mountDashboard(
       stubs: {
         // Children — all stubbed so we don't try to render echarts /
         // sparkline math during dashboard-level tests.
-        LLMSchemaPanel: { template: "<div data-test=\"llm-schema-panel\" />" },
-        LLMErrorTable: { template: "<div data-test=\"llm-error-table\" />" },
-        KpiSparkline: { template: "<div data-test=\"kpi-sparkline\" />" },
-        LLMInsightsSkeleton: { template: "<div data-test=\"llm-insights-skeleton\" />" },
+        LLMSchemaPanel: { template: '<div data-test="llm-schema-panel" />' },
+        LLMErrorTable: { template: '<div data-test="llm-error-table" />' },
+        KpiSparkline: { template: '<div data-test="kpi-sparkline" />' },
+        LLMInsightsSkeleton: { template: '<div data-test="llm-insights-skeleton" />' },
         OButton: {
           template: "<button @click=\"$emit('click')\"><slot /></button>",
           emits: ["click"],

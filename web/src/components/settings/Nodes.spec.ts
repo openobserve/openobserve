@@ -19,7 +19,6 @@ import { createStore } from "vuex";
 import { createI18n } from "vue-i18n";
 import Nodes from "./Nodes.vue";
 
-
 vi.mock("@/services/common", () => ({
   default: {
     list_nodes: vi.fn(),
@@ -137,8 +136,12 @@ function mountComponent() {
       plugins: [mockI18n],
       provide: { store: mockStore },
       stubs: {
-        "QTablePagination": { template: "<div class='pagination' />", props: ["scope", "resultTotal", "perPageOptions", "position"], emits: ["update:changeRecordPerPage"] },
-        "NoData": { template: "<div class='no-data'>No Data</div>" },
+        QTablePagination: {
+          template: "<div class='pagination' />",
+          props: ["scope", "resultTotal", "perPageOptions", "position"],
+          emits: ["update:changeRecordPerPage"],
+        },
+        NoData: { template: "<div class='no-data'>No Data</div>" },
       },
     },
   });
@@ -382,8 +385,8 @@ describe("Nodes", () => {
           plugins: [mockI18n],
           provide: { store: storeWithoutSuperCluster },
           stubs: {
-            "QTablePagination": { template: "<div />" },
-            "NoData": { template: "<div />" },
+            QTablePagination: { template: "<div />" },
+            NoData: { template: "<div />" },
           },
         },
       });

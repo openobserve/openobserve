@@ -1,0 +1,19 @@
+[package]
+name = "audit"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[features]
+default = []
+enterprise = ["dep:o2_enterprise"]
+
+[dependencies]
+anyhow.workspace = true
+async-trait.workspace = true
+config.workspace = true
+log.workspace = true
+o2_enterprise = { workspace = true, optional = true, default-features = false }
+proto.workspace = true
+tokio.workspace = true

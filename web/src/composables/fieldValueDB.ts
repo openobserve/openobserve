@@ -33,8 +33,8 @@ const DB_VERSION = 1;
 const STORE_NAME = "fieldValues";
 
 export interface FieldValueRecord {
-  key: string;       // PK — composite key "org|streamType|streamName|fieldName"
-  values: string[];  // unique, deduplicated; capped at MAX_VALUES_PER_FIELD
+  key: string; // PK — composite key "org|streamType|streamName|fieldName"
+  values: string[]; // unique, deduplicated; capped at MAX_VALUES_PER_FIELD
   updatedAt: number; // Unix ms — last write timestamp; used for LRU eviction
   expiresAt: number; // Unix ms — sliding TTL, reset on every write
   // "mixed" means values came from both sources at different points in time.
@@ -119,10 +119,7 @@ export const mergeValues = async (
       for (const v of incoming) valueSet.add(String(v));
       const merged = Array.from(valueSet);
       // Keep the last maxValues entries (most recently added, at the array's end).
-      const values =
-        merged.length > maxValues
-          ? merged.slice(merged.length - maxValues)
-          : merged;
+      const values = merged.length > maxValues ? merged.slice(merged.length - maxValues) : merged;
       const now = Date.now();
       const record: FieldValueRecord = {
         key,
@@ -131,9 +128,9 @@ export const mergeValues = async (
         expiresAt: now + ttlMs, // sliding window — reset on every write
         source: existing
           ? existing.source === source
-            ? source    // same source as before — keep it
-            : "mixed"   // different source — mark as mixed
-          : source,     // first write — use the incoming source
+            ? source // same source as before — keep it
+            : "mixed" // different source — mark as mixed
+          : source, // first write — use the incoming source
       };
       store.put(record);
     };
@@ -173,20 +170,13 @@ export const mergeMultipleValues = async (
         const valueSet = new Set(existing?.values ?? []);
         for (const v of incoming) valueSet.add(String(v));
         const merged = Array.from(valueSet);
-        const values =
-          merged.length > maxValues
-            ? merged.slice(merged.length - maxValues)
-            : merged;
+        const values = merged.length > maxValues ? merged.slice(merged.length - maxValues) : merged;
         const record: FieldValueRecord = {
           key,
           values,
           updatedAt: now,
           expiresAt: now + ttlMs,
-          source: existing
-            ? existing.source === source
-              ? source
-              : "mixed"
-            : source,
+          source: existing ? (existing.source === source ? source : "mixed") : source,
         };
         store.put(record);
       };

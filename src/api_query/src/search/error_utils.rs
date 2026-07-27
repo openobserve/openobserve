@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pub use crate::service::http::map_error_to_http_response;
+pub use openobserve_core::http::map_error_to_http_response;
 
 #[cfg(test)]
 mod tests {

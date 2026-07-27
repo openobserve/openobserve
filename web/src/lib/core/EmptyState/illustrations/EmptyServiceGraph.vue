@@ -34,7 +34,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ellipse cx="120" cy="156" rx="66" ry="9" fill="var(--color-primary-900)" opacity="0.1" />
     <!-- Ambient dots -->
     <g fill="var(--color-border-default)" opacity="0.5">
-      <circle cx="26" cy="46" r="2" /><circle cx="214" cy="120" r="2" /><circle cx="210" cy="42" r="1.6" />
+      <circle cx="26" cy="46" r="2" />
+      <circle cx="214" cy="120" r="2" />
+      <circle cx="210" cy="42" r="1.6" />
     </g>
 
     <!-- Edge: root → top-right child -->
@@ -48,17 +50,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <path d="M 153 122 L 144 123 L 148 115 Z" fill="var(--color-border-strong)" />
 
     <!-- Root node (left — service origin), larger -->
-    <circle cx="75" cy="90" r="20" fill="var(--color-surface-base)" stroke="var(--color-border-strong)" stroke-width="2" />
+    <circle
+      cx="75"
+      cy="90"
+      r="20"
+      fill="var(--color-surface-base)"
+      stroke="var(--color-border-strong)"
+      stroke-width="2"
+    />
     <circle cx="75" cy="90" r="8" fill="var(--color-primary-500)" opacity="0.9" />
     <circle cx="75" cy="90" r="4" fill="var(--color-primary-700)" />
 
     <!-- Top-right child node -->
-    <circle cx="168" cy="52" r="16" fill="var(--color-surface-base)" stroke="var(--color-border-strong)" stroke-width="2" />
+    <circle
+      cx="168"
+      cy="52"
+      r="16"
+      fill="var(--color-surface-base)"
+      stroke="var(--color-border-strong)"
+      stroke-width="2"
+    />
     <circle cx="168" cy="52" r="6" fill="var(--color-primary-400)" opacity="0.85" />
     <circle cx="168" cy="52" r="3" fill="var(--color-primary-600)" />
 
     <!-- Bottom-right child node -->
-    <circle cx="168" cy="128" r="16" fill="var(--color-surface-base)" stroke="var(--color-border-strong)" stroke-width="2" />
+    <circle
+      cx="168"
+      cy="128"
+      r="16"
+      fill="var(--color-surface-base)"
+      stroke="var(--color-border-strong)"
+      stroke-width="2"
+    />
     <circle cx="168" cy="128" r="6" fill="var(--color-primary-300)" opacity="0.85" />
     <circle cx="168" cy="128" r="3" fill="var(--color-primary-500)" />
 
@@ -71,10 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-withDefaults(
-  defineProps<{ width?: number; animated?: boolean }>(),
-  { width: 260, animated: true },
-);
+withDefaults(defineProps<{ width?: number; animated?: boolean }>(), { width: 260, animated: true });
 </script>
 
 <style scoped>
@@ -94,11 +114,25 @@ withDefaults(
   animation: es-packet-top 3s ease-in-out infinite;
 }
 @keyframes es-packet-top {
-  0% { transform: translateX(0) translateY(0); opacity: 0; }
-  10% { opacity: 1; }
-  50% { transform: translateX(59px) translateY(-24px); opacity: 1; }
-  65% { transform: translateX(59px) translateY(-24px); opacity: 0; }
-  100% { transform: translateX(59px) translateY(-24px); opacity: 0; }
+  0% {
+    transform: translateX(0) translateY(0);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  50% {
+    transform: translateX(59px) translateY(-24px);
+    opacity: 1;
+  }
+  65% {
+    transform: translateX(59px) translateY(-24px);
+    opacity: 0;
+  }
+  100% {
+    transform: translateX(59px) translateY(-24px);
+    opacity: 0;
+  }
 }
 
 .es-packet-bottom {
@@ -106,11 +140,25 @@ withDefaults(
   animation: es-packet-bottom 3s ease-in-out infinite 1.5s;
 }
 @keyframes es-packet-bottom {
-  0% { transform: translateX(0) translateY(0); opacity: 0; }
-  10% { opacity: 1; }
-  50% { transform: translateX(59px) translateY(24px); opacity: 1; }
-  65% { transform: translateX(59px) translateY(24px); opacity: 0; }
-  100% { transform: translateX(59px) translateY(24px); opacity: 0; }
+  0% {
+    transform: translateX(0) translateY(0);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  50% {
+    transform: translateX(59px) translateY(24px);
+    opacity: 1;
+  }
+  65% {
+    transform: translateX(59px) translateY(24px);
+    opacity: 0;
+  }
+  100% {
+    transform: translateX(59px) translateY(24px);
+    opacity: 0;
+  }
 }
 
 .es-static :where(.es-packet-top, .es-packet-bottom) {

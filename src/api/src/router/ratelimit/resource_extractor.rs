@@ -28,15 +28,13 @@ use o2_ratelimit::{
     },
     middleware::{ExtractorRule, ExtractorRuleResult},
 };
+use openobserve_api_management::auth::validator::get_user_email_from_auth_str;
 use regex::Regex;
 use utoipa::OpenApi;
 
 use crate::{
-    common::utils::auth::extract_auth_str_from_headers,
-    handler::http::{
-        auth::validator::get_user_email_from_auth_str,
-        request::ratelimit::QUOTA_PAGE_GLOBAL_RULES_ORG, router::openapi::ApiDoc,
-    },
+    handler::http::{request::ratelimit::QUOTA_PAGE_GLOBAL_RULES_ORG, router::openapi::ApiDoc},
+    service::auth::extract_auth_str_from_headers,
 };
 
 fn extract_org_id(path: &str) -> String {
@@ -80,7 +78,7 @@ fn rule_extractor(
         let user_roles = if user_email.is_empty() {
             vec![]
         } else {
-            crate::service::users::get_user_roles(user_email.as_str(), Some(&org_id)).await
+            openobserve_core::users::get_user_roles(user_email.as_str(), Some(&org_id)).await
         };
         log::debug!("found user_roles: {:?}", user_roles);
         let openapi_path = openapi_path.unwrap_or(path);

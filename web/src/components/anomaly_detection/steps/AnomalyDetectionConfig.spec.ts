@@ -54,14 +54,7 @@ vi.mock("@/components/dashboards/PanelSchemaRenderer.vue", () => ({
 vi.mock("@/components/QueryEditor.vue", () => ({
   default: {
     template: '<div data-test="query-editor" />',
-    props: [
-      "query",
-      "editorId",
-      "language",
-      "readOnly",
-      "showAutoComplete",
-      "hideNlToggle",
-    ],
+    props: ["query", "editorId", "language", "readOnly", "showAutoComplete", "hideNlToggle"],
   },
 }));
 
@@ -300,9 +293,7 @@ describe("AnomalyDetectionConfig", () => {
 
     it("should include field IN (values) for an IN filter", async () => {
       wrapper = mountConfig({
-        filters: [
-          { field: "status", operator: "IN", value: "200,404,500" },
-        ],
+        filters: [{ field: "status", operator: "IN", value: "200,404,500" }],
       });
       const sql = await getSqlFromPreview(wrapper);
       expect(sql).toContain("WHERE status IN (200,404,500)");
@@ -310,9 +301,7 @@ describe("AnomalyDetectionConfig", () => {
 
     it("should include field NOT IN (values) for a NOT IN filter", async () => {
       wrapper = mountConfig({
-        filters: [
-          { field: "status", operator: "NOT IN", value: "500,503" },
-        ],
+        filters: [{ field: "status", operator: "NOT IN", value: "500,503" }],
       });
       const sql = await getSqlFromPreview(wrapper);
       expect(sql).toContain("WHERE status NOT IN (500,503)");
@@ -320,9 +309,7 @@ describe("AnomalyDetectionConfig", () => {
 
     it("should use str_match for a Contains filter", async () => {
       wrapper = mountConfig({
-        filters: [
-          { field: "message", operator: "Contains", value: "error" },
-        ],
+        filters: [{ field: "message", operator: "Contains", value: "error" }],
       });
       const sql = await getSqlFromPreview(wrapper);
       expect(sql).toContain("WHERE str_match(message, 'error')");
@@ -330,9 +317,7 @@ describe("AnomalyDetectionConfig", () => {
 
     it("should use str_match for a str_match filter", async () => {
       wrapper = mountConfig({
-        filters: [
-          { field: "message", operator: "str_match", value: "timeout" },
-        ],
+        filters: [{ field: "message", operator: "str_match", value: "timeout" }],
       });
       const sql = await getSqlFromPreview(wrapper);
       expect(sql).toContain("WHERE str_match(message, 'timeout')");
@@ -349,16 +334,12 @@ describe("AnomalyDetectionConfig", () => {
         ],
       });
       const sql = await getSqlFromPreview(wrapper);
-      expect(sql).toContain(
-        "WHERE str_match_ignore_case(message, 'ERROR')",
-      );
+      expect(sql).toContain("WHERE str_match_ignore_case(message, 'ERROR')");
     });
 
     it("should use re_match for a re_match filter", async () => {
       wrapper = mountConfig({
-        filters: [
-          { field: "level", operator: "re_match", value: "^(error|warn)$" },
-        ],
+        filters: [{ field: "level", operator: "re_match", value: "^(error|warn)$" }],
       });
       const sql = await getSqlFromPreview(wrapper);
       expect(sql).toContain("WHERE re_match(level, '^(error|warn)$')");
@@ -366,9 +347,7 @@ describe("AnomalyDetectionConfig", () => {
 
     it("should use match_all for a match_all filter", async () => {
       wrapper = mountConfig({
-        filters: [
-          { field: "message", operator: "match_all", value: "critical" },
-        ],
+        filters: [{ field: "message", operator: "match_all", value: "critical" }],
       });
       const sql = await getSqlFromPreview(wrapper);
       expect(sql).toContain("WHERE match_all('critical')");
@@ -392,9 +371,7 @@ describe("AnomalyDetectionConfig", () => {
 
     it("should use NOT LIKE pattern for a Not Contains filter", async () => {
       wrapper = mountConfig({
-        filters: [
-          { field: "message", operator: "Not Contains", value: "debug" },
-        ],
+        filters: [{ field: "message", operator: "Not Contains", value: "debug" }],
       });
       const sql = await getSqlFromPreview(wrapper);
       expect(sql).toContain("WHERE message NOT LIKE '%debug%'");
@@ -560,17 +537,14 @@ describe("AnomalyDetectionConfig", () => {
 
       // pre-submit: submit-then-change timing → no errors surfaced yet
       expect(form.state.submissionAttempts).toBe(0);
-      expect((form.getFieldMeta("detection_window_value")?.errors ?? [])
-        .length).toBe(0);
+      expect((form.getFieldMeta("detection_window_value")?.errors ?? []).length).toBe(0);
 
       form.setFieldValue("detection_window_value", ""); // OFormInput emits ""
       await form.handleSubmit();
       await nextTick();
 
       expect(form.state.isValid).toBe(false); // "" → coerce 0 → min(1) fails
-      expect(fieldError(wrapper, "detection_window_value")).toBe(
-        "Field is required!",
-      );
+      expect(fieldError(wrapper, "detection_window_value")).toBe("Field is required!");
       // validate() (the exposed surface) blocks Next/Save
       await expect((wrapper.vm as any).validate()).resolves.toBe(false);
     });
@@ -675,9 +649,7 @@ describe("AnomalyDetectionConfig", () => {
       await nextTick();
 
       expect(form.state.isValid).toBe(false);
-      expect(fieldError(wrapper, "detection_function")).toBe(
-        "Detection function is required",
-      );
+      expect(fieldError(wrapper, "detection_function")).toBe("Detection function is required");
       await expect((wrapper.vm as any).validate()).resolves.toBe(false);
     });
 
@@ -711,9 +683,7 @@ describe("AnomalyDetectionConfig", () => {
       await nextTick();
 
       expect(form.state.isValid).toBe(false);
-      expect(fieldError(wrapper, "detection_function_field")).toBe(
-        "Field is required",
-      );
+      expect(fieldError(wrapper, "detection_function_field")).toBe("Field is required");
     });
 
     it("filters mode: count function does NOT require detection_function_field", async () => {
@@ -767,22 +737,18 @@ describe("AnomalyDetectionConfig", () => {
 
       // R3: pre-submit the alias error div (a bare, data-test-selectable div)
       // must NOT render even though the SQL is already invalid.
-      expect(
-        wrapper
-          .find('[data-test="anomaly-custom-sql-timestamp-alias-error"]')
-          .exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="anomaly-custom-sql-timestamp-alias-error"]').exists()).toBe(
+        false,
+      );
 
       await form.handleSubmit();
       await nextTick();
 
       expect(form.state.isValid).toBe(false);
       // post-submit the gate opens and the div renders
-      expect(
-        wrapper
-          .find('[data-test="anomaly-custom-sql-timestamp-alias-error"]')
-          .exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="anomaly-custom-sql-timestamp-alias-error"]').exists()).toBe(
+        true,
+      );
     });
 
     it("detection-window error div (kept data-test) is submission-gated", async () => {
@@ -793,16 +759,12 @@ describe("AnomalyDetectionConfig", () => {
       await nextTick();
 
       // pre-submit: no error div
-      expect(
-        wrapper.find('[data-test="anomaly-detection-window-error"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="anomaly-detection-window-error"]').exists()).toBe(false);
 
       await form.handleSubmit();
       await nextTick();
 
-      expect(
-        wrapper.find('[data-test="anomaly-detection-window-error"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="anomaly-detection-window-error"]').exists()).toBe(true);
     });
   });
 
@@ -883,9 +845,10 @@ describe("AnomalyDetectionConfig", () => {
       await flushPromises();
 
       // form DATA is correct
-      expect(
-        getForm(wrapper).state.values.filters.map((f: any) => f.field),
-      ).toEqual(["alpha", "gamma"]);
+      expect(getForm(wrapper).state.values.filters.map((f: any) => f.field)).toEqual([
+        "alpha",
+        "gamma",
+      ]);
 
       // the RENDERED inputs must match — not shifted, not blank (:key=index)
       expect(renderedFilterFields(wrapper)).toEqual(["alpha", "gamma"]);

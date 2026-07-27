@@ -21,138 +21,133 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     tabs-below
     bleed
   >
-      <template #actions>
-        <date-time
-          ref="dateTimeRef"
-          auto-apply
-          :default-type="dateTimeType"
-          :default-absolute-time="{
-            startTime: timeRange.__global.start_time.getTime(),
-            endTime: timeRange.__global.end_time.getTime(),
-          }"
-          :default-relative-time="relativeTime"
-          @on:date-change="updateDateTime"
-          @on:timezone-change="updateTimezone"
-          data-test="alert-insights-datetime"
+    <template #actions>
+      <date-time
+        ref="dateTimeRef"
+        auto-apply
+        :default-type="dateTimeType"
+        :default-absolute-time="{
+          startTime: timeRange.__global.start_time.getTime(),
+          endTime: timeRange.__global.end_time.getTime(),
+        }"
+        :default-relative-time="relativeTime"
+        @on:date-change="updateDateTime"
+        @on:timezone-change="updateTimezone"
+        data-test="alert-insights-datetime"
+      />
+
+      <OButton
+        @click="refreshDashboard"
+        :loading="isLoading"
+        variant="ghost"
+        size="icon-sm"
+        data-test="alert-insights-refresh-btn"
+      >
+        <OIcon name="refresh" size="sm" />
+        <OTooltip :content="t('common.refresh')" />
+      </OButton>
+    </template>
+
+    <template #header-tabs>
+      <OTabs v-model="currentTab" dense align="left" data-test="alert-insights-tabs">
+        <OTab
+          name="overview"
+          :label="t('alerts.insights.tabs.overview')"
+          data-test="tab-overview"
         />
-
-        <OButton
-          @click="refreshDashboard"
-          :loading="isLoading"
-          variant="ghost"
-          size="icon-sm"
-          data-test="alert-insights-refresh-btn"
-        >
-          <OIcon name="refresh" size="sm" />
-          <OTooltip :content="t('common.refresh')" />
-        </OButton>
-      </template>
-
-      <template #header-tabs>
-        <OTabs
-          v-model="currentTab"
-          dense
-          align="left"
-          data-test="alert-insights-tabs"
-        >
-          <OTab name="overview" :label="t('alerts.insights.tabs.overview')" data-test="tab-overview" />
-          <OTab
-            v-if="isEnterprise"
-            name="frequency"
-            :label="t('alerts.insights.tabs.frequency')"
-            data-test="tab-frequency"
-          />
-          <OTab
-            v-if="isEnterprise"
-            name="correlation"
-            :label="t('alerts.insights.tabs.correlation')"
-            data-test="tab-correlation"
-          />
-          <OTab name="quality" :label="t('alerts.insights.tabs.quality')" data-test="tab-quality" />
-        </OTabs>
-      </template>
+        <OTab
+          v-if="isEnterprise"
+          name="frequency"
+          :label="t('alerts.insights.tabs.frequency')"
+          data-test="tab-frequency"
+        />
+        <OTab
+          v-if="isEnterprise"
+          name="correlation"
+          :label="t('alerts.insights.tabs.correlation')"
+          data-test="tab-correlation"
+        />
+        <OTab name="quality" :label="t('alerts.insights.tabs.quality')" data-test="tab-quality" />
+      </OTabs>
+    </template>
 
     <!-- Filters Section -->
     <div
       v-if="show"
-      class="flex items-center gap-2 flex-wrap px-page-edge py-3 border-b border-border-default shrink-0"
+      class="px-page-edge border-border-default flex shrink-0 flex-wrap items-center gap-2 border-b py-3"
     >
-          <span class="text-sm font-semibold relative top-1">{{ t("common.filters") }}:</span>
+      <span class="relative top-1 text-sm font-semibold">{{ t("common.filters") }}:</span>
 
-          <!-- Failed Only Toggle -->
-          <OSwitch
-          v-model="showFailedOnly"
-          :label="t('alerts.insights.filters.failedOnly')"
-          class="o2-toggle-button-sm"
-          @update:model-value="onFilterChange"
-          data-test="failed-only-toggle"
-          >
-          <OTooltip :content="t('alerts.insights.filters.failedOnlyTooltip')">
-          </OTooltip>
-        </OSwitch>
+      <!-- Failed Only Toggle -->
+      <OSwitch
+        v-model="showFailedOnly"
+        :label="t('alerts.insights.filters.failedOnly')"
+        class="o2-toggle-button-sm"
+        @update:model-value="onFilterChange"
+        data-test="failed-only-toggle"
+      >
+        <OTooltip :content="t('alerts.insights.filters.failedOnlyTooltip')"> </OTooltip>
+      </OSwitch>
 
-          <!-- Silenced Only Toggle -->
-          <OSwitch
-          v-model="showSilencedOnly"
-          :label="t('alerts.insights.filters.silenced')"
-          class="o2-toggle-button-sm"
-          @update:model-value="onFilterChange"
-          data-test="silenced-only-toggle"
-          >
-          <OTooltip :content="t('alerts.insights.filters.silencedTooltip')">
-          </OTooltip>
-            </OSwitch>
+      <!-- Silenced Only Toggle -->
+      <OSwitch
+        v-model="showSilencedOnly"
+        :label="t('alerts.insights.filters.silenced')"
+        class="o2-toggle-button-sm"
+        @update:model-value="onFilterChange"
+        data-test="silenced-only-toggle"
+      >
+        <OTooltip :content="t('alerts.insights.filters.silencedTooltip')"> </OTooltip>
+      </OSwitch>
 
-          <!-- Range Filter Chips -->
-          <div
-            v-for="[panelId, filter] in rangeFilters"
-            :key="panelId"
-            class="inline-flex items-center rounded-default py-1 px-3 text-sm cursor-default bg-status-info-bg text-status-info-text"
-            data-test="range-filter-chip"
-          >
-            <span class="chip-label">
-              {{ filter.panelTitle }}
-              <span v-if="filter.start !== null && filter.end !== null">
-                {{ formatFilterValue(filter.start) }} -
-                {{ formatFilterValue(filter.end) }}
-              </span>
-              <span v-else-if="filter.start !== null">
-                >= {{ formatFilterValue(filter.start) }}
-              </span>
-              <span v-else-if="filter.end !== null">
-                &lt;= {{ formatFilterValue(filter.end) }}
-              </span>
-            </span>
-            <OIcon
-              name="close" size="sm"
-              class="cursor-pointer text-sm ml-2 opacity-70 transition-opacity duration-200 hover:opacity-100"
-              @click="removeRangeFilter(panelId)"
-            />
-          </div>
+      <!-- Range Filter Chips -->
+      <div
+        v-for="[panelId, filter] in rangeFilters"
+        :key="panelId"
+        class="rounded-default bg-status-info-bg text-status-info-text inline-flex cursor-default items-center px-3 py-1 text-sm"
+        data-test="range-filter-chip"
+      >
+        <span class="chip-label">
+          {{ filter.panelTitle }}
+          <span v-if="filter.start !== null && filter.end !== null">
+            {{ formatFilterValue(filter.start) }} -
+            {{ formatFilterValue(filter.end) }}
+          </span>
+          <span v-else-if="filter.start !== null"> >= {{ formatFilterValue(filter.start) }} </span>
+          <span v-else-if="filter.end !== null"> &lt;= {{ formatFilterValue(filter.end) }} </span>
+        </span>
+        <OIcon
+          name="close"
+          size="sm"
+          class="ml-2 cursor-pointer text-sm opacity-70 transition-opacity duration-200 hover:opacity-100"
+          @click="removeRangeFilter(panelId)"
+        />
+      </div>
 
-          <!-- Clear All Filters -->
-          <OButton
-            v-if="hasActiveFilters"
-            variant="ghost"
-            size="sm"
-            class="ml-2"
-            @click="clearAllFilters"
-            data-test="clear-all-filters-btn"
-            icon-left="close"
-          >
-            {{ t('alerts.insights.filters.clearAll') }}
-          </OButton>
+      <!-- Clear All Filters -->
+      <OButton
+        v-if="hasActiveFilters"
+        variant="ghost"
+        size="sm"
+        class="ml-2"
+        @click="clearAllFilters"
+        data-test="clear-all-filters-btn"
+        icon-left="close"
+      >
+        {{ t("alerts.insights.filters.clearAll") }}
+      </OButton>
     </div>
 
     <!-- Action Buttons Row -->
     <div
       v-if="selectedAlertForAction"
-      class="bg-primary bg-opacity-10 flex items-center px-4 py-3 gap-3 border-b border-border-default shrink-0"
+      class="bg-primary bg-opacity-10 border-border-default flex shrink-0 items-center gap-3 border-b px-4 py-3"
       data-test="action-buttons-row"
     >
       <OIcon name="campaign" size="sm" />
       <span class="text-sm font-medium"
-        >{{ t("alerts.insights.actions.actionsFor") }} <strong>{{ selectedAlertForAction }}</strong></span
+        >{{ t("alerts.insights.actions.actionsFor") }}
+        <strong>{{ selectedAlertForAction }}</strong></span
       >
 
       <OButton
@@ -202,21 +197,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Dashboard Content -->
-    <div class="flex-1 min-h-0 px-2.5 pb-2.5">
+    <div class="min-h-0 flex-1 px-2.5 pb-2.5">
       <div class="bg-card-glass-bg mb-2.5 h-[calc(100vh-13rem)]">
-        <div
-          @contextmenu="handleNativeContextMenu"
-        >
-          <div v-show="isLoading" class="flex items-center justify-center h-100">
+        <div @contextmenu="handleNativeContextMenu">
+          <div v-show="isLoading" class="flex h-100 items-center justify-center">
             <OSpinner size="md" />
             <div class="ml-3">Loading insights...</div>
           </div>
 
           <div :class="isLoading ? 'invisible' : 'visible'">
-            <div v-if="!dashboardData" class="p-5 text-center text-text-muted">
+            <div v-if="!dashboardData" class="text-text-muted p-5 text-center">
               {{ t("alerts.insights.loading.dashboardConfig") }}
             </div>
-            <div v-else-if="!show" class="p-5 text-center text-text-muted">
+            <div v-else-if="!show" class="text-text-muted p-5 text-center">
               {{ t("alerts.insights.loading.refreshing") }}
             </div>
             <RenderDashboardCharts
@@ -254,9 +247,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
-import OTab from '@/lib/navigation/Tabs/OTab.vue'
-import OButton from '@/lib/core/Button/OButton.vue';
+import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import OTab from "@/lib/navigation/Tabs/OTab.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { ref, computed, onMounted, watch, nextTick, reactive, provide } from "vue";
 import { useRouter, useRoute } from "vue-router";
@@ -357,9 +350,7 @@ const loadDashboard = () => {
   const org = store.state.selectedOrganization.identifier;
 
   // Find the current tab
-  const currentTabData = config.tabs?.find(
-    (tab: any) => tab.tabId === currentTab.value
-  );
+  const currentTabData = config.tabs?.find((tab: any) => tab.tabId === currentTab.value);
 
   if (!currentTabData) {
     dashboardData.value = config;
@@ -374,9 +365,7 @@ const loadDashboard = () => {
 
         // Build base filters that always apply
         // Note: module = 'alert' is now hardcoded in all queries in insights-metrics.json
-        const mandatoryFilters = [
-          `org = '${org}'`
-        ];
+        const mandatoryFilters = [`org = '${org}'`];
 
         // Combine with user filters
         const allFilters = [...mandatoryFilters, ...baseFilters];
@@ -423,9 +412,9 @@ const fetchAlerts = async () => {
       "name",
       false,
       "",
-      store.state.selectedOrganization.identifier,//store.state.selectedOrganization.identifier,
+      store.state.selectedOrganization.identifier, //store.state.selectedOrganization.identifier,
       "", // Empty folder to get all alerts
-      ""
+      "",
     );
     alertsList.value = res.data.list || [];
   } catch (error) {
@@ -437,14 +426,17 @@ const fetchAlerts = async () => {
 };
 
 const goBack = () => {
-  router.push({ name: "alertList", query: { org_identifier: store.state.selectedOrganization.identifier } });
+  router.push({
+    name: "alertList",
+    query: { org_identifier: store.state.selectedOrganization.identifier },
+  });
 };
 
 const updateDateTime = (value: any) => {
   timeRange.value = {
     __global: {
-      start_time: new Date(value.startTime ),
-      end_time: new Date(value.endTime ),
+      start_time: new Date(value.startTime),
+      end_time: new Date(value.endTime),
     },
   };
 
@@ -499,14 +491,14 @@ const onDataZoom = (data: any) => {
 
 const handleNativeContextMenu = (event: MouseEvent) => {
   // Only handle context menu on Frequency & Dedup tab
-  if (currentTab.value !== 'frequency') {
+  if (currentTab.value !== "frequency") {
     return; // Let other handlers or default behavior work
   }
 
   const target = event.target as HTMLElement;
 
   // Find if we clicked on a table cell
-  const tableCell = target.closest('td');
+  const tableCell = target.closest("td");
   if (!tableCell) {
     return; // Not a table cell, let default behavior work
   }
@@ -516,7 +508,7 @@ const handleNativeContextMenu = (event: MouseEvent) => {
 
   // Extract alert name (remove the /unique_id part)
   // Format: alert_name/unique_id -> alert_name
-  const alertName = alertKey?.split('/')[0];
+  const alertName = alertKey?.split("/")[0];
 
   // Check if this is the "Alert Key" column (first column in Dedup table)
   const cellIndex = Array.from(tableCell.parentElement?.children || []).indexOf(tableCell);
@@ -529,16 +521,14 @@ const handleNativeContextMenu = (event: MouseEvent) => {
 
     // Find the panel title from dashboard data
     const currentTabData = dashboardData.value?.tabs?.[0];
-    const dedupPanel = currentTabData?.panels?.find((p: any) =>
-      p.title?.includes('Dedup')
-    );
+    const dedupPanel = currentTabData?.panels?.find((p: any) => p.title?.includes("Dedup"));
 
     contextMenu.show = true;
     contextMenu.x = event.clientX;
     contextMenu.y = event.clientY;
     contextMenu.value = alertName;
-    contextMenu.panelId = dedupPanel?.id || '';
-    contextMenu.panelTitle = dedupPanel?.title || 'Dedup Impact Analysis';
+    contextMenu.panelId = dedupPanel?.id || "";
+    contextMenu.panelTitle = dedupPanel?.title || "Dedup Impact Analysis";
   }
   // If not first column or no alert name, let default context menu show
 };

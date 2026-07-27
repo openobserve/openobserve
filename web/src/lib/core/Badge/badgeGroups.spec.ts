@@ -49,8 +49,13 @@ describe("badgeGroups", () => {
   });
   it("resolves backfillJobStatus 1:1 (plain, solid, deletion overlay)", () => {
     const cases: Record<string, string> = {
-      running: "success", completed: "success", failed: "error",
-      pending: "warning", canceled: "default", deletionfailed: "error", weird: "default",
+      running: "success",
+      completed: "success",
+      failed: "error",
+      pending: "warning",
+      canceled: "default",
+      deletionfailed: "error",
+      weird: "default",
     };
     for (const [v, variant] of Object.entries(cases)) {
       expect(resolveBadge("backfillJobStatus", v).variant, v).toBe(variant);

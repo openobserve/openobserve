@@ -317,9 +317,7 @@ describe("AddPanel.vue", () => {
       // Test the showTutorial method
       wrapper.vm.showTutorial();
 
-      expect(window.open).toHaveBeenCalledWith(
-        "https://short.openobserve.ai/dashboard-tutorial",
-      );
+      expect(window.open).toHaveBeenCalledWith("https://short.openobserve.ai/dashboard-tutorial");
     });
 
     it.skip("should update seriesData when seriesDataUpdate is called", () => {
@@ -723,9 +721,7 @@ describe("AddPanel.vue", () => {
       wrapper.vm.handleLastTriggeredAtUpdate("2023-10-15");
 
       // Verify all data was set correctly
-      expect(wrapper.vm.seriesData).toEqual([
-        { name: "test", data: [1, 2, 3] },
-      ]);
+      expect(wrapper.vm.seriesData).toEqual([{ name: "test", data: [1, 2, 3] }]);
       expect(wrapper.vm.metaData).toEqual({ fields: ["field1"] });
       expect(wrapper.vm.lastTriggeredAt).toBe("2023-10-15");
     });
@@ -895,9 +891,7 @@ describe("AddPanel.vue", () => {
     it("should test dashboard panel data structure validation", () => {
       // Test dashboardPanelData structure
       expect(wrapper.vm.dashboardPanelData.data.queries).toBeDefined();
-      expect(Array.isArray(wrapper.vm.dashboardPanelData.data.queries)).toBe(
-        true,
-      );
+      expect(Array.isArray(wrapper.vm.dashboardPanelData.data.queries)).toBe(true);
 
       // Test panel configuration
       expect(wrapper.vm.dashboardPanelData.data.config).toBeDefined();
@@ -968,9 +962,7 @@ describe("AddPanel.vue", () => {
       };
 
       wrapper.vm.dashboardPanelData.data.queries.push(newQuery);
-      expect(wrapper.vm.dashboardPanelData.data.queries.length).toBeGreaterThan(
-        0,
-      );
+      expect(wrapper.vm.dashboardPanelData.data.queries.length).toBeGreaterThan(0);
     });
 
     it("should test panel type variations and configurations", () => {
@@ -992,8 +984,7 @@ describe("AddPanel.vue", () => {
           { name: "message", type: "text" },
           { name: "count", type: "number" },
         ],
-        query:
-          "SELECT timestamp, level, message, count(*) as count FROM logs GROUP BY level",
+        query: "SELECT timestamp, level, message, count(*) as count FROM logs GROUP BY level",
         queryType: "sql",
         resultSize: 1000,
       };
@@ -1054,9 +1045,7 @@ describe("AddPanel.vue", () => {
       wrapper.vm.dashboardPanelData.layout.currentQueryIndex = 0;
 
       expect(wrapper.vm.dashboardPanelData.data.queries.length).toBe(1);
-      expect(wrapper.vm.dashboardPanelData.data.queries[0].customQuery).toBe(
-        true,
-      );
+      expect(wrapper.vm.dashboardPanelData.data.queries[0].customQuery).toBe(true);
       expect(wrapper.vm.dashboardPanelData.layout.currentQueryIndex).toBe(0);
     });
 
@@ -1082,12 +1071,7 @@ describe("AddPanel.vue", () => {
       const testPanelId = "test-panel";
       const testHoveredTime = new Date();
 
-      providedValue.value.setIndex(
-        testDataIndex,
-        testSeriesIndex,
-        testPanelId,
-        testHoveredTime,
-      );
+      providedValue.value.setIndex(testDataIndex, testSeriesIndex, testPanelId, testHoveredTime);
 
       expect(providedValue.value.dataIndex).toBe(testDataIndex);
       expect(providedValue.value.seriesIndex).toBe(testSeriesIndex);
@@ -1099,8 +1083,7 @@ describe("AddPanel.vue", () => {
       expect(wrapper.vm.searchRequestTraceIds).toBeDefined();
       expect(Array.isArray(wrapper.vm.searchRequestTraceIds)).toBe(true);
 
-      const loadingState =
-        wrapper.vm.$.provides.variablesAndPanelsDataLoadingState;
+      const loadingState = wrapper.vm.$.provides.variablesAndPanelsDataLoadingState;
       expect(loadingState).toBeDefined();
 
       loadingState.searchRequestTraceIds = {
@@ -1109,19 +1092,14 @@ describe("AddPanel.vue", () => {
         panel3: ["trace3"],
       };
 
-      expect(wrapper.vm.searchRequestTraceIds).toEqual([
-        "trace1",
-        "trace2",
-        "trace3",
-      ]);
+      expect(wrapper.vm.searchRequestTraceIds).toEqual(["trace1", "trace2", "trace3"]);
     });
 
     it("should handle cancelAddPanelQuery function", () => {
       expect(wrapper.vm.cancelAddPanelQuery).toBeDefined();
       expect(typeof wrapper.vm.cancelAddPanelQuery).toBe("function");
 
-      const loadingState =
-        wrapper.vm.$.provides.variablesAndPanelsDataLoadingState;
+      const loadingState = wrapper.vm.$.provides.variablesAndPanelsDataLoadingState;
       loadingState.searchRequestTraceIds = {
         panel1: ["trace1", "trace2"],
         panel2: ["trace3"],
@@ -1137,9 +1115,7 @@ describe("AddPanel.vue", () => {
       const mockEvent = { target: null };
       const mockRow = { id: "test" };
 
-      expect(() =>
-        wrapper.vm.goBackToDashboardList(mockEvent, mockRow),
-      ).not.toThrow();
+      expect(() => wrapper.vm.goBackToDashboardList(mockEvent, mockRow)).not.toThrow();
     });
 
     it.skip("should handle collapseFieldList method when showFieldList is true", () => {
@@ -1230,9 +1206,7 @@ describe("AddPanel.vue", () => {
       expect(wrapper.vm.dashboardPanelData.layout.currentQueryIndex).toBe(0);
 
       // Test that time-related functionality is accessible
-      expect(
-        typeof wrapper.vm.dashboardPanelData.layout.currentQueryIndex,
-      ).toBe("number");
+      expect(typeof wrapper.vm.dashboardPanelData.layout.currentQueryIndex).toBe("number");
     });
 
     it("should handle dashboard panel data validation", () => {
@@ -1242,9 +1216,7 @@ describe("AddPanel.vue", () => {
 
       // Test queries structure validation
       expect(wrapper.vm.dashboardPanelData.data.queries).toBeDefined();
-      expect(Array.isArray(wrapper.vm.dashboardPanelData.data.queries)).toBe(
-        true,
-      );
+      expect(Array.isArray(wrapper.vm.dashboardPanelData.data.queries)).toBe(true);
 
       // Test that basic data structure is valid
       expect(wrapper.vm.dashboardPanelData.data.type).toBeDefined();
@@ -1295,8 +1267,7 @@ describe("AddPanel.vue", () => {
     });
 
     it("should test disable computed property with loading state", async () => {
-      const loadingState =
-        wrapper.vm.$.provides.variablesAndPanelsDataLoadingState;
+      const loadingState = wrapper.vm.$.provides.variablesAndPanelsDataLoadingState;
 
       // Set some panels as loading
       loadingState.panels = {
@@ -1313,8 +1284,7 @@ describe("AddPanel.vue", () => {
     });
 
     it("should test disable computed property with no loading state", async () => {
-      const loadingState =
-        wrapper.vm.$.provides.variablesAndPanelsDataLoadingState;
+      const loadingState = wrapper.vm.$.provides.variablesAndPanelsDataLoadingState;
 
       // Set all panels as not loading
       loadingState.panels = {
@@ -1427,9 +1397,7 @@ describe("AddPanel.vue", () => {
       expect(wrapper.vm.dashboardPanelData.data.queries).toBeDefined();
 
       // Verify chart data structure is valid
-      expect(Array.isArray(wrapper.vm.dashboardPanelData.data.queries)).toBe(
-        true,
-      );
+      expect(Array.isArray(wrapper.vm.dashboardPanelData.data.queries)).toBe(true);
     });
 
     it("should handle variablesDataUpdated with markdown panel type", () => {
@@ -1509,15 +1477,9 @@ describe("AddPanel.vue", () => {
       ];
 
       // Verify query structure is valid
-      expect(wrapper.vm.dashboardPanelData.data.queries[0].customQuery).toBe(
-        false,
-      );
-      expect(
-        wrapper.vm.dashboardPanelData.data.queries[0].fields,
-      ).toBeDefined();
-      expect(
-        wrapper.vm.dashboardPanelData.data.queries[0].fields.x,
-      ).toBeDefined();
+      expect(wrapper.vm.dashboardPanelData.data.queries[0].customQuery).toBe(false);
+      expect(wrapper.vm.dashboardPanelData.data.queries[0].fields).toBeDefined();
+      expect(wrapper.vm.dashboardPanelData.data.queries[0].fields.x).toBeDefined();
     });
 
     it("should handle function field list functionality for custom SQL", () => {
@@ -1530,12 +1492,8 @@ describe("AddPanel.vue", () => {
       ];
 
       // Verify query structure is valid
-      expect(wrapper.vm.dashboardPanelData.data.queries[0].customQuery).toBe(
-        true,
-      );
-      expect(
-        wrapper.vm.dashboardPanelData.data.queries[0].fields,
-      ).toBeDefined();
+      expect(wrapper.vm.dashboardPanelData.data.queries[0].customQuery).toBe(true);
+      expect(wrapper.vm.dashboardPanelData.data.queries[0].fields).toBeDefined();
 
       // updateVrlFunctionFieldList method has been moved to PanelEditor component
       // Test that panelEditorRef exists instead
@@ -1632,27 +1590,17 @@ describe("AddPanel.vue", () => {
         vrlFunctionFieldList: [],
       };
 
-      const fieldList = [
-        "timestamp",
-        "count",
-        "level",
-        "value",
-        "additional_field",
-      ];
+      const fieldList = ["timestamp", "count", "level", "value", "additional_field"];
 
       try {
         wrapper.vm.updateVrlFunctionFieldList(fieldList);
 
         // Verify the method runs without errors
-        expect(wrapper.vm.dashboardPanelData.data.queries[0].customQuery).toBe(
-          false,
-        );
+        expect(wrapper.vm.dashboardPanelData.data.queries[0].customQuery).toBe(false);
       } catch (error) {
         // If it fails, just verify the structure was set up correctly
         expect(wrapper.vm.dashboardPanelData.meta.stream).toBeDefined();
-        expect(wrapper.vm.dashboardPanelData.data.queries[0].customQuery).toBe(
-          false,
-        );
+        expect(wrapper.vm.dashboardPanelData.data.queries[0].customQuery).toBe(false);
       }
     });
 
@@ -1792,12 +1740,8 @@ describe("AddPanel.vue", () => {
       }
 
       // Verify stream data is set up correctly
-      expect(wrapper.vm.dashboardPanelData.data.queries[0].fields.stream).toBe(
-        "test-stream",
-      );
-      expect(
-        wrapper.vm.dashboardPanelData.data.queries[0].fields.stream_type,
-      ).toBe("logs");
+      expect(wrapper.vm.dashboardPanelData.data.queries[0].fields.stream).toBe("test-stream");
+      expect(wrapper.vm.dashboardPanelData.data.queries[0].fields.stream_type).toBe("logs");
     });
 
     it("should handle getContext with no stream selected", async () => {
@@ -1817,9 +1761,7 @@ describe("AddPanel.vue", () => {
         expect(result).toBe("");
       } catch (error) {
         // Expected to potentially fail due to mocking
-        expect(
-          wrapper.vm.dashboardPanelData.data.queries[0].fields.stream,
-        ).toBeNull();
+        expect(wrapper.vm.dashboardPanelData.data.queries[0].fields.stream).toBeNull();
       }
     });
 
@@ -1875,12 +1817,12 @@ describe("AddPanel.vue", () => {
         wrapper.vm.updateVrlFunctionFieldList(fieldList);
 
         // Verify latitude/longitude fields are handled
-        expect(
-          wrapper.vm.dashboardPanelData.data.queries[0].fields.latitude.alias,
-        ).toBe("lat_field");
-        expect(
-          wrapper.vm.dashboardPanelData.data.queries[0].fields.longitude.alias,
-        ).toBe("lng_field");
+        expect(wrapper.vm.dashboardPanelData.data.queries[0].fields.latitude.alias).toBe(
+          "lat_field",
+        );
+        expect(wrapper.vm.dashboardPanelData.data.queries[0].fields.longitude.alias).toBe(
+          "lng_field",
+        );
       } catch (error) {
         // If it fails, verify structure was set up
         expect(wrapper.vm.dashboardPanelData.meta.stream).toBeDefined();
@@ -1928,15 +1870,15 @@ describe("AddPanel.vue", () => {
         wrapper.vm.updateVrlFunctionFieldList(fieldList);
 
         // Verify all field types are handled
-        expect(
-          wrapper.vm.dashboardPanelData.data.queries[0].fields.weight.alias,
-        ).toBe("weight_field");
-        expect(
-          wrapper.vm.dashboardPanelData.data.queries[0].fields.source.alias,
-        ).toBe("source_field");
-        expect(
-          wrapper.vm.dashboardPanelData.data.queries[0].fields.target.alias,
-        ).toBe("target_field");
+        expect(wrapper.vm.dashboardPanelData.data.queries[0].fields.weight.alias).toBe(
+          "weight_field",
+        );
+        expect(wrapper.vm.dashboardPanelData.data.queries[0].fields.source.alias).toBe(
+          "source_field",
+        );
+        expect(wrapper.vm.dashboardPanelData.data.queries[0].fields.target.alias).toBe(
+          "target_field",
+        );
       } catch (error) {
         // If it fails, verify structure was set up
         expect(wrapper.vm.dashboardPanelData.meta.stream).toBeDefined();
@@ -1972,12 +1914,7 @@ describe("AddPanel.vue", () => {
         vrlFunctionFieldList: [],
       };
 
-      const fieldList = [
-        "regular_field",
-        "count_field",
-        "derived_field",
-        "derived_count",
-      ];
+      const fieldList = ["regular_field", "count_field", "derived_field", "derived_count"];
 
       try {
         wrapper.vm.updateVrlFunctionFieldList(fieldList);
@@ -1988,9 +1925,7 @@ describe("AddPanel.vue", () => {
         expect(fields.y.some((f) => !f.isDerived)).toBe(true);
       } catch (error) {
         // Verify structure is correct
-        expect(
-          wrapper.vm.dashboardPanelData.data.queries[0].fields.x,
-        ).toBeDefined();
+        expect(wrapper.vm.dashboardPanelData.data.queries[0].fields.x).toBeDefined();
       }
     });
 
@@ -2023,9 +1958,7 @@ describe("AddPanel.vue", () => {
         await wrapper.vm.getContext();
       } catch (error) {
         // Should handle different stream types
-        expect(
-          wrapper.vm.dashboardPanelData.data.queries[0].fields.stream_type,
-        ).toBe("metrics");
+        expect(wrapper.vm.dashboardPanelData.data.queries[0].fields.stream_type).toBe("metrics");
       }
     });
 
@@ -2255,8 +2188,7 @@ describe("AddPanel.vue", () => {
         wrapper.vm.isPanelConfigChanged = false;
 
         // Change dashboard panel data to trigger watcher
-        wrapper.vm.dashboardPanelData.data.title =
-          "Modified Title for Watcher Test";
+        wrapper.vm.dashboardPanelData.data.title = "Modified Title for Watcher Test";
 
         await nextTick();
 
@@ -2379,10 +2311,7 @@ describe("AddPanel.vue", () => {
 
         // Should set up beforeunload listener
         // Note: This might be called during component setup
-        expect(addEventListenerSpy).toHaveBeenCalledWith(
-          "beforeunload",
-          expect.any(Function),
-        );
+        expect(addEventListenerSpy).toHaveBeenCalledWith("beforeunload", expect.any(Function));
       } catch (error) {
         // Method might not exist or be accessible, verify spy was set up
         expect(addEventListenerSpy).toBeDefined();
@@ -2489,9 +2418,7 @@ describe("AddPanel.vue", () => {
         expect(result).toBe("");
       } catch (error) {
         // Fallback test
-        expect(
-          wrapper.vm.dashboardPanelData.data.queries[0].fields.stream,
-        ).toBe("");
+        expect(wrapper.vm.dashboardPanelData.data.queries[0].fields.stream).toBe("");
       }
     });
 
@@ -2514,9 +2441,7 @@ describe("AddPanel.vue", () => {
         // Should resolve with empty string due to no stream type
         expect(result).toBe("");
       } catch (error) {
-        expect(
-          wrapper.vm.dashboardPanelData.data.queries[0].fields.stream_type,
-        ).toBeNull();
+        expect(wrapper.vm.dashboardPanelData.data.queries[0].fields.stream_type).toBeNull();
       }
     });
 
@@ -2655,9 +2580,7 @@ describe("AddPanel.vue", () => {
       expect(wrapper.vm.dashboardPanelData).toBeDefined();
       expect(wrapper.vm.dashboardPanelData.data.description).toBe("");
       expect(wrapper.vm.dashboardPanelData.data.config.unit).toBe("");
-      expect(wrapper.vm.dashboardPanelData.data.queries[0].fields.x).toEqual(
-        [],
-      );
+      expect(wrapper.vm.dashboardPanelData.data.queries[0].fields.x).toEqual([]);
     });
 
     it("should handle normalizeVariables with complex array sorting", () => {
@@ -2805,16 +2728,13 @@ describe("AddPanel.vue", () => {
 
       // Replace global functions
       const originalIsEqual = (global as any).isEqual;
-      const originalCheckConfig = (global as any)
-        .checkIfConfigChangeRequiredApiCallOrNot;
+      const originalCheckConfig = (global as any).checkIfConfigChangeRequiredApiCallOrNot;
 
       (global as any).isEqual = mockIsEqual;
       (global as any).checkIfConfigChangeRequiredApiCallOrNot = mockCheckConfig;
 
       // Mock window.dispatchEvent
-      const dispatchEventSpy = vi
-        .spyOn(window, "dispatchEvent")
-        .mockImplementation(() => true);
+      const dispatchEventSpy = vi.spyOn(window, "dispatchEvent").mockImplementation(() => true);
 
       // Set up initial chart data
       const initialChartData = { type: "bar", data: { x: [1, 2, 3] } };
@@ -2825,10 +2745,7 @@ describe("AddPanel.vue", () => {
         // Line 1576: if (!isEqual(chartData.value, newVal))
         if (!mockIsEqual(wrapper.vm.chartData, newVal)) {
           // Lines 1577-1580: const configNeedsApiCall = checkIfConfigChangeRequiredApiCallOrNot
-          const configNeedsApiCall = mockCheckConfig(
-            wrapper.vm.chartData,
-            newVal,
-          );
+          const configNeedsApiCall = mockCheckConfig(wrapper.vm.chartData, newVal);
 
           // Line 1582: if (!configNeedsApiCall)
           if (!configNeedsApiCall) {
@@ -2847,19 +2764,13 @@ describe("AddPanel.vue", () => {
 
       // Verify all the expected calls were made
       expect(mockIsEqual).toHaveBeenCalledWith(initialChartData, newChartData);
-      expect(mockCheckConfig).toHaveBeenCalledWith(
-        initialChartData,
-        newChartData,
-      );
+      expect(mockCheckConfig).toHaveBeenCalledWith(initialChartData, newChartData);
       expect(dispatchEventSpy).toHaveBeenCalledWith(expect.any(Event));
-      expect(JSON.stringify(wrapper.vm.chartData)).toBe(
-        JSON.stringify(newChartData),
-      );
+      expect(JSON.stringify(wrapper.vm.chartData)).toBe(JSON.stringify(newChartData));
 
       // Cleanup
       (global as any).isEqual = originalIsEqual;
-      (global as any).checkIfConfigChangeRequiredApiCallOrNot =
-        originalCheckConfig;
+      (global as any).checkIfConfigChangeRequiredApiCallOrNot = originalCheckConfig;
       dispatchEventSpy.mockRestore();
     });
 
@@ -2901,60 +2812,59 @@ describe("AddPanel.vue", () => {
       // Execute the complete getContext function flow
       const contextPromise = new Promise((resolve) => {
         (async () => {
-        try {
-          // Line 1604: const isAddPanelPage = router.currentRoute.value.name === "addPanel"
-          const isAddPanelPage =
-            mockRouter.currentRoute.value.name === "addPanel";
+          try {
+            // Line 1604: const isAddPanelPage = router.currentRoute.value.name === "addPanel"
+            const isAddPanelPage = mockRouter.currentRoute.value.name === "addPanel";
 
-          // Lines 1606-1609: const isStreamSelectedInDashboardPage
-          const isStreamSelectedInDashboardPage =
-            wrapper.vm.dashboardPanelData.data.queries[
-              wrapper.vm.dashboardPanelData.layout.currentQueryIndex
-            ].fields.stream;
+            // Lines 1606-1609: const isStreamSelectedInDashboardPage
+            const isStreamSelectedInDashboardPage =
+              wrapper.vm.dashboardPanelData.data.queries[
+                wrapper.vm.dashboardPanelData.layout.currentQueryIndex
+              ].fields.stream;
 
-          // Lines 1611-1614: if (!isAddPanelPage || !isStreamSelectedInDashboardPage)
-          if (!isAddPanelPage || !isStreamSelectedInDashboardPage) {
+            // Lines 1611-1614: if (!isAddPanelPage || !isStreamSelectedInDashboardPage)
+            if (!isAddPanelPage || !isStreamSelectedInDashboardPage) {
+              resolve("");
+              return;
+            }
+
+            // Line 1616: const payload = {}
+            const payload = {};
+
+            // Lines 1618-1621: const stream =
+            const stream =
+              wrapper.vm.dashboardPanelData.data.queries[
+                wrapper.vm.dashboardPanelData.layout.currentQueryIndex
+              ].fields.stream;
+
+            // Lines 1623-1626: const streamType =
+            const streamType =
+              wrapper.vm.dashboardPanelData.data.queries[
+                wrapper.vm.dashboardPanelData.layout.currentQueryIndex
+              ].fields.stream_type;
+
+            // Lines 1628-1631: if (!streamType || !stream?.length)
+            if (!streamType || !stream?.length) {
+              resolve("");
+              return;
+            }
+
+            // Line 1633: const schema = await getStream(stream, streamType, true)
+            const schema = await mockGetStream(stream, streamType, true);
+
+            // Line 1635: payload["stream_name"] = stream
+            payload["stream_name"] = stream;
+
+            // Line 1636: payload["schema"] = schema.uds_schema || schema.schema || []
+            payload["schema"] = schema.uds_schema || schema.schema || [];
+
+            // Line 1638: resolve(payload)
+            resolve(payload);
+          } catch (error) {
+            // Lines 1639-1641: catch block
+            console.error("Error in getContext for add panel page", error);
             resolve("");
-            return;
           }
-
-          // Line 1616: const payload = {}
-          const payload = {};
-
-          // Lines 1618-1621: const stream =
-          const stream =
-            wrapper.vm.dashboardPanelData.data.queries[
-              wrapper.vm.dashboardPanelData.layout.currentQueryIndex
-            ].fields.stream;
-
-          // Lines 1623-1626: const streamType =
-          const streamType =
-            wrapper.vm.dashboardPanelData.data.queries[
-              wrapper.vm.dashboardPanelData.layout.currentQueryIndex
-            ].fields.stream_type;
-
-          // Lines 1628-1631: if (!streamType || !stream?.length)
-          if (!streamType || !stream?.length) {
-            resolve("");
-            return;
-          }
-
-          // Line 1633: const schema = await getStream(stream, streamType, true)
-          const schema = await mockGetStream(stream, streamType, true);
-
-          // Line 1635: payload["stream_name"] = stream
-          payload["stream_name"] = stream;
-
-          // Line 1636: payload["schema"] = schema.uds_schema || schema.schema || []
-          payload["schema"] = schema.uds_schema || schema.schema || [];
-
-          // Line 1638: resolve(payload)
-          resolve(payload);
-        } catch (error) {
-          // Lines 1639-1641: catch block
-          console.error("Error in getContext for add panel page", error);
-          resolve("");
-        }
         })();
       });
 
@@ -2965,11 +2875,7 @@ describe("AddPanel.vue", () => {
       expect(result.stream_name).toBe("production-logs-stream");
       expect(result).toHaveProperty("schema");
       expect(result.schema).toEqual(mockStreamResponse.uds_schema); // Should prioritize uds_schema
-      expect(mockGetStream).toHaveBeenCalledWith(
-        "production-logs-stream",
-        "logs",
-        true,
-      );
+      expect(mockGetStream).toHaveBeenCalledWith("production-logs-stream", "logs", true);
 
       // Cleanup
       (global as any).getStream = originalGetStream;
@@ -2984,8 +2890,7 @@ describe("AddPanel.vue", () => {
 
       // Mock checkIfConfigChangeRequiredApiCallOrNot (should not be called)
       const mockCheckConfig = vi.fn();
-      const originalCheckConfig = (global as any)
-        .checkIfConfigChangeRequiredApiCallOrNot;
+      const originalCheckConfig = (global as any).checkIfConfigChangeRequiredApiCallOrNot;
       (global as any).checkIfConfigChangeRequiredApiCallOrNot = mockCheckConfig;
 
       const sameChartData = { type: "bar", data: [1, 2, 3] };
@@ -3009,8 +2914,7 @@ describe("AddPanel.vue", () => {
 
       // Cleanup
       (global as any).isEqual = originalIsEqual;
-      (global as any).checkIfConfigChangeRequiredApiCallOrNot =
-        originalCheckConfig;
+      (global as any).checkIfConfigChangeRequiredApiCallOrNot = originalCheckConfig;
     });
 
     it("should hit the configNeedsApiCall true path in debouncedUpdateChartConfig", async () => {
@@ -3020,8 +2924,7 @@ describe("AddPanel.vue", () => {
       const mockCheckConfig = vi.fn().mockReturnValue(true); // API call IS needed
 
       const originalIsEqual = (global as any).isEqual;
-      const originalCheckConfig = (global as any)
-        .checkIfConfigChangeRequiredApiCallOrNot;
+      const originalCheckConfig = (global as any).checkIfConfigChangeRequiredApiCallOrNot;
 
       (global as any).isEqual = mockIsEqual;
       (global as any).checkIfConfigChangeRequiredApiCallOrNot = mockCheckConfig;
@@ -3034,10 +2937,7 @@ describe("AddPanel.vue", () => {
       // Simulate the debounced function when API call is needed
       const testDebouncedFn = (newVal) => {
         if (!mockIsEqual(wrapper.vm.chartData, newVal)) {
-          const configNeedsApiCall = mockCheckConfig(
-            wrapper.vm.chartData,
-            newVal,
-          );
+          const configNeedsApiCall = mockCheckConfig(wrapper.vm.chartData, newVal);
 
           // Line 1582: if (!configNeedsApiCall)
           // This should be FALSE (meaning API call IS needed), so the inner block should NOT execute
@@ -3060,8 +2960,7 @@ describe("AddPanel.vue", () => {
 
       // Cleanup
       (global as any).isEqual = originalIsEqual;
-      (global as any).checkIfConfigChangeRequiredApiCallOrNot =
-        originalCheckConfig;
+      (global as any).checkIfConfigChangeRequiredApiCallOrNot = originalCheckConfig;
       dispatchEventSpy.mockRestore();
     });
 
@@ -3075,9 +2974,7 @@ describe("AddPanel.vue", () => {
       (global as any).getStream = mockGetStream;
 
       // Mock console.error to verify error logging
-      const consoleErrorSpy = vi
-        .spyOn(console, "error")
-        .mockImplementation(() => {});
+      const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
       // Set up valid conditions that would normally succeed
       wrapper.vm.dashboardPanelData.data.queries = [
@@ -3093,23 +2990,23 @@ describe("AddPanel.vue", () => {
       // Execute getContext with error scenario
       const contextPromise = new Promise((resolve) => {
         (async () => {
-        try {
-          const stream = "error-stream";
-          const streamType = "logs";
+          try {
+            const stream = "error-stream";
+            const streamType = "logs";
 
-          if (streamType && stream?.length) {
-            // This should throw an error
-            const schema = await mockGetStream(stream, streamType, true);
-            const payload = {};
-            payload["stream_name"] = stream;
-            payload["schema"] = schema.uds_schema || schema.schema || [];
-            resolve(payload);
+            if (streamType && stream?.length) {
+              // This should throw an error
+              const schema = await mockGetStream(stream, streamType, true);
+              const payload = {};
+              payload["stream_name"] = stream;
+              payload["schema"] = schema.uds_schema || schema.schema || [];
+              resolve(payload);
+            }
+          } catch (error) {
+            // Lines 1639-1641: Error handling
+            console.error("Error in getContext for add panel page", error);
+            resolve(""); // Should resolve with empty string on error
           }
-        } catch (error) {
-          // Lines 1639-1641: Error handling
-          console.error("Error in getContext for add panel page", error);
-          resolve(""); // Should resolve with empty string on error
-        }
         })();
       });
 
@@ -3143,9 +3040,7 @@ describe("AddPanel.vue", () => {
         expect(wrapper.vm.editMode).toBe(false);
       } catch (error) {
         // Should handle the modified state
-        expect(wrapper.vm.dashboardPanelData.data.description).toBe(
-          "Modified description",
-        );
+        expect(wrapper.vm.dashboardPanelData.data.description).toBe("Modified description");
       }
     });
 
@@ -3223,9 +3118,7 @@ describe("AddPanel.vue", () => {
       const originalUpdatePanel = wrapper.vm.updatePanel;
       const originalAddPanel = wrapper.vm.addPanel;
 
-      wrapper.vm.updatePanel = vi
-        .fn()
-        .mockRejectedValue(new Error("Update failed"));
+      wrapper.vm.updatePanel = vi.fn().mockRejectedValue(new Error("Update failed"));
       wrapper.vm.addPanel = vi.fn().mockRejectedValue(new Error("Add failed"));
 
       try {
@@ -3250,9 +3143,7 @@ describe("AddPanel.vue", () => {
         },
       ];
 
-      const consoleLogSpy = vi
-        .spyOn(console, "log")
-        .mockImplementation(() => {});
+      const consoleLogSpy = vi.spyOn(console, "log").mockImplementation(() => {});
 
       // Mock potential query execution error
       try {
@@ -3394,11 +3285,7 @@ describe("AddPanel.vue", () => {
               stream_name: "test-stream",
               schema: [{ field: "test", type: "string" }],
             });
-            expect((global as any).getStream).toHaveBeenCalledWith(
-              "test-stream",
-              "logs",
-              true,
-            );
+            expect((global as any).getStream).toHaveBeenCalledWith("test-stream", "logs", true);
           }
         } finally {
           (global as any).getStream = originalGetStream;
@@ -3629,9 +3516,7 @@ describe("AddPanel.vue", () => {
           const vm = wrapper.vm as any;
           vm.dashboardPanelData = {
             data: {
-              queries: [
-                { fields: { stream: "test-stream", stream_type: "logs" } },
-              ],
+              queries: [{ fields: { stream: "test-stream", stream_type: "logs" } }],
             },
             layout: {
               currentQueryIndex: 0,
@@ -3696,9 +3581,7 @@ describe("AddPanel.vue", () => {
           const vm = wrapper.vm as any;
           vm.dashboardPanelData = {
             data: {
-              queries: [
-                { fields: { stream: "test-stream", stream_type: "logs" } },
-              ],
+              queries: [{ fields: { stream: "test-stream", stream_type: "logs" } }],
             },
             layout: {
               currentQueryIndex: 0,
@@ -3767,9 +3650,7 @@ describe("AddPanel.vue", () => {
           const vm = wrapper.vm as any;
           vm.dashboardPanelData = {
             data: {
-              queries: [
-                { fields: { stream: "error-stream", stream_type: "logs" } },
-              ],
+              queries: [{ fields: { stream: "error-stream", stream_type: "logs" } }],
             },
             layout: {
               currentQueryIndex: 0,
@@ -3970,13 +3851,11 @@ describe("AddPanel.vue", () => {
         ];
 
         const aliasList = [];
-        wrapper.vm.dashboardPanelData.data.queries[0].fields.breakdown.forEach(
-          (it) => {
-            if (!it.isDerived) {
-              aliasList.push(it.alias);
-            }
-          },
-        );
+        wrapper.vm.dashboardPanelData.data.queries[0].fields.breakdown.forEach((it) => {
+          if (!it.isDerived) {
+            aliasList.push(it.alias);
+          }
+        });
 
         expect(aliasList).toContain("breakdown1");
       });
@@ -4022,9 +3901,7 @@ describe("AddPanel.vue", () => {
           wrapper.vm.dashboardPanelData.data.queries[0].fields.value?.alias &&
           !wrapper.vm.dashboardPanelData.data.queries[0].fields.value?.isDerived
         ) {
-          aliasList.push(
-            wrapper.vm.dashboardPanelData.data.queries[0].fields.value.alias,
-          );
+          aliasList.push(wrapper.vm.dashboardPanelData.data.queries[0].fields.value.alias);
         }
 
         expect(aliasList).toContain("valuefield");
@@ -4041,9 +3918,7 @@ describe("AddPanel.vue", () => {
           wrapper.vm.dashboardPanelData.data.queries[0].fields.name?.alias &&
           !wrapper.vm.dashboardPanelData.data.queries[0].fields.name?.isDerived
         ) {
-          aliasList.push(
-            wrapper.vm.dashboardPanelData.data.queries[0].fields.name.alias,
-          );
+          aliasList.push(wrapper.vm.dashboardPanelData.data.queries[0].fields.name.alias);
         }
 
         expect(aliasList).toContain("namefield");
@@ -4057,15 +3932,10 @@ describe("AddPanel.vue", () => {
 
         const aliasList = [];
         if (
-          wrapper.vm.dashboardPanelData.data.queries[0].fields.value_for_maps
-            ?.alias &&
-          !wrapper.vm.dashboardPanelData.data.queries[0].fields.value_for_maps
-            ?.isDerived
+          wrapper.vm.dashboardPanelData.data.queries[0].fields.value_for_maps?.alias &&
+          !wrapper.vm.dashboardPanelData.data.queries[0].fields.value_for_maps?.isDerived
         ) {
-          aliasList.push(
-            wrapper.vm.dashboardPanelData.data.queries[0].fields.value_for_maps
-              .alias,
-          );
+          aliasList.push(wrapper.vm.dashboardPanelData.data.queries[0].fields.value_for_maps.alias);
         }
 
         expect(aliasList).toContain("mapfield");
@@ -4092,9 +3962,7 @@ describe("AddPanel.vue", () => {
           selectedDateObj.end.setMinutes(selectedDateObj.end.getMinutes() + 1);
         }
 
-        expect(selectedDateObj.end.getTime()).toBeGreaterThan(
-          selectedDateObj.start.getTime(),
-        );
+        expect(selectedDateObj.end.getTime()).toBeGreaterThan(selectedDateObj.start.getTime());
       });
 
       it("should test watch on showQueryBar with false value", () => {
@@ -4157,10 +4025,8 @@ describe("AddPanel.vue", () => {
           uds_schema: [{ field: "test" }],
           schema: [{ field: "backup" }],
         };
-        wrapper.vm.dashboardPanelData.data.queries[0].fields.stream =
-          "test-stream";
-        wrapper.vm.dashboardPanelData.data.queries[0].fields.stream_type =
-          "logs";
+        wrapper.vm.dashboardPanelData.data.queries[0].fields.stream = "test-stream";
+        wrapper.vm.dashboardPanelData.data.queries[0].fields.stream_type = "logs";
 
         const payload = {};
         payload["stream_name"] = "test-stream";
@@ -4241,9 +4107,7 @@ describe("AddPanel.vue", () => {
       it("should test actual handleLimitNumberOfSeriesWarningMessage", () => {
         if (wrapper.vm.handleLimitNumberOfSeriesWarningMessage) {
           wrapper.vm.handleLimitNumberOfSeriesWarningMessage("Warning message");
-          expect(wrapper.vm.limitNumberOfSeriesWarningMessage).toBe(
-            "Warning message",
-          );
+          expect(wrapper.vm.limitNumberOfSeriesWarningMessage).toBe("Warning message");
         }
       });
 
@@ -4317,9 +4181,7 @@ describe("AddPanel.vue", () => {
           ];
           wrapper.vm.updateVrlFunctionFieldList(fieldList);
 
-          expect(
-            wrapper.vm.dashboardPanelData.meta.stream.vrlFunctionFieldList,
-          ).toBeDefined();
+          expect(wrapper.vm.dashboardPanelData.meta.stream.vrlFunctionFieldList).toBeDefined();
         }
       });
 
@@ -4328,9 +4190,7 @@ describe("AddPanel.vue", () => {
           wrapper.vm.dashboardPanelData.layout.showFieldList = true;
           wrapper.vm.collapseFieldList();
           expect(wrapper.vm.dashboardPanelData.layout.splitter).toBe(0);
-          expect(wrapper.vm.dashboardPanelData.layout.showFieldList).toBe(
-            false,
-          );
+          expect(wrapper.vm.dashboardPanelData.layout.showFieldList).toBe(false);
         }
       });
 
@@ -4473,9 +4333,7 @@ describe("AddPanel.vue", () => {
 
       it("should test showTutorial method", () => {
         if (wrapper.vm.showTutorial) {
-          const openSpy = vi
-            .spyOn(window, "open")
-            .mockImplementation(() => null);
+          const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
           wrapper.vm.showTutorial();
           expect(openSpy).toHaveBeenCalled();
           openSpy.mockRestore();
@@ -4730,8 +4588,7 @@ describe("AddPanel.vue", () => {
   describe("Panel title OForm (real form)", () => {
     const OPageHeaderStub = {
       name: "OPageHeader",
-      template:
-        "<div><slot /><slot name='tabs' /><slot name='actions' /></div>",
+      template: "<div><slot /><slot name='tabs' /><slot name='actions' /></div>",
     };
 
     const mountReal = async () => {

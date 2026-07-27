@@ -18,7 +18,6 @@ import { mount } from "@vue/test-utils";
 import DashboardGeoMapsQueryBuilder from "@/components/dashboards/addPanel/DashboardGeoMapsQueryBuilder.vue";
 import i18n from "@/locales";
 
-
 // Mock the composables
 const mockDashboardPanelData = {
   data: {
@@ -125,7 +124,7 @@ describe("DashboardGeoMapsQueryBuilder", () => {
           SanitizedHtmlRenderer: true,
           DashboardFiltersOption: true,
           DashboardJoinsOption: true,
-          "OIcon": true,
+          OIcon: true,
         },
         mocks: {
           $t: (key: string) => key,
@@ -200,9 +199,7 @@ describe("DashboardGeoMapsQueryBuilder", () => {
       wrapper = createWrapper();
 
       // Check component registration
-      expect(
-        wrapper.vm.$options.components.DashboardFiltersOption,
-      ).toBeDefined();
+      expect(wrapper.vm.$options.components.DashboardFiltersOption).toBeDefined();
     });
   });
 
@@ -279,8 +276,7 @@ describe("DashboardGeoMapsQueryBuilder", () => {
       };
       wrapper = createWrapper();
 
-      const latitudeField =
-        wrapper.vm.dashboardPanelData.data.queries[0].fields.latitude;
+      const latitudeField = wrapper.vm.dashboardPanelData.data.queries[0].fields.latitude;
       expect(latitudeField).toBeDefined();
       expect(latitudeField.column).toBe("lat_field");
     });
@@ -291,8 +287,7 @@ describe("DashboardGeoMapsQueryBuilder", () => {
       mockDashboardPanelData.data.queries[0].fields.latitude = null;
       wrapper = createWrapper();
 
-      const latitudeField =
-        wrapper.vm.dashboardPanelData.data.queries[0].fields.latitude;
+      const latitudeField = wrapper.vm.dashboardPanelData.data.queries[0].fields.latitude;
       expect(latitudeField).toBe(null);
     });
 
@@ -305,9 +300,7 @@ describe("DashboardGeoMapsQueryBuilder", () => {
       };
       wrapper = createWrapper();
 
-      const removeButton = wrapper.find(
-        '[data-test="dashboard-latitude-item-lat_field-remove"]',
-      );
+      const removeButton = wrapper.find('[data-test="dashboard-latitude-item-lat_field-remove"]');
       if (removeButton.exists()) {
         await removeButton.trigger("click");
         expect(mockUseDashboardPanelData.removeLatitude).toHaveBeenCalled();
@@ -325,9 +318,7 @@ describe("DashboardGeoMapsQueryBuilder", () => {
       };
       wrapper = createWrapper();
 
-      expect(
-        wrapper.vm.dashboardPanelData.data.queries[0].fields.latitude.label,
-      ).toBe("Latitude");
+      expect(wrapper.vm.dashboardPanelData.data.queries[0].fields.latitude.label).toBe("Latitude");
     });
 
     it("should have modifiable latitude field label", () => {
@@ -338,8 +329,7 @@ describe("DashboardGeoMapsQueryBuilder", () => {
       wrapper = createWrapper();
 
       // Test that the field label can be accessed and modified
-      const latitudeField =
-        wrapper.vm.dashboardPanelData.data.queries[0].fields.latitude;
+      const latitudeField = wrapper.vm.dashboardPanelData.data.queries[0].fields.latitude;
       expect(latitudeField.label).toBe("Latitude");
 
       latitudeField.label = "New Latitude";
@@ -355,8 +345,7 @@ describe("DashboardGeoMapsQueryBuilder", () => {
       };
       wrapper = createWrapper();
 
-      const longitudeField =
-        wrapper.vm.dashboardPanelData.data.queries[0].fields.longitude;
+      const longitudeField = wrapper.vm.dashboardPanelData.data.queries[0].fields.longitude;
       expect(longitudeField).toBeDefined();
       expect(longitudeField.column).toBe("lng_field");
     });
@@ -365,8 +354,7 @@ describe("DashboardGeoMapsQueryBuilder", () => {
       mockDashboardPanelData.data.queries[0].fields.longitude = null;
       wrapper = createWrapper();
 
-      const longitudeField =
-        wrapper.vm.dashboardPanelData.data.queries[0].fields.longitude;
+      const longitudeField = wrapper.vm.dashboardPanelData.data.queries[0].fields.longitude;
       expect(longitudeField).toBe(null);
     });
 
@@ -377,9 +365,7 @@ describe("DashboardGeoMapsQueryBuilder", () => {
       };
       wrapper = createWrapper();
 
-      const removeButton = wrapper.find(
-        '[data-test="dashboard-longitude-item-lng_field-remove"]',
-      );
+      const removeButton = wrapper.find('[data-test="dashboard-longitude-item-lng_field-remove"]');
       if (removeButton.exists()) {
         await removeButton.trigger("click");
         expect(mockUseDashboardPanelData.removeLongitude).toHaveBeenCalled();
@@ -396,9 +382,9 @@ describe("DashboardGeoMapsQueryBuilder", () => {
       };
       wrapper = createWrapper();
 
-      expect(
-        wrapper.vm.dashboardPanelData.data.queries[0].fields.longitude.label,
-      ).toBe("Longitude");
+      expect(wrapper.vm.dashboardPanelData.data.queries[0].fields.longitude.label).toBe(
+        "Longitude",
+      );
     });
 
     it("should have modifiable longitude field label", () => {
@@ -408,8 +394,7 @@ describe("DashboardGeoMapsQueryBuilder", () => {
       };
       wrapper = createWrapper();
 
-      const longitudeField =
-        wrapper.vm.dashboardPanelData.data.queries[0].fields.longitude;
+      const longitudeField = wrapper.vm.dashboardPanelData.data.queries[0].fields.longitude;
       expect(longitudeField.label).toBe("Longitude");
 
       longitudeField.label = "New Longitude";
@@ -426,8 +411,7 @@ describe("DashboardGeoMapsQueryBuilder", () => {
       };
       wrapper = createWrapper();
 
-      const weightField =
-        wrapper.vm.dashboardPanelData.data.queries[0].fields.weight;
+      const weightField = wrapper.vm.dashboardPanelData.data.queries[0].fields.weight;
       expect(weightField).toBeDefined();
       expect(weightField.column).toBe("weight_field");
       expect(weightField.aggregationFunction).toBe("sum");
@@ -437,8 +421,7 @@ describe("DashboardGeoMapsQueryBuilder", () => {
       mockDashboardPanelData.data.queries[0].fields.weight = null;
       wrapper = createWrapper();
 
-      const weightField =
-        wrapper.vm.dashboardPanelData.data.queries[0].fields.weight;
+      const weightField = wrapper.vm.dashboardPanelData.data.queries[0].fields.weight;
       expect(weightField).toBe(null);
     });
 
@@ -449,9 +432,7 @@ describe("DashboardGeoMapsQueryBuilder", () => {
       };
       wrapper = createWrapper();
 
-      const removeButton = wrapper.find(
-        '[data-test="dashboard-weight-item-weight_field-remove"]',
-      );
+      const removeButton = wrapper.find('[data-test="dashboard-weight-item-weight_field-remove"]');
       if (removeButton.exists()) {
         await removeButton.trigger("click");
         expect(mockUseDashboardPanelData.removeWeight).toHaveBeenCalled();
@@ -468,9 +449,7 @@ describe("DashboardGeoMapsQueryBuilder", () => {
       };
       wrapper = createWrapper();
 
-      expect(
-        wrapper.vm.dashboardPanelData.data.queries[0].fields.weight.label,
-      ).toBe("Weight");
+      expect(wrapper.vm.dashboardPanelData.data.queries[0].fields.weight.label).toBe("Weight");
     });
 
     it("should handle aggregation function for weight field", () => {
@@ -481,10 +460,9 @@ describe("DashboardGeoMapsQueryBuilder", () => {
       };
       wrapper = createWrapper();
 
-      expect(
-        wrapper.vm.dashboardPanelData.data.queries[0].fields.weight
-          .aggregationFunction,
-      ).toBe("count");
+      expect(wrapper.vm.dashboardPanelData.data.queries[0].fields.weight.aggregationFunction).toBe(
+        "count",
+      );
     });
 
     it("should have modifiable weight field label", () => {
@@ -494,8 +472,7 @@ describe("DashboardGeoMapsQueryBuilder", () => {
       };
       wrapper = createWrapper();
 
-      const weightField =
-        wrapper.vm.dashboardPanelData.data.queries[0].fields.weight;
+      const weightField = wrapper.vm.dashboardPanelData.data.queries[0].fields.weight;
       expect(weightField.label).toBe("Weight");
 
       weightField.label = "New Weight";
@@ -577,9 +554,7 @@ describe("DashboardGeoMapsQueryBuilder", () => {
         wrapper = createWrapper();
 
         // When weight is null, weightLabel should return empty or handle gracefully
-        expect(
-          wrapper.vm.dashboardPanelData.data.queries[0].fields.weight,
-        ).toBe(null);
+        expect(wrapper.vm.dashboardPanelData.data.queries[0].fields.weight).toBe(null);
       });
     });
   });
@@ -592,17 +567,10 @@ describe("DashboardGeoMapsQueryBuilder", () => {
         mockDashboardPanelData.meta.dragAndDrop.dragElement = mockField;
         wrapper = createWrapper();
 
-        wrapper.vm.onDrop(
-          { stopPropagation: vi.fn(), preventDefault: vi.fn() },
-          "latitude",
-        );
+        wrapper.vm.onDrop({ stopPropagation: vi.fn(), preventDefault: vi.fn() }, "latitude");
 
-        expect(mockUseDashboardPanelData.addLatitude).toHaveBeenCalledWith(
-          mockField,
-        );
-        expect(
-          mockUseDashboardPanelData.cleanupDraggingFields,
-        ).toHaveBeenCalled();
+        expect(mockUseDashboardPanelData.addLatitude).toHaveBeenCalledWith(mockField);
+        expect(mockUseDashboardPanelData.cleanupDraggingFields).toHaveBeenCalled();
       });
 
       it("should add longitude from field list", () => {
@@ -611,17 +579,10 @@ describe("DashboardGeoMapsQueryBuilder", () => {
         mockDashboardPanelData.meta.dragAndDrop.dragElement = mockField;
         wrapper = createWrapper();
 
-        wrapper.vm.onDrop(
-          { stopPropagation: vi.fn(), preventDefault: vi.fn() },
-          "longitude",
-        );
+        wrapper.vm.onDrop({ stopPropagation: vi.fn(), preventDefault: vi.fn() }, "longitude");
 
-        expect(mockUseDashboardPanelData.addLongitude).toHaveBeenCalledWith(
-          mockField,
-        );
-        expect(
-          mockUseDashboardPanelData.cleanupDraggingFields,
-        ).toHaveBeenCalled();
+        expect(mockUseDashboardPanelData.addLongitude).toHaveBeenCalledWith(mockField);
+        expect(mockUseDashboardPanelData.cleanupDraggingFields).toHaveBeenCalled();
       });
 
       it("should add weight from field list", () => {
@@ -630,17 +591,10 @@ describe("DashboardGeoMapsQueryBuilder", () => {
         mockDashboardPanelData.meta.dragAndDrop.dragElement = mockField;
         wrapper = createWrapper();
 
-        wrapper.vm.onDrop(
-          { stopPropagation: vi.fn(), preventDefault: vi.fn() },
-          "weight",
-        );
+        wrapper.vm.onDrop({ stopPropagation: vi.fn(), preventDefault: vi.fn() }, "weight");
 
-        expect(mockUseDashboardPanelData.addWeight).toHaveBeenCalledWith(
-          mockField,
-        );
-        expect(
-          mockUseDashboardPanelData.cleanupDraggingFields,
-        ).toHaveBeenCalled();
+        expect(mockUseDashboardPanelData.addWeight).toHaveBeenCalledWith(mockField);
+        expect(mockUseDashboardPanelData.cleanupDraggingFields).toHaveBeenCalled();
       });
 
       it("should add filtered item from field list", () => {
@@ -649,17 +603,10 @@ describe("DashboardGeoMapsQueryBuilder", () => {
         mockDashboardPanelData.meta.dragAndDrop.dragElement = mockField;
         wrapper = createWrapper();
 
-        wrapper.vm.onDrop(
-          { stopPropagation: vi.fn(), preventDefault: vi.fn() },
-          "f",
-        );
+        wrapper.vm.onDrop({ stopPropagation: vi.fn(), preventDefault: vi.fn() }, "f");
 
-        expect(mockUseDashboardPanelData.addFilteredItem).toHaveBeenCalledWith(
-          mockField,
-        );
-        expect(
-          mockUseDashboardPanelData.cleanupDraggingFields,
-        ).toHaveBeenCalled();
+        expect(mockUseDashboardPanelData.addFilteredItem).toHaveBeenCalledWith(mockField);
+        expect(mockUseDashboardPanelData.cleanupDraggingFields).toHaveBeenCalled();
       });
 
       it("should handle drag element not found", () => {
@@ -667,10 +614,7 @@ describe("DashboardGeoMapsQueryBuilder", () => {
         mockDashboardPanelData.meta.dragAndDrop.dragElement = null;
         wrapper = createWrapper();
 
-        wrapper.vm.onDrop(
-          { stopPropagation: vi.fn(), preventDefault: vi.fn() },
-          "latitude",
-        );
+        wrapper.vm.onDrop({ stopPropagation: vi.fn(), preventDefault: vi.fn() }, "latitude");
 
         expect(mockUseDashboardPanelData.addLatitude).not.toHaveBeenCalled();
       });
@@ -681,21 +625,17 @@ describe("DashboardGeoMapsQueryBuilder", () => {
         mockDashboardPanelData.data.queries[0].fields.latitude = {
           column: "existing_field",
         };
-        mockUseDashboardPanelData.selectedStreamFieldsBasedOnUserDefinedSchema.value =
-          [{ name: "existing_field" }];
+        mockUseDashboardPanelData.selectedStreamFieldsBasedOnUserDefinedSchema.value = [
+          { name: "existing_field" },
+        ];
         wrapper = createWrapper();
 
-        wrapper.vm.onDrop(
-          { stopPropagation: vi.fn(), preventDefault: vi.fn() },
-          "latitude",
-        );
+        wrapper.vm.onDrop({ stopPropagation: vi.fn(), preventDefault: vi.fn() }, "latitude");
 
         expect(mockNotifications.showErrorNotification).toHaveBeenCalledWith(
           "Max 1 field in LATITUDE is allowed.",
         );
-        expect(
-          mockUseDashboardPanelData.cleanupDraggingFields,
-        ).toHaveBeenCalled();
+        expect(mockUseDashboardPanelData.cleanupDraggingFields).toHaveBeenCalled();
       });
 
       it("should handle field movement between axes", () => {
@@ -706,19 +646,13 @@ describe("DashboardGeoMapsQueryBuilder", () => {
         };
         mockDashboardPanelData.meta.dragAndDrop.dragSource = "latitude";
         mockDashboardPanelData.meta.dragAndDrop.dragElement = mockField;
-        mockUseDashboardPanelData.selectedStreamFieldsBasedOnUserDefinedSchema.value =
-          [mockField];
+        mockUseDashboardPanelData.selectedStreamFieldsBasedOnUserDefinedSchema.value = [mockField];
         wrapper = createWrapper();
 
-        wrapper.vm.onDrop(
-          { stopPropagation: vi.fn(), preventDefault: vi.fn() },
-          "longitude",
-        );
+        wrapper.vm.onDrop({ stopPropagation: vi.fn(), preventDefault: vi.fn() }, "longitude");
 
         expect(mockUseDashboardPanelData.removeLatitude).toHaveBeenCalled();
-        expect(
-          mockUseDashboardPanelData.cleanupDraggingFields,
-        ).toHaveBeenCalled();
+        expect(mockUseDashboardPanelData.cleanupDraggingFields).toHaveBeenCalled();
       });
     });
 
@@ -730,12 +664,8 @@ describe("DashboardGeoMapsQueryBuilder", () => {
         wrapper.vm.onFieldDragStart(mockEvent, "test_item", "latitude");
 
         expect(mockDashboardPanelData.meta.dragAndDrop.dragging).toBe(true);
-        expect(mockDashboardPanelData.meta.dragAndDrop.dragElement).toBe(
-          "test_item",
-        );
-        expect(mockDashboardPanelData.meta.dragAndDrop.dragSource).toBe(
-          "latitude",
-        );
+        expect(mockDashboardPanelData.meta.dragAndDrop.dragElement).toBe("test_item");
+        expect(mockDashboardPanelData.meta.dragAndDrop.dragSource).toBe("latitude");
       });
     });
 
@@ -746,9 +676,7 @@ describe("DashboardGeoMapsQueryBuilder", () => {
         const mockEvent = { preventDefault: vi.fn() };
         wrapper.vm.onDragEnter(mockEvent, "weight", 1);
 
-        expect(mockDashboardPanelData.meta.dragAndDrop.currentDragArea).toBe(
-          "weight",
-        );
+        expect(mockDashboardPanelData.meta.dragAndDrop.currentDragArea).toBe("weight");
         expect(mockDashboardPanelData.meta.dragAndDrop.targetDragIndex).toBe(1);
         expect(mockEvent.preventDefault).toHaveBeenCalled();
       });
@@ -781,9 +709,7 @@ describe("DashboardGeoMapsQueryBuilder", () => {
 
         wrapper.vm.onDragEnd();
 
-        expect(
-          mockUseDashboardPanelData.cleanupDraggingFields,
-        ).toHaveBeenCalled();
+        expect(mockUseDashboardPanelData.cleanupDraggingFields).toHaveBeenCalled();
       });
     });
   });
@@ -844,9 +770,7 @@ describe("DashboardGeoMapsQueryBuilder", () => {
       mockDashboardPanelData.meta.dragAndDrop.dragging = true;
       wrapper = createWrapper();
 
-      const latitudeContainer = wrapper.find(
-        '[data-test="dashboard-latitude-layout"]',
-      );
+      const latitudeContainer = wrapper.find('[data-test="dashboard-latitude-layout"]');
       expect(latitudeContainer.classes()).toContain("bg-[rgba(0,0,0,0.042)]");
     });
 
@@ -855,12 +779,8 @@ describe("DashboardGeoMapsQueryBuilder", () => {
       mockDashboardPanelData.meta.dragAndDrop.currentDragArea = "latitude";
       wrapper = createWrapper();
 
-      const latitudeContainer = wrapper.find(
-        '[data-test="dashboard-latitude-layout"]',
-      );
-      expect(latitudeContainer.classes()).toContain(
-        "bg-field-list-row-hover-bg",
-      );
+      const latitudeContainer = wrapper.find('[data-test="dashboard-latitude-layout"]');
+      expect(latitudeContainer.classes()).toContain("bg-field-list-row-hover-bg");
     });
 
     it("should not apply drop-entered class when drag area doesn't match", () => {
@@ -868,12 +788,8 @@ describe("DashboardGeoMapsQueryBuilder", () => {
       mockDashboardPanelData.meta.dragAndDrop.currentDragArea = "longitude";
       wrapper = createWrapper();
 
-      const latitudeContainer = wrapper.find(
-        '[data-test="dashboard-latitude-layout"]',
-      );
-      expect(latitudeContainer.classes()).not.toContain(
-        "bg-field-list-row-hover-bg",
-      );
+      const latitudeContainer = wrapper.find('[data-test="dashboard-latitude-layout"]');
+      expect(latitudeContainer.classes()).not.toContain("bg-field-list-row-hover-bg");
     });
   });
 
@@ -890,8 +806,7 @@ describe("DashboardGeoMapsQueryBuilder", () => {
         wrapper = createWrapper();
 
         // For custom query, verify the field structure
-        const weightField =
-          wrapper.vm.dashboardPanelData.data.queries[0].fields.weight;
+        const weightField = wrapper.vm.dashboardPanelData.data.queries[0].fields.weight;
         expect(weightField.column).toBe("custom_col");
       });
 
@@ -904,9 +819,7 @@ describe("DashboardGeoMapsQueryBuilder", () => {
         mockDashboardPanelData.data.queries[0].fields.weight = {
           type: "build",
           functionName: "count",
-          args: [
-            { type: "field", value: { field: "test_col", streamAlias: "" } },
-          ],
+          args: [{ type: "field", value: { field: "test_col", streamAlias: "" } }],
         };
         const result = wrapper.vm.weightLabel;
 
@@ -921,9 +834,7 @@ describe("DashboardGeoMapsQueryBuilder", () => {
 
         mockDashboardPanelData.data.queries[0].fields.weight = {
           type: "build",
-          args: [
-            { type: "field", value: { field: "plain_col", streamAlias: "" } },
-          ],
+          args: [{ type: "field", value: { field: "plain_col", streamAlias: "" } }],
         };
         const result = wrapper.vm.weightLabel;
 
@@ -1009,17 +920,10 @@ describe("DashboardGeoMapsQueryBuilder", () => {
       mockDashboardPanelData.meta.dragAndDrop.dragSource = "fieldList";
       mockDashboardPanelData.meta.dragAndDrop.dragElement = mockField;
 
-      wrapper.vm.onDrop(
-        { stopPropagation: vi.fn(), preventDefault: vi.fn() },
-        "latitude",
-      );
+      wrapper.vm.onDrop({ stopPropagation: vi.fn(), preventDefault: vi.fn() }, "latitude");
 
-      expect(mockUseDashboardPanelData.addLatitude).toHaveBeenCalledWith(
-        mockField,
-      );
-      expect(
-        mockUseDashboardPanelData.cleanupDraggingFields,
-      ).toHaveBeenCalled();
+      expect(mockUseDashboardPanelData.addLatitude).toHaveBeenCalledWith(mockField);
+      expect(mockUseDashboardPanelData.cleanupDraggingFields).toHaveBeenCalled();
 
       // Remove field
       wrapper.vm.removeLatitude();

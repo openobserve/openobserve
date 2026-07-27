@@ -41,14 +41,12 @@ vi.mock("./shared/dataProcessor", () => ({
 }));
 
 vi.mock("../legendConfiguration", () => ({
-  applyLegendConfiguration: vi.fn(
-    (panelSchema, chartPanelRef, hoveredSeriesState, options) => {
-      options.legend = {
-        show: true,
-        type: "scroll",
-      };
-    },
-  ),
+  applyLegendConfiguration: vi.fn((panelSchema, chartPanelRef, hoveredSeriesState, options) => {
+    options.legend = {
+      show: true,
+      type: "scroll",
+    };
+  }),
   getChartDimensions: vi.fn(() => ({
     chartWidth: 800,
     chartHeight: 600,
@@ -108,10 +106,7 @@ describe("convertPromQLChartData", () => {
     it("should route to TimeSeriesConverter for line charts", async () => {
       mockContext.panelSchema.type = "line";
 
-      const result = await convertPromQLChartData(
-        mockPromQLResponse,
-        mockContext,
-      );
+      const result = await convertPromQLChartData(mockPromQLResponse, mockContext);
 
       expect(result.options.series).toBeDefined();
       expect(result.options.xAxis).toBeDefined();
@@ -121,10 +116,7 @@ describe("convertPromQLChartData", () => {
     it("should route to TimeSeriesConverter for area charts", async () => {
       mockContext.panelSchema.type = "area";
 
-      const result = await convertPromQLChartData(
-        mockPromQLResponse,
-        mockContext,
-      );
+      const result = await convertPromQLChartData(mockPromQLResponse, mockContext);
 
       expect(result.options.series).toBeDefined();
     });
@@ -132,10 +124,7 @@ describe("convertPromQLChartData", () => {
     it("should route to TimeSeriesConverter for bar charts", async () => {
       mockContext.panelSchema.type = "bar";
 
-      const result = await convertPromQLChartData(
-        mockPromQLResponse,
-        mockContext,
-      );
+      const result = await convertPromQLChartData(mockPromQLResponse, mockContext);
 
       expect(result.options.series).toBeDefined();
     });
@@ -143,10 +132,7 @@ describe("convertPromQLChartData", () => {
     it("should route to TimeSeriesConverter for scatter charts", async () => {
       mockContext.panelSchema.type = "scatter";
 
-      const result = await convertPromQLChartData(
-        mockPromQLResponse,
-        mockContext,
-      );
+      const result = await convertPromQLChartData(mockPromQLResponse, mockContext);
 
       expect(result.options.series).toBeDefined();
     });
@@ -154,10 +140,7 @@ describe("convertPromQLChartData", () => {
     it("should route to PieConverter for pie charts", async () => {
       mockContext.panelSchema.type = "pie";
 
-      const result = await convertPromQLChartData(
-        mockPromQLResponse,
-        mockContext,
-      );
+      const result = await convertPromQLChartData(mockPromQLResponse, mockContext);
 
       expect(result.options.series).toBeDefined();
     });
@@ -165,10 +148,7 @@ describe("convertPromQLChartData", () => {
     it("should route to PieConverter for donut charts", async () => {
       mockContext.panelSchema.type = "donut";
 
-      const result = await convertPromQLChartData(
-        mockPromQLResponse,
-        mockContext,
-      );
+      const result = await convertPromQLChartData(mockPromQLResponse, mockContext);
 
       expect(result.options.series).toBeDefined();
     });
@@ -176,10 +156,7 @@ describe("convertPromQLChartData", () => {
     it("should route to TableConverter for table charts", async () => {
       mockContext.panelSchema.type = "table";
 
-      const result = await convertPromQLChartData(
-        mockPromQLResponse,
-        mockContext,
-      );
+      const result = await convertPromQLChartData(mockPromQLResponse, mockContext);
 
       expect(result.options.columns).toBeDefined();
       expect(result.options.rows).toBeDefined();
@@ -188,10 +165,7 @@ describe("convertPromQLChartData", () => {
     it("should route to GaugeConverter for gauge charts", async () => {
       mockContext.panelSchema.type = "gauge";
 
-      const result = await convertPromQLChartData(
-        mockPromQLResponse,
-        mockContext,
-      );
+      const result = await convertPromQLChartData(mockPromQLResponse, mockContext);
 
       expect(result.options.series).toBeDefined();
     });
@@ -199,10 +173,7 @@ describe("convertPromQLChartData", () => {
     it("should route to MetricConverter for metric charts", async () => {
       mockContext.panelSchema.type = "metric";
 
-      const result = await convertPromQLChartData(
-        mockPromQLResponse,
-        mockContext,
-      );
+      const result = await convertPromQLChartData(mockPromQLResponse, mockContext);
 
       expect(result.options.series).toBeDefined();
     });
@@ -210,10 +181,7 @@ describe("convertPromQLChartData", () => {
     it("should route to HeatmapConverter for heatmap charts", async () => {
       mockContext.panelSchema.type = "heatmap";
 
-      const result = await convertPromQLChartData(
-        mockPromQLResponse,
-        mockContext,
-      );
+      const result = await convertPromQLChartData(mockPromQLResponse, mockContext);
 
       expect(result.options.series).toBeDefined();
     });
@@ -221,10 +189,7 @@ describe("convertPromQLChartData", () => {
     it("should route to BarConverter for h-bar charts", async () => {
       mockContext.panelSchema.type = "h-bar";
 
-      const result = await convertPromQLChartData(
-        mockPromQLResponse,
-        mockContext,
-      );
+      const result = await convertPromQLChartData(mockPromQLResponse, mockContext);
 
       expect(result.options.series).toBeDefined();
     });
@@ -232,10 +197,7 @@ describe("convertPromQLChartData", () => {
     it("should route to GeoConverter for geomap charts", async () => {
       mockContext.panelSchema.type = "geomap";
 
-      const result = await convertPromQLChartData(
-        mockPromQLResponse,
-        mockContext,
-      );
+      const result = await convertPromQLChartData(mockPromQLResponse, mockContext);
 
       expect(result.options.series).toBeDefined();
     });
@@ -243,10 +205,7 @@ describe("convertPromQLChartData", () => {
     it("should route to MapsConverter for maps charts", async () => {
       mockContext.panelSchema.type = "maps";
 
-      const result = await convertPromQLChartData(
-        mockPromQLResponse,
-        mockContext,
-      );
+      const result = await convertPromQLChartData(mockPromQLResponse, mockContext);
 
       expect(result.options.series).toBeDefined();
     });
@@ -254,15 +213,13 @@ describe("convertPromQLChartData", () => {
     it("should throw error for unsupported chart type", async () => {
       mockContext.panelSchema.type = "unsupported_type" as any;
 
-      await expect(
-        convertPromQLChartData(mockPromQLResponse, mockContext),
-      ).rejects.toThrow("Unsupported chart type for PromQL: unsupported_type");
+      await expect(convertPromQLChartData(mockPromQLResponse, mockContext)).rejects.toThrow(
+        "Unsupported chart type for PromQL: unsupported_type",
+      );
     });
 
     it("should log error for unsupported chart type", async () => {
-      const consoleErrorSpy = vi
-        .spyOn(console, "error")
-        .mockImplementation(() => {});
+      const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
       mockContext.panelSchema.type = "invalid" as any;
 
       try {
@@ -271,9 +228,7 @@ describe("convertPromQLChartData", () => {
         // Expected to throw
       }
 
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        "No converter found for chart type: invalid",
-      );
+      expect(consoleErrorSpy).toHaveBeenCalledWith("No converter found for chart type: invalid");
 
       consoleErrorSpy.mockRestore();
     });
@@ -281,10 +236,7 @@ describe("convertPromQLChartData", () => {
 
   describe("options configuration", () => {
     it("should set transparent background", async () => {
-      const result = await convertPromQLChartData(
-        mockPromQLResponse,
-        mockContext,
-      );
+      const result = await convertPromQLChartData(mockPromQLResponse, mockContext);
 
       expect(result.options.backgroundColor).toBe("transparent");
     });
@@ -294,10 +246,7 @@ describe("convertPromQLChartData", () => {
         axis_width: 100,
       };
 
-      const result = await convertPromQLChartData(
-        mockPromQLResponse,
-        mockContext,
-      );
+      const result = await convertPromQLChartData(mockPromQLResponse, mockContext);
 
       expect(result.options.grid.left).toBe(100);
     });
@@ -307,10 +256,7 @@ describe("convertPromQLChartData", () => {
         axis_width: 100,
       };
 
-      const result = await convertPromQLChartData(
-        mockPromQLResponse,
-        mockContext,
-      );
+      const result = await convertPromQLChartData(mockPromQLResponse, mockContext);
 
       expect(result.options.grid).toBeDefined();
     });
@@ -318,8 +264,7 @@ describe("convertPromQLChartData", () => {
 
   describe("legend configuration", () => {
     it("should apply legend configuration for non-table charts", async () => {
-      const { applyLegendConfiguration } =
-        await import("../legendConfiguration");
+      const { applyLegendConfiguration } = await import("../legendConfiguration");
 
       mockContext.panelSchema.type = "line";
 
@@ -329,8 +274,7 @@ describe("convertPromQLChartData", () => {
     });
 
     it("should not apply legend configuration for table charts", async () => {
-      const { applyLegendConfiguration } =
-        await import("../legendConfiguration");
+      const { applyLegendConfiguration } = await import("../legendConfiguration");
       vi.mocked(applyLegendConfiguration).mockClear();
 
       mockContext.panelSchema.type = "table";
@@ -343,10 +287,7 @@ describe("convertPromQLChartData", () => {
 
   describe("extras object", () => {
     it("should initialize extras with empty legends array", async () => {
-      const result = await convertPromQLChartData(
-        mockPromQLResponse,
-        mockContext,
-      );
+      const result = await convertPromQLChartData(mockPromQLResponse, mockContext);
 
       expect(result.extras.legends).toBeDefined();
       expect(Array.isArray(result.extras.legends)).toBe(true);
@@ -355,10 +296,7 @@ describe("convertPromQLChartData", () => {
     it("should initialize extras with null hoveredSeriesState when not provided", async () => {
       mockContext.hoveredSeriesState = null;
 
-      const result = await convertPromQLChartData(
-        mockPromQLResponse,
-        mockContext,
-      );
+      const result = await convertPromQLChartData(mockPromQLResponse, mockContext);
 
       expect(result.extras.hoveredSeriesState).toBeNull();
     });
@@ -367,10 +305,7 @@ describe("convertPromQLChartData", () => {
       const hoveredState = { seriesName: "test" };
       mockContext.hoveredSeriesState = hoveredState;
 
-      const result = await convertPromQLChartData(
-        mockPromQLResponse,
-        mockContext,
-      );
+      const result = await convertPromQLChartData(mockPromQLResponse, mockContext);
 
       expect(result.extras.hoveredSeriesState).toBe(hoveredState);
     });
@@ -392,10 +327,7 @@ describe("convertPromQLChartData", () => {
         },
       ];
 
-      const result = await convertPromQLChartData(
-        mockPromQLResponse,
-        mockContext,
-      );
+      const result = await convertPromQLChartData(mockPromQLResponse, mockContext);
 
       expect(result.options.series[0].markLine).toBeDefined();
       expect(result.options.series[0].markLine.data.length).toBeGreaterThan(0);
@@ -412,14 +344,9 @@ describe("convertPromQLChartData", () => {
         },
       ];
 
-      const result = await convertPromQLChartData(
-        mockPromQLResponse,
-        mockContext,
-      );
+      const result = await convertPromQLChartData(mockPromQLResponse, mockContext);
 
-      const markLine = result.options.series[0].markLine.data.find(
-        (m: any) => m.name === "Event",
-      );
+      const markLine = result.options.series[0].markLine.data.find((m: any) => m.name === "Event");
       expect(markLine.xAxis).toBe(1234567890000);
       expect(markLine.yAxis).toBeNull();
     });
@@ -437,10 +364,7 @@ describe("convertPromQLChartData", () => {
         },
       ];
 
-      const result = await convertPromQLChartData(
-        mockPromQLResponse,
-        mockContext,
-      );
+      const result = await convertPromQLChartData(mockPromQLResponse, mockContext);
 
       expect(result.options.series[0].markArea).toBeDefined();
       expect(result.options.series[0].markArea.data).toHaveLength(1);
@@ -456,14 +380,9 @@ describe("convertPromQLChartData", () => {
         },
       ];
 
-      const result = await convertPromQLChartData(
-        mockPromQLResponse,
-        mockContext,
-      );
+      const result = await convertPromQLChartData(mockPromQLResponse, mockContext);
 
-      expect(
-        result.options.series[0].markLine?.data?.length || 0,
-      ).toBeLessThanOrEqual(0);
+      expect(result.options.series[0].markLine?.data?.length || 0).toBeLessThanOrEqual(0);
     });
 
     it("should use default values for annotation properties", async () => {
@@ -476,10 +395,7 @@ describe("convertPromQLChartData", () => {
         },
       ];
 
-      const result = await convertPromQLChartData(
-        mockPromQLResponse,
-        mockContext,
-      );
+      const result = await convertPromQLChartData(mockPromQLResponse, mockContext);
 
       const markLine = result.options.series[0].markLine.data[0];
       expect(markLine.lineStyle.color).toBe("#FF0000");
@@ -498,10 +414,7 @@ describe("convertPromQLChartData", () => {
         },
       ];
 
-      const result = await convertPromQLChartData(
-        mockPromQLResponse,
-        mockContext,
-      );
+      const result = await convertPromQLChartData(mockPromQLResponse, mockContext);
 
       const markLine = result.options.series[0].markLine.data[0];
       expect(markLine.label.show).toBe(false);
@@ -518,10 +431,7 @@ describe("convertPromQLChartData", () => {
         },
       ];
 
-      const result = await convertPromQLChartData(
-        mockPromQLResponse,
-        mockContext,
-      );
+      const result = await convertPromQLChartData(mockPromQLResponse, mockContext);
 
       const markLine = result.options.series[0].markLine.data[0];
       expect(markLine.label.position).toBe("insideEndTop");
@@ -538,10 +448,7 @@ describe("convertPromQLChartData", () => {
         },
       ];
 
-      const result = await convertPromQLChartData(
-        mockPromQLResponse,
-        mockContext,
-      );
+      const result = await convertPromQLChartData(mockPromQLResponse, mockContext);
 
       const markLine = result.options.series[0].markLine.data[0];
       expect(markLine.label.position).toBe("start");
@@ -558,10 +465,7 @@ describe("convertPromQLChartData", () => {
         },
       ];
 
-      const result = await convertPromQLChartData(
-        mockPromQLResponse,
-        mockContext,
-      );
+      const result = await convertPromQLChartData(mockPromQLResponse, mockContext);
 
       const markLine = result.options.series[0].markLine.data[0];
       expect(markLine.label.formatter).toBe("{b}: {c}");
@@ -577,10 +481,7 @@ describe("convertPromQLChartData", () => {
         },
       ];
 
-      const result = await convertPromQLChartData(
-        mockPromQLResponse,
-        mockContext,
-      );
+      const result = await convertPromQLChartData(mockPromQLResponse, mockContext);
 
       const markLine = result.options.series[0].markLine.data[0];
       expect(markLine.label.formatter).toBe("{c}");
@@ -597,10 +498,7 @@ describe("convertPromQLChartData", () => {
         },
       ];
 
-      const result = await convertPromQLChartData(
-        mockPromQLResponse,
-        mockContext,
-      );
+      const result = await convertPromQLChartData(mockPromQLResponse, mockContext);
 
       const markArea = result.options.series[0].markArea.data[0];
       expect(markArea[0].xAxis).toBe(1234567890000);
@@ -618,10 +516,7 @@ describe("convertPromQLChartData", () => {
         },
       ];
 
-      const result = await convertPromQLChartData(
-        mockPromQLResponse,
-        mockContext,
-      );
+      const result = await convertPromQLChartData(mockPromQLResponse, mockContext);
 
       const markArea = result.options.series[0].markArea.data[0];
       expect(markArea[1].itemStyle.color).toBe("rgba(255, 0, 0, 0.1)");
@@ -630,10 +525,7 @@ describe("convertPromQLChartData", () => {
     it("should not apply annotations when array is empty", async () => {
       mockContext.annotations = [];
 
-      const result = await convertPromQLChartData(
-        mockPromQLResponse,
-        mockContext,
-      );
+      const result = await convertPromQLChartData(mockPromQLResponse, mockContext);
 
       expect(result.options.series[0].markLine?.data?.length || 0).toBe(0);
       expect(result.options.series[0].markArea).toBeUndefined();
@@ -660,10 +552,7 @@ describe("convertPromQLChartData", () => {
         },
       ];
 
-      const result = await convertPromQLChartData(
-        mockPromQLResponse,
-        mockContext,
-      );
+      const result = await convertPromQLChartData(mockPromQLResponse, mockContext);
 
       expect(result.options.series[0].markLine.data.length).toBeGreaterThan(1);
     });
@@ -679,14 +568,9 @@ describe("convertPromQLChartData", () => {
         },
       ]);
 
-      const consoleWarnSpy = vi
-        .spyOn(console, "warn")
-        .mockImplementation(() => {});
+      const consoleWarnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
-      const result = await convertPromQLChartData(
-        mockPromQLResponse,
-        mockContext,
-      );
+      const result = await convertPromQLChartData(mockPromQLResponse, mockContext);
 
       expect(result.options.series).toEqual([]);
       expect(result.options.xAxis).toEqual([]);
@@ -698,10 +582,7 @@ describe("convertPromQLChartData", () => {
     });
 
     it("should return valid data when series exist", async () => {
-      const result = await convertPromQLChartData(
-        mockPromQLResponse,
-        mockContext,
-      );
+      const result = await convertPromQLChartData(mockPromQLResponse, mockContext);
 
       expect(result.options.series.length).toBeGreaterThan(0);
     });
@@ -709,10 +590,7 @@ describe("convertPromQLChartData", () => {
     it("should return valid data when table columns exist", async () => {
       mockContext.panelSchema.type = "table";
 
-      const result = await convertPromQLChartData(
-        mockPromQLResponse,
-        mockContext,
-      );
+      const result = await convertPromQLChartData(mockPromQLResponse, mockContext);
 
       expect(result.options.columns.length).toBeGreaterThan(0);
     });
@@ -736,10 +614,7 @@ describe("convertPromQLChartData", () => {
       const chartPanelRef = { value: "test-ref" };
       mockContext.chartPanelRef = chartPanelRef;
 
-      const result = await convertPromQLChartData(
-        mockPromQLResponse,
-        mockContext,
-      );
+      const result = await convertPromQLChartData(mockPromQLResponse, mockContext);
 
       expect(result.options).toBeDefined();
     });

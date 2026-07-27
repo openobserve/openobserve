@@ -42,8 +42,7 @@ export const ANOMALY_FILTER_OPERATORS = [
 export type AnomalyFilterOperator = (typeof ANOMALY_FILTER_OPERATORS)[number];
 
 /** Returns true when the operator requires a value input. */
-export const operatorNeedsValue = (op: string): boolean =>
-  op !== "Is Null" && op !== "Is Not Null";
+export const operatorNeedsValue = (op: string): boolean => op !== "Is Null" && op !== "Is Not Null";
 
 /**
  * Converts a single filter row { field, operator, value } into a SQL

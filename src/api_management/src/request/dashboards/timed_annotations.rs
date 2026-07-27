@@ -21,11 +21,10 @@ use axum::{
 use config::meta::timed_annotations::{
     ListTimedAnnotationsQuery, TimedAnnotation, TimedAnnotationDelete, TimedAnnotationReq,
 };
+use db::dashboards as dashboards_db;
+use openobserve_core::dashboards::timed_annotations;
 
-use crate::{
-    common::meta::http::HttpResponse as MetaHttpResponse,
-    service::{dashboards::timed_annotations, db::dashboards as dashboards_db},
-};
+use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 
 async fn ensure_dashboard_in_org(org_id: &str, dashboard_id: &str) -> bool {
     dashboards_db::dashboard_in_org(org_id, dashboard_id).await

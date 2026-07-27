@@ -50,7 +50,7 @@ const BASE_TONE: Record<string, StatusTone> = {
   resolved: "success",
   done: "success",
   live: "success",
-  "true": "success",
+  true: "success",
 
   // warning / transient / attention
   paused: "warning",
@@ -85,7 +85,7 @@ const BASE_TONE: Record<string, StatusTone> = {
   rejected: "error",
   expired: "error",
   blocked: "error",
-  "false": "error",
+  false: "error",
 
   // info / running / scheduled
   running: "info",
@@ -119,7 +119,7 @@ const BASE_TONE: Record<string, StatusTone> = {
  */
 const DOMAIN_TONE: Record<string, Record<string, StatusTone>> = {
   // Invoices: an "open" invoice is normal/info, not a warning.
-  invoice: { open: "info", uncollectible: "error", "void": "neutral" },
+  invoice: { open: "info", uncollectible: "error", void: "neutral" },
   // Services / nodes catalog: "warning" sits between degraded and critical.
   service: { warning: "warning", degraded: "warning", critical: "error" },
   node: { warning: "warning" },
@@ -149,12 +149,8 @@ export function humanizeStatus(value: string): string {
  * @param value  raw status string (case-insensitive) — also accepts booleans.
  * @param domain optional feature key for overrides ("invoice"|"eval"|"service"|"node"|…).
  */
-export function statusVariant(
-  value: unknown,
-  domain?: string,
-): StatusVariantResult {
-  const raw =
-    typeof value === "boolean" ? String(value) : String(value ?? "").trim();
+export function statusVariant(value: unknown, domain?: string): StatusVariantResult {
+  const raw = typeof value === "boolean" ? String(value) : String(value ?? "").trim();
   const key = raw.toLowerCase();
 
   let tone: StatusTone | undefined;

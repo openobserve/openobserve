@@ -14,16 +14,12 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::meta::cluster::get_internal_grpc_token;
+use db::{org_users::get_cached_user_org, user::is_root_user};
 use http_auth_basic::Credentials;
+use openobserve_core::auth::get_hash;
 use tonic::{Request, Status, metadata::MetadataValue};
 
-use crate::{
-    common::{
-        infra::config::ROOT_USER,
-        utils::auth::{get_hash, is_root_user},
-    },
-    service::db::org_users::get_cached_user_org,
-};
+use crate::common::infra::config::ROOT_USER;
 
 pub fn check_auth(req: Request<()>) -> Result<Request<()>, Status> {
     let cfg = config::get_config();
@@ -106,6 +102,7 @@ pub fn check_auth(req: Request<()>) -> Result<Request<()>, Status> {
 
 #[cfg(test)]
 mod tests {
+    use common::infra::config::ORG_USERS;
     use config::{
         cache_instance_id, get_config,
         meta::user::{User, UserRole},
@@ -113,7 +110,6 @@ mod tests {
     use infra::table::org_users::OrgUserRecord;
 
     use super::*;
-    use crate::common::infra::config::ORG_USERS;
 
     #[tokio::test]
     async fn test_check_no_auth() {

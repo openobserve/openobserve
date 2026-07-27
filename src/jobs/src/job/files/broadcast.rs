@@ -14,8 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::cluster;
-
-use crate::service::db::file_list::broadcast;
+use db::file_list::broadcast;
 
 pub async fn run() -> Result<(), anyhow::Error> {
     loop {

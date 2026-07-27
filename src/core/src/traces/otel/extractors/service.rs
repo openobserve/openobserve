@@ -19,7 +19,7 @@ use std::collections::HashMap;
 
 use config::utils::json;
 
-use crate::service::traces::otel::attributes::LangfuseAttributes;
+use crate::traces::otel::attributes::LangfuseAttributes;
 
 pub struct ServiceNameExtractor;
 

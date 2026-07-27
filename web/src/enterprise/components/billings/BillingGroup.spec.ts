@@ -60,13 +60,7 @@ interface MountOptions {
 const ODrawerSlotStub = {
   name: "ODrawer",
   template: "<div class='o-drawer'><slot /></div>",
-  props: [
-    "open",
-    "title",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "formId",
-  ],
+  props: ["open", "title", "primaryButtonLabel", "secondaryButtonLabel", "formId"],
   emits: ["update:open", "click:primary", "click:secondary"],
 };
 
@@ -348,9 +342,7 @@ describe("BillingGroup.vue", () => {
           },
         ],
       }));
-      expect(wrapper.vm.receivedInvites.map((i: any) => i.token)).toEqual([
-        "t1",
-      ]);
+      expect(wrapper.vm.receivedInvites.map((i: any) => i.token)).toEqual(["t1"]);
     });
   });
 
@@ -358,14 +350,7 @@ describe("BillingGroup.vue", () => {
     it("exposes the expected invite table columns", async () => {
       ({ wrapper } = await mountBillingGroup());
       const ids = wrapper.vm.inviteColumns.map((c: any) => c.id);
-      expect(ids).toEqual([
-        "index",
-        "org_name",
-        "org_id",
-        "inviter_id",
-        "date",
-        "actions",
-      ]);
+      expect(ids).toEqual(["index", "org_name", "org_id", "inviter_id", "date", "actions"]);
     });
   });
 
@@ -440,10 +425,7 @@ describe("BillingGroup.vue", () => {
       await wrapper.vm.acceptInvite("token-1");
       await flushPromises();
 
-      expect(billing.accept_billing_group_invite).toHaveBeenCalledWith(
-        "default",
-        "token-1"
-      );
+      expect(billing.accept_billing_group_invite).toHaveBeenCalledWith("default", "token-1");
     });
 
     it("rejects an invite by token", async () => {
@@ -453,10 +435,7 @@ describe("BillingGroup.vue", () => {
       await wrapper.vm.rejectInvite("token-2");
       await flushPromises();
 
-      expect(billing.reject_billing_group_invite).toHaveBeenCalledWith(
-        "default",
-        "token-2"
-      );
+      expect(billing.reject_billing_group_invite).toHaveBeenCalledWith("default", "token-2");
     });
 
     // The invite form is migrated to OForm + Zod: the schema (not a disabled
@@ -506,10 +485,7 @@ describe("BillingGroup.vue", () => {
       await flushPromises();
 
       expect(form.state.isValid).toBe(true);
-      expect(billing.send_billing_group_invite).toHaveBeenCalledWith(
-        "default",
-        "target-org"
-      );
+      expect(billing.send_billing_group_invite).toHaveBeenCalledWith("default", "target-org");
     });
   });
 });

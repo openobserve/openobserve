@@ -208,12 +208,7 @@ describe("AppSessions.vue", () => {
           DateTime: {
             template:
               '<div data-test="date-time" v-bind="$attrs" @on:date-change="$emit(\'on:date-change\', $event)"></div>',
-            props: [
-              "autoApply",
-              "defaultType",
-              "defaultAbsoluteTime",
-              "defaultRelativeTime",
-            ],
+            props: ["autoApply", "defaultType", "defaultAbsoluteTime", "defaultRelativeTime"],
             emits: ["on:date-change"],
           },
           SyntaxGuide: {
@@ -236,8 +231,7 @@ describe("AppSessions.vue", () => {
             props: ["count"],
           },
           SessionLocationColumn: {
-            template:
-              '<div data-test="session-location-column" v-bind="$attrs"></div>',
+            template: '<div data-test="session-location-column" v-bind="$attrs"></div>',
             props: ["column"],
           },
           NoData: { template: '<div data-test-stub="no-data" />' },
@@ -289,9 +283,7 @@ describe("AppSessions.vue", () => {
   describe("Query Functionality", () => {
     it("should trigger run query when button is clicked", async () => {
       const runQuerySpy = vi.spyOn(wrapper.vm, "runQuery");
-      const runButton = wrapper.find(
-        '[data-test="metrics-explorer-run-query-button"]',
-      );
+      const runButton = wrapper.find('[data-test="metrics-explorer-run-query-button"]');
 
       if (runButton.exists()) {
         // Try multiple ways to trigger the event
@@ -375,9 +367,7 @@ describe("AppSessions.vue", () => {
     it("should handle scroll end events for pagination", () => {
       // handleScrollEnd increments currentPage when sessions are fully fetched
       wrapper.vm.handleScrollEnd();
-      expect(
-        wrapper.vm.sessionState.data.resultGrid.currentPage,
-      ).toBeGreaterThanOrEqual(0);
+      expect(wrapper.vm.sessionState.data.resultGrid.currentPage).toBeGreaterThanOrEqual(0);
     });
   });
 
@@ -395,11 +385,7 @@ describe("AppSessions.vue", () => {
     });
 
     it("should fetch stream fields on mount", async () => {
-      expect(mockStreams.getStream).toHaveBeenCalledWith(
-        "_rumdata",
-        "logs",
-        true,
-      );
+      expect(mockStreams.getStream).toHaveBeenCalledWith("_rumdata", "logs", true);
     });
 
     it("should get sessions data when component is mounted", async () => {
@@ -448,14 +434,10 @@ describe("AppSessions.vue", () => {
         "resource_url",
         "session_id",
       ];
-      const streamFieldNames: string[] = wrapper.vm.streamFields.map(
-        (f: any) => f.name,
-      );
+      const streamFieldNames: string[] = wrapper.vm.streamFields.map((f: any) => f.name);
 
       // Collect only the entries that are priority fields, preserving their positions.
-      const priorityInResult = streamFieldNames.filter((n) =>
-        priorityNames.includes(n),
-      );
+      const priorityInResult = streamFieldNames.filter((n) => priorityNames.includes(n));
 
       expect(priorityInResult).toEqual(priorityNames);
     });
@@ -476,9 +458,7 @@ describe("AppSessions.vue", () => {
         (max, name, idx) => (prioritySet.has(name) ? idx : max),
         -1,
       );
-      const firstNonPriorityIndex = names.findIndex(
-        (name) => !prioritySet.has(name),
-      );
+      const firstNonPriorityIndex = names.findIndex((name) => !prioritySet.has(name));
 
       // Every priority field must come before every non-priority field.
       if (lastPriorityIndex !== -1 && firstNonPriorityIndex !== -1) {
@@ -491,9 +471,7 @@ describe("AppSessions.vue", () => {
     it("should handle sidebar events for field addition", () => {
       // Test the method directly
       wrapper.vm.handleSidebarEvent("add-field", "field_name='value'");
-      expect(wrapper.vm.sessionState.data.editorValue).toContain(
-        "field_name='value'",
-      );
+      expect(wrapper.vm.sessionState.data.editorValue).toContain("field_name='value'");
     });
 
     it("should add field to query when no existing query", () => {
@@ -504,16 +482,12 @@ describe("AppSessions.vue", () => {
     });
 
     it("should append field with AND when adding a different field", async () => {
-      const routerPushSpy = vi
-        .spyOn(router, "push")
-        .mockResolvedValue(undefined);
+      const routerPushSpy = vi.spyOn(router, "push").mockResolvedValue(undefined);
 
       mockSessionState.data.editorValue = "existing_field='test'";
       wrapper.vm.handleSidebarEvent("add-field", "new_field='value'");
 
-      expect(mockSessionState.data.editorValue).toBe(
-        "existing_field='test' and new_field='value'",
-      );
+      expect(mockSessionState.data.editorValue).toBe("existing_field='test' and new_field='value'");
 
       routerPushSpy.mockRestore();
     });
@@ -528,23 +502,15 @@ describe("AppSessions.vue", () => {
 
   describe("URL Query Parameters", () => {
     it("should restore query parameters from URL", () => {
-      const restoreUrlQueryParamsSpy = vi.spyOn(
-        wrapper.vm,
-        "restoreUrlQueryParams",
-      );
+      const restoreUrlQueryParamsSpy = vi.spyOn(wrapper.vm, "restoreUrlQueryParams");
 
       // This would have been called during component setup
       expect(restoreUrlQueryParamsSpy).toBeDefined();
     });
 
     it("should update URL when query parameters change", async () => {
-      const updateUrlQueryParamsSpy = vi.spyOn(
-        wrapper.vm,
-        "updateUrlQueryParams",
-      );
-      const routerPushSpy = vi
-        .spyOn(router, "push")
-        .mockResolvedValue(undefined);
+      const updateUrlQueryParamsSpy = vi.spyOn(wrapper.vm, "updateUrlQueryParams");
+      const routerPushSpy = vi.spyOn(router, "push").mockResolvedValue(undefined);
 
       wrapper.vm.isMounted = true;
       await wrapper.vm.updateUrlQueryParams();
@@ -578,9 +544,7 @@ describe("AppSessions.vue", () => {
 
       expect(wrapper.vm.dateTime.startTime).toBe(newDate.startTime);
       expect(wrapper.vm.dateTime.endTime).toBe(newDate.endTime);
-      expect(wrapper.vm.dateTime.relativeTimePeriod).toBe(
-        newDate.relativeTimePeriod,
-      );
+      expect(wrapper.vm.dateTime.relativeTimePeriod).toBe(newDate.relativeTimePeriod);
     });
 
     it("should not update if date is same", () => {
@@ -588,9 +552,7 @@ describe("AppSessions.vue", () => {
       wrapper.vm.updateDateChange(currentDate);
 
       // Should not trigger any side effects if date is the same
-      expect(JSON.stringify(wrapper.vm.dateTime)).toBe(
-        JSON.stringify(currentDate),
-      );
+      expect(JSON.stringify(wrapper.vm.dateTime)).toBe(JSON.stringify(currentDate));
     });
   });
 
@@ -617,8 +579,7 @@ describe("AppSessions.vue", () => {
           stubs: {
             OButton: { template: "<button><slot /></button>" },
             OSplitter: {
-              template:
-                '<div><slot name="before" /><slot name="after" /></div>',
+              template: '<div><slot name="before" /><slot name="after" /></div>',
             },
             OIcon: { template: "<span></span>" },
             OTable: { template: "<div></div>" },
@@ -667,9 +628,7 @@ describe("AppSessions.vue", () => {
 
     it("should handle stream loading errors", async () => {
       const originalGetStream = mockStreams.getStream;
-      mockStreams.getStream = vi
-        .fn()
-        .mockRejectedValue(new Error("Stream Error"));
+      mockStreams.getStream = vi.fn().mockRejectedValue(new Error("Stream Error"));
 
       try {
         await wrapper.vm.getStreamFields();
@@ -760,8 +719,7 @@ describe("AppSessions.vue", () => {
           stubs: {
             OButton: { template: "<button><slot /></button>" },
             OSplitter: {
-              template:
-                '<div><slot name="before" /><slot name="after" /></div>',
+              template: '<div><slot name="before" /><slot name="after" /></div>',
             },
             OIcon: { template: "<span></span>" },
             OTable: { template: "<div></div>" },
@@ -783,10 +741,7 @@ describe("AppSessions.vue", () => {
 
   describe("Lifecycle Hooks", () => {
     it("should call restoreUrlQueryParams on beforeMount", () => {
-      const restoreUrlQueryParamsSpy = vi.spyOn(
-        wrapper.vm,
-        "restoreUrlQueryParams",
-      );
+      const restoreUrlQueryParamsSpy = vi.spyOn(wrapper.vm, "restoreUrlQueryParams");
 
       // This would be called during component setup
       expect(restoreUrlQueryParamsSpy).toBeDefined();
@@ -810,18 +765,14 @@ describe("AppSessions.vue", () => {
     });
 
     it("should have health column covering frustration signals", () => {
-      const healthColumn = wrapper.vm.tableColumns.find(
-        (col: any) => col.id === "health",
-      );
+      const healthColumn = wrapper.vm.tableColumns.find((col: any) => col.id === "health");
 
       expect(healthColumn).toBeDefined();
       expect(healthColumn.sortable).toBe(true);
     });
 
     it("should sort health column by errors first, frustrations as tiebreak", () => {
-      const healthColumn = wrapper.vm.tableColumns.find(
-        (col: any) => col.id === "health",
-      );
+      const healthColumn = wrapper.vm.tableColumns.find((col: any) => col.id === "health");
 
       const errorsOnly = healthColumn.accessorFn({
         error_count: 2,
@@ -852,13 +803,10 @@ describe("AppSessions.vue", () => {
       };
 
       // Simulate the mapping logic from getSessionLogs
-      wrapper.vm.sessionState.data.sessions[
-        mockHit.session_id
-      ].frustration_count = mockHit.frustration_count || 0;
+      wrapper.vm.sessionState.data.sessions[mockHit.session_id].frustration_count =
+        mockHit.frustration_count || 0;
 
-      expect(
-        wrapper.vm.sessionState.data.sessions["test-123"].frustration_count,
-      ).toBe(3);
+      expect(wrapper.vm.sessionState.data.sessions["test-123"].frustration_count).toBe(3);
     });
 
     it("should default frustration_count to 0 when not present", () => {
@@ -873,41 +821,28 @@ describe("AppSessions.vue", () => {
       };
 
       // Simulate the mapping with missing frustration_count
-      wrapper.vm.sessionState.data.sessions[
-        mockHit.session_id
-      ].frustration_count = mockHit.frustration_count || 0;
+      wrapper.vm.sessionState.data.sessions[mockHit.session_id].frustration_count =
+        mockHit.frustration_count || 0;
 
-      expect(
-        wrapper.vm.sessionState.data.sessions["test-456"].frustration_count,
-      ).toBe(0);
+      expect(wrapper.vm.sessionState.data.sessions["test-456"].frustration_count).toBe(0);
     });
 
     it("should make health column sortable", () => {
-      const healthColumn = wrapper.vm.tableColumns.find(
-        (col: any) => col.id === "health",
-      );
+      const healthColumn = wrapper.vm.tableColumns.find((col: any) => col.id === "health");
 
       expect(healthColumn.sortable).toBe(true);
     });
 
     it("should position health column after session", () => {
-      const sessionIndex = wrapper.vm.tableColumns.findIndex(
-        (col: any) => col.id === "session",
-      );
-      const healthIndex = wrapper.vm.tableColumns.findIndex(
-        (col: any) => col.id === "health",
-      );
+      const sessionIndex = wrapper.vm.tableColumns.findIndex((col: any) => col.id === "session");
+      const healthIndex = wrapper.vm.tableColumns.findIndex((col: any) => col.id === "health");
 
       expect(healthIndex).toBeGreaterThan(sessionIndex);
     });
 
     it("should position health column before location", () => {
-      const healthIndex = wrapper.vm.tableColumns.findIndex(
-        (col: any) => col.id === "health",
-      );
-      const locationIndex = wrapper.vm.tableColumns.findIndex(
-        (col: any) => col.id === "location",
-      );
+      const healthIndex = wrapper.vm.tableColumns.findIndex((col: any) => col.id === "health");
+      const locationIndex = wrapper.vm.tableColumns.findIndex((col: any) => col.id === "location");
 
       expect(healthIndex).toBeLessThan(locationIndex);
     });
@@ -921,20 +856,15 @@ describe("AppSessions.vue", () => {
       wrapper.vm.sessionState.data.sessions["test-789"] = {
         session_id: "test-789",
       };
-      wrapper.vm.sessionState.data.sessions[
-        mockHit.session_id
-      ].frustration_count = mockHit.frustration_count || 0;
+      wrapper.vm.sessionState.data.sessions[mockHit.session_id].frustration_count =
+        mockHit.frustration_count || 0;
 
-      expect(
-        wrapper.vm.sessionState.data.sessions["test-789"].frustration_count,
-      ).toBe(999);
+      expect(wrapper.vm.sessionState.data.sessions["test-789"].frustration_count).toBe(999);
     });
 
     it("should not render the removed FrustrationBadge component", () => {
       // Frustration signals now render via SessionHealthCell in the health column
-      expect(wrapper.findComponent({ name: "FrustrationBadge" }).exists()).toBe(
-        false,
-      );
+      expect(wrapper.findComponent({ name: "FrustrationBadge" }).exists()).toBe(false);
     });
   });
 });

@@ -13,17 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import {
-  PromQLChartConverter,
-  ProcessedPromQLData,
-  TOOLTIP_SCROLL_STYLE,
-} from "./shared/types";
+import { PromQLChartConverter, ProcessedPromQLData, TOOLTIP_SCROLL_STYLE } from "./shared/types";
 import { getUnitValue, formatUnitValue } from "../convertDataIntoUnitValue";
 import { chartColor } from "@/utils/chartTheme";
-import {
-  deaccumulateHistogramSeries,
-  HistogramSeriesInput,
-} from "./shared/histogramBuckets";
+import { deaccumulateHistogramSeries, HistogramSeriesInput } from "./shared/histogramBuckets";
 import {
   HEATMAP_SPLIT_AREA,
   HEATMAP_VISUAL_MAP_COLORS,
@@ -46,9 +39,7 @@ export const PROMETHEUS_HISTOGRAM_MODE = "prometheus_histogram";
  * different grids, later samples get looked up against query 0's timestamps and
  * read as 0. The union degrades to the truth instead of to blankness.
  */
-function buildTimeAxis(
-  processedData: ProcessedPromQLData[],
-): Array<[any, any]> {
+function buildTimeAxis(processedData: ProcessedPromQLData[]): Array<[any, any]> {
   const byTs = new Map<string, [any, any]>();
 
   for (const queryData of processedData ?? []) {
@@ -60,9 +51,7 @@ function buildTimeAxis(
     }
   }
 
-  return [...byTs.values()].sort(
-    (a, b) => Number(a[0]) - Number(b[0]),
-  );
+  return [...byTs.values()].sort((a, b) => Number(a[0]) - Number(b[0]));
 }
 
 /**
@@ -76,10 +65,7 @@ function buildTimeAxis(
  * same colour. Both paths ask this one question so neither can answer it wrongly
  * on its own.
  */
-function visualMapRangeOf(
-  minValue: number,
-  maxValue: number,
-): { min: number; max: number } {
+function visualMapRangeOf(minValue: number, maxValue: number): { min: number; max: number } {
   return {
     min: Number.isFinite(minValue) ? Math.min(0, minValue) : 0,
     max: Number.isFinite(maxValue) ? maxValue : 0,
@@ -147,17 +133,66 @@ function formatBucketLabel(le: string, leValue: number, config: any): string {
 
   try {
     const formatted = formatUnitValue(
-      getUnitValue(
-        leValue,
-        config?.bucket_unit,
-        config?.bucket_unit_custom,
-        config?.decimals,
-      ),
+      getUnitValue(leValue, config?.bucket_unit, config?.bucket_unit_custom, config?.decimals),
     );
     return formatted || le;
   } catch (error) {
     return le;
   }
+}
+
+/**
+ * Card-sized heatmap. The metrics explorer's preview cards are a few cm tall,
+ * where the default colour bar and full-size axis labels swamp the plot (the
+ * cells collapse to a thin line and only one bucket label survives). Shrinks the
+ * visual map, thins the bucket labels — always keeping the top `+Inf` row — and
+ * drops the font sizes. Mutates and returns `options`. Only run when the card
+ * sets `config.compact_preview`.
+ */
+function applyCompactPreview(options: any): any {
+  if (options.visualMap) {
+    options.visualMap = {
+      ...options.visualMap,
+      show: true,
+      orient: "horizontal",
+      left: "center",
+      bottom: 0,
+      itemWidth: 10,
+      itemHeight: 90,
+      precision: 2,
+      textStyle: { fontSize: 9 },
+    };
+    options.grid = { ...(options.grid ?? {}), top: 8, bottom: 48 };
+  }
+
+  const yAxis = Array.isArray(options.yAxis) ? options.yAxis[0] : options.yAxis;
+  const rowCount = yAxis?.data?.length ?? 0;
+  if (yAxis && rowCount) {
+    // Thin the bucket labels to what a card can render, but ALWAYS keep the top
+    // row: a histogram's `+Inf` bucket is the "everything slower than this" row,
+    // and ECharts' hideOverlap would otherwise drop it. Count DOWN from the top
+    // so `+Inf` is always labelled and the spacing stays even.
+    const step = Math.max(1, Math.ceil(rowCount / 8));
+    yAxis.axisLabel = {
+      ...(yAxis.axisLabel ?? {}),
+      fontSize: 9,
+      width: 46,
+      overflow: "truncate",
+      hideOverlap: false,
+      interval: (index: number) => (rowCount - 1 - index) % step === 0,
+    };
+  }
+
+  const xAxis = Array.isArray(options.xAxis) ? options.xAxis[0] : options.xAxis;
+  if (xAxis) {
+    xAxis.axisLabel = {
+      ...(xAxis.axisLabel ?? {}),
+      fontSize: 9,
+      hideOverlap: true,
+    };
+  }
+
+  return options;
 }
 
 /**
@@ -167,12 +202,7 @@ function formatBucketLabel(le: string, leValue: number, config: any): string {
 export class HeatmapConverter implements PromQLChartConverter {
   supportedTypes = ["heatmap"];
 
-  convert(
-    processedData: ProcessedPromQLData[],
-    panelSchema: any,
-    store: any,
-    extras: any,
-  ) {
+  convert(processedData: ProcessedPromQLData[], panelSchema: any, store: any, extras: any) {
     const config = panelSchema.config || {};
 
     // Opt-in only: Prometheus classic-histogram mode. Generic heatmaps keep
@@ -194,9 +224,7 @@ export class HeatmapConverter implements PromQLChartConverter {
     // Shared across every query, so a cell's column is its INSTANT — not its
     // offset within whichever query happened to report it.
     const timeAxis = buildTimeAxis(processedData);
-    const columnOfTs = new Map(
-      timeAxis.map(([ts], index) => [String(ts), index]),
-    );
+    const columnOfTs = new Map(timeAxis.map(([ts], index) => [String(ts), index]));
 
     processedData.forEach((queryData) => {
       queryData.series.forEach((seriesData) => {
@@ -228,7 +256,7 @@ export class HeatmapConverter implements PromQLChartConverter {
     // Format timestamps to extract time portion (consistent with bar charts)
     const xAxisData = buildXAxisData(timeAxis);
 
-    return {
+    const options: any = {
       series: [
         {
           type: "heatmap",
@@ -292,6 +320,9 @@ export class HeatmapConverter implements PromQLChartConverter {
       },
       tooltip: {
         position: "top",
+        // render into <body> so the tooltip is not clipped by the panel's
+        // overflow — same container treatment as the other PromQL charts
+        appendToBody: true,
         textStyle: {
           color: chartColor("--color-tooltip-text"),
           fontSize: 12,
@@ -301,8 +332,7 @@ export class HeatmapConverter implements PromQLChartConverter {
         extraCssText: TOOLTIP_SCROLL_STYLE,
         formatter: (params: any) => {
           try {
-            const seriesName =
-              seriesNames[params?.value[1]] || params?.seriesName;
+            const seriesName = seriesNames[params?.value[1]] || params?.seriesName;
             const value =
               formatUnitValue(
                 getUnitValue(
@@ -325,6 +355,8 @@ export class HeatmapConverter implements PromQLChartConverter {
         containLabel: true,
       },
     };
+
+    return config?.compact_preview ? applyCompactPreview(options) : options;
   }
 
   /**
@@ -346,12 +378,10 @@ export class HeatmapConverter implements PromQLChartConverter {
     // interleave two histograms' buckets. Each query is its own cumulative
     // histogram.
     const buckets = processedData.flatMap((queryData) => {
-      const inputs: HistogramSeriesInput[] = (queryData.series ?? []).map(
-        (seriesData) => ({
-          le: extractLeLabel(seriesData),
-          data: seriesData.data ?? {},
-        }),
-      );
+      const inputs: HistogramSeriesInput[] = (queryData.series ?? []).map((seriesData) => ({
+        le: extractLeLabel(seriesData),
+        data: seriesData.data ?? {},
+      }));
       return deaccumulateHistogramSeries(inputs);
     });
 
@@ -402,7 +432,7 @@ export class HeatmapConverter implements PromQLChartConverter {
 
     const xAxisData = buildXAxisData(timestamps);
 
-    return {
+    const options: any = {
       series: [
         {
           type: "heatmap",
@@ -450,6 +480,9 @@ export class HeatmapConverter implements PromQLChartConverter {
       },
       tooltip: {
         position: "top",
+        // render into <body> so the tooltip is not clipped by the panel's
+        // overflow — same container treatment as the other PromQL charts
+        appendToBody: true,
         textStyle: {
           color: chartColor("--color-tooltip-text"),
           fontSize: 12,
@@ -459,8 +492,7 @@ export class HeatmapConverter implements PromQLChartConverter {
         extraCssText: TOOLTIP_SCROLL_STYLE,
         formatter: (params: any) => {
           try {
-            const bucketLabel =
-              bucketLabels[params?.value?.[1]] ?? params?.seriesName;
+            const bucketLabel = bucketLabels[params?.value?.[1]] ?? params?.seriesName;
             // config.unit remains the CELL INTENSITY unit (e.g. count/s).
             const value =
               formatUnitValue(
@@ -484,5 +516,7 @@ export class HeatmapConverter implements PromQLChartConverter {
         containLabel: true,
       },
     };
+
+    return config?.compact_preview ? applyCompactPreview(options) : options;
   }
 }

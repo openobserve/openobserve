@@ -69,7 +69,7 @@ async fn initialize_llm_scores_stream_schema(org_id: &str) -> Result<()> {
         return Ok(());
     }
 
-    match crate::service::db::schema::merge(
+    match crate::db::schema::merge(
         org_id,
         stream_name,
         stream_type,
@@ -121,6 +121,15 @@ mod tests {
         let json_value = config::utils::json::to_value(&sample).unwrap();
         let obj = json_value.as_object().unwrap();
         assert!(obj.contains_key("id"));
+        assert!(obj.contains_key("task_id"));
+        assert!(obj.contains_key("eval_run_id"));
+        assert!(obj.contains_key("evaluator_trace_id"));
+        assert!(obj.contains_key("org_id"));
+        assert!(obj.contains_key("target_scope"));
+        assert!(obj.contains_key("target_id"));
+        assert!(obj.contains_key("evaluation_key"));
+        assert!(obj.contains_key("score_version"));
+        assert!(obj.contains_key("job_version"));
         assert!(obj.contains_key("span_id"));
         assert!(obj.contains_key("trace_id"));
         assert!(obj.contains_key("session_id"));

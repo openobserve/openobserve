@@ -17,7 +17,6 @@ import { mount, flushPromises } from "@vue/test-utils";
 import DestinationPreview from "./DestinationPreview.vue";
 import i18n from "@/locales";
 
-
 // Stub ODialog so tests are deterministic (no Portal/Reka teleport)
 // and so we can drive the dialog's emitted events directly.
 const ODialogStub = {
@@ -82,7 +81,7 @@ const mountComponent = (props: Record<string, any> = {}) => {
       plugins: [i18n],
       stubs: {
         ODialog: ODialogStub,
-        "OIcon": QIconStub,
+        OIcon: QIconStub,
       },
     },
   });

@@ -285,12 +285,13 @@ test.describe("Pre-Test Cleanup", () => {
         /^sanitylogstream_/,           // sanitylogstream_61hj, etc.
         /^test\d+$/,                   // test1, test2, test3, etc.
         /^stress_test/,                // stress_test*, stress_test_<runId>_w0, stress_test1, etc.
-        /^sdr_/,                       // sdr_* (SDR test streams)
+        /^sdr_/,                       // sdr_* (SDR logs test streams; traces SDR streams are swept separately by type below)
         /^e2e_join_/,                  // e2e_join_* (UNION test streams)
         /^e2e_conditions_/,            // e2e_conditions_* (Pipeline conditions UI test streams)
         /^e2e_apostrophe_/,            // e2e_apostrophe_* (Bug #9475 apostrophe test streams from logs-regression.spec.js)
         /^e2e_highlighting_test$/,     // e2e_highlighting_test (Bug #9754 logs highlighting test stream from logs-9754.spec.js)
         /^e2e_streamcreation_/,        // e2e_streamcreation_* (Stream creation UI test streams)
+        /^e2e_qp_more_stream_/,        // e2e_qp_more_stream_* (logsQuickPick.spec.js more-footer seed streams)
         /^e2e_MyUpperStream/i,         // e2e_MyUpperStream* (Stream name casing test streams)
         /^e2e_mylowerstream/i,         // e2e_mylowerstream* (Stream name casing test streams)
         /^[a-z]{8,9}$/,                // Random 8-9 char lowercase strings
@@ -336,6 +337,17 @@ test.describe("Pre-Test Cleanup", () => {
       ],
       // Protected streams to never delete
       ['default', 'sensitive', 'important', 'critical', 'production', 'staging', 'automation', 'e2e_automate', 'k8s_json']
+    );
+
+    // Clean up TRACES streams created by the traces SDR suite (sdr_traces_* — one
+    // per run, unique testRunId suffix). These are type=traces, so the logs sweep
+    // above (type=logs) never lists them; sweep them with streamType: 'traces'.
+    await pm.apiCleanup.cleanupStreams(
+      [
+        /^sdr_traces_/,                // sdr_traces_* (traces SDR test streams: redact/drop/hash × ingestion/query)
+      ],
+      ['default'],                     // protect the default traces stream
+      { streamType: 'traces' }
     );
 
     // Note: Pipeline regression test streams (e2e_test_cpu_usage for metrics, e2e_test_traces for traces)

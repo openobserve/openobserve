@@ -130,7 +130,7 @@ describe("CustomNode.vue", () => {
           plugins: [store, router, i18n],
           stubs: {
             Handle: true,
-            "OIcon": true,
+            OIcon: true,
             ConfirmDialog: true,
           },
         },
@@ -156,7 +156,7 @@ describe("CustomNode.vue", () => {
           plugins: [store, router, i18n],
           stubs: {
             Handle: true,
-            "OIcon": true,
+            OIcon: true,
             ConfirmDialog: true,
           },
         },
@@ -182,7 +182,7 @@ describe("CustomNode.vue", () => {
           plugins: [store, router, i18n],
           stubs: {
             Handle: true,
-            "OIcon": true,
+            OIcon: true,
             ConfirmDialog: true,
           },
         },
@@ -208,7 +208,7 @@ describe("CustomNode.vue", () => {
           plugins: [store, router, i18n],
           stubs: {
             Handle: true,
-            "OIcon": true,
+            OIcon: true,
             ConfirmDialog: true,
           },
         },
@@ -233,7 +233,7 @@ describe("CustomNode.vue", () => {
           plugins: [store, router, i18n],
           stubs: {
             Handle: true,
-            "OIcon": true,
+            OIcon: true,
             ConfirmDialog: true,
           },
         },
@@ -260,7 +260,7 @@ describe("CustomNode.vue", () => {
           plugins: [store, router, i18n],
           stubs: {
             Handle: true,
-            "OIcon": true,
+            OIcon: true,
             ConfirmDialog: true,
           },
         },
@@ -291,7 +291,7 @@ describe("CustomNode.vue", () => {
           plugins: [store, router, i18n],
           stubs: {
             Handle: true,
-            "OIcon": true,
+            OIcon: true,
             ConfirmDialog: true,
           },
         },
@@ -319,7 +319,7 @@ describe("CustomNode.vue", () => {
           plugins: [store, router, i18n],
           stubs: {
             Handle: true,
-            "OIcon": true,
+            OIcon: true,
             ConfirmDialog: true,
           },
         },
@@ -327,7 +327,8 @@ describe("CustomNode.vue", () => {
 
       const text = wrapper.text();
       // Should contain ellipsis if truncated (truncated to 20 chars)
-      if (text.length > 23) { // 20 chars + "..."
+      if (text.length > 23) {
+        // 20 chars + "..."
         expect(text).toContain("...");
       }
     });
@@ -363,7 +364,7 @@ describe("CustomNode.vue", () => {
           plugins: [store, router, i18n],
           stubs: {
             Handle: true,
-            "OIcon": true,
+            OIcon: true,
             ConfirmDialog: true,
           },
         },
@@ -389,7 +390,7 @@ describe("CustomNode.vue", () => {
               template: '<div class="handle" :type="type" :id="id" />',
               props: ["type", "id"],
             },
-            "OIcon": true,
+            OIcon: true,
             ConfirmDialog: true,
           },
         },
@@ -413,7 +414,7 @@ describe("CustomNode.vue", () => {
               template: '<div class="handle" :type="type" :id="id" />',
               props: ["type", "id"],
             },
-            "OIcon": true,
+            OIcon: true,
             ConfirmDialog: true,
           },
         },
@@ -437,7 +438,7 @@ describe("CustomNode.vue", () => {
               template: '<div class="handle" :type="type" :id="id" />',
               props: ["type", "id"],
             },
-            "OIcon": true,
+            OIcon: true,
             ConfirmDialog: true,
           },
         },
@@ -460,7 +461,7 @@ describe("CustomNode.vue", () => {
           plugins: [store, router, i18n],
           stubs: {
             Handle: true,
-            "OIcon": true,
+            OIcon: true,
             ConfirmDialog: true,
           },
         },
@@ -481,7 +482,7 @@ describe("CustomNode.vue", () => {
           plugins: [store, router, i18n],
           stubs: {
             Handle: true,
-            "OIcon": true,
+            OIcon: true,
             ConfirmDialog: true,
           },
         },
@@ -502,7 +503,7 @@ describe("CustomNode.vue", () => {
           plugins: [store, router, i18n],
           stubs: {
             Handle: true,
-            "OIcon": true,
+            OIcon: true,
             ConfirmDialog: true,
           },
         },
@@ -553,7 +554,7 @@ describe("CustomNode.vue", () => {
           plugins: [store, router, i18n],
           stubs: {
             Handle: true,
-            "OIcon": true,
+            OIcon: true,
             ConfirmDialog: true,
           },
         },
@@ -600,18 +601,14 @@ describe("CustomNode.vue", () => {
           plugins: [store, router, i18n],
           stubs: {
             Handle: true,
-            "OIcon": true,
+            OIcon: true,
             ConfirmDialog: true,
           },
         },
       });
 
-      expect(
-        wrapper.find('[data-test="pipeline-node-error-badge"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="pipeline-node-error-count"]').text(),
-      ).toBe("5");
+      expect(wrapper.find('[data-test="pipeline-node-error-badge"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="pipeline-node-error-count"]').text()).toBe("5");
     });
   });
 
@@ -630,7 +627,7 @@ describe("CustomNode.vue", () => {
           plugins: [store, router, i18n],
           stubs: {
             Handle: true,
-            "OIcon": true,
+            OIcon: true,
             ConfirmDialog: true,
           },
         },
@@ -656,7 +653,7 @@ describe("CustomNode.vue", () => {
           plugins: [store, router, i18n],
           stubs: {
             Handle: true,
-            "OIcon": true,
+            OIcon: true,
             "confirm-dialog": {
               template: '<div class="confirm-dialog" />',
             },

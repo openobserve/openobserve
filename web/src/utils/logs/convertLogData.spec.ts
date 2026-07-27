@@ -14,17 +14,12 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import {
-  convertLogData,
-  convertStackedLogData,
-  formatDate,
-  formatCount,
-} from "./convertLogData";
+import { convertLogData, convertStackedLogData, formatDate, formatCount } from "./convertLogData";
 
 // Stub the color-palette module so tests are not coupled to palette values.
 vi.mock("@/utils/dashboard/colorPalette", () => ({
   classicColorPaletteLightTheme: ["#aaa", "#bbb", "#ccc"],
-  classicColorPaletteDarkTheme:  ["#111", "#222", "#333"],
+  classicColorPaletteDarkTheme: ["#111", "#222", "#333"],
 }));
 
 describe("convertLogData.ts", () => {
@@ -58,7 +53,16 @@ describe("convertLogData.ts", () => {
         timezone: "UTC",
         itemStyle: null,
       });
-      for (const key of ["title", "backgroundColor", "grid", "tooltip", "xAxis", "yAxis", "toolbox", "series"]) {
+      for (const key of [
+        "title",
+        "backgroundColor",
+        "grid",
+        "tooltip",
+        "xAxis",
+        "yAxis",
+        "toolbox",
+        "series",
+      ]) {
         expect(result.options).toHaveProperty(key);
       }
     });
@@ -84,7 +88,7 @@ describe("convertLogData.ts", () => {
         containLabel: true,
         left: "20",
         right: "20",
-        top: "5",
+        top: "8",
         bottom: "5",
       });
     });
@@ -316,25 +320,40 @@ describe("convertLogData.ts", () => {
     const ts1 = 1640995200000;
     const ts2 = 1640998800000;
 
-    const makeBreakdown = (entries: [string, number[]][]) =>
-      new Map<string, number[]>(entries);
+    const makeBreakdown = (entries: [string, number[]][]) => new Map<string, number[]>(entries);
 
     it("returns an options object with all required ECharts keys", () => {
       const bd = makeBreakdown([["error", [10, 20]]]);
       const { options } = convertStackedLogData([ts1, ts2], bd, baseParams, false);
-      for (const key of ["backgroundColor", "grid", "tooltip", "legend", "xAxis", "yAxis", "toolbox", "series"]) {
+      for (const key of [
+        "backgroundColor",
+        "grid",
+        "tooltip",
+        "legend",
+        "xAxis",
+        "yAxis",
+        "toolbox",
+        "series",
+      ]) {
         expect(options).toHaveProperty(key);
       }
     });
 
     it("produces one series per breakdown category", () => {
-      const bd = makeBreakdown([["error", [10]], ["warn", [5]], ["info", [20]]]);
+      const bd = makeBreakdown([
+        ["error", [10]],
+        ["warn", [5]],
+        ["info", [20]],
+      ]);
       const { options } = convertStackedLogData([ts1], bd, baseParams, false);
       expect(options.series).toHaveLength(3);
     });
 
     it("stacks all series on 'total'", () => {
-      const bd = makeBreakdown([["error", [10]], ["info", [5]]]);
+      const bd = makeBreakdown([
+        ["error", [10]],
+        ["info", [5]],
+      ]);
       const { options } = convertStackedLogData([ts1], bd, baseParams, false);
       options.series.forEach((s: any) => expect(s.stack).toBe("total"));
     });
@@ -487,7 +506,10 @@ describe("convertLogData.ts", () => {
     });
 
     it("shows legend at the bottom when there are multiple series", () => {
-      const bd = makeBreakdown([["info", [1]], ["error", [2]]]);
+      const bd = makeBreakdown([
+        ["info", [1]],
+        ["error", [2]],
+      ]);
       const { options } = convertStackedLogData([ts1], bd, baseParams, false);
       expect(options.legend.show).toBe(true);
       expect(options.legend.bottom).toBe(0);
@@ -500,7 +522,10 @@ describe("convertLogData.ts", () => {
     });
 
     it("sets grid bottom to 20 to accommodate legend when multiple series", () => {
-      const bd = makeBreakdown([["info", [1]], ["error", [2]]]);
+      const bd = makeBreakdown([
+        ["info", [1]],
+        ["error", [2]],
+      ]);
       const { options } = convertStackedLogData([ts1], bd, baseParams, false);
       expect(options.grid.bottom).toBe("20");
     });
@@ -513,7 +538,10 @@ describe("convertLogData.ts", () => {
     // Tooltip formatter tests
     describe("tooltip formatter", () => {
       const getFormatter = (isDark = false) => {
-        const bd = makeBreakdown([["error", [10]], ["info", [5]]]);
+        const bd = makeBreakdown([
+          ["error", [10]],
+          ["info", [5]],
+        ]);
         const { options } = convertStackedLogData([ts1], bd, baseParams, isDark);
         return options.tooltip.formatter;
       };
@@ -527,7 +555,12 @@ describe("convertLogData.ts", () => {
       it("escapes HTML in axisValueLabel to prevent XSS", () => {
         const formatter = getFormatter();
         const result = formatter([
-          { axisValueLabel: "<script>alert(1)</script>", marker: "●", seriesName: "Info", value: [ts1, 5] },
+          {
+            axisValueLabel: "<script>alert(1)</script>",
+            marker: "●",
+            seriesName: "Info",
+            value: [ts1, 5],
+          },
         ]);
         expect(result).not.toContain("<script>");
         expect(result).toContain("&lt;script&gt;");
@@ -545,7 +578,12 @@ describe("convertLogData.ts", () => {
       it("escapes ampersands in series names", () => {
         const formatter = getFormatter();
         const result = formatter([
-          { axisValueLabel: "Jan 1", marker: "●", seriesName: "Errors & Warnings", value: [ts1, 10] },
+          {
+            axisValueLabel: "Jan 1",
+            marker: "●",
+            seriesName: "Errors & Warnings",
+            value: [ts1, 10],
+          },
         ]);
         expect(result).toContain("Errors &amp; Warnings");
       });
@@ -644,7 +682,7 @@ describe("convertLogData.ts", () => {
     });
 
     it("handles all months correctly", () => {
-      const months = ["01","02","03","04","05","06","07","08","09","10","11","12"];
+      const months = ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"];
       months.forEach((m, i) => {
         expect(formatDate(new Date(2022, i, 1, 0, 0, 0))).toContain(`2022-${m}-01`);
       });

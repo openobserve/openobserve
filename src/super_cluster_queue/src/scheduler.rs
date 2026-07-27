@@ -19,6 +19,8 @@ use config::{
     meta::triggers::{Trigger, TriggerModule},
     utils::json,
 };
+#[allow(clippy::single_component_path_imports)]
+use db;
 use infra::{
     db::{ORM_CLIENT, connect_to_orm},
     errors::{Error, Result},
@@ -28,7 +30,6 @@ use o2_enterprise::enterprise::{
     scheduled_jobs::StatusUpdateTuple,
     super_cluster::queue::{Message, MessageType},
 };
-use openobserve_core::service::db;
 pub(crate) async fn process(msg: Message) -> Result<()> {
     match msg.message_type {
         MessageType::SchedulerPush => {
@@ -154,7 +155,7 @@ async fn update(msg: Message) -> Result<()> {
         }
         TriggerModule::DerivedStream => {
             let Ok((_, _, _, pipeline_id)) =
-                openobserve_core::service::alerts::scheduler::handlers::get_pipeline_info_from_module_key(
+                openobserve_core::alerts::scheduler::handlers::get_pipeline_info_from_module_key(
                     &trigger.module_key,
                 )
             else {
@@ -164,7 +165,7 @@ async fn update(msg: Message) -> Result<()> {
                 );
                 return Ok(());
             };
-            if db::pipeline::get_by_id(&pipeline_id).await.is_ok() {
+            if infra::pipeline::get_by_id(&pipeline_id).await.is_ok() {
                 // We need to add this trigger to the db in this region
                 scheduler::push(trigger.clone()).await.map_err(|e| {
                     let error_msg = format!(

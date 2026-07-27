@@ -110,18 +110,15 @@ const useSqlSuggestions = () => {
     {
       label: (_keyword: string) => `match_all_raw_ignore_case('${_keyword}')`,
       kind: "Text",
-      insertText: (_keyword: string) =>
-        `match_all_raw_ignore_case('${_keyword}')`,
+      insertText: (_keyword: string) => `match_all_raw_ignore_case('${_keyword}')`,
     },
     {
-      label: () =>
-        `re_match(fieldname: string, regular_expression: string)`,
+      label: () => `re_match(fieldname: string, regular_expression: string)`,
       kind: "Text",
       insertText: () => `re_match(fieldname, '')`,
     },
     {
-      label: () =>
-        `re_not_match(fieldname: string, regular_expression: string)`,
+      label: () => `re_not_match(fieldname: string, regular_expression: string)`,
       kind: "Text",
       insertText: () => `re_not_match(fieldname, '')`,
     },
@@ -131,11 +128,9 @@ const useSqlSuggestions = () => {
       insertText: (_keyword: string) => `str_match(fieldname, '${_keyword}')`,
     },
     {
-      label: (_keyword: string) =>
-        `str_match_ignore_case(fieldname, '${_keyword}')`,
+      label: (_keyword: string) => `str_match_ignore_case(fieldname, '${_keyword}')`,
       kind: "Text",
-      insertText: (_keyword: string) =>
-        `str_match_ignore_case(fieldname, '${_keyword}')`,
+      insertText: (_keyword: string) => `str_match_ignore_case(fieldname, '${_keyword}')`,
     },
     {
       label: (_keyword: string) => `arr_descending('${_keyword}')`,
@@ -173,24 +168,16 @@ const useSqlSuggestions = () => {
     },
 
     {
-      label: (
-        _keyword: string,
-        _keyword2: string,
-        delimiter: string = "delimiter",
-      ) => `arrzip('${_keyword}', '${_keyword2}', '${delimiter}')`,
+      label: (_keyword: string, _keyword2: string, delimiter: string = "delimiter") =>
+        `arrzip('${_keyword}', '${_keyword2}', '${delimiter}')`,
       kind: "Text",
-      insertText: (
-        _keyword: string,
-        _keyword2: string,
-        delimiter: string = "delimiter",
-      ) => `arrzip('${_keyword}', '${_keyword2}', '${delimiter}')`,
+      insertText: (_keyword: string, _keyword2: string, delimiter: string = "delimiter") =>
+        `arrzip('${_keyword}', '${_keyword2}', '${delimiter}')`,
     },
     {
-      label: (_keyword: string, path: string = "path") =>
-        `spath('${_keyword}', '${path}')`,
+      label: (_keyword: string, path: string = "path") => `spath('${_keyword}', '${path}')`,
       kind: "Text",
-      insertText: (_keyword: string, path: string = "path") =>
-        `spath('${_keyword}', '${path}')`,
+      insertText: (_keyword: string, path: string = "path") => `spath('${_keyword}', '${path}')`,
     },
     {
       label: (array: string = "array") => `to_array_string('${array}')`,
@@ -250,18 +237,10 @@ const useSqlSuggestions = () => {
         `approx_topk('${_keyword}', ${number_of_frequent_values})`,
     },
     {
-      label: (
-        _keyword: string,
-        _keyword2: string,
-        number_of_frequent_values: number = 10,
-      ) =>
+      label: (_keyword: string, _keyword2: string, number_of_frequent_values: number = 10) =>
         `approx_topk_distinct('${_keyword}', '${_keyword2}', ${number_of_frequent_values})`,
       kind: "Text",
-      insertText: (
-        _keyword: string,
-        _keyword2: string,
-        number_of_frequent_values: number = 10,
-      ) =>
+      insertText: (_keyword: string, _keyword2: string, number_of_frequent_values: number = 10) =>
         `approx_topk_distinct('${_keyword}', '${_keyword2}', ${number_of_frequent_values})`,
     },
   ];
@@ -308,9 +287,7 @@ const useSqlSuggestions = () => {
   // an active context dropdown, and the transition back to normal keywords is
   // instant the moment getSuggestions() exits the context branch.
   const effectiveKeywords = computed(() =>
-    contextKeywords.value.length
-      ? contextKeywords.value
-      : autoCompleteKeywords.value,
+    contextKeywords.value.length ? contextKeywords.value : autoCompleteKeywords.value,
   );
   const effectiveSuggestions = computed(() =>
     contextKeywords.value.length ? [] : autoCompleteSuggestions.value,
@@ -379,9 +356,7 @@ const useSqlSuggestions = () => {
       // query. A closed quote from a preceding condition (e.g. http = 'te') has
       // no trailing non-quote chars after it until cursor, which would otherwise
       // make /'[^']*$/ fire and wrongly set hasOpenQuote for the new condition.
-      labelMeta.meta.hasOpenQuote = /'[^']*$/.test(
-        textUpToCursor.slice(match.index),
-      );
+      labelMeta.meta.hasOpenQuote = /'[^']*$/.test(textUpToCursor.slice(match.index));
     }
     return labelMeta;
   }
@@ -392,8 +367,7 @@ const useSqlSuggestions = () => {
     // is never updated by SearchBar and stays 0. We read the top-level one
     // first and fall back to position.cursorIndex for safety.
     const cursorIndex =
-      (autoCompleteData.value as any).cursorIndex ??
-      autoCompleteData.value.position.cursorIndex;
+      (autoCompleteData.value as any).cursorIndex ?? autoCompleteData.value.position.cursorIndex;
 
     // Compute text up to cursor (same slice logic used by analyzeSqlWhereClause).
     const query = autoCompleteData.value.query;
@@ -427,11 +401,11 @@ const useSqlSuggestions = () => {
         // Monaco auto-closes " → "". When the cursor sits between the two quotes,
         // query[endIdx] is already the closing " that Monaco inserted.
         // In that case we must NOT append another " or the result will be "stream"".
-        const charAfterCursor = query[endIdx] ?? '';
+        const charAfterCursor = query[endIdx] ?? "";
         const hasTrailingQuote = charAfterCursor === '"';
         contextKeywords.value = streamKeywords.value.map((kw: any) => ({
           ...kw,
-          insertText: (hasOpenQuote && !hasTrailingQuote) ? kw.label + '"' : kw.label,
+          insertText: hasOpenQuote && !hasTrailingQuote ? kw.label + '"' : kw.label,
         }));
         autoCompleteData.value.popup.open?.(autoCompleteData.value.query);
         return;
@@ -440,10 +414,7 @@ const useSqlSuggestions = () => {
 
     // Determine if the cursor is currently after an operator expecting a value.
     // If so, sqlWhereClause.meta.label is the field name (e.g. "status").
-    const sqlWhereClause = analyzeSqlWhereClause(
-      autoCompleteData.value.query,
-      cursorIndex,
-    );
+    const sqlWhereClause = analyzeSqlWhereClause(autoCompleteData.value.query, cursorIndex);
 
     if (sqlWhereClause.meta.label) {
       const fieldName = sqlWhereClause.meta.label;

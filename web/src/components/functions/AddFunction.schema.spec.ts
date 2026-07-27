@@ -63,8 +63,6 @@ describe("AddFunction.schema", () => {
   });
 
   it("accepts a fully valid record", () => {
-    expect(
-      addFunctionSchema.safeParse({ name: "my_function", transType: "0" }).success,
-    ).toBe(true);
+    expect(addFunctionSchema.safeParse({ name: "my_function", transType: "0" }).success).toBe(true);
   });
 });

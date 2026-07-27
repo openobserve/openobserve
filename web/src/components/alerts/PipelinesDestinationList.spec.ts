@@ -28,7 +28,7 @@ vi.mock("@/services/alert_templates", () => ({
 }));
 
 vi.mock("@/utils/zincutils", async (importOriginal) => {
-  const actual = await importOriginal() as any;
+  const actual = (await importOriginal()) as any;
   return {
     ...actual,
     getImageURL: vi.fn((p: string) => `mock-${p}`),
@@ -170,25 +170,19 @@ describe("PipelinesDestinationList", () => {
     it("renders the table when no editor is open", async () => {
       wrapper = mountComponent();
       await flushPromises();
-      expect(
-        wrapper.find('[data-test="alert-destinations-list-table"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="alert-destinations-list-table"]').exists()).toBe(true);
     });
 
     it("does not render the editor initially", async () => {
       wrapper = mountComponent();
       await flushPromises();
-      expect(
-        wrapper.find('[data-test="pipeline-destination-editor-stub"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="pipeline-destination-editor-stub"]').exists()).toBe(false);
     });
 
     it("renders the add button", async () => {
       wrapper = mountComponent();
       await flushPromises();
-      expect(
-        wrapper.find('[data-test="pipeline-destination-list-add-btn"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="pipeline-destination-list-add-btn"]').exists()).toBe(true);
     });
   });
 
@@ -308,6 +302,37 @@ describe("PipelinesDestinationList", () => {
       (wrapper!.vm as any).filterQuery = "zzz-no-match";
       expect((wrapper!.vm as any).visibleRows).toHaveLength(0);
     });
+
+    it("filters without crashing when a non-matching row has null type/url/method", async () => {
+      // Destinations without a type render "—" in the UI; those fields are
+      // null. A non-matching search term must still iterate past such a row,
+      // which used to throw in filterData and silently disable search
+      // (the whole list stayed visible regardless of the query).
+      (destinationService.list as any).mockResolvedValue({
+        data: [
+          makeDestination(1),
+          makeDestination(2, {
+            name: "no-type-dest",
+            destination_type_name: null,
+            url: null,
+            method: null,
+            output_format: null,
+          }),
+        ],
+      });
+      wrapper = mountComponent();
+      await flushPromises();
+
+      // Random string that matches nothing — must return [] without throwing.
+      (wrapper!.vm as any).filterQuery = "zzz-no-match";
+      expect((wrapper!.vm as any).visibleRows).toHaveLength(0);
+
+      // And a term matching only the fully-populated row still works.
+      (wrapper!.vm as any).filterQuery = "destination-1";
+      const rows = (wrapper!.vm as any).visibleRows;
+      expect(rows).toHaveLength(1);
+      expect(rows[0].name).toBe("destination-1");
+    });
   });
 
   // ── editor toggle ──────────────────────────────────────────────────────────
@@ -355,9 +380,7 @@ describe("PipelinesDestinationList", () => {
       await flushPromises();
       (wrapper.vm as any).showDestinationEditor = true;
       await nextTick();
-      expect(
-        wrapper.find('[data-test="pipeline-destination-editor-stub"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="pipeline-destination-editor-stub"]').exists()).toBe(true);
     });
 
     it("hides the table when editor is open", async () => {
@@ -365,9 +388,7 @@ describe("PipelinesDestinationList", () => {
       await flushPromises();
       (wrapper.vm as any).showDestinationEditor = true;
       await nextTick();
-      expect(
-        wrapper.find('[data-test="alert-destinations-list-table"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="alert-destinations-list-table"]').exists()).toBe(false);
     });
   });
 
@@ -384,9 +405,7 @@ describe("PipelinesDestinationList", () => {
     it("returns undefined for unknown name", async () => {
       wrapper = mountComponent();
       await flushPromises();
-      expect(
-        (wrapper.vm as any).getDestinationByName("no-such-dest"),
-      ).toBeUndefined();
+      expect((wrapper.vm as any).getDestinationByName("no-such-dest")).toBeUndefined();
     });
   });
 
@@ -458,10 +477,7 @@ describe("PipelinesDestinationList", () => {
     it("selectedDestinationIds is computed from selectedDestinations", async () => {
       wrapper = mountComponent();
       await flushPromises();
-      (wrapper.vm as any).selectedDestinations = [
-        makeDestination(1),
-        makeDestination(2),
-      ];
+      (wrapper.vm as any).selectedDestinations = [makeDestination(1), makeDestination(2)];
       const ids = (wrapper.vm as any).selectedDestinationIds;
       expect(ids).toContain("destination-1");
       expect(ids).toContain("destination-2");

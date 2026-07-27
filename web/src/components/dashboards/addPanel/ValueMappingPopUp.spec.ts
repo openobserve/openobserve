@@ -18,7 +18,6 @@ import { mount, VueWrapper } from "@vue/test-utils";
 import ValueMappingPopUp from "@/components/dashboards/addPanel/ValueMappingPopUp.vue";
 import i18n from "@/locales";
 
-
 // Stub ODialog so tests are deterministic (no Portal/Reka teleport)
 // and so we can drive the dialog's primary/neutral buttons via emit.
 const ODialogStub = {
@@ -124,9 +123,7 @@ describe("ValueMappingPopUp", () => {
   describe("Component Rendering", () => {
     it("should render the ODialog stub wrapper", () => {
       wrapper = createWrapper();
-      expect(
-        wrapper.find('[data-test="dashboard-value-mapping-popup"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-value-mapping-popup"]').exists()).toBe(true);
     });
 
     it("should forward title to ODialog", () => {
@@ -174,9 +171,7 @@ describe("ValueMappingPopUp", () => {
     it("should render the draggable container", () => {
       wrapper = createWrapper();
       expect(
-        wrapper
-          .find('[data-test="dashboard-addpanel-config-value-mapping-drag"]')
-          .exists(),
+        wrapper.find('[data-test="dashboard-addpanel-config-value-mapping-drag"]').exists(),
       ).toBe(true);
     });
   });
@@ -251,9 +246,7 @@ describe("ValueMappingPopUp", () => {
     });
 
     it("should initialise editedValueMapping from the valueMapping prop", () => {
-      const mappings = [
-        { type: "regex", pattern: "test.*", text: "Test", color: null },
-      ];
+      const mappings = [{ type: "regex", pattern: "test.*", text: "Test", color: null }];
       wrapper = createWrapper({ valueMapping: mappings });
       expect(wrapper.vm.editedValueMapping).toEqual(mappings);
     });
@@ -287,9 +280,7 @@ describe("ValueMappingPopUp", () => {
       wrapper = createWrapper();
       expect(
         wrapper
-          .find(
-            '[data-test="dashboard-addpanel-config-value-mapping-type-select-0"]',
-          )
+          .find('[data-test="dashboard-addpanel-config-value-mapping-type-select-0"]')
           .exists(),
       ).toBe(true);
     });
@@ -297,50 +288,32 @@ describe("ValueMappingPopUp", () => {
 
   describe("Value Type Mapping", () => {
     it("should render the value input for a value-type mapping", () => {
-      const mappings = [
-        { type: "value", value: "test", text: "Test", color: null },
-      ];
+      const mappings = [{ type: "value", value: "test", text: "Test", color: null }];
       wrapper = createWrapper({ valueMapping: mappings });
       expect(
         wrapper
-          .find(
-            '[data-test="dashboard-addpanel-config-value-mapping-value-input-0"]',
-          )
+          .find('[data-test="dashboard-addpanel-config-value-mapping-value-input-0"]')
           .exists(),
       ).toBe(true);
     });
 
     it("should not render range inputs for a value-type mapping", () => {
-      const mappings = [
-        { type: "value", value: "test", text: "Test", color: null },
-      ];
+      const mappings = [{ type: "value", value: "test", text: "Test", color: null }];
       wrapper = createWrapper({ valueMapping: mappings });
       expect(
-        wrapper
-          .find(
-            '[data-test="dashboard-addpanel-config-value-mapping-from-input-0"]',
-          )
-          .exists(),
+        wrapper.find('[data-test="dashboard-addpanel-config-value-mapping-from-input-0"]').exists(),
       ).toBe(false);
       expect(
-        wrapper
-          .find(
-            '[data-test="dashboard-addpanel-config-value-mapping-to-input-0"]',
-          )
-          .exists(),
+        wrapper.find('[data-test="dashboard-addpanel-config-value-mapping-to-input-0"]').exists(),
       ).toBe(false);
     });
 
     it("should not render the pattern input for a value-type mapping", () => {
-      const mappings = [
-        { type: "value", value: "test", text: "Test", color: null },
-      ];
+      const mappings = [{ type: "value", value: "test", text: "Test", color: null }];
       wrapper = createWrapper({ valueMapping: mappings });
       expect(
         wrapper
-          .find(
-            '[data-test="dashboard-addpanel-config-value-mapping-pattern-input-0"]',
-          )
+          .find('[data-test="dashboard-addpanel-config-value-mapping-pattern-input-0"]')
           .exists(),
       ).toBe(false);
     });
@@ -348,50 +321,32 @@ describe("ValueMappingPopUp", () => {
 
   describe("Range Type Mapping", () => {
     it("should render from and to inputs for a range-type mapping", () => {
-      const mappings = [
-        { type: "range", from: "0", to: "100", text: "Range", color: null },
-      ];
+      const mappings = [{ type: "range", from: "0", to: "100", text: "Range", color: null }];
       wrapper = createWrapper({ valueMapping: mappings });
       expect(
-        wrapper
-          .find(
-            '[data-test="dashboard-addpanel-config-value-mapping-from-input-0"]',
-          )
-          .exists(),
+        wrapper.find('[data-test="dashboard-addpanel-config-value-mapping-from-input-0"]').exists(),
       ).toBe(true);
       expect(
-        wrapper
-          .find(
-            '[data-test="dashboard-addpanel-config-value-mapping-to-input-0"]',
-          )
-          .exists(),
+        wrapper.find('[data-test="dashboard-addpanel-config-value-mapping-to-input-0"]').exists(),
       ).toBe(true);
     });
 
     it("should not render the value input for a range-type mapping", () => {
-      const mappings = [
-        { type: "range", from: "0", to: "100", text: "Range", color: null },
-      ];
+      const mappings = [{ type: "range", from: "0", to: "100", text: "Range", color: null }];
       wrapper = createWrapper({ valueMapping: mappings });
       expect(
         wrapper
-          .find(
-            '[data-test="dashboard-addpanel-config-value-mapping-value-input-0"]',
-          )
+          .find('[data-test="dashboard-addpanel-config-value-mapping-value-input-0"]')
           .exists(),
       ).toBe(false);
     });
 
     it("should not render the pattern input for a range-type mapping", () => {
-      const mappings = [
-        { type: "range", from: "0", to: "100", text: "Range", color: null },
-      ];
+      const mappings = [{ type: "range", from: "0", to: "100", text: "Range", color: null }];
       wrapper = createWrapper({ valueMapping: mappings });
       expect(
         wrapper
-          .find(
-            '[data-test="dashboard-addpanel-config-value-mapping-pattern-input-0"]',
-          )
+          .find('[data-test="dashboard-addpanel-config-value-mapping-pattern-input-0"]')
           .exists(),
       ).toBe(false);
     });
@@ -399,51 +354,33 @@ describe("ValueMappingPopUp", () => {
 
   describe("Regex Type Mapping", () => {
     it("should render the pattern input for a regex-type mapping", () => {
-      const mappings = [
-        { type: "regex", pattern: "test.*", text: "Test", color: null },
-      ];
+      const mappings = [{ type: "regex", pattern: "test.*", text: "Test", color: null }];
       wrapper = createWrapper({ valueMapping: mappings });
       expect(
         wrapper
-          .find(
-            '[data-test="dashboard-addpanel-config-value-mapping-pattern-input-0"]',
-          )
+          .find('[data-test="dashboard-addpanel-config-value-mapping-pattern-input-0"]')
           .exists(),
       ).toBe(true);
     });
 
     it("should not render the value input for a regex-type mapping", () => {
-      const mappings = [
-        { type: "regex", pattern: "test.*", text: "Test", color: null },
-      ];
+      const mappings = [{ type: "regex", pattern: "test.*", text: "Test", color: null }];
       wrapper = createWrapper({ valueMapping: mappings });
       expect(
         wrapper
-          .find(
-            '[data-test="dashboard-addpanel-config-value-mapping-value-input-0"]',
-          )
+          .find('[data-test="dashboard-addpanel-config-value-mapping-value-input-0"]')
           .exists(),
       ).toBe(false);
     });
 
     it("should not render range inputs for a regex-type mapping", () => {
-      const mappings = [
-        { type: "regex", pattern: "test.*", text: "Test", color: null },
-      ];
+      const mappings = [{ type: "regex", pattern: "test.*", text: "Test", color: null }];
       wrapper = createWrapper({ valueMapping: mappings });
       expect(
-        wrapper
-          .find(
-            '[data-test="dashboard-addpanel-config-value-mapping-from-input-0"]',
-          )
-          .exists(),
+        wrapper.find('[data-test="dashboard-addpanel-config-value-mapping-from-input-0"]').exists(),
       ).toBe(false);
       expect(
-        wrapper
-          .find(
-            '[data-test="dashboard-addpanel-config-value-mapping-to-input-0"]',
-          )
-          .exists(),
+        wrapper.find('[data-test="dashboard-addpanel-config-value-mapping-to-input-0"]').exists(),
       ).toBe(false);
     });
   });
@@ -452,45 +389,33 @@ describe("ValueMappingPopUp", () => {
     it("should render the display-value text input for every mapping", () => {
       wrapper = createWrapper();
       expect(
-        wrapper
-          .find(
-            '[data-test="dashboard-addpanel-config-value-mapping-text-input-0"]',
-          )
-          .exists(),
+        wrapper.find('[data-test="dashboard-addpanel-config-value-mapping-text-input-0"]').exists(),
       ).toBe(true);
     });
   });
 
   describe("Color Management", () => {
     it("should keep the mapping color when one is provided", () => {
-      const mappings = [
-        { type: "value", value: "test", text: "Test", color: "#ff0000" },
-      ];
+      const mappings = [{ type: "value", value: "test", text: "Test", color: "#ff0000" }];
       wrapper = createWrapper({ valueMapping: mappings });
       expect(wrapper.vm.editedValueMapping[0].color).toBe("#ff0000");
     });
 
     it("should show the Set color button when mapping color is null", () => {
-      const mappings = [
-        { type: "value", value: "test", text: "Test", color: null },
-      ];
+      const mappings = [{ type: "value", value: "test", text: "Test", color: null }];
       wrapper = createWrapper({ valueMapping: mappings });
       expect(wrapper.text()).toContain("Set color");
     });
 
     it("should set color to #000000 when setColorByIndex is called", () => {
-      const mappings = [
-        { type: "value", value: "test", text: "Test", color: null },
-      ];
+      const mappings = [{ type: "value", value: "test", text: "Test", color: null }];
       wrapper = createWrapper({ valueMapping: mappings });
       wrapper.vm.setColorByIndex(0);
       expect(wrapper.vm.editedValueMapping[0].color).toBe("#000000");
     });
 
     it("should clear color when removeColorByIndex is called", () => {
-      const mappings = [
-        { type: "value", value: "test", text: "Test", color: "#ff0000" },
-      ];
+      const mappings = [{ type: "value", value: "test", text: "Test", color: "#ff0000" }];
       wrapper = createWrapper({ valueMapping: mappings });
       wrapper.vm.removeColorByIndex(0);
       expect(wrapper.vm.editedValueMapping[0].color).toBe(null);
@@ -502,9 +427,7 @@ describe("ValueMappingPopUp", () => {
       wrapper = createWrapper();
       expect(
         wrapper
-          .find(
-            '[data-test="dashboard-addpanel-config-value-mapping-drag-handle-0"]',
-          )
+          .find('[data-test="dashboard-addpanel-config-value-mapping-drag-handle-0"]')
           .exists(),
       ).toBe(true);
     });
@@ -530,9 +453,7 @@ describe("ValueMappingPopUp", () => {
       const initialLength = wrapper.vm.editedValueMapping.length;
       wrapper.vm.addValueMapping();
       expect(wrapper.vm.editedValueMapping.length).toBe(initialLength + 1);
-      expect(
-        wrapper.vm.editedValueMapping[wrapper.vm.editedValueMapping.length - 1],
-      ).toEqual({
+      expect(wrapper.vm.editedValueMapping[wrapper.vm.editedValueMapping.length - 1]).toEqual({
         type: "value",
         value: "",
         pattern: "",
@@ -557,11 +478,7 @@ describe("ValueMappingPopUp", () => {
     it("should render a delete button per mapping row", () => {
       wrapper = createWrapper();
       expect(
-        wrapper
-          .find(
-            '[data-test="dashboard-addpanel-config-value-mapping-delete-btn-0"]',
-          )
-          .exists(),
+        wrapper.find('[data-test="dashboard-addpanel-config-value-mapping-delete-btn-0"]').exists(),
       ).toBe(true);
     });
 
@@ -655,9 +572,7 @@ describe("ValueMappingPopUp", () => {
     });
 
     it("should not add a default mapping when valueMapping is provided", () => {
-      const mappings = [
-        { type: "value", value: "test", text: "Test", color: null },
-      ];
+      const mappings = [{ type: "value", value: "test", text: "Test", color: null }];
       wrapper = createWrapper({ valueMapping: mappings });
       expect(wrapper.vm.editedValueMapping.length).toBe(1);
       expect(wrapper.vm.editedValueMapping[0]).toEqual(mappings[0]);
@@ -675,23 +590,17 @@ describe("ValueMappingPopUp", () => {
 
       expect(
         wrapper
-          .find(
-            '[data-test="dashboard-addpanel-config-value-mapping-type-select-0"]',
-          )
+          .find('[data-test="dashboard-addpanel-config-value-mapping-type-select-0"]')
           .exists(),
       ).toBe(true);
       expect(
         wrapper
-          .find(
-            '[data-test="dashboard-addpanel-config-value-mapping-type-select-1"]',
-          )
+          .find('[data-test="dashboard-addpanel-config-value-mapping-type-select-1"]')
           .exists(),
       ).toBe(true);
       expect(
         wrapper
-          .find(
-            '[data-test="dashboard-addpanel-config-value-mapping-type-select-2"]',
-          )
+          .find('[data-test="dashboard-addpanel-config-value-mapping-type-select-2"]')
           .exists(),
       ).toBe(true);
     });
@@ -706,23 +615,15 @@ describe("ValueMappingPopUp", () => {
 
       expect(
         wrapper
-          .find(
-            '[data-test="dashboard-addpanel-config-value-mapping-value-input-0"]',
-          )
+          .find('[data-test="dashboard-addpanel-config-value-mapping-value-input-0"]')
           .exists(),
       ).toBe(true);
       expect(
-        wrapper
-          .find(
-            '[data-test="dashboard-addpanel-config-value-mapping-from-input-1"]',
-          )
-          .exists(),
+        wrapper.find('[data-test="dashboard-addpanel-config-value-mapping-from-input-1"]').exists(),
       ).toBe(true);
       expect(
         wrapper
-          .find(
-            '[data-test="dashboard-addpanel-config-value-mapping-pattern-input-2"]',
-          )
+          .find('[data-test="dashboard-addpanel-config-value-mapping-pattern-input-2"]')
           .exists(),
       ).toBe(true);
     });
@@ -742,18 +643,14 @@ describe("ValueMappingPopUp", () => {
     });
 
     it("should accept empty string value and text", () => {
-      const mappings = [
-        { type: "value", value: "", text: "", color: null },
-      ];
+      const mappings = [{ type: "value", value: "", text: "", color: null }];
       wrapper = createWrapper({ valueMapping: mappings });
       expect(wrapper.vm.editedValueMapping[0].value).toBe("");
       expect(wrapper.vm.editedValueMapping[0].text).toBe("");
     });
 
     it("should treat null color as no-color", () => {
-      const mappings = [
-        { type: "value", value: "1", text: "One", color: null },
-      ];
+      const mappings = [{ type: "value", value: "1", text: "One", color: null }];
       wrapper = createWrapper({ valueMapping: mappings });
       expect(wrapper.vm.editedValueMapping[0].color).toBe(null);
     });
@@ -762,19 +659,13 @@ describe("ValueMappingPopUp", () => {
   describe("Accessibility", () => {
     it("should attach data-test attributes for each key element", () => {
       wrapper = createWrapper();
+      expect(wrapper.find('[data-test="dashboard-value-mapping-popup"]').exists()).toBe(true);
       expect(
-        wrapper.find('[data-test="dashboard-value-mapping-popup"]').exists(),
+        wrapper.find('[data-test="dashboard-addpanel-config-value-mapping-drag"]').exists(),
       ).toBe(true);
       expect(
         wrapper
-          .find('[data-test="dashboard-addpanel-config-value-mapping-drag"]')
-          .exists(),
-      ).toBe(true);
-      expect(
-        wrapper
-          .find(
-            '[data-test="dashboard-addpanel-config-value-mapping-type-select-0"]',
-          )
+          .find('[data-test="dashboard-addpanel-config-value-mapping-type-select-0"]')
           .exists(),
       ).toBe(true);
     });

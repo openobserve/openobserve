@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       v-if="showBackdrop"
       aria-hidden="true"
-      class="absolute inset-0 pointer-events-none"
+      class="pointer-events-none absolute inset-0"
       :style="dotGridStyle"
     />
 
@@ -65,15 +65,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- inline size shows a compact icon instead of a full illustration -->
       <span
         v-else-if="inlineIcon"
-        :class="['o2-empty-state__inline-icon inline-flex items-center justify-center rounded-full', sizeClass.iconWrap]"
+        :class="[
+          'o2-empty-state__inline-icon inline-flex items-center justify-center rounded-full',
+          sizeClass.iconWrap,
+        ]"
       >
         <OIcon :name="inlineIcon" :size="size === 'inline' ? 'lg' : 'xl'" />
       </span>
 
-      <div :class="['flex flex-col max-w-xl', sizeClass.copy]">
+      <div :class="['flex max-w-xl flex-col', sizeClass.copy]">
         <component
           :is="size === 'inline' ? 'p' : 'h2'"
-          :class="['font-medium text-text-heading tracking-[-0.01em]', sizeClass.title]"
+          :class="['text-text-heading font-medium tracking-[-0.01em]', sizeClass.title]"
         >
           <slot name="title">{{ resolvedTitle }}</slot>
         </component>
@@ -232,14 +235,12 @@ const FILTERED_ACTION: EmptyStateAction = {
 // --- copy resolution: filtered > explicit prop > preset i18n key ------------
 const resolvedTitle = computed(() => {
   if (props.title) return props.title;
-  if (isFiltered.value)
-    return t("emptyState.filtered.title", { noun: noun.value });
+  if (isFiltered.value) return t("emptyState.filtered.title", { noun: noun.value });
   return preset.value ? t(preset.value.titleKey) : "";
 });
 const resolvedDescription = computed(() => {
   if (props.description) return props.description;
-  if (isFiltered.value)
-    return t("emptyState.filtered.description", { noun: noun.value });
+  if (isFiltered.value) return t("emptyState.filtered.description", { noun: noun.value });
   const key = preset.value?.descriptionKey;
   return key ? t(key) : "";
 });
@@ -250,43 +251,29 @@ const resolvedActions = computed<EmptyStateAction[]>(() => {
   if (isFiltered.value) return [FILTERED_ACTION];
   return props.actions ?? preset.value?.actions ?? [];
 });
-const showCards = computed(
-  () => size.value !== "inline" && resolvedActions.value.length > 0,
-);
+const showCards = computed(() => size.value !== "inline" && resolvedActions.value.length > 0);
 
 // Simple button fallback (only when a call site passes actionLabel directly and
 // there are no cards).
-const resolvedActionLabel = computed(() =>
-  props.hideAction ? "" : (props.actionLabel ?? ""),
-);
-const resolvedActionIcon = computed<IconName | undefined>(
-  () => props.actionIcon,
-);
+const resolvedActionLabel = computed(() => (props.hideAction ? "" : (props.actionLabel ?? "")));
+const resolvedActionIcon = computed<IconName | undefined>(() => props.actionIcon);
 
 // --- variant / illustration -------------------------------------------------
 const variant = computed<EmptyStateVariant>(() =>
-  isFiltered.value
-    ? "no-results"
-    : (props.variant ?? preset.value?.variant ?? "neutral"),
+  isFiltered.value ? "no-results" : (props.variant ?? preset.value?.variant ?? "neutral"),
 );
-const actionVariant = computed(() =>
-  variant.value === "error" ? "outline" : "primary",
-);
+const actionVariant = computed(() => (variant.value === "error" ? "outline" : "primary"));
 
 // Filtered always uses the magnifier so it reads as "search found nothing".
 const illustrationName = computed<IllustrationName | undefined>(() =>
-  isFiltered.value
-    ? "no-results"
-    : (props.illustration ?? preset.value?.illustration),
+  isFiltered.value ? "no-results" : (props.illustration ?? preset.value?.illustration),
 );
 const illustrationComponent = computed(() =>
   illustrationName.value ? illustrations[illustrationName.value] : undefined,
 );
 // inline never shows the full illustration — it uses a compact icon instead.
 const hasIllustration = computed(
-  () =>
-    size.value !== "inline" &&
-    (!!slots.illustration || !!illustrationComponent.value),
+  () => size.value !== "inline" && (!!slots.illustration || !!illustrationComponent.value),
 );
 const inlineIcon = computed<IconName | undefined>(() => {
   if (size.value !== "inline") return undefined;
@@ -311,9 +298,7 @@ onMounted(() => {
 onBeforeUnmount(() => mq?.removeEventListener?.("change", syncMotion));
 
 // --- backdrop ---------------------------------------------------------------
-const showBackdrop = computed(() =>
-  props.backdrop ?? size.value !== "inline",
-);
+const showBackdrop = computed(() => props.backdrop ?? size.value !== "inline");
 const dotGridStyle =
   "background-image: radial-gradient(var(--empty-dot) 1.25px, transparent 1.25px);" +
   "background-size: 30px 30px;" +
@@ -368,8 +353,7 @@ const SIZE_MAP: Record<
     title: "text-sm!",
     description: "text-xs",
     illustrationWidth: 0,
-    iconWrap:
-      "w-12 h-12 bg-surface-subtle text-text-secondary mb-0.5",
+    iconWrap: "w-12 h-12 bg-surface-subtle text-text-secondary mb-0.5",
   },
 };
 const sizeClass = computed(() => SIZE_MAP[size.value]);

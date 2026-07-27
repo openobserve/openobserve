@@ -30,9 +30,7 @@
     </OButton>
     <ValueMappingPopUp
       :open="showValueMappingPopUp"
-      :value-mapping="
-        JSON.parse(JSON.stringify(dashboardPanelData.data.config.mappings))
-      "
+      :value-mapping="JSON.parse(JSON.stringify(dashboardPanelData.data.config.mappings))"
       @close="showValueMappingPopUp = false"
       @save="saveValueMappingConfig"
     />
@@ -53,13 +51,8 @@ export default defineComponent({
   props: [],
   setup() {
     const { t } = useI18n();
-    const dashboardPanelDataPageKey = inject(
-      "dashboardPanelDataPageKey",
-      "dashboard",
-    );
-    const { dashboardPanelData } = useDashboardPanelData(
-      dashboardPanelDataPageKey,
-    );
+    const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
+    const { dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey);
 
     const showValueMappingPopUp = ref(false);
 
@@ -89,4 +82,3 @@ export default defineComponent({
   },
 });
 </script>
-

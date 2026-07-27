@@ -22,13 +22,32 @@ import MySQL from "./MySQL.vue";
 import mysqlCard from "@/components/ingestion/setupCard/content/mysql";
 import { getDataSourceCard } from "@/components/ingestion/setupCard/registry";
 
-const mockEndpoint = ref({ url: "https://test.openobserve.ai", host: "h", port: 443, protocol: "https", tls: true });
-vi.mock("@/composables/useIngestion", () => ({ default: vi.fn(() => ({ endpoint: mockEndpoint })) }));
+const mockEndpoint = ref({
+  url: "https://test.openobserve.ai",
+  host: "h",
+  port: 443,
+  protocol: "https",
+  tls: true,
+});
+vi.mock("@/composables/useIngestion", () => ({
+  default: vi.fn(() => ({ endpoint: mockEndpoint })),
+}));
 vi.mock("@/components/ingestion/setupCard/SetupCardRenderer.vue", () => ({
-  default: { name: "SetupCardRenderer", props: ["content", "subs", "logoUrl", "logoUrlDark"], template: '<div data-test="rich-card-stub" />' },
+  default: {
+    name: "SetupCardRenderer",
+    props: ["content", "subs", "logoUrl", "logoUrlDark"],
+    template: '<div data-test="rich-card-stub" />',
+  },
 }));
 
-const mockStore = createStore({ state: { selectedOrganization: { identifier: "test-org" }, userInfo: { email: "test@example.com" }, organizationData: { organizationPasscode: "pc" }, theme: "light" } });
+const mockStore = createStore({
+  state: {
+    selectedOrganization: { identifier: "test-org" },
+    userInfo: { email: "test@example.com" },
+    organizationData: { organizationPasscode: "pc" },
+    theme: "light",
+  },
+});
 const mockI18n = createI18n({ locale: "en", messages: { en: {} } });
 const SUBS = { url: "https://test.openobserve.ai", org: "test-org", token: "dGVzdEB0b2tlbg==" };
 
@@ -37,8 +56,18 @@ describe("mysqlCard builder", () => {
     const card = mysqlCard(SUBS);
     expect(card.provider.name).toBe("MySQL");
     expect(card.provider.metaBadges).toEqual(["Metrics"]);
-    expect(card.detect).toMatchObject({ streamType: "metrics", match: "keyword", streamName: "mysql" });
-    expect(card.steps.map((s) => s.id)).toEqual(["prepare", "install", "configure", "run", "verify"]);
+    expect(card.detect).toMatchObject({
+      streamType: "metrics",
+      match: "keyword",
+      streamName: "mysql",
+    });
+    expect(card.steps.map((s) => s.id)).toEqual([
+      "prepare",
+      "install",
+      "configure",
+      "run",
+      "verify",
+    ]);
   });
 
   it("offers mysql / docker / GUI tabs to create the user", () => {
@@ -63,7 +92,9 @@ describe("mysqlCard builder", () => {
 
 describe("MySQL.vue", () => {
   let wrapper: VueWrapper<any>;
-  afterEach(() => { if (wrapper) wrapper.unmount(); });
+  afterEach(() => {
+    if (wrapper) wrapper.unmount();
+  });
   it("renders the shared card for the mySQL slug", () => {
     expect(getDataSourceCard("mySQL", SUBS)?.provider.name).toBe("MySQL");
     wrapper = mount(MySQL, { global: { plugins: [mockStore, mockI18n] } });

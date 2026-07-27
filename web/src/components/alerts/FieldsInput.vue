@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          error refs — the consuming form's schema owns validation (Rule ②). -->
     <template v-if="formMode">
       <div data-test="alert-conditions-text" class="font-bold">
-        {{ t('alerts.filters.conditions') + ' *' }} {{ t('alerts.filters.conditionsHint') }}
+        {{ t("alerts.filters.conditions") + " *" }} {{ t("alerts.filters.conditionsHint") }}
       </div>
       <template v-if="!formRows.length">
         <OButton
@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="addFormRow"
           icon-left="add"
         >
-          {{ t('alerts.addCondition') }}
+          {{ t("alerts.addCondition") }}
         </OButton>
       </template>
       <template v-else>
@@ -45,10 +45,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-for="(row, index) in formRows"
           :key="index"
-          class="flex justify-start items-end gap-2 pb-2"
+          class="flex items-end justify-start gap-2 pb-2"
           :data-test="`alert-conditions-${index + 1}`"
         >
-          <div class="ml-0 o2-input">
+          <div class="o2-input ml-0">
             <OFormSelect
               :name="`${namePrefix}[${index}].column`"
               :options="props.streamFields"
@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @create="(val: string) => setRowColumn(index, val)"
             />
           </div>
-          <div class="ml-0 o2-input">
+          <div class="o2-input ml-0">
             <OFormSelect
               :name="`${namePrefix}[${index}].operator`"
               :options="triggerOperators"
@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="alert-conditions-operator-select"
             />
           </div>
-          <div class="ml-0 flex items-end o2-input">
+          <div class="o2-input ml-0 flex items-end">
             <OFormInput
               :name="`${namePrefix}[${index}].value`"
               :placeholder="t('common.value')"
@@ -78,9 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="alert-conditions-value-input"
             />
           </div>
-          <div
-            class="ml-0 alerts-condition-action mb-3"
-          >
+          <div class="alerts-condition-action mb-3 ml-0">
             <OButton
               data-test="alert-conditions-delete-condition-btn"
               class="ml-1"
@@ -110,91 +108,115 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          Consumed bare by functions/logstream/pipeline forms; a legitimate
          permanent pattern (see START-HERE 🔀). Do NOT delete. -->
     <template v-else>
-    <div data-test="alert-conditions-text" class="font-bold">
-      {{ t('alerts.filters.conditions') + ' *' }} {{ t('alerts.filters.conditionsHint') }}
-    </div>
-    <template v-if="!fields.length">
-      <OButton
-        data-test="alert-conditions-add-btn"
-        variant="outline"
-        size="sm"
-        class="mt-2"
-        @click="addApiHeader"
-        icon-left="add"
-      >
-        {{ t('alerts.addCondition') }}
-      </OButton>
-    </template>
-    <template v-else>
-      <div
-        v-for="(field, index) in fields"
-        :key="field.uuid"
-        class="flex justify-start items-end gap-2 pb-2"
-        :data-test="`alert-conditions-${index + 1}`"
-      >
-        <div class="ml-0 o2-input">
-          <OSelect
-            v-model="field.column"
-            :options="props.streamFields"
-            class="py-2 min-w-55"
-            :placeholder="t('alerts.column')"
-            :creatable="props.enableNewValueMode"
-            :error="!!fieldErrors[`${field.uuid}-column`]"
-            :error-message="fieldErrors[`${field.uuid}-column`] || ''"
-            data-test="alert-conditions-select-column"
-            @create="(val: string) => { field.column = val; emits('input:update', 'conditions', field); }"
-            @update:model-value="(v: any) => { fieldErrors[`${field.uuid}-column`] = v ? '' : t('alerts.validation.fieldRequired'); emits('input:update', 'conditions', field); }"
-          />
-        </div>
-        <div class="ml-0 o2-input">
-          <OSelect
-            v-model="field.operator"
-            :options="triggerOperators"
-            class="py-2 min-w-30"
-            :error="!!fieldErrors[`${field.uuid}-operator`]"
-            :error-message="fieldErrors[`${field.uuid}-operator`] || ''"
-            data-test="alert-conditions-operator-select"
-            @update:model-value="(v: any) => { fieldErrors[`${field.uuid}-operator`] = v ? '' : t('alerts.validation.fieldRequired'); emits('input:update', 'conditions', field); }"
-          />
-        </div>
-        <div class="ml-0 flex items-end o2-input">
-          <OInput
-            v-model="field.value"
-            :placeholder="t('common.value')"
-            class="py-2 min-w-37.5"
-            :error="!!fieldErrors[`${field.uuid}-value`]"
-            :error-message="fieldErrors[`${field.uuid}-value`] || ''"
-            data-test="alert-conditions-value-input"
-            @update:model-value="(v: any) => { fieldErrors[`${field.uuid}-value`] = v ? '' : t('alerts.validation.fieldRequired'); emits('input:update', 'conditions', field); }"
-          />
-        </div>
-        <div
-          class="ml-0 alerts-condition-action mb-3"
-        >
-          <OButton
-            data-test="alert-conditions-delete-condition-btn"
-            class="ml-1"
-            variant="ghost"
-            size="icon-circle-sm"
-            :title="t('alert_templates.edit')"
-            @click="deleteApiHeader(field)"
-          >
-            <OIcon name="delete" size="sm" />
-          </OButton>
-          <OButton
-            data-test="alert-conditions-add-condition-btn"
-            v-if="index === fields.length - 1"
-            class="ml-1"
-            variant="ghost"
-            size="icon-circle-sm"
-            :title="t('alert_templates.edit')"
-            @click="addApiHeader()"
-          >
-            <OIcon name="add" size="sm" />
-          </OButton>
-        </div>
+      <div data-test="alert-conditions-text" class="font-bold">
+        {{ t("alerts.filters.conditions") + " *" }} {{ t("alerts.filters.conditionsHint") }}
       </div>
-    </template>
+      <template v-if="!fields.length">
+        <OButton
+          data-test="alert-conditions-add-btn"
+          variant="outline"
+          size="sm"
+          class="mt-2"
+          @click="addApiHeader"
+          icon-left="add"
+        >
+          {{ t("alerts.addCondition") }}
+        </OButton>
+      </template>
+      <template v-else>
+        <div
+          v-for="(field, index) in fields"
+          :key="field.uuid"
+          class="flex items-end justify-start gap-2 pb-2"
+          :data-test="`alert-conditions-${index + 1}`"
+        >
+          <div class="o2-input ml-0">
+            <OSelect
+              v-model="field.column"
+              :options="props.streamFields"
+              class="min-w-55 py-2"
+              :placeholder="t('alerts.column')"
+              :creatable="props.enableNewValueMode"
+              :error="!!fieldErrors[`${field.uuid}-column`]"
+              :error-message="fieldErrors[`${field.uuid}-column`] || ''"
+              data-test="alert-conditions-select-column"
+              @create="
+                (val: string) => {
+                  field.column = val;
+                  emits('input:update', 'conditions', field);
+                }
+              "
+              @update:model-value="
+                (v: any) => {
+                  fieldErrors[`${field.uuid}-column`] = v
+                    ? ''
+                    : t('alerts.validation.fieldRequired');
+                  emits('input:update', 'conditions', field);
+                }
+              "
+            />
+          </div>
+          <div class="o2-input ml-0">
+            <OSelect
+              v-model="field.operator"
+              :options="triggerOperators"
+              class="min-w-30 py-2"
+              :error="!!fieldErrors[`${field.uuid}-operator`]"
+              :error-message="fieldErrors[`${field.uuid}-operator`] || ''"
+              data-test="alert-conditions-operator-select"
+              @update:model-value="
+                (v: any) => {
+                  fieldErrors[`${field.uuid}-operator`] = v
+                    ? ''
+                    : t('alerts.validation.fieldRequired');
+                  emits('input:update', 'conditions', field);
+                }
+              "
+            />
+          </div>
+          <div class="o2-input ml-0 flex items-end">
+            <OInput
+              v-model="field.value"
+              :placeholder="t('common.value')"
+              class="min-w-37.5 py-2"
+              :error="!!fieldErrors[`${field.uuid}-value`]"
+              :error-message="fieldErrors[`${field.uuid}-value`] || ''"
+              data-test="alert-conditions-value-input"
+              @update:model-value="
+                (v: any) => {
+                  fieldErrors[`${field.uuid}-value`] = v
+                    ? ''
+                    : t('alerts.validation.fieldRequired');
+                  emits('input:update', 'conditions', field);
+                }
+              "
+            />
+          </div>
+          <div class="alerts-condition-action mb-3 ml-0">
+            <OButton
+              data-test="alert-conditions-delete-condition-btn"
+              class="ml-1"
+              variant="ghost"
+              size="icon-circle-sm"
+              :title="t('alert_templates.edit')"
+              @click="deleteApiHeader(field)"
+            >
+              <OIcon name="delete" size="sm" />
+            </OButton>
+            <OButton
+              data-test="alert-conditions-add-condition-btn"
+              v-if="index === fields.length - 1"
+              class="ml-1"
+              variant="ghost"
+              size="icon-circle-sm"
+              :title="t('alert_templates.edit')"
+              @click="addApiHeader()"
+            >
+              <OIcon name="add" size="sm" />
+            </OButton>
+          </div>
+        </div>
+      </template>
     </template>
   </div>
 </template>
@@ -204,7 +226,7 @@ import { ref, computed, reactive, inject } from "vue";
 import type { PropType, Ref } from "vue";
 import { useI18n } from "vue-i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OButton from '@/lib/core/Button/OButton.vue';
+import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
@@ -225,10 +247,10 @@ const props = defineProps({
     required: true,
   },
   enableNewValueMode: {
-      type: Boolean,
-      default: false,
-      required: false,
-    },
+    type: Boolean,
+    default: false,
+    required: false,
+  },
   /**
    * OForm "form mode" opt-in: the path of the rows array inside the parent
    * <OForm>'s values (e.g. "conditions" / "query_condition.conditions").
@@ -254,16 +276,7 @@ interface ConditionField extends ConditionRow {
 
 const fieldErrors = reactive<Record<string, string>>({});
 
-var triggerOperators: any = ref([
-  "=",
-  "!=",
-  ">=",
-  "<=",
-  ">",
-  "<",
-  "Contains",
-  "NotContains",
-]);
+var triggerOperators: any = ref(["=", "!=", ">=", "<=", ">", "<", "Contains", "NotContains"]);
 const emits = defineEmits(["add", "remove", "input:update"]);
 
 const store = useStore();
@@ -295,11 +308,9 @@ const formRows: Ref<ConditionRow[]> = injectedForm
 
 const makeConditionRow = (): ConditionRow => ({ column: "", operator: "=", value: "" });
 
-const addFormRow = () =>
-  injectedForm?.pushFieldValue(props.namePrefix, makeConditionRow());
+const addFormRow = () => injectedForm?.pushFieldValue(props.namePrefix, makeConditionRow());
 
-const removeFormRow = (index: number) =>
-  injectedForm?.removeFieldValue(props.namePrefix, index);
+const removeFormRow = (index: number) => injectedForm?.removeFieldValue(props.namePrefix, index);
 
 // A `creatable` OSelect emits only `create` (no update:model-value), so write
 // the created value straight into the form field (bare mode's @create parity).
@@ -316,7 +327,4 @@ const deleteApiHeader = (field: any) => {
 const addApiHeader = () => {
   emits("add");
 };
-
-
-
 </script>

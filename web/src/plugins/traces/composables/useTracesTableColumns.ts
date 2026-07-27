@@ -42,11 +42,7 @@ import { useI18n } from "vue-i18n";
 import { SPAN_KIND_MAP } from "@/utils/traces/constants";
 
 /** IDs of LLM columns injected at runtime — never stored in selectedFields. */
-export const LLM_COLUMN_IDS = new Set([
-  "input_tokens",
-  "output_tokens",
-  "cost",
-]);
+export const LLM_COLUMN_IDS = new Set(["input_tokens", "output_tokens", "cost"]);
 
 /**
  * Known column metadata. Any field name NOT in this map gets a generic
@@ -95,8 +91,7 @@ const KNOWN_COLUMN_META: Record<
     header: "Span Kind",
     size: 120,
     meta: { align: "left", slot: false, closable: true },
-    accessorFn: (row: any) =>
-      SPAN_KIND_MAP[row.span_kind] ?? row.span_kind ?? "",
+    accessorFn: (row: any) => SPAN_KIND_MAP[row.span_kind] ?? row.span_kind ?? "",
   },
   span_status: {
     header: "Span Status",
@@ -147,9 +142,7 @@ function toColumnDef(
     };
   }
   // Generic: prettify field name as header, default size
-  const header = fieldName
-    .replace(/_/g, " ")
-    .replace(/\b\w/g, (c) => c.toUpperCase());
+  const header = fieldName.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
   return {
     id: fieldName,
     header,
@@ -177,8 +170,7 @@ export function useTracesTableColumns() {
       toColumnDef(field, searchMode),
     );
 
-    const timestampCol =
-      store?.state?.zoConfig?.timestamp_column || "_timestamp";
+    const timestampCol = store?.state?.zoConfig?.timestamp_column || "_timestamp";
     if (!selectedFields.find((col) => col === timestampCol))
       cols.unshift({
         id: timestampCol,

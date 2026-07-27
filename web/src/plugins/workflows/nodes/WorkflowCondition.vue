@@ -26,18 +26,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div data-test="workflow-condition-body" class="w-full">
-    <ConditionBuilder
-      ref="builder"
-      :fields="fields"
-      :initial-conditions="savedConditions"
-    >
+    <ConditionBuilder ref="builder" :fields="fields" :initial-conditions="savedConditions">
       <!-- The examples below are CODE SAMPLES held in en-US.json: only the
            illustrative column name ("severity") is meant to vary per locale —
            the operators and literals (`!=`, `""`, `null`) are expression syntax
            and must be copied verbatim, so translators should leave them alone. -->
       <template #guidelines>
         <div
-          class="bg-banner-warning-bg text-banner-warning-text w-full rounded-default p-3 mt-4 flex flex-col gap-2"
+          class="bg-banner-warning-bg border-banner-warning-border text-banner-warning-text rounded-default mt-4 flex w-full flex-col gap-2 border p-3"
           data-test="workflow-condition-note"
         >
           <div class="text-sm font-bold">
@@ -45,21 +41,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div class="flex flex-col gap-1 text-sm">
             <div class="flex items-start gap-2">
-              <OIcon name="info" size="sm" class="shrink-0 mt-0.5 text-status-warning-text" />
+              <OIcon name="info" size="sm" class="text-status-warning-text mt-0.5 shrink-0" />
               <span>
                 {{ t("workflow.node.conditionNoteEmpty") }}
-                <span class="font-mono py-px px-1 rounded-default bg-code-bg text-code-text">{{ t("workflow.node.conditionExampleEmpty") }}</span>
+                <span class="rounded-default bg-code-bg text-code-text px-1 py-px font-mono">{{
+                  t("workflow.node.conditionExampleEmpty")
+                }}</span>
               </span>
             </div>
             <div class="flex items-start gap-2">
-              <OIcon name="info" size="sm" class="shrink-0 mt-0.5 text-status-warning-text" />
+              <OIcon name="info" size="sm" class="text-status-warning-text mt-0.5 shrink-0" />
               <span>
                 {{ t("workflow.node.conditionNoteNull") }}
-                <span class="font-mono py-px px-1 rounded-default bg-code-bg text-code-text">{{ t("workflow.node.conditionExampleNull") }}</span>
+                <span class="rounded-default bg-code-bg text-code-text px-1 py-px font-mono">{{
+                  t("workflow.node.conditionExampleNull")
+                }}</span>
               </span>
             </div>
             <div class="flex items-start gap-2">
-              <OIcon name="info" size="sm" class="shrink-0 mt-0.5 text-status-warning-text" />
+              <OIcon name="info" size="sm" class="text-status-warning-text mt-0.5 shrink-0" />
               <span>{{ t("workflow.node.conditionNoteCustom") }}</span>
             </div>
           </div>
@@ -79,8 +79,7 @@ import { ALERT_PAYLOAD_FIELDS } from "@/plugins/workflows/alertFields";
 
 const { t } = useI18n();
 const fields = ALERT_PAYLOAD_FIELDS;
-const savedConditions =
-  workflowObj.currentSelectedNodeData?.data?.conditions ?? null;
+const savedConditions = workflowObj.currentSelectedNodeData?.data?.conditions ?? null;
 
 const builder = ref<any>(null);
 // The builder validates through its zod schema (async) and renders the error

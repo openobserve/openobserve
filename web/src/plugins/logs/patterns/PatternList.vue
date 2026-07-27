@@ -15,12 +15,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="flex flex-col h-full">
+  <div class="flex h-full flex-col">
     <!-- Patterns Table — hidden during loading so skeleton always shows on re-run -->
     <div v-if="!loading && patterns?.length > 0" class="flex flex-col">
       <!-- Severity filter chips (multi-select; none selected = all) -->
       <div
-        class="flex items-center gap-2 px-3 py-2 border-b border-table-header-border flex-wrap"
+        class="border-table-header-border flex flex-wrap items-center gap-2 border-b px-3 py-2"
         data-test="pattern-list-severity-filter"
       >
         <OToggleGroup
@@ -43,22 +43,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Table Header -->
       <div
-        class="flex items-center gap-3 border-b border-table-header-border bg-table-header-bg min-w-full"
+        class="border-table-header-border bg-table-header-bg flex min-w-full items-center gap-3 border-b"
       >
-        <div class="w-28 flex-shrink-0 pl-3 pr-1 table-head text-left">
-          <span class="font-medium text-table-header-text text-xs">{{ t("search.occurrenceColumnHeader") }}</span>
+        <div class="table-head w-28 flex-shrink-0 pr-1 pl-3 text-left">
+          <span class="text-table-header-text text-xs font-medium">{{
+            t("search.occurrenceColumnHeader")
+          }}</span>
         </div>
-        <div class="w-44 flex-shrink-0 table-head text-left">
-          <span class="font-medium text-table-header-text text-xs">{{ t("logs.patternList.volumeHeader") }}</span>
+        <div class="table-head w-44 flex-shrink-0 text-left">
+          <span class="text-table-header-text text-xs font-medium">{{
+            t("logs.patternList.volumeHeader")
+          }}</span>
         </div>
-        <div class="w-20 flex-shrink-0 table-head text-left">
-          <span class="font-medium text-table-header-text text-xs">{{ t("logs.patternList.statusHeader") }}</span>
+        <div class="table-head w-20 flex-shrink-0 text-left">
+          <span class="text-table-header-text text-xs font-medium">{{
+            t("logs.patternList.statusHeader")
+          }}</span>
         </div>
-        <div class="w-32 flex-shrink-0 table-head text-left">
-          <span class="font-medium text-table-header-text text-xs">{{ t("logs.patternList.serviceHeader") }}</span>
+        <div class="table-head w-32 flex-shrink-0 text-left">
+          <span class="text-table-header-text text-xs font-medium">{{
+            t("logs.patternList.serviceHeader")
+          }}</span>
         </div>
-        <div class="flex-1 min-w-0 table-head text-left">
-          <span class="font-medium text-table-header-text text-xs">{{ t("search.patternColumnHeader") }}</span>
+        <div class="table-head min-w-0 flex-1 text-left">
+          <span class="text-table-header-text text-xs font-medium">{{
+            t("search.patternColumnHeader")
+          }}</span>
         </div>
       </div>
 
@@ -106,13 +116,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <!-- Header skeleton -->
       <div
-        class="min-h-8 flex items-center border-b border-table-header-border bg-table-header-bg min-w-full"
+        class="border-table-header-border bg-table-header-bg flex min-h-8 min-w-full items-center border-b"
       >
-        <div class="flex-1 min-w-0 px-2">
-          <span class="pattern-skel-pill inline-block h-3 w-16 rounded-default" aria-hidden="true" />
+        <div class="min-w-0 flex-1 px-2">
+          <span
+            class="pattern-skel-pill rounded-default inline-block h-3 w-16"
+            aria-hidden="true"
+          />
         </div>
-        <div class="w-24 flex-shrink-0 px-2 flex justify-end">
-          <span class="pattern-skel-pill inline-block h-3 w-14 rounded-default" aria-hidden="true" />
+        <div class="flex w-24 flex-shrink-0 justify-end px-2">
+          <span
+            class="pattern-skel-pill rounded-default inline-block h-3 w-14"
+            aria-hidden="true"
+          />
         </div>
       </div>
 
@@ -120,30 +136,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-for="(skeletonWidth, n) in SKELETON_WIDTHS"
         :key="n"
-        class="pattern-skel-row flex items-center border-b border-table-row-divider relative opacity-0 h-8 bg-log-table-row-bg"
+        class="pattern-skel-row border-table-row-divider bg-log-table-row-bg relative flex h-8 items-center border-b opacity-0"
         :style="{ animationDelay: `${n * 40}ms` }"
       >
         <!-- Left accent bar -->
-        <span class="absolute left-0 inset-y-0 w-1 pattern-skel-pill" aria-hidden="true" />
+        <span class="pattern-skel-pill absolute inset-y-0 left-0 w-1" aria-hidden="true" />
         <!-- Pattern column -->
-        <div class="flex-1 min-w-0 px-2 pl-3">
-          <span class="pattern-skel-pill inline-block h-3 rounded-default" :class="skeletonWidth" aria-hidden="true" />
+        <div class="min-w-0 flex-1 px-2 pl-3">
+          <span
+            class="pattern-skel-pill rounded-default inline-block h-3"
+            :class="skeletonWidth"
+            aria-hidden="true"
+          />
         </div>
         <!-- Count column -->
-        <div class="w-24 flex-shrink-0 px-2 flex flex-col items-end gap-1">
-          <span class="pattern-skel-pill inline-block h-3 w-12 rounded-default" aria-hidden="true" />
-          <span class="pattern-skel-pill inline-block h-2 w-10 rounded-default" aria-hidden="true" />
+        <div class="flex w-24 flex-shrink-0 flex-col items-end gap-1 px-2">
+          <span
+            class="pattern-skel-pill rounded-default inline-block h-3 w-12"
+            aria-hidden="true"
+          />
+          <span
+            class="pattern-skel-pill rounded-default inline-block h-2 w-10"
+            aria-hidden="true"
+          />
         </div>
       </div>
     </div>
 
     <!-- Empty State -->
-    <div v-else class="flex-1 flex items-center justify-center">
-      <OEmptyState
-        size="hero"
-        preset="no-patterns"
-        data-test="log-patterns-empty-state"
-      >
+    <div v-else class="flex flex-1 items-center justify-center">
+      <OEmptyState size="hero" preset="no-patterns" data-test="log-patterns-empty-state">
         <!-- When the selected time range has no logs but the stream has data
              elsewhere, offer a precise jump to the latest data — same as the
              logs search empty state. -->
@@ -157,7 +179,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </template>
         <template v-if="totalLogsAnalyzed" #extra>
-          <span class="text-sm text-text-secondary">
+          <span class="text-text-secondary text-sm">
             {{ t("emptyState.noPatterns.logsAnalyzed", { count: totalLogsAnalyzed }) }}
           </span>
         </template>
@@ -268,28 +290,13 @@ const scaleToWindow = (sampleCount: number): number | null => {
 };
 
 const openDetails = (pattern: any, index: number) => {
-  emit(
-    "open-details",
-    pattern,
-    index,
-    filteredPatterns.value,
-  );
+  emit("open-details", pattern, index, filteredPatterns.value);
 };
 
-const {
-  hoveredToken,
-  onPopoverEnter,
-  onPopoverLeave,
-} = useWildcardHover();
+const { hoveredToken, onPopoverEnter, onPopoverLeave } = useWildcardHover();
 
 // --- Severity filter (multi-select; empty = show all) -----------------------
-const SEVERITY_ORDER: PatternSeverityKey[] = [
-  "error",
-  "warning",
-  "info",
-  "debug",
-  "uncategorized",
-];
+const SEVERITY_ORDER: PatternSeverityKey[] = ["error", "warning", "info", "debug", "uncategorized"];
 const SEVERITY_LABEL_KEY: Record<PatternSeverityKey, string> = {
   error: "logs.patternList.severityError",
   warning: "logs.patternList.severityWarning",
@@ -301,9 +308,7 @@ const SEVERITY_LABEL_KEY: Record<PatternSeverityKey, string> = {
 const activeSeverities = ref<PatternSeverityKey[]>([]);
 
 const onSeverityFilterChange = (value: unknown) => {
-  activeSeverities.value = Array.isArray(value)
-    ? (value as PatternSeverityKey[])
-    : [];
+  activeSeverities.value = Array.isArray(value) ? (value as PatternSeverityKey[]) : [];
 };
 
 // Chip counts come from the extraction sample, which is a clean partition
@@ -331,9 +336,7 @@ const severityChips = computed(() =>
       key,
       label: t(SEVERITY_LABEL_KEY[key]),
       countLabel:
-        scaled !== null
-          ? `~${compactCount(scaled)}`
-          : severityCounts.value[key].toLocaleString(),
+        scaled !== null ? `~${compactCount(scaled)}` : severityCounts.value[key].toLocaleString(),
       colorClass: severityTextClass(key),
     };
   }),
@@ -431,17 +434,32 @@ const jumpTargetSublabel = computed(() => {
 }
 
 @keyframes pattern-skel-shimmer {
-  0%   { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
 }
 
 @keyframes pattern-skel-row-in {
-  from { opacity: 0; transform: translateY(0.125rem); }
-  to   { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(0.125rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .pattern-skel-row  { opacity: 1; animation: none; }
-  .pattern-skel-pill { animation: none; }
+  .pattern-skel-row {
+    opacity: 1;
+    animation: none;
+  }
+  .pattern-skel-pill {
+    animation: none;
+  }
 }
 </style>

@@ -31,13 +31,9 @@ use config::{
     utils::json,
 };
 use hashbrown::{HashMap, hash_map::Entry};
+use ingestion_common::{self as ingestion, IngestUser, SystemJobType};
 use proto::cluster_rpc;
 use reqwest::header::{AUTHORIZATION, CONTENT_TYPE};
-
-use crate::{
-    common::meta::ingestion::{self, IngestUser, SystemJobType},
-    service,
-};
 
 pub(super) async fn ingest_usages(mut curr_usages: Vec<UsageData>) {
     if curr_usages.is_empty() {
@@ -57,7 +53,7 @@ pub(super) async fn ingest_usages(mut curr_usages: Vec<UsageData>) {
                     .as_ref()
                     .map(|ctx| (&ctx.dashboard_id, &ctx.dashboard_name))
                 && let Ok((folder, dashboard)) =
-                    service::dashboards::get_folder_and_dashboard(&usage_data.org_id, dashboard_id)
+                    crate::dashboards::get_folder_and_dashboard(&usage_data.org_id, dashboard_id)
                         .await
                 && let Some(ctx) = usage_data.search_event_context.as_mut()
             {
@@ -151,9 +147,9 @@ pub(super) async fn ingest_usages(mut curr_usages: Vec<UsageData>) {
                         // on error in ingesting usage data, push back the data
                         let curr_usages = curr_usages.clone();
                         for usage_data in curr_usages {
-                            if let Err(e) = super::queues::USAGE_QUEUE
-                                .try_enqueue(ReportingData::Usage(Box::new(usage_data)))
-                            {
+                            if let Err(e) = usage_reporting::try_enqueue(ReportingData::Usage(
+                                Box::new(usage_data),
+                            )) {
                                 log::error!(
                                     "[SELF-REPORTING] Error in pushing back un-ingested Usage data to UsageQueuer: {e}"
                                 );
@@ -168,8 +164,8 @@ pub(super) async fn ingest_usages(mut curr_usages: Vec<UsageData>) {
                     // on error in ingesting usage data, push back the data
                     let curr_usages = curr_usages.clone();
                     for usage_data in curr_usages {
-                        if let Err(e) = super::queues::USAGE_QUEUE
-                            .try_enqueue(ReportingData::Usage(Box::new(usage_data)))
+                        if let Err(e) =
+                            usage_reporting::try_enqueue(ReportingData::Usage(Box::new(usage_data)))
                         {
                             log::error!(
                                 "[SELF-REPORTING] Error in pushing back un-ingested Usage data to UsageQueuer: {e}"
@@ -203,9 +199,9 @@ pub(super) async fn ingest_usages(mut curr_usages: Vec<UsageData>) {
                 // on error in ingesting usage data, push back the data
                 tokio::spawn(async move {
                     for usage_data in curr_usages {
-                        if let Err(e) = super::queues::USAGE_QUEUE
-                            .enqueue(ReportingData::Usage(Box::new(usage_data)))
-                            .await
+                        if let Err(e) =
+                            usage_reporting::enqueue(ReportingData::Usage(Box::new(usage_data)))
+                                .await
                         {
                             log::error!(
                                 "[SELF-REPORTING] Error in pushing back un-ingested Usage data to UsageQueuer: {e}"
@@ -242,9 +238,7 @@ pub(super) async fn ingest_usages(mut curr_usages: Vec<UsageData>) {
                 // do not skip self-reporting even if super org reporting fails
 
                 // Check if org has usage stream enabled
-                match crate::service::db::organization::get_org_setting_usage_stream_enabled(&org)
-                    .await
-                {
+                match crate::db::organization::get_org_setting_usage_stream_enabled(&org).await {
                     Ok(true) => {}
                     Ok(false) => continue, // self-report not enabled, so skip
                     Err(e) => {
@@ -287,7 +281,7 @@ pub(super) async fn ingest_reporting_data(
         );
         let bytes = bytes::Bytes::from(json::to_string(&reporting_data_json).unwrap());
         let req = ingestion::IngestionRequest::Usage(bytes);
-        match service::logs::ingest::ingest(
+        match crate::logs::ingest::ingest(
             0,
             &org_id,
             &stream_name,
@@ -330,7 +324,7 @@ pub(super) async fn ingest_reporting_data(
             metadata: None,
         };
 
-        match service::ingestion::ingestion_service::ingest(req).await {
+        match crate::ingestion::ingestion_service::ingest(req).await {
             Ok(resp) if resp.status_code == 200 => {
                 log::debug!(
                     "[SELF-REPORTING] ReportingData successfully ingested to stream {org_id}/{stream_name}"

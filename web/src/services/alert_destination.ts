@@ -24,22 +24,13 @@ const destination = {
     return http().post(url, data);
   },
   update: ({ org_identifier, destination_name, data, module }: any) => {
-    let url = `/api/${org_identifier}/alerts/destinations/${encodeURIComponent(
-      destination_name
-    )}`;
+    let url = `/api/${org_identifier}/alerts/destinations/${encodeURIComponent(destination_name)}`;
     if (module) {
       url += `?module=${module}`;
     }
     return http().put(url, data);
   },
-  list: ({
-    org_identifier,
-    page_num,
-    page_size,
-    desc,
-    sort_by,
-    module,
-  }: any) => {
+  list: ({ org_identifier, page_num, page_size, desc, sort_by, module }: any) => {
     // Construct the base URL with required parameters
     let url = `/api/${org_identifier}/alerts/destinations?page_num=${page_num}&page_size=${page_size}&sort_by=${sort_by}&desc=${desc}`;
     // Append module if it is defined
@@ -50,16 +41,12 @@ const destination = {
   },
   get_by_name: ({ org_identifier, destination_name }: any) => {
     return http().get(
-      `/api/${org_identifier}/alerts/destinations/${encodeURIComponent(
-        destination_name
-      )}`
+      `/api/${org_identifier}/alerts/destinations/${encodeURIComponent(destination_name)}`,
     );
   },
   delete: ({ org_identifier, destination_name }: any) => {
     return http().delete(
-      `/api/${org_identifier}/alerts/destinations/${encodeURIComponent(
-        destination_name
-      )}`
+      `/api/${org_identifier}/alerts/destinations/${encodeURIComponent(destination_name)}`,
     );
   },
   bulkDelete: (org_identifier: string, data: any) => {

@@ -8,7 +8,11 @@ import type {
   SelectValue as SelectPrimitiveValue,
   SelectModelValue,
 } from "./OSelect.types";
-import { SELECT_VALUE_MAP_KEY, SELECT_PARENT_DATA_TEST_KEY, NULL_VALUE_SENTINEL } from "./OSelect.types";
+import {
+  SELECT_VALUE_MAP_KEY,
+  SELECT_PARENT_DATA_TEST_KEY,
+  NULL_VALUE_SENTINEL,
+} from "./OSelect.types";
 import OSelectItem from "./OSelectItem.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
@@ -108,9 +112,7 @@ const props = withDefaults(defineProps<SelectProps>(), {
 // (Same pattern as ODialog / OInput.)
 defineOptions({ inheritAttrs: false });
 const $attrs = useAttrs();
-const parentDataTest = computed(
-  () => $attrs["data-test"] as string | undefined,
-);
+const parentDataTest = computed(() => $attrs["data-test"] as string | undefined);
 
 // Forward tabindex to the real trigger; keep it off the wrapper (avoids a double tab-stop).
 const inputTabindex = computed(() => $attrs["tabindex"] as number | string | undefined);
@@ -149,9 +151,7 @@ provide(SELECT_VALUE_MAP_KEY, valueMap);
 // auto-derive `<parent>-option` data-test attributes (non-listbox mode).
 provide(SELECT_PARENT_DATA_TEST_KEY, parentDataTest);
 
-const isPrimitiveSelectValue = (
-  value: unknown,
-): value is SelectPrimitiveValue =>
+const isPrimitiveSelectValue = (value: unknown): value is SelectPrimitiveValue =>
   value === null || ["string", "number", "boolean"].includes(typeof value);
 
 /** Map null ↔ sentinel so Reka UI receives a valid string */
@@ -179,8 +179,7 @@ function normalizeOption(raw: unknown): NormalizedOption | null {
   const isHeader = Boolean(option["header"]) || Boolean(option["isTab"]);
   if (isHeader) {
     return {
-      label:
-        rawLabel === undefined || rawLabel === null ? "" : String(rawLabel),
+      label: rawLabel === undefined || rawLabel === null ? "" : String(rawLabel),
       value: `__header__${String(rawLabel)}`,
       disabled: true,
       header: true,
@@ -199,10 +198,7 @@ function normalizeOption(raw: unknown): NormalizedOption | null {
   const rawSubLabelInline = option["subLabelInline"];
   const rawColorPalette = option["colorPalette"];
   return {
-    label:
-      rawLabel === undefined || rawLabel === null
-        ? String(rawValue)
-        : String(rawLabel),
+    label: rawLabel === undefined || rawLabel === null ? String(rawValue) : String(rawLabel),
     value: rawValue,
     disabled: Boolean(option[DEFAULT_OPTION_DISABLED]),
     header: false,
@@ -210,14 +206,10 @@ function normalizeOption(raw: unknown): NormalizedOption | null {
     iconComponent: rawIconComponent ?? undefined,
     subLabel: typeof rawSubLabel === "string" ? rawSubLabel : undefined,
     subLabelInline: rawSubLabelInline === true,
-    colorPalette: Array.isArray(rawColorPalette)
-      ? (rawColorPalette as string[])
-      : undefined,
+    colorPalette: Array.isArray(rawColorPalette) ? (rawColorPalette as string[]) : undefined,
     badge: typeof option["badge"] === "string" ? (option["badge"] as string) : undefined,
     badgeTitle:
-      typeof option["badgeTitle"] === "string"
-        ? (option["badgeTitle"] as string)
-        : undefined,
+      typeof option["badgeTitle"] === "string" ? (option["badgeTitle"] as string) : undefined,
     badgeStyle:
       option["badgeStyle"] && typeof option["badgeStyle"] === "object"
         ? (option["badgeStyle"] as Record<string, string>)
@@ -260,9 +252,7 @@ const baseFilteredOptions = computed(() => {
   let options = normalizedOptions.value;
 
   if (props.hideSelected && props.multiple && selectedValues.value.length > 0) {
-    options = options.filter(
-      (opt) => opt.header || !selectedValues.value.includes(opt.value),
-    );
+    options = options.filter((opt) => opt.header || !selectedValues.value.includes(opt.value));
     // Drop headers that no longer have any following non-header items
     options = options.filter((opt, i) => {
       if (!opt.header) return true;
@@ -276,11 +266,7 @@ const baseFilteredOptions = computed(() => {
     // can immediately see and manage their current choices on re-open.
     // Only applies when there is a non-empty pin set and no headers in the list
     // (headers imply grouped options where reordering would break visual grouping).
-    if (
-      props.multiple &&
-      pinnedSelected.value.size > 0 &&
-      !options.some((o) => o.header)
-    ) {
+    if (props.multiple && pinnedSelected.value.size > 0 && !options.some((o) => o.header)) {
       const pinned = pinnedSelected.value;
       const top = options.filter((o) => pinned.has(toRekaString(o.value)));
       const rest = options.filter((o) => !pinned.has(toRekaString(o.value)));
@@ -369,8 +355,7 @@ const listboxModeEnabled = computed(
       props.searchable ||
       props.creatable ||
       (!!props.options?.length &&
-        (props.labelKey !== DEFAULT_OPTION_LABEL ||
-          props.valueKey !== DEFAULT_OPTION_VALUE))),
+        (props.labelKey !== DEFAULT_OPTION_LABEL || props.valueKey !== DEFAULT_OPTION_VALUE))),
 );
 
 const selectedValues = computed<SelectPrimitiveValue[]>(() => {
@@ -380,24 +365,18 @@ const selectedValues = computed<SelectPrimitiveValue[]>(() => {
   }
   if (props.modelValue === null) {
     // null is a valid selection when a null-valued option exists (e.g. "Auto", "None", "Default")
-    const hasNullOption = normalizedOptions.value.some(
-      (opt) => !opt.header && opt.value === null,
-    );
+    const hasNullOption = normalizedOptions.value.some((opt) => !opt.header && opt.value === null);
     return hasNullOption ? [null] : [];
   }
   return [props.modelValue];
 });
 
-const hasSelection = computed(() =>
-  selectedValues.value.some((v) => v !== undefined),
-);
+const hasSelection = computed(() => selectedValues.value.some((v) => v !== undefined));
 
 const selectedLabels = computed(() => {
   return selectedValues.value
     .map((selectedValue) => {
-      const option = normalizedOptions.value.find(
-        (opt) => opt.value === selectedValue,
-      );
+      const option = normalizedOptions.value.find((opt) => opt.value === selectedValue);
       if (option) return option.label;
       // Don't render "null" for unmatched null values — treat as empty/placeholder
       if (selectedValue === null) return null;
@@ -416,10 +395,7 @@ watch(searchTerm, (value) => {
   if (!inputEnabled.value) return;
   if ((props.searchDebounce ?? 0) > 0) {
     if (filterDebounceTimer.value) clearTimeout(filterDebounceTimer.value);
-    filterDebounceTimer.value = setTimeout(
-      () => emit("search", value),
-      props.searchDebounce,
-    );
+    filterDebounceTimer.value = setTimeout(() => emit("search", value), props.searchDebounce);
     return;
   }
   emit("search", value);
@@ -433,9 +409,7 @@ watch(popoverOpen, (open) => {
   if (!open) {
     searchTerm.value = "";
   } else if (props.multiple) {
-    pinnedSelected.value = new Set(
-      selectedValues.value.map((v) => toRekaString(v)),
-    );
+    pinnedSelected.value = new Set(selectedValues.value.map((v) => toRekaString(v)));
   }
 });
 
@@ -481,9 +455,7 @@ function resolveListboxValue(value: unknown): SelectModelValue {
     }
     return value.map((item) => {
       const key = String(item);
-      return valueMap.has(key)
-        ? (valueMap.get(key) as SelectPrimitiveValue)
-        : key;
+      return valueMap.has(key) ? (valueMap.get(key) as SelectPrimitiveValue) : key;
     });
   }
 
@@ -491,9 +463,7 @@ function resolveListboxValue(value: unknown): SelectModelValue {
     const first = value[0];
     if (first === undefined || first === null) return undefined;
     const key = String(first);
-    return valueMap.has(key)
-      ? (valueMap.get(key) as SelectPrimitiveValue)
-      : key;
+    return valueMap.has(key) ? (valueMap.get(key) as SelectPrimitiveValue) : key;
   }
 
   if (value === undefined || value === null) return undefined;
@@ -536,7 +506,9 @@ function handleItemClickCapture(event: MouseEvent, rekaStringValue: string) {
   // Find the separator line rendered inside this item. Anything clicked at or
   // to the left of the separator is the "checkbox zone" — let Reka toggle normally.
   // Anything to the right is the "label zone" — single-select and close.
-  const separator = (event.currentTarget as HTMLElement | null)?.querySelector("[data-select-separator]");
+  const separator = (event.currentTarget as HTMLElement | null)?.querySelector(
+    "[data-select-separator]",
+  );
 
   if (separator) {
     const { right } = separator.getBoundingClientRect();
@@ -571,17 +543,13 @@ function handleClear() {
 // filtered subset — so the master state stays predictable regardless of the
 // search term.
 const selectableOptions = computed<NormalizedOption[]>(() =>
-  normalizedOptions.value.filter(
-    (o: NormalizedOption) => !o.header && !o.disabled,
-  ),
+  normalizedOptions.value.filter((o: NormalizedOption) => !o.header && !o.disabled),
 );
 
 const allSelected = computed(() => {
   const all = selectableOptions.value;
   if (all.length === 0) return false;
-  return all.every((o: NormalizedOption) =>
-    selectedValues.value.includes(o.value),
-  );
+  return all.every((o: NormalizedOption) => selectedValues.value.includes(o.value));
 });
 
 const partiallySelected = computed(() => {
@@ -685,8 +653,7 @@ watch(filteredOptions, () => {
 
 function scrollHighlightedIntoView() {
   if (highlightedIndex.value < 0 || !listboxScrollEl.value) return;
-  const rows =
-    listboxScrollEl.value.querySelectorAll<HTMLElement>("[data-vrow]");
+  const rows = listboxScrollEl.value.querySelectorAll<HTMLElement>("[data-vrow]");
   for (const row of rows) {
     if (Number(row.dataset.vrow) === highlightedIndex.value) {
       row.scrollIntoView({ block: "nearest" });
@@ -746,7 +713,7 @@ const virtualizer = useVirtualizer(
       if (!opt) return 28;
       const hasSubLabel = !!opt.subLabel;
       const isInline = !!opt.subLabelInline;
-      const hasPalette = !!(opt.colorPalette?.length);
+      const hasPalette = !!opt.colorPalette?.length;
       const hasBadge = !!opt.badge;
       // Inline subLabel renders on the same line — single-row height.
       if (hasSubLabel && isInline) return 28;
@@ -783,9 +750,7 @@ const heightClasses: Record<NonNullable<SelectProps["size"]>, string> = {
 // bind the chevron's rotation class to it.
 const selectOpen = ref(false);
 
-const isOpen = computed(() =>
-  listboxModeEnabled.value ? popoverOpen.value : selectOpen.value,
-);
+const isOpen = computed(() => (listboxModeEnabled.value ? popoverOpen.value : selectOpen.value));
 
 // Clicking the field label opens the dropdown — mirroring how clicking an
 // OInput's label focuses its input. Reka's triggers open on `pointerdown`, so
@@ -799,7 +764,6 @@ function handleLabelClick() {
     selectOpen.value = true;
   }
 }
-
 
 // When this OSelect is nested inside an ODropdown, signal its
 // open/close so the parent ignores the pointer event that closes us.
@@ -844,7 +808,7 @@ if (!parentDropdownRegistry) {
 
 // Close when the sidebar scroll container scrolls, preventing the portal
 // from floating disconnected at the top of the screen.
-const sidebarScrollTick = inject<Ref<number> | null>('sidebarScrollTick', null);
+const sidebarScrollTick = inject<Ref<number> | null>("sidebarScrollTick", null);
 if (sidebarScrollTick) {
   watch(sidebarScrollTick, () => {
     if (popoverOpen.value) popoverOpen.value = false;
@@ -864,8 +828,7 @@ function handleViewportScroll(event: Event) {
   // Ignore scrolls that originate inside the option list so it stays scrollable.
   if (
     target instanceof Element &&
-    (listboxScrollEl.value?.contains(target) ||
-      target.closest?.('[role="listbox"]'))
+    (listboxScrollEl.value?.contains(target) || target.closest?.('[role="listbox"]'))
   ) {
     return;
   }
@@ -989,10 +952,7 @@ const dynamicMaxChips = computed(() => {
     return Math.min(props.maxVisibleChips ?? 3, total);
   }
 
-  const available = Math.max(
-    0,
-    triggerWidth.value - reservedTriggerSpace.value,
-  );
+  const available = Math.max(0, triggerWidth.value - reservedTriggerSpace.value);
   let used = 0;
   let count = 0;
 
@@ -1001,8 +961,7 @@ const dynamicMaxChips = computed(() => {
     const remaining = total - i - 1;
     // If there'll be hidden chips after this one, reserve space for the
     // "+N more" pill so it can still fit on the row.
-    const overflowReserve =
-      remaining > 0 ? overflowChipEstimatedWidth + chipGap : 0;
+    const overflowReserve = remaining > 0 ? overflowChipEstimatedWidth + chipGap : 0;
     const needed = chipW + (i > 0 ? chipGap : 0) + overflowReserve;
     if (used + needed > available) break;
     used += chipW + (i > 0 ? chipGap : 0);
@@ -1017,9 +976,7 @@ const dynamicMaxChips = computed(() => {
   return fit;
 });
 
-const visibleSelectedLabels = computed(() =>
-  selectedLabels.value.slice(0, dynamicMaxChips.value),
-);
+const visibleSelectedLabels = computed(() => selectedLabels.value.slice(0, dynamicMaxChips.value));
 const overflowSelectedCount = computed(() =>
   Math.max(0, selectedLabels.value.length - dynamicMaxChips.value),
 );
@@ -1051,19 +1008,17 @@ const fieldWidthClass = computed(() => {
 <template>
   <div
     v-bind="wrapperAttrs"
-    :class="[
-      'flex flex-col gap-1',
-      fieldWidthClass,
-      labelPosition === 'inside' ? 'min-w-0' : '',
-    ]"
+    :class="['flex flex-col gap-1', fieldWidthClass, labelPosition === 'inside' ? 'min-w-0' : '']"
   >
     <!-- Label -->
     <label
       v-if="(label || $slots.tooltip) && labelPosition !== 'inside'"
       :for="inputId"
       :class="[
-        'o-input-label text-compact leading-tight flex items-center gap-1',
-        disabled ? 'font-normal text-input-label-text-disabled' : 'font-medium text-input-label-text cursor-pointer',
+        'o-input-label text-compact flex items-center gap-1 leading-tight',
+        disabled
+          ? 'text-input-label-text-disabled font-normal'
+          : 'text-input-label-text cursor-pointer font-medium',
       ]"
       @click.prevent="handleLabelClick"
     >
@@ -1083,10 +1038,7 @@ const fieldWidthClass = computed(() => {
         v-model:open="popoverOpen"
         @update:open="(v) => (v ? emit('open') : emit('close'))"
       >
-        <div
-          ref="triggerWrapperRef"
-          class="relative flex items-center"
-        >
+        <div ref="triggerWrapperRef" class="relative flex items-center">
           <PopoverTrigger
             type="button"
             :id="inputId"
@@ -1097,9 +1049,7 @@ const fieldWidthClass = computed(() => {
             :aria-expanded="popoverOpen"
             :aria-invalid="hasError || undefined"
             @keydown="handleTriggerKeydown"
-            :data-test="
-              parentDataTest ? `${parentDataTest}-trigger` : undefined
-            "
+            :data-test="parentDataTest ? `${parentDataTest}-trigger` : undefined"
             :data-test-selected-value="
               multiple
                 ? selectedValues.map((v) => String(v)).join(',')
@@ -1109,51 +1059,52 @@ const fieldWidthClass = computed(() => {
             "
             :data-test-selected-label="triggerDisplayLabel"
             :class="[
-              'relative flex w-full rounded-default border',
+              'rounded-default relative flex w-full border',
               // In inside-label mode padding is handled per-row; in normal mode it goes on the trigger
-              labelPosition === 'inside' && label ? '' : ($slots['icon-left'] ? 'ps-2' : 'ps-3'),
+              labelPosition === 'inside' && label ? '' : $slots['icon-left'] ? 'ps-2' : 'ps-3',
               'bg-select-bg',
               hasError
-                ? 'border-select-border-error focus:ring-[0.125rem] focus:ring-select-border-error/30 data-[state=open]:ring-[0.125rem] data-[state=open]:ring-select-border-error/30'
-                : 'border-select-border hover:border-select-border-hover focus:border-select-border-focus focus:ring-[0.125rem] focus:ring-primary-500/25 data-[state=open]:border-select-border-focus data-[state=open]:ring-[0.125rem] data-[state=open]:ring-primary-500/25',
+                ? 'border-select-border-error focus:ring-select-border-error/30 data-[state=open]:ring-select-border-error/30 focus:ring-[0.125rem] data-[state=open]:ring-[0.125rem]'
+                : 'border-select-border hover:border-select-border-hover focus:border-select-border-focus focus:ring-accent/25 data-[state=open]:border-select-border-focus data-[state=open]:ring-accent/25 focus:ring-[0.125rem] data-[state=open]:ring-[0.125rem]',
               /* Keep the red error border on focus; focus border color applies only when there's no error. */
               'focus:outline-none',
               'transition-[color,background-color,border-color,box-shadow] duration-150',
               'disabled:bg-select-disabled-bg disabled:cursor-not-allowed disabled:border-dashed',
               labelPosition === 'inside' && label
-                ? [
-                    'flex-col justify-between py-0.5',
-                    heightClasses[size ?? 'md'],
-                  ]
+                ? ['flex-col justify-between py-0.5', heightClasses[size ?? 'md']]
                 : ['items-center', triggerEndPadding, heightClasses[size ?? 'md']],
             ]"
           >
             <!-- Inside label: in-flow with whitespace-nowrap so it drives the trigger's auto-width -->
             <span
               v-if="label && labelPosition === 'inside'"
-              class="text-3xs leading-none whitespace-nowrap text-start text-text-secondary select-none pointer-events-none ps-3 pe-7"
+              class="text-3xs text-text-secondary pointer-events-none ps-3 pe-7 text-start leading-none whitespace-nowrap select-none"
               >{{ label }}<span v-if="required" aria-hidden="true">&nbsp;*</span></span
             >
 
             <!-- Content row: flex-row for inside-label; display:contents (transparent) for normal mode -->
             <div
-              :class="labelPosition === 'inside' && label
-                ? ['flex items-center flex-1 w-full min-w-0', triggerEndPadding, $slots['icon-left'] ? 'ps-2' : 'ps-3']
-                : 'contents'"
+              :class="
+                labelPosition === 'inside' && label
+                  ? [
+                      'flex w-full min-w-0 flex-1 items-center',
+                      triggerEndPadding,
+                      $slots['icon-left'] ? 'ps-2' : 'ps-3',
+                    ]
+                  : 'contents'
+              "
             >
               <!-- Icon-left slot (inside trigger, left — matches OButton #icon-left) -->
               <span
                 v-if="$slots['icon-left']"
-                class="flex items-center me-1.5 text-select-placeholder shrink-0"
+                class="text-select-placeholder me-1.5 flex shrink-0 items-center"
               >
                 <slot name="icon-left" />
               </span>
 
               <slot name="trigger" :value="modelValue">
                 <template v-if="multiple && selectedLabels.length > 0">
-                  <div
-                    class="flex-1 flex flex-nowrap items-center gap-1 overflow-hidden pe-2"
-                  >
+                  <div class="flex flex-1 flex-nowrap items-center gap-1 overflow-hidden pe-2">
                     <slot
                       v-for="(labelText, idx) in visibleSelectedLabels"
                       name="chip"
@@ -1162,14 +1113,14 @@ const fieldWidthClass = computed(() => {
                     >
                       <span
                         :key="`${idx}-${String(labelText ?? '')}`"
-                        class="inline-flex items-center rounded-default px-2 py-0.5 text-xs leading-none bg-select-item-selected-bg text-select-item-selected-text max-w-40 truncate shrink-0"
+                        class="rounded-default bg-select-item-selected-bg text-select-item-selected-text inline-flex max-w-40 shrink-0 items-center truncate px-2 py-0.5 text-xs leading-none"
                       >
                         {{ labelText }}
                       </span>
                     </slot>
                     <span
                       v-if="overflowSelectedCount > 0"
-                      class="inline-flex items-center rounded-default px-2 py-0.5 text-xs bg-select-item-hover-bg text-select-text shrink-0"
+                      class="rounded-default bg-select-item-hover-bg text-select-text inline-flex shrink-0 items-center px-2 py-0.5 text-xs"
                       data-test="o-select-overflow-chip"
                     >
                       +{{ overflowSelectedCount }} more
@@ -1180,10 +1131,8 @@ const fieldWidthClass = computed(() => {
                   v-else
                   :title="optionTooltip && hasSelection ? triggerDisplayLabel : undefined"
                   :class="[
-                    'flex-1 text-start truncate text-sm',
-                    labelPosition === 'inside' && label
-                      ? 'text-xs leading-4'
-                      : '',
+                    'flex-1 truncate text-start text-sm',
+                    labelPosition === 'inside' && label ? 'text-xs leading-4' : '',
                     disabled
                       ? 'text-select-disabled-text'
                       : hasSelection
@@ -1205,18 +1154,16 @@ const fieldWidthClass = computed(() => {
             is anchored to the container's right edge, toggling the clear
             button in or out does not shift the chevron.
           -->
-          <div
-            class="absolute end-2.5 flex items-center gap-1.5 pointer-events-none"
-          >
+          <div class="pointer-events-none absolute end-2.5 flex items-center gap-1.5">
             <button
               v-if="clearable && hasSelection"
               type="button"
               tabindex="-1"
               aria-label="Clear selection"
               :class="[
-                'flex items-center justify-center size-3.5',
+                'flex size-3.5 items-center justify-center',
                 'text-input-clear-btn hover:text-input-clear-btn-hover',
-                'transition-colors pointer-events-auto',
+                'pointer-events-auto transition-colors',
               ]"
               @click.stop="handleClear"
             >
@@ -1238,7 +1185,7 @@ const fieldWidthClass = computed(() => {
               v-else
               aria-hidden="true"
               :class="[
-                'flex items-center justify-center text-select-icon',
+                'text-select-icon flex items-center justify-center',
                 'transition-transform duration-150',
                 isOpen ? 'rotate-180' : '',
               ]"
@@ -1267,43 +1214,42 @@ const fieldWidthClass = computed(() => {
             :trap-focus="false"
             :disable-outside-pointer-events="false"
             :hide-when-detached="true"
-            :data-test="
-              parentDataTest ? `${parentDataTest}-popover` : undefined
-            "
+            :data-test="parentDataTest ? `${parentDataTest}-popover` : undefined"
             :class="[
-              'z-[10001] min-w-(--reka-popover-trigger-width)',
-              'overflow-hidden flex flex-col',
+              'z-10001 min-w-(--reka-popover-trigger-width)',
+              'flex flex-col overflow-hidden',
               'rounded-default shadow-lg',
               'bg-select-content-bg',
             ]"
-            :style="[dropdownStyle, { maxHeight: 'min(18rem, var(--reka-popover-content-available-height, 18rem))' }]"
+            :style="[
+              dropdownStyle,
+              { maxHeight: 'min(18rem, var(--reka-popover-content-available-height, 18rem))' },
+            ]"
             @click.stop
           >
             <ListboxRoot
               :model-value="listboxStringModelValue"
               :multiple="multiple"
               :disabled="disabled"
-              class="flex flex-col flex-1 min-h-0"
+              class="flex min-h-0 flex-1 flex-col"
               @update:model-value="handleListboxUpdate"
             >
               <!-- Single bordered container wrapping search + list -->
               <div
                 :class="[
-                  'rounded-default border border-input-border overflow-hidden',
-                  'bg-select-content-bg flex flex-col flex-1 min-h-0',
+                  'rounded-default border-input-border overflow-hidden border',
+                  'bg-select-content-bg flex min-h-0 flex-1 flex-col',
                 ]"
               >
                 <ListboxFilter
                   v-if="inputEnabled"
                   v-model="searchTerm"
                   auto-focus
-                  :data-test="
-                    parentDataTest ? `${parentDataTest}-search` : undefined
-                  "
+                  :data-test="parentDataTest ? `${parentDataTest}-search` : undefined"
                   :class="[
-                    'w-full px-3 bg-transparent text-input-text shrink-0',
+                    'text-input-text w-full shrink-0 bg-transparent px-3',
                     'placeholder:text-input-placeholder outline-none',
-                    'border-b border-input-border',
+                    'border-input-border border-b',
                     heightClasses[size ?? 'md'],
                   ]"
                   :placeholder="searchPlaceholder"
@@ -1322,18 +1268,16 @@ const fieldWidthClass = computed(() => {
                   role="button"
                   tabindex="0"
                   aria-label="Toggle all options"
-                  :aria-checked="
-                    allSelected ? 'true' : partiallySelected ? 'mixed' : 'false'
-                  "
+                  :aria-checked="allSelected ? 'true' : partiallySelected ? 'mixed' : 'false'"
                   :class="[
-                    'relative flex items-center w-full gap-2 shrink-0',
-                    'ps-3 pe-3 py-1.5 text-sm',
-                    'text-select-item-text rounded-default',
-                    'cursor-pointer select-none outline-none',
+                    'relative flex w-full shrink-0 items-center gap-2',
+                    'py-1.5 ps-3 pe-3 text-sm',
+                    'text-select-item-text',
+                    'cursor-pointer outline-none select-none',
                     'hover:bg-select-item-hover-bg',
                     'focus-visible:bg-select-item-hover-bg',
                     'transition-colors duration-100',
-                    'border-b border-select-content-border mb-1 pb-1.5',
+                    'border-select-content-border mb-1 border-b pb-1.5',
                   ]"
                   data-test="o-select-all"
                   @click="toggleAllSelections"
@@ -1342,8 +1286,8 @@ const fieldWidthClass = computed(() => {
                 >
                   <span
                     :class="[
-                      'flex items-center justify-center shrink-0',
-                      'size-3.5 rounded-default border transition-colors',
+                      'flex shrink-0 items-center justify-center',
+                      'rounded-checkbox size-3.5 border transition-colors',
                       allSelected
                         ? 'bg-checkbox-checked-bg border-checkbox-checked-border'
                         : 'bg-checkbox-bg border-checkbox-border',
@@ -1359,7 +1303,7 @@ const fieldWidthClass = computed(() => {
                       stroke-width="2"
                       stroke-linecap="round"
                       stroke-linejoin="round"
-                      class="size-full p-0.5 text-checkbox-checked-fg"
+                      class="text-checkbox-checked-fg size-full p-0.5"
                     >
                       <polyline points="2,6 5,9 10,3" />
                     </svg>
@@ -1372,10 +1316,16 @@ const fieldWidthClass = computed(() => {
 
                 <!-- Virtual scroll container — keyboard nav handled by handleDropdownKeydown
                    on the ListboxFilter input above. Items are index-highlighted reactively. -->
-                <div ref="listboxScrollEl" :class="['overflow-auto', multiple && rowClickSingleSelect ? 'flex-1 min-h-24' : 'max-h-60']">
+                <div
+                  ref="listboxScrollEl"
+                  :class="[
+                    'overflow-auto',
+                    multiple && rowClickSingleSelect ? 'min-h-24 flex-1' : 'max-h-60',
+                  ]"
+                >
                   <div
                     v-if="filteredOptions.length === 0"
-                    class="px-3 py-2 text-sm text-select-placeholder"
+                    class="text-select-placeholder px-3 py-2 text-sm"
                   >
                     <slot name="empty">No options found</slot>
                   </div>
@@ -1408,14 +1358,13 @@ const fieldWidthClass = computed(() => {
                       <div
                         v-if="filteredOptions[vRow.index].header"
                         :class="[
-                          'flex w-full h-full px-3 py-1 text-xs font-bold select-none text-select-item-text',
+                          'text-select-item-text flex h-full w-full px-3 py-1 text-xs font-bold select-none',
                           collapsibleGroups
-                            ? 'items-center gap-1 cursor-pointer bg-surface-subtle'
-                            : 'pointer-events-none bg-select-content-bg',
+                            ? 'bg-surface-subtle cursor-pointer items-center gap-1'
+                            : 'bg-select-content-bg pointer-events-none',
                         ]"
                         @click.stop="
-                          collapsibleGroups &&
-                            toggleGroup(filteredOptions[vRow.index].label)
+                          collapsibleGroups && toggleGroup(filteredOptions[vRow.index].label)
                         "
                       >
                         <OIcon
@@ -1440,201 +1389,234 @@ const fieldWidthClass = computed(() => {
                       <div
                         v-else
                         class="contents"
-                        @click.capture="handleItemClickCapture($event, toRekaString(filteredOptions[vRow.index].value))"
+                        @click.capture="
+                          handleItemClickCapture(
+                            $event,
+                            toRekaString(filteredOptions[vRow.index].value),
+                          )
+                        "
                       >
-                      <ListboxItem
-                        :value="toRekaString(filteredOptions[vRow.index].value)"
-                        :disabled="filteredOptions[vRow.index].disabled"
-                        :data-test="
-                          parentDataTest
-                            ? `${parentDataTest}-option`
-                            : undefined
-                        "
-                        :data-test-value="
-                          toRekaString(filteredOptions[vRow.index].value)
-                        "
-                        :data-test-label="
-                          String(filteredOptions[vRow.index].label ?? '')
-                        "
-                        :class="[
-                          'relative flex w-full h-full gap-2',
-                          'ps-3 pe-3 text-sm',
-                          'text-select-item-text rounded-default',
-                          'cursor-pointer select-none outline-none',
-                          'transition-colors duration-100',
-                          // Use flex-col for stacked rich items; flex-row for inline subLabel or simple items
-                          (filteredOptions[vRow.index].subLabel && !filteredOptions[vRow.index].subLabelInline) || filteredOptions[vRow.index].colorPalette?.length
-                            ? 'flex-col items-start py-2'
-                            : 'flex-row items-center',
-                          // highlightedIndex-based highlight — works with virtualised items.
-                          // Reka's data-highlighted only fires for direct DOM children of
-                          // ListboxRoot; virtual rows are not, so we track highlight ourselves.
-                          vRow.index === highlightedIndex
-                            ? 'bg-select-item-hover-bg'
-                            : 'hover:bg-select-item-hover-bg',
-                          multiple
-                            ? ''
-                            : 'data-[state=checked]:bg-select-item-selected-bg data-[state=checked]:text-select-item-selected-text',
-                          'data-disabled:text-select-item-disabled data-disabled:cursor-not-allowed data-disabled:pointer-events-none',
-                        ]"
-                      >
-                        <!-- Multi-select: always-visible checkbox indicator -->
-                        <template v-if="multiple">
-                          <span
-                            :class="[
-                              'flex items-center justify-center shrink-0',
-                              'size-3.5 rounded-default border transition-colors',
-                              selectedValues.includes(
-                                filteredOptions[vRow.index].value,
-                              )
-                                ? 'bg-checkbox-checked-bg border-checkbox-checked-border'
-                                : 'bg-checkbox-bg border-checkbox-border',
-                            ]"
-                            aria-hidden="true"
-                            data-select-checkbox
-                          >
-
-                            <svg
-                              v-if="
-                                selectedValues.includes(
-                                  filteredOptions[vRow.index].value,
-                                )
-                              "
-                              xmlns="http://www.w3.org/2000/svg"
-                              viewBox="0 0 12 12"
-                              fill="none"
-                              stroke="currentColor"
-                              stroke-width="2"
-                              stroke-linecap="round"
-                              stroke-linejoin="round"
-                              class="size-full p-0.5 text-checkbox-checked-fg"
-                            >
-                              <polyline points="2,6 5,9 10,3" />
-                            </svg>
-                          </span>
-                          <!-- Separator between checkbox zone and label zone (rowClickSingleSelect only) -->
-                          <span
-                            v-if="rowClickSingleSelect"
-                            class="w-px shrink-0 bg-card-glass-border mx-1 my-1 self-stretch"
-                            aria-hidden="true"
-                            data-select-separator
-                          />
-                        </template>
-
-                        <!-- Inline subLabel: name – url on a single row -->
-                        <template
-                          v-if="filteredOptions[vRow.index].subLabel && filteredOptions[vRow.index].subLabelInline"
+                        <ListboxItem
+                          :value="toRekaString(filteredOptions[vRow.index].value)"
+                          :disabled="filteredOptions[vRow.index].disabled"
+                          :data-test="parentDataTest ? `${parentDataTest}-option` : undefined"
+                          :data-test-value="toRekaString(filteredOptions[vRow.index].value)"
+                          :data-test-label="String(filteredOptions[vRow.index].label ?? '')"
+                          :class="[
+                            'relative flex h-full w-full gap-2',
+                            'ps-3 pe-3 text-sm',
+                            'text-select-item-text',
+                            'cursor-pointer outline-none select-none',
+                            'transition-colors duration-100',
+                            // Use flex-col for stacked rich items; flex-row for inline subLabel or simple items
+                            (filteredOptions[vRow.index].subLabel &&
+                              !filteredOptions[vRow.index].subLabelInline) ||
+                            filteredOptions[vRow.index].colorPalette?.length
+                              ? 'flex-col items-start py-2'
+                              : 'flex-row items-center',
+                            // highlightedIndex-based highlight — works with virtualised items.
+                            // Reka's data-highlighted only fires for direct DOM children of
+                            // ListboxRoot; virtual rows are not, so we track highlight ourselves.
+                            vRow.index === highlightedIndex
+                              ? 'bg-select-item-hover-bg'
+                              : 'hover:bg-select-item-hover-bg',
+                            multiple
+                              ? ''
+                              : 'data-[state=checked]:bg-select-item-selected-bg data-[state=checked]:text-select-item-selected-text',
+                            'data-disabled:text-select-item-disabled data-disabled:pointer-events-none data-disabled:cursor-not-allowed',
+                          ]"
                         >
-                          <span class="font-medium shrink-0">{{ filteredOptions[vRow.index].label }}</span>
-                          <span class="text-select-placeholder shrink-0 mx-1">–</span>
-                          <span class="text-text-secondary truncate text-xs">{{ filteredOptions[vRow.index].subLabel }}</span>
-                        </template>
+                          <!-- Multi-select: always-visible checkbox indicator -->
+                          <template v-if="multiple">
+                            <span
+                              :class="[
+                                'flex shrink-0 items-center justify-center',
+                                'rounded-checkbox size-3.5 border transition-colors',
+                                selectedValues.includes(filteredOptions[vRow.index].value)
+                                  ? 'bg-checkbox-checked-bg border-checkbox-checked-border'
+                                  : 'bg-checkbox-bg border-checkbox-border',
+                              ]"
+                              aria-hidden="true"
+                              data-select-checkbox
+                            >
+                              <svg
+                                v-if="selectedValues.includes(filteredOptions[vRow.index].value)"
+                                xmlns="http://www.w3.org/2000/svg"
+                                viewBox="0 0 12 12"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                class="text-checkbox-checked-fg size-full p-0.5"
+                              >
+                                <polyline points="2,6 5,9 10,3" />
+                              </svg>
+                            </span>
+                            <!-- Separator between checkbox zone and label zone (rowClickSingleSelect only) -->
+                            <span
+                              v-if="rowClickSingleSelect"
+                              class="bg-card-glass-border mx-1 my-1 w-px shrink-0 self-stretch"
+                              aria-hidden="true"
+                              data-select-separator
+                            />
+                          </template>
 
-                        <!-- Rich item: label + optional badge + optional subLabel + optional color palette swatch.
+                          <!-- Inline subLabel: name – url on a single row -->
+                          <template
+                            v-if="
+                              filteredOptions[vRow.index].subLabel &&
+                              filteredOptions[vRow.index].subLabelInline
+                            "
+                          >
+                            <span class="shrink-0 font-medium">{{
+                              filteredOptions[vRow.index].label
+                            }}</span>
+                            <span class="text-select-placeholder mx-1 shrink-0">–</span>
+                            <span class="text-text-secondary truncate text-xs">{{
+                              filteredOptions[vRow.index].subLabel
+                            }}</span>
+                          </template>
+
+                          <!-- Rich item: label + optional badge + optional subLabel + optional color palette swatch.
                              Wrapped in a single div so ListboxItem's gap-2 does not
                              add unexpected space between each child and overflow the fixed height. -->
-                        <template
-                          v-else-if="filteredOptions[vRow.index].subLabel || filteredOptions[vRow.index].colorPalette?.length || filteredOptions[vRow.index].badge"
-                        >
-                          <div class="flex flex-col gap-1 w-full overflow-hidden">
-                            <span class="flex items-center gap-1.5 w-full leading-snug">
-                              <span class="truncate font-medium" :title="optionTooltip ? filteredOptions[vRow.index].label : undefined">{{ filteredOptions[vRow.index].label }}</span>
+                          <template
+                            v-else-if="
+                              filteredOptions[vRow.index].subLabel ||
+                              filteredOptions[vRow.index].colorPalette?.length ||
+                              filteredOptions[vRow.index].badge
+                            "
+                          >
+                            <div class="flex w-full flex-col gap-1 overflow-hidden">
+                              <span class="flex w-full items-center gap-1.5 leading-snug">
+                                <span
+                                  class="truncate font-medium"
+                                  :title="
+                                    optionTooltip ? filteredOptions[vRow.index].label : undefined
+                                  "
+                                  >{{ filteredOptions[vRow.index].label }}</span
+                                >
+                                <span
+                                  v-if="filteredOptions[vRow.index].badge"
+                                  class="rounded-default shrink-0 border border-solid"
+                                  :class="[
+                                    filteredOptions[vRow.index].badgeTitle
+                                      ? 'cursor-help'
+                                      : undefined,
+                                    filteredOptions[vRow.index].badgeStyle
+                                      ? 'ml-auto inline-flex h-[1.125rem] min-w-[1.125rem] items-center justify-center border-current px-1 text-xs leading-none font-semibold'
+                                      : 'text-3xs px-1 py-px leading-tight font-medium',
+                                  ]"
+                                  :title="filteredOptions[vRow.index].badgeTitle"
+                                  :style="
+                                    filteredOptions[vRow.index].badgeStyle ?? {
+                                      color: 'var(--color-status-positive)',
+                                      borderColor: 'var(--color-status-positive)',
+                                    }
+                                  "
+                                  >{{ filteredOptions[vRow.index].badge }}</span
+                                >
+                              </span>
                               <span
-                                v-if="filteredOptions[vRow.index].badge"
-                                class="shrink-0 rounded-default border border-solid"
-                                :class="[
-                                  filteredOptions[vRow.index].badgeTitle ? 'cursor-help' : undefined,
-                                  filteredOptions[vRow.index].badgeStyle
-                                    ? 'inline-flex items-center justify-center leading-none ml-auto min-w-[1.125rem] h-[1.125rem] px-1 text-xs font-semibold border-current'
-                                    : 'text-3xs font-medium px-1 py-px leading-tight',
-                                ]"
-                                :title="filteredOptions[vRow.index].badgeTitle"
-                                :style="
-                                  filteredOptions[vRow.index].badgeStyle ?? {
-                                    color: 'var(--color-status-positive)',
-                                    borderColor: 'var(--color-status-positive)',
-                                  }
-                                "
-                              >{{ filteredOptions[vRow.index].badge }}</span>
-                            </span>
-                            <span
-                              v-if="filteredOptions[vRow.index].subLabel"
-                              class="text-xs text-text-secondary line-clamp-2 whitespace-normal w-full leading-snug"
-                            >{{ filteredOptions[vRow.index].subLabel }}</span>
-                            <div
-                              v-if="filteredOptions[vRow.index].colorPalette?.length"
-                              class="h-1.5 w-full rounded-default"
-                              :style="{
-                                background: getPaletteGradient(
-                                  filteredOptions[vRow.index].colorPalette!,
-                                ),
-                              }"
-                            />
-                          </div>
-                        </template>
+                                v-if="filteredOptions[vRow.index].subLabel"
+                                class="text-text-secondary line-clamp-2 w-full text-xs leading-snug whitespace-normal"
+                                >{{ filteredOptions[vRow.index].subLabel }}</span
+                              >
+                              <div
+                                v-if="filteredOptions[vRow.index].colorPalette?.length"
+                                class="rounded-default h-1.5 w-full"
+                                :style="{
+                                  background: getPaletteGradient(
+                                    filteredOptions[vRow.index].colorPalette!,
+                                  ),
+                                }"
+                              />
+                            </div>
+                          </template>
 
-                        <!-- Simple item: optional icon + label -->
-                        <template v-else>
-                          <!-- Per-option icon: prefer a raw Vue component (iconComponent),
+                          <!-- Simple item: optional icon + label -->
+                          <template v-else>
+                            <!-- Per-option icon: prefer a raw Vue component (iconComponent),
                              fall back to a string name (icon) resolved via OIcon registry.
                              When iconKey is set but this option has no icon, reserve the
                              same space with a blank spacer so labels stay aligned. -->
-                          <component
-                            v-if="filteredOptions[vRow.index].iconComponent"
-                            :is="filteredOptions[vRow.index].iconComponent"
-                            class="shrink-0 size-4"
-                          />
-                          <OIcon
-                            v-else-if="filteredOptions[vRow.index].icon"
-                            :name="filteredOptions[vRow.index].icon"
-                            size="sm"
-                            class="shrink-0"
-                          />
-                          <span
-                            v-else-if="iconKey"
-                            class="shrink-0 size-4"
-                          />
-                          <span class="truncate" :title="optionTooltip ? filteredOptions[vRow.index].label : undefined">{{
-                            filteredOptions[vRow.index].label
-                          }}</span>
-                        </template>
-                      </ListboxItem>
+                            <component
+                              v-if="filteredOptions[vRow.index].iconComponent"
+                              :is="filteredOptions[vRow.index].iconComponent"
+                              class="size-4 shrink-0"
+                            />
+                            <OIcon
+                              v-else-if="filteredOptions[vRow.index].icon"
+                              :name="filteredOptions[vRow.index].icon"
+                              size="sm"
+                              class="shrink-0"
+                            />
+                            <span v-else-if="iconKey" class="size-4 shrink-0" />
+                            <span
+                              class="truncate"
+                              :title="optionTooltip ? filteredOptions[vRow.index].label : undefined"
+                              >{{ filteredOptions[vRow.index].label }}</span
+                            >
+                          </template>
+                        </ListboxItem>
                       </div>
                     </div>
                   </div>
                 </div>
 
                 <slot name="after-options" />
-              <!-- rowClickSingleSelect hint bar — inside bordered container so the border wraps it -->
-              <template v-if="multiple && rowClickSingleSelect">
-              <div class="mx-2 mt-1 h-px bg-input-border shrink-0" aria-hidden="true" />
-              <div
-                class="flex items-center gap-2 px-3 py-2 select-none pointer-events-none shrink-0"
-              >
-                <!-- Checkbox zone hint -->
-                <span class="flex items-center gap-1.5 text-2xs text-select-placeholder shrink-0">
-                  <span
-                    class="inline-flex items-center justify-center size-3.5 rounded-default border border-select-placeholder shrink-0"
-                    aria-hidden="true"
+                <!-- rowClickSingleSelect hint bar — inside bordered container so the border wraps it -->
+                <template v-if="multiple && rowClickSingleSelect">
+                  <div class="bg-input-border mx-2 mt-1 h-px shrink-0" aria-hidden="true" />
+                  <div
+                    class="pointer-events-none flex shrink-0 items-center gap-2 px-3 py-2 select-none"
                   >
-                    <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-2.5 p-px">
-                      <polyline points="1.5,5 4,8 8.5,2" />
-                    </svg>
-                  </span>
-                  <span>Multi select</span>
-                </span>
+                    <!-- Checkbox zone hint -->
+                    <span
+                      class="text-2xs text-select-placeholder flex shrink-0 items-center gap-1.5"
+                    >
+                      <span
+                        class="rounded-checkbox border-select-placeholder inline-flex size-3.5 shrink-0 items-center justify-center border"
+                        aria-hidden="true"
+                      >
+                        <svg
+                          viewBox="0 0 10 10"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="2"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          class="size-2.5 p-px"
+                        >
+                          <polyline points="1.5,5 4,8 8.5,2" />
+                        </svg>
+                      </span>
+                      <span>Multi select</span>
+                    </span>
 
-                <span class="w-px h-3.5 bg-input-border shrink-0" aria-hidden="true" />
+                    <span class="bg-input-border h-3.5 w-px shrink-0" aria-hidden="true" />
 
-                <!-- Name zone hint -->
-                <span class="flex items-center gap-1.5 text-2xs text-select-placeholder shrink-0">
-                  <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="size-3 shrink-0" aria-hidden="true">
-                    <path d="M4 2h6M4 5h6M4 8h3" />
-                  </svg>
-                  <span>Single select</span>
-                </span>
-              </div>
-              </template>
+                    <!-- Name zone hint -->
+                    <span
+                      class="text-2xs text-select-placeholder flex shrink-0 items-center gap-1.5"
+                    >
+                      <svg
+                        viewBox="0 0 14 14"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="1.5"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        class="size-3 shrink-0"
+                        aria-hidden="true"
+                      >
+                        <path d="M4 2h6M4 5h6M4 8h3" />
+                      </svg>
+                      <span>Single select</span>
+                    </span>
+                  </div>
+                </template>
               </div>
               <!-- end bordered container -->
             </ListboxRoot>
@@ -1658,56 +1640,48 @@ const fieldWidthClass = computed(() => {
         }
       "
     >
-      <div
-        ref="selectTriggerWrapperRef"
-        class="relative flex items-center"
-      >
+      <div ref="selectTriggerWrapperRef" class="relative flex items-center">
         <SelectTrigger
           :id="inputId"
           :tabindex="inputTabindex"
-          :data-test="
-            parentDataTest ? `${parentDataTest}-trigger` : undefined
-          "
+          :data-test="parentDataTest ? `${parentDataTest}-trigger` : undefined"
           :class="[
-            'relative flex w-full rounded-default border',
+            'rounded-default relative flex w-full border',
             // In inside-label mode padding is handled per-row
             labelPosition === 'inside' && label ? '' : 'ps-3',
             'bg-select-bg',
             hasError
-              ? 'border-select-border-error focus:ring-[0.125rem] focus:ring-select-border-error/30 data-[state=open]:ring-[0.125rem] data-[state=open]:ring-select-border-error/30'
-              : 'border-select-border hover:border-select-border-hover focus:border-select-border-focus focus:ring-[0.125rem] focus:ring-primary-500/25 data-[state=open]:border-select-border-focus data-[state=open]:ring-[0.125rem] data-[state=open]:ring-primary-500/25',
+              ? 'border-select-border-error focus:ring-select-border-error/30 data-[state=open]:ring-select-border-error/30 focus:ring-[0.125rem] data-[state=open]:ring-[0.125rem]'
+              : 'border-select-border hover:border-select-border-hover focus:border-select-border-focus focus:ring-accent/25 data-[state=open]:border-select-border-focus data-[state=open]:ring-accent/25 focus:ring-[0.125rem] data-[state=open]:ring-[0.125rem]',
             /* Keep the red error border on focus; focus border color applies only when there's no error. */
             'focus:outline-none',
             'transition-[color,background-color,border-color,box-shadow] duration-150',
             'data-disabled:bg-select-disabled-bg data-disabled:cursor-not-allowed data-disabled:border-dashed',
             labelPosition === 'inside' && label
-              ? [
-                  'flex-col justify-between py-0.5',
-                  heightClasses[size ?? 'md'],
-                ]
+              ? ['flex-col justify-between py-0.5', heightClasses[size ?? 'md']]
               : ['items-center', triggerEndPadding, heightClasses[size ?? 'md']],
           ]"
         >
           <!-- Inside label: in-flow with whitespace-nowrap so it drives the trigger's auto-width -->
           <span
             v-if="label && labelPosition === 'inside'"
-            class="text-3xs leading-none whitespace-nowrap text-start text-text-secondary select-none pointer-events-none ps-3 pe-7"
+            class="text-3xs text-text-secondary pointer-events-none ps-3 pe-7 text-start leading-none whitespace-nowrap select-none"
             >{{ label }}<span v-if="required" aria-hidden="true">&nbsp;*</span></span
           >
 
           <!-- Content row: flex-row for inside-label; display:contents for normal mode -->
           <div
-            :class="labelPosition === 'inside' && label
-              ? ['flex items-center flex-1 w-full min-w-0', triggerEndPadding, 'ps-3']
-              : 'contents'"
+            :class="
+              labelPosition === 'inside' && label
+                ? ['flex w-full min-w-0 flex-1 items-center', triggerEndPadding, 'ps-3']
+                : 'contents'
+            "
           >
             <SelectValue
               :placeholder="placeholder"
               :class="[
-                'flex-1 text-start truncate text-sm',
-                labelPosition === 'inside' && label
-                  ? 'text-xs leading-4'
-                  : '',
+                'flex-1 truncate text-start text-sm',
+                labelPosition === 'inside' && label ? 'text-xs leading-4' : '',
                 disabled
                   ? 'text-select-disabled-text'
                   : hasSelection
@@ -1722,18 +1696,16 @@ const fieldWidthClass = computed(() => {
 
         <!-- Trailing icons: clear (left) then chevron (right). See note in
              the listbox branch above for the pointer-events strategy. -->
-        <div
-          class="absolute end-2.5 flex items-center gap-1.5 pointer-events-none"
-        >
+        <div class="pointer-events-none absolute end-2.5 flex items-center gap-1.5">
           <button
             v-if="clearable && hasSelection"
             type="button"
             tabindex="-1"
             aria-label="Clear selection"
             :class="[
-              'flex items-center justify-center size-3.5',
+              'flex size-3.5 items-center justify-center',
               'text-input-clear-btn hover:text-input-clear-btn-hover',
-              'transition-colors pointer-events-auto',
+              'pointer-events-auto transition-colors',
             ]"
             @click.stop="handleClear"
           >
@@ -1755,7 +1727,7 @@ const fieldWidthClass = computed(() => {
             v-else
             aria-hidden="true"
             :class="[
-              'flex items-center justify-center text-select-icon',
+              'text-select-icon flex items-center justify-center',
               'transition-transform duration-150',
               isOpen ? 'rotate-180' : '',
             ]"
@@ -1784,7 +1756,7 @@ const fieldWidthClass = computed(() => {
           :hide-when-detached="true"
           :data-test="parentDataTest ? `${parentDataTest}-popover` : undefined"
           :class="[
-            'z-[10001] min-w-(--reka-select-trigger-width)',
+            'z-10001 min-w-(--reka-select-trigger-width)',
             'overflow-hidden',
             'rounded-default border shadow-md',
             'bg-select-content-bg border-select-content-border',
@@ -1796,13 +1768,14 @@ const fieldWidthClass = computed(() => {
             'data-[side=top]:data-[state=open]:animate-[o2-reveal-up-in_140ms_cubic-bezier(0.16,1,0.3,1)]',
             'data-[side=top]:data-[state=closed]:animate-[o2-reveal-up-out_100ms_cubic-bezier(0.4,0,1,1)]',
           ]"
-          :style="[dropdownStyle, { maxHeight: 'min(15rem, var(--reka-select-content-available-height, 15rem))' }]"
+          :style="[
+            dropdownStyle,
+            { maxHeight: 'min(15rem, var(--reka-select-content-available-height, 15rem))' },
+          ]"
           @click.stop
           @pointerdown.stop
         >
-          <SelectScrollUpButton
-            class="flex items-center justify-center h-6 text-select-icon"
-          >
+          <SelectScrollUpButton class="text-select-icon flex h-6 items-center justify-center">
             <svg
               xmlns="http://www.w3.org/2000/svg"
               viewBox="0 0 16 16"
@@ -1832,9 +1805,7 @@ const fieldWidthClass = computed(() => {
             <slot />
           </SelectViewport>
 
-          <SelectScrollDownButton
-            class="flex items-center justify-center h-6 text-select-icon"
-          >
+          <SelectScrollDownButton class="text-select-icon flex h-6 items-center justify-center">
             <svg
               xmlns="http://www.w3.org/2000/svg"
               viewBox="0 0 16 16"
@@ -1857,16 +1828,13 @@ const fieldWidthClass = computed(() => {
     <span
       v-if="effectiveError && effectiveError.trim()"
       :data-test="parentDataTest ? `${parentDataTest}-error` : undefined"
-      class="text-xs text-select-error-text leading-none"
+      class="text-select-error-text text-xs leading-none"
       role="alert"
     >
       {{ effectiveError }}
     </span>
     <!-- Help text -->
-    <span
-      v-else-if="helpText"
-      class="text-xs text-input-help-text leading-none"
-    >
+    <span v-else-if="helpText" class="text-input-help-text text-xs leading-none">
       {{ helpText }}
     </span>
   </div>

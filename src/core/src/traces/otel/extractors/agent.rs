@@ -19,7 +19,7 @@ use std::collections::HashMap;
 
 use config::{meta::gen_ai::GenAiAgentMappingConfig, utils::json};
 
-use crate::service::traces::otel::attributes::GenAiAttributes;
+use crate::traces::otel::attributes::GenAiAttributes;
 
 pub struct AgentExtractor;
 

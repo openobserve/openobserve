@@ -91,7 +91,7 @@ pub fn get_severity_value(severity_number: i32) -> String {
 /// is not an observation, so the caller has no record to write.
 ///
 /// The value is returned raw: whether a NaN or an infinity may be *recorded* is the metrics
-/// value policy, and lives with it (`crate::service::metrics::metric_value`).
+/// value policy, and lives with it (`crate::metrics::metric_value`).
 pub fn get_metric_val(attr_val: &Option<number_data_point::Value>) -> Option<f64> {
     match attr_val.as_ref()? {
         number_data_point::Value::AsDouble(val) => Some(*val),

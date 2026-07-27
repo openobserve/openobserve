@@ -553,8 +553,10 @@ impl Writer {
 
     // rotate is used to rotate the wal and memtable if the size exceeds the threshold
     async fn rotate(&self, entry_bytes_size: usize, entry_batch_size: usize) -> Result<()> {
-        if !self.check_wal_threshold(self.wal.read().await.size(), entry_bytes_size)
-            && !self.check_mem_threshold(self.memtable.read().await.size(), entry_batch_size)
+        let wal_size = self.wal.read().await.size();
+        if !self
+            .should_rotate(wal_size, entry_bytes_size, entry_batch_size)
+            .await
         {
             return Ok(());
         }
@@ -566,8 +568,12 @@ impl Writer {
         metrics::INGEST_WAL_LOCK_TIME
             .with_label_values(&[&self.key.org_id])
             .observe(wal_lock_time);
-        if !self.check_wal_threshold(wal.size(), entry_bytes_size) {
-            return Ok(()); // check again to avoid race condition
+        // check again to avoid race condition
+        if !self
+            .should_rotate(wal.size(), entry_bytes_size, entry_batch_size)
+            .await
+        {
+            return Ok(());
         }
         let cfg = get_config();
         let wal_id = self.next_seq.fetch_add(1, Ordering::SeqCst);
@@ -660,6 +666,21 @@ impl Writer {
     ) -> Result<(u64, Vec<ReadRecordBatchEntry>)> {
         let memtable = self.memtable.read().await;
         memtable.read(org_id, stream_name, time_range, partition_filters)
+    }
+
+    /// Check if the wal file or memtable is over its threshold, or the wal file is too old.
+    ///
+    /// `rotate()` calls this twice - before and after taking the wal write lock - and both
+    /// calls must check the same thresholds, otherwise memtable-triggered rotations would
+    /// be dropped by the re-check.
+    async fn should_rotate(
+        &self,
+        wal_size: (usize, usize),
+        entry_bytes_size: usize,
+        entry_batch_size: usize,
+    ) -> bool {
+        self.check_wal_threshold(wal_size, entry_bytes_size)
+            || self.check_mem_threshold(self.memtable.read().await.size(), entry_batch_size)
     }
 
     /// Check if the wal file size is over the threshold or the file is too old

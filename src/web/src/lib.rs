@@ -21,6 +21,10 @@
 
 use rust_embed_for_web::RustEmbed;
 
+mod ui;
+
+pub use ui::ui_routes;
+
 #[derive(RustEmbed)]
 #[folder = "../../web/dist/"]
 #[allow_missing = true]

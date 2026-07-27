@@ -16,9 +16,8 @@
 use proto::cluster_rpc::{
     DeleteResultCacheRequest, DeleteResultCacheResponse, query_cache_server::QueryCache,
 };
+use search_service::cache::cacher;
 use tonic::{Request, Response, Status};
-
-use crate::service::search::cache::cacher;
 
 #[derive(Default)]
 pub struct QueryCacheServerImpl;

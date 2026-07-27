@@ -13,11 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import {
-  PromQLResponse,
-  ConversionContext,
-  PromQLChartConverter,
-} from "./shared/types";
+import { PromQLResponse, ConversionContext, PromQLChartConverter } from "./shared/types";
 import { processPromQLData } from "./shared/dataProcessor";
 import { TimeSeriesConverter } from "./convertPromQLTimeSeriesChart";
 import { PieConverter } from "./convertPromQLPieChart";
@@ -75,18 +71,10 @@ export async function convertPromQLChartData(
   searchQueryData: PromQLResponse[],
   context: ConversionContext,
 ): Promise<{ options: any; extras: any }> {
-  const {
-    panelSchema,
-    store,
-    chartPanelRef,
-    hoveredSeriesState,
-    annotations,
-  } = context;
+  const { panelSchema, store, chartPanelRef, hoveredSeriesState, annotations } = context;
   const chartType = panelSchema.type;
   // Step 1: Find appropriate converter for this chart type
-  const converter = CONVERTER_REGISTRY.find((c) =>
-    c.supportedTypes.includes(chartType),
-  );
+  const converter = CONVERTER_REGISTRY.find((c) => c.supportedTypes.includes(chartType));
 
   if (!converter) {
     console.error(`No converter found for chart type: ${chartType}`);
@@ -98,11 +86,7 @@ export async function convertPromQLChartData(
 
   // Step 2: Preprocess data (common for all chart types)
   // This handles timestamp alignment, legend generation, and series limiting
-  const processedData = await processPromQLData(
-    searchQueryData,
-    panelSchema,
-    store,
-  );
+  const processedData = await processPromQLData(searchQueryData, panelSchema, store);
 
   // Step 3: Initialize extras object
   // This will be populated by converters with legends, hover state, etc.
@@ -113,13 +97,7 @@ export async function convertPromQLChartData(
 
   // Step 4: Delegate to chart-specific converter
   // Each converter knows how to transform data for its chart type(s)
-  const chartConfig = converter.convert(
-    processedData,
-    panelSchema,
-    store,
-    extras,
-    chartPanelRef,
-  );
+  const chartConfig = converter.convert(processedData, panelSchema, store, extras, chartPanelRef);
 
   // Step 5: Apply common chart configurations
   const options: { series?: any[]; columns?: unknown[]; [key: string]: any } = {
@@ -139,12 +117,7 @@ export async function convertPromQLChartData(
   // This handles plain vs scroll types, grid adjustments, and proper positioning
   // Skip for table charts as they don't use ECharts legends
   if (chartType !== "table") {
-    applyLegendConfiguration(
-      panelSchema,
-      chartPanelRef,
-      hoveredSeriesState,
-      options,
-    );
+    applyLegendConfiguration(panelSchema, chartPanelRef, hoveredSeriesState, options);
   }
 
   // Step 7: Apply annotations (if applicable)
@@ -182,10 +155,7 @@ export async function convertPromQLChartData(
  * @param options - Chart options to modify
  * @param annotations - Array of annotation configurations
  */
-function applyAnnotations(
-  options: any,
-  annotations: any[],
-): void {
+function applyAnnotations(options: any, annotations: any[]): void {
   if (!Array.isArray(options.series)) return;
 
   // Apply annotations to the first series

@@ -22,7 +22,6 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import i18n from "@/locales";
 import { makeModelPricingSchema } from "./ModelPricingEditor.schema";
 
-
 // Service mocks
 vi.mock("@/services/model_pricing", () => ({
   default: {
@@ -288,7 +287,7 @@ describe("ModelPricingEditor.vue", () => {
       const res = schema.safeParse({ name, match_pattern: "gpt" });
       return res.success
         ? ""
-        : res.error.issues.find((iss: any) => iss.path[0] === "name")?.message ?? "";
+        : (res.error.issues.find((iss: any) => iss.path[0] === "name")?.message ?? "");
     };
 
     it("requires a model name", () => {
@@ -296,9 +295,7 @@ describe("ModelPricingEditor.vue", () => {
     });
 
     it("rejects names over 256 chars", () => {
-      expect(nameIssue("a".repeat(257))).toBe(
-        "Model name must be 256 characters or fewer",
-      );
+      expect(nameIssue("a".repeat(257))).toBe("Model name must be 256 characters or fewer");
     });
 
     it("accepts a valid name", () => {
@@ -312,8 +309,7 @@ describe("ModelPricingEditor.vue", () => {
       const res = schema.safeParse({ name: "X", match_pattern });
       return res.success
         ? ""
-        : res.error.issues.find((iss: any) => iss.path[0] === "match_pattern")
-            ?.message ?? "";
+        : (res.error.issues.find((iss: any) => iss.path[0] === "match_pattern")?.message ?? "");
     };
 
     it("requires a match pattern", () => {
@@ -321,9 +317,7 @@ describe("ModelPricingEditor.vue", () => {
     });
 
     it("rejects patterns over 512 chars", () => {
-      expect(patternIssue("a".repeat(513))).toBe(
-        "Match pattern must be 512 characters or fewer",
-      );
+      expect(patternIssue("a".repeat(513))).toBe("Match pattern must be 512 characters or fewer");
     });
 
     it("reports an invalid regex with the parser error message", () => {
@@ -347,18 +341,14 @@ describe("ModelPricingEditor.vue", () => {
       const res = schema.safeParse({
         name: "X",
         match_pattern: "gpt",
-        tiers: [
-          { name: "Default", condition: null, prices: [{ key, value: 1 }] },
-        ],
+        tiers: [{ name: "Default", condition: null, prices: [{ key, value: 1 }] }],
       });
       return res.success
         ? ""
-        : res.error.issues.find(
+        : (res.error.issues.find(
             (iss: any) =>
-              iss.path[0] === "tiers" &&
-              iss.path[2] === "prices" &&
-              iss.path[4] === "key",
-          )?.message ?? "";
+              iss.path[0] === "tiers" && iss.path[2] === "prices" && iss.path[4] === "key",
+          )?.message ?? "");
     };
 
     it("rejects a pure-integer price key", () => {
@@ -366,9 +356,7 @@ describe("ModelPricingEditor.vue", () => {
     });
 
     it("rejects a price key that contains spaces", () => {
-      expect(keyIssue("input tokens")).toBe(
-        "Usage key must not contain spaces",
-      );
+      expect(keyIssue("input tokens")).toBe("Usage key must not contain spaces");
     });
 
     it("accepts a valid alphanumeric price key", () => {
@@ -495,9 +483,7 @@ describe("ModelPricingEditor.vue", () => {
     it("addPrice commits the draft row into the tier and clears the draft", async () => {
       const wrapper = createWrapper();
       await flushPromises();
-      getForm(wrapper).setFieldValue("tiers", [
-        tier({ draftKey: "input", draftValue: 5 }),
-      ]);
+      getForm(wrapper).setFieldValue("tiers", [tier({ draftKey: "input", draftValue: 5 })]);
       await nextTick();
       (wrapper.vm as any).addPrice(0);
       await nextTick();
@@ -510,9 +496,7 @@ describe("ModelPricingEditor.vue", () => {
     it("addPrice is a no-op when the draft key is empty", async () => {
       const wrapper = createWrapper();
       await flushPromises();
-      getForm(wrapper).setFieldValue("tiers", [
-        tier({ draftKey: "  ", draftValue: 5 }),
-      ]);
+      getForm(wrapper).setFieldValue("tiers", [tier({ draftKey: "  ", draftValue: 5 })]);
       await nextTick();
       (wrapper.vm as any).addPrice(0);
       await nextTick();
@@ -522,9 +506,7 @@ describe("ModelPricingEditor.vue", () => {
     it("removePrice removes the row at the given index", async () => {
       const wrapper = createWrapper();
       await flushPromises();
-      getForm(wrapper).setFieldValue("tiers", [
-        tier({ prices: [row("a", 1), row("b", 2)] }),
-      ]);
+      getForm(wrapper).setFieldValue("tiers", [tier({ prices: [row("a", 1), row("b", 2)] })]);
       await nextTick();
       (wrapper.vm as any).removePrice(0, 0);
       await nextTick();
@@ -687,9 +669,7 @@ describe("ModelPricingEditor.vue", () => {
     it("warns when a draft row has a value but no key", async () => {
       const wrapper = createWrapper();
       await flushPromises();
-      fillValid(wrapper, [
-        tier({ prices: [row("input", 1000)], draftKey: "", draftValue: 5 }),
-      ]);
+      fillValid(wrapper, [tier({ prices: [row("input", 1000)], draftKey: "", draftValue: 5 })]);
       await nextTick();
       await getForm(wrapper).handleSubmit();
       await flushPromises();
@@ -840,9 +820,7 @@ describe("ModelPricingEditor.vue", () => {
     it("auto-commits a draft row before saving", async () => {
       const wrapper = createWrapper();
       await flushPromises();
-      fillValid(wrapper, [
-        tier({ prices: [], draftKey: "input", draftValue: 1 }),
-      ]);
+      fillValid(wrapper, [tier({ prices: [], draftKey: "input", draftValue: 1 })]);
       await nextTick();
       await getForm(wrapper).handleSubmit();
       await flushPromises();
@@ -969,9 +947,7 @@ describe("ModelPricingEditor.vue", () => {
       const tiers = (wrapper.vm as any).formTiers;
       expect(tiers).toHaveLength(2);
       // 0.001 per-token → 1000 per-million
-      expect(tiers[0].prices.map((r: any) => [r.key, r.value])).toEqual([
-        ["input", 1000],
-      ]);
+      expect(tiers[0].prices.map((r: any) => [r.key, r.value])).toEqual([["input", 1000]]);
       expect(tiers[0].condition).toBeNull();
       expect(tiers[1].condition).toEqual({ usage_key: "input", operator: "gt", value: 0 });
     });
@@ -1035,9 +1011,11 @@ describe("ModelPricingEditor.vue", () => {
       await flushPromises();
 
       // form data is correct (only "input" removed)
-      expect(
-        (wrapper.vm as any).formTiers[0].prices.map((p: any) => p.key),
-      ).toEqual(["output", "cache_read_input_tokens", "output_reasoning_tokens"]);
+      expect((wrapper.vm as any).formTiers[0].prices.map((p: any) => p.key)).toEqual([
+        "output",
+        "cache_read_input_tokens",
+        "output_reasoning_tokens",
+      ]);
 
       // the RENDERED inputs must match the data — not shifted, not blank
       expect(renderedPriceKeys(wrapper)).toEqual([
@@ -1076,10 +1054,7 @@ describe("ModelPricingEditor.vue", () => {
       await nextTick();
       await flushPromises();
 
-      expect((wrapper.vm as any).formTiers.map((t: any) => t.name)).toEqual([
-        "Default",
-        "Tier C",
-      ]);
+      expect((wrapper.vm as any).formTiers.map((t: any) => t.name)).toEqual(["Default", "Tier C"]);
       expect(renderedTierNames(wrapper)).toEqual(["Default", "Tier C"]);
     });
 
@@ -1110,9 +1085,7 @@ describe("ModelPricingEditor.vue", () => {
       await nextTick();
 
       // modelToForm preserves the map's key order exactly — no sort, no reverse
-      expect(
-        (wrapper.vm as any).formTiers[0].prices.map((p: any) => p.key),
-      ).toEqual([
+      expect((wrapper.vm as any).formTiers[0].prices.map((p: any) => p.key)).toEqual([
         "input",
         "output",
         "cache_read_input_tokens",

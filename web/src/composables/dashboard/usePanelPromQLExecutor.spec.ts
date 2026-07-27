@@ -284,7 +284,9 @@ describe("usePanelPromQLExecutor", () => {
     it("handles errors gracefully: resets loading state", async () => {
       const { ctx } = makeCtx();
       // Force an error by making replaceQueryValue throw
-      ctx.replaceQueryValue = vi.fn(() => { throw new Error("substitution error"); });
+      ctx.replaceQueryValue = vi.fn(() => {
+        throw new Error("substitution error");
+      });
       ctx.state.loading = true;
 
       const { executePromQL } = usePanelPromQLExecutor(ctx);
@@ -326,17 +328,15 @@ describe("usePanelPromQLExecutor", () => {
       const { executePromQL } = usePanelPromQLExecutor(ctx);
       await executePromQL(0, 300_000_000, null);
 
-      capturedHandlers.error(
-        {},
-        { content: { message: "query failed", code: 400 } },
-      );
+      capturedHandlers.error({}, { content: { message: "query failed", code: 400 } });
 
       expect(state.errorDetail.message).toBe("query failed");
       expect(removeTraceId).toHaveBeenCalledWith("mock-trace-id");
     });
 
     it("complete handler resets loading and calls saveCurrentStateToCache", async () => {
-      const { ctx, fetchQueryDataWithHttpStream, state, saveCurrentStateToCache, removeTraceId } = makeCtx();
+      const { ctx, fetchQueryDataWithHttpStream, state, saveCurrentStateToCache, removeTraceId } =
+        makeCtx();
       let capturedHandlers: any;
 
       fetchQueryDataWithHttpStream.mockImplementation((_payload: any, handlers: any) => {
@@ -386,7 +386,13 @@ describe("the heatmap column cap", () => {
    * one range where a 15s step happens to land under the cap (60 columns). So this
    * table starts at 15m and does not stop there.
    */
-  const MS = { "15m": 15 * 60_000, "1h": 3_600_000, "6h": 21_600_000, "24h": 86_400_000, "7d": 604_800_000 };
+  const MS = {
+    "15m": 15 * 60_000,
+    "1h": 3_600_000,
+    "6h": 21_600_000,
+    "24h": 86_400_000,
+    "7d": 604_800_000,
+  };
 
   const stepFor = async (rangeMs: number) => {
     const panelSchema = makePanelSchema();
@@ -448,8 +454,8 @@ describe("streaming PromQL errors reach the user as sentences", () => {
   const errorFrom = async (payload: any) => {
     const panelSchema = makePanelSchema();
     const { ctx, state, fetchQueryDataWithHttpStream } = makeCtx({ panelSchema });
-    (fetchQueryDataWithHttpStream as any).mockImplementation(
-      (_req: any, handlers: any) => handlers.error({}, payload),
+    (fetchQueryDataWithHttpStream as any).mockImplementation((_req: any, handlers: any) =>
+      handlers.error({}, payload),
     );
     const { executePromQL } = usePanelPromQLExecutor(ctx as any);
     await executePromQL(1_700_000_000_000, 1_700_000_000_100, null);

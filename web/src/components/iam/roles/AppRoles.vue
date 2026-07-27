@@ -15,30 +15,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OPageLayout
-      :title="t('iam.roles')"
-      icon="shield" bleed>
-      <template #subtitle>
-        <span data-test="iam-roles-subtitle">
-          {{ t('iam.rolesPage.subtitle') }}
-        </span>
-      </template>
-      <template #actions>
-        <OButton
-          data-test="alert-list-add-alert-btn"
-          variant="primary"
-          size="sm"
-          @click="addRole"
-        >
-          {{ t('iam.addRole') }}
-        </OButton>
-      </template>
-    <div class="w-full flex-1 min-h-0 overflow-hidden">
+  <OPageLayout :title="t('iam.roles')" icon="shield" bleed>
+    <template #subtitle>
+      <span data-test="iam-roles-subtitle">
+        {{ t("iam.rolesPage.subtitle") }}
+      </span>
+    </template>
+    <template #actions>
+      <OButton data-test="alert-list-add-alert-btn" variant="primary" size="sm" @click="addRole">
+        {{ t("iam.addRole") }}
+      </OButton>
+    </template>
+    <div class="min-h-0 w-full flex-1 overflow-hidden">
       <div class="bg-card-glass-bg h-full">
         <RoleTable
           data-test="iam-roles-table-section"
           :data="rows"
           :loading="loading"
+          :action-loading="bulkDeleteLoading"
           v-model:global-filter="filterQuery"
           :selected-ids="selectedRoleNames"
           @update:selected-ids="onSelectionChange"
@@ -56,17 +50,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="iam-roles-refresh-btn"
               @click="setupRoles"
             >
-              <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="iamRolesRefresh" />
+              <OTooltip
+                side="bottom"
+                :content="t('common.refresh')"
+                shortcut-id="iamRolesRefresh"
+              />
             </OButton>
           </template>
         </RoleTable>
       </div>
     </div>
   </OPageLayout>
-  <AddRole
-    v-model:open="showAddGroup"
-    @added:role="onRoleAdded"
-  />
+  <AddRole v-model:open="showAddGroup" @added:role="onRoleAdded" />
   <ConfirmDialog
     :title="t('iam.appRoles.deleteRole')"
     :message="t('iam.appRoles.deleteConfirm', { roleName: deleteConformDialog?.data?.role_name })"
@@ -103,8 +98,6 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 
-
-
 const { t } = useI18n();
 
 const { track } = useReo();
@@ -119,17 +112,17 @@ const router = useRouter();
 
 const store = useStore();
 
-
 const deleteConformDialog = ref({
   show: false,
   data: null as any,
 });
 
 const selectedRoleNames = ref<string[]>([]);
-const onSelectionChange = (ids: string[]) => { selectedRoleNames.value = ids; };
+const onSelectionChange = (ids: string[]) => {
+  selectedRoleNames.value = ids;
+};
 const confirmBulkDelete = ref(false);
-
-
+const bulkDeleteLoading = ref(false);
 
 const { rolesState } = usePermissions();
 
@@ -144,7 +137,7 @@ const updateTable = () => {
 const addRole = () => {
   track("Button Click", {
     button: "Add Role",
-    page: "Roles"
+    page: "Roles",
   });
   showAddGroup.value = true;
 };
@@ -178,9 +171,9 @@ const editRole = (role: any) => {
     params: {
       role_name: role.role_name,
     },
-    query:{
-      org_identifier: store.state.selectedOrganization.identifier
-    }
+    query: {
+      org_identifier: store.state.selectedOrganization.identifier,
+    },
   });
 };
 
@@ -233,10 +226,7 @@ const showConfirmDialog = async (row: any) => {
   deleteImpactMessage.value = t("iam.rolesPage.delete.impact", { count: 0 });
 
   try {
-    const res = await getRoleUsers(
-      row.role_name,
-      store.state.selectedOrganization.identifier,
-    );
+    const res = await getRoleUsers(row.role_name, store.state.selectedOrganization.identifier);
     const userCount = Array.isArray(res.data) ? res.data.length : 0;
     deleteImpactMessage.value = t("iam.rolesPage.delete.impact", {
       count: userCount,
@@ -284,6 +274,7 @@ const openBulkDeleteDialog = async () => {
 
 const bulkDeleteUserRoles = async () => {
   const roleNames = selectedRoleNames.value;
+  bulkDeleteLoading.value = true;
 
   try {
     const response = await bulkDeleteRoles(store.state.selectedOrganization.identifier, {
@@ -303,7 +294,10 @@ const bulkDeleteUserRoles = async () => {
       });
     } else if (successful.length > 0 && unsuccessful.length > 0) {
       toast({
-        message: t("iam.appRoles.bulkDeletePartial", { successful: successful.length, unsuccessful: unsuccessful.length }),
+        message: t("iam.appRoles.bulkDeletePartial", {
+          successful: successful.length,
+          unsuccessful: unsuccessful.length,
+        }),
         variant: "warning",
       });
     } else if (unsuccessful.length > 0) {
@@ -319,11 +313,14 @@ const bulkDeleteUserRoles = async () => {
   } catch (error: any) {
     if (error.response?.status != 403 || error?.status != 403) {
       toast({
-        message: error.response?.data?.message || error?.message || t("iam.appRoles.bulkDeleteRolesError"),
+        message:
+          error.response?.data?.message || error?.message || t("iam.appRoles.bulkDeleteRolesError"),
         variant: "error",
       });
     }
     confirmBulkDelete.value = false;
+  } finally {
+    bulkDeleteLoading.value = false;
   }
 };
 
@@ -331,11 +328,15 @@ const bulkDeleteUserRoles = async () => {
 useShortcuts([
   {
     id: "iamRolesAdd",
-    handler: () => { if (!isInputFocused()) addRole(); },
+    handler: () => {
+      if (!isInputFocused()) addRole();
+    },
   },
   {
     id: "iamRolesRefresh",
-    handler: () => { if (!isInputFocused()) setupRoles(); },
+    handler: () => {
+      if (!isInputFocused()) setupRoles();
+    },
   },
   {
     id: "iamRolesFocusSearch",
@@ -344,5 +345,4 @@ useShortcuts([
     },
   },
 ]);
-
 </script>

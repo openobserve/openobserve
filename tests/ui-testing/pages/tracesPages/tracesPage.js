@@ -1501,6 +1501,29 @@ export class TracesPage {
   }
 
   /**
+   * Open a tab in the trace details view ('waterfall', 'flame-graph', 'map',
+   * 'dag', 'thread').
+   *
+   * Tests must not assume which tab is active on open: the view defaults to the
+   * flame graph, the last active tab is persisted per-browser, and LLM-only tabs
+   * (dag/thread) are hidden for traces without LLM spans. Anything reading the
+   * span tree has to select 'waterfall' explicitly first.
+   * @param {string} tabValue
+   * @returns {Promise<boolean>} whether the tab existed and was selected
+   */
+  async openTraceDetailsTab(tabValue) {
+    const tab = this.page.locator(`[data-test="trace-details-${tabValue}-tab"]`);
+    const appeared = await tab
+      .waitFor({ state: 'visible', timeout: 10000 })
+      .then(() => true)
+      .catch(() => false);
+    if (!appeared) return false;
+    await tab.click();
+    await this.page.waitForTimeout(1000);
+    return true;
+  }
+
+  /**
    * Check if trace details tree is visible
    * @returns {Promise<boolean>}
    */

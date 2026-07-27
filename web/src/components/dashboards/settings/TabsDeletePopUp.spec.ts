@@ -37,9 +37,7 @@ vi.mock("vue-i18n", async () => {
         const message = resolve(key);
         if (typeof message !== "string") return key;
         if (!params) return message;
-        return message.replace(/\{\s*(\w+)\s*\}/g, (_match, name: string) =>
-          String(params[name]),
-        );
+        return message.replace(/\{\s*(\w+)\s*\}/g, (_match, name: string) => String(params[name]));
       },
     }),
   };
@@ -96,7 +94,6 @@ const ODialogStub = {
     </div>
   `,
 };
-
 
 describe("TabsDeletePopUp", () => {
   let wrapper: VueWrapper<any>;
@@ -237,14 +234,18 @@ describe("TabsDeletePopUp", () => {
     it("should show panel options when tab has panels", () => {
       wrapper = createWrapper();
 
-      const panelsContainer = wrapper.find('[data-test="dashboard-tab-delete-tab-panels-container"]');
+      const panelsContainer = wrapper.find(
+        '[data-test="dashboard-tab-delete-tab-panels-container"]',
+      );
       expect(panelsContainer.exists()).toBe(true);
     });
 
     it("should not show panel options when tab has no panels", () => {
       wrapper = createWrapper({ tabId: "tab4" }); // Tab 4 has no panels
 
-      const panelsContainer = wrapper.find('[data-test="dashboard-tab-delete-tab-panels-container"]');
+      const panelsContainer = wrapper.find(
+        '[data-test="dashboard-tab-delete-tab-panels-container"]',
+      );
       expect(panelsContainer.exists()).toBe(false);
     });
 
@@ -268,7 +269,9 @@ describe("TabsDeletePopUp", () => {
       // Default action should be "move"
       expect(wrapper.vm.action).toBe("move");
 
-      const selectElement = wrapper.find('[data-test="dashboard-tab-delete-tab-panels-move-select"]');
+      const selectElement = wrapper.find(
+        '[data-test="dashboard-tab-delete-tab-panels-move-select"]',
+      );
       expect(selectElement.exists()).toBe(true);
     });
 
@@ -285,7 +288,9 @@ describe("TabsDeletePopUp", () => {
         dashboardData: dataWithUndefinedPanels,
       });
 
-      const panelsContainer = wrapper.find('[data-test="dashboard-tab-delete-tab-panels-container"]');
+      const panelsContainer = wrapper.find(
+        '[data-test="dashboard-tab-delete-tab-panels-container"]',
+      );
       expect(panelsContainer.exists()).toBe(false);
     });
   });
@@ -312,9 +317,7 @@ describe("TabsDeletePopUp", () => {
 
     it("should handle case with only one tab", () => {
       const singleTabData = {
-        tabs: [
-          { tabId: "only-tab", name: "Only Tab", panels: [{ id: "panel1" }] },
-        ],
+        tabs: [{ tabId: "only-tab", name: "Only Tab", panels: [{ id: "panel1" }] }],
       };
 
       wrapper = createWrapper({
@@ -515,7 +518,9 @@ describe("TabsDeletePopUp", () => {
 
       expect(wrapper.vm.action).toBe("move");
 
-      const selectElement = wrapper.find('[data-test="dashboard-tab-delete-tab-panels-move-select"]');
+      const selectElement = wrapper.find(
+        '[data-test="dashboard-tab-delete-tab-panels-move-select"]',
+      );
       expect(selectElement.exists()).toBe(true);
     });
 
@@ -531,9 +536,7 @@ describe("TabsDeletePopUp", () => {
 
     it("should handle empty options gracefully", () => {
       const emptyTabsData = {
-        tabs: [
-          { tabId: "only-tab", name: "Only Tab", panels: [{ id: "panel1" }] },
-        ],
+        tabs: [{ tabId: "only-tab", name: "Only Tab", panels: [{ id: "panel1" }] }],
       };
 
       wrapper = createWrapper({

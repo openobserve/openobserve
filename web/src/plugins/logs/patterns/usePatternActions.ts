@@ -46,19 +46,12 @@ export const usePatternActions = () => {
    * pattern set. Without the fallback, navigation silently does nothing if the
    * drawer's state was set without going through `openPatternDetails`. */
   const navigablePatterns = computed<any[]>(() =>
-    navPatterns.value.length
-      ? navPatterns.value
-      : (patternsState.value.patterns?.patterns ?? []),
+    navPatterns.value.length ? navPatterns.value : (patternsState.value.patterns?.patterns ?? []),
   );
   const navTotal = computed(() => navigablePatterns.value.length);
 
-  const openPatternDetails = (
-    pattern: any,
-    index: number,
-    visiblePatterns?: any[],
-  ) => {
-    navPatterns.value =
-      visiblePatterns ?? patternsState.value.patterns?.patterns ?? [];
+  const openPatternDetails = (pattern: any, index: number, visiblePatterns?: any[]) => {
+    navPatterns.value = visiblePatterns ?? patternsState.value.patterns?.patterns ?? [];
     selectedPattern.value = { pattern, index };
     showPatternDetails.value = true;
   };
@@ -81,10 +74,7 @@ export const usePatternActions = () => {
     }
   };
 
-  const addPatternToSearch = (
-    pattern: any,
-    action: "include" | "exclude",
-  ) => {
+  const addPatternToSearch = (pattern: any, action: "include" | "exclude") => {
     // Only the pattern's invariant constant text identifies the pattern. An
     // all-wildcard template has none — its sample values are per-log examples,
     // not invariants — so there's no reliable filter and we warn instead of
@@ -99,27 +89,20 @@ export const usePatternActions = () => {
       return;
     }
 
-    const matchAllClauses = terms.map(
-      (term) => `match_all('${escapeForMatchAll(term)}')`,
-    );
+    const matchAllClauses = terms.map((term) => `match_all('${escapeForMatchAll(term)}')`);
 
     let filterExpression = matchAllClauses.join(" AND ");
 
     if (action === "exclude") {
       filterExpression =
-        matchAllClauses.length > 1
-          ? `NOT (${filterExpression})`
-          : `NOT ${filterExpression}`;
+        matchAllClauses.length > 1 ? `NOT (${filterExpression})` : `NOT ${filterExpression}`;
     }
 
     searchObj.data.stream.addToFilter = filterExpression;
     searchObj.meta.logsVisualizeToggle = "logs";
   };
 
-  const addWildcardValueToSearch = (
-    value: string,
-    action: "include" | "exclude",
-  ) => {
+  const addWildcardValueToSearch = (value: string, action: "include" | "exclude") => {
     const escaped = escapeForMatchAll(value);
     let filterExpression = `match_all('${escaped}')`;
 
@@ -157,9 +140,7 @@ export const usePatternActions = () => {
     const start = dt?.startTime;
     const end = dt?.endTime;
     const periodMinutes =
-      start && end
-        ? Math.max(5, Math.min(60, Math.round((end - start) / 60_000_000)))
-        : 15;
+      start && end ? Math.max(5, Math.min(60, Math.round((end - start) / 60_000_000))) : 15;
 
     const patternData = buildPatternAlertData(
       pattern,

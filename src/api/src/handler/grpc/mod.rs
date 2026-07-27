@@ -17,14 +17,14 @@ pub mod auth;
 pub mod flight;
 pub mod request;
 
+pub use common::meta::grpc::MetadataMap;
 use proto::cluster_rpc;
-
-pub use crate::common::meta::grpc::MetadataMap;
 
 #[cfg(test)]
 mod tests {
+    use promql_service::MetricsQueryRequest;
+
     use super::*;
-    use crate::service::promql::MetricsQueryRequest;
 
     fn make_request() -> MetricsQueryRequest {
         MetricsQueryRequest {

@@ -15,22 +15,19 @@
 
 use std::collections::HashMap;
 
+use common::meta::loki::{LokiError, LokiPushRequest};
 use config::{
     DEFAULT_STREAM_NAME, MESSAGE_COL_NAME, STREAM_NAME_LABEL, STREAM_NAME_LABEL_OLD,
     TIMESTAMP_COL_NAME,
     utils::{json, schema::format_stream_name},
 };
 use infra::errors::Result;
+use ingestion_common::{IngestUser, IngestionRequest, IngestionResponse, IngestionValueType};
 use promql_parser::{
     label::MatchOp,
     parser::{self, Expr as PromExpr},
 };
 use proto::loki_rpc;
-
-use crate::common::meta::{
-    ingestion::{IngestUser, IngestionRequest, IngestionResponse, IngestionValueType},
-    loki::{LokiError, LokiPushRequest},
-};
 
 pub enum LokiRequest {
     Json(LokiPushRequest),

@@ -8,7 +8,6 @@ license.workspace = true
 default = ["gxhash"]
 enterprise = []
 gxhash = ["dep:gxhash"]
-vortex = ["dep:vortex"]
 
 [dependencies]
 aes-siv.workspace = true
@@ -85,7 +84,7 @@ urlencoding.workspace = true
 utoipa.workspace = true
 uuid.workspace = true
 vrl.workspace = true
-vortex = { workspace = true, optional = true }
+vortex = { workspace = true }
 
 [dev-dependencies]
 expect-test.workspace = true

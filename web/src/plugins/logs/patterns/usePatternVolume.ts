@@ -77,8 +77,7 @@ export function buildPatternVolumeContext(args: {
 }
 
 /** SQL keywords that can follow a table name, so they're never read as aliases. */
-const CLAUSE_KEYWORDS =
-  "WHERE|GROUP|ORDER|LIMIT|OFFSET|HAVING|UNION|JOIN|ON|WINDOW|QUALIFY";
+const CLAUSE_KEYWORDS = "WHERE|GROUP|ORDER|LIMIT|OFFSET|HAVING|UNION|JOIN|ON|WINDOW|QUALIFY";
 
 /**
  * The filter to AND into a volume query, or `null` when the extraction query's
@@ -92,9 +91,7 @@ const CLAUSE_KEYWORDS =
  * unavailable, which is honest — silently dropping the filter would report
  * counts for the whole stream as if they were the pattern's.
  */
-export async function resolveBaseFilter(
-  sql?: string | null,
-): Promise<string | null> {
+export async function resolveBaseFilter(sql?: string | null): Promise<string | null> {
   if (!sql?.trim()) return "";
   // Compound shapes whose filtering can't be re-expressed as a bare WHERE.
   if (/\bWITH\b|\bJOIN\b|\bUNION\b/i.test(sql)) return null;
@@ -167,13 +164,9 @@ export async function fetchPatternVolume(
   }
 
   const windowSecs = Math.max(1, (ctx.endUs - ctx.startUs) / 1_000_000);
-  const { label: interval, seconds: intervalSecs } = histogramInterval(
-    windowSecs / TARGET_BARS,
-  );
+  const { label: interval, seconds: intervalSecs } = histogramInterval(windowSecs / TARGET_BARS);
 
-  const patternWhere = constants
-    .map((c) => `match_all('${escapeForMatchAll(c)}')`)
-    .join(" AND ");
+  const patternWhere = constants.map((c) => `match_all('${escapeForMatchAll(c)}')`).join(" AND ");
   // AND the extraction query's own filter (if any) so a filtered extraction's
   // volume reflects the same subset the patterns were extracted from. A null
   // means that filter can't be reproduced — report no volume rather than a
@@ -186,10 +179,7 @@ export async function fetchPatternVolume(
     `FROM "${ctx.streamName}" WHERE ${where} ` +
     `GROUP BY zo_key ORDER BY zo_key`;
 
-  const response: any = await searchService.search(
-    volumeSearchPayload(ctx, sql, 500),
-    "ui",
-  );
+  const response: any = await searchService.search(volumeSearchPayload(ctx, sql, 500), "ui");
 
   const hits: any[] = response?.data?.hits ?? [];
   return {
@@ -203,11 +193,7 @@ export async function fetchPatternVolume(
  * extracted in. Dropping the VRL function, action, or region/cluster selection
  * would silently count a different population than the one being described.
  */
-function volumeSearchPayload(
-  ctx: PatternVolumeContext,
-  sql: string,
-  size: number,
-) {
+function volumeSearchPayload(ctx: PatternVolumeContext, sql: string, size: number) {
   return {
     org_identifier: ctx.orgId,
     query: {
@@ -274,8 +260,7 @@ export function bucketizeHistogram(
 
   // First boundary at or before the window start, on the backend's grid.
   const gridStartMs =
-    DATE_BIN_ORIGIN_MS +
-    Math.floor((startMs - DATE_BIN_ORIGIN_MS) / bucketMs) * bucketMs;
+    DATE_BIN_ORIGIN_MS + Math.floor((startMs - DATE_BIN_ORIGIN_MS) / bucketMs) * bucketMs;
   const bucketCount = Math.max(1, Math.ceil((endMs - gridStartMs) / bucketMs));
 
   const buckets = new Array<number>(bucketCount).fill(0);
@@ -342,10 +327,7 @@ export function usePatternVolumeCache(ctx: Ref<PatternVolumeContext | null>) {
     try {
       const result = await fetchPatternVolume(pattern, c);
       const buckets = result?.buckets ?? null;
-      const total =
-        buckets && buckets.length
-          ? buckets.reduce((sum, v) => sum + v, 0)
-          : null;
+      const total = buckets && buckets.length ? buckets.reduce((sum, v) => sum + v, 0) : null;
       entry = {
         buckets,
         total,
@@ -382,21 +364,15 @@ export interface PatternVolumeCache {
  * constants of `... from web` and `... from api` both reduce to the shared
  * prefix), so summing them double-counts and can exceed the true total.
  */
-export async function fetchWindowTotal(
-  ctx: PatternVolumeContext,
-): Promise<number | null> {
+export async function fetchWindowTotal(ctx: PatternVolumeContext): Promise<number | null> {
   const baseWhere = await resolveBaseFilter(ctx.baseSql);
   // Can't reproduce the extraction's filter → no total, so the chips fall back
   // to sample counts instead of being scaled against the wrong population.
   if (baseWhere === null) return null;
   const sql =
-    `SELECT count(*) AS zo_cnt FROM "${ctx.streamName}"` +
-    (baseWhere ? ` WHERE ${baseWhere}` : "");
+    `SELECT count(*) AS zo_cnt FROM "${ctx.streamName}"` + (baseWhere ? ` WHERE ${baseWhere}` : "");
   try {
-    const response: any = await searchService.search(
-      volumeSearchPayload(ctx, sql, 1),
-      "ui",
-    );
+    const response: any = await searchService.search(volumeSearchPayload(ctx, sql, 1), "ui");
     const value = Number(response?.data?.hits?.[0]?.zo_cnt);
     return Number.isFinite(value) ? value : null;
   } catch {

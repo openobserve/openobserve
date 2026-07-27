@@ -51,14 +51,13 @@ export default {
       return null;
     };
 
-    const getBestUnit = (diffInSeconds: number): { value: number; unit: Intl.RelativeTimeFormatUnit } => {
+    const getBestUnit = (
+      diffInSeconds: number,
+    ): { value: number; unit: Intl.RelativeTimeFormatUnit } => {
       if (diffInSeconds < 60) return { value: diffInSeconds, unit: "second" };
-      if (diffInSeconds < 3600)
-        return { value: Math.floor(diffInSeconds / 60), unit: "minute" };
-      if (diffInSeconds < 86400)
-        return { value: Math.floor(diffInSeconds / 3600), unit: "hour" };
-      if (diffInSeconds < 2592000)
-        return { value: Math.floor(diffInSeconds / 86400), unit: "day" };
+      if (diffInSeconds < 3600) return { value: Math.floor(diffInSeconds / 60), unit: "minute" };
+      if (diffInSeconds < 86400) return { value: Math.floor(diffInSeconds / 3600), unit: "hour" };
+      if (diffInSeconds < 2592000) return { value: Math.floor(diffInSeconds / 86400), unit: "day" };
       if (diffInSeconds < 31536000)
         return { value: Math.floor(diffInSeconds / 2592000), unit: "month" };
       return { value: Math.floor(diffInSeconds / 31536000), unit: "year" };
@@ -90,7 +89,7 @@ export default {
       return `${props.fullTimePrefix} ${timestampToTimezoneDate(
         timestampMs,
         store.state.timezone,
-        "yyyy-MM-dd HH:mm:ss.SSS"
+        "yyyy-MM-dd HH:mm:ss.SSS",
       )} ${store.state.timezone}`;
     });
 
@@ -103,7 +102,7 @@ export default {
       () => props.timestamp,
       () => {
         updateRelativeTime(); // Update immediately if the timestamp prop changes
-      }
+      },
     );
 
     onBeforeUnmount(() => {

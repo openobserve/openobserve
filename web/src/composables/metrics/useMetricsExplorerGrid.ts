@@ -21,10 +21,7 @@ import { createPromQLChunkProcessor } from "@/composables/dashboard/promqlChunkP
 import { usePanelCache } from "@/composables/dashboard/usePanelCache";
 import { isEqual } from "lodash-es";
 import { generateTraceContext } from "@/utils/zincutils";
-import {
-  parseSearchError,
-  toSearchErrorObject,
-} from "@/utils/query/searchError";
+import { parseSearchError, toSearchErrorObject } from "@/utils/query/searchError";
 import StreamService from "@/services/stream";
 import metricsService from "@/services/metrics";
 import {
@@ -50,11 +47,7 @@ import {
   isRateBasedKind,
   resolveVariant,
 } from "@/utils/metrics/metricDefaults";
-import {
-  createPreviewQueue,
-  isCancelled,
-  PRIORITY,
-} from "./useMetricsPreviewQueue";
+import { createPreviewQueue, isCancelled, PRIORITY } from "./useMetricsPreviewQueue";
 
 export interface LabelFilter {
   label: string;
@@ -240,8 +233,7 @@ const HEATMAP_POINTS = 40;
 const LABEL_VALUE_FANOUT = 5;
 const LABEL_VALUE_CAP = 100;
 
-const storageKey = (kind: string, org: string) =>
-  `o2.metricsExplorer.${kind}.${org}`;
+const storageKey = (kind: string, org: string) => `o2.metricsExplorer.${kind}.${org}`;
 
 function readJson<T>(key: string, fallback: T): T {
   try {
@@ -267,9 +259,7 @@ export function useMetricsExplorerGrid() {
   const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } =
     useHttpStreamingSearch();
 
-  const org = computed(
-    () => store.state.selectedOrganization?.identifier ?? "",
-  );
+  const org = computed(() => store.state.selectedOrganization?.identifier ?? "");
 
   /* ---------------------------------------------------------------- state */
 
@@ -378,9 +368,7 @@ export function useMetricsExplorerGrid() {
     for (const [name, ov] of Object.entries(overrides.value)) {
       if (known.has(name)) keptOverrides[name] = ov;
     }
-    if (
-      Object.keys(keptOverrides).length !== Object.keys(overrides.value).length
-    ) {
+    if (Object.keys(keptOverrides).length !== Object.keys(overrides.value).length) {
       overrides.value = keptOverrides;
       writeJson(storageKey("fnOverrides", id), keptOverrides);
     }
@@ -449,9 +437,7 @@ export function useMetricsExplorerGrid() {
     } catch (error: any) {
       if (generation !== orgGeneration || requestedOrg !== org.value) return;
       loadError.value =
-        error?.response?.data?.message ??
-        error?.message ??
-        "Failed to load metrics";
+        error?.response?.data?.message ?? error?.message ?? "Failed to load metrics";
       streams.value = [];
       cards.value = [];
     } finally {
@@ -541,9 +527,7 @@ export function useMetricsExplorerGrid() {
    * key array in it cost ~90ms per keystroke on a large org. `labelsByStream` is
    * a shallowRef, so this recomputes only when the map is actually replaced.
    */
-  const membershipKnown = computed(
-    () => Object.keys(labelsByStream.value).length > 0,
-  );
+  const membershipKnown = computed(() => Object.keys(labelsByStream.value).length > 0);
 
   /**
    * A card is eligible for a label filter only when EVERY stream its effective
@@ -636,11 +620,7 @@ export function useMetricsExplorerGrid() {
 
   /** Everything except one facet — for that facet's "how many more" counts. */
   const passesExcept = (card: MetricCard, except: string): boolean => {
-    if (
-      except !== "search" &&
-      !matchesSearch(card.name, card.help, searchTerm.value)
-    )
-      return false;
+    if (except !== "search" && !matchesSearch(card.name, card.help, searchTerm.value)) return false;
     const applyFacets = !showFavoritesOnly.value;
     if (
       applyFacets &&
@@ -665,13 +645,8 @@ export function useMetricsExplorerGrid() {
       return false;
     if (except !== "label" && !isLabelEligible(card)) return false;
     // The Workspace tab (showFavoritesOnly) narrows to the scratchpad's pins.
-    if (showFavoritesOnly.value && !favorites.value.includes(card.name))
-      return false;
-    if (
-      except !== "empty" &&
-      hideEmptyPanels.value &&
-      emptyMetrics.value.has(card.name)
-    )
+    if (showFavoritesOnly.value && !favorites.value.includes(card.name)) return false;
+    if (except !== "empty" && hideEmptyPanels.value && emptyMetrics.value.has(card.name))
       return false;
     return true;
   };
@@ -687,20 +662,16 @@ export function useMetricsExplorerGrid() {
   const emptyHiddenCount = computed(() => {
     if (!hideEmptyPanels.value || emptyMetrics.value.size === 0) return 0;
     return cards.value.filter(
-      (card) =>
-        emptyMetrics.value.has(card.name) && passesExcept(card, "empty"),
+      (card) => emptyMetrics.value.has(card.name) && passesExcept(card, "empty"),
     ).length;
   });
 
   // Derived once per stream list, not per card test. The assignment comes from
   // the grouping module itself — re-deriving it here would let the rail's facet
   // counts drift out of step with what the grid actually filters.
-  const prefixAssignment = computed(() =>
-    computePrefixAssignment(cards.value.map((c) => c.name)),
-  );
+  const prefixAssignment = computed(() => computePrefixAssignment(cards.value.map((c) => c.name)));
 
-  const prefixOf = (name: string) =>
-    prefixAssignment.value.groupOf.get(name) ?? MISC_GROUP_ID;
+  const prefixOf = (name: string) => prefixAssignment.value.groupOf.get(name) ?? MISC_GROUP_ID;
   const suffixOf = (name: string) => {
     const parts = name.split("_");
     return parts.length > 1 ? parts[parts.length - 1] : "";
@@ -775,10 +746,7 @@ export function useMetricsExplorerGrid() {
     const eligible = cards.value.filter((c) => passesExcept(c, "type"));
     const counts = new Map<string, number>();
     for (const card of eligible) {
-      counts.set(
-        card.typeFilterBucket,
-        (counts.get(card.typeFilterBucket) ?? 0) + 1,
-      );
+      counts.set(card.typeFilterBucket, (counts.get(card.typeFilterBucket) ?? 0) + 1);
     }
     return ["counter", "gauge", "histogram", "summary", "other"].map((id) => ({
       id,
@@ -794,14 +762,10 @@ export function useMetricsExplorerGrid() {
    * The page's query budget: at most `pageSize` cards, chosen BEFORE the no-data
    * filter. Nothing outside this slice is ever rendered or queried.
    */
-  const pageSlice = computed(() =>
-    sortedCandidates.value.slice(0, pageSize.value),
-  );
+  const pageSlice = computed(() => sortedCandidates.value.slice(0, pageSize.value));
 
   /** The slice actually rendered. Colour index is position in this same order. */
-  const pagedCards = computed(() =>
-    pageSlice.value.filter((card) => !isHiddenAsEmpty(card)),
-  );
+  const pagedCards = computed(() => pageSlice.value.filter((card) => !isHiddenAsEmpty(card)));
 
   const hasMore = computed(() => sortedCandidates.value.length > pageSize.value);
   const remainingCount = computed(() =>
@@ -852,15 +816,9 @@ export function useMetricsExplorerGrid() {
         await Promise.all(
           cands
             .slice(cursor, next)
-            .map((card) =>
-              requestPreview(card, { priority: PRIORITY.PREFETCH }).catch(
-                () => {},
-              ),
-            ),
+            .map((card) => requestPreview(card, { priority: PRIORITY.PREFETCH }).catch(() => {})),
         );
-        revealed += cands
-          .slice(cursor, next)
-          .filter((c) => !emptyMetrics.value.has(c.name)).length;
+        revealed += cands.slice(cursor, next).filter((c) => !emptyMetrics.value.has(c.name)).length;
         cursor = next;
         batches++;
       }
@@ -916,15 +874,10 @@ export function useMetricsExplorerGrid() {
 
   /* -------------------------------------------------------- query context */
 
-  const streamNameSet = computed(
-    () => new Set(streams.value.map((s) => s.name)),
-  );
+  const streamNameSet = computed(() => new Set(streams.value.map((s) => s.name)));
 
   const rangeSeconds = computed(() =>
-    Math.max(
-      0,
-      (timeRange.value.end_time - timeRange.value.start_time) / 1_000_000,
-    ),
+    Math.max(0, (timeRange.value.end_time - timeRange.value.start_time) / 1_000_000),
   );
 
   /**
@@ -941,9 +894,7 @@ export function useMetricsExplorerGrid() {
       DEFAULT_SCRAPE_INTERVAL_SECONDS,
   );
 
-  const streamByName = computed(
-    () => new Map(streams.value.map((s) => [s.name, s])),
-  );
+  const streamByName = computed(() => new Map(streams.value.map((s) => [s.name, s])));
 
   /**
    * How many points a card's preview asks for. Heatmaps are coarser.
@@ -1038,11 +989,7 @@ export function useMetricsExplorerGrid() {
         // `$__rate_interval` instead, because a PANEL resolves that itself.
         rateWindow:
           opts?.rateWindow ??
-          computeRateWindow(
-            rangeSeconds.value,
-            points,
-            scrapeIntervalSeconds.value,
-          ),
+          computeRateWindow(rangeSeconds.value, points, scrapeIntervalSeconds.value),
         labels: card.labels ?? labelsByStream.value[card.name],
         applyNanGuard: opts?.applyNanGuard,
       },
@@ -1085,10 +1032,7 @@ export function useMetricsExplorerGrid() {
    */
   const invalidatePreview = (name: string, alsoCancel: string[] = []) => {
     const card = cards.value.find((c) => c.name === name);
-    const keys = new Set([
-      ...alsoCancel,
-      ...(card ? previewKeysOf(card) : []),
-    ]);
+    const keys = new Set([...alsoCancel, ...(card ? previewKeysOf(card) : [])]);
     for (const key of keys) queue.cancel(key, name);
     delete previews.value[name];
   };
@@ -1155,10 +1099,7 @@ export function useMetricsExplorerGrid() {
         {
           data: (_payload: any, res: any) => {
             if (res?.type !== "promql_response") return;
-            accumulated = chunkProcessor.processChunk(
-              accumulated,
-              res?.content?.results,
-            );
+            accumulated = chunkProcessor.processChunk(accumulated, res?.content?.results);
           },
           error: (_payload: any, err: any) => {
             // Parsed HERE, not in the catch upstream: rejecting with a plain
@@ -1262,8 +1203,7 @@ export function useMetricsExplorerGrid() {
 
   /* -------------------------------------------------- persistent card cache */
 
-  const cacheFor = (card: MetricCard) =>
-    usePanelCache(EXPLORER_CACHE_FOLDER, org.value, card.name);
+  const cacheFor = (card: MetricCard) => usePanelCache(EXPLORER_CACHE_FOLDER, org.value, card.name);
 
   /**
    * What the cached result is a result OF. A mismatch means re-query.
@@ -1307,8 +1247,7 @@ export function useMetricsExplorerGrid() {
       return false;
     }
     if (!cached?.value) return false;
-    if (!isEqual(cached.key, cacheIdentity(resolved.queries, step)))
-      return false;
+    if (!isEqual(cached.key, cacheIdentity(resolved.queries, step))) return false;
     // IndexedDB answered after the grid moved on. Painting now would restore the
     // previous org's — or the previous window's — chart into a map that was
     // deliberately emptied.
@@ -1329,8 +1268,7 @@ export function useMetricsExplorerGrid() {
     // mount, so every restored card would wear a warning that told the user
     // nothing. The honest answer to drift is to draw the data on ITS OWN axis
     // (`cachedTimeRange` below) and let `lastTriggeredAt` say how old it is.
-    const differs =
-      window.end_time - window.start_time !== range.end_time - range.start_time;
+    const differs = window.end_time - window.start_time !== range.end_time - range.start_time;
 
     previews.value[card.name] = {
       status: "done",
@@ -1370,12 +1308,7 @@ export function useMetricsExplorerGrid() {
     return true;
   };
 
-  const persistToCache = (
-    card: MetricCard,
-    preview: CardPreview,
-    queries: any[],
-    step: number,
-  ) => {
+  const persistToCache = (card: MetricCard, preview: CardPreview, queries: any[], step: number) => {
     void cacheFor(card)
       .savePanelCache(
         cacheIdentity(queries, step),
@@ -1456,12 +1389,7 @@ export function useMetricsExplorerGrid() {
     // `skipCache` (refresh / time-range change / override) still forces a real
     // re-query, and an `error`/`loading` preview falls through to retry.
     const settled = previews.value[card.name];
-    if (
-      !opts?.skipCache &&
-      settled &&
-      settled.status !== "loading" &&
-      settled.status !== "error"
-    ) {
+    if (!opts?.skipCache && settled && settled.status !== "loading" && settled.status !== "error") {
       return;
     }
 
@@ -1517,11 +1445,7 @@ export function useMetricsExplorerGrid() {
       // underflowed on extremely small values. Re-run once with the selector
       // guarded against NaN samples rather than showing a blank chart (or
       // hiding the card as "no data", which would be a lie).
-      if (
-        defaults.supportsNanGuard &&
-        results.length > 0 &&
-        results.every(isAllNaN)
-      ) {
+      if (defaults.supportsNanGuard && results.length > 0 && results.every(isAllNaN)) {
         const guarded = effectiveVariant(card, points, {
           applyNanGuard: true,
         });
@@ -1621,8 +1545,7 @@ export function useMetricsExplorerGrid() {
         nanGuardApplied: existing?.nanGuardApplied ?? false,
         sparse: existing?.sparse ?? false,
         lastTriggeredAt: existing?.lastTriggeredAt ?? null,
-        cachedDataDiffersFromTimeRange:
-          existing?.cachedDataDiffersFromTimeRange ?? false,
+        cachedDataDiffersFromTimeRange: existing?.cachedDataDiffersFromTimeRange ?? false,
         // Carried with `results`: this path KEEPS the previous chart up, so it
         // must keep the window that chart is true of. Dropping it would pin the
         // surviving points to the selected window — the drift bug again, but only
@@ -1801,8 +1724,7 @@ export function useMetricsExplorerGrid() {
           // Those are not labels and filtering on them is meaningless, so they are
           // kept out of the picker.
           names = (response?.data?.data ?? []).filter(
-            (l: string) =>
-              l && !l.startsWith("__") && !INTERNAL_LABEL_FIELDS.has(l),
+            (l: string) => l && !l.startsWith("__") && !INTERNAL_LABEL_FIELDS.has(l),
           );
         } catch {
           if (generation !== labelNamesGeneration) return;
@@ -1957,9 +1879,7 @@ export function useMetricsExplorerGrid() {
   /** By identity, not by label — several filters can share a label. */
   const removeLabelFilter = (filter: LabelFilter) => {
     const key = labelFilterKey(filter);
-    labelFilters.value = labelFilters.value.filter(
-      (f) => labelFilterKey(f) !== key,
-    );
+    labelFilters.value = labelFilters.value.filter((f) => labelFilterKey(f) !== key);
     invalidateAll();
   };
 

@@ -22,39 +22,39 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use axum_extra::extract::cookie::{Cookie, SameSite};
+#[cfg(feature = "cloud")]
+use common::meta::user::UserList;
 use config::{
     Config, get_config,
     meta::user::UserRole,
     utils::{base64, json, password::validate_password_strength},
 };
+use openobserve_api_common::extractors::Headers;
+use openobserve_core::{
+    auth::{UserEmail, generate_presigned_url, is_valid_email},
+    users,
+};
 use serde::Serialize;
 #[cfg(feature = "enterprise")]
 use {
-    crate::common::utils::auth::check_permissions,
-    crate::service::self_reporting::audit,
+    audit::audit,
     config::utils::time::now_micros,
     o2_dex::config::get_config as get_dex_config,
     o2_enterprise::enterprise::common::auditor::{AuditMessage, Protocol, ResponseMeta},
     o2_openfga::config::get_config as get_openfga_config,
+    openobserve_core::auth::check_permissions,
 };
 
-#[cfg(feature = "cloud")]
-use crate::common::meta::user::UserList;
 use crate::{
-    common::{
-        meta::{
-            self,
-            http::HttpResponse as MetaHttpResponse,
-            user::{
-                AuthTokens, PostUserRequest, RolesResponse, SignInResponse, SignInUser, UpdateUser,
-                UserOrgRole, UserRequest, UserRoleRequest, UserUpdateMode, get_roles,
-            },
+    common::meta::{
+        self,
+        http::HttpResponse as MetaHttpResponse,
+        user::{
+            AuthTokens, PostUserRequest, RolesResponse, SignInResponse, SignInUser, UpdateUser,
+            UserOrgRole, UserRequest, UserRoleRequest, UserUpdateMode, get_roles,
         },
-        utils::auth::{UserEmail, generate_presigned_url, is_valid_email},
     },
-    extractors::Headers,
     request::{BulkDeleteRequest, BulkDeleteResponse},
-    service::users,
 };
 
 pub mod service_accounts;
@@ -611,8 +611,7 @@ pub async fn authentication(
 
     #[cfg(feature = "enterprise")]
     {
-        if get_dex_config().root_only_login && !crate::common::utils::auth::is_root_user(&auth.name)
-        {
+        if get_dex_config().root_only_login && !db::user::is_root_user(&auth.name) {
             audit_unauthorized_error(audit_message).await;
             return unauthorized_error(resp);
         }
@@ -1083,8 +1082,10 @@ pub async fn decline_invitation(
     Headers(user_email): Headers<UserEmail>,
     Path(token): Path<String>,
 ) -> Response {
+    use db;
+    use openobserve_core::organization;
+
     use super::super::auth::jwt;
-    use crate::service::{db, organization};
 
     let user_id = user_email.user_id.as_str();
 

@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </template>
 
-    <section class="h-full min-w-0 min-h-0 overflow-y-auto">
+    <section class="h-full min-h-0 min-w-0 overflow-y-auto">
       <router-view />
     </section>
   </OPageLayout>
@@ -43,10 +43,7 @@ import { useStore } from "vuex";
 import { useRoute } from "vue-router";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import SectionRail from "@/components/common/SectionRail.vue";
-import type {
-  SectionHubGroup,
-  SectionHubItem,
-} from "@/components/common/SectionHub.vue";
+import type { SectionHubGroup, SectionHubItem } from "@/components/common/SectionHub.vue";
 
 defineOptions({ name: "AIObservabilityShell" });
 

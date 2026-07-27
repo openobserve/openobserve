@@ -25,21 +25,15 @@ use config::{
     utils::{base64, json},
 };
 use hashbrown::HashMap;
-use tracing::{Instrument, Span};
-
-use crate::{
-    common::utils::http::get_work_group,
-    service::{
-        search::{
-            self as SearchService,
-            sql::rewriter::{
-                add_new_filter::add_new_filters_with_and_operator,
-                add_ordering_term::check_or_add_order_by_timestamp,
-            },
-        },
-        self_reporting::{http_report_metrics, report_request_usage_stats},
-    },
+use search::sql::rewriter::{
+    add_new_filter::add_new_filters_with_and_operator,
+    add_ordering_term::check_or_add_order_by_timestamp,
 };
+use search_service as SearchService;
+use tracing::{Instrument, Span};
+use usage_reporting::{http_report_metrics, report_request_usage_stats};
+
+use crate::common::utils::http::get_work_group;
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) async fn around(
@@ -187,6 +181,7 @@ pub(crate) async fn around(
         use_cache: default_use_cache(),
         clear_cache: false,
         local_mode: None,
+        agent_options: None,
     };
     let resp_forward = SearchService::search(trace_id, org_id, stream_type, user_id.clone(), &req)
         .instrument(http_span.clone())
@@ -227,6 +222,7 @@ pub(crate) async fn around(
         use_cache: default_use_cache(),
         clear_cache: false,
         local_mode: None,
+        agent_options: None,
     };
     let resp_backward = SearchService::search(trace_id, org_id, stream_type, user_id.clone(), &req)
         .instrument(http_span)

@@ -100,11 +100,26 @@ const ODrawerStub = {
   name: "ODrawer",
   inheritAttrs: false,
   props: [
-    "open", "side", "persistent", "size", "width", "title", "subTitle",
-    "showClose", "seamless", "primaryButtonLabel", "secondaryButtonLabel",
-    "neutralButtonLabel", "primaryButtonVariant", "secondaryButtonVariant",
-    "neutralButtonVariant", "primaryButtonDisabled", "secondaryButtonDisabled",
-    "neutralButtonDisabled", "primaryButtonLoading", "secondaryButtonLoading",
+    "open",
+    "side",
+    "persistent",
+    "size",
+    "width",
+    "title",
+    "subTitle",
+    "showClose",
+    "seamless",
+    "primaryButtonLabel",
+    "secondaryButtonLabel",
+    "neutralButtonLabel",
+    "primaryButtonVariant",
+    "secondaryButtonVariant",
+    "neutralButtonVariant",
+    "primaryButtonDisabled",
+    "secondaryButtonDisabled",
+    "neutralButtonDisabled",
+    "primaryButtonLoading",
+    "secondaryButtonLoading",
     "neutralButtonLoading",
   ],
   emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
@@ -157,7 +172,8 @@ function mountComponent(options: any = {}) {
         },
         OTab: {
           name: "OTab",
-          template: '<div class="o-tab-stub" v-bind="$attrs" @click="$parent.$emit(\'update:modelValue\', name)"><slot /></div>',
+          template:
+            '<div class="o-tab-stub" v-bind="$attrs" @click="$parent.$emit(\'update:modelValue\', name)"><slot /></div>',
           props: ["name", "label", "style"],
         },
         OTabPanels: {
@@ -899,9 +915,7 @@ describe("EventDetailDrawerContent", () => {
       await flushPromises();
 
       // Assert
-      expect(copyToClipboardSpy).toHaveBeenCalledWith(
-        expect.stringContaining('"action_type"'),
-      );
+      expect(copyToClipboardSpy).toHaveBeenCalledWith(expect.stringContaining('"action_type"'));
 
       vi.unstubAllGlobals();
     });
@@ -933,7 +947,12 @@ describe("EventDetailDrawerContent", () => {
       // Skip: badge class-based detection is forbidden by standards
       await wrapper.setProps({
         event: createMockEvent({ type: "error", name: "Network Error" }),
-        rawEvent: createMockRawEvent({ error_type: "NetworkError", error_message: "Failed to fetch", action_type: undefined, action_id: undefined }),
+        rawEvent: createMockRawEvent({
+          error_type: "NetworkError",
+          error_message: "Failed to fetch",
+          action_type: undefined,
+          action_id: undefined,
+        }),
       });
       await flushPromises();
       expect(wrapper.text()).toContain("error");
@@ -948,7 +967,11 @@ describe("EventDetailDrawerContent", () => {
       // Skip: badge class-based detection is forbidden by standards
       await wrapper.setProps({
         event: createMockEvent({ type: "view", name: "Home Page" }),
-        rawEvent: createMockRawEvent({ view_url: "https://example.com", action_type: undefined, action_id: undefined }),
+        rawEvent: createMockRawEvent({
+          view_url: "https://example.com",
+          action_type: undefined,
+          action_id: undefined,
+        }),
       });
       await flushPromises();
       expect(wrapper.text()).toContain("view");
@@ -986,7 +1009,10 @@ describe("EventDetailDrawerContent", () => {
         await flushPromises();
         expect(wrapper.emitted("resource-selected")).toBeTruthy();
         expect(wrapper.emitted("resource-selected")?.[0][0]).toEqual(
-          expect.objectContaining({ type: "resource", resource_url: "https://api.example.com/data" }),
+          expect.objectContaining({
+            type: "resource",
+            resource_url: "https://api.example.com/data",
+          }),
         );
       }
     });
@@ -1020,7 +1046,11 @@ describe("EventDetailDrawerContent", () => {
       // Skip: already tested in Related resources section
       const noActionWrapper = mountComponent({
         props: {
-          rawEvent: createMockRawEvent({ action_id: undefined, action_type: "click", action_target_name: "Button" }),
+          rawEvent: createMockRawEvent({
+            action_id: undefined,
+            action_type: "click",
+            action_target_name: "Button",
+          }),
         },
       });
       await flushPromises();
@@ -1032,7 +1062,11 @@ describe("EventDetailDrawerContent", () => {
       // Arrange & Act
       await wrapper.setProps({
         event: createMockEvent({ type: "view", name: "Page View" }),
-        rawEvent: createMockRawEvent({ view_url: "https://example.com", action_id: undefined, action_type: undefined }),
+        rawEvent: createMockRawEvent({
+          view_url: "https://example.com",
+          action_id: undefined,
+          action_type: undefined,
+        }),
       });
       await flushPromises();
 
@@ -1076,7 +1110,11 @@ describe("EventDetailDrawerContent", () => {
           http.post(
             `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/_search`,
             async () =>
-              HttpResponse.json({ took: 0, hits: [createMockResource({ _oo_trace_id: undefined })], total: 1 }),
+              HttpResponse.json({
+                took: 0,
+                hits: [createMockResource({ _oo_trace_id: undefined })],
+                total: 1,
+              }),
           ),
         );
       }
@@ -1146,14 +1184,20 @@ describe("EventDetailDrawerContent", () => {
           http.post(
             `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/_search`,
             async () =>
-              HttpResponse.json({ took: 0, hits: [createMockResource({ resource_status_code: 404, resource_id: "res-404" })], total: 1 }),
+              HttpResponse.json({
+                took: 0,
+                hits: [createMockResource({ resource_status_code: 404, resource_id: "res-404" })],
+                total: 1,
+              }),
           ),
         );
       }
       const statusWrapper = mountComponent();
       await flushPromises();
       await vi.waitFor(() => {
-        expect(statusWrapper.findAll('[data-test="related-resource-item"]').length).toBeGreaterThan(0);
+        expect(statusWrapper.findAll('[data-test="related-resource-item"]').length).toBeGreaterThan(
+          0,
+        );
       });
       expect(statusWrapper.text()).toContain("404");
       statusWrapper.unmount();

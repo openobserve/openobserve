@@ -100,11 +100,7 @@ export default defineComponent({
     const getTabList = useLoading(async () => {
       if (!props.dashboardId || !props.folderId) return;
 
-      const dashboardData = await getDashboard(
-        store,
-        props.dashboardId,
-        props.folderId,
-      );
+      const dashboardData = await getDashboard(store, props.dashboardId, props.folderId);
 
       tabList.value = dashboardData?.tabs?.map((tab: any) => ({
         label: tab.name,

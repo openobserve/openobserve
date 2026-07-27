@@ -17,12 +17,11 @@
 
 use axum::{Json, extract::Path, response::Response};
 #[cfg(feature = "enterprise")]
+use common::meta::http::HttpResponse as MetaHttpResponse;
+#[cfg(feature = "enterprise")]
 use config::meta::alerts::deduplication::GlobalDeduplicationConfig;
 #[cfg(feature = "enterprise")]
 use config::meta::correlation::FieldAlias;
-
-#[cfg(feature = "enterprise")]
-use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 
 /// Get deduplication configuration for an organization
 #[cfg(feature = "enterprise")]
@@ -44,7 +43,7 @@ use crate::common::meta::http::HttpResponse as MetaHttpResponse;
     ),
 )]
 pub async fn get_config(Path(org_id): Path<String>) -> Response {
-    match crate::service::alerts::org_config::get_deduplication_config(&org_id).await {
+    match openobserve_core::alerts::org_config::get_deduplication_config(&org_id).await {
         Ok(Some(config)) => axum::response::Response::builder()
             .status(axum::http::StatusCode::OK)
             .header(axum::http::header::CONTENT_TYPE, "application/json")
@@ -114,7 +113,7 @@ pub async fn set_config(
     Path(org_id): Path<String>,
     Json(config): Json<GlobalDeduplicationConfig>,
 ) -> Response {
-    match crate::service::alerts::org_config::set_deduplication_config(&org_id, &config).await {
+    match openobserve_core::alerts::org_config::set_deduplication_config(&org_id, &config).await {
         Ok(()) => MetaHttpResponse::ok("Deduplication config saved successfully"),
         Err(e) => {
             log::error!("Error setting deduplication config for org {org_id}: {e}");
@@ -171,7 +170,7 @@ pub async fn set_config(_org_id: Path<String>, _config: Json<serde_json::Value>)
     ),
 )]
 pub async fn delete_config(Path(org_id): Path<String>) -> Response {
-    match crate::service::alerts::org_config::delete_deduplication_config(&org_id).await {
+    match openobserve_core::alerts::org_config::delete_deduplication_config(&org_id).await {
         Ok(()) => axum::response::Response::builder()
             .status(axum::http::StatusCode::OK)
             .header(axum::http::header::CONTENT_TYPE, "application/json")
@@ -256,7 +255,7 @@ pub struct SemanticGroupModification {
 )]
 pub async fn get_semantic_groups(Path(org_id): Path<String>) -> Response {
     // Use system_settings which has proper caching and cluster watch
-    let groups = crate::service::db::system_settings::get_semantic_field_groups(&org_id).await;
+    let groups = db::system_settings::get_semantic_field_groups(&org_id).await;
     axum::response::Response::builder()
         .status(axum::http::StatusCode::OK)
         .header(axum::http::header::CONTENT_TYPE, "application/json")
@@ -338,8 +337,7 @@ pub async fn preview_semantic_groups_diff(
     }
 
     // Get current groups from system_settings (with caching)
-    let current_groups =
-        crate::service::db::system_settings::get_semantic_field_groups(&org_id).await;
+    let current_groups = db::system_settings::get_semantic_field_groups(&org_id).await;
 
     // Build a map of current groups by ID
     let current_map: std::collections::HashMap<String, &FieldAlias> =
@@ -474,8 +472,7 @@ pub async fn save_semantic_groups(
     // resurrected any group the UI had deleted. Treat the incoming list as the
     // full replacement — but re-inject protected groups (like "service") from the
     // existing config if the client omitted them, so they can never be lost.
-    let existing_groups =
-        crate::service::db::system_settings::get_semantic_field_groups(&org_id).await;
+    let existing_groups = db::system_settings::get_semantic_field_groups(&org_id).await;
 
     let incoming_ids: std::collections::HashSet<String> =
         incoming_groups.iter().map(|g| g.id.clone()).collect();
@@ -502,7 +499,7 @@ pub async fn save_semantic_groups(
     )
     .with_category(SettingCategory::Correlation);
 
-    match crate::service::db::system_settings::set(&setting).await {
+    match db::system_settings::set(&setting).await {
         Ok(_) => axum::response::Response::builder()
             .status(axum::http::StatusCode::OK)
             .header(axum::http::header::CONTENT_TYPE, "application/json")

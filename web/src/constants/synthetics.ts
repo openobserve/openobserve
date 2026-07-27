@@ -51,12 +51,10 @@ export const VALUE_ACTIONS: readonly StepAction[] = [
 ];
 
 // ── Action dropdown options ──────────────────────────────────────────────
-export const actionOptions = (Object.keys(ACTION_LABELS) as StepAction[]).map(
-  (a) => ({
-    label: ACTION_LABELS[a],
-    value: a,
-  }),
-);
+export const actionOptions = (Object.keys(ACTION_LABELS) as StepAction[]).map((a) => ({
+  label: ACTION_LABELS[a],
+  value: a,
+}));
 
 // ── Selector type options ────────────────────────────────────────────────
 export const SELECTOR_TYPE_OPTIONS: readonly {
@@ -130,8 +128,6 @@ export const CHECK_TYPE_CARDS: CheckTypeCard[] = [
 
 // ── Value field tooltips ─────────────────────────────────────────────────
 export const VALUE_TOOLTIP_MAP: Record<string, string> = {
-  press:
-    'Press a keyboard key by its key name, e.g. "Enter", "Tab", "Escape", "ArrowDown".',
-  assert:
-    'Assertion expression, e.g. "text=Hello" or "visible" to check element visibility.',
+  press: 'Press a keyboard key by its key name, e.g. "Enter", "Tab", "Escape", "ArrowDown".',
+  assert: 'Assertion expression, e.g. "text=Hello" or "visible" to check element visibility.',
 };

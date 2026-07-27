@@ -42,7 +42,6 @@ const s3FileListXml = (folderPath: string, files: string[]): string => {
   return `<?xml version="1.0" encoding="UTF-8"?>\n<ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">\n${keys}\n</ListBucketResult>`;
 };
 
-
 import dashboardsService from "@/services/dashboards";
 
 const OIconStub = {
@@ -247,9 +246,7 @@ describe("AddDashboardFromGitHub Component", () => {
     // Default fetch mock - return empty folders
     mockFetch.mockResolvedValue(new Response("[]", { status: 200 }));
 
-    vi.mocked(dashboardsService.list_Folders).mockResolvedValue(
-      mockFolderList as any
-    );
+    vi.mocked(dashboardsService.list_Folders).mockResolvedValue(mockFolderList as any);
   });
 
   afterEach(() => {
@@ -328,9 +325,26 @@ describe("AddDashboardFromGitHub Component", () => {
     beforeEach(() => {
       wrapper = createWrapper({ modelValue: false });
       wrapper.vm.dashboards = [
-        { name: "aws_ec2", displayName: "AWS EC2", description: "EC2 monitoring", folderPath: "aws_ec2", jsonFiles: [] },
-        { name: "nginx_web", displayName: "Nginx Web", description: "Nginx web server", folderPath: "nginx_web", jsonFiles: [] },
-        { name: "kubernetes_cluster", displayName: "Kubernetes Cluster", folderPath: "kubernetes_cluster", jsonFiles: [] },
+        {
+          name: "aws_ec2",
+          displayName: "AWS EC2",
+          description: "EC2 monitoring",
+          folderPath: "aws_ec2",
+          jsonFiles: [],
+        },
+        {
+          name: "nginx_web",
+          displayName: "Nginx Web",
+          description: "Nginx web server",
+          folderPath: "nginx_web",
+          jsonFiles: [],
+        },
+        {
+          name: "kubernetes_cluster",
+          displayName: "Kubernetes Cluster",
+          folderPath: "kubernetes_cluster",
+          jsonFiles: [],
+        },
       ];
     });
 
@@ -374,12 +388,22 @@ describe("AddDashboardFromGitHub Component", () => {
     });
 
     it("should return false when dashboard is not selected", () => {
-      const dashboard = { name: "aws_ec2", displayName: "AWS EC2", folderPath: "aws_ec2", jsonFiles: [] };
+      const dashboard = {
+        name: "aws_ec2",
+        displayName: "AWS EC2",
+        folderPath: "aws_ec2",
+        jsonFiles: [],
+      };
       expect(wrapper.vm.isSelected(dashboard)).toBe(false);
     });
 
     it("should return true when dashboard is selected", () => {
-      const dashboard = { name: "aws_ec2", displayName: "AWS EC2", folderPath: "aws_ec2", jsonFiles: [] };
+      const dashboard = {
+        name: "aws_ec2",
+        displayName: "AWS EC2",
+        folderPath: "aws_ec2",
+        jsonFiles: [],
+      };
       wrapper.vm.selectedDashboards.push(dashboard);
       expect(wrapper.vm.isSelected(dashboard)).toBe(true);
     });
@@ -391,20 +415,35 @@ describe("AddDashboardFromGitHub Component", () => {
     });
 
     it("should add dashboard to selectedDashboards when not selected", () => {
-      const dashboard = { name: "aws_ec2", displayName: "AWS EC2", folderPath: "aws_ec2", jsonFiles: [] };
+      const dashboard = {
+        name: "aws_ec2",
+        displayName: "AWS EC2",
+        folderPath: "aws_ec2",
+        jsonFiles: [],
+      };
       wrapper.vm.toggleDashboard(dashboard);
       expect(wrapper.vm.selectedDashboards).toContainEqual(dashboard);
     });
 
     it("should remove dashboard from selectedDashboards when already selected", () => {
-      const dashboard = { name: "aws_ec2", displayName: "AWS EC2", folderPath: "aws_ec2", jsonFiles: [] };
+      const dashboard = {
+        name: "aws_ec2",
+        displayName: "AWS EC2",
+        folderPath: "aws_ec2",
+        jsonFiles: [],
+      };
       wrapper.vm.selectedDashboards.push(dashboard);
       wrapper.vm.toggleDashboard(dashboard);
       expect(wrapper.vm.selectedDashboards).not.toContain(dashboard);
     });
 
     it("should toggle correctly on multiple calls", () => {
-      const dashboard = { name: "aws_ec2", displayName: "AWS EC2", folderPath: "aws_ec2", jsonFiles: [] };
+      const dashboard = {
+        name: "aws_ec2",
+        displayName: "AWS EC2",
+        folderPath: "aws_ec2",
+        jsonFiles: [],
+      };
       wrapper.vm.toggleDashboard(dashboard);
       expect(wrapper.vm.selectedDashboards).toHaveLength(1);
       wrapper.vm.toggleDashboard(dashboard);
@@ -425,12 +464,8 @@ describe("AddDashboardFromGitHub Component", () => {
       mockFetch.mockImplementation(
         () =>
           new Promise((resolve) =>
-            setTimeout(
-              () =>
-                resolve(new Response(s3FolderListXml([]), { status: 200 })),
-              100
-            )
-          )
+            setTimeout(() => resolve(new Response(s3FolderListXml([]), { status: 200 })), 100),
+          ),
       );
       wrapper = createWrapper({ modelValue: false });
       const loadPromise = wrapper.vm.loadDashboards();
@@ -464,9 +499,7 @@ describe("AddDashboardFromGitHub Component", () => {
         dashboardJsonCache: {},
       };
 
-      mockFetch.mockResolvedValue(
-        new Response(s3FolderListXml(mockS3Folders), { status: 200 })
-      );
+      mockFetch.mockResolvedValue(new Response(s3FolderListXml(mockS3Folders), { status: 200 }));
 
       wrapper = createWrapper({ modelValue: false });
       await wrapper.vm.loadDashboards();
@@ -476,9 +509,7 @@ describe("AddDashboardFromGitHub Component", () => {
     });
 
     it("should filter out dot-prefixed directories", async () => {
-      mockFetch.mockResolvedValue(
-        new Response(s3FolderListXml(mockS3Folders), { status: 200 })
-      );
+      mockFetch.mockResolvedValue(new Response(s3FolderListXml(mockS3Folders), { status: 200 }));
 
       wrapper = createWrapper({ modelValue: false });
       await wrapper.vm.loadDashboards();
@@ -531,7 +562,7 @@ describe("AddDashboardFromGitHub Component", () => {
 
     it("should sort dashboards alphabetically", async () => {
       mockFetch.mockResolvedValue(
-        new Response(s3FolderListXml(["z_last", "a_first", "m_middle"]), { status: 200 })
+        new Response(s3FolderListXml(["z_last", "a_first", "m_middle"]), { status: 200 }),
       );
 
       wrapper = createWrapper({ modelValue: false });
@@ -559,11 +590,9 @@ describe("AddDashboardFromGitHub Component", () => {
     });
 
     it("should call loadFolders when dashboards are selected", async () => {
-      vi.mocked(dashboardsService.list_Folders).mockResolvedValue(
-        mockFolderList as any
-      );
+      vi.mocked(dashboardsService.list_Folders).mockResolvedValue(mockFolderList as any);
       mockFetch.mockResolvedValue(
-        new Response(s3FileListXml("aws_ec2", ["dashboard.json"]), { status: 200 })
+        new Response(s3FileListXml("aws_ec2", ["dashboard.json"]), { status: 200 }),
       );
 
       wrapper = createWrapper({ modelValue: false });
@@ -578,14 +607,17 @@ describe("AddDashboardFromGitHub Component", () => {
     });
 
     it("should show folder selection dialog after successful next", async () => {
-      vi.mocked(dashboardsService.list_Folders).mockResolvedValue(
-        mockFolderList as any
-      );
+      vi.mocked(dashboardsService.list_Folders).mockResolvedValue(mockFolderList as any);
       mockFetch.mockResolvedValue(new Response("[]", { status: 200 }));
 
       wrapper = createWrapper({ modelValue: false });
       wrapper.vm.selectedDashboards = [
-        { name: "aws_ec2", displayName: "AWS EC2", folderPath: "aws_ec2", jsonFiles: ["dash.json"] },
+        {
+          name: "aws_ec2",
+          displayName: "AWS EC2",
+          folderPath: "aws_ec2",
+          jsonFiles: ["dash.json"],
+        },
       ];
 
       await wrapper.vm.handleNext();
@@ -604,9 +636,7 @@ describe("AddDashboardFromGitHub Component", () => {
     });
 
     it("should auto-select newly created folder", async () => {
-      vi.mocked(dashboardsService.list_Folders).mockResolvedValue(
-        mockFolderList as any
-      );
+      vi.mocked(dashboardsService.list_Folders).mockResolvedValue(mockFolderList as any);
       wrapper = createWrapper({ modelValue: false });
 
       await wrapper.vm.updateFolderList({
@@ -681,9 +711,7 @@ describe("AddDashboardFromGitHub Component", () => {
     const preloadedDashboard = { name: "nginx", folderPath: "nginx", jsonFiles: ["nginx.json"] };
 
     it("should populate folderOptions from dashboards service", async () => {
-      vi.mocked(dashboardsService.list_Folders).mockResolvedValue(
-        mockFolderList as any
-      );
+      vi.mocked(dashboardsService.list_Folders).mockResolvedValue(mockFolderList as any);
 
       wrapper = createWrapper({ modelValue: false });
       wrapper.vm.selectedDashboards = [preloadedDashboard];
@@ -712,9 +740,7 @@ describe("AddDashboardFromGitHub Component", () => {
     });
 
     it("should auto-select default folder when previous selection is no longer valid", async () => {
-      vi.mocked(dashboardsService.list_Folders).mockResolvedValue(
-        mockFolderList as any
-      );
+      vi.mocked(dashboardsService.list_Folders).mockResolvedValue(mockFolderList as any);
 
       wrapper = createWrapper({ modelValue: false });
       wrapper.vm.selectedDashboards = [preloadedDashboard];
@@ -809,14 +835,17 @@ describe("AddDashboardFromGitHub Component", () => {
     });
 
     it("should invoke handleNext when primary (Next) is emitted", async () => {
-      vi.mocked(dashboardsService.list_Folders).mockResolvedValue(
-        mockFolderList as any
-      );
+      vi.mocked(dashboardsService.list_Folders).mockResolvedValue(mockFolderList as any);
       wrapper = createWrapper({ modelValue: true });
       await flushPromises();
 
       wrapper.vm.selectedDashboards = [
-        { name: "aws_ec2", displayName: "AWS EC2", folderPath: "aws_ec2", jsonFiles: ["dash.json"] },
+        {
+          name: "aws_ec2",
+          displayName: "AWS EC2",
+          folderPath: "aws_ec2",
+          jsonFiles: ["dash.json"],
+        },
       ];
       await wrapper.vm.$nextTick();
 
@@ -910,7 +939,12 @@ describe("AddDashboardFromGitHub Component", () => {
       await flushPromises();
 
       wrapper.vm.selectedDashboards = [
-        { name: "aws_ec2", displayName: "AWS EC2", folderPath: "aws_ec2", jsonFiles: ["dash.json"] },
+        {
+          name: "aws_ec2",
+          displayName: "AWS EC2",
+          folderPath: "aws_ec2",
+          jsonFiles: ["dash.json"],
+        },
       ];
       wrapper.vm.selectedFolderObj = "default";
       wrapper.vm.showFolderSelection = true;
@@ -935,7 +969,9 @@ describe("AddDashboardFromGitHub Component", () => {
       const dialogs = wrapper.findAllComponents({ name: "ODialog" });
       expect(dialogs.length).toBeGreaterThanOrEqual(1);
       // The nested add-folder dialog should be closed by default.
-      const addFolderDialog = wrapper.findComponent('[data-test="add-dashboard-github-add-folder-dialog"]');
+      const addFolderDialog = wrapper.findComponent(
+        '[data-test="add-dashboard-github-add-folder-dialog"]',
+      );
       expect(addFolderDialog.exists()).toBe(true);
       expect(addFolderDialog.props("open")).toBe(false);
     });
@@ -946,7 +982,9 @@ describe("AddDashboardFromGitHub Component", () => {
       wrapper.vm.showAddFolderDialog = true;
       await wrapper.vm.$nextTick();
 
-      const addFolderDialog = wrapper.findComponent('[data-test="add-dashboard-github-add-folder-dialog"]');
+      const addFolderDialog = wrapper.findComponent(
+        '[data-test="add-dashboard-github-add-folder-dialog"]',
+      );
       expect(addFolderDialog.exists()).toBe(true);
       expect(addFolderDialog.props("open")).toBe(true);
     });
@@ -957,7 +995,9 @@ describe("AddDashboardFromGitHub Component", () => {
       wrapper.vm.showAddFolderDialog = true;
       await wrapper.vm.$nextTick();
 
-      const addFolderDialog = wrapper.findComponent('[data-test="add-dashboard-github-add-folder-dialog"]');
+      const addFolderDialog = wrapper.findComponent(
+        '[data-test="add-dashboard-github-add-folder-dialog"]',
+      );
       // The ODialog uses v-model:open, so closing it emits update:open with false.
       await addFolderDialog.vm.$emit("update:open", false);
       await wrapper.vm.$nextTick();

@@ -17,7 +17,6 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
 import SpanStatusPill from "./SpanStatusPill.vue";
 
-
 describe("SpanStatusPill", () => {
   let wrapper: VueWrapper;
 
@@ -32,9 +31,7 @@ describe("SpanStatusPill", () => {
     });
 
     it("should render the status pill container", () => {
-      expect(
-        wrapper.find('[data-test="span-row-status-pill"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="span-row-status-pill"]').exists()).toBe(true);
     });
   });
 
@@ -44,25 +41,19 @@ describe("SpanStatusPill", () => {
     });
 
     it("should apply the error class", () => {
-      expect(
-        wrapper
-          .find('[data-test="span-row-status-pill"]')
-          .classes(),
-      ).toContain("bg-badge-error-soft-bg");
+      expect(wrapper.find('[data-test="span-row-status-pill"]').classes()).toContain(
+        "bg-badge-error-soft-bg",
+      );
     });
 
     it("should not apply the success class", () => {
-      expect(
-        wrapper
-          .find('[data-test="span-row-status-pill"]')
-          .classes(),
-      ).not.toContain("bg-badge-success-soft-bg");
+      expect(wrapper.find('[data-test="span-row-status-pill"]').classes()).not.toContain(
+        "bg-badge-success-soft-bg",
+      );
     });
 
     it("should display the ERROR label", () => {
-      expect(
-        wrapper.find('[data-test="span-row-status-pill"]').text(),
-      ).toContain("ERROR");
+      expect(wrapper.find('[data-test="span-row-status-pill"]').text()).toContain("ERROR");
     });
   });
 
@@ -72,25 +63,19 @@ describe("SpanStatusPill", () => {
     });
 
     it("should apply the error class treating it case-insensitively", () => {
-      expect(
-        wrapper
-          .find('[data-test="span-row-status-pill"]')
-          .classes(),
-      ).toContain("bg-badge-error-soft-bg");
+      expect(wrapper.find('[data-test="span-row-status-pill"]').classes()).toContain(
+        "bg-badge-error-soft-bg",
+      );
     });
 
     it("should not apply the success class", () => {
-      expect(
-        wrapper
-          .find('[data-test="span-row-status-pill"]')
-          .classes(),
-      ).not.toContain("bg-badge-success-soft-bg");
+      expect(wrapper.find('[data-test="span-row-status-pill"]').classes()).not.toContain(
+        "bg-badge-success-soft-bg",
+      );
     });
 
     it("should display the original cased label", () => {
-      expect(
-        wrapper.find('[data-test="span-row-status-pill"]').text(),
-      ).toContain("error");
+      expect(wrapper.find('[data-test="span-row-status-pill"]').text()).toContain("error");
     });
   });
 
@@ -100,25 +85,19 @@ describe("SpanStatusPill", () => {
     });
 
     it("should apply the success class", () => {
-      expect(
-        wrapper
-          .find('[data-test="span-row-status-pill"]')
-          .classes(),
-      ).toContain("bg-badge-success-soft-bg");
+      expect(wrapper.find('[data-test="span-row-status-pill"]').classes()).toContain(
+        "bg-badge-success-soft-bg",
+      );
     });
 
     it("should not apply the error class", () => {
-      expect(
-        wrapper
-          .find('[data-test="span-row-status-pill"]')
-          .classes(),
-      ).not.toContain("bg-badge-error-soft-bg");
+      expect(wrapper.find('[data-test="span-row-status-pill"]').classes()).not.toContain(
+        "bg-badge-error-soft-bg",
+      );
     });
 
     it("should display the OK label", () => {
-      expect(
-        wrapper.find('[data-test="span-row-status-pill"]').text(),
-      ).toContain("OK");
+      expect(wrapper.find('[data-test="span-row-status-pill"]').text()).toContain("OK");
     });
   });
 
@@ -128,41 +107,31 @@ describe("SpanStatusPill", () => {
     });
 
     it("should apply the unset class", () => {
-      expect(
-        wrapper
-          .find('[data-test="span-row-status-pill"]')
-          .classes(),
-      ).toContain("bg-badge-default-soft-bg");
+      expect(wrapper.find('[data-test="span-row-status-pill"]').classes()).toContain(
+        "bg-badge-default-soft-bg",
+      );
     });
 
     it("should not apply the error class", () => {
-      expect(
-        wrapper
-          .find('[data-test="span-row-status-pill"]')
-          .classes(),
-      ).not.toContain("bg-badge-error-soft-bg");
+      expect(wrapper.find('[data-test="span-row-status-pill"]').classes()).not.toContain(
+        "bg-badge-error-soft-bg",
+      );
     });
 
     it("should display UNSET as the label", () => {
-      expect(
-        wrapper.find('[data-test="span-row-status-pill"]').text(),
-      ).toContain("UNSET");
+      expect(wrapper.find('[data-test="span-row-status-pill"]').text()).toContain("UNSET");
     });
   });
 
   describe("label text", () => {
     it("should display the exact status string passed via prop", () => {
       wrapper = mount(SpanStatusPill, { props: { status: "CUSTOM_STATUS" } });
-      expect(
-        wrapper.find('[data-test="span-row-status-pill"]').text(),
-      ).toContain("CUSTOM_STATUS");
+      expect(wrapper.find('[data-test="span-row-status-pill"]').text()).toContain("CUSTOM_STATUS");
     });
 
     it("should display UNSET when an empty string is passed", () => {
       wrapper = mount(SpanStatusPill, { props: { status: "" } });
-      expect(
-        wrapper.find('[data-test="span-row-status-pill"]').text(),
-      ).toContain("UNSET");
+      expect(wrapper.find('[data-test="span-row-status-pill"]').text()).toContain("UNSET");
     });
   });
 });

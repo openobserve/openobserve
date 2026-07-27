@@ -41,10 +41,6 @@ pub mod enrichment;
 pub mod js;
 
 use enrichment::ENRICHMENT_TABLES;
-// Re-export the underlying engines so downstream crates depend on this crate
-// instead of on `vrl`/`vector-enrichment` directly.
-pub use vector_enrichment;
-pub use vrl;
 
 /// Metric label recorded when a transform fails to process a record.
 pub const TRANSFORM_FAILED: &str = "document_failed_transform";

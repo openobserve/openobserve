@@ -21,7 +21,7 @@ use tokio::{
 };
 
 use super::handlers::handle_triggers;
-use crate::service::db::scheduler::{Trigger, TriggerModule, pull as scheduler_pull};
+use crate::db::scheduler::{Trigger, TriggerModule, pull as scheduler_pull};
 
 #[derive(Debug, Clone)]
 pub struct ScheduledJob {

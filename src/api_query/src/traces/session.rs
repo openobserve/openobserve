@@ -21,6 +21,9 @@ use config::{
     utils::json,
 };
 use hashbrown::{HashMap, HashSet};
+use openobserve_api_common::extractors::Headers;
+use openobserve_core::{auth::UserEmail, traces};
+use search_service as SearchService;
 use serde::Serialize;
 use tracing::{Instrument, Span};
 
@@ -28,14 +31,9 @@ use super::TraceDetail;
 use crate::{
     common::{
         meta::http::HttpResponse as MetaHttpResponse,
-        utils::{
-            auth::UserEmail,
-            http::{get_or_create_trace_id, get_use_cache_from_request},
-        },
+        utils::http::{get_or_create_trace_id, get_use_cache_from_request},
     },
-    extractors::Headers,
     search::error_utils::map_error_to_http_response,
-    service::{search as SearchService, traces},
 };
 
 /// GetLatestSessions
@@ -101,7 +99,7 @@ pub async fn get_latest_sessions(
 
     #[cfg(feature = "enterprise")]
     {
-        if let Err(e) = crate::service::search::check_search_allowed(&org_id, Some(&stream_name)) {
+        if let Err(e) = search_service::check_search_allowed(&org_id, Some(&stream_name)) {
             return MetaHttpResponse::too_many_requests(e.to_string());
         }
     }
@@ -127,15 +125,12 @@ pub async fn get_latest_sessions(
     {
         use o2_openfga::meta::mapping::OFGA_MODELS;
 
-        use crate::{
-            common::utils::auth::{AuthExtractor, is_root_user},
-            service::users::get_user,
-        };
-        if !is_root_user(user_id) {
+        use crate::service::{auth::AuthExtractor, users::get_user};
+        if !db::user::is_root_user(user_id) {
             let user: config::meta::user::User = get_user(Some(&org_id), user_id).await.unwrap();
             let stream_type_str = StreamType::Traces.as_str();
 
-            if !crate::service::authz::check_permissions(
+            if !openobserve_core::authz::check_permissions(
                 user_id,
                 AuthExtractor {
                     auth: "".to_string(),
@@ -188,7 +183,7 @@ pub async fn get_latest_sessions(
         return MetaHttpResponse::bad_request("end_time is empty");
     }
 
-    let max_query_range = crate::common::utils::stream::get_max_query_range(
+    let max_query_range = search_service::query_range::get_max_query_range(
         std::slice::from_ref(&stream_name),
         org_id.as_str(),
         user_id,
@@ -523,7 +518,9 @@ pub async fn get_latest_sessions(
             Some(s) => s.to_string(),
             None => continue,
         };
-        let first_user_message = extract_first_user_message(item.get("gen_ai_input_messages"), 400);
+        let first_user_message = item
+            .get("gen_ai_input_messages")
+            .and_then(|value| extract_first_user_message(value, 400));
         trace_details.insert(
             tid,
             TraceDetail {
@@ -666,7 +663,7 @@ pub async fn get_session_details(
 
     #[cfg(feature = "enterprise")]
     {
-        if let Err(e) = crate::service::search::check_search_allowed(&org_id, Some(&stream_name)) {
+        if let Err(e) = search_service::check_search_allowed(&org_id, Some(&stream_name)) {
             return MetaHttpResponse::too_many_requests(e.to_string());
         }
     }
@@ -696,15 +693,12 @@ pub async fn get_session_details(
     {
         use o2_openfga::meta::mapping::OFGA_MODELS;
 
-        use crate::{
-            common::utils::auth::{AuthExtractor, is_root_user},
-            service::users::get_user,
-        };
-        if !is_root_user(user_id) {
+        use crate::service::{auth::AuthExtractor, users::get_user};
+        if !db::user::is_root_user(user_id) {
             let user: config::meta::user::User = get_user(Some(&org_id), user_id).await.unwrap();
             let stream_type_str = StreamType::Traces.as_str();
 
-            if !crate::service::authz::check_permissions(
+            if !openobserve_core::authz::check_permissions(
                 user_id,
                 AuthExtractor {
                     auth: "".to_string(),
@@ -762,10 +756,11 @@ pub async fn get_session_details(
         stream_type,
     )
     .await;
-    let validated = match schema.as_ref() {
+    let (validated, session_id_columns) = match schema.as_ref() {
         Some(s) => match super::schema_compat::validate_llm_schema(s, &stream_name) {
             Ok(v) => {
-                if s.field_with_name(v.columns.session_id).is_err() {
+                let session_id_columns = traces::session::session_id_columns(s);
+                if session_id_columns.is_empty() {
                     return MetaHttpResponse::json(PaginatedResponse {
                         took: 0,
                         total: 0,
@@ -776,24 +771,20 @@ pub async fn get_session_details(
                         function_error: String::new(),
                     });
                 }
-                v
+                (v, session_id_columns)
             }
             Err(e) => return MetaHttpResponse::bad_request(e.to_string()),
         },
-        None => super::schema_compat::ValidatedLlmSchema::fallback(false),
+        None => {
+            let validated = super::schema_compat::ValidatedLlmSchema::fallback(false);
+            let session_id_columns = vec![validated.columns.session_id.to_string()];
+            (validated, session_id_columns)
+        }
     };
-    let session_id_col = validated.columns.session_id;
-    let safe_session_id = escape_sql_string(&session_id);
     let use_cache = get_use_cache_from_request(&query);
     let user_id_opt = Some(user_id.to_string());
 
-    let query_sql = format!(
-        "SELECT trace_id, min({TIMESTAMP_COL_NAME}) as zo_sql_timestamp \
-         FROM \"{stream_name}\" \
-         WHERE {session_id_col} = '{safe_session_id}' \
-         GROUP BY trace_id \
-         ORDER BY zo_sql_timestamp DESC"
-    );
+    let query_sql = traces::session::trace_ids_sql(&stream_name, &session_id_columns, &session_id);
 
     let mut req = config::meta::search::Request {
         query: config::meta::search::Query {
@@ -852,7 +843,7 @@ pub async fn get_session_details(
         }
     };
 
-    let trace_ids = trace_ids_from_hits(&resp_search.hits);
+    let trace_ids = traces::session::trace_ids_from_hits(&resp_search.hits);
     if trace_ids.is_empty() {
         return MetaHttpResponse::json(PaginatedResponse {
             took: 0,
@@ -973,7 +964,7 @@ async fn fetch_session_trace_hits(
     start_time: i64,
     end_time: i64,
 ) -> Result<Vec<SessionTraceResponseItem>, infra::errors::Error> {
-    let trace_ids_sql = trace_ids.join("','");
+    let trace_id_predicate = traces::session::trace_id_predicate(trace_ids);
     let service_key_expr = if has_infer {
         "COALESCE(infer_service_name, service_name)"
     } else {
@@ -984,7 +975,7 @@ async fn fetch_session_trace_hits(
         validated,
         has_ref_parent_id,
         service_key_expr,
-        &trace_ids_sql,
+        &trace_id_predicate,
     );
     req.query.from = 0;
     req.query.size = trace_ids.len() as i64;
@@ -1021,7 +1012,7 @@ async fn fetch_session_trace_hits(
     }
 
     if !multi_service_tids.is_empty() {
-        let multi_ids_str = multi_service_tids.join("','");
+        let multi_trace_id_predicate = traces::session::trace_id_predicate(&multi_service_tids);
         let svc_type_select = if has_infer {
             ", max(infer_service_type) AS service_type"
         } else {
@@ -1030,7 +1021,7 @@ async fn fetch_session_trace_hits(
         let svc_sql = format!(
             "SELECT trace_id, {service_key_expr} AS service_name{svc_type_select}, \
              count(*) AS svc_count, max(duration) AS svc_duration \
-             FROM \"{stream_name}\" WHERE trace_id IN ('{multi_ids_str}') \
+             FROM \"{stream_name}\" WHERE {multi_trace_id_predicate} \
              GROUP BY trace_id, {service_key_expr}"
         );
         req.query.sql = svc_sql;
@@ -1092,7 +1083,7 @@ fn build_session_trace_details_sql(
     validated: &super::schema_compat::ValidatedLlmSchema,
     has_ref_parent_id: bool,
     service_key_expr: &str,
-    trace_ids_sql: &str,
+    trace_id_predicate: &str,
 ) -> String {
     let (root_service_name_expr, root_operation_name_expr) = if has_ref_parent_id {
         (
@@ -1178,7 +1169,7 @@ fn build_session_trace_details_sql(
             {first_msg_clause} as gen_ai_input_messages, \
             {trace_selects} \
             FROM \"{stream_name}\" \
-            WHERE trace_id IN ('{trace_ids_sql}') \
+            WHERE {trace_id_predicate} \
             GROUP BY trace_id"
         )
     } else {
@@ -1204,7 +1195,7 @@ fn build_session_trace_details_sql(
             {first_msg_clause} as gen_ai_input_messages, \
             {trace_selects} \
             FROM \"{stream_name}\" \
-            WHERE trace_id IN ('{trace_ids_sql}') \
+            WHERE {trace_id_predicate} \
             GROUP BY trace_id"
         )
     }
@@ -1337,33 +1328,6 @@ fn build_session_trace_response_item(
     Some((tid, service_count, hit))
 }
 
-fn trace_ids_from_hits(hits: &[json::Value]) -> Vec<String> {
-    let mut seen = HashSet::with_capacity(hits.len());
-    let mut trace_ids = Vec::with_capacity(hits.len());
-    for item in hits {
-        let Some(tid) = item.get("trace_id").and_then(|v| v.as_str()) else {
-            continue;
-        };
-        let sanitized = sanitize_trace_id_for_sql(tid);
-        if sanitized.is_empty() || !seen.insert(sanitized.clone()) {
-            continue;
-        }
-        trace_ids.push(sanitized);
-    }
-    trace_ids
-}
-
-fn sanitize_trace_id_for_sql(trace_id: &str) -> String {
-    trace_id
-        .chars()
-        .filter(|c| c.is_ascii_hexdigit() || *c == '-')
-        .collect()
-}
-
-fn escape_sql_string(value: &str) -> String {
-    value.replace('\'', "''")
-}
-
 fn optional_sum_expr(has_field: bool, column: &str, alias: &str) -> String {
     if has_field {
         format!("sum({column}) as {alias}")
@@ -1405,68 +1369,115 @@ struct SessionTraceServiceNameItem {
     service_type: Option<String>,
 }
 
-/// Extract the first user message from a `gen_ai_input_messages` JSON value.
-///
-/// The input is expected to be a JSON array of message objects with `role` and
-/// `content` fields (e.g. `[{"role":"user","content":"hello"}]`). Returns the
-/// content of the first message with role "user", trimmed to `max_len` chars.
-fn extract_first_user_message(
-    messages_val: Option<&json::Value>,
-    max_len: usize,
-) -> Option<String> {
-    let val = messages_val?;
+fn truncate_message(value: String, max_len: usize) -> Option<String> {
+    if value.trim().is_empty() {
+        return None;
+    }
+    Some(value.chars().take(max_len).collect())
+}
 
-    // The value may be:
-    // 1. A JSON array directly: [{"role":"user","content":"..."}]
-    // 2. A JSON string of an array: "[{\"role\":\"user\",...}]"
-    // 3. A JSON string of an object with a nested "messages" array:
-    //    "{\"model\":\"...\",\"messages\":[{\"role\":\"user\",...}]}"
-    let parsed: json::Value;
-    let msgs_val: &json::Value = if val.is_array() {
-        val
-    } else {
-        let s = val.as_str()?;
-        parsed = json::from_str(s).ok()?;
-        &parsed
-    };
-
-    // Resolve the actual messages array — either the top-level value, or a nested
-    // "messages" key (OpenAI-style) or "contents" key (Gemini/LiteLLM-style).
-    let arr = if let Some(a) = msgs_val.as_array() {
-        a
-    } else if let Some(a) = msgs_val.get("messages").and_then(|v| v.as_array()) {
-        a
-    } else {
-        msgs_val.get("contents").and_then(|v| v.as_array())?
-    };
-
-    for msg in arr {
-        let role = msg.get("role").and_then(|v| v.as_str()).unwrap_or("");
-        if !role.eq_ignore_ascii_case("user") {
-            continue;
+fn content_value_to_text(value: &json::Value) -> Option<String> {
+    match value {
+        json::Value::Null => None,
+        json::Value::Bool(value) => Some(value.to_string()),
+        json::Value::Number(value) => Some(value.to_string()),
+        json::Value::String(value) => (!value.trim().is_empty()).then(|| value.to_string()),
+        json::Value::Array(values) => {
+            let parts: Vec<String> = values.iter().filter_map(content_value_to_text).collect();
+            (!parts.is_empty()).then(|| parts.join("\n"))
         }
+        json::Value::Object(value) => {
+            if let Some(part_type) = value.get("type").and_then(|value| value.as_str()) {
+                if part_type == "text" {
+                    return value
+                        .get("content")
+                        .or_else(|| value.get("text"))
+                        .and_then(content_value_to_text);
+                }
+                return None;
+            }
 
-        // OpenAI-style: content is a plain string
-        if let Some(content) = msg.get("content").and_then(|v| v.as_str()) {
-            let trimmed: String = content.chars().take(max_len).collect();
-            return Some(trimmed);
-        }
-
-        // Gemini/LiteLLM-style: parts: [{text: "..."}]
-        if let Some(text) = msg
-            .get("parts")
-            .and_then(|v| v.as_array())
-            .and_then(|parts| {
-                parts
-                    .iter()
-                    .find_map(|p| p.get("text").and_then(|t| t.as_str()))
-            })
-        {
-            let trimmed: String = text.chars().take(max_len).collect();
-            return Some(trimmed);
+            value
+                .get("text")
+                .or_else(|| value.get("content"))
+                .or_else(|| value.get("parts"))
+                .and_then(content_value_to_text)
         }
     }
-    None
+}
+
+fn any_value_to_text(value: &json::Value) -> Option<String> {
+    content_value_to_text(value).or_else(|| match value {
+        json::Value::Null => None,
+        json::Value::Array(value) if value.is_empty() => None,
+        json::Value::Object(value) if value.is_empty() => None,
+        _ => json::to_string(value).ok(),
+    })
+}
+
+/// Extract the first user message from an OTEL `gen_ai_input_messages` AnyValue.
+fn extract_first_user_message(value: &json::Value, max_len: usize) -> Option<String> {
+    match value {
+        json::Value::Null => None,
+        json::Value::String(value) => match json::from_str::<json::Value>(value) {
+            Ok(json::Value::String(parsed)) => truncate_message(parsed, max_len),
+            Ok(parsed) => extract_first_user_message(&parsed, max_len),
+            Err(_) => truncate_message(value.to_string(), max_len),
+        },
+        json::Value::Array(values) => {
+            let contains_messages = values.iter().any(|value| {
+                value
+                    .as_object()
+                    .is_some_and(|value| value.contains_key("role"))
+            });
+
+            if contains_messages {
+                for message in values {
+                    let Some(message) = message.as_object() else {
+                        continue;
+                    };
+                    let role = message
+                        .get("role")
+                        .and_then(|value| value.as_str())
+                        .unwrap_or("");
+                    if !role.eq_ignore_ascii_case("user") && !role.eq_ignore_ascii_case("human") {
+                        continue;
+                    }
+
+                    if let Some(content) = message
+                        .get("content")
+                        .or_else(|| message.get("text"))
+                        .or_else(|| message.get("parts"))
+                        .and_then(content_value_to_text)
+                        .and_then(|value| truncate_message(value, max_len))
+                    {
+                        return Some(content);
+                    }
+                }
+                return None;
+            }
+
+            any_value_to_text(value).and_then(|value| truncate_message(value, max_len))
+        }
+        json::Value::Object(value) => {
+            if let Some(messages) = value.get("messages").or_else(|| value.get("contents")) {
+                return extract_first_user_message(messages, max_len);
+            }
+
+            if let Some(role) = value.get("role").and_then(|value| value.as_str())
+                && !role.eq_ignore_ascii_case("user")
+                && !role.eq_ignore_ascii_case("human")
+            {
+                return None;
+            }
+
+            any_value_to_text(&json::Value::Object(value.clone()))
+                .and_then(|value| truncate_message(value, max_len))
+        }
+        json::Value::Bool(_) | json::Value::Number(_) => {
+            any_value_to_text(value).and_then(|value| truncate_message(value, max_len))
+        }
+    }
 }
 
 #[derive(Debug, Serialize)]
@@ -1640,10 +1651,10 @@ mod tests {
             &validated,
             true,
             "service_name",
-            "trace-1','trace-2",
+            "\"trace_id\" IN ('trace-1', 'trace-2')",
         );
 
-        assert!(sql.contains("WHERE trace_id IN ('trace-1','trace-2')"));
+        assert!(sql.contains("WHERE \"trace_id\" IN ('trace-1', 'trace-2')"));
         assert!(
             sql.contains("sum(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END) AS error_count")
         );
@@ -1681,14 +1692,17 @@ mod tests {
     }
 
     #[test]
-    fn trace_ids_from_hits_sanitizes_and_deduplicates() {
+    fn shared_trace_ids_from_hits_preserves_exact_ids_and_deduplicates() {
         let hits = vec![
             json!({"trace_id": "abc-123"}),
             json!({"trace_id": "abc-123"}),
             json!({"trace_id": "bad';drop"}),
         ];
 
-        assert_eq!(trace_ids_from_hits(&hits), vec!["abc-123", "badd"]);
+        assert_eq!(
+            traces::session::trace_ids_from_hits(&hits),
+            vec!["abc-123", "bad';drop"]
+        );
     }
 
     #[test]
@@ -2131,7 +2145,7 @@ mod tests {
             {"role": "user", "content": "Hello, how are you doing today?"},
             {"role": "assistant", "content": "I'm fine, thanks!"}
         ]);
-        let result = extract_first_user_message(Some(&messages), 30);
+        let result = extract_first_user_message(&messages, 30);
         assert_eq!(result, Some("Hello, how are you doing today".to_string()));
     }
 
@@ -2140,19 +2154,15 @@ mod tests {
         let messages = json::json!([
             {"role": "user", "content": "short"}
         ]);
-        let result = extract_first_user_message(Some(&messages), 30);
+        let result = extract_first_user_message(&messages, 30);
         assert_eq!(result, Some("short".to_string()));
     }
 
     #[test]
     fn test_extract_first_user_message_empty() {
-        assert_eq!(extract_first_user_message(None, 30), None);
-        assert_eq!(extract_first_user_message(Some(&json::json!([])), 30), None);
+        assert_eq!(extract_first_user_message(&json::json!([]), 30), None);
         assert_eq!(
-            extract_first_user_message(
-                Some(&json::json!([{"role": "assistant", "content": "hi"}])),
-                30
-            ),
+            extract_first_user_message(&json::json!([{"role": "assistant", "content": "hi"}]), 30),
             None
         );
     }
@@ -2162,7 +2172,59 @@ mod tests {
         let messages = json::json!([
             {"role": "User", "content": "Hello"}
         ]);
-        let result = extract_first_user_message(Some(&messages), 30);
+        let result = extract_first_user_message(&messages, 30);
         assert_eq!(result, Some("Hello".to_string()));
+    }
+
+    #[test]
+    fn test_extract_first_user_message_from_plain_string_any_value() {
+        let result = extract_first_user_message(&json::json!("plain input"), 30);
+        assert_eq!(result, Some("plain input".to_string()));
+    }
+
+    #[test]
+    fn test_extract_first_user_message_from_scalar_any_values() {
+        assert_eq!(
+            extract_first_user_message(&json::json!(42), 30),
+            Some("42".to_string())
+        );
+        assert_eq!(
+            extract_first_user_message(&json::json!(false), 30),
+            Some("false".to_string())
+        );
+    }
+
+    #[test]
+    fn test_extract_first_user_message_from_json_encoded_scalar() {
+        let result = extract_first_user_message(&json::json!("\"encoded input\""), 30);
+        assert_eq!(result, Some("encoded input".to_string()));
+    }
+
+    #[test]
+    fn test_extract_first_user_message_from_json_encoded_messages() {
+        let input = json::json!(r#"[{"role":"user","content":"encoded message"}]"#);
+        let result = extract_first_user_message(&input, 30);
+        assert_eq!(result, Some("encoded message".to_string()));
+    }
+
+    #[test]
+    fn test_extract_first_user_message_from_otel_parts() {
+        let messages = json::json!([
+            {
+                "role": "user",
+                "parts": [
+                    {"type": "text", "content": "Weather in Paris?"}
+                ]
+            }
+        ]);
+        let result = extract_first_user_message(&messages, 30);
+        assert_eq!(result, Some("Weather in Paris?".to_string()));
+    }
+
+    #[test]
+    fn test_extract_first_user_message_from_unstructured_object_any_value() {
+        let input = json::json!({"prompt": "hello"});
+        let result = extract_first_user_message(&input, 30);
+        assert_eq!(result, Some("{\"prompt\":\"hello\"}".to_string()));
     }
 }

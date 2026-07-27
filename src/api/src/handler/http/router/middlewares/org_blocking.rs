@@ -39,7 +39,7 @@ pub async fn blocked_orgs_middleware(request: Request, next: Next) -> Response {
 
     if !org_id.is_empty()
         && !SYSTEM_PREFIXES.contains(&org_id)
-        && crate::service::db::org_status::is_blocked(org_id)
+        && db::org_status::is_blocked(org_id)
     {
         use axum::{http::StatusCode, response::IntoResponse};
         // "deleted", not "being deleted": this gate also covers the soft-delete
@@ -53,8 +53,7 @@ pub async fn blocked_orgs_middleware(request: Request, next: Next) -> Response {
     {
         use axum::{http::StatusCode, response::IntoResponse};
         use config::cluster::LOCAL_NODE;
-
-        use crate::service::organization;
+        use openobserve_core::organization;
 
         if LOCAL_NODE.is_ingester()
             && config::router::INGESTER_ROUTES
@@ -97,6 +96,6 @@ mod tests {
     #[test]
     fn test_non_blocked_org_is_allowed_by_cache() {
         // ORG_STATUS_CACHE starts empty; is_blocked for an unknown org returns false
-        assert!(!crate::service::db::org_status::is_blocked("someorg"));
+        assert!(!db::org_status::is_blocked("someorg"));
     }
 }

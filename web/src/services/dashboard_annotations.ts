@@ -15,15 +15,11 @@ export const annotationService = {
     };
 
     // Make the API call
-    return http().post(
-      `/api/${org_id}/dashboards/${dashboard_id}/annotations`,
-      data,
-      {
-        headers: {
-          "Content-Type": "application/json; charset=UTF-8",
-        },
+    return http().post(`/api/${org_id}/dashboards/${dashboard_id}/annotations`, data, {
+      headers: {
+        "Content-Type": "application/json; charset=UTF-8",
       },
-    );
+    });
   },
 
   update_timed_annotations: (
@@ -48,14 +44,11 @@ export const annotationService = {
     dashboardId: string,
     annotationIds: string[],
   ) => {
-    return http().delete(
-      `/api/${organization}/dashboards/${dashboardId}/annotations`,
-      {
-        data: {
-          annotation_ids: annotationIds,
-        },
+    return http().delete(`/api/${organization}/dashboards/${dashboardId}/annotations`, {
+      data: {
+        annotation_ids: annotationIds,
       },
-    );
+    });
   },
 
   get_timed_annotations: (
@@ -68,9 +61,7 @@ export const annotationService = {
     },
   ) => {
     // Format the panels parameter as comma-separated string if it's an array
-    const formattedPanels = Array.isArray(params.panels)
-      ? params.panels.join(",")
-      : params.panels;
+    const formattedPanels = Array.isArray(params.panels) ? params.panels.join(",") : params.panels;
 
     // Construct query parameters
     const queryParams = {

@@ -24,13 +24,11 @@ use config::{
 };
 use hashbrown::HashSet;
 use infra::table::org_users::get_admin;
+use stream::get_streams;
 
 use crate::{
     common::{infra::config::ORGANIZATIONS, meta::telemetry},
-    service::{
-        organization::is_org_in_free_trial_period, self_reporting::search::get_usage,
-        stream::get_streams,
-    },
+    service::{organization::is_org_in_free_trial_period, self_reporting::search::get_usage},
 };
 
 /// This file has all odd-jobs that are specific to cloud installation,
@@ -67,7 +65,7 @@ pub fn start() {
 pub fn start_trial_quota_jobs() {
     tokio::spawn(async move { run_trial_quota_flush().await });
     tokio::spawn(async move {
-        crate::service::trial_quota::subscribe_ha_queue().await;
+        openobserve_core::trial_quota::subscribe_ha_queue().await;
     });
 }
 
@@ -160,7 +158,8 @@ async fn run_trial_quota_flush() {
     interval.tick().await; // skip first immediate tick
     loop {
         interval.tick().await;
-        crate::service::trial_quota::flush_to_db().await;
+        openobserve_core::trial_quota::flush_to_db().await;
+        openobserve_core::trial_quota::refresh_limits_from_db().await;
     }
 }
 
@@ -176,9 +175,9 @@ async fn run_ai_quota_check() {
 }
 
 async fn check_all_orgs_ai_quota() {
-    use crate::service::trial_quota;
+    use openobserve_core::trial_quota;
 
-    let orgs = crate::service::db::schema::list_organizations_from_cache().await;
+    let orgs = db::schema::list_organizations_from_cache().await;
 
     // Pre-fetch all notified checkpoints in a single GROUP-BY query to avoid
     // one DB round-trip per org (N+1).
@@ -214,7 +213,11 @@ async fn check_all_orgs_ai_quota() {
             }
         };
 
-        let is_paid = trial_quota::org_has_active_subscription(&org_id).await;
+        let policy =
+            o2_enterprise::enterprise::cloud::ai_credits::resolve_ai_credit_exhaustion_policy(
+                &org_id,
+            )
+            .await;
         let used = trial_quota::get_used(&org_id);
         let limit = trial_quota::get_limit(&org_id);
 
@@ -226,15 +229,17 @@ async fn check_all_orgs_ai_quota() {
             }
         };
 
-        let (subject, body) = trial_quota::build_quota_email_message(
-            &org_id, &org_name, checkpoint, is_paid, used, limit,
-        );
+        let (subject, body) =
+            o2_enterprise::enterprise::cloud::ai_credits::build_ai_credit_quota_email(
+                &org_id, &org_name, checkpoint, policy, used, limit,
+            );
 
         let email = Email {
             recipients: vec![admin.email.clone()],
         };
 
-        match crate::service::alerts::alert::send_email_notification(&subject, &email, body).await {
+        match openobserve_core::alerts::alert::send_email_notification(&subject, &email, body).await
+        {
             Ok(_) => {
                 log::info!(
                     "[AI_QUOTA] Sent {}% checkpoint email to {} for org={org_id}",
@@ -459,7 +464,8 @@ async fn check_external_contract_expiry() {
             recipients: vec![admin.email.clone()],
         };
 
-        match crate::service::alerts::alert::send_email_notification(&subject, &email, body).await {
+        match openobserve_core::alerts::alert::send_email_notification(&subject, &email, body).await
+        {
             Ok(_) => {
                 log::info!(
                     "[EXT_CONTRACT] Sent {stage:?} expiry warning to {} for org={org_id}",

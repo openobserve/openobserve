@@ -1,6 +1,7 @@
-import type { Scorer } from "@/services/online-evals.service";
+import type { EvalTargetScope, Scorer } from "@/services/online-evals.service";
 import { entityId } from "./evalEntity";
 import { extractTemplateVariables } from "./evalFormat";
+import { isSystemProvidedVariable } from "./systemProvidedVariables";
 
 export function scorerTemplateVariables(scorer: Scorer) {
   return [
@@ -31,17 +32,13 @@ export function jobMappingVariablesForScorer(
   scorer: Scorer,
   existingMapping: Record<string, string> | undefined,
 ) {
-  return [
-    ...new Set([
-      ...scorerTemplateVariables(scorer),
-      ...Object.keys(existingMapping || {}),
-    ]),
-  ];
+  return [...new Set([...scorerTemplateVariables(scorer), ...Object.keys(existingMapping || {})])];
 }
 
 export function buildJobInputMappingPayload(
   scorerIds: string[],
   inputMappings: Record<string, Record<string, string>>,
+  targetScope: EvalTargetScope = "span",
 ) {
   const payload: Record<string, Record<string, string>> = {};
 
@@ -49,7 +46,7 @@ export function buildJobInputMappingPayload(
     const cleanMapping = Object.fromEntries(
       Object.entries(inputMappings[scorerId] || {})
         .map(([key, value]) => [key.trim(), value.trim()])
-        .filter(([key, value]) => key && value),
+        .filter(([key, value]) => key && value && !isSystemProvidedVariable(targetScope, key)),
     );
 
     if (Object.keys(cleanMapping).length) payload[scorerId] = cleanMapping;
@@ -74,14 +71,8 @@ export function normalizeJobInputMappings(value: any, selectedScorerIds: string[
   if (hasPerScorerShape) {
     return Object.fromEntries(
       entries
-        .filter(
-          ([, mapping]) =>
-            mapping && typeof mapping === "object" && !Array.isArray(mapping),
-        )
-        .map(([scorerId, mapping]) => [
-          scorerId,
-          { ...(mapping as Record<string, string>) },
-        ]),
+        .filter(([, mapping]) => mapping && typeof mapping === "object" && !Array.isArray(mapping))
+        .map(([scorerId, mapping]) => [scorerId, { ...(mapping as Record<string, string>) }]),
     );
   }
 
@@ -89,9 +80,7 @@ export function normalizeJobInputMappings(value: any, selectedScorerIds: string[
     entries.filter(([, mappingValue]) => typeof mappingValue === "string"),
   ) as Record<string, string>;
 
-  return Object.fromEntries(
-    selectedScorerIds.map((scorerId) => [scorerId, { ...flatMapping }]),
-  );
+  return Object.fromEntries(selectedScorerIds.map((scorerId) => [scorerId, { ...flatMapping }]));
 }
 
 export function syncJobInputMappings(

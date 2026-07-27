@@ -109,9 +109,7 @@ describe("OButton", () => {
 
   it("applies outline variant classes", () => {
     const wrapper = mount(OButton, { props: { variant: "outline" } });
-    expect(wrapper.classes().join(" ")).toContain(
-      "text-button-outline-text",
-    );
+    expect(wrapper.classes().join(" ")).toContain("text-button-outline-text");
   });
 
   it("applies ghost variant classes", () => {
@@ -126,16 +124,12 @@ describe("OButton", () => {
 
   it("applies ghost-primary variant classes", () => {
     const wrapper = mount(OButton, { props: { variant: "ghost-primary" } });
-    expect(wrapper.classes().join(" ")).toContain(
-      "text-button-ghost-primary-text",
-    );
+    expect(wrapper.classes().join(" ")).toContain("text-button-ghost-primary-text");
   });
 
   it("applies ghost-destructive variant classes", () => {
     const wrapper = mount(OButton, { props: { variant: "ghost-destructive" } });
-    expect(wrapper.classes().join(" ")).toContain(
-      "text-button-ghost-destructive-text",
-    );
+    expect(wrapper.classes().join(" ")).toContain("text-button-ghost-destructive-text");
   });
 
   // --- Size classes ---
@@ -264,11 +258,11 @@ describe("OButton", () => {
     expect(wrapper.classes()).not.toContain("transition-colors");
   });
 
-  it("applies unified focus glow (ring-[0.125rem]! ring-primary-500/25!) as base", () => {
+  it("applies unified focus glow (ring-[0.125rem]! ring-accent/25!) as base", () => {
     const wrapper = mount(OButton);
     const classes = wrapper.classes().join(" ");
     expect(classes).toContain("focus-visible:ring-[0.125rem]!");
-    expect(classes).toContain("focus-visible:ring-primary-500/25!");
+    expect(classes).toContain("focus-visible:ring-accent/25!");
   });
 
   it("retains outline-none as part of base classes", () => {
@@ -279,16 +273,12 @@ describe("OButton", () => {
 
   it("applies a focus-visible ring on the default primary variant", () => {
     const wrapper = mount(OButton);
-    expect(wrapper.classes().join(" ")).toContain(
-      "focus-visible:ring-button-primary-hover",
-    );
+    expect(wrapper.classes().join(" ")).toContain("focus-visible:ring-button-primary-hover");
   });
 
   it("applies a focus-visible ring on the secondary variant", () => {
     const wrapper = mount(OButton, { props: { variant: "secondary" } });
-    expect(wrapper.classes().join(" ")).toContain(
-      "focus-visible:ring-button-secondary-focus-ring",
-    );
+    expect(wrapper.classes().join(" ")).toContain("focus-visible:ring-button-secondary-focus-ring");
   });
 
   it("applies focus-visible:ring-[3px] on every styled variant", () => {

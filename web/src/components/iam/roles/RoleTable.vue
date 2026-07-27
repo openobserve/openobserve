@@ -14,6 +14,7 @@ const { t } = useI18n();
 defineProps<{
   data: any[];
   loading?: boolean;
+  actionLoading?: boolean;
   selectedIds?: string[];
   globalFilter?: string;
 }>();
@@ -79,7 +80,7 @@ const columns: OTableColumnDef[] = [
     @update:global-filter="emit('update:globalFilter', $event)"
   >
     <template #toolbar>
-      <div class="flex items-center gap-2 w-full">
+      <div class="flex w-full items-center gap-2">
         <OSearchInput
           :model-value="globalFilter"
           :placeholder="t('iam.searchRole')"
@@ -134,6 +135,7 @@ const columns: OTableColumnDef[] = [
         data-test="iam-roles-bulk-delete-btn"
         variant="outline-destructive"
         size="sm"
+        :loading="actionLoading"
         @click="emit('bulk-delete')"
       >
         <template #icon-left>

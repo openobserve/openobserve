@@ -51,8 +51,8 @@ class PromqlRendererImpl implements PromqlRenderer {
       // Properly escape backslashes first, then double quotes
       // This is required for PromQL string literals
       const value = label.value
-        .replace(/\\/g, '\\\\')  // Escape backslashes first
-        .replace(/"/g, '\\"');    // Then escape double quotes
+        .replace(/\\/g, "\\\\") // Escape backslashes first
+        .replace(/"/g, '\\"'); // Then escape double quotes
       return `${label.label}${label.op}"${value}"`;
     });
 
@@ -62,10 +62,7 @@ class PromqlRendererImpl implements PromqlRenderer {
   /**
    * Render a single operation
    */
-  private renderOperation(
-    operation: PromqlStep,
-    innerExpr: string
-  ): string {
+  private renderOperation(operation: PromqlStep, innerExpr: string): string {
     // A panel may persist an old scalar-math step id, so resolve it before
     // anything looks it up or switches on it.
     const id = normalizeStepId(operation.id);
@@ -175,11 +172,7 @@ class PromqlRendererImpl implements PromqlRenderer {
     ) {
       if (id === PromqlStepId.Clamp) {
         return `${id}(${innerExpr}, ${params[0]}, ${params[1]})`;
-      } else if (
-        id === PromqlStepId.Round &&
-        params[0] &&
-        params[0] !== 1
-      ) {
+      } else if (id === PromqlStepId.Round && params[0] && params[0] !== 1) {
         return `${id}(${innerExpr}, ${params[0]})`;
       }
       return `${id}(${innerExpr})`;
@@ -223,9 +216,7 @@ class PromqlRendererImpl implements PromqlRenderer {
 
   /** Every step in one group of the picker. */
   getStepsForGroup(group: string): PromqlStepSpec[] {
-    return Array.from(this.operations.values()).filter(
-      (op) => op.group === group
-    );
+    return Array.from(this.operations.values()).filter((op) => op.group === group);
   }
 
   /** The picker's groups, in declaration order. */

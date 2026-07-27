@@ -23,7 +23,7 @@ describe("useRateLimiter", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    
+
     mockStore = {
       state: {
         allApiLimitsByOrgId: {},
@@ -32,7 +32,7 @@ describe("useRateLimiter", () => {
       },
       dispatch: vi.fn(),
     };
-    
+
     (useStore as any).mockReturnValue(mockStore);
     rateLimiterInstance = useRateLimiter();
   });
@@ -68,7 +68,7 @@ describe("useRateLimiter", () => {
       expect(result).toBeDefined();
       expect(Array.isArray(result)).toBe(true);
       expect(result.length).toBe(3);
-      
+
       // Check users module transformation
       const usersModule = result.find((module: any) => module.module_name === "users");
       expect(usersModule).toEqual({
@@ -80,7 +80,7 @@ describe("useRateLimiter", () => {
         delete: 25,
       });
 
-      // Check dashboards module transformation  
+      // Check dashboards module transformation
       const dashboardsModule = result.find((module: any) => module.module_name === "dashboards");
       expect(dashboardsModule).toEqual({
         module_name: "dashboards",
@@ -171,7 +171,7 @@ describe("useRateLimiter", () => {
       await rateLimiterInstance.getApiLimitsByOrganization("test-org");
 
       expect(mockStore.dispatch).toHaveBeenCalledTimes(2);
-      
+
       // Check first dispatch for API limits
       expect(mockStore.dispatch).toHaveBeenNthCalledWith(1, "setApiLimitsByOrgId", {
         "test-org_second": expect.arrayContaining([
@@ -330,7 +330,7 @@ describe("useRateLimiter", () => {
       expect(mockStore.dispatch).toHaveBeenCalledWith("setRoleLimitsByOrgIdByRole", {
         "test-org": {
           "existing-role": [{ module_name: "existing" }],
-          "admin_second": expect.arrayContaining([
+          admin_second: expect.arrayContaining([
             expect.objectContaining({
               module_name: "test_module",
             }),
@@ -377,11 +377,11 @@ describe("useRateLimiter", () => {
     it("should preserve existing role data in store", async () => {
       mockStore.state.allRoleLimitsByOrgIdByRole = {
         "test-org": {
-          "role1": [{ module_name: "module1" }],
-          "role2": [{ module_name: "module2" }],
+          role1: [{ module_name: "module1" }],
+          role2: [{ module_name: "module2" }],
         },
         "other-org": {
-          "role3": [{ module_name: "module3" }],
+          role3: [{ module_name: "module3" }],
         },
       };
 
@@ -397,12 +397,12 @@ describe("useRateLimiter", () => {
 
       expect(mockStore.dispatch).toHaveBeenCalledWith("setRoleLimitsByOrgIdByRole", {
         "test-org": {
-          "role1": [{ module_name: "module1" }],
-          "role2": [{ module_name: "module2" }],
+          role1: [{ module_name: "module1" }],
+          role2: [{ module_name: "module2" }],
           "new-role_second": expect.any(Array),
         },
         "other-org": {
-          "role3": [{ module_name: "module3" }],
+          role3: [{ module_name: "module3" }],
         },
       });
     });
@@ -508,7 +508,10 @@ describe("useRateLimiter", () => {
 
       const result = await rateLimiterInstance.getModulesToDisplay("test-org");
 
-      expect(result).toContainEqual({ label: "module_with_underscores", value: "module_with_underscores" });
+      expect(result).toContainEqual({
+        label: "module_with_underscores",
+        value: "module_with_underscores",
+      });
       expect(result).toContainEqual({ label: "module-with-dashes", value: "module-with-dashes" });
       expect(result).toContainEqual({ label: "module.with.dots", value: "module.with.dots" });
     });
@@ -581,7 +584,9 @@ describe("useRateLimiter", () => {
       const roleResult = await rateLimiterInstance.getRoleLimitsByOrganization("test-org", "admin");
 
       // Both should have same structure and sorting
-      expect(apiResult.map((m: any) => m.module_name)).toEqual(roleResult.map((m: any) => m.module_name));
+      expect(apiResult.map((m: any) => m.module_name)).toEqual(
+        roleResult.map((m: any) => m.module_name),
+      );
       expect(apiResult[0].module_name).toBe("alerts");
       expect(apiResult[1].module_name).toBe("users");
     });

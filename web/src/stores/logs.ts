@@ -2,7 +2,7 @@ export default {
   namespaced: true,
   state: {
     logs: {},
-    isInitialized: false
+    isInitialized: false,
   },
   getters: {
     getLogs(state: any) {
@@ -26,13 +26,13 @@ export default {
   },
   actions: {
     setLogs(context: any, logs: any) {
-      context.commit('setLogs', logs);
+      context.commit("setLogs", logs);
     },
     setIsInitialized(context: any, isInitialized: boolean) {
-      context.commit('setIsInitialized', isInitialized);
+      context.commit("setIsInitialized", isInitialized);
     },
     resetLogs(context: any) {
-      context.commit('resetLogs');
+      context.commit("resetLogs");
     },
   },
 };

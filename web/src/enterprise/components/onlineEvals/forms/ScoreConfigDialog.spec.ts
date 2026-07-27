@@ -58,9 +58,7 @@ function domFind(sel: string) {
   return document.querySelector(sel);
 }
 async function typeNumber(testId: string, value: string) {
-  const el = document.querySelector(
-    `[data-test="${testId}"] input`,
-  ) as HTMLInputElement | null;
+  const el = document.querySelector(`[data-test="${testId}"] input`) as HTMLInputElement | null;
   if (!el) throw new Error(`input not found: ${testId}`);
   el.value = value;
   el.dispatchEvent(new Event("input", { bubbles: true }));

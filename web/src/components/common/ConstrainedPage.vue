@@ -30,14 +30,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   the child manages its own padding.
 -->
 <template>
-  <div
-    class="o2-constrained-page h-full min-h-0 overflow-y-auto"
-    data-test="constrained-page"
-  >
-    <div
-      class="w-full"
-      :class="[alignClass, maxWidthClass, padded ? 'px-6 py-6' : '']"
-    >
+  <div class="o2-constrained-page h-full min-h-0 overflow-y-auto" data-test="constrained-page">
+    <div class="w-full" :class="[alignClass, maxWidthClass, padded ? 'px-6 py-6' : '']">
       <slot />
     </div>
   </div>
@@ -74,7 +68,5 @@ const maxWidthClass = computed(() => SIZE_CLASS[props.size]);
 
 // `center` keeps the column centered (mx-auto); `left` pins it to the start so
 // form pages read left-aligned instead of floating in the middle of wide screens.
-const alignClass = computed(() =>
-  props.align === "left" ? "mr-auto" : "mx-auto",
-);
+const alignClass = computed(() => (props.align === "left" ? "mr-auto" : "mx-auto"));
 </script>

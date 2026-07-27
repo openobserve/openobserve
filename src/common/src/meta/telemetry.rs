@@ -31,6 +31,7 @@ use infra::{
     schema::STREAM_SCHEMAS_LATEST,
 };
 use segment::{Message, message::Track};
+use transform::QUERY_FUNCTIONS;
 
 use crate::infra::config::*;
 

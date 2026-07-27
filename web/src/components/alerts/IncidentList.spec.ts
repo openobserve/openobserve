@@ -101,8 +101,7 @@ function createWrapper() {
         NoData: { template: '<div data-test="no-data-stub" />' },
         OEmptyState: { template: '<div data-test="no-data-stub" />' },
         OButton: {
-          template:
-            '<button v-bind="$attrs" @click="$emit(\'click\')"><slot /></button>',
+          template: '<button v-bind="$attrs" @click="$emit(\'click\')"><slot /></button>',
           emits: ["click"],
         },
         OIcon: { template: "<span />" },
@@ -232,13 +231,7 @@ describe("IncidentList.vue", () => {
     it("calls list with correct org identifier", async () => {
       wrapper = createWrapper();
       await flushPromises();
-      expect(incidentsService.list).toHaveBeenCalledWith(
-        "default",
-        undefined,
-        1000,
-        0,
-        undefined,
-      );
+      expect(incidentsService.list).toHaveBeenCalledWith("default", undefined, 1000, 0, undefined);
     });
 
     it("populates allIncidents after successful load", async () => {
@@ -289,6 +282,8 @@ describe("IncidentList.vue", () => {
     it("returns all incidents when searchQuery is empty", async () => {
       wrapper = createWrapper();
       await flushPromises();
+      // Default status filter is now "active"; select "all" to see every row.
+      (wrapper.vm as any).statusFilter = "all";
       (wrapper.vm as any).searchQuery = "";
       expect((wrapper.vm as any).visibleIncidents).toHaveLength(3);
     });
@@ -332,9 +327,7 @@ describe("IncidentList.vue", () => {
     it("filters case-insensitively", async () => {
       (incidentsService.list as any).mockResolvedValue({
         data: {
-          incidents: [
-            createIncident({ id: "1", title: "Alpha Incident", status: "open" }),
-          ],
+          incidents: [createIncident({ id: "1", title: "Alpha Incident", status: "open" })],
           total: 1,
         },
       });
@@ -379,11 +372,7 @@ describe("IncidentList.vue", () => {
       const incident = (wrapper.vm as any).allIncidents[0];
       await (wrapper.vm as any).reopenIncident(incident);
       await flushPromises();
-      expect(incidentsService.updateStatus).toHaveBeenCalledWith(
-        "default",
-        incident.id,
-        "open",
-      );
+      expect(incidentsService.updateStatus).toHaveBeenCalledWith("default", incident.id, "open");
     });
 
     it("reloads incidents after successful status update", async () => {
@@ -399,9 +388,7 @@ describe("IncidentList.vue", () => {
     });
 
     it("handles updateStatus error without crashing", async () => {
-      (incidentsService.updateStatus as any).mockRejectedValue(
-        new Error("Update failed"),
-      );
+      (incidentsService.updateStatus as any).mockRejectedValue(new Error("Update failed"));
       const incident = (wrapper.vm as any).allIncidents[0];
       await (wrapper.vm as any).resolveIncident(incident);
       await flushPromises();
@@ -433,9 +420,7 @@ describe("IncidentList.vue", () => {
 
     it("returns the raw status for unknown values", () => {
       wrapper = createWrapper();
-      expect((wrapper.vm as any).getStatusLabel("custom-status")).toBe(
-        "custom-status",
-      );
+      expect((wrapper.vm as any).getStatusLabel("custom-status")).toBe("custom-status");
     });
   });
 
@@ -447,23 +432,17 @@ describe("IncidentList.vue", () => {
 
     it("returns status-acknowledged for acknowledged", () => {
       wrapper = createWrapper();
-      expect((wrapper.vm as any).getStatusColorClass("acknowledged")).toBe(
-        "status-acknowledged",
-      );
+      expect((wrapper.vm as any).getStatusColorClass("acknowledged")).toBe("status-acknowledged");
     });
 
     it("returns status-resolved for resolved", () => {
       wrapper = createWrapper();
-      expect((wrapper.vm as any).getStatusColorClass("resolved")).toBe(
-        "status-resolved",
-      );
+      expect((wrapper.vm as any).getStatusColorClass("resolved")).toBe("status-resolved");
     });
 
     it("returns status-default for unknown status", () => {
       wrapper = createWrapper();
-      expect((wrapper.vm as any).getStatusColorClass("unknown")).toBe(
-        "status-default",
-      );
+      expect((wrapper.vm as any).getStatusColorClass("unknown")).toBe("status-default");
     });
   });
 
@@ -532,6 +511,8 @@ describe("IncidentList.vue", () => {
     it("visibleIncidents has 3 items after load", async () => {
       wrapper = createWrapper();
       await flushPromises();
+      // Default status filter is now "active"; select "all" to see every row.
+      (wrapper.vm as any).statusFilter = "all";
       expect((wrapper.vm as any).visibleIncidents).toHaveLength(3);
     });
 

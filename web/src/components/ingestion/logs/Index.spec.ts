@@ -58,10 +58,9 @@ function buildMountOptions() {
       },
       stubs: {
         OSplitter: {
-          template:
-            '<div><slot name="before"></slot><slot name="after"></slot></div>',
+          template: '<div><slot name="before"></slot><slot name="after"></slot></div>',
         },
-        OTabs: { template: '<div><slot /></div>' },
+        OTabs: { template: "<div><slot /></div>" },
         ORouteTab: true,
         "router-view": true,
       },
@@ -105,9 +104,7 @@ describe("IngestLogs Component", () => {
     });
 
     it("should expose currentOrgIdentifier from the store", () => {
-      expect(wrapper.vm.currentOrgIdentifier).toBe(
-        store.state.selectedOrganization.identifier,
-      );
+      expect(wrapper.vm.currentOrgIdentifier).toBe(store.state.selectedOrganization.identifier);
     });
 
     it("should expose copyToClipboardFn as a function", () => {
@@ -134,6 +131,7 @@ describe("IngestLogs Component", () => {
         "fluentd",
         "vector",
         "syslogNg",
+        "loongcollector",
       ]);
     });
   });
@@ -153,10 +151,9 @@ describe("IngestLogs Component", () => {
           provide: { store },
           stubs: {
             OSplitter: {
-              template:
-                '<div><slot name="before"></slot><slot name="after"></slot></div>',
+              template: '<div><slot name="before"></slot><slot name="after"></slot></div>',
             },
-            OTabs: { template: '<div><slot /></div>' },
+            OTabs: { template: "<div><slot /></div>" },
             ORouteTab: true,
             "router-view": true,
           },
@@ -250,6 +247,18 @@ describe("IngestLogs Component", () => {
       const tw = mount(IngestLogs, buildMountOptions());
       expect(mockRouter.push).toHaveBeenCalledWith({
         name: "syslogNg",
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
+        },
+      });
+      tw.unmount();
+    });
+
+    it("should push with org_identifier query when route is 'loongcollector'", () => {
+      mockRouter.currentRoute.value.name = "loongcollector";
+      const tw = mount(IngestLogs, buildMountOptions());
+      expect(mockRouter.push).toHaveBeenCalledWith({
+        name: "loongcollector",
         query: {
           org_identifier: store.state.selectedOrganization.identifier,
         },
@@ -431,9 +440,7 @@ describe("IngestLogs Component", () => {
   // ─────────────────────────────────────────────────────────────────────────
   describe("Store Integration", () => {
     it("should read selectedOrganization.identifier from the store", () => {
-      expect(wrapper.vm.currentOrgIdentifier).toBe(
-        store.state.selectedOrganization.identifier,
-      );
+      expect(wrapper.vm.currentOrgIdentifier).toBe(store.state.selectedOrganization.identifier);
     });
 
     it("should read userInfo.email from the store", () => {

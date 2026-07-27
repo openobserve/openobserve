@@ -159,6 +159,29 @@ pub async fn count_referencing_location<C: ConnectionTrait>(
         .count() as u64)
 }
 
+/// Synthetics in one org whose `locations` array contains the given location
+/// id. Filtered in Rust for the same cross-DB reason as
+/// `count_referencing_location`; the per-org set is small.
+pub async fn list_referencing_location<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    location_id: &str,
+) -> Result<Vec<Synthetic>, errors::Error> {
+    let _lock = super::get_lock().await;
+    let models = Entity::find()
+        .filter(Column::OrgId.eq(org_id))
+        .all(conn)
+        .await?;
+    let mut out = Vec::new();
+    for m in models {
+        let s = Synthetic::try_from(m)?;
+        if s.locations.iter().any(|l| l == location_id) {
+            out.push(s);
+        }
+    }
+    Ok(out)
+}
+
 pub async fn create<C: TransactionTrait>(
     conn: &C,
     org_id: &str,
@@ -313,6 +336,10 @@ pub struct DueMonitor {
     pub frequency: SyntheticFrequency,
     /// Minutes from UTC — used for cron scheduling. 0 = UTC.
     pub tz_offset: i32,
+    /// The scheduled due time that made this monitor eligible. The scheduler
+    /// anchors the NEXT run to this (fixed-rate) instead of `now`, so the tick
+    /// lag doesn't accumulate into schedule drift.
+    pub next_run_at: i64,
     /// Populated only for browser monitors (parsed from config.browser_devices).
     pub browser_devices: Vec<config::meta::synthetics::BrowserDevice>,
     pub tags: Vec<String>,
@@ -373,6 +400,7 @@ pub async fn fetch_due<C: ConnectionTrait>(
                 locations,
                 frequency,
                 tz_offset: m.tz_offset,
+                next_run_at: m.next_run_at,
                 browser_devices,
                 tags,
             })

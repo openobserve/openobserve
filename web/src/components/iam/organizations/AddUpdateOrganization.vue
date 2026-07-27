@@ -15,10 +15,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <ODialog data-test="add-update-organization-dialog"
+  <ODialog
+    data-test="add-update-organization-dialog"
     :open="open"
     size="sm"
-    :title="beingUpdated ? t('organization.updateOrganization') : t('organization.createOrganization')"
+    :title="
+      beingUpdated ? t('organization.updateOrganization') : t('organization.createOrganization')
+    "
     :primaryButtonLabel="t('organization.save')"
     :secondaryButtonLabel="t('organization.cancel')"
     form-id="add-update-organization-form"
@@ -59,14 +62,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="org-make-billed-member"
         />
 
-        <div class="flex justify-center mt-4" v-if="proPlanRequired">
+        <div class="mt-4 flex justify-center" v-if="proPlanRequired">
           <OButton
             variant="secondary"
             size="md"
             class="mb-4 ml-4"
             @click="completeSubscriptionProcess"
           >
-            {{ t('organization.proceed_subscription') }}
+            {{ t("organization.proceed_subscription") }}
           </OButton>
         </div>
       </OForm>
@@ -180,9 +183,7 @@ export default defineComponent({
 
   methods: {
     completeSubscriptionProcess() {
-      this.router.push(
-        `/billings/plans?org_identifier=${this.newOrgIdentifier}`,
-      );
+      this.router.push(`/billings/plans?org_identifier=${this.newOrgIdentifier}`);
     },
     // Plain async @submit handler — fires only after the schema passes (name
     // required + regex). Awaited by OForm, so the footer Save spinner spans the
@@ -196,15 +197,11 @@ export default defineComponent({
       if (!organizationId) {
         const payload: any = { name };
         if (value.makeBilledMember && config.isCloud == "true") {
-          payload.make_billed_member_of =
-            this.store.state.selectedOrganization.identifier;
+          payload.make_billed_member_of = this.store.state.selectedOrganization.identifier;
         }
         callOrganization = organizationService.create(payload);
       } else {
-        callOrganization = organizationService.rename_organization(
-          organizationId,
-          name,
-        );
+        callOrganization = organizationService.rename_organization(organizationId, name);
       }
 
       try {

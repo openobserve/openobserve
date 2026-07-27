@@ -39,7 +39,6 @@ o2_openfga = { workspace = true, optional = true }
 opentelemetry.workspace = true
 parking_lot.workspace = true
 prost.workspace = true
-regex.workspace = true
 reqwest.workspace = true
 segment.workspace = true
 serde.workspace = true
@@ -57,6 +56,3 @@ url.workspace = true
 utoipa.workspace = true
 config.workspace = true
 infra.workspace = true
-
-[dev-dependencies]
-expect-test.workspace = true

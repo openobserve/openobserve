@@ -18,10 +18,7 @@
 
 import { b64EncodeUnicode, b64DecodeUnicodeSafe } from "@/utils/zincutils";
 import { applyOverridesFromRegistry } from "@/utils/url/deepLinkParams";
-import {
-  METRICS_PARAMS,
-  defaultMetricsQuery,
-} from "@/utils/metrics/metricsParamRegistry";
+import { METRICS_PARAMS, defaultMetricsQuery } from "@/utils/metrics/metricsParamRegistry";
 
 // bump when the blob payload shape changes; older blobs decode to null
 export const METRICS_BLOB_VERSION = 1;
@@ -50,9 +47,7 @@ export const encodeMetricsConfig = (blob: MetricsBlob): string => {
 };
 
 // base64 metrics_data -> { v, data }, or null on bad/old/empty input (never throws)
-export const decodeMetricsConfig = (
-  raw: string | null | undefined,
-): MetricsBlob | null => {
+export const decodeMetricsConfig = (raw: string | null | undefined): MetricsBlob | null => {
   if (!raw) return null;
   try {
     const decoded = b64DecodeUnicodeSafe(raw);

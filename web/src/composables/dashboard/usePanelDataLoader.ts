@@ -13,16 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import {
-  ref,
-  watch,
-  reactive,
-  toRefs,
-  onMounted,
-  onUnmounted,
-  toRaw,
-  markRaw,
-} from "vue";
+import { ref, watch, reactive, toRefs, onMounted, onUnmounted, toRaw, markRaw } from "vue";
 import queryService from "../../services/search";
 import { useStore } from "vuex";
 
@@ -65,6 +56,7 @@ export const usePanelDataLoader = (
   shouldRefreshWithoutCache?: any,
   regionClusterParams?: any,
   allowAnnotationsAPI?: any,
+  injectedPromqlData?: any,
 ) => {
   const PANEL_DATA_LOADER_DEBUG = false;
   const log = (...args: any[]) => {
@@ -77,10 +69,7 @@ export const usePanelDataLoader = (
   const store = useStore();
 
   const getRegionClusterParams = () => {
-    if (
-      regionClusterParams?.value?.regions ||
-      regionClusterParams?.value?.clusters
-    ) {
+    if (regionClusterParams?.value?.regions || regionClusterParams?.value?.clusters) {
       return {
         regions: regionClusterParams.value.regions,
         clusters: regionClusterParams.value.clusters,
@@ -278,9 +267,7 @@ export const usePanelDataLoader = (
         () => {
           // Check if panel-specific variables are ready
           if (ifPanelVariablesCompletedLoading()) {
-            log(
-              "waitForTheVariablesToLoad: panel variables are loaded (inside watch)",
-            );
+            log("waitForTheVariablesToLoad: panel variables are loaded (inside watch)");
             resolve();
             stopWatching(); // Stop watching once panel variables are ready
           }
@@ -325,11 +312,7 @@ export const usePanelDataLoader = (
   };
 
   const loadData = async () => {
-    log(
-      "[usePanelDataLoader] " +
-        panelSchema?.value?.title +
-        ": loadData() PROCEEDING",
-    );
+    log("[usePanelDataLoader] " + panelSchema?.value?.title + ": loadData() PROCEEDING");
 
     // Only reset isPartialData if we're starting a fresh load and not restoring from cache
     if (runCount > 0 && !state.isOperationCancelled) {
@@ -360,6 +343,26 @@ export const usePanelDataLoader = (
           queries: [],
         };
         state.resultMetaData = [];
+        return;
+      }
+
+      // Injected-data path: the caller already fetched the PromQL results and
+      // owns the fetch lifecycle (the metrics explorer's preview queue —
+      // concurrency-capped, viewport-gated, cancellable, cached). Render those
+      // results directly instead of firing our own query_range. Skips the
+      // debounce, cache restore, visibility and variable waits — the caller
+      // already gated all of that. See MetricCard.
+      if (injectedPromqlData?.value != null) {
+        log("loadData: rendering injected PromQL data");
+        state.loading = false;
+        state.isOperationCancelled = false;
+        state.isPartialData = false;
+        state.data = markRaw(injectedPromqlData.value.data ?? []);
+        state.metadata = injectedPromqlData.value.metadata ?? { queries: [] };
+        state.resultMetaData = injectedPromqlData.value.resultMetaData ?? [];
+        state.annotations = [];
+        state.errorDetail = { message: "", code: "" };
+        runCount++;
         return;
       }
 
@@ -406,18 +409,13 @@ export const usePanelDataLoader = (
         timestamps.start_time != "Invalid Date" &&
         timestamps.end_time != "Invalid Date"
       ) {
-        startISOTimestamp = new Date(
-          timestamps.start_time.toISOString(),
-        ).getTime();
+        startISOTimestamp = new Date(timestamps.start_time.toISOString()).getTime();
         endISOTimestamp = new Date(timestamps.end_time.toISOString()).getTime();
       } else {
         return;
       }
 
-      log(
-        "loadData: panelcache: no cache restored, continue firing, runCount ",
-        runCount,
-      );
+      log("loadData: panelcache: no cache restored, continue firing, runCount ", runCount);
 
       runCount++;
 
@@ -432,28 +430,15 @@ export const usePanelDataLoader = (
 
       // Check if the query type is "promql"
       if (panelSchema.value.queryType == "promql") {
-        await executePromQL(
-          startISOTimestamp,
-          endISOTimestamp,
-          abortController,
-        );
+        await executePromQL(startISOTimestamp, endISOTimestamp, abortController);
       } else if (panelSchema.value.queries.length > 1) {
-        const pageType =
-          panelSchema.value.queries[0]?.fields?.stream_type;
-        await executeMultiSQL(
-          startISOTimestamp,
-          endISOTimestamp,
-          abortController,
-          pageType,
-        );
+        const pageType = panelSchema.value.queries[0]?.fields?.stream_type;
+        await executeMultiSQL(startISOTimestamp, endISOTimestamp, abortController, pageType);
       } else {
         await executeSQL(startISOTimestamp, endISOTimestamp, abortController);
       }
     } catch (error: any) {
-      if (
-        error.name === "AbortError" ||
-        error.message === "Aborted waiting for loading"
-      ) {
+      if (error.name === "AbortError" || error.message === "Aborted waiting for loading") {
         log("logaData: Operation aborted");
       } else {
         log("logaData: An error occurred:", error);
@@ -469,13 +454,8 @@ export const usePanelDataLoader = (
 
       // If panelIdToBeRefreshed is set and doesn't match this panel, skip loading
       // This prevents all panels from refreshing when only one panel's time changes
-      if (
-        panelIdToBeRefreshed.value &&
-        panelIdToBeRefreshed.value !== panelSchema.value.id
-      ) {
-        log(
-          "PanelSchema/Time Wather: skipping - different panel is being refreshed",
-        );
+      if (panelIdToBeRefreshed.value && panelIdToBeRefreshed.value !== panelSchema.value.id) {
+        log("PanelSchema/Time Wather: skipping - different panel is being refreshed");
         return;
       }
 
@@ -483,16 +463,25 @@ export const usePanelDataLoader = (
     },
   );
 
+  // Re-render when the caller hands us a fresh set of injected results (the
+  // metrics explorer replaces the whole object on every refresh). No-op for
+  // panels that fetch their own data — the ref stays undefined for them.
+  if (injectedPromqlData) {
+    watch(
+      () => injectedPromqlData.value,
+      () => {
+        loadData();
+      },
+    );
+  }
+
   watch(
     () => [panelSchema?.value],
     async (newVal, oldVal) => {
       const [newSchema] = newVal;
       const [oldSchema] = oldVal;
 
-      const configNeedsApiCall = checkIfConfigChangeRequiredApiCallOrNot(
-        oldSchema,
-        newSchema,
-      );
+      const configNeedsApiCall = checkIfConfigChangeRequiredApiCallOrNot(oldSchema, newSchema);
 
       if (!configNeedsApiCall) {
         return;
@@ -566,25 +555,19 @@ export const usePanelDataLoader = (
   };
 
   const removeTraceId = (traceId: string) => {
-    state.searchRequestTraceIds = state.searchRequestTraceIds.filter(
-      (id: any) => id !== traceId,
-    );
+    state.searchRequestTraceIds = state.searchRequestTraceIds.filter((id: any) => id !== traceId);
   };
 
   // Wire up search handlers composable (placed here so processApiError,
   // loadData, and removeTraceId are all already declared above).
-  const {
-    handleSearchResponse,
-    handleSearchClose,
-    handleSearchReset,
-    handleSearchError,
-  } = usePanelSearchHandlers({
-    state,
-    processApiError,
-    saveCurrentStateToCache,
-    loadData,
-    removeTraceId,
-  });
+  const { handleSearchResponse, handleSearchClose, handleSearchReset, handleSearchError } =
+    usePanelSearchHandlers({
+      state,
+      processApiError,
+      saveCurrentStateToCache,
+      loadData,
+      removeTraceId,
+    });
 
   // Wire up PromQL and SQL executors (placed here so handleSearch* handlers,
   // processApiError, addTraceId, removeTraceId are all already declared above).
@@ -641,8 +624,7 @@ export const usePanelDataLoader = (
     getRegionClusterParams,
   });
 
-  const hasAtLeastOneQuery = () =>
-    panelSchema.value.queries?.some((q: any) => q?.query);
+  const hasAtLeastOneQuery = () => panelSchema.value.queries?.some((q: any) => q?.query);
 
   // [START] variables management
   // check when the variables data changes
@@ -703,10 +685,7 @@ export const usePanelDataLoader = (
     if (abortController) {
       // Only set isPartialData if we're still loading or haven't received complete response
       // AND we haven't already marked it as complete
-      if (
-        (state.loading || state.loadingProgressPercentage < 100) &&
-        !state.isOperationCancelled
-      ) {
+      if ((state.loading || state.loadingProgressPercentage < 100) && !state.isOperationCancelled) {
         state.isPartialData = true;
       }
       abortController.abort();
@@ -722,11 +701,7 @@ export const usePanelDataLoader = (
       observer.disconnect();
     }
     // cancel http2 queries using http streaming api
-    if (
-      state.searchRequestTraceIds?.length > 0 &&
-      state.loading &&
-      !state.isOperationCancelled
-    ) {
+    if (state.searchRequestTraceIds?.length > 0 && state.loading && !state.isOperationCancelled) {
       try {
         state.searchRequestTraceIds.forEach((traceId) => {
           cancelStreamQueryBasedOnRequestId({
@@ -778,10 +753,7 @@ export const usePanelDataLoader = (
     ];
 
     log("usePanelDataLoader: panelcache: tempPanelCacheKey", tempPanelCacheKey);
-    log(
-      "usePanelDataLoader: panelcache: omit(getCacheKey())",
-      omit(getCacheKey(), keysToIgnore),
-    );
+    log("usePanelDataLoader: panelcache: omit(getCacheKey())", omit(getCacheKey(), keysToIgnore));
     log(
       "usePanelDataLoader: panelcache: omit(tempPanelCacheKey))",
       omit(tempPanelCacheKey, keysToIgnore),
@@ -806,10 +778,7 @@ export const usePanelDataLoader = (
     const currentCacheKey = omit(getCacheKey(), keysToIgnore);
     // tempPanelCacheKey is untyped (from the panel cache), so mirror the
     // typed key shape rather than lodash's Omit<any, string> inference.
-    const savedCacheKey: typeof currentCacheKey = omit(
-      tempPanelCacheKey,
-      keysToIgnore,
-    );
+    const savedCacheKey: typeof currentCacheKey = omit(tempPanelCacheKey, keysToIgnore);
 
     // Normalize variables in both keys before comparison
     const normalizedCurrentKey = {
@@ -824,11 +793,7 @@ export const usePanelDataLoader = (
     const cacheKeysMatch = isEqual(normalizedCurrentKey, normalizedSavedKey);
 
     // Check if it is stale or not
-    if (
-      tempPanelCacheValue &&
-      Object.keys(tempPanelCacheValue).length > 0 &&
-      cacheKeysMatch
-    ) {
+    if (tempPanelCacheValue && Object.keys(tempPanelCacheValue).length > 0 && cacheKeysMatch) {
       // const cache = getPanelCache();
       state.data = markRaw(tempPanelCacheValue.data ?? []);
       state.loading = tempPanelCacheValue.loading;
@@ -846,8 +811,7 @@ export const usePanelDataLoader = (
 
       // if selected time range is not matched with the cache time range
       if (
-        selectedTimeObj?.value?.end_time -
-          selectedTimeObj?.value?.start_time !==
+        selectedTimeObj?.value?.end_time - selectedTimeObj?.value?.start_time !==
         cache?.cacheTimeRange?.end_time - cache?.cacheTimeRange?.start_time
       ) {
         state.isCachedDataDifferWithCurrentTimeRange = true;

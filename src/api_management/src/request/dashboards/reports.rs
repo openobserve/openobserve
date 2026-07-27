@@ -24,19 +24,20 @@ use config::meta::{
     folder::DEFAULT_FOLDER,
     triggers::{Trigger, TriggerModule},
 };
+use db::scheduler;
+use openobserve_api_common::extractors::Headers;
+#[cfg(feature = "enterprise")]
+use openobserve_core::auth::check_permissions;
+use openobserve_core::{
+    auth::UserEmail,
+    dashboards::reports::{self, ReportError},
+};
 use serde::Deserialize;
 
-#[cfg(feature = "enterprise")]
-use crate::common::utils::auth::check_permissions;
 use crate::{
-    common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
-    extractors::Headers,
+    common::meta::http::HttpResponse as MetaHttpResponse,
     models::reports::{ListReportsResponseBody, ListReportsResponseBodyItem},
     request::{BulkDeleteRequest, BulkDeleteResponse, dashboards::get_folder},
-    service::{
-        dashboards::reports::{self, ReportError},
-        db::scheduler,
-    },
 };
 
 #[derive(Debug, serde::Serialize, Deserialize, utoipa::ToSchema)]
@@ -207,7 +208,7 @@ pub async fn list_reports(
                 _permitted = list;
             }
             Err(e) => {
-                return crate::common::meta::http::HttpResponse::forbidden(e.to_string());
+                return common::meta::http::HttpResponse::forbidden(e.to_string());
             }
         }
         // Get List of allowed objects ends
@@ -927,8 +928,7 @@ pub async fn move_reports(
 #[cfg(test)]
 mod tests {
     use axum::{http::StatusCode, response::Response};
-
-    use crate::service::dashboards::reports::ReportError;
+    use openobserve_core::dashboards::reports::ReportError;
 
     fn status(err: ReportError) -> StatusCode {
         Response::from(err).status()
@@ -1064,7 +1064,7 @@ mod tests {
     // 500 Internal Server Error
     #[test]
     fn test_send_report_error_is_internal_server_error() {
-        use crate::service::dashboards::reports::SendReportError;
+        use openobserve_core::dashboards::reports::SendReportError;
         assert_eq!(
             status(ReportError::SendReportError(SendReportError::NoDashboards)),
             StatusCode::INTERNAL_SERVER_ERROR

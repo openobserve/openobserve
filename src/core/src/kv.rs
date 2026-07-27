@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use crate::service::db::kv;
+use crate::db::kv;
 
 pub async fn get(org_id: &str, key: &str) -> Result<bytes::Bytes, anyhow::Error> {
     let val = kv::get(org_id, key).await?;

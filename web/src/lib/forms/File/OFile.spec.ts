@@ -91,9 +91,7 @@ describe("OFile", () => {
 
   it("disables the control", () => {
     wrapper = mount(OFile, { props: { disabled: true } });
-    expect(
-      wrapper.find("input[type='file']").attributes("disabled"),
-    ).toBeDefined();
+    expect(wrapper.find("input[type='file']").attributes("disabled")).toBeDefined();
   });
 
   it("renders the error message", () => {

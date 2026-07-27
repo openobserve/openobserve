@@ -43,11 +43,7 @@ export default defineComponent({
     watch(
       () => store.state.zoConfig,
       (zoConfig) => {
-        if (
-          zoConfig.sso_enabled ||
-          config.isEnterprise == "true" ||
-          config.isCloud == "true"
-        ) {
+        if (zoConfig.sso_enabled || config.isEnterprise == "true" || config.isCloud == "true") {
           componentName.value = "OrganizationsEnterprise";
         }
 

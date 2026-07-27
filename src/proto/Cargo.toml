@@ -4,6 +4,10 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 
+# Both crates are used directly from build.rs; cargo-machete does not inspect build scripts.
+[package.metadata.cargo-machete]
+ignored = ["cargo_metadata", "tonic-prost-build"]
+
 [dependencies]
 datafusion-proto.workspace = true
 prost.workspace = true
@@ -15,5 +19,4 @@ tonic-prost.workspace = true
 
 [build-dependencies]
 cargo_metadata = "0.19"
-prost-build = { version = "0.14.1" }
 tonic-prost-build = { version = "0.14.1" }

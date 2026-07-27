@@ -46,17 +46,12 @@ export const makeScoreConfigSchema = (
         // Empty is owned by the required check above → skip here so only ONE
         // message shows. Edit skips the pattern entirely (immutable name).
         .refine(
-          (val) =>
-            mode === "edit" ||
-            val.trim().length === 0 ||
-            NAME_PATTERN.test(val.trim()),
+          (val) => mode === "edit" || val.trim().length === 0 || NAME_PATTERN.test(val.trim()),
           { message: t("onlineEvals.scoreConfig.validation.nameFormat") },
         ),
       description: z.string().optional().default(""),
       // Discriminator (bridged from the bespoke radio-cards).
-      dataType: z
-        .enum(["numeric", "categorical", "boolean"])
-        .default("numeric"),
+      dataType: z.enum(["numeric", "categorical", "boolean"]).default("numeric"),
       // Numeric range endpoints. Kept permissive at the field level — the
       // "required number" rule applies ONLY to the numeric data type and lives in
       // superRefine below, so a blank min/max can't trap the user on a type whose
@@ -95,8 +90,8 @@ export const makeScoreConfigSchema = (
         });
       }
     });
-    // Intentionally NO numeric `min < max` ordering rule and NO categorical
-    // "≥1 category" rule — both min≥max ranges and empty categorical are allowed.
+// Intentionally NO numeric `min < max` ordering rule and NO categorical
+// "≥1 category" rule — both min≥max ranges and empty categorical are allowed.
 
 export type ScoreConfigForm = z.infer<ReturnType<typeof makeScoreConfigSchema>>;
 

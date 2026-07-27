@@ -30,6 +30,7 @@ pub mod parquet;
 pub mod password;
 pub mod pausable_job;
 pub mod prom_json_encoder;
+pub mod query_range;
 pub mod query_select_utils;
 pub mod rand;
 pub mod record_batch_ext;

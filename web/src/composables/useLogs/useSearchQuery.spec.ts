@@ -152,10 +152,7 @@ vi.mock("@/aws-exports", () => ({
 }));
 
 vi.mock("@/utils/zincutils", async () => {
-  const actual =
-    await vi.importActual<typeof import("@/utils/zincutils")>(
-      "@/utils/zincutils",
-    );
+  const actual = await vi.importActual<typeof import("@/utils/zincutils")>("@/utils/zincutils");
   return {
     ...actual,
     b64EncodeUnicode: vi.fn((s: string) => s),
@@ -190,10 +187,9 @@ vi.mock("@/composables/useServiceCorrelation", () => ({
 }));
 
 vi.mock("@/utils/telemetryCorrelation", async () => {
-  const actual =
-    await vi.importActual<
-      typeof import("@/utils/telemetryCorrelation")
-    >("@/utils/telemetryCorrelation");
+  const actual = await vi.importActual<typeof import("@/utils/telemetryCorrelation")>(
+    "@/utils/telemetryCorrelation",
+  );
   return {
     ...actual,
     buildFieldToGroupIdMap: vi.fn((groups: any[]) => {
@@ -306,10 +302,7 @@ describe("useSearchQuery › buildSearch › ignoreQuickMode parameter", () => {
         { name: "field1" },
         { name: "field2" },
       ];
-      mockState.searchObj.data.stream.interestingFieldList = [
-        "field1",
-        "field2",
-      ];
+      mockState.searchObj.data.stream.interestingFieldList = ["field1", "field2"];
     });
 
     it("should use the interesting field list in SQL when quickMode=true and ignoreQuickMode=false", () => {
@@ -438,10 +431,7 @@ describe("useSearchQuery › SQL Reserved Keyword Quoting", () => {
       { name: "message" },
       { name: RESERVED_KEYWORD },
     ];
-    mockState.searchObj.data.stream.interestingFieldList = [
-      "message",
-      RESERVED_KEYWORD,
-    ];
+    mockState.searchObj.data.stream.interestingFieldList = ["message", RESERVED_KEYWORD];
   });
 
   it("should quote reserved keywords in SELECT and WHERE, keep non-reserved unquoted", () => {
@@ -504,9 +494,7 @@ describe("useSearchQuery › validateFilterForMultiStream", () => {
     it("should not set missingStreamMultiStreamFilter", () => {
       validateFilterForMultiStream();
 
-      expect(
-        mockState.searchObj.data.stream.missingStreamMultiStreamFilter,
-      ).toEqual([]);
+      expect(mockState.searchObj.data.stream.missingStreamMultiStreamFilter).toEqual([]);
       expect(mockState.searchObj.data.missingStreamMessage).toBe("");
     });
   });
@@ -533,21 +521,18 @@ describe("useSearchQuery › validateFilterForMultiStream", () => {
       const result = validateFilterForMultiStream();
 
       expect(result).toBe(false);
-      expect(mockState.searchObj.data.filterErrMsg).toContain(
-        "does not exist",
-      );
+      expect(mockState.searchObj.data.filterErrMsg).toContain("does not exist");
       expect(mockState.searchObj.data.filterErrMsg).toContain("nonexistent");
     });
 
     it("should set missingStreamMultiStreamFilter to all selected streams", () => {
       validateFilterForMultiStream();
 
-      expect(
-        mockState.searchObj.data.stream.missingStreamMultiStreamFilter,
-      ).toEqual(["streamA", "streamB"]);
-      expect(mockState.searchObj.data.missingStreamMessage).toContain(
-        "streamA, streamB",
-      );
+      expect(mockState.searchObj.data.stream.missingStreamMultiStreamFilter).toEqual([
+        "streamA",
+        "streamB",
+      ]);
+      expect(mockState.searchObj.data.missingStreamMessage).toContain("streamA, streamB");
     });
   });
 
@@ -595,19 +580,13 @@ describe("useSearchQuery › validateFilterForMultiStream", () => {
     it("should clear missingStreamMultiStreamFilter for the resolved stream", () => {
       validateFilterForMultiStream();
 
-      expect(
-        mockState.searchObj.data.stream.missingStreamMultiStreamFilter,
-      ).toEqual([]);
+      expect(mockState.searchObj.data.stream.missingStreamMultiStreamFilter).toEqual([]);
     });
   });
 
   describe("when an equivalent field resolves only some missing streams", () => {
     beforeEach(() => {
-      mockState.searchObj.data.stream.selectedStream = [
-        "streamA",
-        "streamB",
-        "streamC",
-      ];
+      mockState.searchObj.data.stream.selectedStream = ["streamA", "streamB", "streamC"];
       mockState.searchObj.data.stream.selectedStreamFields = [
         { name: "msg", streams: ["streamA"] },
         { name: "message", streams: ["streamB"] },
@@ -639,9 +618,7 @@ describe("useSearchQuery › validateFilterForMultiStream", () => {
     it("should report streamC as still missing (no equivalent exists there)", () => {
       validateFilterForMultiStream();
 
-      expect(
-        mockState.searchObj.data.stream.missingStreamMultiStreamFilter,
-      ).toEqual(["streamC"]);
+      expect(mockState.searchObj.data.stream.missingStreamMultiStreamFilter).toEqual(["streamC"]);
     });
   });
 
@@ -684,9 +661,7 @@ describe("useSearchQuery › validateFilterForMultiStream", () => {
       expect(mockState.searchObj.data.filterErrMsg).toBe("");
 
       // missingStreamMultiStreamFilter is empty → streamB was resolved
-      expect(
-        mockState.searchObj.data.stream.missingStreamMultiStreamFilter,
-      ).toEqual([]);
+      expect(mockState.searchObj.data.stream.missingStreamMultiStreamFilter).toEqual([]);
     });
   });
 
@@ -697,9 +672,7 @@ describe("useSearchQuery › validateFilterForMultiStream", () => {
       // Pre-set dirty state
       mockState.searchObj.data.filterErrMsg = "old error";
       mockState.searchObj.data.missingStreamMessage = "old message";
-      mockState.searchObj.data.stream.missingStreamMultiStreamFilter = [
-        "old-stream",
-      ];
+      mockState.searchObj.data.stream.missingStreamMultiStreamFilter = ["old-stream"];
 
       // Valid state — field exists in both streams
       mockState.searchObj.data.stream.selectedStream = ["streamA", "streamB"];
@@ -719,9 +692,7 @@ describe("useSearchQuery › validateFilterForMultiStream", () => {
 
       expect(mockState.searchObj.data.filterErrMsg).toBe("");
       expect(mockState.searchObj.data.missingStreamMessage).toBe("");
-      expect(
-        mockState.searchObj.data.stream.missingStreamMultiStreamFilter,
-      ).toEqual([]);
+      expect(mockState.searchObj.data.stream.missingStreamMultiStreamFilter).toEqual([]);
     });
   });
 });
@@ -793,10 +764,7 @@ describe("useSearchQuery › handleMultiStream WHERE rewrite", () => {
       const walk = (n: any) => {
         if (!n) return;
         if (n.type === "column_ref") {
-          col =
-            typeof n.column === "string"
-              ? n.column
-              : n.column?.expr?.value ?? "?";
+          col = typeof n.column === "string" ? n.column : (n.column?.expr?.value ?? "?");
         }
         walk(n.left);
         walk(n.right);
@@ -817,17 +785,13 @@ describe("useSearchQuery › handleMultiStream WHERE rewrite", () => {
     expect(Array.isArray(sqlArray)).toBe(true);
 
     // streamB should have "message" (the equivalent field) instead of "msg"
-    const streamBSQL = sqlArray.find((s: string) =>
-      s.includes('"streamB"'),
-    );
+    const streamBSQL = sqlArray.find((s: string) => s.includes('"streamB"'));
     expect(streamBSQL).toBeDefined();
     expect(streamBSQL).toContain("message");
     expect(streamBSQL).not.toContain('"msg"');
 
     // streamA should keep "msg" (it has the field directly, no rewrite needed)
-    const streamASQL = sqlArray.find((s: string) =>
-      s.includes('"streamA"'),
-    );
+    const streamASQL = sqlArray.find((s: string) => s.includes('"streamA"'));
     expect(streamASQL).toBeDefined();
     expect(streamASQL).toContain("msg");
   });

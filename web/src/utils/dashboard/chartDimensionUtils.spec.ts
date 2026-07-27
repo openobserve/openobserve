@@ -20,6 +20,8 @@ import {
   calculateDynamicNameGap,
   calculateNiceTickValues,
   calculateRotatedLabelBottomSpace,
+  applyMeasuredYAxisLeftInset,
+  X_AXIS_TICK_LABEL_BAND,
 } from "@/utils/dashboard/chartDimensionUtils";
 
 // calculateWidthText delegates to zrender's text measurement (the same one
@@ -51,16 +53,12 @@ describe("chartDimensionUtils", () => {
     });
 
     it("scales with the text length", () => {
-      expect(calculateWidthText("HelloHello")).toBeGreaterThan(
-        calculateWidthText("Hello"),
-      );
+      expect(calculateWidthText("HelloHello")).toBeGreaterThan(calculateWidthText("Hello"));
     });
 
     it("measures unit-formatted values realistically (wider string is wider)", () => {
       // the motivating bug: "995.56GB" is a smaller value but a wider label
-      expect(calculateWidthText("995.56GB")).toBeGreaterThan(
-        calculateWidthText("1.34TB"),
-      );
+      expect(calculateWidthText("995.56GB")).toBeGreaterThan(calculateWidthText("1.34TB"));
     });
   });
 
@@ -85,9 +83,7 @@ describe("chartDimensionUtils", () => {
     });
 
     it("matches ECharts ticks for a range crossing zero", () => {
-      expect(calculateNiceTickValues(-50, 175)).toEqual([
-        -50, 0, 50, 100, 150, 200,
-      ]);
+      expect(calculateNiceTickValues(-50, 175)).toEqual([-50, 0, 50, 100, 150, 200]);
     });
 
     it("strips floating point noise from tick values", () => {
@@ -105,13 +101,9 @@ describe("chartDimensionUtils", () => {
       expect(result).toBeGreaterThan(0);
       expect(result).toBeLessThanOrEqual(90);
       // the chosen size fits, the next size up would not (or is the 90 cap)
-      expect(calculateWidthText("Hello", `${result}px`)).toBeLessThanOrEqual(
-        200,
-      );
+      expect(calculateWidthText("Hello", `${result}px`)).toBeLessThanOrEqual(200);
       if (result < 90) {
-        expect(
-          calculateWidthText("Hello", `${result + 1}px`),
-        ).toBeGreaterThan(200);
+        expect(calculateWidthText("Hello", `${result + 1}px`)).toBeGreaterThan(200);
       }
     });
 
@@ -230,6 +222,135 @@ describe("chartDimensionUtils", () => {
       const positive = calculateRotatedLabelBottomSpace(45);
       const negative = calculateRotatedLabelBottomSpace(-45);
       expect(positive).toBe(negative);
+    });
+  });
+
+  describe("applyMeasuredYAxisLeftInset", () => {
+    const formatter = (v: number) => `${v}c/s`;
+
+    it("widens grid.left to the widest formatted label and disables containLabel", () => {
+      const options = {
+        grid: { left: 10, containLabel: true },
+        yAxis: { type: "value", axisLabel: { formatter } },
+        series: [
+          {
+            data: [
+              [0, 1],
+              [1, 60000],
+            ],
+          },
+        ],
+      };
+
+      applyMeasuredYAxisLeftInset(options);
+
+      // "60000c/s" is the widest label; grid.left should equal its measured width
+      expect(options.grid.left).toBe(calculateWidthText("60000c/s"));
+      expect(options.grid.containLabel).toBe(false);
+    });
+
+    it("re-reserves the x tick-label band when it turns containLabel off", () => {
+      const options = {
+        grid: { left: 10, bottom: 30, containLabel: true },
+        yAxis: { type: "value", axisLabel: { formatter } },
+        series: [{ data: [[0, 60000]] }],
+      };
+
+      applyMeasuredYAxisLeftInset(options);
+
+      expect(options.grid.bottom).toBe(30 + X_AXIS_TICK_LABEL_BAND);
+      expect(options.grid.containLabel).toBe(false);
+    });
+
+    it("leaves grid.bottom alone when containLabel was already off", () => {
+      const options = {
+        grid: { left: 10, bottom: 50, containLabel: false },
+        yAxis: { type: "value", axisLabel: { formatter } },
+        series: [{ data: [[0, 60000]] }],
+      };
+
+      applyMeasuredYAxisLeftInset(options);
+
+      expect(options.grid.bottom).toBe(50);
+    });
+
+    it("handles scalar (non-tuple) series points", () => {
+      const options = {
+        grid: { left: 10, containLabel: true },
+        yAxis: { type: "value", axisLabel: { formatter } },
+        series: [{ data: [1, 60000] }],
+      };
+
+      applyMeasuredYAxisLeftInset(options);
+
+      expect(options.grid.left).toBe(calculateWidthText("60000c/s"));
+      expect(options.grid.containLabel).toBe(false);
+    });
+
+    it("no-ops when grid is an array", () => {
+      const grid = [{ left: 10 }];
+      const options = {
+        grid,
+        yAxis: { type: "value", axisLabel: { formatter } },
+        series: [{ data: [[0, 60000]] }],
+      };
+
+      applyMeasuredYAxisLeftInset(options);
+
+      expect(options.grid).toBe(grid);
+      expect(options.grid[0].left).toBe(10);
+    });
+
+    it("no-ops when yAxis is an array", () => {
+      const options = {
+        grid: { left: 10, containLabel: true },
+        yAxis: [{ type: "value", axisLabel: { formatter } }],
+        series: [{ data: [[0, 60000]] }],
+      };
+
+      applyMeasuredYAxisLeftInset(options);
+
+      expect(options.grid.left).toBe(10);
+      expect(options.grid.containLabel).toBe(true);
+    });
+
+    it("no-ops when there is no series data", () => {
+      const options = {
+        grid: { left: 10, containLabel: true },
+        yAxis: { type: "value", axisLabel: { formatter } },
+        series: [{ data: [] }],
+      };
+
+      applyMeasuredYAxisLeftInset(options);
+
+      expect(options.grid.left).toBe(10);
+      expect(options.grid.containLabel).toBe(true);
+    });
+
+    it("no-ops for a non-value axis", () => {
+      const options = {
+        grid: { left: 10, containLabel: true },
+        yAxis: { type: "category", axisLabel: { formatter } },
+        series: [{ data: [[0, 60000]] }],
+      };
+
+      applyMeasuredYAxisLeftInset(options);
+
+      expect(options.grid.left).toBe(10);
+      expect(options.grid.containLabel).toBe(true);
+    });
+
+    it("no-ops when there is no formatter function", () => {
+      const options = {
+        grid: { left: 10, containLabel: true },
+        yAxis: { type: "value", axisLabel: {} },
+        series: [{ data: [[0, 60000]] }],
+      };
+
+      applyMeasuredYAxisLeftInset(options);
+
+      expect(options.grid.left).toBe(10);
+      expect(options.grid.containLabel).toBe(true);
     });
   });
 });

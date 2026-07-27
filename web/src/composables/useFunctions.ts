@@ -27,7 +27,7 @@ const useFunctions = () => {
         "name",
         false,
         "",
-        store.state.selectedOrganization.identifier
+        store.state.selectedOrganization.identifier,
       )
         .then((res: any) => {
           store.dispatch("setFunctions", res.data.list);

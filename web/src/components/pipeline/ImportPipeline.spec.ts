@@ -20,7 +20,6 @@ import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
 import ImportPipeline from "@/components/pipeline/ImportPipeline.vue";
 
-
 // --------------------------------------------------------------------------
 // Module mocks
 // --------------------------------------------------------------------------
@@ -442,9 +441,7 @@ describe("ImportPipeline.vue", () => {
         jsonArrayOfObj: [
           {
             source: { query_condition: { type: "sql", sql: "" } },
-            nodes: [
-              { io_type: "input", data: { query_condition: { type: "sql", sql: "" } } },
-            ],
+            nodes: [{ io_type: "input", data: { query_condition: { type: "sql", sql: "" } } }],
           },
         ],
       });
@@ -464,9 +461,9 @@ describe("ImportPipeline.vue", () => {
 
     it("updates matching input nodes query_condition.sql", () => {
       wrapper.vm.updateSqlQuery("SELECT 1", 0);
-      expect(
-        wrapper.vm.baseImportRef.jsonArrayOfObj[0].nodes[0].data.query_condition.sql,
-      ).toBe("SELECT 1");
+      expect(wrapper.vm.baseImportRef.jsonArrayOfObj[0].nodes[0].data.query_condition.sql).toBe(
+        "SELECT 1",
+      );
     });
 
     it("does not update nodes whose io_type is not input", () => {
@@ -476,9 +473,9 @@ describe("ImportPipeline.vue", () => {
       });
       wrapper.vm.updateSqlQuery("SELECT 1", 0);
       // output node should remain unchanged
-      expect(
-        wrapper.vm.baseImportRef.jsonArrayOfObj[0].nodes[1].data.query_condition.sql,
-      ).toBe("old");
+      expect(wrapper.vm.baseImportRef.jsonArrayOfObj[0].nodes[1].data.query_condition.sql).toBe(
+        "old",
+      );
     });
   });
 
@@ -503,9 +500,7 @@ describe("ImportPipeline.vue", () => {
 
     it("updates source.stream_name", () => {
       wrapper.vm.updateStreamFields({ value: "new-stream" }, 0);
-      expect(wrapper.vm.baseImportRef.jsonArrayOfObj[0].source.stream_name).toBe(
-        "new-stream",
-      );
+      expect(wrapper.vm.baseImportRef.jsonArrayOfObj[0].source.stream_name).toBe("new-stream");
     });
 
     it("updates pipeline root stream_name", () => {
@@ -522,16 +517,14 @@ describe("ImportPipeline.vue", () => {
 
     it("updates edges sourceNode data", () => {
       wrapper.vm.updateStreamFields({ value: "new-stream" }, 0);
-      expect(
-        wrapper.vm.baseImportRef.jsonArrayOfObj[0].edges[0].sourceNode.data.stream_name,
-      ).toBe("new-stream");
+      expect(wrapper.vm.baseImportRef.jsonArrayOfObj[0].edges[0].sourceNode.data.stream_name).toBe(
+        "new-stream",
+      );
     });
 
     it("also accepts a plain string value instead of an object", () => {
       wrapper.vm.updateStreamFields("plain-stream", 0);
-      expect(wrapper.vm.baseImportRef.jsonArrayOfObj[0].source.stream_name).toBe(
-        "plain-stream",
-      );
+      expect(wrapper.vm.baseImportRef.jsonArrayOfObj[0].source.stream_name).toBe("plain-stream");
     });
   });
 
@@ -581,16 +574,12 @@ describe("ImportPipeline.vue", () => {
 
     it("updates name on a function node", () => {
       wrapper.vm.updateFunctionName("my-fn", 0, 0);
-      expect(wrapper.vm.baseImportRef.jsonArrayOfObj[0].nodes[0].data.name).toBe(
-        "my-fn",
-      );
+      expect(wrapper.vm.baseImportRef.jsonArrayOfObj[0].nodes[0].data.name).toBe("my-fn");
     });
 
     it("does not modify a non-function node", () => {
       wrapper.vm.updateFunctionName("my-fn", 0, 1);
-      expect(
-        wrapper.vm.baseImportRef.jsonArrayOfObj[0].nodes[1].data.name,
-      ).toBeUndefined();
+      expect(wrapper.vm.baseImportRef.jsonArrayOfObj[0].nodes[1].data.name).toBeUndefined();
     });
   });
 
@@ -615,16 +604,14 @@ describe("ImportPipeline.vue", () => {
 
     it("sets destination_name on remote_stream nodes", () => {
       wrapper.vm.updateRemoteDestination("my-remote", 0);
-      expect(
-        wrapper.vm.baseImportRef.jsonArrayOfObj[0].nodes[0].data.destination_name,
-      ).toBe("my-remote");
+      expect(wrapper.vm.baseImportRef.jsonArrayOfObj[0].nodes[0].data.destination_name).toBe(
+        "my-remote",
+      );
     });
 
     it("does not modify non-remote nodes", () => {
       wrapper.vm.updateRemoteDestination("my-remote", 0);
-      expect(
-        wrapper.vm.baseImportRef.jsonArrayOfObj[0].nodes[1].data.destination_name,
-      ).toBe("");
+      expect(wrapper.vm.baseImportRef.jsonArrayOfObj[0].nodes[1].data.destination_name).toBe("");
     });
   });
 
@@ -649,16 +636,14 @@ describe("ImportPipeline.vue", () => {
 
     it("updates stream_name on output nodes", () => {
       wrapper.vm.updateDestinationStreamFields("out-stream", 0);
-      expect(
-        wrapper.vm.baseImportRef.jsonArrayOfObj[0].nodes[0].data.stream_name,
-      ).toBe("out-stream");
+      expect(wrapper.vm.baseImportRef.jsonArrayOfObj[0].nodes[0].data.stream_name).toBe(
+        "out-stream",
+      );
     });
 
     it("does not touch non-output nodes", () => {
       wrapper.vm.updateDestinationStreamFields("out-stream", 0);
-      expect(
-        wrapper.vm.baseImportRef.jsonArrayOfObj[0].nodes[1].data.stream_name,
-      ).toBe("");
+      expect(wrapper.vm.baseImportRef.jsonArrayOfObj[0].nodes[1].data.stream_name).toBe("");
     });
   });
 
@@ -681,16 +666,15 @@ describe("ImportPipeline.vue", () => {
 
     it("updates source trigger_condition.timezone", () => {
       wrapper.vm.updateTimezone("UTC", 0);
-      expect(
-        wrapper.vm.baseImportRef.jsonArrayOfObj[0].source.trigger_condition.timezone,
-      ).toBe("UTC");
+      expect(wrapper.vm.baseImportRef.jsonArrayOfObj[0].source.trigger_condition.timezone).toBe(
+        "UTC",
+      );
     });
 
     it("updates query node trigger_condition.timezone", () => {
       wrapper.vm.updateTimezone("UTC", 0);
       expect(
-        wrapper.vm.baseImportRef.jsonArrayOfObj[0].nodes[0].data.trigger_condition
-          .timezone,
+        wrapper.vm.baseImportRef.jsonArrayOfObj[0].nodes[0].data.trigger_condition.timezone,
       ).toBe("UTC");
     });
   });
@@ -729,12 +713,8 @@ describe("ImportPipeline.vue", () => {
 
     it("updates org_id on stream and query nodes", () => {
       wrapper.vm.updateOrgId("my-org", 0);
-      expect(wrapper.vm.baseImportRef.jsonArrayOfObj[0].nodes[0].data.org_id).toBe(
-        "my-org",
-      );
-      expect(wrapper.vm.baseImportRef.jsonArrayOfObj[0].nodes[1].data.org_id).toBe(
-        "my-org",
-      );
+      expect(wrapper.vm.baseImportRef.jsonArrayOfObj[0].nodes[0].data.org_id).toBe("my-org");
+      expect(wrapper.vm.baseImportRef.jsonArrayOfObj[0].nodes[1].data.org_id).toBe("my-org");
     });
 
     it("does not update function node org_id", () => {
@@ -764,26 +744,18 @@ describe("ImportPipeline.vue", () => {
 
     it("updates source and root stream_name when value is non-empty", () => {
       wrapper.vm.handleDynamicStreamName("dynamic-stream", 0);
-      expect(
-        wrapper.vm.baseImportRef.jsonArrayOfObj[0].source.stream_name,
-      ).toBe("dynamic-stream");
-      expect(wrapper.vm.baseImportRef.jsonArrayOfObj[0].stream_name).toBe(
-        "dynamic-stream",
-      );
+      expect(wrapper.vm.baseImportRef.jsonArrayOfObj[0].source.stream_name).toBe("dynamic-stream");
+      expect(wrapper.vm.baseImportRef.jsonArrayOfObj[0].stream_name).toBe("dynamic-stream");
     });
 
     it("skips update when stream name is empty string", () => {
       wrapper.vm.handleDynamicStreamName("", 0);
-      expect(
-        wrapper.vm.baseImportRef.jsonArrayOfObj[0].source.stream_name,
-      ).toBe("");
+      expect(wrapper.vm.baseImportRef.jsonArrayOfObj[0].source.stream_name).toBe("");
     });
 
     it("skips update when stream name is whitespace only", () => {
       wrapper.vm.handleDynamicStreamName("   ", 0);
-      expect(
-        wrapper.vm.baseImportRef.jsonArrayOfObj[0].source.stream_name,
-      ).toBe("");
+      expect(wrapper.vm.baseImportRef.jsonArrayOfObj[0].source.stream_name).toBe("");
     });
   });
 
@@ -849,7 +821,10 @@ describe("ImportPipeline.vue", () => {
     it("returns true when all remote_stream nodes reference valid destinations", () => {
       const input = {
         nodes: [
-          { io_type: "output", data: { node_type: "remote_stream", destination_name: "valid-dest" } },
+          {
+            io_type: "output",
+            data: { node_type: "remote_stream", destination_name: "valid-dest" },
+          },
         ],
       };
       expect(wrapper.vm.validateRemoteDestination(input)).toBe(true);
@@ -866,9 +841,7 @@ describe("ImportPipeline.vue", () => {
 
     it("returns true when no remote_stream output nodes exist", () => {
       const input = {
-        nodes: [
-          { io_type: "output", data: { node_type: "stream", destination_name: "any" } },
-        ],
+        nodes: [{ io_type: "output", data: { node_type: "stream", destination_name: "any" } }],
       };
       expect(wrapper.vm.validateRemoteDestination(input)).toBe(true);
     });
@@ -899,9 +872,7 @@ describe("ImportPipeline.vue", () => {
       const query = "SELECT * FROM logs";
       const input = {
         source: { source_type: "scheduled" },
-        nodes: [
-          { io_type: "input", data: { query_condition: { type: "sql", sql: query } } },
-        ],
+        nodes: [{ io_type: "input", data: { query_condition: { type: "sql", sql: query } } }],
       };
       expect(await wrapper.vm.validateScheduledPipelineNodes(input, query)).toBe(true);
     });
@@ -916,9 +887,7 @@ describe("ImportPipeline.vue", () => {
           },
         ],
       };
-      expect(
-        await wrapper.vm.validateScheduledPipelineNodes(input, "SELECT 1"),
-      ).toBe(false);
+      expect(await wrapper.vm.validateScheduledPipelineNodes(input, "SELECT 1")).toBe(false);
     });
 
     it("returns false when no sqlQuery provided and input node has empty sql", async () => {
@@ -952,14 +921,7 @@ describe("ImportPipeline.vue", () => {
     it("calls jstransform.list with the selected organization identifier", async () => {
       wrapper = createWrapper();
       await flushPromises();
-      expect(jstransform.list).toHaveBeenCalledWith(
-        1,
-        100,
-        "created_at",
-        true,
-        "",
-        "default",
-      );
+      expect(jstransform.list).toHaveBeenCalledWith(1, 100, "created_at", true, "", "default");
     });
   });
 
@@ -1017,9 +979,7 @@ describe("ImportPipeline.vue", () => {
 
     it("does not throw and returns early on empty JSON string", async () => {
       // Should not throw – component shows a notify and returns
-      await expect(
-        wrapper.vm.importJson({ jsonStr: "", jsonArray: [] }),
-      ).resolves.toBeUndefined();
+      await expect(wrapper.vm.importJson({ jsonStr: "", jsonArray: [] })).resolves.toBeUndefined();
     });
 
     it("does not throw and returns early on invalid JSON", async () => {
@@ -1052,18 +1012,14 @@ describe("ImportPipeline.vue", () => {
         [{ field: "pipeline_name", message: "Pipeline - 1: Name is required" }],
       ];
       await nextTick();
-      expect(
-        wrapper.find('[data-test="pipeline-import-error-0"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="pipeline-import-error-0"]').exists()).toBe(true);
     });
 
     it("shows pipeline creation messages when pipelineCreators is populated", async () => {
       wrapper = createWrapper();
       wrapper.vm.pipelineCreators = [{ message: "Pipeline - 1: ok", success: true }];
       await nextTick();
-      expect(
-        wrapper.find('[data-test="pipeline-import-creation-title"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="pipeline-import-creation-title"]').exists()).toBe(true);
     });
   });
 

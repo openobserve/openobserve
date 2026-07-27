@@ -14,9 +14,9 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use axum::{extract::Path, response::Response};
-
 #[cfg(feature = "enterprise")]
-use crate::common::utils::auth::UserEmail;
+use openobserve_core::auth::UserEmail;
+
 #[cfg(feature = "enterprise")]
 use crate::handler::http::extractors::Headers;
 use crate::{

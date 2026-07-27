@@ -1,12 +1,7 @@
 <script setup lang="ts">
 // Copyright 2026 OpenObserve Inc.
 
-import type {
-  RadioGroupProps,
-  RadioGroupEmits,
-  RadioGroupSlots,
-  RadioValue,
-} from "./ORadio.types";
+import type { RadioGroupProps, RadioGroupEmits, RadioGroupSlots, RadioValue } from "./ORadio.types";
 import { RADIO_VALUE_MAP_KEY } from "./ORadio.types";
 import { RadioGroupRoot, type AcceptableValue } from "reka-ui";
 import { provide } from "vue";
@@ -37,10 +32,7 @@ function handleUpdate(value: AcceptableValue) {
     :orientation="orientation"
     :name="name"
     :aria-label="label"
-    :class="[
-      'flex gap-2',
-      orientation === 'horizontal' ? 'flex-row flex-wrap' : 'flex-col',
-    ]"
+    :class="['flex gap-2', orientation === 'horizontal' ? 'flex-row flex-wrap' : 'flex-col']"
     @update:model-value="handleUpdate"
   >
     <slot />

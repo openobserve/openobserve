@@ -24,11 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   with the traces search "no events" state.
 -->
 <template>
-  <OEmptyState
-    v-if="jumpTarget"
-    preset="no-services-catalog"
-    size="hero"
-  >
+  <OEmptyState v-if="jumpTarget" preset="no-services-catalog" size="hero">
     <template #actions>
       <EmptyStateActionCard
         icon="schedule"
@@ -39,12 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </template>
   </OEmptyState>
-  <OEmptyState
-    v-else
-    preset="no-services-catalog"
-    size="hero"
-    :hide-action="true"
-  />
+  <OEmptyState v-else preset="no-services-catalog" size="hero" :hide-action="true" />
 </template>
 
 <script setup lang="ts">

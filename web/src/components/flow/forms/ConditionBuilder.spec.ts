@@ -26,7 +26,16 @@ vi.mock("@/components/alerts/FilterGroup.vue", () => ({
   default: {
     name: "FilterGroup",
     template: '<div class="filter-group-stub" />',
-    props: ["streamFields", "group", "depth", "conditionInputWidth", "allowCustomColumns", "module", "namePrefix", "indentRem"],
+    props: [
+      "streamFields",
+      "group",
+      "depth",
+      "conditionInputWidth",
+      "allowCustomColumns",
+      "module",
+      "namePrefix",
+      "indentRem",
+    ],
     emits: ["add-condition", "add-group", "remove-group"],
   },
 }));
@@ -54,9 +63,7 @@ describe("ConditionBuilder", () => {
     const saved = {
       filterType: "group",
       logicalOperator: "AND",
-      conditions: [
-        { filterType: "condition", column: "level", operator: "=", value: "error" },
-      ],
+      conditions: [{ filterType: "condition", column: "level", operator: "=", value: "error" }],
     };
     const wrapper = createWrapper({ initialConditions: saved });
     const g = (wrapper.vm as any).conditionGroup;
@@ -67,9 +74,7 @@ describe("ConditionBuilder", () => {
     const saved = {
       filterType: "group",
       logicalOperator: "AND",
-      conditions: [
-        { filterType: "condition", column: "msg", operator: "contains", value: "x" },
-      ],
+      conditions: [{ filterType: "condition", column: "msg", operator: "contains", value: "x" }],
     };
     const wrapper = createWrapper({ initialConditions: saved, normalizeOperators: true });
     expect((wrapper.vm as any).conditionGroup.conditions[0].operator).toBe("Contains");
@@ -79,9 +84,7 @@ describe("ConditionBuilder", () => {
     const saved = {
       filterType: "group",
       logicalOperator: "AND",
-      conditions: [
-        { filterType: "condition", column: "msg", operator: "contains", value: "x" },
-      ],
+      conditions: [{ filterType: "condition", column: "msg", operator: "contains", value: "x" }],
     };
     const wrapper = createWrapper({ initialConditions: saved });
     expect((wrapper.vm as any).conditionGroup.conditions[0].operator).toBe("contains");
@@ -90,9 +93,7 @@ describe("ConditionBuilder", () => {
   it("submit resolves { version, conditions } for a valid rule", async () => {
     const saved = {
       filterType: "group",
-      conditions: [
-        { filterType: "condition", column: "level", operator: "=", value: "error" },
-      ],
+      conditions: [{ filterType: "condition", column: "level", operator: "=", value: "error" }],
     };
     const wrapper = createWrapper({ initialConditions: saved });
     const payload = await (wrapper.vm as any).submit();
@@ -113,17 +114,13 @@ describe("ConditionBuilder", () => {
     await expect((wrapper.vm as any).submit()).resolves.toBeNull();
     await flushPromises();
     expect(wrapper.find('[data-test="add-condition-error"]').exists()).toBe(true);
-    expect(mockToast).not.toHaveBeenCalledWith(
-      expect.objectContaining({ variant: "error" }),
-    );
+    expect(mockToast).not.toHaveBeenCalledWith(expect.objectContaining({ variant: "error" }));
   });
 
   it("passes fields through to FilterGroup as stream-fields", () => {
     const fields = [{ label: "level", value: "level", type: "Utf8" }];
     const wrapper = createWrapper({ fields });
-    expect(
-      wrapper.findComponent({ name: "FilterGroup" }).props("streamFields"),
-    ).toEqual(fields);
+    expect(wrapper.findComponent({ name: "FilterGroup" }).props("streamFields")).toEqual(fields);
   });
 
   // ── Prop plumbing down to FilterGroup ─────────────────────────────────────
@@ -137,16 +134,12 @@ describe("ConditionBuilder", () => {
     // Without the prefix, FilterCondition falls out of name-binding and no leaf
     // value ever reaches the form — the whole builder silently stops working.
     const wrapper = createWrapper();
-    expect(
-      wrapper.findComponent({ name: "FilterGroup" }).props("namePrefix"),
-    ).toBe("conditions");
+    expect(wrapper.findComponent({ name: "FilterGroup" }).props("namePrefix")).toBe("conditions");
   });
 
   it("passes allowCustomColumns through to FilterGroup", () => {
     const wrapper = createWrapper({ allowCustomColumns: true });
-    expect(
-      wrapper.findComponent({ name: "FilterGroup" }).props("allowCustomColumns"),
-    ).toBe(true);
+    expect(wrapper.findComponent({ name: "FilterGroup" }).props("allowCustomColumns")).toBe(true);
   });
 
   // Note the deliberate asymmetry: FilterGroup/FilterCondition default this to
@@ -156,16 +149,12 @@ describe("ConditionBuilder", () => {
   // tell users to type one and press Enter.
   it("defaults allowCustomColumns to true (flow nodes want custom columns)", () => {
     const wrapper = createWrapper();
-    expect(
-      wrapper.findComponent({ name: "FilterGroup" }).props("allowCustomColumns"),
-    ).toBe(true);
+    expect(wrapper.findComponent({ name: "FilterGroup" }).props("allowCustomColumns")).toBe(true);
   });
 
   it("still honours an explicit opt-out", () => {
     const wrapper = createWrapper({ allowCustomColumns: false });
-    expect(
-      wrapper.findComponent({ name: "FilterGroup" }).props("allowCustomColumns"),
-    ).toBe(false);
+    expect(wrapper.findComponent({ name: "FilterGroup" }).props("allowCustomColumns")).toBe(false);
   });
   // ── Ported from pipeline Condition.spec ───────────────────────────────────
   // These behaviours moved here when pipelines and workflows were put back on
@@ -198,9 +187,7 @@ describe("ConditionBuilder", () => {
       ...JSON.parse(JSON.stringify(root)),
       logicalOperator: "OR",
     };
-    await wrapper
-      .findComponent({ name: "FilterGroup" })
-      .vm.$emit("add-condition", updated);
+    await wrapper.findComponent({ name: "FilterGroup" }).vm.$emit("add-condition", updated);
     expect((wrapper.vm as any).conditionGroup.logicalOperator).toBe("OR");
   });
 

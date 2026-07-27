@@ -13,21 +13,23 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::meta::destinations::{Template, TemplateType};
 // The "is this a system-managed template?" check lives next to
 // `get_prebuilt_template` in `config::prebuilt_loader` so the HTTP model, the
 // service-layer guards below, and any future caller all derive the same
 // answer from one place. Re-exported here as a thin wrapper so existing
 // callers in this module keep working without a long path.
-pub use config::prebuilt_loader::is_prebuilt_template_name;
-
-use crate::{
-    common::{
-        meta::{authz::Authz, organization::DEFAULT_ORG},
-        utils::auth::{is_ofga_unsupported, remove_ownership, set_ownership},
-    },
-    service::db::{self, alerts::templates::TemplateError},
+use config::{
+    DEFAULT_ORG,
+    meta::destinations::{Template, TemplateType},
+    prebuilt_loader::is_prebuilt_template_name,
 };
+use db::{
+    self,
+    alerts::templates::TemplateError,
+    authz::{remove_ownership, set_ownership},
+};
+
+use crate::{auth::is_ofga_unsupported, common::meta::authz::Authz};
 
 pub async fn save(
     name: &str,

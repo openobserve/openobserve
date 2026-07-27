@@ -14,7 +14,7 @@ vi.mock("@/services/users", () => ({
     getRoles: vi.fn(),
     getUserGroups: vi.fn(),
     getUserRoles: vi.fn(),
-    delete: vi.fn()
+    delete: vi.fn(),
   },
 }));
 
@@ -26,7 +26,7 @@ vi.mock("@/services/organizations", () => ({
 
 // Mock vue-i18n. Resolve keys against the real app locale so migrated t()
 // calls produce the actual English text the notification assertions expect.
-vi.mock('vue-i18n', async (importOriginal) => {
+vi.mock("vue-i18n", async (importOriginal) => {
   const actual = await importOriginal();
   const en = (await import("@/locales/languages/en-US.json")).default;
   const t = (key, params) => {
@@ -43,29 +43,29 @@ vi.mock('vue-i18n', async (importOriginal) => {
   };
   return {
     ...actual,
-    useI18n: () => ({ t })
+    useI18n: () => ({ t }),
   };
 });
 
 // Mock router
-vi.mock('vue-router', () => ({
+vi.mock("vue-router", () => ({
   useRouter: () => ({
     push: vi.fn(),
     replace: vi.fn(),
     currentRoute: {
       value: {
-        query: {}
-      }
-    }
-  })
+        query: {},
+      },
+    },
+  }),
 }));
 
 // Mock config
 vi.mock("@/aws-exports", () => ({
   default: {
     isCloud: "false",
-    isEnterprise: "false"
-  }
+    isEnterprise: "false",
+  },
 }));
 
 // The factory must not reference top-level variables — vi.mock() is hoisted
@@ -75,7 +75,6 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
 }));
 
 import * as useToastModule from "@/lib/feedback/Toast/useToast";
-
 
 describe("User Component", () => {
   let wrapper;
@@ -89,15 +88,15 @@ describe("User Component", () => {
       first_name: "Test",
       last_name: "User",
       role: "admin",
-      org_member_id: "123"
+      org_member_id: "123",
     },
     {
       email: "user@example.com",
       first_name: "Regular",
       last_name: "User",
       role: "user",
-      org_member_id: "456"
-    }
+      org_member_id: "456",
+    },
   ];
 
   beforeEach(() => {
@@ -106,14 +105,14 @@ describe("User Component", () => {
       state: {
         selectedOrganization: {
           id: "123",
-          identifier: "test-org"
+          identifier: "test-org",
         },
         userInfo: {
-          email: "test@example.com"
+          email: "test@example.com",
         },
         organizations: [],
-        theme: 'light'
-      }
+        theme: "light",
+      },
     };
 
     // Setup notify mock with dismiss function — use toast which is what source calls
@@ -124,17 +123,17 @@ describe("User Component", () => {
     // Mock successful API responses
     vi.mocked(usersService.orgUsers).mockResolvedValue({
       data: {
-        data: mockUsers
-      }
+        data: mockUsers,
+      },
     });
 
     vi.mocked(usersService.invitedUsers).mockResolvedValue({
       status: 200,
-      data: []
+      data: [],
     });
 
     vi.mocked(usersService.getRoles).mockResolvedValue({
-      data: ["admin", "user"]
+      data: ["admin", "user"],
     });
 
     // Mount component
@@ -148,8 +147,8 @@ describe("User Component", () => {
           QPage: false,
           QTable: true,
           QInput: {
-            template: '<div><input /></div>',
-            props: ['modelValue', 'prefix', 'borderless', 'dense', 'filled']
+            template: "<div><input /></div>",
+            props: ["modelValue", "prefix", "borderless", "dense", "filled"],
           },
           QBtn: true,
           QIcon: true,
@@ -160,11 +159,10 @@ describe("User Component", () => {
           QTr: true,
           QTd: true,
           QTh: true,
-          RouterLink: true
-        }
-      }
+          RouterLink: true,
+        },
+      },
     });
-
   });
 
   afterEach(() => {
@@ -182,13 +180,12 @@ describe("User Component", () => {
       expect(usersService.orgUsers).toHaveBeenCalled();
       expect(usersService.getRoles).toHaveBeenCalled();
     });
-
   });
 
   describe("User Management", () => {
     it("deletes a user successfully", async () => {
       vi.mocked(usersService.delete).mockResolvedValue({
-        data: { code: 200 }
+        data: { code: 200 },
       });
 
       wrapper.vm.deleteUserEmail = "user@example.com";
@@ -200,7 +197,7 @@ describe("User Component", () => {
 
     it("handles user deletion error", async () => {
       vi.mocked(usersService.delete).mockRejectedValue({
-        response: { status: 500 }
+        response: { status: 500 },
       });
 
       wrapper.vm.deleteUserEmail = "user@example.com";
@@ -211,8 +208,8 @@ describe("User Component", () => {
       // without a variant property — assert only on the message.
       expect(notifyMock).toHaveBeenCalledWith(
         expect.objectContaining({
-          message: "Error while deleting user."
-        })
+          message: "Error while deleting user.",
+        }),
       );
     });
 
@@ -220,11 +217,11 @@ describe("User Component", () => {
       const userData = {
         org_member_id: "123",
         email: "test@example.com",
-        role: "admin"
+        role: "admin",
       };
 
       vi.mocked(organizationsService.update_member_role).mockResolvedValue({
-        data: { success: true }
+        data: { success: true },
       });
 
       await wrapper.vm.updateUserRole(userData);
@@ -234,16 +231,16 @@ describe("User Component", () => {
         expect.objectContaining({
           id: 123,
           role: "admin",
-          email: "test@example.com"
+          email: "test@example.com",
         }),
-        "test-org"
+        "test-org",
       );
 
       expect(notifyMock).toHaveBeenCalledWith(
         expect.objectContaining({
           variant: "success",
-          message: "Organization member updated successfully."
-        })
+          message: "Organization member updated successfully.",
+        }),
       );
     });
   });
@@ -256,14 +253,12 @@ describe("User Component", () => {
       const addButton = wrapper.find('[data-test="add-basic-user"]');
       expect(addButton.exists()).toBe(true);
     });
-
-
   });
 
   describe("Error Handling", () => {
     it("handles network error when loading users", async () => {
       vi.mocked(usersService.orgUsers).mockRejectedValue(new Error("Network error"));
-      
+
       try {
         await wrapper.vm.getOrgMembers();
       } catch (error) {
@@ -275,8 +270,8 @@ describe("User Component", () => {
       expect(notifyMock).toHaveBeenCalledWith(
         expect.objectContaining({
           variant: "loading",
-          message: "Please wait while loading users..."
-        })
+          message: "Please wait while loading users...",
+        }),
       );
     });
 
@@ -284,10 +279,12 @@ describe("User Component", () => {
       const userData = {
         org_member_id: "123",
         email: "test@example.com",
-        role: "admin"
+        role: "admin",
       };
 
-      vi.mocked(organizationsService.update_member_role).mockRejectedValue(new Error("Update failed"));
+      vi.mocked(organizationsService.update_member_role).mockRejectedValue(
+        new Error("Update failed"),
+      );
 
       await wrapper.vm.updateUserRole(userData);
       await flushPromises();
@@ -295,7 +292,7 @@ describe("User Component", () => {
 
     it("handles error when loading invited users", async () => {
       vi.mocked(usersService.invitedUsers).mockRejectedValue(new Error("Failed to load"));
-      
+
       await wrapper.vm.getOrgMembers();
       await flushPromises();
 
@@ -304,7 +301,6 @@ describe("User Component", () => {
   });
 
   describe("User Role Management", () => {
-
     it("updates current user role on initialization", async () => {
       await wrapper.vm.getOrgMembers();
       expect(wrapper.vm.currentUserRole).toBeDefined();
@@ -316,7 +312,7 @@ describe("User Component", () => {
       // Fix: Need to wait for setTimeout
       wrapper.vm.addUser({}, false);
       // Wait for the setTimeout in addUser
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
       await wrapper.vm.$nextTick();
       expect(wrapper.vm.showAddUserDialog).toBe(true);
     });
@@ -335,7 +331,7 @@ describe("User Component", () => {
         email: "new@example.com",
         first_name: "New",
         last_name: "User",
-        role: "user"
+        role: "user",
       };
 
       await wrapper.vm.addMember(mockResponse, mockData, "created");
@@ -346,8 +342,8 @@ describe("User Component", () => {
       // without a variant property — assert only on the message.
       expect(notifyMock).toHaveBeenCalledWith(
         expect.objectContaining({
-          message: "User added successfully."
-        })
+          message: "User added successfully.",
+        }),
       );
     });
   });
@@ -379,8 +375,8 @@ describe("User Component", () => {
             QPage: false,
             QTable: true,
             QInput: {
-              template: '<div><input /></div>',
-              props: ['modelValue', 'prefix', 'borderless', 'dense', 'filled']
+              template: "<div><input /></div>",
+              props: ["modelValue", "prefix", "borderless", "dense", "filled"],
             },
             QBtn: true,
             QIcon: true,
@@ -392,9 +388,9 @@ describe("User Component", () => {
             QTd: true,
             QTh: true,
             RouterLink: true,
-            MemberInvitation: true // Add this stub
-          }
-        }
+            MemberInvitation: true, // Add this stub
+          },
+        },
       });
       await wrapper.vm.$nextTick();
     });
@@ -404,7 +400,7 @@ describe("User Component", () => {
     });
 
     it("shows member invitation component in cloud mode", async () => {
-      const memberInvitation = wrapper.findComponent({ name: 'MemberInvitation' });
+      const memberInvitation = wrapper.findComponent({ name: "MemberInvitation" });
       expect(memberInvitation.exists()).toBe(true);
     });
 

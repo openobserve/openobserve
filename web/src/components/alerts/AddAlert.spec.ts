@@ -111,7 +111,11 @@ const stubs = {
   // orchestrator calls during saveAnomalyDetection resolves truthy.
   AnomalyDetectionConfig: {
     template: "<div />",
-    methods: { async validate() { return true; } },
+    methods: {
+      async validate() {
+        return true;
+      },
+    },
   },
   AnomalyAlerting: true,
   AnomalySummary: true,
@@ -121,10 +125,7 @@ const stubs = {
   OPageHeader: true,
 };
 
-const mountAlert = (
-  props: Record<string, any> = {},
-  options: Record<string, any> = {},
-) =>
+const mountAlert = (props: Record<string, any> = {}, options: Record<string, any> = {}) =>
   mount(AddAlert, {
     global: { provide: { store }, plugins: [i18n, router], stubs },
     props,
@@ -319,9 +320,7 @@ describe("AddAlert (OForm owner)", () => {
       expect(form.state.isValid).toBe(false);
       // The error lands on the exact path both the logs and the metrics
       // <OFormSelect> bind, so the field renders it (red border + message).
-      const errors =
-        form.getFieldMeta("query_condition.aggregation.having.column")?.errors ??
-        [];
+      const errors = form.getFieldMeta("query_condition.aggregation.having.column")?.errors ?? [];
       expect(errors.map((e: any) => e?.message ?? e)).toContain(
         "Column is required when using an aggregate function.",
       );
@@ -353,9 +352,7 @@ describe("AddAlert (OForm owner)", () => {
       await form.handleSubmit();
       await flushPromises();
 
-      const errors =
-        form.getFieldMeta("query_condition.aggregation.having.column")?.errors ??
-        [];
+      const errors = form.getFieldMeta("query_condition.aggregation.having.column")?.errors ?? [];
       expect(errors).toHaveLength(0);
       expect(alertsService.create_by_alert_id).toHaveBeenCalledTimes(1);
     });
@@ -539,8 +536,7 @@ describe("AddAlert (OForm owner)", () => {
       await flushPromises();
 
       expect(alertsService.create_by_alert_id).toHaveBeenCalledTimes(1);
-      const [, payload] = (alertsService.create_by_alert_id as any).mock
-        .calls[0];
+      const [, payload] = (alertsService.create_by_alert_id as any).mock.calls[0];
       expect(payload.workflows).toEqual(["wf-1"]);
     });
 
@@ -553,8 +549,7 @@ describe("AddAlert (OForm owner)", () => {
       await form.handleSubmit();
       await flushPromises();
 
-      const [, payload] = (alertsService.create_by_alert_id as any).mock
-        .calls[0];
+      const [, payload] = (alertsService.create_by_alert_id as any).mock.calls[0];
       expect(payload.workflows).toEqual([]);
     });
   });
@@ -572,8 +567,7 @@ describe("AddAlert (OForm owner)", () => {
       expect(form.state.isValid).toBe(true);
       expect(alertsService.create_by_alert_id).toHaveBeenCalledTimes(1);
 
-      const [orgId, payload, folderId] =
-        (alertsService.create_by_alert_id as any).mock.calls[0];
+      const [orgId, payload, folderId] = (alertsService.create_by_alert_id as any).mock.calls[0];
 
       expect(orgId).toBe("default");
       expect(folderId).toBeDefined();
@@ -788,9 +782,7 @@ describe("AddAlert (OForm owner)", () => {
 
       expect(form.state.isValid).toBe(false);
       expect(
-        form.state.fieldMeta.name.errors.map((e: any) =>
-          typeof e === "string" ? e : e?.message,
-        ),
+        form.state.fieldMeta.name.errors.map((e: any) => (typeof e === "string" ? e : e?.message)),
       ).toContain("Anomaly name is required.");
       expect(anomalyDetectionService.create).not.toHaveBeenCalled();
     });
@@ -833,8 +825,7 @@ describe("AddAlert (OForm owner)", () => {
     const seedFieldError = (tab: string): HTMLInputElement => {
       const pane = wrapper.find(`[data-tab-pane="${tab}"]`).element;
       const field = document.createElement("div");
-      field.innerHTML =
-        '<span role="alert">At least one destination is required.</span><input />';
+      field.innerHTML = '<span role="alert">At least one destination is required.</span><input />';
       pane.appendChild(field);
       return field.querySelector("input") as HTMLInputElement;
     };
@@ -899,7 +890,13 @@ describe("AddAlert (OForm owner)", () => {
         filterType: "group",
         logicalOperator: "AND",
         conditions: [
-          { filterType: "condition", column: "age", operator: ">", value: 30, logicalOperator: "AND" },
+          {
+            filterType: "condition",
+            column: "age",
+            operator: ">",
+            value: 30,
+            logicalOperator: "AND",
+          },
         ],
       };
       expect(generateWhereClause(group, streamFieldsMap)).toBe("WHERE age > 30");
@@ -910,7 +907,13 @@ describe("AddAlert (OForm owner)", () => {
         filterType: "group",
         logicalOperator: "AND",
         conditions: [
-          { filterType: "condition", column: "city", operator: "=", value: "delhi", logicalOperator: "AND" },
+          {
+            filterType: "condition",
+            column: "city",
+            operator: "=",
+            value: "delhi",
+            logicalOperator: "AND",
+          },
         ],
       };
       expect(generateWhereClause(group, streamFieldsMap)).toBe("WHERE city = 'delhi'");

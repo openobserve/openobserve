@@ -19,20 +19,21 @@ use axum::{
     response::Response,
 };
 use config::meta::dashboards::Dashboard;
+use db::dashboards as dashboards_db;
 use hashbrown::HashMap;
-
+use openobserve_api_common::extractors::Headers;
 #[cfg(feature = "enterprise")]
-use crate::common::utils::auth::check_permissions;
+use openobserve_core::auth::check_permissions;
+use openobserve_core::{auth::UserEmail, dashboards};
+
 use crate::{
-    common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
-    extractors::Headers,
+    common::meta::http::HttpResponse as MetaHttpResponse,
     models::dashboards::{
         DashboardRequestBody, DashboardResponseBody, DeletePanelResponseBody, ListDashboardsQuery,
         ListDashboardsResponseBody, MoveDashboardRequestBody, MoveDashboardsRequestBody,
         PanelRequestBody, PanelResponseBody,
     },
     request::{BulkDeleteRequest, BulkDeleteResponse},
-    service::{dashboards, db::dashboards as dashboards_db},
 };
 
 pub mod reports;
@@ -85,7 +86,7 @@ pub async fn create_dashboard(
     Headers(user_email): Headers<UserEmail>,
     axum::Json(req_body): axum::Json<DashboardRequestBody>,
 ) -> Response {
-    let folder = crate::common::utils::http::get_folder(&query);
+    let folder = common::utils::http::get_folder(&query);
 
     let mut dashboard: Dashboard = req_body.into();
 
@@ -138,7 +139,7 @@ pub async fn update_dashboard(
     if !ensure_dashboard_in_org(&org_id, &dashboard_id).await {
         return MetaHttpResponse::not_found("Dashboard not found");
     }
-    let folder = crate::common::utils::http::get_folder(&query);
+    let folder = common::utils::http::get_folder(&query);
     let hash = query.get("hash").map(|h| h.as_str());
 
     let mut dashboard: Dashboard = req_body.into();
@@ -315,7 +316,7 @@ pub async fn delete_dashboard_bulk(
     axum::Json(req): axum::Json<BulkDeleteRequest>,
 ) -> Response {
     let _user_id = user_email.user_id;
-    let _folder_id = crate::common::utils::http::get_folder(&query);
+    let _folder_id = common::utils::http::get_folder(&query);
 
     if !dashboards_db::all_dashboards_in_org(&org_id, &req.ids).await {
         return MetaHttpResponse::not_found("Dashboard not found");
@@ -513,7 +514,7 @@ pub async fn add_panel(
     if !ensure_dashboard_in_org(&org_id, &dashboard_id).await {
         return MetaHttpResponse::not_found("Dashboard not found");
     }
-    let folder = crate::common::utils::http::get_folder(&query);
+    let folder = common::utils::http::get_folder(&query);
     let hash = match query.get("hash") {
         Some(h) => h.as_str(),
         None => {
@@ -579,7 +580,7 @@ pub async fn update_panel(
     if !ensure_dashboard_in_org(&org_id, &dashboard_id).await {
         return MetaHttpResponse::not_found("Dashboard not found");
     }
-    let folder = crate::common::utils::http::get_folder(&query);
+    let folder = common::utils::http::get_folder(&query);
     let hash = match query.get("hash") {
         Some(h) => h.as_str(),
         None => {
@@ -645,7 +646,7 @@ pub async fn delete_panel(
     if !ensure_dashboard_in_org(&org_id, &dashboard_id).await {
         return MetaHttpResponse::not_found("Dashboard not found");
     }
-    let folder = crate::common::utils::http::get_folder(&query);
+    let folder = common::utils::http::get_folder(&query);
     let hash = match query.get("hash") {
         Some(h) => h.as_str(),
         None => {
@@ -676,7 +677,7 @@ pub fn get_folder(query_str: &str) -> String {
     let query: HashMap<String, String> = url::form_urlencoded::parse(query_str.as_bytes())
         .into_owned()
         .collect();
-    crate::common::utils::http::get_folder(&query)
+    common::utils::http::get_folder(&query)
 }
 
 pub fn is_overwrite(query_str: &str) -> bool {
@@ -709,9 +710,9 @@ fn set_dashboard_owner_if_empty(
 #[cfg(test)]
 mod tests {
     use axum::{http::StatusCode, response::Response};
+    use openobserve_core::dashboards::DashboardError;
 
     use super::{get_folder, is_overwrite};
-    use crate::service::dashboards::DashboardError;
 
     fn status(err: DashboardError) -> StatusCode {
         Response::from(err).status()

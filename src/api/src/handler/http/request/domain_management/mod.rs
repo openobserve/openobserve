@@ -14,11 +14,10 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use axum::{extract::Path, response::Response};
+use common::meta::http::HttpResponse as MetaHttpResponse;
 use config::META_ORG_ID;
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::domain_management::{self, meta::DomainManagementRequest};
-
-use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 
 /// Helper function to validate that only meta org can access domain management APIs
 fn validate_meta_org_access(org_id: &str) -> Result<(), infra::errors::Error> {

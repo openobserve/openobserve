@@ -24,19 +24,15 @@ use config::{
     },
     utils::time::now_micros,
 };
+use db::authz::{remove_ownership, set_ownership};
 use infra::{db::ORM_CLIENT, table::anomaly_detection::config as anomaly_config_table};
 use sea_orm::{ActiveModelTrait, IntoActiveModel, Set};
+use search_service as search;
 use serde::{Deserialize, Serialize};
 use svix_ksuid::KsuidLike;
 use utoipa::ToSchema;
 
-use crate::{
-    common::{
-        meta::authz::Authz,
-        utils::auth::{remove_ownership, set_ownership},
-    },
-    service::{alerts::destinations, search},
-};
+use crate::{alerts::destinations, common::meta::authz::Authz};
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct CreateAnomalyConfigRequest {
@@ -113,7 +109,7 @@ async fn resolve_folder_pk(org_id: &str, name: &str) -> Option<String> {
             name: "default".to_owned(),
             description: "default".to_owned(),
         };
-        if crate::service::folders::save_folder(org_id, folder, FolderType::Alerts, true)
+        if crate::folders::save_folder(org_id, folder, FolderType::Alerts, true)
             .await
             .is_ok()
         {
@@ -185,7 +181,7 @@ pub async fn list_configs(
 
     // Build a map of anomaly_id → trigger for O(1) lookups.
     let trigger_map: std::collections::HashMap<String, _> =
-        crate::service::db::scheduler::list_by_org(org_id, Some(TriggerModule::AnomalyDetection))
+        crate::db::scheduler::list_by_org(org_id, Some(TriggerModule::AnomalyDetection))
             .await
             .unwrap_or_default()
             .into_iter()
@@ -437,7 +433,7 @@ pub async fn create_config(
     // same infrastructure as alerts.  The handler will check `is_trained` and skip
     // until training is complete.
     {
-        let trigger = crate::service::db::scheduler::Trigger {
+        let trigger = crate::db::scheduler::Trigger {
             org: org_id.to_string(),
             module: TriggerModule::AnomalyDetection,
             module_key: anomaly_id.clone(),
@@ -446,7 +442,7 @@ pub async fn create_config(
             is_silenced: false,
             ..Default::default()
         };
-        if let Err(e) = crate::service::db::scheduler::push(trigger).await {
+        if let Err(e) = crate::db::scheduler::push(trigger).await {
             log::warn!("[anomaly_detection {anomaly_id}] failed to push detection trigger: {e}");
         }
     }
@@ -708,7 +704,7 @@ pub async fn update_config(
     // Push the trigger AFTER the DB save so the scheduler always sees enabled=true
     // when it picks up the newly inserted trigger row.
     if push_trigger_after_save {
-        let trigger = crate::service::db::scheduler::Trigger {
+        let trigger = crate::db::scheduler::Trigger {
             org: org_id.to_string(),
             module: TriggerModule::AnomalyDetection,
             module_key: anomaly_id.to_string(),
@@ -719,7 +715,7 @@ pub async fn update_config(
         };
         // push() is a no-op if the row already exists (ON CONFLICT DO NOTHING);
         // the existing next_run_at is kept, which is fine — it will fire soon.
-        if let Err(e) = crate::service::db::scheduler::push(trigger).await {
+        if let Err(e) = crate::db::scheduler::push(trigger).await {
             log::warn!("[anomaly_detection {anomaly_id}] failed to push trigger on enable: {e}");
         }
     }
@@ -729,18 +725,10 @@ pub async fn update_config(
     // existing row due to ON CONFLICT DO NOTHING).  Only applicable for enabled configs.
     if reset_trigger_after_save && updated.enabled {
         let now = now_micros();
-        match crate::service::db::scheduler::get(
-            org_id,
-            TriggerModule::AnomalyDetection,
-            anomaly_id,
-        )
-        .await
-        {
+        match crate::db::scheduler::get(org_id, TriggerModule::AnomalyDetection, anomaly_id).await {
             Ok(mut trigger) => {
                 trigger.next_run_at = now;
-                if let Err(e) =
-                    crate::service::db::scheduler::update_trigger(trigger, false, "").await
-                {
+                if let Err(e) = crate::db::scheduler::update_trigger(trigger, false, "").await {
                     log::warn!(
                         "[anomaly_detection {anomaly_id}] failed to reset trigger on interval change: {e}"
                     );
@@ -748,7 +736,7 @@ pub async fn update_config(
             }
             Err(_) => {
                 // No trigger row — create one (config is enabled, so one should exist).
-                let trigger = crate::service::db::scheduler::Trigger {
+                let trigger = crate::db::scheduler::Trigger {
                     org: org_id.to_string(),
                     module: TriggerModule::AnomalyDetection,
                     module_key: anomaly_id.to_string(),
@@ -757,7 +745,7 @@ pub async fn update_config(
                     is_silenced: false,
                     ..Default::default()
                 };
-                if let Err(e) = crate::service::db::scheduler::push(trigger).await {
+                if let Err(e) = crate::db::scheduler::push(trigger).await {
                     log::warn!(
                         "[anomaly_detection {anomaly_id}] failed to push trigger on interval change: {e}"
                     );
@@ -821,12 +809,8 @@ pub async fn delete_config(org_id: &str, anomaly_id: &str) -> Result<()> {
 
     // Remove the detection trigger from the shared scheduler.
     {
-        if let Err(e) = crate::service::db::scheduler::delete(
-            org_id,
-            TriggerModule::AnomalyDetection,
-            anomaly_id,
-        )
-        .await
+        if let Err(e) =
+            crate::db::scheduler::delete(org_id, TriggerModule::AnomalyDetection, anomaly_id).await
         {
             log::warn!("[anomaly_detection {anomaly_id}] failed to delete detection trigger: {e}");
         }
@@ -953,7 +937,7 @@ pub async fn clone_config(
 
     // Register detection trigger for the new config
     {
-        let trigger = crate::service::db::scheduler::Trigger {
+        let trigger = crate::db::scheduler::Trigger {
             org: org_id.to_string(),
             module: TriggerModule::AnomalyDetection,
             module_key: new_id.clone(),
@@ -962,7 +946,7 @@ pub async fn clone_config(
             is_silenced: false,
             ..Default::default()
         };
-        if let Err(e) = crate::service::db::scheduler::push(trigger).await {
+        if let Err(e) = crate::db::scheduler::push(trigger).await {
             log::warn!("[anomaly_detection {new_id}] failed to push detection trigger: {e}");
         }
     }
@@ -1311,7 +1295,7 @@ pub async fn recover_detection_triggers_on_startup() {
         let org = &config.org_id;
         let key = &config.anomaly_id;
 
-        match crate::service::db::scheduler::get(org, TriggerModule::AnomalyDetection, key).await {
+        match crate::db::scheduler::get(org, TriggerModule::AnomalyDetection, key).await {
             Ok(_) => {
                 // Trigger exists — OSS scheduler will fire it when next_run_at passes.
                 // Processing→Waiting recovery is handled by watch_timeout().
@@ -1319,7 +1303,7 @@ pub async fn recover_detection_triggers_on_startup() {
             Err(_) => {
                 // Row missing — create a fresh trigger due immediately.
                 log::info!("[anomaly_detection] Re-creating missing trigger for {key}");
-                let trigger = crate::service::db::scheduler::Trigger {
+                let trigger = crate::db::scheduler::Trigger {
                     org: org.clone(),
                     module: TriggerModule::AnomalyDetection,
                     module_key: key.clone(),
@@ -1328,7 +1312,7 @@ pub async fn recover_detection_triggers_on_startup() {
                     is_silenced: false,
                     ..Default::default()
                 };
-                if let Err(e) = crate::service::db::scheduler::push(trigger).await {
+                if let Err(e) = crate::db::scheduler::push(trigger).await {
                     log::warn!("[anomaly_detection] Failed to re-create trigger for {key}: {e}");
                 }
             }
@@ -1498,6 +1482,7 @@ pub async fn execute_anomaly_query(
         use_cache: false,
         clear_cache: false,
         local_mode: None,
+        agent_options: None,
     };
 
     let parsed_stream_type = StreamType::from(stream_type);
@@ -1828,8 +1813,7 @@ pub async fn send_anomaly_alert(
     // client through `build_safe_client` so redirects + connect-time resolution
     // are re-validated.
     if let Err(e) =
-        crate::common::utils::ssrf_guard::SsrfGuard::validate_url_with_config_async(&endpoint.url)
-            .await
+        common::utils::ssrf_guard::SsrfGuard::validate_url_with_config_async(&endpoint.url).await
     {
         return Err(anyhow::anyhow!("Webhook URL blocked by SSRF guard: {e}"));
     }
@@ -1838,7 +1822,7 @@ pub async fn send_anomaly_alert(
     } else {
         reqwest::Client::builder()
     };
-    let client = crate::common::utils::ssrf_guard::build_safe_client(builder)?;
+    let client = common::utils::ssrf_guard::build_safe_client(builder)?;
 
     let mut req = client.post(&endpoint.url);
 

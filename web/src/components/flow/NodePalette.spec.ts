@@ -72,10 +72,12 @@ describe("NodePalette - mounting", () => {
     expect(wrapper.exists()).toBe(true);
   });
 
-  it("renders the docked sidebar with a header title", async () => {
-    wrapper = await mountComp({ items: [], title: "Nodes" });
+  it("renders the docked sidebar with no header of its own", async () => {
+    wrapper = await mountComp({ items: [] });
     expect(wrapper.find(".np-sidebar").exists()).toBe(true);
-    expect(wrapper.find(".np-header").text()).toContain("Nodes");
+    // The rail is headerless — the editor labels it from the outside (the
+    // collapse toggle), so an in-rail title would only repeat that.
+    expect(wrapper.find(".np-header").exists()).toBe(false);
   });
 
   it("renders no draggable node buttons when items is empty", async () => {
@@ -177,7 +179,12 @@ describe("NodePalette - drag and click callbacks", () => {
   let wrapper: any = null;
   const onDragStart = vi.fn();
   const onItemClick = vi.fn();
-  const inputNode = makeNode({ io_type: "input", subtype: "stream", label: "Stream", icon: "input" });
+  const inputNode = makeNode({
+    io_type: "input",
+    subtype: "stream",
+    label: "Stream",
+    icon: "input",
+  });
 
   beforeEach(async () => {
     vi.clearAllMocks();

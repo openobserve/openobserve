@@ -56,7 +56,6 @@ vi.mock("@/composables/useServiceCorrelation", () => ({
   initServiceCorrelationProviders: vi.fn(),
 }));
 
-
 // ---------------------------------------------------------------------------
 // ODrawer stub — replaces the migrated trace filters drawer
 // (-> ODrawer with v-model:open). Renders default + footer
@@ -120,8 +119,14 @@ const ODrawerStub = {
 
 describe("TraceDetails", () => {
   let wrapper: any;
+  let mountOptions: any;
 
   beforeEach(async () => {
+    // The active tab and tab order persist to localStorage, so a test that
+    // switches tabs would otherwise leak its selection into every later test.
+    localStorage.removeItem("o2_trace_active_tab");
+    localStorage.removeItem("o2_trace_tab_order");
+
     // Mock router query params
     vi.spyOn(router, "currentRoute", "get").mockReturnValue({
       value: {
@@ -200,7 +205,7 @@ describe("TraceDetails", () => {
       }),
     }));
 
-    wrapper = mount(TraceDetails, {
+    mountOptions = {
       attachTo: "#app",
       props: {
         traceId: "test-trace-id",
@@ -214,8 +219,7 @@ describe("TraceDetails", () => {
             name: "CodeQueryEditor",
             props: ["query", "language"],
             emits: ["update:query"],
-            template:
-              '<div data-test="trace-details-filters-code-editor" />',
+            template: '<div data-test="trace-details-filters-code-editor" />',
           },
           "chart-renderer": {
             template: '<div data-test="chart-renderer">Chart</div>',
@@ -267,16 +271,36 @@ describe("TraceDetails", () => {
               "parentMode",
               "activeTab",
               "selectedLogStreams",
-              "showLogStreamSelector"
+              "showLogStreamSelector",
             ],
-            emits: ["view-logs", "close", "open-trace", "add-filter", "apply-filter-immediately", "update:activeTab"],
+            emits: [
+              "view-logs",
+              "close",
+              "open-trace",
+              "add-filter",
+              "apply-filter-immediately",
+              "update:activeTab",
+            ],
           },
         },
       },
-    });
+    };
+
+    wrapper = mount(TraceDetails, mountOptions);
 
     await flushPromises();
   });
+
+  /**
+   * Re-mounts with the same options. Needed by tests that assert on state read
+   * from localStorage during setup, which only runs at mount time.
+   */
+  async function remount() {
+    wrapper.unmount();
+    wrapper = mount(TraceDetails, mountOptions);
+    await flushPromises();
+    return wrapper;
+  }
 
   afterEach(() => {
     if (wrapper) {
@@ -298,9 +322,7 @@ describe("TraceDetails", () => {
       });
     });
     it("should display operation name in toolbar", () => {
-      const operationName = wrapper.find(
-        '[data-test="trace-details-operation-name"]',
-      );
+      const operationName = wrapper.find('[data-test="trace-details-operation-name"]');
 
       expect(operationName.exists()).toBe(true);
       expect(operationName.text()).toContain(
@@ -323,10 +345,29 @@ describe("TraceDetails", () => {
       );
     });
 
+    // Regression: these were written as <OButton name="content-copy" /> but
+    // `name` is not an OButton prop (ButtonProps exposes iconLeft/iconRight).
+    // It fell through to the native <button name> attribute, so the buttons
+    // rendered EMPTY — and OButton defaults to variant="primary", so they
+    // showed as solid filled blocks. The old test below hid this because it
+    // only queried by data-test, which still resolved.
+    it("renders the copy buttons with their icon, not as empty buttons", () => {
+      const copyBtn = wrapper.find('[data-test="trace-details-copy-trace-id-btn"]');
+
+      expect(copyBtn.exists()).toBe(true);
+      // OIcon resolves to an SVG component, so the icon NAME never reaches the
+      // DOM — the observable difference is simply that a broken button renders
+      // no children at all.
+      expect(copyBtn.element.children.length).toBeGreaterThan(0);
+      // A stray `name` attribute means the icon prop was mis-spelled again and
+      // fell through $attrs onto the native <button>.
+      expect(copyBtn.attributes("name")).toBeUndefined();
+      // Icon-only buttons must not render as a filled primary block.
+      expect(copyBtn.attributes("data-o2-variant")).toBe("ghost");
+    });
+
     it("should copy trace ID when copy button is clicked", async () => {
-      const copyBtn = wrapper.find(
-        '[data-test="trace-details-copy-trace-id-btn"]',
-      );
+      const copyBtn = wrapper.find('[data-test="trace-details-copy-trace-id-btn"]');
       if (copyBtn.exists()) {
         await copyBtn.trigger("click");
         expect(navigator.clipboard.writeText).toHaveBeenCalled();
@@ -343,9 +384,7 @@ describe("TraceDetails", () => {
     });
 
     it("should show share link button", () => {
-      const shareBtn = wrapper.find(
-        '[data-test="trace-details-share-link-btn"]',
-      );
+      const shareBtn = wrapper.find('[data-test="trace-details-share-link-btn"]');
       expect(shareBtn.exists()).toBe(true);
     });
   });
@@ -353,9 +392,7 @@ describe("TraceDetails", () => {
   describe("Search functionality", () => {
     it("should handle search query changes", async () => {
       // OInput wraps the native input in a div; find the inner element
-      const searchInputWrapper = wrapper.find(
-        '[data-test="trace-details-search-input"]',
-      );
+      const searchInputWrapper = wrapper.find('[data-test="trace-details-search-input"]');
       if (searchInputWrapper.exists()) {
         const nativeInput = searchInputWrapper.find("input");
         if (nativeInput.exists()) {
@@ -366,21 +403,20 @@ describe("TraceDetails", () => {
     });
 
     it("should show search navigation buttons when there are results", async () => {
+      // Search is a waterfall-view affordance — it is hidden on the flame-graph,
+      // map and thread tabs.
+      wrapper.vm.activeTab = "waterfall";
       wrapper.vm.searchResults = 5;
       wrapper.vm.currentIndex = 2;
       await wrapper.vm.$nextTick();
 
-      const searchResults = wrapper.find(
-        '[data-test="trace-details-search-results"]',
-      );
+      const searchResults = wrapper.find('[data-test="trace-details-search-results"]');
       expect(searchResults.exists()).toBe(true);
       expect(searchResults.text()).toContain("3/5");
     });
 
     it.skip("should handle next match navigation", async () => {
-      const nextBtn = wrapper.find(
-        '[data-test="trace-details-search-next-btn"]',
-      );
+      const nextBtn = wrapper.find('[data-test="trace-details-search-next-btn"]');
       if (nextBtn.exists() && wrapper.vm.traceTreeRef) {
         await nextBtn.trigger("click");
         expect(wrapper.vm.traceTreeRef.nextMatch).toHaveBeenCalled();
@@ -388,9 +424,7 @@ describe("TraceDetails", () => {
     });
 
     it.skip("should handle previous match navigation", async () => {
-      const prevBtn = wrapper.find(
-        '[data-test="trace-details-search-prev-btn"]',
-      );
+      const prevBtn = wrapper.find('[data-test="trace-details-search-prev-btn"]');
       if (prevBtn.exists() && wrapper.vm.traceTreeRef) {
         await prevBtn.trigger("click");
         expect(wrapper.vm.traceTreeRef.prevMatch).toHaveBeenCalled();
@@ -400,9 +434,7 @@ describe("TraceDetails", () => {
 
   describe("Stream selection", () => {
     it("should display stream selector with placeholder", () => {
-      const streamSelector = wrapper.find(
-        '[data-test="trace-details-log-streams-select"]',
-      );
+      const streamSelector = wrapper.find('[data-test="trace-details-log-streams-select"]');
       expect(streamSelector.exists()).toBe(true);
 
       // The component uses :placeholder (not :label)
@@ -411,15 +443,13 @@ describe("TraceDetails", () => {
     });
 
     it("should handle view logs button click with conditional disabled state", async () => {
-      const viewLogsBtn = wrapper.find(
-        '[data-test="trace-details-view-logs-btn"]',
-      );
+      const viewLogsBtn = wrapper.find('[data-test="trace-details-view-logs-btn"]');
       expect(viewLogsBtn.exists()).toBe(true);
 
       // The component HAS isViewLogsDisabled computed property that controls disabled state
       // When no log streams are selected, button should be disabled
       if (wrapper.vm.isViewLogsDisabled) {
-        expect(viewLogsBtn.attributes('disabled')).toBeDefined();
+        expect(viewLogsBtn.attributes("disabled")).toBeDefined();
       } else {
         const routerPushSpy = vi.spyOn(router, "push");
         await viewLogsBtn.trigger("click");
@@ -437,9 +467,7 @@ describe("TraceDetails", () => {
 
     it("should have wrapper spans for conditional tooltips on View Logs button", () => {
       // The component HAS tooltip functionality with wrapper spans
-      const viewLogsBtn = wrapper.find(
-        '[data-test="trace-details-view-logs-btn"]',
-      );
+      const viewLogsBtn = wrapper.find('[data-test="trace-details-view-logs-btn"]');
 
       if (viewLogsBtn.exists()) {
         // Button may have tooltip wrapper spans for conditional tooltip behavior
@@ -451,22 +479,25 @@ describe("TraceDetails", () => {
   });
 
   describe("Span interaction", () => {
+    // The trace tree, header and span sidebar all live inside the waterfall
+    // view. The component defaults to the flame graph, so opt in explicitly.
+    beforeEach(async () => {
+      wrapper.vm.activeTab = "waterfall";
+      await wrapper.vm.$nextTick();
+    });
+
     it("should handle span selection", () => {
       const spanId = "test-span-id";
       wrapper.vm.updateSelectedSpan(spanId);
 
-      expect(wrapper.vm.searchObj.data.traceDetails.selectedSpanId).toBe(
-        spanId,
-      );
+      expect(wrapper.vm.searchObj.data.traceDetails.selectedSpanId).toBe(spanId);
       expect(wrapper.vm.searchObj.data.traceDetails.showSpanDetails).toBe(true);
     });
 
     it("should handle sidebar close", () => {
       wrapper.vm.closeSidebar();
 
-      expect(wrapper.vm.searchObj.data.traceDetails.showSpanDetails).toBe(
-        false,
-      );
+      expect(wrapper.vm.searchObj.data.traceDetails.showSpanDetails).toBe(false);
       expect(wrapper.vm.searchObj.data.traceDetails.selectedSpanId).toBe(null);
     });
 
@@ -524,9 +555,7 @@ describe("TraceDetails", () => {
 
   describe("Data processing", () => {
     it("should process span data correctly", () => {
-      expect(wrapper.vm.spanList).toEqual(
-        tracesMockData.tracesDetails.traceSpans.hits,
-      );
+      expect(wrapper.vm.spanList).toEqual(tracesMockData.tracesDetails.traceSpans.hits);
     });
 
     it("should calculate trace position", () => {
@@ -601,16 +630,12 @@ describe("TraceDetails", () => {
       });
 
       it("should show share button when showShareButton is true in standalone mode", () => {
-        const shareBtn = wrapper.find(
-          '[data-test="trace-details-share-link-btn"]',
-        );
+        const shareBtn = wrapper.find('[data-test="trace-details-share-link-btn"]');
         expect(shareBtn.exists()).toBe(true);
       });
 
       it("should not show expand button in standalone mode", () => {
-        const expandBtn = wrapper.find(
-          '[data-test="trace-details-expand-btn"]',
-        );
+        const expandBtn = wrapper.find('[data-test="trace-details-expand-btn"]');
         expect(expandBtn.exists()).toBe(false);
       });
 
@@ -650,8 +675,7 @@ describe("TraceDetails", () => {
                 name: "CodeQueryEditor",
                 props: ["query", "language"],
                 emits: ["update:query"],
-                template:
-                  '<div data-test="trace-details-filters-code-editor" />',
+                template: '<div data-test="trace-details-filters-code-editor" />',
               },
               "chart-renderer": {
                 template: '<div data-test="chart-renderer">Chart</div>',
@@ -671,12 +695,7 @@ describe("TraceDetails", () => {
                   "spanList",
                   "selectedSpanId",
                 ],
-                emits: [
-                  "toggle-collapse",
-                  "select-span",
-                  "update-current-index",
-                  "search-result",
-                ],
+                emits: ["toggle-collapse", "select-span", "update-current-index", "search-result"],
                 methods: {
                   nextMatch: vi.fn(),
                   prevMatch: vi.fn(),
@@ -688,8 +707,7 @@ describe("TraceDetails", () => {
                 emits: ["resize-start"],
               },
               "trace-details-sidebar": {
-                template:
-                  '<div data-test="trace-details-sidebar">Sidebar</div>',
+                template: '<div data-test="trace-details-sidebar">Sidebar</div>',
                 props: [
                   "span",
                   "baseTracePosition",
@@ -699,9 +717,16 @@ describe("TraceDetails", () => {
                   "parentMode",
                   "activeTab",
                   "selectedLogStreams",
-                  "showLogStreamSelector"
+                  "showLogStreamSelector",
                 ],
-                emits: ["view-logs", "close", "open-trace", "add-filter", "apply-filter-immediately", "update:activeTab"],
+                emits: [
+                  "view-logs",
+                  "close",
+                  "open-trace",
+                  "add-filter",
+                  "apply-filter-immediately",
+                  "update:activeTab",
+                ],
               },
             },
           },
@@ -722,47 +747,35 @@ describe("TraceDetails", () => {
       });
 
       it("should not show back button in embedded mode when showBackButton is false", () => {
-        const backBtn = embeddedWrapper.find(
-          '[data-test="trace-details-back-btn"]',
-        );
+        const backBtn = embeddedWrapper.find('[data-test="trace-details-back-btn"]');
         expect(backBtn.exists()).toBe(false);
       });
 
       it("should show expand button in embedded mode when showExpandButton is true", () => {
-        const expandBtn = embeddedWrapper.find(
-          '[data-test="trace-details-expand-btn"]',
-        );
+        const expandBtn = embeddedWrapper.find('[data-test="trace-details-expand-btn"]');
         expect(expandBtn.exists()).toBe(true);
       });
 
       it("should not show share button in embedded mode when showShareButton is false", () => {
-        const shareBtn = embeddedWrapper.find(
-          '[data-test="trace-details-share-link-btn"]',
-        );
+        const shareBtn = embeddedWrapper.find('[data-test="trace-details-share-link-btn"]');
         expect(shareBtn.exists()).toBe(false);
       });
 
       it("should not show close button in embedded mode when showCloseButton is false", () => {
-        const closeBtn = embeddedWrapper.find(
-          '[data-test="trace-details-close-btn"]',
-        );
+        const closeBtn = embeddedWrapper.find('[data-test="trace-details-close-btn"]');
         expect(closeBtn.exists()).toBe(false);
       });
 
       it("should make trace ID clickable in embedded mode", async () => {
         await embeddedWrapper.vm.$nextTick();
-        const traceId = embeddedWrapper.find(
-          '[data-test="trace-details-trace-id"]',
-        );
+        const traceId = embeddedWrapper.find('[data-test="trace-details-trace-id"]');
         if (traceId.exists()) {
           expect(traceId.classes()).toContain("cursor-pointer");
         }
       });
 
       it("should show open_in_new icon next to trace ID in embedded mode", () => {
-        const openIcon = embeddedWrapper.find(
-          '[data-test="trace-details-trace-id-open-btn"]',
-        );
+        const openIcon = embeddedWrapper.find('[data-test="trace-details-trace-id-open-btn"]');
         expect(openIcon.exists()).toBe(true);
       });
 
@@ -814,8 +827,7 @@ describe("TraceDetails", () => {
               name: "CodeQueryEditor",
               props: ["query", "language"],
               emits: ["update:query"],
-              template:
-                '<div data-test="trace-details-filters-code-editor" />',
+              template: '<div data-test="trace-details-filters-code-editor" />',
             },
             "chart-renderer": {
               template: '<div data-test="chart-renderer">Chart</div>',
@@ -835,12 +847,7 @@ describe("TraceDetails", () => {
                 "spanList",
                 "selectedSpanId",
               ],
-              emits: [
-                "toggle-collapse",
-                "select-span",
-                "update-current-index",
-                "search-result",
-              ],
+              emits: ["toggle-collapse", "select-span", "update-current-index", "search-result"],
               methods: {
                 nextMatch: vi.fn(),
                 prevMatch: vi.fn(),
@@ -862,9 +869,16 @@ describe("TraceDetails", () => {
                 "parentMode",
                 "activeTab",
                 "selectedLogStreams",
-                "showLogStreamSelector"
+                "showLogStreamSelector",
               ],
-              emits: ["view-logs", "close", "open-trace", "add-filter", "apply-filter-immediately", "update:activeTab"],
+              emits: [
+                "view-logs",
+                "close",
+                "open-trace",
+                "add-filter",
+                "apply-filter-immediately",
+                "update:activeTab",
+              ],
             },
           },
         },
@@ -917,9 +931,7 @@ describe("TraceDetails", () => {
       await embeddedWrapper.setProps({ spanListProp: newSpanList });
       await flushPromises();
 
-      expect(embeddedWrapper.vm.effectiveSpanList.length).toBe(
-        newSpanList.length,
-      );
+      expect(embeddedWrapper.vm.effectiveSpanList.length).toBe(newSpanList.length);
     });
 
     it("should watch for traceIdProp changes and fetch new data", async () => {
@@ -956,8 +968,7 @@ describe("TraceDetails", () => {
                 name: "CodeQueryEditor",
                 props: ["query", "language"],
                 emits: ["update:query"],
-                template:
-                  '<div data-test="trace-details-filters-code-editor" />',
+                template: '<div data-test="trace-details-filters-code-editor" />',
               },
               "chart-renderer": {
                 template: '<div data-test="chart-renderer">Chart</div>',
@@ -975,18 +986,23 @@ describe("TraceDetails", () => {
                   "parentMode",
                   "activeTab",
                   "selectedLogStreams",
-                  "showLogStreamSelector"
+                  "showLogStreamSelector",
                 ],
-                emits: ["view-logs", "close", "open-trace", "add-filter", "apply-filter-immediately", "update:activeTab"]
+                emits: [
+                  "view-logs",
+                  "close",
+                  "open-trace",
+                  "add-filter",
+                  "apply-filter-immediately",
+                  "update:activeTab",
+                ],
               },
             },
           },
         });
 
         await flushPromises();
-        const backBtn = wrapperNoBack.find(
-          '[data-test="trace-details-back-btn"]',
-        );
+        const backBtn = wrapperNoBack.find('[data-test="trace-details-back-btn"]');
         expect(backBtn.exists()).toBe(false);
         wrapperNoBack.unmount();
       });
@@ -994,9 +1010,7 @@ describe("TraceDetails", () => {
 
     describe("showLogStreamSelector prop", () => {
       it.skip("should show log stream selector when true (default)", () => {
-        const selector = wrapper.find(
-          '[data-test="trace-details-log-streams-select"]',
-        );
+        const selector = wrapper.find('[data-test="trace-details-log-streams-select"]');
         expect(selector.exists()).toBe(true);
       });
 
@@ -1015,8 +1029,7 @@ describe("TraceDetails", () => {
                 name: "CodeQueryEditor",
                 props: ["query", "language"],
                 emits: ["update:query"],
-                template:
-                  '<div data-test="trace-details-filters-code-editor" />',
+                template: '<div data-test="trace-details-filters-code-editor" />',
               },
               "chart-renderer": {
                 template: '<div data-test="chart-renderer">Chart</div>',
@@ -1034,18 +1047,23 @@ describe("TraceDetails", () => {
                   "parentMode",
                   "activeTab",
                   "selectedLogStreams",
-                  "showLogStreamSelector"
+                  "showLogStreamSelector",
                 ],
-                emits: ["view-logs", "close", "open-trace", "add-filter", "apply-filter-immediately", "update:activeTab"]
+                emits: [
+                  "view-logs",
+                  "close",
+                  "open-trace",
+                  "add-filter",
+                  "apply-filter-immediately",
+                  "update:activeTab",
+                ],
               },
             },
           },
         });
 
         await flushPromises();
-        const selector = wrapperNoSelector.find(
-          '[data-test="trace-details-log-streams-select"]',
-        );
+        const selector = wrapperNoSelector.find('[data-test="trace-details-log-streams-select"]');
         expect(selector.exists()).toBe(false);
         wrapperNoSelector.unmount();
       });
@@ -1053,9 +1071,7 @@ describe("TraceDetails", () => {
 
     describe("showShareButton prop", () => {
       it("should show share button when true in standalone mode", () => {
-        const shareBtn = wrapper.find(
-          '[data-test="trace-details-share-link-btn"]',
-        );
+        const shareBtn = wrapper.find('[data-test="trace-details-share-link-btn"]');
         expect(shareBtn.exists()).toBe(true);
       });
     });
@@ -1085,8 +1101,7 @@ describe("TraceDetails", () => {
                 name: "CodeQueryEditor",
                 props: ["query", "language"],
                 emits: ["update:query"],
-                template:
-                  '<div data-test="trace-details-filters-code-editor" />',
+                template: '<div data-test="trace-details-filters-code-editor" />',
               },
               "chart-renderer": {
                 template: '<div data-test="chart-renderer">Chart</div>',
@@ -1104,18 +1119,23 @@ describe("TraceDetails", () => {
                   "parentMode",
                   "activeTab",
                   "selectedLogStreams",
-                  "showLogStreamSelector"
+                  "showLogStreamSelector",
                 ],
-                emits: ["view-logs", "close", "open-trace", "add-filter", "apply-filter-immediately", "update:activeTab"]
+                emits: [
+                  "view-logs",
+                  "close",
+                  "open-trace",
+                  "add-filter",
+                  "apply-filter-immediately",
+                  "update:activeTab",
+                ],
               },
             },
           },
         });
 
         await flushPromises();
-        const expandBtn = embeddedWrapper.find(
-          '[data-test="trace-details-expand-btn"]',
-        );
+        const expandBtn = embeddedWrapper.find('[data-test="trace-details-expand-btn"]');
         expect(expandBtn.exists()).toBe(true);
         embeddedWrapper.unmount();
       });
@@ -1146,8 +1166,7 @@ describe("TraceDetails", () => {
                 name: "CodeQueryEditor",
                 props: ["query", "language"],
                 emits: ["update:query"],
-                template:
-                  '<div data-test="trace-details-filters-code-editor" />',
+                template: '<div data-test="trace-details-filters-code-editor" />',
               },
               "chart-renderer": {
                 template: '<div data-test="chart-renderer">Chart</div>',
@@ -1165,9 +1184,16 @@ describe("TraceDetails", () => {
                   "parentMode",
                   "activeTab",
                   "selectedLogStreams",
-                  "showLogStreamSelector"
+                  "showLogStreamSelector",
                 ],
-                emits: ["view-logs", "close", "open-trace", "add-filter", "apply-filter-immediately", "update:activeTab"]
+                emits: [
+                  "view-logs",
+                  "close",
+                  "open-trace",
+                  "add-filter",
+                  "apply-filter-immediately",
+                  "update:activeTab",
+                ],
               },
             },
           },
@@ -1215,8 +1241,7 @@ describe("TraceDetails", () => {
                 name: "CodeQueryEditor",
                 props: ["query", "language"],
                 emits: ["update:query"],
-                template:
-                  '<div data-test="trace-details-filters-code-editor" />',
+                template: '<div data-test="trace-details-filters-code-editor" />',
               },
               "chart-renderer": {
                 template: '<div data-test="chart-renderer">Chart</div>',
@@ -1234,9 +1259,16 @@ describe("TraceDetails", () => {
                   "parentMode",
                   "activeTab",
                   "selectedLogStreams",
-                  "showLogStreamSelector"
+                  "showLogStreamSelector",
                 ],
-                emits: ["view-logs", "close", "open-trace", "add-filter", "apply-filter-immediately", "update:activeTab"]
+                emits: [
+                  "view-logs",
+                  "close",
+                  "open-trace",
+                  "add-filter",
+                  "apply-filter-immediately",
+                  "update:activeTab",
+                ],
               },
             },
           },
@@ -1305,8 +1337,7 @@ describe("TraceDetails", () => {
               name: "CodeQueryEditor",
               props: ["query", "language"],
               emits: ["update:query"],
-              template:
-                '<div data-test="trace-details-filters-code-editor" />',
+              template: '<div data-test="trace-details-filters-code-editor" />',
             },
             "chart-renderer": {
               template: '<div data-test="chart-renderer">Chart</div>',
@@ -1321,9 +1352,7 @@ describe("TraceDetails", () => {
       await flushPromises();
 
       const windowOpenSpy = vi.spyOn(window, "open").mockImplementation();
-      const expandBtn = embeddedWrapper.find(
-        '[data-test="trace-details-expand-btn"]',
-      );
+      const expandBtn = embeddedWrapper.find('[data-test="trace-details-expand-btn"]');
 
       if (expandBtn.exists()) {
         await expandBtn.trigger("click");
@@ -1355,8 +1384,7 @@ describe("TraceDetails", () => {
               name: "CodeQueryEditor",
               props: ["query", "language"],
               emits: ["update:query"],
-              template:
-                '<div data-test="trace-details-filters-code-editor" />',
+              template: '<div data-test="trace-details-filters-code-editor" />',
             },
             "chart-renderer": {
               template: '<div data-test="chart-renderer">Chart</div>',
@@ -1407,8 +1435,7 @@ describe("TraceDetails", () => {
               name: "CodeQueryEditor",
               props: ["query", "language"],
               emits: ["update:query"],
-              template:
-                '<div data-test="trace-details-filters-code-editor" />',
+              template: '<div data-test="trace-details-filters-code-editor" />',
             },
             "chart-renderer": {
               template: '<div data-test="chart-renderer">Chart</div>',
@@ -1464,17 +1491,17 @@ describe("TraceDetails", () => {
       const sidebar = wrapper.findComponent('[data-test="trace-details-sidebar"]');
       if (sidebar.exists()) {
         // The component DOES pass these props based on the current implementation
-        expect(sidebar.props('selectedLogStreams')).toBeDefined();
-        expect(sidebar.props('showLogStreamSelector')).toBeDefined();
-        expect(sidebar.props('selectedLogStreams')).toEqual(wrapper.vm.searchObj.data.traceDetails.selectedLogStreams);
-        expect(sidebar.props('showLogStreamSelector')).toBe(wrapper.vm.showLogStreamSelector);
+        expect(sidebar.props("selectedLogStreams")).toBeDefined();
+        expect(sidebar.props("showLogStreamSelector")).toBeDefined();
+        expect(sidebar.props("selectedLogStreams")).toEqual(
+          wrapper.vm.searchObj.data.traceDetails.selectedLogStreams,
+        );
+        expect(sidebar.props("showLogStreamSelector")).toBe(wrapper.vm.showLogStreamSelector);
       }
     });
 
     it("should use placeholder for log stream selector", () => {
-      const streamSelector = wrapper.find(
-        '[data-test="trace-details-log-streams-select"]',
-      );
+      const streamSelector = wrapper.find('[data-test="trace-details-log-streams-select"]');
 
       if (streamSelector.exists()) {
         const selectElement = streamSelector.element as HTMLElement;
@@ -1484,9 +1511,7 @@ describe("TraceDetails", () => {
     });
 
     it("should have conditional disabled state and tooltip wrapper on View Logs button", () => {
-      const viewLogsBtn = wrapper.find(
-        '[data-test="trace-details-view-logs-btn"]',
-      );
+      const viewLogsBtn = wrapper.find('[data-test="trace-details-view-logs-btn"]');
 
       if (viewLogsBtn.exists()) {
         // The component HAS conditional disabled state via isViewLogsDisabled
@@ -1509,9 +1534,9 @@ describe("TraceDetails", () => {
       if (viewLogsBtn.exists()) {
         // Disabled state is controlled by isViewLogsDisabled computed property
         if (wrapper.vm.isViewLogsDisabled) {
-          expect(viewLogsBtn.attributes('disabled')).toBeDefined();
+          expect(viewLogsBtn.attributes("disabled")).toBeDefined();
         } else {
-          expect(viewLogsBtn.attributes('disabled')).toBeUndefined();
+          expect(viewLogsBtn.attributes("disabled")).toBeUndefined();
         }
       }
 
@@ -1523,10 +1548,12 @@ describe("TraceDetails", () => {
       // 4. TraceDetailsSidebar should receive selected-log-streams props correctly
       const sidebar = wrapper.findComponent('[data-test="trace-details-sidebar"]');
       if (sidebar.exists()) {
-        expect(sidebar.props('selectedLogStreams')).toBeDefined();
-        expect(sidebar.props('showLogStreamSelector')).toBeDefined();
-        expect(sidebar.props('selectedLogStreams')).toEqual(wrapper.vm.searchObj.data.traceDetails.selectedLogStreams);
-        expect(sidebar.props('showLogStreamSelector')).toBe(wrapper.vm.showLogStreamSelector);
+        expect(sidebar.props("selectedLogStreams")).toBeDefined();
+        expect(sidebar.props("showLogStreamSelector")).toBeDefined();
+        expect(sidebar.props("selectedLogStreams")).toEqual(
+          wrapper.vm.searchObj.data.traceDetails.selectedLogStreams,
+        );
+        expect(sidebar.props("showLogStreamSelector")).toBe(wrapper.vm.showLogStreamSelector);
       }
 
       // 5. Log stream selector should exist with current structure
@@ -1553,10 +1580,7 @@ describe("TraceDetails", () => {
         trace_start_time: 1000000,
         trace_end_time: 2000000,
       };
-      wrapper.vm.searchObj.data.traceDetails.selectedLogStreams = [
-        "stream1",
-        "stream2",
-      ];
+      wrapper.vm.searchObj.data.traceDetails.selectedLogStreams = ["stream1", "stream2"];
 
       wrapper.vm.redirectToLogs();
 
@@ -1743,8 +1767,7 @@ describe("TraceDetails", () => {
               name: "CodeQueryEditor",
               props: ["query", "language"],
               emits: ["update:query"],
-              template:
-                '<div data-test="trace-details-filters-code-editor" />',
+              template: '<div data-test="trace-details-filters-code-editor" />',
             },
             "chart-renderer": {
               template: '<div data-test="chart-renderer">Chart</div>',
@@ -1787,9 +1810,7 @@ describe("TraceDetails", () => {
 
       // After reset and setup, these should be reset
       expect(wrapper.vm.searchObj.data.traceDetails.selectedSpanId).toBe("");
-      expect(wrapper.vm.searchObj.data.traceDetails.showSpanDetails).toBe(
-        false,
-      );
+      expect(wrapper.vm.searchObj.data.traceDetails.showSpanDetails).toBe(false);
     });
   });
 
@@ -1804,9 +1825,7 @@ describe("TraceDetails", () => {
       await wrapper.vm.$nextTick();
 
       expect(wrapper.vm.hasRumSessionId).toBe(true);
-      const replayBtn = wrapper.find(
-        '[data-test="trace-details-view-session-replay-btn"]',
-      );
+      const replayBtn = wrapper.find('[data-test="trace-details-view-session-replay-btn"]');
       expect(replayBtn.exists()).toBe(true);
     });
 
@@ -1816,9 +1835,7 @@ describe("TraceDetails", () => {
       await wrapper.vm.$nextTick();
 
       expect(wrapper.vm.hasRumSessionId).toBe(false);
-      const replayBtn = wrapper.find(
-        '[data-test="trace-details-view-session-replay-btn"]',
-      );
+      const replayBtn = wrapper.find('[data-test="trace-details-view-session-replay-btn"]');
       expect(replayBtn.exists()).toBe(false);
     });
 
@@ -1859,9 +1876,7 @@ describe("TraceDetails", () => {
 
       await flushPromises();
 
-      const replayBtn = hiddenWrapper.find(
-        '[data-test="trace-details-view-session-replay-btn"]',
-      );
+      const replayBtn = hiddenWrapper.find('[data-test="trace-details-view-session-replay-btn"]');
       expect(replayBtn.exists()).toBe(false);
 
       hiddenWrapper.unmount();
@@ -1870,16 +1885,9 @@ describe("TraceDetails", () => {
 
   describe("Coverage: Stream filtering integration", () => {
     it("should filter streams when user types in search", async () => {
-      wrapper.vm.logStreams = [
-        "app-logs",
-        "system-logs",
-        "error-logs",
-        "debug-logs",
-      ];
+      wrapper.vm.logStreams = ["app-logs", "system-logs", "error-logs", "debug-logs"];
 
-      const searchInput = wrapper.find(
-        '[data-test="trace-details-stream-search-input"]',
-      );
+      const searchInput = wrapper.find('[data-test="trace-details-stream-search-input"]');
       if (searchInput.exists()) {
         await searchInput.setValue("error");
         await wrapper.vm.$nextTick();
@@ -1920,8 +1928,8 @@ describe("TraceDetails", () => {
 
       const result = wrapper.vm.formatRumEventsAsSpans(
         [resource], // tracedResources
-        [],         // viewEvents
-        [],         // actionEvents
+        [], // viewEvents
+        [], // actionEvents
         [resource], // allViewEvents
       );
 
@@ -1950,12 +1958,7 @@ describe("TraceDetails", () => {
         [store.state.zoConfig.timestamp_column]: 1234567890000,
       };
 
-      const result = wrapper.vm.formatRumEventsAsSpans(
-        [resource],
-        [],
-        [],
-        [resource],
-      );
+      const result = wrapper.vm.formatRumEventsAsSpans([resource], [], [], [resource]);
 
       expect(result[0].span_status).toBe("ERROR");
     });
@@ -1978,9 +1981,9 @@ describe("TraceDetails", () => {
 
       const result = wrapper.vm.formatRumEventsAsSpans(
         [tracedResource], // sets traceId and tracedTimestamp
-        [],               // viewEvents
-        [action],         // actionEvents
-        [action],         // allViewEvents
+        [], // viewEvents
+        [action], // actionEvents
+        [action], // allViewEvents
       );
 
       expect(result).toHaveLength(1);
@@ -2004,10 +2007,10 @@ describe("TraceDetails", () => {
       };
 
       const result = wrapper.vm.formatRumEventsAsSpans(
-        [view],  // tracedResources — provides traceId
-        [view],  // viewEvents
-        [],      // actionEvents
-        [view],  // allViewEvents — classifyLeafEvents skips 'view' type → no leaf spans
+        [view], // tracedResources — provides traceId
+        [view], // viewEvents
+        [], // actionEvents
+        [view], // allViewEvents — classifyLeafEvents skips 'view' type → no leaf spans
       );
 
       expect(result).toHaveLength(1);
@@ -2029,12 +2032,7 @@ describe("TraceDetails", () => {
         [store.state.zoConfig.timestamp_column]: 1234567890000,
       };
 
-      const result = wrapper.vm.formatRumEventsAsSpans(
-        [error],
-        [],
-        [],
-        [error],
-      );
+      const result = wrapper.vm.formatRumEventsAsSpans([error], [], [], [error]);
 
       expect(result).toHaveLength(1);
       expect(result[0].operation_name).toBe("Error: Network timeout");
@@ -2053,12 +2051,7 @@ describe("TraceDetails", () => {
         [store.state.zoConfig.timestamp_column]: 1234567890000,
       };
 
-      const result = wrapper.vm.formatRumEventsAsSpans(
-        [resource],
-        [],
-        [],
-        [resource],
-      );
+      const result = wrapper.vm.formatRumEventsAsSpans([resource], [], [], [resource]);
 
       expect(result).toHaveLength(1);
       expect(result[0].operation_name).toBe("GET Unknown URL");
@@ -2075,12 +2068,7 @@ describe("TraceDetails", () => {
         [store.state.zoConfig.timestamp_column]: 1234567890000,
       };
 
-      const result = wrapper.vm.formatRumEventsAsSpans(
-        [resource],
-        [],
-        [],
-        [resource],
-      );
+      const result = wrapper.vm.formatRumEventsAsSpans([resource], [], [], [resource]);
 
       expect(result[0].span_id).toBe(`rum_resource_${resource.date}`);
     });
@@ -2096,12 +2084,7 @@ describe("TraceDetails", () => {
         [store.state.zoConfig.timestamp_column]: 1234567890000,
       };
 
-      const result = wrapper.vm.formatRumEventsAsSpans(
-        [view],
-        [view],
-        [],
-        [view],
-      );
+      const result = wrapper.vm.formatRumEventsAsSpans([view], [view], [], [view]);
 
       expect(result[0].span_id).toBe("rum_view_view-specific-id");
     });
@@ -2116,19 +2099,11 @@ describe("TraceDetails", () => {
         [store.state.zoConfig.timestamp_column]: 1234567890000,
       };
 
-      const result = wrapper.vm.formatRumEventsAsSpans(
-        [resource],
-        [],
-        [],
-        [resource],
-      );
+      const result = wrapper.vm.formatRumEventsAsSpans([resource], [], [], [resource]);
 
       expect(result).toHaveLength(1);
-      const serviceNames =
-        wrapper.vm.searchObj.data.traceDetails.selectedTrace.service_name;
-      const newService = serviceNames.find(
-        (s: any) => s.service_name === "NewService",
-      );
+      const serviceNames = wrapper.vm.searchObj.data.traceDetails.selectedTrace.service_name;
+      const newService = serviceNames.find((s: any) => s.service_name === "NewService");
       expect(newService).toBeDefined();
       expect(newService.count).toBe(1);
     });
@@ -2147,23 +2122,13 @@ describe("TraceDetails", () => {
         [store.state.zoConfig.timestamp_column]: 1234567890000,
       };
 
-      const result = wrapper.vm.formatRumEventsAsSpans(
-        [resource],
-        [],
-        [],
-        [resource],
-      );
+      const result = wrapper.vm.formatRumEventsAsSpans([resource], [], [], [resource]);
 
       expect(result).toHaveLength(1);
-      const serviceNames =
-        wrapper.vm.searchObj.data.traceDetails.selectedTrace.service_name;
+      const serviceNames = wrapper.vm.searchObj.data.traceDetails.selectedTrace.service_name;
       // registerServiceColors only adds NEW services; existing entries are left unchanged
-      expect(
-        serviceNames.filter((s: any) => s.service_name === "Frontend"),
-      ).toHaveLength(1);
-      expect(
-        serviceNames.find((s: any) => s.service_name === "Frontend").count,
-      ).toBe(1);
+      expect(serviceNames.filter((s: any) => s.service_name === "Frontend")).toHaveLength(1);
+      expect(serviceNames.find((s: any) => s.service_name === "Frontend").count).toBe(1);
     });
 
     it("should use _oo_span_id as the span ID for traced resource events", () => {
@@ -2177,12 +2142,7 @@ describe("TraceDetails", () => {
         [store.state.zoConfig.timestamp_column]: 1234567890000,
       };
 
-      const result = wrapper.vm.formatRumEventsAsSpans(
-        [resource],
-        [],
-        [],
-        [resource],
-      );
+      const result = wrapper.vm.formatRumEventsAsSpans([resource], [], [], [resource]);
 
       expect(result[0].span_id).toBe("span-child");
     });
@@ -2251,16 +2211,11 @@ describe("TraceDetails", () => {
         [store.state.zoConfig.timestamp_column]: 1234567890000,
       };
 
-      const result = wrapper.vm.formatRumEventsAsSpans(
-        [resource],
-        [],
-        [],
-        [resource],
-      );
+      const result = wrapper.vm.formatRumEventsAsSpans([resource], [], [], [resource]);
 
       expect(result[0].start_time).toBe(1000000000); // date * 1_000_000
-      expect(result[0].end_time).toBe(1500000000);   // (date + 500ms) * 1_000_000
-      expect(result[0].duration).toBe(500000);        // 500ms * 1000 = 500 000 µs
+      expect(result[0].end_time).toBe(1500000000); // (date + 500ms) * 1_000_000
+      expect(result[0].duration).toBe(500000); // 500ms * 1000 = 500 000 µs
     });
 
     it("should handle unknown event types with default operation name", () => {
@@ -2273,12 +2228,7 @@ describe("TraceDetails", () => {
         [store.state.zoConfig.timestamp_column]: 1234567890000,
       };
 
-      const result = wrapper.vm.formatRumEventsAsSpans(
-        [event],
-        [],
-        [],
-        [event],
-      );
+      const result = wrapper.vm.formatRumEventsAsSpans([event], [], [], [event]);
 
       expect(result[0].operation_name).toBe("Unknown RUM Event");
     });
@@ -2314,8 +2264,7 @@ describe("TraceDetails", () => {
               name: "CodeQueryEditor",
               props: ["query", "language"],
               emits: ["update:query"],
-              template:
-                '<div data-test="trace-details-filters-code-editor" />',
+              template: '<div data-test="trace-details-filters-code-editor" />',
             },
             "chart-renderer": {
               template: '<div data-test="chart-renderer">Chart</div>',
@@ -2334,12 +2283,7 @@ describe("TraceDetails", () => {
                 "searchQuery",
                 "spanList",
               ],
-              emits: [
-                "toggle-collapse",
-                "select-span",
-                "update-current-index",
-                "search-result",
-              ],
+              emits: ["toggle-collapse", "select-span", "update-current-index", "search-result"],
             },
             "trace-header": {
               template: '<div data-test="trace-header">Trace Header</div>',
@@ -2357,9 +2301,16 @@ describe("TraceDetails", () => {
                 "parentMode",
                 "activeTab",
                 "selectedLogStreams",
-                "showLogStreamSelector"
+                "showLogStreamSelector",
               ],
-              emits: ["view-logs", "close", "open-trace", "add-filter", "apply-filter-immediately", "update:activeTab"],
+              emits: [
+                "view-logs",
+                "close",
+                "open-trace",
+                "add-filter",
+                "apply-filter-immediately",
+                "update:activeTab",
+              ],
             },
           },
         },
@@ -2408,25 +2359,18 @@ describe("TraceDetails", () => {
       );
 
       // State must be cleaned up
-      expect(localWrapper.vm.searchObj.data.traceDetails.showSpanDetails).toBe(
-        false,
-      );
-      expect(localWrapper.vm.searchObj.data.traceDetails.selectedSpanId).toBe(
-        "",
-      );
+      expect(localWrapper.vm.searchObj.data.traceDetails.showSpanDetails).toBe(false);
+      expect(localWrapper.vm.searchObj.data.traceDetails.selectedSpanId).toBe("");
 
       // Sidebar must not be rendered because showSpanDetails is false
-      expect(
-        localWrapper.find('[data-test="trace-details-sidebar"]').exists(),
-      ).toBe(false);
+      expect(localWrapper.find('[data-test="trace-details-sidebar"]').exists()).toBe(false);
 
       localWrapper.unmount();
     });
 
     it("should open sidebar and scroll when span_id in URL matches a span in the trace", async () => {
       // "6b080023171f5767" is the root span in the mock trace data
-      const validSpanId =
-        tracesMockData.tracesDetails.traceSpans.hits[0].span_id;
+      const validSpanId = tracesMockData.tracesDetails.traceSpans.hits[0].span_id;
       const localWrapper = mountWithSpanQuery(validSpanId);
       await flushPromises();
 
@@ -2434,13 +2378,59 @@ describe("TraceDetails", () => {
       expect(mockShowErrorNotification).not.toHaveBeenCalled();
 
       // Sidebar state must reflect the selected span
-      expect(localWrapper.vm.searchObj.data.traceDetails.showSpanDetails).toBe(
-        true,
-      );
-      expect(localWrapper.vm.searchObj.data.traceDetails.selectedSpanId).toBe(
-        validSpanId,
+      expect(localWrapper.vm.searchObj.data.traceDetails.showSpanDetails).toBe(true);
+      expect(localWrapper.vm.searchObj.data.traceDetails.selectedSpanId).toBe(validSpanId);
+
+      localWrapper.unmount();
+    });
+
+    it("opens Preview when a URL-selected span is an LLM evaluator span", async () => {
+      const response = JSON.parse(JSON.stringify(tracesMockData.tracesDetails.traceSpans));
+      response.hits[0].gen_ai_system = "openai";
+      const spanId = response.hits[0].span_id;
+
+      globalThis.server.use(
+        http.post(
+          `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/_search`,
+          async ({ request }) => {
+            const body = (await request.json()) as any;
+            if (body.query?.sql?.includes("_rumdata")) {
+              return HttpResponse.json({ hits: [], total: 0 });
+            }
+            return HttpResponse.json(response);
+          },
+        ),
       );
 
+      const localWrapper = mountWithSpanQuery(spanId);
+      await flushPromises();
+
+      expect(localWrapper.vm.sidebarActiveTab).toBe("preview");
+      localWrapper.unmount();
+    });
+
+    it("opens Preview when a URL-selected remote evaluator has a response", async () => {
+      const response = JSON.parse(JSON.stringify(tracesMockData.tracesDetails.traceSpans));
+      response.hits[0].attributes_response = '{"code":"OK","value":0.9,"reason":"good"}';
+      const spanId = response.hits[0].span_id;
+
+      globalThis.server.use(
+        http.post(
+          `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/_search`,
+          async ({ request }) => {
+            const body = (await request.json()) as any;
+            if (body.query?.sql?.includes("_rumdata")) {
+              return HttpResponse.json({ hits: [], total: 0 });
+            }
+            return HttpResponse.json(response);
+          },
+        ),
+      );
+
+      const localWrapper = mountWithSpanQuery(spanId);
+      await flushPromises();
+
+      expect(localWrapper.vm.sidebarActiveTab).toBe("preview");
       localWrapper.unmount();
     });
   });
@@ -2472,9 +2462,7 @@ describe("TraceDetails", () => {
         // Should not throw error
         expect(() => wrapper.vm.nextMatch()).not.toThrow();
 
-        expect(consoleWarnSpy).toHaveBeenCalledWith(
-          "TraceTree component reference not found",
-        );
+        expect(consoleWarnSpy).toHaveBeenCalledWith("TraceTree component reference not found");
         consoleWarnSpy.mockRestore();
       });
 
@@ -2484,9 +2472,7 @@ describe("TraceDetails", () => {
 
         expect(() => wrapper.vm.nextMatch()).not.toThrow();
 
-        expect(consoleWarnSpy).toHaveBeenCalledWith(
-          "TraceTree component reference not found",
-        );
+        expect(consoleWarnSpy).toHaveBeenCalledWith("TraceTree component reference not found");
         consoleWarnSpy.mockRestore();
       });
 
@@ -2518,9 +2504,7 @@ describe("TraceDetails", () => {
         // Should not throw error
         expect(() => wrapper.vm.prevMatch()).not.toThrow();
 
-        expect(consoleWarnSpy).toHaveBeenCalledWith(
-          "TraceTree component reference not found",
-        );
+        expect(consoleWarnSpy).toHaveBeenCalledWith("TraceTree component reference not found");
         consoleWarnSpy.mockRestore();
       });
 
@@ -2530,9 +2514,7 @@ describe("TraceDetails", () => {
 
         expect(() => wrapper.vm.prevMatch()).not.toThrow();
 
-        expect(consoleWarnSpy).toHaveBeenCalledWith(
-          "TraceTree component reference not found",
-        );
+        expect(consoleWarnSpy).toHaveBeenCalledWith("TraceTree component reference not found");
         consoleWarnSpy.mockRestore();
       });
 
@@ -2706,16 +2688,14 @@ describe("TraceDetails", () => {
   describe("effectiveSpanId", () => {
     it("should return hoveredSpanId when hovering over a span", () => {
       wrapper.vm.hoveredSpanId = "hovered-span-1";
-      wrapper.vm.searchObj.data.traceDetails.selectedSpanId =
-        "selected-span-1";
+      wrapper.vm.searchObj.data.traceDetails.selectedSpanId = "selected-span-1";
 
       expect(wrapper.vm.effectiveSpanId).toBe("hovered-span-1");
     });
 
     it("should return selectedSpanId when not hovering", () => {
       wrapper.vm.hoveredSpanId = "";
-      wrapper.vm.searchObj.data.traceDetails.selectedSpanId =
-        "selected-span-1";
+      wrapper.vm.searchObj.data.traceDetails.selectedSpanId = "selected-span-1";
 
       expect(wrapper.vm.effectiveSpanId).toBe("selected-span-1");
     });
@@ -2749,16 +2729,14 @@ describe("TraceDetails", () => {
 
   describe("TraceTree hover integration", () => {
     it("should pass hoveredSpanId prop to TraceTree child component", async () => {
+      // TraceTree only renders inside the waterfall view.
+      wrapper.vm.activeTab = "waterfall";
       wrapper.vm.hoveredSpanId = "hovered-span-from-parent";
       await wrapper.vm.$nextTick();
 
-      const traceTree = wrapper.findComponent(
-        '[data-test="trace-details-tree"]',
-      );
+      const traceTree = wrapper.findComponent('[data-test="trace-details-tree"]');
       expect(traceTree.exists()).toBe(true);
-      expect(traceTree.props("hoveredSpanId")).toBe(
-        "hovered-span-from-parent",
-      );
+      expect(traceTree.props("hoveredSpanId")).toBe("hovered-span-from-parent");
     });
   });
 
@@ -2777,9 +2755,7 @@ describe("TraceDetails", () => {
 
     it("binds open via v-model:open to showFilterPopover state", async () => {
       expect(wrapper.vm.showFilterPopover).toBe(false);
-      expect(wrapper.find(drawerSelector).attributes("data-open")).toBe(
-        "false",
-      );
+      expect(wrapper.find(drawerSelector).attributes("data-open")).toBe("false");
 
       wrapper.vm.showFilterPopover = true;
       await wrapper.vm.$nextTick();
@@ -2791,9 +2767,7 @@ describe("TraceDetails", () => {
       wrapper.vm.showFilterPopover = true;
       await wrapper.vm.$nextTick();
 
-      await wrapper
-        .find('[data-test="trace-details-filters-drawer-secondary"]')
-        .trigger("click");
+      await wrapper.find('[data-test="trace-details-filters-drawer-secondary"]').trigger("click");
 
       expect(wrapper.vm.showFilterPopover).toBe(false);
     });
@@ -2803,9 +2777,7 @@ describe("TraceDetails", () => {
       wrapper.vm.localEditorValue = "service_name = 'test-service'";
       await wrapper.vm.$nextTick();
 
-      await wrapper
-        .find('[data-test="trace-details-filters-drawer-primary"]')
-        .trigger("click");
+      await wrapper.find('[data-test="trace-details-filters-drawer-primary"]').trigger("click");
 
       // applyAndViewTraces() closes the drawer and clears the local editor value
       expect(wrapper.vm.showFilterPopover).toBe(false);
@@ -2818,13 +2790,9 @@ describe("TraceDetails", () => {
       wrapper.vm.showFilterPopover = true;
       await wrapper.vm.$nextTick();
 
-      await wrapper
-        .find('[data-test="trace-details-filters-drawer-primary"]')
-        .trigger("click");
+      await wrapper.find('[data-test="trace-details-filters-drawer-primary"]').trigger("click");
 
-      expect(wrapper.vm.searchObj.data.editorValue).toBe(
-        "level = 'error' and duration > 100",
-      );
+      expect(wrapper.vm.searchObj.data.editorValue).toBe("level = 'error' and duration > 100");
       expect(wrapper.vm.showFilterPopover).toBe(false);
     });
 
@@ -2834,18 +2802,118 @@ describe("TraceDetails", () => {
       wrapper.vm.showFilterPopover = true;
       await wrapper.vm.$nextTick();
 
-      await wrapper
-        .find('[data-test="trace-details-filters-drawer-primary"]')
-        .trigger("click");
+      await wrapper.find('[data-test="trace-details-filters-drawer-primary"]').trigger("click");
 
       expect(wrapper.vm.searchObj.data.editorValue).toBe("status_code = 200");
     });
 
     it("renders the CodeQueryEditor inside the drawer default slot", () => {
-      const editor = wrapper.find(
-        '[data-test="trace-details-filters-code-editor"]',
-      );
+      const editor = wrapper.find('[data-test="trace-details-filters-code-editor"]');
       expect(editor.exists()).toBe(true);
+    });
+  });
+
+  describe("Tab order and active-tab persistence", () => {
+    const ORDER_KEY = "o2_trace_tab_order";
+    const ACTIVE_KEY = "o2_trace_active_tab";
+
+    const tabValues = () => wrapper.vm.traceTabs.map((tab: any) => tab.value);
+    const storedOrder = () => JSON.parse(localStorage.getItem(ORDER_KEY) as string);
+
+    // The fixture trace has no LLM spans, so the dag and thread tabs are
+    // filtered out of traceTabs regardless of the stored order.
+    it("defaults to the waterfall when nothing is persisted", () => {
+      expect(wrapper.vm.activeTab).toBe("waterfall");
+    });
+
+    it("restores the persisted active tab on mount", async () => {
+      localStorage.setItem(ACTIVE_KEY, "map");
+      await remount();
+
+      expect(wrapper.vm.activeTab).toBe("map");
+    });
+
+    it("persists the active tab when it changes", async () => {
+      wrapper.vm.updateActiveTab("waterfall");
+      await wrapper.vm.$nextTick();
+
+      expect(localStorage.getItem(ACTIVE_KEY)).toBe("waterfall");
+    });
+
+    it("falls back to the default when the persisted tab is unavailable for this trace", async () => {
+      // "thread" only renders for traces with LLM spans; this fixture has none.
+      localStorage.setItem(ACTIVE_KEY, "thread");
+      await remount();
+
+      expect(tabValues()).not.toContain("thread");
+      expect(wrapper.vm.activeTab).toBe("waterfall");
+    });
+
+    it("ignores a persisted tab that is no longer a known tab", async () => {
+      localStorage.setItem(ACTIVE_KEY, "some-removed-tab");
+      await remount();
+
+      expect(wrapper.vm.activeTab).toBe("waterfall");
+    });
+
+    it("renders tabs in the persisted order", async () => {
+      localStorage.setItem(ORDER_KEY, JSON.stringify(["map", "waterfall", "flame-graph"]));
+      await remount();
+
+      expect(tabValues()).toEqual(["map", "waterfall", "flame-graph"]);
+    });
+
+    it("drops unknown values from a persisted order and appends newly shipped tabs", async () => {
+      // A stored order written before "map" shipped, containing a since-removed tab.
+      localStorage.setItem(ORDER_KEY, JSON.stringify(["waterfall", "retired-tab", "flame-graph"]));
+      await remount();
+
+      // "retired-tab" is discarded; "map" is appended rather than lost.
+      expect(tabValues()).toEqual(["waterfall", "flame-graph", "map"]);
+    });
+
+    it("survives a corrupt persisted order", async () => {
+      localStorage.setItem(ORDER_KEY, "{not json");
+      await remount();
+
+      expect(tabValues()).toEqual(["waterfall", "flame-graph", "map"]);
+    });
+
+    it("moves a tab before the drop target and persists the new order", async () => {
+      wrapper.vm.onTabReorder({ from: "map", to: "flame-graph", before: true });
+      await wrapper.vm.$nextTick();
+
+      expect(tabValues()).toEqual(["waterfall", "map", "flame-graph"]);
+      expect(storedOrder()).toEqual(["waterfall", "map", "flame-graph", "dag", "thread"]);
+    });
+
+    it("moves a tab after the drop target", async () => {
+      wrapper.vm.onTabReorder({
+        from: "waterfall",
+        to: "map",
+        before: false,
+      });
+      await wrapper.vm.$nextTick();
+
+      expect(tabValues()).toEqual(["flame-graph", "map", "waterfall"]);
+    });
+
+    it("keeps hidden tabs in the persisted order so the arrangement survives", async () => {
+      wrapper.vm.onTabReorder({ from: "map", to: "flame-graph", before: true });
+      await wrapper.vm.$nextTick();
+
+      // dag and thread are not rendered for this trace, but must not be dropped
+      // from storage — otherwise the order resets when opening an LLM trace.
+      expect(storedOrder()).toContain("dag");
+      expect(storedOrder()).toContain("thread");
+    });
+
+    it("ignores a reorder whose source tab is unknown", async () => {
+      const before = tabValues();
+      wrapper.vm.onTabReorder({ from: "ghost", to: "map", before: true });
+      await wrapper.vm.$nextTick();
+
+      expect(tabValues()).toEqual(before);
     });
   });
 });

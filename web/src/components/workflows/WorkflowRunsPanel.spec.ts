@@ -123,9 +123,9 @@ describe("WorkflowRunsPanel", () => {
   it("highlights the selected run row via rowClass", async () => {
     const wrapper = mountPanel({ selectedRunId: "run-2" });
     await flushPromises();
-    const rowClass = wrapper
-      .findComponent(OTableStub as any)
-      .props("rowClass") as (row: any) => string;
+    const rowClass = wrapper.findComponent(OTableStub as any).props("rowClass") as (
+      row: any,
+    ) => string;
 
     expect(rowClass({ run_id: "run-2" })).toBe("bg-select-item-hover-bg!");
     expect(rowClass({ run_id: "run-9" })).toBe("");

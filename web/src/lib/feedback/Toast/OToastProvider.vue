@@ -15,44 +15,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <script setup lang="ts">
-import { ToastProvider, ToastViewport } from "reka-ui"
-import { useToast } from "./useToast"
-import { toastRecords } from "./useToast"
-import { viewportPositionClasses } from "./OToastProvider.types"
-import type { ToastPosition } from "./OToast.types"
-import OToast from "./OToast.vue"
+import { ToastProvider, ToastViewport } from "reka-ui";
+import { useToast } from "./useToast";
+import { toastRecords } from "./useToast";
+import { viewportPositionClasses } from "./OToastProvider.types";
+import type { ToastPosition } from "./OToast.types";
+import OToast from "./OToast.vue";
 
-const { toasts } = useToast()
+const { toasts } = useToast();
 
 // Always render these two positions. Each needs its own ToastProvider so that
 // Reka UI's single-viewport-per-provider constraint is satisfied — if all toasts
 // shared one provider with two viewports the last-mounted viewport would win and
 // all toasts would appear there regardless of their intended position.
-const positions: ToastPosition[] = ["bottom-center"]
+const positions: ToastPosition[] = ["bottom-center"];
 
 function toastsForPosition(pos: ToastPosition) {
-  return toasts.filter((t) => t.position === pos)
+  return toasts.filter((t) => t.position === pos);
 }
 
 function handleOpenChange(id: string, open: boolean): void {
   if (!open) {
-    const idx = toastRecords.findIndex((r) => r.id === id)
+    const idx = toastRecords.findIndex((r) => r.id === id);
     if (idx !== -1) {
-      const record = toastRecords[idx]
-      record.onDismiss?.()
-      toastRecords.splice(idx, 1)
+      const record = toastRecords[idx];
+      record.onDismiss?.();
+      toastRecords.splice(idx, 1);
     }
   }
 }
 </script>
 
 <template>
-  <ToastProvider
-    v-for="pos in positions"
-    :key="pos"
-    swipe-direction="right"
-    :duration="0"
-  >
+  <ToastProvider v-for="pos in positions" :key="pos" swipe-direction="right" :duration="0">
     <OToast
       v-for="t in toastsForPosition(pos)"
       :key="t.id"

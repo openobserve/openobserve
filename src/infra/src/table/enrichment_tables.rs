@@ -13,7 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::{meta::stream::EnrichmentTableMetaStreamStats, utils::time::now_micros};
+use config::{
+    meta::stream::{EnrichmentTableMetaStreamStats, StreamType},
+    utils::time::{BASE_TIME, now_micros},
+};
 use sea_orm::{
     ColumnTrait, EntityTrait, FromQueryResult, Order, QueryFilter, QueryOrder, QuerySelect, Set,
     entity::prelude::*,
@@ -29,6 +32,22 @@ use crate::{
 };
 
 pub const ENRICHMENT_TABLE_META_STREAM_STATS_KEY: &str = "/enrichment_table_meta_stream_stats";
+
+/// Get the earliest searchable timestamp for an enrichment table.
+pub async fn get_start_time(org_id: &str, name: &str) -> i64 {
+    match get_meta_stats(org_id, name).await {
+        Some(meta_stats) => meta_stats.start_time,
+        None => {
+            let stats =
+                crate::cache::stats::get_stream_stats(org_id, name, StreamType::EnrichmentTables);
+            if stats.doc_time_min > 0 {
+                stats.doc_time_min
+            } else {
+                BASE_TIME.timestamp_micros()
+            }
+        }
+    }
+}
 
 #[derive(FromQueryResult, Debug, Serialize, Deserialize)]
 pub struct EnrichmentTableRecord {

@@ -64,12 +64,12 @@ impl Event for Eventer {
 
             // Collect files to download
             for item in put_items.iter() {
-                if !crate::service::file_downloader::should_download(item.meta.records) {
+                if !infra::cache::file_downloader::should_download(item.meta.records) {
                     continue;
                 }
                 // files with data older than the cache max age should not be
                 // cached, e.g. merged files from compaction of old partitions
-                if crate::service::file_downloader::exceeds_cache_max_age(
+                if infra::cache::file_downloader::exceeds_cache_max_age(
                     item.meta.max_ts,
                     CacheType::Disk,
                 ) {
@@ -107,7 +107,7 @@ impl Event for Eventer {
 
                 // Try batch download files
                 if !files_to_download.is_empty() {
-                    match crate::service::file_downloader::download_from_node(
+                    match infra::cache::file_downloader::download_from_node(
                         &grpc_addr,
                         &files_to_download,
                     )
@@ -123,7 +123,7 @@ impl Event for Eventer {
 
                 // Fallback to individual downloads for failed files
                 for (id, account, file, size, ts) in failed_files {
-                    if let Err(e) = crate::service::file_downloader::queue_download(
+                    if let Err(e) = infra::cache::file_downloader::queue_download(
                         TRACE_ID_FOR_CACHE_LATEST_FILE.to_string(),
                         id,
                         account,
@@ -140,7 +140,7 @@ impl Event for Eventer {
             } else {
                 // Direct download when download_from_node_enabled is false
                 for (id, account, file, size, ts) in files_to_download {
-                    if let Err(e) = crate::service::file_downloader::queue_download(
+                    if let Err(e) = infra::cache::file_downloader::queue_download(
                         TRACE_ID_FOR_CACHE_LATEST_FILE.to_string(),
                         id,
                         account,

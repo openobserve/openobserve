@@ -17,12 +17,10 @@ use std::collections::HashMap;
 
 use axum::{extract::Path, response::Response};
 use config::utils::json;
+use openobserve_core::auth::UserEmail;
 
 use crate::{
-    common::{
-        meta::{http::HttpResponse as MetaHttpResponse, telemetry},
-        utils::auth::UserEmail,
-    },
+    common::meta::{http::HttpResponse as MetaHttpResponse, telemetry},
     handler::http::{extractors::Headers, models::billings::NewUserAttribution},
 };
 

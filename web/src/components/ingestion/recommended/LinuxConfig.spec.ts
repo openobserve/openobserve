@@ -96,6 +96,14 @@ describe("linuxCard builder", () => {
     expect(generic.note).not.toContain("ec2:DescribeTags");
   });
 
+  it("offers the uninstall command", () => {
+    const uninstall = linuxCard(SUBS).extras?.uninstall;
+    expect(uninstall?.code.raw).toContain("/linux/uninstall.sh");
+    expect(uninstall?.code.lang).toBe("bash");
+    // One uninstall script serves both the generic and EC2 installs.
+    expect(uninstall?.code.raw).not.toContain("/ec2/");
+  });
+
   it("substitutes url/org and masks the ingestion token", () => {
     const generic = linuxCard(SUBS).steps[0].variants![0];
     expect(generic.code.raw).toContain(`${SUBS.url}/api/${SUBS.org}/`);

@@ -26,5 +26,8 @@ pub mod tools;
 pub mod types;
 
 // Re-export commonly used types and functions
-pub use handler::{OAuthServerMetadata, handle_mcp_request, handle_mcp_request_stream};
+pub use handler::{
+    OAuthProtectedResourceMetadata, OAuthServerMetadata, handle_mcp_request,
+    handle_mcp_request_stream,
+};
 pub use types::{MCP_PROTOCOL_VERSION, MCPRequest, MCPResponse};

@@ -17,18 +17,16 @@ use config::{
     get_config,
     meta::destinations::{Destination, DestinationType, Email, Module, Template},
 };
+use db::{
+    self,
+    alerts::{destinations::DestinationError, templates::TemplateError},
+    authz::{remove_ownership, set_ownership},
+    user,
+};
 
 use crate::{
-    common::{
-        infra::config::ALERTS,
-        meta::authz::Authz,
-        utils::auth::{is_ofga_unsupported, remove_ownership, set_ownership},
-    },
-    service::db::{
-        self,
-        alerts::{destinations::DestinationError, templates::TemplateError},
-        user,
-    },
+    auth::is_ofga_unsupported,
+    common::{infra::config::ALERTS, meta::authz::Authz},
 };
 
 /// Helper function to ensure a prebuilt template exists for the given type.
@@ -165,7 +163,7 @@ pub async fn save(
                 // persisting so the alert fire path can't be tricked into reading
                 // internal services via a destination saved with a malicious URL.
                 if let Err(e) =
-                    crate::common::utils::ssrf_guard::SsrfGuard::validate_url_with_config_async(
+                    common::utils::ssrf_guard::SsrfGuard::validate_url_with_config_async(
                         &endpoint.url,
                     )
                     .await
@@ -184,10 +182,8 @@ pub async fn save(
                 return Err(DestinationError::EmptyUrl);
             }
             if let Err(e) =
-                crate::common::utils::ssrf_guard::SsrfGuard::validate_url_with_config_async(
-                    &endpoint.url,
-                )
-                .await
+                common::utils::ssrf_guard::SsrfGuard::validate_url_with_config_async(&endpoint.url)
+                    .await
             {
                 return Err(DestinationError::SsrfBlocked(e));
             }
@@ -388,7 +384,7 @@ pub async fn delete(org_id: &str, name: &str) -> Result<(), DestinationError> {
     }
     drop(cacher);
 
-    if let Ok(pls) = db::pipeline::list_by_org(org_id).await {
+    if let Ok(pls) = infra::pipeline::list_by_org(org_id).await {
         for pl in pls {
             if pl.contains_remote_destination(name) {
                 return Err(DestinationError::UsedByPipeline(pl.name));
@@ -397,7 +393,7 @@ pub async fn delete(org_id: &str, name: &str) -> Result<(), DestinationError> {
     }
 
     #[cfg(feature = "enterprise")]
-    if let Ok(workflows) = crate::service::workflows::list_workflows(org_id, None).await {
+    if let Ok(workflows) = crate::workflows::list_workflows(org_id, None).await {
         for w in workflows {
             for node in w.nodes {
                 if let config::meta::pipeline::components::NodeData::Destination(dest) = node.data

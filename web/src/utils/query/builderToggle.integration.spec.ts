@@ -43,9 +43,7 @@ import {
 // ============================================================================
 
 beforeAll(async () => {
-  const Parser: any = await import(
-    "@openobserve/node-sql-parser/build/datafusionsql"
-  );
+  const Parser: any = await import("@openobserve/node-sql-parser/build/datafusionsql");
   new Parser.default.Parser();
 });
 
@@ -71,10 +69,7 @@ function countConditions(filter: any): number {
   if (!filter) return 0;
   if (filter.filterType === "condition") return 1;
   if (filter.conditions && Array.isArray(filter.conditions)) {
-    return filter.conditions.reduce(
-      (sum: number, c: any) => sum + countConditions(c),
-      0,
-    );
+    return filter.conditions.reduce((sum: number, c: any) => sum + countConditions(c), 0);
   }
   return 0;
 }
@@ -96,7 +91,7 @@ function flattenConditions(filter: any): any[] {
 describe("Case 3: SQL ON — empty / SELECT * detection", () => {
   const selectStarQueries = [
     'SELECT * FROM "default"',
-    "SELECT * FROM \"default\" ",
+    'SELECT * FROM "default" ',
     '  SELECT  *  FROM  "default"  ',
     'select * from "default"',
     'SELECT * FROM "k8s_logs"',
@@ -105,24 +100,15 @@ describe("Case 3: SQL ON — empty / SELECT * detection", () => {
     'SELECT * FROM "default" ORDER BY _timestamp DESC',
   ];
 
-  it.each(selectStarQueries)(
-    "isSimpleSelectAllQuery detects: %s",
-    (sql) => {
-      expect(isSimpleSelectAllQuery(sql)).toBe(true);
-    },
-  );
+  it.each(selectStarQueries)("isSimpleSelectAllQuery detects: %s", (sql) => {
+    expect(isSimpleSelectAllQuery(sql)).toBe(true);
+  });
 
   it("rejects non-SELECT* queries", () => {
-    expect(
-      isSimpleSelectAllQuery(
-        'SELECT count(*) FROM "default"',
-      ),
-    ).toBe(false);
-    expect(
-      isSimpleSelectAllQuery(
-        'SELECT level, count(*) FROM "default" GROUP BY level',
-      ),
-    ).toBe(false);
+    expect(isSimpleSelectAllQuery('SELECT count(*) FROM "default"')).toBe(false);
+    expect(isSimpleSelectAllQuery('SELECT level, count(*) FROM "default" GROUP BY level')).toBe(
+      false,
+    );
   });
 });
 
@@ -155,9 +141,7 @@ describe("Case 3a: SQL ON — bare-field-select queries get default histogram/co
   });
 
   it("bare field with WHERE: SELECT method FROM stream WHERE code='200' → defaults + filter", async () => {
-    const r = await fullPipeline(
-      'SELECT method FROM "default" WHERE code = \'200\'',
-    );
+    const r = await fullPipeline("SELECT method FROM \"default\" WHERE code = '200'");
     expect(r.customQuery).toBe(false);
     expect(r.panelFields!.x.length).toBe(1);
     expect(r.panelFields!.x[0].functionName).toBe("histogram");
@@ -257,18 +241,14 @@ describe("Case 2: SQL OFF — parseWhereClauseToFilter (15 queries)", () => {
   });
 
   it("Q8: NOT LIKE", async () => {
-    const f = await parseWhereClauseToFilter(
-      "message NOT LIKE '%healthcheck%'",
-    );
+    const f = await parseWhereClauseToFilter("message NOT LIKE '%healthcheck%'");
     const conds = flattenConditions(f);
     expect(conds.length).toBe(1);
     expect(conds[0].operator).toBe("Not Contains");
   });
 
   it("Q9: IN list", async () => {
-    const f = await parseWhereClauseToFilter(
-      "level IN ('ERROR', 'WARN', 'FATAL')",
-    );
+    const f = await parseWhereClauseToFilter("level IN ('ERROR', 'WARN', 'FATAL')");
     const conds = flattenConditions(f);
     expect(conds.length).toBe(1);
     expect(conds[0].filterType).toBe("condition");
@@ -291,9 +271,7 @@ describe("Case 2: SQL OFF — parseWhereClauseToFilter (15 queries)", () => {
 
   // -- Compound conditions --
   it("Q12: two ANDs", async () => {
-    const f = await parseWhereClauseToFilter(
-      "level = 'ERROR' AND code = '500'",
-    );
+    const f = await parseWhereClauseToFilter("level = 'ERROR' AND code = '500'");
     expect(countConditions(f)).toBe(2);
   });
 
@@ -305,9 +283,7 @@ describe("Case 2: SQL OFF — parseWhereClauseToFilter (15 queries)", () => {
   });
 
   it("Q14: OR condition", async () => {
-    const f = await parseWhereClauseToFilter(
-      "level = 'ERROR' OR level = 'WARN'",
-    );
+    const f = await parseWhereClauseToFilter("level = 'ERROR' OR level = 'WARN'");
     expect(countConditions(f)).toBe(2);
   });
 
@@ -520,7 +496,7 @@ describe("Case 4: SQL ON — simple parseable queries (40 queries)", () => {
 
   it("Q36: WHERE with three AND conditions", async () => {
     const r = await fullPipeline(
-      'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1" FROM "default" WHERE level = \'ERROR\' AND code = \'500\' AND method = \'POST\' GROUP BY x_axis_1 ORDER BY x_axis_1 ASC',
+      "SELECT histogram(_timestamp) as \"x_axis_1\", count(_timestamp) as \"y_axis_1\" FROM \"default\" WHERE level = 'ERROR' AND code = '500' AND method = 'POST' GROUP BY x_axis_1 ORDER BY x_axis_1 ASC",
     );
     expect(countConditions(r.panelFields!.filter)).toBe(3);
     const conds = flattenConditions(r.panelFields!.filter);
@@ -625,13 +601,11 @@ describe("Case 4: SQL ON — simple parseable queries (40 queries)", () => {
 
   it("Q48: WHERE with four conditions", async () => {
     const r = await fullPipeline(
-      'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1" FROM "default" WHERE level = \'ERROR\' AND code = \'500\' AND method = \'POST\' AND path LIKE \'/api%\' GROUP BY x_axis_1 ORDER BY x_axis_1 ASC',
+      "SELECT histogram(_timestamp) as \"x_axis_1\", count(_timestamp) as \"y_axis_1\" FROM \"default\" WHERE level = 'ERROR' AND code = '500' AND method = 'POST' AND path LIKE '/api%' GROUP BY x_axis_1 ORDER BY x_axis_1 ASC",
     );
     expect(countConditions(r.panelFields!.filter)).toBe(4);
     const conds = flattenConditions(r.panelFields!.filter);
-    expect(conds.find((c) => c.column.field === "path")?.operator).toBe(
-      "Starts With",
-    );
+    expect(conds.find((c) => c.column.field === "path")?.operator).toBe("Starts With");
   });
 
   it("Q49: WHERE with NOT IN", async () => {
@@ -698,7 +672,7 @@ describe("Case 4: SQL ON — simple parseable queries (40 queries)", () => {
 
   it("Q55: WHERE with five conditions", async () => {
     const r = await fullPipeline(
-      'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1" FROM "default" WHERE level = \'ERROR\' AND code >= 500 AND method = \'GET\' AND host LIKE \'%.prod.%\' AND trace_id IS NOT NULL GROUP BY x_axis_1 ORDER BY x_axis_1 ASC',
+      "SELECT histogram(_timestamp) as \"x_axis_1\", count(_timestamp) as \"y_axis_1\" FROM \"default\" WHERE level = 'ERROR' AND code >= 500 AND method = 'GET' AND host LIKE '%.prod.%' AND trace_id IS NOT NULL GROUP BY x_axis_1 ORDER BY x_axis_1 ASC",
     );
     expect(countConditions(r.panelFields!.filter)).toBe(5);
   });
@@ -711,9 +685,7 @@ describe("Case 4: SQL ON — simple parseable queries (40 queries)", () => {
 describe("Case 5: SQL ON — complex queries → custom mode (10 queries)", () => {
   it("Q56: subquery in FROM", () => {
     expect(
-      shouldUseCustomMode(
-        'SELECT * FROM (SELECT level, count(*) FROM "default" GROUP BY level)',
-      ),
+      shouldUseCustomMode('SELECT * FROM (SELECT level, count(*) FROM "default" GROUP BY level)'),
     ).toBe(true);
   });
 
@@ -726,19 +698,11 @@ describe("Case 5: SQL ON — complex queries → custom mode (10 queries)", () =
   });
 
   it("Q58: CTE (WITH clause)", () => {
-    expect(
-      shouldUseCustomMode(
-        'WITH errors AS (\nVALUES (1)\n) SELECT * FROM errors',
-      ),
-    ).toBe(true);
+    expect(shouldUseCustomMode("WITH errors AS (\nVALUES (1)\n) SELECT * FROM errors")).toBe(true);
   });
 
   it("Q59: UNION", () => {
-    expect(
-      shouldUseCustomMode(
-        'SELECT * FROM "errors" UNION SELECT * FROM "warnings"',
-      ),
-    ).toBe(true);
+    expect(shouldUseCustomMode('SELECT * FROM "errors" UNION SELECT * FROM "warnings"')).toBe(true);
   });
 
   it("Q60: INTERSECT", () => {
@@ -759,34 +723,22 @@ describe("Case 5: SQL ON — complex queries → custom mode (10 queries)", () =
 
   it("Q62: RANK window function", () => {
     expect(
-      shouldUseCustomMode(
-        'SELECT user_id, RANK() OVER (ORDER BY score DESC) FROM "leaderboard"',
-      ),
+      shouldUseCustomMode('SELECT user_id, RANK() OVER (ORDER BY score DESC) FROM "leaderboard"'),
     ).toBe(true);
   });
 
   it("Q63: DISTINCT ON", () => {
-    expect(
-      shouldUseCustomMode(
-        'SELECT DISTINCT ON (user_id) * FROM "events"',
-      ),
-    ).toBe(true);
+    expect(shouldUseCustomMode('SELECT DISTINCT ON (user_id) * FROM "events"')).toBe(true);
   });
 
   it("Q64: ARRAY_AGG", () => {
     expect(
-      shouldUseCustomMode(
-        'SELECT user_id, ARRAY_AGG(tag) FROM "events" GROUP BY user_id',
-      ),
+      shouldUseCustomMode('SELECT user_id, ARRAY_AGG(tag) FROM "events" GROUP BY user_id'),
     ).toBe(true);
   });
 
   it("Q65: JSON arrow operator", () => {
-    expect(
-      shouldUseCustomMode(
-        'SELECT data->>\'name\' FROM "events"',
-      ),
-    ).toBe(true);
+    expect(shouldUseCustomMode("SELECT data->>'name' FROM \"events\"")).toBe(true);
   });
 });
 
@@ -796,9 +748,7 @@ describe("Case 5: SQL ON — complex queries → custom mode (10 queries)", () =
 
 describe("Case 6: SQL ON — aggregation only queries (10 queries)", () => {
   it("Q66: count only", async () => {
-    const r = await fullPipeline(
-      'SELECT count(_timestamp) as "y_axis_1" FROM "default"',
-    );
+    const r = await fullPipeline('SELECT count(_timestamp) as "y_axis_1" FROM "default"');
     expect(r.customQuery).toBe(false);
     expect(r.panelFields!.x.length).toBe(0);
     expect(r.panelFields!.y.length).toBe(1);
@@ -807,32 +757,24 @@ describe("Case 6: SQL ON — aggregation only queries (10 queries)", () => {
   });
 
   it("Q67: sum only", async () => {
-    const r = await fullPipeline(
-      'SELECT sum(bytes) as "y_axis_1" FROM "default"',
-    );
+    const r = await fullPipeline('SELECT sum(bytes) as "y_axis_1" FROM "default"');
     expect(r.panelFields!.y[0].functionName).toBe("sum");
     expect(r.panelFields!.x.length).toBe(0);
   });
 
   it("Q68: avg only", async () => {
-    const r = await fullPipeline(
-      'SELECT avg(response_time) as "y_axis_1" FROM "default"',
-    );
+    const r = await fullPipeline('SELECT avg(response_time) as "y_axis_1" FROM "default"');
     expect(r.panelFields!.y[0].functionName).toBe("avg");
     expect(r.panelFields!.x.length).toBe(0);
   });
 
   it("Q69: min only", async () => {
-    const r = await fullPipeline(
-      'SELECT min(latency) as "y_axis_1" FROM "default"',
-    );
+    const r = await fullPipeline('SELECT min(latency) as "y_axis_1" FROM "default"');
     expect(r.panelFields!.y[0].functionName).toBe("min");
   });
 
   it("Q70: max only", async () => {
-    const r = await fullPipeline(
-      'SELECT max(latency) as "y_axis_1" FROM "default"',
-    );
+    const r = await fullPipeline('SELECT max(latency) as "y_axis_1" FROM "default"');
     expect(r.panelFields!.y[0].functionName).toBe("max");
   });
 
@@ -854,15 +796,13 @@ describe("Case 6: SQL ON — aggregation only queries (10 queries)", () => {
   });
 
   it("Q73: p95 only", async () => {
-    const r = await fullPipeline(
-      'SELECT p95(duration) as "y_axis_1" FROM "default"',
-    );
+    const r = await fullPipeline('SELECT p95(duration) as "y_axis_1" FROM "default"');
     expect(r.panelFields!.y[0].functionName).toBe("p95");
   });
 
   it("Q74: aggregation only with multi-filter", async () => {
     const r = await fullPipeline(
-      'SELECT count(_timestamp) as "y_axis_1" FROM "default" WHERE level = \'ERROR\' AND code >= 500 AND method = \'POST\'',
+      "SELECT count(_timestamp) as \"y_axis_1\" FROM \"default\" WHERE level = 'ERROR' AND code >= 500 AND method = 'POST'",
     );
     expect(r.panelFields!.y.length).toBe(1);
     expect(countConditions(r.panelFields!.filter)).toBe(3);
@@ -1103,16 +1043,12 @@ describe("Edge cases — no fields or filters lost (5 queries)", () => {
     expect(countConditions(r.panelFields!.filter)).toBe(2);
     const conds = flattenConditions(r.panelFields!.filter);
     expect(conds.find((c) => c.column.field === "k8s_pod_name")).toBeTruthy();
-    expect(
-      conds.find(
-        (c) => c.column.field === "level" && c.values?.length === 2,
-      ),
-    ).toBeTruthy();
+    expect(conds.find((c) => c.column.field === "level" && c.values?.length === 2)).toBeTruthy();
   });
 
   it("Q99: all operators in one query preserved", async () => {
     const r = await fullPipeline(
-      'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1" FROM "default" WHERE level = \'ERROR\' AND response_time > 100 AND method != \'OPTIONS\' AND path LIKE \'/api%\' AND trace_id IS NOT NULL GROUP BY x_axis_1 ORDER BY x_axis_1 ASC',
+      "SELECT histogram(_timestamp) as \"x_axis_1\", count(_timestamp) as \"y_axis_1\" FROM \"default\" WHERE level = 'ERROR' AND response_time > 100 AND method != 'OPTIONS' AND path LIKE '/api%' AND trace_id IS NOT NULL GROUP BY x_axis_1 ORDER BY x_axis_1 ASC",
     );
     expect(countConditions(r.panelFields!.filter)).toBe(5);
     const conds = flattenConditions(r.panelFields!.filter);
@@ -1204,12 +1140,8 @@ describe("Simple JOINs — parseable with fields, filters, join conditions (15 q
       'SELECT a.level as "x_axis_1", count(a._timestamp) as "y_axis_1" FROM "logs" a JOIN "traces" b ON a.trace_id = b.trace_id AND a.span_id = b.span_id GROUP BY x_axis_1',
     );
     expect(r.panelFields!.joins[0].conditions.length).toBe(2);
-    expect(r.panelFields!.joins[0].conditions[0].leftField.field).toBe(
-      "trace_id",
-    );
-    expect(r.panelFields!.joins[0].conditions[1].leftField.field).toBe(
-      "span_id",
-    );
+    expect(r.panelFields!.joins[0].conditions[0].leftField.field).toBe("trace_id");
+    expect(r.panelFields!.joins[0].conditions[1].leftField.field).toBe("span_id");
   });
 
   it("Q107: multiple JOINs (a JOIN b JOIN c) — all extracted", async () => {
@@ -1338,7 +1270,7 @@ describe("CASE/WHEN expressions — parseable as raw fields (8 queries)", () => 
 
   it("Q118: CASE with multiple WHEN branches", async () => {
     const r = await parseFields(
-      'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1", CASE WHEN code >= 500 THEN \'5xx\' WHEN code >= 400 THEN \'4xx\' WHEN code >= 300 THEN \'3xx\' ELSE \'2xx\' END as "z_axis_1" FROM "default" GROUP BY x_axis_1, z_axis_1 ORDER BY x_axis_1 ASC',
+      "SELECT histogram(_timestamp) as \"x_axis_1\", count(_timestamp) as \"y_axis_1\", CASE WHEN code >= 500 THEN '5xx' WHEN code >= 400 THEN '4xx' WHEN code >= 300 THEN '3xx' ELSE '2xx' END as \"z_axis_1\" FROM \"default\" GROUP BY x_axis_1, z_axis_1 ORDER BY x_axis_1 ASC",
     );
     const caseField = r.fields.find((f: any) => f.type === "raw");
     expect(caseField).toBeTruthy();
@@ -1380,14 +1312,14 @@ describe("CASE/WHEN expressions — parseable as raw fields (8 queries)", () => 
   it("Q121: CASE/WHEN is NOT detected as custom mode", () => {
     expect(
       shouldUseCustomMode(
-        'SELECT CASE WHEN level = \'ERROR\' THEN 1 ELSE 0 END as flag FROM "default"',
+        "SELECT CASE WHEN level = 'ERROR' THEN 1 ELSE 0 END as flag FROM \"default\"",
       ),
     ).toBe(false);
   });
 
   it("Q122: CASE/WHEN with string comparison", async () => {
     const r = await parseFields(
-      'SELECT CASE WHEN method = \'GET\' THEN \'read\' WHEN method = \'POST\' THEN \'write\' WHEN method = \'DELETE\' THEN \'delete\' ELSE \'other\' END as "op_type" FROM "default"',
+      "SELECT CASE WHEN method = 'GET' THEN 'read' WHEN method = 'POST' THEN 'write' WHEN method = 'DELETE' THEN 'delete' ELSE 'other' END as \"op_type\" FROM \"default\"",
     );
     const caseField = r.fields.find((f: any) => f.type === "raw");
     expect(caseField).toBeTruthy();
@@ -1398,7 +1330,7 @@ describe("CASE/WHEN expressions — parseable as raw fields (8 queries)", () => 
 
   it("Q123: multiple CASE/WHEN expressions in one query", async () => {
     const r = await parseFields(
-      'SELECT CASE WHEN level = \'ERROR\' THEN \'Bad\' ELSE \'Good\' END as "severity", CASE WHEN code >= 500 THEN \'server\' ELSE \'client\' END as "error_type" FROM "default"',
+      "SELECT CASE WHEN level = 'ERROR' THEN 'Bad' ELSE 'Good' END as \"severity\", CASE WHEN code >= 500 THEN 'server' ELSE 'client' END as \"error_type\" FROM \"default\"",
     );
     const rawFields = r.fields.filter((f: any) => f.type === "raw");
     expect(rawFields.length).toBe(2);
@@ -1412,24 +1344,18 @@ describe("CASE/WHEN expressions — parseable as raw fields (8 queries)", () => 
 describe("Custom mode — full pipeline for unparseable queries (15 queries)", () => {
   // --- Nested functions ---
   it("Q124: nested function ceil(count(field)) → custom mode", async () => {
-    const r = await fullPipeline(
-      'SELECT ceil(count(_timestamp)) as total FROM "default"',
-    );
+    const r = await fullPipeline('SELECT ceil(count(_timestamp)) as total FROM "default"');
     expect(r.customQuery).toBe(true);
     expect(r.panelFields).toBeNull();
   });
 
   it("Q125: nested function round(avg(latency)) → custom mode", async () => {
-    const r = await fullPipeline(
-      'SELECT round(avg(latency)) as avg_latency FROM "default"',
-    );
+    const r = await fullPipeline('SELECT round(avg(latency)) as avg_latency FROM "default"');
     expect(r.customQuery).toBe(true);
   });
 
   it("Q126: nested function floor(sum(bytes)) → custom mode", async () => {
-    const r = await fullPipeline(
-      'SELECT floor(sum(bytes)) as total_bytes FROM "default"',
-    );
+    const r = await fullPipeline('SELECT floor(sum(bytes)) as total_bytes FROM "default"');
     expect(r.customQuery).toBe(true);
   });
 
@@ -1443,7 +1369,7 @@ describe("Custom mode — full pipeline for unparseable queries (15 queries)", (
 
   it("Q128: UNION two different aggregations → custom mode", async () => {
     const r = await fullPipeline(
-      'SELECT \'errors\' as source, count(*) as cnt FROM "errors" UNION SELECT \'warnings\' as source, count(*) as cnt FROM "warnings"',
+      "SELECT 'errors' as source, count(*) as cnt FROM \"errors\" UNION SELECT 'warnings' as source, count(*) as cnt FROM \"warnings\"",
     );
     expect(r.customQuery).toBe(true);
   });
@@ -1458,23 +1384,21 @@ describe("Custom mode — full pipeline for unparseable queries (15 queries)", (
   // --- CTE ---
   it("Q130: CTE with simple body → custom mode", async () => {
     const r = await fullPipeline(
-      'WITH error_counts AS (\nVALUES (1)\n) SELECT * FROM error_counts',
+      "WITH error_counts AS (\nVALUES (1)\n) SELECT * FROM error_counts",
     );
     expect(r.customQuery).toBe(true);
   });
 
   it("Q131: CTE with multiple CTEs → custom mode", async () => {
     const result = isQueryParseable(
-      'WITH errors AS (\nVALUES (1)\n), warnings AS (\nVALUES (2)\n) SELECT * FROM errors',
+      "WITH errors AS (\nVALUES (1)\n), warnings AS (\nVALUES (2)\n) SELECT * FROM errors",
     );
     expect(result.isParseable).toBe(false);
   });
 
   // --- Subqueries ---
   it("Q132: subquery in WHERE → custom mode", async () => {
-    const r = await fullPipeline(
-      'SELECT * FROM "logs" WHERE user_id IN (SELECT id FROM "admins")',
-    );
+    const r = await fullPipeline('SELECT * FROM "logs" WHERE user_id IN (SELECT id FROM "admins")');
     expect(r.customQuery).toBe(true);
   });
 
@@ -1536,35 +1460,30 @@ describe("Complex nested WHERE filters — no conditions lost (10 queries)", () 
 
   it("Q140: A AND (B OR C) — 3 conditions", async () => {
     const r = await fullPipeline(
-      'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1" FROM "default" WHERE method = \'POST\' AND (code = \'500\' OR code = \'503\') GROUP BY x_axis_1 ORDER BY x_axis_1 ASC',
+      "SELECT histogram(_timestamp) as \"x_axis_1\", count(_timestamp) as \"y_axis_1\" FROM \"default\" WHERE method = 'POST' AND (code = '500' OR code = '503') GROUP BY x_axis_1 ORDER BY x_axis_1 ASC",
     );
     expect(countConditions(r.panelFields!.filter)).toBe(3);
   });
 
   it("Q141: (A AND B) OR (C AND D) — 4 conditions", async () => {
     const r = await fullPipeline(
-      'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1" FROM "default" WHERE (level = \'ERROR\' AND code = \'500\') OR (level = \'WARN\' AND code = \'429\') GROUP BY x_axis_1 ORDER BY x_axis_1 ASC',
+      "SELECT histogram(_timestamp) as \"x_axis_1\", count(_timestamp) as \"y_axis_1\" FROM \"default\" WHERE (level = 'ERROR' AND code = '500') OR (level = 'WARN' AND code = '429') GROUP BY x_axis_1 ORDER BY x_axis_1 ASC",
     );
     expect(countConditions(r.panelFields!.filter)).toBe(4);
   });
 
   it("Q142: A AND B AND C AND D — 4 flat conditions", async () => {
     const r = await fullPipeline(
-      'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1" FROM "default" WHERE level = \'ERROR\' AND code = \'500\' AND method = \'POST\' AND path = \'/api\' GROUP BY x_axis_1 ORDER BY x_axis_1 ASC',
+      "SELECT histogram(_timestamp) as \"x_axis_1\", count(_timestamp) as \"y_axis_1\" FROM \"default\" WHERE level = 'ERROR' AND code = '500' AND method = 'POST' AND path = '/api' GROUP BY x_axis_1 ORDER BY x_axis_1 ASC",
     );
     expect(countConditions(r.panelFields!.filter)).toBe(4);
     const conds = flattenConditions(r.panelFields!.filter);
-    expect(conds.map((c) => c.column.field).sort()).toEqual([
-      "code",
-      "level",
-      "method",
-      "path",
-    ]);
+    expect(conds.map((c) => c.column.field).sort()).toEqual(["code", "level", "method", "path"]);
   });
 
   it("Q143: deeply nested (A OR (B AND C)) AND D — 4 conditions", async () => {
     const r = await fullPipeline(
-      'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1" FROM "default" WHERE (level = \'ERROR\' OR (code >= 500 AND method = \'POST\')) AND host = \'prod\' GROUP BY x_axis_1 ORDER BY x_axis_1 ASC',
+      "SELECT histogram(_timestamp) as \"x_axis_1\", count(_timestamp) as \"y_axis_1\" FROM \"default\" WHERE (level = 'ERROR' OR (code >= 500 AND method = 'POST')) AND host = 'prod' GROUP BY x_axis_1 ORDER BY x_axis_1 ASC",
     );
     expect(countConditions(r.panelFields!.filter)).toBe(4);
   });
@@ -1594,21 +1513,21 @@ describe("Complex nested WHERE filters — no conditions lost (10 queries)", () 
 
   it("Q146: five flat AND conditions — all preserved", async () => {
     const r = await fullPipeline(
-      'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1" FROM "default" WHERE a = \'1\' AND b = \'2\' AND c = \'3\' AND d = \'4\' AND e = \'5\' GROUP BY x_axis_1 ORDER BY x_axis_1 ASC',
+      "SELECT histogram(_timestamp) as \"x_axis_1\", count(_timestamp) as \"y_axis_1\" FROM \"default\" WHERE a = '1' AND b = '2' AND c = '3' AND d = '4' AND e = '5' GROUP BY x_axis_1 ORDER BY x_axis_1 ASC",
     );
     expect(countConditions(r.panelFields!.filter)).toBe(5);
   });
 
   it("Q147: six flat AND conditions — all preserved", async () => {
     const r = await fullPipeline(
-      'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1" FROM "default" WHERE level = \'ERROR\' AND code = \'500\' AND method = \'POST\' AND path LIKE \'/api%\' AND trace_id IS NOT NULL AND response_time > 1000 GROUP BY x_axis_1 ORDER BY x_axis_1 ASC',
+      "SELECT histogram(_timestamp) as \"x_axis_1\", count(_timestamp) as \"y_axis_1\" FROM \"default\" WHERE level = 'ERROR' AND code = '500' AND method = 'POST' AND path LIKE '/api%' AND trace_id IS NOT NULL AND response_time > 1000 GROUP BY x_axis_1 ORDER BY x_axis_1 ASC",
     );
     expect(countConditions(r.panelFields!.filter)).toBe(6);
   });
 
   it("Q148: (A OR B OR C) AND D — all preserved", async () => {
     const r = await fullPipeline(
-      'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1" FROM "default" WHERE (level = \'ERROR\' OR level = \'WARN\' OR level = \'FATAL\') AND code >= 400 GROUP BY x_axis_1 ORDER BY x_axis_1 ASC',
+      "SELECT histogram(_timestamp) as \"x_axis_1\", count(_timestamp) as \"y_axis_1\" FROM \"default\" WHERE (level = 'ERROR' OR level = 'WARN' OR level = 'FATAL') AND code >= 400 GROUP BY x_axis_1 ORDER BY x_axis_1 ASC",
     );
     expect(countConditions(r.panelFields!.filter)).toBe(4);
   });

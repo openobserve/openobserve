@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="flex wrap justify-start items-center bg-surface-base"
+    class="wrap bg-surface-base flex items-center justify-start"
     :class="defocusSpan ? 'opacity-30' : ''"
     :style="{
       zIndex: 2,
@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="span-block-container"
   >
     <div
-      class="flex justify-between items-end cursor-pointer span-block relative-position bg-surface-base w-full pb-1.5"
+      class="span-block relative-position bg-surface-base flex w-full cursor-pointer items-end justify-between pb-1.5"
       :style="{
         height: spanDimensions.height + 'px',
       }"
@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="span-block"
     >
       <div
-        class="cursor-pointer flex items-center flex-nowrap position-relative w-full overflow-hidden"
+        class="position-relative flex w-full cursor-pointer flex-nowrap items-center overflow-hidden"
         :class="defocusSpan ? 'opacity-30' : ''"
         @click="selectSpan(span.spanId)"
         data-test="span-block-select-trigger"
@@ -46,12 +46,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             width: spanWidth + '%',
             left: leftPosition + '%',
           }"
-          class="flex justify-start items-center flex-nowrap relative"
+          class="relative flex flex-nowrap items-center justify-start"
           ref="spanMarkerRef"
           data-test="span-marker"
         >
           <div
-            class="w-[calc(100%-0.375rem)] h-full rounded-default"
+            class="rounded-default h-full w-[calc(100%-0.375rem)]"
             :style="{
               backgroundColor: span.style?.color || DEFAULT_SPAN_COLOR,
             }"
@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ...durationStyle,
             zIndex: 1,
           }"
-          class="text-xs flex items-center absolute transition-all duration-500 ease-[ease]"
+          class="absolute flex items-center text-xs transition-all duration-500 ease-[ease]"
           data-test="span-block-duration"
         >
           <div>
@@ -75,14 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import {
-  defineComponent,
-  computed,
-  ref,
-  onMounted,
-  onBeforeUnmount,
-  watch,
-} from "vue";
+import { defineComponent, computed, ref, onMounted, onBeforeUnmount, watch } from "vue";
 import useTraces from "@/composables/useTraces";
 import { getImageURL, formatTimeWithSuffix } from "@/utils/zincutils";
 import { useStore } from "vuex";
@@ -158,18 +151,14 @@ export default defineComponent({
     const spanMarkerRef = ref(null);
 
     const getLeftPosition = () => {
-      const left =
-        props.span.startTimeUs - props.baseTracePosition["startTimeUs"];
+      const left = props.span.startTimeUs - props.baseTracePosition["startTimeUs"];
 
       return (left / props.baseTracePosition?.durationUs) * 100;
     };
 
     const getSpanWidth = () => {
       return Number(
-        (
-          (props.span?.durationUs / props.baseTracePosition?.durationUs) *
-          100
-        ).toFixed(2),
+        ((props.span?.durationUs / props.baseTracePosition?.durationUs) * 100).toFixed(2),
       );
     };
 
@@ -236,18 +225,13 @@ export default defineComponent({
 
       const onePercent = Number((spanBlockWidth.value / 100).toFixed(2));
       const labelWidth = 60;
-      if (
-        (leftPosition.value + spanWidth.value) * onePercent + labelWidth >
-        spanBlockWidth.value
-      ) {
+      if ((leftPosition.value + spanWidth.value) * onePercent + labelWidth > spanBlockWidth.value) {
         style.right = 0;
         style.top = "-0.3125rem";
       } else if (leftPosition.value > 50) {
         style.left = leftPosition.value * onePercent - labelWidth + "px";
       } else {
-        const left =
-          leftPosition.value +
-          (Math.floor(spanWidth.value) ? spanWidth.value : 1);
+        const left = leftPosition.value + (Math.floor(spanWidth.value) ? spanWidth.value : 1);
 
         style.left =
           (left * onePercent - leftPosition.value * onePercent < 19

@@ -223,9 +223,7 @@
             "line_interpolation": "smooth",
             "color": {
               "mode": "palette-classic-by-series",
-              "fixedColor": [
-                "#5960b2"
-              ],
+              "fixedColor": ["#5960b2"],
               "seriesBy": "last"
             },
             "dataZoom": {
@@ -285,9 +283,7 @@
             "show_symbol": false,
             "line_interpolation": "smooth",
             "color": {
-              "fixedColor": [
-                "#53ca53"
-              ]
+              "fixedColor": ["#53ca53"]
             },
             "dataZoom": {
               "yAxisIndex": "none"
@@ -392,9 +388,7 @@
             "unit": "custom",
             "decimals": 0,
             "color": {
-              "fixedColor": [
-                "#ff6b6b"
-              ]
+              "fixedColor": ["#ff6b6b"]
             },
             "dataZoom": {
               "yAxisIndex": 0

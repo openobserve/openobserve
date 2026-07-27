@@ -40,7 +40,8 @@ export interface SQLLimit {
 export interface SQLGroupBy {
   type: string;
   value: any;
-}[];
+}
+[];
 
 export interface SQLWhere {
   type: string;

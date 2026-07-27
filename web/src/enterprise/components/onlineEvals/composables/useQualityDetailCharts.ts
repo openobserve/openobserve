@@ -12,6 +12,9 @@ import {
   combineWhere,
   type AgentFilterSelection,
 } from "../utils/agentFilterSql";
+import { latestScoresFromSql } from "../utils/latestScoreSql";
+import { qualityScopeWhere, type QualityScope } from "../utils/qualityScope";
+import { healthyBooleanValue } from "../utils/qualitySummary";
 
 export interface TrendPoint {
   /** Bucket end in milliseconds */
@@ -73,21 +76,15 @@ interface RawBooleanSplitRow {
   bucket?: string | number;
   series_key?: string | number | null;
   total?: number | string;
-  trues?: number | string;
+  healthy?: number | string;
 }
 
-function valueOf<T = any>(
-  row: any,
-  camel: string,
-  snake: string,
-): T | undefined {
+function valueOf<T = any>(row: any, camel: string, snake: string): T | undefined {
   if (row == null) return undefined;
   return row[camel] ?? row[snake];
 }
 
-function numericRangeOf(
-  config: ScoreConfig,
-): { min: number; max: number } | null {
+function numericRangeOf(config: ScoreConfig): { min: number; max: number } | null {
   const r = valueOf<any>(config, "numericRange", "numeric_range");
   if (!r) return null;
   const min = toNumber(r.min);
@@ -109,7 +106,8 @@ function healthyThresholdValue(
 export function useQualityDetailCharts(
   selectedConfig: Ref<ScoreConfig | null>,
   dateWindow: Ref<DateWindow>,
-  agentFilter?: Ref<AgentFilterSelection | null | undefined>,
+  agentFilter: Ref<AgentFilterSelection | null | undefined>,
+  qualityScope: Ref<QualityScope>,
 ) {
   const { executeQuery } = useLLMStreamQuery();
   const isLoading = ref(false);
@@ -117,6 +115,14 @@ export function useQualityDetailCharts(
   const numericDistribution = ref<DistributionBucket[]>([]);
   const booleanTrend = ref<BooleanTrendPoint[]>([]);
   const booleanTrendSeries = ref<BooleanTrendSeries[]>([]);
+  let refreshGeneration = 0;
+
+  function clearData() {
+    numericTrend.value = [];
+    numericDistribution.value = [];
+    booleanTrend.value = [];
+    booleanTrendSeries.value = [];
+  }
 
   async function runQuery<T>(
     sqlText: string,
@@ -170,12 +176,11 @@ export function useQualityDetailCharts(
   }
 
   async function refresh() {
+    const generation = ++refreshGeneration;
     const cfg = selectedConfig.value;
+    clearData();
     if (!cfg) {
-      numericTrend.value = [];
-      numericDistribution.value = [];
-      booleanTrend.value = [];
-      booleanTrendSeries.value = [];
+      isLoading.value = false;
       return;
     }
 
@@ -190,7 +195,8 @@ export function useQualityDetailCharts(
       const type = dataTypeOf(cfg);
       const where = combineWhere(
         `CAST(score_config_id AS VARCHAR) = '${configId}'`,
-        buildScoresAgentFilterWhere(agentFilter?.value ?? null),
+        buildScoresAgentFilterWhere(agentFilter.value ?? null),
+        qualityScopeWhere(qualityScope.value),
       )!;
 
       if (type === "numeric") {
@@ -199,32 +205,23 @@ export function useQualityDetailCharts(
           `  histogram(_timestamp, '${interval}') AS bucket,`,
           "  AVG(value_numeric) AS avg_v,",
           "  approx_percentile_cont(value_numeric, 0.95) AS p95_v",
-          'FROM "_llm_scores"',
-          `WHERE ${where}`,
+          `FROM ${latestScoresFromSql(where)}`,
           "GROUP BY bucket",
           "ORDER BY bucket",
         ].join("\n");
 
         const valuesSql = [
           "SELECT value_numeric AS v",
-          'FROM "_llm_scores"',
-          `WHERE ${where} AND value_numeric IS NOT NULL`,
+          `FROM ${latestScoresFromSql(where)}`,
+          "WHERE value_numeric IS NOT NULL",
         ].join("\n");
 
         const [trendRows, valueRows] = await Promise.all([
-          runQuery<RawNumericTrendRow>(
-            trendSql,
-            "numeric.trend",
-            startUs,
-            endUs,
-          ),
-          runQuery<{ v?: number | string }>(
-            valuesSql,
-            "numeric.values",
-            startUs,
-            endUs,
-          ),
+          runQuery<RawNumericTrendRow>(trendSql, "numeric.trend", startUs, endUs),
+          runQuery<{ v?: number | string }>(valuesSql, "numeric.values", startUs, endUs),
         ]);
+
+        if (generation !== refreshGeneration) return;
 
         numericTrend.value = trendRows
           .map((r) => ({
@@ -236,68 +233,57 @@ export function useQualityDetailCharts(
 
         const range = numericRangeOf(cfg);
         if (range) {
-          const values = valueRows
-            .map((r) => toNumber(r.v))
-            .filter((v): v is number => v != null);
-          numericDistribution.value = buildDistribution(
-            values,
-            range,
-            healthyThresholdValue(cfg),
-          );
+          const values = valueRows.map((r) => toNumber(r.v)).filter((v): v is number => v != null);
+          numericDistribution.value = buildDistribution(values, range, healthyThresholdValue(cfg));
         } else {
           numericDistribution.value = [];
         }
         booleanTrend.value = [];
         booleanTrendSeries.value = [];
       } else if (type === "boolean") {
+        const expected = healthyBooleanValue(cfg);
+        const healthyValue = expected ?? true;
         // Single pass-rate series — a constant series_key keeps the downstream
         // grouped-series code path working as a one-element array.
         const trendSql = [
           "SELECT",
           `  histogram(_timestamp, '${interval}') AS bucket,`,
           "  '__default__' AS series_key,",
-          "  COUNT(*) AS total,",
-          "  COUNT(CASE WHEN value_boolean = true THEN 1 END) AS trues",
-          'FROM "_llm_scores"',
-          `WHERE ${where}`,
+          "  COUNT(value_boolean) AS total,",
+          `  COUNT(CASE WHEN value_boolean = ${healthyValue} THEN 1 END) AS healthy`,
+          `FROM ${latestScoresFromSql(where)}`,
           "GROUP BY bucket, series_key",
           "ORDER BY bucket",
         ].join("\n");
-        const rows = await runQuery<RawBooleanSplitRow>(
-          trendSql,
-          "boolean.trend",
-          startUs,
-          endUs,
-        );
+        const rows = await runQuery<RawBooleanSplitRow>(trendSql, "boolean.trend", startUs, endUs);
+        if (generation !== refreshGeneration) return;
 
         const groupedByKey = new Map<string, BooleanTrendPoint[]>();
         for (const r of rows) {
-          const key =
-            r.series_key != null ? String(r.series_key) : "__default__";
+          const key = r.series_key != null ? String(r.series_key) : "__default__";
           const total = toNumber(r.total) ?? 0;
-          const trues = toNumber(r.trues) ?? 0;
+          const healthy = toNumber(r.healthy) ?? 0;
           const point: BooleanTrendPoint = {
             t: bucketToMs(r.bucket),
             total,
-            passRate: total > 0 ? (trues / total) * 100 : 0,
+            passRate: total > 0 ? (healthy / total) * 100 : 0,
           };
           if (point.t === 0) continue;
           if (!groupedByKey.has(key)) groupedByKey.set(key, []);
           groupedByKey.get(key)!.push(point);
         }
 
-        const series: BooleanTrendSeries[] = Array.from(
-          groupedByKey.entries(),
-        ).map(([key, points]) => ({
-          id: key,
-          label: key === "__default__" ? "Pass rate" : key,
-          points: points.sort((a, b) => a.t - b.t),
-        }));
+        const series: BooleanTrendSeries[] = Array.from(groupedByKey.entries()).map(
+          ([key, points]) => ({
+            id: key,
+            label: key === "__default__" ? (expected == null ? "True rate" : "Healthy rate") : key,
+            points: points.sort((a, b) => a.t - b.t),
+          }),
+        );
         // Sort by total volume descending so the dominant series renders first.
         series.sort(
           (a, b) =>
-            b.points.reduce((s, p) => s + p.total, 0) -
-            a.points.reduce((s, p) => s + p.total, 0),
+            b.points.reduce((s, p) => s + p.total, 0) - a.points.reduce((s, p) => s + p.total, 0),
         );
 
         booleanTrendSeries.value = series;
@@ -314,18 +300,21 @@ export function useQualityDetailCharts(
         booleanTrendSeries.value = [];
       }
     } finally {
-      isLoading.value = false;
+      if (generation === refreshGeneration) isLoading.value = false;
     }
   }
 
-  // Only opening the drawer on a row (selectedConfig change) refreshes from
-  // here. Date-window / agent-filter changes are driven by the page's
+  // Opening a row or changing the detail scope refreshes here. Date-window /
+  // agent-filter changes are driven by the page's
   // refreshAll(), so watching them here would double-fire the chart queries
   // alongside the KPI/table reload. No `immediate`: the initial load is
   // covered by refreshAll() too.
-  watch(selectedConfig, () => {
-    void refresh();
-  });
+  watch(
+    () => [selectedConfig.value, qualityScope.value] as const,
+    () => {
+      void refresh();
+    },
+  );
 
   return {
     isLoading,

@@ -19,7 +19,6 @@ import SelectFunction from "@/components/dashboards/addPanel/dynamicFunction/Sel
 import { createStore } from "vuex";
 import { createI18n } from "vue-i18n";
 
-
 const i18n = createI18n({
   legacy: false,
   locale: "en",
@@ -110,9 +109,7 @@ describe("SelectFunction", () => {
   describe("Component Rendering", () => {
     it("should render select function dropdown", () => {
       wrapper = createWrapper();
-      expect(
-        wrapper.find('[data-test="dashboard-function-dropdown"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-function-dropdown"]').exists()).toBe(true);
     });
 
     it("should render with correct default structure", () => {
@@ -194,9 +191,7 @@ describe("SelectFunction", () => {
       const initialLength = wrapper.vm.fields.args.length;
       if (wrapper.vm.canAddArgument(wrapper.vm.fields.functionName)) {
         wrapper.vm.addArgument();
-        expect(wrapper.vm.fields.args.length).toBeGreaterThanOrEqual(
-          initialLength,
-        );
+        expect(wrapper.vm.fields.args.length).toBeGreaterThanOrEqual(initialLength);
       }
     });
 
@@ -334,10 +329,7 @@ describe("SelectFunction", () => {
 
     it("should get supported types for function and index", () => {
       wrapper = createWrapper();
-      const types = wrapper.vm.getSupportedTypeBasedOnFunctionNameAndIndex(
-        "concat",
-        0,
-      );
+      const types = wrapper.vm.getSupportedTypeBasedOnFunctionNameAndIndex("concat", 0);
       expect(Array.isArray(types)).toBe(true);
     });
   });
@@ -562,10 +554,7 @@ describe("SelectFunction", () => {
     it("should handle allowAddArgAt with n-1 value", () => {
       wrapper = createWrapper();
       // Some functions allow adding before last argument
-      const types = wrapper.vm.getSupportedTypeBasedOnFunctionNameAndIndex(
-        "concat",
-        0,
-      );
+      const types = wrapper.vm.getSupportedTypeBasedOnFunctionNameAndIndex("concat", 0);
       expect(Array.isArray(types)).toBe(true);
     });
   });

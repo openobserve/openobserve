@@ -21,28 +21,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div
-    class="bg-card-glass-bg rounded-default border border-border-default pt-4 px-4 pb-2.5 flex flex-col"
+    class="bg-card-glass-bg rounded-default border-border-default flex flex-col border px-4 pt-4 pb-2.5"
     data-test="session-ribbon"
   >
     <!-- Header: title + subtitle (left) · metric toggle (right) -->
-    <div class="flex items-baseline justify-between gap-2 mb-3">
+    <div class="mb-3 flex items-baseline justify-between gap-2">
       <div>
-        <div class="text-sm font-semibold text-text-heading">
-          {{ t('traces.sessionDetail.ribbon.title') }}
+        <div class="text-text-heading text-sm font-semibold">
+          {{ t("traces.sessionDetail.ribbon.title") }}
         </div>
-        <div class="text-2xs leading-normal text-text-secondary mt-[0.1rem]">
-          {{ t('traces.sessionDetail.ribbon.subtitle') }}
+        <div class="text-2xs text-text-secondary mt-[0.1rem] leading-normal">
+          {{ t("traces.sessionDetail.ribbon.subtitle") }}
         </div>
       </div>
       <OToggleGroup v-model="metric" class="flex-shrink-0">
         <OToggleGroupItem value="cost" size="sm">
-          {{ t('traces.sessionDetail.kpi.cost') }}
+          {{ t("traces.sessionDetail.kpi.cost") }}
         </OToggleGroupItem>
         <OToggleGroupItem value="latency" size="sm">
-          {{ t('traces.sessionDetail.kpi.duration') }}
+          {{ t("traces.sessionDetail.kpi.duration") }}
         </OToggleGroupItem>
         <OToggleGroupItem value="tokens" size="sm">
-          {{ t('traces.sessionDetail.kpi.tokens') }}
+          {{ t("traces.sessionDetail.kpi.tokens") }}
         </OToggleGroupItem>
       </OToggleGroup>
     </div>
@@ -51,11 +51,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          (y-axis + bars) grows; the x-axis row sits beneath it, offset by the
          y-axis width so the turn numbers stay aligned under their bars. Shows the
          whole session when it fits, otherwise just the selected window. -->
-    <div class="flex flex-col flex-1 min-h-0">
+    <div class="flex min-h-0 flex-1 flex-col">
       <!-- chart region: y-axis labels + bars, sharing the grown height -->
-      <div class="flex gap-2 flex-1 min-h-0">
+      <div class="flex min-h-0 flex-1 gap-2">
         <div
-          class="flex flex-col justify-between items-end h-full w-11 flex-shrink-0 text-3xs text-text-muted tabular-nums"
+          class="text-3xs text-text-muted flex h-full w-11 flex-shrink-0 flex-col items-end justify-between tabular-nums"
         >
           <span>{{ maxLabel }}</span>
           <span>{{ midLabel }}</span>
@@ -63,11 +63,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <div
-          class="relative flex-1 min-w-0 min-h-0 flex items-end gap-0.75 border-l border-b border-border-default"
+          class="border-border-default relative flex min-h-0 min-w-0 flex-1 items-end gap-0.75 border-b border-l"
         >
           <!-- gridlines (top + mid) to echo the dashboard chart grid -->
-          <div class="absolute inset-x-0 top-0 border-t border-border-default opacity-60" />
-          <div class="absolute inset-x-0 top-1/2 border-t border-border-default opacity-40" />
+          <div class="border-border-default absolute inset-x-0 top-0 border-t opacity-60" />
+          <div class="border-border-default absolute inset-x-0 top-1/2 border-t opacity-40" />
 
           <TurnPreviewCard
             v-for="bar in detailBars"
@@ -78,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :delay="40"
           >
             <div
-              class="relative flex-1 min-w-0 rounded-t-default cursor-pointer transition-[height] duration-300 ease-out hover:brightness-110"
+              class="rounded-t-default relative min-w-0 flex-1 cursor-pointer transition-[height] duration-300 ease-out hover:brightness-110"
               :style="{ height: bar.pct + '%', background: bar.color }"
               @click="emit('jump', bar.index + 1)"
             />
@@ -89,14 +89,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- x-axis + title, offset by the y-axis column width so the numbers stay
            aligned under their bars. With the window capped at WINDOW turns, every
            visible bar is wide enough to print its turn number. -->
-      <div class="flex gap-2 flex-shrink-0">
+      <div class="flex flex-shrink-0 gap-2">
         <div class="w-11 flex-shrink-0" />
-        <div class="flex-1 min-w-0">
-          <div class="flex gap-0.75 mt-1">
+        <div class="min-w-0 flex-1">
+          <div class="mt-1 flex gap-0.75">
             <span
               v-for="bar in detailBars"
               :key="bar.index"
-              class="flex-1 min-w-0 text-center text-3xs text-text-muted tabular-nums"
+              class="text-3xs text-text-muted min-w-0 flex-1 text-center tabular-nums"
             >
               {{ detailLabeled.has(bar.index + 1) ? bar.index + 1 : "" }}
             </span>
@@ -104,10 +104,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- x-axis title — matches the dashboard axis name (nameLocation
                "middle" + nameTextStyle bold/14px). -->
-          <div
-            class="text-center text-sm font-bold text-text-heading mt-1"
-          >
-            {{ t('traces.sessionDetail.turnLabel') }}
+          <div class="text-text-heading mt-1 text-center text-sm font-bold">
+            {{ t("traces.sessionDetail.turnLabel") }}
           </div>
         </div>
       </div>
@@ -119,14 +117,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          labelled ribbon above shows just that window. Only rendered when there
          are more turns than fit. Offset by the y-axis width so the minimap lines
          up with the bars above. -->
-    <div
-      v-if="windowed"
-      class="flex gap-2 flex-shrink-0 mt-2.5"
-    >
+    <div v-if="windowed" class="mt-2.5 flex flex-shrink-0 gap-2">
       <div class="w-11 flex-shrink-0" />
       <div
         ref="overviewTrackRef"
-        class="relative flex-1 min-w-0 h-6.5 flex items-end gap-px select-none touch-none"
+        class="relative flex h-6.5 min-w-0 flex-1 touch-none items-end gap-px select-none"
         :class="dragging ? 'cursor-grabbing' : 'cursor-grab'"
         @pointerdown="onTrackPointerDown"
         data-test="session-ribbon-overview"
@@ -134,7 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-for="bar in bars"
           :key="bar.index"
-          class="flex-1 min-w-0 rounded-t-default transition-opacity"
+          class="rounded-t-default min-w-0 flex-1 transition-opacity"
           :style="{
             height: Math.max(2, bar.pct) + '%',
             background: bar.color,
@@ -143,24 +138,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <!-- selected window: drag the body to pan, or either edge to resize -->
         <div
-          class="absolute top-0 bottom-0 rounded-default border border-[color-mix(in_srgb,var(--color-text-heading)_45%,transparent)] bg-[color-mix(in_srgb,var(--color-text-heading)_8%,transparent)]"
+          class="rounded-default absolute top-0 bottom-0 border border-[color-mix(in_srgb,var(--color-text-heading)_45%,transparent)] bg-[color-mix(in_srgb,var(--color-text-heading)_8%,transparent)]"
           :class="dragging ? 'cursor-grabbing' : 'cursor-grab'"
           :style="{ left: brushLeftPct + '%', width: brushWidthPct + '%' }"
           @pointerdown.stop="(e) => beginDrag('pan', e)"
         >
           <!-- left resize handle (overhangs the edge so it's easy to grab) -->
           <div
-            class="absolute top-0 bottom-0 -left-1 w-2.25 cursor-ew-resize flex items-center justify-center"
+            class="absolute top-0 bottom-0 -left-1 flex w-2.25 cursor-ew-resize items-center justify-center"
             @pointerdown.stop="(e) => beginDrag('resize-left', e)"
           >
-            <div class="w-0.5 h-[55%] rounded-default bg-[color-mix(in_srgb,var(--color-text-heading)_60%,transparent)]" />
+            <div
+              class="rounded-default h-[55%] w-0.5 bg-[color-mix(in_srgb,var(--color-text-heading)_60%,transparent)]"
+            />
           </div>
           <!-- right resize handle -->
           <div
-            class="absolute top-0 bottom-0 -right-1 w-2.25 cursor-ew-resize flex items-center justify-center"
+            class="absolute top-0 -right-1 bottom-0 flex w-2.25 cursor-ew-resize items-center justify-center"
             @pointerdown.stop="(e) => beginDrag('resize-right', e)"
           >
-            <div class="w-0.5 h-[55%] rounded-default bg-[color-mix(in_srgb,var(--color-text-heading)_60%,transparent)]" />
+            <div
+              class="rounded-default h-[55%] w-0.5 bg-[color-mix(in_srgb,var(--color-text-heading)_60%,transparent)]"
+            />
           </div>
         </div>
       </div>
@@ -175,11 +174,7 @@ import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import TurnPreviewCard from "./TurnPreviewCard.vue";
 import type { SessionTraceRow } from "./composables/useSessions";
-import {
-  splitCost,
-  splitDuration,
-  splitNumberWithUnit,
-} from "./llmInsightsDashboard.utils";
+import { splitCost, splitDuration, splitNumberWithUnit } from "./llmInsightsDashboard.utils";
 
 const props = defineProps<{
   traces: SessionTraceRow[];
@@ -284,35 +279,28 @@ watch(total, () => {
 
 // Turns rendered in the detailed ribbon: the whole session when it fits,
 // otherwise just the selected window.
-const detailBars = computed(() =>
-  bars.value.slice(windowStart.value, windowEnd.value),
-);
+const detailBars = computed(() => bars.value.slice(windowStart.value, windowEnd.value));
 
 // Brush rectangle geometry, as percentages of the overview width.
-const brushLeftPct = computed(() =>
-  total.value ? (windowStart.value / total.value) * 100 : 0,
-);
+const brushLeftPct = computed(() => (total.value ? (windowStart.value / total.value) * 100 : 0));
 const brushWidthPct = computed(() =>
   total.value ? (effectiveWindow.value / total.value) * 100 : 100,
 );
 
-const clamp = (v: number, lo: number, hi: number) =>
-  Math.min(hi, Math.max(lo, v));
+const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 
 // ── Drag the window: pan the body, or resize from either edge ───────────────
 const overviewTrackRef = ref<HTMLElement | null>(null);
 const dragging = ref(false);
 type DragMode = "pan" | "resize-left" | "resize-right";
-let dragState:
-  | {
-      mode: DragMode;
-      startX: number;
-      startStart: number;
-      startSize: number;
-      trackLeft: number;
-      trackWidth: number;
-    }
-  | null = null;
+let dragState: {
+  mode: DragMode;
+  startX: number;
+  startStart: number;
+  startSize: number;
+  trackLeft: number;
+  trackWidth: number;
+} | null = null;
 
 // Turn index under the given client X (fractional), using the geometry captured
 // at drag start.
@@ -347,11 +335,7 @@ function onTrackPointerDown(e: PointerEvent) {
   if (!el || total.value === 0) return;
   const rect = el.getBoundingClientRect();
   const center = ((e.clientX - rect.left) / rect.width) * total.value;
-  windowStart.value = clamp(
-    Math.round(center - effectiveWindow.value / 2),
-    0,
-    maxStart.value,
-  );
+  windowStart.value = clamp(Math.round(center - effectiveWindow.value / 2), 0, maxStart.value);
   beginDrag("pan", e);
 }
 
@@ -359,14 +343,8 @@ function onPointerMove(e: PointerEvent) {
   if (!dragState) return;
   const { mode, startX, startStart, startSize, trackWidth } = dragState;
   if (mode === "pan") {
-    const deltaTurns = Math.round(
-      ((e.clientX - startX) / trackWidth) * total.value,
-    );
-    windowStart.value = clamp(
-      startStart + deltaTurns,
-      0,
-      total.value - effectiveWindow.value,
-    );
+    const deltaTurns = Math.round(((e.clientX - startX) / trackWidth) * total.value);
+    windowStart.value = clamp(startStart + deltaTurns, 0, total.value - effectiveWindow.value);
   } else if (mode === "resize-right") {
     // Left edge fixed; the right edge follows the pointer → grows/shrinks size,
     // bounded by MIN_WINDOW and MAX_WINDOW (and the end of the session).

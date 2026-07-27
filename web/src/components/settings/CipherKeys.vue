@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
-  <div class="flex flex-col h-full p-0">
+  <div class="flex h-full flex-col p-0">
     <OPageLayout
       v-if="!showAddDialog"
       :title="t('cipherKey.header')"
@@ -24,110 +24,107 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :subtitle="t('settings.cipherKeysPage.subtitle')"
       bleed
     >
-        <template #actions>
-          <OButton
-            variant="primary"
-            size="sm"
-            @click="addCipherKey"
-            data-test="cipher-keys-add-btn"
-          >
-            {{ t(`cipherKey.add`) }}
-          </OButton>
-        </template>
-      <div class="bg-card-glass-bg flex-1 min-h-0 overflow-hidden">
-      <OTable
-        :frame="false"
-        :data="visibleRows"
-        :columns="columns"
-        row-key="name"
-        :loading="loading"
-        :selected-ids="selectedKeyIds"
-        selection="multiple"
-        pagination="client"
-        :page-size="20"
-        :page-size-options="[20, 50, 100, 250, 500]"
-        :footer-title="t('cipherKey.header')"
-        sorting="client"
-        filter-mode="client"
-        :default-columns="false"
-        show-index
-        :enable-column-resize="true"
-        :persist-columns="true"
-        table-id="settings-cipher-keys"
-        :show-global-filter="false"
-        @update:selected-ids="handleSelectedIdsUpdate"
-      >
-        <template #toolbar>
-          <OSearchInput
-            v-model="filterQuery"
-            class="flex-1"
-            :placeholder="t('cipherKey.search')"
-          />
-        </template>
-        <template #toolbar-trailing>
-          <OButton
-            variant="outline"
-            size="icon-sm"
-            icon-left="refresh"
-            :loading="loading"
-            data-test="cipher-keys-list-refresh-btn"
-            @click="getData"
-          >
-            <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="cipherKeysRefresh" />
-          </OButton>
-        </template>
-        <template #empty>
-          <OEmptyState
-            size="hero"
-            preset="no-cipher-keys"
-            :filtered="!!filterQuery"
-            @action="(id) => id === 'clear-filters' ? (filterQuery = '') : addCipherKey()"
-          />
-        </template>
-        <template #cell-actions="{ row }">
-          <OButton
-            :data-test="`cipherkey-list-${row.name}-update`"
-            data-row-action="edit"
-            variant="ghost"
-            size="icon-sm"
-            class="ml-1"
-            :title="t('common.edit')"
-            @click="editCipherKey(row)"
-            icon-left="edit"
-          />
-          <OButton
-            :data-test="`cipherkey-list-${row.name}-delete`"
-            data-row-action="delete"
-            variant="ghost-destructive"
-            size="icon-sm"
-            class="ml-1"
-            :title="t('common.delete')"
-            @click="confirmDeleteCipherKey(row)"
-            icon-left="delete"
-          />
-        </template>
-        <template
-          v-if="selectedKeys.length > 0"
-          #bottom
+      <template #actions>
+        <OButton variant="primary" size="sm" @click="addCipherKey" data-test="cipher-keys-add-btn">
+          {{ t(`cipherKey.add`) }}
+        </OButton>
+      </template>
+      <div class="bg-card-glass-bg min-h-0 flex-1 overflow-hidden">
+        <OTable
+          :frame="false"
+          :data="visibleRows"
+          :columns="columns"
+          row-key="name"
+          :loading="loading"
+          :selected-ids="selectedKeyIds"
+          selection="multiple"
+          pagination="client"
+          :page-size="20"
+          :page-size-options="[20, 50, 100, 250, 500]"
+          :footer-title="t('cipherKey.header')"
+          sorting="client"
+          filter-mode="client"
+          :default-columns="false"
+          show-index
+          :enable-column-resize="true"
+          :persist-columns="true"
+          table-id="settings-cipher-keys"
+          :show-global-filter="false"
+          @update:selected-ids="handleSelectedIdsUpdate"
         >
-          <span class="text-xs text-text-body font-medium">
-            {{ t('settings.cipherKeysPage.selected', { count: selectedKeys.length }) }}
-          </span>
-          <OButton
-            data-test="cipher-keys-list-delete-keys-btn"
-            variant="outline-destructive"
-            size="sm"
-            icon-left="delete"
-            @click="openBulkDeleteDialog"
-          >
-            {{ t('settings.cipherKeysPage.delete') }}
-          </OButton>
-        </template>
-      </OTable>
+          <template #toolbar>
+            <OSearchInput
+              v-model="filterQuery"
+              class="flex-1"
+              :placeholder="t('cipherKey.search')"
+            />
+          </template>
+          <template #toolbar-trailing>
+            <OButton
+              variant="outline"
+              size="icon-sm"
+              icon-left="refresh"
+              :loading="loading"
+              data-test="cipher-keys-list-refresh-btn"
+              @click="getData"
+            >
+              <OTooltip
+                side="bottom"
+                :content="t('common.refresh')"
+                shortcut-id="cipherKeysRefresh"
+              />
+            </OButton>
+          </template>
+          <template #empty>
+            <OEmptyState
+              size="hero"
+              preset="no-cipher-keys"
+              :filtered="!!filterQuery"
+              @action="(id) => (id === 'clear-filters' ? (filterQuery = '') : addCipherKey())"
+            />
+          </template>
+          <template #cell-actions="{ row }">
+            <OButton
+              :data-test="`cipherkey-list-${row.name}-update`"
+              data-row-action="edit"
+              variant="ghost"
+              size="icon-sm"
+              class="ml-1"
+              :title="t('common.edit')"
+              @click="editCipherKey(row)"
+              icon-left="edit"
+            />
+            <OButton
+              :data-test="`cipherkey-list-${row.name}-delete`"
+              data-row-action="delete"
+              variant="ghost-destructive"
+              size="icon-sm"
+              class="ml-1"
+              :title="t('common.delete')"
+              @click="confirmDeleteCipherKey(row)"
+              icon-left="delete"
+            />
+          </template>
+          <template v-if="selectedKeys.length > 0" #bottom>
+            <span class="text-text-body text-xs font-medium">
+              {{ t("settings.cipherKeysPage.selected", { count: selectedKeys.length }) }}
+            </span>
+            <OButton
+              data-test="cipher-keys-list-delete-keys-btn"
+              variant="outline-destructive"
+              size="sm"
+              icon-left="delete"
+              :loading="bulkDeleteLoading"
+              @click="openBulkDeleteDialog"
+            >
+              {{ t("settings.cipherKeysPage.delete") }}
+            </OButton>
+          </template>
+        </OTable>
       </div>
     </OPageLayout>
     <div v-else>
-      <add-cipher-key @cancel:hideform="hideAddDialog" />
+      <AddCipherKey @cancel:hideform="hideAddDialog" />
     </div>
   </div>
   <ConfirmDialog
@@ -148,7 +145,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-
 import { defineComponent, ref, onMounted, onUpdated, watch, Ref, computed } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -158,7 +154,7 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import AddCipherKey from "@/components/cipherkeys/AddCipherKey.vue";
 import CipherKeysService from "@/services/cipher_keys";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
-import OButton from '@/lib/core/Button/OButton.vue';
+import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -180,7 +176,7 @@ export default defineComponent({
     OTooltip,
     OSearchInput,
     OTable,
-},
+  },
   setup() {
     const store = useStore();
     const router = useRouter();
@@ -238,6 +234,7 @@ export default defineComponent({
     }> = ref({ visible: false, data: null });
     const selectedKeys: Ref<any[]> = ref([]);
     const confirmBulkDelete = ref(false);
+    const bulkDeleteLoading = ref(false);
 
     watch(
       () => router.currentRoute.value.query?.action,
@@ -268,9 +265,7 @@ export default defineComponent({
       }
     });
 
-    const selectedKeyIds = computed(() =>
-      selectedKeys.value.map((k: any) => k.name),
-    );
+    const selectedKeyIds = computed(() => selectedKeys.value.map((k: any) => k.name));
 
     const handleSelectedIdsUpdate = (ids: string[]) => {
       const map = new Map(tabledata.value.map((r: any) => [r.name, r]));
@@ -301,8 +296,8 @@ export default defineComponent({
       const dismiss = toast({
         variant: "loading",
         message: t("settings.cipherKeysPage.loadingData"),
-              timeout: 0,
-});
+        timeout: 0,
+      });
 
       CipherKeysService.list(store.state.selectedOrganization.identifier)
         .then((response) => {
@@ -327,9 +322,7 @@ export default defineComponent({
           if (error.status != 403) {
             toast({
               variant: "error",
-              message:
-                error.response?.data?.message ||
-                t("settings.cipherKeysPage.fetchFailed"),
+              message: error.response?.data?.message || t("settings.cipherKeysPage.fetchFailed"),
               timeout: 5000,
             });
           }
@@ -354,8 +347,8 @@ export default defineComponent({
         const dismiss = toast({
           variant: "loading",
           message: t("settings.cipherKeysPage.processingDelete"),
-                  timeout: 0,
-});
+          timeout: 0,
+        });
         CipherKeysService.delete(
           store.state.selectedOrganization.identifier,
           confirmDelete.value.data.name,
@@ -396,15 +389,15 @@ export default defineComponent({
       confirmDelete.value.data = null;
     };
     const filterData = (rows: string | any[], terms: string) => {
-        const filtered = [];
-        terms = terms.toLowerCase();
-        for (let i = 0; i < rows.length; i++) {
-          if (rows[i]["name"].toLowerCase().includes(terms)) {
-            filtered.push(rows[i]);
-          }
+      const filtered = [];
+      terms = terms.toLowerCase();
+      for (let i = 0; i < rows.length; i++) {
+        if (rows[i]["name"].toLowerCase().includes(terms)) {
+          filtered.push(rows[i]);
         }
-        return filtered;
-      };
+      }
+      return filtered;
+    };
 
     const visibleRows = computed(() => {
       if (!filterQuery.value) return tabledata.value || [];
@@ -412,15 +405,20 @@ export default defineComponent({
     });
 
     // Watch visibleRows to sync resultTotal with search filter
-    watch(visibleRows, (newVisibleRows) => {
-      resultTotal.value = newVisibleRows.length;
-    }, { immediate: true });
+    watch(
+      visibleRows,
+      (newVisibleRows) => {
+        resultTotal.value = newVisibleRows.length;
+      },
+      { immediate: true },
+    );
 
     const openBulkDeleteDialog = () => {
       confirmBulkDelete.value = true;
     };
 
     const bulkDeleteCipherKeys = () => {
+      bulkDeleteLoading.value = true;
       const keyNames = selectedKeys.value.map((key: any) => key.name);
 
       CipherKeysService.bulkDelete(store.state.selectedOrganization.identifier, { ids: keyNames })
@@ -435,12 +433,17 @@ export default defineComponent({
           } else if (successful.length > 0 && unsuccessful.length > 0) {
             toast({
               variant: "warning",
-              message: t("settings.cipherKeysPage.bulkDeletePartial", { successful: successful.length, failed: unsuccessful.length }),
+              message: t("settings.cipherKeysPage.bulkDeletePartial", {
+                successful: successful.length,
+                failed: unsuccessful.length,
+              }),
             });
           } else if (unsuccessful.length > 0) {
             toast({
               variant: "error",
-              message: t("settings.cipherKeysPage.bulkDeleteFailed", { count: unsuccessful.length }),
+              message: t("settings.cipherKeysPage.bulkDeleteFailed", {
+                count: unsuccessful.length,
+              }),
             });
           }
 
@@ -452,14 +455,25 @@ export default defineComponent({
           if (err.response?.status != 403 || err?.status != 403) {
             toast({
               variant: "error",
-              message: err.response?.data?.message || err?.message || t("settings.cipherKeysPage.bulkDeleteError"),
+              message:
+                err.response?.data?.message ||
+                err?.message ||
+                t("settings.cipherKeysPage.bulkDeleteError"),
             });
           }
+        })
+        .finally(() => {
+          bulkDeleteLoading.value = false;
         });
     };
 
     useShortcuts([
-      { id: "cipherKeysRefresh", handler: () => { if (!isInputFocused()) getData(); } },
+      {
+        id: "cipherKeysRefresh",
+        handler: () => {
+          if (!isInputFocused()) getData();
+        },
+      },
     ]);
 
     return {
@@ -486,6 +500,7 @@ export default defineComponent({
       selectedKeyIds,
       handleSelectedIdsUpdate,
       confirmBulkDelete,
+      bulkDeleteLoading,
       openBulkDeleteDialog,
       bulkDeleteCipherKeys,
     };

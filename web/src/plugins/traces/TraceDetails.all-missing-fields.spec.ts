@@ -33,7 +33,6 @@ vi.mock("@/composables/useNotifications", () => ({
   }),
 }));
 
-
 // Mock clipboard API
 Object.assign(navigator, {
   clipboard: {
@@ -212,12 +211,7 @@ describe("TraceDetails - All Missing Fields (Real Data)", () => {
               "searchQuery",
               "spanList",
             ],
-            emits: [
-              "toggle-collapse",
-              "select-span",
-              "update-current-index",
-              "search-result",
-            ],
+            emits: ["toggle-collapse", "select-span", "update-current-index", "search-result"],
             methods: {
               nextMatch: vi.fn(),
               prevMatch: vi.fn(),
@@ -281,9 +275,7 @@ describe("TraceDetails - All Missing Fields (Real Data)", () => {
     it("should handle span selection with missing span_id", () => {
       // Should not crash even if span_id is missing
       expect(() => {
-        const formattedSpan = wrapper.vm.getFormattedSpan(
-          realWorldProblematicSpan,
-        );
+        const formattedSpan = wrapper.vm.getFormattedSpan(realWorldProblematicSpan);
         expect(formattedSpan.spanId).toBeDefined();
       }).not.toThrow();
     });
@@ -291,9 +283,7 @@ describe("TraceDetails - All Missing Fields (Real Data)", () => {
 
   describe("Critical: Missing service_name handling", () => {
     it("should use default service name", () => {
-      const formattedSpan = wrapper.vm.getFormattedSpan(
-        realWorldProblematicSpan,
-      );
+      const formattedSpan = wrapper.vm.getFormattedSpan(realWorldProblematicSpan);
       expect(formattedSpan.serviceName).toBe("nodeA");
     });
 
@@ -316,9 +306,7 @@ describe("TraceDetails - All Missing Fields (Real Data)", () => {
     });
 
     it("should format span without span_kind", () => {
-      const formattedSpan = wrapper.vm.getFormattedSpan(
-        realWorldProblematicSpan,
-      );
+      const formattedSpan = wrapper.vm.getFormattedSpan(realWorldProblematicSpan);
       expect(formattedSpan.spanKind).toBe("Unspecified");
     });
 
@@ -335,26 +323,20 @@ describe("TraceDetails - All Missing Fields (Real Data)", () => {
 
   describe("Critical: Missing span_status handling", () => {
     it("should use UNSET as default span_status", () => {
-      const formattedSpan = wrapper.vm.getFormattedSpan(
-        realWorldProblematicSpan,
-      );
+      const formattedSpan = wrapper.vm.getFormattedSpan(realWorldProblematicSpan);
       expect(formattedSpan.spanStatus).toBe("UNSET");
     });
   });
 
   describe("Critical: Missing idle_ns and busy_ns handling", () => {
     it("should use 0 for missing idle_ns", () => {
-      const formattedSpan = wrapper.vm.getFormattedSpan(
-        realWorldProblematicSpan,
-      );
+      const formattedSpan = wrapper.vm.getFormattedSpan(realWorldProblematicSpan);
       expect(formattedSpan.idleMs).toBe(0);
       expect(Number.isNaN(formattedSpan.idleMs)).toBe(false);
     });
 
     it("should use 0 for missing busy_ns", () => {
-      const formattedSpan = wrapper.vm.getFormattedSpan(
-        realWorldProblematicSpan,
-      );
+      const formattedSpan = wrapper.vm.getFormattedSpan(realWorldProblematicSpan);
       expect(formattedSpan.busyMs).toBe(0);
       expect(Number.isNaN(formattedSpan.busyMs)).toBe(false);
     });
@@ -362,9 +344,7 @@ describe("TraceDetails - All Missing Fields (Real Data)", () => {
 
   describe("Critical: Missing reference_parent_span_id handling", () => {
     it("should use empty string for missing parent ID", () => {
-      const formattedSpan = wrapper.vm.getFormattedSpan(
-        realWorldProblematicSpan,
-      );
+      const formattedSpan = wrapper.vm.getFormattedSpan(realWorldProblematicSpan);
       expect(formattedSpan.parentId).toBe("");
     });
 
@@ -377,9 +357,7 @@ describe("TraceDetails - All Missing Fields (Real Data)", () => {
 
   describe("Data integrity with missing fields", () => {
     it("should preserve all provided fields", () => {
-      const formattedSpan = wrapper.vm.getFormattedSpan(
-        realWorldProblematicSpan,
-      );
+      const formattedSpan = wrapper.vm.getFormattedSpan(realWorldProblematicSpan);
 
       // Check that provided fields are preserved
       expect(formattedSpan.operationName).toBe("Karomi.");
@@ -387,9 +365,7 @@ describe("TraceDetails - All Missing Fields (Real Data)", () => {
     });
 
     it("should calculate time fields correctly", () => {
-      const formattedSpan = wrapper.vm.getFormattedSpan(
-        realWorldProblematicSpan,
-      );
+      const formattedSpan = wrapper.vm.getFormattedSpan(realWorldProblematicSpan);
 
       expect(formattedSpan.startTimeMs).toBeDefined();
       expect(formattedSpan.endTimeMs).toBeDefined();
@@ -398,9 +374,7 @@ describe("TraceDetails - All Missing Fields (Real Data)", () => {
     });
 
     it("should parse links correctly", () => {
-      const formattedSpan = wrapper.vm.getFormattedSpan(
-        realWorldProblematicSpan,
-      );
+      const formattedSpan = wrapper.vm.getFormattedSpan(realWorldProblematicSpan);
       expect(formattedSpan.links).toEqual([]);
     });
   });
@@ -453,9 +427,7 @@ describe("TraceDetails - All Missing Fields (Real Data)", () => {
 
   describe("UI rendering with missing fields", () => {
     it("should render operation name", () => {
-      const operationName = wrapper.find(
-        '[data-test="trace-details-operation-name"]',
-      );
+      const operationName = wrapper.find('[data-test="trace-details-operation-name"]');
       if (operationName.exists()) {
         expect(operationName.text()).toContain("Karomi.");
       }
@@ -519,9 +491,7 @@ describe("TraceDetails - All Missing Fields (Real Data)", () => {
     });
 
     it("should allow copy trace ID", async () => {
-      const copyBtn = wrapper.find(
-        '[data-test="trace-details-copy-trace-id-btn"]',
-      );
+      const copyBtn = wrapper.find('[data-test="trace-details-copy-trace-id-btn"]');
       if (copyBtn.exists()) {
         await copyBtn.trigger("click");
         expect(navigator.clipboard.writeText).toHaveBeenCalled();
@@ -529,9 +499,7 @@ describe("TraceDetails - All Missing Fields (Real Data)", () => {
     });
 
     it("should allow navigation to logs", async () => {
-      const viewLogsBtn = wrapper.find(
-        '[data-test="trace-details-view-logs-btn"]',
-      );
+      const viewLogsBtn = wrapper.find('[data-test="trace-details-view-logs-btn"]');
       if (viewLogsBtn.exists()) {
         const routerPushSpy = vi.spyOn(router, "push");
         await viewLogsBtn.trigger("click");

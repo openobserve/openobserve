@@ -21,9 +21,10 @@ import i18n from "@/locales";
 
 const mockPush = vi.fn();
 const mockRouteQuery: Record<string, string | string[] | undefined> = {};
+const mockRouteParams: Record<string, string | string[] | undefined> = {};
 
 vi.mock("vue-router", () => ({
-  useRoute: () => ({ query: mockRouteQuery }),
+  useRoute: () => ({ query: mockRouteQuery, params: mockRouteParams }),
   useRouter: () => ({ push: mockPush }),
   RouterLink: { name: "RouterLinkStub", template: "<a><slot /></a>" },
 }));
@@ -92,8 +93,9 @@ describe("CreateCheck", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    // Reset route query
+    // Reset route state
     Object.keys(mockRouteQuery).forEach((k) => delete mockRouteQuery[k]);
+    Object.keys(mockRouteParams).forEach((k) => delete mockRouteParams[k]);
   });
 
   afterEach(() => {
@@ -106,24 +108,16 @@ describe("CreateCheck", () => {
       wrapper = makeWrapper();
       await flushPromises();
 
-      expect(
-        wrapper.find('[data-test="create-browser-test"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="create-protocol-check"]').exists(),
-      ).toBe(false);
-      expect(
-        wrapper.find('[data-test="create-browser-test-skeleton"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="create-browser-test"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="create-protocol-check"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="create-browser-test-skeleton"]').exists()).toBe(false);
     });
 
     it("should default to CreateBrowserTest when no type query param is present", async () => {
       wrapper = makeWrapper();
       await flushPromises();
 
-      expect(
-        wrapper.find('[data-test="create-browser-test"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="create-browser-test"]').exists()).toBe(true);
     });
 
     it("should default to CreateBrowserTest when type query param is an unknown value", async () => {
@@ -131,9 +125,7 @@ describe("CreateCheck", () => {
       wrapper = makeWrapper();
       await flushPromises();
 
-      expect(
-        wrapper.find('[data-test="create-browser-test"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="create-browser-test"]').exists()).toBe(true);
     });
   });
 
@@ -143,12 +135,8 @@ describe("CreateCheck", () => {
       wrapper = makeWrapper();
       await flushPromises();
 
-      expect(
-        wrapper.find('[data-test="create-protocol-check"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="protocol-check-type"]').text(),
-      ).toBe("http");
+      expect(wrapper.find('[data-test="create-protocol-check"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="protocol-check-type"]').text()).toBe("http");
     });
 
     it("should render CreateProtocolCheck when type=tcp in route query", async () => {
@@ -156,12 +144,8 @@ describe("CreateCheck", () => {
       wrapper = makeWrapper();
       await flushPromises();
 
-      expect(
-        wrapper.find('[data-test="create-protocol-check"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="protocol-check-type"]').text(),
-      ).toBe("tcp");
+      expect(wrapper.find('[data-test="create-protocol-check"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="protocol-check-type"]').text()).toBe("tcp");
     });
 
     it("should render CreateProtocolCheck when type=tls in route query", async () => {
@@ -169,12 +153,8 @@ describe("CreateCheck", () => {
       wrapper = makeWrapper();
       await flushPromises();
 
-      expect(
-        wrapper.find('[data-test="create-protocol-check"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="protocol-check-type"]').text(),
-      ).toBe("tls");
+      expect(wrapper.find('[data-test="create-protocol-check"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="protocol-check-type"]').text()).toBe("tls");
     });
 
     it("should render CreateProtocolCheck when type=ssh in route query", async () => {
@@ -182,28 +162,22 @@ describe("CreateCheck", () => {
       wrapper = makeWrapper();
       await flushPromises();
 
-      expect(
-        wrapper.find('[data-test="create-protocol-check"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="protocol-check-type"]').text(),
-      ).toBe("ssh");
+      expect(wrapper.find('[data-test="create-protocol-check"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="protocol-check-type"]').text()).toBe("ssh");
     });
   });
 
   describe("edit mode", () => {
     it("should show skeleton while resolving the type (before service responds)", () => {
-      mockRouteQuery.edit = "mon-http-1";
+      mockRouteParams.id = "mon-http-1";
       // Don't await — check the immediate render before the promise resolves
       wrapper = makeWrapper();
 
-      expect(
-        wrapper.find('[data-test="create-browser-test-skeleton"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="create-browser-test-skeleton"]').exists()).toBe(true);
     });
 
     it("should render CreateProtocolCheck after resolving edit monitor type from API", async () => {
-      mockRouteQuery.edit = "mon-tcp-1";
+      mockRouteParams.id = "mon-tcp-1";
       vi.mocked(mockedService.get).mockResolvedValueOnce({
         data: { type: "tcp", name: "TCP Monitor", id: "mon-tcp-1" },
       });
@@ -211,21 +185,15 @@ describe("CreateCheck", () => {
       wrapper = makeWrapper();
       await flushPromises();
 
-      expect(
-        wrapper.find('[data-test="create-protocol-check"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="protocol-check-type"]').text(),
-      ).toBe("tcp");
-      expect(
-        wrapper.find('[data-test="protocol-edit-id"]').text(),
-      ).toBe("mon-tcp-1");
+      expect(wrapper.find('[data-test="create-protocol-check"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="protocol-check-type"]').text()).toBe("tcp");
+      expect(wrapper.find('[data-test="protocol-edit-id"]').text()).toBe("mon-tcp-1");
       // Service was called with correct args
-      expect(mockedService.get).toHaveBeenCalledWith("org-1", "mon-tcp-1");
+      expect(mockedService.get).toHaveBeenCalledWith("org-1", "mon-tcp-1", "");
     });
 
     it("should default to CreateBrowserTest when edit monitor has an unknown type", async () => {
-      mockRouteQuery.edit = "mon-unknown-1";
+      mockRouteParams.id = "mon-unknown-1";
       vi.mocked(mockedService.get).mockResolvedValueOnce({
         data: { type: "bizarre-type", name: "Unknown Monitor", id: "mon-unknown-1" },
       });
@@ -233,26 +201,22 @@ describe("CreateCheck", () => {
       wrapper = makeWrapper();
       await flushPromises();
 
-      expect(
-        wrapper.find('[data-test="create-browser-test"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="create-browser-test"]').exists()).toBe(true);
     });
 
     it("should default to CreateBrowserTest when the API call fails", async () => {
-      mockRouteQuery.edit = "mon-non-existent";
+      mockRouteParams.id = "mon-non-existent";
       vi.mocked(mockedService.get).mockRejectedValueOnce(new Error("Not found"));
 
       wrapper = makeWrapper();
       await flushPromises();
 
       // Falls back to browser on error
-      expect(
-        wrapper.find('[data-test="create-browser-test"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="create-browser-test"]').exists()).toBe(true);
     });
 
     it("should pass edit-id to CreateProtocolCheck when resolving a protocol monitor", async () => {
-      mockRouteQuery.edit = "proto-http-1";
+      mockRouteParams.id = "proto-http-1";
       vi.mocked(mockedService.get).mockResolvedValueOnce({
         data: { type: "http", name: "HTTP Monitor", id: "proto-http-1" },
       });
@@ -260,9 +224,7 @@ describe("CreateCheck", () => {
       wrapper = makeWrapper();
       await flushPromises();
 
-      expect(
-        wrapper.find('[data-test="protocol-edit-id"]').text(),
-      ).toBe("proto-http-1");
+      expect(wrapper.find('[data-test="protocol-edit-id"]').text()).toBe("proto-http-1");
     });
   });
 });

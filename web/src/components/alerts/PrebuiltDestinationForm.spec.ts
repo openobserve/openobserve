@@ -85,34 +85,24 @@ const hostForm = (w: any) => w.findComponent({ name: "OForm" }).vm.form;
 describe("PrebuiltDestinationForm - base rendering", () => {
   it("renders the wrapper", () => {
     wrapper = mountComp();
-    expect(
-      wrapper.find('[data-test="prebuilt-destination-form"]').exists(),
-    ).toBe(true);
+    expect(wrapper.find('[data-test="prebuilt-destination-form"]').exists()).toBe(true);
   });
 
   it("shows preview/test buttons when hideActions=false", () => {
     wrapper = mountComp({ hideActions: false });
-    expect(
-      wrapper.find('[data-test="destination-preview-button"]').exists(),
-    ).toBe(true);
-    expect(
-      wrapper.find('[data-test="destination-test-button"]').exists(),
-    ).toBe(true);
+    expect(wrapper.find('[data-test="destination-preview-button"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="destination-test-button"]').exists()).toBe(true);
   });
 
   it("hides preview/test buttons when hideActions=true", () => {
     wrapper = mountComp({ hideActions: true });
-    expect(
-      wrapper.find('[data-test="destination-preview-button"]').exists(),
-    ).toBe(false);
+    expect(wrapper.find('[data-test="destination-preview-button"]').exists()).toBe(false);
   });
 
   it("preview/test buttons emit their events", async () => {
     wrapper = mountComp();
     const child = wrapper.findComponent(PrebuiltDestinationForm);
-    await wrapper
-      .find('[data-test="destination-preview-button"]')
-      .trigger("click");
+    await wrapper.find('[data-test="destination-preview-button"]').trigger("click");
     await wrapper.find('[data-test="destination-test-button"]').trigger("click");
     expect(child.emitted("preview")).toBeTruthy();
     expect(child.emitted("test")).toBeTruthy();
@@ -122,79 +112,49 @@ describe("PrebuiltDestinationForm - base rendering", () => {
 describe("PrebuiltDestinationForm - rendering per type", () => {
   it("renders slack webhook + channel inputs", () => {
     wrapper = mountComp({ destinationType: "slack" });
-    expect(wrapper.find('[data-test="slack-webhook-url-input"]').exists()).toBe(
-      true,
-    );
-    expect(wrapper.find('[data-test="slack-channel-input"]').exists()).toBe(
-      true,
-    );
-    expect(
-      wrapper.find('[data-test="discord-webhook-url-input"]').exists(),
-    ).toBe(false);
+    expect(wrapper.find('[data-test="slack-webhook-url-input"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="slack-channel-input"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="discord-webhook-url-input"]').exists()).toBe(false);
   });
 
   it("renders discord webhook + username inputs", () => {
     wrapper = mountComp({ destinationType: "discord" });
-    expect(
-      wrapper.find('[data-test="discord-webhook-url-input"]').exists(),
-    ).toBe(true);
-    expect(wrapper.find('[data-test="discord-username-input"]').exists()).toBe(
-      true,
-    );
+    expect(wrapper.find('[data-test="discord-webhook-url-input"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="discord-username-input"]').exists()).toBe(true);
   });
 
   it("renders msteams webhook input", () => {
     wrapper = mountComp({ destinationType: "msteams" });
-    expect(
-      wrapper.find('[data-test="msteams-webhook-url-input"]').exists(),
-    ).toBe(true);
+    expect(wrapper.find('[data-test="msteams-webhook-url-input"]').exists()).toBe(true);
   });
 
   it("renders pagerduty integration key + severity select", () => {
     wrapper = mountComp({ destinationType: "pagerduty" });
-    expect(
-      wrapper.find('[data-test="pagerduty-integration-key-input"]').exists(),
-    ).toBe(true);
-    expect(
-      wrapper.find('[data-test="pagerduty-severity-select"]').exists(),
-    ).toBe(true);
+    expect(wrapper.find('[data-test="pagerduty-integration-key-input"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="pagerduty-severity-select"]').exists()).toBe(true);
   });
 
   it("renders opsgenie api key + priority + eu-region toggle", () => {
     wrapper = mountComp({ destinationType: "opsgenie" });
-    expect(wrapper.find('[data-test="opsgenie-api-key-input"]').exists()).toBe(
-      true,
-    );
-    expect(
-      wrapper.find('[data-test="opsgenie-priority-select"]').exists(),
-    ).toBe(true);
-    expect(
-      wrapper.find('[data-test="opsgenie-eu-region-toggle"]').exists(),
-    ).toBe(true);
+    expect(wrapper.find('[data-test="opsgenie-api-key-input"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="opsgenie-priority-select"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="opsgenie-eu-region-toggle"]').exists()).toBe(true);
   });
 
   it("renders servicenow url/username/password/assignment-group", () => {
     wrapper = mountComp({ destinationType: "servicenow" });
-    expect(
-      wrapper.find('[data-test="servicenow-instance-url-input"]').exists(),
-    ).toBe(true);
-    expect(
-      wrapper.find('[data-test="servicenow-password-input"]').exists(),
-    ).toBe(true);
+    expect(wrapper.find('[data-test="servicenow-instance-url-input"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="servicenow-password-input"]').exists()).toBe(true);
   });
 
   it("renders email recipients input", () => {
     wrapper = mountComp({ destinationType: "email" });
-    expect(wrapper.find('[data-test="email-recipients-input"]').exists()).toBe(
-      true,
-    );
+    expect(wrapper.find('[data-test="email-recipients-input"]').exists()).toBe(true);
   });
 
   it("keeps type=password on sensitive inputs", () => {
     wrapper = mountComp({ destinationType: "pagerduty" });
-    const input = wrapper
-      .find('[data-test="pagerduty-integration-key-input"]')
-      .find("input");
+    const input = wrapper.find('[data-test="pagerduty-integration-key-input"]').find("input");
     expect(input.attributes("type")).toBe("password");
   });
 });
@@ -205,9 +165,7 @@ describe("PrebuiltDestinationForm - binds into the ONE parent form", () => {
       destinationType: "slack",
       modelValue: { webhookUrl: "https://hooks.slack.com/x", channel: "#a" },
     });
-    const input = wrapper
-      .find('[data-test="slack-webhook-url-input"]')
-      .findComponent(OInput);
+    const input = wrapper.find('[data-test="slack-webhook-url-input"]').findComponent(OInput);
     expect(input.props("modelValue")).toBe("https://hooks.slack.com/x");
   });
 

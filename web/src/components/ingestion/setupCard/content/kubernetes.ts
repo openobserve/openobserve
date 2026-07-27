@@ -31,11 +31,7 @@
 
 import config from "@/aws-exports";
 import { getImageURL } from "@/utils/zincutils";
-import type {
-  CardSubstitutions,
-  RichCardContent,
-  RichCardStepVariant,
-} from "../types";
+import type { CardSubstitutions, RichCardContent, RichCardStepVariant } from "../types";
 import { applySubs, applySubsMasked } from "../subs";
 
 /** Pinned cert-manager release the manual sequence installs. Bump in one place. */
@@ -47,8 +43,7 @@ const CERT_MANAGER_VERSION = "1.19.0";
  * `http://<helm-release>-openobserve-router.<namespace>.svc.cluster.local:5080`
  * — the default below assumes release `o2` in namespace `openobserve`.
  */
-const IN_CLUSTER_URL =
-  "http://o2-openobserve-router.openobserve.svc.cluster.local:5080";
+const IN_CLUSTER_URL = "http://o2-openobserve-router.openobserve.svc.cluster.local:5080";
 
 const INSTALL_SCRIPT =
   "https://raw.githubusercontent.com/openobserve/o2-datasource/main/k8s/install.sh";
@@ -96,11 +91,7 @@ helm --namespace openobserve-collector \\
   --set exporters.'otlphttp/openobserve_k8s_events'.headers.Authorization='Basic {token}'`;
 
 /** Build a variant whose code carries the org token (masked until revealed). */
-const codeFor = (
-  template: string,
-  subs: CardSubstitutions,
-  lang = "bash",
-) => ({
+const codeFor = (template: string, subs: CardSubstitutions, lang = "bash") => ({
   lang,
   raw: applySubs(template, subs),
   masked: applySubsMasked(template, subs),
@@ -122,21 +113,20 @@ kubectl annotate namespace my-namespace \\
 # Restart so running pods pick up the injection
 kubectl rollout restart deployment -n my-namespace`;
 
-const LANGUAGES: { id: string; label: string; icon: string; extra?: string }[] =
-  [
-    { id: "java", label: "Java", icon: "images/ingestion/java.svg" },
-    { id: "dotnet", label: ".NET", icon: "images/ingestion/dotnet.svg" },
-    { id: "nodejs", label: "Node.js", icon: "images/ingestion/nodejs.svg" },
-    { id: "python", label: "Python", icon: "images/ingestion/python.svg" },
-    {
-      id: "go",
-      label: "Go (eBPF)",
-      icon: "images/ingestion/golang.svg",
-      // eBPF attaches to the binary, so the operator needs its in-container path.
-      extra: ` \\
+const LANGUAGES: { id: string; label: string; icon: string; extra?: string }[] = [
+  { id: "java", label: "Java", icon: "images/ingestion/java.svg" },
+  { id: "dotnet", label: ".NET", icon: "images/ingestion/dotnet.svg" },
+  { id: "nodejs", label: "Node.js", icon: "images/ingestion/nodejs.svg" },
+  { id: "python", label: "Python", icon: "images/ingestion/python.svg" },
+  {
+    id: "go",
+    label: "Go (eBPF)",
+    icon: "images/ingestion/golang.svg",
+    // eBPF attaches to the binary, so the operator needs its in-container path.
+    extra: ` \\
   instrumentation.opentelemetry.io/otel-go-auto-target-exe="/path/to/container/executable"`,
-    },
-  ];
+  },
+];
 
 const instrumentVariants = (): RichCardStepVariant[] =>
   LANGUAGES.map((l) => ({
@@ -152,9 +142,7 @@ const instrumentVariants = (): RichCardStepVariant[] =>
 
 // ── card ─────────────────────────────────────────────────────────────────────
 
-export default function kubernetesCard(
-  subs: CardSubstitutions,
-): RichCardContent {
+export default function kubernetesCard(subs: CardSubstitutions): RichCardContent {
   const isCloud = config.isCloud === "true";
 
   const INSTALLER_NOTE =
@@ -184,10 +172,7 @@ export default function kubernetesCard(
         {
           id: "internal",
           label: "Internal Endpoint",
-          code: codeFor(
-            scriptInstall(`--internal-endpoint=${IN_CLUSTER_URL}`),
-            subs,
-          ),
+          code: codeFor(scriptInstall(`--internal-endpoint=${IN_CLUSTER_URL}`), subs),
           note: `Use this when OpenObserve runs in this same cluster — traffic never leaves it. ${INSTALLER_NOTE} ${ADVANCED_HINT}`,
         },
       ];
@@ -248,13 +233,7 @@ export default function kubernetesCard(
         chip: { kind: "traces", label: "Logs" },
         completeOn: "detect",
         detectionAnchor: true,
-        pills: [
-          "Container Logs",
-          "Kubernetes Events",
-          "Node Metrics",
-          "Pod Metrics",
-          "Traces",
-        ],
+        pills: ["Container Logs", "Kubernetes Events", "Node Metrics", "Pod Metrics", "Traces"],
       },
     ],
     // Collector logs carry the k8sattributes processor's resource attributes;

@@ -9,8 +9,7 @@
  */
 export const shouldApplyChartAlign = (dashboardPanelData: any): boolean => {
   return (
-    (dashboardPanelData.data.type === "pie" ||
-      dashboardPanelData.data.type === "donut") &&
+    (dashboardPanelData.data.type === "pie" || dashboardPanelData.data.type === "donut") &&
     dashboardPanelData.data.config.show_legends &&
     dashboardPanelData.data.config.legends_position === "right" &&
     (dashboardPanelData.data.config.legends_type === "plain" ||
@@ -142,9 +141,7 @@ export const shouldShowLegendHeight = (dashboardPanelData: any): boolean => {
  * @param dashboardPanelData - The dashboard panel data
  * @returns boolean indicating if legend width unit container should be displayed
  */
-export const shouldShowLegendWidthUnitContainer = (
-  dashboardPanelData: any,
-): boolean => {
+export const shouldShowLegendWidthUnitContainer = (dashboardPanelData: any): boolean => {
   return shouldShowLegendWidth(dashboardPanelData);
 };
 
@@ -153,9 +150,7 @@ export const shouldShowLegendWidthUnitContainer = (
  * @param dashboardPanelData - The dashboard panel data
  * @returns boolean indicating if legend height unit container should be displayed
  */
-export const shouldShowLegendHeightUnitContainer = (
-  dashboardPanelData: any,
-): boolean => {
+export const shouldShowLegendHeightUnitContainer = (dashboardPanelData: any): boolean => {
   return shouldShowLegendHeight(dashboardPanelData);
 };
 
@@ -170,9 +165,8 @@ export const shouldShowNoValueReplacement = (
   promqlMode: boolean,
 ): boolean => {
   return (
-    ["area", "line", "area-stacked", "bar", "stacked"].includes(
-      dashboardPanelData.data.type,
-    ) && !promqlMode
+    ["area", "line", "area-stacked", "bar", "stacked"].includes(dashboardPanelData.data.type) &&
+    !promqlMode
   );
 };
 
@@ -182,12 +176,8 @@ export const shouldShowNoValueReplacement = (
  * @param dashboardPanelData - The dashboard panel data
  * @returns boolean indicating if area/line style config controls should be displayed
  */
-export const shouldShowAreaLineStyleConfig = (
-  dashboardPanelData: any,
-): boolean => {
-  return ["area", "line", "area-stacked"].includes(
-    dashboardPanelData.data.type,
-  );
+export const shouldShowAreaLineStyleConfig = (dashboardPanelData: any): boolean => {
+  return ["area", "line", "area-stacked"].includes(dashboardPanelData.data.type);
 };
 
 /**
@@ -202,16 +192,9 @@ export const shouldShowTopResultsConfig = (
   promqlMode: boolean,
 ): boolean => {
   return (
-    [
-      "area",
-      "bar",
-      "line",
-      "h-bar",
-      "h-stacked",
-      "scatter",
-      "area-stacked",
-      "stacked",
-    ].includes(dashboardPanelData.data.type) && !promqlMode
+    ["area", "bar", "line", "h-bar", "h-stacked", "scatter", "area-stacked", "stacked"].includes(
+      dashboardPanelData.data.type,
+    ) && !promqlMode
   );
 };
 
@@ -240,9 +223,7 @@ export const shouldShowAxisConfig = (dashboardPanelData: any): boolean => {
  * @param dashboardPanelData - The dashboard panel data
  * @returns boolean indicating if cartesian axis config should be displayed
  */
-export const shouldShowCartesianAxisConfig = (
-  dashboardPanelData: any,
-): boolean => {
+export const shouldShowCartesianAxisConfig = (dashboardPanelData: any): boolean => {
   return [
     "area",
     "area-stacked",
@@ -274,15 +255,10 @@ export const shouldShowAxisLabelConfig = (dashboardPanelData: any): boolean => {
  * @param promqlMode - Whether promql mode is active
  * @returns boolean indicating if line thickness input should be displayed
  */
-export const shouldShowLineThickness = (
-  dashboardPanelData: any,
-  promqlMode: boolean,
-): boolean => {
+export const shouldShowLineThickness = (dashboardPanelData: any, promqlMode: boolean): boolean => {
   return (
     !promqlMode &&
-    !dashboardPanelData.data.queries[
-      dashboardPanelData.layout.currentQueryIndex
-    ].customQuery &&
+    !dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery &&
     ["area", "area-stacked", "line"].includes(dashboardPanelData.data.type)
   );
 };
@@ -299,9 +275,8 @@ export const shouldShowDrilldown = (
   dashboardPanelDataPageKey: string,
 ): boolean => {
   return (
-    !["html", "markdown", "geomap", "maps"].includes(
-      dashboardPanelData.data.type,
-    ) && dashboardPanelDataPageKey !== "logs"
+    !["html", "markdown", "geomap", "maps"].includes(dashboardPanelData.data.type) &&
+    dashboardPanelDataPageKey !== "logs"
   );
 };
 
@@ -319,16 +294,9 @@ export const shouldShowTimeShift = (
   dashboardPanelDataPageKey: string,
 ): boolean => {
   return (
-    [
-      "area",
-      "bar",
-      "line",
-      "h-bar",
-      "h-stacked",
-      "scatter",
-      "area-stacked",
-      "stacked",
-    ].includes(dashboardPanelData.data.type) &&
+    ["area", "bar", "line", "h-bar", "h-stacked", "scatter", "area-stacked", "stacked"].includes(
+      dashboardPanelData.data.type,
+    ) &&
     !promqlMode &&
     dashboardPanelDataPageKey !== "logs"
   );

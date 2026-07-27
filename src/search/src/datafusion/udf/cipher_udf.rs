@@ -18,6 +18,7 @@ const BASE64_CHARS: &str = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ
 
 use std::sync::{Arc, LazyLock as Lazy};
 
+use ::openobserve_cipher::registry::REGISTRY;
 use arrow::array::{ArrayRef, StringArray};
 use config::utils::str;
 use datafusion::{
@@ -31,8 +32,6 @@ use datafusion::{
 };
 use o2_enterprise::enterprise::cipher::Cipher;
 use serde_json::Value;
-
-use crate::cipher::registry::REGISTRY;
 
 /// The name of the decrypt UDF given to DataFusion.
 pub const DECRYPT_UDF_NAME: &str = "decrypt_path";

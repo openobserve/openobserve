@@ -78,8 +78,7 @@ export const makeEditScriptSchema = (opts: EditScriptSchemaOptions) =>
       //   (b) CREATE: the cron field has been edited AND the repeat tab is live.
       //       An untouched blank cron on create still saves.
       const editRepeat = opts.getExecutionDetails() === "repeat";
-      const createEditedRepeat =
-        opts.getCronEdited() && val.frequencyType === "repeat";
+      const createEditedRepeat = opts.getCronEdited() && val.frequencyType === "repeat";
       if (editRepeat || createEditedRepeat) {
         const cron = String(val.cron ?? "").trim();
         if (!cron) {

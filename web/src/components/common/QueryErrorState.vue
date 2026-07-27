@@ -89,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <!-- ── HERO layout ──────────────────────────────────────────────────── -->
   <div
     v-if="size === 'hero'"
-    class="w-full h-full overflow-y-auto flex flex-col items-center pb-8"
+    class="flex h-full w-full flex-col items-center overflow-y-auto pb-8"
     data-test="query-error-state"
   >
     <!-- Illustration + title + description + action cards -->
@@ -133,10 +133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </OEmptyState>
 
     <!-- Detail panel + buttons (outside OEmptyState — avoids its overflow:hidden) -->
-    <div
-      v-if="hasAnyContent"
-      class="w-full max-w-2xl mx-auto px-6 flex flex-col gap-3"
-    >
+    <div v-if="hasAnyContent" class="mx-auto flex w-full max-w-2xl flex-col gap-3 px-6">
       <ErrorDetailPanel
         :summary-line="summaryLine"
         :detail-body="detailBody"
@@ -146,7 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @toggle-detail="showDetail = !showDetail"
       />
 
-      <div class="flex items-center justify-center gap-2 flex-wrap">
+      <div class="flex flex-wrap items-center justify-center gap-2">
         <OButton
           variant="ghost"
           size="sm"
@@ -160,12 +157,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="aiEnabled && (isQueryError || errorCode === 0)"
           variant="ghost"
           size="sm"
-          class="group [background:var(--color-gradient-ai-subtle)]! text-ai-accent! dark:text-white! [transition:background_0.3s_ease,box-shadow_0.3s_ease,color_0.3s_ease] dark:shadow-[0_0.25rem_0.75rem_0_color-mix(in_srgb,var(--color-ai-accent)_20%,transparent)] hover:[background:var(--color-gradient-ai)]! hover:text-white! hover:shadow-[0_0.25rem_0.75rem_0_color-mix(in_srgb,var(--color-ai-accent)_35%,transparent)] dark:hover:shadow-[0_0.25rem_0.75rem_0_color-mix(in_srgb,var(--color-ai-accent)_35%,transparent)]"
+          class="group text-ai-accent! [background:var(--color-gradient-ai-subtle)]! [transition:background_0.3s_ease,box-shadow_0.3s_ease,color_0.3s_ease] hover:text-white! hover:shadow-[0_0.25rem_0.75rem_0_color-mix(in_srgb,var(--color-ai-accent)_35%,transparent)] hover:[background:var(--color-gradient-ai)]! dark:text-white! dark:shadow-[0_0.25rem_0.75rem_0_color-mix(in_srgb,var(--color-ai-accent)_20%,transparent)] dark:hover:shadow-[0_0.25rem_0.75rem_0_color-mix(in_srgb,var(--color-ai-accent)_35%,transparent)]"
           data-test="query-error-ask-ai-btn"
           @click="emit('ask-ai')"
         >
           <template #icon-left>
-            <img :src="aiIconSrc" class="w-4 h-4 shrink-0 group-hover:brightness-0 group-hover:invert group-hover:[transition:filter_0.3s_ease]" alt="" />
+            <img
+              :src="aiIconSrc"
+              class="h-4 w-4 shrink-0 group-hover:brightness-0 group-hover:invert group-hover:[transition:filter_0.3s_ease]"
+              alt=""
+            />
           </template>
           {{ t("queryError.askAi") }}
         </OButton>
@@ -175,13 +176,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- AI button when there's nothing to show in the detail panel -->
     <div
       v-else-if="aiEnabled && (isQueryError || errorCode === 0)"
-      class="flex justify-center mt-2"
+      class="mt-2 flex justify-center"
     >
       <OButton
         variant="ghost"
         size="sm"
         icon-left="bolt"
-        class="[background:var(--color-gradient-ai-subtle)]! text-ai-accent! dark:text-white! [transition:background_0.3s_ease,box-shadow_0.3s_ease,color_0.3s_ease] dark:shadow-[0_0.25rem_0.75rem_0_color-mix(in_srgb,var(--color-ai-accent)_20%,transparent)] hover:[background:var(--color-gradient-ai)]! hover:text-white! hover:shadow-[0_0.25rem_0.75rem_0_color-mix(in_srgb,var(--color-ai-accent)_35%,transparent)] dark:hover:shadow-[0_0.25rem_0.75rem_0_color-mix(in_srgb,var(--color-ai-accent)_35%,transparent)]"
+        class="text-ai-accent! [background:var(--color-gradient-ai-subtle)]! [transition:background_0.3s_ease,box-shadow_0.3s_ease,color_0.3s_ease] hover:text-white! hover:shadow-[0_0.25rem_0.75rem_0_color-mix(in_srgb,var(--color-ai-accent)_35%,transparent)] hover:[background:var(--color-gradient-ai)]! dark:text-white! dark:shadow-[0_0.25rem_0.75rem_0_color-mix(in_srgb,var(--color-ai-accent)_20%,transparent)] dark:hover:shadow-[0_0.25rem_0.75rem_0_color-mix(in_srgb,var(--color-ai-accent)_35%,transparent)]"
         data-test="query-error-ask-ai-btn"
         @click="emit('ask-ai')"
       >
@@ -194,25 +195,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </div>
 
   <!-- ── BLOCK layout (dashboard panels, alerts) ───────────────────────── -->
-  <div
-    v-else
-    class="w-full flex flex-col gap-3 p-4"
-    data-test="query-error-state"
-  >
+  <div v-else class="flex w-full flex-col gap-3 p-4" data-test="query-error-state">
     <!-- Title row -->
     <div class="flex items-start gap-2">
-      <OIcon
-        name="error-outline"
-        size="sm"
-        class="text-status-error shrink-0 mt-0.5"
-      />
-      <div class="flex flex-col gap-0.5 min-w-0">
-        <p class="text-sm font-semibold text-text-body m-0">
+      <OIcon name="error-outline" size="sm" class="text-status-error mt-0.5 shrink-0" />
+      <div class="flex min-w-0 flex-col gap-0.5">
+        <p class="text-text-body m-0 text-sm font-semibold">
           {{ resolvedTitle }}
         </p>
         <p
           v-if="summaryLine"
-          class="text-xs text-text-secondary m-0 break-words"
+          class="text-text-secondary m-0 text-xs break-words"
           data-test="query-error-summary"
         >
           {{ summaryLine }}
@@ -224,7 +217,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template v-if="hasDetail">
       <button
         type="button"
-        class="flex items-center gap-1 text-xs text-text-secondary cursor-pointer bg-transparent border-0 p-0 self-start hover:text-text-body transition-colors"
+        class="text-text-secondary hover:text-text-body flex cursor-pointer items-center gap-1 self-start border-0 bg-transparent p-0 text-xs transition-colors"
         data-test="query-error-toggle-detail-btn"
         @click="showDetail = !showDetail"
       >
@@ -233,12 +226,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </button>
       <div
         v-if="showDetail"
-        class="rounded-default bg-surface-panel border border-border-default px-3 py-2 max-h-40 overflow-y-auto"
+        class="rounded-default bg-surface-panel border-border-default max-h-40 overflow-y-auto border px-3 py-2"
         data-test="query-error-detail-expanded"
       >
-        <p
-          class="text-xs font-mono text-text-secondary m-0 whitespace-pre-wrap break-all"
-        >
+        <p class="text-text-secondary m-0 font-mono text-xs break-all whitespace-pre-wrap">
           {{ detailBody }}
         </p>
       </div>
@@ -251,7 +242,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </small>
 
     <!-- Action row (block) -->
-    <div class="flex items-center gap-2 flex-wrap">
+    <div class="flex flex-wrap items-center gap-2">
       <!-- Default slot for module-specific actions -->
       <slot name="actions" v-bind="slotProps">
         <OButton
@@ -300,7 +291,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         variant="ghost"
         size="sm"
         icon-left="bolt"
-        class="[background:var(--color-gradient-ai-subtle)]! text-ai-accent! dark:text-white! [transition:background_0.3s_ease,box-shadow_0.3s_ease,color_0.3s_ease] dark:shadow-[0_0.25rem_0.75rem_0_color-mix(in_srgb,var(--color-ai-accent)_20%,transparent)] hover:[background:var(--color-gradient-ai)]! hover:text-white! hover:shadow-[0_0.25rem_0.75rem_0_color-mix(in_srgb,var(--color-ai-accent)_35%,transparent)] dark:hover:shadow-[0_0.25rem_0.75rem_0_color-mix(in_srgb,var(--color-ai-accent)_35%,transparent)]"
+        class="text-ai-accent! [background:var(--color-gradient-ai-subtle)]! [transition:background_0.3s_ease,box-shadow_0.3s_ease,color_0.3s_ease] hover:text-white! hover:shadow-[0_0.25rem_0.75rem_0_color-mix(in_srgb,var(--color-ai-accent)_35%,transparent)] hover:[background:var(--color-gradient-ai)]! dark:text-white! dark:shadow-[0_0.25rem_0.75rem_0_color-mix(in_srgb,var(--color-ai-accent)_20%,transparent)] dark:hover:shadow-[0_0.25rem_0.75rem_0_color-mix(in_srgb,var(--color-ai-accent)_35%,transparent)]"
         data-test="query-error-ask-ai-btn"
         @click="emit('ask-ai')"
       >
@@ -388,9 +379,7 @@ const {
 
 const { t } = useI18n();
 const resolvedTitle = computed(() => props.title ?? defaultTitle.value);
-const resolvedDescription = computed(
-  () => props.description ?? defaultDescription.value,
-);
+const resolvedDescription = computed(() => props.description ?? defaultDescription.value);
 
 // ── Copy feedback — show "Copied!" for 2 s after the user clicks ───────────
 

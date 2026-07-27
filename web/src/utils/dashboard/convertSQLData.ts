@@ -25,10 +25,7 @@ import { convertSQLChartData } from "./sql";
 import { applySeriesColorMappings } from "./chartColorUtils";
 import { chartColor } from "@/utils/chartTheme";
 import { calculateMetricFontSize } from "./sql/charts/convertSQLMetricChart";
-import {
-  calculateGridPositions,
-  getTrellisGrid,
-} from "./calculateGridForSubPlot";
+import { calculateGridPositions, getTrellisGrid } from "./calculateGridForSubPlot";
 import { formatUnitValue, getUnitValue } from "./convertDataIntoUnitValue";
 
 /**
@@ -48,15 +45,11 @@ function reapplyTrellisLayout(
 ) {
   try {
     const trellisConfig = panelSchema.config.trellis;
-    const isHorizontalChart =
-      panelSchema.type === "h-bar" || panelSchema.type === "h-stacked";
+    const isHorizontalChart = panelSchema.type === "h-bar" || panelSchema.type === "h-stacked";
 
     // Column logic — matches trellisConfig.ts
     let customCols = -1;
-    if (
-      trellisConfig.layout === "custom" &&
-      trellisConfig.num_of_columns > 0
-    ) {
+    if (trellisConfig.layout === "custom" && trellisConfig.num_of_columns > 0) {
       customCols = trellisConfig.num_of_columns;
     }
     if (trellisConfig.layout === "vertical") {
@@ -64,9 +57,7 @@ function reapplyTrellisLayout(
     }
 
     // Filter out annotation/markArea helper series
-    const realSeries = (opts.series || []).filter(
-      (s: any) => !(s.zlevel === 1 && s.markArea),
-    );
+    const realSeries = (opts.series || []).filter((s: any) => !(s.zlevel === 1 && s.markArea));
     if (realSeries.length === 0) return;
 
     // Group series by breakdown value so multiple queries sharing the same
@@ -94,9 +85,7 @@ function reapplyTrellisLayout(
     const cloneObj = (o: any) => JSON.parse(JSON.stringify(o));
 
     // Capture base axis templates
-    const baseXAxis = cloneObj(
-      Array.isArray(opts.xAxis) ? opts.xAxis[0] : opts.xAxis,
-    );
+    const baseXAxis = cloneObj(Array.isArray(opts.xAxis) ? opts.xAxis[0] : opts.xAxis);
     const baseYAxis = cloneObj(
       Array.isArray(opts.yAxis) ? (opts.yAxis[0] ?? opts.yAxis) : opts.yAxis,
     );
@@ -229,9 +218,7 @@ export const convertMultiSQLData = async (
   const isTrellis =
     !!panelSchema.config?.trellis?.layout &&
     (panelSchema.queries?.length ?? 0) > 0 &&
-    panelSchema.queries.every(
-      (q: any) => (q?.fields?.breakdown?.length ?? 0) > 0,
-    );
+    panelSchema.queries.every((q: any) => (q?.fields?.breakdown?.length ?? 0) > 0);
 
   for (let i = 0; i < searchQueryData.length; i++) {
     // Get the original query index from metadata (handling time-shifts gracefully)
@@ -249,9 +236,7 @@ export const convertMultiSQLData = async (
     const querySchema = {
       ...panelSchema,
       queries: [panelSchema.queries[panelQueryIndex]],
-      ...(isMultiQuery
-        ? { config: { ...panelSchema.config, trellis: undefined } }
-        : {}),
+      ...(isMultiQuery ? { config: { ...panelSchema.config, trellis: undefined } } : {}),
     };
 
     options.push(
@@ -298,10 +283,7 @@ export const convertMultiSQLData = async (
   };
 
   // C5: Pie/Donut — merge data arrays into single series (not series concat)
-  if (
-    (chartType === "pie" || chartType === "donut") &&
-    options.length > 1
-  ) {
+  if ((chartType === "pie" || chartType === "donut") && options.length > 1) {
     const mergedData: any[] = [];
 
     options.forEach((opt: any, execIndex: number) => {
@@ -309,11 +291,7 @@ export const convertMultiSQLData = async (
       const queryConfig = panelSchema.queries[panelQueryIndex]?.config;
 
       opt?.options?.series?.[0]?.data?.forEach((d: any) => {
-        const labeledName = buildLabeledName(
-          d.name,
-          queryConfig,
-          execIndex,
-        );
+        const labeledName = buildLabeledName(d.name, queryConfig, execIndex);
         mergedData.push({ ...d, name: labeledName });
       });
     });
@@ -344,20 +322,13 @@ export const convertMultiSQLData = async (
     // reads and this block references them for every grid cell
     const panelW = chartPanelRef?.value?.offsetWidth ?? 0;
     const panelH = chartPanelRef?.value?.offsetHeight ?? 0;
-    const gridData = calculateGridPositions(
-      panelW,
-      panelH,
-      allMetricSeries.length,
-    );
+    const gridData = calculateGridPositions(panelW, panelH, allMetricSeries.length);
     const longestText = allMetricSeries.reduce(
       (acc: string, s: any) =>
         (s._metricText ?? "").length > acc.length ? (s._metricText ?? "") : acc,
       "",
     );
-    const labelFontSize = Math.max(
-      11,
-      Math.min(14, Math.round(gridData.gridWidth / 30)),
-    );
+    const labelFontSize = Math.max(11, Math.min(14, Math.round(gridData.gridWidth / 30)));
     // The label renders below the value inside the same cell, so the value's
     // vertical budget is the cell height minus the label line and gaps.
     // Sizing against the longest value keeps all cells' fonts identical.
@@ -370,10 +341,8 @@ export const convertMultiSQLData = async (
     allMetricSeries.forEach((s: any, idx: number) => {
       const cell = gridData?.gridArray?.[idx];
       if (!cell) return;
-      const cx =
-        ((parseFloat(cell.left) + parseFloat(cell.width) / 2) / 100) * panelW;
-      const cy =
-        ((parseFloat(cell.top) + parseFloat(cell.height) / 2) / 100) * panelH;
+      const cx = ((parseFloat(cell.left) + parseFloat(cell.width) / 2) / 100) * panelW;
+      const cy = ((parseFloat(cell.top) + parseFloat(cell.height) / 2) / 100) * panelH;
       const fill = s?._metricFillColor ?? chartColor("--color-text-heading");
       // Grid-cell rect (px) is the hover zone; cx/cy/fontSize place + size the
       // copy icon beside the number, clamped inside the cell.
@@ -447,10 +416,7 @@ export const convertMultiSQLData = async (
       chartPanelRef.value.offsetHeight,
       allSeries.length,
     );
-    const minDim = Math.min(
-      gridDataForGauge.gridWidth,
-      gridDataForGauge.gridHeight,
-    );
+    const minDim = Math.min(gridDataForGauge.gridWidth, gridDataForGauge.gridHeight);
 
     allSeries.forEach((s: any, idx: number) => {
       const cell = gridDataForGauge.gridArray[idx];
@@ -540,7 +506,12 @@ export const convertMultiSQLData = async (
         const panelQueryIndex = metadata?.queries?.[i]?.panelQueryIndex ?? i;
         const queryConfig = panelSchema.queries[panelQueryIndex]?.config;
         const periodAsStr = metadata?.queries[i]?.timeRangeGap?.periodAsStr || "";
-        const labeledName = buildLabeledName(srcSeries.name, queryConfig, panelQueryIndex, periodAsStr);
+        const labeledName = buildLabeledName(
+          srcSeries.name,
+          queryConfig,
+          panelQueryIndex,
+          periodAsStr,
+        );
 
         allSeries.push({ ...srcSeries, xAxisIndex: i, yAxisIndex: i, name: labeledName });
 
@@ -579,9 +550,7 @@ export const convertMultiSQLData = async (
       formatter: (params: any) => {
         try {
           const yLabel =
-            allYAxes[params.seriesIndex]?.data?.[params?.value?.[1]] ??
-            params?.seriesName ??
-            "";
+            allYAxes[params.seriesIndex]?.data?.[params?.value?.[1]] ?? params?.seriesName ?? "";
           const rawVal = params?.value?.[2];
           const formatted =
             formatUnitValue(
@@ -621,9 +590,7 @@ export const convertMultiSQLData = async (
 
   if (needsXAxisMerge) {
     // Save each query's original xAxis BEFORE merging
-    const originalXAxes = options.map(
-      (opt: any) => [...(opt?.options?.xAxis?.[0]?.data || [])],
-    );
+    const originalXAxes = options.map((opt: any) => [...(opt?.options?.xAxis?.[0]?.data || [])]);
 
     // Build merged xAxis (union of all queries' values)
     const mergedXAxisSet = new Set<any>();
@@ -653,9 +620,7 @@ export const convertMultiSQLData = async (
 
       // Build value→mergedIndex lookup
       const valueToMergedIdx = new Map<any, number>();
-      mergedXAxis.forEach((val: any, idx: number) =>
-        valueToMergedIdx.set(val, idx),
-      );
+      mergedXAxis.forEach((val: any, idx: number) => valueToMergedIdx.set(val, idx));
 
       // Reindex each series' data array
       opt?.options?.series?.forEach((series: any) => {
@@ -676,19 +641,16 @@ export const convertMultiSQLData = async (
     if (options[0].options.series) {
       const pIdx0 = metadata?.queries?.[0]?.panelQueryIndex ?? 0;
       const q1Config = panelSchema.queries[pIdx0]?.config;
-      const q1Period =
-        metadata?.queries[0]?.timeRangeGap?.periodAsStr || "";
+      const q1Period = metadata?.queries[0]?.timeRangeGap?.periodAsStr || "";
 
-      options[0].options.series = options[0].options.series.map(
-        (it: any) => {
-          if (isAnnotationSeries(it)) return it;
-          return {
-            ...it,
-            name: buildLabeledName(it.name, q1Config, pIdx0, q1Period),
-            _queryIndex: 0,
-          };
-        },
-      );
+      options[0].options.series = options[0].options.series.map((it: any) => {
+        if (isAnnotationSeries(it)) return it;
+        return {
+          ...it,
+          name: buildLabeledName(it.name, q1Config, pIdx0, q1Period),
+          _queryIndex: 0,
+        };
+      });
     }
 
     // Label + merge Q2+ series
@@ -696,8 +658,7 @@ export const convertMultiSQLData = async (
       if (options[i]?.options?.series) {
         const panelQueryIndex = metadata?.queries?.[i]?.panelQueryIndex ?? i;
         const qConfig = panelSchema.queries[panelQueryIndex]?.config;
-        const periodAsStr =
-          metadata?.queries[i]?.timeRangeGap?.periodAsStr || "";
+        const periodAsStr = metadata?.queries[i]?.timeRangeGap?.periodAsStr || "";
 
         options[0].options.series = [
           ...options[0].options.series,
@@ -748,12 +709,7 @@ export const convertMultiSQLData = async (
   // result, grouping series by breakdown value (originalSeriesName) so
   // series from different queries share the same subplot.
   if (isMultiQuery && isTrellis && options[0]?.options && chartPanelRef?.value) {
-    reapplyTrellisLayout(
-      options[0].options,
-      panelSchema,
-      chartPanelRef,
-      chartPanelStyle,
-    );
+    reapplyTrellisLayout(options[0].options, panelSchema, chartPanelRef, chartPanelStyle);
   }
 
   return options[0];
@@ -783,5 +739,4 @@ export const convertSQLData = async (
     annotations,
     loading,
   );
-
 };

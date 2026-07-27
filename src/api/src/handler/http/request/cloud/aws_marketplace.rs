@@ -23,10 +23,11 @@ use o2_enterprise::enterprise::{
     aws_marketplace::{api as aws_mp_api, db as aws_mp_db},
     cloud::billing_group,
 };
+use openobserve_core::auth::UserEmail;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
+    common::meta::http::HttpResponse as MetaHttpResponse,
     handler::http::extractors::Headers,
     service::{organization, users},
 };
@@ -65,7 +66,7 @@ pub async fn aws_marketplace_register(
 
         // Store PKCE state
         let state = login_data.state.clone();
-        if let Err(e) = crate::service::kv::set(
+        if let Err(e) = openobserve_core::kv::set(
             crate::handler::http::auth::validator::PKCE_STATE_ORG,
             &state,
             state.clone().into(),

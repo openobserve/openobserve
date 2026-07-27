@@ -15,10 +15,9 @@
 
 use std::sync::Arc;
 
+use compaction;
 use config::{cluster::LOCAL_NODE, get_config, meta::stream::FileKey, spawn_pausable_job};
 use tokio::sync::{Mutex, mpsc};
-
-use crate::service::compact;
 
 pub async fn run() -> Result<(), anyhow::Error> {
     if !LOCAL_NODE.is_flatten_compactor() {
@@ -43,7 +42,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
                         log::debug!("[FLATTEN_COMPACTOR:JOB] Receiving files channel is closed");
                         break;
                     }
-                    Some(file) => match compact::flatten::generate_file(&file).await {
+                    Some(file) => match compaction::flatten::generate_file(&file).await {
                         Ok(_) => {}
                         Err(e) => {
                             log::error!(
@@ -62,7 +61,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
         get_config().compact.interval,
         {
             log::debug!("[COMPACTOR] Running parquet file data flatten");
-            let ret = compact::flatten::run_generate(tx.clone()).await;
+            let ret = compaction::flatten::run_generate(tx.clone()).await;
             if ret.is_err() {
                 log::error!(
                     "[COMPACTOR] run parquet file data flatten error: {}",

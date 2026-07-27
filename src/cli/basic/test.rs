@@ -32,7 +32,7 @@ pub async fn file_list(
     println!("strategy: {mode}");
     println!("group size: {group_size}gb");
 
-    let file_list = crate::service::file_list::query_for_merge(
+    let file_list = search_service::file_list::query_for_merge(
         org,
         stream_type.into(),
         stream_name,

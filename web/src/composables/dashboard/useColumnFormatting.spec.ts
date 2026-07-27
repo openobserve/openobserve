@@ -78,9 +78,10 @@ describe("useColumnFormatting", () => {
 
     it("serializes a forced field type but omits 'auto'", () => {
       // 'auto' adds no config item, but the field still persists (empty config).
-      expect(
-        serializeColumnOverride({ ...emptyColumnOverride("x"), fieldType: "auto" }),
-      ).toEqual({ field: { matchBy: "name", value: "x" }, config: [] });
+      expect(serializeColumnOverride({ ...emptyColumnOverride("x"), fieldType: "auto" })).toEqual({
+        field: { matchBy: "name", value: "x" },
+        config: [],
+      });
       const num = serializeColumnOverride({ ...emptyColumnOverride("x"), fieldType: "num" });
       expect(num.config).toEqual([{ type: "field_type", value: "num" }]);
       const text = serializeColumnOverride({ ...emptyColumnOverride("x"), fieldType: "text" });
@@ -90,9 +91,7 @@ describe("useColumnFormatting", () => {
     it("persists the unit (no longer gated on numeric-ness)", () => {
       const col = { ...emptyColumnOverride("x"), unit: "bytes" };
       const entry = serializeColumnOverride(col);
-      expect(entry.config).toEqual([
-        { type: "unit", value: { unit: "bytes", customUnit: null } },
-      ]);
+      expect(entry.config).toEqual([{ type: "unit", value: { unit: "bytes", customUnit: null } }]);
     });
 
     it("drops conditional rules with a blank/non-numeric threshold or no operator", () => {
@@ -126,9 +125,7 @@ describe("useColumnFormatting", () => {
         ],
       };
       const entry = serializeColumnOverride(col);
-      expect(
-        entry.config.some((c: any) => c.type === "conditional_styles"),
-      ).toBe(false);
+      expect(entry.config.some((c: any) => c.type === "conditional_styles")).toBe(false);
     });
   });
 
@@ -143,9 +140,7 @@ describe("useColumnFormatting", () => {
         textColor: "#111827",
         bgColor: "#f3f4f6",
         autoColor: true,
-        conditions: [
-          { operator: ">=", threshold: "90", textColor: "#b91c1c", bgColor: "#fef2f2" },
-        ],
+        conditions: [{ operator: ">=", threshold: "90", textColor: "#b91c1c", bgColor: "#fef2f2" }],
       };
       const entry = serializeColumnOverride(original);
       expect(entry.field).toEqual({ matchBy: "name", value: "count" });
@@ -184,11 +179,7 @@ describe("useColumnFormatting", () => {
       ];
       const out = serializeOverrides(cols);
       expect(out).toHaveLength(3);
-      expect(out.map((e: any) => e.field.value).sort()).toEqual([
-        "kept",
-        "num",
-        "txt",
-      ]);
+      expect(out.map((e: any) => e.field.value).sort()).toEqual(["kept", "num", "txt"]);
     });
   });
 });

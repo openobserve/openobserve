@@ -14,9 +14,10 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::ider;
+use db;
 use infra::table::org_ingestion_tokens;
 
-use crate::{common::meta::organization::OrgIngestionToken, service::db};
+use crate::common::meta::organization::OrgIngestionToken;
 
 /// Create the default ingestion token for a newly created org.
 pub async fn create_default_token(org_id: &str, created_by: &str) -> Result<(), anyhow::Error> {

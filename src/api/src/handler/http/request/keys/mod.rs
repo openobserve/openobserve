@@ -14,25 +14,22 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use axum::{extract::Path, response::Response};
+use common::meta::http::HttpResponse as MetaHttpResponse;
 #[cfg(feature = "enterprise")]
 use {
-    crate::cipher::{KeyAddRequest, KeyGetResponse, KeyInfo, KeyListResponse},
-    crate::common::utils::auth::check_permissions,
-    crate::common::{
-        meta::authz::Authz,
-        utils::auth::{UserEmail, remove_ownership, set_ownership},
-    },
     crate::handler::http::{
         extractors::Headers,
         request::{BulkDeleteRequest, BulkDeleteResponse},
     },
     axum::{Json, http::StatusCode, response::IntoResponse},
+    common::meta::authz::Authz,
     config::utils::time::now_micros,
+    db::authz::{remove_ownership, set_ownership},
     infra::table::cipher::CipherEntry,
     o2_enterprise::enterprise::cipher::{Cipher, CipherData, http_repr::merge_updates},
+    openobserve_cipher::enterprise::{KeyAddRequest, KeyGetResponse, KeyInfo, KeyListResponse},
+    openobserve_core::auth::{UserEmail, check_permissions},
 };
-
-use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 
 #[cfg(feature = "enterprise")]
 /// Store a key credential in db
@@ -92,7 +89,7 @@ pub async fn save(
         Err(e) => return MetaHttpResponse::bad_request(e),
     }
 
-    match crate::service::db::keys::add(CipherEntry {
+    match db::keys::add(CipherEntry {
         org: org_id.to_string(),
         created_at: now_micros(),
         created_by: user_id.to_string(),
@@ -309,7 +306,7 @@ pub async fn delete(Path(path): Path<(String, String)>) -> Response {
     #[cfg(feature = "enterprise")]
     {
         let (org_id, key_name) = path;
-        match crate::service::db::keys::remove(
+        match db::keys::remove(
             &org_id,
             infra::table::cipher::EntryKind::CipherKey,
             &key_name,
@@ -394,7 +391,7 @@ pub async fn delete_bulk(
     let mut unsuccessful = Vec::with_capacity(body.ids.len());
     let mut err = None;
     for key_name in &body.ids {
-        match crate::service::db::keys::remove(
+        match db::keys::remove(
             &org_id,
             infra::table::cipher::EntryKind::CipherKey,
             key_name,
@@ -509,7 +506,7 @@ pub async fn update(
         Err(e) => return MetaHttpResponse::bad_request(e),
     }
 
-    match crate::service::db::keys::update(CipherEntry {
+    match db::keys::update(CipherEntry {
         org: org_id.to_string(),
         created_at: now_micros(),
         created_by: user_id.to_string(),

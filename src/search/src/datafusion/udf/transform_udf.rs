@@ -26,11 +26,9 @@ use datafusion::{
     logical_expr::{ColumnarValue, ScalarUDF, Volatility},
     prelude::create_udf,
 };
-use transform::{
-    QUERY_FUNCTIONS, compile_vrl_function,
-    vector_enrichment::TableRegistry,
-    vrl::compiler::{TargetValueRef, VrlRuntime, runtime::Runtime},
-};
+use transform::{QUERY_FUNCTIONS, compile_vrl_function};
+use vector_enrichment::TableRegistry;
+use vrl::compiler::{TargetValueRef, VrlRuntime, runtime::Runtime};
 
 type FnType = Arc<dyn Fn(&[ColumnarValue]) -> Result<ColumnarValue> + Sync + Send>;
 
@@ -80,7 +78,7 @@ fn get_udf_vrl(
         let len = args[0].len();
         let in_params = local_fn_params.split(',').collect::<Vec<&str>>();
         let mut res_data_vec = vec![];
-        let mut runtime = Runtime::new(transform::vrl::prelude::state::RuntimeState::default());
+        let mut runtime = Runtime::new(vrl::prelude::state::RuntimeState::default());
 
         for i in 0..len {
             let mut obj_str = String::from("");
@@ -117,19 +115,16 @@ fn get_udf_vrl(
     Ok(create_user_df(fn_name.as_str(), num_args, vrl_calc))
 }
 
-pub fn apply_vrl_fn(
-    runtime: &mut Runtime,
-    program: transform::vrl::compiler::Program,
-) -> json::Value {
+pub fn apply_vrl_fn(runtime: &mut Runtime, program: vrl::compiler::Program) -> json::Value {
     let obj_str = String::from("");
 
-    let mut metadata = transform::vrl::value::Value::from(BTreeMap::new());
+    let mut metadata = vrl::value::Value::from(BTreeMap::new());
     let mut target = TargetValueRef {
-        value: &mut transform::vrl::value::Value::from(obj_str),
+        value: &mut vrl::value::Value::from(obj_str),
         metadata: &mut metadata,
-        secrets: &mut transform::vrl::value::Secrets::new(),
+        secrets: &mut vrl::value::Secrets::new(),
     };
-    let timezone = transform::vrl::compiler::TimeZone::Local;
+    let timezone = vrl::compiler::TimeZone::Local;
     let result = match VrlRuntime::default() {
         VrlRuntime::Ast => runtime.resolve(&mut target, &program, &timezone),
     };

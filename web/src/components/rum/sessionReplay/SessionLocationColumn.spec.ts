@@ -109,7 +109,9 @@ describe("SessionLocationColumn", () => {
       await flushPromises();
 
       // Act
-      await wrapper.setProps({ column: { ...mockColumn, country_iso_code: "uk", country: "United Kingdom" } });
+      await wrapper.setProps({
+        column: { ...mockColumn, country_iso_code: "uk", country: "United Kingdom" },
+      });
 
       // Assert
       expect(wrapper.find(".fi-uk").exists()).toBe(true);
@@ -267,8 +269,20 @@ describe("SessionLocationColumn", () => {
       await flushPromises();
 
       const testCases = [
-        { country: "Japan", country_iso_code: "jp", city: "Tokyo", browser: "Chrome", os: "Android" },
-        { country: "Brazil", country_iso_code: "br", city: "São Paulo", browser: "Firefox", os: "iOS" },
+        {
+          country: "Japan",
+          country_iso_code: "jp",
+          city: "Tokyo",
+          browser: "Chrome",
+          os: "Android",
+        },
+        {
+          country: "Brazil",
+          country_iso_code: "br",
+          city: "São Paulo",
+          browser: "Firefox",
+          os: "iOS",
+        },
       ];
 
       // Act & Assert

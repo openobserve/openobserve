@@ -14,18 +14,12 @@ const props = defineProps<FormTimeProps>();
 const form = inject(FORM_CONTEXT_KEY, null);
 
 if (import.meta.env.DEV && !form) {
-  console.warn(
-    "[OFormTime] must be rendered inside <OForm>. No form context found.",
-  );
+  console.warn("[OFormTime] must be rendered inside <OForm>. No form context found.");
 }
 </script>
 
 <template>
-  <component
-    v-if="form"
-    :is="form.Field"
-    :name="props.name"
-  >
+  <component v-if="form" :is="form.Field" :name="props.name">
     <template #default="{ field }">
       <OTime
         v-bind="$attrs"
@@ -44,13 +38,9 @@ if (import.meta.env.DEV && !form) {
         :id="props.id"
         :name="props.name"
         :model-value="field.state.value"
-        :error="
-          field.state.meta.errors.length > 0
-        "
+        :error="field.state.meta.errors.length > 0"
         :error-message="
-          field.state.meta.errors.length > 0
-            ? firstFieldError(field.state.meta.errors)
-            : undefined
+          field.state.meta.errors.length > 0 ? firstFieldError(field.state.meta.errors) : undefined
         "
         @update:model-value="field.handleChange"
         @blur="field.handleBlur"

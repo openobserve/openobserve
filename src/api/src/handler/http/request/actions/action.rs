@@ -18,23 +18,23 @@ use axum::{
     extract::{Multipart, Path},
     response::Response,
 };
+use openobserve_core::auth::UserEmail;
 #[cfg(feature = "enterprise")]
 use {
     crate::{
-        common::{
-            meta::authz::Authz,
-            utils::auth::{check_permissions, remove_ownership, set_ownership},
-        },
+        common::meta::authz::Authz,
         handler::http::models::action::{GetActionDetailsResponse, GetActionInfoResponse},
         service::organization::get_service_account_passcode,
     },
     bytes::Bytes,
     config::meta::actions::action::{Action, ExecutionDetailsType},
+    db::authz::{remove_ownership, set_ownership},
     infra::table::action_scripts,
     o2_enterprise::enterprise::actions::action_manager::{
         delete_app_from_target_cluster, get_action_details, get_actions, register_app,
         serve_file_from_s3, update_app_on_target_cluster,
     },
+    openobserve_core::auth::check_permissions,
     regex::Regex,
     serde_json,
     std::collections::HashMap,
@@ -44,7 +44,7 @@ use {
 };
 
 use crate::{
-    common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
+    common::meta::http::HttpResponse as MetaHttpResponse,
     handler::http::{
         extractors::Headers,
         request::{BulkDeleteRequest, BulkDeleteResponse},

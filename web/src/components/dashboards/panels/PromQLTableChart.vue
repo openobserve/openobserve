@@ -15,10 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="h-full w-full flex flex-col relative"
-    data-test="promql-table-chart"
-  >
-    <div class="h-full relative">
+  <div class="relative flex h-full w-full flex-col" data-test="promql-table-chart">
+    <div class="relative h-full">
       <TableRenderer
         ref="innerTableRef"
         :data="{ rows: filteredTableRows, columns: tableColumns }"
@@ -32,9 +30,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Override bottom slot to add legend filter alongside native pagination -->
         <!-- When legend footer is not shown, TableRenderer's default pagination will be used -->
         <template #bottom="scope" v-if="showLegendFooter">
-          <div class="flex items-center w-full" data-test="dashboard-table-pagination">
+          <div class="flex w-full items-center" data-test="dashboard-table-pagination">
             <div class="flex items-center gap-1">
-              <OSelect class="min-w-50 max-w-100"
+              <OSelect
+                class="max-w-100 min-w-50"
                 v-model="selectedLegend"
                 :options="legendOptions"
                 :placeholder="t('dashboard.promQLTableChart.selectSeriesToFilter')"
@@ -91,9 +90,7 @@ export default defineComponent({
       default: false,
     },
   },
-  components: { TableRenderer, TablePaginationControls, OSelect,
-    OIcon,
-},
+  components: { TableRenderer, TablePaginationControls, OSelect, OIcon },
   setup(props) {
     const store = useStore();
     const { t } = useI18n();
@@ -163,9 +160,7 @@ export default defineComponent({
     const showLegendFooter = computed(() => {
       const tableMode = props.config?.promql_table_mode || "single";
       // Show legend footer in both "single" and "expanded_timeseries" modes
-      return (
-        (tableMode === "single" || tableMode === "expanded_timeseries")
-      );
+      return tableMode === "single" || tableMode === "expanded_timeseries";
     });
 
     // Filter rows based on selected legend

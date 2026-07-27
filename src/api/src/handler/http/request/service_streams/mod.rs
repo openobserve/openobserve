@@ -19,12 +19,12 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
 };
-
+use openobserve_core::auth::UserEmail;
 #[cfg(feature = "enterprise")]
-use crate::common::utils::auth::check_permissions;
+use openobserve_core::auth::check_permissions;
+
 use crate::{
-    common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
-    handler::http::extractors::Headers,
+    common::meta::http::HttpResponse as MetaHttpResponse, handler::http::extractors::Headers,
 };
 
 /// GET /api/{org_id}/service_streams/_analytics
@@ -80,8 +80,7 @@ pub async fn get_dimension_analytics(
         {
             return MetaHttpResponse::forbidden("Unauthorized Access");
         }
-        let semantic_groups =
-            crate::service::db::system_settings::get_semantic_field_groups(&org_id).await;
+        let semantic_groups = db::system_settings::get_semantic_field_groups(&org_id).await;
         match o2_enterprise::enterprise::service_streams::storage::ServiceStorage::calculate_dimension_analytics(&org_id, semantic_groups)
             .await
         {
@@ -127,8 +126,7 @@ pub async fn list_services(
                 return MetaHttpResponse::internal_error(format!("Failed to list services: {e}"));
             }
         };
-        let identity_config =
-            crate::service::db::system_settings::get_service_identity_config(&org_id).await;
+        let identity_config = db::system_settings::get_service_identity_config(&org_id).await;
         let records = if identity_config.service_optional {
             o2_enterprise::enterprise::service_streams::storage::merge_by_disambiguation(records)
         } else {
@@ -216,16 +214,14 @@ pub async fn correlate_streams(
         {
             return MetaHttpResponse::forbidden("Unauthorized Access");
         }
-        let identity_config =
-            crate::service::db::system_settings::get_service_identity_config(&org_id).await;
+        let identity_config = db::system_settings::get_service_identity_config(&org_id).await;
         log::debug!(
             "[correlation] Loaded service_identity config for org {}: sets={}, tracked_alias_ids={:?}",
             org_id,
             identity_config.sets.len(),
             identity_config.tracked_alias_ids
         );
-        let semantic_groups =
-            crate::service::db::system_settings::get_semantic_field_groups(&org_id).await;
+        let semantic_groups = db::system_settings::get_semantic_field_groups(&org_id).await;
 
         // Enhanced debug logging for correlation troubleshooting
         log::debug!(
@@ -345,7 +341,7 @@ pub async fn get_identity_config(
     #[cfg(not(feature = "enterprise"))]
     let _ = &user_email;
 
-    let cfg = crate::service::db::system_settings::get_service_identity_config(&org_id).await;
+    let cfg = db::system_settings::get_service_identity_config(&org_id).await;
     MetaHttpResponse::json(cfg)
 }
 
@@ -404,7 +400,7 @@ pub async fn save_identity_config(
                 .collect();
         // User-defined semantic groups stored in system_settings
         known_ids.extend(
-            crate::service::db::system_settings::get_semantic_field_groups(&org_id)
+            db::system_settings::get_semantic_field_groups(&org_id)
                 .await
                 .into_iter()
                 .map(|g| g.id),

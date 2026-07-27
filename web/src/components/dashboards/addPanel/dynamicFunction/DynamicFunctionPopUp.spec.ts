@@ -20,7 +20,6 @@ import { createStore } from "vuex";
 import { createI18n } from "vue-i18n";
 import enLocaleFull from "@/locales/languages/en-US.json";
 
-
 const i18n = createI18n({
   legacy: false,
   locale: "en",
@@ -94,27 +93,19 @@ describe("DynamicFunctionPopUp", () => {
 
     it("should render property section", () => {
       wrapper = createWrapper();
-      const propertyLabel = wrapper.find(
-        '[data-test="dynamic-function-popup-property-label"]',
-      );
+      const propertyLabel = wrapper.find('[data-test="dynamic-function-popup-property-label"]');
       expect(propertyLabel.text()).toBe("Property");
     });
 
     it("should render label input", () => {
       wrapper = createWrapper();
-      expect(
-        wrapper.find('[data-test="dynamic-function-popup-label-input"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="dynamic-function-popup-label-input"]').exists()).toBe(true);
     });
 
     it("should render alias input", () => {
       wrapper = createWrapper();
-      expect(
-        wrapper.find('[data-test="dynamic-function-popup-label-input"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="dynamic-function-popup-alias-input"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="dynamic-function-popup-label-input"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="dynamic-function-popup-alias-input"]').exists()).toBe(true);
     });
 
     it("should render tabs", () => {
@@ -173,9 +164,7 @@ describe("DynamicFunctionPopUp", () => {
     it("should update label on input", async () => {
       wrapper = createWrapper();
       // OInput renders a div wrapper; find the native input inside it
-      const nativeInput = wrapper.find(
-        '[data-test="dynamic-function-popup-label-input"] input',
-      );
+      const nativeInput = wrapper.find('[data-test="dynamic-function-popup-label-input"] input');
 
       await nativeInput.setValue("Updated Label");
       await flushPromises();
@@ -194,9 +183,7 @@ describe("DynamicFunctionPopUp", () => {
     it("should apply correct theme class to input", () => {
       wrapper = createWrapper({}, mockStoreDark);
       // OInput uses CSS tokens for dark-mode theming; the label input still renders
-      expect(
-        wrapper.find('[data-test="dynamic-function-popup-label-input"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="dynamic-function-popup-label-input"]').exists()).toBe(true);
     });
   });
 
@@ -209,9 +196,7 @@ describe("DynamicFunctionPopUp", () => {
     it("should be disabled", () => {
       wrapper = createWrapper();
       // OInput renders a div wrapper; the disabled attr is on the native input inside
-      const nativeInput = wrapper.find(
-        '[data-test="dynamic-function-popup-alias-input"] input',
-      );
+      const nativeInput = wrapper.find('[data-test="dynamic-function-popup-alias-input"] input');
       expect(nativeInput.attributes("disabled")).toBeDefined();
     });
 
@@ -547,18 +532,14 @@ describe("DynamicFunctionPopUp", () => {
   describe("Theme Support", () => {
     it("should apply light theme to inputs", () => {
       wrapper = createWrapper({}, mockStore);
-      const labelInput = wrapper.find(
-        '[data-test="dynamic-function-popup-label-input"]',
-      );
+      const labelInput = wrapper.find('[data-test="dynamic-function-popup-label-input"]');
       expect(labelInput.classes()).not.toContain("bg-gray-800");
     });
 
     it("should apply dark theme to inputs", () => {
       wrapper = createWrapper({}, mockStoreDark);
       // OInput uses CSS tokens for dark-mode theming; the element still renders
-      expect(
-        wrapper.find('[data-test="dynamic-function-popup-label-input"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="dynamic-function-popup-label-input"]').exists()).toBe(true);
     });
 
     it("should access store theme", () => {
@@ -650,18 +631,14 @@ describe("DynamicFunctionPopUp", () => {
 
     it("should apply correct label styles", () => {
       wrapper = createWrapper();
-      const boldLabel = wrapper.find(
-        '[data-test="dynamic-function-popup-property-label"]',
-      );
+      const boldLabel = wrapper.find('[data-test="dynamic-function-popup-property-label"]');
       expect(boldLabel.exists()).toBe(true);
       expect(boldLabel.classes()).toContain("font-semibold");
     });
 
     it("should apply correct normal label styles", () => {
       wrapper = createWrapper();
-      const normalLabel = wrapper.find(
-        '[data-test="dynamic-function-popup-label-text"]',
-      );
+      const normalLabel = wrapper.find('[data-test="dynamic-function-popup-label-text"]');
       expect(normalLabel.exists()).toBe(true);
       expect(normalLabel.classes()).toContain("font-normal");
     });
@@ -669,9 +646,7 @@ describe("DynamicFunctionPopUp", () => {
     it("should have edit-input class on inputs", () => {
       wrapper = createWrapper();
       // OInput applies w-full from the class prop on its outer div
-      const labelInput = wrapper.find(
-        '[data-test="dynamic-function-popup-label-input"]',
-      );
+      const labelInput = wrapper.find('[data-test="dynamic-function-popup-label-input"]');
       expect(labelInput.classes()).toContain("w-full");
     });
   });

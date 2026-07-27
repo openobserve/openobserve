@@ -43,9 +43,7 @@ vi.mock("@/services/service_streams", () => ({
     },
   }),
   getSemanticGroups: vi.fn().mockResolvedValue({ data: [] }),
-  getDimensionAnalytics: vi
-    .fn()
-    .mockResolvedValue({ data: { available_groups: [] } }),
+  getDimensionAnalytics: vi.fn().mockResolvedValue({ data: { available_groups: [] } }),
   buildChipDimensionsFromFilters: vi.fn().mockReturnValue({}),
 }));
 
@@ -80,10 +78,7 @@ vi.mock("vue-i18n", async () => {
     if (identityKeys.has(key)) return key;
     const val = key
       .split(".")
-      .reduce<any>(
-        (acc, part) => (acc == null ? undefined : acc[part]),
-        enLocaleFull,
-      );
+      .reduce<any>((acc, part) => (acc == null ? undefined : acc[part]), enLocaleFull);
     return typeof val === "string" ? val : key;
   };
   return {
@@ -117,7 +112,6 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
 import ServiceGraphNodeSidePanel from "./ServiceGraphNodeSidePanel.vue";
 import searchService from "@/services/search";
 import { correlate as correlateStreams } from "@/services/service_streams";
-
 
 // ---------------------------------------------------------------------------
 // Shared fixtures
@@ -200,9 +194,7 @@ const ODrawerStub = {
   `,
 };
 
-function mountPanel(
-  props: Partial<InstanceType<typeof ServiceGraphNodeSidePanel>["$props"]> = {},
-) {
+function mountPanel(props: Partial<InstanceType<typeof ServiceGraphNodeSidePanel>["$props"]> = {}) {
   return mount(ServiceGraphNodeSidePanel, {
     global: {
       plugins: [store],
@@ -216,13 +208,15 @@ function mountPanel(
         // Render ODropdown content inline so data-test items are always queryable
         ODropdown: {
           name: "ODropdown",
-          template: '<div class="o-dropdown-stub" v-bind="$attrs"><slot name="trigger" /><slot /></div>',
+          template:
+            '<div class="o-dropdown-stub" v-bind="$attrs"><slot name="trigger" /><slot /></div>',
           emits: ["update:open"],
           props: ["open", "side", "align", "sideOffset"],
         },
         ODropdownItem: {
           name: "ODropdownItem",
-          template: '<div class="o-dropdown-item-stub" v-bind="$attrs" @click="$emit(\'select\')"><slot name="icon-left" /><slot /></div>',
+          template:
+            '<div class="o-dropdown-item-stub" v-bind="$attrs" @click="$emit(\'select\')"><slot name="icon-left" /><slot /></div>',
           emits: ["select"],
         },
         // OTabs stub — Reka UI-based, needs stub to avoid context errors
@@ -234,7 +228,8 @@ function mountPanel(
         },
         OTab: {
           name: "OTab",
-          template: '<div class="o-tab-stub" v-bind="$attrs" @click="$parent.$emit(\'update:modelValue\', name)"><slot /></div>',
+          template:
+            '<div class="o-tab-stub" v-bind="$attrs" @click="$parent.$emit(\'update:modelValue\', name)"><slot /></div>',
           props: ["name", "label", "style"],
         },
         // OTabPanels: provide reactive context via setup()
@@ -300,24 +295,17 @@ describe("ServiceGraphNodeSidePanel", () => {
     });
 
     it("should render the panel when visible is true", () => {
-      expect(
-        wrapper.find('[data-test="service-graph-side-panel"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="service-graph-side-panel"]').exists()).toBe(true);
     });
 
     it("should not render the panel when visible is false", () => {
       wrapper = mountPanel({ visible: false });
-      expect(
-        wrapper.find('[data-test="service-graph-side-panel"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="service-graph-side-panel"]').exists()).toBe(false);
     });
 
     it("should render the close button", () => {
-      expect(
-        wrapper.find('[data-test="o-drawer-close-btn"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="o-drawer-close-btn"]').exists()).toBe(true);
     });
-
   });
 
   // -------------------------------------------------------------------------
@@ -404,21 +392,15 @@ describe("ServiceGraphNodeSidePanel", () => {
     it("should render the red-charts section when streamFilter is not 'all'", async () => {
       wrapper = mountPanel({ streamFilter: "default" });
       await flushPromises();
-      expect(
-        wrapper
-          .find('[data-test="service-graph-side-panel-red-charts"]')
-          .exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="service-graph-side-panel-red-charts"]').exists()).toBe(true);
     });
 
     it("should NOT render the red-charts section when streamFilter is 'all'", async () => {
       wrapper = mountPanel({ streamFilter: "all" });
       await flushPromises();
-      expect(
-        wrapper
-          .find('[data-test="service-graph-side-panel-red-charts"]')
-          .exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="service-graph-side-panel-red-charts"]').exists()).toBe(
+        false,
+      );
     });
   });
 
@@ -433,29 +415,19 @@ describe("ServiceGraphNodeSidePanel", () => {
 
     it("should render the tabs when streamFilter is not 'all'", async () => {
       await flushPromises();
-      expect(
-        wrapper
-          .find('[data-test="service-graph-node-panel-tabs"]')
-          .exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="service-graph-node-panel-tabs"]').exists()).toBe(true);
     });
 
     it("should NOT render the tabs when streamFilter is 'all'", async () => {
       wrapper = mountPanel({ streamFilter: "all" });
       await flushPromises();
-      expect(
-        wrapper
-          .find('[data-test="service-graph-node-panel-tabs"]')
-          .exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="service-graph-node-panel-tabs"]').exists()).toBe(false);
     });
 
     it("should default to the operations tab panel", async () => {
       await flushPromises();
       expect(
-        wrapper
-          .find('[data-test="service-graph-side-panel-recent-operations"]')
-          .exists(),
+        wrapper.find('[data-test="service-graph-side-panel-recent-operations"]').exists(),
       ).toBe(true);
     });
   });
@@ -489,69 +461,49 @@ describe("ServiceGraphNodeSidePanel", () => {
 
     it("should render the metrics tab", async () => {
       await flushPromises();
-      expect(
-        wrapper
-          .find('[data-test="service-graph-node-panel-tab-metrics"]')
-          .exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="service-graph-node-panel-tab-metrics"]').exists()).toBe(
+        true,
+      );
     });
 
     it("should show loading state when metricsCorrelationLoading is true", async () => {
       // Delay the correlate response so the loading state is visible
-      vi.mocked(correlateStreams).mockImplementationOnce(
-        () => new Promise(() => {}),
-      );
+      vi.mocked(correlateStreams).mockImplementationOnce(() => new Promise(() => {}));
 
       // Activate the metrics tab to trigger fetchMetricsCorrelation
-      const metricsTab = wrapper.find(
-        '[data-test="service-graph-node-panel-tab-metrics"]',
-      );
+      const metricsTab = wrapper.find('[data-test="service-graph-node-panel-tab-metrics"]');
       expect(metricsTab.exists()).toBe(true);
       await metricsTab.trigger("click");
       await flushPromises();
 
-      expect(
-        wrapper
-          .find('[data-test="service-graph-side-panel-metrics-loading"]')
-          .exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="service-graph-side-panel-metrics-loading"]').exists()).toBe(
+        true,
+      );
     });
 
     it("should show error state when metricsCorrelationError is set", async () => {
-      vi.mocked(correlateStreams).mockRejectedValueOnce(
-        new Error("Network failure"),
-      );
+      vi.mocked(correlateStreams).mockRejectedValueOnce(new Error("Network failure"));
 
-      const metricsTab = wrapper.find(
-        '[data-test="service-graph-node-panel-tab-metrics"]',
-      );
+      const metricsTab = wrapper.find('[data-test="service-graph-node-panel-tab-metrics"]');
       expect(metricsTab.exists()).toBe(true);
       await metricsTab.trigger("click");
       await flushPromises();
 
-      const errorEl = wrapper.find(
-        '[data-test="service-graph-side-panel-metrics-error"]',
-      );
+      const errorEl = wrapper.find('[data-test="service-graph-side-panel-metrics-error"]');
       expect(errorEl.exists()).toBe(true);
       expect(errorEl.text()).toContain("Network failure");
     });
 
     it("should call fetchMetricsCorrelation with true when retry button is clicked", async () => {
       // First call fails to put the component into error state
-      vi.mocked(correlateStreams).mockRejectedValueOnce(
-        new Error("Server error"),
-      );
+      vi.mocked(correlateStreams).mockRejectedValueOnce(new Error("Server error"));
 
-      const metricsTab = wrapper.find(
-        '[data-test="service-graph-node-panel-tab-metrics"]',
-      );
+      const metricsTab = wrapper.find('[data-test="service-graph-node-panel-tab-metrics"]');
       expect(metricsTab.exists()).toBe(true);
       await metricsTab.trigger("click");
       await flushPromises();
 
-      const retryBtn = wrapper.find(
-        '[data-test="service-graph-side-panel-metrics-retry-btn"]',
-      );
+      const retryBtn = wrapper.find('[data-test="service-graph-side-panel-metrics-retry-btn"]');
       expect(retryBtn.exists()).toBe(true);
 
       // Second call succeeds
@@ -568,11 +520,9 @@ describe("ServiceGraphNodeSidePanel", () => {
       await flushPromises();
 
       // After retry succeeds the error state should be gone
-      expect(
-        wrapper
-          .find('[data-test="service-graph-side-panel-metrics-error"]')
-          .exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="service-graph-side-panel-metrics-error"]').exists()).toBe(
+        false,
+      );
     });
   });
 
@@ -612,9 +562,7 @@ describe("ServiceGraphNodeSidePanel", () => {
       } as any);
       wrapper = mountPanel({ streamFilter: "default" });
       await flushPromises();
-      const panel = wrapper.find(
-        '[data-test="service-graph-side-panel-recent-operations"]',
-      );
+      const panel = wrapper.find('[data-test="service-graph-side-panel-recent-operations"]');
       expect(panel.exists()).toBe(true);
       expect(panel.text()).toContain("No operations found");
     });
@@ -634,20 +582,15 @@ describe("ServiceGraphNodeSidePanel", () => {
         selectedNode: { ...baseNode, name: "load_skill", service_type: "tool" },
       });
       await flushPromises();
-      const sql =
-        vi.mocked(searchService.search).mock.calls[0][0].query.query.sql;
+      const sql = vi.mocked(searchService.search).mock.calls[0][0].query.query.sql;
       // Nearest-ancestor-agent caller, not raw service_name.
-      expect(sql).toContain(
-        "COALESCE(c.gen_ai_agent_name, p1.gen_ai_agent_name",
-      );
+      expect(sql).toContain("COALESCE(c.gen_ai_agent_name, p1.gen_ai_agent_name");
       expect(sql).toContain("c.service_name)");
       // Chained ancestor joins, one per level, keyed on parent span + trace.
       expect(sql).toContain(
         'LEFT JOIN "sre_agent_v2" AS p1 ON c.reference_parent_span_id = p1.span_id',
       );
-      expect(sql).toContain(
-        "p1.reference_parent_span_id = p2.span_id",
-      );
+      expect(sql).toContain("p1.reference_parent_span_id = p2.span_id");
       expect((sql.match(/LEFT JOIN/g) || []).length).toBe(4);
       // Filters the tool's own spans (child-qualified identity field).
       expect(sql).toContain("c.gen_ai_tool_name = 'load_skill'");
@@ -665,8 +608,7 @@ describe("ServiceGraphNodeSidePanel", () => {
         selectedNode: { ...baseNode, name: "postgres", service_type: "database" },
       });
       await flushPromises();
-      const sql =
-        vi.mocked(searchService.search).mock.calls[0][0].query.query.sql;
+      const sql = vi.mocked(searchService.search).mock.calls[0][0].query.query.sql;
       // Inferred deps genuinely have the caller on service_name — no agent climb.
       expect(sql).toContain("service_name as caller_service");
       expect(sql).not.toContain("LEFT JOIN");
@@ -682,17 +624,14 @@ describe("ServiceGraphNodeSidePanel", () => {
       wrapper = mountPanel({ streamFilter: "default" });
       await flushPromises();
 
-      const initialCallCount = vi.mocked(searchService.search).mock.calls
-        .length;
+      const initialCallCount = vi.mocked(searchService.search).mock.calls.length;
 
       await wrapper.setProps({
         selectedNode: { ...baseNode, id: "new-service", name: "new-service" },
       });
       await flushPromises();
 
-      expect(vi.mocked(searchService.search).mock.calls.length).toBeGreaterThan(
-        initialCallCount,
-      );
+      expect(vi.mocked(searchService.search).mock.calls.length).toBeGreaterThan(initialCallCount);
     });
   });
 
@@ -734,9 +673,7 @@ describe("ServiceGraphNodeSidePanel", () => {
     });
 
     it("should show a warning notification when correlate throws an error", async () => {
-      vi.mocked(correlateStreams).mockRejectedValueOnce(
-        new Error("Network failure"),
-      );
+      vi.mocked(correlateStreams).mockRejectedValueOnce(new Error("Network failure"));
 
       const viewRelatedLogsBtn = wrapper.find(
         '[data-test="service-graph-node-panel-view-related-logs-btn"]',
@@ -754,9 +691,7 @@ describe("ServiceGraphNodeSidePanel", () => {
     });
 
     it("should NOT navigate to /logs when correlate throws an error", async () => {
-      vi.mocked(correlateStreams).mockRejectedValueOnce(
-        new Error("Network failure"),
-      );
+      vi.mocked(correlateStreams).mockRejectedValueOnce(new Error("Network failure"));
 
       const viewRelatedLogsBtn = wrapper.find(
         '[data-test="service-graph-node-panel-view-related-logs-btn"]',
@@ -783,9 +718,7 @@ describe("ServiceGraphNodeSidePanel", () => {
     });
 
     it("should have top-level IDs in order: pods, nodes", () => {
-      const ids = wrapper.vm.metricGroupResources.map(
-        (g: { id: string }) => g.id,
-      );
+      const ids = wrapper.vm.metricGroupResources.map((g: { id: string }) => g.id);
       expect(ids).toEqual(["pods", "nodes"]);
     });
 
@@ -797,22 +730,9 @@ describe("ServiceGraphNodeSidePanel", () => {
 
     it("should nest compute/memory/network/storage/others under each top-level group", () => {
       const groups = wrapper.vm.metricGroupResources;
-      const childIds = (g: { children?: { id: string }[] }) =>
-        (g.children ?? []).map((c) => c.id);
-      expect(childIds(groups[0])).toEqual([
-        "compute",
-        "memory",
-        "network",
-        "storage",
-        "others",
-      ]);
-      expect(childIds(groups[1])).toEqual([
-        "compute",
-        "memory",
-        "network",
-        "storage",
-        "others",
-      ]);
+      const childIds = (g: { children?: { id: string }[] }) => (g.children ?? []).map((c) => c.id);
+      expect(childIds(groups[0])).toEqual(["compute", "memory", "network", "storage", "others"]);
+      expect(childIds(groups[1])).toEqual(["compute", "memory", "network", "storage", "others"]);
     });
   });
 
@@ -865,9 +785,7 @@ describe("ServiceGraphNodeSidePanel", () => {
       await viewRelatedLogsBtn.trigger("click");
       await flushPromises();
 
-      expect(notifyMock).not.toHaveBeenCalledWith(
-        expect.objectContaining({ type: "warning" }),
-      );
+      expect(notifyMock).not.toHaveBeenCalledWith(expect.objectContaining({ type: "warning" }));
     });
   });
 
@@ -1390,9 +1308,7 @@ describe("ServiceGraphNodeSidePanel", () => {
   describe("metrics tab visibility for inferred services", () => {
     it("should render metrics tab for regular (non-inferred) services", () => {
       wrapper = mountPanel({ selectedNode: baseNode });
-      const metricsTab = wrapper.find(
-        '[data-test="service-graph-node-panel-tab-metrics"]',
-      );
+      const metricsTab = wrapper.find('[data-test="service-graph-node-panel-tab-metrics"]');
       expect(metricsTab.exists()).toBe(true);
     });
 
@@ -1400,9 +1316,7 @@ describe("ServiceGraphNodeSidePanel", () => {
       wrapper = mountPanel({
         selectedNode: { ...baseNode, service_type: "database" },
       });
-      const metricsTab = wrapper.find(
-        '[data-test="service-graph-node-panel-tab-metrics"]',
-      );
+      const metricsTab = wrapper.find('[data-test="service-graph-node-panel-tab-metrics"]');
       expect(metricsTab.exists()).toBe(false);
     });
   });

@@ -17,7 +17,7 @@ import { computed } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import config from "@/aws-exports";
-import { b64EncodeUnicode, useLocalLogFilterField, } from "@/utils/zincutils";
+import { b64EncodeUnicode, useLocalLogFilterField } from "@/utils/zincutils";
 import { canvasFont } from "@/utils/fonts";
 
 import {
@@ -29,11 +29,7 @@ import {
 
 import { searchState } from "@/composables/useLogs/searchState";
 import { Parser } from "@openobserve/node-sql-parser/build/datafusionsql";
-import {
-  TimestampRange,
-  ParsedSQLResult,
-  TimePeriodUnit,
-} from "@/ts/interfaces";
+import { TimestampRange, ParsedSQLResult, TimePeriodUnit } from "@/ts/interfaces";
 import { TIME_MULTIPLIERS } from "@/utils/logs/constants";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
@@ -56,10 +52,7 @@ interface SQLColumn {
  * Returns `null` when the entire sub-tree has been removed (caller should treat
  * a `null` WHERE as "no WHERE clause").
  */
-export const removeFieldFromWhereAST = (
-  whereNode: any,
-  fieldName: string,
-): any => {
+export const removeFieldFromWhereAST = (whereNode: any, fieldName: string): any => {
   if (!whereNode) return null;
 
   const operator = whereNode.operator?.toUpperCase();
@@ -184,9 +177,7 @@ export const logsUtils = () => {
    * @returns Object containing 'from' and 'to' timestamps in milliseconds,
    *          or undefined if the period format is invalid
    */
-  const extractTimestamps = (
-    period: string,
-  ): TimestampRange | undefined => {
+  const extractTimestamps = (period: string): TimestampRange | undefined => {
     if (!period || typeof period !== "string") {
       console.error("Invalid period: must be a non-empty string");
       return undefined;
@@ -218,9 +209,7 @@ export const logsUtils = () => {
       const multiplier = TIME_MULTIPLIERS[unit];
       fromTimestamp = toTimestamp - value * multiplier;
     } else {
-      console.error(
-        `Invalid period unit: "${unit}". Supported units: s, m, h, d, w, M`,
-      );
+      console.error(`Invalid period unit: "${unit}". Supported units: s, m, h, d, w, M`);
       return undefined;
     }
 
@@ -264,14 +253,12 @@ export const logsUtils = () => {
    * @param parsedSQL - The parsed SQL AST object (typically from fnParsedSQL)
    * @returns true if a LIMIT clause with values is present, false otherwise
    */
-  const isLimitQuery = (
-    parsedSQL: ParsedSQLResult | null = null,
-  ): boolean => {
+  const isLimitQuery = (parsedSQL: ParsedSQLResult | null = null): boolean => {
     return Boolean(
       parsedSQL?.limit &&
-        parsedSQL.limit.value &&
-        Array.isArray(parsedSQL.limit.value) &&
-        parsedSQL.limit.value.length > 0,
+      parsedSQL.limit.value &&
+      Array.isArray(parsedSQL.limit.value) &&
+      parsedSQL.limit.value.length > 0,
     );
   };
 
@@ -281,9 +268,7 @@ export const logsUtils = () => {
    * @param parsedSQL - The parsed SQL AST object (typically from fnParsedSQL)
    * @returns true if DISTINCT clause is present, false otherwise
    */
-  const isDistinctQuery = (
-    parsedSQL: ParsedSQLResult | any = null,
-  ): boolean => {
+  const isDistinctQuery = (parsedSQL: ParsedSQLResult | any = null): boolean => {
     return parsedSQL?.distinct?.type === "DISTINCT";
   };
 
@@ -293,14 +278,8 @@ export const logsUtils = () => {
    * @param parsedSQL - The parsed SQL AST object (typically from fnParsedSQL)
    * @returns true if WITH clauses are present, false otherwise
    */
-  const isWithQuery = (
-    parsedSQL: ParsedSQLResult | any = null,
-  ): boolean => {
-    return Boolean(
-      parsedSQL?.with &&
-        Array.isArray(parsedSQL.with) &&
-        parsedSQL.with.length > 0,
-    );
+  const isWithQuery = (parsedSQL: ParsedSQLResult | any = null): boolean => {
+    return Boolean(parsedSQL?.with && Array.isArray(parsedSQL.with) && parsedSQL.with.length > 0);
   };
 
   // Todo: Duplicate function in IndexList.vue same for removeTraceId
@@ -344,36 +323,25 @@ export const logsUtils = () => {
       return;
     }
     // Remove trace ID from HTTP request trace IDs array
-    searchObj.data.searchRequestTraceIds =
-      searchObj.data.searchRequestTraceIds.filter(
-        (existingTraceId: string) => existingTraceId !== traceId,
-      );
+    searchObj.data.searchRequestTraceIds = searchObj.data.searchRequestTraceIds.filter(
+      (existingTraceId: string) => existingTraceId !== traceId,
+    );
   };
 
   const shouldAddFunctionToSearch = () => {
     if (!isActionsEnabled.value)
-      return (
-        searchObj.data.tempFunctionContent != "" &&
-        searchObj.meta.showTransformEditor
-      );
+      return searchObj.data.tempFunctionContent != "" && searchObj.meta.showTransformEditor;
 
-    return (
-      searchObj.data.transformType === "function" &&
-      searchObj.data.tempFunctionContent != ""
-    );
+    return searchObj.data.transformType === "function" && searchObj.data.tempFunctionContent != "";
   };
 
   const addTransformToQuery = (queryReq: any) => {
     if (shouldAddFunctionToSearch()) {
-      queryReq.query["query_fn"] =
-        b64EncodeUnicode(searchObj.data.tempFunctionContent) || "";
+      queryReq.query["query_fn"] = b64EncodeUnicode(searchObj.data.tempFunctionContent) || "";
     }
 
     // Add action ID if it exists
-    if (
-      searchObj.data.transformType === "action" &&
-      searchObj.data.selectedTransform?.id
-    ) {
+    if (searchObj.data.transformType === "action" && searchObj.data.selectedTransform?.id) {
       queryReq.query["action_id"] = searchObj.data.selectedTransform.id;
     }
   };
@@ -403,9 +371,7 @@ export const logsUtils = () => {
     try {
       for (let i = 0; i < 5; i++) {
         if (searchObj.data.queryResults.hits?.[i]?.[field]) {
-          width = context.measureText(
-            searchObj.data.queryResults.hits[i][field],
-          ).width;
+          width = context.measureText(searchObj.data.queryResults.hits[i][field]).width;
 
           if (width > max) max = width;
         }
@@ -446,10 +412,7 @@ export const logsUtils = () => {
     // selectedStream is string[] in state; branches below defensively handle
     // legacy string / { value } shapes that may still reach this code path
     const selectedStream: string[] = searchObj.data.stream.selectedStream;
-    if (
-      selectedStream.length > 0 &&
-      typeof selectedStream != "object"
-    ) {
+    if (selectedStream.length > 0 && typeof selectedStream != "object") {
       // Dead defensive branch for a legacy non-array shape (TS narrows the
       // array type to never here); cast keeps it compiling, runtime unchanged.
       query["stream"] = (selectedStream as string[]).join(",");
@@ -484,13 +447,8 @@ export const logsUtils = () => {
     //add the function editor toggle is true or false
     //it will help to retain the function editor state when we refresh the page
     query["fn_editor"] = searchObj.meta.showTransformEditor;
-    if (
-      searchObj.data.transformType === "function" &&
-      searchObj.data.tempFunctionContent != ""
-    ) {
-      query["functionContent"] = b64EncodeUnicode(
-        searchObj.data.tempFunctionContent.trim(),
-      );
+    if (searchObj.data.transformType === "function" && searchObj.data.tempFunctionContent != "") {
+      query["functionContent"] = b64EncodeUnicode(searchObj.data.tempFunctionContent.trim());
     }
 
     // TODO : Add type in query params for all types
@@ -503,17 +461,11 @@ export const logsUtils = () => {
     query["quick_mode"] = searchObj.meta.quickMode;
     query["show_histogram"] = searchObj.meta.showHistogram;
 
-    if (
-      store.state.zoConfig?.super_cluster_enabled &&
-      searchObj.meta?.regions?.length
-    ) {
+    if (store.state.zoConfig?.super_cluster_enabled && searchObj.meta?.regions?.length) {
       query["regions"] = searchObj.meta.regions.join(",");
     }
 
-    if (
-      store.state.zoConfig?.super_cluster_enabled &&
-      searchObj.meta?.clusters?.length
-    ) {
+    if (store.state.zoConfig?.super_cluster_enabled && searchObj.meta?.clusters?.length) {
       query["clusters"] = searchObj.meta.clusters.join(",");
     }
 
@@ -523,10 +475,7 @@ export const logsUtils = () => {
 
     // Preserve visualization data in URL
     // - If in visualize mode and panel data is provided, encode the dashboardPanelData
-    if (
-      searchObj.meta.logsVisualizeToggle === "visualize" &&
-      dashboardPanelData
-    ) {
+    if (searchObj.meta.logsVisualizeToggle === "visualize" && dashboardPanelData) {
       const visualizationData = getVisualizationConfig(dashboardPanelData);
       if (visualizationData) {
         const encoded = encodeVisualizationConfig(visualizationData);
@@ -536,8 +485,9 @@ export const logsUtils = () => {
       }
     } else {
       // else preserve existing visualization data from the current URL
-      const existingEncodedConfig = router.currentRoute.value?.query
-        ?.visualization_data as string | undefined;
+      const existingEncodedConfig = router.currentRoute.value?.query?.visualization_data as
+        | string
+        | undefined;
       if (existingEncodedConfig) {
         query["visualization_data"] = existingEncodedConfig;
       }
@@ -545,10 +495,7 @@ export const logsUtils = () => {
 
     // Preserve build data in URL
     // - If in build mode and build panel data is provided, encode the buildPanelData
-    if (
-      searchObj.meta.logsVisualizeToggle === "build" &&
-      buildPanelData
-    ) {
+    if (searchObj.meta.logsVisualizeToggle === "build" && buildPanelData) {
       const buildData = getBuildConfig(buildPanelData);
       if (buildData) {
         const encoded = encodeBuildConfig(buildData);
@@ -558,8 +505,9 @@ export const logsUtils = () => {
       }
     } else {
       // else preserve existing build data from the current URL
-      const existingEncodedBuildConfig = router.currentRoute.value?.query
-        ?.build_data as string | undefined;
+      const existingEncodedBuildConfig = router.currentRoute.value?.query?.build_data as
+        | string
+        | undefined;
       if (existingEncodedBuildConfig) {
         query["build_data"] = existingEncodedBuildConfig;
       }
@@ -600,25 +548,18 @@ export const logsUtils = () => {
     }
     const identifier: string = searchObj.organizationIdentifier || "default";
     const selectedFields: any =
-      useLocalLogFilterField()?.value != null
-        ? useLocalLogFilterField()?.value
-        : {};
+      useLocalLogFilterField()?.value != null ? useLocalLogFilterField()?.value : {};
     const stream = searchObj.data.stream.selectedStream.sort().join("_");
-    selectedFields[`${identifier}_${stream}`] =
-      searchObj.data.stream.selectedFields.filter(
-        (_field) =>
-          _field !== (store?.state?.zoConfig?.timestamp_column || "_timestamp"),
-      );
+    selectedFields[`${identifier}_${stream}`] = searchObj.data.stream.selectedFields.filter(
+      (_field) => _field !== (store?.state?.zoConfig?.timestamp_column || "_timestamp"),
+    );
     useLocalLogFilterField(selectedFields);
   };
 
   function isTimestampASC(orderby: any) {
     if (orderby) {
       for (const order of orderby) {
-        if (
-          order.expr &&
-          order.expr.column === store.state.zoConfig.timestamp_column
-        ) {
+        if (order.expr && order.expr.column === store.state.zoConfig.timestamp_column) {
           if (order.type && order.type === "ASC") {
             return true;
           }
@@ -630,25 +571,19 @@ export const logsUtils = () => {
 
   // validate if timestamp column alias is used for any field
   const checkTimestampAlias = (query: string): boolean => {
-    const tsCol =
-      timestampColumnName ?? store.state.zoConfig.timestamp_column ?? "_timestamp";
+    const tsCol = timestampColumnName ?? store.state.zoConfig.timestamp_column ?? "_timestamp";
     const parsedSQL = fnParsedSQL(query);
 
     const columns = parsedSQL?.columns;
     if (Array.isArray(columns)) {
-      const invalid = columns.some(
-        (field: any) => field.as === tsCol,
-      );
+      const invalid = columns.some((field: any) => field.as === tsCol);
       if (invalid) {
         return false;
       }
     }
 
     // Escape special regex characters in timestamp column name
-    const escapedTimestamp = tsCol.replace(
-      /[.*+?^${}()|[\]\\]/g,
-      "\\$&",
-    );
+    const escapedTimestamp = tsCol.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
     // Patterns for alias check
     const patterns = [

@@ -17,10 +17,7 @@ interface Options {
  * Cycles through `prompts` with a typewriter effect.
  * Use the returned `placeholder` as a reactive placeholder text on an input.
  */
-export function useTypewriterPlaceholder(
-  prompts: string[] | Ref<string[]>,
-  options: Options = {},
-) {
+export function useTypewriterPlaceholder(prompts: string[] | Ref<string[]>, options: Options = {}) {
   const placeholder = ref("");
   const typeSpeed = options.typeSpeedMs ?? 45;
   const eraseSpeed = options.eraseSpeedMs ?? 25;
@@ -30,8 +27,7 @@ export function useTypewriterPlaceholder(
   let cancelled = false;
   let timer: ReturnType<typeof setTimeout> | null = null;
 
-  const getPrompts = (): string[] =>
-    Array.isArray(prompts) ? prompts : prompts.value;
+  const getPrompts = (): string[] => (Array.isArray(prompts) ? prompts : prompts.value);
 
   function clearTimer() {
     if (timer !== null) {

@@ -50,8 +50,7 @@ export function useMcpCredential() {
 
   /** rbac + service accounts must both be enabled for a read-only SA to exist. */
   const canGenerate = () =>
-    !!store.state.zoConfig?.rbac_enabled &&
-    (store.state.zoConfig?.service_account_enabled ?? true);
+    !!store.state.zoConfig?.rbac_enabled && (store.state.zoConfig?.service_account_enabled ?? true);
 
   const generate = async (): Promise<McpCredential | null> => {
     generating.value = true;
@@ -96,9 +95,7 @@ export function useMcpCredential() {
       return credential.value;
     } catch (err: any) {
       error.value =
-        err?.response?.data?.message ||
-        err?.message ||
-        t("ingestion.mcp.credential.error");
+        err?.response?.data?.message || err?.message || t("ingestion.mcp.credential.error");
       return null;
     } finally {
       generating.value = false;

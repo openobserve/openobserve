@@ -160,7 +160,7 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
   ].join(" "),
   // On-dark primary — white background with primary color text, for use on dark gradient panels
   "on-dark-primary": [
-    "bg-white text-primary-600 font-bold border-0 shadow-md",
+    "bg-white text-button-on-dark-primary-text font-bold border-0 shadow-md",
     "enabled:hover:shadow-lg",
     "enabled:active:opacity-90",
     "focus-visible:ring-[3px] focus-visible:ring-white/50",
@@ -220,7 +220,7 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
     "bg-transparent text-inherit border border-border-default",
     "!rounded-full !text-xs !font-medium !h-auto !py-1.25 !px-3.5 !gap-1.5",
     "transition-colors duration-150",
-    "enabled:hover:border-primary-600 enabled:hover:text-primary-600 enabled:hover:bg-button-ghost-hover-bg",
+    "enabled:hover:border-accent enabled:hover:text-accent enabled:hover:bg-button-ghost-hover-bg",
     "disabled:opacity-60",
   ].join(" "),
 };
@@ -231,16 +231,14 @@ const sizeClasses: Record<NonNullable<ButtonProps["size"]>, string> = {
   // inputs in toolbars/headers. (radius 8 = rounded-default.)
   sm: "h-[2.125rem] ps-3 pe-3 text-sm gap-2 rounded-default",
   // 30px labeled — matches icon-toolbar height for labeled outline buttons in toolbars
-  "sm-toolbar":
-    "h-[1.875rem] ps-2 pe-2 text-xs gap-1.5 rounded-default",
+  "sm-toolbar": "h-[1.875rem] ps-2 pe-2 text-xs gap-1.5 rounded-default",
   // Compact labeled size for inline field chips (axis items) — ~28px, matches the dense button size
   // Extra-compact chip size — 24px height for axis field chips in query builder
   chip: "h-6 ps-2 pe-1.5 text-xs gap-1 rounded-default leading-none",
   // Same as chip but with fixed 12px font — for dashboard query builder axis field chips
   // (needed because the html font-size is 14px, making text-xs = 10.5px instead of 12px)
   "chip-12": "h-6 ps-2 pe-1.5 !text-xs gap-1 rounded-default leading-none",
-  "sm-action":
-    "h-[2.125rem] ps-3 pe-3 min-w-20 text-sm gap-2 rounded-default",
+  "sm-action": "h-[2.125rem] ps-3 pe-3 min-w-20 text-sm gap-2 rounded-default",
   md: "h-10 ps-4 pe-4 text-sm gap-2 rounded-default",
   lg: "h-12 ps-6 pe-6 text-base gap-3 rounded-default",
   icon: "size-6 p-0 rounded-default gap-x-0",
@@ -261,8 +259,7 @@ const sizeClasses: Record<NonNullable<ButtonProps["size"]>, string> = {
   // 26px rounded-default — compact modern icon button for panel header collapse/expand
   "icon-panel": "size-[1.625rem] p-0 rounded-default gap-x-0",
   // Tall narrow vertical rectangle — 32px × 20px for splitter collapse/expand buttons
-  "sidebar-button":
-    "h-8 w-3 p-0 rounded-default overflow-hidden gap-x-0",
+  "sidebar-button": "h-8 w-3 p-0 rounded-default overflow-hidden gap-x-0",
 };
 
 const activeClasses = [
@@ -288,7 +285,7 @@ const classes = computed<string[]>(() => [
      halo hugging the control (no ring-offset gap). The trailing `!` overrides
      each variant's own ring width/color below, so every button focuses with the
      exact same soft glow regardless of variant. */
-  "focus-visible:ring-[0.125rem]! focus-visible:ring-primary-500/25!",
+  "focus-visible:ring-[0.125rem]! focus-visible:ring-accent/25!",
   "disabled:cursor-not-allowed enabled:cursor-pointer",
   // Variant + size (active overrides variant to primary appearance)
   props.active ? activeClasses : variantClasses[props.variant],
@@ -318,7 +315,7 @@ function handleClick(event: MouseEvent): void {
     <!-- Loading spinner overlay — centered, absolute, shown only when loading -->
     <span
       v-if="loading"
-      class="absolute inset-0 flex items-center justify-center pointer-events-none"
+      class="pointer-events-none absolute inset-0 flex items-center justify-center"
       aria-hidden="true"
     >
       <OIcon name="progress-activity" size="sm" class="animate-spin" />

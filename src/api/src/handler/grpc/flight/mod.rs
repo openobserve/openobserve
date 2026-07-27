@@ -32,30 +32,25 @@ use flight::common::{MetricsInfo, PreCustomMessage};
 use futures::{StreamExt, stream::BoxStream};
 use futures_util::pin_mut;
 use prost::Message;
+use search::inspector::{SearchInspectorFieldsBuilder, search_inspector_fields};
+use search_service::{grpc::flight as grpcFlight, work_group::DeferredLock};
 use tonic::{Request, Response, Status, Streaming};
 use tracing::Instrument;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 #[cfg(feature = "enterprise")]
 use {
-    crate::service::search::SEARCH_SERVER,
     o2_enterprise::enterprise::{common::config::get_config as get_o2_config, search::TaskStatus},
+    search_service::SEARCH_SERVER,
 };
 
-use crate::{
-    handler::grpc::{
-        MetadataMap,
-        flight::{
-            stream::FlightEncoderStreamBuilder,
-            visitor::{
-                get_cluster_metrics, get_partial_err, get_peak_memory, get_peak_memory_from_ctx,
-                get_scan_stats,
-            },
+use crate::handler::grpc::{
+    MetadataMap,
+    flight::{
+        stream::FlightEncoderStreamBuilder,
+        visitor::{
+            get_cluster_metrics, get_partial_err, get_peak_memory, get_peak_memory_from_ctx,
+            get_scan_stats,
         },
-    },
-    service::search::{
-        grpc::flight as grpcFlight,
-        inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
-        work_group::DeferredLock,
     },
 };
 
@@ -343,7 +338,7 @@ async fn get_ctx_and_physical_plan(
 ) -> Result<PlanResult, infra::errors::Error> {
     if req.super_cluster_info.is_super_cluster {
         let (ctx, physical_plan, lock, scan_stats) =
-            crate::service::search::super_cluster::follower::search(trace_id, req).await?;
+            search_service::super_cluster::follower::search(trace_id, req).await?;
         Ok((ctx, physical_plan, Some(lock), scan_stats))
     } else {
         let (ctx, physical_plan, scan_stats) = grpcFlight::search(trace_id, req).await?;
@@ -363,9 +358,9 @@ async fn get_ctx_and_physical_plan(
 
 fn clear_session_data(trace_id: &str) {
     // clear session data
-    crate::service::search::datafusion::storage::file_list::clear(trace_id);
+    search::datafusion::storage::file_list::clear(trace_id);
     // release wal lock files
-    crate::common::infra::wal::release_request(trace_id);
+    common::infra::wal::release_request(trace_id);
     log::info!("Cleared session for trace_id: {trace_id}");
 }
 

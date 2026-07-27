@@ -75,7 +75,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
             format!("search_job_worker_{}", i),
             get_config().limit.search_job_scheduler_interval,
             {
-                if let Err(e) = service::search_jobs::run(i).await {
+                if let Err(e) = search_service::search_jobs::run(i).await {
                     log::error!("[SEARCH JOB {i}] run search jobs error: {e}");
                 }
             }
@@ -89,9 +89,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
             log::debug!("[SEARCH JOB] Running check on running jobs");
             let now = config::utils::time::now_micros();
             let updated_at = now - (get_config().limit.search_job_run_timeout as i64 * 1_000_000);
-            if let Err(e) =
-                service::db::search_job::search_jobs::check_running_jobs(updated_at).await
-            {
+            if let Err(e) = db::search_job::search_jobs::check_running_jobs(updated_at).await {
                 log::error!("[SEARCH JOB] Error checking running jobs: {e}");
             }
         }
@@ -117,7 +115,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
             let retention_seconds = get_config().limit.search_job_retention * 24 * 60 * 60;
             let now = config::utils::time::now_micros();
             let updated_at = now - (retention_seconds as i64 * 1_000_000);
-            if let Err(e) = service::db::search_job::search_jobs::delete_jobs(updated_at).await {
+            if let Err(e) = db::search_job::search_jobs::delete_jobs(updated_at).await {
                 log::error!("[SEARCH JOB] Error deleting jobs: {e}");
             }
         }
@@ -128,7 +126,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
         get_config().limit.search_job_delete_interval,
         {
             log::debug!("[SEARCH JOB] Running delete jobs");
-            if let Err(e) = service::search_jobs::delete_jobs().await {
+            if let Err(e) = search_service::search_jobs::delete_jobs().await {
                 log::error!("[SEARCH JOB] run delete jobs error: {e}");
             }
         }

@@ -52,13 +52,10 @@ export interface SearchError {
   traceId?: string;
 }
 
-const str = (value: any): string =>
-  typeof value === "string" && value.trim() ? value.trim() : "";
+const str = (value: any): string => (typeof value === "string" && value.trim() ? value.trim() : "");
 
 const truncate = (message: string): string =>
-  message.length > MAX_MESSAGE_LENGTH
-    ? `${message.slice(0, MAX_MESSAGE_LENGTH)} …`
-    : message;
+  message.length > MAX_MESSAGE_LENGTH ? `${message.slice(0, MAX_MESSAGE_LENGTH)} …` : message;
 
 /**
  * Pulls the sentence out of an `ErrorCode# {...}` envelope, or `null` when the
@@ -97,10 +94,7 @@ function unwrapErrorCode(raw: string): Omit<SearchError, "traceId"> | null {
  * has to say *something*, and "" would render as a blank tooltip that looks like
  * a second bug.
  */
-export function parseSearchError(
-  error: any,
-  fallback = "Query failed",
-): SearchError {
+export function parseSearchError(error: any, fallback = "Query failed"): SearchError {
   // Already normalised upstream (the streaming path parses at the point of
   // failure, where the payload is still intact) — do not re-derive it.
   if (error?.searchError) return error.searchError as SearchError;
@@ -126,8 +120,7 @@ export function parseSearchError(
 
   // `error` first: on a PromQL failure that is the field carrying the envelope,
   // while `message` is often just the HTTP-level "Request failed with status…".
-  const raw =
-    str(body.error) || str(body.message) || bodyText || str(error?.message);
+  const raw = str(body.error) || str(body.message) || bodyText || str(error?.message);
   const unwrapped = unwrapErrorCode(raw);
 
   const httpStatus = error?.response?.status ?? error?.status;

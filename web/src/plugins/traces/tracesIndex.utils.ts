@@ -66,18 +66,14 @@ export const EMPTY_INSIGHTS_TIME_RANGE: InsightsTimeRange = {
  */
 export function computeInsightsTimeRange(
   dt: TraceDatetime | null | undefined,
-  getConsumableRelativeTime: (
-    period: string,
-  ) => InsightsTimeRange | null | undefined,
+  getConsumableRelativeTime: (period: string) => InsightsTimeRange | null | undefined,
 ): InsightsTimeRange {
   if (!dt) return { ...EMPTY_INSIGHTS_TIME_RANGE };
 
   if (dt.type === "relative") {
     const period = dt.relativeTimePeriod;
     if (!period) return { ...EMPTY_INSIGHTS_TIME_RANGE };
-    return (
-      getConsumableRelativeTime(period) || { ...EMPTY_INSIGHTS_TIME_RANGE }
-    );
+    return getConsumableRelativeTime(period) || { ...EMPTY_INSIGHTS_TIME_RANGE };
   }
 
   // Absolute (or unspecified type — treat as absolute fall-through).
@@ -89,8 +85,6 @@ export function computeInsightsTimeRange(
         ? dt.startTime
         : new Date(dt.startTime as string).getTime() * 1000,
     endTime:
-      typeof dt.endTime === "number"
-        ? dt.endTime
-        : new Date(dt.endTime as string).getTime() * 1000,
+      typeof dt.endTime === "number" ? dt.endTime : new Date(dt.endTime as string).getTime() * 1000,
   };
 }

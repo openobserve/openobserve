@@ -26,7 +26,6 @@ vi.mock("@/components/dashboards/panels/ChartRenderer.vue", () => ({
   },
 }));
 
-
 describe("IncidentServiceGraph.vue", () => {
   let wrapper: VueWrapper<any>;
 
@@ -217,7 +216,7 @@ describe("IncidentServiceGraph.vue", () => {
       const chartData = wrapper.vm.chartData;
       // First node is always marked as root cause (red), so there should be 1
       const rootCauseNodes = chartData.options.series[0].data.filter(
-        (n: any) => n.itemStyle.color === "#ef4444"
+        (n: any) => n.itemStyle.color === "#ef4444",
       );
       expect(rootCauseNodes.length).toBe(1);
     });
@@ -233,9 +232,7 @@ describe("IncidentServiceGraph.vue", () => {
       await nextTick();
 
       expect(wrapper.text()).toContain("Service Graph Unavailable");
-      expect(wrapper.text()).toContain(
-        "No topology data available for this incident"
-      );
+      expect(wrapper.text()).toContain("No topology data available for this incident");
     });
   });
 
@@ -302,7 +299,6 @@ describe("IncidentServiceGraph.vue", () => {
     });
 
     it("should change layout when layout selector changes", async () => {
-
       wrapper = mountComponent();
       await flushPromises();
 
@@ -319,20 +315,16 @@ describe("IncidentServiceGraph.vue", () => {
 
       // Find refresh button in empty state
       const buttons = wrapper.findAll("button");
-      const refreshBtn = buttons.find((btn) =>
-        btn.text().includes("Refresh to Check Again")
-      );
+      const refreshBtn = buttons.find((btn) => btn.text().includes("Refresh to Check Again"));
       if (refreshBtn) {
         await refreshBtn.trigger("click");
         await flushPromises();
-
       }
     });
   });
 
   describe("Layout Options", () => {
     it("should use D3-force pre-computed layout", async () => {
-
       wrapper = mountComponent();
       await flushPromises();
 
@@ -349,7 +341,6 @@ describe("IncidentServiceGraph.vue", () => {
     });
 
     it("should generate circular layout configuration", async () => {
-
       wrapper = mountComponent();
       await flushPromises();
 
@@ -367,7 +358,6 @@ describe("IncidentServiceGraph.vue", () => {
 
   describe("Node Styling", () => {
     it("should color root cause nodes red", async () => {
-
       wrapper = mountComponent();
       await flushPromises();
 
@@ -378,7 +368,6 @@ describe("IncidentServiceGraph.vue", () => {
     });
 
     it("should color high alert nodes orange", async () => {
-
       wrapper = mountComponent();
       await flushPromises();
 
@@ -439,7 +428,6 @@ describe("IncidentServiceGraph.vue", () => {
     });
 
     it("should calculate node size based on alert count", async () => {
-
       wrapper = mountComponent();
       await flushPromises();
 
@@ -484,7 +472,6 @@ describe("IncidentServiceGraph.vue", () => {
     });
 
     it("should add border to primary service nodes", async () => {
-
       wrapper = mountComponent();
       await flushPromises();
 
@@ -497,7 +484,6 @@ describe("IncidentServiceGraph.vue", () => {
     });
 
     it("should not add border to non-primary nodes", async () => {
-
       wrapper = mountComponent();
       await flushPromises();
 
@@ -523,7 +509,7 @@ describe("IncidentServiceGraph.vue", () => {
         topologyContext: {
           ...mockGraphData,
           nodes: [],
-        }
+        },
       });
       await flushPromises();
 
@@ -532,7 +518,6 @@ describe("IncidentServiceGraph.vue", () => {
     });
 
     it("should generate valid ECharts options with nodes and edges", async () => {
-
       wrapper = mountComponent();
       await flushPromises();
 
@@ -544,7 +529,6 @@ describe("IncidentServiceGraph.vue", () => {
     });
 
     it("should set tooltip configuration", async () => {
-
       wrapper = mountComponent();
       await flushPromises();
 
@@ -553,7 +537,6 @@ describe("IncidentServiceGraph.vue", () => {
     });
 
     it("should enable roam and draggable on graph", async () => {
-
       wrapper = mountComponent();
       await flushPromises();
 
@@ -563,7 +546,6 @@ describe("IncidentServiceGraph.vue", () => {
     });
 
     it("should set emphasis focus to adjacency", async () => {
-
       wrapper = mountComponent();
       await flushPromises();
 
@@ -572,7 +554,6 @@ describe("IncidentServiceGraph.vue", () => {
     });
 
     it("should generate edge with arrow symbols", async () => {
-
       wrapper = mountComponent();
       await flushPromises();
 
@@ -584,7 +565,6 @@ describe("IncidentServiceGraph.vue", () => {
     });
 
     it("should set edge curveness", async () => {
-
       wrapper = mountComponent();
       await flushPromises();
 
@@ -597,7 +577,6 @@ describe("IncidentServiceGraph.vue", () => {
 
   describe("Theme Support", () => {
     it("should apply light theme colors", async () => {
-
       wrapper = mountComponent({}, { theme: "light" });
       await flushPromises();
 
@@ -609,7 +588,6 @@ describe("IncidentServiceGraph.vue", () => {
     });
 
     it("should apply dark theme colors", async () => {
-
       wrapper = mountComponent({}, { theme: "dark" });
       await flushPromises();
 
@@ -621,7 +599,6 @@ describe("IncidentServiceGraph.vue", () => {
     });
 
     it("should apply dark theme to edge colors", async () => {
-
       wrapper = mountComponent({}, { theme: "dark" });
       await flushPromises();
 
@@ -632,7 +609,6 @@ describe("IncidentServiceGraph.vue", () => {
     });
 
     it("should apply light theme to edge colors", async () => {
-
       wrapper = mountComponent({}, { theme: "light" });
       await flushPromises();
 
@@ -643,7 +619,6 @@ describe("IncidentServiceGraph.vue", () => {
     });
 
     it("should apply dark theme to node labels", async () => {
-
       wrapper = mountComponent({}, { theme: "dark" });
       await flushPromises();
 
@@ -653,7 +628,6 @@ describe("IncidentServiceGraph.vue", () => {
     });
 
     it("should apply light theme to node labels", async () => {
-
       wrapper = mountComponent({}, { theme: "light" });
       await flushPromises();
 
@@ -712,7 +686,6 @@ describe("IncidentServiceGraph.vue", () => {
 
   describe("Legend Display", () => {
     it("should display legend with all node types", async () => {
-
       wrapper = mountComponent();
       await flushPromises();
       await nextTick();
@@ -730,13 +703,12 @@ describe("IncidentServiceGraph.vue", () => {
 
   describe("Node Tooltips", () => {
     it("should include service name in tooltip", async () => {
-
       wrapper = mountComponent();
       await flushPromises();
 
       const chartData = wrapper.vm.chartData;
       const cpuNode = chartData.options.series[0].data.find(
-        (n: any) => n.name === "High CPU Usage"
+        (n: any) => n.name === "High CPU Usage",
       );
       const tooltip = cpuNode.tooltip.formatter();
 
@@ -744,13 +716,12 @@ describe("IncidentServiceGraph.vue", () => {
     });
 
     it("should include alert count in tooltip", async () => {
-
       wrapper = mountComponent();
       await flushPromises();
 
       const chartData = wrapper.vm.chartData;
       const cpuNode = chartData.options.series[0].data.find(
-        (n: any) => n.name === "High CPU Usage"
+        (n: any) => n.name === "High CPU Usage",
       );
       const tooltip = cpuNode.tooltip.formatter();
 
@@ -759,7 +730,6 @@ describe("IncidentServiceGraph.vue", () => {
     });
 
     it("should show root cause indicator in tooltip", async () => {
-
       wrapper = mountComponent();
       await flushPromises();
 
@@ -772,7 +742,6 @@ describe("IncidentServiceGraph.vue", () => {
     });
 
     it("should show primary service indicator in tooltip", async () => {
-
       wrapper = mountComponent();
       await flushPromises();
 
@@ -785,7 +754,6 @@ describe("IncidentServiceGraph.vue", () => {
     });
 
     it("should not show root cause indicator for non-root-cause nodes", async () => {
-
       wrapper = mountComponent();
       await flushPromises();
 
@@ -908,7 +876,6 @@ describe("IncidentServiceGraph.vue", () => {
 
   describe("Animation Configuration", () => {
     it("should set animation duration", async () => {
-
       wrapper = mountComponent();
       await flushPromises();
 
@@ -918,7 +885,6 @@ describe("IncidentServiceGraph.vue", () => {
     });
 
     it("should set animation easing", async () => {
-
       wrapper = mountComponent();
       await flushPromises();
 
@@ -945,40 +911,44 @@ describe("IncidentServiceGraph.vue", () => {
       expect(links).toHaveLength(3);
     });
 
-    it("collapses many firings into far fewer time-bucket nodes (bucketed mode)", { timeout: 15000 }, async () => {
-      // 60 firings of a single alert over a ~60-minute span. Above NODE_CAP, so
-      // they bucket by time into a small, legible set.
-      const manyNodes = {
-        nodes: Array.from({ length: 60 }, (_, i) => ({
-          alert_id: `alert_${i}`,
-          alert_name: "Scheduler_Down",
-          service_name: `service-${i % 5}`,
-          alert_count: i + 1,
-          first_fired_at: 1000000 + i * 60 * 1000 * 1000, // 1-minute steps (us)
-          last_fired_at: 1000000 + i * 60 * 1000 * 1000 + 1000,
-        })),
-        edges: Array.from({ length: 59 }, (_, i) => ({
-          from_node_index: i,
-          to_node_index: i + 1,
-          edge_type: "temporal",
-        })),
-        stats: { total_services: 5, total_alerts: 0, services_with_alerts: 0 },
-      };
+    it(
+      "collapses many firings into far fewer time-bucket nodes (bucketed mode)",
+      { timeout: 15000 },
+      async () => {
+        // 60 firings of a single alert over a ~60-minute span. Above NODE_CAP, so
+        // they bucket by time into a small, legible set.
+        const manyNodes = {
+          nodes: Array.from({ length: 60 }, (_, i) => ({
+            alert_id: `alert_${i}`,
+            alert_name: "Scheduler_Down",
+            service_name: `service-${i % 5}`,
+            alert_count: i + 1,
+            first_fired_at: 1000000 + i * 60 * 1000 * 1000, // 1-minute steps (us)
+            last_fired_at: 1000000 + i * 60 * 1000 * 1000 + 1000,
+          })),
+          edges: Array.from({ length: 59 }, (_, i) => ({
+            from_node_index: i,
+            to_node_index: i + 1,
+            edge_type: "temporal",
+          })),
+          stats: { total_services: 5, total_alerts: 0, services_with_alerts: 0 },
+        };
 
-      wrapper = mountComponent({ topologyContext: manyNodes });
-      await flushPromises();
+        wrapper = mountComponent({ topologyContext: manyNodes });
+        await flushPromises();
 
-      const chartData = wrapper.vm.chartData;
-      const nodes = chartData.options.series[0].data;
+        const chartData = wrapper.vm.chartData;
+        const nodes = chartData.options.series[0].data;
 
-      // Far fewer than the 60 raw firings, and bounded by the bucket target.
-      expect(nodes.length).toBeLessThan(60);
-      expect(nodes.length).toBeLessThanOrEqual(24);
-      expect(nodes.length).toBeGreaterThan(1);
+        // Far fewer than the 60 raw firings, and bounded by the bucket target.
+        expect(nodes.length).toBeLessThan(60);
+        expect(nodes.length).toBeLessThanOrEqual(24);
+        expect(nodes.length).toBeGreaterThan(1);
 
-      // Bucket labels carry the name + aggregated count + window.
-      expect(nodes[0].name).toMatch(/Scheduler_Down x\d+/);
-    });
+        // Bucket labels carry the name + aggregated count + window.
+        expect(nodes[0].name).toMatch(/Scheduler_Down x\d+/);
+      },
+    );
 
     it("preserves cross-alert correlation edges in bucketed mode", async () => {
       // Two alert names that the backend links to each other; above the cap so
@@ -1012,11 +982,9 @@ describe("IncidentServiceGraph.vue", () => {
       const nameOf = (id: string) => {
         const n = nodes.find((nn: any) => nn.id === id);
         // display_label is "<name> x<count> <window>" — take the leading name token.
-        return (n?.originalNode?.alert_name) as string;
+        return n?.originalNode?.alert_name as string;
       };
-      const hasCrossEdge = links.some(
-        (l: any) => nameOf(l.source) !== nameOf(l.target)
-      );
+      const hasCrossEdge = links.some((l: any) => nameOf(l.source) !== nameOf(l.target));
       expect(hasCrossEdge).toBe(true);
 
       // No self-loops survived the bucket remap.
@@ -1028,7 +996,6 @@ describe("IncidentServiceGraph.vue", () => {
 
   describe("Chart Renderer Integration", () => {
     it("should pass chart data to ChartRenderer", async () => {
-
       wrapper = mountComponent();
       await flushPromises();
       await nextTick();
@@ -1058,7 +1025,6 @@ describe("IncidentServiceGraph.vue", () => {
     });
 
     it("should update chartKey when loadGraph is called", async () => {
-
       wrapper = mountComponent();
       await flushPromises();
 

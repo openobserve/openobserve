@@ -14,14 +14,13 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use axum::response::Response;
+use common::meta::http::HttpResponse as MetaHttpResponse;
 use hashbrown::HashMap;
 #[cfg(feature = "enterprise")]
 use {
     config::meta::cluster::RoleGroup,
     o2_enterprise::enterprise::common::config::get_config as get_o2_config,
 };
-
-use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 
 /// ListClusters
 #[utoipa::path(

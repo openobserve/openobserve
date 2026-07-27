@@ -131,6 +131,56 @@ describe("buildJobInputMappingPayload", () => {
     expect(buildJobInputMappingPayload(["s1"], { s1: {} })).toBeNull();
     expect(buildJobInputMappingPayload([], {})).toBeNull();
   });
+
+  it("omits the complete system-provided view for trace jobs", () => {
+    expect(
+      buildJobInputMappingPayload(
+        ["s1"],
+        {
+          s1: {
+            input: "{{custom_input}}",
+            output: "{{custom_output}}",
+            statistics: "{{custom_stats}}",
+            spans: "{{custom_spans}}",
+            steps: "{{custom_steps}}",
+            custom: "{{custom_field}}",
+          },
+        },
+        "trace",
+      ),
+    ).toEqual({ s1: { custom: "{{custom_field}}" } });
+  });
+
+  it("only omits statistics and steps for session jobs", () => {
+    expect(
+      buildJobInputMappingPayload(
+        ["s1"],
+        {
+          s1: {
+            input: "{{custom_input}}",
+            statistics: "{{custom_stats}}",
+            spans: "{{custom_spans}}",
+            steps: "{{custom_steps}}",
+          },
+        },
+        "session",
+      ),
+    ).toEqual({
+      s1: { input: "{{custom_input}}", spans: "{{custom_spans}}" },
+    });
+  });
+
+  it("keeps statistics and steps freely mappable for span jobs", () => {
+    expect(
+      buildJobInputMappingPayload(
+        ["s1"],
+        { s1: { statistics: "{{span_stats}}", steps: "{{span_steps}}" } },
+        "span",
+      ),
+    ).toEqual({
+      s1: { statistics: "{{span_stats}}", steps: "{{span_steps}}" },
+    });
+  });
 });
 
 describe("normalizeJobInputMappings", () => {
@@ -155,7 +205,9 @@ describe("normalizeJobInputMappings", () => {
 
   it("parses a JSON string before normalising", () => {
     const json = JSON.stringify({ s1: { input: "{{a}}" } });
-    expect(normalizeJobInputMappings(json, ["s1"])).toEqual({ s1: { input: "{{a}}" } });
+    expect(normalizeJobInputMappings(json, ["s1"])).toEqual({
+      s1: { input: "{{a}}" },
+    });
   });
 
   it("returns an empty object for null / non-object / array input", () => {

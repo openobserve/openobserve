@@ -40,7 +40,6 @@ vi.mock("@/utils/alerts/anomalySqlBuilder", () => ({
 
 import alertsService from "@/services/alerts";
 
-
 const node = document.createElement("div");
 node.setAttribute("id", "app");
 document.body.appendChild(node);
@@ -216,14 +215,8 @@ describe("AlertHistoryDrawer.vue", () => {
 
     it("should have correct data-test attributes", async () => {
       await mountComponent();
-      expect(
-        wrapper.find('[data-test="alert-details-title"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper
-          .find('[data-test="alert-history-drawer-date-picker"]')
-          .exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="alert-details-title"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="alert-history-drawer-date-picker"]').exists()).toBe(true);
     });
 
     it("should fetch alert history on mount", async () => {
@@ -273,9 +266,7 @@ describe("AlertHistoryDrawer.vue", () => {
 
   describe("Query/Conditions Block", () => {
     const switchToConditionTab = async () => {
-      const conditionBtn = wrapper.find(
-        '[data-test="alert-history-tab-condition"]',
-      );
+      const conditionBtn = wrapper.find('[data-test="alert-history-tab-condition"]');
       await conditionBtn.trigger("click");
       await flushPromises();
     };
@@ -302,19 +293,13 @@ describe("AlertHistoryDrawer.vue", () => {
     it("should display the query text", async () => {
       await mountComponent();
       await switchToConditionTab();
-      expect(wrapper.text()).toContain(
-        "SELECT count(*) FROM logs WHERE level='error'",
-      );
+      expect(wrapper.text()).toContain("SELECT count(*) FROM logs WHERE level='error'");
     });
 
     it("should have a copy button for conditions", async () => {
       await mountComponent();
       await switchToConditionTab();
-      expect(
-        wrapper
-          .find('[data-test="alert-details-copy-conditions-btn"]')
-          .exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="alert-details-copy-conditions-btn"]').exists()).toBe(true);
     });
 
     it("should display the description when provided", async () => {
@@ -337,9 +322,7 @@ describe("AlertHistoryDrawer.vue", () => {
   describe("History Table", () => {
     it("should display history table with data", async () => {
       await mountComponent();
-      expect(
-        wrapper.find('[data-test="alert-details-history-table"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="alert-details-history-table"]').exists()).toBe(true);
     });
 
     it("should display correct number of rows", async () => {
@@ -393,9 +376,7 @@ describe("AlertHistoryDrawer.vue", () => {
 
   describe("Error Handling", () => {
     it("should handle API errors gracefully", async () => {
-      vi.mocked(alertsService.getHistory).mockRejectedValue(
-        new Error("API Error"),
-      );
+      vi.mocked(alertsService.getHistory).mockRejectedValue(new Error("API Error"));
 
       await mountComponent();
       expect(wrapper.exists()).toBe(true);
@@ -425,11 +406,7 @@ describe("AlertHistoryDrawer.vue", () => {
   describe("Date Time Picker", () => {
     it("should have date time picker component", async () => {
       await mountComponent();
-      expect(
-        wrapper
-          .find('[data-test="alert-history-drawer-date-picker"]')
-          .exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="alert-history-drawer-date-picker"]').exists()).toBe(true);
     });
 
     it("should refresh history when date changes with relative time", async () => {
@@ -533,9 +510,7 @@ describe("AlertHistoryDrawer.vue", () => {
       expect(wrapper.exists()).toBe(true);
 
       // The content section (with v-if="alertDetails") should not render
-      expect(
-        wrapper.find('[data-test="alert-details-history-table"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="alert-details-history-table"]').exists()).toBe(false);
     });
   });
 
@@ -586,7 +561,6 @@ describe("AlertHistoryDrawer.vue", () => {
   });
 
   describe("Helper Functions", () => {
-
     it("getRowClass should return error class for error/firing status", async () => {
       await mountComponent();
       const vm = wrapper.vm as any;

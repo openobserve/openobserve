@@ -59,7 +59,6 @@ const node = document.createElement("div");
 node.setAttribute("id", "app");
 document.body.appendChild(node);
 
-
 describe("BackGroundColorConfig", () => {
   let wrapper: any;
 
@@ -292,9 +291,7 @@ describe("BackGroundColorConfig", () => {
       mockDashboardPanelData.data.config.background.value.color = "";
       wrapper.vm.backgroundColor = "#00ff00";
 
-      expect(mockDashboardPanelData.data.config.background.value.color).toBe(
-        "#00ff00",
-      );
+      expect(mockDashboardPanelData.data.config.background.value.color).toBe("#00ff00");
     });
 
     it("should handle setting color when value object doesn't exist", () => {
@@ -307,9 +304,7 @@ describe("BackGroundColorConfig", () => {
       wrapper.vm.backgroundColor = "#ff0000";
 
       expect(mockDashboardPanelData.data.config.background.value).toBeDefined();
-      expect(mockDashboardPanelData.data.config.background.value.color).toBe(
-        "#ff0000",
-      );
+      expect(mockDashboardPanelData.data.config.background.value.color).toBe("#ff0000");
     });
   });
 
@@ -479,9 +474,7 @@ describe("BackGroundColorConfig", () => {
       const colorInput = wrapper.find('[data-test="dashboard-config-color-input"]');
       await colorInput.setValue("#00ff00");
 
-      expect(mockDashboardPanelData.data.config.background.value.color).toBe(
-        "#00ff00",
-      );
+      expect(mockDashboardPanelData.data.config.background.value.color).toBe("#00ff00");
     });
 
     it("should handle form interactions correctly", async () => {

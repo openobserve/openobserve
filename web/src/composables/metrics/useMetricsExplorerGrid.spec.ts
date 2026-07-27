@@ -26,19 +26,34 @@ const HIST = [
   {
     name: "lat_seconds",
     stream_type: "metrics",
-    metrics_meta: { metric_type: "Histogram", metric_family_name: "lat_seconds", help: "", unit: "s" },
+    metrics_meta: {
+      metric_type: "Histogram",
+      metric_family_name: "lat_seconds",
+      help: "",
+      unit: "s",
+    },
     stats: { doc_num: 0 },
   },
   {
     name: "lat_seconds_bucket",
     stream_type: "metrics",
-    metrics_meta: { metric_type: "Counter", metric_family_name: "lat_seconds_bucket", help: "", unit: "" },
+    metrics_meta: {
+      metric_type: "Counter",
+      metric_family_name: "lat_seconds_bucket",
+      help: "",
+      unit: "",
+    },
     stats: { doc_num: 100 },
   },
   {
     name: "lat_seconds_count",
     stream_type: "metrics",
-    metrics_meta: { metric_type: "Counter", metric_family_name: "lat_seconds_count", help: "", unit: "" },
+    metrics_meta: {
+      metric_type: "Counter",
+      metric_family_name: "lat_seconds_count",
+      help: "",
+      unit: "",
+    },
     stats: { doc_num: 100 },
   },
 ];
@@ -67,13 +82,23 @@ const STREAMS = [
   {
     name: "http_requests_total",
     stream_type: "metrics",
-    metrics_meta: { metric_type: "Counter", metric_family_name: "http_requests_total", help: "", unit: "" },
+    metrics_meta: {
+      metric_type: "Counter",
+      metric_family_name: "http_requests_total",
+      help: "",
+      unit: "",
+    },
     stats: { doc_num: 100 },
   },
   {
     name: "idle_metric_total",
     stream_type: "metrics",
-    metrics_meta: { metric_type: "Counter", metric_family_name: "idle_metric_total", help: "", unit: "" },
+    metrics_meta: {
+      metric_type: "Counter",
+      metric_family_name: "idle_metric_total",
+      help: "",
+      unit: "",
+    },
     stats: { doc_num: 100 },
   },
 ];
@@ -264,15 +289,10 @@ describe("useMetricsExplorerGrid", () => {
       // reason anyone widens a window.
       const grid = await setup();
 
-      await landPreview(
-        grid.requestPreview(cardNamed(grid, "idle_metric_total")),
-        NO_SERIES,
-      );
+      await landPreview(grid.requestPreview(cardNamed(grid, "idle_metric_total")), NO_SERIES);
 
       expect(grid.emptyHiddenCount.value).toBe(1);
-      expect(grid.sortedCards.value.map((c: any) => c.name)).not.toContain(
-        "idle_metric_total",
-      );
+      expect(grid.sortedCards.value.map((c: any) => c.name)).not.toContain("idle_metric_total");
 
       grid.setTimeRange({
         start_time: NOW_US - 720 * HOUR_US, // 30 days
@@ -280,9 +300,7 @@ describe("useMetricsExplorerGrid", () => {
       });
 
       expect(grid.emptyHiddenCount.value).toBe(0);
-      expect(grid.sortedCards.value.map((c: any) => c.name)).toContain(
-        "idle_metric_total",
-      );
+      expect(grid.sortedCards.value.map((c: any) => c.name)).toContain("idle_metric_total");
     });
 
     it("keeps them hidden across a refresh, which re-runs the SAME window", async () => {
@@ -291,10 +309,7 @@ describe("useMetricsExplorerGrid", () => {
       // user's cursor once a minute.
       const grid = await setup();
 
-      await landPreview(
-        grid.requestPreview(cardNamed(grid, "idle_metric_total")),
-        NO_SERIES,
-      );
+      await landPreview(grid.requestPreview(cardNamed(grid, "idle_metric_total")), NO_SERIES);
 
       grid.setTimeRange(
         { start_time: NOW_US - HOUR_US + 5_000_000, end_time: NOW_US + 5_000_000 },
@@ -334,21 +349,15 @@ describe("useMetricsExplorerGrid", () => {
       fresh.complete(SERIES);
       await second;
 
-      expect(grid.previews.value["http_requests_total"].footerLabel).toContain(
-        "increase",
-      );
+      expect(grid.previews.value["http_requests_total"].footerLabel).toContain("increase");
 
       // The superseded request lands LATE. It must be inert.
       superseded.complete(SERIES);
       await flush();
 
       // Still the function the user chose — not the one they replaced.
-      expect(grid.previews.value["http_requests_total"].footerLabel).toContain(
-        "increase",
-      );
-      expect(grid.previews.value["http_requests_total"].footerLabel).not.toContain(
-        "rate",
-      );
+      expect(grid.previews.value["http_requests_total"].footerLabel).toContain("increase");
+      expect(grid.previews.value["http_requests_total"].footerLabel).not.toContain("rate");
       expect(grid.previews.value["http_requests_total"].status).toBe("done");
     });
   });
@@ -472,9 +481,7 @@ describe("useMetricsExplorerGrid", () => {
 
       await grid.addLabelFilter({ label: "code", value: "500", operator: "=" });
 
-      expect(grid.sortedCards.value.map((c: any) => c.name)).toEqual([
-        "http_requests_total",
-      ]);
+      expect(grid.sortedCards.value.map((c: any) => c.name)).toEqual(["http_requests_total"]);
     });
   });
 
@@ -702,9 +709,7 @@ describe("useMetricsExplorerGrid", () => {
       expect(new Set(asked).size).toBe(INITIAL_PAGE_SIZE);
       // And each card is asked at most twice — the rate query, plus the presence
       // probe that confirms an empty rate() result is real.
-      const perMetric = [...new Set(asked)].map(
-        (i) => asked.filter((a) => a === i).length,
-      );
+      const perMetric = [...new Set(asked)].map((i) => asked.filter((a) => a === i).length);
       expect(Math.max(...perMetric)).toBeLessThanOrEqual(2);
       expect(asked).toHaveLength(2 * INITIAL_PAGE_SIZE);
 
@@ -713,9 +718,7 @@ describe("useMetricsExplorerGrid", () => {
       expect(grid.pagedCards.value).toHaveLength(0);
       // ...and the budget is untouched: no card outside the first 30 was pulled in.
       expect(grid.pageSlice.value).toHaveLength(INITIAL_PAGE_SIZE);
-      expect(grid.pageSlice.value.map((c: any) => c.name)).toEqual(
-        page.map((c: any) => c.name),
-      );
+      expect(grid.pageSlice.value.map((c: any) => c.name)).toEqual(page.map((c: any) => c.name));
     });
 
     it("showMore is how the user asks to spend more budget", async () => {
@@ -729,9 +732,7 @@ describe("useMetricsExplorerGrid", () => {
       grid.hideEmptyPanels.value = false;
       expect(grid.pageSlice.value).toHaveLength(INITIAL_PAGE_SIZE);
       grid.showMore();
-      expect(grid.pageSlice.value).toHaveLength(
-        INITIAL_PAGE_SIZE + PAGE_SIZE_INCREMENT,
-      );
+      expect(grid.pageSlice.value).toHaveLength(INITIAL_PAGE_SIZE + PAGE_SIZE_INCREMENT);
     });
 
     // A budget bump of PAGE_SIZE_INCREMENT can land entirely on cards that turn
@@ -765,8 +766,7 @@ describe("useMetricsExplorerGrid", () => {
         // Mid-flight the budget is untouched: the look-ahead resolves BEFORE
         // the commit, so the grid grows once — not batch by batch — and the
         // count never ticks back down as empties resolve.
-        if (grid.showingMore.value)
-          expect(grid.pageSlice.value).toHaveLength(INITIAL_PAGE_SIZE);
+        if (grid.showingMore.value) expect(grid.pageSlice.value).toHaveLength(INITIAL_PAGE_SIZE);
         if (!inFlight.length) continue;
         inFlight.forEach((q) => {
           const m = q.query.match(/metric_(\d+)_total/);
@@ -801,12 +801,19 @@ describe("useMetricsExplorerGrid", () => {
 
       grid.onOrgChange(); // the user switches org mid-flight
 
-      releaseOldOrg({ list: [{ name: "ghost_from_old_org", stream_type: "metrics", metrics_meta: { metric_type: "Counter" }, stats: { doc_num: 1 } }] });
+      releaseOldOrg({
+        list: [
+          {
+            name: "ghost_from_old_org",
+            stream_type: "metrics",
+            metrics_meta: { metric_type: "Counter" },
+            stats: { doc_num: 1 },
+          },
+        ],
+      });
       await inFlightLoad;
 
-      expect(grid.cards.value.map((c: any) => c.name)).not.toContain(
-        "ghost_from_old_org",
-      );
+      expect(grid.cards.value.map((c: any) => c.name)).not.toContain("ghost_from_old_org");
     });
   });
 
@@ -880,14 +887,11 @@ describe("useMetricsExplorerGrid", () => {
       });
 
       expect(await grid.loadLabelValues("job")).toEqual(["api"]);
-      const callsAfterFirst = (metricsService.labelValues as any).mock.calls
-        .length;
+      const callsAfterFirst = (metricsService.labelValues as any).mock.calls.length;
 
       // Same window: answered from cache, no second request.
       await grid.loadLabelValues("job");
-      expect((metricsService.labelValues as any).mock.calls.length).toBe(
-        callsAfterFirst,
-      );
+      expect((metricsService.labelValues as any).mock.calls.length).toBe(callsAfterFirst);
 
       // New window: the cache is gone, so it asks again — and serves the NEW
       // window's answer. (Asserting "it asked again" would have proved nothing
@@ -900,9 +904,9 @@ describe("useMetricsExplorerGrid", () => {
       grid.setTimeRange({ start_time: NOW_US - 24 * HOUR_US, end_time: NOW_US });
 
       expect(await grid.loadLabelValues("job")).toEqual(["web"]);
-      expect(
-        (metricsService.labelValues as any).mock.calls.length,
-      ).toBeGreaterThan(callsAfterFirst);
+      expect((metricsService.labelValues as any).mock.calls.length).toBeGreaterThan(
+        callsAfterFirst,
+      );
     });
 
     it("re-asks for the label NAMES on a new window, as it does for the values", async () => {
@@ -926,9 +930,7 @@ describe("useMetricsExplorerGrid", () => {
 
       // Same window: already answered, so it must not ask again.
       await grid.loadLabelNames();
-      expect((metricsService.labels as any).mock.calls.length).toBe(
-        callsAfterFirst,
-      );
+      expect((metricsService.labels as any).mock.calls.length).toBe(callsAfterFirst);
 
       // A wider window exposes a label the narrow one never saw.
       (metricsService.labels as any).mockResolvedValue({
@@ -940,9 +942,7 @@ describe("useMetricsExplorerGrid", () => {
       });
 
       await grid.loadLabelNames();
-      expect((metricsService.labels as any).mock.calls.length).toBeGreaterThan(
-        callsAfterFirst,
-      );
+      expect((metricsService.labels as any).mock.calls.length).toBeGreaterThan(callsAfterFirst);
       expect(grid.labelNames.value).toEqual(["job", "pod"]);
     });
 
@@ -1033,8 +1033,7 @@ describe("useMetricsExplorerGrid", () => {
   });
 
   describe("hiding no-data cards must not depend on the user scrolling to them", () => {
-    const names = (grid: any) =>
-      grid.sortedCards.value.map((c: any) => c.name);
+    const names = (grid: any) => grid.sortedCards.value.map((c: any) => c.name);
 
     /**
      * Answer everything the queue lets through, until it lets nothing more
@@ -1124,8 +1123,7 @@ describe("useMetricsExplorerGrid", () => {
     });
   });
   describe("an empty rate() is not proof of an empty metric", () => {
-    const names = (grid: any) =>
-      grid.sortedCards.value.map((c: any) => c.name);
+    const names = (grid: any) => grid.sortedCards.value.map((c: any) => c.name);
 
     /** Answers each round of one preview's queries with a different result. */
     const landRounds = async (preview: Promise<any>, ...rounds: any[]) => {
@@ -1168,16 +1166,10 @@ describe("useMetricsExplorerGrid", () => {
       // whole histogram vanished from the product and its data was unreachable.
       const grid = await setup();
 
-      expect(grid.cards.value.map((c: any) => c.name)).not.toContain(
-        "lat_seconds",
-      ); // the phantom base: correctly suppressed, so the components are all there is
+      expect(grid.cards.value.map((c: any) => c.name)).not.toContain("lat_seconds"); // the phantom base: correctly suppressed, so the components are all there is
 
       for (const member of ["lat_seconds_bucket", "lat_seconds_count"]) {
-        await landRounds(
-          grid.requestPreview(cardNamed(grid, member)),
-          NO_SERIES,
-          SERIES,
-        );
+        await landRounds(grid.requestPreview(cardNamed(grid, member)), NO_SERIES, SERIES);
       }
 
       expect(names(grid)).toEqual(
@@ -1195,9 +1187,7 @@ describe("useMetricsExplorerGrid", () => {
 
       // A yes/no question, asked of the stream the card actually reads — and
       // asked WITHOUT `rate()`, which is the whole point.
-      expect(inFlight.map((q) => q.query)).toEqual([
-        'count({__name__="lat_seconds_count"})',
-      ]);
+      expect(inFlight.map((q) => q.query)).toEqual(['count({__name__="lat_seconds_count"})']);
 
       inFlight.splice(0, inFlight.length).forEach((q) => q.complete(SERIES));
       await preview;
@@ -1242,9 +1232,7 @@ describe("useMetricsExplorerGrid", () => {
       grid.setTimeRange({ start_time: NOW_US - HOUR_US, end_time: NOW_US });
       await grid.loadStreams();
 
-      const preview = grid.requestPreview(
-        cardNamed(grid, "never_written_total"),
-      );
+      const preview = grid.requestPreview(cardNamed(grid, "never_written_total"));
       await flush();
       inFlight.splice(0, inFlight.length).forEach((q) => q.complete(NO_SERIES));
       await flush();
@@ -1294,16 +1282,12 @@ describe("useMetricsExplorerGrid", () => {
       await grid.addLabelFilter({ label: "le", value: "0.5", operator: "=" });
 
       // The default histogram variant reads X_bucket, which HAS `le` -> eligible.
-      expect(grid.sortedCards.value.map((c: any) => c.name)).toContain(
-        "lat_seconds_bucket",
-      );
+      expect(grid.sortedCards.value.map((c: any) => c.name)).toContain("lat_seconds_bucket");
 
       // Override it to the count line, which reads X_count — no `le` there.
       grid.setOverride("lat_seconds_bucket", { variantId: "count-rate" });
 
-      expect(grid.sortedCards.value.map((c: any) => c.name)).not.toContain(
-        "lat_seconds_bucket",
-      );
+      expect(grid.sortedCards.value.map((c: any) => c.name)).not.toContain("lat_seconds_bucket");
     });
   });
   describe("an org switch must not deadlock the deferred loads", () => {
@@ -1426,9 +1410,7 @@ describe("useMetricsExplorerGrid", () => {
 
       expect(await values).toEqual(["api-1"]);
       // It really fanned out — the bug's signature was zero labelValues calls.
-      expect(
-        (metricsService.labelValues as any).mock.calls.length,
-      ).toBeGreaterThan(0);
+      expect((metricsService.labelValues as any).mock.calls.length).toBeGreaterThan(0);
     });
 
     it("keeps label values out of the chart-result cache", async () => {

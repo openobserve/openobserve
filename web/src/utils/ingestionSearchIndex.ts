@@ -57,6 +57,12 @@ export const ingestionSearchIndex: SearchableItem[] = [
     parentTab: "recommended",
   },
   {
+    name: "ingestFromMacOS",
+    label: "macOS",
+    keywords: ["macos", "mac", "osx", "darwin", "apple", "unified log"],
+    parentTab: "recommended",
+  },
+  {
     name: "AWSConfig",
     label: "AWS",
     keywords: ["aws", "amazon"],
@@ -288,8 +294,6 @@ export function searchIngestionItems(query: string): SearchableItem[] {
     }
 
     // Check if query matches any of the keywords
-    return item.keywords.some((keyword) =>
-      keyword.toLowerCase().includes(searchTerm),
-    );
+    return item.keywords.some((keyword) => keyword.toLowerCase().includes(searchTerm));
   });
 }

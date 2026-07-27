@@ -47,9 +47,7 @@ vi.mock("@tanstack/vue-virtual", () => ({
 }));
 
 vi.mock("@/utils/traces/convertTraceData", () => ({
-  getServiceIconDataUrl: vi
-    .fn()
-    .mockReturnValue("data:image/svg+xml;base64,ICON"),
+  getServiceIconDataUrl: vi.fn().mockReturnValue("data:image/svg+xml;base64,ICON"),
   getSpanTechIconDataUrl: vi.fn().mockReturnValue(null),
 }));
 
@@ -227,10 +225,7 @@ const mockSpanList = [
   },
 ];
 
-function mountTraceTree(
-  extraProps: Record<string, unknown> = {},
-  storePlugin = mockStore,
-) {
+function mountTraceTree(extraProps: Record<string, unknown> = {}, storePlugin = mockStore) {
   return mount(TraceTree, {
     props: {
       spans: mockSpans,
@@ -271,15 +266,11 @@ describe("TraceTree", () => {
   });
 
   it("should render all spans", () => {
-    const spanElements = wrapper.findAll(
-      `[data-test^="trace-tree-span-container-"]`,
-    );
+    const spanElements = wrapper.findAll(`[data-test^="trace-tree-span-container-"]`);
     expect(spanElements.length).toBe(mockSpans.length);
 
     for (const span of mockSpans) {
-      const spanElement = wrapper.find(
-        `[data-test="trace-tree-span-container-${span.spanId}"]`,
-      );
+      const spanElement = wrapper.find(`[data-test="trace-tree-span-container-${span.spanId}"]`);
       expect(spanElement.exists()).toBe(true);
     }
   });
@@ -295,9 +286,7 @@ describe("TraceTree", () => {
   });
 
   it("should render service names", () => {
-    const serviceNameElements = wrapper.findAll(
-      '[data-test^="trace-tree-span-service-name-"]',
-    );
+    const serviceNameElements = wrapper.findAll('[data-test^="trace-tree-span-service-name-"]');
     expect(serviceNameElements.length).toBe(mockSpans.length);
 
     expect(serviceNameElements[0].text()).toBe(mockSpans[0].serviceName);
@@ -305,16 +294,12 @@ describe("TraceTree", () => {
   });
 
   it("should render error icon for error spans", () => {
-    const errorIcon = wrapper.find(
-      '[data-test="trace-tree-span-error-icon-6702b0494b2b6e57"]',
-    );
+    const errorIcon = wrapper.find('[data-test="trace-tree-span-error-icon-6702b0494b2b6e57"]');
     expect(errorIcon.exists()).toBe(true);
   });
 
   it("should not render error icon for non-error spans", () => {
-    const errorIcon = wrapper.find(
-      '[data-test="trace-tree-span-error-icon-d9603ec7f76eb499"]',
-    );
+    const errorIcon = wrapper.find('[data-test="trace-tree-span-error-icon-d9603ec7f76eb499"]');
     expect(errorIcon.exists()).toBe(false);
   });
 
@@ -372,9 +357,7 @@ describe("TraceTree", () => {
       await collapseBtn.trigger("click");
 
       expect(wrapper.emitted("toggleCollapse")).toBeTruthy();
-      expect(wrapper.emitted("toggleCollapse")[0]).toEqual([
-        "d9603ec7f76eb499",
-      ]);
+      expect(wrapper.emitted("toggleCollapse")[0]).toEqual(["d9603ec7f76eb499"]);
     });
 
     it("should apply correct collapse icon rotation", async () => {
@@ -534,10 +517,7 @@ describe("TraceTree", () => {
           ["operation_name", "evaluate_scheduled"],
         ];
 
-        const result = wrapper.vm.isHighlighted([
-          "service_name",
-          "alertmanager",
-        ]);
+        const result = wrapper.vm.isHighlighted(["service_name", "alertmanager"]);
         expect(result).toBe(true);
       });
 
@@ -786,9 +766,7 @@ describe("TraceTree", () => {
     it("should render span-block stubs for each span", () => {
       // span-block is stubbed; verify the component renders without error
       // and the expected number of span containers is present.
-      const spanContainers = wrapper.findAll(
-        '[data-test^="trace-tree-span-container-"]',
-      );
+      const spanContainers = wrapper.findAll('[data-test^="trace-tree-span-container-"]');
       expect(spanContainers.length).toBe(mockSpans.length);
     });
 
@@ -1030,9 +1008,7 @@ describe("TraceTree", () => {
 
       await flushPromises();
 
-      const spanElements = wrapper.findAll(
-        '[data-test^="trace-tree-span-container-"]',
-      );
+      const spanElements = wrapper.findAll('[data-test^="trace-tree-span-container-"]');
       expect(spanElements.length).toBe(100);
     });
 
@@ -1043,9 +1019,7 @@ describe("TraceTree", () => {
 
       await flushPromises();
 
-      const updatedSpans = wrapper.findAll(
-        '[data-test^="trace-tree-span-container-"]',
-      );
+      const updatedSpans = wrapper.findAll('[data-test^="trace-tree-span-container-"]');
       expect(updatedSpans.length).toBe(1);
     });
   });
@@ -1093,9 +1067,7 @@ describe("TraceTree", () => {
       await wrapper.setProps({ selectedSpanId: "d9603ec7f76eb499" });
       await flushPromises();
 
-      const row = wrapper.find(
-        '[data-test="trace-tree-span-container-d9603ec7f76eb499"]',
-      );
+      const row = wrapper.find('[data-test="trace-tree-span-container-d9603ec7f76eb499"]');
       expect(row.exists()).toBe(true);
       expect(row.classes()).toContain("span-row-selected");
     });
@@ -1104,9 +1076,7 @@ describe("TraceTree", () => {
       await wrapper.setProps({ selectedSpanId: "d9603ec7f76eb499" });
       await flushPromises();
 
-      const row = wrapper.find(
-        '[data-test="trace-tree-span-container-6702b0494b2b6e57"]',
-      );
+      const row = wrapper.find('[data-test="trace-tree-span-container-6702b0494b2b6e57"]');
       expect(row.exists()).toBe(true);
       expect(row.classes()).not.toContain("span-row-selected");
     });
@@ -1117,9 +1087,7 @@ describe("TraceTree", () => {
       await wrapper.setProps({ selectedSpanId: "" });
       await flushPromises();
 
-      const row = wrapper.find(
-        '[data-test="trace-tree-span-container-d9603ec7f76eb499"]',
-      );
+      const row = wrapper.find('[data-test="trace-tree-span-container-d9603ec7f76eb499"]');
       expect(row.exists()).toBe(true);
       expect(row.classes()).not.toContain("span-row-selected");
     });
@@ -1359,16 +1327,12 @@ describe("TraceTree", () => {
     });
 
     it("should render vertical connector segments for spans with depth > 0", () => {
-      const verticalSegments = depthWrapper.findAll(
-        '[data-test="vertical-segment"]',
-      );
+      const verticalSegments = depthWrapper.findAll('[data-test="vertical-segment"]');
       expect(verticalSegments.length).toBeGreaterThan(0);
     });
 
     it("should render horizontal connector segments for spans with depth > 0", () => {
-      const horizontalSegment = depthWrapper.find(
-        '[data-test="horizontal-segment"]',
-      );
+      const horizontalSegment = depthWrapper.find('[data-test="horizontal-segment"]');
       expect(horizontalSegment.exists()).toBe(true);
     });
   });

@@ -28,10 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:secondary="emits('update:open', false)"
   >
     <div class="w-full">
-      <OForm
-        id="add-stream-form"
-        :form="addStreamForm"
-      >
+      <OForm id="add-stream-form" :form="addStreamForm">
         <div class="mt-2">
           <OFormInput
             data-test="add-stream-name-input"
@@ -68,10 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
 
-        <StreamFieldInputs
-          class="mt-4"
-          form-field-name="fields"
-        />
+        <StreamFieldInputs class="mt-4" form-field-name="fields" />
       </OForm>
     </div>
   </ODialog>
@@ -80,53 +74,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
        The drawer owns the footer Cancel/Save (built-in ODrawer footer); its Save
        submits this form via `form-id="add-stream-node-form"`, so no inline
        buttons here. -->
-    <div v-else class="w-full">
-      <OForm
-        id="add-stream-node-form"
-        :form="addStreamForm"
-      >
-        <div class="mt-2">
-          <OFormInput
-            data-test="add-stream-name-input"
-            name="name"
-            :label="t('common.name')"
-            required
-            class="showLabelOnTop"
-            :help-text="t('logStream.streamNameHelpText')"
-            tabindex="0"
-          />
-        </div>
-
-        <div class="mt-2">
-          <OFormSelect
-            data-test="add-stream-type-input"
-            name="stream_type"
-            :options="filteredStreamTypes"
-            :label="t('alerts.streamType')"
-            required
-            labelKey="label"
-            valueKey="value"
-            class="showLabelOnTop"
-          />
-        </div>
-
-        <div data-test="add-stream-data-retention-input" v-if="showDataRetention" class="mt-2">
-          <OFormInput
-            data-test="add-stream-data-retention"
-            name="dataRetentionDays"
-            :label="t('logStream.dataRetention')"
-            required
-            class="showLabelOnTop"
-            type="number"
-          />
-        </div>
-
-        <StreamFieldInputs
-          class="mt-4"
-          form-field-name="fields"
+  <div v-else class="w-full">
+    <OForm id="add-stream-node-form" :form="addStreamForm">
+      <div class="mt-2">
+        <OFormInput
+          data-test="add-stream-name-input"
+          name="name"
+          :label="t('common.name')"
+          required
+          class="showLabelOnTop"
+          :help-text="t('logStream.streamNameHelpText')"
+          tabindex="0"
         />
-      </OForm>
-    </div>
+      </div>
+
+      <div class="mt-2">
+        <OFormSelect
+          data-test="add-stream-type-input"
+          name="stream_type"
+          :options="filteredStreamTypes"
+          :label="t('alerts.streamType')"
+          required
+          labelKey="label"
+          valueKey="value"
+          class="showLabelOnTop"
+        />
+      </div>
+
+      <div data-test="add-stream-data-retention-input" v-if="showDataRetention" class="mt-2">
+        <OFormInput
+          data-test="add-stream-data-retention"
+          name="dataRetentionDays"
+          :label="t('logStream.dataRetention')"
+          required
+          class="showLabelOnTop"
+          type="number"
+        />
+      </div>
+
+      <StreamFieldInputs class="mt-4" form-field-name="fields" />
+    </OForm>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -144,14 +132,9 @@ import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import {
-  makeAddStreamSchema,
-  addStreamDefaults,
-  type AddStreamForm,
-} from "./AddStream.schema";
+import { makeAddStreamSchema, addStreamDefaults, type AddStreamForm } from "./AddStream.schema";
 
 const { t } = useI18n();
-
 
 const streamTypes = [
   { label: "Logs", value: "logs" },
@@ -164,7 +147,6 @@ const props = defineProps<{
   isInPipeline: boolean;
   open?: boolean;
 }>();
-
 
 const { addStream, getStream } = useStreams();
 
@@ -195,9 +177,7 @@ const { track } = useReo();
 // org config the schema can't read — re-evaluates when the user changes the type.
 // Must use form.useStore; a `form.state.values` read inside a computed would not
 // track changes.
-const formStreamType = addStreamForm.useStore(
-  (s: any) => (s.values.stream_type as string) ?? "",
-);
+const formStreamType = addStreamForm.useStore((s: any) => (s.values.stream_type as string) ?? "");
 
 // Reset to fresh defaults whenever the dialog opens so each reopen starts blank.
 // reset() also zeroes submissionAttempts so no stale "required" errors flash.
@@ -219,11 +199,10 @@ const filteredStreamTypes = computed(() => {
   return streamTypes;
 });
 
-
 const showDataRetention = computed(
   () =>
     !!(store.state.zoConfig.data_retention_days || false) &&
-    formStreamType.value !== "enrichment_tables"
+    formStreamType.value !== "enrichment_tables",
 );
 
 // `value` is the fully-validated submit payload — scalars and the `fields`
@@ -243,10 +222,7 @@ const saveStream = async (value: AddStreamForm) => {
 
   if (isStreamPresent) return;
 
-  const payload = getStreamPayload(
-    Number(value.dataRetentionDays),
-    value.fields ?? [],
-  );
+  const payload = getStreamPayload(Number(value.dataRetentionDays), value.fields ?? []);
   if (!payload) return;
 
   await streamService
@@ -254,7 +230,7 @@ const saveStream = async (value: AddStreamForm) => {
       store.state.selectedOrganization.identifier,
       value.name,
       value.stream_type,
-      payload
+      payload,
     )
     .then(() => {
       toast({
@@ -263,11 +239,7 @@ const saveStream = async (value: AddStreamForm) => {
       });
 
       return streamService
-        .schema(
-          store.state.selectedOrganization.identifier,
-          value.name,
-          value.stream_type
-        )
+        .schema(store.state.selectedOrganization.identifier, value.name, value.stream_type)
         .then((streamRes: any) => {
           addStream(streamRes.data);
           emits("streamAdded");
@@ -276,18 +248,17 @@ const saveStream = async (value: AddStreamForm) => {
         });
     })
     .catch((err) => {
-      if(err.response.status != 403){
+      if (err.response.status != 403) {
         toast({
-        message: err.response?.data?.message || "Failed to create stream",
-        variant: "error",
-      });
+          message: err.response?.data?.message || "Failed to create stream",
+          variant: "error",
+        });
       }
     });
-    track("Button Click", {
-      button: "Save Stream",
-      page: "Add Stream"
-    });
-
+  track("Button Click", {
+    button: "Save Stream",
+    page: "Add Stream",
+  });
 };
 
 const getStreamPayload = (dataRetentionDays: number, rows: any[]) => {
@@ -300,7 +271,7 @@ const getStreamPayload = (dataRetentionDays: number, rows: any[]) => {
       bloom_filter_fields: any[];
       data_retention?: number;
       defined_schema_fields: any[];
-    }
+    };
   } = {
     fields: [],
     settings: {
@@ -309,13 +280,12 @@ const getStreamPayload = (dataRetentionDays: number, rows: any[]) => {
       full_text_search_keys: [],
       bloom_filter_fields: [],
       defined_schema_fields: [],
-    }
+    },
   };
 
   if (showDataRetention.value && dataRetentionDays < 1) {
     toast({
-      message:
-        "Invalid Data Retention Period: Retention period must be at least 1 day.",
+      message: "Invalid Data Retention Period: Retention period must be at least 1 day.",
       variant: "error",
     });
     return;
@@ -326,13 +296,8 @@ const getStreamPayload = (dataRetentionDays: number, rows: any[]) => {
   }
 
   rows.forEach((field) => {
+    field.name = field.name.trim().toLowerCase().replace(/ /g, "_").replace(/-/g, "_");
 
-    field.name = field.name
-      .trim()
-      .toLowerCase()
-      .replace(/ /g, "_")
-      .replace(/-/g, "_");
-    
     stream.fields.push(field);
 
     // process index types
@@ -381,4 +346,3 @@ const getStreamPayload = (dataRetentionDays: number, rows: any[]) => {
   return stream;
 };
 </script>
-

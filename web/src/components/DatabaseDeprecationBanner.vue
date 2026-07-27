@@ -25,14 +25,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="flex items-center">
       <div class="flex flex-col">
         <span
-          class="text-base font-semibold leading-6 text-text-heading"
+          class="text-text-heading text-base leading-6 font-semibold"
           data-test="database-deprecation-banner-title"
         >
           ⚠️ MySQL support is DEPRECATED and will be removed in future.
         </span>
         <br />
         <span
-          class="text-sm font-normal leading-5 text-text-secondary"
+          class="text-text-secondary text-sm leading-5 font-normal"
           data-test="database-deprecation-banner-subtitle"
         >
           Please migrate to PostgreSQL to ensure continued support.
@@ -75,7 +75,7 @@ export default defineComponent({
           const dismissedDate = new Date(timestamp);
           const currentDate = new Date();
           const daysSinceDismissal = Math.floor(
-            (currentDate.getTime() - dismissedDate.getTime()) / (1000 * 60 * 60 * 24)
+            (currentDate.getTime() - dismissedDate.getTime()) / (1000 * 60 * 60 * 24),
           );
 
           // Show again if more than DISMISS_DURATION_DAYS have passed
@@ -111,4 +111,3 @@ export default defineComponent({
   },
 });
 </script>
-

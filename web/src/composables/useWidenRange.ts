@@ -65,18 +65,14 @@ export default function useWidenRange(
   const { absoluteRangeLabel = "", absoluteExpandDesc = "" } = options;
 
   const relPeriod = computed(() => relativeTimePeriod() || "");
-  const isRelative = computed(
-    () => dateType() === "relative" && !!relPeriod.value,
-  );
+  const isRelative = computed(() => dateType() === "relative" && !!relPeriod.value);
   const suggestedPeriod = computed(() =>
     isRelative.value ? nextWiderPeriod(relPeriod.value) : "7d",
   );
   const currentPeriodLabel = computed(() =>
     isRelative.value ? periodToLabel(relPeriod.value) : absoluteRangeLabel,
   );
-  const suggestedPeriodLabel = computed(() =>
-    periodToLabel(suggestedPeriod.value),
-  );
+  const suggestedPeriodLabel = computed(() => periodToLabel(suggestedPeriod.value));
   const expandRangeSublabel = computed(() => {
     if (!isRelative.value) return absoluteExpandDesc;
     return `${currentPeriodLabel.value} → ${suggestedPeriodLabel.value}`;

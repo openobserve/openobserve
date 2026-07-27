@@ -22,11 +22,7 @@
 
 import config from "@/aws-exports";
 import { getImageURL } from "@/utils/zincutils";
-import type {
-  CardSubstitutions,
-  RichCardContent,
-  RichCardStepVariant,
-} from "../types";
+import type { CardSubstitutions, RichCardContent, RichCardStepVariant } from "../types";
 import { applySubs, applySubsMasked } from "../subs";
 
 // Collector exporter config. {stream} is filled live by the renderer.
@@ -63,9 +59,7 @@ export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Basic {token},stream-name={stre
 export OTEL_EXPORTER_OTLP_PROTOCOL="http/protobuf"
 export OTEL_SERVICE_NAME="my-service"`;
 
-export default function otlpTracesCard(
-  subs: CardSubstitutions,
-): RichCardContent {
+export default function otlpTracesCard(subs: CardSubstitutions): RichCardContent {
   const isCloud = config.isCloud === "true";
   // The gRPC endpoint is a self-hosted port; cloud terminates HTTP only.
   const host = subs.url.replace(/^https?:\/\//, "").replace(/\/$/, "");
@@ -181,7 +175,6 @@ export default function otlpTracesCard(
         },
       ],
     },
-    docUrl:
-      "https://openobserve.ai/docs/user-guide/data-sources-ingestion/traces/opentelemetry/",
+    docUrl: "https://openobserve.ai/docs/user-guide/data-sources-ingestion/traces/opentelemetry/",
   };
 }

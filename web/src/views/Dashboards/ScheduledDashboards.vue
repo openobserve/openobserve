@@ -15,7 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <ODrawer data-test="scheduled-dashboards-drawer"
+  <ODrawer
+    data-test="scheduled-dashboards-drawer"
     bleed
     :open="open"
     :width="60"
@@ -43,73 +44,64 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="sm"
           data-test="alert-list-add-alert-btn"
           @click="createScheduledReport"
-        >{{ t("dashboard.newReport") }}</OButton
+          >{{ t("dashboard.newReport") }}</OButton
         >
       </div>
     </template>
 
-    <div
-      data-test="scheduled-dashboards-container"
-      class="scheduled-dashboards h-fit"
-    >
-    <OTable class="w-full"
-      data-test="scheduled-dashboard-table"
-      :data="displayReports"
-      :columns="columns"
-      row-key="id"
-      pagination="client"
-      :page-size="selectedPerPage"
-      :page-size-options="perPageOptionsList"
-      :show-global-filter="false"
-      :default-columns="false"
-      show-index
-      :loading="loading"
-    >
-      <template #cell-name="{ row }">
-        <span class="cursor-pointer" @click="openReport(row)">{{ row.name }}</span>
-      </template>
+    <div data-test="scheduled-dashboards-container" class="scheduled-dashboards h-fit">
+      <OTable
+        class="w-full"
+        data-test="scheduled-dashboard-table"
+        :data="displayReports"
+        :columns="columns"
+        row-key="id"
+        pagination="client"
+        :page-size="selectedPerPage"
+        :page-size-options="perPageOptionsList"
+        :show-global-filter="false"
+        :default-columns="false"
+        show-index
+        :loading="loading"
+      >
+        <template #cell-name="{ row }">
+          <span class="cursor-pointer" @click="openReport(row)">{{ row.name }}</span>
+        </template>
 
-      <template #cell-tab="{ row }">
-        <span class="cursor-pointer" @click="openReport(row)">{{ row.tab }}</span>
-      </template>
+        <template #cell-tab="{ row }">
+          <span class="cursor-pointer" @click="openReport(row)">{{ row.tab }}</span>
+        </template>
 
-      <template #cell-time_range="{ row }">
-        <span class="cursor-pointer" @click="openReport(row)">{{ row.time_range }}</span>
-      </template>
+        <template #cell-time_range="{ row }">
+          <span class="cursor-pointer" @click="openReport(row)">{{ row.time_range }}</span>
+        </template>
 
-      <template #cell-frequency="{ row }">
-        <span class="cursor-pointer" @click="openReport(row)">{{ row.frequency }}</span>
-      </template>
+        <template #cell-frequency="{ row }">
+          <span class="cursor-pointer" @click="openReport(row)">{{ row.frequency }}</span>
+        </template>
 
-      <template #cell-last_triggered_at="{ row }">
-        <span class="cursor-pointer" @click="openReport(row)">
-          <OTimeCell
-            :value="row.last_triggered_at_raw"
-            unit="us"
-            mode="absolute"
-            :timezone="store.state.timezone"
-            :empty-label="t('dashboard.scheduledDashboardsPage.never')"
-          />
-        </span>
-      </template>
+        <template #cell-last_triggered_at="{ row }">
+          <span class="cursor-pointer" @click="openReport(row)">
+            <OTimeCell
+              :value="row.last_triggered_at_raw"
+              unit="us"
+              mode="absolute"
+              :timezone="store.state.timezone"
+              :empty-label="t('dashboard.scheduledDashboardsPage.never')"
+            />
+          </span>
+        </template>
 
-      <template #cell-created_at="{ row }">
-        <span class="cursor-pointer" @click="openReport(row)">
-          <OTimeCell
-            :value="row.created_at_raw"
-            unit="us"
-            :timezone="store.state.timezone"
-          />
-        </span>
-      </template>
+        <template #cell-created_at="{ row }">
+          <span class="cursor-pointer" @click="openReport(row)">
+            <OTimeCell :value="row.created_at_raw" unit="us" :timezone="store.state.timezone" />
+          </span>
+        </template>
 
-      <template #empty>
-        <NoData
-          :filtered="!!scheduledFilterQuery"
-          @action="scheduledFilterQuery = ''"
-        />
-      </template>
-    </OTable>
+        <template #empty>
+          <NoData :filtered="!!scheduledFilterQuery" @action="scheduledFilterQuery = ''" />
+        </template>
+      </OTable>
     </div>
   </ODrawer>
 </template>
@@ -196,9 +188,7 @@ type ScheduledReportRow = Omit<ScheduledDashboardReport, "#"> & {
   created_at_raw: number | null;
 };
 
-const scheduledReports = ref<ScheduledReportRow[]>(
-  props.reports as ScheduledReportRow[],
-);
+const scheduledReports = ref<ScheduledReportRow[]>(props.reports as ScheduledReportRow[]);
 
 const formattedReports = ref<ScheduledReportRow[]>([]);
 
@@ -214,12 +204,9 @@ watch(
   },
 );
 
-watch(
-  scheduledActiveTab,
-  () => {
-    filterReports();
-  },
-);
+watch(scheduledActiveTab, () => {
+  filterReports();
+});
 //this makes sure that reports are formatted when the component is mounted
 //because sometimes watcher might not be triggered if the props are already set
 onMounted(() => {
@@ -257,13 +244,9 @@ const filterReports = () => {
   // filter reports based on the selected tab
   // If reports are cached, show only cached reports
   if (scheduledActiveTab.value === "cached") {
-    formattedReports.value = scheduledReports.value.filter(
-      (report) => report.isCached,
-    );
+    formattedReports.value = scheduledReports.value.filter((report) => report.isCached);
   } else {
-    formattedReports.value = scheduledReports.value.filter(
-      (report) => !report.isCached,
-    );
+    formattedReports.value = scheduledReports.value.filter((report) => !report.isCached);
   }
 };
 
@@ -327,9 +310,7 @@ const displayReports = computed(() => {
   if (scheduledFilterQuery.value) {
     const query = scheduledFilterQuery.value.toLowerCase();
     reports = reports.filter((row: any) =>
-      Object.values(row).some((v) =>
-        String(v).toLowerCase().includes(query),
-      ),
+      Object.values(row).some((v) => String(v).toLowerCase().includes(query)),
     );
   }
   return reports;

@@ -20,12 +20,10 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use config::meta::short_url::{ShortenUrlRequest, ShortenUrlResponse};
+use openobserve_api_query::search::error_utils::map_error_to_http_response;
 use serde::Deserialize;
 
-use crate::{
-    common::utils::redirect_response::RedirectResponseBuilder,
-    handler::http::request::search::error_utils::map_error_to_http_response, service::short_url,
-};
+use crate::{common::utils::redirect_response::RedirectResponseBuilder, service::short_url};
 
 /// Shorten a URL
 #[utoipa::path(

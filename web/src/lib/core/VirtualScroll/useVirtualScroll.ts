@@ -30,13 +30,7 @@ export interface UseVirtualScrollOptions {
  * instead of TanStack Table `Row<T>[]`.
  */
 export function useVirtualScroll(options: UseVirtualScrollOptions) {
-  const {
-    items,
-    parentRef,
-    scrollTarget,
-    estimateSize = 40,
-    overscan = 5,
-  } = options;
+  const { items, parentRef, scrollTarget, estimateSize = 40, overscan = 5 } = options;
 
   const dynamicRowHeight = options.dynamicRowHeight ?? ref(false);
 
@@ -72,8 +66,7 @@ export function useVirtualScroll(options: UseVirtualScrollOptions) {
   const virtualizerOptions = computed(() => {
     const base: Record<string, any> = {
       count: items.value.length,
-      getScrollElement: () =>
-        (scrollTarget?.value as HTMLElement | null) ?? parentRef.value,
+      getScrollElement: () => (scrollTarget?.value as HTMLElement | null) ?? parentRef.value,
       estimateSize: dynamicRowHeight.value
         ? (index: number) => measuredHeights.value[index] || estimateSize
         : () => estimateSize,
@@ -145,6 +138,6 @@ export function useVirtualScroll(options: UseVirtualScrollOptions) {
     scrollToIndex,
     scrollToTop,
     measure,
-    measureElement
+    measureElement,
   };
 }

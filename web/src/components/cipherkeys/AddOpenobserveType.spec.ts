@@ -33,9 +33,7 @@ const addCipherKeySchema = makeAddCipherKeySchema((k: string) => i18n.global.t(k
 // OFormTextarea binds to the actual form by name.
 
 const baseDefaults = (local = ""): AddCipherKeyForm => {
-  const v = JSON.parse(
-    JSON.stringify(addCipherKeyDefaults()),
-  ) as AddCipherKeyForm;
+  const v = JSON.parse(JSON.stringify(addCipherKeyDefaults())) as AddCipherKeyForm;
   v.name = "valid-key";
   v.key.store.type = "local";
   v.key.store.local = local;
@@ -79,19 +77,15 @@ describe("AddOpenobserveType.vue", () => {
     });
 
     it("renders the editable secret textarea", () => {
-      expect(
-        wrapper
-          .find('[data-test="add-cipher-key-openobserve-secret-input"]')
-          .exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="add-cipher-key-openobserve-secret-input"]').exists()).toBe(
+        true,
+      );
     });
 
     it("flags a missing secret on submit (store.type === local)", async () => {
       await form().handleSubmit();
       expect(form().state.isValid).toBe(false);
-      expect(
-        (form().getFieldMeta("key.store.local")?.errors ?? []).length,
-      ).toBeGreaterThan(0);
+      expect((form().getFieldMeta("key.store.local")?.errors ?? []).length).toBeGreaterThan(0);
     });
 
     it("passes validation once a secret is provided", async () => {
@@ -107,15 +101,11 @@ describe("AddOpenobserveType.vue", () => {
     });
 
     it("shows the read-only display + Update button (not the textarea)", () => {
+      expect(wrapper.find('[data-test="add-cipher-key-openobserve-secret-input"]').exists()).toBe(
+        false,
+      );
       expect(
-        wrapper
-          .find('[data-test="add-cipher-key-openobserve-secret-input"]')
-          .exists(),
-      ).toBe(false);
-      expect(
-        wrapper
-          .find('[data-test="add-cipher-key-openobserve-secret-input-update"]')
-          .exists(),
+        wrapper.find('[data-test="add-cipher-key-openobserve-secret-input-update"]').exists(),
       ).toBe(true);
     });
 
@@ -124,11 +114,9 @@ describe("AddOpenobserveType.vue", () => {
         .find('[data-test="add-cipher-key-openobserve-secret-input-update"]')
         .trigger("click");
       await nextTick();
-      expect(
-        wrapper
-          .find('[data-test="add-cipher-key-openobserve-secret-input"]')
-          .exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="add-cipher-key-openobserve-secret-input"]').exists()).toBe(
+        true,
+      );
     });
   });
 });

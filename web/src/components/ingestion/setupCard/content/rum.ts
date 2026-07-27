@@ -108,7 +108,10 @@ const indent = (block: string, spaces: number) =>
 
 const NPM_INSTALL = "npm i @openobserve/browser-rum @openobserve/browser-logs";
 
-const npmInit = (subs: RumCardSubs, token: string) => `import { openobserveRum } from '@openobserve/browser-rum';
+const npmInit = (
+  subs: RumCardSubs,
+  token: string,
+) => `import { openobserveRum } from '@openobserve/browser-rum';
 import { openobserveLogs } from '@openobserve/browser-logs';
 
 const options = ${optionsBlock(subs, token)};
@@ -141,7 +144,9 @@ const cdnLoader = (globalName: string, src: string) => `  (function (h, o, u, n,
     n = o.getElementsByTagName(u)[0]; n.parentNode.insertBefore(d, n);
   })(window, document, 'script', '${src}', '${globalName}');`;
 
-const cdnInstall = (subs: RumCardSubs) => `<!-- Performance: resolve DNS + open the TLS connection early for the CDN and
+const cdnInstall = (
+  subs: RumCardSubs,
+) => `<!-- Performance: resolve DNS + open the TLS connection early for the CDN and
      your OpenObserve endpoint, so neither is on the SDK's critical path. -->
 <link rel="preconnect" href="${CDN_HOST}" crossorigin />
 <link rel="dns-prefetch" href="${CDN_HOST}" />
@@ -265,14 +270,7 @@ export default function rumCard(subs: RumCardSubs): RichCardContent {
         chip: { kind: "traces", label: "RUM" },
         completeOn: "detect",
         detectionAnchor: true,
-        pills: [
-          "Sessions",
-          "Page Views",
-          "User Actions",
-          "Errors",
-          "Web Vitals",
-          "Session Replay",
-        ],
+        pills: ["Sessions", "Page Views", "User Actions", "Errors", "Web Vitals", "Session Replay"],
       },
     ],
     // Every session emits `view` events on init, so their presence in _rumdata

@@ -35,6 +35,7 @@ pub mod distinct_values;
 pub mod enrichment_table_urls;
 pub mod enrichment_tables;
 pub mod entity;
+pub mod evaluation_watermarks;
 pub mod folders;
 pub mod gen_ai_agents;
 pub mod incident_events;
@@ -72,6 +73,7 @@ pub mod system_settings;
 pub mod templates;
 pub mod timed_annotation_panels;
 pub mod timed_annotations;
+#[cfg(feature = "cloud")]
 pub mod trial_quota_usage;
 pub mod users;
 pub mod workflows;

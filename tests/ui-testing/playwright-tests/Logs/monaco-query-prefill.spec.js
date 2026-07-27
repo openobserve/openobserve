@@ -56,7 +56,6 @@ test.describe("Monaco Editor Query Pre-fill Tests", () => {
     await page.goto(logsUrlWithQuery);
 
     // Step 3: Wait for page and Monaco editor to load (critical for lazy loading)
-    await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
 
     // Wait for Monaco editor to be visible AND finish pre-filling from the URL query
     // param. It's lazy loaded, so the host can be visible before the model content is
@@ -85,7 +84,6 @@ test.describe("Monaco Editor Query Pre-fill Tests", () => {
     // Step 1: Navigate to logs page and setup a query
     const logsUrl = `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`;
     await page.goto(logsUrl);
-    await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
 
     // Step 2: Select stream
     await pm.logsPage.selectStream(TEST_STREAM);
@@ -106,7 +104,6 @@ test.describe("Monaco Editor Query Pre-fill Tests", () => {
     // Step 7: Navigate to the shared URL (simulates opening in new tab)
     await page.goto(sharedUrl);
     await pm.logsPage.waitForRedirectComplete();
-    await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
 
     // Step 8: Wait for Monaco to load AND finish pre-filling from the restored short-URL
     // state. The editor host becomes visible before the query re-hydrates, so poll the
@@ -140,7 +137,6 @@ test.describe("Monaco Editor Query Pre-fill Tests", () => {
     // Step 1: Navigate to logs page
     const logsUrl = `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`;
     await page.goto(logsUrl);
-    await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
 
     // Step 2: Select stream
     await pm.logsPage.selectStream(TEST_STREAM);
@@ -176,12 +172,10 @@ test.describe("Monaco Editor Query Pre-fill Tests", () => {
 
     // Step 7: Navigate away (go to home or different page)
     await page.goto(`${process.env["ZO_BASE_URL"]}/web/?org_identifier=${process.env["ORGNAME"]}`);
-    await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
     await page.waitForTimeout(2000);
 
     // Step 8: Navigate back to logs page (fresh load, triggers lazy loading)
     await page.goto(logsUrl);
-    await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
 
     // Wait for Monaco editor to load
     await pm.logsPage.waitForQueryEditorVisible();
@@ -237,7 +231,6 @@ test.describe("Monaco Editor Query Pre-fill Tests", () => {
     // Step 1: Navigate to Streams page
     const streamsUrl = `${process.env["ZO_BASE_URL"]}/web/streams?org_identifier=${process.env["ORGNAME"]}`;
     await page.goto(streamsUrl);
-    await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
     await page.waitForTimeout(2000);
 
     // Step 2: Search for the test stream
@@ -249,7 +242,6 @@ test.describe("Monaco Editor Query Pre-fill Tests", () => {
     await pm.streamsPage.exploreStream();
 
     // Step 4: Wait for logs page to load with Monaco editor
-    await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
     await pm.logsPage.waitForQueryEditorVisible();
     await page.waitForTimeout(2000);
 
@@ -280,7 +272,6 @@ test.describe("Monaco Editor Query Pre-fill Tests", () => {
     // Step 1: Navigate to logs page first
     const logsUrl = `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`;
     await page.goto(logsUrl);
-    await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
 
     // Step 2: Select stream
     await pm.logsPage.selectStream(TEST_STREAM);
@@ -305,7 +296,6 @@ test.describe("Monaco Editor Query Pre-fill Tests", () => {
     const sharedUrl = await pm.logsPage.clickShareLinkAndGetUrl();
     await page.goto(sharedUrl);
     await pm.logsPage.waitForRedirectComplete();
-    await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
 
     // Step 9: Wait for Monaco to load AND finish pre-filling from the restored state
     // (host visible before content hydrates — poll the model value, self-healing with one

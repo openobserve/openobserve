@@ -93,9 +93,7 @@ const createWrapper = (action: "add" | "edit" = "add") =>
 const getForm = (wrapper: any) => wrapper.vm.storageForm.form;
 
 const selectProvider = async (wrapper: any, provider: string) => {
-  await wrapper
-    .find(`[data-test="storage-settings-provider-card-${provider}"]`)
-    .trigger("click");
+  await wrapper.find(`[data-test="storage-settings-provider-card-${provider}"]`).trigger("click");
   await nextTick();
 };
 
@@ -115,38 +113,26 @@ describe("OrgStorageEditor", () => {
     const wrapper = createWrapper("add");
     expect(wrapper.exists()).toBe(true);
     expect(
-      wrapper
-        .find('[data-test="storage-settings-provider-card-AwsCredentials"]')
-        .exists(),
+      wrapper.find('[data-test="storage-settings-provider-card-AwsCredentials"]').exists(),
     ).toBe(true);
-    expect(
-      wrapper
-        .find('[data-test="storage-settings-provider-card-AwsRoleArn"]')
-        .exists(),
-    ).toBe(true);
+    expect(wrapper.find('[data-test="storage-settings-provider-card-AwsRoleArn"]').exists()).toBe(
+      true,
+    );
   });
 
   it("renders the AWS credential fields after selecting the provider", async () => {
     const wrapper = createWrapper("add");
     await selectProvider(wrapper, "AwsCredentials");
 
-    expect(
-      wrapper.find('[data-test="storage-settings-bucket-name-input"]').exists(),
-    ).toBe(true);
-    expect(
-      wrapper.find('[data-test="storage-settings-access-key-input"]').exists(),
-    ).toBe(true);
-    expect(
-      wrapper.find('[data-test="storage-settings-secret-key-input"]').exists(),
-    ).toBe(true);
+    expect(wrapper.find('[data-test="storage-settings-bucket-name-input"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="storage-settings-access-key-input"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="storage-settings-secret-key-input"]').exists()).toBe(true);
   });
 
   it("bridges the selected provider into the form", async () => {
     const wrapper = createWrapper("add");
     await selectProvider(wrapper, "AwsCredentials");
-    expect(getForm(wrapper).state.values.selectedProvider).toBe(
-      "AwsCredentials",
-    );
+    expect(getForm(wrapper).state.values.selectedProvider).toBe("AwsCredentials");
   });
 
   describe("Provider-discriminated validation (real OForm)", () => {
@@ -302,9 +288,7 @@ describe("OrgStorageEditor", () => {
     it("requires bucket_name and access_key for GcpCredentials", () => {
       const res = schema.safeParse({ selectedProvider: "GcpCredentials" });
       expect(res.success).toBe(false);
-      const paths = res.success
-        ? []
-        : res.error.issues.map((iss: any) => iss.path.join("."));
+      const paths = res.success ? [] : res.error.issues.map((iss: any) => iss.path.join("."));
       expect(paths).toContain("bucket_name");
       expect(paths).toContain("access_key");
     });

@@ -14,9 +14,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use axum::response::Response;
+use common::meta::http::HttpResponse as MetaHttpResponse;
 use o2_enterprise::enterprise::cloud::billings::{self as o2_cloud_billings};
-
-use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 
 pub mod aws_marketplace;
 pub mod azure_marketplace;

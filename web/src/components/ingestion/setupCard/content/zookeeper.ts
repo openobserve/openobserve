@@ -76,8 +76,7 @@ export default function zookeeperCard(subs: CardSubstitutions): RichCardContent 
       {
         id: "verify",
         title: "Verify Data in OpenObserve",
-        description:
-          "Hit Test below, or check Streams for the `zookeeper_*` metrics.",
+        description: "Hit Test below, or check Streams for the `zookeeper_*` metrics.",
         chip: { kind: "traces", label: "Metrics" },
         completeOn: "detect",
         detectionAnchor: true,

@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, ref, computed, onMounted } from "vue";
 import { useStore } from "vuex";
-import OButton from '@/lib/core/Button/OButton.vue';
+import OButton from "@/lib/core/Button/OButton.vue";
 import AddFolder from "./AddFolder.vue";
 import { getFoldersListByType } from "@/utils/commons";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -77,11 +77,12 @@ export default defineComponent({
     const store: any = useStore();
     const showDialog = ref(false);
 
-    const folderOptions = computed(() =>
-      store.state.organizationData.foldersByType[props.type]?.map((f: any) => ({
-        label: f.name,
-        value: f.folderId,
-      })) ?? []
+    const folderOptions = computed(
+      () =>
+        store.state.organizationData.foldersByType[props.type]?.map((f: any) => ({
+          label: f.name,
+          value: f.folderId,
+        })) ?? [],
     );
 
     const onFolderAdded = (newFolder: any) => {
@@ -114,14 +115,20 @@ export default defineComponent({
 }
 
 @media (max-width: 93.75rem) {
-  .folder-select { width: 5.625rem; }
+  .folder-select {
+    width: 5.625rem;
+  }
 }
 
 @media (max-width: 68.75rem) {
-  .folder-select { width: 4.6875rem; }
+  .folder-select {
+    width: 4.6875rem;
+  }
 }
 
 @media (max-width: 59.375rem) {
-  .folder-select { width: 4.0625rem; }
+  .folder-select {
+    width: 4.0625rem;
+  }
 }
 </style>

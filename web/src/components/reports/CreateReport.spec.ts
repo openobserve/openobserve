@@ -191,9 +191,7 @@ function setField(w: VueWrapper, name: string, value: unknown) {
 // `@update:model-value` handler (merged onto the same event via $attrs), which is
 // exactly the wiring the cascade depends on.
 async function pickFromSelect(w: VueWrapper, name: string, value: unknown) {
-  const target = w
-    .findAllComponents(OSelect)
-    .find((s) => s.props("name") === name);
+  const target = w.findAllComponents(OSelect).find((s) => s.props("name") === name);
   if (!target) throw new Error(`OSelect[name="${name}"] not rendered`);
   target.vm.$emit("update:modelValue", value);
   await flushPromises();
@@ -396,12 +394,8 @@ describe("CreateReport", () => {
       // `.number` modifier) emits the RAW STRING the DOM input holds — exactly what
       // a user's keystrokes produce — so this drives the z.coerce.number() path the
       // schema exists for, not a pre-made JS number handed straight to the form.
-      await wrapper
-        .find('[data-test="add-report-dimension-width"] input')
-        .setValue("1440");
-      await wrapper
-        .find('[data-test="add-report-dimension-height"] input')
-        .setValue("900");
+      await wrapper.find('[data-test="add-report-dimension-width"] input').setValue("1440");
+      await wrapper.find('[data-test="add-report-dimension-height"] input').setValue("900");
       await flushPromises();
 
       // The form holds the raw STRING the number input emitted (pre-coercion).
@@ -420,12 +414,8 @@ describe("CreateReport", () => {
         width: 1440,
         height: 900,
       });
-      expect(typeof payload.dashboards[0].attachment_dimensions.width).toBe(
-        "number",
-      );
-      expect(typeof payload.dashboards[0].attachment_dimensions.height).toBe(
-        "number",
-      );
+      expect(typeof payload.dashboards[0].attachment_dimensions.width).toBe("number");
+      expect(typeof payload.dashboards[0].attachment_dimensions.height).toBe("number");
     });
 
     it("submits in cron mode with a valid cron + timezone", async () => {
@@ -544,15 +534,11 @@ describe("CreateReport", () => {
       await flushPromises();
       const form = (wrapper.vm as any).form;
       // Before any submit → the OFormSelect field has no error (submit-then-change).
-      expect(
-        (form.getFieldMeta("dashboards[0].folder")?.errors ?? []).length,
-      ).toBe(0);
+      expect((form.getFieldMeta("dashboards[0].folder")?.errors ?? []).length).toBe(0);
       await submitForm(wrapper);
       // After submit with an empty folder → the field's error is populated, so
       // the OFormSelect renders it.
-      expect(
-        (form.getFieldMeta("dashboards[0].folder")?.errors ?? []).length,
-      ).toBeGreaterThan(0);
+      expect((form.getFieldMeta("dashboards[0].folder")?.errors ?? []).length).toBeGreaterThan(0);
     });
   });
 
@@ -604,9 +590,7 @@ describe("CreateReport", () => {
       expect(row.dashboard).toBe("dash-1");
       expect(row.tabs).toBe("");
       // tab options were populated for the picked dashboard
-      expect((wrapper.vm as any).dashboardTabOptions).toEqual([
-        { label: "Tab 1", value: "tab-1" },
-      ]);
+      expect((wrapper.vm as any).dashboardTabOptions).toEqual([{ label: "Tab 1", value: "tab-1" }]);
     });
   });
 
@@ -614,7 +598,10 @@ describe("CreateReport", () => {
 
   describe("edit mode (route has name query param)", () => {
     beforeEach(async () => {
-      ({ wrapper, mockRouter } = mountComponent({ name: "existing-report", org_identifier: "test-org" }));
+      ({ wrapper, mockRouter } = mountComponent({
+        name: "existing-report",
+        org_identifier: "test-org",
+      }));
       await flushPromises();
     });
 
@@ -624,10 +611,7 @@ describe("CreateReport", () => {
     });
 
     it("should call getReport API with correct args", () => {
-      expect(vi.mocked(reports.getReport)).toHaveBeenCalledWith(
-        "test-org",
-        "existing-report",
-      );
+      expect(vi.mocked(reports.getReport)).toHaveBeenCalledWith("test-org", "existing-report");
     });
 
     it("should set isEditingReport to true", () => {
@@ -635,9 +619,7 @@ describe("CreateReport", () => {
     });
 
     it("should prefill the form-owned name from the fetched report", () => {
-      expect((wrapper.vm as any).form.state.values.name).toBe(
-        MOCK_REPORT.name,
-      );
+      expect((wrapper.vm as any).form.state.values.name).toBe(MOCK_REPORT.name);
     });
 
     it("should prefill the dashboard row without the cascade wiping it", () => {
@@ -702,17 +684,13 @@ describe("CreateReport", () => {
     it("reactively hides the Share step when isCachedReport is toggled on", async () => {
       ({ wrapper } = mountComponent());
       await flushPromises();
-      expect(
-        wrapper.find('[data-test="add-report-share-step"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="add-report-share-step"]').exists()).toBe(true);
 
       setField(wrapper, "isCachedReport", true);
       await flushPromises();
 
       expect((wrapper.vm as any).isCachedReportValue).toBe(true);
-      expect(
-        wrapper.find('[data-test="add-report-share-step"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="add-report-share-step"]').exists()).toBe(false);
     });
 
     // Regression: enabling "Cached Report" AFTER a Continue click must not leave
@@ -744,9 +722,7 @@ describe("CreateReport", () => {
 
       // Click "Continue" on step 1 → the form-level schema runs and stamps the
       // out-of-step title/emails errors onto the form's errorMap.onDynamic.
-      await wrapper
-        .find('[data-test="add-report-step1-continue-btn"]')
-        .trigger("click");
+      await wrapper.find('[data-test="add-report-step1-continue-btn"]').trigger("click");
       await flushPromises();
       const form = (wrapper.vm as any).form;
       expect(form.state.errorMap?.onDynamic).toBeTruthy();
@@ -774,9 +750,7 @@ describe("CreateReport", () => {
     it("should fetch folders on mount", async () => {
       ({ wrapper } = mountComponent());
       await flushPromises();
-      expect(vi.mocked(dashboardService.list_Folders)).toHaveBeenCalledWith(
-        "test-org",
-      );
+      expect(vi.mocked(dashboardService.list_Folders)).toHaveBeenCalledWith("test-org");
     });
 
     it("should populate folderOptions after fetch", async () => {
@@ -827,9 +801,7 @@ describe("CreateReport", () => {
       await (wrapper.vm as any).onFolderSelection("folder-1");
       setField(wrapper, "dashboards[0].tabs", "tab-old");
       (wrapper.vm as any).onDashboardSelection("dash-1");
-      expect(
-        (wrapper.vm as any).form.state.values.dashboards[0].tabs,
-      ).toBe("");
+      expect((wrapper.vm as any).form.state.values.dashboards[0].tabs).toBe("");
     });
   });
 
@@ -839,8 +811,7 @@ describe("CreateReport", () => {
     it("seeds a default timerange into the form (OFormDateTimeRange)", async () => {
       ({ wrapper } = mountComponent());
       await flushPromises();
-      const tr = (wrapper.vm as any).form.state.values.dashboards[0]
-        .timerange;
+      const tr = (wrapper.vm as any).form.state.values.dashboards[0].timerange;
       expect(tr).toMatchObject({ type: "relative", period: "30m" });
     });
 
@@ -904,9 +875,7 @@ describe("CreateReport", () => {
 
       expect(reports.createReportV2).toHaveBeenCalledTimes(1);
       const payload = vi.mocked(reports.createReportV2).mock.calls[0][1] as any;
-      expect(payload.dashboards[0].variables).toEqual([
-        { key: "env", value: "prod" },
-      ]);
+      expect(payload.dashboards[0].variables).toEqual([{ key: "env", value: "prod" }]);
     });
   });
 });

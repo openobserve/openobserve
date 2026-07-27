@@ -14,10 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { addLabelToPromQlQuery } from "@/utils/query/promQLUtils";
-import {
-  addLabelsToSQlQuery,
-  getStreamFromQuery,
-} from "@/utils/query/sqlUtils";
+import { addLabelsToSQlQuery, getStreamFromQuery } from "@/utils/query/sqlUtils";
 import {
   formatInterval,
   formatRateInterval,
@@ -109,32 +106,22 @@ export const usePanelVariableSubstitution = ({
 
   // Snapshot updaters
 
-  const updateCurrentDependentVariablesData = (
-    newDependentVariablesData: any,
-  ) => {
-    currentDependentVariablesData = JSON.parse(
-      JSON.stringify(newDependentVariablesData),
-    );
+  const updateCurrentDependentVariablesData = (newDependentVariablesData: any) => {
+    currentDependentVariablesData = JSON.parse(JSON.stringify(newDependentVariablesData));
   };
 
   const updateCurrentDynamicVariablesData = (newDynamicVariablesData: any) => {
-    currentDynamicVariablesData = JSON.parse(
-      JSON.stringify(newDynamicVariablesData),
-    );
+    currentDynamicVariablesData = JSON.parse(JSON.stringify(newDynamicVariablesData));
   };
 
   // Loading-state checks
 
   const areDynamicVariablesStillLoading = () =>
     variablesData.value?.values?.some(
-      (it: any) =>
-        it.type === "dynamic_filters" &&
-        (it.isLoading || it.isVariableLoadingPending),
+      (it: any) => it.type === "dynamic_filters" && (it.isLoading || it.isVariableLoadingPending),
     );
 
-  const areDependentVariablesStillLoadingWith = (
-    newDependentVariablesData: any,
-  ) => {
+  const areDependentVariablesStillLoadingWith = (newDependentVariablesData: any) => {
     const result = newDependentVariablesData?.some((it: any) => {
       const hasNullValue = it.value == null;
       const hasEmptyArray = Array.isArray(it.value) && it.value.length === 0;
@@ -186,13 +173,9 @@ export const usePanelVariableSubstitution = ({
     return true;
   };
 
-  const isAllRegularVariablesValuesSameWith = (
-    newDependentVariablesData: any,
-  ) =>
+  const isAllRegularVariablesValuesSameWith = (newDependentVariablesData: any) =>
     newDependentVariablesData.every((it: any) => {
-      const oldValue = currentDependentVariablesData.find(
-        (it2: any) => it2.name == it.name,
-      );
+      const oldValue = currentDependentVariablesData.find((it2: any) => it2.name == it.name);
       return it.multiSelect
         ? areArraysEqual(it.value, oldValue?.value)
         : it.value == oldValue?.value && oldValue?.value != "";
@@ -200,13 +183,9 @@ export const usePanelVariableSubstitution = ({
 
   const isAllDynamicVariablesValuesSameWith = (newDynamicVariablesData: any) =>
     newDynamicVariablesData.every((it: any) => {
-      const oldValue = currentDynamicVariablesData?.find(
-        (it2: any) => it2.name == it.name,
-      );
+      const oldValue = currentDynamicVariablesData?.find((it2: any) => it2.name == it.name);
       return (
-        oldValue?.value != "" &&
-        it.value == oldValue?.value &&
-        it.operator == oldValue?.operator
+        oldValue?.value != "" && it.value == oldValue?.value && it.operator == oldValue?.operator
       );
     });
 
@@ -262,37 +241,18 @@ export const usePanelVariableSubstitution = ({
     // so we need to fire the query
     log("Step3: checking if no of variables have changed, starting...");
 
-    log(
-      "Step3: newDependentVariablesData,",
-      JSON.stringify(newDependentVariablesData, null, 2),
-    );
-    log(
-      "Step3: newDynamicVariablesData...",
-      JSON.stringify(newDynamicVariablesData, null, 2),
-    );
+    log("Step3: newDependentVariablesData,", JSON.stringify(newDependentVariablesData, null, 2));
+    log("Step3: newDynamicVariablesData...", JSON.stringify(newDynamicVariablesData, null, 2));
 
     // if the length of the any of the regular and old dynamic data has changed,
     // we need to fire the query
-    log(
-      "Step3: newDependentVariablesData?.length",
-      newDependentVariablesData?.length,
-    );
-    log(
-      "Step3: newDynamicVariablesData?.length",
-      newDynamicVariablesData?.length,
-    );
-    log(
-      "Step3: currentDependentVariablesData?.length",
-      currentDependentVariablesData?.length,
-    );
-    log(
-      "Step3: currentAdHocVariablesData?.length",
-      currentDynamicVariablesData?.length,
-    );
+    log("Step3: newDependentVariablesData?.length", newDependentVariablesData?.length);
+    log("Step3: newDynamicVariablesData?.length", newDynamicVariablesData?.length);
+    log("Step3: currentDependentVariablesData?.length", currentDependentVariablesData?.length);
+    log("Step3: currentAdHocVariablesData?.length", currentDynamicVariablesData?.length);
 
     if (
-      newDependentVariablesData?.length !=
-        currentDependentVariablesData?.length ||
+      newDependentVariablesData?.length != currentDependentVariablesData?.length ||
       newDynamicVariablesData?.length != currentDynamicVariablesData?.length
     ) {
       updateCurrentDependentVariablesData(newDependentVariablesData);
@@ -317,33 +277,19 @@ export const usePanelVariableSubstitution = ({
     // 3. Regular variables  = 0 and Dynamic variables >= 1
     // 4. Regular variables >= 1 and Dynamic variables >= 1
 
-    log(
-      "Step4: newDependentVariablesData.length",
-      newDependentVariablesData?.length,
-    );
-    log(
-      "Step4: newDynamicVariablesData.length",
-      newDynamicVariablesData?.length,
-    );
+    log("Step4: newDependentVariablesData.length", newDependentVariablesData?.length);
+    log("Step4: newDynamicVariablesData.length", newDynamicVariablesData?.length);
 
     // execute different scenarios based on the count of variables
-    if (
-      !newDependentVariablesData?.length &&
-      !newDynamicVariablesData?.length
-    ) {
+    if (!newDependentVariablesData?.length && !newDynamicVariablesData?.length) {
       // 1. Regular variables  = 0 and Dynamic variables  = 0
       // go ahead and bravly load the data
       !newDependentVariablesData?.length && !newDynamicVariablesData?.length;
 
-      log(
-        "Step4: 1: no variables are there, no waiting, can call the api, returning true...",
-      );
+      log("Step4: 1: no variables are there, no waiting, can call the api, returning true...");
 
       return true;
-    } else if (
-      newDependentVariablesData?.length &&
-      !newDynamicVariablesData?.length
-    ) {
+    } else if (newDependentVariablesData?.length && !newDynamicVariablesData?.length) {
       log("Step4: 2: Regular variables >= 1 and Dynamic variables  = 0");
       // 2. Regular variables >= 1 and Dynamic variables  = 0
 
@@ -365,10 +311,7 @@ export const usePanelVariableSubstitution = ({
 
       log("Step4: 2: regular variables values has changed, returning true");
       return true;
-    } else if (
-      !newDependentVariablesData?.length &&
-      newDynamicVariablesData?.length
-    ) {
+    } else if (!newDependentVariablesData?.length && newDynamicVariablesData?.length) {
       // 3. Regular variables  = 0 and Dynamic variables >= 1
       log("Step4: 3: Regular variables  = 0 and Dynamic variables >= 1");
 
@@ -386,10 +329,7 @@ export const usePanelVariableSubstitution = ({
 
       log("Step4: 3: dynamic variables values has changed, returning true");
       return true;
-    } else if (
-      newDependentVariablesData?.length &&
-      newDynamicVariablesData?.length
-    ) {
+    } else if (newDependentVariablesData?.length && newDynamicVariablesData?.length) {
       // 4. Regular variables >= 1 and Dynamic variables >= 1
       log("Step4: 4: Regular variables >= 1 and Dynamic variables >= 1");
 
@@ -401,20 +341,12 @@ export const usePanelVariableSubstitution = ({
       const isAllDynamicVariablesValuesSame =
         isAllDynamicVariablesValuesSameWith(newDynamicVariablesData);
 
-      log(
-        "Step4: 4: isAllRegularVariablesValuesSame",
-        isAllRegularVariablesValuesSame,
-      );
-      log(
-        "Step4: 4: isAllDynamicVariablesValuesSame",
-        isAllDynamicVariablesValuesSame,
-      );
+      log("Step4: 4: isAllRegularVariablesValuesSame", isAllRegularVariablesValuesSame);
+      log("Step4: 4: isAllDynamicVariablesValuesSame", isAllDynamicVariablesValuesSame);
 
       // if any has changed
       if (isAllRegularVariablesValuesSame && isAllDynamicVariablesValuesSame) {
-        log(
-          "Step4: 4: regular and dynamic variables has same old value, returning false",
-        );
+        log("Step4: 4: regular and dynamic variables has same old value, returning false");
         return false;
       }
 
@@ -450,14 +382,11 @@ export const usePanelVariableSubstitution = ({
 
     //fixed variables value calculations
     //scrape interval by default 15 seconds
-    const scrapeInterval =
-      store.state.organizationData.organizationSettings.scrape_interval ?? 15;
+    const scrapeInterval = store.state.organizationData.organizationSettings.scrape_interval ?? 15;
 
     // timestamp in seconds / chart panel width
     const __interval =
-      (endISOTimestamp - startISOTimestamp) /
-      (chartPanelRef.value?.offsetWidth ?? 1000) /
-      1000;
+      (endISOTimestamp - startISOTimestamp) / (chartPanelRef.value?.offsetWidth ?? 1000) / 1000;
 
     // if less than 1, set it to 1
     // minimum will be 15000 millisecond
@@ -469,19 +398,13 @@ export const usePanelVariableSubstitution = ({
     // calculate rate interval in seconds
     // we need formatted interval value in seconds
     const __rate_interval: any = Math.max(
-      getTimeInSecondsBasedOnUnit(
-        formattedInterval.value,
-        formattedInterval.unit,
-      ) + scrapeInterval,
+      getTimeInSecondsBasedOnUnit(formattedInterval.value, formattedInterval.unit) + scrapeInterval,
       4 * scrapeInterval,
     );
 
     //get interval in ms
     const __interval_ms =
-      getTimeInSecondsBasedOnUnit(
-        formattedInterval.value,
-        formattedInterval.unit,
-      ) * 1000;
+      getTimeInSecondsBasedOnUnit(formattedInterval.value, formattedInterval.unit) * 1000;
 
     // calculate range in seconds (total time range of the dashboard)
     // Note: startISOTimestamp and endISOTimestamp are in microseconds (from API)
@@ -550,8 +473,7 @@ export const usePanelVariableSubstitution = ({
         let variableValue = "";
         if (Array.isArray(variable.value)) {
           // If no data found (empty array), use SELECT_ALL_VALUE
-          const valueToUse =
-            variable.value.length === 0 ? [SELECT_ALL_VALUE] : variable.value;
+          const valueToUse = variable.value.length === 0 ? [SELECT_ALL_VALUE] : variable.value;
           const value =
             valueToUse
               .map(
@@ -571,8 +493,7 @@ export const usePanelVariableSubstitution = ({
             },
             {
               placeHolder: `{{${variable.name}:doublequote}}`,
-              value:
-                valueToUse.map((value: any) => `"${value}"`).join(",") || '""',
+              value: valueToUse.map((value: any) => `"${value}"`).join(",") || '""',
             },
             {
               placeHolder: `{{${variable.name}:singlequote}}`,
@@ -593,8 +514,7 @@ export const usePanelVariableSubstitution = ({
             },
             {
               placeHolder: `\${${variable.name}:doublequote}`,
-              value:
-                valueToUse.map((value: any) => `"${value}"`).join(",") || '""',
+              value: valueToUse.map((value: any) => `"${value}"`).join(",") || '""',
             },
             {
               placeHolder: `\${${variable.name}:singlequote}`,
@@ -618,15 +538,11 @@ export const usePanelVariableSubstitution = ({
                 value: placeHolderObj.value,
               });
             }
-            query = query.replaceAll(
-              placeHolderObj.placeHolder,
-              placeHolderObj.value,
-            );
+            query = query.replaceAll(placeHolderObj.placeHolder, placeHolderObj.value);
           });
         } else {
           // If no data found (null value), use SELECT_ALL_VALUE
-          const valueToUse =
-            variable.value === null ? SELECT_ALL_VALUE : variable.value;
+          const valueToUse = variable.value === null ? SELECT_ALL_VALUE : variable.value;
           variableValue = `${variable.escapeSingleQuotes ? escapeSingleQuotes(valueToUse) : valueToUse}`;
           const mustachePlaceholder = `{{${variable.name}}}`;
           if (
@@ -648,14 +564,8 @@ export const usePanelVariableSubstitution = ({
           // For singlequote form, the variable value will be wrapped with single quotes.
           query = query.replaceAll(`{{${variable.name}:csv}}`, variableValue);
           query = query.replaceAll(`{{${variable.name}:pipe}}`, variableValue);
-          query = query.replaceAll(
-            `{{${variable.name}:doublequote}}`,
-            variableValue,
-          );
-          query = query.replaceAll(
-            `{{${variable.name}:singlequote}}`,
-            variableValue,
-          );
+          query = query.replaceAll(`{{${variable.name}:doublequote}}`, variableValue);
+          query = query.replaceAll(`{{${variable.name}:singlequote}}`, variableValue);
           query = query.replaceAll(mustachePlaceholder, variableValue);
           query = query.replaceAll(variableNameWithBrackets, variableValue);
           query = query.replaceAll(variableName, variableValue);
@@ -690,12 +600,7 @@ export const usePanelVariableSubstitution = ({
           operator: variable.operator,
         });
 
-        query = addLabelToPromQlQuery(
-          query,
-          variable.name,
-          variable.value,
-          variable.operator,
-        );
+        query = addLabelToPromQlQuery(query, variable.name, variable.value, variable.operator);
       });
     }
 

@@ -36,6 +36,9 @@ pub const EVALUATOR_STREAM: &str = "_evaluator";
 /// Standard span name for an LLM-Judge evaluation.
 pub const SPAN_NAME_LLM_JUDGE: &str = "llm_judge.evaluate";
 
+/// Root span name for one target evaluation run.
+pub const SPAN_NAME_EVALUATION: &str = "online_eval.evaluate";
+
 /// Standard span name for a Remote-Scorer evaluation.
 pub const SPAN_NAME_REMOTE_SCORER: &str = "remote_scorer.evaluate";
 
@@ -53,8 +56,11 @@ pub const SPAN_NAME_SPAN_SKIPPED: &str = "online_eval.span_skipped";
 // ---------------------------------------------------------------------------
 
 // Identity of the evaluated object
+pub const ATTR_TARGET_SCOPE: &str = "target_scope";
+pub const ATTR_TARGET_ID: &str = "target_id";
 pub const ATTR_TARGET_SPAN_ID: &str = "target_span_id";
 pub const ATTR_TARGET_TRACE_ID: &str = "target_trace_id";
+pub const ATTR_TARGET_SESSION_ID: &str = "target_session_id";
 pub const ATTR_TARGET_STREAM: &str = "target_stream";
 pub const ATTR_TARGET_STREAM_TYPE: &str = "target_stream_type";
 pub const ATTR_TARGET_AGENT_NAME: &str = "target_agent_name";
@@ -65,9 +71,13 @@ pub const ATTR_SCORER_ID: &str = "scorer_id";
 pub const ATTR_SCORER_VERSION: &str = "scorer_version";
 pub const ATTR_SCORER_TYPE: &str = "scorer_type";
 pub const ATTR_JOB_ID: &str = "job_id";
+pub const ATTR_JOB_VERSION: &str = "job_version";
 pub const ATTR_SCORE_CONFIG_ID: &str = "score_config_id";
 pub const ATTR_SCORE_CONFIG_VERSION: &str = "score_config_version";
 pub const ATTR_EVAL_RUN_ID: &str = "eval_run_id";
+pub const ATTR_TASK_ID: &str = "task_id";
+pub const ATTR_SCORE_ID: &str = "score_id";
+pub const ATTR_EVALUATION_KEY: &str = "evaluation_key";
 
 // Provider context (LLM Judge only)
 pub const ATTR_PROVIDER_ID: &str = "provider_id";

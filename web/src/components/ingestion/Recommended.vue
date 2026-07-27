@@ -25,9 +25,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     panel-data-test="data-sources-recommended-tabs"
     tab-data-test-prefix="ingestion-recommended-tab-"
   >
-    <div class="w-full h-full">
+    <div class="h-full w-full">
       <div class="bg-card-glass-bg h-full">
-        <div class="overflow-auto h-full pt-1.5">
+        <div class="h-full overflow-auto pt-1.5">
           <router-view
             :title="tabs"
             :currOrgIdentifier="currOrgIdentifier"
@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import DataSourceSidebarLayout from '@/components/ingestion/DataSourceSidebarLayout.vue'
+import DataSourceSidebarLayout from "@/components/ingestion/DataSourceSidebarLayout.vue";
 // @ts-ignore
 import { defineComponent, ref, onBeforeMount, onUpdated } from "vue";
 import { useI18n } from "vue-i18n";
@@ -65,11 +65,11 @@ export default defineComponent({
     const store = useStore();
     const router: any = useRouter();
     const tabs = ref("");
-    const currentOrgIdentifier: any = ref(
-      store.state.selectedOrganization.identifier,
-    );
+    const currentOrgIdentifier: any = ref(store.state.selectedOrganization.identifier);
 
-    const ingestTabType = ref(resolveTab("recommended", router.currentRoute.value.name as string, "ingestFromKubernetes"));
+    const ingestTabType = ref(
+      resolveTab("recommended", router.currentRoute.value.name as string, "ingestFromKubernetes"),
+    );
 
     onBeforeMount(() => {
       if (router.currentRoute.value.name === "recommended") {
@@ -130,6 +130,18 @@ export default defineComponent({
         },
         icon: "img:" + getImageURL("images/common/linux.svg"),
         label: t("ingestion.linux"),
+        contentClass: "tab_content",
+      },
+      {
+        name: "ingestFromMacOS",
+        to: {
+          name: "ingestFromMacOS",
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        },
+        icon: "img:" + getImageURL("images/common/macos.png"),
+        label: t("ingestion.macos"),
         contentClass: "tab_content",
       },
       {
@@ -230,4 +242,3 @@ export default defineComponent({
   },
 });
 </script>
-

@@ -28,26 +28,22 @@ use config::{
     utils::time::now_micros,
 };
 use hashbrown::HashMap;
+use openobserve_api_common::extractors::Headers;
+use openobserve_core::auth::UserEmail;
+use search::{inspector::*, sql::visitor::cipher_key::get_cipher_key_names};
+use search_service::query_range::get_settings_max_query_range;
 use serde_json;
 use tracing::{Instrument, Span};
+use usage_reporting::http_report_metrics;
 
 use crate::{
     common::{
         meta::{self},
-        utils::{
-            auth::UserEmail,
-            http::{get_or_create_trace_id, get_use_cache_from_request},
-            stream::get_settings_max_query_range,
-        },
+        utils::http::{get_or_create_trace_id, get_use_cache_from_request},
     },
-    extractors::Headers,
     search::{
         error_utils,
         utils::{StreamPermissionResourceType, check_stream_permissions},
-    },
-    service::{
-        search::{inspector::*, sql::visitor::cipher_key::get_cipher_key_names},
-        self_reporting::http_report_metrics,
     },
 };
 
@@ -218,13 +214,11 @@ pub async fn get_search_profile(
     for key in keys_used {
         // Check permissions on keys
         {
+            use common::infra::config::USERS;
             use config::meta::user::DBUser;
+            use db::user::is_root_user;
             use o2_openfga::meta::mapping::OFGA_MODELS;
-
-            use crate::common::{
-                infra::config::USERS,
-                utils::auth::{AuthExtractor, is_root_user},
-            };
+            use openobserve_core::auth::AuthExtractor;
 
             if !is_root_user(&user_id) {
                 let user = match USERS
@@ -238,7 +232,7 @@ pub async fn get_search_profile(
                     }
                 };
 
-                if !crate::service::authz::check_permissions(
+                if !openobserve_core::authz::check_permissions(
                     &user_id,
                     AuthExtractor {
                         auth: "".to_string(),
@@ -262,7 +256,7 @@ pub async fn get_search_profile(
                 )
                 .await
                 {
-                    return crate::common::meta::http::HttpResponse::forbidden(
+                    return common::meta::http::HttpResponse::forbidden(
                         "Unauthorized Access to key",
                     );
                 }
@@ -272,7 +266,7 @@ pub async fn get_search_profile(
     }
 
     // run search with cache
-    let res = crate::service::search::cache::search(
+    let res = search_service::cache::search(
         &trace_id,
         org_id,
         stream_type,
@@ -559,8 +553,9 @@ fn format_trace_id(trace_id: Option<String>) -> String {
 
 #[cfg(test)]
 mod tests {
+    use search::inspector::SearchInspectorFields;
+
     use super::*;
-    use crate::service::search::inspector::SearchInspectorFields;
 
     #[test]
     fn test_format_trace_id_none_returns_empty() {

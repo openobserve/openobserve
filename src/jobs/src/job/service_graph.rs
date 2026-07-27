@@ -36,7 +36,8 @@ pub async fn run() -> Result<(), anyhow::Error> {
             get_o2_config().service_graph.processing_interval_secs,
             {
                 log::debug!("[SERVICE_GRAPH::JOB] Running service graph processing");
-                if let Err(e) = crate::service::traces::service_graph::process_service_graph().await
+                if let Err(e) =
+                    openobserve_core::traces::service_graph::process_service_graph().await
                 {
                     log::error!("[SERVICE_GRAPH::JOB] Processing failed: {e}");
                 }

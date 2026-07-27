@@ -18,7 +18,6 @@ import { mount, flushPromises } from "@vue/test-utils";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-
 vi.mock("vue-router", () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn() }),
   useRoute: () => ({ query: {}, params: {} }),
@@ -70,9 +69,7 @@ describe("PipelineDestinationEditor - rendering", () => {
 
   it("data-test='pipeline-destination-editor-title' exists", async () => {
     wrapper = await mountComp();
-    expect(
-      wrapper.find('[data-test="pipeline-destination-editor-title"]').exists()
-    ).toBe(true);
+    expect(wrapper.find('[data-test="pipeline-destination-editor-title"]').exists()).toBe(true);
   });
 
   it("shows addTitle text (v-else branch) when no destination prop is passed", async () => {
@@ -93,9 +90,7 @@ describe("PipelineDestinationEditor - rendering", () => {
 
   it("renders the CreateDestinationForm stub", async () => {
     wrapper = await mountComp();
-    expect(
-      wrapper.find('[data-test="create-destination-form-stub"]').exists()
-    ).toBe(true);
+    expect(wrapper.find('[data-test="create-destination-form-stub"]').exists()).toBe(true);
   });
 
   it("renders the back arrow icon", async () => {

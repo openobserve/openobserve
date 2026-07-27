@@ -14,16 +14,14 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use axum::{extract::Path, response::Response};
-
+use db::authz::{remove_ownership, set_ownership};
 #[cfg(feature = "enterprise")]
-use crate::common::utils::auth::UserEmail;
+use openobserve_core::auth::{UserEmail, is_ofga_object_visible};
+
 #[cfg(feature = "enterprise")]
 use crate::handler::http::extractors::Headers;
 use crate::{
-    common::{
-        meta::{authz::Authz, http::HttpResponse as MetaHttpResponse},
-        utils::auth::{is_ofga_object_visible, remove_ownership, set_ownership},
-    },
+    common::meta::{authz::Authz, http::HttpResponse as MetaHttpResponse},
     handler::http::models::score_configs::{
         ListScoreConfigVersionsResponseBody, ListScoreConfigsResponseBody, ScoreConfigRequestBody,
         ScoreConfigResponseBody, ScoreConfigUpdateRequestBody,

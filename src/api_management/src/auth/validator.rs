@@ -20,33 +20,31 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use config::{
-    get_config,
+    DEFAULT_ORG, get_config,
     meta::user::{DBUser, User, UserRole, UserType},
     utils::base64,
 };
+use db::{self, user::is_root_user};
 #[cfg(feature = "enterprise")]
 use o2_dex::config::get_config as get_dex_config;
-
 #[cfg(feature = "enterprise")]
-pub use crate::common::utils::auth::get_user_email_from_auth_str;
-pub use crate::service::authz::{check_permissions, list_objects_for_user};
-use crate::{
-    common::{
-        infra::config::ORG_INGESTION_TOKENS,
-        meta::{
-            ingestion_routes,
-            organization::DEFAULT_ORG,
-            user::{
-                AuthTokensExt, TokenValidationResponse, TokenValidationResponseBuilder,
-                get_default_user_role,
-            },
-        },
-        utils::{
-            auth::{AuthExtractor, V2_API_PREFIX, get_hash, get_user_details, is_root_user},
-            redirect_response::RedirectResponseBuilder,
+pub use openobserve_core::auth::get_user_email_from_auth_str;
+pub use openobserve_core::authz::{check_permissions, list_objects_for_user};
+use openobserve_core::{
+    auth::{AuthExtractor, V2_API_PREFIX, get_hash, get_user_details},
+    users,
+};
+
+use crate::common::{
+    infra::config::ORG_INGESTION_TOKENS,
+    meta::{
+        ingestion_routes,
+        user::{
+            AuthTokensExt, TokenValidationResponse, TokenValidationResponseBuilder,
+            get_default_user_role,
         },
     },
-    service::{db, users},
+    utils::redirect_response::RedirectResponseBuilder,
 };
 
 pub const PKCE_STATE_ORG: &str = "o2_pkce_state";
@@ -260,11 +258,11 @@ pub async fn validate_credentials(
         path_columns.pop();
     }
 
-    // Synthetics probe job + agent APIs — no org_id in path. Look up exclusively
-    // in synthetics_probe_tokens (o2syn_ prefix). Separate table from o2oi_
-    // ingest tokens.
-    let is_synthetics_job_path = path_columns.first() == Some(&"synthetics")
-        && matches!(path_columns.get(1), Some(&"jobs") | Some(&"agent"));
+    // Synthetics probe job + agent APIs — `/{org_id}/synthetics/{jobs,agent}/*`.
+    // Look up exclusively in synthetics_probe_tokens (o2syn_ prefix). Separate
+    // table from o2oi_ ingest tokens. The handler asserts token org == path org.
+    let is_synthetics_job_path = path_columns.get(1) == Some(&"synthetics")
+        && matches!(path_columns.get(2), Some(&"jobs") | Some(&"agent"));
     if is_synthetics_job_path
         && user_password
             .starts_with(infra::table::synthetics_probe_tokens::SYNTHETICS_PROBE_TOKEN_PREFIX)
@@ -352,12 +350,7 @@ pub async fn validate_credentials(
             }
 
             // Cache miss — do DB lookup. find_enabled_token filters by enabled=true.
-            match crate::service::db::org_ingestion_tokens::find_enabled_token(
-                org_id,
-                user_password,
-            )
-            .await
-            {
+            match db::org_ingestion_tokens::find_enabled_token(org_id, user_password).await {
                 Ok(Some(token_record)) => {
                     // Populate cache for future fast lookups
                     ORG_INGESTION_TOKENS.insert(cache_key, token_record.name.clone());
@@ -777,8 +770,12 @@ async fn check_and_create_org(user_id: &str, method: &Method, path: &str) -> Res
     if path_columns[0].eq("node") || path_columns[0].eq("profile") {
         return Ok(());
     }
-    // Synthetics probe job API has no org_id in path — skip org check.
-    if path_columns[0].eq("synthetics") && path_columns.get(1) == Some(&"jobs") {
+    // Synthetics probe job + agent APIs — `/{org_id}/synthetics/{jobs,agent}/*`.
+    // Skip org auto-create / user-membership: the caller is an o2syn_ probe
+    // token, not a user in the org. The handler validates token org == path org.
+    if path_columns.get(1).eq(&Some(&"synthetics"))
+        && matches!(path_columns.get(2), Some(&"jobs") | Some(&"agent"))
+    {
         return Ok(());
     }
     // Hack for v2 apis
@@ -794,7 +791,7 @@ async fn check_and_create_org(user_id: &str, method: &Method, path: &str) -> Res
         path_columns[0]
     };
 
-    if crate::service::organization::get_org(org_id)
+    if openobserve_core::organization::get_org(org_id)
         .await
         .is_none()
     {
@@ -802,7 +799,7 @@ async fn check_and_create_org(user_id: &str, method: &Method, path: &str) -> Res
             Err(AuthError::NotFound("Organization not found".to_string()))
         } else if is_root_user(user_id)
             && ingestion_routes::is_ingestion_write(method, path)
-            && crate::service::organization::check_and_create_org(org_id)
+            && openobserve_core::organization::check_and_create_org(org_id)
                 .await
                 .is_ok()
         {
@@ -1245,14 +1242,12 @@ mod tests {
         db::{ORM_CLIENT, connect_to_orm},
         table as infra_table,
     };
+    use openobserve_core::{organization, users};
 
     use super::*;
-    use crate::{
-        common::{
-            infra::config::{ORG_USERS, USERS},
-            meta::user::UserRequest,
-        },
-        service::{organization, users},
+    use crate::common::{
+        infra::config::{ORG_USERS, USERS},
+        meta::user::UserRequest,
     };
 
     #[tokio::test]
@@ -1484,7 +1479,7 @@ mod tests {
             UserRequest {
                 email: init_user.to_string(),
                 password: pwd.to_string(),
-                role: crate::common::meta::user::UserOrgRole {
+                role: common::meta::user::UserOrgRole {
                     base_role: config::meta::user::UserRole::Root,
                     custom_role: None,
                 },
@@ -1500,7 +1495,7 @@ mod tests {
             UserRequest {
                 email: user_id.to_string(),
                 password: pwd.to_string(),
-                role: crate::common::meta::user::UserOrgRole {
+                role: common::meta::user::UserOrgRole {
                     base_role: config::meta::user::UserRole::Admin,
                     custom_role: None,
                 },

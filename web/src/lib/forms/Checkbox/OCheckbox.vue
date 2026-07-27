@@ -24,13 +24,9 @@ defineSlots<CheckboxSlots>();
 // ── Group context ──────────────────────────────────────────────────────────
 const groupContext = inject(CHECKBOX_GROUP_KEY, null);
 
-const resolvedValue = computed<CheckboxPrimitive | undefined>(
-  () => props.value ?? props.val,
-);
+const resolvedValue = computed<CheckboxPrimitive | undefined>(() => props.value ?? props.val);
 
-const isGroupMember = computed(
-  () => groupContext !== null && resolvedValue.value !== undefined,
-);
+const isGroupMember = computed(() => groupContext !== null && resolvedValue.value !== undefined);
 
 const isArrayModel = computed(
   () => Array.isArray(props.modelValue) && resolvedValue.value !== undefined,
@@ -42,25 +38,16 @@ const hasCustomValues = computed(
 
 /** Whether this checkbox is checked, considering the group context if present */
 const checked = computed((): boolean | "indeterminate" => {
-  if (
-    isGroupMember.value &&
-    groupContext &&
-    resolvedValue.value !== undefined
-  ) {
+  if (isGroupMember.value && groupContext && resolvedValue.value !== undefined) {
     return groupContext.isChecked(resolvedValue.value);
   }
 
   if (isArrayModel.value && resolvedValue.value !== undefined) {
-    return (props.modelValue as CheckboxPrimitive[]).includes(
-      resolvedValue.value,
-    );
+    return (props.modelValue as CheckboxPrimitive[]).includes(resolvedValue.value);
   }
 
   if (hasCustomValues.value) {
-    if (
-      props.indeterminateValue !== undefined &&
-      props.modelValue === props.indeterminateValue
-    ) {
+    if (props.indeterminateValue !== undefined && props.modelValue === props.indeterminateValue) {
       return "indeterminate";
     }
     if (props.trueValue !== undefined) {
@@ -73,18 +60,14 @@ const checked = computed((): boolean | "indeterminate" => {
   return Boolean(props.modelValue);
 });
 
-const isDisabled = computed(
-  () => props.disabled || (groupContext?.disabled ?? false),
-);
+const isDisabled = computed(() => props.disabled || (groupContext?.disabled ?? false));
 
 const dataState = computed<"checked" | "unchecked" | "indeterminate">(() => {
   if (checked.value === "indeterminate") return "indeterminate";
   return checked.value ? "checked" : "unchecked";
 });
 
-function mapToCustomValue(
-  value: boolean | "indeterminate",
-): CheckboxModelValue {
+function mapToCustomValue(value: boolean | "indeterminate"): CheckboxModelValue {
   if (!hasCustomValues.value) return value;
   if (value === "indeterminate") {
     return props.indeterminateValue ?? "indeterminate";
@@ -98,11 +81,7 @@ function mapToCustomValue(
 function toggle() {
   if (isDisabled.value) return;
 
-  if (
-    isGroupMember.value &&
-    groupContext &&
-    resolvedValue.value !== undefined
-  ) {
+  if (isGroupMember.value && groupContext && resolvedValue.value !== undefined) {
     groupContext.toggle(resolvedValue.value);
     emit("change", !groupContext.isChecked(resolvedValue.value));
     return;
@@ -131,7 +110,6 @@ const boxSizeClasses: Record<NonNullable<CheckboxProps["size"]>, string> = {
   sm: "size-3.5",
   md: "size-4",
 };
-
 </script>
 
 <template>
@@ -152,7 +130,7 @@ const boxSizeClasses: Record<NonNullable<CheckboxProps["size"]>, string> = {
       :data-state="dataState"
       :disabled="isDisabled"
       :class="[
-        'shrink-0 rounded-checkbox border cursor-[inherit]',
+        'rounded-checkbox shrink-0 cursor-[inherit] border',
         boxSizeClasses[size ?? 'md'],
         // Base / unchecked
         'bg-checkbox-bg border-checkbox-border',
@@ -172,7 +150,7 @@ const boxSizeClasses: Record<NonNullable<CheckboxProps["size"]>, string> = {
         'disabled:bg-checkbox-disabled-bg',
         'disabled:border-checkbox-disabled-border',
         // Focus
-        'outline-none ring-offset-1 ring-offset-surface-base focus-visible:ring-2 focus-visible:ring-checkbox-focus-ring',
+        'ring-offset-surface-base focus-visible:ring-checkbox-focus-ring ring-offset-1 outline-none focus-visible:ring-2',
         // Transition
         'transition-[color,background-color,border-color,box-shadow] duration-150',
         // Centering for indicator
@@ -182,7 +160,7 @@ const boxSizeClasses: Record<NonNullable<CheckboxProps["size"]>, string> = {
     >
       <span
         v-if="checked === true"
-        class="flex items-center justify-center text-checkbox-checked-fg size-full"
+        class="text-checkbox-checked-fg flex size-full items-center justify-center"
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -200,7 +178,7 @@ const boxSizeClasses: Record<NonNullable<CheckboxProps["size"]>, string> = {
       </span>
       <span
         v-else-if="checked === 'indeterminate'"
-        class="flex items-center justify-center text-checkbox-checked-fg size-full"
+        class="text-checkbox-checked-fg flex size-full items-center justify-center"
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -220,11 +198,14 @@ const boxSizeClasses: Record<NonNullable<CheckboxProps["size"]>, string> = {
     <span
       v-if="$slots.label || label"
       :class="[
-        'o-input-label text-compact select-none leading-tight',
-        isDisabled ? 'font-normal text-input-label-text-disabled' : 'font-medium text-input-label-text',
+        'o-input-label text-compact leading-tight select-none',
+        isDisabled
+          ? 'text-input-label-text-disabled font-normal'
+          : 'text-input-label-text font-medium',
       ]"
     >
-      <slot name="label">{{ label }}</slot><span v-if="required" aria-hidden="true">&nbsp;*</span>
+      <slot name="label">{{ label }}</slot
+      ><span v-if="required" aria-hidden="true">&nbsp;*</span>
     </span>
   </label>
 </template>

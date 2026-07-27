@@ -77,6 +77,7 @@ const ROUTE_TAB_MAPS: Record<string, Record<string, string>> = {
     ingestFromKubernetes: "ingestFromKubernetes",
     ingestFromWindows: "ingestFromWindows",
     ingestFromLinux: "ingestFromLinux",
+    ingestFromMacOS: "ingestFromMacOS",
     AWSConfig: "AWSConfig",
     GCPConfig: "GCPConfig",
     AzureConfig: "AzureConfig",
@@ -120,6 +121,7 @@ const ROUTE_TAB_MAPS: Record<string, Record<string, string>> = {
     ingestLogsFromOtel: "ingestLogsFromOtel",
     logstash: "logstash",
     syslogNg: "syslogNg",
+    loongcollector: "loongcollector",
   },
 
   /** enterprise/components/billings/Billing.vue */
@@ -157,7 +159,7 @@ export function resolveTab(
   fallback: string,
 ): string {
   const map = ROUTE_TAB_MAPS[section];
-  return (map && routeName && map[routeName]) ? map[routeName] : fallback;
+  return map && routeName && map[routeName] ? map[routeName] : fallback;
 }
 
 /** Expose the raw maps for consumers that need to iterate over valid tab names. */

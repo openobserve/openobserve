@@ -1,0 +1,30 @@
+name: DB Schema Version Check
+
+on:
+  pull_request:
+    branches:
+      - "**"
+  merge_group:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.event.merge_group.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  db_schema_version_check:
+    name: db_schema_version_check
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout git repository
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Check DB schema version
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
+        run: bash .github/scripts/check-db-schema-version.sh "$BASE_SHA" "$HEAD_SHA"

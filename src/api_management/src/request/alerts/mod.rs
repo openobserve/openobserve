@@ -25,13 +25,23 @@ use config::meta::{
     alerts::alert::{Alert as MetaAlert, AlertTypeFilter},
     triggers::{Trigger, TriggerModule},
 };
+use db::scheduler;
 use hashbrown::HashMap;
 use infra::db::{ORM_CLIENT, connect_to_orm};
+use openobserve_api_common::extractors::Headers;
+use openobserve_core::{
+    alerts::{
+        ConditionListExt,
+        alert::{self, AlertError},
+        build_sql,
+    },
+    auth::UserEmail,
+};
 use svix_ksuid::Ksuid;
 #[cfg(feature = "enterprise")]
 use {
-    crate::common::utils::auth::check_permissions,
-    crate::service::authz::{StreamPermissionResourceType, check_stream_permissions},
+    openobserve_core::auth::check_permissions,
+    openobserve_core::authz::{StreamPermissionResourceType, check_stream_permissions},
 };
 
 #[cfg(feature = "enterprise")]
@@ -39,8 +49,7 @@ use crate::models::alerts::requests::UpdateAnomalyAlertFields;
 #[cfg(feature = "enterprise")]
 use crate::models::alerts::responses::anomaly_config_to_list_item;
 use crate::{
-    common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
-    extractors::Headers,
+    common::meta::http::HttpResponse as MetaHttpResponse,
     models::alerts::{
         requests::{
             AlertBulkEnableRequest, CloneAlertRequestBody, CreateAlertRequestBody,
@@ -56,14 +65,6 @@ use crate::{
     request::{
         BulkDeleteRequest, BulkDeleteResponse,
         dashboards::{get_folder, is_overwrite},
-    },
-    service::{
-        alerts::{
-            ConditionListExt,
-            alert::{self, AlertError},
-            build_sql,
-        },
-        db::scheduler,
     },
 };
 
@@ -139,7 +140,7 @@ async fn create_anomaly_alert(
     req_body: CreateAlertRequestBody,
     query_folder_id: &str,
 ) -> Response {
-    use crate::service::anomaly_detection::CreateAnomalyConfigRequest;
+    use openobserve_core::anomaly_detection::CreateAnomalyConfigRequest;
 
     let Some(anomaly_fields) = req_body.anomaly_fields() else {
         return MetaHttpResponse::bad_request(
@@ -185,7 +186,7 @@ async fn create_anomaly_alert(
         owner,
     };
 
-    match crate::service::anomaly_detection::create_config(org_id, req).await {
+    match openobserve_core::anomaly_detection::create_config(org_id, req).await {
         Ok(v) => MetaHttpResponse::json(v),
         Err(e) => MetaHttpResponse::internal_error(e.to_string()),
     }
@@ -243,7 +244,8 @@ pub async fn get_alert(Path((org_id, alert_id)): Path<(String, String)>) -> Resp
             #[cfg(feature = "enterprise")]
             {
                 // Fall back to anomaly detection config lookup.
-                match crate::service::anomaly_detection::get_config(&org_id, &alert_id_str).await {
+                match openobserve_core::anomaly_detection::get_config(&org_id, &alert_id_str).await
+                {
                     Ok(Some(mut v)) => {
                         // Tag with alert_type so the caller can discriminate.
                         if let Some(obj) = v.as_object_mut() {
@@ -318,7 +320,8 @@ pub async fn export_alert(Path((org_id, alert_id)): Path<(String, String)>) -> R
             #[cfg(feature = "enterprise")]
             {
                 // Fall back to anomaly detection config export
-                match crate::service::anomaly_detection::get_config(&org_id, &alert_id_str).await {
+                match openobserve_core::anomaly_detection::get_config(&org_id, &alert_id_str).await
+                {
                     Ok(Some(mut v)) => {
                         // Inject alert_type so consumers know what kind this is
                         if let Some(obj) = v.as_object_mut() {
@@ -424,7 +427,7 @@ pub async fn clone_alert(
             #[cfg(feature = "enterprise")]
             {
                 // Fall back to anomaly detection config clone
-                match crate::service::anomaly_detection::clone_config(
+                match openobserve_core::anomaly_detection::clone_config(
                     &org_id,
                     &alert_id_str,
                     req_body.name,
@@ -546,7 +549,7 @@ async fn build_and_run_anomaly_update(
     fields: UpdateAnomalyAlertFields,
     alert: crate::models::alerts::Alert,
 ) -> Response {
-    use crate::service::anomaly_detection::UpdateAnomalyConfigRequest;
+    use openobserve_core::anomaly_detection::UpdateAnomalyConfigRequest;
 
     let owner = fields
         .owner
@@ -581,7 +584,7 @@ async fn build_and_run_anomaly_update(
         owner,
     };
 
-    match crate::service::anomaly_detection::update_config(org_id, anomaly_id, req).await {
+    match openobserve_core::anomaly_detection::update_config(org_id, anomaly_id, req).await {
         Ok(v) => MetaHttpResponse::json(v),
         Err(e) => MetaHttpResponse::internal_error(e.to_string()),
     }
@@ -638,7 +641,7 @@ pub async fn delete_alert(Path((org_id, alert_id)): Path<(String, String)>) -> R
     // Not a regular alert — try anomaly detection config (enterprise only).
     #[cfg(feature = "enterprise")]
     {
-        match crate::service::anomaly_detection::delete_config(&org_id, &alert_id_str).await {
+        match openobserve_core::anomaly_detection::delete_config(&org_id, &alert_id_str).await {
             Ok(_) => MetaHttpResponse::ok("Alert deleted"),
             Err(e) => {
                 let msg = e.to_string().to_lowercase();
@@ -687,7 +690,7 @@ pub async fn delete_alert_bulk(
     Json(req): Json<BulkDeleteRequest>,
 ) -> Response {
     let _user_id = user_email.user_id;
-    let _folder_id = crate::common::utils::http::get_folder(&query);
+    let _folder_id = common::utils::http::get_folder(&query);
 
     #[cfg(feature = "enterprise")]
     for id in &req.ids {
@@ -731,7 +734,7 @@ pub async fn delete_alert_bulk(
                 Err(format!("alert {id} not found"))
             }
             #[cfg(feature = "enterprise")]
-            crate::service::anomaly_detection::delete_config(&org_id, &id)
+            openobserve_core::anomaly_detection::delete_config(&org_id, &id)
                 .await
                 .map_err(|e: anyhow::Error| e.to_string())
         };
@@ -853,7 +856,7 @@ pub async fn list_alerts(
     if matches!(
         alert_type,
         AlertTypeFilter::All | AlertTypeFilter::AnomalyDetection
-    ) && let Ok(configs) = crate::service::anomaly_detection::list_configs(
+    ) && let Ok(configs) = openobserve_core::anomaly_detection::list_configs(
         &org_id,
         folder_slug.as_deref(),
         name_substring.as_deref(),
@@ -933,12 +936,12 @@ pub async fn enable_alert(
             #[cfg(feature = "enterprise")]
             {
                 // Fall back to anomaly detection config
-                use crate::service::anomaly_detection::UpdateAnomalyConfigRequest;
+                use openobserve_core::anomaly_detection::UpdateAnomalyConfigRequest;
                 let req = UpdateAnomalyConfigRequest {
                     enabled: Some(should_enable),
                     ..Default::default()
                 };
-                match crate::service::anomaly_detection::update_config(
+                match openobserve_core::anomaly_detection::update_config(
                     &org_id,
                     &alert_id.to_string(),
                     req,
@@ -1041,12 +1044,12 @@ pub async fn enable_alert_bulk(
                 #[cfg(feature = "enterprise")]
                 {
                     // Fall back to anomaly detection config
-                    use crate::service::anomaly_detection::UpdateAnomalyConfigRequest;
+                    use openobserve_core::anomaly_detection::UpdateAnomalyConfigRequest;
                     let req = UpdateAnomalyConfigRequest {
                         enabled: Some(should_enable),
                         ..Default::default()
                     };
-                    match crate::service::anomaly_detection::update_config(
+                    match openobserve_core::anomaly_detection::update_config(
                         &org_id,
                         &id.to_string(),
                         req,
@@ -1121,7 +1124,7 @@ pub async fn trigger_alert(Path((org_id, alert_id)): Path<(String, String)>) -> 
             #[cfg(feature = "enterprise")]
             {
                 // Fall back to anomaly detection — trigger a detection run
-                match crate::service::anomaly_detection::detect_anomalies(
+                match openobserve_core::anomaly_detection::detect_anomalies(
                     &org_id,
                     &alert_id.to_string(),
                 )
@@ -1196,7 +1199,7 @@ pub async fn retrain_alert(Path((org_id, alert_id)): Path<(String, String)>) -> 
         MetaHttpResponse::bad_request("retrain is only supported for anomaly detection alerts")
     }
     #[cfg(feature = "enterprise")]
-    match crate::service::anomaly_detection::train_model(&org_id, &alert_id_str).await {
+    match openobserve_core::anomaly_detection::train_model(&org_id, &alert_id_str).await {
         Ok(_) => MetaHttpResponse::ok("Retraining triggered"),
         Err(e) => {
             let msg = e.to_string().to_lowercase();
@@ -1254,13 +1257,13 @@ pub async fn move_alerts(
     // regular alerts have not yet been relocated (reduces partial-move risk).
     #[cfg(feature = "enterprise")]
     for id in anomaly_ids {
-        use crate::service::anomaly_detection::UpdateAnomalyConfigRequest;
+        use openobserve_core::anomaly_detection::UpdateAnomalyConfigRequest;
         let req = UpdateAnomalyConfigRequest {
             folder_id: Some(req_body.dst_folder_id.clone()),
             ..Default::default()
         };
         if let Err(e) =
-            crate::service::anomaly_detection::update_config(&org_id, &id.to_string(), req).await
+            openobserve_core::anomaly_detection::update_config(&org_id, &id.to_string(), req).await
         {
             let msg = e.to_string().to_lowercase();
             if msg.contains("not found") {
@@ -1433,8 +1436,7 @@ pub async fn generate_sql(
 #[cfg(test)]
 mod tests {
     use axum::{http::StatusCode, response::Response};
-
-    use crate::service::alerts::alert::AlertError;
+    use openobserve_core::alerts::alert::AlertError;
 
     fn status(err: AlertError) -> StatusCode {
         Response::from(err).status()
@@ -1675,7 +1677,7 @@ mod tests {
 
     #[test]
     fn test_get_destination_with_template_error_is_internal_server_error() {
-        use crate::service::db::alerts::destinations::DestinationError;
+        use db::alerts::destinations::DestinationError;
         assert_eq!(
             status(AlertError::GetDestinationWithTemplateError(
                 DestinationError::NotFound

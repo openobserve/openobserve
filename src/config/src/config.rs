@@ -52,7 +52,7 @@ pub type RwAHashSet<K> = tokio::sync::RwLock<HashSet<K>>;
 pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 
 // for DDL commands and migrations
-pub const DB_SCHEMA_VERSION: u64 = 50;
+pub const DB_SCHEMA_VERSION: u64 = 53;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -107,6 +107,7 @@ pub const REQUIRED_DB_CONNECTIONS: u32 = 4;
 
 // Columns added to ingested records for _INTERNAL_ use only.
 pub const TIMESTAMP_COL_NAME: &str = "_timestamp";
+pub const O2_INGEST_TS_COL_NAME: &str = "_o2_ingest_ts";
 // Used for storing and querying unflattened original data
 pub const ID_COL_NAME: &str = "_o2_id";
 pub const ORIGINAL_DATA_COL_NAME: &str = "_original";
@@ -116,6 +117,7 @@ pub const ALL_VALUES_COL_NAME: &str = "_all_values";
 /// never persisted in `defined_schema_fields` and exempt from the UDS limit.
 pub fn is_uds_internal_column(name: &str) -> bool {
     name == TIMESTAMP_COL_NAME
+        || name == O2_INGEST_TS_COL_NAME
         || name == ID_COL_NAME
         || name == ORIGINAL_DATA_COL_NAME
         || name == ALL_VALUES_COL_NAME
@@ -3022,8 +3024,6 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     // format local_mode_storage
     cfg.common.local_mode_storage = cfg.common.local_mode_storage.to_lowercase();
 
-    check_file_format_config(cfg);
-
     // check queue store
     check_queue_store_config(cfg)?;
 
@@ -3184,17 +3184,6 @@ fn check_queue_store_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         })?;
     Ok(())
 }
-
-#[cfg(not(feature = "enterprise"))]
-fn check_file_format_config(cfg: &mut Config) {
-    if cfg.common.file_format != FileFormat::Parquet {
-        log::warn!("ZO_FILE_FORMAT is only supported in enterprise builds; using parquet");
-        cfg.common.file_format = FileFormat::Parquet;
-    }
-}
-
-#[cfg(feature = "enterprise")]
-fn check_file_format_config(_cfg: &mut Config) {}
 
 fn check_grpc_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if cfg.grpc.tls_enabled
@@ -4013,23 +4002,11 @@ mod tests {
     }
 
     #[test]
-    #[cfg(not(feature = "enterprise"))]
-    fn test_non_enterprise_file_format_forces_parquet() {
-        let mut cfg = Config::default();
+    fn test_common_config_preserves_vortex_file_format() {
+        let mut cfg = Config::init().unwrap();
         cfg.common.file_format = FileFormat::Vortex;
 
-        check_file_format_config(&mut cfg);
-
-        assert_eq!(cfg.common.file_format, FileFormat::Parquet);
-    }
-
-    #[test]
-    #[cfg(feature = "enterprise")]
-    fn test_enterprise_file_format_preserves_configured_value() {
-        let mut cfg = Config::default();
-        cfg.common.file_format = FileFormat::Vortex;
-
-        check_file_format_config(&mut cfg);
+        check_common_config(&mut cfg).unwrap();
 
         assert_eq!(cfg.common.file_format, FileFormat::Vortex);
     }

@@ -16,22 +16,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div>
-    <div class="setup-card max-w-225 mx-auto">
+    <div class="setup-card mx-auto max-w-225">
       <!-- Header -->
-      <div class="mb-6 p-4 rounded-default" :class="quickInstallBgClass">
+      <div class="rounded-default mb-6 p-4" :class="quickInstallBgClass">
         <div class="flex items-start gap-3">
-          <OIcon
-            name="rocket-launch"
-            size="xl"
-            class="text-text-link"
-          />
+          <OIcon name="rocket-launch" size="xl" class="text-text-link" />
           <div>
-            <h6 class="text-xl! font-bold m-0 mb-2!">
-              Complete AWS Integration
-            </h6>
-            <p class="text-sm mt-0 mb-0" :class="descriptionClass">
-              Deploy all selected AWS services in one click using a single
-              CloudFormation stack.
+            <h6 class="m-0 mb-2! text-xl! font-bold">Complete AWS Integration</h6>
+            <p class="mt-0 mb-0 text-sm" :class="descriptionClass">
+              Deploy all selected AWS services in one click using a single CloudFormation stack.
             </p>
           </div>
         </div>
@@ -39,25 +32,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Deployment Mode Toggle -->
       <div class="mb-6">
-        <div class="mb-3 font-semibold text-sm" :class="stepLabelClass">Deployment mode</div>
-        <OToggleGroup
-          v-model="deploymentMode"
-          data-test="aws-deployment-mode-toggle"
-        >
+        <div class="mb-3 text-sm font-semibold" :class="stepLabelClass">Deployment mode</div>
+        <OToggleGroup v-model="deploymentMode" data-test="aws-deployment-mode-toggle">
           <OToggleGroupItem value="single">Single Region</OToggleGroupItem>
-          <OToggleGroupItem value="stackset"
-            >Multi-Region (StackSets)</OToggleGroupItem
-          >
+          <OToggleGroupItem value="stackset">Multi-Region (StackSets)</OToggleGroupItem>
         </OToggleGroup>
         <div class="mt-2 text-xs" :class="hintTextClass">
           <span v-if="deploymentMode === 'single'">
-            Deploys a CloudFormation stack in one AWS region. Parameters are
-            pre-filled automatically.
+            Deploys a CloudFormation stack in one AWS region. Parameters are pre-filled
+            automatically.
           </span>
           <span v-else>
-            Deploys across multiple regions using CloudFormation StackSets.
-            Requires AWS Organizations or self-managed IAM roles. Parameters are
-            shown for copy-paste into the AWS console wizard.
+            Deploys across multiple regions using CloudFormation StackSets. Requires AWS
+            Organizations or self-managed IAM roles. Parameters are shown for copy-paste into the
+            AWS console wizard.
           </span>
         </div>
       </div>
@@ -65,28 +53,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Step: Services -->
       <div class="mb-6">
         <div
-          class="flex items-center justify-between cursor-pointer py-2 px-3 rounded-default"
+          class="rounded-default flex cursor-pointer items-center justify-between px-3 py-2"
           :class="collapsibleHeaderClass"
           @click="showServices = !showServices"
         >
           <div class="flex items-center gap-2">
-            <OIcon
-              :name="showServices ? 'expand-less' : 'expand-more'" size="sm"
-              color="primary"
-            />
-            <div class="font-semibold text-sm" :class="stepLabelClass">Select services to monitor</div>
+            <OIcon :name="showServices ? 'expand-less' : 'expand-more'" size="sm" color="primary" />
+            <div class="text-sm font-semibold" :class="stepLabelClass">
+              Select services to monitor
+            </div>
             <OTag type="countChip" value="accent">
-              {{ enabledServices.length }} /
-              {{ QUICK_SETUP_SERVICES.length }} selected
+              {{ enabledServices.length }} / {{ QUICK_SETUP_SERVICES.length }} selected
             </OTag>
           </div>
           <div class="flex gap-2" @click.stop>
-            <OButton variant="ghost-primary" size="xs" @click="selectAll"
-              >Select all</OButton
-            >
-            <OButton variant="ghost-primary" size="xs" @click="deselectAll"
-              >Deselect all</OButton
-            >
+            <OButton variant="ghost-primary" size="xs" @click="selectAll">Select all</OButton>
+            <OButton variant="ghost-primary" size="xs" @click="deselectAll">Deselect all</OButton>
           </div>
         </div>
 
@@ -94,13 +76,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="grid transition-[grid-template-rows] duration-300 ease-in-out"
           :class="showServices ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'"
         >
-          <div class="overflow-hidden min-h-0">
+          <div class="min-h-0 overflow-hidden">
             <div class="mt-3">
               <div class="grid grid-cols-4 gap-x-4 gap-y-2">
-                <div
-                  v-for="service in QUICK_SETUP_SERVICES"
-                  :key="service.flag"
-                >
+                <div v-for="service in QUICK_SETUP_SERVICES" :key="service.flag">
                   <OCheckbox
                     v-model="enabledServices"
                     :value="service.flag"
@@ -115,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Single Region: region picker -->
       <div v-if="deploymentMode === 'single'" class="mb-6">
-        <div class="mb-3 font-semibold text-sm" :class="stepLabelClass">Deployment region</div>
+        <div class="mb-3 text-sm font-semibold" :class="stepLabelClass">Deployment region</div>
         <OSelect
           v-model="selectedRegion"
           :options="AWS_REGIONS"
@@ -129,11 +108,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- StackSets: admin + target regions -->
       <template v-else>
         <div class="mb-6">
-          <div class="mb-3 font-semibold text-sm" :class="stepLabelClass">
+          <div class="mb-3 text-sm font-semibold" :class="stepLabelClass">
             Admin region
-            <span class="font-normal text-xs text-text-muted"
-              >(where the StackSet is managed)</span
-            >
+            <span class="text-text-muted text-xs font-normal">(where the StackSet is managed)</span>
           </div>
           <OSelect
             v-model="selectedRegion"
@@ -147,41 +124,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div class="mb-6">
           <div
-            class="flex items-center justify-between cursor-pointer py-2 px-3 rounded-default"
-          :class="collapsibleHeaderClass"
+            class="rounded-default flex cursor-pointer items-center justify-between px-3 py-2"
+            :class="collapsibleHeaderClass"
             @click="showTargetRegions = !showTargetRegions"
           >
             <div class="flex items-center gap-2">
               <OIcon
-                :name="showTargetRegions ? 'expand-less' : 'expand-more'" size="sm"
+                :name="showTargetRegions ? 'expand-less' : 'expand-more'"
+                size="sm"
                 color="primary"
               />
-              <div class="font-semibold text-sm" :class="stepLabelClass">
+              <div class="text-sm font-semibold" :class="stepLabelClass">
                 Target regions
-                <span class="font-normal text-xs text-text-muted"
+                <span class="text-text-muted text-xs font-normal"
                   >(where stacks will be deployed)</span
                 >
               </div>
-              <OTag
-                v-if="targetRegions.length > 0"
-                type="countChip"
-                value="accent"
+              <OTag v-if="targetRegions.length > 0" type="countChip" value="accent"
                 >{{ targetRegions.length }} selected</OTag
               >
             </div>
             <div class="flex gap-2" @click.stop>
-              <OButton
-                variant="ghost-primary"
-                size="xs"
-                @click="selectAllRegions"
+              <OButton variant="ghost-primary" size="xs" @click="selectAllRegions"
                 >Select all</OButton
               >
-              <OButton
-                variant="ghost-primary"
-                size="xs"
-                @click="targetRegions = []"
-                >Clear</OButton
-              >
+              <OButton variant="ghost-primary" size="xs" @click="targetRegions = []">Clear</OButton>
             </div>
           </div>
 
@@ -189,13 +156,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="grid transition-[grid-template-rows] duration-300 ease-in-out"
             :class="showTargetRegions ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'"
           >
-            <div class="overflow-hidden min-h-0">
+            <div class="min-h-0 overflow-hidden">
               <div class="mt-3">
                 <div class="grid grid-cols-3 gap-x-4 gap-y-2">
-                  <div
-                    v-for="region in AWS_REGIONS"
-                    :key="region.value"
-                  >
+                  <div v-for="region in AWS_REGIONS" :key="region.value">
                     <OCheckbox
                       v-model="targetRegions"
                       :value="region.value"
@@ -209,33 +173,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <div class="mb-6">
-          <div class="mb-3 font-semibold text-sm" :class="stepLabelClass">Deployment model</div>
-          <OToggleGroup
-            v-model="stackSetModel"
-            data-test="aws-stackset-model-toggle"
-          >
+          <div class="mb-3 text-sm font-semibold" :class="stepLabelClass">Deployment model</div>
+          <OToggleGroup v-model="stackSetModel" data-test="aws-stackset-model-toggle">
             <OToggleGroupItem value="self">Self-managed</OToggleGroupItem>
-            <OToggleGroupItem value="service"
-              >Service-managed (AWS Organizations)</OToggleGroupItem
-            >
+            <OToggleGroupItem value="service">Service-managed (AWS Organizations)</OToggleGroupItem>
           </OToggleGroup>
           <div class="mt-2 text-xs" :class="hintTextClass">
             <span v-if="stackSetModel === 'self'">
               Requires
               <code>AWSCloudFormationStackSetAdministrationRole</code> and
-              <code>AWSCloudFormationStackSetExecutionRole</code> IAM roles in
-              your account.
+              <code>AWSCloudFormationStackSetExecutionRole</code> IAM roles in your account.
             </span>
             <span v-else>
-              Uses AWS Organizations. Your account must be the management or
-              delegated admin account.
+              Uses AWS Organizations. Your account must be the management or delegated admin
+              account.
             </span>
           </div>
         </div>
       </template>
 
       <!-- Launch -->
-      <div class="flex items-center gap-3 mb-6">
+      <div class="mb-6 flex items-center gap-3">
         <OButton
           variant="primary"
           size="sm"
@@ -245,43 +203,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
           @click="handleLaunch"
           :data-test="
-            deploymentMode === 'single'
-              ? 'aws-quick-setup-deploy-btn'
-              : 'aws-stackset-launch-btn'
+            deploymentMode === 'single' ? 'aws-quick-setup-deploy-btn' : 'aws-stackset-launch-btn'
           "
         >
-          <template #icon-left
-            ><OIcon name="cloud-upload" size="sm"
-          /></template>
+          <template #icon-left><OIcon name="cloud-upload" size="sm" /></template>
           {{
-            deploymentMode === "single"
-              ? "Launch CloudFormation Stack"
-              : "Open StackSets Console"
+            deploymentMode === "single" ? "Launch CloudFormation Stack" : "Open StackSets Console"
           }}
         </OButton>
-        <span
-          v-if="enabledServices.length === 0"
-          class="text-sm text-status-error-text"
-        >
+        <span v-if="enabledServices.length === 0" class="text-status-error-text text-sm">
           Select at least one service
         </span>
         <span
-          v-else-if="
-            deploymentMode === 'stackset' && targetRegions.length === 0
-          "
-          class="text-sm text-status-error-text"
+          v-else-if="deploymentMode === 'stackset' && targetRegions.length === 0"
+          class="text-status-error-text text-sm"
         >
           Select at least one target region
         </span>
         <span v-else class="text-sm" :class="hintTextClass">
-          {{ enabledServices.length }} service{{
-            enabledServices.length > 1 ? "s" : ""
-          }}
+          {{ enabledServices.length }} service{{ enabledServices.length > 1 ? "s" : "" }}
           selected
           <template v-if="deploymentMode === 'stackset'">
-            · {{ targetRegions.length }} region{{
-              targetRegions.length > 1 ? "s" : ""
-            }}</template
+            · {{ targetRegions.length }} region{{ targetRegions.length > 1 ? "s" : "" }}</template
           >
         </span>
       </div>
@@ -289,65 +232,61 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- StackSets Parameter Helper -->
       <div
         class="grid transition-[grid-template-rows] duration-300 ease-in-out"
-        :class="(showParamHelper && deploymentMode === 'stackset') ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'"
+        :class="
+          showParamHelper && deploymentMode === 'stackset' ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'
+        "
       >
-        <div class="overflow-hidden min-h-0">
-        <div>
-          <OSeparator class="mb-4" />
-          <div class="rounded-default p-4" :class="paramHelperClass">
-            <div class="flex items-center justify-between mb-3">
-              <div class="font-semibold text-sm" :class="stepLabelClass">
-                Parameters to enter in the AWS wizard
+        <div class="min-h-0 overflow-hidden">
+          <div>
+            <OSeparator class="mb-4" />
+            <div class="rounded-default p-4" :class="paramHelperClass">
+              <div class="mb-3 flex items-center justify-between">
+                <div class="text-sm font-semibold" :class="stepLabelClass">
+                  Parameters to enter in the AWS wizard
+                </div>
+                <OButton variant="ghost" size="icon-circle-sm" @click="showParamHelper = false">
+                  <OIcon name="close" size="sm" />
+                </OButton>
               </div>
-              <OButton
-                variant="ghost"
-                size="icon-circle-sm"
-                @click="showParamHelper = false"
-              >
-                <OIcon name="close" size="sm" />
-              </OButton>
-            </div>
-            <p class="text-xs mb-3" :class="hintTextClass">
-              The StackSets console doesn't support URL pre-fill. Enter these
-              values as you go through the wizard.
-            </p>
-            <div class="flex flex-col gap-1.5">
-              <div
-                v-for="param in stackSetParams"
-                :key="param.key"
-                class="flex items-center gap-3 py-1.5 px-2.5 rounded-default text-compact font-mono"
-                :class="paramRowClass"
-              >
-                <div class="min-w-60 font-semibold shrink-0" :class="paramKeyClass">{{ param.key }}</div>
-                <div class="flex items-center gap-1 flex-1 overflow-hidden">
-                  <span class="overflow-hidden text-ellipsis whitespace-nowrap flex-1" :class="paramValTextClass">{{ param.value }}</span>
-                  <OButton
-                    variant="ghost"
-                    size="icon-xs-circle"
-                    @click="copyParam(param.value)"
-                  >
-                    <OIcon name="content-copy" size="sm" />
-                    <OTooltip content="Copy" />
-                  </OButton>
+              <p class="mb-3 text-xs" :class="hintTextClass">
+                The StackSets console doesn't support URL pre-fill. Enter these values as you go
+                through the wizard.
+              </p>
+              <div class="flex flex-col gap-1.5">
+                <div
+                  v-for="param in stackSetParams"
+                  :key="param.key"
+                  class="rounded-default text-compact flex items-center gap-3 px-2.5 py-1.5 font-mono"
+                  :class="paramRowClass"
+                >
+                  <div class="min-w-60 shrink-0 font-semibold" :class="paramKeyClass">
+                    {{ param.key }}
+                  </div>
+                  <div class="flex flex-1 items-center gap-1 overflow-hidden">
+                    <span
+                      class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap"
+                      :class="paramValTextClass"
+                      >{{ param.value }}</span
+                    >
+                    <OButton variant="ghost" size="icon-xs-circle" @click="copyParam(param.value)">
+                      <OIcon name="content-copy" size="sm" />
+                      <OTooltip content="Copy" />
+                    </OButton>
+                  </div>
+                </div>
+              </div>
+              <div class="mt-3">
+                <div class="mb-1 text-xs font-semibold" :class="stepLabelClass">
+                  Target regions to enter in "Deployment targets":
+                </div>
+                <div class="mt-1 flex flex-wrap gap-1">
+                  <OTag v-for="r in targetRegions" :key="r" type="fieldTag" value="primarysm">{{
+                    r
+                  }}</OTag>
                 </div>
               </div>
             </div>
-            <div class="mt-3">
-              <div class="font-semibold text-xs mb-1" :class="stepLabelClass">
-                Target regions to enter in "Deployment targets":
-              </div>
-              <div class="flex flex-wrap gap-1 mt-1">
-                <OTag
-                  v-for="r in targetRegions"
-                  :key="r"
-                  type="fieldTag"
-                  value="primarysm"
-                  >{{ r }}</OTag
-                >
-              </div>
-            </div>
           </div>
-        </div>
         </div>
       </div>
     </div>
@@ -371,7 +310,7 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
-import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import segment from "@/services/segment_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";
@@ -381,10 +320,17 @@ const COMPLETE_TEMPLATE_URL =
 
 export default defineComponent({
   name: "AWSQuickSetup",
-  components: { OSeparator, OToggleGroup, OToggleGroupItem, OButton, OSelect, OTooltip, OCheckbox,
+  components: {
+    OSeparator,
+    OToggleGroup,
+    OToggleGroupItem,
+    OButton,
+    OSelect,
+    OTooltip,
+    OCheckbox,
     OIcon,
     OTag,
-},
+  },
   setup() {
     const store = useStore();
 
@@ -392,25 +338,23 @@ export default defineComponent({
     const stackSetModel = ref<"self" | "service">("self");
     const selectedRegion = ref("us-east-1");
     const targetRegions = ref<string[]>(["us-east-1"]);
-    const enabledServices = ref<string[]>(
-      QUICK_SETUP_SERVICES.map((s) => s.flag),
-    );
+    const enabledServices = ref<string[]>(QUICK_SETUP_SERVICES.map((s) => s.flag));
     const showParamHelper = ref(false);
     const showTargetRegions = ref(false);
     const showServices = ref(false);
 
     // Colors resolve via theme-aware design tokens, so these class strings are
     // theme-independent (dark handled automatically by dark.css).
-    const quickInstallBgClass = 'bg-banner-info-bg border border-banner-info-border';
-    const descriptionClass = 'text-text-secondary';
-    const stepLabelClass = 'text-text-body';
-    const hintTextClass = 'text-text-secondary';
+    const quickInstallBgClass = "bg-banner-info-bg border border-banner-info-border";
+    const descriptionClass = "text-text-secondary";
+    const stepLabelClass = "text-text-body";
+    const hintTextClass = "text-text-secondary";
     const collapsibleHeaderClass =
-      'bg-surface-subtle border border-border-default hover:bg-surface-subtle-hover';
-    const paramHelperClass = 'bg-surface-subtle';
-    const paramRowClass = 'bg-surface-base border border-border-default';
-    const paramKeyClass = 'text-text-body';
-    const paramValTextClass = 'text-text-secondary';
+      "bg-surface-subtle border border-border-default hover:bg-surface-subtle-hover";
+    const paramHelperClass = "bg-surface-subtle";
+    const paramRowClass = "bg-surface-base border border-border-default";
+    const paramKeyClass = "text-text-body";
+    const paramValTextClass = "text-text-secondary";
 
     let endpoint: any = null;
     try {
@@ -506,11 +450,7 @@ export default defineComponent({
       }
     };
 
-    const launchSingleRegion = (
-      organizationId: string,
-      email: string,
-      passcode: string,
-    ) => {
+    const launchSingleRegion = (organizationId: string, email: string, passcode: string) => {
       const accessKey = btoa(`${email}:${passcode}`);
 
       const url = generateCloudFormationURL(
@@ -568,8 +508,7 @@ export default defineComponent({
 
       toast({
         variant: "info",
-        message:
-          "AWS StackSets console opened. Use the parameter values below to complete setup.",
+        message: "AWS StackSets console opened. Use the parameter values below to complete setup.",
         timeout: 5000,
       });
     };

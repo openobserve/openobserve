@@ -136,7 +136,9 @@ describe("FieldsInput", () => {
     it("renders a delete button for each field", () => {
       wrapper = buildWrapper({ fields: [makeField()] });
 
-      expect(wrapper.find('[data-test="alert-conditions-delete-condition-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="alert-conditions-delete-condition-btn"]').exists()).toBe(
+        true,
+      );
     });
 
     it("renders the add-condition inline button only on the last row", () => {
@@ -390,9 +392,7 @@ describe("FieldsInput — form mode (name-prefix inside a real <OForm>)", () => 
   it("typing in a row's value input updates the form values", async () => {
     wrapper = buildFormWrapper([threeRows[0]]);
 
-    await wrapper
-      .find('[data-test="alert-conditions-value-input"] input')
-      .setValue("changed");
+    await wrapper.find('[data-test="alert-conditions-value-input"] input').setValue("changed");
     await flushPromises();
 
     expect(getForm(wrapper).state.values.conditions[0].value).toBe("changed");
@@ -411,7 +411,9 @@ describe("FieldsInput — form mode (name-prefix inside a real <OForm>)", () => 
   it("does not emit bare-mode events in form mode (form owns the rows)", async () => {
     wrapper = buildFormWrapper(threeRows);
 
-    await wrapper.findAll('[data-test="alert-conditions-delete-condition-btn"]')[0].trigger("click");
+    await wrapper
+      .findAll('[data-test="alert-conditions-delete-condition-btn"]')[0]
+      .trigger("click");
     await wrapper.find('[data-test="alert-conditions-add-condition-btn"]').trigger("click");
     await flushPromises();
 

@@ -106,17 +106,12 @@ export default defineComponent({
     const getDashboardList = useLoading(async () => {
       if (!props.folderId) return;
 
-      const allDashboardDataByFolderId = await getAllDashboardsByFolderId(
-        store,
-        props.folderId,
-      );
+      const allDashboardDataByFolderId = await getAllDashboardsByFolderId(store, props.folderId);
 
-      dashboardList.value = allDashboardDataByFolderId?.map(
-        (dashboard: any) => ({
-          label: dashboard.title,
-          value: dashboard.dashboardId,
-        }),
-      );
+      dashboardList.value = allDashboardDataByFolderId?.map((dashboard: any) => ({
+        label: dashboard.title,
+        value: dashboard.dashboardId,
+      }));
 
       // select first dashboard
       if (dashboardList.value.length > 0) {
@@ -147,11 +142,12 @@ export default defineComponent({
     watch(
       () => selectedDashboard.value,
       (dashboardId) => {
-        const dashboard = dashboardList.value.find(
-          (d: any) => d.value === dashboardId,
-        );
+        const dashboard = dashboardList.value.find((d: any) => d.value === dashboardId);
         // emit {label, value} for backward compatibility with parents
-        emit("dashboard-selected", dashboard ?? (dashboardId ? { label: dashboardId, value: dashboardId } : null));
+        emit(
+          "dashboard-selected",
+          dashboard ?? (dashboardId ? { label: dashboardId, value: dashboardId } : null),
+        );
       },
     );
 

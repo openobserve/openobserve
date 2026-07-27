@@ -60,9 +60,7 @@ describe("agentFilterSql", () => {
 
   it("labels the agent by identity only (no source stream)", () => {
     expect(agentFilterLabel(agentWithId)).toBe("support-agent (agent-123)");
-    expect(agentFilterLabel({ ...agentWithId, id: null })).toBe(
-      "support-agent",
-    );
+    expect(agentFilterLabel({ ...agentWithId, id: null })).toBe("support-agent");
   });
 
   it("combines filters without emitting an empty WHERE clause", () => {

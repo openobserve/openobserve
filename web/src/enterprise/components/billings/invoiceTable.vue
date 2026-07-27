@@ -164,12 +164,10 @@ const getInvoiceHistory = () => {
   const dismiss = toast({
     variant: "loading",
     message: "Please wait while loading invoice history...",
-      timeout: 0,
-});
+    timeout: 0,
+  });
 
-  BillingService.list_invoice_history(
-    store.state.selectedOrganization.identifier
-  )
+  BillingService.list_invoice_history(store.state.selectedOrganization.identifier)
     .then((res) => {
       dismiss();
       const invoiceList = res.data.invoices;

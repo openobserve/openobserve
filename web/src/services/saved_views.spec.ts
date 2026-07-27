@@ -50,9 +50,7 @@ describe("saved_views service", () => {
 
       await savedViews.get(org_identifier);
 
-      expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/${org_identifier}/savedviews`
-      );
+      expect(mockHttpInstance.get).toHaveBeenCalledWith(`/api/${org_identifier}/savedviews`);
     });
 
     it("should make GET request with a different org identifier", async () => {
@@ -69,9 +67,7 @@ describe("saved_views service", () => {
 
       await savedViews.get(org_identifier);
 
-      expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/${org_identifier}/savedviews`
-      );
+      expect(mockHttpInstance.get).toHaveBeenCalledWith(`/api/${org_identifier}/savedviews`);
     });
   });
 
@@ -88,10 +84,9 @@ describe("saved_views service", () => {
 
       await savedViews.post(org_identifier, data);
 
-      expect(mockHttpInstance.post).toHaveBeenCalledWith(
-        `/api/${org_identifier}/savedviews`,
-        { ...data }
-      );
+      expect(mockHttpInstance.post).toHaveBeenCalledWith(`/api/${org_identifier}/savedviews`, {
+        ...data,
+      });
     });
 
     it("should make POST request with minimal data payload", async () => {
@@ -102,10 +97,9 @@ describe("saved_views service", () => {
 
       await savedViews.post(org_identifier, data);
 
-      expect(mockHttpInstance.post).toHaveBeenCalledWith(
-        `/api/${org_identifier}/savedviews`,
-        { name: "Minimal View" }
-      );
+      expect(mockHttpInstance.post).toHaveBeenCalledWith(`/api/${org_identifier}/savedviews`, {
+        name: "Minimal View",
+      });
     });
 
     it("should spread the data object into the request body", async () => {
@@ -140,10 +134,9 @@ describe("saved_views service", () => {
 
       await savedViews.put(org_identifier, id, data);
 
-      expect(mockHttpInstance.put).toHaveBeenCalledWith(
-        `/api/${org_identifier}/savedviews/${id}`,
-        { ...data }
-      );
+      expect(mockHttpInstance.put).toHaveBeenCalledWith(`/api/${org_identifier}/savedviews/${id}`, {
+        ...data,
+      });
     });
 
     it("should make PUT request with different org, id, and data", async () => {
@@ -155,10 +148,10 @@ describe("saved_views service", () => {
 
       await savedViews.put(org_identifier, id, data);
 
-      expect(mockHttpInstance.put).toHaveBeenCalledWith(
-        `/api/${org_identifier}/savedviews/${id}`,
-        { name: "Renamed View", pinned: true }
-      );
+      expect(mockHttpInstance.put).toHaveBeenCalledWith(`/api/${org_identifier}/savedviews/${id}`, {
+        name: "Renamed View",
+        pinned: true,
+      });
     });
 
     it("should spread the data into request body for PUT", async () => {
@@ -189,7 +182,7 @@ describe("saved_views service", () => {
       await savedViews.delete(org_identifier, id);
 
       expect(mockHttpInstance.delete).toHaveBeenCalledWith(
-        `/api/${org_identifier}/savedviews/${id}`
+        `/api/${org_identifier}/savedviews/${id}`,
       );
     });
 
@@ -202,7 +195,7 @@ describe("saved_views service", () => {
       await savedViews.delete(org_identifier, id);
 
       expect(mockHttpInstance.delete).toHaveBeenCalledWith(
-        `/api/${org_identifier}/savedviews/${id}`
+        `/api/${org_identifier}/savedviews/${id}`,
       );
     });
   });
@@ -218,9 +211,7 @@ describe("saved_views service", () => {
 
       await savedViews.getViewDetail(org_identifier, id);
 
-      expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/${org_identifier}/savedviews/${id}`
-      );
+      expect(mockHttpInstance.get).toHaveBeenCalledWith(`/api/${org_identifier}/savedviews/${id}`);
     });
 
     it("should make GET request with different org and view id", async () => {
@@ -233,9 +224,7 @@ describe("saved_views service", () => {
 
       await savedViews.getViewDetail(org_identifier, id);
 
-      expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/${org_identifier}/savedviews/${id}`
-      );
+      expect(mockHttpInstance.get).toHaveBeenCalledWith(`/api/${org_identifier}/savedviews/${id}`);
     });
 
     it("should use the same URL pattern as put and delete for a given id", async () => {
@@ -269,36 +258,34 @@ describe("saved_views service", () => {
       const error = new Error("Validation error");
       mockHttpInstance.post.mockRejectedValue(error);
 
-      await expect(
-        savedViews.post("org123", { name: "broken-view" })
-      ).rejects.toThrow("Validation error");
+      await expect(savedViews.post("org123", { name: "broken-view" })).rejects.toThrow(
+        "Validation error",
+      );
     });
 
     it("should propagate errors from put", async () => {
       const error = new Error("Not found");
       mockHttpInstance.put.mockRejectedValue(error);
 
-      await expect(
-        savedViews.put("org123", "missing-id", { name: "updated" })
-      ).rejects.toThrow("Not found");
+      await expect(savedViews.put("org123", "missing-id", { name: "updated" })).rejects.toThrow(
+        "Not found",
+      );
     });
 
     it("should propagate errors from delete", async () => {
       const error = new Error("Forbidden");
       mockHttpInstance.delete.mockRejectedValue(error);
 
-      await expect(
-        savedViews.delete("org123", "locked-view-id")
-      ).rejects.toThrow("Forbidden");
+      await expect(savedViews.delete("org123", "locked-view-id")).rejects.toThrow("Forbidden");
     });
 
     it("should propagate errors from getViewDetail", async () => {
       const error = new Error("Server error");
       mockHttpInstance.get.mockRejectedValue(error);
 
-      await expect(
-        savedViews.getViewDetail("org123", "some-view-id")
-      ).rejects.toThrow("Server error");
+      await expect(savedViews.getViewDetail("org123", "some-view-id")).rejects.toThrow(
+        "Server error",
+      );
     });
   });
 });

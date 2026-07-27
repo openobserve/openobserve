@@ -20,13 +20,12 @@ use axum::{
     extract::{Path, Query},
     response::Response,
 };
+use openobserve_api_common::extractors::Headers;
+use openobserve_core::auth::UserEmail;
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 
-use crate::{
-    common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
-    extractors::Headers,
-};
+use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 
 /// Query parameters for listing incidents
 #[derive(Debug, Deserialize, IntoParams, ToSchema)]
@@ -133,7 +132,7 @@ pub async fn list_incidents(
     Path(org_id): Path<String>,
     Query(query): Query<ListIncidentsQuery>,
 ) -> Response {
-    match crate::service::alerts::incidents::list_incidents(
+    match openobserve_core::alerts::incidents::list_incidents(
         &org_id,
         query.status.as_deref(),
         query.limit,
@@ -173,7 +172,8 @@ pub async fn list_incidents(
     )
 )]
 pub async fn get_incident(Path((org_id, incident_id)): Path<(String, String)>) -> Response {
-    match crate::service::alerts::incidents::get_incident_with_alerts(&org_id, &incident_id).await {
+    match openobserve_core::alerts::incidents::get_incident_with_alerts(&org_id, &incident_id).await
+    {
         Ok(Some(incident)) => MetaHttpResponse::json(incident),
         Ok(None) => MetaHttpResponse::not_found("Incident not found"),
         Err(e) => MetaHttpResponse::internal_error(e),
@@ -221,7 +221,7 @@ pub async fn update_incident(
                 return MetaHttpResponse::bad_request("Title cannot exceed 255 characters");
             }
 
-            match crate::service::alerts::incidents::update_title(
+            match openobserve_core::alerts::incidents::update_title(
                 &org_id,
                 &incident_id,
                 &title,
@@ -240,7 +240,7 @@ pub async fn update_incident(
             }
         }
         UpdatePayload::Severity { severity } => {
-            match crate::service::alerts::incidents::update_severity(
+            match openobserve_core::alerts::incidents::update_severity(
                 &org_id,
                 &incident_id,
                 severity.as_str(),
@@ -254,7 +254,7 @@ pub async fn update_incident(
                     let events = infra::table::incident_events::get(&org_id, &incident_id)
                         .await
                         .unwrap_or_default();
-                    let in_flight = crate::service::alerts::incidents::is_analysis_in_flight(
+                    let in_flight = openobserve_core::alerts::incidents::is_analysis_in_flight(
                         &events,
                         cooldown * 2,
                     );
@@ -272,23 +272,25 @@ pub async fn update_incident(
                 }
             }
         }
-        UpdatePayload::Status { status } => match crate::service::alerts::incidents::update_status(
-            &org_id,
-            &incident_id,
-            status.as_str(),
-            &user_id,
-        )
-        .await
-        {
-            Ok(incident) => MetaHttpResponse::json(incident),
-            Err(e) => {
-                if e.to_string().contains("not found") {
-                    MetaHttpResponse::not_found("Incident not found")
-                } else {
-                    MetaHttpResponse::internal_error(e)
+        UpdatePayload::Status { status } => {
+            match openobserve_core::alerts::incidents::update_status(
+                &org_id,
+                &incident_id,
+                status.as_str(),
+                &user_id,
+            )
+            .await
+            {
+                Ok(incident) => MetaHttpResponse::json(incident),
+                Err(e) => {
+                    if e.to_string().contains("not found") {
+                        MetaHttpResponse::not_found("Incident not found")
+                    } else {
+                        MetaHttpResponse::internal_error(e)
+                    }
                 }
             }
-        },
+        }
     }
 }
 
@@ -420,7 +422,7 @@ pub async fn trigger_incident_rca(
         let events = infra::table::incident_events::get(&org_id, &incident_id)
             .await
             .unwrap_or_default();
-        if crate::service::alerts::incidents::is_analysis_in_flight(&events, cooldown * 2) {
+        if openobserve_core::alerts::incidents::is_analysis_in_flight(&events, cooldown * 2) {
             return MetaHttpResponse::bad_request("Analysis already in progress");
         }
     }
@@ -439,7 +441,7 @@ pub async fn trigger_incident_rca(
 
     // Get incident with alerts
     let incident =
-        match crate::service::alerts::incidents::get_incident_with_alerts(&org_id, &incident_id)
+        match openobserve_core::alerts::incidents::get_incident_with_alerts(&org_id, &incident_id)
             .await
         {
             Ok(Some(i)) => i,
@@ -486,7 +488,7 @@ pub async fn trigger_incident_rca(
 
     // Create RCA agent client with SA credentials
     let (email, token) =
-        match crate::service::organization::get_sre_agent_credentials(&org_id).await {
+        match openobserve_core::organization::get_sre_agent_credentials(&org_id).await {
             Ok(creds) => creds,
             Err(e) => {
                 let _ = infra::table::incident_events::append(
@@ -504,7 +506,7 @@ pub async fn trigger_incident_rca(
                 ));
             }
         };
-    let auth_header = crate::common::utils::auth::build_basic_auth_header(&email, &token);
+    let auth_header = openobserve_core::auth::build_basic_auth_header(&email, &token);
     let client = match o2_enterprise::enterprise::ai::client::get_agent_client() {
         Some(c) => c,
         None => {
@@ -554,7 +556,7 @@ pub async fn trigger_incident_rca(
         let incident_id_bg = incident_id.clone();
         let user_email_bg = user_email.user_id.clone();
         tokio::spawn(async move {
-            if let Err(e) = crate::service::alerts::incidents::trigger_rca_for_incident(
+            if let Err(e) = openobserve_core::alerts::incidents::trigger_rca_for_incident(
                 org_id_bg.clone(),
                 incident_id_bg.clone(),
                 true,

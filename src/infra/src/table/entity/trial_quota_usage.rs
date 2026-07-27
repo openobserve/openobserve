@@ -8,6 +8,7 @@ pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub feature: String,
     pub usage_count: i64,
+    pub usage_limit: Option<i64>,
     pub updated_at: i64,
     pub notified_checkpoint: i16,
 }
@@ -27,11 +28,13 @@ mod tests {
             org_id: "org".to_string(),
             feature: "ingest".to_string(),
             usage_count: 100,
+            usage_limit: Some(1_000),
             updated_at: 1000,
             notified_checkpoint: 0,
         };
         assert_eq!(m.org_id, "org");
         assert_eq!(m.usage_count, 100);
+        assert_eq!(m.usage_limit, Some(1_000));
         assert_eq!(m.notified_checkpoint, 0);
     }
 }
