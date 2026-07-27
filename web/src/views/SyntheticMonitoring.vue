@@ -1054,6 +1054,21 @@ async function toggleEnabled(m: any) {
   }
 }
 
+/**
+ * A duplicate is a brand-new check, so it cannot inherit the original's start
+ * timestamp: mapFrequencyToSchedule reports every saved check as "Schedule
+ * Later" with the date/time it originally started, and the API rejects a start
+ * in the past ("start must not be in the past"). Keep a start that is still in
+ * the future — duplicating a check scheduled for next week should stay
+ * scheduled — and otherwise fall back to "Schedule Now".
+ */
+function rebaseScheduleStart(schedule: any, start?: number) {
+  // `start` is microseconds on the wire.
+  if (typeof start === "number" && start / 1000 > Date.now()) return { ...schedule };
+  const { startDate: _startDate, startTime: _startTime, ...rest } = schedule ?? {};
+  return { ...rest, startType: "now" as const };
+}
+
 async function duplicateMonitor(m: any) {
   duplicateTarget.value = m;
   duplicateName.value = t("synthetics.labels.copyOf", { name: m.name });
@@ -1100,6 +1115,7 @@ async function saveDuplicate() {
       ...duplicateSource.value,
       name: duplicateName.value,
       folder: targetFolder,
+      schedule: rebaseScheduleStart(duplicateSource.value.schedule, duplicateSource.value.start),
     };
     delete (check as any).id;
     const payload = buildCreateBrowserTestPayload(check);

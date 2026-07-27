@@ -614,6 +614,90 @@ describe("SyntheticMonitoring", () => {
       expect(mockServiceList.mock.calls.length - listCallsAfterMount).toBe(1);
     });
 
+    // The API rejects a start in the past, and mapFrequencyToSchedule reports
+    // every saved check as "Schedule Later" with the date it originally started.
+    describe("schedule start rebasing", () => {
+      const pastStart = 1_600_000_000_000_000; // µs — Sep 2020
+
+      it("resets a past start to 'Schedule Now'", async () => {
+        mockServiceGet.mockResolvedValue({
+          data: {
+            id: "m-1",
+            name: "Checkout flow",
+            start: pastStart,
+            schedule: { startType: "later", startDate: "2020-09-13", startTime: "12:26" },
+          },
+        });
+        wrapper = mountPage();
+        await flushPromises();
+        await openDuplicate();
+        findDialog().vm.$emit("click:primary");
+        await flushPromises();
+
+        const [, payload] = mockServiceCreate.mock.calls[0];
+        expect((payload as any).schedule.startType).toBe("now");
+        expect((payload as any).schedule.startDate).toBeUndefined();
+        expect((payload as any).schedule.startTime).toBeUndefined();
+      });
+
+      // buildPayload is mocked to identity above, so the tests around this one
+      // only prove the view sets startType. This one pins the contract the fix
+      // relies on, using the real builder.
+      it("real buildCreateBrowserTestPayload emits a current start for 'now' and replays a past one for 'later'", async () => {
+        const actual = await vi.importActual<typeof import("@/utils/synthetics/buildPayload")>(
+          "@/utils/synthetics/buildPayload",
+        );
+        const source = actual.mapResponseToBrowserCheck({
+          name: "Checkout flow",
+          target: "https://example.com",
+          folder_id: "f-2",
+          start: pastStart,
+          frequency: { type: "minutes", interval: 5, timezone: "UTC" },
+          config: { steps: [] },
+        });
+
+        // As read back from the API: "later", replaying the original start —
+        // in the past, which is what the server rejects. (Not exactly
+        // pastStart: the round-trip through HH:mm truncates to the minute.)
+        expect(source.schedule.startType).toBe("later");
+        const asIs = actual.buildCreateBrowserTestPayload({ ...source }) as any;
+        expect(asIs.start).toBeLessThan(Date.now() * 1000);
+        expect(asIs.start).toBeCloseTo(pastStart, -8); // same minute
+
+        // What saveDuplicate submits instead. computeStart truncates to the
+        // minute, so allow up to 60s of backdating.
+        const rebased = actual.buildCreateBrowserTestPayload({
+          ...source,
+          schedule: { ...source.schedule, startType: "now" },
+        } as any) as any;
+        expect(rebased.start).toBeGreaterThan((Date.now() - 60_000) * 1000);
+      });
+
+      it("preserves a start that is still in the future", async () => {
+        const futureStart = (Date.now() + 7 * 24 * 60 * 60 * 1000) * 1000;
+        mockServiceGet.mockResolvedValue({
+          data: {
+            id: "m-1",
+            name: "Checkout flow",
+            start: futureStart,
+            schedule: { startType: "later", startDate: "2099-01-01", startTime: "09:00" },
+          },
+        });
+        wrapper = mountPage();
+        await flushPromises();
+        await openDuplicate();
+        findDialog().vm.$emit("click:primary");
+        await flushPromises();
+
+        const [, payload] = mockServiceCreate.mock.calls[0];
+        expect((payload as any).schedule).toEqual({
+          startType: "later",
+          startDate: "2099-01-01",
+          startTime: "09:00",
+        });
+      });
+    });
+
     it("closes the dialog without an extra error toast on a 403", async () => {
       mockServiceCreate.mockRejectedValueOnce({ response: { status: 403 } });
       wrapper = mountPage();
