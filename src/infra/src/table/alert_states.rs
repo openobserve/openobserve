@@ -240,15 +240,25 @@ pub async fn advance_delivery_state_with<C: sea_orm::ConnectionTrait + Transacti
         return Ok(false);
     };
 
-    // Both arms decide with the PURE contract and only then write. Expressing
-    // these rules as SET clauses is exactly how the layers drifted before:
-    // staleness guards, the silence-window floor and the outcome-axis
-    // invariants all live in `dispatch`, are unit-tested there, and are
-    // reached from here rather than restated.
+    // The DECISION comes from the pure contract — staleness guards, the
+    // silence-window floor, the outcome-axis invariants all live in `dispatch`
+    // and are unit-tested there rather than restated as SET clauses.
     //
-    // The read and the write share one transaction, so a concurrent delivery
-    // cannot slip between deciding and writing.
-    match outcome {
+    // The WRITE still carries the same guards in its `WHERE`, and every arm
+    // checks `rows_affected`. Validating in Rust alone would leave a window
+    // between the read and the write in which a concurrent evaluation can
+    // commit a recovery or a new level — and the stale callback would then
+    // silence (or resurrect) an episode that no longer exists.
+    let guarded = || {
+        alert_states::Entity::update_many()
+            .filter(alert_states::Column::AlertId.eq(alert_id))
+            .filter(alert_states::Column::GroupKey.eq(group_key))
+            .filter(alert_states::Column::Level.eq(episode.level.to_i32()))
+            .filter(alert_states::Column::LevelSince.eq(episode.level_since))
+    };
+    // TEMP
+
+    let affected = match outcome {
         DeliveryOutcome::Delivered {
             silence_minutes,
             at,
@@ -263,13 +273,10 @@ pub async fn advance_delivery_state_with<C: sea_orm::ConnectionTrait + Transacti
                 return Ok(false);
             };
 
-            // Targeted column update, NOT `write_update`: the upsert's conflict
-            // clause deliberately excludes the delivery columns (the one-writer
-            // rule, §5.5 MN-2), so routing this through it would silently write
-            // nothing at all.
-            alert_states::Entity::update_many()
-                .filter(alert_states::Column::AlertId.eq(alert_id))
-                .filter(alert_states::Column::GroupKey.eq(group_key))
+            // Targeted columns, NOT `write_update`: the upsert's conflict
+            // clause deliberately excludes the delivery columns (one-writer
+            // rule, §5.5 MN-2), so routing this through it would write nothing.
+            guarded()
                 .col_expr(
                     alert_states::Column::LastNotifiedLevel,
                     sea_orm::sea_query::Expr::value(next.last_notified_level.map(|l| l.to_i32())),
@@ -279,7 +286,8 @@ pub async fn advance_delivery_state_with<C: sea_orm::ConnectionTrait + Transacti
                     sea_orm::sea_query::Expr::value(next.silenced_until),
                 )
                 .exec(&txn)
-                .await?;
+                .await?
+                .rows_affected
         }
 
         DeliveryOutcome::Failed { at } => {
@@ -289,12 +297,60 @@ pub async fn advance_delivery_state_with<C: sea_orm::ConnectionTrait + Transacti
                 txn.rollback().await?;
                 return Ok(false);
             };
-            // A failure moves the outcome axis and may emit a transition, so it
-            // goes through the ordinary state writer.
-            write_update(&txn, &update).await?;
-        }
-    }
+            let Some(next) = update.state.as_ref() else {
+                txn.rollback().await?;
+                return Ok(false);
+            };
 
+            // A failure also carries the ATTEMPT anchor into the predicates: a
+            // newer success in this episode has already moved delivery state,
+            // and `eq(NULL)` is never true, so a never-delivered anchor must be
+            // matched with IS NULL.
+            let (notified_level, silenced_until) = episode.notified_at_enqueue;
+            let mut stmt = match notified_level {
+                Some(l) => guarded().filter(alert_states::Column::LastNotifiedLevel.eq(l.to_i32())),
+                None => guarded().filter(alert_states::Column::LastNotifiedLevel.is_null()),
+            };
+            stmt = match silenced_until {
+                Some(t) => stmt.filter(alert_states::Column::SilencedUntil.eq(t)),
+                None => stmt.filter(alert_states::Column::SilencedUntil.is_null()),
+            };
+
+            let affected = stmt
+                .col_expr(
+                    alert_states::Column::LastOutcome,
+                    sea_orm::sea_query::Expr::value(RunOutcome::NotifyFailed.to_i32()),
+                )
+                .col_expr(
+                    alert_states::Column::LastOutcomeAt,
+                    sea_orm::sea_query::Expr::value(next.last_outcome_at),
+                )
+                .col_expr(
+                    alert_states::Column::Since,
+                    sea_orm::sea_query::Expr::value(next.since),
+                )
+                .exec(&txn)
+                .await?
+                .rows_affected;
+
+            // The transition only goes in if the state write actually landed,
+            // and in the same transaction — history must never describe a
+            // change that was not applied (MN-9).
+            if affected > 0
+                && let Some(t) = update.transition.as_ref()
+            {
+                write_transition(&txn, t).await?;
+            }
+            affected
+        }
+    };
+
+    if affected == 0 {
+        // The guard matched nothing: the episode moved on between the read and
+        // the write. Correctly dropped rather than applied.
+        txn.rollback().await?;
+        return Ok(false);
+    }
     txn.commit().await?;
     Ok(true)
 }
@@ -429,22 +485,35 @@ where
         .await?;
 
     if let Some(t) = update.transition.as_ref() {
-        alert_state_transitions::ActiveModel {
-            alert_id: Set(t.alert_id.clone()),
-            group_key: Set(t.group_key.clone()),
-            from_outcome: Set(t.from_outcome.as_ref().map(|o| o.to_i32())),
-            to_outcome: Set(t.to_outcome.to_i32()),
-            from_level: Set(t.from_level.map(|l| l.to_i32())),
-            to_level: Set(t.to_level.map(|l| l.to_i32())),
-            at: Set(t.at),
-            value: Set(t.value),
-            group_labels: Set(t.group_labels.clone()),
-            ..Default::default()
-        }
-        .insert(txn)
-        .await?;
+        write_transition(txn, t).await?;
     }
 
+    Ok(())
+}
+
+/// Append one transition row, inside a caller-owned transaction.
+///
+/// Split out so the delivery callbacks can write a transition alongside their
+/// own guarded state update without going through the state upsert, whose
+/// conflict clause deliberately excludes the delivery columns.
+async fn write_transition<C>(txn: &C, t: &StateTransition) -> Result<(), errors::Error>
+where
+    C: sea_orm::ConnectionTrait,
+{
+    alert_state_transitions::ActiveModel {
+        alert_id: Set(t.alert_id.clone()),
+        group_key: Set(t.group_key.clone()),
+        from_outcome: Set(t.from_outcome.as_ref().map(|o| o.to_i32())),
+        to_outcome: Set(t.to_outcome.to_i32()),
+        from_level: Set(t.from_level.map(|l| l.to_i32())),
+        to_level: Set(t.to_level.map(|l| l.to_i32())),
+        at: Set(t.at),
+        value: Set(t.value),
+        group_labels: Set(t.group_labels.clone()),
+        ..Default::default()
+    }
+    .insert(txn)
+    .await?;
     Ok(())
 }
 

@@ -268,7 +268,15 @@ pub fn delivery_success_update(
     // a live silence and let the group page early. Taking the later of the two
     // makes commit order irrelevant — and `None` (silence = 0) is the earliest
     // window, not the newest, so it cannot wipe a live one.
+    //
+    // The floor applies only to SIBLING successes — deliveries of the same
+    // level, which are the ones that can race. An ESCALATION is a different
+    // delivery: if silence was shortened, a Warning window computed under the
+    // old setting must not outlive the Critical page that supersedes it, so an
+    // escalation establishes its own window outright.
+    let same_level_sibling = current.last_notified_level == Some(episode.level);
     next.silenced_until = match (current.silenced_until, candidate) {
+        _ if !same_level_sibling => candidate,
         (Some(existing), Some(new)) => Some(existing.max(new)),
         (Some(existing), None) => Some(existing),
         (None, new) => new,
@@ -1681,6 +1689,34 @@ mod tests {
                 notified_at_enqueue: (Some(AlertLevel::Warning), Some(9_999)),
             })
         );
+    }
+
+    #[test]
+    fn test_an_escalation_establishes_its_own_window() {
+        // The floor exists for sibling successes racing each other, not for a
+        // delivery at a NEW level. If silence was shortened from 60m to 10m, a
+        // Warning window computed under the old setting must not outlive the
+        // Critical page that supersedes it — the group would stay silent long
+        // past when the operator asked to hear about it again.
+        let since = 1_000 * SEC;
+        let row = state(
+            &key_of("a"),
+            AlertLevel::Critical,
+            since,
+            Some(AlertLevel::Warning),          // last delivered at Warning...
+            Some(since + 60 * MIN),             // ...under the old, longer silence
+        );
+
+        let updated =
+            delivery_success_update(&row, episode(AlertLevel::Critical, since), 10, since + 5 * MIN)
+                .expect("current episode");
+
+        assert_eq!(
+            updated.silenced_until,
+            Some(since + 5 * MIN + 10 * MIN),
+            "an escalation resets the window rather than inheriting the old one"
+        );
+        assert_eq!(updated.last_notified_level, Some(AlertLevel::Critical));
     }
 
     #[test]
