@@ -2749,6 +2749,8 @@ async fn widen_varchar_column(
         format!("ALTER TABLE IF EXISTS {table} ALTER COLUMN {column} TYPE VARCHAR({target_width})");
     if let Err(e) = sqlx::query(&sql).execute(pool).await {
         log::warn!("[POSTGRES] Failed to widen {column} column for {table}: {e}");
+    } else {
+        log::info!("[POSTGRES] Widened {column} column for {table} to VARCHAR({target_width})");
     }
     Ok(())
 }
