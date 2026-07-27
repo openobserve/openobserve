@@ -86,19 +86,26 @@ pub async fn run() -> Result<(), anyhow::Error> {
         });
     }
 
+    #[cfg(feature = "enterprise")]
+    let mut drain_backoff_ms = 50u64; // Start with 50ms backoff
     loop {
-        if cluster::is_offline() {
-            break;
-        }
-        tokio::time::sleep(tokio::time::Duration::from_secs(
-            get_config().limit.file_push_interval,
-        ))
-        .await;
-
         #[cfg(feature = "enterprise")]
         let is_draining = o2_enterprise::enterprise::drain::is_draining();
         #[cfg(not(feature = "enterprise"))]
         let is_draining = false;
+
+        if !is_draining {
+            // Normal operation: sleep between snapshots
+            if cluster::is_offline() {
+                break;
+            }
+            tokio::time::sleep(tokio::time::Duration::from_secs(
+                get_config().limit.file_push_interval,
+            ))
+            .await;
+        } else {
+            log::info!("[INGESTER:PACK:JOB] Draining mode active, processing segments immediately");
+        }
 
         // check if db is available, skip this iteration to avoid generating
         // orphaned files in object store when db is down
@@ -110,11 +117,9 @@ pub async fn run() -> Result<(), anyhow::Error> {
         }
 
         let pending = ingester::pack::get_pending_streams().await;
-        if pending.is_empty() {
-            continue;
-        }
         let cfg = get_config();
-        for ps in pending {
+        for ps in pending.into_iter() {
+            // when draining, flush everything regardless of the thresholds
             if !is_draining && !should_flush(&ps, &cfg) {
                 continue;
             }
@@ -129,6 +134,23 @@ pub async fn run() -> Result<(), anyhow::Error> {
             if let Err(e) = tx.send(ps).await {
                 log::error!("[INGESTER:PACK:JOB] error sending stream to move: {e}");
             }
+        }
+
+        #[cfg(feature = "enterprise")]
+        if is_draining {
+            // If draining and no more segments to process, we can exit
+            let (pending_streams, _) = ingester::pack::get_segment_index_stats().await;
+            let processing_count = PROCESSING_STREAMS.read().await.len();
+            if pending_streams == 0 && processing_count == 0 {
+                log::info!(
+                    "[INGESTER:PACK:JOB] Draining complete, all pack segments uploaded to S3"
+                );
+                break;
+            }
+            // Backoff to avoid tight loop while draining
+            tokio::time::sleep(tokio::time::Duration::from_millis(drain_backoff_ms)).await;
+            // Exponential backoff up to 1 second
+            drain_backoff_ms = (drain_backoff_ms * 2).min(1000);
         }
     }
     log::info!("[INGESTER:PACK:JOB] job::files::pack is stopped");
