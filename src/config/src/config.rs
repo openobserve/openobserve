@@ -1351,6 +1351,8 @@ pub struct Limit {
     pub query_index_thread_num: usize,
     #[env_config(name = "ZO_FILE_DOWNLOAD_THREAD_NUM", default = 0)]
     pub file_download_thread_num: usize,
+    #[env_config(name = "ZO_FILE_DOWNLOAD_MIN_RECORDS", default = 100)]
+    pub file_download_min_records: i64,
     #[env_config(name = "ZO_FILE_DOWNLOAD_PRIORITY_QUEUE_THREAD_NUM", default = 0)]
     pub file_download_priority_queue_thread_num: usize,
     #[env_config(name = "ZO_FILE_DOWNLOAD_PRIORITY_QUEUE_WINDOW_SECS", default = 3600)]
@@ -1655,6 +1657,12 @@ pub struct Compact {
     pub enabled: bool,
     #[env_config(name = "ZO_COMPACT_INTERVAL", default = 10)] // seconds
     pub interval: u64,
+    #[env_config(
+        name = "ZO_COMPACT_DATA_RETENTION_INTERVAL",
+        default = 3600,
+        help = "Interval in seconds for the data retention job, default is 3600. Retention works at day granularity, so it doesn't need to run at ZO_COMPACT_INTERVAL"
+    )] // seconds
+    pub data_retention_interval: u64,
     #[env_config(name = "ZO_COMPACT_OLD_DATA_INTERVAL", default = 3600)] // seconds
     pub old_data_interval: u64,
     #[env_config(name = "ZO_COMPACT_STRATEGY", default = "file_time")]
@@ -1770,6 +1778,10 @@ pub struct MemoryCache {
     pub gc_size: usize,
     #[env_config(name = "ZO_MEMORY_CACHE_GC_INTERVAL", default = 60)] // seconds
     pub gc_interval: u64,
+    // Days, files with data older than this will not be downloaded into the cache,
+    // queries read them directly from object storage. default 0 means no limit
+    #[env_config(name = "ZO_MEMORY_CACHE_MAX_AGE_DAYS", default = 0)]
+    pub max_age_days: i64,
     #[env_config(name = "ZO_MEMORY_CACHE_SKIP_DISK_CHECK", default = false)]
     pub skip_disk_check: bool,
     // MB, default is 50% of system memory
@@ -1808,6 +1820,10 @@ pub struct DiskCache {
     pub gc_size: usize,
     #[env_config(name = "ZO_DISK_CACHE_GC_INTERVAL", default = 60)] // seconds
     pub gc_interval: u64,
+    // Days, files with data older than this will not be downloaded into the cache,
+    // queries read them directly from object storage. default 0 means no limit
+    #[env_config(name = "ZO_DISK_CACHE_MAX_AGE_DAYS", default = 0)]
+    pub max_age_days: i64,
     #[env_config(name = "ZO_DISK_CACHE_MULTI_DIR", default = "")] // dir1,dir2,dir3...
     pub multi_dir: String,
 }
@@ -2972,6 +2988,9 @@ fn check_compact_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.compact.delete_files_delay_hours = 2;
     }
 
+    if cfg.compact.data_retention_interval < 1 {
+        cfg.compact.data_retention_interval = 3600;
+    }
     if cfg.compact.old_data_interval < 1 {
         cfg.compact.old_data_interval = 3600;
     }
