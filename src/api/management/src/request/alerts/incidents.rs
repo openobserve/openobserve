@@ -800,10 +800,40 @@ pub async fn get_incident_rca_history(
 /// Get incident events timeline
 #[cfg(feature = "enterprise")]
 pub async fn get_incident_events(Path((org_id, incident_id)): Path<(String, String)>) -> Response {
-    match infra::table::incident_events::get(&org_id, &incident_id).await {
-        Ok(events) => MetaHttpResponse::json(serde_json::json!({ "events": events })),
-        Err(e) => MetaHttpResponse::internal_error(format!("Failed to get events: {e}")),
+    let events = match infra::table::incident_events::get(&org_id, &incident_id).await {
+        Ok(events) => events,
+        Err(e) => return MetaHttpResponse::internal_error(format!("Failed to get events: {e}")),
+    };
+
+    // Self-heal timelines emptied by the pre-fix read/write cycle (releases up to v0.91.x).
+    // Repairing lazily on read avoids a migration that would rewrite every incident row;
+    // an empty timeline is cheap to inspect and, for healthy incidents, is a normal state
+    // that reconstruct_if_empty leaves alone once there is nothing to rebuild.
+    if events.is_empty() {
+        match infra::table::incident_events::reconstruct_if_empty(&org_id, &incident_id).await {
+            Ok(Some(_)) => match infra::table::incident_events::get(&org_id, &incident_id).await {
+                Ok(rebuilt) => {
+                    return MetaHttpResponse::json(serde_json::json!({
+                        "events": rebuilt,
+                        // Flags that the timeline was rebuilt from incident/alert rows and is
+                        // missing anything that lived only in the lost blob (comments,
+                        // acknowledgements, RCA activity).
+                        "partial_reconstruction": true,
+                    }));
+                }
+                Err(e) => {
+                    return MetaHttpResponse::internal_error(format!("Failed to get events: {e}"));
+                }
+            },
+            Ok(None) => {}
+            // Repair is best-effort: a failure here must not fail the read.
+            Err(e) => {
+                log::warn!("[INCIDENTS] timeline reconstruction failed for {incident_id}: {e}");
+            }
+        }
     }
+
+    MetaHttpResponse::json(serde_json::json!({ "events": events }))
 }
 
 /// Get incident events timeline (OSS)
