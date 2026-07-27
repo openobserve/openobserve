@@ -529,8 +529,20 @@ watch(
 // `insufficient` for that phantom agent, the view drops to the slow raw-sample
 // bootstrap fallback, and the KPI cards render STALE cross-org numbers. Reset on
 // org change too, so the compare view never queries an agent from another org.
+//
+// The STREAM is likewise an identity dimension: every compare query runs
+// `FROM "<effectiveStream>"` and each stream carries its own agents/versions.
+// Switching stream mid-compare left the comparison pinned to the OLD stream's
+// agent pair (which may not exist in the new stream) — so reset on stream change
+// too. The user re-enters compare for an agent that actually lives in the new
+// stream.
 watch(
-  [selectedAgentName, selectedEnv, () => store.state.selectedOrganization?.identifier],
+  [
+    selectedAgentName,
+    selectedEnv,
+    effectiveStream,
+    () => store.state.selectedOrganization?.identifier,
+  ],
   () => {
     if (compareMode.value) exitCompareMode();
   },
@@ -985,10 +997,12 @@ defineExpose({
   compareDateDisabled,
   versionCompare,
   // Exposed for tests: compareMode + the cascade identity refs so the
-  // auto-exit-on-agent-change behavior is assertable.
+  // auto-exit-on-identity-change behavior (agent, env, stream) is assertable.
   compareMode,
   selectedAgentName,
   selectedEnv,
+  activeStream,
+  filterMode,
 });
 
 onMounted(() => {

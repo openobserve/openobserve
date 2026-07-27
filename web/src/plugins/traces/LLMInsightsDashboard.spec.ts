@@ -349,6 +349,33 @@ describe("LLMInsightsDashboard — onStreamChange", () => {
     );
     expect(localStorage.getItem(STREAM_LS_KEY)).toBe("other");
   });
+
+  // Stream is an identity dimension: the compare A/B pair belongs to the OLD
+  // stream's agents, so switching stream must exit compare mode (otherwise the
+  // comparison lingers on agents that may not exist in the new stream).
+  it("exits compare mode when the active stream changes (stream mode)", async () => {
+    const wrapper = mountDashboard();
+    await flushPromises();
+    // Stream mode: effectiveStream follows the page stream picker (activeStream).
+    // (In agent mode effectiveStream follows the agent's source_stream, which the
+    // selectedAgentName watcher already covers.)
+    (wrapper.vm as any).filterMode = "stream";
+    (wrapper.vm as any).activeStream = "start-stream";
+    await wrapper.vm.$nextTick();
+    await flushPromises();
+    // Enter compare AFTER the mode/stream have settled, so the identity watcher
+    // isn't fired by the setup itself.
+    (wrapper.vm as any).compareMode = true;
+    await wrapper.vm.$nextTick();
+    expect((wrapper.vm as any).compareMode).toBe(true);
+
+    // Now the real action: switch stream → compare mode must exit.
+    (wrapper.vm as any).activeStream = "another-stream";
+    await wrapper.vm.$nextTick();
+    await flushPromises();
+
+    expect((wrapper.vm as any).compareMode).toBe(false);
+  });
 });
 
 // ===========================================================================
