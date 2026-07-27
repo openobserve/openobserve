@@ -51,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
               ?.source
           "
-          :draggable="true"
+          :draggable="isDragArmed()"
           @dragstart="
             onFieldDragStart(
               $event,
@@ -64,7 +64,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             variant="ghost"
             size="icon-chip"
-            class="!w-4 cursor-grab"
+            class="!w-4 !cursor-grab"
+            @mousedown="armDrag()"
             :data-test="`dashboard-source-item-${sourceLabel}-drag`"
           >
             <template #icon-left>
@@ -176,7 +177,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
               ?.target
           "
-          :draggable="true"
+          :draggable="isDragArmed()"
           @dragstart="
             onFieldDragStart(
               $event,
@@ -189,7 +190,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             variant="ghost"
             size="icon-chip"
-            class="!w-4 cursor-grab"
+            class="!w-4 !cursor-grab"
+            @mousedown="armDrag()"
             :data-test="`dashboard-target-item-${targetLabel}-drag`"
           >
             <template #icon-left>
@@ -300,7 +302,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
               ?.value
           "
-          :draggable="true"
+          :draggable="isDragArmed()"
           @dragstart="
             onFieldDragStart(
               $event,
@@ -313,7 +315,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             variant="ghost"
             size="icon-chip"
-            class="!w-4 cursor-grab"
+            class="!w-4 !cursor-grab"
+            @mousedown="armDrag()"
             :data-test="`dashboard-value-item-${valueLabel}-drag`"
           >
             <template #icon-left>
@@ -402,6 +405,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref, reactive, watch, computed, inject } from "vue";
 import { useI18n } from "vue-i18n";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
+import useDragHandle from "@/composables/useDragHandle";
 import { getImageURL } from "../../../utils/zincutils";
 import useNotifications from "@/composables/useNotifications";
 import DashboardFiltersOption from "@/views/Dashboards/addPanel/DashboardFiltersOption.vue";
@@ -612,6 +616,9 @@ export default defineComponent({
     const onDragEnd = () => {
       cleanupDraggingFields();
     };
+
+    // Handle-gated drag: chips drag only from the grip, not the label.
+    const { arm: armDrag, isArmed: isDragArmed } = useDragHandle();
     const Hint = computed(() => {
       switch (dashboardPanelData.data.type) {
         case "sankey":
@@ -686,6 +693,8 @@ export default defineComponent({
       onDragStart,
       onDragEnd,
       onDragOver,
+      armDrag,
+      isDragArmed,
       expansionItems,
       Hint,
       promqlMode,

@@ -81,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="axis-field border-border-default border-s-badge-indigo-ol-border bg-surface-panel overflow-hidden border border-s-2"
                 radius="sm"
                 :divided="false"
-                :draggable="true"
+                :draggable="isDragArmed('x-' + index)"
                 @dragstart="onFieldDragStart($event, itemX, 'x', Number(index))"
                 @drop="onDrop($event, 'x', Number(index))"
                 @dragenter="onDragEnter($event, 'x', index)"
@@ -89,7 +89,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OButton
                   variant="ghost"
                   size="icon-chip"
-                  class="!w-4 cursor-grab"
+                  class="!w-4 !cursor-grab"
+                  @mousedown="armDrag('x-' + index)"
                   :data-test="`dashboard-x-item-${itemX?.alias}-drag`"
                 >
                   <template #icon-left>
@@ -245,7 +246,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="axis-field border-border-default border-s-badge-orange-ol-border bg-surface-panel overflow-hidden border border-s-2"
                 radius="sm"
                 :divided="false"
-                :draggable="true"
+                :draggable="isDragArmed('breakdown-' + index)"
                 @dragstart="onFieldDragStart($event, itemB, 'breakdown', Number(index))"
                 @drop="onDrop($event, 'breakdown', Number(index))"
                 @dragenter="onDragEnter($event, 'breakdown', index)"
@@ -253,7 +254,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OButton
                   variant="ghost"
                   size="icon-chip"
-                  class="!w-4 cursor-grab"
+                  class="!w-4 !cursor-grab"
+                  @mousedown="armDrag('breakdown-' + index)"
                   :data-test="`dashboard-b-item-${itemB?.alias}-drag`"
                 >
                   <template #icon-left>
@@ -379,7 +381,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="axis-field border-border-default border-s-badge-success-ol-border bg-surface-panel overflow-hidden border border-s-2"
             radius="sm"
             :divided="false"
-            :draggable="true"
+            :draggable="isDragArmed('y-' + index)"
             @dragstart="onFieldDragStart($event, itemY, 'y', Number(index))"
             @drop="onDrop($event, 'y', Number(index))"
             @dragenter="onDragEnter($event, 'y', index)"
@@ -388,6 +390,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="ghost"
               size="icon-chip"
               class="!w-4 cursor-grab"
+              @mousedown="armDrag('y-' + index)"
               :data-test="`dashboard-y-item-${itemY?.alias}-drag`"
             >
               <template #icon-left>
@@ -512,7 +515,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="axis-field border-border-default border-s-badge-success-ol-border bg-surface-panel overflow-hidden border border-s-2"
               radius="sm"
               :divided="false"
-              :draggable="true"
+              :draggable="isDragArmed('z-' + index)"
               @dragstart="onFieldDragStart($event, itemZ, 'z', Number(index))"
               @drop="onDrop($event, 'z', Number(index))"
               @dragenter="onDragEnter($event, 'z', index)"
@@ -521,6 +524,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="ghost"
                 size="icon-chip"
                 class="!w-4 cursor-grab"
+                @mousedown="armDrag('z-' + index)"
                 :data-test="`dashboard-z-item-${itemZ?.alias}-drag`"
               >
                 <template #icon-left>
@@ -629,6 +633,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref, reactive, watch, computed, inject, nextTick, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
+import useDragHandle from "@/composables/useDragHandle";
 import { getImageURL } from "../../../utils/zincutils";
 import DashboardGeoMapsQueryBuilder from "./DashboardGeoMapsQueryBuilder.vue";
 import DashboardMapsQueryBuilder from "./DashboardMapsQueryBuilder.vue";
@@ -1103,6 +1108,9 @@ export default defineComponent({
       cleanupDraggingFields();
     };
 
+    // Handle-gated drag: chips drag only from the grip, not the label.
+    const { arm: armDrag, isArmed: isDragArmed } = useDragHandle();
+
     const xAxisHint = computed(() => {
       switch (dashboardPanelData.data.type) {
         case "pie":
@@ -1529,6 +1537,8 @@ export default defineComponent({
       bLabel,
       onFieldDragStart,
       onDragEnd,
+      armDrag,
+      isDragArmed,
       currentXLabel,
       currentYLabel,
       labelWidthClass,
