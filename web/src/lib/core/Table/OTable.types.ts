@@ -458,14 +458,19 @@ export interface OTableSlots<TData = any> {
     row: TData;
     column: OTableColumnDef<TData>;
     value: any;
-    active: boolean;
+    active?: boolean;
   }) => any;
   /** Per-column cell slot (`#cell-<columnId>`) — scoped to the plain row data
-   *  (`row.original`) + row index. The union also admits the `cell-hover-actions`
-   *  shape so that reserved key stays assignable to this index signature. */
+   *  (`row.original`) + row index. `active` is only ever passed to the reserved
+   *  `cell-hover-actions` key, which this signature has to admit. */
   [key: `cell-${string}`]:
-    | ((props: { row: TData; column: OTableColumnDef<TData>; value: any; index: number }) => any)
-    | ((props: { row: TData; column: OTableColumnDef<TData>; value: any; active: boolean }) => any)
+    | ((props: {
+        row: TData;
+        column: OTableColumnDef<TData>;
+        value: any;
+        index: number;
+        active?: boolean;
+      }) => any)
     | undefined;
   /** Custom header content */
   "header-actions"?: () => any;

@@ -518,29 +518,5 @@ export default defineComponent({
     max-height: none !important;
     overflow: hidden !important;
   }
-
-  .table-wrapper :deep(.my-sticky-virtscroll-table) {
-    height: auto !important;
-    overflow: visible !important;
-  }
-
-  .table-wrapper :deep(.my-sticky-virtscroll-table thead tr th) {
-    position: static !important;
-    top: auto !important;
-  }
-
-  .table-wrapper :deep(.my-sticky-virtscroll-table .table-container) {
-    overflow: visible !important;
-    height: auto !important;
-  }
-
-  .table-wrapper :deep(.my-sticky-virtscroll-table [data-test="dashboard-table-pagination"]) {
-    position: absolute !important;
-    bottom: 0 !important;
-    left: 0 !important;
-    right: 0 !important;
-    background-color: var(--color-surface-base) !important;
-    z-index: 1 !important;
-  }
 }
 </style>

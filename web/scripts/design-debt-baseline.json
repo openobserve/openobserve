@@ -1,6 +1,6 @@
 {
   "totals": {
-    "rawVarInComponent": 539,
+    "rawVarInComponent": 532,
     "darkMechanism": 2,
     "stylePxUnit": 84,
     "unscopedStyle": 1
@@ -89,9 +89,6 @@
     },
     "components/settings/Nodes.vue": {
       "rawVarInComponent": 6
-    },
-    "components/TenstackTable.vue": {
-      "rawVarInComponent": 3
     },
     "components/ThemeSwitcher.vue": {
       "darkMechanism": 1
@@ -210,14 +207,14 @@
     "plugins/logs/SearchResult.vue": {
       "rawVarInComponent": 16
     },
-    "plugins/logs/TenstackTable.vue": {
-      "rawVarInComponent": 5
-    },
     "plugins/pipelines/CustomNode.vue": {
       "rawVarInComponent": 10
     },
     "plugins/traces/components/TraceErrorTab.vue": {
       "rawVarInComponent": 14
+    },
+    "plugins/traces/components/TracesSearchResultList.vue": {
+      "rawVarInComponent": 1
     },
     "plugins/traces/Index.vue": {
       "rawVarInComponent": 2

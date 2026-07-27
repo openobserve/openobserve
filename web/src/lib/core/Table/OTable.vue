@@ -20,6 +20,7 @@ import {
   type OTableProps,
   type OTableEmits,
   type OTableSlots,
+  type OTableColumnDef,
 } from "./OTable.types";
 
 import { useTableCore } from "./composables/useTableCore";

@@ -357,7 +357,7 @@ import DimensionFiltersBar from "./DimensionFiltersBar.vue";
 import CorrelationEventHeader from "./CorrelationEventHeader.vue";
 import { timestampToTimezoneDate } from "@/utils/timezone";
 import { copyToClipboard } from "@/utils/clipboard";
-import type { ColumnDef } from "@tanstack/vue-table";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import { byString } from "@/utils/json";
 import { searchState } from "@/composables/useLogs/searchState";
@@ -843,7 +843,7 @@ const getColumnWidthHelper = (field: string): number => {
 };
 
 // Generate table columns dynamically from visible fields in custom order
-const tableColumns = computed<ColumnDef<any>[]>(() => {
+const tableColumns = computed<OTableColumnDef<any>[]>(() => {
   // Use the computed visibleFields
   const fields = visibleFields.value;
 

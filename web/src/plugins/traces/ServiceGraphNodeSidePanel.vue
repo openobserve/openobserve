@@ -329,7 +329,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         operationName: row.operation,
                         callerService: isInferred ? row.caller : undefined,
                         errorsOnly: column.id === 'errors',
-                        minDurationMicros: isDurationColumn(column.id) ? row[column.id] : undefined,
+                        minDurationMicros: isDurationColumn(column.id)
+                          ? (row as Record<string, any>)[column.id]
+                          : undefined,
                       })
                     "
                   >

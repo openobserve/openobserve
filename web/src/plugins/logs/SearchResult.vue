@@ -322,7 +322,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="histogram-skeleton__y-label" style="width: 2.25rem" />
                 <div class="histogram-skeleton__y-label" style="width: 1rem" />
               </div>
-              <div class="histogram-skeleton__plot">
+              <div class="histogram-skeleton__plot border-card-glass-border border-b border-l">
                 <div class="histogram-skeleton__bars">
                   <div
                     v-for="h in skeletonBarHeights"
@@ -335,7 +335,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <!-- x-axis labels row -->
             <div class="histogram-skeleton__x-axis">
-              <div v-for="i in 6" :key="i" class="histogram-skeleton__x-label" />
+              <div v-for="i in 6" :key="i" class="histogram-skeleton__x-label bg-skeleton-base" />
             </div>
           </div>
 
@@ -711,6 +711,7 @@ import {
   provide,
 } from "vue";
 import { copyToClipboard } from "@/utils/clipboard";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
 import { useI18n } from "vue-i18n";
@@ -1781,8 +1782,8 @@ export default defineComponent({
       scrollContainerRef.value?.scrollTo({ top: value });
     };
 
-    const getColumns = computed(() => {
-      return searchObj.data?.resultGrid?.columns?.filter((col: any) => !!col.id);
+    const getColumns = computed<OTableColumnDef<any>[]>(() => {
+      return ((searchObj.data?.resultGrid?.columns as any[]) ?? []).filter((col: any) => !!col.id);
     });
 
     const getPartitionPaginations = computed(() => {
@@ -2265,12 +2266,12 @@ export default defineComponent({
 .logs-results-otable :deep(td[data-test^="o2-table-cell-"]) {
   font-family: var(--font-mono);
   font-size: var(--text-xs);
-  /* Cap the line box so a single log line can't push the row past 20px. */
+  /* Cap the line box so a single log line can't grow the row height. */
   line-height: 1.125rem;
 }
 
-/* The default expand button is 24px, which floors every log row at 24px
-   regardless of :row-height and costs a line per screen. */
+/* The default expand button sets a floor under every log row height
+   regardless of :row-height, which costs a line per screen. */
 .logs-results-otable :deep([data-test^="o2-table-expand-"]) {
   height: 1.125rem !important;
   width: 1.125rem !important;
@@ -2520,8 +2521,6 @@ export default defineComponent({
     min-width: 0;
     display: flex;
     flex-direction: column;
-    border-left: 1px solid var(--color-card-glass-border);
-    border-bottom: 1px solid var(--color-card-glass-border);
   }
 
   &__bars {
@@ -2571,7 +2570,6 @@ export default defineComponent({
     width: 2.25rem;
     height: 0.4375rem;
     border-radius: 0.125rem;
-    background-color: var(--color-skeleton-base);
   }
 }
 
