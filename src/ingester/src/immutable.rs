@@ -86,15 +86,11 @@ pub async fn read_from_immutable(
     Ok((ids, batches))
 }
 
-/// Delete a file, treating NotFound as success: the wal/lock file may already
-/// be deleted by the startup recovery or replay tasks.
-async fn remove_file_if_exists(path: &PathBuf) -> Result<()> {
+/// Delete a file. Returns whether the file existed (false = already deleted).
+async fn remove_file_if_exists(path: &PathBuf) -> Result<bool> {
     match fs::remove_file(path).await {
-        Ok(_) => Ok(()),
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-            log::warn!("file already deleted: {}", path.display());
-            Ok(())
-        }
+        Ok(_) => Ok(true),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(false),
         Err(e) => Err(e).context(DeleteFileSnafu { path }),
     }
 }
@@ -136,8 +132,23 @@ impl Immutable {
         fs::write(&done_path, lock_data.as_bytes())
             .await
             .context(WriteDataSnafu)?;
-        // 3. delete wal file
-        remove_file_if_exists(wal_path).await?;
+        // 3. delete wal file. if it is already gone, another persist (the wal
+        // replay task) won the race and the data is already persisted:
+        // discard our dumped files instead of renaming them, otherwise the
+        // data would be duplicated
+        if !remove_file_if_exists(wal_path).await? {
+            log::warn!(
+                "wal file {} already deleted by another persist, discarding {} dumped files",
+                wal_path.display(),
+                paths.len()
+            );
+            for (path, stat) in paths {
+                persist_stat += stat;
+                let _ = fs::remove_file(&path).await;
+            }
+            remove_file_if_exists(&done_path).await?;
+            return Ok(persist_stat);
+        }
         // 4. rename the tmp files to parquet files
         for (path, stat) in paths {
             persist_stat += stat;
@@ -190,8 +201,20 @@ impl Immutable {
         fs::write(&done_path, lock_data.as_bytes())
             .await
             .context(WriteDataSnafu)?;
-        // 3. delete wal file
-        remove_file_if_exists(wal_path).await?;
+        // 3. delete wal file. if it is already gone, another persist won the
+        // race: discard our tmp packs to avoid duplicating the data
+        if !remove_file_if_exists(wal_path).await? {
+            log::warn!(
+                "wal file {} already deleted by another persist, discarding {} tmp pack files",
+                wal_path.display(),
+                finished.len()
+            );
+            for pack in finished.iter() {
+                let _ = fs::remove_file(&pack.tmp_path).await;
+            }
+            remove_file_if_exists(&done_path).await?;
+            return Ok(persist_stat);
+        }
         // 4. rename the tmp files to pack files and register the segments
         for pack in finished.iter() {
             fs::rename(&pack.tmp_path, &pack.path)
