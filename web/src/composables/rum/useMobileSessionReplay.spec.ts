@@ -48,11 +48,7 @@ describe("useMobileSessionReplay", () => {
     it("ignores malformed records without a numeric type/timestamp", () => {
       const tl = buildMobileTimeline([
         {
-          records: [
-            { type: 10 } as any,
-            null as any,
-            { type: 4, timestamp: 5, data: {} },
-          ],
+          records: [{ type: 10 } as any, null as any, { type: 4, timestamp: 5, data: {} }],
         },
       ]);
 
@@ -110,8 +106,16 @@ describe("useMobileSessionReplay", () => {
 
     it("seeds from the latest full snapshot at or before t", () => {
       const recs = [
-        { type: 10, timestamp: 0, data: { wireframes: [{ id: 1, x: 0, y: 0, width: 1, height: 1, type: "shape" }] } },
-        { type: 10, timestamp: 100, data: { wireframes: [{ id: 9, x: 0, y: 0, width: 1, height: 1, type: "shape" }] } },
+        {
+          type: 10,
+          timestamp: 0,
+          data: { wireframes: [{ id: 1, x: 0, y: 0, width: 1, height: 1, type: "shape" }] },
+        },
+        {
+          type: 10,
+          timestamp: 100,
+          data: { wireframes: [{ id: 9, x: 0, y: 0, width: 1, height: 1, type: "shape" }] },
+        },
       ];
 
       expect(wireframesAt(recs, 150).map((w) => w.id)).toEqual([9]);
@@ -153,7 +157,12 @@ describe("useMobileSessionReplay", () => {
 
     it("applies shape background, opacity and corner radius", () => {
       const s = wireframeStyle({
-        id: 1, x: 0, y: 0, width: 1, height: 1, type: "shape",
+        id: 1,
+        x: 0,
+        y: 0,
+        width: 1,
+        height: 1,
+        type: "shape",
         shapeStyle: { backgroundColor: "#fafafaff", opacity: 0.5, cornerRadius: 4 },
       });
 
@@ -164,7 +173,12 @@ describe("useMobileSessionReplay", () => {
 
     it("applies text font styles", () => {
       const s = wireframeStyle({
-        id: 1, x: 0, y: 0, width: 1, height: 1, type: "text",
+        id: 1,
+        x: 0,
+        y: 0,
+        width: 1,
+        height: 1,
+        type: "text",
         textStyle: { color: "#1c1c1eff", size: 20, family: "roboto" },
       });
 

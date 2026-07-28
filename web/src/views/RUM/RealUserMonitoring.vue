@@ -51,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           session detail page re-ran every query instead of showing the list already
           fetched. `include` decides what is retained; the element itself stays put.
         -->
-        <div class="flex-1 min-h-0 flex flex-col">
+        <div class="flex min-h-0 flex-1 flex-col">
           <keep-alive :include="CACHED_RUM_VIEWS">
             <component
               :is="Component"

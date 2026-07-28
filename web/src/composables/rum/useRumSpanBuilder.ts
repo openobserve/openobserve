@@ -18,15 +18,8 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import useStreams from "@/composables/useStreams";
 import searchService from "@/services/search";
-import {
-  rumField,
-  hasRumField,
-  rumFieldEqualsSql,
-} from "@/utils/rum/fields";
-import {
-  SPAN_KIND_CLIENT,
-  SPAN_KIND_UNSPECIFIED,
-} from "@/utils/traces/constants";
+import { rumField, hasRumField, rumFieldEqualsSql } from "@/utils/rum/fields";
+import { SPAN_KIND_CLIENT, SPAN_KIND_UNSPECIFIED } from "@/utils/traces/constants";
 
 const ACTION_PROXIMITY_MS = 10_000; // ±10s — actions beyond this are collapsed
 

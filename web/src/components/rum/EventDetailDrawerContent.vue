@@ -542,9 +542,7 @@ const fetchRelatedResources = async () => {
     relatedResources.value = res.data.hits || [];
 
     // Auto-select first resource with trace_id for trace correlation
-    const resourceWithTrace = relatedResources.value.find(
-      (r: any) => rumField(r, 'trace_id'),
-    );
+    const resourceWithTrace = relatedResources.value.find((r: any) => rumField(r, "trace_id"));
     if (resourceWithTrace) {
       selectedResourceWithTrace.value = resourceWithTrace;
     }
@@ -567,7 +565,7 @@ watch(
 
 const viewResourceDetails = (resource: any) => {
   // Update selected resource for trace correlation
-  if (rumField(resource, 'trace_id')) {
+  if (rumField(resource, "trace_id")) {
     selectedResourceWithTrace.value = resource;
   }
 
@@ -584,9 +582,7 @@ const navigateToSpecificTrace = (traceId: string) => {
   if (!traceId) return;
 
   // Find the resource with this trace_id to get timing information
-  const resource = relatedResources.value.find(
-    (r: any) => rumField(r, 'trace_id') === traceId,
-  );
+  const resource = relatedResources.value.find((r: any) => rumField(r, "trace_id") === traceId);
 
   // Use resource timing if available, otherwise use event timing
   const startTime = resource?.date

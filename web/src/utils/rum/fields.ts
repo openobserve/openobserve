@@ -44,10 +44,7 @@ export type RumInternalField =
   | "header";
 
 /** Preferred spelling first — new data wins when a row somehow carries both. */
-export const rumFieldNames = (field: string): [string, string] => [
-  `_o2_${field}`,
-  `_oo_${field}`,
-];
+export const rumFieldNames = (field: string): [string, string] => [`_o2_${field}`, `_oo_${field}`];
 
 /**
  * Read an internal field off an ingested row under either spelling.

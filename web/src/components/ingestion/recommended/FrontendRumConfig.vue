@@ -36,10 +36,7 @@ import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
-import type {
-  CardSubstitutions,
-  RichCardContent,
-} from "@/components/ingestion/setupCard/types";
+import type { CardSubstitutions, RichCardContent } from "@/components/ingestion/setupCard/types";
 import rumCard from "@/components/ingestion/setupCard/content/rum";
 import rumReactNativeCard from "@/components/ingestion/setupCard/content/rumReactNative";
 
@@ -103,8 +100,8 @@ const PLATFORMS: {
 /** Which platform's setup guide is shown. */
 const platform = ref<string>(PLATFORMS[0].id);
 
-const content = computed<RichCardContent>(
-  () => (PLATFORMS.find((p) => p.id === platform.value) ?? PLATFORMS[0]).build(),
+const content = computed<RichCardContent>(() =>
+  (PLATFORMS.find((p) => p.id === platform.value) ?? PLATFORMS[0]).build(),
 );
 
 // The renderer's subs drive detection (org) — RUM never exposes the Basic-auth

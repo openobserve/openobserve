@@ -257,7 +257,6 @@ function mountComponent(options: MountOptions = {}) {
 // Must import after mocks
 import PlayerTracesTab from "@/components/rum/PlayerTracesTab.vue";
 
-
 // The composable now asks the stream schema which trace-id namespaces exist (`_o2_` vs
 // `_oo_`) before building SQL, so getStream must be mocked or every call hangs.
 // Reports the legacy spelling, matching data ingested before the namespace migration.
@@ -525,10 +524,7 @@ describe("PlayerTracesTab", () => {
       // filteredViews ends up empty — component renders the empty state.
       mockSearch.mockResolvedValue({
         data: {
-          hits: [
-            createRumHit({ _trace_id: null }),
-            createRumHit({ _trace_id: "valid-trace" }),
-          ],
+          hits: [createRumHit({ _trace_id: null }), createRumHit({ _trace_id: "valid-trace" })],
         },
       });
 

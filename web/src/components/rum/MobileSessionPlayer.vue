@@ -114,8 +114,7 @@ function markerLeftPct(event: any): number {
 // Applied via a :style binding, so the token is reached by var() here (a
 // sanctioned raw-var site: JS-generated style values have no utility class).
 function markerColor(event: any): string {
-  if (event?.frustration_types?.length)
-    return "var(--color-badge-orange-solid-bg)"; // frustration
+  if (event?.frustration_types?.length) return "var(--color-badge-orange-solid-bg)"; // frustration
   if (event?.type === "error") return "var(--color-badge-error-solid-bg)"; // error
   return "var(--color-badge-teal-solid-bg)"; // action / view
 }
@@ -222,10 +221,10 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <section class="flex flex-col h-full" data-test="rum-mobile-replay-player">
+  <section class="flex h-full flex-col" data-test="rum-mobile-replay-player">
     <div
       v-if="!hasReplay"
-      class="flex items-center justify-center h-full text-text-secondary"
+      class="text-text-secondary flex h-full items-center justify-center"
       data-test="rum-mobile-replay-empty"
     >
       {{ t("rum.noSessionReplay") }}
@@ -234,7 +233,7 @@ onBeforeUnmount(() => {
     <template v-else>
       <div
         ref="stageRef"
-        class="relative flex-1 min-h-0 overflow-hidden bg-surface-base border-b border-card-glass-border"
+        class="bg-surface-base border-card-glass-border relative min-h-0 flex-1 overflow-hidden border-b"
       >
         <!-- Canvas is the recorded device screen — deliberately white in both
              themes, since it reproduces the app's own background, not our chrome. -->
@@ -258,18 +257,18 @@ onBeforeUnmount(() => {
       </div>
 
       <!-- Controls, matching the browser session player. -->
-      <div class="pt-2 px-3 pb-3">
+      <div class="px-3 pt-2 pb-3">
         <div
-          class="relative w-full h-1.25 mt-2 mb-3 bg-card-glass-border cursor-pointer"
+          class="bg-card-glass-border relative mt-2 mb-3 h-1.25 w-full cursor-pointer"
           data-test="rum-mobile-replay-playback-bar"
           @click="onBarClick"
         >
           <div
-            class="absolute top-0 left-0 h-full bg-accent transition-[width] duration-100 ease-linear"
+            class="bg-accent absolute top-0 left-0 h-full transition-[width] duration-100 ease-linear"
             :style="{ width: `${progressPct}%` }"
           />
           <div
-            class="absolute -bottom-1.25 w-0.5 h-3.75 -ml-px bg-accent transition-[left] duration-100 ease-linear"
+            class="bg-accent absolute -bottom-1.25 -ml-px h-3.75 w-0.5 transition-[left] duration-100 ease-linear"
             :style="{ left: `${progressPct}%` }"
           />
           <div
@@ -279,8 +278,8 @@ onBeforeUnmount(() => {
             class="absolute -bottom-1.25 -ml-px cursor-pointer"
             :class="
               event.frustration_types?.length
-                ? 'w-[0.1875rem] h-4.5 shadow-[0_0_0.25rem_var(--color-badge-orange-solid-bg)]'
-                : 'w-0.5 h-3.75'
+                ? 'h-4.5 w-[0.1875rem] shadow-[0_0_0.25rem_var(--color-badge-orange-solid-bg)]'
+                : 'h-3.75 w-0.5'
             "
             :style="{ left: `${markerLeftPct(event)}%`, background: markerColor(event) }"
             :title="markerTooltip(event)"
@@ -292,7 +291,7 @@ onBeforeUnmount(() => {
             <OIcon
               name="replay-10"
               size="md"
-              class="cursor-pointer text-text-body hover:text-accent"
+              class="text-text-body hover:text-accent cursor-pointer"
               :aria-label="t('rum.seek')"
               data-test="rum-mobile-replay-back-btn"
               @click="skip('backward')"
@@ -300,7 +299,7 @@ onBeforeUnmount(() => {
             <OIcon
               :name="playing ? 'pause-circle-filled' : 'play-circle-filled'"
               size="lg"
-              class="cursor-pointer text-text-body hover:text-accent"
+              class="text-text-body hover:text-accent cursor-pointer"
               :aria-label="playing ? t('common.pause') : t('common.play')"
               data-test="rum-mobile-replay-play-btn"
               @click="togglePlay"
@@ -308,12 +307,15 @@ onBeforeUnmount(() => {
             <OIcon
               name="forward-10"
               size="md"
-              class="cursor-pointer text-text-body hover:text-accent"
+              class="text-text-body hover:text-accent cursor-pointer"
               :aria-label="t('rum.seek')"
               data-test="rum-mobile-replay-forward-btn"
               @click="skip('forward')"
             />
-            <span class="ml-2 text-text-body tabular-nums whitespace-nowrap" data-test="rum-mobile-replay-time">
+            <span
+              class="text-text-body ml-2 whitespace-nowrap tabular-nums"
+              data-test="rum-mobile-replay-time"
+            >
               {{ fmt(playhead) }} / {{ fmt(timeline.duration) }}
             </span>
           </div>

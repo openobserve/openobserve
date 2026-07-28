@@ -56,12 +56,10 @@ export interface RumReactNativeCardSubs {
 }
 
 /** Base URL the core SDK appends `/rum` and `/logs` to. */
-export const rumBaseUrl = (subs: RumReactNativeCardSubs) =>
-  `${subs.endpoint}/rum/v1/${subs.org}`;
+export const rumBaseUrl = (subs: RumReactNativeCardSubs) => `${subs.endpoint}/rum/v1/${subs.org}`;
 
 /** Full URL Session Replay posts to verbatim. */
-export const replayUrl = (subs: RumReactNativeCardSubs) =>
-  `${rumBaseUrl(subs)}/replay`;
+export const replayUrl = (subs: RumReactNativeCardSubs) => `${rumBaseUrl(subs)}/replay`;
 
 // ── install ──────────────────────────────────────────────────────────────────
 
@@ -170,9 +168,7 @@ const navigationRef = useRef(null);
 
 // ── card ─────────────────────────────────────────────────────────────────────
 
-export default function rumReactNativeCard(
-  subs: RumReactNativeCardSubs,
-): RichCardContent {
+export default function rumReactNativeCard(subs: RumReactNativeCardSubs): RichCardContent {
   const nodeIcon = getImageURL("images/ingestion/nodejs.svg");
 
   const installVariants: RichCardStepVariant[] = [
@@ -271,14 +267,7 @@ export default function rumReactNativeCard(
         chip: { kind: "traces", label: "RUM" },
         completeOn: "detect",
         detectionAnchor: true,
-        pills: [
-          "Sessions",
-          "Views",
-          "User Actions",
-          "Errors",
-          "Crashes",
-          "Session Replay",
-        ],
+        pills: ["Sessions", "Views", "User Actions", "Errors", "Crashes", "Session Replay"],
       },
     ],
     // The SDK stamps `source` on every event, so filtering on it confirms the

@@ -33,11 +33,7 @@ vi.mock("@/utils/zincutils", () => ({
   getImageURL: vi.fn((p: string) => `/mocked-asset/${p}`),
 }));
 
-import rumReactNativeCard, {
-  RUM_RN_SDK_VERSION,
-  rumBaseUrl,
-  replayUrl,
-} from "./rumReactNative";
+import rumReactNativeCard, { RUM_RN_SDK_VERSION, rumBaseUrl, replayUrl } from "./rumReactNative";
 import type { RumReactNativeCardSubs } from "./rumReactNative";
 import type { RichCardContent } from "../types";
 
@@ -412,18 +408,14 @@ describe("rumReactNativeCard builder", () => {
       const replay = card.steps.find((s) => s.id === "session-replay")!;
 
       expect(replay.code!.raw).toContain(replayUrl(BASE_SUBS));
-      expect(replay.code!.raw).toContain(
-        "customEndpoint: '" + replayUrl(BASE_SUBS) + "'",
-      );
+      expect(replay.code!.raw).toContain("customEndpoint: '" + replayUrl(BASE_SUBS) + "'");
     });
 
     it("does not use the bare rumBaseUrl as the SessionReplay customEndpoint", () => {
       const card = buildCard();
       const replay = card.steps.find((s) => s.id === "session-replay")!;
 
-      expect(replay.code!.raw).not.toContain(
-        `customEndpoint: '${rumBaseUrl(BASE_SUBS)}'`,
-      );
+      expect(replay.code!.raw).not.toContain(`customEndpoint: '${rumBaseUrl(BASE_SUBS)}'`);
     });
 
     it("reflects a different org/endpoint in the replay URL", () => {
@@ -435,9 +427,7 @@ describe("rumReactNativeCard builder", () => {
       const card = rumReactNativeCard(subs);
       const replay = card.steps.find((s) => s.id === "session-replay")!;
 
-      expect(replay.code!.raw).toContain(
-        "https://other.example.com/rum/v1/other-org/replay",
-      );
+      expect(replay.code!.raw).toContain("https://other.example.com/rum/v1/other-org/replay");
     });
 
     it("code.lang is 'tsx' with filename 'App.tsx'", () => {
@@ -463,9 +453,7 @@ describe("rumReactNativeCard builder", () => {
       const card = buildCard();
       const nav = card.steps.find((s) => s.id === "navigation")!;
 
-      expect(nav.code!.raw).toContain(
-        "OoRumReactNavigationTracking.startTrackingViews",
-      );
+      expect(nav.code!.raw).toContain("OoRumReactNavigationTracking.startTrackingViews");
     });
 
     it("does not depend on subs (identical raw code across orgs)", () => {
@@ -529,9 +517,7 @@ describe("rumReactNativeCard builder", () => {
     it("includes the 'RUM events arrive but there is no session replay' entry, and its answer mentions the replay URL", () => {
       const card = buildCard();
       const ts = card.extras!.troubleshooting as any[];
-      const entry = ts.find(
-        (e: any) => e.q === "RUM events arrive but there is no session replay",
-      );
+      const entry = ts.find((e: any) => e.q === "RUM events arrive but there is no session replay");
 
       expect(entry).toBeDefined();
       expect(entry.a).toContain(replayUrl(BASE_SUBS));

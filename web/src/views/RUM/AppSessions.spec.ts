@@ -893,24 +893,12 @@ describe("AppSessions.vue", () => {
       OTable: {
         template:
           '<div data-test="rum-sessions-table" v-bind="$attrs"><div v-for="row in data" :key="row.session_id"><slot name="cell-platform" :row="row" /></div></div>',
-        props: [
-          "data",
-          "columns",
-          "loading",
-          "rowKey",
-          "columnVisibility",
-          "getRowStatusColor",
-        ],
+        props: ["data", "columns", "loading", "rowKey", "columnVisibility", "getRowStatusColor"],
       },
       DateTime: {
         template:
           '<div data-test="date-time" v-bind="$attrs" @on:date-change="$emit(\'on:date-change\', $event)"></div>',
-        props: [
-          "autoApply",
-          "defaultType",
-          "defaultAbsoluteTime",
-          "defaultRelativeTime",
-        ],
+        props: ["autoApply", "defaultType", "defaultAbsoluteTime", "defaultRelativeTime"],
         emits: ["on:date-change"],
       },
       SyntaxGuide: { template: '<div data-test="syntax-guide"></div>' },
@@ -927,13 +915,11 @@ describe("AppSessions.vue", () => {
         emits: ["event-emitted"],
       },
       FrustrationBadge: {
-        template:
-          '<div data-test-stub="frustration-badge" v-bind="$attrs"></div>',
+        template: '<div data-test-stub="frustration-badge" v-bind="$attrs"></div>',
         props: ["count"],
       },
       SessionLocationColumn: {
-        template:
-          '<div data-test="session-location-column" v-bind="$attrs"></div>',
+        template: '<div data-test="session-location-column" v-bind="$attrs"></div>',
         props: ["column"],
       },
       NoData: { template: '<div data-test-stub="no-data" />' },
@@ -983,9 +969,7 @@ describe("AppSessions.vue", () => {
       await setSessionRow("react-native");
 
       // Assert
-      const platformText = wrapper.find(
-        '[data-test="rum-app-sessions-platform-text"]',
-      );
+      const platformText = wrapper.find('[data-test="rum-app-sessions-platform-text"]');
       expect(platformText.exists()).toBe(true);
       expect(platformText.text()).toBe("React Native");
     });
@@ -995,9 +979,7 @@ describe("AppSessions.vue", () => {
       await setSessionRow("ios");
 
       // Assert
-      const platformText = wrapper.find(
-        '[data-test="rum-app-sessions-platform-text"]',
-      );
+      const platformText = wrapper.find('[data-test="rum-app-sessions-platform-text"]');
       expect(platformText.exists()).toBe(true);
       expect(platformText.text()).toBe("iOS");
     });
@@ -1007,9 +989,7 @@ describe("AppSessions.vue", () => {
       await setSessionRow("android");
 
       // Assert
-      const platformText = wrapper.find(
-        '[data-test="rum-app-sessions-platform-text"]',
-      );
+      const platformText = wrapper.find('[data-test="rum-app-sessions-platform-text"]');
       expect(platformText.exists()).toBe(true);
       expect(platformText.text()).toBe("Android");
     });
@@ -1019,9 +999,7 @@ describe("AppSessions.vue", () => {
       await setSessionRow("flutter");
 
       // Assert
-      const platformText = wrapper.find(
-        '[data-test="rum-app-sessions-platform-text"]',
-      );
+      const platformText = wrapper.find('[data-test="rum-app-sessions-platform-text"]');
       expect(platformText.exists()).toBe(true);
       expect(platformText.text()).toBe("Flutter");
     });
@@ -1031,9 +1009,7 @@ describe("AppSessions.vue", () => {
       await setSessionRow("");
 
       // Assert
-      const platformText = wrapper.find(
-        '[data-test="rum-app-sessions-platform-text"]',
-      );
+      const platformText = wrapper.find('[data-test="rum-app-sessions-platform-text"]');
       expect(platformText.exists()).toBe(true);
       expect(platformText.text()).toBe("Browser");
     });
@@ -1043,9 +1019,7 @@ describe("AppSessions.vue", () => {
       await setSessionRow(undefined);
 
       // Assert
-      const platformText = wrapper.find(
-        '[data-test="rum-app-sessions-platform-text"]',
-      );
+      const platformText = wrapper.find('[data-test="rum-app-sessions-platform-text"]');
       expect(platformText.exists()).toBe(true);
       expect(platformText.text()).toBe("Browser");
     });
@@ -1055,9 +1029,7 @@ describe("AppSessions.vue", () => {
       await setSessionRow("roku");
 
       // Assert
-      const platformText = wrapper.find(
-        '[data-test="rum-app-sessions-platform-text"]',
-      );
+      const platformText = wrapper.find('[data-test="rum-app-sessions-platform-text"]');
       expect(platformText.exists()).toBe(true);
       expect(platformText.text()).toBe("roku");
     });
@@ -1070,12 +1042,10 @@ describe("AppSessions.vue", () => {
       // each request's SQL text at call time via a custom implementation.
       vi.mocked(searchService.search).mockClear();
       const capturedSqls: string[] = [];
-      vi.mocked(searchService.search).mockImplementation(
-        async (params: any) => {
-          capturedSqls.push(params?.query?.query?.sql ?? "");
-          return { data: { hits: [] } };
-        },
-      );
+      vi.mocked(searchService.search).mockImplementation(async (params: any) => {
+        capturedSqls.push(params?.query?.query?.sql ?? "");
+        return { data: { hits: [] } };
+      });
 
       // Act
       wrapper.vm.getSessions();

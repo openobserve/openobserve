@@ -18,7 +18,6 @@ import { ref } from "vue";
 import useTraceCorrelation from "@/composables/rum/useTraceCorrelation";
 import searchService from "@/services/search";
 
-
 // The composable now asks the stream schema which trace-id namespaces exist (`_o2_` vs
 // `_oo_`) before building SQL, so getStream must be mocked or every call hangs.
 // Reports the legacy spelling, matching data ingested before the namespace migration.

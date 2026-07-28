@@ -135,9 +135,9 @@ export function wireframesAt(records: MobileRecord[], t: number): Wireframe[] {
   }
   if (snapshotIdx === -1) return [];
 
-  const order: Wireframe[] = (records[snapshotIdx].data?.wireframes ?? []).map(
-    (w: Wireframe) => ({ ...w }),
-  );
+  const order: Wireframe[] = (records[snapshotIdx].data?.wireframes ?? []).map((w: Wireframe) => ({
+    ...w,
+  }));
   const indexById = new Map<number, number>();
   const rebuildIndex = () => {
     indexById.clear();
@@ -175,7 +175,9 @@ export function wireframesAt(records: MobileRecord[], t: number): Wireframe[] {
 
 /** Whether a session's source is a mobile SDK (→ use the wireframe player). */
 export function isMobileReplaySource(source: string | undefined | null): boolean {
-  return source === "react-native" || source === "ios" || source === "android" || source === "flutter";
+  return (
+    source === "react-native" || source === "ios" || source === "android" || source === "flutter"
+  );
 }
 
 /**
@@ -206,10 +208,12 @@ export function wireframeStyle(w: Wireframe): Record<string, string> {
     if (w.textStyle.size) style["font-size"] = `${w.textStyle.size}px`;
     if (w.textStyle.family) style["font-family"] = w.textStyle.family;
     const align = w.textPosition?.alignment?.horizontal;
-    if (align) style["text-align"] = align === "center" ? "center" : align === "right" ? "right" : "left";
+    if (align)
+      style["text-align"] = align === "center" ? "center" : align === "right" ? "right" : "left";
     const valign = w.textPosition?.alignment?.vertical;
     style.display = "flex";
-    style["align-items"] = valign === "center" ? "center" : valign === "bottom" ? "flex-end" : "flex-start";
+    style["align-items"] =
+      valign === "center" ? "center" : valign === "bottom" ? "flex-end" : "flex-start";
     const p = w.textPosition?.padding;
     if (p) style.padding = `${p.top ?? 0}px ${p.right ?? 0}px ${p.bottom ?? 0}px ${p.left ?? 0}px`;
   }

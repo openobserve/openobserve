@@ -70,9 +70,9 @@ const getDescription = computed(() => {
     return props.column["view_url"];
   } else if (props.column["type"] === "action") {
     return (
-      rumField(props.column, 'action_target_text') +
+      rumField(props.column, "action_target_text") +
       " : " +
-      rumField(props.column, 'action_target_selector')
+      rumField(props.column, "action_target_selector")
     );
   }
   return "";

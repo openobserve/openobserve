@@ -843,9 +843,7 @@ const hasCompleteResult = ref(false);
 // they must not raise error toasts or paint SQL error squiggles.
 function isAbortError(err: any): boolean {
   return (
-    err?.code === "ERR_CANCELED" ||
-    err?.name === "CanceledError" ||
-    err?.name === "AbortError"
+    err?.code === "ERR_CANCELED" || err?.name === "CanceledError" || err?.name === "AbortError"
   );
 }
 
@@ -1052,11 +1050,7 @@ function clearWindowAggregates() {
 }
 
 // Query 2: Get start/end times from _sessionreplay for the sessions
-const getSessionTimeFromReplay = (
-  req: any,
-  sessionIds: string[],
-  signal?: AbortSignal,
-) => {
+const getSessionTimeFromReplay = (req: any, sessionIds: string[], signal?: AbortSignal) => {
   if (sessionIds.length === 0) {
     rows.value = [];
     isLoading.value.pop();
@@ -1163,11 +1157,7 @@ const runAggregateQuery = (req: any, signal?: AbortSignal) =>
 
 // Returns a promise that settles when ALL aggregate queries finish — used to
 // release the activity-sparkline gate so those queries go last.
-const fetchWindowAggregates = (
-  baseReq: any,
-  whereClause: string,
-  signal?: AbortSignal,
-) => {
+const fetchWindowAggregates = (baseReq: any, whereClause: string, signal?: AbortSignal) => {
   clearWindowAggregates();
 
   const pending: Promise<unknown>[] = [];
@@ -1350,8 +1340,7 @@ const classifySource = (source?: string): string => {
 
 // A session is "mobile" when its SDK source is a mobile platform (react-native/
 // ios/android/flutter) — reuses the same predicate the replay player uses.
-const isMobilePlatform = (source?: string): boolean =>
-  isMobileReplaySource(source);
+const isMobilePlatform = (source?: string): boolean => isMobileReplaySource(source);
 
 const enrichedRows = computed(() =>
   rows.value.map((row: any) => ({

@@ -90,13 +90,13 @@ const getTimestamp = computed(() => {
 // Trace id linking this error to a backend trace: on the error itself, or
 // on the nearest xhr/fetch event captured around the failure.
 const errorTraceId = computed(() => {
-  if (rumField(errorDetails.value, 'trace_id')) {
-    return rumField<string>(errorDetails.value, 'trace_id');
+  if (rumField(errorDetails.value, "trace_id")) {
+    return rumField<string>(errorDetails.value, "trace_id");
   }
   const xhrWithTrace = (errorDetails.value?.events || []).find(
-    (event: any) => event.type === "resource" && rumField(event, 'trace_id'),
+    (event: any) => event.type === "resource" && rumField(event, "trace_id"),
   );
-  return rumField<string>(xhrWithTrace, 'trace_id') || "";
+  return rumField<string>(xhrWithTrace, "trace_id") || "";
 });
 
 const getErrorLogs = () => {

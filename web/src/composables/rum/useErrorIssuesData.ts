@@ -277,20 +277,13 @@ const useErrorIssuesData = () => {
     trendContext = { ctx, params, interval, intervalMicros };
     trendInFlight.clear();
 
-    const [issuesR, chartR, kpisR, denomR, deploysR] =
-      await Promise.allSettled([
-        runSearch(buildIssuesSql(ctx), params, ISSUES_LIMIT, undefined, signal),
-        runSearch(
-          buildErrorsHistogramSql(ctx, interval),
-          params,
-          2000,
-          undefined,
-          signal,
-        ),
-        runSearch(buildErrorKpisSql(ctx), params, 10, undefined, signal),
-        runSearch(buildDenominatorsSql(ctx), params, 10, undefined, signal),
-        runSearch(buildDeploysSql(ctx), params, 10, undefined, signal),
-      ]);
+    const [issuesR, chartR, kpisR, denomR, deploysR] = await Promise.allSettled([
+      runSearch(buildIssuesSql(ctx), params, ISSUES_LIMIT, undefined, signal),
+      runSearch(buildErrorsHistogramSql(ctx, interval), params, 2000, undefined, signal),
+      runSearch(buildErrorKpisSql(ctx), params, 10, undefined, signal),
+      runSearch(buildDenominatorsSql(ctx), params, 10, undefined, signal),
+      runSearch(buildDeploysSql(ctx), params, 10, undefined, signal),
+    ]);
     if (currentRun !== runId) return;
 
     // Deploys resolve before issues: status derivation needs the deploy ts.
