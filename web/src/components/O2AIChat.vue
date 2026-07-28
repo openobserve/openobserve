@@ -3636,10 +3636,7 @@ export default defineComponent({
      *
      * Returns true when the confirmation was accepted.
      */
-    const sendConfirmation = async (
-      sessionId: string,
-      approved: boolean,
-    ): Promise<boolean> => {
+    const sendConfirmation = async (sessionId: string, approved: boolean): Promise<boolean> => {
       try {
         const orgId = store.state.selectedOrganization.identifier;
         const res = await fetch(

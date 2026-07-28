@@ -1138,7 +1138,9 @@ mod tests {
         // check, but not a UUID. This is the case the stricter check exists for.
         assert!(!is_valid_session_id("----zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz"));
         // Right characters, hyphens in the wrong places.
-        assert!(!is_valid_session_id("0123456-789ab-cdef-0123-456789abcdeff"));
+        assert!(!is_valid_session_id(
+            "0123456-789ab-cdef-0123-456789abcdeff"
+        ));
     }
 
     #[test]
@@ -1152,7 +1154,9 @@ mod tests {
     fn test_wrong_length_session_ids_are_rejected() {
         assert!(!is_valid_session_id(""));
         assert!(!is_valid_session_id("01234567-89ab-cdef-0123-456789abcde"));
-        assert!(!is_valid_session_id("01234567-89ab-cdef-0123-456789abcdeff"));
+        assert!(!is_valid_session_id(
+            "01234567-89ab-cdef-0123-456789abcdeff"
+        ));
     }
 
     #[test]

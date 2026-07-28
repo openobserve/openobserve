@@ -39,6 +39,7 @@
 use async_nats::jetstream;
 use config::get_config;
 use serde::Deserialize;
+use tokio::sync::OnceCell;
 
 use crate::db::nats::get_nats_client;
 
@@ -62,33 +63,59 @@ struct SessionOwner {
     addr: String,
 }
 
-/// The routable address of the o2-ai replica owning `session_id`.
+/// Cached handle to the session-owner bucket.
 ///
-/// Returns `None` for every non-answer: no claim recorded yet (a new
-/// conversation), no advertised address, NATS unreachable, or a malformed
-/// record. Callers treat them identically — fall back to the configured agent
-/// URL and let o2-ai's own ownership check catch a genuine misroute.
-pub async fn get_session_owner_addr(session_id: &str) -> Option<String> {
-    if session_id.is_empty() {
-        return None;
+/// `get_key_value` costs a JetStream round-trip to fetch stream metadata, and
+/// this lookup runs on every chat turn and confirmation — resolving the bucket
+/// each time would double the network cost of routing. The handle is stable for
+/// the process lifetime, so it is resolved once.
+///
+/// Only successful resolutions are stored. If the bucket does not exist yet —
+/// o2-ai creates it on its first claim — a later call retries, rather than
+/// routing being permanently disabled by a startup ordering accident.
+static SESSION_BUCKET: OnceCell<jetstream::kv::Store> = OnceCell::const_new();
+
+async fn session_bucket() -> Option<&'static jetstream::kv::Store> {
+    if let Some(bucket) = SESSION_BUCKET.get() {
+        return Some(bucket);
     }
 
     let cfg = get_config();
     let bucket_name = format!("{}{}", cfg.nats.prefix, BUCKET);
-
     let client = get_nats_client().await.clone();
     let jetstream = jetstream::new(client);
 
     // Deliberately get-only, never create: o2-ai owns this bucket's lifecycle
     // (including its TTL). If it doesn't exist yet, no replica has claimed
     // anything and there is nothing to route.
-    let bucket = match jetstream.get_key_value(&bucket_name).await {
-        Ok(b) => b,
+    match jetstream.get_key_value(&bucket_name).await {
+        Ok(b) => Some(SESSION_BUCKET.get_or_init(|| async { b }).await),
         Err(e) => {
             log::debug!("[AI_SESSIONS] bucket {bucket_name} unavailable: {e}");
-            return None;
+            None
         }
-    };
+    }
+}
+
+/// The routable address of the o2-ai replica owning `session_id`.
+///
+/// Returns `None` for every non-answer: no claim recorded yet (a new
+/// conversation), no advertised address, NATS unreachable, or a malformed
+/// record. Callers treat them identically — fall back to the configured agent
+/// URL and let o2-ai's own ownership check catch a genuine misroute.
+///
+/// # Consumers
+///
+/// This has no open-source callers: it is used by the enterprise crate's
+/// `AiAgentClient` (`o2_enterprise::enterprise::ai::client`) to route a session
+/// to its owning replica. Signature changes here must be made in lockstep with
+/// that crate.
+pub async fn get_session_owner_addr(session_id: &str) -> Option<String> {
+    if session_id.is_empty() {
+        return None;
+    }
+
+    let bucket = session_bucket().await?;
 
     let entry = match bucket.get(session_id).await {
         Ok(Some(v)) => v,
