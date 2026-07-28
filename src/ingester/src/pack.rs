@@ -161,9 +161,10 @@ impl PackWriter {
         fs::create_dir_all(&self.dir)
             .await
             .context(CreateFileSnafu { path: &self.dir })?;
-        let path = self
-            .dir
-            .join(format!("{}.{}.{}", self.memtable_id, self.seq, PACK_FILE_EXT));
+        let path = self.dir.join(format!(
+            "{}.{}.{}",
+            self.memtable_id, self.seq, PACK_FILE_EXT
+        ));
         let tmp_path = self.dir.join(format!(
             "{}.{}.{}.tmp",
             self.memtable_id, self.seq, PACK_FILE_EXT
@@ -205,13 +206,9 @@ impl PackWriter {
             self.open_next().await?;
         }
         let current = self.current.as_mut().unwrap();
-        current
-            .file
-            .write_all(data)
-            .await
-            .context(WriteFileSnafu {
-                path: &current.tmp_path,
-            })?;
+        current.file.write_all(data).await.context(WriteFileSnafu {
+            path: &current.tmp_path,
+        })?;
         current.segments.push(PackSegmentMeta {
             org_id: org_id.to_string(),
             stream_name: stream_name.to_string(),
@@ -271,7 +268,9 @@ impl PackWriter {
     }
 
     /// Finalize all pack files (footer written + fsynced, still `.pack.tmp`).
-    pub(crate) async fn finish(mut self) -> Result<(Vec<FinishedPack>, PersistStat, HashMap<String, i64>)> {
+    pub(crate) async fn finish(
+        mut self,
+    ) -> Result<(Vec<FinishedPack>, PersistStat, HashMap<String, i64>)> {
         self.finish_current().await?;
         Ok((self.finished, self.stat, self.bytes_by_org))
     }
@@ -280,11 +279,7 @@ impl PackWriter {
 /// Read and verify the footer of a pack file.
 pub async fn read_footer(path: &Path) -> Result<PackFooter> {
     let mut file = fs::File::open(path).await.context(OpenFileSnafu { path })?;
-    let file_size = file
-        .metadata()
-        .await
-        .context(ReadFileSnafu { path })?
-        .len();
+    let file_size = file.metadata().await.context(ReadFileSnafu { path })?.len();
     if file_size < PACK_TRAILER_LEN as u64 {
         return Err(pack_format_error(path, "file too small"));
     }
@@ -307,9 +302,11 @@ pub async fn read_footer(path: &Path) -> Result<PackFooter> {
     if footer_len + PACK_TRAILER_LEN as u64 > file_size {
         return Err(pack_format_error(path, "invalid footer length"));
     }
-    file.seek(SeekFrom::End(-((PACK_TRAILER_LEN as u64 + footer_len) as i64)))
-        .await
-        .context(ReadFileSnafu { path })?;
+    file.seek(SeekFrom::End(
+        -((PACK_TRAILER_LEN as u64 + footer_len) as i64),
+    ))
+    .await
+    .context(ReadFileSnafu { path })?;
     let mut footer_data = vec![0u8; footer_len as usize];
     file.read_exact(&mut footer_data)
         .await
@@ -417,14 +414,20 @@ pub async fn register_pack(
         if consumed.contains(&seg.offset) {
             continue;
         }
-        let key: Arc<str> =
-            Arc::from(segment_index_key(&seg.org_id, &footer.stream_type, &seg.stream_name));
-        w.entry(key.clone()).or_default().segments.push(PackSegment {
-            pack_path: pack_path.clone(),
-            memtable_id: footer.memtable_id,
-            registered_at,
-            meta: Arc::new(seg.clone()),
-        });
+        let key: Arc<str> = Arc::from(segment_index_key(
+            &seg.org_id,
+            &footer.stream_type,
+            &seg.stream_name,
+        ));
+        w.entry(key.clone())
+            .or_default()
+            .segments
+            .push(PackSegment {
+                pack_path: pack_path.clone(),
+                memtable_id: footer.memtable_id,
+                registered_at,
+                meta: Arc::new(seg.clone()),
+            });
         touched.push(key);
     }
     touched.dedup();
@@ -443,9 +446,12 @@ fn consumed_sidecar_path(pack_path: &Path) -> PathBuf {
     PathBuf::from(p)
 }
 
-/// serialize sidecar appends so concurrent workers cannot interleave lines
-static CONSUMED_APPEND_LOCK: Lazy<tokio::sync::Mutex<()>> =
-    Lazy::new(|| tokio::sync::Mutex::new(()));
+/// Open sidecar file handles, cached for the pack lifetime (a sidecar gets
+/// one append per consumed stream, tens of thousands for a large pack). Also
+/// serializes appends so concurrent workers cannot interleave lines. Handles
+/// are dropped in delete_pack_file; live packs are few so the map stays small.
+static CONSUMED_FILES: Lazy<tokio::sync::Mutex<HashMap<PathBuf, fs::File>>> =
+    Lazy::new(Default::default);
 
 async fn append_consumed_sidecar(pack_path: &Path, offsets: &[u64]) {
     if offsets.is_empty() {
@@ -457,23 +463,40 @@ async fn append_consumed_sidecar(pack_path: &Path, offsets: &[u64]) {
         data.push_str(&offset.to_string());
         data.push('\n');
     }
-    let _guard = CONSUMED_APPEND_LOCK.lock().await;
-    let ret = async {
-        let mut f = fs::OpenOptions::new()
+    let mut files = CONSUMED_FILES.lock().await;
+    if !files.contains_key(&path) {
+        match fs::OpenOptions::new()
             .create(true)
             .append(true)
             .open(&path)
-            .await?;
+            .await
+        {
+            Ok(f) => {
+                files.insert(path.clone(), f);
+            }
+            Err(e) => {
+                // worst case the segments are re-uploaded after a restart
+                log::error!(
+                    "[INGESTER:PACK] open consumed sidecar {} failed: {e}",
+                    path.display()
+                );
+                return;
+            }
+        }
+    }
+    let f = files.get_mut(&path).unwrap();
+    let ret = async {
         f.write_all(data.as_bytes()).await?;
         f.sync_all().await
     }
     .await;
     if let Err(e) = ret {
-        // worst case the segments are re-uploaded after a restart
         log::error!(
             "[INGESTER:PACK] write consumed sidecar {} failed: {e}",
             path.display()
         );
+        // drop the handle so the next append reopens the file
+        files.remove(&path);
     }
 }
 
@@ -544,10 +567,15 @@ async fn end_read(paths: &[Arc<PathBuf>]) {
 }
 
 async fn delete_pack_file(path: &Path) {
-    let _ = fs::remove_file(consumed_sidecar_path(path)).await;
+    let sidecar = consumed_sidecar_path(path);
+    CONSUMED_FILES.lock().await.remove(&sidecar);
+    let _ = fs::remove_file(&sidecar).await;
     match fs::remove_file(path).await {
         Ok(_) => {
-            log::info!("[INGESTER:PACK] deleted consumed pack file: {}", path.display());
+            log::info!(
+                "[INGESTER:PACK] deleted consumed pack file: {}",
+                path.display()
+            );
         }
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
         Err(e) => {
@@ -696,8 +724,7 @@ pub async fn read_from_pack(
     pack_paths.dedup();
     let acquired = begin_read(&pack_paths).await;
 
-    let result =
-        read_segments(segments, time_range, partition_filters, skip_memtable_ids).await;
+    let result = read_segments(segments, time_range, partition_filters, skip_memtable_ids).await;
     end_read(&acquired).await;
     result
 }
@@ -914,12 +941,24 @@ mod tests {
         writer.dir = dir.path().to_path_buf();
         // 18 bytes, fits
         writer
-            .append_segment("o", "s1", "p", b"parquet-bytes-aaaa", &test_file_meta(1, 2, 1, 1))
+            .append_segment(
+                "o",
+                "s1",
+                "p",
+                b"parquet-bytes-aaaa",
+                &test_file_meta(1, 2, 1, 1),
+            )
             .await
             .unwrap();
         // 18 more bytes would exceed 20 -> roll over
         writer
-            .append_segment("o", "s2", "p", b"parquet-bytes-aaaa", &test_file_meta(1, 2, 1, 1))
+            .append_segment(
+                "o",
+                "s2",
+                "p",
+                b"parquet-bytes-aaaa",
+                &test_file_meta(1, 2, 1, 1),
+            )
             .await
             .unwrap();
         let (finished, stat, _) = writer.finish().await.unwrap();
@@ -943,7 +982,9 @@ mod tests {
         // truncated file
         let data = fs::read(&pack.path).await.unwrap();
         let truncated = dir.path().join("truncated.pack");
-        fs::write(&truncated, &data[..data.len() - 4]).await.unwrap();
+        fs::write(&truncated, &data[..data.len() - 4])
+            .await
+            .unwrap();
         assert!(read_footer(&truncated).await.is_err());
 
         // corrupted footer byte
@@ -1034,10 +1075,16 @@ mod tests {
         assert_eq!(read_batches.iter().map(|b| b.num_rows()).sum::<usize>(), 2);
 
         // time range filter excludes the segment
-        let (batches, stats) =
-            read_from_pack("porg", "logs", "pstream", Some((5000, 6000)), &[], &skip_ids)
-                .await
-                .unwrap();
+        let (batches, stats) = read_from_pack(
+            "porg",
+            "logs",
+            "pstream",
+            Some((5000, 6000)),
+            &[],
+            &skip_ids,
+        )
+        .await
+        .unwrap();
         assert!(batches.is_empty());
         assert_eq!(stats.files, 0);
 
