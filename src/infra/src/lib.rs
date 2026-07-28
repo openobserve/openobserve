@@ -64,7 +64,9 @@ fn is_db_schema_version_missing(e: &errors::Error) -> bool {
         // meta table not created yet: fresh install. the sqlite/postgres
         // Db::get() wrap the sqlx error text into DBOperError
         errors::Error::DbError(errors::DbError::DBOperError(msg, _)) => {
-            is_table_missing_message(msg) || is_sqlite_db_file_missing(msg)
+            let db_file = format!("{}metadata.sqlite", config::get_config().common.data_db_dir);
+            is_table_missing_message(msg)
+                || is_sqlite_cantopen_fresh_install(msg, std::path::Path::new(&db_file).exists())
         }
         errors::Error::SqlxError(sqlx::Error::Database(e)) => {
             e.code().as_deref() == Some("42P01") // postgres: undefined_table
@@ -83,12 +85,8 @@ fn is_table_missing_message(msg: &str) -> bool {
 /// sqlite CANTOPEN is a fresh install only when the metadata file itself does
 /// not exist yet (db_init creates it); CANTOPEN on an existing file means a
 /// permission/disk/mount problem and must keep failing the startup.
-fn is_sqlite_db_file_missing(msg: &str) -> bool {
-    if !msg.contains("unable to open database file") {
-        return false;
-    }
-    let path = format!("{}metadata.sqlite", config::get_config().common.data_db_dir);
-    !std::path::Path::new(&path).exists()
+fn is_sqlite_cantopen_fresh_install(msg: &str, db_file_exists: bool) -> bool {
+    msg.contains("unable to open database file") && !db_file_exists
 }
 
 #[cfg(test)]
@@ -115,12 +113,19 @@ mod schema_version_tests {
             "/meta/kv/version".to_string(),
         ));
         assert!(is_db_schema_version_missing(&e));
-        // sqlite fresh install: the db directory does not exist yet
-        let e = errors::Error::DbError(errors::DbError::DBOperError(
-            "error returned from database: (code: 14) unable to open database file".to_string(),
-            "/db_schema_version/".to_string(),
+    }
+
+    #[test]
+    fn test_sqlite_cantopen_fresh_install_depends_on_db_file() {
+        let msg = "error returned from database: (code: 14) unable to open database file";
+        // fresh install: the metadata file does not exist yet
+        assert!(is_sqlite_cantopen_fresh_install(msg, false));
+        // existing file: permission/disk problem, must keep failing startup
+        assert!(!is_sqlite_cantopen_fresh_install(msg, true));
+        assert!(!is_sqlite_cantopen_fresh_install(
+            "connection refused",
+            false
         ));
-        assert!(is_db_schema_version_missing(&e));
     }
 
     #[test]

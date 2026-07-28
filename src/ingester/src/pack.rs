@@ -483,9 +483,8 @@ async fn append_consumed_sidecar(pack_path: &Path, offsets: &[u64]) -> std::io::
         match sidecar_append_once(&mut files, &path, &data).await {
             Ok(_) => return Ok(()),
             Err(e) => {
-                // drop the handle so the next attempt reopens the file.
-                // duplicate offset lines from a partially applied attempt
-                // are harmless, the reader collects them into a set
+                // drop the handle so the next attempt reopens the file and
+                // truncates whatever partial record this attempt left behind
                 files.remove(&path);
                 log::warn!(
                     "[INGESTER:PACK] write consumed sidecar {} failed (attempt {attempt}/3): {e}",
@@ -504,6 +503,10 @@ async fn sidecar_append_once(
     data: &str,
 ) -> std::io::Result<()> {
     if !files.contains_key(path) {
+        // a crashed or failed previous append can leave a partial record;
+        // appending after it would concatenate both into a different
+        // (possibly valid) offset, so cut back to the last complete line
+        truncate_partial_sidecar_line(path).await?;
         let f = fs::OpenOptions::new()
             .create(true)
             .append(true)
@@ -518,6 +521,21 @@ async fn sidecar_append_once(
         *writes = 0;
         f.sync_all().await?;
     }
+    Ok(())
+}
+
+async fn truncate_partial_sidecar_line(path: &Path) -> std::io::Result<()> {
+    let data = match fs::read(path).await {
+        Ok(v) => v,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(e) => return Err(e),
+    };
+    if data.last().is_none_or(|b| *b == b'\n') {
+        return Ok(());
+    }
+    let keep = data.iter().rposition(|b| *b == b'\n').map_or(0, |i| i + 1);
+    let f = fs::OpenOptions::new().write(true).open(path).await?;
+    f.set_len(keep as u64).await?;
     Ok(())
 }
 
@@ -578,24 +596,35 @@ async fn begin_read(paths: &[Arc<PathBuf>]) -> Vec<Arc<PathBuf>> {
 
 /// Release read guards, deleting packs that became fully consumed meanwhile.
 async fn end_read(paths: &[Arc<PathBuf>]) {
-    let mut to_delete = Vec::new();
-    {
+    let to_delete = {
         let mut w = PACK_REGISTRY.write().await;
-        for path in paths {
-            if let Some(entry) = w.get_mut(path) {
-                entry.readers = entry.readers.saturating_sub(1);
-                if entry.readers == 0 && entry.consumed >= entry.total {
-                    to_delete.push(path.clone());
-                }
-            }
-        }
-        for path in to_delete.iter() {
-            w.remove(path);
-        }
-    }
+        end_read_locked(&mut w, paths)
+    };
     for path in to_delete {
         delete_pack_file(&path).await;
     }
+}
+
+/// Decrement reader counters and collect packs whose deferred deletion now
+/// falls to the caller. Sync on purpose: callers must not cross a cancellation
+/// point between taking the guard paths and decrementing the counters.
+fn end_read_locked(
+    w: &mut HashMap<Arc<PathBuf>, PackEntry>,
+    paths: &[Arc<PathBuf>],
+) -> Vec<Arc<PathBuf>> {
+    let mut to_delete = Vec::new();
+    for path in paths {
+        if let Some(entry) = w.get_mut(path) {
+            entry.readers = entry.readers.saturating_sub(1);
+            if entry.readers == 0 && entry.consumed >= entry.total {
+                to_delete.push(path.clone());
+            }
+        }
+    }
+    for path in to_delete.iter() {
+        w.remove(path);
+    }
+    to_delete
 }
 
 async fn delete_pack_file(path: &Path) {
@@ -759,9 +788,23 @@ struct ReadGuards {
 }
 
 impl ReadGuards {
+    /// The paths are taken and the counters decremented inside a single lock
+    /// scope with no cancellation point in between: a cancelled call either
+    /// left the guards intact (Drop re-releases them) or has already fully
+    /// released them. Pack deletion runs detached so a cancel cannot skip it.
     async fn release(mut self) {
-        let paths = std::mem::take(&mut self.paths);
-        end_read(&paths).await;
+        let to_delete = {
+            let mut w = PACK_REGISTRY.write().await;
+            let paths = std::mem::take(&mut self.paths);
+            end_read_locked(&mut w, &paths)
+        };
+        if !to_delete.is_empty() {
+            tokio::spawn(async move {
+                for path in to_delete {
+                    delete_pack_file(&path).await;
+                }
+            });
+        }
     }
 }
 
@@ -1270,7 +1313,8 @@ mod tests {
             "stream_a",
             &[(pack_path.clone(), seg_a.offset)],
         )
-        .await;
+        .await
+        .unwrap();
         let consumed = read_consumed_sidecar(&pack.path).await;
         assert!(consumed.contains(&seg_a.offset));
         assert_eq!(consumed.len(), 1);
@@ -1296,7 +1340,8 @@ mod tests {
             "stream_b",
             &[(pack_path.clone(), seg_b.offset)],
         )
-        .await;
+        .await
+        .unwrap();
         assert!(!pack.path.exists());
         assert!(!consumed_sidecar_path(&pack.path).exists());
     }
@@ -1409,6 +1454,63 @@ mod tests {
         // releasing the guard deletes the fully consumed pack
         end_read(&acquired).await;
         assert!(!pack.path.exists());
+    }
+
+    #[tokio::test]
+    async fn test_cancelled_release_still_frees_reader() {
+        let dir = tempfile::tempdir().unwrap();
+        let finished = write_test_pack(dir.path(), 999).await;
+        let pack = &finished[0];
+        fs::rename(&pack.tmp_path, &pack.path).await.unwrap();
+        register_pack(
+            pack.path.clone(),
+            &pack.footer,
+            config::utils::time::now_micros(),
+            &Default::default(),
+        )
+        .await;
+
+        let pack_path = Arc::new(pack.path.clone());
+        let acquired = begin_read(std::slice::from_ref(&pack_path)).await;
+        assert_eq!(acquired.len(), 1);
+        let guards = ReadGuards { paths: acquired };
+
+        // cancel release() while it is still waiting for the registry lock
+        {
+            let _hold = PACK_REGISTRY.write().await;
+            let cancelled =
+                tokio::time::timeout(std::time::Duration::from_millis(50), guards.release()).await;
+            assert!(cancelled.is_err());
+        }
+
+        // the Drop-spawned release must still bring the counter back to zero
+        let mut readers = usize::MAX;
+        for _ in 0..1000 {
+            tokio::task::yield_now().await;
+            let r = PACK_REGISTRY.read().await;
+            readers = r.get(&pack_path).map(|e| e.readers).unwrap_or(usize::MAX);
+            if readers == 0 {
+                break;
+            }
+        }
+        assert_eq!(readers, 0);
+        unregister_pack(&pack.path).await;
+    }
+
+    #[tokio::test]
+    async fn test_sidecar_append_truncates_partial_line() {
+        let dir = tempfile::tempdir().unwrap();
+        let pack_path = dir.path().join("truncate_test.pack");
+        let sidecar = consumed_sidecar_path(&pack_path);
+        // crash remnant: one complete record followed by a partial one; a
+        // plain append would concatenate into "100\n25300\n"
+        fs::write(&sidecar, b"100\n25").await.unwrap();
+        append_consumed_sidecar(&pack_path, &[300]).await.unwrap();
+        let data = fs::read_to_string(&sidecar).await.unwrap();
+        assert_eq!(data, "100\n300\n");
+        let consumed = read_consumed_sidecar(&pack_path).await;
+        assert_eq!(consumed.len(), 2);
+        assert!(consumed.contains(&100) && consumed.contains(&300));
     }
 
     #[tokio::test]
