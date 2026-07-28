@@ -9621,7 +9621,7 @@
         "assertionValue": "Значение",
         "assertions": "Утверждения",
         "body": "Тело запроса",
-        "bodyPlaceholder": "{\"key\": \"value\"}",
+        "bodyPlaceholder": "{'{'}\"key\": \"value\"{'}'}",
         "fields": {
           "body": "Тело ответа",
           "response_time_ms": "Время ответа (мс)",

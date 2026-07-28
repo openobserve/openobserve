@@ -9621,7 +9621,7 @@
         "assertionValue": "值",
         "assertions": "断言",
         "body": "请求正文",
-        "bodyPlaceholder": "{\"key\": \"value\"}",
+        "bodyPlaceholder": "{'{'}\"key\": \"value\"{'}'}",
         "fields": {
           "body": "响应正文",
           "response_time_ms": "响应时间（毫秒）",
