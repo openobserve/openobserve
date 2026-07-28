@@ -34,11 +34,8 @@ pub use migrator::{run_file_list, run_meta};
 pub async fn init_db() -> std::result::Result<(), anyhow::Error> {
     // we init client here to avoid deadlocks
     ORM_CLIENT.get_or_init(connect_to_orm).await;
-    // reading the version must be reliable: a genuinely missing version
-    // (fresh install) is reported as Ok(0), so an error here means the
-    // database is unreachable or overloaded. Never treat that as a fresh
-    // install - running the full db upgrade against a struggling database
-    // only adds more load on top of it. Retry, then abort the startup.
+    // a missing version is Ok(0), so an error here means the db is
+    // unreachable or overloaded: never assume a fresh install, retry then abort
     const MAX_RETRIES: usize = 5;
     let mut db_schema_version = 0;
     let mut last_err = None;

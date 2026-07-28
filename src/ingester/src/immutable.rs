@@ -141,8 +141,7 @@ impl Immutable {
         Ok(persist_stat)
     }
 
-    /// Persist the memtable into pack files: a few large files per rotation
-    /// instead of one file per stream × hour. Follows the same lock-file
+    /// Persist the memtable into pack files, following the same lock-file
     /// crash-recovery flow as `persist_files`.
     async fn persist_pack(&self, wal_path: &PathBuf) -> Result<PersistStat> {
         let cfg = config::get_config();

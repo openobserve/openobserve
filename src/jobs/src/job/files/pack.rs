@@ -14,18 +14,10 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 //! Pack mover: uploads wal pack segments (see `ingester::pack`) to object
-//! storage. The counterpart of the legacy per-stream file mover in
-//! `parquet.rs`, but sourced from the in-memory segment index instead of
-//! directory scans:
-//!
-//! - every `file_push_interval` the pending streams are snapshotted from the
-//!   segment index (pure memory, no readdir / stat storm)
-//! - a stream is flushed once its pending segments are big enough or the
-//!   oldest segment exceeds `max_file_retention_time` (or the node drains)
-//! - a single segment is uploaded as-is (it is a complete parquet file, no
-//!   decode/re-encode), multiple segments are merged in memory
-//! - consumed segments are removed from the index; a pack file is deleted as
-//!   soon as all its segments are consumed and no reader holds it
+//! storage. Counterpart of the legacy mover in `parquet.rs`, but sourced from
+//! the in-memory segment index instead of directory scans. A single segment
+//! is uploaded as-is (already a complete parquet file), multiple segments are
+//! merged in memory; consumed packs are deleted.
 
 use std::{collections::BTreeMap, sync::Arc};
 
@@ -157,8 +149,8 @@ pub async fn run() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-/// A stream is flushed when its pending segments are big enough or the oldest
-/// segment exceeded the retention time (same thresholds as the legacy mover).
+/// Flush when pending segments are big enough or the oldest exceeded the
+/// retention time (same thresholds as the legacy mover).
 fn should_flush(ps: &PendingStream, cfg: &config::Config) -> bool {
     let max_file_size = std::cmp::min(
         cfg.limit.max_file_size_on_disk as i64,
@@ -247,8 +239,7 @@ async fn move_stream_segments(thread_id: usize, ps: PendingStream) -> Result<(),
         cfg.compact.max_file_size as i64,
     );
 
-    // group segments by partition path (same granularity as the legacy
-    // per-prefix grouping: date/hour + schema suffix + custom partitions)
+    // group by partition path, same granularity as the legacy per-prefix grouping
     let mut groups: BTreeMap<String, Vec<PackSegment>> = BTreeMap::new();
     for seg in segments {
         groups
@@ -330,9 +321,7 @@ async fn move_stream_segments(thread_id: usize, ps: PendingStream) -> Result<(),
     Ok(())
 }
 
-/// Upload one chunk of segments as a single object storage file. A single
-/// segment is uploaded as-is (it is already a complete parquet file), multiple
-/// segments are merged in memory.
+/// Upload one chunk of segments as a single object storage file.
 async fn upload_chunk(
     thread_id: usize,
     org_id: &str,
@@ -392,8 +381,7 @@ async fn upload_chunk(
     }
 
     let (buf, mut new_file_meta, file_format) = if chunk.len() == 1 {
-        // fast path: a single segment is already a complete parquet file,
-        // upload the bytes as-is without decode/re-encode
+        // fast path: upload the parquet bytes as-is, no decode/re-encode
         let buf = Bytes::from(bufs.pop().unwrap());
         let file_meta = FileMeta {
             min_ts,
@@ -468,8 +456,7 @@ async fn upload_chunk(
         ));
     }
 
-    // generate the object storage file key; the synthetic wal-like name keeps
-    // the partition path (date/hour + custom partitions) of the segments
+    // the synthetic wal-like name keeps the segments' partition path
     let wal_like_name = format!(
         "0/{}/{}",
         chunk[0].meta.partition_key,
@@ -543,8 +530,7 @@ async fn upload_chunk(
     Ok((account, new_file_key, new_file_meta))
 }
 
-/// Remove segments from the index (deleting fully consumed packs) and release
-/// their bytes from the wal usage metric.
+/// Remove segments from the index and release their wal usage bytes.
 async fn consume_segments(
     org_id: &str,
     stream_type: StreamType,

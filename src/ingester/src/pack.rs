@@ -13,23 +13,19 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Packed persist format for the ingester WAL.
+//! Packed persist format for the ingester WAL: all streams of a memtable are
+//! appended into a few large pack files instead of one parquet per
+//! stream × hour. Each segment is a complete, self-contained parquet file.
 //!
-//! Instead of writing one parquet file per stream × hour on every memtable
-//! rotation, all streams of a memtable are appended into a few large "pack"
-//! files. Each segment inside a pack is a complete, self-contained parquet
-//! file, so uploading a single segment later is a plain byte-range copy.
-//!
-//! File layout:
+//! Layout of `{data_wal_dir}/pack/{idx}/{memtable_id}.{seq}.pack`:
 //!
 //! ```text
 //! [segment 0: parquet bytes][segment 1: parquet bytes]...[footer JSON]
 //! [footer_len u32 LE][footer_hash u64 LE][version u16 LE][magic 8B]
 //! ```
 //!
-//! Packs live in `{data_wal_dir}/pack/{idx}/{memtable_id}.{seq}.pack` and are
-//! written as `.pack.tmp` first; the same `.lock` recovery flow as the legacy
-//! per-stream files guarantees exactly-once persistence across crashes.
+//! Written as `.pack.tmp` first, finalized via the same `.lock` recovery flow
+//! as the legacy per-stream files.
 
 use std::{
     io::SeekFrom,
@@ -64,11 +60,8 @@ pub const PACK_DIR_PREFIX: &str = "pack";
 pub const PACK_FILE_EXT: &str = "pack";
 
 /// Whether the packed persist format is enabled for the given stream type.
-///
-/// `ZO_FEATURE_WAL_PACK_ENABLED` is empty (disabled), a comma-separated list
-/// of stream types, or `all`. `true`/`false` are accepted as aliases of
-/// `all`/empty. This only gates the write path: packs already on disk are
-/// always searched, uploaded and recycled regardless of the flag.
+/// Only gates the write path: packs already on disk are always searched,
+/// uploaded and recycled.
 pub fn wal_pack_enabled(stream_type: &str) -> bool {
     wal_pack_enabled_for(
         &config::get_config().common.feature_wal_pack_enabled,
@@ -115,8 +108,7 @@ pub struct PackFooter {
     pub segments: Vec<PackSegmentMeta>,
 }
 
-/// A finalized pack file, still named `.pack.tmp` until the caller renames it
-/// after the wal file is deleted (same crash-recovery flow as legacy files).
+/// A finalized pack file, still named `.pack.tmp` until the lock/rename flow.
 pub(crate) struct FinishedPack {
     pub tmp_path: PathBuf,
     pub path: PathBuf,
@@ -132,8 +124,7 @@ struct CurrentPack {
     segments: Vec<PackSegmentMeta>,
 }
 
-/// Appends per-stream parquet segments into pack files, rolling over to a new
-/// pack when `max_size` is exceeded.
+/// Appends parquet segments into pack files, rolling over at `max_size`.
 pub(crate) struct PackWriter {
     dir: PathBuf,
     memtable_id: u64,
@@ -279,8 +270,7 @@ impl PackWriter {
         Ok(())
     }
 
-    /// Finalize all pack files (footer written + fsynced), still named
-    /// `.pack.tmp`. Returns the finished packs for the lock/rename flow.
+    /// Finalize all pack files (footer written + fsynced, still `.pack.tmp`).
     pub(crate) async fn finish(mut self) -> Result<(Vec<FinishedPack>, PersistStat, HashMap<String, i64>)> {
         self.finish_current().await?;
         Ok((self.finished, self.stat, self.bytes_by_org))
@@ -406,8 +396,7 @@ pub async fn register_pack(path: PathBuf, footer: &PackFooter, registered_at: i6
     }
 }
 
-/// Remove all segments of a pack from the index and registry, without
-/// deleting the pack file. Used by tests and error recovery.
+/// Remove a pack from the index and registry without deleting the file.
 pub async fn unregister_pack(path: &Path) {
     let mut w = PACK_SEGMENTS.write().await;
     for (_, segments) in w.iter_mut() {
@@ -427,9 +416,8 @@ pub async fn get_segment_index_stats() -> (usize, usize) {
     (streams, segments)
 }
 
-/// Acquire read guards on the given packs so the mover will not delete them
-/// while their segments are being read. Returns the paths actually acquired;
-/// packs already gone (consumed and deleted) are skipped.
+/// Acquire read guards so the mover will not delete these packs mid-read.
+/// Returns the paths actually acquired (already-deleted packs are skipped).
 async fn begin_read(paths: &[Arc<PathBuf>]) -> Vec<Arc<PathBuf>> {
     let mut acquired = Vec::with_capacity(paths.len());
     let mut w = PACK_REGISTRY.write().await;
@@ -442,8 +430,7 @@ async fn begin_read(paths: &[Arc<PathBuf>]) -> Vec<Arc<PathBuf>> {
     acquired
 }
 
-/// Release read guards and delete any pack that became fully consumed while
-/// it was being read.
+/// Release read guards, deleting packs that became fully consumed meanwhile.
 async fn end_read(paths: &[Arc<PathBuf>]) {
     let mut to_delete = Vec::new();
     {
@@ -516,9 +503,8 @@ pub async fn get_pending_streams() -> Vec<PendingStream> {
     result
 }
 
-/// Mark segments of a stream as consumed (uploaded to object storage or
-/// dropped by retention): remove them from the index and delete any pack file
-/// whose segments are all consumed and which has no in-flight readers.
+/// Mark segments as consumed: remove them from the index and delete packs
+/// that are fully consumed with no in-flight readers.
 pub async fn mark_segments_consumed(
     org_id: &str,
     stream_type: &str,
@@ -564,12 +550,9 @@ pub async fn mark_segments_consumed(
     }
 }
 
-/// Read all pack segments of a stream as record batches.
-///
-/// Segments are fully materialized into memory, so the caller does not need to
-/// hold any lock on the pack files afterwards. Segments whose memtable is
-/// still readable in memory (`skip_memtable_ids`) are skipped to avoid
-/// duplicates, mirroring the legacy wal parquet search.
+/// Read all pack segments of a stream as record batches. Segments are fully
+/// materialized, so no lock is needed afterwards; `skip_memtable_ids` avoids
+/// duplicates with data still readable in memory.
 pub async fn read_from_pack(
     org_id: &str,
     stream_type: &str,
@@ -587,8 +570,6 @@ pub async fn read_from_pack(
         }
     };
 
-    // hold read guards on the involved packs so the mover does not delete
-    // them between the index snapshot above and the segment reads below
     let mut pack_paths = segments
         .iter()
         .map(|s| s.pack_path.clone())
@@ -636,8 +617,7 @@ async fn read_segments(
         {
             Ok(v) => v,
             Err(e) => {
-                // the pack may have been consumed and deleted concurrently,
-                // its data is already readable from object storage then
+                // pack consumed and deleted concurrently, data is on storage
                 log::warn!(
                     "[INGESTER:PACK] read segment from {} failed: {e}, skip",
                     segment.pack_path.display()
@@ -661,8 +641,8 @@ async fn read_segments(
     Ok((results, stats))
 }
 
-/// Scan the pack directory on startup: delete orphan `.tmp` files (the `.lock`
-/// recovery has already run) and rebuild the segment index from pack footers.
+/// Startup: delete orphan `.tmp` files (the `.lock` recovery has already run)
+/// and rebuild the segment index from pack footers.
 pub(crate) async fn init() -> Result<()> {
     let cfg = config::get_config();
     let pack_dir = PathBuf::from(&cfg.common.data_wal_dir).join(PACK_DIR_PREFIX);
@@ -698,8 +678,7 @@ pub(crate) async fn init() -> Result<()> {
         };
         packs += 1;
         segments += footer.segments.len();
-        // use the file mtime as the registered time so the flush-by-age
-        // condition survives restarts
+        // mtime keeps the flush-by-age condition working across restarts
         let registered_at = fs::metadata(&pack_file)
             .await
             .ok()

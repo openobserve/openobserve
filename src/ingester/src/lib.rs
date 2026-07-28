@@ -106,10 +106,8 @@ pub async fn init() -> errors::Result<()> {
         path: wal_dir.clone(),
     })?;
 
-    // process uncompleted .lock files first: this only scans the small
-    // wal/logs dir, and it MUST run before the pack index is rebuilt (a
-    // .pack.tmp referenced by a lock file is finished data, not an orphan)
-    // and before wal replay
+    // must run before pack::init and wal replay: a lock-referenced .pack.tmp
+    // is finished data, not an orphan
     wal::check_uncompleted_lock_files().await?;
 
     // clean orphan tmp pack files and rebuild the pack segment index
@@ -117,8 +115,7 @@ pub async fn init() -> errors::Result<()> {
 
     // replay wal files
     tokio::task::spawn(async move {
-        // delete orphan .par files in the background: the wal/files tree can
-        // hold millions of files, walking it must not block the startup
+        // wal/files can hold millions of files, clean orphans in the background
         if let Err(e) = wal::clean_orphan_par_files().await {
             log::error!("Clean orphan par files error: {e}");
         }

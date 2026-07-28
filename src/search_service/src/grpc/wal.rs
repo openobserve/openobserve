@@ -84,9 +84,8 @@ pub async fn search_parquet(
     )
     .await?;
 
-    // search in wal pack segments. not gated by the pack feature flag: packs
-    // already on disk must stay searchable even after the flag is turned off
-    // (the segment index lookup is a no-op when there are no packs)
+    // not gated by the pack flag: packs on disk must stay searchable after
+    // the flag is turned off
     let (pack_tables, pack_stats) = search_pack_segments(
         query,
         schema,
@@ -429,8 +428,7 @@ pub async fn search_memtable(
     Ok((tables, scan_stats, memtable_ids))
 }
 
-/// search in the wal pack segments (packed persist format), the segments are
-/// fully materialized into record batches so no file lock is needed
+/// search in the wal pack segments, fully materialized so no file lock needed
 async fn search_pack_segments(
     query: Arc<super::QueryParams>,
     schema: Arc<Schema>,
@@ -521,8 +519,7 @@ async fn search_pack_segments(
     Ok((tables, scan_stats))
 }
 
-/// Adapt record batch groups to the latest schema, merge small batches and
-/// build one `NewMemTable` per group. Shared by the memtable and pack search.
+/// Build one `NewMemTable` per batch group, shared by memtable and pack search.
 async fn create_tables_from_batch_groups(
     query: &Arc<super::QueryParams>,
     schema: Arc<Schema>,
