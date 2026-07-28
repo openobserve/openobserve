@@ -33,9 +33,22 @@ pub mod schema;
 pub mod storage;
 pub mod table;
 
+/// Get the db schema version.
+///
+/// Returns `Ok(0)` only when the version is genuinely absent: the version key
+/// does not exist (fresh install or pre-versioning database) or the meta
+/// table itself does not exist yet (fresh install, the tables are created by
+/// the upgrade the caller is about to run). Any other error - connection
+/// failure, timeout, overloaded database - is returned as an error: callers
+/// must NOT treat those as a fresh install, otherwise a struggling database
+/// would get a full schema upgrade on top of its existing load.
 pub async fn get_db_schema_version() -> Result<u64, anyhow::Error> {
     let db = db::get_db().await;
-    let b = db.get(config::DB_SCHEMA_KEY).await?;
+    let b = match db.get(config::DB_SCHEMA_KEY).await {
+        Ok(v) => v,
+        Err(e) if is_db_schema_version_missing(&e) => return Ok(0),
+        Err(e) => return Err(e.into()),
+    };
     let s = String::from_utf8_lossy(&b);
     let k = match s.parse::<u64>() {
         Ok(v) => v,
@@ -47,6 +60,44 @@ pub async fn get_db_schema_version() -> Result<u64, anyhow::Error> {
     };
 
     Ok(k)
+}
+
+/// Whether the error means the schema version is genuinely not stored yet,
+/// as opposed to the database being unreachable or overloaded.
+fn is_db_schema_version_missing(e: &errors::Error) -> bool {
+    match e {
+        // the version key is not present (all backends map a missing key to
+        // KeyNotExists): fresh install or pre-versioning database
+        errors::Error::DbError(errors::DbError::KeyNotExists(_)) => true,
+        // the meta table itself does not exist yet: fresh SQL install
+        errors::Error::SqlxError(sqlx::Error::Database(e)) => {
+            // postgres: undefined_table
+            e.code().as_deref() == Some("42P01")
+                // sqlite reports a generic error code, match the message
+                || e.message().contains("no such table")
+        }
+        _ => false,
+    }
+}
+
+#[cfg(test)]
+mod schema_version_tests {
+    use super::*;
+
+    #[test]
+    fn test_missing_version_key_is_fresh_install() {
+        let e = errors::Error::DbError(errors::DbError::KeyNotExists("/meta/kv/version".into()));
+        assert!(is_db_schema_version_missing(&e));
+    }
+
+    #[test]
+    fn test_other_errors_are_not_fresh_install() {
+        // a connection-level error must never be treated as a fresh install
+        let e = errors::Error::Message("connection refused".to_string());
+        assert!(!is_db_schema_version_missing(&e));
+        let e = errors::Error::SqlxError(sqlx::Error::PoolTimedOut);
+        assert!(!is_db_schema_version_missing(&e));
+    }
 }
 
 pub async fn set_db_schema_version() -> Result<(), anyhow::Error> {

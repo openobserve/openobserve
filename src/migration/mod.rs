@@ -34,15 +34,35 @@ pub use migrator::{run_file_list, run_meta};
 pub async fn init_db() -> std::result::Result<(), anyhow::Error> {
     // we init client here to avoid deadlocks
     ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let db_schema_version = match infra::get_db_schema_version().await {
-        Ok(v) => v,
-        Err(e) => {
-            log::warn!(
-                "error in getting db schema version {e}; assuming default of 0 and trying upgrade."
-            );
-            0
+    // reading the version must be reliable: a genuinely missing version
+    // (fresh install) is reported as Ok(0), so an error here means the
+    // database is unreachable or overloaded. Never treat that as a fresh
+    // install - running the full db upgrade against a struggling database
+    // only adds more load on top of it. Retry, then abort the startup.
+    const MAX_RETRIES: usize = 5;
+    let mut db_schema_version = 0;
+    let mut last_err = None;
+    for attempt in 1..=MAX_RETRIES {
+        match infra::get_db_schema_version().await {
+            Ok(v) => {
+                db_schema_version = v;
+                last_err = None;
+                break;
+            }
+            Err(e) => {
+                log::warn!(
+                    "error in getting db schema version (attempt {attempt}/{MAX_RETRIES}): {e}, retrying..."
+                );
+                last_err = Some(e);
+                tokio::time::sleep(std::time::Duration::from_secs(attempt as u64 * 2)).await;
+            }
         }
-    };
+    }
+    if let Some(e) = last_err {
+        return Err(anyhow::anyhow!(
+            "failed to get db schema version after {MAX_RETRIES} attempts: {e}; refusing to assume a fresh install and run the db upgrade against an unhealthy database"
+        ));
+    }
     if db_schema_version == DB_SCHEMA_VERSION {
         // if version matches, we do not need to run update commands
         log::info!("DB_SCHEMA_VERSION match, skipping db upgrade");
