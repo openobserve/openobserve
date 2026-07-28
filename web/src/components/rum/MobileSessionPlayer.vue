@@ -20,6 +20,7 @@ import { useI18n } from "vue-i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import {
   buildMobileTimeline,
   wireframesAt,
@@ -34,6 +35,12 @@ const props = defineProps<{
   segments: MobileSegment[];
   /** RUM events (action/view/error) with `relativeTime` — rendered as timeline markers. */
   events?: any[];
+  /**
+   * True while the parent is still fetching this session's replay segments. Without it the
+   * player treats "segments not loaded yet" the same as "session has no replay" and flashes
+   * the empty state before the segment query resolves.
+   */
+  isLoading?: boolean;
 }>();
 
 const { t } = useI18n();
@@ -222,8 +229,20 @@ onBeforeUnmount(() => {
 
 <template>
   <section class="flex h-full flex-col" data-test="rum-mobile-replay-player">
+    <!-- Loading takes precedence over the empty state: until the segment fetch settles we
+         cannot know whether this session has a replay, so show a spinner rather than a
+         premature "no replay" message. -->
     <div
-      v-if="!hasReplay"
+      v-if="isLoading"
+      class="text-text-secondary flex h-full flex-col items-center justify-center gap-2"
+      data-test="rum-mobile-replay-loading"
+    >
+      <OSpinner size="md" />
+      <span>{{ t("rum.loadingSessionReplay") }}</span>
+    </div>
+
+    <div
+      v-else-if="!hasReplay"
       class="text-text-secondary flex h-full items-center justify-center"
       data-test="rum-mobile-replay-empty"
     >
