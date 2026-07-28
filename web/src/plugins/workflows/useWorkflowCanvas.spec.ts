@@ -47,6 +47,7 @@ import useWorkflowCanvas, {
   workflowObj,
   loadWorkflowRun,
   executeTestRun,
+  currentTriggerKind,
 } from "@/plugins/workflows/useWorkflowCanvas";
 
 const triggerNode = () => ({
@@ -343,5 +344,45 @@ describe("trigger-first guard — palette adds are blocked until a trigger exist
     expect(mockToast).not.toHaveBeenCalled();
     expect(workflowObj.dialog.show).toBe(true);
     expect(workflowObj.currentSelectedNodeData?.data.node_type).toBe("function");
+  });
+});
+
+describe("currentTriggerKind", () => {
+  const setNodes = (nodes: any[]) => {
+    workflowObj.currentSelectedWorkflow = { nodes } as any;
+  };
+
+  it("returns undefined when there is no trigger node", () => {
+    setNodes([{ id: "c1", data: { node_type: "condition" } }]);
+    expect(currentTriggerKind()).toBeUndefined();
+  });
+
+  it("reads the kind from a fresh trigger node (data.trigger_kind)", () => {
+    setNodes([
+      { id: "t1", data: { node_type: "workflow_trigger", trigger_kind: "incident_event" } },
+    ]);
+    expect(currentTriggerKind()).toBe("incident_event");
+  });
+
+  it("falls back to meta.trigger_kind (rehydrated from the API)", () => {
+    setNodes([
+      {
+        id: "t1",
+        data: { node_type: "workflow_trigger" },
+        meta: { trigger_kind: "alert_fired" },
+      },
+    ]);
+    expect(currentTriggerKind()).toBe("alert_fired");
+  });
+
+  it("prefers data.trigger_kind over meta.trigger_kind", () => {
+    setNodes([
+      {
+        id: "t1",
+        data: { node_type: "workflow_trigger", trigger_kind: "incident_event" },
+        meta: { trigger_kind: "alert_fired" },
+      },
+    ]);
+    expect(currentTriggerKind()).toBe("incident_event");
   });
 });
