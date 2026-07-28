@@ -51,7 +51,6 @@ openobserve-core.workspace = true
 openobserve-tls.workspace = true
 ingestion-common.workspace = true
 stream.workspace = true
-search.workspace = true
 openobserve-api-ingest.workspace = true
 openobserve-api-management.workspace = true
 openobserve-api-pipelines.workspace = true
