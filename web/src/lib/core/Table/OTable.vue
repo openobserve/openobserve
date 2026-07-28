@@ -285,49 +285,49 @@ provide(OTableCellActionsKey, {
 // ── Core table instance ─────────────────────────────────────────
 const { table, effectiveColumns, columnOrder, userReorderedColumns, columnSizing, columnSizeVars } =
   useTableCore<TData>(
-  {
-    get data() {
-      return tree.enabled.value ? tree.flatRows.value : props.data;
+    {
+      get data() {
+        return tree.enabled.value ? tree.flatRows.value : props.data;
+      },
+      get columns() {
+        return props.columns;
+      },
+      get pageSize() {
+        return props.pageSize;
+      },
+      get currentPage() {
+        return props.currentPage;
+      },
+      showIndex: props.showIndex,
+      sortBy: props.sortBy,
+      sortOrder: props.sortOrder,
+      sortFieldMap: props.sortFieldMap,
+      get globalFilter() {
+        return globalFilterLocal.value;
+      },
+      rowKey: props.rowKey,
+      enableColumnResize: props.enableColumnResize,
+      enableColumnReorder: props.enableColumnReorder,
+      enableColumnPin: props.enableColumnPin,
+      get columnVisibility() {
+        return internalColumnVisibility.value;
+      },
+      defaultColumns: props.defaultColumns,
+      initialColumnSizes: persistence.loadColumnSizes(),
+      getSubRows: props.getSubRows,
+      pagination: props.pagination,
+      sorting: props.sorting,
+      rowHeight: props.rowHeight,
+      filterMode: props.filterMode,
+      get horizontalScroll() {
+        return props.horizontalScroll;
+      },
+      get keepPageOnDataChange() {
+        return props.keepPageOnDataChange;
+      },
     },
-    get columns() {
-      return props.columns;
-    },
-    get pageSize() {
-      return props.pageSize;
-    },
-    get currentPage() {
-      return props.currentPage;
-    },
-    showIndex: props.showIndex,
-    sortBy: props.sortBy,
-    sortOrder: props.sortOrder,
-    sortFieldMap: props.sortFieldMap,
-    get globalFilter() {
-      return globalFilterLocal.value;
-    },
-    rowKey: props.rowKey,
-    enableColumnResize: props.enableColumnResize,
-    enableColumnReorder: props.enableColumnReorder,
-    enableColumnPin: props.enableColumnPin,
-    get columnVisibility() {
-      return internalColumnVisibility.value;
-    },
-    defaultColumns: props.defaultColumns,
-    initialColumnSizes: persistence.loadColumnSizes(),
-    getSubRows: props.getSubRows,
-    pagination: props.pagination,
-    sorting: props.sorting,
-    rowHeight: props.rowHeight,
-    filterMode: props.filterMode,
-    get horizontalScroll() {
-      return props.horizontalScroll;
-    },
-    get keepPageOnDataChange() {
-      return props.keepPageOnDataChange;
-    },
-  },
-  emit,
-);
+    emit,
+  );
 
 // ── Column resize reset ─────────────────────────────────────────
 const hasResizedColumns = computed(() => Object.keys(table.getState().columnSizing).length > 0);
