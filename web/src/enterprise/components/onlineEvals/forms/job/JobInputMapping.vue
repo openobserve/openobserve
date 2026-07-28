@@ -113,7 +113,10 @@
           </span>
         </div>
         <div
-          v-if="targetScope === 'trace' && scorerUsesSpans(scorer, inputMappings[entityId(scorer)])"
+          v-if="
+            targetScope === 'trace' &&
+            mappingUsesSystemProvidedSpans(inputMappings[entityId(scorer)])
+          "
           class="border-dialog-header-border flex flex-col gap-1 border-b px-3 py-2"
           :data-test="`job-input-mapping-span-selector-${entityId(scorer)}`"
         >
@@ -202,7 +205,7 @@ import { formatTemplateVariable } from "../../utils/evalFormat";
 import {
   defaultJobMappingValue,
   jobMappingVariablesForScorer,
-  scorerUsesSpans,
+  mappingUsesSystemProvidedSpans,
 } from "../../utils/jobMappings";
 import {
   systemProvidedVariablesForScope,

@@ -10,8 +10,8 @@ import {
   buildJobInputMappingPayload,
   defaultJobMappingValue,
   jobMappingVariablesForScorer,
+  mappingUsesSystemProvidedSpans,
   normalizeJobInputMappings,
-  scorerUsesSpans,
   scorerTemplateVariables,
   syncJobInputMappings,
 } from "./jobMappings";
@@ -108,22 +108,18 @@ describe("jobMappingVariablesForScorer", () => {
   });
 });
 
-describe("scorerUsesSpans", () => {
-  it("detects the spans prompt variable", () => {
+describe("mappingUsesSystemProvidedSpans", () => {
+  it("ignores a spans prompt variable mapped to a span attribute", () => {
     expect(
-      scorerUsesSpans(
-        scorer({
-          variables: ["question", "spans"],
-          template: "Judge {{ question }} using {{ spans }}",
-        }),
-        {},
-      ),
-    ).toBe(true);
+      mappingUsesSystemProvidedSpans({
+        spans: "{{custom_spans}}",
+      }),
+    ).toBe(false);
   });
 
   it("detects a custom prompt variable mapped to the spans view", () => {
     expect(
-      scorerUsesSpans(scorer({ variables: ["evidence"] }), {
+      mappingUsesSystemProvidedSpans({
         evidence: "{{ spans }}",
       }),
     ).toBe(true);
@@ -131,7 +127,7 @@ describe("scorerUsesSpans", () => {
 
   it("does not require spans for unrelated prompt variables", () => {
     expect(
-      scorerUsesSpans(scorer({ variables: ["input", "output"] }), {
+      mappingUsesSystemProvidedSpans({
         input: "{{ input }}",
         output: "{{ output }}",
       }),

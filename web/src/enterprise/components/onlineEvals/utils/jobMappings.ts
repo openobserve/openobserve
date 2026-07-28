@@ -39,12 +39,9 @@ export function jobMappingVariablesForScorer(
   return [...new Set([...scorerTemplateVariables(scorer), ...Object.keys(existingMapping || {})])];
 }
 
-export function scorerUsesSpans(
-  scorer: Scorer,
+export function mappingUsesSystemProvidedSpans(
   existingMapping: Record<string, string> | undefined,
 ) {
-  if (scorerTemplateVariables(scorer).includes("spans")) return true;
-
   return Object.values(existingMapping || {}).some(
     (value) => value.trim().replace(/\s+/g, "") === "{{spans}}",
   );

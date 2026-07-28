@@ -119,7 +119,7 @@ describe("JobInputMapping", () => {
       ).toBe(true);
     }
     expect(wrapper.find('[data-test="job-input-mapping-span-selector-scorer-1"]').exists()).toBe(
-      true,
+      false,
     );
     expect(wrapper.find('[data-test="job-input-mapping-select-scorer-1-custom"]').exists()).toBe(
       true,
@@ -267,6 +267,19 @@ describe("JobInputMapping", () => {
   it("hides the selector dropdown until a selector exists", async () => {
     const wrapper = mountMapping("trace");
 
+    await wrapper.setProps({
+      inputMappings: {
+        "scorer-1": {
+          input: "{{custom_input}}",
+          output: "{{custom_output}}",
+          statistics: "{{custom_statistics}}",
+          spans: "{{spans}}",
+          steps: "{{custom_steps}}",
+          custom: "{{custom_field}}",
+        },
+      },
+    });
+
     expect(wrapper.find('[data-test="span-selector-binding-scorer-1"]').exists()).toBe(false);
     const createButton = wrapper.get('[data-test="span-selector-create-scorer-1"]');
     expect(createButton.text()).toContain("Create for scorer");
@@ -286,6 +299,49 @@ describe("JobInputMapping", () => {
     });
 
     expect(wrapper.find('[data-test="span-selector-binding-scorer-1"]').exists()).toBe(true);
+  });
+
+  it("offers a Span Selector only after the spans system value is selected", async () => {
+    const wrapper = mountMapping("trace");
+
+    expect(wrapper.find('[data-test="job-input-mapping-span-selector-scorer-1"]').exists()).toBe(
+      false,
+    );
+
+    const spansSelect = wrapper
+      .findAllComponents(OSelect)
+      .find(
+        (component) =>
+          component.attributes("data-test") === "job-input-mapping-select-scorer-1-spans",
+      );
+    expect(spansSelect).toBeDefined();
+
+    spansSelect?.vm.$emit("update:modelValue", "{{spans}}");
+    await wrapper.vm.$nextTick();
+
+    const inputMappings = wrapper.emitted("update:inputMappings")?.at(-1)?.[0];
+    expect(inputMappings).toEqual(
+      expect.objectContaining({
+        "scorer-1": expect.objectContaining({ spans: "{{spans}}" }),
+      }),
+    );
+
+    await wrapper.setProps({
+      inputMappings: {
+        "scorer-1": {
+          input: "{{custom_input}}",
+          output: "{{custom_output}}",
+          statistics: "{{custom_statistics}}",
+          spans: "{{spans}}",
+          steps: "{{custom_steps}}",
+          custom: "{{custom_field}}",
+        },
+      },
+    });
+
+    expect(wrapper.find('[data-test="job-input-mapping-span-selector-scorer-1"]').exists()).toBe(
+      true,
+    );
   });
 
   it("offers no Span Selector for a trace scorer that has no {{ spans }}", () => {

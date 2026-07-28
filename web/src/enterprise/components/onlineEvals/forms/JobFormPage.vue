@@ -358,8 +358,8 @@ import {
 import { buildConditionsString } from "@/utils/alerts/conditionsFormatter";
 import {
   buildJobInputMappingPayload,
+  mappingUsesSystemProvidedSpans,
   normalizeJobInputMappings,
-  scorerUsesSpans,
   syncJobInputMappings,
 } from "../utils/jobMappings";
 import {
@@ -743,7 +743,7 @@ async function onSubmit(value: JobForm) {
   }
   const scorersMissingSpanSelectors = selectedScorers.value.filter(
     (scorer) =>
-      scorerUsesSpans(scorer, inputMappings.value[entityId(scorer)]) &&
+      mappingUsesSystemProvidedSpans(inputMappings.value[entityId(scorer)]) &&
       !spanSelectorBindings.value[entityId(scorer)],
   );
   if (
