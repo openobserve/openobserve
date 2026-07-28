@@ -105,6 +105,11 @@ export class MetricsPage {
         this.promqlTableHeaders = page.locator(
             '[data-test="promql-table-chart"] [data-test^="o2-table-th-"]:not([data-test*="-sort-"]):not([data-test*="-remove-"])'
         );
+        // Trailing "Value" column of the expanded_timeseries / all layouts — the
+        // stable render-complete signal for the table (see waitForPromqlTableLayoutReady).
+        this.promqlTableValueHeader = page.locator(
+            '[data-test="promql-table-chart"] [data-test="o2-table-th-value"]'
+        );
 
         // ===== ConfigPanel sidebar (PanelSidebar + Reka Collapsible sections) =====
         this.dashboardSidebarButton = page.locator('[data-test="dashboard-sidebar"]').first();
@@ -2444,6 +2449,22 @@ export class MetricsPage {
      */
     async waitForPromqlTableHeaders(timeout = 15000) {
         await this.promqlTableHeaders.first().waitFor({ state: 'visible', timeout });
+    }
+
+    /**
+     * Waits until the expanded_timeseries layout has finished rendering.
+     *
+     * That layout is [Timestamp, ...metric labels, Value] — Value is always the
+     * final column (convertPromQLTableChart appends it after the label columns).
+     * Gate on the Value header's own id rather than on `nth(count - 1)`: the
+     * count and the positional read are two separate round-trips, so a table
+     * still painting its columns (or repainting as a fresh query response lands
+     * under parallel-worker load in CI) yields a count taken before the Value
+     * column exists, and `nth(count - 1)` then resolves to the last *label*
+     * (`start_time`) instead. Keying off the id removes the race entirely.
+     */
+    async waitForPromqlTableLayoutReady(timeout = 20000) {
+        await this.promqlTableValueHeader.waitFor({ state: 'visible', timeout });
     }
 
     /**
