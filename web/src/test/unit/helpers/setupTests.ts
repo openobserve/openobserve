@@ -23,6 +23,10 @@ import "../../__mocks__/index";
 
 // Install i18n globally so every component's useI18n() resolves in tests (mirrors
 // main.ts); without it useI18n() throws "Need to install with `app.use` function".
+// NOTE: this preloads @/locales' import graph (utils/cookies, constants/key,
+// js-cookie, vue-i18n) into the module cache before every spec, so specs cannot
+// vi.mock() those modules — vi.spyOn() the shared instance instead (see
+// utils/cookies.spec.ts).
 import i18n from "@/locales";
 config.global.plugins = [...(config.global.plugins ?? []), i18n];
 
