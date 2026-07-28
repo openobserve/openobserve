@@ -559,10 +559,11 @@ export const getDashboard = async (store: any, dashboardId: any, folderId: any) 
   // Fix duplicate panel IDs and check if any were found
   const hasDuplicates = fixDuplicatePanelIds(dashboardJson);
 
-  // `_timestamp` is not allowed as a SQL output alias — normalize it to `ts`.
-  // Returns true when anything was rewritten, so we persist it (save + re-fetch)
-  // exactly like duplicate panel IDs.
-  const hasReservedAlias = normalizeReservedTimestampAlias(dashboardJson);
+  // The reserved timestamp column is not allowed as a SQL output alias —
+  // normalize it to `ts`. Returns true when anything was rewritten, so we
+  // persist it (save + re-fetch) exactly like duplicate panel IDs.
+  const timestampColumn = store.state.zoConfig?.timestamp_column ?? "_timestamp";
+  const hasReservedAlias = normalizeReservedTimestampAlias(dashboardJson, timestampColumn);
 
   // If either fix changed the dashboard, save it and retrieve the updated version
   if (hasDuplicates || hasReservedAlias) {

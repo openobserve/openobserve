@@ -891,6 +891,51 @@ describe("Commons Utility Functions", () => {
 
       expect(dashboardService.save).not.toHaveBeenCalled();
     });
+
+    it("uses the configured timestamp_column (zoConfig) as the reserved alias", async () => {
+      const dashboardId = "dashboard-custom-ts";
+      mockStore.state.zoConfig = { timestamp_column: "event_time" };
+      const mockDashboard = {
+        tabs: [
+          {
+            panels: [
+              {
+                config: {},
+                queries: [
+                  {
+                    customQuery: true,
+                    query:
+                      'SELECT histogram(event_time) AS "event_time" FROM "x" GROUP BY event_time',
+                    fields: {
+                      x: [
+                        { alias: "event_time", column: "event_time", isDerived: false },
+                      ],
+                    },
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      };
+
+      mockStore.state.organizationData.allDashboardData[dashboardId] =
+        mockDashboard;
+      (dashboardService.save as any).mockResolvedValue({
+        data: { success: true },
+      });
+      (dashboardService.get_Dashboard as any).mockResolvedValue({
+        data: { version: 1, v1: mockDashboard, hash: 123 },
+      });
+
+      await getDashboard(mockStore, dashboardId, "test-folder");
+
+      const query = mockDashboard.tabs[0].panels[0].queries[0];
+      expect(query.query).toContain('AS "ts"');
+      expect(query.query).not.toContain('AS "event_time"');
+      expect(query.fields.x[0].alias).toBe("ts");
+      expect(dashboardService.save).toHaveBeenCalled();
+    });
   });
 
   describe("addVariable", () => {
