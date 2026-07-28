@@ -44,6 +44,7 @@ import {
   durationFormatter,
   getTimezoneOffset,
   convertDateToTimestamp,
+  resolveBrowserTimezone,
   isValidResourceName,
   escapeSingleQuotes,
   splitQuotedString,
@@ -1112,6 +1113,71 @@ if .severity == "error" {
         expect(result).toHaveProperty("offset");
         expect(typeof result.timestamp).toBe("number");
         expect(typeof result.offset).toBe("number");
+      });
+    });
+
+    describe("resolveBrowserTimezone", () => {
+      it("returns a raw IANA zone unchanged", () => {
+        expect(resolveBrowserTimezone("America/Los_Angeles")).toBe(
+          "America/Los_Angeles",
+        );
+      });
+
+      it("returns 'UTC' unchanged", () => {
+        expect(resolveBrowserTimezone("UTC")).toBe("UTC");
+      });
+
+      it("resolves a 'Browser Time (<zone>)' label to the inner IANA zone", () => {
+        expect(
+          resolveBrowserTimezone("Browser Time (America/Los_Angeles)"),
+        ).toBe("America/Los_Angeles");
+      });
+
+      it("resolves a legacy label saved on another machine (rc9 update case)", () => {
+        // An alert created on an older release persisted this literal string;
+        // opening/updating it must yield a plain IANA zone, not the label.
+        expect(resolveBrowserTimezone("Browser Time (Asia/Kolkata)")).toBe(
+          "Asia/Kolkata",
+        );
+      });
+
+      it("is case-insensitive on the label prefix", () => {
+        expect(resolveBrowserTimezone("browser time (Asia/Kolkata)")).toBe(
+          "Asia/Kolkata",
+        );
+      });
+
+      it("never returns a 'Browser Time' label for a malformed value", () => {
+        const result = resolveBrowserTimezone("Browser Time");
+        expect(result.toLowerCase().startsWith("browser time")).toBe(false);
+        expect(result).toBeTruthy();
+      });
+
+      it("returns an empty string unchanged", () => {
+        expect(resolveBrowserTimezone("")).toBe("");
+      });
+
+      it("trims whitespace inside the label parentheses", () => {
+        expect(resolveBrowserTimezone("Browser Time ( Asia/Kolkata )")).toBe(
+          "Asia/Kolkata",
+        );
+      });
+
+      it("matches the label prefix regardless of case", () => {
+        expect(resolveBrowserTimezone("BROWSER TIME (Asia/Kolkata)")).toBe(
+          "Asia/Kolkata",
+        );
+      });
+
+      it("leaves a value that only contains (not starts with) the label untouched", () => {
+        expect(resolveBrowserTimezone("Not Browser Time (Asia/Kolkata)")).toBe(
+          "Not Browser Time (Asia/Kolkata)",
+        );
+      });
+
+      it("passes a null/undefined value through without throwing", () => {
+        expect(resolveBrowserTimezone(null as any)).toBeNull();
+        expect(resolveBrowserTimezone(undefined as any)).toBeUndefined();
       });
     });
   });

@@ -441,9 +441,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   hide-selected
                   :title="formData.trigger_condition.timezone"
                   placeholder="Timezone *"
-                  :display-value="`${browserTimezone || 'Select timezone'}`"
+                  :display-value="formData.trigger_condition.timezone || 'Select Timezone'"
                   style="width: 210px"
-                  @update:model-value="emitTriggerUpdate"
+                  @update:model-value="onTimezoneChange"
                 />
               </div>
             </div>
@@ -633,6 +633,7 @@ import {
   getCronIntervalDifferenceInSeconds,
   isAboveMinRefreshInterval,
   convertMinutesToCron,
+  resolveBrowserTimezone,
 } from "@/utils/zincutils";
 import searchService from "@/services/search";
 
@@ -824,31 +825,61 @@ export default defineComponent({
       return '';
     };
 
+    // Every IANA zone the runtime knows about (fallback: the detected zone).
+    const getAllTimezones = (): string[] => {
+      try {
+        // @ts-ignore - supportedValuesOf is not in all TypeScript lib versions
+        if (typeof Intl !== 'undefined' && typeof Intl.supportedValuesOf === 'function') {
+          // @ts-ignore
+          return Intl.supportedValuesOf("timeZone");
+        }
+      } catch (err) {
+        // fall through to the browser-zone fallback below
+      }
+      return [browserTimezone.value || "UTC"];
+    };
+
+    // Options for the picker: the two convenience shortcuts first (matching the
+    // reports picker in CreateReport.vue), then every IANA zone.
+    const buildTimezoneOptions = (): string[] => [
+      `Browser Time (${browserTimezone.value})`,
+      "UTC",
+      ...getAllTimezones(),
+    ];
+
+    // Resolve the picked value to a canonical zone, then notify the parent.
+    // "Browser Time (<zone>)" is a display-only shortcut; resolveBrowserTimezone
+    // persists the plain IANA zone so trigger_condition.timezone stays a value
+    // the backend can parse (storing the raw label produces a NaN tz_offset).
+    const onTimezoneChange = (value: string) => {
+      const resolved = resolveBrowserTimezone(value);
+      if (resolved !== props.formData.trigger_condition.timezone) {
+        props.formData.trigger_condition.timezone = resolved;
+      }
+      emitTriggerUpdate();
+    };
+
     // Initialize timezone
     const initializeTimezone = () => {
       try {
         const detectedTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
         browserTimezone.value = detectedTimezone;
 
-        // Auto-detect and set timezone if not already set and in cron mode
-        if (props.formData.trigger_condition.frequency_type === 'cron' && !props.formData.trigger_condition.timezone) {
+        if (
+          props.formData.trigger_condition.frequency_type === 'cron' &&
+          !props.formData.trigger_condition.timezone
+        ) {
+          // Cron mode with no timezone yet: default to the detected zone.
           props.formData.trigger_condition.timezone = detectedTimezone;
           showTimezoneWarning.value = true;
+        } else if (props.formData.trigger_condition.timezone) {
+          // Heal legacy alerts that persisted a "Browser Time (…)" label.
+          props.formData.trigger_condition.timezone = resolveBrowserTimezone(
+            props.formData.trigger_condition.timezone,
+          );
         }
 
-        // Get all available timezones
-        try {
-          // @ts-ignore - supportedValuesOf is not in all TypeScript versions
-          if (typeof Intl !== 'undefined' && typeof Intl.supportedValuesOf === 'function') {
-            // @ts-ignore
-            filteredTimezone.value = Intl.supportedValuesOf("timeZone");
-          } else {
-            // Fallback for older browsers
-            filteredTimezone.value = [detectedTimezone];
-          }
-        } catch (err) {
-          filteredTimezone.value = [detectedTimezone];
-        }
+        filteredTimezone.value = buildTimezoneOptions();
       } catch (e) {
         console.error('Error initializing timezone:', e);
         browserTimezone.value = "UTC";
@@ -1066,33 +1097,17 @@ export default defineComponent({
     };
 
 
-    // Timezone filter function
+    // Timezone filter function — filters the full option list (including the
+    // "Browser Time" and "UTC" shortcuts) so they remain searchable.
     const timezoneFilterFn = (val: string, update: any) => {
       update(() => {
+        const options = buildTimezoneOptions();
         if (val === "") {
-          try {
-            // @ts-ignore
-            if (typeof Intl !== 'undefined' && typeof Intl.supportedValuesOf === 'function') {
-              // @ts-ignore
-              filteredTimezone.value = Intl.supportedValuesOf("timeZone");
-            }
-          } catch (e) {
-            // Keep current filtered list
-          }
+          filteredTimezone.value = options;
         } else {
           const needle = val.toLowerCase();
-          const allTimezones: string[] = [];
-          try {
-            // @ts-ignore
-            if (typeof Intl !== 'undefined' && typeof Intl.supportedValuesOf === 'function') {
-              // @ts-ignore
-              allTimezones.push(...Intl.supportedValuesOf("timeZone"));
-            }
-          } catch (e) {
-            allTimezones.push(browserTimezone.value);
-          }
-          filteredTimezone.value = allTimezones.filter((v: string) =>
-            v.toLowerCase().indexOf(needle) > -1
+          filteredTimezone.value = options.filter(
+            (tz: string) => tz.toLowerCase().indexOf(needle) > -1,
           );
         }
       });
@@ -1372,6 +1387,7 @@ export default defineComponent({
       filteredTimezone,
       showTimezoneWarning,
       timezoneFilterFn,
+      onTimezoneChange,
       // Cron validation
       cronJobError,
       validateFrequency,

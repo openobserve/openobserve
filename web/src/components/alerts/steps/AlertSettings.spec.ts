@@ -77,6 +77,13 @@ vi.mock("@/utils/zincutils", () => ({
     if (minutes === 10) return "0 */10 * * * *";
     return `0 */${minutes} * * * *`;
   }),
+  resolveBrowserTimezone: vi.fn((tz: string) => {
+    if (typeof tz === "string" && tz.toLowerCase().startsWith("browser time")) {
+      const inner = tz.match(/\(([^)]+)\)/)?.[1]?.trim();
+      return inner || Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+    }
+    return tz;
+  }),
 }));
 
 // Mock window.open
@@ -233,6 +240,170 @@ describe("AlertSettings.vue", () => {
       await wrapper.setProps({ isAggregationEnabled: true });
       await nextTick();
       expect(wrapper.vm.localIsAggregationEnabled).toBe(true);
+    });
+  });
+
+  describe("Timezone Options", () => {
+    // Quasar calls the filter fn's `update` with a callback; run it inline.
+    const runUpdate = (fn: () => void) => fn();
+
+    it("lists 'Browser Time' and 'UTC' shortcuts at the top of the options", () => {
+      const options = wrapper.vm.filteredTimezone;
+      expect(options[0]).toBe(`Browser Time (${wrapper.vm.browserTimezone})`);
+      expect(options[1]).toBe("UTC");
+      // Real IANA zones follow the two shortcuts.
+      expect(options.length).toBeGreaterThan(2);
+    });
+
+    it("timezoneFilterFn('') restores the full list including the shortcuts", () => {
+      wrapper.vm.filteredTimezone = [];
+      wrapper.vm.timezoneFilterFn("", runUpdate);
+      expect(wrapper.vm.filteredTimezone).toContain("UTC");
+      expect(
+        wrapper.vm.filteredTimezone.some((tz: string) =>
+          tz.startsWith("Browser Time"),
+        ),
+      ).toBe(true);
+    });
+
+    it("keeps the UTC shortcut searchable", () => {
+      wrapper.vm.timezoneFilterFn("utc", runUpdate);
+      expect(wrapper.vm.filteredTimezone).toContain("UTC");
+    });
+
+    it("keeps the Browser Time shortcut searchable", () => {
+      wrapper.vm.timezoneFilterFn("browser", runUpdate);
+      expect(
+        wrapper.vm.filteredTimezone.some((tz: string) =>
+          tz.startsWith("Browser Time"),
+        ),
+      ).toBe(true);
+    });
+
+    it("onTimezoneChange stores 'UTC' unchanged", () => {
+      wrapper.vm.onTimezoneChange("UTC");
+      expect(mockFormData.trigger_condition.timezone).toBe("UTC");
+    });
+
+    it("onTimezoneChange passes a raw IANA zone through unchanged", () => {
+      wrapper.vm.onTimezoneChange("Asia/Kolkata");
+      expect(mockFormData.trigger_condition.timezone).toBe("Asia/Kolkata");
+    });
+
+    it("onTimezoneChange resolves a 'Browser Time (<zone>)' pick to the inner IANA zone", () => {
+      wrapper.vm.onTimezoneChange("Browser Time (America/Los_Angeles)");
+      expect(mockFormData.trigger_condition.timezone).toBe(
+        "America/Los_Angeles",
+      );
+    });
+
+    it("heals a legacy 'Browser Time (<zone>)' value to a plain IANA zone on mount", () => {
+      const legacyFormData = {
+        query_condition: { type: "custom", aggregation: null },
+        trigger_condition: {
+          operator: ">=",
+          threshold: 1,
+          period: 10,
+          frequency: 10,
+          frequency_type: "cron",
+          cron: "0 0 * * * *",
+          timezone: "Browser Time (Asia/Kolkata)",
+          silence: 10,
+        },
+      };
+
+      const localWrapper = mount(AlertSettings, {
+        global: {
+          mocks: { $store: mockStore, $router: mockRouter },
+          provide: { store: mockStore, router: mockRouter },
+          plugins: [i18n],
+        },
+        props: {
+          formData: legacyFormData,
+          isRealTime: "false",
+          columns: [],
+          isAggregationEnabled: false,
+          destinations: [],
+          formattedDestinations: [],
+        },
+      });
+
+      expect(legacyFormData.trigger_condition.timezone).toBe("Asia/Kolkata");
+      localWrapper.unmount();
+    });
+
+    // Mounts a fresh component with the given trigger_condition overrides.
+    const mountWith = (triggerOverrides: Record<string, any>) => {
+      const formData = {
+        query_condition: { type: "custom", aggregation: null },
+        trigger_condition: {
+          operator: ">=",
+          threshold: 1,
+          period: 10,
+          frequency: 10,
+          frequency_type: "minutes",
+          cron: "",
+          timezone: "",
+          silence: 10,
+          ...triggerOverrides,
+        },
+      };
+      const w = mount(AlertSettings, {
+        global: {
+          mocks: { $store: mockStore, $router: mockRouter },
+          provide: { store: mockStore, router: mockRouter },
+          plugins: [i18n],
+        },
+        props: {
+          formData,
+          isRealTime: "false",
+          columns: [],
+          isAggregationEnabled: false,
+          destinations: [],
+          formattedDestinations: [],
+        },
+      });
+      return { w, formData };
+    };
+
+    it("does not auto-set a timezone in minutes mode when none is provided", () => {
+      const { w, formData } = mountWith({
+        frequency_type: "minutes",
+        timezone: "",
+      });
+      expect(formData.trigger_condition.timezone).toBe("");
+      w.unmount();
+    });
+
+    it("auto-detects the browser zone and warns when entering cron with no timezone", () => {
+      const { w, formData } = mountWith({
+        frequency_type: "cron",
+        cron: "0 0 * * * *",
+        timezone: "",
+      });
+      expect(formData.trigger_condition.timezone).toBe(w.vm.browserTimezone);
+      expect(formData.trigger_condition.timezone).toBeTruthy();
+      expect(w.vm.showTimezoneWarning).toBe(true);
+      w.unmount();
+    });
+
+    it("heals a legacy 'Browser Time (<zone>)' value even in minutes mode", () => {
+      const { w, formData } = mountWith({
+        frequency_type: "minutes",
+        timezone: "Browser Time (Europe/Paris)",
+      });
+      expect(formData.trigger_condition.timezone).toBe("Europe/Paris");
+      w.unmount();
+    });
+
+    it("returns an empty list when the filter matches nothing", () => {
+      wrapper.vm.timezoneFilterFn("zzz-not-a-timezone", runUpdate);
+      expect(wrapper.vm.filteredTimezone).toEqual([]);
+    });
+
+    it("emits 'update:trigger' when the timezone changes", () => {
+      wrapper.vm.onTimezoneChange("UTC");
+      expect(wrapper.emitted("update:trigger")).toBeTruthy();
     });
   });
 
