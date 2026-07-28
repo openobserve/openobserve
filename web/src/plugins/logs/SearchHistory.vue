@@ -331,7 +331,14 @@ export default defineComponent({
   },
   methods: {
     closeSearchHistory() {
-      this.$router.push({ name: "logs" });
+      // Go back to wherever the user came from (preserving that page's URL/state)
+      // instead of resetting to a bare /logs. Fall back to the Logs route when this
+      // page was the entry point (deep link / refresh) and there's no history to pop.
+      if (window.history.state?.back) {
+        this.$router.back();
+      } else {
+        this.$router.push({ name: "logs" });
+      }
     },
   },
   setup() {
