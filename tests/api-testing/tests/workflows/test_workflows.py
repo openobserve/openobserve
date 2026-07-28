@@ -139,8 +139,9 @@ def test_create_workflow_malformed_body(create_session, base_url):
 def test_create_workflow_trigger_only_rejected(create_session, base_url):
     """CT-15c — a trigger-only graph (non-leaf leaf) is rejected by graph validation."""
     payload = _workflow_payload(f"wf_auto_api_{_suffix()}", "unused")
-    payload["nodes"] = payload["nodes"][:1]  # drop the destination node
-    payload["edges"] = []
+    # nodes/edges live under the "workflow" envelope now (create body is {workflow, trigger_type}).
+    payload["workflow"]["nodes"] = payload["workflow"]["nodes"][:1]  # drop the destination node
+    payload["workflow"]["edges"] = []
     resp = create_session.post(f"{base_url}api/{ORG_ID}/workflows", json=payload)
     assert resp.status_code in (400, 422), f"expected 4xx, got {resp.status_code}: {resp.text[:300]}"
 
@@ -162,7 +163,9 @@ def test_update_workflow_round_trip(create_session, base_url, workflow):
     """CT-13c — update persists; re-reading via list shows the edited fields (no get-by-id endpoint)."""
     new_desc = "automation workflow edited"
     payload = _workflow_payload(workflow["name"], workflow["dest"], description=new_desc)
-    payload["id"] = workflow["id"]
+    # id must be set inside the "workflow" envelope; the handler reads payload.workflow.id
+    # and 400s ("id mismatch in payload and path") if it doesn't match the path id.
+    payload["workflow"]["id"] = workflow["id"]
     resp = create_session.put(f"{base_url}api/{ORG_ID}/workflows/{workflow['id']}", json=payload)
     assert resp.status_code == 200, f"update failed: {resp.status_code} {resp.text[:300]}"
     found = _find_in_list(create_session, base_url, workflow["id"])
