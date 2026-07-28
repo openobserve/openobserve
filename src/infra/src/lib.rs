@@ -64,7 +64,7 @@ fn is_db_schema_version_missing(e: &errors::Error) -> bool {
         // meta table not created yet: fresh install. the sqlite/postgres
         // Db::get() wrap the sqlx error text into DBOperError
         errors::Error::DbError(errors::DbError::DBOperError(msg, _)) => {
-            is_table_missing_message(msg)
+            is_table_missing_message(msg) || is_sqlite_db_file_missing(msg)
         }
         errors::Error::SqlxError(sqlx::Error::Database(e)) => {
             e.code().as_deref() == Some("42P01") // postgres: undefined_table
@@ -76,12 +76,19 @@ fn is_db_schema_version_missing(e: &errors::Error) -> bool {
 
 fn is_table_missing_message(msg: &str) -> bool {
     // sqlite: "no such table: meta"
-    // sqlite fresh install, the db directory/file is created by db_init:
-    // "(code: 14) unable to open database file"
     // postgres: "relation \"meta\" does not exist"
-    msg.contains("no such table")
-        || msg.contains("unable to open database file")
-        || (msg.contains("relation") && msg.contains("does not exist"))
+    msg.contains("no such table") || (msg.contains("relation") && msg.contains("does not exist"))
+}
+
+/// sqlite CANTOPEN is a fresh install only when the metadata file itself does
+/// not exist yet (db_init creates it); CANTOPEN on an existing file means a
+/// permission/disk/mount problem and must keep failing the startup.
+fn is_sqlite_db_file_missing(msg: &str) -> bool {
+    if !msg.contains("unable to open database file") {
+        return false;
+    }
+    let path = format!("{}metadata.sqlite", config::get_config().common.data_db_dir);
+    !std::path::Path::new(&path).exists()
 }
 
 #[cfg(test)]

@@ -458,9 +458,9 @@ static CONSUMED_FILES: Lazy<tokio::sync::Mutex<HashMap<PathBuf, (fs::File, u32)>
 /// can be re-uploaded after a power loss / kernel crash.
 const CONSUMED_SYNC_EVERY: u32 = 32;
 
-async fn append_consumed_sidecar(pack_path: &Path, offsets: &[u64]) {
+async fn append_consumed_sidecar(pack_path: &Path, offsets: &[u64]) -> std::io::Result<()> {
     if offsets.is_empty() {
-        return;
+        return Ok(());
     }
     let path = consumed_sidecar_path(pack_path);
     let mut data = String::with_capacity(offsets.len() * 12);
@@ -469,9 +469,10 @@ async fn append_consumed_sidecar(pack_path: &Path, offsets: &[u64]) {
         data.push('\n');
     }
     let mut files = CONSUMED_FILES.lock().await;
+    let mut last_err = None;
     for attempt in 1..=3 {
         match sidecar_append_once(&mut files, &path, &data).await {
-            Ok(_) => return,
+            Ok(_) => return Ok(()),
             Err(e) => {
                 // drop the handle so the next attempt reopens the file.
                 // duplicate offset lines from a partially applied attempt
@@ -481,14 +482,11 @@ async fn append_consumed_sidecar(pack_path: &Path, offsets: &[u64]) {
                     "[INGESTER:PACK] write consumed sidecar {} failed (attempt {attempt}/3): {e}",
                     path.display()
                 );
+                last_err = Some(e);
             }
         }
     }
-    // worst case the segments are re-uploaded after a restart
-    log::error!(
-        "[INGESTER:PACK] write consumed sidecar {} failed after 3 attempts, segments may be re-uploaded after a restart",
-        path.display()
-    );
+    Err(last_err.unwrap())
 }
 
 async fn sidecar_append_once(
@@ -583,7 +581,8 @@ async fn end_read(paths: &[Arc<PathBuf>]) {
 async fn delete_pack_file(path: &Path) {
     let sidecar = consumed_sidecar_path(path);
     CONSUMED_FILES.lock().await.remove(&sidecar);
-    let _ = fs::remove_file(&sidecar).await;
+    // delete the pack first: if it fails the sidecar must survive, otherwise
+    // a restart would re-register the whole pack and re-upload every segment
     match fs::remove_file(path).await {
         Ok(_) => {
             log::info!(
@@ -597,8 +596,10 @@ async fn delete_pack_file(path: &Path) {
                 "[INGESTER:PACK] failed to delete consumed pack file: {}, error: {e}",
                 path.display()
             );
+            return;
         }
     }
+    let _ = fs::remove_file(&sidecar).await;
 }
 
 /// Aggregates of one stream's pending segments, for the mover flush decision.
@@ -654,14 +655,20 @@ pub async fn get_stream_segments(
 
 /// Mark segments as consumed: remove them from the index and delete packs
 /// that are fully consumed with no in-flight readers.
+///
+/// Returns an error when a sidecar write definitively failed. The in-memory
+/// consumption is still committed in that case: the file_list entry is
+/// already durable, so keeping the segments pending would re-upload
+/// (duplicate) them immediately - the error is for the caller to stop and
+/// surface the IO problem, the remaining risk is a re-upload after a restart.
 pub async fn mark_segments_consumed(
     org_id: &str,
     stream_type: &str,
     stream_name: &str,
     segments: &[(Arc<PathBuf>, u64)],
-) {
+) -> Result<()> {
     if segments.is_empty() {
-        return;
+        return Ok(());
     }
     // record the consumption in the sidecar first, so a restart does not
     // re-upload (duplicate) already consumed segments
@@ -669,8 +676,13 @@ pub async fn mark_segments_consumed(
     for (path, offset) in segments {
         by_pack.entry(path.clone()).or_default().push(*offset);
     }
+    let mut sidecar_err = None;
     for (path, offsets) in by_pack.iter() {
-        append_consumed_sidecar(path.as_path(), offsets).await;
+        if let Err(e) = append_consumed_sidecar(path.as_path(), offsets).await
+            && sidecar_err.is_none()
+        {
+            sidecar_err = Some((path.clone(), e));
+        }
     }
     let key = segment_index_key(org_id, stream_type, stream_name);
     {
@@ -708,6 +720,13 @@ pub async fn mark_segments_consumed(
     for path in to_delete {
         delete_pack_file(&path).await;
     }
+
+    if let Some((path, e)) = sidecar_err {
+        return Err(e).context(WriteFileSnafu {
+            path: consumed_sidecar_path(&path),
+        });
+    }
+    Ok(())
 }
 
 /// Read all pack segments of a stream as record batches. Segments are fully
@@ -1164,7 +1183,9 @@ mod tests {
             .filter(|s| s.memtable_id == 555)
             .map(|s| (s.pack_path.clone(), s.meta.offset))
             .collect::<Vec<_>>();
-        mark_segments_consumed("org1", "logs", "stream_a", &consumed_a).await;
+        mark_segments_consumed("org1", "logs", "stream_a", &consumed_a)
+            .await
+            .unwrap();
         assert!(pack.path.exists());
 
         // consume stream_b: pack fully consumed -> file deleted
@@ -1174,7 +1195,9 @@ mod tests {
             .filter(|s| s.memtable_id == 555)
             .map(|s| (s.pack_path.clone(), s.meta.offset))
             .collect::<Vec<_>>();
-        mark_segments_consumed("org1", "logs", "stream_b", &consumed_b).await;
+        mark_segments_consumed("org1", "logs", "stream_b", &consumed_b)
+            .await
+            .unwrap();
         assert!(!pack.path.exists());
 
         // registry entry is gone
@@ -1261,8 +1284,12 @@ mod tests {
             .iter()
             .map(|s| (pack_path.clone(), s.offset))
             .collect::<Vec<_>>();
-        mark_segments_consumed("org1", "logs", "stream_a", &all[..1]).await;
-        mark_segments_consumed("org1", "logs", "stream_b", &all[1..]).await;
+        mark_segments_consumed("org1", "logs", "stream_a", &all[..1])
+            .await
+            .unwrap();
+        mark_segments_consumed("org1", "logs", "stream_b", &all[1..])
+            .await
+            .unwrap();
         // deletion deferred: reader still active
         assert!(pack.path.exists());
 

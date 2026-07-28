@@ -190,7 +190,7 @@ async fn move_stream_segments(
             "[INGESTER:PACK:JOB:{thread_id}] the stream [{org_id}/{stream_type}/{stream_name}] is deleting, drop {} segments",
             segments.len()
         );
-        consume_segments(&org_id, stream_type, &stream_name, &segments).await;
+        consume_segments(&org_id, stream_type, &stream_name, &segments).await?;
         return Ok(());
     }
 
@@ -203,7 +203,7 @@ async fn move_stream_segments(
             "[INGESTER:PACK:JOB:{thread_id}] the stream [{org_id}/{stream_type}/{stream_name}] was deleted, drop {} segments",
             segments.len()
         );
-        consume_segments(&org_id, stream_type, &stream_name, &segments).await;
+        consume_segments(&org_id, stream_type, &stream_name, &segments).await?;
         return Ok(());
     }
 
@@ -228,7 +228,7 @@ async fn move_stream_segments(
                 "[INGESTER:PACK:JOB:{thread_id}] the stream [{org_id}/{stream_type}/{stream_name}] has {} segments exceeding the data retention, drop them",
                 expired.len()
             );
-            consume_segments(&org_id, stream_type, &stream_name, &expired).await;
+            consume_segments(&org_id, stream_type, &stream_name, &expired).await?;
         }
         segments = retained;
     }
@@ -288,7 +288,7 @@ async fn move_stream_segments(
                 log::warn!(
                     "[INGESTER:PACK:JOB:{thread_id}] skip empty chunk for stream [{org_id}/{stream_type}/{stream_name}]"
                 );
-                consume_segments(&org_id, stream_type, &stream_name, chunk).await;
+                consume_segments(&org_id, stream_type, &stream_name, chunk).await?;
                 continue;
             }
 
@@ -318,7 +318,7 @@ async fn move_stream_segments(
             .await;
 
             // remove the segments from the index, delete fully consumed packs
-            consume_segments(&org_id, stream_type, &stream_name, chunk).await;
+            consume_segments(&org_id, stream_type, &stream_name, chunk).await?;
 
             // metrics
             for seg in chunk.iter() {
@@ -402,7 +402,7 @@ async fn upload_chunk(
         (buf, file_meta, FileFormat::Parquet)
     } else {
         // merge multiple segments in memory
-        let mut shared_fields = HashSet::new();
+        let mut segment_schemas = Vec::with_capacity(bufs.len());
         let mut raw_batches = Vec::new();
         for data in bufs {
             let (schema, batches) = config::utils::parquet::read_recordbatch_from_bytes(
@@ -410,13 +410,10 @@ async fn upload_chunk(
                 Bytes::from(data),
             )
             .await?;
-            shared_fields.extend(schema.fields().iter().cloned());
+            segment_schemas.push(schema);
             raw_batches.extend(batches);
         }
-        let mut fields = shared_fields.into_iter().collect::<Vec<_>>();
-        fields.sort_by(|a, b| a.name().cmp(b.name()));
-        fields.dedup_by(|a, b| a.name() == b.name());
-        let union_schema = Arc::new(Schema::new(fields));
+        let union_schema = build_union_schema(&segment_schemas);
 
         // align every batch to the union schema: segments can differ in
         // fields and field order (schema evolution), and the union plan
@@ -539,6 +536,60 @@ async fn upload_chunk(
     Ok((account, new_file_key, new_file_meta))
 }
 
+/// Build the union schema of the segments' schemas, fields sorted by name.
+/// Type conflicts of same-named fields are resolved deterministically with
+/// the same widening rules as the ingestion schema evolution
+/// (`is_widening_conversion`), folding the schemas in segment (min_ts) order;
+/// a field is nullable when it is nullable in - or missing from - any segment.
+fn build_union_schema(schemas: &[Arc<Schema>]) -> Arc<Schema> {
+    let mut merged: BTreeMap<String, arrow_schema::FieldRef> = BTreeMap::new();
+    for schema in schemas {
+        for field in schema.fields() {
+            match merged.get(field.name()) {
+                None => {
+                    merged.insert(field.name().clone(), field.clone());
+                }
+                Some(existing) => {
+                    let widened = if existing.data_type() != field.data_type()
+                        && infra::schema::is_widening_conversion(
+                            existing.data_type(),
+                            field.data_type(),
+                        ) {
+                        field.data_type().clone()
+                    } else {
+                        existing.data_type().clone()
+                    };
+                    let nullable = existing.is_nullable() || field.is_nullable();
+                    if widened != *existing.data_type() || nullable != existing.is_nullable() {
+                        merged.insert(
+                            field.name().clone(),
+                            Arc::new(arrow_schema::Field::new(field.name(), widened, nullable)),
+                        );
+                    }
+                }
+            }
+        }
+    }
+    // a field missing from some segment is filled with nulls when adapting
+    let field_in_all = |name: &str| schemas.iter().all(|s| s.index_of(name).is_ok());
+    let fields = merged
+        .into_values()
+        .map(|f| {
+            if !f.is_nullable() && f.name() != config::TIMESTAMP_COL_NAME && !field_in_all(f.name())
+            {
+                Arc::new(arrow_schema::Field::new(
+                    f.name(),
+                    f.data_type().clone(),
+                    true,
+                ))
+            } else {
+                f
+            }
+        })
+        .collect::<Vec<_>>();
+    Arc::new(Schema::new(fields))
+}
+
 /// Align a record batch to the target schema: reorder columns, fill missing
 /// fields with nulls, cast mismatched types.
 fn adapt_batch_to_schema(
@@ -575,19 +626,22 @@ async fn consume_segments(
     stream_type: StreamType,
     stream_name: &str,
     segments: &[PackSegment],
-) {
+) -> Result<(), anyhow::Error> {
     if segments.is_empty() {
-        return;
+        return Ok(());
     }
     let consumed = segments
         .iter()
         .map(|s| (s.pack_path.clone(), s.meta.offset))
         .collect::<Vec<_>>();
-    ingester::mark_segments_consumed(org_id, stream_type.as_str(), stream_name, &consumed).await;
+    let ret =
+        ingester::mark_segments_consumed(org_id, stream_type.as_str(), stream_name, &consumed)
+            .await;
     let total_bytes: i64 = segments.iter().map(|s| s.meta.length as i64).sum();
     metrics::INGEST_WAL_USED_BYTES
         .with_label_values(&[org_id, stream_type.as_str()])
         .sub(total_bytes);
+    ret.map_err(|e| anyhow::anyhow!("record segment consumption failed: {e}"))
 }
 
 #[cfg(test)]
@@ -606,6 +660,44 @@ mod tests {
             total_original_size,
             total_compressed_size,
             oldest_registered_at,
+        }
+    }
+
+    #[test]
+    fn test_build_union_schema_widens_type_conflicts_deterministically() {
+        use arrow_schema::{DataType, Field};
+
+        let s1 = Arc::new(Schema::new(vec![
+            Field::new("_timestamp", DataType::Int64, false),
+            Field::new("value", DataType::Int64, true),
+            Field::new("code", DataType::Utf8, true),
+        ]));
+        // evolved segment: value widened to Float64, code narrowed to Int64
+        let s2 = Arc::new(Schema::new(vec![
+            Field::new("_timestamp", DataType::Int64, false),
+            Field::new("value", DataType::Float64, true),
+            Field::new("code", DataType::Int64, true),
+            Field::new("extra", DataType::Utf8, false),
+        ]));
+
+        // widening rule applies regardless of segment order
+        for schemas in [vec![s1.clone(), s2.clone()], vec![s2.clone(), s1.clone()]] {
+            let union = build_union_schema(&schemas);
+            // Int64 -> Float64 is widening, Float64 wins
+            assert_eq!(
+                union.field_with_name("value").unwrap().data_type(),
+                &DataType::Float64
+            );
+            // Utf8 -> Int64 is not widening, Utf8 wins
+            assert_eq!(
+                union.field_with_name("code").unwrap().data_type(),
+                &DataType::Utf8
+            );
+            // a field missing from one segment becomes nullable
+            assert!(union.field_with_name("extra").unwrap().is_nullable());
+            // fields sorted by name
+            let names: Vec<&str> = union.fields().iter().map(|f| f.name().as_str()).collect();
+            assert_eq!(names, vec!["_timestamp", "code", "extra", "value"]);
         }
     }
 
