@@ -307,9 +307,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   row.period
                     ? row.period >= 60
                       ? row.period % 60 === 0
-                        ? `${Math.floor(row.period / 60)} Hours`
-                        : `${Math.floor(row.period / 60)} Hours ${row.period % 60} Mins`
-                      : `${row.period} Mins`
+                        ? t("alerts.periodHours", { count: Math.floor(row.period / 60) })
+                        : t("alerts.periodHoursMins", {
+                            hours: Math.floor(row.period / 60),
+                            mins: row.period % 60,
+                          })
+                      : t("alerts.periodMins", { count: row.period })
                     : "--"
                 }}
               </template>
@@ -317,7 +320,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template #cell-frequency="{ row }">
                 {{
                   row.frequency
-                    ? row.frequency + (row.frequency_type == "cron" ? "" : " Mins")
+                    ? row.frequency_type == "cron"
+                      ? row.frequency
+                      : t("alerts.periodMins", { count: row.frequency })
                     : "--"
                 }}
               </template>
@@ -335,7 +340,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-if="alertStateLoadingMap[row.uuid]"
                     style="display: inline-block; width: 33.14px; height: auto"
                     class="ml-1 flex items-center justify-center"
-                    :title="`Turning ${row.enabled ? 'Off' : 'On'}`"
+                    :title="row.enabled ? t('common.turningOff') : t('common.turningOn')"
                   >
                     <OSpinner size="xs" />
                   </div>
@@ -609,7 +614,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <ConfirmDialog
       :title="t('alerts.deleteAlertsTitle')"
-      :message="`Are you sure you want to delete ${selectedAlerts.length} alert(s)?`"
+      :message="t('alerts.confirmDeleteAlerts', { count: selectedAlerts.length })"
       @update:ok="bulkDeleteAlerts"
       @update:cancel="confirmBulkDelete = false"
       v-model="confirmBulkDelete"

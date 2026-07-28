@@ -229,7 +229,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <template #icon-left><OIcon name="cloud-upload" size="sm" /></template>
           {{
-            deploymentMode === "single" ? "Launch CloudFormation Stack" : "Open StackSets Console"
+            deploymentMode === "single"
+              ? t("ingestion.launchCloudFormationStack")
+              : t("ingestion.openStackSetsConsole")
           }}
         </OButton>
         <span v-if="enabledServices.length === 0" class="text-status-error-text text-sm">

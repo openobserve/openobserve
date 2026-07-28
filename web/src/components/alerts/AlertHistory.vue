@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         labelKey="label"
         valueKey="value"
         @update:model-value="onAlertSelected"
-        :placeholder="t(`alerts.searcHistory`) || 'Select or search alert...'"
+        :placeholder="t('alerts.searcHistory')"
         data-test="alert-history-search-select"
         class="o2-search-input min-w-62.5"
         clearable
@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="alert-history-manual-search-btn"
         :disabled="loading"
       >
-        <OTooltip :content="t('common.search') || 'Search'" />
+        <OTooltip :content="t('common.search')" />
       </OButton>
       <OButton
         variant="ghost"
@@ -74,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="alert-history-refresh-btn"
         :loading="loading"
       >
-        <OTooltip :content="t('common.refresh') || 'Refresh'" />
+        <OTooltip :content="t('common.refresh')" />
       </OButton>
     </template>
     <div class="min-h-0 flex-1 overflow-hidden">
@@ -147,7 +147,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :class="value ? 'text-status-positive' : 'text-text-body'"
               size="xs"
             >
-              <OTooltip :content="value ? 'Real-time' : 'Scheduled'" />
+              <OTooltip :content="value ? t('common.realTime') : t('alerts.scheduled')" />
             </OIcon>
           </template>
 
@@ -157,7 +157,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :class="value ? 'text-text-body' : 'text-status-positive'"
               size="md"
             >
-              <OTooltip :content="value ? 'Silenced' : 'Not Silenced'" />
+              <OTooltip
+                :content="value ? t('alerts.insights.filters.silenced') : t('common.notSilenced')"
+              />
             </OIcon>
           </template>
 
@@ -227,7 +229,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click.stop="showErrorDialog(row)"
             >
               <OTooltip
-                :content="`Last error: ${new Date(row.timestamp / 1000).toLocaleString()}`"
+                :content="
+                  t('common.lastErrorAt', { time: new Date(row.timestamp / 1000).toLocaleString() })
+                "
               />
             </OButton>
           </template>
@@ -294,7 +298,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="mr-1"
                   size="xs"
                 />
-                {{ selectedRow.is_realtime ? "Real-time" : "Scheduled" }}
+                {{ selectedRow.is_realtime ? t("common.realTime") : t("alerts.scheduled") }}
               </div>
             </div>
             <div class="w-1/2">
@@ -304,7 +308,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="text-sm">
                 <OIcon v-if="selectedRow.is_silenced" name="volume-off" size="xs" class="mr-1" />
                 <OIcon v-else name="volume-up" size="xs" class="mr-1" />
-                {{ selectedRow.is_silenced ? "Yes" : "No" }}
+                {{ selectedRow.is_silenced ? t("common.yes") : t("common.no") }}
               </div>
             </div>
           </div>

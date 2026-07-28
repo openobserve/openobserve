@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="valueSearchTerm"
           clearable
           size="sm"
-          :placeholder="`Search ${fieldName} values…`"
+          :placeholder="t('common.searchValuesIn', { field: fieldName })"
           @clear="valueSearchTerm = ''"
         />
       </div>

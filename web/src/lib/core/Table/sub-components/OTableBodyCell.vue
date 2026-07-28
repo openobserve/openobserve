@@ -8,6 +8,7 @@ import { useSanitizedHtml } from "../composables/useSanitizedHtml";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { OTableTreeContextKey } from "../composables/useTableTree";
 import { copyToClipboard } from "@/utils/clipboard";
+import { useI18n } from "vue-i18n";
 
 const { sanitize } = useSanitizedHtml();
 
@@ -173,6 +174,8 @@ function handleClick() {
     value: props.cell.getValue(),
   });
 }
+
+const { t } = useI18n();
 </script>
 
 <template>
@@ -293,7 +296,7 @@ function handleClick() {
       type="button"
       :data-test="`o2-table-cell-copy-${cell.column.id}`"
       class="bg-surface-base border-border-default rounded-default text-text-muted hover:text-text-body absolute right-1 cursor-pointer border p-0.5 leading-none opacity-0 transition-opacity group-hover:opacity-100"
-      :title="copied ? 'Copied!' : 'Copy'"
+      :title="copied ? t('common.copiedExclaim') : t('common.copy')"
       @click="handleCopy"
     >
       <OIcon :name="copied ? 'check' : 'content-copy'" size="xs" />

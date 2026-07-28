@@ -75,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :error="touchedPipelineName[index] && !userSelectedPipelineName[index]"
                         :error-message="
                           touchedPipelineName[index] && !userSelectedPipelineName[index]
-                            ? 'Name is required'
+                            ? t('common.nameIsRequired')
                             : ''
                         "
                         tabindex="0"
@@ -133,7 +133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :error="touchedStreamType[index] && !userSelectedStreamType[index]"
                         :error-message="
                           touchedStreamType[index] && !userSelectedStreamType[index]
-                            ? 'Stream type is required'
+                            ? t('common.streamTypeIsRequired')
                             : ''
                         "
                         @update:model-value="
@@ -196,7 +196,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :error-message="
                           touchedDestinationStreamType[index] &&
                           !userSelectedDestinationStreamType[index]
-                            ? 'Stream type is required'
+                            ? t('common.streamTypeIsRequired')
                             : ''
                         "
                         @update:model-value="
@@ -258,7 +258,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :error-message="
                           touchedFunctionName[errorMessage.nodeIndex] &&
                           !userSelectedFunctionName[errorMessage.nodeIndex]
-                            ? 'Function name is required'
+                            ? t('common.functionNameIsRequired')
                             : ''
                         "
                         @update:model-value="
@@ -292,7 +292,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         "
                         :error-message="
                           touchedRemoteDestination[index] && !userSelectedRemoteDestination[index]
-                            ? 'Remote destination is required'
+                            ? t('common.remoteDestinationIsRequired')
                             : ''
                         "
                         @update:model-value="
@@ -324,7 +324,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :error="touchedTimezone[index] && !userSelectedTimezone[index]"
                         :error-message="
                           touchedTimezone[index] && !userSelectedTimezone[index]
-                            ? 'Timezone is required'
+                            ? t('common.timezoneIsRequired')
                             : ''
                         "
                         @update:model-value="

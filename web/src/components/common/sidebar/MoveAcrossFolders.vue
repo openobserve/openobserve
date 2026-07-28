@@ -19,7 +19,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="move-across-folders-dialog"
     :open="open"
     size="md"
-    :title="`Move ${type.charAt(0).toUpperCase() + type.slice(1)} To Another Folder`"
+    :title="
+      t('dashboard.moveToAnotherFolder', { type: type.charAt(0).toUpperCase() + type.slice(1) })
+    "
     :secondary-button-label="t('dashboard.cancel')"
     :primary-button-label="t('common.move')"
     :primary-button-loading="onSubmit.isLoading.value"

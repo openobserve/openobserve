@@ -42,7 +42,11 @@
       @keydown="!disable && handleKeyDown($event)"
       role="separator"
       :aria-orientation="horizontal ? 'horizontal' : 'vertical'"
-      :aria-label="`${horizontal ? 'Horizontal' : 'Vertical'} splitter`"
+      :aria-label="
+        t('common.splitterLabel', {
+          orientation: horizontal ? t('common.horizontal') : t('common.vertical'),
+        })
+      "
       :aria-valuenow="modelValue"
       :aria-valuemin="limits?.[0] || 0"
       :aria-valuemax="limits?.[1] || 100"
@@ -143,6 +147,7 @@ const handleKeyDown = (event: KeyboardEvent) => {
 
 // Watch for external prop changes
 import { watch } from "vue";
+import { useI18n } from "vue-i18n";
 watch(
   () => props.modelValue,
   (newValue) => {
@@ -150,6 +155,8 @@ watch(
   },
   { immediate: true },
 );
+
+const { t } = useI18n();
 </script>
 
 <style scoped>

@@ -66,7 +66,7 @@ the Free Software Foundation, either version 3 of the License, or
           data-test="scorer-library-select-all"
         >
           <OCheckbox :model-value="allVisibleSelected" @update:model-value="toggleSelectAll" />
-          <span>{{ allVisibleSelected ? "Clear all" : "Select all" }}</span>
+          <span>{{ allVisibleSelected ? t("common.clearAll") : t("common.selectAll") }}</span>
         </label>
         <span class="text-text-secondary text-xs">
           {{ filteredEntries.length }} {{ t("onlineEvals.scorerLibrary.scorerCountSuffix") }}

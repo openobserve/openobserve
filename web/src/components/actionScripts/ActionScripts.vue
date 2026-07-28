@@ -117,7 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="alertStateLoadingMap[row.uuid]"
               style="display: inline-block; width: 33.14px"
               class="ml-1 flex h-auto items-center justify-center"
-              :title="`Turning ${row.enabled ? 'Off' : 'On'}`"
+              :title="row.enabled ? t('common.turningOff') : t('common.turningOn')"
             >
               <OSpinner size="xs" />
             </div>
@@ -183,7 +183,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
     <ConfirmDialog
       :title="t('alerts.bulkDeleteActionScriptsTitle')"
-      :message="`Are you sure you want to delete ${selectedActionScripts.length} action script(s)?`"
+      :message="
+        t('actionScripts.confirmDeleteActionScripts', { count: selectedActionScripts.length })
+      "
       @update:ok="bulkDeleteActionScripts"
       @update:cancel="confirmBulkDelete = false"
       v-model="confirmBulkDelete"

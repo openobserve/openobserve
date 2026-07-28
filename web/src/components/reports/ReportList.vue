@@ -177,7 +177,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- Folder column -->
               <template #cell-folder_name="{ row }">
-                {{ row.folder_name || "default" }}
+                {{ row.folder_name || t("common.defaultLabel") }}
               </template>
 
               <!-- Last triggered timestamp -->

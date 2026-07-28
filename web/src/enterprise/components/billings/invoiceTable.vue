@@ -177,7 +177,7 @@ const getInvoiceHistory = () => {
             id: ++index,
             start_date: invoice.period_start,
             end_date: invoice.period_end,
-            paid: invoice.paid ? "Yes" : "No",
+            paid: invoice.paid ? t("common.yes") : t("common.no"),
             amount: invoice.total + " " + invoice.currency.toUpperCase(),
             amount_paid: invoice.amount_paid,
             amount_due: invoice.amount_due,

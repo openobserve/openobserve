@@ -334,7 +334,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
     <ConfirmDialog
       :title="t('function.bulkDeleteEnrichmentTablesTitle')"
-      :message="`Are you sure you want to delete ${selectedEnrichmentTables.length} enrichment table(s)?`"
+      :message="
+        t('functions.confirmDeleteEnrichmentTables', { count: selectedEnrichmentTables.length })
+      "
       @update:ok="bulkDeleteEnrichmentTables"
       @update:cancel="confirmBulkDelete = false"
       v-model="confirmBulkDelete"

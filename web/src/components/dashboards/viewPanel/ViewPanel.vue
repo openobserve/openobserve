@@ -67,7 +67,9 @@
           icon-left="refresh"
         >
           <OTooltip
-            :content="isVariablesChanged ? 'Refresh' : 'Refresh to apply latest variable changes'"
+            :content="
+              isVariablesChanged ? t('common.refresh') : t('dashboard.refreshToApplyVariables')
+            "
           />
         </OButton>
         <OButton

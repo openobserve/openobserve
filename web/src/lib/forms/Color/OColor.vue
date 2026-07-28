@@ -159,7 +159,7 @@ const wrapperClasses = computed(() => [
         <PopoverTrigger
           type="button"
           :disabled="disabled || readonly"
-          :aria-label="label ? `${label} — pick color` : 'Pick color'"
+          :aria-label="label ? t('common.pickColorFor', { label }) : t('common.pickColor')"
           class="ring-offset-surface-base focus-visible:ring-datepicker-focus-ring rounded-s-default flex shrink-0 items-center ps-2 pe-1 ring-offset-1 transition-[box-shadow] duration-150 outline-none focus-visible:ring-2"
           :class="disabled || readonly ? 'cursor-not-allowed' : 'cursor-pointer'"
         >

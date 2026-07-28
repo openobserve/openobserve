@@ -83,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="sm"
                   />
                   <OTooltip
-                    :content="expandedSections[item.id] ? 'Collapse' : 'Expand'"
+                    :content="expandedSections[item.id] ? t('common.collapse') : t('common.expand')"
                     side="top"
                   />
                 </OButton>
@@ -130,7 +130,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           size="sm"
                         />
                         <OTooltip
-                          :content="expandedSections[child.id] ? 'Collapse' : 'Expand'"
+                          :content="
+                            expandedSections[child.id] ? t('common.collapse') : t('common.expand')
+                          "
                           side="top"
                         />
                       </OButton>

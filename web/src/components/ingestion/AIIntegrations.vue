@@ -71,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             !failedLogos.has(integration.slug)
                           "
                           :src="(isDark && integration.logoDark) || integration.logo"
-                          :alt="`${integration.name} logo`"
+                          :alt="t('common.itemLogo', { name: integration.name })"
                           class="rounded-default h-4.5 w-4.5 flex-none object-contain"
                           loading="lazy"
                           referrerpolicy="no-referrer"

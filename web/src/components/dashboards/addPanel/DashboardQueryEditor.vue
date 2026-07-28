@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="cursor-pointer text-xs whitespace-nowrap select-none"
                 :title="t('dashboard.doubleClickToRename')"
                 :data-test="`dashboard-panel-query-tab-name-${index}`"
-                >{{ tab.tabName || "Query " + (Number(index) + 1) }}</span
+                >{{ tab.tabName || t("common.queryNumber", { index: Number(index) + 1 }) }}</span
               >
               <!-- Eye icon + its tooltip wrapped in a span so the tooltip's
                    trigger is scoped to JUST the icon, not the entire OTab. -->

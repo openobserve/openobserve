@@ -421,7 +421,11 @@
       "clearFiltersAction": "Clear filters",
       "sizesSectionTitle": "Sizes — the same system at block & inline scale",
       "sizeBlockLabel": "size=\"block\" (inside a card / dashboard panel)",
-      "sizeInlineLabel": "size=\"inline\" (table body / dropdown)"
+      "sizeInlineLabel": "size=\"inline\" (table body / dropdown)",
+      "firstRunState": "First-run state",
+      "filteredState": "Filtered state",
+      "lightPreview": "Light preview",
+      "darkPreview": "Dark preview"
     }
   },
   "common": {
@@ -590,6 +594,20 @@
     "unsavedChanges": "Unsaved changes",
     "update": "Update",
     "favourite": "Favorite",
+    "notAvailable": "N/A",
+    "notAvailableShort": "NA",
+    "realTime": "Real-time",
+    "notSilenced": "Not Silenced",
+    "complete": "Complete",
+    "partial": "Partial",
+    "completeResults": "Complete Results",
+    "partialResults": "Partial Results",
+    "unknownUser": "Unknown User",
+    "lastErrorPrefix": "Last error: ",
+    "yes": "Yes",
+    "no": "No",
+    "resolved": "Resolved",
+    "stillOngoing": "Still ongoing",
     "refresh": "Refresh",
     "showMore": "Show More",
     "contactUs": "Contact Us",
@@ -617,7 +635,80 @@
     "password": "Password",
     "shortUrl": {
       "redirecting": "Redirecting..."
-    }
+    },
+    "copied": "Copied",
+    "copiedExclaim": "Copied!",
+    "clearAll": "Clear all",
+    "unknown": "Unknown",
+    "mins": "Mins",
+    "totalFields": "Total Fields: {count}",
+    "removeItem": "Remove {name}",
+    "providerLogo": "{name} logo",
+    "errorPrefix": "Error: {message}",
+    "lastErrorAt": "Last error: {time}",
+    "lastPausedAt": "Last paused: {time}",
+    "confirmBulkDelete": "Are you sure you want to delete {count} {entity}?",
+    "turningOn": "Turning On",
+    "turningOff": "Turning Off",
+    "errorOccurred": "Error occurred",
+    "errorLoadingData": "Error Loading Data",
+    "noValuesFound": "No values found",
+    "dialogFallbackTitle": "Dialog",
+    "drawerFallbackTitle": "Drawer",
+    "plainText": "text",
+    "defaultLabel": "default",
+    "durationGte": "duration >= {value}",
+    "durationLte": "duration <= {value}",
+    "nameIsRequired": "Name is required",
+    "streamTypeIsRequired": "Stream type is required",
+    "functionNameIsRequired": "Function name is required",
+    "remoteDestinationIsRequired": "Remote destination is required",
+    "timezoneIsRequired": "Timezone is required",
+    "idPrefix": "ID: {id}",
+    "unchangedCount": "Unchanged ({count})",
+    "importCount": "Import ({count})",
+    "countOfTotal": "{count} of {total}",
+    "copyAll": "Copy all",
+    "rangeMinimum": "{label} minimum",
+    "rangeMaximum": "{label} maximum",
+    "rangeFallbackLabel": "Range",
+    "hourWithValue": "Hour: {value}",
+    "minuteWithValue": "Minute: {value}",
+    "secondWithValue": "Second: {value}",
+    "selectMode": "Select {mode}",
+    "newChat": "New Chat",
+    "collapseExpandShortcut": "{action} ({shortcut}B)",
+    "fileWithSize": "{name} ({size}KB)",
+    "manageColumns": "Manage columns",
+    "manageColumnsHidden": "Manage columns, {count} hidden",
+    "columnsHidden": "Columns ({count} hidden)",
+    "columns": "Columns",
+    "toggleColumn": "Toggle {name} column",
+    "copyOrganizationId": "Copy organization ID {id}",
+    "applyTheme": "Apply {name} theme",
+    "pipelinesAssociatedWith": "Pipelines Associated with {name}",
+    "removeField": "Remove {name}",
+    "dialog": "Dialog",
+    "drawer": "Drawer",
+    "warningIngestionQuota": "Warning: {percent}% of ingestion limit used",
+    "notificationsCount": "{count} notifications",
+    "failedTimesInWindow": "Failed {count} times in this window",
+    "loadingLabel": "Loading",
+    "deleting": "Deleting...",
+    "pageNumber": "Page {page}",
+    "removeTag": "Remove {tag}",
+    "pickColor": "Pick color",
+    "pickColorFor": "{label} — pick color",
+    "searchValuesIn": "Search {field} values…",
+    "panelColor": "Panel color: {color}",
+    "queryNumber": "Query {index}",
+    "itemLogo": "{name} logo",
+    "screenshotOfStep": "Screenshot {step}",
+    "splitterLabel": "{orientation} splitter",
+    "atLeastOneItemRequired": "At least 1 item required",
+    "dropFilesHint": "Drop files here or click to choose",
+    "chooseFiles": "Choose files",
+    "chooseAFile": "Choose a file"
   },
   "flow": {
     "stepPicker": {
@@ -1234,7 +1325,8 @@
     "showMoreFrame": "Show {count} more frame",
     "showMoreFrames": "Show {count} more frames",
     "unableToTranslateStackTrace": "Unable to translate stack trace. Source maps may not be available.",
-    "failedToTranslateStackTrace": "Failed to translate stack trace. Source maps may not be available."
+    "failedToTranslateStackTrace": "Failed to translate stack trace. Source maps may not be available.",
+    "frustrationSignalsDetected": "{count} frustration signal detected | {count} frustration signals detected"
   },
   "about": {
     "copyCommitHash": "Copy commit hash",
@@ -2297,7 +2389,13 @@
     "fieldName": "Field Name",
     "fieldRequired": "Field is required!",
     "dataType": "Data Type",
-    "dataTypeRequired": "Data Type is required!"
+    "dataTypeRequired": "Data Type is required!",
+    "removeFromInterestingFields": "Remove from interesting fields",
+    "addToInterestingFields": "Add to interesting fields",
+    "viewPatternsCount": "View {count} Patterns",
+    "addPattern": "Add Pattern",
+    "editStream": "Edit Stream",
+    "createNewStream": "Create new Stream"
   },
   "workflow": {
     "header": "Workflows",
@@ -2763,7 +2861,8 @@
     "selectStream": "Select a stream ...",
     "queryEditorPlaceholder": "Select a stream or write SQL query here...",
     "moreErrors": "... and {count} more errors",
-    "chunkDelayTooltip": "Delay between processing chunks in seconds. Default: 5"
+    "chunkDelayTooltip": "Delay between processing chunks in seconds. Default: 5",
+    "processingChunk": "Processing Chunk {done}/{total}"
   },
   "evalTemplate": {
     "header": "Evaluation Templates",
@@ -3335,7 +3434,11 @@
       "arrow": "→",
       "stuck": "Stuck?",
       "askOnSlack": "Ask on Slack"
-    }
+    },
+    "instrumentBeforeImportTitle": "Instrument Before Importing The Client",
+    "instrumentBeforeImportBody": "If your app runs but no spans arrive, instrumentation likely loaded after the client was imported. Re-order so the init runs first:",
+    "launchCloudFormationStack": "Launch CloudFormation Stack",
+    "openStackSetsConsole": "Open StackSets Console"
   },
   "dashboard": {
     "approximately": "Approximately",
@@ -4468,7 +4571,12 @@
       "addedSuccessfully": "Dashboard added successfully.",
       "creationFailed": "Dashboard creation failed.",
       "filesFailedValidation": "{count} file(s) did not pass validation constraints"
-    }
+    },
+    "copyLegend": "Copy legend",
+    "exitAnnotationsMode": "Exit Annotations Mode",
+    "addAnnotations": "Add Annotations",
+    "refreshToApplyVariables": "Refresh to apply latest variable changes",
+    "moveToAnotherFolder": "Move {type} To Another Folder"
   },
   "panel": {
     "addPivotShort": "+P",
@@ -5594,6 +5702,10 @@
       "filterAll": "All",
       "filterActive": "Active",
       "alertCount": "Alerts",
+      "correlatedAlertsCount": "Alerts: {count} correlated alerts",
+      "noCorrelatedLogs": "No correlated logs found",
+      "noCorrelatedMetrics": "No correlated metrics found",
+      "noCorrelatedTraces": "No correlated traces found",
       "firstAlertAt": "First Alert",
       "lastAlertAt": "Last Alert",
       "resolvedAt": "Resolved At",
@@ -5719,7 +5831,8 @@
       "loadingHistory": "Loading history...",
       "noHistoryAvailable": "No evaluation history available for this alert",
       "tryExpandingTimeRange": "Try expanding the time range",
-      "results": "Results"
+      "results": "Results",
+      "ifCondition": "if {condition}"
     },
     "historyTable": {
       "timestamp": "Timestamp",
@@ -6085,7 +6198,18 @@
       "invalidTargetType": "Invalid target type",
       "unknownDestinationType": "Unknown destination type",
       "testFailedUnknownError": "Test failed with unknown error"
-    }
+    },
+    "confirmDeleteAlerts": "Are you sure you want to delete {count} alert(s)?",
+    "confirmDeleteDestinations": "Are you sure you want to delete {count} destination(s)?",
+    "prebuiltDestination": "Prebuilt {type} destination",
+    "errorValidations": "Error Validations",
+    "outputMessagesLabel": "Output Messages",
+    "incidentSingular": "Incident",
+    "incidentPlural": "Incidents",
+    "confirmDeleteTemplates": "Are you sure you want to delete {count} template(s)?",
+    "periodHours": "{count} Hours",
+    "periodMins": "{count} Mins",
+    "periodHoursMins": "{hours} Hours {mins} Mins"
   },
   "alert_templates": {
     "exportTemplate": "Export Template",
@@ -7268,7 +7392,8 @@
       "bulkDeletePartial": "Deleted {successful} regex pattern(s), but {unsuccessful} failed",
       "bulkDeleteFailed": "Failed to delete {n} regex pattern(s)",
       "errorBulkDeleting": "Error while deleting regex patterns"
-    }
+    },
+    "setAiCreditsFor": "Set AI Credits for {name}"
   },
   "reports": {
     "cachedReportHint": "Note: Cached reports are stored for quick access to dashboards; sharing is disabled for these reports.",
@@ -8500,7 +8625,9 @@
       "compareChanges": "Compare Changes",
       "current": "Current",
       "proposed": "Proposed"
-    }
+    },
+    "noMetricStreamsFor": "No metric streams found for this {kind}",
+    "correlatedStreamsFor": "Correlated Streams - {service}"
   },
   "search_scheduler_job": {
     "title": "Search Job Scheduler",
@@ -10032,7 +10159,8 @@
         "idleWindowMinimum": "Idle window must be at least 45 seconds",
         "samplingValueRequired": "A sampling value is required"
       }
-    }
+    },
+    "importCount": "Import ({count})"
   },
   "llmProviders": {
     "tabLabel": "LLM Providers",
@@ -11617,7 +11745,8 @@
       "customThemeColorAriaLabel": "Pick a custom theme color",
       "customColor": "Custom Color",
       "themeSyncNote": "Saved to this device only — themes don't sync across different browsers or devices.",
-      "pickCustomColorTitle": "Pick Custom Color"
+      "pickCustomColorTitle": "Pick Custom Color",
+      "pickAnyBrandHex": "Pick any brand hex"
     },
     "webinarBanner": {
       "dismissBannerAriaLabel": "Dismiss webinar banner",
@@ -11628,5 +11757,16 @@
       "title": "⚠️ MySQL support is DEPRECATED and will be removed in future.",
       "description": "Please migrate to PostgreSQL to ensure continued support."
     }
+  },
+  "functions": {
+    "confirmDeleteFunctions": "Are you sure you want to delete {count} function(s)?",
+    "confirmDeleteEnrichmentTables": "Are you sure you want to delete {count} enrichment table(s)?",
+    "newCsvFileUrl": "New CSV File URL",
+    "replacementCsvFileUrl": "Replacement CSV File URL",
+    "newCsvFileUrlHelp": "Enter a new URL to add to this enrichment table",
+    "replacementCsvFileUrlHelp": "Enter a URL to replace all existing URLs"
+  },
+  "actionScripts": {
+    "confirmDeleteActionScripts": "Are you sure you want to delete {count} action script(s)?"
   }
 }

@@ -125,7 +125,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTooltip :content="`${chip.label} = ${chip.value}`" side="top" />
           <template v-if="chip.disabled">
             <OTooltip
-              :content="`No metric streams found for this ${chip.label.toLowerCase()}`"
+              :content="t('correlation.noMetricStreamsFor', { kind: chip.label.toLowerCase() })"
               side="top"
             />
           </template>

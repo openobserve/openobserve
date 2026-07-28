@@ -121,6 +121,8 @@ vi.mock("@/views/Dashboards/RenderDashboardCharts.vue", () => ({
 }));
 
 const mockTranslations = {
+  "correlation.correlatedStreamsFor": "Correlated Streams - {service}",
+  "correlation.noMetricStreamsFor": "No metric streams found for this {kind}",
   "correlation.filters": "Filters",
   "correlation.all": "All",
   "correlation.loadingLogs": "Loading logs...",

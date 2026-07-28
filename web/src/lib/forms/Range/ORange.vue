@@ -4,6 +4,7 @@
 import type { RangeProps, RangeEmits, RangeSlots, RangeValue } from "./ORange.types";
 import { computed, ref, useAttrs, useId } from "vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { useI18n } from "vue-i18n";
 
 defineOptions({ inheritAttrs: false });
 const $attrs = useAttrs();
@@ -359,6 +360,8 @@ function onHorizCancel() {
   dragVisualMax.value = null;
   hDragging = null;
 }
+
+const { t } = useI18n();
 </script>
 
 <template>
@@ -445,7 +448,7 @@ function onHorizCancel() {
           :aria-valuenow="current.min"
           :aria-valuemin="min"
           :aria-valuemax="max"
-          :aria-label="`${label ?? 'Range'} minimum`"
+          :aria-label="t('common.rangeMinimum', { label: label ?? t('common.rangeFallbackLabel') })"
           tabindex="0"
         />
         <!-- Max thumb -->
@@ -467,7 +470,7 @@ function onHorizCancel() {
           :aria-valuenow="current.max"
           :aria-valuemin="min"
           :aria-valuemax="max"
-          :aria-label="`${label ?? 'Range'} maximum`"
+          :aria-label="t('common.rangeMaximum', { label: label ?? t('common.rangeFallbackLabel') })"
           tabindex="0"
         />
       </div>
@@ -563,7 +566,7 @@ function onHorizCancel() {
           :step="step"
           :value="current.min"
           :disabled="disabled"
-          :aria-label="`${label ?? 'Range'} minimum`"
+          :aria-label="t('common.rangeMinimum', { label: label ?? t('common.rangeFallbackLabel') })"
           :aria-invalid="hasError || undefined"
           :class="[
             'o2-range-input',
@@ -587,7 +590,7 @@ function onHorizCancel() {
           :step="step"
           :value="current.max"
           :disabled="disabled"
-          :aria-label="`${label ?? 'Range'} maximum`"
+          :aria-label="t('common.rangeMaximum', { label: label ?? t('common.rangeFallbackLabel') })"
           :aria-invalid="hasError || undefined"
           :class="[
             'o2-range-input',

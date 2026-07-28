@@ -44,7 +44,7 @@ the Free Software Foundation, either version 3 of the License, or
         >
           <OCheckbox :model-value="allVisibleSelected" @update:model-value="toggleSelectAll" />
           <span class="cursor-pointer" @click="toggleSelectAll">{{
-            allVisibleSelected ? "Clear all" : "Select all"
+            allVisibleSelected ? t("common.clearAll") : t("common.selectAll")
           }}</span>
         </div>
         <span class="text-text-secondary text-xs">

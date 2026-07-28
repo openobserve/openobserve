@@ -74,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 : 'border-card-glass-border bg-card-glass-bg hover:border-accent hover:bg-[color-mix(in_srgb,var(--color-accent)_5%,var(--color-card-glass-bg))]'
             "
             :aria-pressed="isThemeApplied(theme, mode)"
-            :aria-label="`Apply ${themeDisplayName(theme.name)} theme`"
+            :aria-label="t('common.applyTheme', { name: themeDisplayName(theme.name) })"
             @click="applyTheme(theme, mode)"
           >
             <span
@@ -134,7 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     ? mode === "light"
                       ? customLightColor
                       : customDarkColor
-                    : "Pick any brand hex"
+                    : t("components.predefinedThemes.pickAnyBrandHex")
                 }}
               </span>
             </span>

@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         valueKey="value"
         searchable
         @update:model-value="onPipelineSelected"
-        :placeholder="t(`pipeline.searchHistory`) || 'Select or search pipeline...'"
+        :placeholder="t('pipeline.searchHistory')"
         data-test="pipeline-history-search-select"
         class="min-w-62.5"
         clearable
@@ -65,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :loading="loading"
         icon-left="refresh"
       >
-        <OTooltip :content="t('common.refresh') || 'Refresh'" side="top" />
+        <OTooltip :content="t('common.refresh')" side="top" />
       </OButton>
     </Teleport>
     <div class="min-h-0 flex-1 overflow-hidden">
@@ -139,7 +139,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #cell-is_realtime="{ row }">
-            <OTooltip :content="row.is_realtime ? 'Real-time' : 'Scheduled'">
+            <OTooltip :content="row.is_realtime ? t('common.realTime') : t('alerts.scheduled')">
               <OIcon
                 :name="row.is_realtime ? 'check-circle' : 'schedule'"
                 :class="row.is_realtime ? 'text-status-positive' : 'text-text-muted'"
@@ -149,7 +149,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #cell-is_silenced="{ row }">
-            <OTooltip :content="row.is_silenced ? 'Silenced' : 'Not Silenced'">
+            <OTooltip
+              :content="
+                row.is_silenced ? t('alerts.insights.filters.silenced') : t('common.notSilenced')
+              "
+            >
               <OIcon
                 :name="row.is_silenced ? 'volume-off' : 'volume-up'"
                 :class="row.is_silenced ? 'text-text-muted' : 'text-status-positive'"
@@ -169,7 +173,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :class="row.is_partial ? 'text-warning' : 'text-status-positive'"
               size="xs"
             >
-              <OTooltip :content="row.is_partial ? 'Partial Results' : 'Complete Results'" />
+              <OTooltip
+                :content="row.is_partial ? t('common.partialResults') : t('common.completeResults')"
+              />
             </OIcon>
             <span v-else>-</span>
           </template>
@@ -279,7 +285,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="mr-1"
                     size="xs"
                   />
-                  {{ selectedRow.is_realtime ? "Real-time" : "Scheduled" }}
+                  {{ selectedRow.is_realtime ? t("common.realTime") : t("alerts.scheduled") }}
                 </div>
               </div>
               <div class="w-1/2">
@@ -287,7 +293,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="text-sm">
                   <OIcon v-if="selectedRow.is_silenced" name="volume-off" size="xs" class="mr-1" />
                   <OIcon v-else name="volume-up" size="xs" class="mr-1" />
-                  {{ selectedRow.is_silenced ? "Yes" : "No" }}
+                  {{ selectedRow.is_silenced ? t("common.yes") : t("common.no") }}
                 </div>
               </div>
             </div>
@@ -340,7 +346,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       ]"
                       size="xs"
                     />
-                    {{ selectedRow.is_partial ? "Partial" : "Complete" }}
+                    {{ selectedRow.is_partial ? t("common.partial") : t("common.complete") }}
                   </div>
                 </div>
               </div>
@@ -417,7 +423,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :title="errorMessage?.pipeline_name"
       :sub-title="
         errorMessage?.last_error_timestamp
-          ? `Last error: ${new Date(errorMessage.last_error_timestamp / 1000).toLocaleString()}`
+          ? t('common.lastErrorAt', {
+              time: new Date(errorMessage.last_error_timestamp / 1000).toLocaleString(),
+            })
           : undefined
       "
       :primary-button-label="t('common.close')"

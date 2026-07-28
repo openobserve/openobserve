@@ -107,7 +107,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <button
           type="button"
           class="ease border-border-default hover:border-button-primary hover:ring-button-primary-focus-ring focus-visible:outline-button-primary-focus-ring h-8 w-8 flex-shrink-0 cursor-pointer rounded-full border-2 border-solid transition-[box-shadow,border-color] duration-200 hover:ring-2 focus-visible:outline-2 focus-visible:outline-offset-2"
-          :aria-label="`Panel color: ${dashboardPanelData.data.config.color.fixedColor[0]}`"
+          :aria-label="
+            t('common.panelColor', { color: dashboardPanelData.data.config.color.fixedColor[0] })
+          "
           :style="{ background: dashboardPanelData.data.config.color.fixedColor[0] }"
           data-test="dashboard-color-palette-swatch-btn"
           @click="($refs.colorInput as HTMLInputElement).click()"

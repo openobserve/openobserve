@@ -104,7 +104,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           v-if="p.key !== 'max'"
                           variant="ghost"
                           size="icon-xs-circle"
-                          :title="`duration >= ${formatPercentile(durationPercentiles[p.key])}`"
+                          :title="
+                            t('common.durationGte', {
+                              value: formatPercentile(durationPercentiles[p.key]),
+                            })
+                          "
                           @click.stop="
                             addSearchTerm(
                               `duration>='${formatPercentile(durationPercentiles[p.key])}'`,
@@ -117,7 +121,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <OButton
                           variant="ghost"
                           size="icon-xs-circle"
-                          :title="`duration <= ${formatPercentile(durationPercentiles[p.key])}`"
+                          :title="
+                            t('common.durationLte', {
+                              value: formatPercentile(durationPercentiles[p.key]),
+                            })
+                          "
                           @click.stop="
                             addSearchTerm(
                               `duration<='${formatPercentile(durationPercentiles[p.key])}'`,

@@ -85,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="text-text-muted text-xs">{{
               t("synthetics.privateLocations.detail.version")
             }}</span>
-            <span class="font-medium">{{ "v" + detail.version }}</span>
+            <span class="font-medium">{{ t("synthetics.versionPrefix") + detail.version }}</span>
           </div>
           <div class="flex flex-col">
             <span class="text-text-muted text-xs">{{

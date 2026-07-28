@@ -61,14 +61,22 @@ function resetToDefault(): void {
         <OButton
           variant="outline"
           size="icon-sm"
-          :aria-label="`Manage columns${hiddenCount > 0 ? `, ${hiddenCount} hidden` : ''}`"
+          :aria-label="
+            hiddenCount > 0
+              ? t('common.manageColumnsHidden', { count: hiddenCount })
+              : t('common.manageColumns')
+          "
           data-test="o2-table-column-toggle-btn"
         >
           <template #icon-left>
             <OIcon name="view-column" size="sm" />
           </template>
           <OTooltip
-            :content="hiddenCount > 0 ? `Columns (${hiddenCount} hidden)` : 'Columns'"
+            :content="
+              hiddenCount > 0
+                ? t('common.columnsHidden', { count: hiddenCount })
+                : t('common.columns')
+            "
             side="bottom"
           />
         </OButton>
@@ -103,7 +111,11 @@ function resetToDefault(): void {
           <OCheckbox
             :model-value="isVisible(col.id)"
             size="sm"
-            :aria-label="`Toggle ${typeof col.header === 'string' ? col.header : col.id} column`"
+            :aria-label="
+              t('common.toggleColumn', {
+                name: typeof col.header === 'string' ? col.header : col.id,
+              })
+            "
             @update:model-value="toggleColumn(col.id)"
             @click.stop
           />

@@ -235,7 +235,9 @@ const rowStateClass = (row: { org: OrgOption; index: number }) => {
             class="text-2xs bg-select-item-hover-bg text-text-secondary shrink-0 rounded-full px-2 py-1 leading-none font-semibold"
           >
             {{
-              searchQuery ? `${filtered.length} of ${organizations.length}` : organizations.length
+              searchQuery
+                ? t("common.countOfTotal", { count: filtered.length, total: organizations.length })
+                : organizations.length
             }}
           </span>
         </div>
@@ -301,7 +303,7 @@ const rowStateClass = (row: { org: OrgOption; index: number }) => {
               <button
                 type="button"
                 data-test="organization-menu-item-copy-id"
-                :aria-label="`Copy organization ID ${row.org.identifier}`"
+                :aria-label="t('common.copyOrganizationId', { id: row.org.identifier })"
                 class="rounded-default hover:bg-select-item-selected-bg hover:text-select-item-selected-text inline-flex size-6 shrink-0 items-center justify-center transition"
                 :class="
                   copiedId === row.org.identifier

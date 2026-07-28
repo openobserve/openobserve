@@ -189,7 +189,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OIcon
                   name="auto-awesome"
                   size="sm"
-                  :title="'Prebuilt ' + getPrebuiltTypeName(row) + ' destination'"
+                  :title="t('alerts.prebuiltDestination', { type: getPrebuiltTypeName(row) })"
                 />
               </template>
               <template v-else>
@@ -268,7 +268,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <ConfirmDialog
       :title="t('alert_destinations.deleteDestinationsTitle')"
-      :message="`Are you sure you want to delete ${selectedDestinations.length} destination(s)?`"
+      :message="t('alerts.confirmDeleteDestinations', { count: selectedDestinations.length })"
       @update:ok="bulkDeleteDestinations"
       @update:cancel="confirmBulkDelete = false"
       v-model="confirmBulkDelete"

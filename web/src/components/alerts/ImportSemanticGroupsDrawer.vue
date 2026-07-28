@@ -187,7 +187,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div v-if="diffData.unchanged.length > 0">
             <OCollapsible
               v-model="unchangedOpen"
-              :label="`Unchanged (${diffData.unchanged.length})`"
+              :label="t('common.unchangedCount', { count: diffData.unchanged.length })"
               icon="check-circle"
             >
               <ul class="divide-border rounded-default flex flex-col divide-y border">
@@ -229,7 +229,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-model:open="showGroupDialog"
     size="md"
     :title="selectedGroup?.display"
-    :sub-title="`ID: ${selectedGroup?.id}`"
+    :sub-title="t('common.idPrefix', { id: selectedGroup?.id })"
     :primary-button-label="t('common.close')"
     @click:primary="showGroupDialog = false"
   >

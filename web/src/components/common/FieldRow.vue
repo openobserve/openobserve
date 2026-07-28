@@ -31,7 +31,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="mr-1 gap-0!"
       size="icon"
       :title="
-        field.isInterestingField ? 'Remove from interesting fields' : 'Add to interesting fields'
+        field.isInterestingField
+          ? t('logStream.removeFromInterestingFields')
+          : t('logStream.addToInterestingFields')
       "
       @click.stop="$emit('toggle-interesting', field, field.isInterestingField)"
     >
@@ -77,7 +79,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="gap-0!"
         size="icon"
         :title="
-          field.isInterestingField ? 'Remove from interesting fields' : 'Add to interesting fields'
+          field.isInterestingField
+            ? t('logStream.removeFromInterestingFields')
+            : t('logStream.addToInterestingFields')
         "
         @click.stop="$emit('toggle-interesting', field, field.isInterestingField)"
       >

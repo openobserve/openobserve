@@ -420,12 +420,12 @@ watch(internalOpen, (open) => {
           The visible title in the header is a plain <span> to avoid <h2> browser styles.
         -->
         <DialogTitle class="sr-only absolute">
-          {{ title ?? "Dialog" }}
+          {{ title ?? t("common.dialog") }}
         </DialogTitle>
 
         <!-- Required by Reka; hidden from view -->
         <DialogDescription class="sr-only absolute">
-          {{ title ?? "Dialog" }}
+          {{ title ?? t("common.dialog") }}
         </DialogDescription>
 
         <!-- ── Header ───────────────────────────────────────── -->

@@ -441,8 +441,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             >
                               {{
                                 patternAssociations[row.name]?.length
-                                  ? `View ${patternAssociations[row.name]?.length} Patterns`
-                                  : "Add Pattern"
+                                  ? t("logStream.viewPatternsCount", {
+                                      count: patternAssociations[row.name]?.length,
+                                    })
+                                  : t("logStream.addPattern")
                               }}
                               <OIcon name="arrow-forward" size="xs" />
                             </span>

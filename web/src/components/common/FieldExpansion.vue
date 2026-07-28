@@ -46,8 +46,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="mr-1 gap-0!"
           :title="
             field.isInterestingField
-              ? 'Remove from interesting fields'
-              : 'Add to interesting fields'
+              ? t('logStream.removeFromInterestingFields')
+              : t('logStream.addToInterestingFields')
           "
           size="icon"
           @click.stop="$emit('toggle-interesting', field, field.isInterestingField)"
@@ -92,8 +92,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="gap-0!"
             :title="
               field.isInterestingField
-                ? 'Remove from interesting fields'
-                : 'Add to interesting fields'
+                ? t('logStream.removeFromInterestingFields')
+                : t('logStream.addToInterestingFields')
             "
             size="icon"
             @click.stop="$emit('toggle-interesting', field, field.isInterestingField)"
@@ -136,6 +136,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import OFieldRow from "@/lib/lists/FieldList/OFieldRow.vue";
 import OFieldLabel from "@/lib/lists/FieldList/OFieldLabel.vue";
+import { useI18n } from "vue-i18n";
 
 interface Props {
   field: any;
@@ -239,6 +240,8 @@ const handleToggle = (val: boolean) => {
 };
 
 defineExpose({ reset: () => fieldValuesPanelRef.value?.reset() });
+
+const { t } = useI18n();
 </script>
 
 <style scoped>

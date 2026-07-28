@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="column.country_iso_code"
         :class="`fi fi-${column.country_iso_code} mr-1.5 shrink-0`"
       />
-      <div class="truncate text-xs">{{ column.country || "Unknown" }}</div>
+      <div class="truncate text-xs">{{ column.country || t("common.unknown") }}</div>
     </div>
     <div class="text-text-secondary flex min-w-0 flex-nowrap items-center text-xs">
       <template v-for="(part, index) in detailParts" :key="`${index}-${part}`">
@@ -41,6 +41,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 import "flag-icons/css/flag-icons.min.css";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { useI18n } from "vue-i18n";
+
+const { t } = useI18n();
 
 const props = defineProps({
   column: {

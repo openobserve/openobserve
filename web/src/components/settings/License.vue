@@ -15,7 +15,7 @@
               <div class="text-xl font-semibold">{{ t("about.no_license_found") }}</div>
               <div class="mt-2 text-sm">
                 {{ t("about.installation_id") }}:
-                <strong>{{ licenseData.installation_id || "N/A" }}</strong>
+                <strong>{{ licenseData.installation_id || t("common.notAvailable") }}</strong>
               </div>
               <div
                 class="mt-3 text-sm"

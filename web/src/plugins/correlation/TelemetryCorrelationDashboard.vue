@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-model:open="isOpen"
     side="right"
     :width="90"
-    :title="`Correlated Streams - ${serviceName}`"
+    :title="t('correlation.correlatedStreamsFor', { service: serviceName })"
     :sub-title="formatTimeRange(timeRange)"
     @update:open="(v) => !v && onClose()"
   >

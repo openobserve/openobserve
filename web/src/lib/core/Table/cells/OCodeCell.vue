@@ -10,6 +10,7 @@
 
 import { computed, ref } from "vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { useI18n } from "vue-i18n";
 
 const props = withDefaults(
   defineProps<{
@@ -39,6 +40,8 @@ async function handleCopy(e: MouseEvent) {
     /* clipboard unavailable — no-op */
   }
 }
+
+const { t } = useI18n();
 </script>
 
 <template>
@@ -49,7 +52,7 @@ async function handleCopy(e: MouseEvent) {
       v-if="copy"
       type="button"
       class="text-text-body shrink-0 cursor-pointer leading-none opacity-0 transition-opacity group-hover/code:opacity-60 hover:opacity-100!"
-      :title="copied ? 'Copied!' : 'Copy'"
+      :title="copied ? t('common.copiedExclaim') : t('common.copy')"
       @click="handleCopy"
     >
       <OIcon :name="copied ? 'check' : 'content-copy'" size="xs" />

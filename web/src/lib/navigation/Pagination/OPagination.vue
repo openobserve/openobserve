@@ -93,7 +93,7 @@ const navigate = (page: number) => {
             : 'text-pagination-item-text hover:bg-pagination-item-hover-bg cursor-pointer',
       ]"
       :disabled="disable && page !== modelValue"
-      :aria-label="`Page ${page}`"
+      :aria-label="t('common.pageNumber', { page })"
       :aria-current="page === modelValue ? 'page' : undefined"
       :data-test="parentDataTest ? `${parentDataTest}-page-${page}` : undefined"
       :data-test-value="page"

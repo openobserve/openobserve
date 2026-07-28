@@ -380,7 +380,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             type="countChip"
             value="error"
             class="shrink-0"
-            :title="`Failed ${ev.failCount} times in this window`"
+            :title="t('common.failedTimesInWindow', { count: ev.failCount })"
             >{{ t("overview.timesSymbol") }}{{ ev.failCount }}</OTag
           >
           <span class="text-text-secondary shrink-0 text-xs whitespace-nowrap">{{

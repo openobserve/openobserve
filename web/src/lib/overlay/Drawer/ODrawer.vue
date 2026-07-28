@@ -362,10 +362,10 @@ watch(internalOpen, (open) => {
       >
         <!-- Accessibility: hidden title required by Reka UI -->
         <DialogTitle class="sr-only absolute">
-          {{ title ?? "Drawer" }}
+          {{ title ?? t("common.drawer") }}
         </DialogTitle>
         <DialogDescription class="sr-only absolute">
-          {{ title ?? "Drawer" }}
+          {{ title ?? t("common.drawer") }}
         </DialogDescription>
 
         <!-- ── Header ───────────────────────────────────────── -->

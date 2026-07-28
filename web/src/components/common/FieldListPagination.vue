@@ -124,7 +124,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Pagination -->
       <div v-if="pagesNumber > 1" class="flex items-center gap-0.5">
         <OTooltip
-          :content="'Total Fields: ' + totalFieldsCount"
+          :content="t('common.totalFields', { count: totalFieldsCount })"
           max-width="18.75rem"
           side="left"
           align="center"

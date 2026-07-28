@@ -20,7 +20,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="resume-pipeline-dialog"
     size="sm"
     :title="t('pipeline_list.resume_pipeline_title')"
-    :sub-title="lastPausedAt ? `Last paused: ${convertUnixToDateFormat(lastPausedAt)}` : undefined"
+    :sub-title="
+      lastPausedAt
+        ? t('common.lastPausedAt', { time: convertUnixToDateFormat(lastPausedAt) })
+        : undefined
+    "
     :secondary-button-label="t('confirmDialog.cancel')"
     :primary-button-label="t('pipeline_list.run_pipeline')"
     @click:secondary="onCancel"

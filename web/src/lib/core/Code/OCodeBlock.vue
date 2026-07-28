@@ -112,11 +112,11 @@ const onCopy = () => {
       >
         <OIcon name="code" size="xs" class="opacity-60" />
         <span class="font-mono text-xs font-semibold tracking-[0.01em] opacity-75">{{
-          filename || lang || "text"
+          filename || lang || t("common.plainText")
         }}</span>
       </span>
       <span v-else class="o2-code-lang text-2xs font-mono tracking-wider uppercase opacity-55">{{
-        lang || "text"
+        lang || t("common.plainText")
       }}</span>
       <div class="flex items-center gap-1">
         <OButton

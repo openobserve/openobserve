@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #trailing>
             <button
               type="button"
-              :aria-label="`Remove ${field.name}`"
+              :aria-label="t('common.removeField', { name: field.name })"
               class="inline-flex cursor-pointer items-center justify-center hover:opacity-70"
               @click="$emit('remove-field', 'fts', field.name)"
             >
@@ -78,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #trailing>
             <button
               type="button"
-              :aria-label="`Remove ${field.name}`"
+              :aria-label="t('common.removeField', { name: field.name })"
               class="inline-flex cursor-pointer items-center justify-center hover:opacity-70"
               @click="$emit('remove-field', 'secondaryIndex', field.name)"
             >

@@ -142,6 +142,8 @@ const NON_TRANSLATABLE = [
   "px",
   "s",
   "ms",
+  "ns", // nanoseconds — trace span durations
+  "min", // minutes, appended to a number
   "×",
   "→",
   "≠",
@@ -152,6 +154,27 @@ const NON_TRANSLATABLE = [
   "●",
   "🕑",
   "$_",
+  // Protocol / standard identifiers — defined by a spec, identical in every locale.
+  "GET", // HTTP method, shown as the default when a request has none
+  "UTC", // timezone designator
+  "SQL", // query language name (proper noun)
+  "PromQL", // query language name (proper noun)
+  "OK", // OpenTelemetry span status code
+  "ERROR", // OpenTelemetry span status code
+  "UNSET", // OpenTelemetry span status code
+  "PerDayCount", // license limit enum value returned by the API
+  // Code identifiers rendered as-is — column names, axis handles, node markers.
+  "_timestamp", // reserved SQL column name
+  "+X", // chart axis handle
+  "+Y", // chart axis handle
+  "[RAF]", // pipeline node marker — "run after flatten"
+  "[RBF]", // pipeline node marker — "run before flatten"
+  "var_", // generated variable-name prefix
+  "p", // percentile prefix (p50, p95 …)
+  "x", // "times" multiplier suffix on a number
+  "devices", // Material icon name used as the device-icon fallback
+  "0us", // zero-duration literal
+  "0 MB", // zero-size literal
   // Specific literal tokens shown to the user as documentation / code.
   "1000", // hardcoded record-limit value
   "./.env", // relative config-file path shown in setup steps
@@ -216,17 +239,53 @@ noLegacyO2Tokens.rules["no-bare-bound-text-props"] = {
     const sourceCode = context.sourceCode ?? context.getSourceCode();
     const ps = sourceCode.parserServices ?? context.parserServices;
     if (!ps || !ps.defineTemplateBodyVisitor) return {};
-    // A bare string literal (or zero-expression template literal) that contains a
-    // letter → return the text; otherwise null (expressions, variables, and
-    // punctuation-only literals all pass).
+    // Collect every hardcoded text fragment reachable inside an expression.
+    //
+    // A bare literal is the simple case (:label="'Save'"). The recursion covers the
+    // COMPOSED shapes a dev reaches for naturally, which are just as untranslatable:
+    //   'Deleted ' + n + ' rows'      concatenation
+    //   cond ? 'Yes' : 'No'           ternary  (very common on toggle labels)
+    //   name || 'Unknown'             fallback
+    //   `Deleted ${n} rows`           interpolation (the literal parts / quasis)
+    // vue-i18n already handles all of these via named interpolation —
+    // t('key', { n }) with "Deleted {n} rows" in en-US.json — so there is no reason
+    // to exempt them. Variables and t() calls contribute no literal text and so
+    // still pass. Uses the SAME letter test + NON_TRANSLATABLE allowlist as before,
+    // so this adds no new vocabulary to maintain.
+    const collect = (expr, out) => {
+      if (!expr) return out;
+      switch (expr.type) {
+        case "Literal":
+          if (typeof expr.value === "string") out.push(expr.value);
+          break;
+        case "TemplateLiteral":
+          for (const q of expr.quasis) out.push(q.value.cooked ?? "");
+          for (const e of expr.expressions) collect(e, out);
+          break;
+        case "BinaryExpression":
+          if (expr.operator === "+") {
+            collect(expr.left, out);
+            collect(expr.right, out);
+          }
+          break;
+        case "ConditionalExpression":
+          collect(expr.consequent, out);
+          collect(expr.alternate, out);
+          break;
+        case "LogicalExpression":
+          collect(expr.left, out);
+          collect(expr.right, out);
+          break;
+      }
+      return out;
+    };
+    // → the offending text (joined when composed), or null when the expression
+    // carries no translatable literal.
     const bareText = (expr) => {
-      if (!expr) return null;
-      let text = null;
-      if (expr.type === "Literal" && typeof expr.value === "string") text = expr.value;
-      else if (expr.type === "TemplateLiteral" && expr.expressions.length === 0)
-        text = expr.quasis[0].value.cooked;
-      if (text == null || NON_TRANSLATABLE_SET.has(text.trim())) return null;
-      return /\p{L}/u.test(text) ? text : null;
+      const parts = collect(expr, []).filter(
+        (t) => t != null && /\p{L}/u.test(t) && !NON_TRANSLATABLE_SET.has(t.trim()),
+      );
+      return parts.length ? parts.join("|") : null;
     };
     return ps.defineTemplateBodyVisitor({
       VAttribute(node) {

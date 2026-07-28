@@ -161,7 +161,7 @@
               side="left"
               align="center"
               max-width="18.75rem"
-              :content="`Total Fields: ${bottomProps.totalRows}`"
+              :content="t('common.totalFields', { count: bottomProps.totalRows })"
             />
             <OButton
               variant="ghost-primary"

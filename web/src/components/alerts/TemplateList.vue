@@ -247,7 +247,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <ConfirmDialog
       :title="t('alert_templates.deleteTemplatesTitle')"
-      :message="`Are you sure you want to delete ${selectedTemplates.length} template(s)?`"
+      :message="t('alerts.confirmDeleteTemplates', { count: selectedTemplates.length })"
       @update:ok="bulkDeleteTemplates"
       @update:cancel="confirmBulkDelete = false"
       v-model="confirmBulkDelete"

@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #trailing>
             <button
               type="button"
-              :aria-label="`Remove ${tag}`"
+              :aria-label="t('common.removeTag', { tag })"
               class="inline-flex cursor-pointer items-center justify-center hover:opacity-70"
               @click="removeTag(index)"
             >
@@ -71,6 +71,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, computed } from "vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { useI18n } from "vue-i18n";
+
+const { t } = useI18n();
 
 interface Props {
   modelValue: string[];

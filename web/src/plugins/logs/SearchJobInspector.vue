@@ -88,7 +88,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div class="flex flex-col gap-1">
                 <div class="text-text-body text-2xl font-bold">
-                  {{ hasNoData ? "NA" : (profileData?.data_records || 0).toLocaleString() }}
+                  {{
+                    hasNoData
+                      ? t("common.notAvailableShort")
+                      : (profileData?.data_records || 0).toLocaleString()
+                  }}
                 </div>
                 <div class="text-3xs text-text-secondary">
                   {{ t("logs.searchJobInspector.returnedFromQuery") }}
@@ -122,7 +126,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div class="flex flex-col gap-1">
                 <div class="text-text-body text-2xl font-bold">
-                  {{ hasNoData ? "NA" : (profileData?.scan_records || 0).toLocaleString() }}
+                  {{
+                    hasNoData
+                      ? t("common.notAvailableShort")
+                      : (profileData?.scan_records || 0).toLocaleString()
+                  }}
                 </div>
                 <div class="text-3xs text-text-secondary">
                   {{ t("logs.searchJobInspector.scannedEventsForQuery") }}
@@ -164,7 +172,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="text-text-body text-2xl font-bold">
                   {{
                     hasNoData
-                      ? "NA"
+                      ? t("common.notAvailableShort")
                       : formatDuration(profileData?.time_taken || profileData?.total_duration)
                   }}
                 </div>
@@ -233,7 +241,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="truncate overflow-hidden font-mono text-sm leading-tight font-semibold"
                   :class="hasNoData ? 'text-text-secondary' : 'text-text-link'"
                 >
-                  {{ hasNoData ? "NA" : traceId }}
+                  {{ hasNoData ? t("common.notAvailableShort") : traceId }}
                   <OTooltip v-if="!hasNoData" :content="traceId" />
                 </div>
               </div>

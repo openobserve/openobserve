@@ -116,6 +116,7 @@ const mockI18n = createI18n({
       dashboard: {
         currentFolderLabel: "Current Folder",
         cancel: "Cancel",
+        moveToAnotherFolder: "Move {type} To Another Folder",
       },
       common: {
         move: "Move",

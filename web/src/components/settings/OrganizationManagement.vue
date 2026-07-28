@@ -210,7 +210,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="organization-management-ai-credits-dialog"
       v-model:open="aiCreditsPrompt"
       size="sm"
-      :title="`Set AI Credits for ${aiCreditsDataRow?.name}`"
+      :title="t('settings.setAiCreditsFor', { name: aiCreditsDataRow?.name })"
       :sub-title="t('settings.organizationManagementPage.setAiCreditsSubtitle')"
       :secondary-button-label="t('common.cancel')"
       :primary-button-label="t('settings.organizationManagementPage.saveCredits')"

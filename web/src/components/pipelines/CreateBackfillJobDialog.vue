@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               variant="ghost-muted"
               size="icon-xs-sq"
-              :title="showAdvanced ? 'Collapse' : 'Expand'"
+              :title="showAdvanced ? t('common.collapse') : t('common.expand')"
               :icon-left="showAdvanced ? 'unfold-less' : 'unfold-more'"
               @click.stop="showAdvanced = !showAdvanced"
               class="opacity-50 transition-all duration-200 hover:opacity-100"

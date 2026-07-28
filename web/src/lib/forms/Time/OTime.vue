@@ -328,7 +328,7 @@ const fieldClasses = computed(() => [
                   ? 'text-datepicker-day-selected-bg border-datepicker-day-selected-bg'
                   : 'text-datepicker-heading-text hover:text-datepicker-day-selected-bg border-transparent',
               ]"
-              :aria-label="`Hour: ${displayHour}`"
+              :aria-label="t('common.hourWithValue', { value: displayHour })"
               @click="clockMode = 'hour'"
             >
               {{ displayHour }}
@@ -344,7 +344,7 @@ const fieldClasses = computed(() => [
                   ? 'text-datepicker-day-selected-bg border-datepicker-day-selected-bg'
                   : 'text-datepicker-heading-text hover:text-datepicker-day-selected-bg border-transparent',
               ]"
-              :aria-label="`Minute: ${displayMinute}`"
+              :aria-label="t('common.minuteWithValue', { value: displayMinute })"
               @click="clockMode = 'minute'"
             >
               {{ displayMinute }}
@@ -361,7 +361,7 @@ const fieldClasses = computed(() => [
                     ? 'text-datepicker-day-selected-bg border-datepicker-day-selected-bg'
                     : 'text-datepicker-heading-text hover:text-datepicker-day-selected-bg border-transparent',
                 ]"
-                :aria-label="`Second: ${displaySecond}`"
+                :aria-label="t('common.secondWithValue', { value: displaySecond })"
                 @click="clockMode = 'second'"
               >
                 {{ displaySecond }}
@@ -410,7 +410,7 @@ const fieldClasses = computed(() => [
             width="200"
             height="200"
             role="img"
-            :aria-label="`Select ${clockMode}`"
+            :aria-label="t('common.selectMode', { mode: clockMode })"
             data-test="otime-clock-face"
           >
             <circle

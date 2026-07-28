@@ -205,8 +205,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <OTooltip
                         :content="
                           panelSchemaRendererRef?.isAddAnnotationMode
-                            ? 'Exit Annotations Mode'
-                            : 'Add Annotations'
+                            ? t('dashboard.exitAnnotationsMode')
+                            : t('dashboard.addAnnotations')
                         "
                         side="bottom"
                         align="end"

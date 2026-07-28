@@ -60,14 +60,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div class="flex items-center text-xs">
                 <OIcon name="code" size="sm" class="pr-1" />
-                {{ rawEvent.service || "Unknown User" }}
+                {{ rawEvent.service || t("common.unknownUser") }}
               </div>
               <div class="flex items-center text-xs">
-                {{ t("common.versionAbbreviation") }} {{ rawEvent.version || "Unknown User" }}
+                {{ t("common.versionAbbreviation") }}
+                {{ rawEvent.version || t("common.unknownUser") }}
               </div>
               <div class="flex items-center text-xs">
                 <OIcon name="mail" size="sm" class="pr-1" />
-                {{ sessionDetails.user_email || "Unknown User" }}
+                {{ sessionDetails.user_email || t("common.unknownUser") }}
               </div>
               <div class="flex items-center truncate text-xs">
                 <OIcon name="settings" size="sm" class="pr-1" />
@@ -523,13 +524,13 @@ const actionFields = computed(() => [
   {
     key: "action_type",
     label: "Action Type",
-    value: props.rawEvent?.action_type || "N/A",
+    value: props.rawEvent?.action_type || t("common.notAvailable"),
     valueClass: "capitalize",
   },
   {
     key: "action_target_name",
     label: "Target",
-    value: props.rawEvent?.action_target_name || "N/A",
+    value: props.rawEvent?.action_target_name || t("common.notAvailable"),
   },
   {
     key: "action_id",

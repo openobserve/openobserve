@@ -46,10 +46,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span :class="['text-xs font-semibold', 'text-text-body']">
             {{
               isAnomaly
-                ? "Anomaly Detection"
+                ? t("alerts.anomalyDetection")
                 : alertDetails.is_real_time
-                  ? "Real-time"
-                  : "Scheduled"
+                  ? t("common.realTime")
+                  : t("alerts.scheduled")
             }}
           </span>
         </div>
@@ -286,7 +286,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           ? "SQL"
                           : alertDetails.type === "promql"
                             ? "PromQL"
-                            : "Conditions"
+                            : t("alerts.alertDetails.conditions")
                       }}
                     </span>
                   </div>
@@ -322,7 +322,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       ? alertDetails.type === "sql" || alertDetails.type === "promql"
                         ? alertDetails.conditions
                         : alertDetails.conditions.length !== 2
-                          ? `if ${alertDetails.conditions}`
+                          ? t("alerts.alertDetails.ifCondition", {
+                              condition: alertDetails.conditions,
+                            })
                           : t("alerts.alertDetails.noCondition")
                       : t("alerts.alertDetails.noCondition")
                   }}</pre

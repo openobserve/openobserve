@@ -32,7 +32,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="templateErrorsToDisplay.length > 0 || tempalteCreators.length > 0"
           class="text-text-heading shrink-0 py-3 text-center text-sm font-semibold"
         >
-          {{ templateErrorsToDisplay.length > 0 ? "Error Validations" : "Output Messages" }}
+          {{
+            templateErrorsToDisplay.length > 0
+              ? t("alerts.errorValidations")
+              : t("alerts.outputMessagesLabel")
+          }}
         </div>
         <div v-else class="text-text-heading shrink-0 py-3 text-center text-sm font-semibold">
           {{ t("alert_templates.outputMessages") }}

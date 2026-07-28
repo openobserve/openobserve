@@ -176,7 +176,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <OTimelineItem
             v-if="job.status === 'running'"
-            :title="`Processing Chunk ${job.chunks_completed || 0}/${job.chunks_total || 'N/A'}`"
+            :title="
+              t('pipeline.processingChunk', {
+                done: job.chunks_completed || 0,
+                total: job.chunks_total || t('common.notAvailable'),
+              })
+            "
             :subtitle="t('pipeline.inProgress')"
             icon="hourglass-empty"
             variant="info"

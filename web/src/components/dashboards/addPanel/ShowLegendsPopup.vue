@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #icon-left
             ><OIcon :name="isAllCopied ? 'check' : 'content-copy'" size="sm"
           /></template>
-          {{ isAllCopied ? "Copied" : "Copy all" }}
+          {{ isAllCopied ? t("common.copied") : t("common.copyAll") }}
         </OButton>
       </div>
     </template>
@@ -81,7 +81,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :name="isLegendCopied(Number(index)) ? 'check' : 'content-copy'"
                     size="sm"
                 /></template>
-                <OTooltip :content="isLegendCopied(Number(index)) ? 'Copied!' : 'Copy legend'" />
+                <OTooltip
+                  :content="
+                    isLegendCopied(Number(index))
+                      ? t('common.copiedExclaim')
+                      : t('dashboard.copyLegend')
+                  "
+                />
               </OButton>
             </div>
           </div>

@@ -226,7 +226,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="error-indicator-btn"
                 icon-left="error"
               >
-                <OTooltip :content="`Error: ${row.error}`" />
+                <OTooltip :content="t('common.errorPrefix', { message: row.error })" />
               </OButton>
             </div>
           </template>

@@ -60,7 +60,7 @@
             <template #trailing>
               <button
                 type="button"
-                :aria-label="`Remove ${field.name}`"
+                :aria-label="t('common.removeField', { name: field.name })"
                 :data-test="`cross-link-field-chip-remove-${idx}`"
                 class="inline-flex cursor-pointer items-center justify-center hover:opacity-70"
                 @click="removeField(idx)"

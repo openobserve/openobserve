@@ -149,7 +149,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{
             errorDetail?.code?.toString().startsWith("4")
               ? errorDetail.message
-              : "Error Loading Data"
+              : t("common.errorLoadingData")
           }}
         </div>
       </div>

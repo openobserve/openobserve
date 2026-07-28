@@ -446,7 +446,7 @@ function fireConfetti() {
             <img
               v-if="logoSrc"
               :src="logoSrc"
-              :alt="`${content.provider.name} logo`"
+              :alt="t('common.providerLogo', { name: content.provider.name })"
               loading="lazy"
               referrerpolicy="no-referrer"
               @error="logoFailed = true"
@@ -725,13 +725,10 @@ function fireConfetti() {
               <div v-if="showFixHint" class="fixbox mt-3">
                 <div class="fixbox-h">
                   <OIcon name="warning" size="sm" /> {{ t("ingestion.setupCard.mostLikelyFix") }}
-                  {{ extras.fixTitle || "Instrument Before Importing The Client" }}
+                  {{ extras.fixTitle || t("ingestion.instrumentBeforeImportTitle") }}
                 </div>
                 <p class="fixbox-p">
-                  {{
-                    extras.fixBody ||
-                    "If your app runs but no spans arrive, instrumentation likely loaded after the client was imported. Re-order so the init runs first:"
-                  }}
+                  {{ extras.fixBody || t("ingestion.instrumentBeforeImportBody") }}
                 </p>
                 <OCodeBlock
                   :lang="extras.fixLang || 'python'"

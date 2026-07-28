@@ -1638,15 +1638,15 @@ export default defineComponent({
     const serviceMetrics = computed(() => {
       if (!props.selectedNode || !props.graphData) {
         return {
-          requestRate: "N/A",
-          requestRateValue: "N/A",
+          requestRate: t("common.notAvailable"),
+          requestRateValue: t("common.notAvailable"),
           totalRequests: 0,
           incomingRequests: 0,
           outgoingRequests: 0,
-          errorRate: "N/A",
-          p50Latency: "N/A",
-          p95Latency: "N/A",
-          p99Latency: "N/A",
+          errorRate: t("common.notAvailable"),
+          p50Latency: t("common.notAvailable"),
+          p95Latency: t("common.notAvailable"),
+          p99Latency: t("common.notAvailable"),
         };
       }
 
@@ -1702,9 +1702,9 @@ export default defineComponent({
         incomingRequests: incomingRequests,
         outgoingRequests: outgoingRequests,
         errorRate: errorRate.toFixed(2) + "%",
-        p50Latency: incomingEdges.length > 0 ? formatLatency(p50Latency) : "N/A",
-        p95Latency: incomingEdges.length > 0 ? formatLatency(p95Latency) : "N/A",
-        p99Latency: incomingEdges.length > 0 ? formatLatency(p99Latency) : "N/A",
+        p50Latency: incomingEdges.length > 0 ? formatLatency(p50Latency) : t("common.notAvailable"),
+        p95Latency: incomingEdges.length > 0 ? formatLatency(p95Latency) : t("common.notAvailable"),
+        p99Latency: incomingEdges.length > 0 ? formatLatency(p99Latency) : t("common.notAvailable"),
       };
     });
 

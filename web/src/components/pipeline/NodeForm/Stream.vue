@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OSwitch
           v-if="selectedNodeType == 'input'"
           data-test="create-stream-toggle"
-          :label="isUpdating ? 'Edit Stream' : 'Create new Stream'"
+          :label="isUpdating ? t('logStream.editStream') : t('logStream.createNewStream')"
           v-model="createNewStream"
           class="mb-3"
         />

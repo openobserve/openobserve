@@ -449,7 +449,7 @@ function getIcon(data: NodeData | undefined, ioType: string | undefined) {
           <OTooltip side="top" align="center" :sideOffset="10" max-width="600px">
             <template #content>
               <div class="max-h-75 overflow-y-auto">
-                {{ getNodeErrorInfo || "Error occurred" }}
+                {{ getNodeErrorInfo || t("common.errorOccurred") }}
               </div>
             </template>
           </OTooltip>

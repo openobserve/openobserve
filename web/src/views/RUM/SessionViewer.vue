@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div class="flex items-center gap-1.5 truncate text-xs">
           <OIcon name="person" size="sm" />
-          {{ sessionDetails.user_email || "Unknown User" }}
+          {{ sessionDetails.user_email || t("common.unknownUser") }}
         </div>
         <div class="flex items-center gap-1.5 truncate text-xs">
           <OIcon name="location-on" size="sm" />
@@ -50,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-if="frustrationCount > 0"
           class="flex items-center truncate text-xs"
-          :title="`${frustrationCount} frustration signal${frustrationCount > 1 ? 's' : ''} detected`"
+          :title="t('rum.frustrationSignalsDetected', { count: frustrationCount }, frustrationCount)"
           data-test="session-viewer-frustration-summary"
         >
           <OIcon
@@ -284,7 +284,7 @@ const getSessionDetails = () => {
     browser: sessionState.data.selectedSession?.browser,
     os: sessionState.data.selectedSession?.os,
     ip: sessionState.data.selectedSession?.ip,
-    user_email: sessionState.data.selectedSession?.user_email || "Unknown User",
+    user_email: sessionState.data.selectedSession?.user_email || t("common.unknownUser"),
     city: sessionState.data.selectedSession?.city || "Unknown",
     country: sessionState.data.selectedSession?.country || "Unknown",
     id: sessionState.data.selectedSession?.session_id,

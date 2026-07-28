@@ -358,7 +358,7 @@ function toggleSteps(executionId: string) {
                     <a :href="artifactUrl(step.screenshotKey!)" target="_blank">
                       <img
                         :src="artifactUrl(step.screenshotKey!)"
-                        :alt="`Screenshot ${step.stepId}`"
+                        :alt="t('common.screenshotOfStep', { step: step.stepId })"
                         class="block max-h-48 w-full object-contain transition-opacity hover:opacity-90"
                         loading="lazy"
                       />

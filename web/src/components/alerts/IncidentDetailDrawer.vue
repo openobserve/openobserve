@@ -73,9 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >{{ triggers.length }} {{ t("alerts.incidents.alertCount") }}</OTag
             >
             <OTooltip
-              :content="
-                t('alerts.incidents.alertCount') + ': ' + triggers.length + ' correlated alerts'
-              "
+              :content="t('alerts.incidents.correlatedAlertsCount', { count: triggers.length })"
             />
           </span>
         </template>
@@ -292,7 +290,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               incidentDetails.first_alert_at,
                               incidentDetails.last_alert_at,
                             )
-                          : "N/A"
+                          : t("common.notAvailable")
                       }}
                     </div>
                   </div>
@@ -362,7 +360,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 {{
                                   incidentDetails?.first_alert_at
                                     ? formatTimestampUTC(incidentDetails.first_alert_at)
-                                    : "N/A"
+                                    : t("common.notAvailable")
                                 }}
                                 <span :class="'text-text-muted'" class="mx-1.5">|</span>
                                 <span>{{ t("alerts.incidents.initialTrigger") }}</span>
@@ -383,7 +381,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 {{
                                   peakActivity.timestamp
                                     ? formatTimestampUTC(peakActivity.timestamp)
-                                    : "N/A"
+                                    : t("common.notAvailable")
                                 }}
                                 <span :class="'text-text-muted'" class="mx-1.5">|</span>
                                 <span
@@ -412,13 +410,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 {{
                                   incidentDetails?.last_alert_at
                                     ? formatTimestampUTC(incidentDetails.last_alert_at)
-                                    : "N/A"
+                                    : t("common.notAvailable")
                                 }}
                                 <span :class="'text-text-muted'" class="mx-1.5">|</span>
                                 <span>{{
                                   incidentDetails?.status === "resolved"
-                                    ? "Resolved"
-                                    : "Still ongoing"
+                                    ? t("common.resolved")
+                                    : t("common.stillOngoing")
                                 }}</span>
                               </div>
                             </div>
@@ -460,7 +458,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               class="rounded-default bg-surface-panel border-border-default text-text-body flex min-w-0 items-center gap-2 border px-2.5 py-1 font-mono text-xs"
                             >
                               <span class="min-w-0 flex-1 truncate">{{
-                                incidentDetails?.id || "N/A"
+                                incidentDetails?.id || t("common.notAvailable")
                               }}</span>
                               <OIcon
                                 :name="copiedField === 'incident_id' ? 'check' : 'content-copy'"
@@ -485,7 +483,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               class="rounded-default bg-surface-panel border-border-default text-text-body flex min-w-0 items-center gap-2 border px-2.5 py-1 text-xs"
                             >
                               <span class="min-w-0 flex-1 truncate">{{
-                                incidentDetails?.title || "N/A"
+                                incidentDetails?.title || t("common.notAvailable")
                               }}</span>
                               <OIcon
                                 :name="copiedField === 'incident_title' ? 'check' : 'content-copy'"
@@ -540,7 +538,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               {{
                                 incidentDetails?.created_at
                                   ? formatTimestamp(incidentDetails.created_at)
-                                  : "N/A"
+                                  : t("common.notAvailable")
                               }}
                             </div>
                           </div>
@@ -554,7 +552,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               {{
                                 incidentDetails?.updated_at
                                   ? formatTimestamp(incidentDetails.updated_at)
-                                  : "N/A"
+                                  : t("common.notAvailable")
                               }}
                             </div>
                           </div>
@@ -893,7 +891,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               {{ t("alerts.incidents.alertName") }}
                             </span>
                             <span :class="'text-text-body'" class="text-sm font-medium">
-                              {{ alerts[selectedAlertIndex]?.name || "N/A" }}
+                              {{ alerts[selectedAlertIndex]?.name || t("common.notAvailable") }}
                             </span>
                           </div>
 
@@ -908,7 +906,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               </span>
                               <OTag
                                 type="streamType"
-                                :value="alerts[selectedAlertIndex]?.stream_type || 'N/A'"
+                                :value="
+                                  alerts[selectedAlertIndex]?.stream_type ||
+                                  t('common.notAvailable')
+                                "
                                 class="w-fit"
                               />
                             </div>
@@ -920,7 +921,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 {{ t("alerts.stream_name") }}
                               </span>
                               <span :class="'text-text-body'" class="truncate text-sm font-medium">
-                                {{ alerts[selectedAlertIndex]?.stream_name || "N/A" }}
+                                {{
+                                  alerts[selectedAlertIndex]?.stream_name ||
+                                  t("common.notAvailable")
+                                }}
                               </span>
                             </div>
                           </div>
@@ -937,7 +941,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               <span :class="'text-text-body'" class="text-sm font-medium">
                                 {{ alerts[selectedAlertIndex]?.trigger_condition?.operator || "" }}
                                 {{
-                                  alerts[selectedAlertIndex]?.trigger_condition?.threshold || "N/A"
+                                  alerts[selectedAlertIndex]?.trigger_condition?.threshold ||
+                                  t("common.notAvailable")
                                 }}
                               </span>
                             </div>
@@ -969,7 +974,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               </span>
                               <span :class="'text-text-body'" class="text-sm font-medium">
                                 {{
-                                  alerts[selectedAlertIndex]?.trigger_condition?.frequency || "N/A"
+                                  alerts[selectedAlertIndex]?.trigger_condition?.frequency ||
+                                  t("common.notAvailable")
                                 }}
                                 {{
                                   alerts[selectedAlertIndex]?.trigger_condition?.frequency_type ||
@@ -986,7 +992,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               </span>
                               <span :class="'text-text-body'" class="text-sm font-medium">
                                 {{
-                                  alerts[selectedAlertIndex]?.trigger_condition?.silence || "N/A"
+                                  alerts[selectedAlertIndex]?.trigger_condition?.silence ||
+                                  t("common.notAvailable")
                                 }}
                                 {{ t("common.min") }}
                               </span>
@@ -1013,10 +1020,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             >
                               {{
                                 alerts[selectedAlertIndex]?.query_condition?.type === "sql"
-                                  ? "SQL Query"
+                                  ? t("alerts.alertDetails.sqlQuery")
                                   : alerts[selectedAlertIndex]?.query_condition?.type === "promql"
-                                    ? "PromQL Query"
-                                    : "Conditions"
+                                    ? t("alerts.alertDetails.promqlQuery")
+                                    : t("alerts.alertDetails.conditions")
                               }}
                             </span>
                           </div>
@@ -1109,7 +1116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     ]"
                   />
                   <div class="mt-3 text-xl font-semibold">
-                    {{ correlationError || "No correlated logs found" }}
+                    {{ correlationError || t("alerts.incidents.noCorrelatedLogs") }}
                   </div>
                   <div
                     v-if="correlationError && correlationError.includes('disambiguation fields')"
@@ -1192,7 +1199,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     ]"
                   />
                   <div class="mt-3 text-xl font-semibold">
-                    {{ correlationError || "No correlated metrics found" }}
+                    {{ correlationError || t("alerts.incidents.noCorrelatedMetrics") }}
                   </div>
                   <div
                     v-if="correlationError && correlationError.includes('disambiguation fields')"
@@ -1293,7 +1300,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     ]"
                   />
                   <div class="mt-3 text-xl font-semibold">
-                    {{ correlationError || "No correlated traces found" }}
+                    {{ correlationError || t("alerts.incidents.noCorrelatedTraces") }}
                   </div>
                   <div
                     v-if="correlationError && correlationError.includes('disambiguation fields')"
@@ -1708,7 +1715,7 @@ export default defineComponent({
     });
 
     const alertFrequency = computed(() => {
-      if (!incidentDetails.value || triggers.value.length === 0) return "N/A";
+      if (!incidentDetails.value || triggers.value.length === 0) return t("common.notAvailable");
 
       const durationMs =
         (incidentDetails.value.last_alert_at - incidentDetails.value.first_alert_at) / 1000;
@@ -1784,7 +1791,7 @@ export default defineComponent({
 
     // Peak Alert Rate - find the highest concentration of alerts
     const peakAlertRate = computed(() => {
-      if (!incidentDetails.value || triggers.value.length === 0) return "N/A";
+      if (!incidentDetails.value || triggers.value.length === 0) return t("common.notAvailable");
 
       // Sort triggers by timestamp
       const sortedTriggers = [...triggers.value].sort(
@@ -2600,7 +2607,7 @@ export default defineComponent({
     };
 
     const formatPeriod = (periodInSeconds: number | undefined) => {
-      if (!periodInSeconds) return "N/A";
+      if (!periodInSeconds) return t("common.notAvailable");
 
       // Convert seconds to minutes
       if (periodInSeconds >= 60) {

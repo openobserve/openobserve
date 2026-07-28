@@ -257,10 +257,10 @@ const wrapperClasses = computed(() => [
         {{
           placeholder ||
           (dropZone
-            ? "Drop files here or click to choose"
+            ? t("common.dropFilesHint")
             : multiple
-              ? "Choose files"
-              : "Choose a file")
+              ? t("common.chooseFiles")
+              : t("common.chooseAFile"))
         }}
       </div>
 

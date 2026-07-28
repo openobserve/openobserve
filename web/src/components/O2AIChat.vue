@@ -25,7 +25,7 @@
                     <span
                       class="chat-title-text text-text-body block max-w-45 truncate text-sm font-medium"
                     >
-                      {{ displayedTitle || "New Chat" }}
+                      {{ displayedTitle || t("common.newChat") }}
                       <OTooltip
                         v-if="displayedTitle && displayedTitle.length > 25"
                         :sideOffset="8"
@@ -132,7 +132,14 @@
                 size="sm"
               />
               <OTooltip
-                :content="`${store.state.isAiChatExpanded ? 'Collapse' : 'Expand'} (${isMac ? '⌘' : 'Ctrl+'}B)`"
+                :content="
+                  t('common.collapseExpandShortcut', {
+                    action: store.state.isAiChatExpanded
+                      ? t('common.collapse')
+                      : t('common.expand'),
+                    shortcut: isMac ? '⌘' : 'Ctrl+',
+                  })
+                "
               />
             </OButton>
             <OButton variant="ghost" size="icon-sm" @click="$emit('close')">
@@ -1270,7 +1277,14 @@
               >
                 <OIcon name="close" size="xs" />
               </OButton>
-              <OTooltip :content="`${img.filename} (${(img.size / 1024).toFixed(0)}KB)`" />
+              <OTooltip
+                :content="
+                  t('common.fileWithSize', {
+                    name: img.filename,
+                    size: (img.size / 1024).toFixed(0),
+                  })
+                "
+              />
             </div>
           </div>
 

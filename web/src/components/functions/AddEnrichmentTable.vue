@@ -182,13 +182,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             name="url"
             data-test="add-enrichment-table-new-url"
             :label="
-              formData.updateMode === 'append' ? 'New CSV File URL' : 'Replacement CSV File URL'
+              formData.updateMode === 'append'
+                ? t('functions.newCsvFileUrl')
+                : t('functions.replacementCsvFileUrl')
             "
             :placeholder="t('function.csvUrlPlaceholder')"
             :help-text="
               formData.updateMode === 'append'
-                ? 'Enter a new URL to add to this enrichment table'
-                : 'Enter a URL to replace all existing URLs'
+                ? t('functions.newCsvFileUrlHelp')
+                : t('functions.replacementCsvFileUrlHelp')
             "
           />
 

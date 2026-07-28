@@ -85,7 +85,7 @@
                         searchable
                         :error="condition.values?.length === 0"
                         :error-message="
-                          condition.values?.length === 0 ? 'At least 1 item required' : ''
+                          condition.values?.length === 0 ? t('common.atLeastOneItemRequired') : ''
                         "
                         data-test="dashboard-add-condition-list-tab"
                         class="o2-custom-select-dashboard"

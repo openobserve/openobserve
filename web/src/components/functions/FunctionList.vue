@@ -188,7 +188,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <ConfirmDialog
       :title="t('function.deleteFunctionsDialogTitle')"
-      :message="`Are you sure you want to delete ${selectedFunctions.length} function(s)?`"
+      :message="t('functions.confirmDeleteFunctions', { count: selectedFunctions.length })"
       @update:ok="bulkDeleteFunctions"
       @update:cancel="confirmBulkDelete = false"
       v-model="confirmBulkDelete"
@@ -199,7 +199,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model:open="confirmForceDelete"
       persistent
       size="md"
-      :title="`Pipelines Associated with ${selectedDelete?.name}`"
+      :title="t('common.pipelinesAssociatedWith', { name: selectedDelete?.name })"
     >
       <div v-if="transformedPipelineList.length > 0" class="max-h-50 overflow-y-auto">
         <ul class="scrollable-list m-0 flex list-none flex-col p-0">

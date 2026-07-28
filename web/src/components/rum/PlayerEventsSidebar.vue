@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="flex w-full flex-col">
           <div class="w-full pb-2 text-xs">
             <OIcon name="mail" size="sm" class="pr-1" />
-            {{ sessionDetails.user_email || "Unknown User" }}
+            {{ sessionDetails.user_email || t("common.unknownUser") }}
           </div>
           <div class="mb-2 w-full truncate pr-1 text-xs">
             <OIcon name="schedule" size="sm" class="pr-1" />

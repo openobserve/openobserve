@@ -172,7 +172,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTooltip
             side="top"
             align="center"
-            :content="`Warning: ${ingestionQuotaPercentage}% of ingestion limit used`"
+            :content="t('common.warningIngestionQuota', { percent: ingestionQuotaPercentage })"
           />
         </OButton>
 

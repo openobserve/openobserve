@@ -236,7 +236,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="flex h-12 w-full items-center justify-between">
             <div class="mr-md flex w-25 items-center text-xs font-normal">
               {{ visibleIncidents.length }}
-              {{ visibleIncidents.length === 1 ? "Incident" : "Incidents" }}
+              {{
+                visibleIncidents.length === 1
+                  ? t("alerts.incidentSingular")
+                  : t("alerts.incidentPlural")
+              }}
             </div>
           </div>
         </template>

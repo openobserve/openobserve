@@ -26,7 +26,11 @@
             icon-left="filter-list"
             @click="filteredPreview = !filteredPreview"
           >
-            {{ filteredPreview ? "First-run state" : "Filtered state" }}
+            {{
+              filteredPreview
+                ? t("emptyState.demo.firstRunState")
+                : t("emptyState.demo.filteredState")
+            }}
           </OButton>
           <OButton
             variant="outline"
@@ -34,7 +38,7 @@
             icon-left="dark-mode"
             @click="localDark = !localDark"
           >
-            {{ localDark ? "Light preview" : "Dark preview" }}
+            {{ localDark ? t("emptyState.demo.lightPreview") : t("emptyState.demo.darkPreview") }}
           </OButton>
         </div>
       </div>

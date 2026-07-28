@@ -252,7 +252,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :disabled="isDeleting"
                   @click="confirmBatchDeleteAction"
                 >
-                  {{ isDeleting ? "Deleting..." : "Delete" }}
+                  {{ isDeleting ? t("common.deleting") : t("common.delete") }}
                 </OButton>
               </div>
             </div>

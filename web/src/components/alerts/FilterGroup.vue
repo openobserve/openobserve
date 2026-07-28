@@ -77,7 +77,7 @@
             :stream-fields="props.streamFields"
             @input:update="(name, field) => inputUpdate(name, field)"
             :index="Number(index)"
-            :label="group.logicalOperator?.toLowerCase() || 'and'"
+            :label="group.logicalOperator?.toLowerCase() || t('common.and')"
             :depth="depth"
             :input-width="props.conditionInputWidth"
             :is-first-in-group="index === 0"
