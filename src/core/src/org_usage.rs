@@ -26,7 +26,7 @@ use o2_enterprise::enterprise::{
 use serde::Serialize;
 use utoipa::ToSchema;
 
-use crate::self_reporting::search::get_usage;
+use crate::usage_search::get_usage;
 
 #[derive(Clone, Debug, Serialize, ToSchema)]
 pub struct GetOrgUsageResponseBody {

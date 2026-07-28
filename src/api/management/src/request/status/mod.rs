@@ -49,7 +49,7 @@ use infra::{
     },
 };
 use openobserve_api_common::extractors::Headers;
-use openobserve_core::{auth::UserEmail, cache::STREAM_EXECUTABLE_PIPELINES};
+use openobserve_core::{auth::UserEmail, pipeline::cache::STREAM_EXECUTABLE_PIPELINES};
 use search::{
     datafusion::{storage::file_statistics_cache, udf::DEFAULT_FUNCTIONS},
     tantivy::cache as tantivy_result_cache,

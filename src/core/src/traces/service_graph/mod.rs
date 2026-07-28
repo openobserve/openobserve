@@ -18,9 +18,11 @@
 //! Daemon-based service graph that queries traces periodically.
 //! No inline processing during trace ingestion.
 
-/// Default window (in minutes) used when no explicit time range is provided.
-/// The UI has its own time range picker, so this only applies as the server-side fallback.
-pub const DEFAULT_QUERY_WINDOW_MINUTES: i64 = 60;
+// The stream reader lives outside this module so that incident topology enrichment can use it
+// without depending on traces; see `crate::service_graph_query`.
+pub use crate::service_graph_query::DEFAULT_QUERY_WINDOW_MINUTES;
+#[cfg(feature = "enterprise")]
+pub use crate::service_graph_query::query_edges_from_stream_internal;
 
 // OSS modules
 pub mod aggregator;
@@ -30,8 +32,6 @@ pub mod processor;
 // Re-export API handler for router
 // Re-export aggregator function (used by processor)
 pub use aggregator::write_sql_aggregated_edges;
-#[cfg(feature = "enterprise")]
-pub use api::query_edges_from_stream_internal;
 pub use api::{get_current_topology, get_edge_history};
 // Re-export enterprise types and functions
 #[cfg(feature = "enterprise")]

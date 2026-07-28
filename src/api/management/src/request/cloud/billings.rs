@@ -36,8 +36,8 @@ use crate::{
         CheckoutSessionDetailRequestQuery, ListInvoicesResponseBody, ListSubscriptionResponseBody,
     },
     service::{
+        cloud_events::{CloudEvent, EventType, enqueue_cloud_event},
         organization,
-        self_reporting::cloud_events::{CloudEvent, EventType, enqueue_cloud_event},
     },
 };
 

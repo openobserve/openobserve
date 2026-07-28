@@ -13,17 +13,20 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use axum::{
-    Json,
-    http::{HeaderValue, StatusCode},
-    response::{IntoResponse, Response},
-};
-use db::alerts::{destinations::DestinationError, templates::TemplateError};
-use infra::errors;
+//! Per-domain error-to-response conversions.
+//!
+//! Each `From<SomeError> for Response` below has to live in the crate that declares the error
+//! type, so this module ends up reaching into every domain and must stay above all of them.
+//! Nothing inside the crate may depend on it -- use [`crate::http_error`] for the generic mapper
+//! instead. When the domains become their own crates these impls move out with their error types.
 
+use axum::response::Response;
+use db::alerts::{destinations::DestinationError, templates::TemplateError};
+
+pub use crate::http_error::map_error_to_http_response;
 use crate::{
     alerts::alert::AlertError,
-    common::meta::http::{ERROR_HEADER, HttpResponse as MetaHttpResponse},
+    common::meta::http::HttpResponse as MetaHttpResponse,
     dashboards::{DashboardError, reports::ReportError},
     pipeline::db::PipelineError,
 };
@@ -32,31 +35,6 @@ use crate::{
     llm_evaluations::eval_jobs::EvalJobError, providers::ProviderError,
     ratelimit::rule::RatelimitError,
 };
-
-pub fn map_error_to_http_response(err: &errors::Error, trace_id: Option<String>) -> Response {
-    // the status code mapping lives on `infra::errors::Error` so that other
-    // consumers (e.g. audit logging) stay consistent with the HTTP responses
-    let status =
-        StatusCode::from_u16(err.http_status()).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
-    match err {
-        errors::Error::ErrorCode(code) => {
-            let mut body = MetaHttpResponse::error_code_with_trace_id(code, trace_id);
-            // attach hint/did-you-mean suggestions where the code carries
-            // enough information (no-op for the rest)
-            crate::error_suggest::enrich(&mut body, code);
-            (
-                status,
-                [(ERROR_HEADER, HeaderValue::from(code.get_code()))],
-                Json(body),
-            )
-                .into_response()
-        }
-        // These errors don't carry a structured error code, so we don't set the
-        // `X-Error-Message` header (it should only carry error codes). The full
-        // message is still returned in the JSON response body.
-        _ => (status, Json(MetaHttpResponse::error(status, err))).into_response(),
-    }
-}
 
 impl From<AlertError> for Response {
     fn from(value: AlertError) -> Self {
@@ -269,34 +247,5 @@ impl From<RatelimitError> for Response {
             RatelimitError::NotFound(_) => MetaHttpResponse::not_found(value),
             error => MetaHttpResponse::bad_request(error),
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_error_code_response_sets_numeric_code_header() {
-        // Error-code responses carry only the numeric error code in the header
-        // (e.g. 20002 for SearchStreamNotFound), never the message.
-        let err = errors::Error::ErrorCode(errors::ErrorCodes::SearchStreamNotFound(
-            "nginx".to_string(),
-        ));
-        let resp = map_error_to_http_response(&err, None);
-        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
-        assert_eq!(resp.headers().get(ERROR_HEADER).unwrap(), "20002");
-    }
-
-    #[test]
-    fn test_non_code_error_omits_header() {
-        // Errors without a structured code don't set the header at all; the
-        // message is surfaced only in the JSON body.
-        let err = errors::Error::SerdeJsonError(
-            serde_json::from_str::<serde_json::Value>("{").unwrap_err(),
-        );
-        let resp = map_error_to_http_response(&err, None);
-        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
-        assert!(resp.headers().get(ERROR_HEADER).is_none());
     }
 }

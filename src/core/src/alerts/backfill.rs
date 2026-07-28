@@ -461,55 +461,6 @@ pub async fn delete_backfill_job(org_id: &str, job_id: &str) -> Result<(), anyho
     Err(anyhow::anyhow!("Backfill job not found"))
 }
 
-pub async fn delete_backfill_jobs_by_pipeline(
-    org_id: &str,
-    pipeline_id: &str,
-) -> Result<(), anyhow::Error> {
-    log::info!(
-        "[BACKFILL] Deleting all backfill jobs for pipeline {} in org {}",
-        pipeline_id,
-        org_id
-    );
-
-    // Get all backfill jobs for this pipeline
-    let jobs = db::backfill::list_by_pipeline(org_id, pipeline_id).await?;
-    let jobs_count = jobs.len();
-
-    for job in jobs {
-        log::info!("delete jobs: {:#?}", job);
-        // Delete the trigger from scheduled_jobs
-        if let Err(e) = db::scheduler::delete(org_id, TriggerModule::Backfill, &job.id).await {
-            log::warn!(
-                "[BACKFILL] Failed to delete trigger for job {} from scheduled_jobs: {}",
-                job.id,
-                e
-            );
-            // Continue even if trigger deletion fails - it might not exist
-        }
-
-        // Delete from backfill_jobs table
-        if let Err(e) = db::backfill::delete(org_id, &job.id).await {
-            log::error!(
-                "[BACKFILL] Failed to delete backfill job {} from backfill_jobs table: {}",
-                job.id,
-                e
-            );
-            return Err(anyhow::anyhow!(
-                "Failed to delete backfill job {}: {}",
-                job.id,
-                e
-            ));
-        }
-    }
-
-    log::info!(
-        "[BACKFILL] Successfully deleted {} backfill jobs for pipeline {}",
-        jobs_count,
-        pipeline_id
-    );
-    Ok(())
-}
-
 pub async fn enable_backfill_job(
     org_id: &str,
     job_id: &str,

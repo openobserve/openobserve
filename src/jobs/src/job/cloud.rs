@@ -28,7 +28,7 @@ use stream::get_streams;
 
 use crate::{
     common::{infra::config::ORGANIZATIONS, meta::telemetry},
-    service::{organization::is_org_in_free_trial_period, self_reporting::search::get_usage},
+    service::{organization::is_org_in_free_trial_period, usage_search::get_usage},
 };
 
 /// This file has all odd-jobs that are specific to cloud installation,

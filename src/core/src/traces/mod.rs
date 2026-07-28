@@ -1341,17 +1341,15 @@ async fn write_traces_by_stream(
         {
             let org = super::organization::get_org(org_id).await.unwrap();
 
-            super::self_reporting::cloud_events::enqueue_cloud_event(
-                super::self_reporting::cloud_events::CloudEvent {
-                    org_id: org.identifier.clone(),
-                    org_name: org.name.clone(),
-                    org_type: org.org_type.clone(),
-                    user: None,
-                    event: super::self_reporting::cloud_events::EventType::StreamCreated,
-                    subscription_type: None,
-                    stream_name: Some(traces_stream_name.clone()),
-                },
-            )
+            super::cloud_events::enqueue_cloud_event(super::cloud_events::CloudEvent {
+                org_id: org.identifier.clone(),
+                org_name: org.name.clone(),
+                org_type: org.org_type.clone(),
+                user: None,
+                event: super::cloud_events::EventType::StreamCreated,
+                subscription_type: None,
+                stream_name: Some(traces_stream_name.clone()),
+            })
             .await;
         }
 

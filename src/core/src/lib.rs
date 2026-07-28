@@ -22,8 +22,10 @@ pub mod alerts;
 pub mod anomaly_detection;
 pub mod auth;
 pub mod authz;
+pub mod backfill_cleanup;
 pub mod bootstrap;
-pub mod cache;
+#[cfg(feature = "cloud")]
+pub mod cloud_events;
 pub mod dashboards;
 use ::common;
 use ::db;
@@ -32,6 +34,7 @@ use ::db::folders;
 pub mod functions;
 pub mod functions_cache;
 pub mod http;
+pub mod http_error;
 pub mod ingestion;
 pub mod ingestion_tokens;
 pub mod kv;
@@ -43,6 +46,7 @@ pub mod metrics;
 #[cfg(feature = "enterprise")]
 pub mod ofga;
 pub mod org_cleanup;
+pub mod org_summary;
 #[cfg(feature = "cloud")]
 pub mod org_usage;
 pub mod organization;
@@ -54,6 +58,7 @@ pub mod ratelimit;
 use search_service as search;
 pub mod self_reporting;
 pub mod service;
+pub mod service_graph_query;
 pub mod session;
 pub mod short_url;
 pub mod stream;
@@ -63,6 +68,9 @@ pub mod system_settings;
 pub mod traces;
 #[cfg(feature = "cloud")]
 pub mod trial_quota;
+pub mod usage_search;
 pub mod users;
+#[cfg(feature = "enterprise")]
+pub mod workflow_execution;
 #[cfg(feature = "enterprise")]
 pub mod workflows;

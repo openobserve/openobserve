@@ -39,7 +39,10 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     common::{meta::http::HttpResponse as MetaHttpResponse, utils::http::get_or_create_trace_id},
-    service::workflows::{self, InputMap, WorkflowTriggerType},
+    service::{
+        workflow_execution,
+        workflows::{self, InputMap, WorkflowTriggerType},
+    },
 };
 
 #[derive(Deserialize)]
@@ -329,7 +332,9 @@ pub async fn test_workflow(
     Path((org_id, workflow_id)): Path<(String, String)>,
     Json(inputs): Json<WorkflowTestInput>,
 ) -> Response {
-    match workflows::test_workflow(&org_id, &workflow_id, inputs.inputs, inputs.from_node).await {
+    match workflow_execution::test_workflow(&org_id, &workflow_id, inputs.inputs, inputs.from_node)
+        .await
+    {
         Ok(v) => MetaHttpResponse::json(WorkflowTestResult { errors: v.errors }),
         Err(e) => MetaHttpResponse::bad_request(e),
     }
@@ -430,7 +435,9 @@ pub async fn retry_workflow(
     Path((org_id, workflow_id)): Path<(String, String)>,
     Json(details): Json<WorkflowRetryDetails>,
 ) -> Response {
-    match workflows::retry_run(&org_id, &workflow_id, &details.run_id, details.from_node).await {
+    match workflow_execution::retry_run(&org_id, &workflow_id, &details.run_id, details.from_node)
+        .await
+    {
         Ok(v) => MetaHttpResponse::json(WorkflowTestResult { errors: v.errors }),
         Err(e) => MetaHttpResponse::bad_request(e),
     }

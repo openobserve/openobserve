@@ -273,7 +273,7 @@ async fn process_org_tasks(
 async fn emit_failed_alert(org_id: &str, _step: &str) {
     #[cfg(feature = "cloud")]
     {
-        use crate::self_reporting::cloud_events::{CloudEvent, EventType, enqueue_cloud_event};
+        use crate::cloud_events::{CloudEvent, EventType, enqueue_cloud_event};
         enqueue_cloud_event(CloudEvent {
             event: EventType::OrgCleanupFailed,
             org_id: org_id.to_string(),

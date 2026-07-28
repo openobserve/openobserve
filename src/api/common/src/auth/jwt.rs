@@ -15,13 +15,13 @@
 
 #[cfg(feature = "cloud")]
 use config::DEFAULT_ORG;
-#[cfg(all(feature = "enterprise", not(feature = "cloud")))]
-use openobserve_core::{organization, users};
 #[cfg(feature = "cloud")]
 use openobserve_core::{
+    cloud_events::{CloudEvent, EventType, enqueue_cloud_event},
     organization::list_org_users_by_user,
-    self_reporting::cloud_events::{CloudEvent, EventType, enqueue_cloud_event},
 };
+#[cfg(all(feature = "enterprise", not(feature = "cloud")))]
+use openobserve_core::{organization, users};
 #[cfg(all(feature = "enterprise", not(feature = "cloud")))]
 use {
     crate::common::meta::user::RoleOrg,

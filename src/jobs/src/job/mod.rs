@@ -1086,7 +1086,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         tokio::task::spawn(openobserve_core::workflows::runtime::clean());
         tokio::task::spawn(db::workflows::watch());
         if LOCAL_NODE.is_alert_manager() {
-            tokio::task::spawn(openobserve_core::workflows::runtime::watch_workflow_triggers());
+            tokio::task::spawn(openobserve_core::workflow_execution::watch_workflow_triggers());
         }
     }
 
@@ -1112,7 +1112,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
             .await
             .expect("cloud ofga migrations failed");
 
-        use openobserve_core::self_reporting::{ingest_data_retention_usages, search::get_usage};
+        use openobserve_core::{
+            self_reporting::ingest_data_retention_usages, usage_search::get_usage,
+        };
         o2_enterprise::enterprise::metering::init(
             get_metering_lock,
             get_usage,
@@ -1144,9 +1146,9 @@ pub async fn init_deferred() -> Result<(), anyhow::Error> {
     #[cfg(feature = "enterprise")]
     {
         o2_enterprise::enterprise::license::start_license_check(
-            openobserve_core::self_reporting::search::get_usage,
+            openobserve_core::usage_search::get_usage,
             get_nats_lock,
-            openobserve_core::self_reporting::search::get_license_usage_data_from_node,
+            openobserve_core::usage_search::get_license_usage_data_from_node,
             LOCAL_NODE.is_router() || LOCAL_NODE.is_single_role(),
         )
         .await;

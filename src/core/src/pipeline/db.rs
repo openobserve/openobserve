@@ -28,9 +28,8 @@ use infra::{
 };
 
 use crate::{
-    cache::STREAM_EXECUTABLE_PIPELINES,
     common::infra::config::{PIPELINE_ID_TO_ORG, PIPELINE_STREAM_MAPPING, SCHEDULED_PIPELINES},
-    pipeline::batch_execution::ExecutablePipeline,
+    pipeline::{batch_execution::ExecutablePipeline, cache::STREAM_EXECUTABLE_PIPELINES},
 };
 
 #[derive(Debug, thiserror::Error)]

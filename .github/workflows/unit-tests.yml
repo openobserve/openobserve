@@ -82,6 +82,9 @@ jobs:
       - name: Check code formatting
         run: cargo fmt --all -- --check
 
+      - name: Check src/core module layering
+        run: python3 scripts/check_core_layering.py
+
       - name: Run clippy
         run: cargo --config net.git-fetch-with-cli=true clippy -- -D warnings
 

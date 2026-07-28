@@ -1,49 +1,14 @@
-use std::sync::LazyLock as Lazy;
+//! The consumer half of cloud event reporting: draining the queue to the usage stream and/or the
+//! external reporting endpoint. The event types and the enqueue path live in
+//! [`crate::cloud_events`], which carries no dependencies so that ingestion can reach it.
 
 use config::{META_ORG_ID, meta::stream::StreamType, utils::json};
 use o2_enterprise::enterprise::common::config::get_config;
 use proto::cluster_rpc;
-use serde::{Deserialize, Serialize};
-use tokio::sync::Mutex;
 
-use crate::ingestion::ingestion_service;
+use crate::{cloud_events::CLOUD_EVENT_QUEUE, ingestion::ingestion_service};
 
 const CLOUD_EVENT_STREAM: &str = "cloud_events";
-
-#[derive(Serialize, Deserialize, Debug, Hash)]
-pub enum EventType {
-    OrgCreated,
-    OrgDeleted,
-    OrgCleanupFailed,
-    UserJoined,
-    CheckoutSessionCreated,
-    SubscriptionCreated,
-    SubscriptionChanged,
-    SubscriptionDeleted,
-    StreamCreated,
-}
-
-#[derive(Serialize, Deserialize, Debug, Hash)]
-pub struct CloudEvent {
-    pub org_id: String,
-    pub org_name: String,
-    pub org_type: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub user: Option<String>,
-    pub event: EventType,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub subscription_type: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub stream_name: Option<String>,
-}
-
-pub(super) static CLOUD_EVENT_QUEUE: Lazy<Mutex<Vec<CloudEvent>>> =
-    Lazy::new(|| Mutex::new(vec![]));
-
-pub async fn enqueue_cloud_event(event: CloudEvent) {
-    let mut q = CLOUD_EVENT_QUEUE.lock().await;
-    q.push(event);
-}
 
 async fn _inner_flush() {
     let cfg = get_config();

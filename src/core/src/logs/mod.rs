@@ -222,17 +222,15 @@ async fn write_logs_by_stream(
                 Some(org) => org,
             };
 
-            super::self_reporting::cloud_events::enqueue_cloud_event(
-                super::self_reporting::cloud_events::CloudEvent {
-                    org_id: org.identifier.clone(),
-                    org_name: org.name.clone(),
-                    org_type: org.org_type.clone(),
-                    user: Some(user_email.to_string()),
-                    event: super::self_reporting::cloud_events::EventType::StreamCreated,
-                    subscription_type: None,
-                    stream_name: Some(stream_name.clone()),
-                },
-            )
+            super::cloud_events::enqueue_cloud_event(super::cloud_events::CloudEvent {
+                org_id: org.identifier.clone(),
+                org_name: org.name.clone(),
+                org_type: org.org_type.clone(),
+                user: Some(user_email.to_string()),
+                event: super::cloud_events::EventType::StreamCreated,
+                subscription_type: None,
+                stream_name: Some(stream_name.clone()),
+            })
             .await;
         }
 

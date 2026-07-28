@@ -7430,7 +7430,6 @@ dependencies = [
  "rand 0.10.1",
  "regex",
  "reqwest 0.13.2",
- "search",
  "serde",
  "serde_json",
  "stream",

@@ -13,6 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+//! Queries against the self-reporting (`usage`, `triggers`) streams.
+//!
+//! This lives outside `self_reporting` on purpose: reading those streams only needs the search
+//! service, while `self_reporting` itself writes through the ingestion path. Keeping the reader
+//! here lets low-level callers (organization summaries, the service graph) query usage without
+//! depending on the ingestion side.
+
 use anyhow::{Result, anyhow};
 use config::{
     META_ORG_ID, ider,

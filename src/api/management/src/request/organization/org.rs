@@ -294,7 +294,7 @@ pub async fn all_organizations(
 )]
 pub async fn org_summary(Path(org_id): Path<String>) -> impl IntoResponse {
     let org = org_id;
-    let org_summary = organization::get_summary(&org).await;
+    let org_summary = openobserve_core::org_summary::get_summary(&org).await;
     Json(org_summary)
 }
 

@@ -39,7 +39,7 @@ use crate::{
         authz::Authz,
         http::{ERROR_HEADER, HttpResponse as MetaHttpResponse},
     },
-    http::map_error_to_http_response,
+    http_error::map_error_to_http_response,
 };
 
 const FN_SUCCESS: &str = "Function saved successfully";

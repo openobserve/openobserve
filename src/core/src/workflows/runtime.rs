@@ -13,12 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
-
 use config::get_config;
-use infra::{coordinator::get_coordinator, db::Event};
+use infra::coordinator::get_coordinator;
 
-use super::{WorkflowTrigger, handle_workflow_trigger};
+use super::WorkflowTrigger;
 
 const CHECK_INTERVAL_MIN: u64 = 30;
 pub const WORKFLOW_TRIGGER_PREFIX: &str = "/workflow_trigger/";
@@ -92,32 +90,4 @@ pub async fn send_workflow_trigger(trigger: WorkflowTrigger) -> Result<(), anyho
         }
     }
     Ok(())
-}
-
-pub async fn watch_workflow_triggers() -> Result<(), anyhow::Error> {
-    let mut events = get_coordinator()
-        .await
-        .watch(WORKFLOW_TRIGGER_PREFIX)
-        .await?;
-    let events = Arc::get_mut(&mut events).unwrap();
-    log::info!("Start watching workflow triggers");
-
-    loop {
-        let Some(event) = events.recv().await else {
-            log::error!("watch_workflow_triggers: event channel closed");
-            return Ok(());
-        };
-
-        if let Event::Put(event) = event {
-            let Some(value) = event.value else {
-                log::error!("watch_workflow_triggers: missing value for put");
-                continue;
-            };
-            let Ok(trigger) = serde_json::from_slice::<WorkflowTrigger>(&value) else {
-                log::error!("watch_workflow_triggers: invalid json value for put");
-                continue;
-            };
-            handle_workflow_trigger(trigger).await;
-        }
-    }
 }

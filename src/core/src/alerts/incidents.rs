@@ -1354,7 +1354,7 @@ pub async fn enrich_with_topology(
     use AlertNode;
     use EdgeType;
 
-    use crate::traces::service_graph;
+    use crate::service_graph_query as service_graph;
 
     // Get current topology or create new
     let mut topology = infra::table::alert_incidents::get_topology(org_id, incident_id)

@@ -31,6 +31,7 @@ use config::meta::{
 use self::{db as pipeline, db::PipelineError};
 
 pub mod batch_execution;
+pub mod cache;
 pub mod db;
 
 /// Validates that no JavaScript functions are used in the pipeline.
@@ -383,7 +384,7 @@ pub async fn delete_pipeline(pipeline_id: &str) -> Result<(), PipelineError> {
     }
 
     // Delete all backfill jobs associated with this pipeline
-    if let Err(error) = super::alerts::backfill::delete_backfill_jobs_by_pipeline(
+    if let Err(error) = super::backfill_cleanup::delete_backfill_jobs_by_pipeline(
         &existing_pipeline.org,
         pipeline_id,
     )

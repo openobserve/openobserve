@@ -21,7 +21,6 @@ mod ingestion;
 #[cfg(feature = "enterprise")]
 pub mod llm_scores_schema;
 pub(crate) mod persistence;
-pub mod search;
 mod triggers_schema;
 mod usage_schema;
 

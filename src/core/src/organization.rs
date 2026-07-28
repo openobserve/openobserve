@@ -15,21 +15,13 @@
 
 use config::{
     DEFAULT_ORG, ider,
-    meta::{
-        alerts::alert::ListAlertsParams,
-        dashboards::ListDashboardsParams,
-        pipeline::components::PipelineSource,
-        self_reporting::usage,
-        stream::StreamType,
-        user::{UserOrg, UserRole},
-    },
-    utils::{json, rand::generate_random_string, time},
+    meta::user::{UserOrg, UserRole},
+    utils::rand::generate_random_string,
 };
 use db::{self, org_users, user::is_root_user};
-use infra::table::{self, org_users::UserOrgExpandedRecord};
+use infra::table::org_users::UserOrgExpandedRecord;
 #[cfg(feature = "enterprise")]
 use o2_openfga::config::get_config as get_openfga_config;
-use stream::get_streams;
 #[cfg(feature = "cloud")]
 use {
     chrono::{Duration, Utc},
@@ -45,18 +37,16 @@ use {
 };
 
 #[cfg(feature = "cloud")]
-use super::self_reporting::cloud_events::{CloudEvent, EventType, enqueue_cloud_event};
+use super::cloud_events::{CloudEvent, EventType, enqueue_cloud_event};
 use crate::{
     auth::{delete_org_tuples, save_org_tuples},
     common::{
         infra::config::ORG_USERS,
         meta::organization::{
-            AlertSummary, CUSTOM, IngestionPasscode, IngestionTokensContainer, OrgSummary,
-            Organization, PipelineSummary, RumIngestionToken, StreamSummary, TriggerStatus,
-            TriggerStatusSearchResult,
+            CUSTOM, IngestionPasscode, IngestionTokensContainer, Organization, RumIngestionToken,
         },
     },
-    ingestion_tokens, self_reporting,
+    ingestion_tokens,
     users::add_admin_to_org,
 };
 
@@ -111,87 +101,6 @@ async fn create_and_assign_sre_readonly_role(
         service_account_email,
     )
     .await
-}
-
-pub async fn get_summary(org_id: &str) -> OrgSummary {
-    let streams = get_streams(org_id, None, false, None).await;
-    let mut stream_summary = StreamSummary::default();
-    let mut has_trigger_stream = false;
-    for stream in streams.iter() {
-        if stream.name == usage::TRIGGERS_STREAM {
-            has_trigger_stream = true;
-        }
-        if !stream.stream_type.eq(&StreamType::Index)
-            && !stream.stream_type.eq(&StreamType::Metadata)
-        {
-            stream_summary.num_streams += 1;
-            stream_summary.total_records += stream.stats.doc_num;
-            stream_summary.total_storage_size += stream.stats.storage_size;
-            stream_summary.total_compressed_size += stream.stats.compressed_size;
-            stream_summary.total_index_size += stream.stats.index_size;
-        }
-    }
-
-    let trigger_status_results = if !has_trigger_stream {
-        vec![]
-    } else {
-        let sql = format!(
-            "SELECT module, status FROM {} WHERE org = '{}' GROUP BY module, status, key",
-            usage::TRIGGERS_STREAM,
-            org_id
-        );
-        let end_time = time::now_micros();
-        let start_time = end_time - time::second_micros(900); // 15 mins
-        self_reporting::search::get_usage(sql, start_time, end_time, false)
-            .await
-            .unwrap_or_default()
-            .into_iter()
-            .filter_map(|v| json::from_value::<TriggerStatusSearchResult>(v).ok())
-            .collect::<Vec<_>>()
-    };
-
-    let pipelines = super::pipeline::list_user_pipelines(org_id, None)
-        .await
-        .unwrap_or_default();
-    let pipeline_summary = PipelineSummary {
-        num_realtime: pipelines
-            .iter()
-            .filter(|p| matches!(p.source, PipelineSource::Realtime(_)))
-            .count() as i64,
-        num_scheduled: pipelines
-            .iter()
-            .filter(|p| matches!(p.source, PipelineSource::Scheduled(_)))
-            .count() as i64,
-        trigger_status: TriggerStatus::from_search_results(
-            &trigger_status_results,
-            usage::TriggerDataType::DerivedStream,
-        ),
-    };
-
-    let alerts = super::alerts::alert::list_with_folders_db(ListAlertsParams::new(org_id))
-        .await
-        .unwrap_or_default();
-    let alert_summary = AlertSummary {
-        num_realtime: alerts.iter().filter(|(_, a)| a.is_real_time).count() as i64,
-        num_scheduled: alerts.iter().filter(|(_, a)| !a.is_real_time).count() as i64,
-        trigger_status: TriggerStatus::from_search_results(
-            &trigger_status_results,
-            usage::TriggerDataType::Alert,
-        ),
-    };
-
-    let functions = db::functions::list(org_id).await.unwrap_or_default();
-    let dashboards = table::dashboards::list(ListDashboardsParams::new(org_id))
-        .await
-        .unwrap_or_default();
-
-    OrgSummary {
-        streams: stream_summary,
-        pipelines: pipeline_summary,
-        alerts: alert_summary,
-        total_functions: functions.len() as i64,
-        total_dashboards: dashboards.len() as i64,
-    }
 }
 
 pub async fn get_passcode(
