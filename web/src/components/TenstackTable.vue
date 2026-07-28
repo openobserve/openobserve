@@ -177,7 +177,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-for="header in headerGroup.headers"
               :key="header.id"
               :id="header.id"
-              class="tw:px-2 tw:relative table-head tw:text-ellipsis!"
+              class="tw:px-2 tw:relative table-head tw:text-ellipsis! tw:group"
               :class="[
                 (header.column.columnDef.meta as any)?.align === 'center'
                   ? 'tw:text-center!'
@@ -371,7 +371,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
                 <div
                   :data-test="`o2-table-add-data-from-column-${header.column.columnDef.header}`"
-                  class="tw:invisible tw:items-center tw:absolute tw:right-2 tw:top-0 tw:px-2 column-actions tw:h-full tw:flex"
+                  class="tw:invisible tw:group-hover:visible tw:items-center tw:absolute tw:right-2 tw:top-0 tw:px-2 column-actions tw:h-full tw:flex tw:bg-[var(--color-table-header-bg)]"
                   :class="
                     store.state.theme === 'dark' ? 'field_overlay_dark' : ''
                   "
@@ -383,16 +383,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OIcon
                     v-if="(header.column.columnDef.meta as any).closable"
                     :data-test="`o2-table-th-remove-${header.column.columnDef.header}-btn`"
-                    name="cancel"
-                    class="tw:m-0 close-icon tw:cursor-pointer"
+                    name="close"
+                    class="tw:m-0 tw:mt-[0.125rem]! close-icon tw:cursor-pointer"
                     :class="
                       store.state.theme === 'dark'
                         ? 'text-white'
-                        : 'tw:text-gray-400'
+                        : 'tw:text-gray-700'
                     "
                     :title="t('common.close')"
                     size="sm"
-                    @click="closeColumn(header.column.columnDef)"
+                    @click.stop="closeColumn(header.column.columnDef)"
                    />
                 </div>
               </div>
