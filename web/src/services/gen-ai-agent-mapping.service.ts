@@ -6,6 +6,84 @@
 // (at your option) any later version.
 
 import http from "./http";
+import { RETENTION_MS } from "@/plugins/traces/versionCompare/constants";
+
+/** One arm (A or B) of a version-compare request — mirrors the backend
+ * `CompareArm` struct (`src/core/src/traces/agent_signals/api.rs`). Times are
+ * epoch microseconds. */
+export interface CompareArmRequest {
+  agent_name: string;
+  env?: string | null;
+  version?: string | null;
+  start_time: number;
+  end_time: number;
+}
+
+/** Mirrors the backend `MetricDelta` struct
+ * (`o2_enterprise/.../agent_signals/compare.rs`) exactly — field names are
+ * NOT camelCased on the wire. */
+export interface MetricDelta {
+  a: number;
+  b: number;
+  delta: number;
+  lo: number;
+  hi: number;
+  straddles_zero: boolean;
+  insufficient: boolean;
+}
+
+/** One failure class that appears in only one arm (introduced/fixed). Mirrors
+ * the backend `SoleError` struct — field names are NOT camelCased on the
+ * wire. */
+export interface SoleError {
+  fail_class: string;
+  count: number;
+}
+
+/** A failure class present in both arms, with per-arm counts + the delta
+ * (count_a - count_b... mirrors backend `SharedError` struct exactly). */
+export interface SharedError {
+  fail_class: string;
+  count_a: number;
+  count_b: number;
+  delta: number;
+}
+
+/** Tri-state error diff between arm A and arm B. Mirrors the backend
+ * `ErrorDiff` struct (`o2_enterprise/.../agent_signals/compare.rs`) exactly —
+ * field names are NOT camelCased on the wire. `insufficient` is true when
+ * neither arm had failure data to compare. */
+export interface ErrorDiff {
+  introduced: SoleError[];
+  fixed: SoleError[];
+  shared: SharedError[];
+  insufficient: boolean;
+}
+
+export interface CompareAgentVersionsResponse {
+  p50: MetricDelta;
+  p95: MetricDelta;
+  p99: MetricDelta;
+  cost: MetricDelta;
+  error_diff: ErrorDiff;
+}
+
+/**
+ * POST /api/{org}/traces/agent_signals/compare — sketch-merge version
+ * comparison. Returns pre-aggregated latency (p50/p95/p99) + cost deltas
+ * with CIs; does NOT return error-rate (that stays on the KPI path — see
+ * `useVersionCompare.run`).
+ */
+export const compareAgentVersions = (
+  org_identifier: string,
+  a: CompareArmRequest,
+  b: CompareArmRequest,
+) => {
+  return http().post<CompareAgentVersionsResponse>(
+    `/api/${org_identifier}/traces/agent_signals/compare`,
+    { a, b },
+  );
+};
 
 export const GEN_AI_AGENT_MAPPING_DEFAULTS_URL =
   "https://raw.githubusercontent.com/openobserve/sdr_patterns/main/gen_ai_agent_mappings.json";
@@ -13,6 +91,8 @@ export const GEN_AI_AGENT_MAPPING_DEFAULTS_URL =
 export interface GenAiAgentMappingConfig {
   agent_name_fields: string[];
   agent_id_fields: string[];
+  env_fields: string[];
+  version_fields: string[];
 }
 
 export interface GenAiAgentListItem {
@@ -20,6 +100,10 @@ export interface GenAiAgentListItem {
   id?: string | null;
   source_stream: string;
   source_stream_type: string;
+  env?: string | null;
+  version?: string | null;
+  first_seen?: number | null;
+  last_seen?: number | null;
 }
 
 export interface GenAiAgentListResponse {
@@ -36,6 +120,8 @@ export interface ClearGenAiAgentRegistryResponse {
 const emptyConfig = (): GenAiAgentMappingConfig => ({
   agent_name_fields: [],
   agent_id_fields: [],
+  env_fields: [],
+  version_fields: [],
 });
 
 const normalizeConfig = (value: any): GenAiAgentMappingConfig => ({
@@ -44,6 +130,12 @@ const normalizeConfig = (value: any): GenAiAgentMappingConfig => ({
     : [],
   agent_id_fields: Array.isArray(value?.agent_id_fields)
     ? value.agent_id_fields.filter((field: any) => typeof field === "string")
+    : [],
+  env_fields: Array.isArray(value?.env_fields)
+    ? value.env_fields.filter((field: any) => typeof field === "string")
+    : [],
+  version_fields: Array.isArray(value?.version_fields)
+    ? value.version_fields.filter((field: any) => typeof field === "string")
     : [],
 });
 
@@ -86,6 +178,10 @@ const genAiAgentMappingService = {
           id: typeof agent.id === "string" ? agent.id : null,
           source_stream: agent.source_stream,
           source_stream_type: agent.source_stream_type,
+          env: typeof agent.env === "string" ? agent.env : null,
+          version: typeof agent.version === "string" ? agent.version : null,
+          first_seen: typeof agent.first_seen === "number" ? agent.first_seen : null,
+          last_seen: typeof agent.last_seen === "number" ? agent.last_seen : null,
         })),
     };
   },
@@ -99,6 +195,28 @@ const genAiAgentMappingService = {
       normalizeConfig(config),
     );
     return normalizeConfig(response.data);
+  },
+  // Wide-window (retention-scoped) version enumeration for the version-compare
+  // slot pickers. Deliberately ignores the page date-picker window: a baseline
+  // version's last_seen may predate the page window, and it must still appear
+  // as a selectable compare slot. UNIT CONTRACT: `nowMicros` is epoch
+  // MICROSECONDS (= Date.now() * 1000). RETENTION_MS is milliseconds, so it is
+  // multiplied by 1000 here to convert to microseconds before subtracting.
+  listVersionsForCompare: async (
+    orgIdentifier: string,
+    agentName: string,
+    env: string | null,
+    nowMicros: number,
+  ): Promise<GenAiAgentListItem[]> => {
+    const start = nowMicros - RETENTION_MS * 1000;
+    const response = await genAiAgentMappingService.listAgents(orgIdentifier, start, nowMicros);
+    return response.agents.filter(
+      (agent) =>
+        agent.name === agentName &&
+        (env === null || agent.env === env) &&
+        agent.version !== null &&
+        agent.version !== undefined,
+    );
   },
   clearRegistry: async (orgIdentifier: string): Promise<ClearGenAiAgentRegistryResponse> => {
     const response = await http().delete(`/api/${orgIdentifier}/settings/gen_ai/agent_registry`);

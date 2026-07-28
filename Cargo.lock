@@ -5620,6 +5620,7 @@ dependencies = [
  "arrow",
  "arrow-schema",
  "byteorder",
+ "bytes",
  "chrono",
  "config",
  "datafusion",
@@ -5632,6 +5633,7 @@ dependencies = [
  "serde",
  "serde_json",
  "snafu 0.9.0",
+ "tempfile",
  "tokio",
  "wal",
 ]
@@ -7724,6 +7726,7 @@ dependencies = [
  "common",
  "compaction",
  "config",
+ "datafusion",
  "db",
  "enrichment-data",
  "futures",

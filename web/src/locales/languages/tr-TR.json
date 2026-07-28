@@ -7736,7 +7736,6 @@
       "scoreConfigs": "Değerlendirmeleriniz tarafından kullanılan puanlama derecelerini yapılandırın"
     },
     "agentGraph": {
-      "allAgents": "Tüm ajanlar",
       "stream": "Akış",
       "agent": "Ajan",
       "noAgentsTitle": "Hiçbir ajan bulunamadı",
@@ -9621,7 +9620,7 @@
         "assertionValue": "Değer",
         "assertions": "Doğrulamalar",
         "body": "İstek gövdesi",
-        "bodyPlaceholder": "{\"key\": \"value\"}",
+        "bodyPlaceholder": "{'{'}\"key\": \"value\"{'}'}",
         "fields": {
           "body": "Yanıt gövdesi",
           "response_time_ms": "Yanıt süresi (ms)",

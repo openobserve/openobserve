@@ -364,6 +364,8 @@
   },
   "common": {
     "beta": "Beta",
+    "play": "Play",
+    "pause": "Pause",
     "close": "Close",
     "cancel": "Cancel",
     "ok": "OK",
@@ -514,7 +516,9 @@
     "fillRequiredFields": "Please fill required fields",
     "test": "Test",
     "username": "Username",
-    "password": "Password"
+    "password": "Password",
+    "field": "Field",
+    "enterValueOrVariable": "Enter value or $variable"
   },
   "flow": {
     "stepPicker": {
@@ -909,6 +913,9 @@
     "experience": "Experience"
   },
   "rum": {
+    "noSessionReplay": "No session replay available",
+    "seek": "Seek",
+    "playbackSpeed": "Playback speed",
     "title": "Real User Monitoring",
     "subtitle": "Monitor real-user sessions, errors, and frontend performance",
     "issueColumn": "Issue",
@@ -1017,6 +1024,7 @@
     "desktop": "Desktop",
     "mobile": "Mobile",
     "tablet": "Tablet",
+    "platform": "Platform",
     "vsPreviousPeriod": "vs previous period",
     "seeSessions": "See the sessions",
     "openErrorTracking": "Open in Error Tracking",
@@ -2084,7 +2092,6 @@
     "search": "Search Workflows",
     "refresh": "Refresh Workflows",
     "trigger": "Trigger",
-    "triggerAlertFired": "Alert Fired",
     "steps": "Steps",
     "status": "Status",
     "updated": "Updated",
@@ -2136,13 +2143,21 @@
       "cta": "Create Workflow",
       "soonCta": "Available In A Future Release",
       "comingSoon": "Coming Soon",
-      "soon": "Soon",
-      "alertFired": "Alert Fired",
-      "alertFiredDesc": "Run When An Alert Fires",
-      "schedule": "Schedule",
-      "scheduleDesc": "Run On A Schedule",
-      "webhook": "Webhook",
-      "webhookDesc": "Run On An Incoming Webhook"
+      "soon": "Soon"
+    },
+    "triggerKind": {
+      "alertFired": {
+        "label": "Alert Fired",
+        "node": "Alert Trigger",
+        "desc": "Run when an alert fires",
+        "intro": "When a linked alert fires, every downstream step receives this payload."
+      },
+      "incidentEvent": {
+        "label": "Incident Event",
+        "node": "Incident Trigger",
+        "desc": "Run on an incident lifecycle event",
+        "intro": "When an incident event occurs, every downstream step receives this payload."
+      }
     },
     "triggerMeta": {
       "orgId": "Organization ID the alert belongs to.",
@@ -2230,7 +2245,6 @@
       "kindTrigger": "Trigger",
       "kindLogic": "Logic",
       "kindAction": "Action",
-      "alertTrigger": "Alert Trigger",
       "condition": "Condition",
       "function": "Function",
       "sendToDestination": "Destination",
@@ -2255,7 +2269,6 @@
       "triggerAlertsNone": "No Alerts Found In This Organization.",
       "triggerAlertsError": "Unable To Load Alerts",
       "triggerNote": "This Workflow Runs When Any Of The Selected Alerts Fires.",
-      "triggerPayloadIntro": "When a linked alert fires, every downstream step receives this payload.",
       "triggerStructureTitle": "Payload Structure",
       "triggerStructureHint": "Hover A Field For Details",
       "triggerDetailHint": "Hover Or Focus A Field Above To See Its Type And Meaning.",
@@ -2264,6 +2277,10 @@
       "triggerDataBlock": "data[] · Your Alert's Rows",
       "triggerDataColumns": "Result Columns",
       "triggerDataExampleNote": "Example only — the actual columns come from your alert's query.",
+      "incidentEventTypeLabel": "Event Type",
+      "incidentCommonTitle": "Common Fields (Every Event)",
+      "incidentSpecificTitle": "Event-Specific Fields",
+      "incidentNoExtraFields": "This event adds no fields beyond the common ones.",
       "triggerDataBlockNote": "An array with one object per matched record. Its columns come from the alert's own query, so they differ by alert — reference them as data[].<column>.",
       "conditionBody": "Set A Rule To Branch On",
       "conditionBodySet": "Branches On A Rule",
@@ -2402,7 +2419,7 @@
     "periodGreaterThanZero": "Period should be greater than 0",
     "frequencyGreaterThanSeconds": "Frequency should be greater than {seconds} seconds.",
     "minimumFrequencyMinutes": "Minimum frequency should be {minutes} minutes",
-    "streamSelectionNameInvalid": "Use alphanumeric and '+=,.@-_' characters only, without spaces.",
+    "streamSelectionNameInvalid": "Use alphanumeric and '+=,.{'@'}-_' characters only, without spaces.",
     "functionAlreadyAssociated": "Function is already associated",
     "atLeastOneCondition": "Please add at least one condition",
     "fillAllConditionFields": "Please fill in all condition fields (column, operator and value are required)",
@@ -2605,6 +2622,9 @@
     "resetRUMTokenLabel": "Reset RUM Token",
     "generateRUMTokenLabel": "Generate RUM Token",
     "generateRUMTokenMessage": "Generate RUM Token to enable RUM for your organization.",
+    "rumPlatform": "Platform",
+    "rumPlatformBrowser": "Browser",
+    "rumPlatformReactNative": "React Native",
     "npmStepTitle": "NPM Installation Method",
     "recommendedLabel": "Recommended",
     "customLabel": "Custom",
@@ -3676,7 +3696,8 @@
       "clause": "Clause {number}",
       "selectOperation": "Select Operation",
       "addAnotherClause": "Add another clause",
-      "removeClause": "Remove clause"
+      "removeClause": "Remove clause",
+      "addClause": "Add clause"
     },
     "viewDashboard": {
       "refreshToApplyVariables": "Refresh to apply latest variable changes",
@@ -3703,7 +3724,9 @@
       "add": "Add",
       "value": "Value",
       "markAsNonTimestamp": "Mark this field as non-timestamp",
-      "renderDataAsJson": "Render Data as JSON / Array"
+      "renderDataAsJson": "Render Data as JSON / Array",
+      "sortBy": "Sort By",
+      "havingHint": "Filter on the aggregate"
     },
     "customChartTypeSelector": {
       "exampleOfCustomCharts": "Example of custom charts",
@@ -3914,6 +3937,10 @@
       "addedSuccessfully": "Dashboard added successfully.",
       "creationFailed": "Dashboard creation failed.",
       "filesFailedValidation": "{count} file(s) did not pass validation constraints"
+    },
+    "rawQueryBuilder": {
+      "query": "Query",
+      "instruction": "Write a SQL query for complex actions."
     }
   },
   "panel": {
@@ -5898,7 +5925,18 @@
       "agentIdFields": "Agent ID fallback fields",
       "agentIdHelp": "Incoming attributes to use as fallbacks for gen_ai.agent.id.",
       "agentIdInfo": "Checked only when the standard gen_ai.agent.id attribute is missing or empty. Add one incoming telemetry attribute per line.",
+      "envFields": "Environment fallback fields",
+      "envHelp": "Incoming attributes to use as the agent's environment.",
+      "envInfo": "Checked only when the standard deployment.environment.name attribute is missing or empty. Add one incoming telemetry attribute per line.",
+      "versionFields": "Version fallback fields",
+      "versionHelp": "Incoming attributes to use as the agent's version.",
+      "versionInfo": "Checked only when the standard gen_ai.agent.version attribute is missing or empty. Add one incoming telemetry attribute per line.",
       "fieldsPlaceholder": "agent.name\nllm.agent.name",
+      "agentNamePlaceholder": "my.custom.agent_name\nteam.agent.label",
+      "agentIdPlaceholder": "my.custom.agent_id\nteam.agent.uid",
+      "envPlaceholder": "my.custom.env\ntier",
+      "versionPlaceholder": "my.custom.version\nrelease.tag",
+      "alwaysAppliedStandard": "Standard (checked first):",
       "applyDefaults": "Apply defaults",
       "resetToEmpty": "Reset to empty",
       "clearRegistry": "Clear registry",
@@ -6463,6 +6501,12 @@
     "querySource": "Query Source"
   },
   "traces": {
+    "agentDefaultVariant": "default",
+    "agentNoEnv": "(No env)",
+    "agentNoVersion": "(No version)",
+    "allAgents": "All Agents",
+    "agentCountBadgeSingular": "{count} agent",
+    "agentCountBadgePlural": "{count} agents",
     "serviceGraph": {
       "searchPlaceholder": "Search Services",
       "noStreamsDetected": "No streams detected. Ensure service graph metrics include stream_name labels.",
@@ -6923,6 +6967,8 @@
     "lLMInsightsDashboard": {
       "stream": "Stream",
       "agent": "Agent",
+      "compareEntry": "Compare versions",
+      "compareEntryHint": "Compare two versions of this agent side by side",
       "failedToLoad": "Failed to load Insights",
       "retry": "Retry",
       "noAgentsInRange": "No Agents In This Range",
@@ -7211,7 +7257,7 @@
     "skillContentRequired": "Skill content is required",
     "genericConfig": "Configuration",
     "genericData": "JSON config",
-    "genericDataPlaceholder": "{}",
+    "genericDataPlaceholder": "{'{}'}",
     "invalidJson": "Must be valid JSON"
   },
   "cipherKey": {
@@ -7769,6 +7815,57 @@
   },
   "aiObservability": {
     "title": "AI Observability",
+    "deltaStrip": {
+      "metricLabel": {
+        "volume": "Volume",
+        "errorRate": "Error rate",
+        "p50": "P50 latency",
+        "p95": "P95 latency",
+        "p99": "P99 latency",
+        "cost": "Cost / trace"
+      },
+      "insufficientLabel": "indicative",
+      "tooltip": {
+        "ciRange": "{level}% CI: {lower} to {upper}",
+        "method": "Method: {method}",
+        "associativeHigher": "B is higher than A — the environments differ, so this is associative, not proof B caused it.",
+        "associativeLower": "B is lower than A — the environments differ, so this is associative, not proof B caused it.",
+        "causalRegressed": "B regressed vs A under the same wall-clock window.",
+        "causalImproved": "B improved vs A under the same wall-clock window.",
+        "insufficient": "Not enough samples yet for a confident verdict — treat this delta as indicative only.",
+        "methodNewcombe": "Wilson/Newcombe proportion CI",
+        "methodBootstrap": "bootstrap resampling"
+      }
+    },
+    "overlayChart": {
+      "seriesA": "Version A",
+      "seriesB": "Version B",
+      "xAxisSinceRollout": "Hours since rollout",
+      "xAxisWallClock": "Time",
+      "lowResolution": "Not enough time resolution to plot both versions in this window — narrow the date range (or switch to “Since each rollout”).",
+      "xAxisSinceRolloutMinutes": "Minutes since rollout",
+      "xAxisSinceRolloutHours": "Hours since rollout",
+      "xAxisSinceRolloutDays": "Days since rollout",
+      "xAxisWallClockMinutes": "Minutes (elapsed, wall-clock)",
+      "xAxisWallClockHours": "Hours (elapsed, wall-clock)",
+      "xAxisWallClockDays": "Days (elapsed, wall-clock)"
+    },
+    "errorDiff": {
+      "title": "Failure changes",
+      "introduced": "Introduced",
+      "fixed": "Fixed",
+      "shared": "Shared",
+      "noData": "No failure data to compare in this window.",
+      "subtitle": "How each failure class changed from {a} to {b}.",
+      "introducedHint": "new in {b}",
+      "fixedHint": "gone in {b}",
+      "sharedHint": "in both versions",
+      "legendA": "A",
+      "legendB": "B",
+      "legendDelta": "Δ",
+      "sharedColHeader": "{a} → {b}",
+      "countIn": "{count} in {version}"
+    },
     "sections": {
       "monitor": "Monitor",
       "evaluate": "Evaluate"
@@ -7793,14 +7890,17 @@
       "scorers": "Create and manage the scorers that grade LLM outputs",
       "scoreConfigs": "Configure the scoring rubrics used by your evaluations"
     },
+    "scope": {
+      "env": "Env",
+      "agent": "Agent",
+      "version": "Version"
+    },
     "agentGraph": {
-      "allAgents": "All agents",
       "stream": "Stream",
       "agent": "Agent",
       "noAgentsTitle": "No agents found",
       "noAgentsDescription": "No agents were discovered in this time range. Try widening the time range, or check that your traces include gen_ai agent attributes.",
-      "agentCountSingular": "agent",
-      "agentCountPlural": "agents"
+      "versionAgnosticHint": "Topology is the same across versions — the graph scopes by environment, not version. Use version comparison to compare versions."
     },
     "kpi": {
       "totalCost": "Total Cost",
@@ -7908,6 +8008,39 @@
         "failExplain": "These are the actual error messages behind this failure class — read them to find the fix, or open a trace to see where it happened.",
         "costExplain": "These traces drove this agent's spend. Open the most expensive ones to see what ran."
       }
+    },
+    "versionCompare": {
+      "entry": "Compare versions…",
+      "entryDisabledHint": "Needs at least 2 versions of this agent to compare",
+      "datePickerDisabled": "Windows are per-version in this mode",
+      "sampledNote": "Latency & cost intervals are computed from up to {cap} randomly-sampled traces per version.",
+      "manual": {
+        "windowA": "Version A window",
+        "windowB": "Version B window"
+      },
+      "bar": {
+        "versionA": "Version A",
+        "versionB": "Version B",
+        "align": "Align",
+        "alignSinceRollout": "Since each rollout",
+        "alignSameWallClock": "Same wall-clock",
+        "alignManual": "Manual",
+        "exit": "Exit compare",
+        "samePickHint": "Pick two different versions to compare",
+        "autoWindow": "auto: {duration}",
+        "windowLabelA": "Version A window",
+        "windowLabelB": "Version B window"
+      },
+      "banner": {
+        "smallSample": "Too little data to compare — A has {nA}, B has {nB}. Widen the window or wait for more traffic.",
+        "disjoint": "These versions ran at different times — differences may reflect traffic changes, not the version itself.",
+        "partial": "These versions were partially concurrent — differences may be partly explained by when each ran."
+      },
+      "windowCard": {
+        "label": "{env} · {version} — {window} · {count} traces",
+        "clamp": "Baseline only ran {duration} — comparing each version's first {duration}.",
+        "labelNoEnv": "{version} — {window} · {count} traces"
+      }
     }
   },
   "onlineEvals": {
@@ -7942,6 +8075,32 @@
       "paused": "Job paused",
       "activateError": "Failed to activate job",
       "pauseError": "Failed to pause job"
+    },
+    "manualEvaluation": {
+      "titles": {
+        "span": "Evaluate span",
+        "trace": "Evaluate trace",
+        "session": "Evaluate session"
+      },
+      "targetLabels": {
+        "span": "Span ID",
+        "trace": "Trace ID",
+        "session": "Session ID"
+      },
+      "scopes": {
+        "span": "span",
+        "trace": "trace",
+        "session": "session"
+      },
+      "description": "Choose an Eval Job to run against this target. The evaluation worker will load the source telemetry from this page's time range.",
+      "jobLabel": "Eval Job",
+      "jobPlaceholder": "Select an Eval Job",
+      "jobRequired": "Select an Eval Job",
+      "noCompatibleJobs": "No {scope} Eval Jobs use the {stream} trace stream.",
+      "loadJobsError": "Failed to load Eval Jobs.",
+      "run": "Run evaluation",
+      "queued": "Queued {count} evaluation task(s).",
+      "runError": "Failed to queue the evaluation."
     },
     "tabs": {
       "quality": "Quality",
@@ -8473,48 +8632,6 @@
       "healthyLabel": "Healthy:",
       "typeLabel": "Type:",
       "promptVariablesLabel": "Variables in this prompt:",
-      "promptVariableGuide": {
-        "title": "Available Prompt Variables",
-        "description": "These variables can be used in the prompt above. How each one is filled in depends on what the Eval Job evaluates.",
-        "columns": {
-          "variable": "Prompt variable"
-        },
-        "scopes": {
-          "span": "Span",
-          "trace": "Trace",
-          "session": "Session"
-        },
-        "statuses": {
-          "jobMapped": "Map in Eval Job",
-          "systemProvided": "System provided",
-          "requiresSelector": "System provided · requires Span Selector",
-          "selectorRequired": "Span Selector required",
-          "unavailable": "Not available"
-        },
-        "variables": {
-          "inputOutput": {
-            "span": "Map these to the span fields holding the input and output.",
-            "trace": "Input and output from the trace's root span.",
-            "session": "Not available \u2014 a session has no single input or output."
-          },
-          "statistics": {
-            "span": "Map this name like any other scorer variable when evaluating a single span.",
-            "trace": "Trace metrics: span count, duration, LLM and tool calls, errors, tokens, and cost.",
-            "session": "Session metrics: trace and turn counts, duration, and errors."
-          },
-          "spans": {
-            "span": "Map this name like any other scorer variable when evaluating a single span.",
-            "trace": "A filtered subset of the trace's spans, chosen by the Eval Job's Span Selector.",
-            "session": "Not available for sessions."
-          },
-          "steps": {
-            "span": "Map this name like any other scorer variable when evaluating a single span.",
-            "trace": "Spans in time order; the middle is folded when the trace is very long.",
-            "session": "Traces in time order, represented as conversation turns."
-          }
-        },
-        "indexDescription": "{spansVar} and {stepsVar} arrive as JSON arrays. Reference the whole variable \u2014 indexed access like {indexedVar} is not supported."
-      },
       "identitySection": "Identity",
       "judgeSection": "Judge configuration",
       "endpointSection": "Endpoint",
@@ -8534,7 +8651,7 @@
       "includeReasoningLabel": "Include Reasoning",
       "includeReasoningHint": "The judge explains why it gave that score, saved with each result.",
       "extraFieldsLabel": "Extra Metadata Fields (Optional)",
-      "extraFieldsHint": "Ask the judge to return extra values with each score \u2014 a category or a confidence, for example.",
+      "extraFieldsHint": "Ask the judge to return extra values with each score — a category or a confidence, for example.",
       "extraFields": {
         "colName": "Field Name",
         "colType": "Type",
@@ -8658,23 +8775,6 @@
         "samplingAll": "Evaluate every match",
         "samplingRate": "Random sample by rate",
         "samplingCount": "First N matches",
-        "manualSection": "Manual Evaluation",
-        "manualHelp": "Queue this job's scorers for one explicit target. Manual runs bypass automatic sampling and record the reason on the score metadata.",
-        "manualTargetIdLabel": "Target ID",
-        "manualSpanIdLabel": "Span ID",
-        "manualSpanIdPlaceholder": "span_id",
-        "manualTraceIdLabel": "Trace ID",
-        "manualTraceIdPlaceholder": "trace_id",
-        "manualSessionIdLabel": "Session ID",
-        "manualSessionIdPlaceholder": "session_id",
-        "manualReasonLabel": "Reason",
-        "manualReasonPlaceholder": "Why are you re-running this target?",
-        "manualVariablesLabel": "Variables JSON",
-        "manualVariablesObjectError": "Variables must be a JSON object",
-        "manualTargetRequired": "Target ID is required",
-        "manualSubmit": "Run Manual Eval",
-        "manualSuccess": "Queued {count} evaluation task(s)",
-        "manualError": "Manual evaluation failed",
         "metadataSection": "Metadata",
         "versionLabel": "Version",
         "pipelineLabel": "Pipeline ID",
@@ -8836,20 +8936,27 @@
       "inputMapping": {
         "title": "Prompt variables",
         "hint": {
-          "span": "Map each variable to the span field that supplies its value.",
-          "trace": "Trace values fill in automatically. Map anything else to a span field.",
-          "session": "Session values fill in automatically. Map anything else to a span field."
+          "span": "Map each variable to a span attribute.",
+          "trace": "Map each variable to a system-provided value or span attribute.",
+          "session": "Map each variable to a system-provided value or span attribute."
+        },
+        "placeholder": "Select a value",
+        "searchPlaceholder": "Search system values and span attributes…",
+        "groups": {
+          "systemProvided": "System-provided values · For each {scope} this job evaluates",
+          "spanAttributes": "Span attributes"
         },
         "selectScorers": "Select scorers to configure their mappings.",
         "noVariables": "This scorer has no template variables to map.",
         "variableCount": "{count} variables",
         "systemProvided": {
-          "title": "{scope} Variables",
-          "description": "OpenObserve supplies these values from the {scope} itself. A scorer prompt can use them directly \u2014 no mapping needed.",
+          "about": "About system-provided values",
+          "title": "{scope} system values",
+          "description": "OpenObserve builds these values separately for each {scope} this job evaluates. Use them as sources when mapping the scorer's prompt variables.",
           "badge": "System provided",
           "selectorRequired": "Span Selector required",
           "columns": {
-            "variable": "Prompt variable",
+            "variable": "Value",
             "source": "Source",
             "description": "Value supplied"
           },
@@ -8886,7 +8993,7 @@
         "customSchema": "Custom Fields",
         "defaultSchemaHelp": "These eight fields are read from every matching span. Anything missing comes through empty.",
         "fields": "Fields",
-        "fieldsHelp": "Only these fields are read \u2014 nothing else is sent to the scorer.",
+        "fieldsHelp": "Only these fields are read — nothing else is sent to the scorer.",
         "maximumSpans": "Maximum Spans",
         "budget": "Limits how many spans are selected from the trace.",
         "validation": {
@@ -8896,7 +9003,7 @@
           "fields": "Select at least one field for a custom schema.",
           "maximumSpans": "Maximum spans must be a positive whole number.",
           "budget": "Too many spans for the fields selected. Lower the span count, or read fewer fields.",
-          "binding": "Select a Span Selector for every scorer."
+          "binding": "Select a Span Selector for each scorer that uses trace spans."
         }
       },
       "preview": {
@@ -8934,6 +9041,8 @@
       "saveError": "Failed to save eval job",
       "createdAndActivated": "Eval job created and activated",
       "createdButActivateFailed": "Eval job created, but activation failed",
+      "savedAndActivated": "Eval job saved and activated",
+      "savedButActivateFailed": "Eval job saved, but activation failed",
       "validation": {
         "nameRequired": "Job name is required",
         "streamRequired": "A stream is required",
@@ -9724,7 +9833,7 @@
         "assertionValue": "Value",
         "assertions": "Assertions",
         "body": "Request body",
-        "bodyPlaceholder": "{\"key\": \"value\"}",
+        "bodyPlaceholder": "{'{'}\"key\": \"value\"{'}'}",
         "fields": {
           "body": "Response body",
           "response_time_ms": "Response time (ms)",
@@ -9771,6 +9880,8 @@
       "assertions": "Assertions",
       "assertionsFailed": "Failed",
       "assertionsPassed": "Passed",
+      "assertionsNotEvaluated": "Not evaluated",
+      "assertionsNotEvaluatedHint": "The request never returned a response, so nothing was asserted.",
       "certExpires": "Expires {date}",
       "completed": "completed",
       "daysRemaining": "{days} days remaining",
@@ -10192,6 +10303,11 @@
         "browserNote": "Browser tests cannot run from private locations yet — protocol checks only (HTTP, TCP, TLS, SSH).",
         "locationNameLabel": "Location name",
         "locationNamePlaceholder": "Corp HQ",
+        "typeTitle": "What this agent runs",
+        "typeProtocol": "Net",
+        "typeBrowser": "Browser",
+        "typeProtocolHint": "HTTP, TCP, TLS and SSH checks. Runs the Go agent — Docker, Kubernetes, Linux or Windows.",
+        "typeBrowserHint": "Browser journeys. Runs the Playwright image — Docker or Kubernetes only.",
         "tabDocker": "Docker",
         "tabK8s": "Kubernetes",
         "tabLinux": "Linux",

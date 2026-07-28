@@ -18,7 +18,12 @@ export const ALL_AGENTS_VALUE = "__all__";
  * preferred over name because names are display labels.
  */
 export function agentOptionKey(agent: GenAiAgentListItem): string {
-  return `${agent.source_stream_type}/${agent.source_stream}/${agent.id ?? agent.name}`;
+  // env/version are identity dimensions: the same name/id in the same stream
+  // but a different env or version is a distinct, separately selectable option
+  // (that is what makes version comparison possible). Keep them in the key.
+  return `${agent.source_stream_type}/${agent.source_stream}/${
+    agent.id ?? agent.name
+  }/${agent.env ?? ""}/${agent.version ?? ""}`;
 }
 
 function sqlQuote(value: string): string {
@@ -40,7 +45,18 @@ export function buildAgentTraceFilter(
   const field = agent.id ? "gen_ai_agent_id" : "gen_ai_agent_name";
   const value = agent.id ?? agent.name;
   if (!value) return "";
-  return `${field} = '${sqlQuote(String(value))}'`;
+  // env/version filter on the CANONICAL columns the registry writes back onto
+  // every discovered span (gen_ai_agent_env / gen_ai_agent_version) — stable
+  // regardless of which source attribute the value came from, mirroring how the
+  // agent identity filters on canonical gen_ai_agent_name/id above.
+  const clauses = [`${field} = '${sqlQuote(String(value))}'`];
+  if (agent.version) {
+    clauses.push(`gen_ai_agent_version = '${sqlQuote(String(agent.version))}'`);
+  }
+  if (agent.env) {
+    clauses.push(`gen_ai_agent_env = '${sqlQuote(String(agent.env))}'`);
+  }
+  return clauses.join(" AND ");
 }
 
 /**

@@ -127,6 +127,97 @@ describe("service_graph service", () => {
       );
     });
 
+    it("should include agent_id param when agentId is provided", async () => {
+      mockHttpInstance.get.mockResolvedValue({ data: {} });
+
+      await serviceGraphService.getCurrentTopology("test-org", {
+        agentId: "agent-123",
+      });
+
+      expect(mockHttpInstance.get).toHaveBeenCalledWith(
+        "/api/test-org/traces/service_graph/topology/current",
+        { params: { agent_id: "agent-123" } },
+      );
+    });
+
+    it("should include agent_name param when agentName is provided", async () => {
+      mockHttpInstance.get.mockResolvedValue({ data: {} });
+
+      await serviceGraphService.getCurrentTopology("test-org", {
+        agentName: "my-agent",
+      });
+
+      expect(mockHttpInstance.get).toHaveBeenCalledWith(
+        "/api/test-org/traces/service_graph/topology/current",
+        { params: { agent_name: "my-agent" } },
+      );
+    });
+
+    it("should include agent_env param when agentEnv is provided", async () => {
+      mockHttpInstance.get.mockResolvedValue({ data: {} });
+
+      await serviceGraphService.getCurrentTopology("test-org", {
+        agentEnv: "production",
+      });
+
+      expect(mockHttpInstance.get).toHaveBeenCalledWith(
+        "/api/test-org/traces/service_graph/topology/current",
+        { params: { agent_env: "production" } },
+      );
+    });
+
+    it("should include all agent params together (id, name, env)", async () => {
+      mockHttpInstance.get.mockResolvedValue({ data: {} });
+
+      await serviceGraphService.getCurrentTopology("test-org", {
+        agentId: "agent-123",
+        agentName: "my-agent",
+        agentEnv: "production",
+      });
+
+      expect(mockHttpInstance.get).toHaveBeenCalledWith(
+        "/api/test-org/traces/service_graph/topology/current",
+        {
+          params: {
+            agent_id: "agent-123",
+            agent_name: "my-agent",
+            agent_env: "production",
+          },
+        },
+      );
+    });
+
+    it("should NOT include agent params when they are null", async () => {
+      mockHttpInstance.get.mockResolvedValue({ data: {} });
+
+      await serviceGraphService.getCurrentTopology("test-org", {
+        agentId: null,
+        agentName: null,
+        agentEnv: null,
+      });
+
+      expect(mockHttpInstance.get).toHaveBeenCalledWith(
+        "/api/test-org/traces/service_graph/topology/current",
+        { params: {} },
+      );
+    });
+
+    it("should NEVER send agent_version to the backend (topology is version-agnostic)", async () => {
+      mockHttpInstance.get.mockResolvedValue({ data: {} });
+
+      // Pass an agentVersion-like key; it must never surface as a param.
+      await serviceGraphService.getCurrentTopology("test-org", {
+        agentId: "agent-123",
+        agentEnv: "production",
+        // @ts-expect-error agentVersion is intentionally not part of ServiceGraphParams
+        agentVersion: "v2.0.0",
+      });
+
+      const callArgs = mockHttpInstance.get.mock.calls[0][1];
+      expect(callArgs.params.agent_version).toBeUndefined();
+      expect(callArgs.params).not.toHaveProperty("agent_version");
+    });
+
     it("should handle different org identifiers", async () => {
       mockHttpInstance.get.mockResolvedValue({ data: {} });
 

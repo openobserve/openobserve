@@ -23,6 +23,8 @@ export interface AgentSignalRecord {
   /** "failure" | "loop" | "cost" */
   signal_type: string;
   agent_name?: string | null;
+  gen_ai_agent_env?: string | null;
+  gen_ai_agent_version?: string | null;
   tool_name?: string | null;
   fail_class?: string | null;
   count: number;

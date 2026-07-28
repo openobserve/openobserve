@@ -76,6 +76,13 @@
      so thin small marks stay readable — that dark flip is why it can't be raw primary-600. */
   --color-accent: var(--color-primary-600);
 
+  /* Series B — the secondary series identity paired with --color-accent (series
+     A) wherever two comparable things are shown side by side (e.g. version
+     compare's A/B delta strip + overlay chart). Aliases the existing amber chart
+     series token (chart-series-6) rather than minting a new hue, so it stays in
+     sync with the dashboard chart palette. */
+  --color-series-b: var(--color-chart-series-6);
+
   /* Favorite (filled star) — a warm yellow, deliberately distinct from the
      destructive error red so "starred" and "danger" never read as the same hue
      on a row that carries both. Only the FILLED star uses this; unfavorited
@@ -133,6 +140,9 @@
 
   /* Accent */
   --color-accent: var(--color-accent);
+
+  /* Series B (paired secondary series identity, see :root above) */
+  --color-series-b: var(--color-series-b);
 
   /* White / black / transparent / current / inherit — Tailwind ships these as
      --color-* theme keys, so the `--color-*: initial` reset (palette-reset.css) wipes

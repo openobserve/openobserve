@@ -352,6 +352,24 @@ pub struct RcaResponse {
     pub rca_content: String,
 }
 
+/// Response for cancelling an in-flight RCA analysis
+#[derive(Debug, Serialize, ToSchema)]
+pub struct CancelRcaResponse {
+    pub message: String,
+    /// Whether an in-process task handle was found and aborted on this node. False when the
+    /// analysis is running on another node — the cancellation event is still recorded.
+    pub aborted_local_task: bool,
+}
+
+/// Response listing an incident's current and superseded RCA reports
+#[derive(Debug, Serialize, ToSchema)]
+pub struct RcaHistoryResponse {
+    /// The active report, if one has been generated
+    pub current: Option<String>,
+    /// Superseded reports, newest first
+    pub previous: Vec<config::meta::alerts::incidents::ArchivedRcaReport>,
+}
+
 /// Query parameters for RCA trigger
 #[derive(Debug, Deserialize, IntoParams, ToSchema)]
 pub struct TriggerRcaQuery {
@@ -436,7 +454,7 @@ pub async fn trigger_incident_rca(
 
     // Emit AIAnalysisBegin — all error paths below this point must emit Complete to
     // clear the in-flight guard, otherwise it stays locked until the stale threshold.
-    let _ = infra::table::incident_events::append(
+    let _ = openobserve_core::incidents::append_event(
         &org_id,
         &incident_id,
         config::meta::alerts::incidents::IncidentEvent::ai_analysis_begin(),
@@ -450,7 +468,7 @@ pub async fn trigger_incident_rca(
         {
             Ok(Some(i)) => i,
             Ok(None) => {
-                let _ = infra::table::incident_events::append(
+                let _ = openobserve_core::incidents::append_event(
                     &org_id,
                     &incident_id,
                     config::meta::alerts::incidents::IncidentEvent::ai_analysis_failed(
@@ -463,7 +481,7 @@ pub async fn trigger_incident_rca(
                 return MetaHttpResponse::not_found("Incident not found");
             }
             Err(e) => {
-                let _ = infra::table::incident_events::append(
+                let _ = openobserve_core::incidents::append_event(
                     &org_id,
                     &incident_id,
                     config::meta::alerts::incidents::IncidentEvent::ai_analysis_failed(
@@ -501,7 +519,7 @@ pub async fn trigger_incident_rca(
         match openobserve_core::organization::get_sre_agent_credentials(&org_id).await {
             Ok(creds) => creds,
             Err(e) => {
-                let _ = infra::table::incident_events::append(
+                let _ = openobserve_core::incidents::append_event(
                     &org_id,
                     &incident_id,
                     config::meta::alerts::incidents::IncidentEvent::ai_analysis_failed(
@@ -521,7 +539,7 @@ pub async fn trigger_incident_rca(
         Some(c) => c,
         None => {
             // Emit failure event instead of misleading Complete event
-            let _ = infra::table::incident_events::append(
+            let _ = openobserve_core::incidents::append_event(
                 &org_id,
                 &incident_id,
                 config::meta::alerts::incidents::IncidentEvent::ai_analysis_failed(
@@ -538,7 +556,7 @@ pub async fn trigger_incident_rca(
     // Check agent health
     if let Err(e) = client.health(&auth_header).await {
         // Emit failure event instead of misleading Complete event
-        let _ = infra::table::incident_events::append(
+        let _ = openobserve_core::incidents::append_event(
             &org_id,
             &incident_id,
             config::meta::alerts::incidents::IncidentEvent::ai_analysis_failed(
@@ -582,7 +600,7 @@ pub async fn trigger_incident_rca(
                 );
 
                 // Emit failure event for manual reanalysis background task
-                if let Err(emit_err) = infra::table::incident_events::append(
+                if let Err(emit_err) = openobserve_core::incidents::append_event(
                     &org_id_bg,
                     &incident_id_bg,
                     config::meta::alerts::incidents::IncidentEvent::ai_analysis_failed(
@@ -623,12 +641,13 @@ pub async fn trigger_incident_rca(
             (*client).clone(),
             context,
             auth_header.clone(),
+            openobserve_core::incidents::append_event_send,
         )
         .await
         {
             Ok(s) => s,
             Err(e) => {
-                let _ = infra::table::incident_events::append(
+                let _ = openobserve_core::incidents::append_event(
                     &org_id,
                     &incident_id,
                     config::meta::alerts::incidents::IncidentEvent::ai_analysis_failed(
@@ -655,7 +674,7 @@ pub async fn trigger_incident_rca(
             match rca_service::analyze_incident((*client).clone(), context, &auth_header).await {
                 Ok(content) => content,
                 Err(e) => {
-                    let _ = infra::table::incident_events::append(
+                    let _ = openobserve_core::incidents::append_event(
                         &org_id,
                         &incident_id,
                         config::meta::alerts::incidents::IncidentEvent::ai_analysis_failed(
@@ -670,7 +689,7 @@ pub async fn trigger_incident_rca(
             };
 
         // Emit AIAnalysisComplete on success
-        let _ = infra::table::incident_events::append(
+        let _ = openobserve_core::incidents::append_event(
             &org_id,
             &incident_id,
             config::meta::alerts::incidents::IncidentEvent::ai_analysis_complete(),
@@ -697,7 +716,7 @@ pub async fn trigger_incident_rca(
         ("incident_id" = String, Path, description = "Incident ID"),
     ),
     responses(
-        (status = 200, description = "Analysis cancelled", content_type = "application/json", body = ()),
+        (status = 200, description = "Analysis cancelled", content_type = "application/json", body = CancelRcaResponse),
         (status = 400, description = "No analysis in progress", content_type = "application/json", body = ()),
         (status = 500, description = "Internal error", content_type = "application/json", body = ()),
     ),
@@ -713,26 +732,24 @@ pub async fn cancel_incident_rca(
     use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
 
     let cooldown = get_o2_config().incidents.reanalysis_cooldown_minutes;
-    let events = infra::table::incident_events::get(&org_id, &incident_id)
-        .await
-        .unwrap_or_default();
 
-    // Nothing running — report it rather than writing a spurious terminal event.
-    if !openobserve_core::alerts::incidents::is_analysis_in_flight(&events, cooldown * 2) {
-        return MetaHttpResponse::bad_request("No analysis is currently in progress");
-    }
-
+    // The in-flight check lives inside cancel_rca_for_incident, after the abort handle is
+    // atomically removed — checking here first would leave a window in which a new
+    // analysis could start and be cancelled in place of the one the user targeted.
     match openobserve_core::alerts::incidents::cancel_rca_for_incident(
         &org_id,
         &incident_id,
         Some(user_email.user_id.clone()),
+        cooldown * 2,
     )
     .await
     {
-        Ok(aborted) => MetaHttpResponse::json(serde_json::json!({
-            "message": "Analysis cancelled",
-            "aborted_local_task": aborted,
-        })),
+        // Nothing running — report it rather than writing a spurious terminal event.
+        Ok(None) => MetaHttpResponse::bad_request("No analysis is currently in progress"),
+        Ok(Some(aborted)) => MetaHttpResponse::json(CancelRcaResponse {
+            message: "Analysis cancelled".to_string(),
+            aborted_local_task: aborted,
+        }),
         Err(e) => MetaHttpResponse::internal_error(format!("Failed to cancel analysis: {e}")),
     }
 }
@@ -753,8 +770,8 @@ pub async fn cancel_incident_rca(
         ("incident_id" = String, Path, description = "Incident ID"),
     ),
     responses(
-        (status = 200, description = "RCA report history", content_type = "application/json", body = ()),
-        (status = 404, description = "Not found", content_type = "application/json", body = ()),
+        (status = 200, description = "RCA report history", content_type = "application/json", body = RcaHistoryResponse),
+        (status = 500, description = "Internal error", content_type = "application/json", body = ()),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "get"})),
@@ -767,24 +784,57 @@ pub async fn get_incident_rca_history(
     let topology = match infra::table::alert_incidents::get_topology(&org_id, &incident_id).await {
         Ok(Some(t)) => t,
         Ok(None) => {
-            return MetaHttpResponse::json(serde_json::json!({ "current": null, "previous": [] }));
+            return MetaHttpResponse::json(RcaHistoryResponse {
+                current: None,
+                previous: vec![],
+            });
         }
         Err(e) => return MetaHttpResponse::internal_error(e),
     };
 
-    MetaHttpResponse::json(serde_json::json!({
-        "current": topology.suggested_root_cause,
-        "previous": topology.previous_analyses,
-    }))
+    MetaHttpResponse::json(RcaHistoryResponse {
+        current: topology.suggested_root_cause,
+        previous: topology.previous_analyses,
+    })
 }
 
 /// Get incident events timeline
 #[cfg(feature = "enterprise")]
 pub async fn get_incident_events(Path((org_id, incident_id)): Path<(String, String)>) -> Response {
-    match infra::table::incident_events::get(&org_id, &incident_id).await {
-        Ok(events) => MetaHttpResponse::json(serde_json::json!({ "events": events })),
-        Err(e) => MetaHttpResponse::internal_error(format!("Failed to get events: {e}")),
+    let events = match infra::table::incident_events::get(&org_id, &incident_id).await {
+        Ok(events) => events,
+        Err(e) => return MetaHttpResponse::internal_error(format!("Failed to get events: {e}")),
+    };
+
+    // Self-heal timelines emptied by the pre-fix read/write cycle (releases up to v0.91.x).
+    // Repairing lazily on read avoids a migration that would rewrite every incident row;
+    // an empty timeline is cheap to inspect and, for healthy incidents, is a normal state
+    // that reconstruct_if_empty leaves alone once there is nothing to rebuild.
+    if events.is_empty() {
+        match infra::table::incident_events::reconstruct_if_empty(&org_id, &incident_id).await {
+            Ok(Some(_)) => match infra::table::incident_events::get(&org_id, &incident_id).await {
+                Ok(rebuilt) => {
+                    return MetaHttpResponse::json(serde_json::json!({
+                        "events": rebuilt,
+                        // Flags that the timeline was rebuilt from incident/alert rows and is
+                        // missing anything that lived only in the lost blob (comments,
+                        // acknowledgements, RCA activity).
+                        "partial_reconstruction": true,
+                    }));
+                }
+                Err(e) => {
+                    return MetaHttpResponse::internal_error(format!("Failed to get events: {e}"));
+                }
+            },
+            Ok(None) => {}
+            // Repair is best-effort: a failure here must not fail the read.
+            Err(e) => {
+                log::warn!("[INCIDENTS] timeline reconstruction failed for {incident_id}: {e}");
+            }
+        }
     }
+
+    MetaHttpResponse::json(serde_json::json!({ "events": events }))
 }
 
 /// Get incident events timeline (OSS)
@@ -811,7 +861,7 @@ pub async fn post_incident_comment(
 
     let event = IncidentEvent::comment(user_email.user_id, body.comment);
 
-    match infra::table::incident_events::append(&org_id, &incident_id, event).await {
+    match openobserve_core::incidents::append_event(&org_id, &incident_id, event).await {
         Ok(()) => MetaHttpResponse::ok("Comment added"),
         Err(e) => MetaHttpResponse::internal_error(format!("Failed to add comment: {e}")),
     }
@@ -989,7 +1039,6 @@ pub async fn update_incident(
         ("incident_id" = String, Path, description = "Incident ID"),
     ),
     responses(
-        (status = 200, description = "Analysis cancelled", content_type = "application/json", body = ()),
         (status = 403, description = "Enterprise feature", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -1019,8 +1068,7 @@ pub async fn cancel_incident_rca(
         ("incident_id" = String, Path, description = "Incident ID"),
     ),
     responses(
-        (status = 200, description = "RCA report history", content_type = "application/json", body = ()),
-        (status = 403, description = "Enterprise feature", content_type = "application/json", body = ()),
+        (status = 200, description = "RCA report history (always empty without enterprise features)", content_type = "application/json", body = RcaHistoryResponse),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "get"})),
@@ -1028,7 +1076,10 @@ pub async fn cancel_incident_rca(
     )
 )]
 pub async fn get_incident_rca_history(_path: Path<(String, String)>) -> Response {
-    MetaHttpResponse::json(serde_json::json!({ "current": null, "previous": [] }))
+    MetaHttpResponse::json(RcaHistoryResponse {
+        current: None,
+        previous: vec![],
+    })
 }
 
 #[cfg(test)]

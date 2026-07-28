@@ -52,6 +52,36 @@ impl schema::OrganizationProvisioner for CoreOrganizationProvisioner {
     }
 }
 
+/// The instance id must stay stable for the lifetime of the deployment:
+/// generate a new one only when it is genuinely absent, never because the db
+/// errored on the read.
+async fn get_or_create_instance_id() -> Result<String, anyhow::Error> {
+    const MAX_RETRIES: usize = 5;
+    let mut last_err = None;
+    for attempt in 1..=MAX_RETRIES {
+        match metas::instance::get().await {
+            Ok(Some(instance)) => return Ok(instance),
+            Ok(None) => {
+                log::info!("Generating new instance id");
+                let id = ider::generate();
+                metas::instance::set(&id).await?;
+                return Ok(id);
+            }
+            Err(e) => {
+                log::warn!(
+                    "error in getting instance id (attempt {attempt}/{MAX_RETRIES}): {e}, retrying..."
+                );
+                last_err = Some(e);
+                tokio::time::sleep(std::time::Duration::from_secs(attempt as u64 * 2)).await;
+            }
+        }
+    }
+    Err(anyhow::anyhow!(
+        "failed to get instance id after {MAX_RETRIES} attempts: {}; refusing to generate a new instance id against an unhealthy database",
+        last_err.unwrap()
+    ))
+}
+
 pub async fn init() -> Result<(), anyhow::Error> {
     schema::set_organization_provisioner(Arc::new(CoreOrganizationProvisioner))
         .map_err(|_| anyhow::anyhow!("organization provisioner is already initialized"))?;
@@ -61,16 +91,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     audit::set_audit_publisher(Arc::new(CoreAuditPublisher))
         .map_err(|_| anyhow::anyhow!("audit publisher is already initialized"))?;
 
-    let instance_id = match metas::instance::get().await {
-        Ok(Some(instance)) => instance,
-        Ok(None) | Err(_) => {
-            log::info!("Generating new instance id");
-            let id = ider::generate();
-            let _ = metas::instance::set(&id).await;
-            id
-        }
-    };
-    cache_instance_id(&instance_id);
+    cache_instance_id(&get_or_create_instance_id().await?);
 
     wal::init()?;
     // because of asynchronous, we need to wait for a while
