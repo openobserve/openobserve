@@ -13,6 +13,7 @@ import {
   MIN_SETTLE_BUDGET_MS,
   RETIRED_ACTIONS,
 } from "@/constants/synthetics";
+import { rankCandidates } from "./locatorStability";
 
 /**
  * In-place upgrade of a version-1 journey to version 2, without re-recording.
@@ -48,6 +49,7 @@ export type LiftChangeKind =
   | "timeout_cleared"
   | "step_dropped"
   | "action_renamed"
+  | "locator_reranked"
   | "sleep_converted";
 
 export interface LiftChange {
@@ -120,6 +122,29 @@ function liftStep(step: BrowserStep, changes: LiftChange[]): BrowserStep | null 
       kind: "locator_created",
       detail: `Selector kept as the only ${kind} candidate. Re-record to gain fallbacks.`,
     });
+  }
+
+  // Re-rank an EXISTING bundle so journeys recorded before the positional fix
+  // benefit without being re-recorded. Ranking on kind alone let a candidate
+  // ending in `>> nth=` become the primary while an unambiguous alternative sat
+  // below it — the one failure mode that makes a step act on the wrong element
+  // and still pass. Reordering is safe by construction: a candidate carrying no
+  // positional token resolved to exactly one element at record time, so this
+  // only ever promotes better evidence.
+  if (step.locator?.candidates?.length) {
+    const ranked = rankCandidates(step.locator.candidates);
+    const reordered = ranked.some((candidate, i) => candidate !== step.locator!.candidates[i]);
+    if (reordered) {
+      lifted.locator = { ...step.locator, candidates: ranked };
+      changes.push({
+        stepId: step.id,
+        stepName: name,
+        kind: "locator_reranked",
+        detail:
+          `Primary locator is now ${ranked[0].kind} \`${ranked[0].value}\`. ` +
+          `A position-dependent candidate no longer outranks a stable one.`,
+      });
+    }
   }
 
   // Clear the recorder's stamp so the runner's per-category default applies.

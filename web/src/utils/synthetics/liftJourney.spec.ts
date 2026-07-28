@@ -183,3 +183,69 @@ describe("liftJourney", () => {
     expect(liftJourney([])).toEqual({ steps: [], changes: [], noop: true });
   });
 });
+
+describe("locator re-ranking (Phase 2a)", () => {
+  const step = (locator: BrowserStep["locator"]): BrowserStep =>
+    ({ id: "s1", name: "Click", action: "click", locator }) as BrowserStep;
+
+  it("promotes an unambiguous candidate over a positional one", () => {
+    const result = liftJourney([
+      step({
+        candidates: [
+          {
+            kind: "test_attribute",
+            value: '[data-test="organization-menu-item-label-item-label"] >> nth=1',
+          },
+          { kind: "role", value: 'internal:role=button[name="Save draft"i]' },
+        ],
+        user_override: null,
+      }),
+    ]);
+
+    expect(result.steps[0].locator?.candidates[0].value).toBe(
+      'internal:role=button[name="Save draft"i]',
+    );
+    expect(result.changes.map((c) => c.kind)).toContain("locator_reranked");
+  });
+
+  it("reports nothing when the bundle is already correctly ordered", () => {
+    const result = liftJourney([
+      step({
+        candidates: [
+          { kind: "test_attribute", value: '[data-test="save"]' },
+          { kind: "css", value: ".btn" },
+        ],
+        user_override: null,
+      }),
+    ]);
+    expect(result.changes.filter((c) => c.kind === "locator_reranked")).toHaveLength(0);
+  });
+
+  it("leaves an all-positional bundle alone — ranking cannot help it", () => {
+    const result = liftJourney([
+      step({
+        candidates: [
+          { kind: "test_attribute", value: '[data-test="row"] >> nth=1' },
+          { kind: "css", value: "div >> internal:has-text=/^Acme$/ >> nth=0" },
+        ],
+        user_override: null,
+      }),
+    ]);
+    expect(result.changes.filter((c) => c.kind === "locator_reranked")).toHaveLength(0);
+    expect(result.steps[0].locator?.candidates[0].value).toBe('[data-test="row"] >> nth=1');
+  });
+
+  it("preserves an author's pin while re-ranking the candidates below it", () => {
+    const pin = { kind: "css" as const, value: "#pinned" };
+    const result = liftJourney([
+      step({
+        candidates: [
+          { kind: "test_attribute", value: '[data-test="row"] >> nth=1' },
+          { kind: "role", value: 'internal:role=link[name="Go"i]' },
+        ],
+        user_override: pin,
+      }),
+    ]);
+    expect(result.steps[0].locator?.user_override).toEqual(pin);
+  });
+});
