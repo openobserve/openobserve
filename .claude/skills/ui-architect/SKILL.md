@@ -191,6 +191,52 @@ read it once, it is the backbone of everything below.
    > since `disable-next-line` reports at the comment's line and misses text nodes.
    > Prefer (2) for anything that repeats; **never** exempt real UI text.
 
+   > **Text in `<script>` — use the TYPES, not a lint rule.** The three rules above
+   > only see `<template>`. A string in `<script>`/`.ts` — a table column `label`, a
+   > toast `message`, an i18n key stored as data — is invisible to them, because
+   > deciding "is this string user-facing?" from the string alone is guesswork. So
+   > that decision lives in the **type declaration**, where the author already knows
+   > the answer, and `npm run type-check:app` enforces it. Two types in
+   > **`web/src/types/i18n.ts`**:
+   >
+   > | Type | Use for | Effect |
+   > |---|---|---|
+   > | **`I18nKey`** | a field holding an i18n **key** (`titleKey`, `labelKey`) | only real en-US.json paths compile; a typo gets a "Did you mean…?" |
+   > | **`I18nText`** | a field holding **resolved user-facing text** (`label`, `message`, `title`) | a bare string literal is a compile error; only `t()` / `raw()` satisfy it |
+   >
+   > ```ts
+   > import type { I18nKey, I18nText } from "@/types/i18n";
+   >
+   > interface Column {
+   >   label: I18nText;    // user-facing  -> must be t() or raw()
+   >   field: string;      // data accessor -> ordinary string
+   > }
+   > interface Preset { titleKey: I18nKey }   // stores a key, not the text
+   > ```
+   >
+   > **When you declare a new interface, prop type, or `*.types.ts` that carries UI
+   > text or an i18n key, type that field as `I18nText` / `I18nKey` — never bare
+   > `string`.** This is the same pattern the library already uses for icons
+   > (`iconLeft?: IconName`): a constrained type derived from a source of truth.
+   > `I18nKey` is derived from en-US.json at compile time, so there is no list to
+   > maintain — add a key and it is instantly valid.
+   >
+   > Careful: a `*Key` field is **not** always an i18n key. `OSelect.labelKey` and
+   > `JourneySteps.actionKey` are *field accessors* ("which property of the row holds
+   > the label") and stay `string`. Read the doc comment before annotating.
+   >
+   > The opt-out is **`raw()`**, not an eslint-disable — it is type-checked, survives
+   > refactors, and `grep -rn "raw(" src` lists every exemption in the app:
+   > ```ts
+   > const columns = [
+   >   { label: t("logs.timestamp"), field: "ts" },
+   >   { label: raw("trace_id"),     field: "trace_id" },  // a field name, not prose
+   > ];
+   > ```
+   > To get a `t()` that returns `I18nText`, use `useI18nTyped()` from the same
+   > module in place of `useI18n()`. Adoption is per-file; plain `useI18n()` still
+   > works everywhere else.
+
 ## Structural decisions
 
 *What* to reach for and *where the code lives* — the recurring calls that
@@ -332,6 +378,10 @@ considering the UI done:
       `vue/no-bare-strings-in-template`, `local/no-bare-bound-text-props`) — a clean
       `cd web && npm run lint`. New text-carrying component prop → add it to
       `TEXT_ATTRS` in `eslint.config.js`.
+- [ ] Any **new type / interface / `*.types.ts`** field that carries UI text or an
+      i18n key is declared `I18nText` / `I18nKey` (from `@/types/i18n`), not bare
+      `string` — that is what guards `<script>`, which the ESLint rules cannot see.
+      Non-translatable values use `raw("…")`. Verified by `npm run type-check:app`.
 - [ ] `data-test` on every interactive and key output element, pattern
       `<module>-<filename>-<descriptor>` (see the project FE rules).
 - [ ] New component uses `<script setup lang="ts">`, no `// @ts-nocheck`.

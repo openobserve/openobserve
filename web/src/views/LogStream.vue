@@ -339,6 +339,7 @@ import { useI18n } from "vue-i18n";
 
 import OTable from "@/lib/core/Table/OTable.vue";
 import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import type { EmptyStateAction } from "@/lib/core/EmptyState/presets";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import streamService from "../services/stream";
 import SchemaIndex from "../components/logstream/schema.vue";
@@ -871,7 +872,7 @@ export default defineComponent({
     };
 
     const streamsEmptyActions = computed(() => {
-      const actions: { id: string; icon: string; titleKey: string; descriptionKey: string }[] = [
+      const actions: EmptyStateAction[] = [
         {
           id: "setup-ingestion",
           icon: "cloud-upload",

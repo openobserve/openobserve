@@ -25,6 +25,8 @@
 // to the same entry.
 // ─────────────────────────────────────────────────────────────────────────
 
+import type { I18nKey } from "@/types/i18n";
+
 import type { BadgeVariant, BadgeSize, BadgeShape } from "./OBadge.types";
 import { statusVariant } from "@/lib/core/Table/cells/statusVariant";
 
@@ -44,7 +46,7 @@ export interface BadgeValueConfig {
    * the text must be translated. A literal `label` (or a per-call `label` prop)
    * still wins over `labelKey`.
    */
-  labelKey?: string;
+  labelKey?: I18nKey;
   /** Force the leading dot on/off regardless of group mode. */
   dot?: boolean;
   /** Per-value size override (wins over the group `size`). For groups whose
@@ -1389,7 +1391,7 @@ export interface ResolvedBadge {
   label: string;
   /** i18n key for the label, if the matched value declared one. `OTag`
    *  translates this when no explicit `label` is supplied. */
-  labelKey?: string;
+  labelKey?: I18nKey;
   icon?: string;
   dot: boolean;
   mode: BadgeRenderMode;

@@ -978,7 +978,7 @@ export default defineComponent({
     });
 
     /** The zero-metrics action card — same shape as the preset's, metrics-specific copy. */
-    const noMetricsActions = [
+    const noMetricsActions: EmptyStateAction[] = [
       {
         id: "setup-ingestion",
         icon: "cloud-upload",
