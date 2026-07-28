@@ -250,6 +250,10 @@ pub async fn get_error_input_data(errors: &WorkflowRunErrors) -> Result<String, 
 
 async fn validate_workflow(workflow: &Workflow) -> Result<(), anyhow::Error> {
     for node in &workflow.nodes {
+        if !node.position.is_valid() {
+            return Err(anyhow::anyhow!("node {} position is not valid", node.id));
+        }
+
         if !node.data.is_workflow_node() {
             return Err(anyhow::anyhow!(
                 "node {} is not a workflow compatible node",
