@@ -98,6 +98,15 @@ pub struct ExternalAlertMeta {
     pub external_url: Option<String>,
     /// JSON object of display-only annotations.
     pub annotations: Option<String>,
+    /// Severity the originating system reported, already normalized to
+    /// "P1".."P4". `None` when the sender supplied nothing recognizable, which
+    /// leaves the incident's default severity in place.
+    ///
+    /// Not persisted on the junction row — severity belongs to the incident,
+    /// not to one alert's link to it. It rides along here because this struct
+    /// is what already threads from the ingest handler down to incident
+    /// creation.
+    pub severity: Option<String>,
 }
 
 pub async fn add_alert_to_incident(

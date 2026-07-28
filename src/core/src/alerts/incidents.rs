@@ -791,7 +791,15 @@ async fn create_new_incident(
     service_name: &str,
     external: Option<&infra::table::alert_incidents::ExternalAlertMeta>,
 ) -> Result<IncidentCorrelationOutcome, anyhow::Error> {
-    let severity = o2_enterprise::enterprise::alerts::incidents::determine_severity(None);
+    // An externally-ingested alert carries the originating system's severity,
+    // already normalized to "P1".."P4" at the ingest boundary. Native alerts
+    // have nothing to map here yet, so they keep the enterprise default.
+    let severity = match external.and_then(|e| e.severity.as_deref()) {
+        Some(mapped) => {
+            o2_enterprise::enterprise::alerts::incidents::determine_severity(Some(mapped))
+        }
+        None => o2_enterprise::enterprise::alerts::incidents::determine_severity(None),
+    };
 
     let title =
         o2_enterprise::enterprise::alerts::incidents::generate_title(&alert.name, group_values);
@@ -1454,6 +1462,15 @@ pub async fn ingest_external_alert(
         } else {
             Some(serde_json::to_string(&payload.annotations)?)
         },
+        // Normalize the sender's vocabulary ("critical", "error", "warning",
+        // "P1", "3", …) here, at the boundary. An unrecognized value maps to
+        // None so the incident keeps its default rather than being silently
+        // downgraded to a guess.
+        severity: payload
+            .severity
+            .as_deref()
+            .and_then(config::meta::alerts::incidents::map_external_severity)
+            .map(|s| s.to_string()),
     };
 
     let notify = std::slice::from_ref(&result_row);
@@ -1602,7 +1619,18 @@ async fn resolve_external_alert(
         }
 
         if resolution.all_resolved {
-            infra::table::alert_incidents::update_status(org_id, &incident.id, "resolved").await?;
+            // Go through the crate-level update_status, not the infra one:
+            // that is what emits the Resolved timeline event and publishes the
+            // status change to the super cluster. Calling infra directly
+            // resolves the row here and leaves peer clusters showing the
+            // incident as still open.
+            update_status(
+                org_id,
+                &incident.id,
+                "resolved",
+                &format!("{} (external)", payload.source),
+            )
+            .await?;
             incident_closed = Some(incident.id.clone());
             log::info!(
                 "[incidents] Incident {} resolved — every alert in it has resolved upstream",
@@ -2498,6 +2526,47 @@ mod tests {
         assert!(alert.creates_incident);
         assert_eq!(alert.org_id, "org1");
         assert_eq!(alert.name, "CPUHigh");
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_external_severity_reaches_incident_creation() {
+        // Regression: `severity` was accepted, validated and documented, but
+        // never applied — every external alert silently got the default
+        // severity. The normalize-then-determine chain below is what
+        // create_new_incident runs; if either half is dropped this fails.
+        use config::meta::alerts::incidents::map_external_severity;
+
+        for (sent, expected) in [
+            ("critical", "P1"),
+            ("P1", "P1"),
+            ("error", "P2"),
+            ("warning", "P3"),
+            ("info", "P4"),
+        ] {
+            let normalized = map_external_severity(sent).map(|s| s.to_string());
+            let applied = o2_enterprise::enterprise::alerts::incidents::determine_severity(
+                normalized.as_deref(),
+            );
+            assert_eq!(
+                applied, expected,
+                "severity {sent} should map to {expected}"
+            );
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_unrecognized_external_severity_falls_back_to_default() {
+        use config::meta::alerts::incidents::map_external_severity;
+
+        let normalized = map_external_severity("spicy").map(|s| s.to_string());
+        assert!(normalized.is_none(), "unknown severity must not be guessed");
+
+        let applied =
+            o2_enterprise::enterprise::alerts::incidents::determine_severity(normalized.as_deref());
+        let default = o2_enterprise::enterprise::alerts::incidents::determine_severity(None);
+        assert_eq!(applied, default);
     }
 
     #[cfg(feature = "enterprise")]

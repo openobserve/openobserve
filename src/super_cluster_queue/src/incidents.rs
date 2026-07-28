@@ -86,6 +86,10 @@ pub(crate) async fn process_msg(msg: IncidentMessage) -> Result<()> {
                 source,
                 external_url,
                 annotations,
+                // Severity is a property of the incident, not of one alert's
+                // link to it, and the peer already received it on the
+                // `Create` message. Nothing to carry here.
+                severity: None,
             });
             alert_incidents::add_alert_to_incident(
                 &incident_id,
