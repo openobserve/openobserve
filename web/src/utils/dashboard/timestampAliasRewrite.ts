@@ -430,19 +430,147 @@ function renameReservedAliasInPanelConfig(
 }
 
 /**
+ * Collect the output-column names a query already defines — every `AS <name>`
+ * alias and every bare projection column — so a replacement alias can avoid
+ * colliding with one of them. `tsCol` itself is excluded (it is what we rename).
+ */
+function collectOutputNames(sql: string, tsCol: string): Set<string> {
+  const names = new Set<string>();
+  const add = (name: string) => {
+    if (name && name !== tsCol) names.add(name);
+  };
+  const n = sql.length;
+  let i = 0;
+  let depth = 0; // any paren (function / grouping / sub-query)
+  let inSelect = false; // inside a SELECT projection list
+  let itemStart = false; // at the start of a projection item (depth 0)
+  let prevWordLower = "";
+
+  while (i < n) {
+    const ch = sql[i];
+
+    if (/\s/.test(ch)) {
+      i++;
+      continue;
+    }
+
+    if (ch === '"' || ch === "'") {
+      let j = i + 1;
+      while (j < n && sql[j] !== ch) j++;
+      const inner = sql.slice(i + 1, j);
+      if (prevWordLower === "as") add(inner);
+      else if (inSelect && depth === 0 && itemStart) add(inner);
+      prevWordLower = "";
+      itemStart = false;
+      i = j < n ? j + 1 : n;
+      continue;
+    }
+
+    if (ch === "(") {
+      depth++;
+      prevWordLower = "";
+      itemStart = false;
+      i++;
+      continue;
+    }
+    if (ch === ")") {
+      if (depth > 0) depth--;
+      prevWordLower = "";
+      itemStart = false;
+      i++;
+      continue;
+    }
+
+    if (isIdentChar(ch)) {
+      let j = i;
+      while (j < n && isIdentChar(sql[j])) j++;
+      const word = sql.slice(i, j);
+      const lower = word.toLowerCase();
+      let k = j;
+      while (k < n && /\s/.test(sql[k])) k++;
+      const nextCh = sql[k] || "";
+
+      if (depth === 0 && lower === "select") {
+        inSelect = true;
+        itemStart = true;
+        prevWordLower = lower;
+        i = j;
+        continue;
+      }
+      if (
+        depth === 0 &&
+        (lower === "from" ||
+          lower === "where" ||
+          lower === "group" ||
+          lower === "having" ||
+          lower === "order" ||
+          lower === "limit" ||
+          lower === "offset" ||
+          lower === "window" ||
+          lower === "union" ||
+          lower === "except" ||
+          lower === "intersect" ||
+          lower === "on")
+      ) {
+        inSelect = false;
+        itemStart = false;
+        prevWordLower = lower;
+        i = j;
+        continue;
+      }
+
+      if (prevWordLower === "as" && lower !== "as") {
+        add(word); // alias name after AS
+      } else if (inSelect && depth === 0 && itemStart && nextCh !== "(" && nextCh !== ".") {
+        add(word); // bare projection column (not a function call, not qualified)
+      }
+      itemStart = false;
+      prevWordLower = lower;
+      i = j;
+      continue;
+    }
+
+    // Other punctuation. A top-level comma begins a new projection item.
+    itemStart = ch === "," && depth === 0 && inSelect;
+    prevWordLower = "";
+    i++;
+  }
+
+  return names;
+}
+
+/**
+ * Pick a collision-free replacement alias for `sql`: `base` (`ts`) if the query
+ * has no output column by that name, otherwise the first free `base_1`, `base_2`, …
+ */
+export function pickReplacementAlias(
+  sql: string,
+  tsCol: string = RESERVED_TS_ALIAS,
+  base: string = RESERVED_TS_ALIAS_REPLACEMENT,
+): string {
+  const taken = collectOutputNames(sql, tsCol);
+  if (!taken.has(base)) return base;
+  let k = 1;
+  while (taken.has(`${base}_${k}`)) k++;
+  return `${base}_${k}`;
+}
+
+/**
  * Normalize every panel in a dashboard so the reserved timestamp column is never
  * used as an output alias. Idempotent — safe to run on every load.
  *
- * Per query: rewrite the SQL string first (the source of truth); rename field
- * aliases only when the SQL actually aliased the reserved column, which keeps
- * `field.alias` in lock-step with the result-row key and structurally excludes
- * VRL-derived `_timestamp` fields (never in the SQL). Rewrite alias-referencing
- * panel configs only when a field was renamed.
+ * Per query: pick a collision-free replacement alias (`ts`, or `ts_1`/`ts_2`/… if
+ * the query already has a `ts` column), then rewrite the SQL string (the source of
+ * truth) and — only when the SQL actually aliased the reserved column — the field
+ * alias, using that same chosen alias. Alias-referencing panel configs follow only
+ * when a field was renamed. This keeps the SQL, field aliases and configs in
+ * lock-step, and structurally excludes VRL-derived `_timestamp` fields (never in
+ * the SQL). PromQL panels are skipped (SQL-only rule).
  */
 export function normalizeReservedTimestampAlias(
   data: any,
   tsCol: string = RESERVED_TS_ALIAS,
-  newAlias: string = RESERVED_TS_ALIAS_REPLACEMENT,
+  base: string = RESERVED_TS_ALIAS_REPLACEMENT,
 ): void {
   if (!data?.tabs) return;
 
@@ -457,21 +585,21 @@ export function normalizeReservedTimestampAlias(
       }
 
       let renamedAny = false;
+      let chosenAlias = base;
       for (const query of panel.queries) {
-        let sqlHadAlias = false;
-        if (typeof query?.query === "string") {
-          const rewritten = rewriteQueryTimestampAlias(query.query, tsCol, newAlias);
-          sqlHadAlias = rewritten !== query.query;
-          query.query = rewritten;
-        }
+        if (typeof query?.query !== "string" || !query.query.includes(tsCol)) continue;
 
-        if (sqlHadAlias) {
-          renamedAny =
-            renameReservedAliasInFields(query.fields, tsCol, newAlias) || renamedAny;
+        const chosen = pickReplacementAlias(query.query, tsCol, base);
+        const rewritten = rewriteQueryTimestampAlias(query.query, tsCol, chosen);
+        if (rewritten !== query.query) {
+          query.query = rewritten;
+          renameReservedAliasInFields(query.fields, tsCol, chosen);
+          renamedAny = true;
+          chosenAlias = chosen;
         }
       }
 
-      if (renamedAny) renameReservedAliasInPanelConfig(panel.config, tsCol, newAlias);
+      if (renamedAny) renameReservedAliasInPanelConfig(panel.config, tsCol, chosenAlias);
     }
   }
 }

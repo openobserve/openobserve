@@ -18,7 +18,40 @@ import {
   RESERVED_TS_ALIAS_REPLACEMENT,
   rewriteQueryTimestampAlias,
   normalizeReservedTimestampAlias,
+  pickReplacementAlias,
 } from "@/utils/dashboard/timestampAliasRewrite";
+
+describe("pickReplacementAlias (collision-avoiding suffix)", () => {
+  it("returns `ts` when the query has no `ts` output column", () => {
+    expect(pickReplacementAlias('SELECT histogram(_timestamp) AS "_timestamp" FROM t')).toBe("ts");
+  });
+
+  it("bumps to `ts_1` when `ts` is already an alias", () => {
+    expect(
+      pickReplacementAlias('SELECT foo AS "ts", histogram(_timestamp) AS "_timestamp" FROM t'),
+    ).toBe("ts_1");
+  });
+
+  it("bumps to `ts_1` when `ts` is a bare selected column", () => {
+    expect(pickReplacementAlias('SELECT ts, histogram(_timestamp) AS "_timestamp" FROM t')).toBe(
+      "ts_1",
+    );
+  });
+
+  it("finds the first free suffix (`ts_2` when `ts` and `ts_1` are taken)", () => {
+    expect(
+      pickReplacementAlias(
+        'SELECT a AS ts, b AS ts_1, histogram(_timestamp) AS "_timestamp" FROM t',
+      ),
+    ).toBe("ts_2");
+  });
+
+  it("does NOT bump when `ts` only appears in WHERE (not an output column)", () => {
+    expect(
+      pickReplacementAlias('SELECT histogram(_timestamp) AS "_timestamp" FROM t WHERE ts > 0'),
+    ).toBe("ts");
+  });
+});
 
 describe("rewriteQueryTimestampAlias", () => {
   it('rewrites AS "_timestamp"', () => {
@@ -476,6 +509,36 @@ describe("normalizeReservedTimestampAlias", () => {
       normalizeReservedTimestampAlias(data);
       expect(data, `queryType=${queryType}`).toEqual(before); // untouched
     }
+  });
+
+  it("uses a collision-free alias (ts_1) consistently across SQL, field, and config", () => {
+    const panel = {
+      config: {
+        override_config: [{ field: { matchBy: "name", value: "_timestamp" }, config: [] }],
+      },
+      queries: [
+        {
+          customQuery: true,
+          query:
+            'SELECT foo AS "ts", histogram(_timestamp) AS "_timestamp" ' +
+            "FROM t GROUP BY _timestamp ORDER BY _timestamp",
+          fields: {
+            x: [{ alias: "_timestamp", column: "_timestamp", isDerived: false }],
+            y: [{ alias: "ts", column: "foo", isDerived: false }],
+          },
+        },
+      ],
+    };
+    normalizeReservedTimestampAlias(wrap(panel));
+
+    // `ts` is taken by `foo AS "ts"`, so `_timestamp` becomes `ts_1` everywhere
+    expect(panel.queries[0].query).toBe(
+      'SELECT foo AS "ts", histogram(_timestamp) AS "ts_1" ' +
+        "FROM t GROUP BY ts_1 ORDER BY ts_1",
+    );
+    expect(panel.queries[0].fields.x[0].alias).toBe("ts_1");
+    expect(panel.queries[0].fields.y[0].alias).toBe("ts"); // the pre-existing ts column untouched
+    expect(panel.config.override_config[0].field.value).toBe("ts_1");
   });
 
   it("is idempotent", () => {
