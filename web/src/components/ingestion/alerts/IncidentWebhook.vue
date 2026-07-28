@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <IngestionDocLink
-      href="https://openobserve.ai/docs/user-guide/alerts/incident-webhook/"
+      href="https://openobserve.ai/docs/user-guide/analytics/incidents/incident-webhook/"
       data-test="ingestion-alerts-webhook-doclink"
     >
       {{ t("ingestion.alertsWebhookDocLink") }}
