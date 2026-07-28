@@ -2858,10 +2858,7 @@ describe("sqlUtils", () => {
 
     it("should return the first (main) table for a JOIN", async () => {
       mockAstify.mockReturnValue({
-        from: [
-          { table: "main_stream" },
-          { table: "joined_stream", join: "INNER JOIN" },
-        ],
+        from: [{ table: "main_stream" }, { table: "joined_stream", join: "INNER JOIN" }],
       });
       const result = await getStreamNameFromQuery(
         "SELECT * FROM main_stream JOIN joined_stream ON a = b",

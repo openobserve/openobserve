@@ -67,18 +67,14 @@ describe("rewriteQueryTimestampAlias", () => {
   });
 
   it("rewrites unquoted AS _timestamp", () => {
-    expect(
-      rewriteQueryTimestampAlias("SELECT histogram(_timestamp) AS _timestamp FROM \"x\""),
-    ).toBe('SELECT histogram(_timestamp) AS ts FROM "x"');
+    expect(rewriteQueryTimestampAlias('SELECT histogram(_timestamp) AS _timestamp FROM "x"')).toBe(
+      'SELECT histogram(_timestamp) AS ts FROM "x"',
+    );
   });
 
   it("is case-insensitive on the AS keyword", () => {
-    expect(rewriteQueryTimestampAlias('SELECT a as "_timestamp"')).toBe(
-      'SELECT a as "ts"',
-    );
-    expect(rewriteQueryTimestampAlias('SELECT a As "_timestamp"')).toBe(
-      'SELECT a As "ts"',
-    );
+    expect(rewriteQueryTimestampAlias('SELECT a as "_timestamp"')).toBe('SELECT a as "ts"');
+    expect(rewriteQueryTimestampAlias('SELECT a As "_timestamp"')).toBe('SELECT a As "ts"');
   });
 
   it("leaves the source column untouched when there is no _timestamp alias (histogram/WHERE/ORDER)", () => {
@@ -130,8 +126,7 @@ describe("rewriteQueryTimestampAlias", () => {
   });
 
   it("does not rename _timestamp in the WHERE clause even when the alias is defined", () => {
-    const sql =
-      'SELECT foo AS "_timestamp" FROM "x" WHERE _timestamp > 0 GROUP BY _timestamp';
+    const sql = 'SELECT foo AS "_timestamp" FROM "x" WHERE _timestamp > 0 GROUP BY _timestamp';
     expect(rewriteQueryTimestampAlias(sql)).toBe(
       'SELECT foo AS "ts" FROM "x" WHERE _timestamp > 0 GROUP BY ts',
     );
@@ -171,14 +166,15 @@ describe("rewriteQueryTimestampAlias — complex queries (never corrupt)", () =>
   it("does NOT touch a string literal containing 'as \"_timestamp\"'", () => {
     const sql =
       'SELECT a AS "_timestamp" FROM "x" ' +
-      'WHERE msg LIKE \'%as "_timestamp"%\' GROUP BY _timestamp';
+      "WHERE msg LIKE '%as \"_timestamp\"%' GROUP BY _timestamp";
     expect(rewriteQueryTimestampAlias(sql)).toBe(
       'SELECT a AS "ts" FROM "x" WHERE msg LIKE \'%as "_timestamp"%\' GROUP BY ts',
     );
   });
 
   it("does NOT rename an unquoted _timestamp inside a string literal", () => {
-    const sql = "SELECT a AS _timestamp FROM \"x\" WHERE m = 'created as _timestamp' GROUP BY _timestamp";
+    const sql =
+      "SELECT a AS _timestamp FROM \"x\" WHERE m = 'created as _timestamp' GROUP BY _timestamp";
     expect(rewriteQueryTimestampAlias(sql)).toBe(
       "SELECT a AS ts FROM \"x\" WHERE m = 'created as _timestamp' GROUP BY ts",
     );
@@ -235,8 +231,7 @@ describe("rewriteQueryTimestampAlias — complex queries (never corrupt)", () =>
       'SELECT a AS "_timestamp" FROM t GROUP BY _timestamp ' +
       "UNION SELECT _timestamp FROM u GROUP BY _timestamp";
     expect(rewriteQueryTimestampAlias(sql)).toBe(
-      'SELECT a AS "ts" FROM t GROUP BY ts ' +
-        "UNION SELECT _timestamp FROM u GROUP BY _timestamp",
+      'SELECT a AS "ts" FROM t GROUP BY ts ' + "UNION SELECT _timestamp FROM u GROUP BY _timestamp",
     );
   });
 
@@ -533,8 +528,7 @@ describe("normalizeReservedTimestampAlias", () => {
 
     // `ts` is taken by `foo AS "ts"`, so `_timestamp` becomes `ts_1` everywhere
     expect(panel.queries[0].query).toBe(
-      'SELECT foo AS "ts", histogram(_timestamp) AS "ts_1" ' +
-        "FROM t GROUP BY ts_1 ORDER BY ts_1",
+      'SELECT foo AS "ts", histogram(_timestamp) AS "ts_1" ' + "FROM t GROUP BY ts_1 ORDER BY ts_1",
     );
     expect(panel.queries[0].fields.x[0].alias).toBe("ts_1");
     expect(panel.queries[0].fields.y[0].alias).toBe("ts"); // the pre-existing ts column untouched
@@ -553,8 +547,6 @@ describe("normalizeReservedTimestampAlias", () => {
     expect(() => normalizeReservedTimestampAlias(undefined)).not.toThrow();
     expect(() => normalizeReservedTimestampAlias({})).not.toThrow();
     expect(() => normalizeReservedTimestampAlias({ tabs: [{}] })).not.toThrow();
-    expect(() =>
-      normalizeReservedTimestampAlias({ tabs: [{ panels: [{}] }] }),
-    ).not.toThrow();
+    expect(() => normalizeReservedTimestampAlias({ tabs: [{ panels: [{}] }] })).not.toThrow();
   });
 });

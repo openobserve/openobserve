@@ -650,9 +650,7 @@ describe("convertDashboardSchemaVersion", () => {
           panels: [
             {
               config: {
-                override_config: [
-                  { field: { matchBy: "name", value: "_timestamp" }, config: [] },
-                ],
+                override_config: [{ field: { matchBy: "name", value: "_timestamp" }, config: [] }],
               },
               queries: [
                 {
