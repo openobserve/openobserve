@@ -3,12 +3,16 @@
     <div class="flex flex-row pl-2">
       <div
         data-test="promql-labelfilter-editor-label"
-        class="flex min-w-21.5 items-center text-sm whitespace-nowrap"
+        class="flex min-w-24 items-center whitespace-nowrap"
       >
+        <span
+          class="rounded-default bg-badge-orange-ol-text mr-1.5 h-2 w-2 shrink-0"
+          aria-hidden="true"
+        ></span>
         {{ t("panel.labelFilters") }}
       </div>
       <span class="mr-0.5 ml-0.5 flex items-center">:</span>
-      <div class="scroll m-0.5 flex flex-wrap items-center gap-2">
+      <div class="scroll m-0.5 flex min-h-8 flex-wrap items-center gap-2">
         <!-- Label Filter Items -->
         <div
           v-for="(label, index) in props.labels"
@@ -16,16 +20,39 @@
           data-test="promql-labelfilter-item"
           class="flex items-center"
         >
-          <OButtonGroup class="axis-field" radius="sm">
+          <OButtonGroup
+            class="axis-field border-border-default border-s-badge-orange-ol-border bg-surface-panel overflow-hidden border border-s-2 [&>*:not(:first-child)]:!border-s"
+            radius="sm"
+            :divided="true"
+          >
             <ODropdown>
               <template #trigger>
                 <OButton
-                  variant="primary"
-                  size="chip"
-                  class="!text-xs"
+                  variant="ghost"
+                  size="chip-12"
+                  class="!ps-1 !pe-1"
                   :data-test="`promql-label-filter-${index}`"
                 >
-                  {{ computedLabel(label) }}
+                  <span class="leading-normal font-normal whitespace-nowrap">
+                    <template v-if="!label.label">
+                      <span class="text-text-secondary">{{ computedLabel(label) }}</span>
+                    </template>
+                    <!-- PromQL editor colours: maroon labels, string/number values -->
+                    <template v-else>
+                      <span class="text-promql-label">{{ label.label }}</span>
+                      <template v-if="label.value">
+                        <span class="text-text-secondary px-1">{{ label.op }}</span>
+                        <span
+                          :class="
+                            /^-?[\d.]+$/.test(String(label.value).trim())
+                              ? 'text-promql-number'
+                              : 'text-promql-string'
+                          "
+                          >{{ label.value }}</span
+                        >
+                      </template>
+                    </template>
+                  </span>
                   <template #icon-right><OIcon name="arrow-drop-down" size="sm" /></template>
                 </OButton>
               </template>
@@ -84,20 +111,21 @@
               </div>
             </ODropdown>
             <OButton
-              variant="outline"
+              variant="ghost"
               size="icon-chip"
+              class="!w-4"
               @click="removeLabel(index)"
               :data-test="`promql-label-filter-remove-${index}`"
-              icon-left="close"
             >
+              <template #icon-left><OIcon name="close" size="xs" class="!size-2.5" /></template>
             </OButton>
           </OButtonGroup>
         </div>
 
         <!-- Add Button -->
         <OButton
-          variant="ghost-primary"
-          size="sm"
+          variant="outline"
+          size="icon-chip"
           @click="addLabel"
           data-test="promql-add-label-filter"
         >

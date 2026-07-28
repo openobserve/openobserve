@@ -15,7 +15,7 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
-import { reactive, computed } from "vue";
+import { reactive, computed, nextTick } from "vue";
 
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -350,7 +350,14 @@ describe("FieldList", () => {
 
       const row = wrapper.find('[data-test="o-field-list-row-field1"]');
       expect(row.exists()).toBe(true);
+      // Drag is handle-gated: the row is not a drag source at rest — it only
+      // becomes draggable while a press is active on its drag-indicator handle.
+      expect(row.attributes("draggable")).toBe("false");
+      await row.find('[data-test="o-field-list-drag-indicator"]').trigger("mousedown");
       expect(row.attributes("draggable")).toBe("true");
+      document.dispatchEvent(new MouseEvent("mouseup"));
+      await nextTick();
+      expect(row.attributes("draggable")).toBe("false");
     });
 
     it("should not set draggable when hideAllFieldsSelection is true", async () => {

@@ -516,7 +516,9 @@
     "fillRequiredFields": "Please fill required fields",
     "test": "Test",
     "username": "Username",
-    "password": "Password"
+    "password": "Password",
+    "field": "Field",
+    "enterValueOrVariable": "Enter value or $variable"
   },
   "flow": {
     "stepPicker": {
@@ -3694,7 +3696,8 @@
       "clause": "Clause {number}",
       "selectOperation": "Select Operation",
       "addAnotherClause": "Add another clause",
-      "removeClause": "Remove clause"
+      "removeClause": "Remove clause",
+      "addClause": "Add clause"
     },
     "viewDashboard": {
       "refreshToApplyVariables": "Refresh to apply latest variable changes",
@@ -3721,7 +3724,9 @@
       "add": "Add",
       "value": "Value",
       "markAsNonTimestamp": "Mark this field as non-timestamp",
-      "renderDataAsJson": "Render Data as JSON / Array"
+      "renderDataAsJson": "Render Data as JSON / Array",
+      "sortBy": "Sort By",
+      "havingHint": "Filter on the aggregate"
     },
     "customChartTypeSelector": {
       "exampleOfCustomCharts": "Example of custom charts",
@@ -3932,6 +3937,10 @@
       "addedSuccessfully": "Dashboard added successfully.",
       "creationFailed": "Dashboard creation failed.",
       "filesFailedValidation": "{count} file(s) did not pass validation constraints"
+    },
+    "rawQueryBuilder": {
+      "query": "Query",
+      "instruction": "Write a SQL query for complex actions."
     }
   },
   "panel": {
