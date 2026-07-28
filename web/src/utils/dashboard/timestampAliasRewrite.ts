@@ -46,8 +46,7 @@ const AXIS_KEYS = [
   "value_for_maps",
 ];
 
-const escapeRegExp = (value: string): string =>
-  value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const escapeRegExp = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 const isIdentChar = (c: string): boolean => /[A-Za-z0-9_]/.test(c);
 
@@ -135,8 +134,7 @@ export function rewriteQueryTimestampAlias(
 
   const isRefClause = (c: number): boolean =>
     c === CLAUSE_GROUP || c === CLAUSE_HAVING || c === CLAUSE_ORDER;
-  const renameText = (quote: string): string =>
-    quote ? quote + newAlias + quote : newAlias;
+  const renameText = (quote: string): string => (quote ? quote + newAlias + quote : newAlias);
 
   // Resolve a scope's deferred refs once its FROM origin is known. A kept ref only
   // signals orphan risk when the scope did NOT define an alias itself — a scope's
@@ -165,12 +163,7 @@ export function rewriteQueryTimestampAlias(
   };
 
   // Handle a `_timestamp` token found at [start, end).
-  const handleTs = (
-    start: number,
-    end: number,
-    quote: string,
-    precededByDot: boolean,
-  ): void => {
+  const handleTs = (start: number, end: number, quote: string, precededByDot: boolean): void => {
     const s = top();
     if (precededByDot) {
       if (!s.sawDefinition) keptRef = true; // qualified `t._timestamp` — a specific source column
@@ -313,11 +306,7 @@ export function rewriteQueryTimestampAlias(
 
       // Left the FROM clause without a renaming sub-query → FROM is a real table,
       // so the scope's deferred `_timestamp` refs are the source column.
-      if (
-        prevClause === CLAUSE_FROM &&
-        s.clause !== CLAUSE_FROM &&
-        s.fromRenamed === null
-      ) {
+      if (prevClause === CLAUSE_FROM && s.clause !== CLAUSE_FROM && s.fromRenamed === null) {
         s.fromRenamed = false;
         resolveDeferred(s, false);
       }
@@ -369,11 +358,7 @@ export function rewriteQueryTimestampAlias(
  * fields as defense-in-depth (they are not in the SQL, so callers already gate
  * on that). Returns true if anything changed.
  */
-function renameReservedAliasInFields(
-  fields: any,
-  tsCol: string,
-  newAlias: string,
-): boolean {
+function renameReservedAliasInFields(fields: any, tsCol: string, newAlias: string): boolean {
   if (!fields) return false;
   let changed = false;
   const rename = (field: any) => {
@@ -396,11 +381,7 @@ function renameReservedAliasInFields(
  *  - drilldown `data.variables[].value` tokens `${row.field["<alias>"]}`
  * Other configs (mark_line, mappings, trellis) do not store a source alias.
  */
-function renameReservedAliasInPanelConfig(
-  config: any,
-  tsCol: string,
-  newAlias: string,
-): void {
+function renameReservedAliasInPanelConfig(config: any, tsCol: string, newAlias: string): void {
   if (!config) return;
 
   if (Array.isArray(config.override_config)) {
@@ -521,13 +502,7 @@ function collectOutputNames(sql: string, tsCol: string): Set<string> {
 
       if (prevWordLower === "as" && lower !== "as") {
         add(word); // alias name after AS
-      } else if (
-        inSelect &&
-        depth === 0 &&
-        itemStart &&
-        nextCh !== "(" &&
-        nextCh !== "."
-      ) {
+      } else if (inSelect && depth === 0 && itemStart && nextCh !== "(" && nextCh !== ".") {
         add(word); // bare projection column (not a function call, not qualified)
       }
       itemStart = false;
@@ -590,25 +565,17 @@ export function normalizeReservedTimestampAlias(
       if (!panel?.queries) continue;
 
       // The `_timestamp` output-alias rule is SQL-only — skip PromQL panels.
-      if (
-        panel.queryType === "promql" ||
-        panel.queryType === "promql-builder"
-      ) {
+      if (panel.queryType === "promql" || panel.queryType === "promql-builder") {
         continue;
       }
 
       let renamedAny = false;
       let chosenAlias = base;
       for (const query of panel.queries) {
-        if (typeof query?.query !== "string" || !query.query.includes(tsCol))
-          continue;
+        if (typeof query?.query !== "string" || !query.query.includes(tsCol)) continue;
 
         const chosen = pickReplacementAlias(query.query, tsCol, base);
-        const rewritten = rewriteQueryTimestampAlias(
-          query.query,
-          tsCol,
-          chosen,
-        );
+        const rewritten = rewriteQueryTimestampAlias(query.query, tsCol, chosen);
         if (rewritten !== query.query) {
           query.query = rewritten;
           renameReservedAliasInFields(query.fields, tsCol, chosen);

@@ -778,9 +778,7 @@ describe("Commons Utility Functions", () => {
                     query:
                       'SELECT histogram(_timestamp) AS "_timestamp" FROM "x" GROUP BY _timestamp',
                     fields: {
-                      x: [
-                        { alias: "_timestamp", column: "_timestamp", isDerived: false },
-                      ],
+                      x: [{ alias: "_timestamp", column: "_timestamp", isDerived: false }],
                     },
                   },
                 ],
@@ -790,11 +788,8 @@ describe("Commons Utility Functions", () => {
         ],
       };
 
-      mockStore.state.organizationData.allDashboardData[dashboardId] =
-        mockDashboard;
-      (dashboardService.save as any).mockResolvedValue({
-        data: { success: true },
-      });
+      mockStore.state.organizationData.allDashboardData[dashboardId] = mockDashboard;
+      (dashboardService.save as any).mockResolvedValue({ data: { success: true } });
       (dashboardService.get_Dashboard as any).mockResolvedValue({
         data: { version: 1, v1: mockDashboard, hash: 123 },
       });
@@ -836,11 +831,8 @@ describe("Commons Utility Functions", () => {
         ],
       };
 
-      mockStore.state.organizationData.allDashboardData[dashboardId] =
-        mockDashboard;
-      (dashboardService.save as any).mockResolvedValue({
-        data: { success: true },
-      });
+      mockStore.state.organizationData.allDashboardData[dashboardId] = mockDashboard;
+      (dashboardService.save as any).mockResolvedValue({ data: { success: true } });
 
       await getDashboard(mockStore, dashboardId, "test-folder");
 
@@ -862,9 +854,7 @@ describe("Commons Utility Functions", () => {
                     query:
                       'SELECT histogram(event_time) AS "event_time" FROM "x" GROUP BY event_time',
                     fields: {
-                      x: [
-                        { alias: "event_time", column: "event_time", isDerived: false },
-                      ],
+                      x: [{ alias: "event_time", column: "event_time", isDerived: false }],
                     },
                   },
                 ],
@@ -874,8 +864,7 @@ describe("Commons Utility Functions", () => {
         ],
       };
 
-      mockStore.state.organizationData.allDashboardData[dashboardId] =
-        mockDashboard;
+      mockStore.state.organizationData.allDashboardData[dashboardId] = mockDashboard;
       (dashboardService.save as any).mockResolvedValue({
         data: { success: true },
       });
