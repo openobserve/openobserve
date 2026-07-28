@@ -48,6 +48,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         (row: any, evt: MouseEvent) => $emit('row-click', evt ?? null, row, sortedRows.indexOf(row))
       "
     >
+      <!-- JSON field inline renderer — the "Render Data as JSON / Array" field
+           option. Registered as a per-column cell slot so the flagged column
+           renders the raw accessor value as formatted JSON instead of the
+           default text cell (the pre-OTable table did the same with a v-if on
+           the cell). -->
+      <template
+        v-for="col in jsonFieldColumns"
+        :key="`json-cell-${col.id}`"
+        #[`cell-${col.id}`]="{ value }"
+      >
+        <JsonFieldRenderer :value="value" />
+      </template>
+
       <!-- PanelSchemaRenderer excludes `table` panels from its own OEmptyState,
            so mirror the chart panels' "No Data" treatment here. -->
       <template #empty>
@@ -97,6 +110,7 @@ import { useI18n } from "vue-i18n";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import TablePaginationControls from "@/components/dashboards/addPanel/TablePaginationControls.vue";
+import JsonFieldRenderer from "@/components/dashboards/panels/JsonFieldRenderer.vue";
 import { TABLE_ROWS_PER_PAGE_DEFAULT_VALUE } from "@/utils/dashboard/constants";
 import { getColorForTable } from "@/utils/dashboard/colorPalette";
 import { isColorDark } from "@/utils/dashboard/chartColorUtils";
@@ -109,6 +123,7 @@ export default defineComponent({
     OTable,
     OEmptyState,
     TablePaginationControls,
+    JsonFieldRenderer,
   },
   props: {
     data: {
@@ -195,6 +210,13 @@ export default defineComponent({
       (tableColumns.value as any[]).filter((c: any) => c._isRowField),
     );
 
+    // Columns the user flagged with "Render Data as JSON / Array"
+    // (convertTableData stamps `showFieldAsJson` from the field option). Each
+    // gets a `#cell-<id>` slot bound to JsonFieldRenderer.
+    const jsonFieldColumns = computed(() =>
+      (otableColumns.value as any[]).filter((c: any) => c.showFieldAsJson),
+    );
+
     /**
      * Computes the inline style for a given TanStack cell.
      * Handles auto-color mode (stable palette per distinct value) and
@@ -226,11 +248,15 @@ export default defineComponent({
       }
     };
 
-    // Look up the original pivot column config by its OTable column id (col.name).
+    // Look up the original column config by its OTable column id. The key MUST
+    // be built with the same `field ?? name` expression `otableColumns` uses for
+    // `id`: on SQL panels `name` is the display label while `field` is the data
+    // key, so keying on `name` missed every renamed column — silently dropping
+    // its mono font, auto-colour, value-mapping and conditional-colour styles.
     const colById = computed(() => {
       const m = new Map<string, any>();
       for (const c of (tableColumns.value as any[]) || []) {
-        m.set(c.name ?? c.field, c);
+        m.set(c.field ?? c.name, c);
       }
       return m;
     });
@@ -399,6 +425,7 @@ export default defineComponent({
       tableColumns,
       otableColumns,
       pivotRowColumns,
+      jsonFieldColumns,
       cellStyleFn,
       effectivePageSize,
       isPivot,
