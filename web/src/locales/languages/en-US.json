@@ -918,6 +918,7 @@
   },
   "rum": {
     "noSessionReplay": "No session replay available",
+    "loadingSessionReplay": "Loading session replay…",
     "seek": "Seek",
     "playbackSpeed": "Playback speed",
     "title": "Real User Monitoring",
