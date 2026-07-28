@@ -2184,6 +2184,16 @@ export default defineComponent({
       }
     };
     const calculateDateRange = () => {
+      // When retention is unset/unlimited (dataRetentionDays <= 0), there is no
+      // meaningful earliest-selectable date to derive: `- (0 - 1)` would push
+      // currentDate to tomorrow, putting minDate after the calendar's maxDate
+      // (today) and breaking the picker. Leave minDate null so DateTime's own
+      // calendarMinDate fallback ("1999/01/01") applies instead.
+      if (dataRetentionDays.value <= 0) {
+        minDate.value = null;
+        return;
+      }
+
       const today = new Date();
       const currentDate = new Date(today);
       currentDate.setDate(today.getDate() - (dataRetentionDays.value - 1)); // Adjust to the desired number of days (dataRetentionDays of  days in this case)

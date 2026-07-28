@@ -541,6 +541,15 @@ describe("Schema Component Tests", () => {
       expect(wrapper.vm.minDate).toBeDefined();
     });
 
+    // Test 25b: calculateDateRange with unlimited/unset retention (0) must not
+    // push minDate past today, which would break the Extended Retention
+    // calendar (min > max).
+    it("should leave minDate null when data retention is unset (0)", () => {
+      wrapper.vm.dataRetentionDays = 0;
+      wrapper.vm.calculateDateRange();
+      expect(wrapper.vm.minDate).toBeNull();
+    });
+
     // Test 26: openPatternAssociationDialog function
     it("should open pattern association dialog", () => {
       wrapper.vm.patternAssociations = {
