@@ -687,6 +687,15 @@ pub struct StepSettle {
     /// ("normally ~2s, today 40s") — never as a timeout.
     #[serde(default)]
     pub observed_duration_ms: Option<u64>,
+    /// How long this step may spend settling. `None` means the runner's default
+    /// (30s).
+    ///
+    /// This is where a retired hard sleep goes when a journey is lifted
+    /// (P3.4.3): `wait 30000` becomes a 30s settle budget on the step BEFORE it,
+    /// so the author's intent — "this step needs longer than usual" — survives
+    /// while the unconditional sleep does not.
+    #[serde(default)]
+    pub budget_ms: Option<u32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -942,6 +951,35 @@ const V2_ELEMENT_ACTIONS: &[&str] = &[
     "click", "fill", "press", "select", "check", "uncheck", "upload", "assert",
 ];
 
+/// Actions retired from the vocabulary (spec X-9, Q-10 / D-6).
+///
+/// A stored v1 monitor containing one keeps EXECUTING — validation runs on
+/// create and update, never on read — but it cannot be saved again until it is
+/// migrated. Rejecting on write while accepting on read is what lets the
+/// retirement land without a flag day, and what stops an author unknowingly
+/// re-saving a journey whose sleeps are the reason it is flaky.
+const RETIRED_STEP_ACTIONS: &[&str] = &["hover", "scroll", "wait", "waitFor", "screenshot"];
+
+/// The closed set of assertion kinds (spec P5.1).
+///
+/// Closed on purpose: the probe fails an unknown kind rather than passing it, so
+/// a typo caught here is an error at save time instead of every run failing —
+/// the same reasoning as the HTTP assertion field/operator sets above.
+const V2_ASSERTION_KINDS: &[&str] = &[
+    "element_visible",
+    "element_not_visible",
+    "element_text",
+    "url_matches",
+    "page_title",
+    "element_attribute",
+];
+
+/// Kinds that ask "is it there?" and so have nothing to compare against.
+const V2_VISIBILITY_ASSERTION_KINDS: &[&str] = &["element_visible", "element_not_visible"];
+
+/// Kinds that describe the page rather than an element, and so need no locator.
+const V2_PAGE_LEVEL_ASSERTION_KINDS: &[&str] = &["url_matches", "page_title"];
+
 const MAX_STEPS: usize = 50;
 const MAX_STEPS_JSON_BYTES: usize = 100_000;
 /// v2 steps carry up to 5 locator candidates and 5 settle patterns each, roughly
@@ -1005,7 +1043,61 @@ fn location_allowed(loc: &str, allowed: &[String]) -> bool {
             && allowed.iter().any(|a| a == &format!("aws-{loc}"))
 }
 
+/// A save-time warning: the monitor is accepted, but something about it is worth
+/// telling the author.
+///
+/// Separate from the `Err(String)` channel on purpose. A zero-assertion journey
+/// is legitimate — a monitor that only navigates still proves the site answers —
+/// so refusing it would be wrong; but it can also click its way through a broken
+/// application and pass, which is worth saying out loud (P5.2.4).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SyntheticWarningCode {
+    NoAssertions,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SyntheticWarning {
+    pub code: SyntheticWarningCode,
+    /// Machine-readable code plus prose, so a UI can key off one and show the
+    /// other without re-deriving the wording.
+    pub message: String,
+}
+
 impl Synthetic {
+    /// Non-blocking problems worth surfacing when a monitor is saved.
+    ///
+    /// Deliberately not part of `validate`: everything here is accepted. A caller
+    /// that ignores this returns exactly the behaviour it had before.
+    pub fn warnings(&self) -> Vec<SyntheticWarning> {
+        let mut warnings = Vec::new();
+
+        if self.monitor_type == SyntheticType::Browser {
+            let has_assertion = self
+                .config
+                .get("steps")
+                .and_then(|s| s.as_array())
+                .is_some_and(|steps| {
+                    steps.iter().any(|step| {
+                        step.get("action").and_then(|a| a.as_str()) == Some("assert")
+                    })
+                });
+            if !has_assertion {
+                warnings.push(SyntheticWarning {
+                    code: SyntheticWarningCode::NoAssertions,
+                    message: "This journey contains no assertions, so it verifies that the steps \
+                              can be performed but not that the application is working. A journey \
+                              with no assertion can click its way through a broken page and still \
+                              pass. Add at least one assertion — for example that a \
+                              post-login element is visible."
+                        .to_string(),
+                });
+            }
+        }
+
+        warnings
+    }
+
     /// Validates a create/update payload. `allowed_*` come from the deployment's
     /// synthetics capabilities. Empty `allowed_browsers`/`allowed_devices` skip
     /// the corresponding membership check; an empty `allowed_locations` REJECTS
@@ -1314,6 +1406,80 @@ impl Synthetic {
 /// schema does not know — is refused here. That is what closes the
 /// arbitrary-JavaScript path at the schema level rather than relying on the
 /// runner to ignore it.
+/// Validate one typed assertion (spec P5.1.1–P5.1.3).
+///
+/// Follows the shape the HTTP assertions already use: a closed kind set, the
+/// values each kind actually needs, and errors naming both the step index and
+/// the known set — so a typo cannot silently pass forever.
+fn validate_v2_assertion(i: usize, assertion: &StepAssertion) -> Result<(), String> {
+    if !V2_ASSERTION_KINDS.contains(&assertion.kind.as_str()) {
+        return Err(format!(
+            "config.steps[{i}].assertion.kind: unknown kind '{}' (known: {})",
+            assertion.kind,
+            V2_ASSERTION_KINDS.join(", ")
+        ));
+    }
+
+    // The visibility kinds ask "is it there?" — there is nothing to compare.
+    if !V2_VISIBILITY_ASSERTION_KINDS.contains(&assertion.kind.as_str()) {
+        let expected = assertion.expected.as_deref().unwrap_or("");
+        if expected.is_empty() {
+            return Err(format!(
+                "config.steps[{i}].assertion: kind '{}' requires a non-empty 'expected'",
+                assertion.kind
+            ));
+        }
+    }
+
+    if assertion.kind == "element_attribute"
+        && assertion
+            .attribute
+            .as_deref()
+            .unwrap_or("")
+            .trim()
+            .is_empty()
+    {
+        return Err(format!(
+            "config.steps[{i}].assertion: kind 'element_attribute' requires an 'attribute' name"
+        ));
+    }
+
+    Ok(())
+}
+
+/// Reject the retired actions on a v1 create or update (Q-10.a).
+///
+/// The error names every offending index and action rather than the first,
+/// because an author fixing them one round-trip at a time is exactly the
+/// friction that makes people give up and leave the sleeps in.
+fn reject_retired_v1_actions(steps: &[serde_json::Value]) -> Result<(), String> {
+    let offenders: Vec<String> = steps
+        .iter()
+        .enumerate()
+        .filter_map(|(i, step)| {
+            let action = step.get("action").and_then(|v| v.as_str())?;
+            RETIRED_STEP_ACTIONS
+                .contains(&action)
+                .then(|| format!("{} ({action})", i + 1))
+        })
+        .collect();
+
+    if offenders.is_empty() {
+        return Ok(());
+    }
+
+    Err(format!(
+        "config.steps: step {} use actions that have been retired ({}). None of them can be \
+         replayed — they have no counterpart in the recorder's action model — and a hard sleep is \
+         the single largest source of the flakiness this schema exists to remove. Upgrade this \
+         journey to steps_version 2, which converts each sleep into a settle budget on the \
+         preceding step and drops the unreplayable steps. Existing runs are unaffected until you \
+         save.",
+        offenders.join(", "),
+        RETIRED_STEP_ACTIONS.join(", ")
+    ))
+}
+
 fn validate_v2_steps(steps: &[serde_json::Value]) -> Result<(), String> {
     let mut seen_ids = std::collections::HashSet::new();
 
@@ -1357,7 +1523,34 @@ fn validate_v2_steps(steps: &[serde_json::Value]) -> Result<(), String> {
             validate_http_url(&format!("config.steps[{i}].url"), url)?;
         }
 
-        if V2_ELEMENT_ACTIONS.contains(&step.action.as_str()) {
+        // P5.1.4 — an assertion is what an `assert` step IS, and is meaningless
+        // on any other action. Allowing it elsewhere would create a second,
+        // invisible place for a journey to state an expectation.
+        if step.action == "assert" {
+            let assertion = step.assertion.as_ref().ok_or_else(|| {
+                format!(
+                    "config.steps[{i}]: 'assert' step requires an 'assertion' (kinds: {})",
+                    V2_ASSERTION_KINDS.join(", ")
+                )
+            })?;
+            validate_v2_assertion(i, assertion)?;
+        } else if step.assertion.is_some() {
+            return Err(format!(
+                "config.steps[{i}]: 'assertion' is only valid on an 'assert' step, not on '{}'",
+                step.action
+            ));
+        }
+
+        // A page-level assertion is about the address bar or the document title,
+        // so requiring an element would make it depend on something unrelated
+        // still being on screen.
+        let needs_locator = V2_ELEMENT_ACTIONS.contains(&step.action.as_str())
+            && !step
+                .assertion
+                .as_ref()
+                .is_some_and(|a| V2_PAGE_LEVEL_ASSERTION_KINDS.contains(&a.kind.as_str()));
+
+        if needs_locator {
             let locator = step.locator.as_ref().ok_or_else(|| {
                 format!("config.steps[{i}]: '{}' step requires a 'locator'", step.action)
             })?;
@@ -1381,13 +1574,20 @@ fn validate_v2_steps(steps: &[serde_json::Value]) -> Result<(), String> {
             ));
         }
 
-        if let Some(settle) = &step.settle
-            && settle.responses.len() > MAX_SETTLE_RESPONSES
-        {
-            return Err(format!(
-                "config.steps[{i}].settle.responses: too many ({} > {MAX_SETTLE_RESPONSES})",
-                settle.responses.len()
-            ));
+        if let Some(settle) = &step.settle {
+            if settle.responses.len() > MAX_SETTLE_RESPONSES {
+                return Err(format!(
+                    "config.steps[{i}].settle.responses: too many ({} > {MAX_SETTLE_RESPONSES})",
+                    settle.responses.len()
+                ));
+            }
+            if let Some(budget) = settle.budget_ms
+                && !(100..=60_000).contains(&budget)
+            {
+                return Err(format!(
+                    "config.steps[{i}].settle.budget_ms: must be 100..=60000, got {budget}"
+                ));
+            }
         }
 
         if let Some(timeout) = step.timeout_ms
@@ -1470,6 +1670,10 @@ fn validate_browser_config(
             allowed_devices,
         );
     }
+
+    // Q-10 / D-6: retired actions are refused on write while stored monitors
+    // carrying them keep executing on read.
+    reject_retired_v1_actions(&cfg.steps)?;
 
     let mut seen_ids = std::collections::HashSet::new();
     for (i, step) in cfg.steps.iter().enumerate() {
@@ -2013,16 +2217,206 @@ mod tests {
     }
 
     #[test]
-    fn test_v1_still_accepts_retired_actions_on_read() {
-        // Q-10 / D-6: stored monitors keep EXECUTING these. Only create/update
-        // rejects them, which is enforced separately — validation of a v1 shape
-        // must not start failing for monitors that already exist.
+    fn test_v1_rejects_retired_actions_on_write_naming_every_offender() {
+        // Q-10.a: the error names EVERY offending step index and action, not the
+        // first — fixing them one round-trip at a time is the friction that makes
+        // authors give up and leave the sleeps in.
         let (locs, brs, devs) = allowed();
         let mut s = valid_browser_synthetic();
         s.config["steps"] = serde_json::json!([
             { "id": "s1", "action": "navigate", "url": "https://example.com" },
-            { "id": "s2", "action": "wait", "timeout_ms": 30000 }
+            { "id": "s2", "action": "wait", "timeout_ms": 30000 },
+            { "id": "s3", "action": "click", "selector": "#go" },
+            { "id": "s4", "action": "hover", "selector": "#menu" }
         ]);
+        let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
+        assert!(err.contains("2 (wait)"), "{err}");
+        assert!(err.contains("4 (hover)"), "{err}");
+        assert!(!err.contains("3 ("), "the healthy click must not be named: {err}");
+        // Q-10.b: the remedy is offered in the message, not left to be guessed.
+        assert!(err.contains("steps_version 2"), "{err}");
+    }
+
+    #[test]
+    fn test_v1_retired_actions_still_deserialize_so_stored_monitors_keep_running() {
+        // D-6: rejection is a WRITE-path rule. Nothing calls `validate` when a
+        // monitor is loaded to be executed, and a stored journey carrying a
+        // legacy `wait` must keep running until its author migrates it.
+        let cfg: BrowserConfig = serde_json::from_value(serde_json::json!({
+            "steps": [
+                { "id": "s1", "action": "navigate", "url": "https://example.com" },
+                { "id": "s2", "action": "wait", "timeout_ms": 30000 }
+            ]
+        }))
+        .expect("a stored v1 config with a retired action must still load");
+        assert_eq!(cfg.steps.len(), 2);
+        assert_eq!(cfg.steps[1]["action"], "wait");
+        assert_eq!(cfg.steps_version, 1);
+    }
+
+    fn v2_assert_step(assertion: serde_json::Value) -> serde_json::Value {
+        serde_json::json!({
+            "id": "s3",
+            "action": "assert",
+            "name": "Profile visible",
+            "locator": {
+                "candidates": [
+                    { "kind": "test_attribute", "value": "[data-test=\"header-my-account-profile-icon\"]" }
+                ]
+            },
+            "assertion": assertion
+        })
+    }
+
+    // ── Phase 5 — typed assertions (T5-1…T5-4) ──────────────────────────────
+
+    #[test]
+    fn test_v2_every_assertion_kind_is_accepted() {
+        let (locs, brs, devs) = allowed();
+        for kind in V2_ASSERTION_KINDS {
+            let mut assertion = serde_json::json!({ "kind": kind });
+            if !V2_VISIBILITY_ASSERTION_KINDS.contains(kind) {
+                assertion["expected"] = serde_json::json!("something");
+            }
+            if *kind == "element_attribute" {
+                assertion["attribute"] = serde_json::json!("href");
+            }
+            let s = v2_synthetic(serde_json::json!([
+                v2_nav_step(),
+                v2_click_step(),
+                v2_assert_step(assertion)
+            ]));
+            assert!(
+                s.validate(&locs, &brs, &devs, true).is_ok(),
+                "kind '{kind}' must be accepted: {:?}",
+                s.validate(&locs, &brs, &devs, true)
+            );
+        }
+    }
+
+    #[test]
+    fn test_v2_unknown_assertion_kind_is_rejected_naming_the_known_set() {
+        let (locs, brs, devs) = allowed();
+        let s = v2_synthetic(serde_json::json!([
+            v2_nav_step(),
+            v2_assert_step(serde_json::json!({ "kind": "element_vissible" }))
+        ]));
+        let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
+        assert!(err.contains("element_vissible"), "{err}");
+        assert!(err.contains("element_visible"), "the known set must be listed: {err}");
+        assert!(err.contains("steps[1]"), "the index must be named: {err}");
+    }
+
+    #[test]
+    fn test_v2_expected_is_required_except_for_the_visibility_kinds() {
+        let (locs, brs, devs) = allowed();
+        for kind in ["element_text", "url_matches", "page_title"] {
+            let s = v2_synthetic(serde_json::json!([
+                v2_nav_step(),
+                v2_assert_step(serde_json::json!({ "kind": kind }))
+            ]));
+            let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
+            assert!(err.contains("expected"), "kind '{kind}': {err}");
+        }
+        // …and an empty string is not a value.
+        let s = v2_synthetic(serde_json::json!([
+            v2_nav_step(),
+            v2_assert_step(serde_json::json!({ "kind": "element_text", "expected": "" }))
+        ]));
+        assert!(s.validate(&locs, &brs, &devs, true).is_err());
+    }
+
+    #[test]
+    fn test_v2_element_attribute_requires_an_attribute_name() {
+        let (locs, brs, devs) = allowed();
+        let s = v2_synthetic(serde_json::json!([
+            v2_nav_step(),
+            v2_assert_step(serde_json::json!({ "kind": "element_attribute", "expected": "/web/" }))
+        ]));
+        let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
+        assert!(err.contains("attribute"), "{err}");
+    }
+
+    #[test]
+    fn test_v2_assertion_is_required_on_assert_and_forbidden_elsewhere() {
+        let (locs, brs, devs) = allowed();
+
+        let mut bare = v2_assert_step(serde_json::json!({ "kind": "element_visible" }));
+        bare.as_object_mut().unwrap().remove("assertion");
+        let s = v2_synthetic(serde_json::json!([v2_nav_step(), bare]));
+        let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
+        assert!(err.contains("requires an 'assertion'"), "{err}");
+
+        let mut click = v2_click_step();
+        click["assertion"] = serde_json::json!({ "kind": "element_visible" });
+        let s = v2_synthetic(serde_json::json!([v2_nav_step(), click]));
+        let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
+        assert!(err.contains("only valid on an 'assert' step"), "{err}");
+    }
+
+    #[test]
+    fn test_v2_page_level_assertions_need_no_locator() {
+        // A statement about the address bar must not depend on some unrelated
+        // element still being on screen.
+        let (locs, brs, devs) = allowed();
+        let step = serde_json::json!({
+            "id": "s3",
+            "action": "assert",
+            "assertion": { "kind": "url_matches", "expected": "**/web/**" }
+        });
+        let s = v2_synthetic(serde_json::json!([v2_nav_step(), v2_click_step(), step]));
+        assert!(s.validate(&locs, &brs, &devs, true).is_ok());
+    }
+
+    #[test]
+    fn test_a_zero_assertion_journey_is_accepted_with_a_machine_readable_warning() {
+        // P5.2.4 — accepted, not refused: a monitor that only navigates still
+        // proves the site answers. The warning is what stops it being mistaken
+        // for a monitor that checks something.
+        let (locs, brs, devs) = allowed();
+        let s = v2_synthetic(serde_json::json!([v2_nav_step(), v2_click_step()]));
+        assert!(s.validate(&locs, &brs, &devs, true).is_ok());
+        let warnings = s.warnings();
+        assert_eq!(warnings.len(), 1);
+        assert_eq!(warnings[0].code, SyntheticWarningCode::NoAssertions);
+
+        let with_assert = v2_synthetic(serde_json::json!([
+            v2_nav_step(),
+            v2_click_step(),
+            v2_assert_step(serde_json::json!({ "kind": "element_visible" }))
+        ]));
+        assert!(with_assert.warnings().is_empty());
+    }
+
+    // ── Phase 3 — settle budget (T3-6's storage side) ───────────────────────
+
+    #[test]
+    fn test_v2_settle_budget_is_range_checked() {
+        let (locs, brs, devs) = allowed();
+        let mut step = v2_click_step();
+        step["settle"] = serde_json::json!({ "budget_ms": 30000 });
+        let s = v2_synthetic(serde_json::json!([v2_nav_step(), step.clone()]));
+        assert!(s.validate(&locs, &brs, &devs, true).is_ok());
+
+        step["settle"] = serde_json::json!({ "budget_ms": 90000 });
+        let s = v2_synthetic(serde_json::json!([v2_nav_step(), step]));
+        let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
+        assert!(err.contains("settle.budget_ms"), "{err}");
+    }
+
+    #[test]
+    fn test_v2_settle_navigation_and_responses_round_trip() {
+        let (locs, brs, devs) = allowed();
+        let mut step = v2_click_step();
+        step["settle"] = serde_json::json!({
+            "navigation": { "url_pattern": "**/web/**" },
+            "responses": [
+                { "url_pattern": "**/auth/login", "method": "POST", "required": false }
+            ],
+            "observed_duration_ms": 1800,
+            "budget_ms": 30000
+        });
+        let s = v2_synthetic(serde_json::json!([v2_nav_step(), step]));
         assert!(s.validate(&locs, &brs, &devs, true).is_ok());
     }
 
