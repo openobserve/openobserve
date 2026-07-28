@@ -2090,7 +2090,6 @@
     "search": "Search Workflows",
     "refresh": "Refresh Workflows",
     "trigger": "Trigger",
-    "triggerAlertFired": "Alert Fired",
     "steps": "Steps",
     "status": "Status",
     "updated": "Updated",
@@ -2142,13 +2141,21 @@
       "cta": "Create Workflow",
       "soonCta": "Available In A Future Release",
       "comingSoon": "Coming Soon",
-      "soon": "Soon",
-      "alertFired": "Alert Fired",
-      "alertFiredDesc": "Run When An Alert Fires",
-      "schedule": "Schedule",
-      "scheduleDesc": "Run On A Schedule",
-      "webhook": "Webhook",
-      "webhookDesc": "Run On An Incoming Webhook"
+      "soon": "Soon"
+    },
+    "triggerKind": {
+      "alertFired": {
+        "label": "Alert Fired",
+        "node": "Alert Trigger",
+        "desc": "Run when an alert fires",
+        "intro": "When a linked alert fires, every downstream step receives this payload."
+      },
+      "incidentEvent": {
+        "label": "Incident Event",
+        "node": "Incident Trigger",
+        "desc": "Run on an incident lifecycle event",
+        "intro": "When an incident event occurs, every downstream step receives this payload."
+      }
     },
     "triggerMeta": {
       "orgId": "Organization ID the alert belongs to.",
@@ -2236,7 +2243,6 @@
       "kindTrigger": "Trigger",
       "kindLogic": "Logic",
       "kindAction": "Action",
-      "alertTrigger": "Alert Trigger",
       "condition": "Condition",
       "function": "Function",
       "sendToDestination": "Destination",
@@ -2261,7 +2267,6 @@
       "triggerAlertsNone": "No Alerts Found In This Organization.",
       "triggerAlertsError": "Unable To Load Alerts",
       "triggerNote": "This Workflow Runs When Any Of The Selected Alerts Fires.",
-      "triggerPayloadIntro": "When a linked alert fires, every downstream step receives this payload.",
       "triggerStructureTitle": "Payload Structure",
       "triggerStructureHint": "Hover A Field For Details",
       "triggerDetailHint": "Hover Or Focus A Field Above To See Its Type And Meaning.",
@@ -2270,6 +2275,10 @@
       "triggerDataBlock": "data[] · Your Alert's Rows",
       "triggerDataColumns": "Result Columns",
       "triggerDataExampleNote": "Example only — the actual columns come from your alert's query.",
+      "incidentEventTypeLabel": "Event Type",
+      "incidentCommonTitle": "Common Fields (Every Event)",
+      "incidentSpecificTitle": "Event-Specific Fields",
+      "incidentNoExtraFields": "This event adds no fields beyond the common ones.",
       "triggerDataBlockNote": "An array with one object per matched record. Its columns come from the alert's own query, so they differ by alert — reference them as data[].<column>.",
       "conditionBody": "Set A Rule To Branch On",
       "conditionBodySet": "Branches On A Rule",

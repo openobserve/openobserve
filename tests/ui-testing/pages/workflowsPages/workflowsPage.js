@@ -57,7 +57,9 @@ class WorkflowsPage {
     // Empty-canvas start node -> trigger picker. The editor no longer pre-places
     // an Alert Trigger on create, so a workflow now BEGINS by choosing one here.
     this.startNode = '[data-test="workflow-flow-start-node"]';
-    this.stepTrigger = '[data-test="workflow-step-workflow_trigger"]';
+    // Trigger-picker items are keyed by TRIGGER KIND (alert_fired, incident_event) —
+    // the picker offers one row per enabled kind (all of node_type workflow_trigger).
+    this.stepTriggerFor = (kind = 'alert_fired') => `[data-test="workflow-step-${kind}"]`;
     // Step picker dialog (source-handle path); options keyed by node_type
     this.stepCondition = '[data-test="workflow-step-condition"]';
     this.stepFunction = '[data-test="workflow-step-function"]';
@@ -110,9 +112,9 @@ class WorkflowsPage {
    * (`?trigger=` is gone; the canvas starts empty and asks via the start node.)
    * Use `goToAddEmpty()` when a spec needs the untouched empty canvas.
    */
-  async goToAdd() {
+  async goToAdd(kind = 'alert_fired') {
     await this.goToAddEmpty();
-    await this.chooseTrigger();
+    await this.chooseTrigger(kind);
   }
 
   async goToAddEmpty() {
@@ -122,12 +124,13 @@ class WorkflowsPage {
   }
 
   /**
-   * Empty canvas -> start node -> trigger picker -> Alert Trigger. The trigger's
+   * Empty canvas -> start node -> trigger picker -> pick a kind (default
+   * alert_fired; pass 'incident_event' for the incident lifecycle). The trigger's
    * panel is a read-only payload reference, so it is dismissed, not saved.
    */
-  async chooseTrigger() {
+  async chooseTrigger(kind = 'alert_fired') {
     await this.page.locator(this.startNode).click({ timeout: DRAWER_TIMEOUT_MS });
-    await this.page.locator(this.stepTrigger).click({ timeout: DRAWER_TIMEOUT_MS });
+    await this.page.locator(this.stepTriggerFor(kind)).click({ timeout: DRAWER_TIMEOUT_MS });
     await this.page.locator(this.triggerNode).waitFor({ state: 'visible', timeout: DRAWER_TIMEOUT_MS });
     await this.closeOpenDrawer();
   }
