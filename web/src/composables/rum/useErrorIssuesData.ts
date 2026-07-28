@@ -70,6 +70,11 @@ export interface FetchIssuesParams {
   service: string;
 }
 
+// Aborting a superseded/unmounted run rejects its in-flight requests. Those are OUR
+// cancellations, not failures, so they must not raise an error toast or squiggle.
+const isAbortError = (err: any): boolean =>
+  err?.code === "ERR_CANCELED" || err?.name === "CanceledError" || err?.name === "AbortError";
+
 const useErrorIssuesData = () => {
   const store = useStore();
   const { getTimeInterval, buildQueryPayload } = useQuery();
@@ -201,6 +206,24 @@ const useErrorIssuesData = () => {
     trendQueue.shift()?.();
   };
 
+  // Trend sparklines are the lowest-priority searches on the page — one per visible row,
+  // fired lazily as rows scroll into view. They are held behind this gate while a load's
+  // issues list and window aggregates are in flight, so they never compete with those for
+  // the server's 4 work-group slots (the same staging the sessions activity sparklines
+  // use). The current load releases the gate once its aggregates settle.
+  let trendGate: Promise<void> = Promise.resolve();
+  let releaseTrendGateFn: (() => void) | null = null;
+  const holdTrendQueries = () => {
+    if (releaseTrendGateFn) return;
+    trendGate = new Promise((resolve) => {
+      releaseTrendGateFn = resolve;
+    });
+  };
+  const releaseTrendQueries = () => {
+    releaseTrendGateFn?.();
+    releaseTrendGateFn = null;
+  };
+
   /**
    * Fetch the histogram for one issue's sparkline. `trendBuckets[key]`
    * stays absent until resolution (cell shows a skeleton), then holds the
@@ -224,12 +247,17 @@ const useErrorIssuesData = () => {
       return Promise.resolve();
     }
 
-    const request = acquireTrendSlot()
-      .then(() => {
-        if (currentRun !== runId || trendSignal.aborted) return [];
-        return runSearch(sql, params, 2000, undefined, trendSignal);
-      })
-      .then((hits) => {
+    const request = (async () => {
+      // Wait behind this load's issues list + window aggregates before taking a slot, so
+      // the rows that render after stage 1 don't fire their trend queries on top of the
+      // aggregate fan-out and blow past the work-group limit.
+      await trendGate;
+      // Superseded or unmounted before a slot was even taken — nothing to release.
+      if (currentRun !== runId || trendSignal.aborted) return;
+      await acquireTrendSlot();
+      try {
+        if (currentRun !== runId || trendSignal.aborted) return;
+        const hits = await runSearch(sql, params, 2000, undefined, trendSignal);
         if (currentRun !== runId) return;
         const pivoted = pivotTrends(hits, params.startTime, params.endTime, intervalMicros);
         // A message shared by several signatures resolves siblings too.
@@ -238,18 +266,48 @@ const useErrorIssuesData = () => {
           [key]: pivoted[key] ?? [],
           ...pivoted,
         };
-      })
-      .catch(() => {
+      } catch {
         if (currentRun === runId) {
           trendBuckets.value = { ...trendBuckets.value, [key]: [] };
         }
-      })
-      .finally(() => {
+      } finally {
         releaseTrendSlot();
-        trendInFlight.delete(key);
-      });
+      }
+    })().finally(() => {
+      trendInFlight.delete(key);
+    });
     trendInFlight.set(key, request);
     return request;
+  };
+
+  // Shape a raw issues hit into an ErrorIssue. deployTs may be null on first paint (the
+  // deploy query lands in stage 2); computeIssueStatus falls back to a window heuristic.
+  const mapIssue = (
+    hit: any,
+    deployTs: number | null,
+    params: FetchIssuesParams,
+  ): ErrorIssue => ({
+    ...hit,
+    events: Number(hit.events) || 0,
+    users_affected:
+      hit.users_affected !== undefined ? Number(hit.users_affected) || 0 : undefined,
+    status: computeIssueStatus(
+      Number(hit.first_seen) || 0,
+      deployTs,
+      params.startTime,
+      params.endTime,
+    ),
+  });
+
+  // Zero the above-the-table state (chart, KPI cards, deploy marker) without querying —
+  // used when the list is empty or failed, so no follow-up searches are spent.
+  const clearAggregates = () => {
+    chartSeries.value = [];
+    latestDeploy.value = null;
+    errorTotals.value = { totalErrors: 0, errorSessions: 0, usersAffected: 0 };
+    denominators.value = { totalSessions: 0, totalUsers: 0 };
+    isLoadingChart.value = false;
+    isLoadingKpis.value = false;
   };
 
   const fetchAll = async (params: FetchIssuesParams): Promise<void> => {
@@ -277,100 +335,142 @@ const useErrorIssuesData = () => {
     trendContext = { ctx, params, interval, intervalMicros };
     trendInFlight.clear();
 
-    const [issuesR, chartR, kpisR, denomR, deploysR] = await Promise.allSettled([
-      runSearch(buildIssuesSql(ctx), params, ISSUES_LIMIT, undefined, signal),
-      runSearch(buildErrorsHistogramSql(ctx, interval), params, 2000, undefined, signal),
-      runSearch(buildErrorKpisSql(ctx), params, 10, undefined, signal),
-      runSearch(buildDenominatorsSql(ctx), params, 10, undefined, signal),
-      runSearch(buildDeploysSql(ctx), params, 10, undefined, signal),
-    ]);
-    if (currentRun !== runId) return;
+    // Hold the per-row trend sparklines until this load's list + aggregates finish.
+    holdTrendQueries();
 
-    // Deploys resolve before issues: status derivation needs the deploy ts.
-    const deploys: DeployInfo[] =
-      deploysR.status === "fulfilled"
-        ? deploysR.value.map((hit: any) => ({
-            version: String(hit.version),
-            firstSeen: Number(hit.first_seen) || 0,
-          }))
-        : [];
-    let deployCandidate = pickLatestDeploy(
-      deploys,
-      params.startTime,
-      params.endTime,
-      intervalMicros,
-    );
-    // Verify the candidate is genuinely new: MIN(_timestamp) is bounded by
-    // the window, so a long-lived version with sparse traffic can "first
-    // appear" mid-window and fake a deploy. Any events in the equal-length
-    // lookback range before the window disqualify it. Unverifiable (query
-    // error) also hides the marker — a false deploy is worse than none.
-    if (deployCandidate) {
-      const lookbackSpan = params.endTime - params.startTime;
+    try {
+      // ── Stage 1: the issues list ──────────────────────────────────────────────
+      // The search the user actually came for. Everything else (chart, KPI cards, deploy
+      // marker) sits ABOVE the table and only makes sense once there are issues to
+      // describe. Fire it ALONE and wait: firing all five searches at once is 5 concurrent
+      // against a 4-search work-group cap, and the overflow — queued, then cancelled —
+      // comes back as HTTP 429 (ErrorCodes::SearchCancelQuery maps to 429).
+      let issuesHits: any[];
       try {
-        const lookbackHits = await runSearch(
-          buildDeployLookbackSql(ctx, deployCandidate.version),
-          params,
-          10,
-          {
-            startTime: params.startTime - lookbackSpan,
-            endTime: params.startTime - 1,
-          },
-        );
+        issuesHits = await runSearch(buildIssuesSql(ctx), params, ISSUES_LIMIT, undefined, signal);
+      } catch (err) {
         if (currentRun !== runId) return;
-        if (Number(lookbackHits[0]?.prior_events) > 0) deployCandidate = null;
-      } catch {
-        if (currentRun !== runId) return;
-        deployCandidate = null;
+        issues.value = [];
+        lastQueryError.value = (err as any)?.response?.data ?? null;
+        isLoadingIssues.value = false;
+        // A superseded/aborted run is our own cancellation, not a failure — no toast.
+        if (!isAbortError(err)) {
+          toast({
+            message:
+              (err as any)?.response?.data?.message || "Error while fetching error events",
+            variant: "error",
+          });
+        }
+        // No usable list → nothing above the table is worth fetching. Zero it and stop.
+        clearAggregates();
+        return;
       }
-    }
-    latestDeploy.value = deployCandidate;
-    const deployTs = latestDeploy.value?.firstSeen ?? null;
+      if (currentRun !== runId) return;
 
-    if (issuesR.status === "fulfilled") {
       lastQueryError.value = null;
-      issues.value = issuesR.value.map((hit: any) => ({
-        ...hit,
-        events: Number(hit.events) || 0,
-        users_affected:
-          hit.users_affected !== undefined ? Number(hit.users_affected) || 0 : undefined,
-        status: computeIssueStatus(
-          Number(hit.first_seen) || 0,
-          deployTs,
-          params.startTime,
-          params.endTime,
-        ),
-      }));
-    } else {
-      issues.value = [];
-      lastQueryError.value = (issuesR.reason as any)?.response?.data ?? null;
-      toast({
-        message:
-          (issuesR.reason as any)?.response?.data?.message || "Error while fetching error events",
-        variant: "error",
-      });
+      // Render the list immediately with a provisional status (no deploy ts yet); stage 2
+      // refines "new vs ongoing" once the deploy query lands.
+      issues.value = issuesHits.map((hit: any) => mapIssue(hit, null, params));
+      isLoadingIssues.value = false;
+
+      if (issuesHits.length === 0) {
+        // Empty window: the chart, KPI and deploy queries all share this WHERE clause and
+        // range, so they would only confirm zero. Skip them and clear the strip.
+        clearAggregates();
+        return;
+      }
+
+      // ── Stage 2: the above-the-table aggregates ───────────────────────────────
+      // Only reached when the list has rows. Four concurrent searches — at the cap, and
+      // the trend sparklines are still held, so nothing overflows.
+      const [chartR, kpisR, denomR, deploysR] = await Promise.allSettled([
+        runSearch(buildErrorsHistogramSql(ctx, interval), params, 2000, undefined, signal),
+        runSearch(buildErrorKpisSql(ctx), params, 10, undefined, signal),
+        runSearch(buildDenominatorsSql(ctx), params, 10, undefined, signal),
+        runSearch(buildDeploysSql(ctx), params, 10, undefined, signal),
+      ]);
+      if (currentRun !== runId) return;
+
+      const deploys: DeployInfo[] =
+        deploysR.status === "fulfilled"
+          ? deploysR.value.map((hit: any) => ({
+              version: String(hit.version),
+              firstSeen: Number(hit.first_seen) || 0,
+            }))
+          : [];
+      let deployCandidate = pickLatestDeploy(
+        deploys,
+        params.startTime,
+        params.endTime,
+        intervalMicros,
+      );
+      // Verify the candidate is genuinely new: MIN(_timestamp) is bounded by
+      // the window, so a long-lived version with sparse traffic can "first
+      // appear" mid-window and fake a deploy. Any events in the equal-length
+      // lookback range before the window disqualify it. Unverifiable (query
+      // error) also hides the marker — a false deploy is worse than none.
+      if (deployCandidate) {
+        const lookbackSpan = params.endTime - params.startTime;
+        try {
+          const lookbackHits = await runSearch(
+            buildDeployLookbackSql(ctx, deployCandidate.version),
+            params,
+            10,
+            {
+              startTime: params.startTime - lookbackSpan,
+              endTime: params.startTime - 1,
+            },
+            signal,
+          );
+          if (currentRun !== runId) return;
+          if (Number(lookbackHits[0]?.prior_events) > 0) deployCandidate = null;
+        } catch {
+          if (currentRun !== runId) return;
+          deployCandidate = null;
+        }
+      }
+      latestDeploy.value = deployCandidate;
+      const deployTs = latestDeploy.value?.firstSeen ?? null;
+
+      // Deploy ts is known now — re-derive each issue's new/ongoing status.
+      if (deployTs !== null) {
+        issues.value = issues.value.map((issue) => ({
+          ...issue,
+          status: computeIssueStatus(
+            Number(issue.first_seen) || 0,
+            deployTs,
+            params.startTime,
+            params.endTime,
+          ),
+        }));
+      }
+
+      chartSeries.value =
+        chartR.status === "fulfilled"
+          ? pivotStackedHistogram(chartR.value, params.startTime, params.endTime, intervalMicros)
+          : [];
+      isLoadingChart.value = false;
+
+      // KPI queries degrade independently — cards show zeros/absent values.
+      const kpiHit = kpisR.status === "fulfilled" ? kpisR.value[0] : null;
+      errorTotals.value = {
+        totalErrors: Number(kpiHit?.total_errors) || 0,
+        errorSessions: Number(kpiHit?.error_sessions) || 0,
+        usersAffected: Number(kpiHit?.users_affected) || 0,
+      };
+      const denomHit = denomR.status === "fulfilled" ? denomR.value[0] : null;
+      denominators.value = {
+        totalSessions: Number(denomHit?.total_sessions) || 0,
+        totalUsers: Number(denomHit?.total_users) || 0,
+      };
+      isLoadingKpis.value = false;
+    } finally {
+      // Stage 3: release the trend sparklines — but only if THIS load is still current.
+      // holdTrendQueries() is a no-op while the gate is already held, so a superseded load
+      // must not release it: the load that replaced it owns the gate and releases it when
+      // its own stages finish.
+      if (currentRun === runId) releaseTrendQueries();
     }
-    isLoadingIssues.value = false;
-
-    chartSeries.value =
-      chartR.status === "fulfilled"
-        ? pivotStackedHistogram(chartR.value, params.startTime, params.endTime, intervalMicros)
-        : [];
-    isLoadingChart.value = false;
-
-    // KPI queries degrade independently — cards show zeros/absent values.
-    const kpiHit = kpisR.status === "fulfilled" ? kpisR.value[0] : null;
-    errorTotals.value = {
-      totalErrors: Number(kpiHit?.total_errors) || 0,
-      errorSessions: Number(kpiHit?.error_sessions) || 0,
-      usersAffected: Number(kpiHit?.users_affected) || 0,
-    };
-    const denomHit = denomR.status === "fulfilled" ? denomR.value[0] : null;
-    denominators.value = {
-      totalSessions: Number(denomHit?.total_sessions) || 0,
-      totalUsers: Number(denomHit?.total_users) || 0,
-    };
-    isLoadingKpis.value = false;
   };
 
   return {
@@ -395,6 +495,9 @@ const useErrorIssuesData = () => {
       runController.abort();
       runController = new AbortController();
       trendInFlight.clear();
+      // Release the gate so a held-but-abandoned load never leaves future trend fetches
+      // waiting forever on it.
+      releaseTrendQueries();
       isLoadingIssues.value = false;
       isLoadingChart.value = false;
       isLoadingKpis.value = false;
