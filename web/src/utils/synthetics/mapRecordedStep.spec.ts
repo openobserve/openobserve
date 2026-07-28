@@ -3,6 +3,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { BrowserStep, WireStep } from "@/types/synthetics";
 import {
+  applyWireValue,
   buildWireFromStep,
   journeyToWireSteps,
   mapWireStep,
@@ -25,10 +26,19 @@ describe("mapRecordedStep", () => {
       selector: undefined,
       selectorType: undefined,
       value: "https://app.example.com/login",
-      timeout: 10000,
+      // 10000 is the recorder's blanket stamp, not a user choice — dropped so
+      // the step inherits the check-level timeout.
+      timeout: 30000,
       code: "",
-      wire: { ...wire, id: expect.any(String) }, // wire.id is now the step's own UUID
+      wire: { ...wire, id: expect.any(String), timeout_ms: undefined },
     });
+  });
+
+  it("should keep a per-step timeout the author actually set", () => {
+    const wire: WireStep = { id: "s2", action: "click", selector: "#x", timeout_ms: 45000 };
+    const step = mapWireStep(wire);
+    expect(step.timeout).toBe(45000);
+    expect(step.wire?.timeout_ms).toBe(45000);
   });
 
   it("should preserve the original extension step verbatim on wire", () => {
@@ -48,7 +58,36 @@ describe("mapRecordedStep", () => {
       code: "await page.locator('#login-btn').click();",
     };
     // wire is spread with the step's own UUID assigned to wire.id.
-    expect(mapWireStep(wire).wire).toEqual({ ...wire, id: expect.any(String) });
+    expect(mapWireStep(wire).wire).toEqual({
+      ...wire,
+      id: expect.any(String),
+      timeout_ms: undefined,
+    });
+  });
+
+  describe("applyWireValue", () => {
+    it("should write a navigate edit to wire.url, not wire.value", () => {
+      const wire: WireStep = { id: "s1", action: "navigate", url: "https://old.test/" };
+      applyWireValue(wire, "navigate", "https://new.test/");
+      expect(wire.url).toBe("https://new.test/");
+      expect(wire.value).toBeUndefined();
+    });
+
+    it("should write a press edit to wire.key and an assert edit to wire.text", () => {
+      const press: WireStep = { id: "s2", action: "press", key: "Enter" };
+      applyWireValue(press, "press", "Tab");
+      expect(press.key).toBe("Tab");
+
+      const assert: WireStep = { id: "s3", action: "assert", text: "Old" };
+      applyWireValue(assert, "assert", "New");
+      expect(assert.text).toBe("New");
+    });
+
+    it("should write every other action's edit to wire.value", () => {
+      const wire: WireStep = { id: "s4", action: "type", value: "old" };
+      applyWireValue(wire, "type", "new");
+      expect(wire.value).toBe("new");
+    });
   });
 
   describe("buildWireFromStep (reverse mapper for manual steps)", () => {

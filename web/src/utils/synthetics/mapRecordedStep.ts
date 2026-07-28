@@ -39,6 +39,15 @@ const WIRE_SELECTOR_TYPE_MAP: Record<SelectorType, WireStep["selector_type"]> = 
 
 const DEFAULT_TIMEOUT = 30000;
 
+// The recorder extension stamps a blanket 10s onto every step it emits. That is
+// a recorder artefact, not a user choice, but it wins over the check-level
+// `config.timeout_ms` (30s) at run time, so recorded journeys ran with a 10s
+// per-step budget that no config surface ever showed. Measured against the live
+// cloud checks, passing steps sat at p95 ≈ 8.1s — inside a 10s ceiling by under
+// 2s — which turned ordinary load jitter into hard failures.
+// See docs/synthetics-lcl/2026-07-27-design-deterministic-browser-steps.md §3.1.
+const RECORDER_BLANKET_TIMEOUT = 10000;
+
 function mapAction(action: string): StepAction {
   const mapped = ACTION_MAP[action];
   if (!mapped) {
@@ -66,6 +75,9 @@ function mapValue(wire: WireStep, action: StepAction): string | undefined {
 export function mapWireStep(wire: WireStep): BrowserStep {
   const action = mapAction(wire.action);
   const id = getUUIDv7(true);
+  // Drop the recorder's blanket timeout so the step inherits the check-level
+  // budget; a value the user actually typed is kept.
+  const timeout_ms = wire.timeout_ms === RECORDER_BLANKET_TIMEOUT ? undefined : wire.timeout_ms;
   return {
     id: id,
     action,
@@ -73,14 +85,42 @@ export function mapWireStep(wire: WireStep): BrowserStep {
     selector: wire.selector,
     selectorType: wire.selector_type ? SELECTOR_TYPE_MAP[wire.selector_type] : undefined,
     value: mapValue(wire, action),
-    timeout: wire.timeout_ms ?? DEFAULT_TIMEOUT,
+    timeout: timeout_ms ?? DEFAULT_TIMEOUT,
     code: wire.code || "",
     // Keep the original extension step untouched for replay (full fidelity).
     wire: {
       ...wire,
       id,
+      timeout_ms,
     },
   };
+}
+
+/**
+ * Inverse of {@link mapValue}: write the UI's single `value` field back to the
+ * wire field the runner actually reads for that action. Writing it to
+ * `wire.value` unconditionally left `wire.url` (navigate), `wire.key` (press)
+ * and `wire.text` (assert) holding their recorded originals, so those edits
+ * were accepted in the UI and silently discarded at run time.
+ */
+export function applyWireValue(
+  wire: WireStep,
+  action: StepAction,
+  value: string | undefined,
+): void {
+  switch (action) {
+    case "navigate":
+      wire.url = value;
+      break;
+    case "press":
+      wire.key = value;
+      break;
+    case "assert":
+      wire.text = value;
+      break;
+    default:
+      wire.value = value;
+  }
 }
 
 /** Convert a list of extension wire steps into UI steps. */

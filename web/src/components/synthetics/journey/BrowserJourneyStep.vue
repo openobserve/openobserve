@@ -3,6 +3,7 @@
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { copyToClipboard } from "@/utils/clipboard";
+import { applyWireValue } from "@/utils/synthetics/mapRecordedStep";
 import type { BrowserStep, SelectorType, StepReplayResult, WireStep } from "@/types/synthetics";
 import {
   ACTION_ICONS,
@@ -76,7 +77,8 @@ function update(patch: Partial<BrowserStep>) {
     if (patch.selector !== undefined) wire.selector = patch.selector;
     if (patch.selectorType !== undefined)
       wire.selector_type = patch.selectorType.toLowerCase() as WireStep["selector_type"];
-    if (patch.value !== undefined) wire.value = patch.value;
+    if (patch.value !== undefined)
+      applyWireValue(wire, patch.action ?? props.step.action, patch.value);
     if (patch.timeout !== undefined) wire.timeout_ms = patch.timeout;
     if (patch.action !== undefined) wire = undefined; // action changed — wire metadata is no longer accurate
   }

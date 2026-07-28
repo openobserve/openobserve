@@ -5,6 +5,7 @@ import { useI18n } from "vue-i18n";
 import type { BrowserStep, ReplayPhase, StepReplayResult, WireStep } from "@/types/synthetics";
 import type { StepDotState } from "./JourneySteps.vue";
 import useSyntheticsRecorder from "@/composables/useSyntheticsRecorder";
+import { applyWireValue } from "@/utils/synthetics/mapRecordedStep";
 import { getUUIDv7 } from "@/utils/zincutils";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -478,7 +479,8 @@ function handleStepUpdate(row: BrowserStep, patch: Partial<BrowserStep>) {
     if (patch.selector !== undefined) wire.selector = patch.selector;
     if (patch.selectorType !== undefined)
       wire.selector_type = patch.selectorType.toLowerCase() as WireStep["selector_type"];
-    if (patch.value !== undefined) wire.value = patch.value;
+    if (patch.value !== undefined)
+      applyWireValue(wire, patch.action ?? next[idx].action, patch.value);
     if (patch.timeout !== undefined) wire.timeout_ms = patch.timeout;
     if (patch.action !== undefined) wire = undefined; // action changed → wire metadata is no longer accurate
   }
