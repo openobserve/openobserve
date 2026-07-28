@@ -1,5 +1,6 @@
 ﻿<template>
   <OPageLayout
+    v-if="store.state.zoConfig.usage_enabled"
     :title="t('search_history.title')"
     icon="history"
     :back="{ onClick: closeSearchHistory }"
@@ -256,11 +257,33 @@
     </div>
   </OPageLayout>
 
-  <!-- Show NoData component if there's no data to display -->
+  <!-- Search History is backed by usage data; when usage reporting is off there
+       is nothing to show, so guide the user to enable it. -->
+  <div v-else class="rounded-default h-50">
+    <div class="rounded-default flex h-[80vh] items-center justify-center p-3 text-center">
+      <div>
+        <div>
+          <OIcon name="history" class="h-25 w-25 opacity-10" />
+        </div>
+        <div class="text-3xl font-semibold opacity-80">
+          {{ t("logs.index.searchHistoryNotEnabled") }}
+        </div>
+        <div class="mt-2 flex items-center justify-center opacity-80">
+          <OIcon name="info" class="mr-1" size="md" />
+          <span class="text-center text-xl font-semibold">
+            {{ t("logs.index.enableUsageReporting") }}</span
+          >
+        </div>
+        <OButton class="mt-6" variant="outline" size="sm-action" @click="closeSearchHistory">{{
+          t("search.redirect_to_logs_page")
+        }}</OButton>
+      </div>
+    </div>
+  </div>
 </template>
 <script lang="ts">
 //@ts-nocheck
-import { ref, watch, onMounted, computed, onUnmounted } from "vue";
+import { ref, onMounted, computed, onUnmounted } from "vue";
 import { timestampToTimezoneDate, b64EncodeUnicode, getUUID } from "@/utils/zincutils";
 import { useRouter, useRoute } from "vue-router";
 import { useStore } from "vuex";
@@ -269,7 +292,6 @@ import { searchState } from "@/composables/useLogs/searchState";
 import searchService from "@/services/search";
 import DOMPurify from "dompurify";
 import { colorizeQuery } from "@/utils/query/colorizeQuery";
-import NoData from "@/components/shared/grid/NoData.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import DateTime from "@/components/DateTime.vue";
 import { useI18n } from "vue-i18n";
@@ -307,19 +329,12 @@ export default defineComponent({
     OTimeCell,
     OPageLayout,
   },
-  props: {
-    isClicked: {
-      type: Boolean,
-      default: false,
-    },
-  },
-  emits: ["closeSearchHistory"],
   methods: {
     closeSearchHistory() {
-      this.$emit("closeSearchHistory");
+      this.$router.push({ name: "logs" });
     },
   },
-  setup(props) {
+  setup() {
     const router = useRouter();
     const route = useRoute();
     const store = useStore();
@@ -362,8 +377,10 @@ export default defineComponent({
     const pageSize = ref(100);
     const pageSizeOptions = [5, 10, 20, 50, 100];
 
-    const generateColumns = (data: any): OTableColumnDef[] => {
-      if (data.length === 0) return [];
+    // Columns are a fixed schema (not derived from the response), so they can be
+    // built up front — the table needs them present during loading to render the
+    // skeleton, and to keep column widths stable across refetches.
+    const generateColumns = (): OTableColumnDef[] => {
       return [
         {
           id: "executed_time",
@@ -385,12 +402,17 @@ export default defineComponent({
     };
 
     const fetchSearchHistory = async () => {
-      columnsToBeRendered.value = [];
+      // Keep columns in place (don't clear) so the loading skeleton has a shape.
+      if (!columnsToBeRendered.value.length) columnsToBeRendered.value = generateColumns();
       dataToBeLoaded.value = [];
       expandedIds.value = [];
       moreDetailsToDisplay.value = "";
       try {
-        const { org_identifier } = router.currentRoute.value.query;
+        // Standalone route has no org_identifier in the URL; fall back to the
+        // currently selected org (the source of truth) so history still loads.
+        const org_identifier =
+          router.currentRoute.value.query.org_identifier ||
+          store.state.selectedOrganization.identifier;
         isLoading.value = true;
         if (dateTimeToBeSent.value.valueType === "relative") {
           const convertedData = extractTimestamps(dateTimeToBeSent.value.relativeTimePeriod);
@@ -426,7 +448,7 @@ export default defineComponent({
         if (filteredHits.length > 0) {
           resultTotal.value = filteredHits.length;
         }
-        columnsToBeRendered.value = generateColumns(filteredHits);
+        columnsToBeRendered.value = generateColumns();
         filteredHits.forEach((hit: any) => {
           //adding uuid to each which will be used to track the expanded "row"
           //why not trace_id ? because trace_id is not unique for each hit
@@ -487,6 +509,10 @@ export default defineComponent({
     const updateDateTime = async (value: any) => {
       dateTimeToBeSent.value = value;
       searchDateTimeRef.value.setAbsoluteTime(value.startTime, value.endTime);
+      // Auto-run on a genuine user time change (consistent with the rest of the
+      // app). Skip programmatic emits — the setAbsoluteTime() call above re-emits
+      // with userChangedValue=false — so we don't loop or double-fetch.
+      if (value.userChangedValue) fetchSearchHistory();
     };
     const formatTime = (took) => {
       return `${took.toFixed(2)} sec`;
@@ -623,18 +649,6 @@ export default defineComponent({
         query: queryObject,
       });
     };
-    watch(
-      () => props.isClicked,
-      (value) => {
-        // This is a v-show sub-view of the Logs page: only own the keyboard
-        // scope while actually visible, otherwise hand it back to the logs page.
-        getManager()?.setScope(value ? "search-history" : "logs");
-        if (value == true && !isLoading.value) {
-          fetchSearchHistory();
-        }
-      },
-    );
-
     function filterRow(row) {
       const desiredColumns = [
         { key: "trace_id", label: "Trace ID" },
@@ -661,10 +675,14 @@ export default defineComponent({
         },
       },
     ]);
-    // useShortcuts activates this sub-view's scope on mount, but it mounts while
-    // hidden inside the Logs page — restore the logs scope until it's shown.
+    // Own page: claim the keyboard scope and load history on mount, then hand the
+    // scope back to the logs page on leave.
     onMounted(() => {
-      if (!props.isClicked) getManager()?.setScope("logs");
+      getManager()?.setScope("search-history");
+      fetchSearchHistory();
+    });
+    onUnmounted(() => {
+      getManager()?.setScope("logs");
     });
     return {
       searchObj,

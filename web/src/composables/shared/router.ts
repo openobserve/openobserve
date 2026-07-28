@@ -30,6 +30,8 @@ import { hasMetricsEditorParams } from "@/utils/metrics/metricsEditorParams";
 
 const Search = () => import("@/plugins/logs/Index.vue");
 const SearchJobInspector = () => import("@/plugins/logs/SearchJobInspector.vue");
+const SearchHistory = () => import("@/plugins/logs/SearchHistory.vue");
+const SearchSchedulersList = () => import("@/plugins/logs/SearchSchedulersList.vue");
 const AppMetrics = () => import("@/plugins/metrics/Index.vue");
 const AppMetricsExplorer = () => import("@/plugins/metrics/explorer/MetricsExplorer.vue");
 const AppTraces = () => import("@/plugins/traces/Index.vue");
@@ -134,6 +136,16 @@ const useRoutes = () => {
         title: "Logs",
       },
       beforeEnter(to: any, from: any, next: any) {
+        // Back-compat: Search History / Scheduler used to be `?action=…` overlays
+        // on /logs. Redirect old bookmarks / shared links to the standalone routes.
+        if (to.query.action === "history") {
+          next({ name: "searchHistory", query: { org_identifier: to.query.org_identifier } });
+          return;
+        }
+        if (to.query.action === "search_scheduler") {
+          next({ name: "searchScheduler", query: { org_identifier: to.query.org_identifier } });
+          return;
+        }
         routeGuard(to, from, next);
       },
     },
@@ -146,6 +158,40 @@ const useRoutes = () => {
         title: "Search Job Inspector",
       },
       beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    },
+    {
+      // Standalone page (was a `?action=history` overlay on /logs). Not
+      // enterprise-gated — available in OSS; the component itself shows an
+      // "enable usage reporting" message when zoConfig.usage_enabled is off.
+      path: "logs/search-history",
+      name: "searchHistory",
+      component: SearchHistory,
+      meta: {
+        keepAlive: false,
+        title: "Search History",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    },
+    {
+      // Standalone page (was a `?action=search_scheduler` overlay on /logs).
+      // Enterprise-only: the scheduled-search endpoints 403 in OSS, so a
+      // hand-typed URL is bounced back to the logs page.
+      path: "logs/search-scheduler",
+      name: "searchScheduler",
+      component: SearchSchedulersList,
+      meta: {
+        keepAlive: false,
+        title: "Search Scheduler",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        if (config.isEnterprise !== "true") {
+          next({ name: "logs" });
+          return;
+        }
         routeGuard(to, from, next);
       },
     },
