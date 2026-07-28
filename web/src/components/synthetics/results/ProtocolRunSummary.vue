@@ -272,7 +272,9 @@ const showAssertions = computed(() => run.value?.type === "http" && assertionRow
           </div>
           <div class="grid grid-cols-2 gap-3 px-3 py-3">
             <div class="rounded-default bg-surface-subtle flex flex-col gap-1.5 p-3">
-              <span class="text-text-muted text-xs">{{ t("synthetics.protocolRun.status") }}</span>
+              <span class="text-text-secondary text-xs">{{
+                t("synthetics.protocolRun.status")
+              }}</span>
               <span class="flex items-center gap-2">
                 <OBadge :variant="statusMeta.variant" size="sm" :icon="statusMeta.icon">{{
                   statusMeta.label
@@ -286,13 +288,13 @@ const showAssertions = computed(() => run.value?.type === "http" && assertionRow
               v-if="run.statusCode != null"
               class="rounded-default bg-surface-subtle flex flex-col gap-1.5 p-3"
             >
-              <span class="text-text-muted text-xs">{{
+              <span class="text-text-secondary text-xs">{{
                 t("synthetics.protocolRun.statusCode")
               }}</span>
               <span class="text-sm font-medium">{{ run.statusCode }}</span>
             </div>
             <div class="rounded-default bg-surface-subtle flex flex-col gap-1.5 p-3">
-              <span class="text-text-muted text-xs">{{
+              <span class="text-text-secondary text-xs">{{
                 t("synthetics.protocolRun.responseTime")
               }}</span>
               <span class="text-sm font-medium">{{ fmtMs(run.responseTimeMs) }}</span>
@@ -301,7 +303,7 @@ const showAssertions = computed(() => run.value?.type === "http" && assertionRow
               v-if="run.responseBytes != null"
               class="rounded-default bg-surface-subtle flex flex-col gap-1.5 p-3"
             >
-              <span class="text-text-muted text-xs">{{
+              <span class="text-text-secondary text-xs">{{
                 t("synthetics.protocolRun.responseSize")
               }}</span>
               <span class="text-sm font-medium">{{ fmtBytes(run.responseBytes) }}</span>
@@ -310,7 +312,9 @@ const showAssertions = computed(() => run.value?.type === "http" && assertionRow
               v-if="run.error"
               class="rounded-default bg-surface-subtle col-span-2 flex flex-col gap-1.5 p-3"
             >
-              <span class="text-text-muted text-xs">{{ t("synthetics.protocolRun.error") }}</span>
+              <span class="text-text-secondary text-xs">{{
+                t("synthetics.protocolRun.error")
+              }}</span>
               <span class="text-status-error-text text-sm font-medium break-all">{{
                 run.error
               }}</span>
@@ -390,7 +394,9 @@ const showAssertions = computed(() => run.value?.type === "http" && assertionRow
                 size="sm"
                 :icon="!assertionsEvaluated ? 'remove' : a.failed ? 'cancel' : 'check-circle'"
               />
-              <span class="font-mono text-xs" :class="assertionsEvaluated ? '' : 'text-text-muted'"
+              <span
+                class="font-mono text-xs"
+                :class="assertionsEvaluated ? '' : 'text-text-secondary'"
                 >{{ a.field }} {{ a.operator }} {{ a.value }}</span
               >
               <!-- The probe's own comparison for this row, e.g. "status 503 eq
@@ -406,7 +412,7 @@ const showAssertions = computed(() => run.value?.type === "http" && assertionRow
           </ul>
           <p
             v-if="!assertionsEvaluated"
-            class="text-text-muted px-3 pb-2 text-xs"
+            class="text-text-secondary px-3 pb-2 text-xs"
             data-test="synthetics-protocol-run-assertions-not-evaluated-hint"
           >
             {{ t("synthetics.protocolRun.assertionsNotEvaluatedHint") }}
@@ -443,30 +449,36 @@ const showAssertions = computed(() => run.value?.type === "http" && assertionRow
           </div>
           <div class="grid grid-cols-2 gap-3 px-3 py-3 text-sm">
             <div class="rounded-default bg-surface-subtle flex flex-col gap-1.5 p-3">
-              <span class="text-text-muted text-xs">{{
+              <span class="text-text-secondary text-xs">{{
                 t("synthetics.protocolRun.location")
               }}</span>
               <span class="font-medium">{{ locationLabel(run.location) || "—" }}</span>
             </div>
             <div class="rounded-default bg-surface-subtle flex flex-col gap-1.5 p-3">
-              <span class="text-text-muted text-xs">{{ t("synthetics.protocolRun.runtime") }}</span>
+              <span class="text-text-secondary text-xs">{{
+                t("synthetics.protocolRun.runtime")
+              }}</span>
               <span class="font-medium"
                 >{{ run.runtime || "—" }}
-                <span v-if="run.initMs" class="text-text-muted"
+                <span v-if="run.initMs" class="text-text-secondary"
                   >(+{{ fmtMs(run.initMs) }} {{ t("synthetics.protocolRun.init") }})</span
                 ></span
               >
             </div>
             <div class="rounded-default bg-surface-subtle flex flex-col gap-1.5 p-3">
-              <span class="text-text-muted text-xs">{{ t("synthetics.protocolRun.probeId") }}</span>
+              <span class="text-text-secondary text-xs">{{
+                t("synthetics.protocolRun.probeId")
+              }}</span>
               <span class="font-mono text-xs break-all">{{ run.probeId || "—" }}</span>
             </div>
             <div class="rounded-default bg-surface-subtle flex flex-col gap-1.5 p-3">
-              <span class="text-text-muted text-xs">{{ t("synthetics.protocolRun.trigger") }}</span>
+              <span class="text-text-secondary text-xs">{{
+                t("synthetics.protocolRun.trigger")
+              }}</span>
               <span class="font-medium">{{ run.triggerType }}</span>
             </div>
             <div class="rounded-default bg-surface-subtle col-span-2 flex flex-col gap-1.5 p-3">
-              <span class="text-text-muted text-xs">{{
+              <span class="text-text-secondary text-xs">{{
                 t("synthetics.protocolRun.timeline")
               }}</span>
               <span class="text-xs">
