@@ -159,6 +159,27 @@ describe("WorkflowTestDialog", () => {
       expect(editorVm(wrapper).props("query")).toBe(buildTestSampleText());
     });
 
+    it("seeds the INCIDENT sample when the trigger is an incident event", () => {
+      // The Test drawer must prefill the payload of the CURRENT trigger kind —
+      // an incident workflow should not seed an alert sample.
+      setWorkflow(
+        [
+          {
+            id: "t1",
+            data: { node_type: "workflow_trigger", trigger_kind: "incident_event" },
+          },
+          destNode,
+        ],
+        [{ source: "t1", target: "d1" }],
+      );
+      workflowObj.testRun.input = "";
+      mountDialog();
+      const [{ meta }] = JSON.parse(workflowObj.testRun.input);
+      expect(meta).toHaveProperty("incident_id");
+      expect(meta).toHaveProperty("event_type");
+      expect(meta).not.toHaveProperty("alert_name"); // not the alert sample
+    });
+
     it("keeps an existing input (persisted across opens) instead of reseeding", () => {
       workflowObj.testRun.input = VALID_INPUT;
       mountDialog();

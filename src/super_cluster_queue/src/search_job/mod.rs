@@ -18,7 +18,10 @@ pub mod search_job_results;
 pub mod search_jobs;
 
 use config::utils::json;
-use db::{sourcemaps::SOURCEMAP_PREFIX, workflows::WORKFLOWS_PREFIX};
+use db::{
+    sourcemaps::SOURCEMAP_PREFIX,
+    workflows::{AssociationDeleteEvent, WORKFLOWS_PREFIX},
+};
 use infra::{
     coordinator::get_coordinator,
     errors::{Error, Result},
@@ -28,7 +31,7 @@ use infra::{
             search_jobs::JobOperator,
         },
         source_maps::SourceMap,
-        workflows::{Workflow, WorkflowRunErrors},
+        workflows::{Workflow, WorkflowAssociation, WorkflowRunErrors},
     },
 };
 use o2_enterprise::enterprise::super_cluster::queue::{Message, MessageType};
@@ -212,6 +215,62 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
                     None,
                 )
                 .await?;
+        }
+
+        MessageType::WorkflowAssociationPut => {
+            let assoc: WorkflowAssociation = json::from_slice(&msg.value.unwrap())?;
+            let org_id = assoc.org_id.clone();
+            let wid = assoc.workflow_id.clone();
+            let eid = assoc.entity_id.clone();
+            let ttyp = assoc.trigger_type.clone();
+            log::info!(
+                "received workflow association store notification for {org_id} trigger_type: {ttyp} entity_id {eid} workflow_id {wid}"
+            );
+            match infra::table::workflows::add_workflow_association(assoc).await {
+                Ok(_) => {
+                    log::info!(
+                        "successfully handled workflow association store notification for {org_id} trigger_type: {ttyp} entity_id {eid} workflow_id {wid}"
+                    );
+                }
+                Err(e) => {
+                    log::info!(
+                        "error in handling workflow association store notification for {org_id} trigger_type: {ttyp} entity_id {eid} workflow_id {wid}: {e}"
+                    );
+                }
+            }
+        }
+
+        MessageType::WorkflowAssociationDelete => {
+            let event: AssociationDeleteEvent = json::from_slice(&msg.value.unwrap())?;
+            match &event {
+                AssociationDeleteEvent::Entity { org_id, entity_id } => {
+                    infra::table::workflows::delete_association_by_entity(&org_id, &entity_id)
+                        .await?;
+                }
+                AssociationDeleteEvent::Workflow {
+                    org_id,
+                    workflow_id,
+                } => {
+                    infra::table::workflows::delete_association_by_workflow(&org_id, &workflow_id)
+                        .await?;
+                }
+                AssociationDeleteEvent::Trigger { org_id, trigger } => {
+                    infra::table::workflows::delete_association_by_trigger(&org_id, &trigger)
+                        .await?;
+                }
+                AssociationDeleteEvent::Specific {
+                    org_id,
+                    entity_id,
+                    workflow_id,
+                } => {
+                    infra::table::workflows::delete_workflow_association(
+                        org_id,
+                        workflow_id,
+                        entity_id,
+                    )
+                    .await?;
+                }
+            }
         }
 
         _ => {

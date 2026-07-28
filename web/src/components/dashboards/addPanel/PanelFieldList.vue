@@ -79,17 +79,18 @@
       </template>
 
       <!-- Field row -->
-      <template #field-row="{ row, draggable, isDragEnabled }">
+      <template #field-row="{ row, draggable, isDragEnabled, armDrag }">
         <OFieldRow>
           <OIcon
             v-if="draggable"
             name="drag-indicator"
             size="sm"
+            @mousedown="armDrag()"
             :class="[
               'o-field-list__drag-icon text-field-list-drag-icon',
               isDragEnabled
-                ? 'o-field-list__drag-icon--enabled'
-                : 'o-field-list__drag-icon--disabled',
+                ? 'o-field-list__drag-icon--enabled cursor-grab'
+                : 'o-field-list__drag-icon--disabled cursor-not-allowed opacity-40',
             ]"
             data-test="o-field-list-drag-indicator"
           />
