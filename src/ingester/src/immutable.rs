@@ -151,7 +151,7 @@ impl Immutable {
             self.idx,
             self.memtable.id(),
             &self.key.stream_type,
-            cfg.limit.wal_pack_max_size as u64,
+            cfg.limit.max_file_size_on_disk as u64,
         );
         let (schema_size, _) = self
             .memtable

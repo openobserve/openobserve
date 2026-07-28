@@ -1580,9 +1580,6 @@ pub struct Limit {
     // MB, per data file size limit in memory
     #[env_config(name = "ZO_MAX_FILE_SIZE_IN_MEMORY", default = 512)]
     pub max_file_size_in_memory: usize,
-    // MB, single wal pack file size limit, packs roll over when exceeded
-    #[env_config(name = "ZO_WAL_PACK_MAX_SIZE", default = 512)]
-    pub wal_pack_max_size: usize,
     #[deprecated(
         since = "0.14.1",
         note = "Please use `ZO_SCHEMA_MAX_FIELDS_TO_ENABLE_UDS` instead. This ENV is subject to be removed soon"
@@ -2967,12 +2964,6 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.limit.max_file_size_in_memory = 512 * 1024 * 1024; // 512MB
     } else {
         cfg.limit.max_file_size_in_memory *= 1024 * 1024;
-    }
-    // check wal_pack_max_size to MB
-    if cfg.limit.wal_pack_max_size == 0 {
-        cfg.limit.wal_pack_max_size = 512 * 1024 * 1024; // 512MB
-    } else {
-        cfg.limit.wal_pack_max_size *= 1024 * 1024;
     }
 
     // check for metrics limit
