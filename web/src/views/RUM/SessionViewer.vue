@@ -82,6 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="isMobileReplay"
             :segments="segments"
             :events="segmentEvents"
+            :is-loading="segmentsLoading"
             class="h-full"
           />
           <VideoPlayer
@@ -165,6 +166,12 @@ const isLoading = ref<boolean[]>([]);
 const { buildQueryPayload } = useQuery();
 const segments = ref<any[]>([]);
 const segmentEvents = ref<any[]>([]);
+// Dedicated to the replay-segment fetch, initialised true so the mobile player shows a
+// loading state from first paint. The shared isLoading counter can't be used here: it
+// dips back to 0 in the gap between getSession() resolving and getSessionSegments()
+// starting, which is exactly the moment the mobile player mounts — that dip is what let
+// the "No session replay available" empty state flash before the segments arrived.
+const segmentsLoading = ref(true);
 
 // Mobile sessions carry wireframe records (source: react-native/ios/android) → the
 // wireframe player; browser sessions use the rrweb VideoPlayer.
@@ -348,7 +355,12 @@ const getSession = () => {
 };
 
 const getSessionSegments = () => {
-  if (!sessionState.data.selectedSession) return;
+  if (!sessionState.data.selectedSession) {
+    // No session to fetch a replay for — resolve the loading state so the player can fall
+    // through to its empty message instead of spinning forever.
+    segmentsLoading.value = false;
+    return;
+  }
 
   const queryPayload: any = {
     from: 0,
@@ -401,7 +413,12 @@ const getSessionSegments = () => {
     .catch((error) => {
       console.error("Failed to fetch session events:", error);
     })
-    .finally(() => isLoading.value.pop());
+    .finally(() => {
+      isLoading.value.pop();
+      // Segment fetch settled: the mobile player can now decide between the replay and the
+      // empty state without a premature "No session replay available" flash.
+      segmentsLoading.value = false;
+    });
 };
 
 const getSessionEvents = () => {
@@ -569,7 +586,13 @@ const handleViewEvent = (event: any) => {
   //     " error " +
   //     event.event.custom.error.stack;
   // }
-  _event.name = event?.view_loading_type + " : " + event?.view_url || "--";
+  // Browser view events carry `view_loading_type` (initial_load / route_change)
+  // and show as "type : url". Mobile SDK views have no loading_type, so fall back
+  // to the human view name (e.g. "ProductDetail") and only then the url — avoids
+  // the "undefined : <url>" label for mobile sessions.
+  _event.name = event?.view_loading_type
+    ? event.view_loading_type + " : " + event?.view_url
+    : event?.view_name || event?.view_url || "--";
   return _event;
 };
 
