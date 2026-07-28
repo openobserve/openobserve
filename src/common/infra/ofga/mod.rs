@@ -75,6 +75,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     let mut need_anomaly_detection_migration = false;
     let mut need_online_eval_migration = false;
     let mut need_billing_group_migration = false;
+    let mut need_stream_names_migration = false;
 
     let existing_meta: Option<o2_openfga::meta::mapping::OFGAModel> =
         match db::ofga::get_ofga_model().await {
@@ -258,6 +259,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
                 let v0_0_33 = version_compare::Version::from("0.0.33").unwrap();
                 let v0_0_34 = version_compare::Version::from("0.0.34").unwrap();
                 let v0_0_35 = version_compare::Version::from("0.0.35").unwrap();
+                let v0_0_36 = version_compare::Version::from("0.0.36").unwrap();
 
                 if meta_version > v0_0_5 && existing_model_version < v0_0_6 {
                     need_pipeline_migration = true;
@@ -331,6 +333,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
                 if existing_model_version < v0_0_35 {
                     log::info!("[OFGA:Local] online eval permissions migration needed");
                     need_online_eval_migration = true;
+                }
+                if existing_model_version < v0_0_36 {
+                    log::info!("[OFGA:Local] stream names migration needed");
+                    need_stream_names_migration = true;
                 }
             }
 
@@ -503,6 +509,16 @@ pub async fn init() -> Result<(), anyhow::Error> {
                             log::error!(
                                 "[OFGA:Local] Error migrating anomaly detection to openfga: {e}"
                             );
+                        }
+                    }
+                }
+                if need_stream_names_migration {
+                    match migrations::migrate_stream_names().await {
+                        Ok(_) => {
+                            log::info!("[OFGA:Local] Stream names migrated to openfga");
+                        }
+                        Err(e) => {
+                            log::error!("[OFGA:Local] Error migrating stream names to openfga: {e}");
                         }
                     }
                 }

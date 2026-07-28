@@ -91,6 +91,15 @@ pub fn is_valid_email(email: &str) -> bool {
     EMAIL_REGEX.is_match(email)
 }
 
+/// Rewrite a resource name into an OpenFGA-safe object id.
+///
+/// OpenFGA-unsupported characters (`:#?\s'"%&`) are collapsed to `.`. We use `.`
+/// rather than `_` on purpose: the only real-world names that carry an
+/// unsupported character are Prometheus metric streams, whose grammar is
+/// `[a-zA-Z0-9_:]`. Mapping `:` to `_` would let a metric named `a:b` collide
+/// with a distinct metric named `a_b`; `.` can never appear in a metric name, so
+/// the mapping stays collision-free for the case that actually occurs. `.` is a
+/// valid OpenFGA object-id character.
 pub fn into_ofga_supported_format(name: &str) -> String {
     // remove spaces around special characters
     let result = RE_SPACE_AROUND.replace_all(name, |caps: &regex::Captures| {
@@ -101,7 +110,7 @@ pub fn into_ofga_supported_format(name: &str) -> String {
             .to_string()
     });
     RE_OFGA_UNSUPPORTED_NAME
-        .replace_all(&result, "_")
+        .replace_all(&result, ".")
         .to_string()
 }
 
@@ -831,14 +840,14 @@ mod tests {
 
     #[test]
     fn test_into_ofga_supported_format() {
-        assert_eq!(into_ofga_supported_format("foo:bar"), "foo_bar");
-        assert_eq!(into_ofga_supported_format("foo bar"), "foo_bar");
-        assert_eq!(into_ofga_supported_format("foo#bar"), "foo_bar");
-        assert_eq!(into_ofga_supported_format("foo : bar"), "foo_bar");
-        assert_eq!(into_ofga_supported_format(" a  & b "), "_a_b_");
-        assert_eq!(into_ofga_supported_format("a   b"), "a_b");
-        assert_eq!(into_ofga_supported_format("a:b#c?d e"), "a_b_c_d_e");
-        assert_eq!(into_ofga_supported_format("foo & bar % baz"), "foo_bar_baz");
+        assert_eq!(into_ofga_supported_format("foo:bar"), "foo.bar");
+        assert_eq!(into_ofga_supported_format("foo bar"), "foo.bar");
+        assert_eq!(into_ofga_supported_format("foo#bar"), "foo.bar");
+        assert_eq!(into_ofga_supported_format("foo : bar"), "foo.bar");
+        assert_eq!(into_ofga_supported_format(" a  & b "), ".a.b.");
+        assert_eq!(into_ofga_supported_format("a   b"), "a.b");
+        assert_eq!(into_ofga_supported_format("a:b#c?d e"), "a.b.c.d.e");
+        assert_eq!(into_ofga_supported_format("foo & bar % baz"), "foo.bar.baz");
     }
 
     #[test]
@@ -970,29 +979,29 @@ mod tests {
         assert_eq!(into_ofga_supported_format("123"), "123");
 
         // Special characters
-        assert_eq!(into_ofga_supported_format("a:b"), "a_b");
-        assert_eq!(into_ofga_supported_format("a#b"), "a_b");
-        assert_eq!(into_ofga_supported_format("a?b"), "a_b");
-        assert_eq!(into_ofga_supported_format("a'b"), "a_b");
-        assert_eq!(into_ofga_supported_format("a\"b"), "a_b");
-        assert_eq!(into_ofga_supported_format("a%b"), "a_b");
-        assert_eq!(into_ofga_supported_format("a&b"), "a_b");
+        assert_eq!(into_ofga_supported_format("a:b"), "a.b");
+        assert_eq!(into_ofga_supported_format("a#b"), "a.b");
+        assert_eq!(into_ofga_supported_format("a?b"), "a.b");
+        assert_eq!(into_ofga_supported_format("a'b"), "a.b");
+        assert_eq!(into_ofga_supported_format("a\"b"), "a.b");
+        assert_eq!(into_ofga_supported_format("a%b"), "a.b");
+        assert_eq!(into_ofga_supported_format("a&b"), "a.b");
 
         // Multiple spaces
-        assert_eq!(into_ofga_supported_format("a   b"), "a_b");
-        assert_eq!(into_ofga_supported_format("  a  b  "), "_a_b_");
+        assert_eq!(into_ofga_supported_format("a   b"), "a.b");
+        assert_eq!(into_ofga_supported_format("  a  b  "), ".a.b.");
 
         // Complex combinations
         assert_eq!(
             into_ofga_supported_format("test:name with spaces"),
-            "test_name_with_spaces"
+            "test.name.with.spaces"
         );
-        assert_eq!(into_ofga_supported_format("a & b : c # d"), "a_b_c_d");
+        assert_eq!(into_ofga_supported_format("a & b : c # d"), "a.b.c.d");
 
         // Edge cases
         assert_eq!(into_ofga_supported_format(""), "");
-        assert_eq!(into_ofga_supported_format(":::"), "_");
-        assert_eq!(into_ofga_supported_format("   "), "_");
+        assert_eq!(into_ofga_supported_format(":::"), ".");
+        assert_eq!(into_ofga_supported_format("   "), ".");
     }
 
     #[test]

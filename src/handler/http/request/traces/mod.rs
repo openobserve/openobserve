@@ -250,7 +250,7 @@ pub async fn get_latest_traces(
                         OFGA_MODELS
                             .get(stream_type_str)
                             .map_or(stream_type_str, |model| model.key),
-                        stream_name
+                        crate::common::utils::auth::into_ofga_supported_format(&stream_name)
                     ),
                     org_id: org_id.clone(),
                     bypass_check: false,
@@ -1070,7 +1070,7 @@ pub async fn get_latest_traces_stream(
                         OFGA_MODELS
                             .get(stream_type_str)
                             .map_or(stream_type_str, |model| model.key),
-                        stream_name
+                        crate::common::utils::auth::into_ofga_supported_format(&stream_name)
                     ),
                     org_id: org_id.clone(),
                     bypass_check: false,
