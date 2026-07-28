@@ -1104,12 +1104,14 @@ defineExpose({
             // wider. Sticky total columns need an explicit content width (w-max):
             // under a min-width the flex container can size the table so the sticky
             // containing block no longer matches the scrollable content, and the
-            // body total cells release while the header stays put.
+            // body total cells release while the header stays put. min-w-full keeps
+            // the table filling the container when the content is narrower (sticky
+            // is inert without overflow, so the release bug can't occur there).
             props.horizontalScroll
               ? isDelegatedScroll
                 ? 'min-w-max'
                 : props.stickyColTotals
-                  ? 'w-max'
+                  ? 'w-max min-w-full'
                   : 'w-full min-w-max'
               : useComputedWidth && frozen
                 ? ''
