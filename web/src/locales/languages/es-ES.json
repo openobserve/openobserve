@@ -7736,7 +7736,6 @@
       "scoreConfigs": "Configure las rúbricas de puntuación utilizadas en sus evaluaciones"
     },
     "agentGraph": {
-      "allAgents": "Todos los agentes",
       "stream": "Stream",
       "agent": "Agente",
       "noAgentsTitle": "No se encontraron agentes",
@@ -9592,6 +9591,8 @@
       "modalSubtitle": "Elija lo que desea monitorear",
       "modalTitle": "Crear una verificación",
       "pageTitle": "Nueva verificación {label}",
+      "saveAndContinue": "Guardar y continuar",
+      "saveAndExit": "Guardar y salir",
       "saveCheck": "Guardar verificación",
       "saveFailed": "Error al guardar la verificación.",
       "saved": "Verificación guardada exitosamente.",
@@ -9619,7 +9620,7 @@
         "assertionValue": "Valor",
         "assertions": "Aserciones",
         "body": "Cuerpo de la solicitud",
-        "bodyPlaceholder": "{\"key\": \"value\"}",
+        "bodyPlaceholder": "{'{'}\"key\": \"value\"{'}'}",
         "fields": {
           "body": "Cuerpo de la respuesta",
           "response_time_ms": "Tiempo de respuesta (ms)",

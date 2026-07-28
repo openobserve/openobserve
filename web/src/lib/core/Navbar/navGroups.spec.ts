@@ -128,6 +128,33 @@ describe("groupNavLinks", () => {
     expect(keysOf(entries)).toEqual(["link:home", "link:dashboards"]);
   });
 
+  it("groups RUM and Synthetics under the Experience tile", () => {
+    const entries = groupNavLinks([
+      link("home"),
+      link("rum"),
+      link("synthetics"),
+      link("alertList"),
+    ]);
+    // rum/synthetics are absorbed; the Experience tile takes rum's slot.
+    expect(keysOf(entries)).toEqual(["link:home", "linkGroup:experience", "link:alertList"]);
+    const experience = entries.find(
+      (e): e is Extract<RailEntry, { type: "linkGroup" }> =>
+        e.type === "linkGroup" && e.item.name === "experience",
+    );
+    // Clicking the tile lands on RUM (always-present route).
+    expect(experience?.item.link).toBe("/rum");
+    // Children navigate by route name: RUM + synthetics.
+    expect(experience?.children.map((c) => c.name)).toEqual(["RUM", "synthetics"]);
+  });
+
+  it("keeps RUM a plain link when Synthetics is absent", () => {
+    // Synthetics is feature-gated; with only RUM present the Experience group has
+    // a single child, so it doesn't collapse and RUM stays a plain link.
+    const entries = groupNavLinks([link("home"), link("rum"), link("dashboards")]);
+    expect(keysOf(entries)).toEqual(["link:home", "link:rum", "link:dashboards"]);
+    expect(entries.some((e) => e.type === "linkGroup")).toBe(false);
+  });
+
   it("only includes Data children whose required top-level item is present", () => {
     const entries = groupNavLinks([link("home"), link("pipeline")]);
     const data = dataGroup(entries);

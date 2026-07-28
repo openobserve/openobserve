@@ -92,6 +92,8 @@
       :source-stream="sourceStream"
       :start-time="startTime"
       :end-time="endTime"
+      :agent-env="agentEnv"
+      :agent-version="agentVersion"
     />
   </div>
 </template>
@@ -108,6 +110,7 @@ import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import AgentSignalDetailPanel from "./AgentSignalDetailPanel.vue";
 import PanelSectionHeader from "./PanelSectionHeader.vue";
 import agentSignalsService, { type AgentSignalRecord } from "@/services/agent_signals";
+import { matchesAgentScope } from "./agentScope";
 
 const props = defineProps<{
   startTime?: number;
@@ -115,6 +118,9 @@ const props = defineProps<{
   sourceStream?: string;
   /** When set (Agent mode), show only this agent's signals; empty = all agents. */
   agentFilter?: string;
+  /** Selected agent's env/version (Agent mode) — surfaced in the detail drawer. */
+  agentEnv?: string | null;
+  agentVersion?: string | null;
 }>();
 
 const { t } = useI18n();
@@ -154,7 +160,9 @@ const orgId = computed(() => store.state.selectedOrganization?.identifier as str
 const scopedSignals = computed(() => {
   const a = props.agentFilter?.trim();
   if (!a) return signals.value;
-  return signals.value.filter((s) => (s.agent_name ?? "") === a);
+  return signals.value.filter((s) =>
+    matchesAgentScope(s, { name: a, env: props.agentEnv, version: props.agentVersion }),
+  );
 });
 
 /** Loop rows: rank (agent, tool) by calls-per-trace ratio. */

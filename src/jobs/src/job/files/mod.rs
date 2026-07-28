@@ -21,6 +21,7 @@ use config::{
 };
 
 pub mod broadcast;
+pub mod pack;
 pub mod parquet;
 
 pub async fn run() -> Result<(), anyhow::Error> {
@@ -32,6 +33,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
     db::file_list::local::load_pending_delete().await?;
 
     tokio::task::spawn(parquet::run());
+    tokio::task::spawn(pack::run());
     tokio::task::spawn(broadcast::run());
     tokio::task::spawn(clean_empty_dirs());
 

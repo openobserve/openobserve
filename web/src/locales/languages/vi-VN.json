@@ -7736,7 +7736,6 @@
       "scoreConfigs": "Cấu hình các tiêu chí chấm điểm được sử dụng bởi các đánh giá của bạn"
     },
     "agentGraph": {
-      "allAgents": "Tất cả tác nhân",
       "stream": "Luồng",
       "agent": "Tác nhân",
       "noAgentsTitle": "Không tìm thấy tác nhân nào",
@@ -9592,6 +9591,8 @@
       "modalSubtitle": "Chọn những gì bạn muốn giám sát",
       "modalTitle": "Tạo kiểm tra",
       "pageTitle": "Kiểm tra {label} mới",
+      "saveAndContinue": "Lưu và tiếp tục",
+      "saveAndExit": "Lưu và thoát",
       "saveCheck": "Lưu kiểm tra",
       "saveFailed": "Lưu kiểm tra thất bại.",
       "saved": "Đã lưu kiểm tra thành công.",
@@ -9619,7 +9620,7 @@
         "assertionValue": "Giá trị",
         "assertions": "Khẳng định",
         "body": "Nội dung yêu cầu",
-        "bodyPlaceholder": "{\"key\": \"value\"}",
+        "bodyPlaceholder": "{'{'}\"key\": \"value\"{'}'}",
         "fields": {
           "body": "Nội dung phản hồi",
           "response_time_ms": "Thời gian phản hồi (ms)",

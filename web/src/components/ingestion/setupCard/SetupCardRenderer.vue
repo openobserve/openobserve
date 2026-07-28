@@ -440,7 +440,7 @@ function fireConfetti() {
       <!-- Hero -->
       <div class="c-hero">
         <div class="c-hero-head">
-          <span class="ds-mono xl" :class="{ logo: logoSrc }">
+          <span class="ds-mono xl text-white" :class="{ logo: logoSrc }">
             <img
               v-if="logoSrc"
               :src="logoSrc"
@@ -452,6 +452,12 @@ function fireConfetti() {
             <template v-else>{{ content.provider.name.charAt(0) }}</template>
           </span>
           <h1 class="c-h1">{{ content.provider.name }}</h1>
+          <!-- Optional control sitting just after the title, spaced off it
+               (e.g. RUM's Browser / React Native platform switch). Renders only
+               when a host page fills it, so other cards are untouched. -->
+          <div v-if="$slots['hero-actions']" class="ms-2 shrink-0" data-test="ai-hero-actions">
+            <slot name="hero-actions" />
+          </div>
         </div>
         <p class="c-sub">{{ content.provider.tagline }}</p>
         <div class="pv-meta">
@@ -942,8 +948,6 @@ function fireConfetti() {
   place-items: center;
   font-weight: 800;
   font-size: var(--text-xs);
-  /* The tile is filled with the theme accent, so the monogram is always knocked out. */
-  color: var(--color-white);
   letter-spacing: -0.02em;
   background: var(--clay-bright);
 }

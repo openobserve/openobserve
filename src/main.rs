@@ -17,15 +17,14 @@
 // harmless for a binary this size (only slows panic unwinding), so silence it.
 #![allow(linker_messages)]
 
+#[cfg(feature = "tokio-console")]
+use std::net::SocketAddr;
 use std::{
-    cmp::max,
     collections::HashMap,
-    net::SocketAddr,
     str::FromStr,
     time::{Duration, SystemTime},
 };
 
-use arrow_flight::flight_service_server::FlightServiceServer;
 use common::{infra::cluster, meta};
 use config::{
     META_ORG_ID,
@@ -37,55 +36,23 @@ use config::{
 use db::{self, scheduler::TriggerModule::QueryRecommendations};
 use infra::runtime::{create_grpc_runtime, create_job_runtime};
 use openobserve::{cli::basic::cli, migration};
-use openobserve_api::{
-    handler::{
-        grpc::{
-            auth::check_auth,
-            flight::FlightServiceImpl,
-            request::{
-                event::Eventer,
-                ingest::Ingester,
-                logs::LogsServer,
-                metrics::{ingester::MetricsIngester, querier::MetricsQuerier},
-                query_cache::QueryCacheServerImpl,
-                stream::StreamServiceImpl,
-                traces::TraceServer,
-            },
-        },
-        http::router::*,
-    },
-    router,
-};
+use openobserve_api_http::handler::http::router::*;
 use openobserve_core::{bootstrap, metadata};
 use openobserve_jobs::job;
-use openobserve_node::{cluster_info::ClusterInfoService, node::NodeService};
 use opentelemetry::{KeyValue, global, trace::TracerProvider};
 use opentelemetry_otlp::{WithExportConfig, WithHttpConfig, WithTonicConfig};
-use opentelemetry_proto::tonic::collector::{
-    logs::v1::logs_service_server::LogsServiceServer,
-    metrics::v1::metrics_service_server::MetricsServiceServer,
-    trace::v1::trace_service_server::TraceServiceServer,
-};
 use opentelemetry_sdk::{Resource, propagation::TraceContextPropagator};
-use proto::cluster_rpc::{
-    cluster_info_service_server::ClusterInfoServiceServer, event_server::EventServer,
-    ingest_server::IngestServer, metrics_server::MetricsServer,
-    node_service_server::NodeServiceServer, query_cache_server::QueryCacheServer,
-    search_server::SearchServer, streams_server::StreamsServer,
-};
-use search_service::SEARCH_SERVER;
 use tokio::sync::oneshot;
 use tonic::{
     codec::CompressionEncoding,
     metadata::{MetadataKey, MetadataMap, MetadataValue},
-    transport::{Identity, ServerTlsConfig},
 };
-use tower_http::{compression::CompressionLayer, trace::TraceLayer};
+#[cfg(feature = "enterprise")]
+use tower_http::trace::TraceLayer;
 use tracing_appender::non_blocking::WorkerGuard;
 use tracing_opentelemetry::OpenTelemetryLayer;
 use tracing_subscriber::Registry;
 use utoipa::OpenApi;
-use web::ui_routes;
 #[cfg(feature = "enterprise")]
 use {
     config::Config,
@@ -323,11 +290,9 @@ async fn main() -> Result<(), anyhow::Error> {
 
         let _guard = rt.enter();
         rt.block_on(async move {
-            let ret = if config::cluster::LOCAL_NODE.is_router() {
-                init_router_grpc_server(grpc_init_tx, grpc_shutdown_rx, grpc_stopped_tx).await
-            } else {
-                init_common_grpc_server(grpc_init_tx, grpc_shutdown_rx, grpc_stopped_tx).await
-            };
+            let ret =
+                openobserve_api_grpc::server::run(grpc_init_tx, grpc_shutdown_rx, grpc_stopped_tx)
+                    .await;
             if let Err(e) = ret {
                 log::error!("gRPC server init failed: {e}");
                 std::process::exit(1);
@@ -423,7 +388,7 @@ async fn main() -> Result<(), anyhow::Error> {
     };
 
     // init http server
-    if let Err(e) = init_http_server().await {
+    if let Err(e) = openobserve_api_http::server::run(web::ui_routes).await {
         log::error!("HTTP server runs failed: {e}");
     }
     log::info!("HTTP server stopped");
@@ -481,331 +446,6 @@ async fn main() -> Result<(), anyhow::Error> {
     log::info!("server stopped");
 
     Ok(())
-}
-
-async fn init_common_grpc_server(
-    init_tx: oneshot::Sender<()>,
-    shutdown_rx: oneshot::Receiver<()>,
-    stopped_tx: oneshot::Sender<()>,
-) -> Result<(), anyhow::Error> {
-    let cfg = get_config();
-    let ip = if !cfg.grpc.addr.is_empty() {
-        cfg.grpc.addr.clone()
-    } else {
-        "0.0.0.0".to_string()
-    };
-    let gaddr: SocketAddr = format!("{}:{}", ip, cfg.grpc.port).parse()?;
-    let event_svc = EventServer::new(Eventer)
-        .send_compressed(CompressionEncoding::Gzip)
-        .accept_compressed(CompressionEncoding::Gzip)
-        .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
-        .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
-    let search_svc = SearchServer::new(SEARCH_SERVER.clone())
-        .send_compressed(CompressionEncoding::Gzip)
-        .accept_compressed(CompressionEncoding::Gzip)
-        .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
-        .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
-    let metrics_svc = MetricsServer::new(MetricsQuerier)
-        .send_compressed(CompressionEncoding::Gzip)
-        .accept_compressed(CompressionEncoding::Gzip)
-        .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
-        .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
-    let metrics_ingest_svc = MetricsServiceServer::new(MetricsIngester)
-        .send_compressed(CompressionEncoding::Gzip)
-        .accept_compressed(CompressionEncoding::Gzip)
-        .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
-        .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
-    let logs_svc = LogsServiceServer::new(LogsServer)
-        .send_compressed(CompressionEncoding::Gzip)
-        .accept_compressed(CompressionEncoding::Gzip)
-        .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
-        .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
-    let trace_svc = TraceServiceServer::new(TraceServer)
-        .send_compressed(CompressionEncoding::Gzip)
-        .accept_compressed(CompressionEncoding::Gzip)
-        .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
-        .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
-    let query_cache_svc = QueryCacheServer::new(QueryCacheServerImpl)
-        .send_compressed(CompressionEncoding::Gzip)
-        .accept_compressed(CompressionEncoding::Gzip)
-        .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
-        .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
-    let ingest_svc = IngestServer::new(Ingester)
-        .send_compressed(CompressionEncoding::Gzip)
-        .accept_compressed(CompressionEncoding::Gzip)
-        .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
-        .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
-    let streams_svc = StreamsServer::new(StreamServiceImpl)
-        .send_compressed(CompressionEncoding::Gzip)
-        .accept_compressed(CompressionEncoding::Gzip)
-        .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
-        .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
-    // Batches are already ZSTD-compressed (Arrow IPC); gzip is dropped client-side only.
-    // Server keeps compression so old clients still work during a rolling upgrade.
-    let flight_svc = FlightServiceServer::new(FlightServiceImpl)
-        .send_compressed(CompressionEncoding::Gzip)
-        .accept_compressed(CompressionEncoding::Gzip)
-        .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
-        .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
-    let node_svc = NodeServiceServer::new(NodeService)
-        .send_compressed(CompressionEncoding::Gzip)
-        .accept_compressed(CompressionEncoding::Gzip)
-        .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
-        .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
-    let cluster_info_svc = ClusterInfoServiceServer::new(ClusterInfoService)
-        .send_compressed(CompressionEncoding::Gzip)
-        .accept_compressed(CompressionEncoding::Gzip)
-        .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
-        .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
-
-    log::info!(
-        "starting gRPC server {} at {}",
-        if cfg.grpc.tls_enabled { "with TLS" } else { "" },
-        gaddr
-    );
-    init_tx.send(()).ok();
-
-    let builder = if cfg.grpc.tls_enabled {
-        let cert = std::fs::read_to_string(&cfg.grpc.tls_cert_path)?;
-        let key = std::fs::read_to_string(&cfg.grpc.tls_key_path)?;
-        let identity = Identity::from_pem(cert, key);
-        tonic::transport::Server::builder().tls_config(ServerTlsConfig::new().identity(identity))?
-    } else {
-        tonic::transport::Server::builder()
-    };
-    let builder = builder
-        .initial_stream_window_size(config::GRPC_HTTP2_STREAM_WINDOW_SIZE)
-        .initial_connection_window_size(config::GRPC_HTTP2_CONNECTION_WINDOW_SIZE)
-        .http2_adaptive_window(Some(cfg.grpc.http2_adaptive_window))
-        .tcp_nodelay(true);
-    let ret = builder
-        .layer(tonic::service::InterceptorLayer::new(check_auth))
-        .add_service(event_svc)
-        .add_service(search_svc)
-        .add_service(metrics_svc)
-        .add_service(metrics_ingest_svc)
-        .add_service(trace_svc)
-        .add_service(logs_svc)
-        .add_service(query_cache_svc)
-        .add_service(ingest_svc)
-        .add_service(streams_svc)
-        .add_service(flight_svc)
-        .add_service(node_svc)
-        .add_service(cluster_info_svc)
-        .serve_with_shutdown(gaddr, async {
-            shutdown_rx.await.ok();
-            log::info!("gRPC server starts shutting down");
-        })
-        .await;
-    if let Err(e) = ret {
-        return Err(anyhow::anyhow!("{e}"));
-    }
-
-    stopped_tx.send(()).ok();
-    Ok(())
-}
-
-async fn init_router_grpc_server(
-    init_tx: oneshot::Sender<()>,
-    shutdown_rx: oneshot::Receiver<()>,
-    stopped_tx: oneshot::Sender<()>,
-) -> Result<(), anyhow::Error> {
-    let cfg = get_config();
-    let gaddr: SocketAddr = format!("0.0.0.0:{}", cfg.grpc.port).parse()?;
-    let logs_svc = LogsServiceServer::new(router::grpc::ingest::logs::LogsServer)
-        .send_compressed(CompressionEncoding::Gzip)
-        .accept_compressed(CompressionEncoding::Gzip)
-        .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
-        .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
-    let metrics_svc = MetricsServiceServer::new(router::grpc::ingest::metrics::MetricsServer)
-        .send_compressed(CompressionEncoding::Gzip)
-        .accept_compressed(CompressionEncoding::Gzip)
-        .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
-        .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
-    let traces_svc = TraceServiceServer::new(router::grpc::ingest::traces::TraceServer)
-        .send_compressed(CompressionEncoding::Gzip)
-        .accept_compressed(CompressionEncoding::Gzip)
-        .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
-        .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
-
-    log::info!(
-        "starting gRPC server {} at {}",
-        if cfg.grpc.tls_enabled { "with TLS" } else { "" },
-        gaddr
-    );
-    init_tx.send(()).ok();
-
-    let builder = if cfg.grpc.tls_enabled {
-        let cert = std::fs::read_to_string(&cfg.grpc.tls_cert_path)?;
-        let key = std::fs::read_to_string(&cfg.grpc.tls_key_path)?;
-        let identity = Identity::from_pem(cert, key);
-        tonic::transport::Server::builder().tls_config(ServerTlsConfig::new().identity(identity))?
-    } else {
-        tonic::transport::Server::builder()
-    };
-    let builder = builder
-        .initial_stream_window_size(config::GRPC_HTTP2_STREAM_WINDOW_SIZE)
-        .initial_connection_window_size(config::GRPC_HTTP2_CONNECTION_WINDOW_SIZE)
-        .http2_adaptive_window(Some(cfg.grpc.http2_adaptive_window))
-        .tcp_nodelay(true);
-    let ret = builder
-        .layer(tonic::service::InterceptorLayer::new(check_auth))
-        .add_service(logs_svc)
-        .add_service(metrics_svc)
-        .add_service(traces_svc)
-        .serve_with_shutdown(gaddr, async {
-            shutdown_rx.await.ok();
-            log::info!("gRPC server starts shutting down");
-        })
-        .await;
-    if let Err(e) = ret {
-        return Err(anyhow::anyhow!("{e}"));
-    }
-
-    stopped_tx.send(()).ok();
-    Ok(())
-}
-
-/// Resolve the HTTP listen address from config
-fn http_server_addr() -> Result<SocketAddr, anyhow::Error> {
-    let cfg = get_config();
-    let haddr = if cfg.http.ipv6_enabled {
-        format!("[::]:{}", cfg.http.port).parse()?
-    } else {
-        let ip = if !cfg.http.addr.is_empty() {
-            cfg.http.addr.clone()
-        } else {
-            "0.0.0.0".to_string()
-        };
-        format!("{}:{}", ip, cfg.http.port).parse()?
-    };
-    Ok(haddr)
-}
-
-/// Apply the middlewares shared by all HTTP servers: access log, slow log and
-/// client IP resolution
-fn apply_common_middlewares(app: axum::Router) -> axum::Router {
-    let cfg = get_config();
-    let ip_sources = config::axum::middlewares::resolve_client_ip_sources(&cfg.http.real_ip_source);
-    log::info!(
-        "HTTP client IP sources (in order, implicit ConnectInfo fallback): {}",
-        cfg.http.real_ip_source
-    );
-    app.layer(config::axum::middlewares::AccessLogLayer::new(
-        config::axum::middlewares::get_http_access_log_format(),
-    ))
-    .layer(config::axum::middlewares::SlowLogLayer::new(
-        cfg.limit.http_slow_log_threshold,
-    ))
-    .layer(axum::middleware::from_fn(
-        config::axum::middlewares::extract_real_ip,
-    ))
-    .layer(axum::Extension(ip_sources))
-}
-
-/// Serve `app` on `haddr`, with TLS if configured. Graceful shutdown is
-/// bounded by ZO_HTTP_SHUTDOWN_TIMEOUT so long-lived connections (SSE,
-/// websocket) cannot block process exit.
-async fn serve_http(haddr: SocketAddr, app: axum::Router) -> Result<(), anyhow::Error> {
-    let cfg = get_config();
-    let handle = axum_server::Handle::new();
-    let shutdown_timeout = cfg.limit.http_shutdown_timeout;
-
-    // Spawn task to handle shutdown signal
-    tokio::spawn({
-        let handle = handle.clone();
-        async move {
-            shutdown_signal().await;
-            handle.graceful_shutdown(Some(Duration::from_secs(max(1, shutdown_timeout))));
-        }
-    });
-
-    let service = app.into_make_service_with_connect_info::<SocketAddr>();
-    if cfg.http.tls_enabled {
-        let tls_config = axum_server::tls_rustls::RustlsConfig::from_pem_file(
-            &cfg.http.tls_cert_path,
-            &cfg.http.tls_key_path,
-        )
-        .await?;
-        axum_server::bind_rustls(haddr, tls_config)
-            .handle(handle)
-            .serve(service)
-            .await?;
-    } else {
-        axum_server::bind(haddr)
-            .handle(handle)
-            .serve(service)
-            .await?;
-    }
-
-    Ok(())
-}
-
-async fn init_http_server() -> Result<(), anyhow::Error> {
-    let cfg = get_config();
-    let haddr = http_server_addr()?;
-    log::info!(
-        "Starting {} server at: {haddr}",
-        if cfg.http.tls_enabled {
-            "HTTPS"
-        } else {
-            "HTTP"
-        }
-    );
-
-    // Build the router
-    let app = apply_common_middlewares(create_app_router(ui_routes)).layer(CompressionLayer::new());
-    // Skip the request tracing layer when tracing is enabled only for search
-    let app = if !cfg.common.tracing_enabled
-        && (cfg.common.tracing_search_enabled || cfg.common.search_inspector_enabled)
-    {
-        app
-    } else {
-        app.layer(TraceLayer::new_for_http())
-    };
-
-    serve_http(haddr, app).await
-}
-
-/// Signal handler for graceful shutdown
-async fn shutdown_signal() {
-    #[cfg(unix)]
-    {
-        use tokio::signal::unix::{SignalKind, signal};
-
-        let mut sigquit = signal(SignalKind::quit()).unwrap();
-        let mut sigterm = signal(SignalKind::terminate()).unwrap();
-        let mut sigint = signal(SignalKind::interrupt()).unwrap();
-
-        tokio::select! {
-            _ = sigquit.recv() =>  log::info!("SIGQUIT received"),
-            _ = sigterm.recv() =>  log::info!("SIGTERM received"),
-            _ = sigint.recv() =>   log::info!("SIGINT received"),
-        }
-    }
-
-    #[cfg(not(unix))]
-    {
-        use tokio::signal::windows::*;
-
-        let mut sigbreak = ctrl_break().unwrap();
-        let mut sigint = ctrl_c().unwrap();
-        let mut sigquit = ctrl_close().unwrap();
-        let mut sigterm = ctrl_shutdown().unwrap();
-
-        tokio::select! {
-            _ = sigbreak.recv() =>  log::info!("ctrl-break received"),
-            _ = sigquit.recv() =>  log::info!("ctrl-c received"),
-            _ = sigterm.recv() =>  log::info!("ctrl-close received"),
-            _ = sigint.recv() =>   log::info!("ctrl-shutdown received"),
-        }
-    }
-
-    // offline the node
-    if let Err(e) = cluster::set_offline().await {
-        log::error!("set offline failed: {e}");
-    }
-    log::info!("Node is offline");
 }
 
 /// Setup the tracing related components
@@ -1333,7 +973,7 @@ fn enable_tracing() -> Result<opentelemetry_sdk::trace::SdkTracerProvider, anyho
 #[cfg(feature = "enterprise")]
 async fn init_action_server() -> Result<(), anyhow::Error> {
     let cfg = get_config();
-    let haddr = http_server_addr()?;
+    let haddr = openobserve_api_http::server::server_addr()?;
 
     // Setup the namespace
     o2_enterprise::enterprise::actions::action_deployer::init().await?;
@@ -1348,10 +988,10 @@ async fn init_action_server() -> Result<(), anyhow::Error> {
     );
 
     // Build the router for action server
-    let app =
-        apply_common_middlewares(create_action_server_router()).layer(TraceLayer::new_for_http());
+    let app = openobserve_api_http::server::apply_common_middlewares(create_action_server_router())
+        .layer(TraceLayer::new_for_http());
 
-    serve_http(haddr, app).await?;
+    openobserve_api_http::server::serve(haddr, app).await?;
 
     log::info!("HTTP server stopped");
 
@@ -1378,7 +1018,7 @@ pub fn create_action_server_router() -> axum::Router {
         middleware,
         routing::{get, post},
     };
-    use openobserve_api::handler::http::{request::action_server, router::cors_layer};
+    use openobserve_api_http::handler::http::{request::action_server, router::cors_layer};
 
     let cfg = get_config();
 
@@ -1396,7 +1036,7 @@ pub fn create_action_server_router() -> axum::Router {
                 .put(action_server::patch_action),
         )
         .layer(middleware::from_fn(
-            openobserve_api_management::auth::action_server::auth_middleware,
+            openobserve_api_common::auth::action_server::auth_middleware,
         ))
         .layer(cors_layer());
 
@@ -1441,8 +1081,10 @@ async fn init_enterprise() -> Result<(), anyhow::Error> {
 
     o2_enterprise::enterprise::pipeline::pipeline_file_server::PipelineFileServer::run().await?;
     if o2cfg.rate_limit.rate_limit_enabled && o2_openfga::config::get_config().enabled {
-        o2_ratelimit::init(openobserve_api::handler::http::router::openapi::openapi_info().await)
-            .await?;
+        o2_ratelimit::init(
+            openobserve_api_http::handler::http::router::openapi::openapi_info().await,
+        )
+        .await?;
     }
 
     Ok(())

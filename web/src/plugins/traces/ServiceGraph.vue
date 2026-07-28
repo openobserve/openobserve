@@ -464,6 +464,32 @@ export default defineComponent({
       type: String,
       default: undefined,
     },
+    // Agent scoping (Agent Graph page). When set, the topology is scoped to the
+    // selected agent + its environment. ENV-ONLY: version is deliberately NOT a
+    // prop and is never forwarded — the graph is version-agnostic.
+    agentId: {
+      type: String as PropType<string | null>,
+      default: null,
+    },
+    agentName: {
+      type: String as PropType<string | null>,
+      default: null,
+    },
+    agentEnv: {
+      type: String as PropType<string | null>,
+      default: null,
+    },
+    // Optional external time window (Agent Graph page owns its own date picker
+    // via useAiDateController). When set it drives the topology query instead of
+    // the shared traces store's `searchObj.data.datetime` — otherwise the page's
+    // date selection and the graph's query window would be two disconnected
+    // clocks, and the graph would show "No service graph data" for a window that
+    // actually has topology. Undefined = fall back to the shared traces store
+    // (the Traces Service Graph tab, driven by the SearchBar toolbar).
+    timeRange: {
+      type: Object as PropType<{ startTime: number; endTime: number } | undefined>,
+      default: undefined,
+    },
   },
   emits: ["view-traces", "request:stream-change", "jump-to-stream-data"],
   setup(props, { emit, expose }) {
@@ -522,6 +548,16 @@ export default defineComponent({
           streamFilter.value = next;
           loadServiceGraph();
         }
+      },
+    );
+    // Agent scoping (Agent Graph page) changes id/name/env when a different
+    // agent is selected. The topology must be re-fetched so it scopes to the
+    // newly selected agent + env. ENV-ONLY: no version in the deps — the graph
+    // is version-agnostic, so a version switch alone must NOT trigger a refetch.
+    watch(
+      () => [props.agentId, props.agentName, props.agentEnv],
+      () => {
+        loadServiceGraph();
       },
     );
     const availableStreams = ref<string[]>([]);
@@ -1543,7 +1579,12 @@ export default defineComponent({
           throw new Error(t("traces.serviceGraph.noOrganizationSelected"));
         }
 
-        const { startTime, endTime } = getEffectiveTimeRange(searchObj.data.datetime);
+        // Prefer the parent-supplied window (Agent Graph page's date picker); fall
+        // back to the shared traces datetime (Traces Service Graph tab).
+        const { startTime, endTime } =
+          props.timeRange && props.timeRange.startTime && props.timeRange.endTime
+            ? props.timeRange
+            : getEffectiveTimeRange(searchObj.data.datetime);
 
         // Topology, node kinds, edges and latency all come from the
         // pre-aggregated _o2_service_graph stream via /topology/current. The
@@ -1558,6 +1599,11 @@ export default defineComponent({
           streamName,
           startTime,
           endTime,
+          // ENV-ONLY: forward agent id/name/env for agent-scoped topology.
+          // agent_version is intentionally never sent (version-agnostic graph).
+          agentId: props.agentId,
+          agentName: props.agentName,
+          agentEnv: props.agentEnv,
         });
         const raw = response?.data ?? { nodes: [], edges: [] };
         const nodeIds = new Set((raw.nodes ?? []).map((n: any) => n.id));
@@ -1707,6 +1753,17 @@ export default defineComponent({
       () => searchObj.data.datetime,
       () => {
         loadServiceGraph();
+      },
+      { deep: true },
+    );
+
+    // Watch the parent-supplied window (Agent Graph page's date picker) — reload
+    // when it changes, so the graph tracks that page's date selection rather than
+    // the disconnected shared traces datetime.
+    watch(
+      () => props.timeRange,
+      () => {
+        if (props.timeRange) loadServiceGraph();
       },
       { deep: true },
     );

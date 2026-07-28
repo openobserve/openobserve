@@ -65,7 +65,7 @@
             class="o-field-list__row group px-page-edge rounded-default relative mt-1 flex min-h-6 w-full cursor-pointer items-center text-xs leading-[0.8rem]"
             :class="{ 'o-field-list__row--draggable': draggable }"
             :data-test="`o-field-list-row-${row.name}`"
-            :draggable="draggable && isDragEnabled(row, row._index ?? 0)"
+            :draggable="draggable && isDragEnabled(row, row._index ?? 0) && isDragArmed()"
             @click="(e: MouseEvent) => onRowClick(row, e)"
             @dblclick="(e: MouseEvent) => onRowDblClick(row, e)"
             @dragstart="(e: DragEvent) => onDragStart(row, e)"
@@ -79,12 +79,14 @@
                 :index="row._index"
                 :draggable="draggable"
                 :is-drag-enabled="isDragEnabled(row, row._index ?? 0)"
+                :arm-drag="armDrag"
               >
                 <OFieldRow>
                   <OIcon
                     v-if="draggable"
                     name="drag-indicator"
                     size="sm"
+                    @mousedown="armDrag()"
                     :class="[
                       'text-field-list-drag-icon inline-flex w-4 shrink-0 items-center justify-center',
                       isDragEnabled(row, row._index ?? 0)
@@ -130,6 +132,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OFieldRow from "./OFieldRow.vue";
 import OFieldLabel from "./OFieldLabel.vue";
 import { type FieldItem } from "./OFieldList.types";
+import useDragHandle from "@/composables/useDragHandle";
 
 const props = withDefaults(
   defineProps<{
@@ -322,6 +325,9 @@ function isExpanded(row: FieldItem): boolean {
 }
 
 // ── Drag-and-drop ───────────────────────────────────────────────────
+
+// Handle-gated drag: rows drag only from the grip icon, not the row body.
+const { arm: armDrag, isArmed: isDragArmed } = useDragHandle();
 
 function isDragEnabled(row: FieldItem, index: number): boolean {
   if (!props.draggable) return false;

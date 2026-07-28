@@ -7736,7 +7736,6 @@
       "scoreConfigs": "配置评估时使用的评分标准"
     },
     "agentGraph": {
-      "allAgents": "所有代理",
       "stream": "流",
       "agent": "代理",
       "noAgentsTitle": "未找到代理",
@@ -9592,6 +9591,8 @@
       "modalSubtitle": "选择您要监控的内容",
       "modalTitle": "创建检查",
       "pageTitle": "新建 {label} 检查",
+      "saveAndContinue": "保存并继续",
+      "saveAndExit": "保存并退出",
       "saveCheck": "保存检查",
       "saveFailed": "保存检查失败。",
       "saved": "检查已成功保存。",
@@ -9619,7 +9620,7 @@
         "assertionValue": "值",
         "assertions": "断言",
         "body": "请求正文",
-        "bodyPlaceholder": "{\"key\": \"value\"}",
+        "bodyPlaceholder": "{'{'}\"key\": \"value\"{'}'}",
         "fields": {
           "body": "响应正文",
           "response_time_ms": "响应时间（毫秒）",
