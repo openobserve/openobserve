@@ -152,10 +152,7 @@ fn build_reconstructed_events(
 ) -> Vec<IncidentEvent> {
     use config::meta::alerts::incidents::IncidentEventType;
 
-    let mut events = vec![IncidentEvent {
-        timestamp: created_at,
-        event_type: IncidentEventType::Created,
-    }];
+    let mut events = Vec::new();
 
     for (alert_id, alert_name, fired_at) in alerts {
         events.push(IncidentEvent {
@@ -182,6 +179,21 @@ fn build_reconstructed_events(
     }
 
     events.sort_by_key(|e| e.timestamp);
+
+    // `Created` is prepended after sorting rather than sorted in with the rest. The
+    // triggering alert routinely fires a few hundred milliseconds BEFORE the incident row
+    // is written (observed locally: alert at ..419417 vs created_at ..883003), so sorting
+    // purely by timestamp renders an "Alert" above the "Created" that opens the incident.
+    // The incident cannot precede its own creation in any readable timeline, so it is
+    // pinned to the front while every other event keeps its true chronological position.
+    events.insert(
+        0,
+        IncidentEvent {
+            timestamp: created_at,
+            event_type: IncidentEventType::Created,
+        },
+    );
+
     events
 }
 
@@ -487,6 +499,44 @@ mod tests {
             }
             other => panic!("expected Alert, got {other:?}"),
         }
+    }
+
+    /// `Created` must open the timeline even when an alert fired before the incident row
+    /// was written. Uses the real timestamps from a local incident, where the triggering
+    /// alert preceded `created_at` by ~464ms; sorting purely by timestamp put `Alert` first.
+    #[test]
+    fn test_reconstructed_created_is_first_despite_earlier_alert() {
+        let created_at = 1_784_737_392_883_003;
+        let alerts = vec![
+            (
+                "a1".to_string(),
+                "payment_gateway_errors".to_string(),
+                1_784_737_392_419_417, // fired BEFORE created_at
+            ),
+            (
+                "a1".to_string(),
+                "payment_gateway_errors".to_string(),
+                1_784_737_442_419_840,
+            ),
+        ];
+
+        let events =
+            build_reconstructed_events(created_at, Some(1_785_020_636_649_257), alerts.into_iter());
+
+        assert!(
+            matches!(events[0].event_type, IncidentEventType::Created),
+            "Created must anchor the timeline, got {:?}",
+            events[0].event_type
+        );
+        assert!(matches!(
+            events.last().unwrap().event_type,
+            IncidentEventType::Resolved { .. }
+        ));
+        // Everything after Created stays in true chronological order.
+        let rest: Vec<i64> = events[1..].iter().map(|e| e.timestamp).collect();
+        let mut sorted = rest.clone();
+        sorted.sort();
+        assert_eq!(rest, sorted, "non-Created events must remain chronological");
     }
 
     #[test]
