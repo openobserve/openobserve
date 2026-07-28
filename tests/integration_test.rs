@@ -3939,7 +3939,7 @@ mod tests {
     }
 
     async fn test_backfill_job_delete_by_pipeline() {
-        use openobserve_core::alerts::backfill::delete_backfill_jobs_by_pipeline;
+        use openobserve_core::backfill_cleanup::delete_backfill_jobs_by_pipeline;
 
         // Test deleting jobs by pipeline
         let org_id = "e2e";
