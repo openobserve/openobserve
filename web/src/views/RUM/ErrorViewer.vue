@@ -49,6 +49,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import { rumField } from "@/utils/rum/fields";
+// Explicit name so <keep-alive :include> in RealUserMonitoring.vue matches this
+// view. Without it the name is inferred from the FILENAME, so renaming the file
+// would silently drop it from the cache and bring back the refetch-on-return.
+defineOptions({ name: "ErrorViewer" });
+
 import { computed, onActivated, ref } from "vue";
 import ErrorHeader from "@/components/rum/errorTracking/view/ErrorHeader.vue";
 import ErrorTags from "@/components/rum/errorTracking/view/ErrorTags.vue";
@@ -84,13 +90,13 @@ const getTimestamp = computed(() => {
 // Trace id linking this error to a backend trace: on the error itself, or
 // on the nearest xhr/fetch event captured around the failure.
 const errorTraceId = computed(() => {
-  if (errorDetails.value?._oo_trace_id) {
-    return errorDetails.value._oo_trace_id as string;
+  if (rumField(errorDetails.value, "trace_id")) {
+    return rumField<string>(errorDetails.value, "trace_id");
   }
   const xhrWithTrace = (errorDetails.value?.events || []).find(
-    (event: any) => event.type === "resource" && event._oo_trace_id,
+    (event: any) => event.type === "resource" && rumField(event, "trace_id"),
   );
-  return (xhrWithTrace?._oo_trace_id as string) || "";
+  return rumField<string>(xhrWithTrace, "trace_id") || "";
 });
 
 const getErrorLogs = () => {
