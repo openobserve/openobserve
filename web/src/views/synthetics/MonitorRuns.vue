@@ -421,9 +421,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           class="border-border-default flex items-center gap-3 border-b py-2.25 last:border-b-0"
                         >
                           <OIcon :name="b.icon" size="sm" class="text-text-secondary flex-none" />
-                          <span class="text-text-body w-20 flex-none text-xs font-semibold">
-                            {{ b.name }}
-                          </span>
+                          <OTooltip :content="b.name">
+                            <span
+                              class="text-text-body w-20 flex-none cursor-help truncate text-xs font-semibold"
+                            >
+                              {{ b.name }}
+                            </span>
+                          </OTooltip>
                           <div
                             class="bg-text-disabled/25! h-1.5 min-w-10 flex-1 overflow-hidden rounded-full"
                           >
@@ -459,9 +463,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           class="border-border-default flex items-center gap-3 border-b py-2.25 last:border-b-0"
                         >
                           <OIcon :name="l.icon" size="sm" class="text-text-secondary flex-none" />
-                          <span class="text-text-body w-27.5 flex-none text-xs font-semibold">
-                            {{ l.name }}
-                          </span>
+                          <OTooltip :content="l.name">
+                            <span
+                              class="text-text-body w-40 flex-none cursor-help truncate text-xs font-semibold"
+                            >
+                              {{ l.name }}
+                            </span>
+                          </OTooltip>
                           <div
                             class="bg-text-disabled/25! h-1.5 min-w-10 flex-1 overflow-hidden rounded-full"
                           >
@@ -480,7 +488,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </div>
                     </div>
                     <div
-                      v-if="!isBrowser"
+                      v-if="isBrowser"
                       class="card-container rounded-default bg-surface-base border-border-default flex flex-col overflow-hidden border"
                     >
                       <div class="flex items-center gap-2 px-2 pt-2.5 pb-2">
@@ -497,15 +505,61 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           class="border-border-default flex items-center gap-3 border-b py-2.25 last:border-b-0"
                         >
                           <OIcon :name="d.icon" size="sm" class="text-text-secondary flex-none" />
-                          <span class="text-text-body w-20 flex-none text-xs font-semibold">
-                            {{ d.name }}
-                          </span>
+                          <OTooltip :content="d.name">
+                            <span
+                              class="text-text-body text-capitalize w-18 flex-none cursor-help truncate text-xs font-semibold"
+                            >
+                              {{ d.name }}
+                            </span>
+                          </OTooltip>
                           <div
                             class="bg-text-disabled/25! h-1.5 min-w-10 flex-1 overflow-hidden rounded-full"
                           >
                             <div
                               class="h-full rounded-full"
                               :style="{ width: d.pct, background: d.barColor }"
+                            />
+                          </div>
+                          <span
+                            class="w-12 text-right font-mono text-xs font-bold tabular-nums"
+                            :style="{ color: d.textColor }"
+                          >
+                            {{ d.pct }}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    <div
+                      v-if="!isBrowser"
+                      class="card-container rounded-default bg-surface-base border-border-default flex flex-col overflow-hidden border"
+                    >
+                      <div class="flex items-center gap-2 px-2 pt-2.5 pb-2">
+                        <OIcon name="schedule" size="sm" class="text-accent" />
+                        <span class="text-text-heading text-sm font-bold">
+                          {{ t("synthetics.runs.durationByLocation") }}
+                        </span>
+                      </div>
+                      <div class="border-border-default border-t" />
+                      <div class="px-2 py-2">
+                        <div
+                          v-for="d in locationDurationBreakdown"
+                          :key="d.id ?? d.name"
+                          class="border-border-default flex items-center gap-3 border-b py-2.25 last:border-b-0"
+                        >
+                          <OIcon :name="d.icon" size="sm" class="text-text-secondary flex-none" />
+                          <OTooltip :content="d.name">
+                            <span
+                              class="text-text-body w-34 flex-none cursor-help truncate text-xs font-semibold"
+                            >
+                              {{ d.name }}
+                            </span>
+                          </OTooltip>
+                          <div
+                            class="bg-text-disabled/25! h-1.5 min-w-10 flex-1 overflow-hidden rounded-full"
+                          >
+                            <div
+                              class="h-full rounded-full"
+                              :style="{ width: d.barPct || d.pct, background: d.barColor }"
                             />
                           </div>
                           <span
@@ -628,7 +682,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <!-- Runs table -->
-              <OCard class="p-0" :key="tableFilterKey">
+              <OCard class="p-0">
                 <OTable
                   :columns="runColumns"
                   :data="visibleRuns"
@@ -636,6 +690,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   pagination="client"
                   :page-size="10"
                   :page-size-options="[10, 20, 25, 50]"
+                  sorting="client"
+                  sort-by="last_run_at"
+                  sort-order="desc"
                   row-key="id"
                   :show-global-filter="false"
                   :enable-column-resize="true"
@@ -685,17 +742,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <span class="text-text-body inline-flex items-center gap-1 text-sm">
                       <OIcon :name="deviceIconName((row as VisibleRun).device)" size="sm" />
                       {{ deviceLabel((row as VisibleRun).device) }}
-                    </span>
-                  </template>
-                  <template #cell-error="{ row }">
-                    <span
-                      v-if="(row as VisibleRun).errorSnippet"
-                      class="cursor-pointer"
-                      @click.stop="filterByError((row as VisibleRun).errorPattern)"
-                    >
-                      <OBadge variant="error-outline" size="sm" class="max-w-50 truncate">
-                        {{ (row as VisibleRun).errorSnippet }}
-                      </OBadge>
                     </span>
                   </template>
                   <template #cell-trigger_type="{ row }">
@@ -1010,6 +1056,7 @@ import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
@@ -1035,6 +1082,7 @@ import webkitSvgUrl from "@/assets/images/synthetics/webkit.svg";
 import SkeletonBox from "@/components/shared/SkeletonBox.vue";
 import syntheticsService from "@/services/synthetics";
 import { locationDisplayLabel } from "@/utils/synthetics/format";
+import { formatTimeWithSuffix } from "@/utils/formatters";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
 defineOptions({ name: "SyntheticMonitorRuns" });
@@ -1112,7 +1160,7 @@ const effectiveP95Ms = computed(() => synthetics.effectiveP95Ms.value);
 
 // ── Helpers ──────────────────────────────────────────────────────────────
 function fmtDur(ms: number): string {
-  return ms >= 1000 ? (ms / 1000).toFixed(1) + "s" : ms + "ms";
+  return formatTimeWithSuffix(ms * 1000);
 }
 
 function browserIcon(name: string): string {
@@ -1263,13 +1311,6 @@ async function handleEmptyStateAction(id: string) {
     }
   }
 }
-
-// Composite key that changes when any filter changes — ensures the runs
-// table fully re-renders with the filtered data.
-const tableFilterKey = computed(
-  () =>
-    `${statusFilter.value}|${browserFilter.value}|${deviceFilter.value}|${locationFilter.value}|${errorFilter.value ?? ""}`,
-);
 
 // ── Select options (dynamic from run data) ──────────────────────────────
 function uniqueValues(key: "browser" | "device" | "location"): string[] {
@@ -1583,7 +1624,7 @@ const timelineSegments = computed<TimelineSegment[]>(() => {
               });
 
     const execDetails: TimelineExecution[] = executions.map((e) => ({
-      location: e.location,
+      location: locationLabel(e.location),
       browserEngine: e.browser,
       device: e.device,
       status:
@@ -1781,9 +1822,10 @@ const locationDurationBreakdown = computed<BreakdownItem[]>(() => {
   }));
   const maxAvg = Math.max(...entries.map((e) => e.avgMs), 1);
 
-  return entries.map(({ name, avgMs }) => ({
-    name,
-    icon: getIconForRegion(name),
+  return entries.map(({ name: rawId, avgMs }) => ({
+    name: locationLabel(rawId),
+    id: rawId,
+    icon: getIconForRegion(rawId),
     pct: fmtDur(avgMs),
     barPct: Math.round((avgMs / maxAvg) * 100) + "%",
     barColor: "var(--color-primary-500)",
@@ -1963,18 +2005,28 @@ const failedStepOptions = computed<SelectOption[]>(() => {
 interface VisibleRun {
   id: number;
   statusBadgeVariant: BadgeVariant;
-  statusIcon: string;
   statusLabel: string;
+  /** Severity order for sorting the status column — ascending surfaces the
+   * runs that need attention first. Sorting the translated `statusLabel`
+   * instead would make the order depend on the active locale. */
+  statusRank: number;
   scheduledTs: number;
   lastRunTs: number;
   triggerType: string;
   duration: string;
+  /** Raw milliseconds behind the formatted `duration` — the column sorts on
+   * this so "900ms" doesn't order after "1.2s". */
+  durationMs: number;
   location: string;
+  /** Resolved location label, i.e. what the cell actually renders. */
+  locationName: string;
   browser: string;
   device: string;
-  errorSnippet: string | null;
-  errorPattern: string | null;
+  /** Resolved device label, i.e. what the cell actually renders. */
+  deviceName: string;
 }
+
+const STATUS_RANK: Record<string, number> = { fail: 0, error: 1, warning: 2, pass: 3 };
 
 const visibleRuns = computed<VisibleRun[]>(() => {
   return filteredRuns.value.map((run) => {
@@ -1984,7 +2036,6 @@ const visibleRuns = computed<VisibleRun[]>(() => {
     return {
       id: run.id,
       statusBadgeVariant: isPass ? "success-soft" : isWarning ? "warning-soft" : "error-soft",
-      statusIcon: isPass || isWarning ? "check_circle" : "cancel",
       statusLabel: isPass
         ? t("synthetics.results.passed")
         : isWarning
@@ -1992,6 +2043,7 @@ const visibleRuns = computed<VisibleRun[]>(() => {
           : isError
             ? t("synthetics.results.error")
             : t("synthetics.results.failed"),
+      statusRank: STATUS_RANK[run.status] ?? 0,
       scheduledTs: run.scheduledTs,
       lastRunTs: run.timestamp,
       triggerType:
@@ -1999,37 +2051,47 @@ const visibleRuns = computed<VisibleRun[]>(() => {
           ? t("synthetics.runs.triggerManual")
           : t("synthetics.runs.triggerSchedule"),
       duration: fmtDur(run.duration),
+      durationMs: run.duration,
       location: run.location,
+      locationName: locationLabel(run.location),
       browser: run.browser,
       device: run.device,
-      errorSnippet: run.errorPattern
-        ? run.errorPattern.split(":")[0] + (run.failedStep ? " · " + run.failedStep : "")
-        : null,
-      errorPattern: run.errorPattern,
+      deviceName: deviceLabel(run.device),
     };
   });
 });
 
+// Every column sorts on the raw value behind what its cell slot renders, so
+// the order the user sees matches the order they asked for.
 const runColumns = computed<OTableColumnDef[]>(() => {
   const cols: OTableColumnDef[] = [
-    { id: "status", header: t("synthetics.table.status"), accessorKey: "status", size: 60 },
+    {
+      id: "status",
+      header: t("synthetics.table.status"),
+      accessorKey: "statusRank",
+      size: 60,
+      sortable: true,
+    },
     {
       id: "last_run_at",
       header: t("synthetics.table.lastRunAt"),
       accessorKey: "lastRunTs",
       size: 100,
+      sortable: true,
     },
     {
       id: "duration",
       header: t("synthetics.results.duration"),
-      accessorKey: "duration",
+      accessorKey: "durationMs",
       size: 50,
+      sortable: true,
     },
     {
       id: "location",
       header: t("synthetics.results.location"),
-      accessorKey: "location",
+      accessorKey: "locationName",
       size: 110,
+      sortable: true,
     },
   ];
   if (isBrowser.value) {
@@ -2039,8 +2101,15 @@ const runColumns = computed<OTableColumnDef[]>(() => {
         header: t("synthetics.results.steps.browser"),
         accessorKey: "browser",
         size: 100,
+        sortable: true,
       },
-      { id: "device", header: t("synthetics.results.device"), accessorKey: "device", size: 90 },
+      {
+        id: "device",
+        header: t("synthetics.results.device"),
+        accessorKey: "deviceName",
+        size: 90,
+        sortable: true,
+      },
     );
   }
   cols.push(
@@ -2049,12 +2118,14 @@ const runColumns = computed<OTableColumnDef[]>(() => {
       header: t("synthetics.table.trigger"),
       accessorKey: "triggerType",
       size: 90,
+      sortable: true,
     },
     {
       id: "scheduled_at",
       header: t("synthetics.table.scheduledAt"),
       accessorKey: "scheduledTs",
       size: 100,
+      sortable: true,
     },
   );
   return cols;
@@ -2327,12 +2398,6 @@ const errorChartOption = computed(() => {
 });
 
 // ── Methods ──────────────────────────────────────────────────────────────
-function filterByError(pattern: string | null) {
-  if (!pattern) return;
-  errorFilter.value = pattern;
-  statusFilter.value = "fail";
-}
-
 function filterByErrorPattern(pattern: string) {
   errorFilter.value = pattern;
   statusFilter.value = "fail";

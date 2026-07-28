@@ -56,9 +56,9 @@ export const STATUS_VALUES = {
  * When the backend adds new devices, add them here only.
  */
 export const KNOWN_DEVICES: Record<string, { label: string; icon: string }> = {
-  laptop_large: { label: "Desktop", icon: "computer" },
+  desktop: { label: "Desktop", icon: "computer" },
   tablet: { label: "Tablet", icon: "tablet" },
-  mobile_small: { label: "Mobile", icon: "smartphone" },
+  mobile: { label: "Mobile", icon: "smartphone" },
 };
 
 /**
@@ -133,6 +133,16 @@ export interface ProtocolTiming {
   ms: number;
 }
 
+/** One assertion's outcome as echoed back by the probe. */
+export interface ProtocolAssertionResult {
+  field: string;
+  operator: string;
+  value: string;
+  passed: boolean;
+  /** Comparison the probe made, e.g. "status 503 eq 200". Failures only. */
+  detail: string;
+}
+
 /**
  * Detail row for a protocol (http/tcp/tls/ssh) run — flat fields from the
  * probe's result record; no steps/screenshots/replay.
@@ -146,6 +156,12 @@ export interface ProtocolRunDetail {
   error: string;
   errorClass: string;
   assertionsPassed: boolean | null;
+  /**
+   * Per-assertion verdicts as reported by the probe, in declaration order.
+   * Empty for records written before the probe echoed them — callers fall back
+   * to inferring a single failing row from `error` in that case.
+   */
+  assertions: ProtocolAssertionResult[];
   statusCode: number | null;
   responseTimeMs: number;
   responseBytes: number | null;
@@ -368,6 +384,21 @@ function parseJsonArray(raw: unknown): any[] {
     }
   }
   return [];
+}
+
+/**
+ * The probe writes `assertions` as an array; OpenObserve stores it as a JSON
+ * string (same as last_attempt_steps), so accept either. `value` is normalised
+ * to a string because the probe sends numerics as numbers.
+ */
+function parseAssertions(raw: unknown): ProtocolAssertionResult[] {
+  return parseJsonArray(raw).map((a: any) => ({
+    field: str(a?.field),
+    operator: str(a?.operator),
+    value: a?.value == null ? "" : String(a.value),
+    passed: Boolean(a?.passed),
+    detail: str(a?.detail),
+  }));
 }
 
 function parseSteps(raw: unknown): StepResult[] {
@@ -710,6 +741,7 @@ export function mapProtocolRunDetail(rawHit: Record<string, unknown>): ProtocolR
     error: str(rawHit.error),
     errorClass: str(rawHit.error_class),
     assertionsPassed: rawHit.assertions_passed == null ? null : Boolean(rawHit.assertions_passed),
+    assertions: parseAssertions(rawHit.assertions),
     statusCode: rawHit.status_code == null ? null : num(rawHit.status_code),
     responseTimeMs: num(rawHit.response_time_ms),
     responseBytes: rawHit.response_bytes == null ? null : num(rawHit.response_bytes),

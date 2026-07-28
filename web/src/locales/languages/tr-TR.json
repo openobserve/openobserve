@@ -7736,7 +7736,6 @@
       "scoreConfigs": "Değerlendirmeleriniz tarafından kullanılan puanlama derecelerini yapılandırın"
     },
     "agentGraph": {
-      "allAgents": "Tüm ajanlar",
       "stream": "Akış",
       "agent": "Ajan",
       "noAgentsTitle": "Hiçbir ajan bulunamadı",
@@ -9592,6 +9591,8 @@
       "modalSubtitle": "İzlemek istediğiniz şeyi seçin",
       "modalTitle": "Bir Kontrol Oluşturun",
       "pageTitle": "Yeni {label} Kontrol",
+      "saveAndContinue": "Kaydet ve devam et",
+      "saveAndExit": "Kaydet ve çık",
       "saveCheck": "Kontrolü kaydet",
       "saveFailed": "Kontrol kaydedilemedi.",
       "saved": "Kontrol başarıyla kaydedildi.",

@@ -1,7 +1,20 @@
-// Copyright 2026 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+-->
 <template>
   <OPageLayout
-    :title="detail?.label || t('synthetics.privateLocations.detail.title')"
     icon="location-on"
     :back="{
       label: t('synthetics.privateLocations.detail.back'),
@@ -9,6 +22,14 @@
     }"
     bleed
   >
+    <template #title>
+      <span class="inline-flex min-w-0 items-center gap-2">
+        <span class="truncate">{{
+          detail?.label || t("synthetics.privateLocations.detail.title")
+        }}</span>
+        <BetaBadge />
+      </span>
+    </template>
     <template #title-trail>
       <OBadge v-if="detail" :variant="statusVariant(detail.status)" :dot="true" size="sm">
         {{ t(`synthetics.privateLocations.status.${detail.status}`) }}
@@ -129,7 +150,7 @@
                   variant="ghost"
                   size="icon-sm"
                   icon-left="content-copy"
-                  :title="t('synthetics.privateLocations.detail.recoverAgent')"
+                  :title="t('synthetics.privateLocations.detail.restartConfig')"
                   :data-test="`synthetics-private-location-agent-recover-btn-${(row as any).id}`"
                   @click="openSetup((row as any).name)"
                 />
@@ -211,6 +232,7 @@ import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { resolveBadge } from "@/lib/core/Badge/badgeGroups";
+import BetaBadge from "@/components/common/BetaBadge.vue";
 import AgentSetupDrawer from "@/components/synthetic-monitoring/AgentSetupDrawer.vue";
 import syntheticsService from "@/services/synthetics";
 import type { AgentSetup, SyntheticLocationDetail } from "@/types/synthetics";

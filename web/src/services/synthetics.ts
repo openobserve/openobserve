@@ -114,6 +114,21 @@ const syntheticsService = {
   getAgentSetup: (orgIdentifier: string) =>
     http().get(`/api/${orgIdentifier}/synthetics/agent-setup`),
 
+  // ── Agent tokens (org-level o2syn_ probe credentials) ──────────────────
+  listAgentTokens: (orgIdentifier: string) =>
+    http().get(`/api/${orgIdentifier}/synthetics/agent-tokens`),
+
+  createAgentToken: (orgIdentifier: string, name: string) =>
+    http().post(`/api/${orgIdentifier}/synthetics/agent-tokens`, { name }),
+
+  rotateAgentToken: (orgIdentifier: string, name?: string) =>
+    http().post(`/api/${orgIdentifier}/synthetics/agent-tokens/rotate`, name ? { name } : {}),
+
+  setAgentTokenEnabled: (orgIdentifier: string, name: string, enabled: boolean) =>
+    http().patch(`/api/${orgIdentifier}/synthetics/agent-tokens/${encodeURIComponent(name)}`, {
+      enabled,
+    }),
+
   getLocation: (orgIdentifier: string, id: string) =>
     http().get(`/api/${orgIdentifier}/synthetics/locations/${id}`),
 

@@ -93,7 +93,7 @@ function makeWrapper() {
         OPageHeader: {
           template: `
             <div data-test="app-page-header">
-              <span data-test="app-page-header-title">{{ title }}</span>
+              <slot name="title" />
               <span data-test="app-page-header-subtitle">{{ subtitle }}</span>
               <slot name="actions" />
             </div>
@@ -150,7 +150,11 @@ function makeWrapper() {
             "overrideMonitorName",
             "overrideRunId",
             "overrideExecutionId",
+            "overrideMonitorType",
           ],
+        },
+        BetaBadge: {
+          template: '<span data-test="beta-badge">BETA</span>',
         },
       },
     },
@@ -192,8 +196,9 @@ describe("MonitorResults", () => {
       wrapper = makeWrapper();
       await flushPromises();
 
-      const title = wrapper.find('[data-test="app-page-header-title"]');
-      expect(title.text()).toBe("Test Monitor");
+      const header = wrapper.find('[data-test="app-page-header"]');
+      expect(header.text()).toContain("Test Monitor");
+      expect(wrapper.find('[data-test="beta-badge"]').exists()).toBe(true);
     });
 
     it("should render MonitorRuns child component", async () => {
@@ -262,6 +267,43 @@ describe("MonitorResults", () => {
 
       expect(wrapper.find('[data-test="run-detail"]').exists()).toBe(true);
     });
+
+    it("should pass an empty override-monitor-type to RunDetail until fetchCheck resolves", async () => {
+      let resolveFetch: (value: any) => void;
+      mockSyntheticsServiceGet.mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveFetch = resolve;
+          }),
+      );
+
+      wrapper = makeWrapper();
+      await flushPromises();
+
+      // fetchCheck() hasn't settled yet — RunDetail must not receive the
+      // possibly-stale "browser" default.
+      let runDetail = wrapper.findComponent('[data-test="run-detail"]');
+      expect(runDetail.props("overrideMonitorType")).toBe("");
+
+      resolveFetch!({ data: { type: "api", last_triggered_at: 0 } });
+      await flushPromises();
+
+      // fetchCheck() has now resolved with the real type.
+      runDetail = wrapper.findComponent('[data-test="run-detail"]');
+      expect(runDetail.props("overrideMonitorType")).toBe("api");
+    });
+
+    it("should resolve override-monitor-type to the default type when fetchCheck fails with a non-404 error", async () => {
+      mockSyntheticsServiceGet.mockRejectedValueOnce({ response: { status: 500 } });
+
+      wrapper = makeWrapper();
+      await flushPromises();
+
+      // The finally block still flips checkTypeReady even on a non-404
+      // error, exposing the untouched "browser" default.
+      const runDetail = wrapper.findComponent('[data-test="run-detail"]');
+      expect(runDetail.props("overrideMonitorType")).toBe("browser");
+    });
   });
 
   describe("auto-open drawer from URL query params", () => {
@@ -297,8 +339,8 @@ describe("MonitorResults", () => {
       wrapper = makeWrapper();
       await flushPromises();
 
-      const title = wrapper.find('[data-test="app-page-header-title"]');
-      expect(title.text()).toBe("synthetics.results.title");
+      const header = wrapper.find('[data-test="app-page-header"]');
+      expect(header.text()).toContain("synthetics.results.title");
     });
   });
 

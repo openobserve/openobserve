@@ -37,21 +37,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @update:open="$emit('update:modelValue', $event)"
   >
     <template #header>
-      <div class="flex min-w-0 items-center gap-2">
+      <div class="flex min-w-0 flex-col">
+        <div class="flex min-w-0 items-center gap-2">
+          <span
+            class="truncate font-mono text-sm font-semibold"
+            :title="card.name"
+            data-test="metrics-fn-metric"
+            >{{ card.name }}</span
+          >
+          <!-- The registry's metricType group — same badge the card footer shows. -->
+          <OTag
+            type="metricType"
+            :value="card.typeFilterBucket"
+            class="shrink-0"
+            data-test="metrics-fn-badge"
+          />
+        </div>
+        <!-- Keep classes in sync with ODialog's built-in subTitle. -->
         <span
-          class="truncate font-mono text-sm font-semibold"
-          :title="card.name"
-          data-test="metrics-fn-metric"
-          >{{ card.name }}</span
+          class="text-dialog-content-text mt-0.5 block truncate text-sm opacity-70"
+          data-test="metrics-fn-subtitle"
         >
-        <!-- The registry's metricType group — same badge the card footer shows. -->
-        <OTag
-          type="metricType"
-          :value="card.typeFilterBucket"
-          class="shrink-0"
-          data-test="metrics-fn-badge"
-        />
-        <span class="text-text-secondary truncate text-xs">
           {{ t("metrics.explorer.fn.subtitle") }}
         </span>
       </div>
@@ -187,7 +193,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <template #footer>
       <div class="flex items-center justify-between gap-2">
-        <OButton variant="ghost" size="sm-action" data-test="metrics-fn-restore" @click="onRestore">
+        <OButton
+          variant="outline"
+          size="sm-action"
+          data-test="metrics-fn-restore"
+          @click="onRestore"
+        >
           {{ t("metrics.explorer.fn.resetToDefault") }}
         </OButton>
 

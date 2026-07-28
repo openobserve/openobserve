@@ -9,6 +9,7 @@ import type {
   SyntheticsLocation,
   SyntheticsDevice,
   SyntheticsFolder,
+  AgentSetup,
 } from "@/types/synthetics";
 import useSyntheticsRecorder from "@/composables/useSyntheticsRecorder";
 import { journeyToWireSteps } from "@/utils/synthetics/mapRecordedStep";
@@ -34,9 +35,11 @@ import OStepper from "@/lib/navigation/Stepper/OStepper.vue";
 import OStep from "@/lib/navigation/Stepper/OStep.vue";
 import BrowserJourney from "@/components/synthetics/journey/BrowserJourney.vue";
 import CheckConfigure from "@/components/synthetics/configure/CheckConfigure.vue";
+import AgentSetupDrawer from "@/components/synthetic-monitoring/AgentSetupDrawer.vue";
 import CreateBrowserTestSkeleton from "@/components/synthetics/CreateBrowserTestSkeleton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import EmptyBrowserCheck from "@/lib/core/EmptyState/illustrations/EmptyBrowserCheck.vue";
+import BetaBadge from "@/components/common/BetaBadge.vue";
 
 const router = useRouter();
 const route = useRoute();
@@ -122,15 +125,32 @@ async function fetchFolders() {
   }
 }
 
+// ── Private agent setup (drawer opened from the locations card) ──────────
+const showAgentSetup = ref(false);
+const agentSetup = ref<AgentSetup | null>(null);
+
+async function openAgentSetup() {
+  showAgentSetup.value = true;
+  if (agentSetup.value) return;
+  try {
+    const org = store.state.selectedOrganization.identifier;
+    const res = await syntheticsService.getAgentSetup(org);
+    agentSetup.value = (res.data ?? null) as AgentSetup | null;
+  } catch {
+    agentSetup.value = null;
+  }
+}
+
 async function fetchLocations() {
   try {
     const org = store.state.selectedOrganization.identifier;
     const res = await syntheticsService.getLocations(org);
     const data = res.data ?? {};
-    // Browser tests are Lambda-only today — private (agent-served) locations
-    // cannot run them, so they are excluded from this picker.
+    // Public browser locations (Lambda) plus private locations whose agents
+    // advertise `browser` (self-hosted browser agent). A protocol-only private
+    // location is excluded — it can't run browser checks.
     locations.value = ((data.locations ?? []) as SyntheticsLocation[]).filter(
-      (l) => l.kind !== "private" && l.enabled !== false,
+      (l) => l.enabled !== false && (l.kind !== "private" || (l.types ?? []).includes("browser")),
     );
     browsers.value = (data.browsers ?? []) as string[];
     devices.value = (data.devices ?? []) as SyntheticsDevice[];
@@ -386,7 +406,13 @@ function beforeUnloadHandler(e: BeforeUnloadEvent) {
   e.preventDefault();
 }
 
-async function saveCheck() {
+/**
+ * Validates and persists the check. Owns validation, the API call and all
+ * toasts — but deliberately NOT navigation, so the footer buttons can decide
+ * where to go afterwards (stay on Configure vs. return to the checks list).
+ * Returns true only when the check was actually written.
+ */
+async function persist(): Promise<boolean> {
   // ── Pre-save validation ───────────────────────────────────────────
   validationErrors.value = {};
   const toValidate = {
@@ -415,7 +441,7 @@ async function saveCheck() {
       variant: "error",
       message: t("synthetics.validation.fixHighlightedFields"),
     });
-    return;
+    return false;
   }
 
   isSaving.value = true;
@@ -431,32 +457,28 @@ async function saveCheck() {
       await syntheticsService.update(org, props.editId, apiPayload.value, check.value.folder);
       dismiss();
       toast({ variant: "success", message: t("synthetics.newCheck.updated") });
-      isDirty.value = false;
-      if (currentStep.value !== 1) {
-        router.push({ name: "synthetics", query: { folder: check.value.folder } });
-      }
     } else {
-      const res = await syntheticsService.create(org, apiPayload.value, check.value.folder);
-      const savedId = res.data?.id ?? crypto.randomUUID();
+      await syntheticsService.create(org, apiPayload.value, check.value.folder);
       dismiss();
       toast({ variant: "success", message: t("synthetics.newCheck.saved") });
-      isDirty.value = false;
-      router.push({ name: "synthetics", query: { folder: check.value.folder } });
     }
+    isDirty.value = false;
+    return true;
   } catch (err: any) {
     dismiss();
     if (err?.response?.status === 404) {
+      // Already navigated away — the caller must not push on top of this.
       forceLeave = true;
       router.push({ name: "synthetics" });
       toast({ variant: "warning", message: t("synthetics.newCheck.notFoundInOrg") });
-      isSaving.value = false;
-      return;
+      return false;
     }
     toast({
       variant: "error",
       message: err?.response?.data?.message || t("synthetics.newCheck.saveFailed"),
     });
     console.error("[synthetics] save failed", err);
+    return false;
   } finally {
     isSaving.value = false;
   }
@@ -478,6 +500,19 @@ function onContinueToConfigure() {
   if (!valid) return;
   journeyStepDone.value = true;
   currentStep.value = 2;
+}
+
+/** Edit mode, Journey step: persist, then move on to Configure. */
+async function onSaveAndContinue() {
+  if (!(await persist())) return;
+  journeyStepDone.value = true;
+  currentStep.value = 2;
+}
+
+/** Persist, then return to the checks list. */
+async function onSaveAndExit() {
+  if (!(await persist())) return;
+  router.push({ name: "synthetics", query: { folder: check.value.folder } });
 }
 
 // ── Replay — uses the composable's phase-based state machine ────────────────
@@ -533,7 +568,6 @@ function onClearResults() {
   <!-- ── Non-loading: shared wrapper with page header ── -->
   <OPageLayout
     class="bg-surface-base"
-    :title="headerTitle"
     :subtitle="folderName"
     :back="{
       label: t('synthetics.newCheck.back'),
@@ -542,6 +576,12 @@ function onClearResults() {
     }"
     bleed
   >
+    <template #title>
+      <span class="inline-flex min-w-0 items-center gap-2">
+        <span class="truncate">{{ headerTitle }}</span>
+        <BetaBadge />
+      </span>
+    </template>
     <!-- ── Gate phase: URL + name ── -->
     <main v-if="phase === 'gate'" class="flex flex-1 flex-col items-center justify-center">
       <div class="mx-auto w-full max-w-[48rem] px-4 py-4">
@@ -596,7 +636,7 @@ function onClearResults() {
             data-test="synthetics-create-record-btn"
             @click="onRecordClick"
           >
-            <template #prefix>
+            <template #icon-left>
               <OIcon name="smart-display" size="sm" />
             </template>
             {{ t("synthetics.journey.recordJourney") }}
@@ -607,7 +647,7 @@ function onClearResults() {
             data-test="synthetics-create-build-btn"
             @click="buildManually"
           >
-            <template #prefix>
+            <template #icon-left>
               <OIcon name="edit" size="sm" />
             </template>
             {{ t("synthetics.createBrowserTest.buildManually") }}
@@ -802,18 +842,37 @@ function onClearResults() {
               :destinations="destinations"
               :folders="folders"
               :validation-errors="validationErrors"
+              allow-private-locations
               class="w-full!"
               @refresh:destinations="fetchDestinations"
               @update:check="onConfigureUpdate"
+              @setup-agent="openAgentSetup"
             />
           </OStep>
         </OStepper>
+
+        <!-- Private browser-agent setup drawer; locations reload on close so a
+           freshly registered location becomes selectable without leaving. -->
+        <AgentSetupDrawer
+          v-model:open="showAgentSetup"
+          agent-type="browser"
+          :token="agentSetup?.token"
+          :org="agentSetup?.org"
+          :o2-url="agentSetup?.o2_url"
+          :script-url="agentSetup?.script_url"
+          :install="agentSetup?.install"
+          @update:open="
+            (open: boolean) => {
+              if (!open) fetchLocations();
+            }
+          "
+        />
 
         <!-- Sticky footer — tab-aware, always visible -->
         <div
           class="border-border-default bg-surface-base flex shrink-0 items-center gap-2 border-t px-3 py-2.5"
         >
-          <!-- Journey step: Cancel | Selection actions (left) | Replay status + Continue (right) -->
+          <!-- Journey step: Selection actions (left) | Cancel + save/continue actions (right) -->
           <template v-if="currentStep === 1">
             <!-- Selection actions — moved from BrowserJourney, kept on the left -->
             <template v-if="journeySelectionState.count > 0 && !journeySelectionState.isRecording">
@@ -840,26 +899,36 @@ function onClearResults() {
             >
               {{ t("common.cancel") }}
             </OButton>
+            <!-- Create mode: nothing to save yet — Configure holds the required fields -->
             <OButton
+              v-if="!props.editId"
               variant="outline"
               size="sm"
               data-test="synthetics-create-continue-btn"
               @click="onContinueToConfigure"
             >
               {{ t("synthetics.createBrowserTest.continue") }}
-              <template #suffix><OIcon name="chevron-right" size="sm" /></template>
             </OButton>
-            <OButton
-              v-if="props.editId"
-              variant="primary"
-              size="sm"
-              :loading="isSaving"
-              data-test="synthetics-create-save-from-journey-btn"
-              @click="saveCheck"
-            >
-              {{ t("synthetics.newCheck.updateCheck") }}
-              <template #suffix><OIcon name="save" size="sm" /></template>
-            </OButton>
+            <template v-else>
+              <OButton
+                variant="outline"
+                size="sm"
+                :loading="isSaving"
+                data-test="synthetics-create-save-continue-btn"
+                @click="onSaveAndContinue"
+              >
+                {{ t("synthetics.newCheck.saveAndContinue") }}
+              </OButton>
+              <OButton
+                variant="primary"
+                size="sm"
+                :loading="isSaving"
+                data-test="synthetics-create-save-exit-btn"
+                @click="onSaveAndExit"
+              >
+                {{ t("synthetics.newCheck.saveAndExit") }}
+              </OButton>
+            </template>
           </template>
 
           <!-- Configure step: Cancel | Back + Save -->
@@ -879,7 +948,6 @@ function onClearResults() {
               data-test="synthetics-create-back-to-journey-btn"
               @click="currentStep = 1"
             >
-              <template #prefix><OIcon name="chevron-left" size="sm" /></template>
               {{ t("common.goBack") }}
             </OButton>
             <OButton
@@ -887,14 +955,9 @@ function onClearResults() {
               size="sm"
               :loading="isSaving"
               data-test="synthetics-create-save-btn"
-              @click="saveCheck"
+              @click="onSaveAndExit"
             >
-              {{
-                props.editId
-                  ? t("synthetics.newCheck.updateCheck")
-                  : t("synthetics.newCheck.saveCheck")
-              }}
-              <template #suffix><OIcon name="save" size="sm" /></template>
+              {{ t("synthetics.newCheck.saveAndExit") }}
             </OButton>
           </template>
         </div>

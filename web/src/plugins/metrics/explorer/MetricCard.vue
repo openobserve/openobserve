@@ -40,8 +40,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       class="border-border-default relative flex min-h-7 min-w-0 items-center gap-2 border-b px-2 py-1"
     >
-      <!-- The name gets the full header width; the type badge sits in the
-           footer, where it cannot truncate the name it describes. -->
+      <!-- Name, then the type badge tight beside it. The name is the only
+           flexible element in the row: it truncates whenever the right-hand
+           cluster needs the room. -->
       <div class="flex min-w-0 items-center gap-1.5">
         <!-- Matches the dashboard panel title's classes (PanelContainer's
              dashboard-panel-header): same size, weight, tracking and token. -->
@@ -50,102 +51,166 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :title="card.name"
           >{{ card.name }}</span
         >
+        <!-- Badge text is never the sole carrier of meaning — the card's aria
+             label spells the type out too. -->
+        <OTag
+          type="metricType"
+          :value="card.typeFilterBucket"
+          class="shrink-0"
+          :data-test="`metrics-explorer-card-badge-${card.name}`"
+        />
       </div>
 
       <!-- Spacer, then the right-hand cluster (PanelContainer: title, `flex-1`
            spacer, then the action row). -->
       <div class="flex-1" />
 
-      <!-- The action row: `size="icon"` buttons sitting adjacent (no gap).
-           Order (left→right): Help → Configure → Open → Pin → 🕑 clock → Refresh. -->
+      <!-- The right-hand cluster. At rest: the query function · unit, then the
+           freshness clock. On hover/focus the query · unit swap out for the
+           action row (Help → Configure → Open → Pin); the clock stays either
+           way, and Refresh joins on the far right. -->
       <div class="flex shrink-0 flex-nowrap items-center">
-        <!-- Help — the SAME element the dashboard panel bar uses for its panel
+        <span
+          v-if="restInfo"
+          class="text-2xs text-text-secondary max-w-40 truncate opacity-70 group-focus-within:hidden group-hover:hidden"
+          :title="restInfo"
+          :data-test="`metrics-explorer-card-rest-info-${card.name}`"
+          >{{ restInfo }}</span
+        >
+
+        <!-- Revealed by width+opacity, NOT display — a display:none control
+             leaves the tab order, and this reveal is focus-driven too: tabbing
+             into the first (invisible) action expands the row for keyboards. -->
+        <div
+          class="flex w-0 flex-nowrap items-center overflow-hidden opacity-0 group-focus-within:w-auto group-focus-within:opacity-100 group-hover:w-auto group-hover:opacity-100"
+          :data-test="`metrics-explorer-card-actions-${card.name}`"
+        >
+          <!-- Help — the SAME element the dashboard panel bar uses for its panel
              description (PanelContainer `dashboard-panel-description-info`): an
              info-outline icon with a width-capped, pre-wrapped OTooltip. NOT a
              dropdown item — a full help sentence in an unbounded menu item blew
              the menu out to full-page width. -->
-        <OButton
-          v-if="card.help"
-          variant="ghost"
-          size="icon"
-          icon-left="info-outline"
-          :aria-label="
-            t('metrics.explorer.card.helpAria', {
-              name: card.name,
-              help: card.help,
-            })
-          "
-          :data-test="`metrics-explorer-card-help-${card.name}`"
-          @click.stop
-        >
-          <OTooltip side="bottom" align="end" max-width="13.75rem">
-            <template #content
-              ><div class="whitespace-pre-wrap">{{ card.help }}</div></template
-            >
-          </OTooltip>
-        </OButton>
+          <OButton
+            v-if="card.help"
+            variant="ghost"
+            size="icon"
+            icon-left="info-outline"
+            :aria-label="
+              t('metrics.explorer.card.helpAria', {
+                name: card.name,
+                help: card.help,
+              })
+            "
+            :data-test="`metrics-explorer-card-help-${card.name}`"
+            @click.stop
+          >
+            <OTooltip side="bottom" align="end" max-width="13.75rem">
+              <template #content
+                ><div class="whitespace-pre-wrap">{{ card.help }}</div></template
+              >
+            </OTooltip>
+          </OButton>
 
-        <!-- Configure — visible icon button (only when the card is configurable). -->
-        <OButton
-          v-if="card.configurable"
-          variant="ghost"
-          size="icon"
-          icon-left="settings"
-          :aria-label="t('metrics.explorer.card.configureAria', { name: card.name })"
-          :data-test="`metrics-explorer-card-fn-${card.name}`"
-          @click="$emit('configure', card)"
-        >
-          <OTooltip :content="t('metrics.explorer.card.configureTooltip')" />
-        </OButton>
+          <!-- Configure — visible icon button (only when the card is configurable). -->
+          <OButton
+            v-if="card.configurable"
+            variant="ghost"
+            size="icon"
+            icon-left="settings"
+            :aria-label="t('metrics.explorer.card.configureAria', { name: card.name })"
+            :data-test="`metrics-explorer-card-fn-${card.name}`"
+            @click="$emit('configure', card)"
+          >
+            <OTooltip :content="t('metrics.explorer.card.configureTooltip')" />
+          </OButton>
 
-        <!-- The drill-in. The ONLY thing that navigates; the chart and card are
+          <!-- The drill-in. The ONLY thing that navigates; the chart and card are
              not click targets, so the metric name stays selectable.
 
              `edit`, not `open-in-new`: this opens the metric in the in-page
              Visualize workspace to CHANGE it (query, chart type, functions), and
              open-in-new is the web's idiom for "leaves this page / new tab",
              which this does not do. -->
-        <OButton
-          variant="ghost"
-          size="icon"
-          icon-left="edit"
-          :aria-label="t('metrics.explorer.card.openAria', { name: card.name })"
-          :data-test="`metrics-explorer-card-select-${card.name}`"
-          @click="$emit('select', card)"
-        >
-          <OTooltip :content="t('metrics.explorer.card.openTooltip')" />
-        </OButton>
+          <OButton
+            variant="ghost"
+            size="icon"
+            icon-left="edit"
+            :aria-label="t('metrics.explorer.card.openAria', { name: card.name })"
+            :data-test="`metrics-explorer-card-select-${card.name}`"
+            @click="$emit('select', card)"
+          >
+            <OTooltip :content="t('metrics.explorer.card.openTooltip')" />
+          </OButton>
 
-        <!-- Pin (star). Always visible. Filled gold star when favorited. -->
-        <OButton
-          variant="ghost"
-          size="icon"
-          :icon-left="isFavorite ? 'star' : 'star-outline'"
-          :class="isFavorite ? 'text-favorite' : ''"
-          :aria-label="
-            isFavorite
-              ? t('metrics.explorer.card.favoriteRemoveAria', {
-                  name: card.name,
-                })
-              : t('metrics.explorer.card.favoriteAddAria', { name: card.name })
-          "
-          :aria-pressed="String(isFavorite)"
-          :data-test="`metrics-explorer-card-favorite-${card.name}`"
-          @click="$emit('toggle-favorite', card)"
-        >
-          <OTooltip
-            :content="
+          <!-- Pin (star). Always visible. Filled gold star when favorited. -->
+          <OButton
+            variant="ghost"
+            size="icon"
+            :icon-left="isFavorite ? 'star' : 'star-outline'"
+            :class="isFavorite ? 'text-favorite' : ''"
+            :aria-label="
               isFavorite
-                ? t('metrics.explorer.card.favoriteRemoveTooltip')
-                : t('metrics.explorer.card.favoriteAddTooltip')
+                ? t('metrics.explorer.card.favoriteRemoveAria', {
+                    name: card.name,
+                  })
+                : t('metrics.explorer.card.favoriteAddAria', { name: card.name })
             "
-          />
-        </OButton>
+            :aria-pressed="String(isFavorite)"
+            :data-test="`metrics-explorer-card-favorite-${card.name}`"
+            @click="$emit('toggle-favorite', card)"
+          >
+            <OTooltip
+              :content="
+                isFavorite
+                  ? t('metrics.explorer.card.favoriteRemoveTooltip')
+                  : t('metrics.explorer.card.favoriteAddTooltip')
+              "
+            />
+          </OButton>
+        </div>
 
-        <!-- Last Refreshed — the SAME element the dashboard panel bar carries
-             (PanelErrorButtons): 🕑 with the relative tooltip. `ml-1.25` matches
-             PanelErrorButtons' spacing. A card restored from cache says how old
-             its data really is instead of passing it off as live. -->
+        <!-- Refresh — revealed with the actions, just LEFT of the freshness
+             clock (the clock is always the rightmost element). Re-runs this
+             card's query, dropping the cached response so a metric that has
+             started emitting shows up. Goes `warning` when the shown data was
+             fetched for a different window than the one selected — the same
+             treatment the dashboard refresh button gives unapplied variable
+             changes — and a warning nobody can see says nothing, so that state
+             forces the button visible at rest. While loading it is disabled,
+             not spinnered: the body's LoadingProgress bar is the loading
+             signal. -->
+        <div
+          :class="
+            preview?.cachedDataDiffersFromTimeRange
+              ? 'flex items-center'
+              : 'flex w-0 items-center overflow-hidden opacity-0 group-focus-within:w-auto group-focus-within:opacity-100 group-hover:w-auto group-hover:opacity-100'
+          "
+        >
+          <OButton
+            v-if="!card.unsupported"
+            :variant="preview?.cachedDataDiffersFromTimeRange ? 'warning' : 'ghost'"
+            size="icon"
+            icon-left="refresh"
+            :disabled="preview?.status === 'loading'"
+            :aria-label="t('metrics.explorer.card.refreshAria', { name: card.name })"
+            :data-test="`metrics-explorer-card-refresh-${card.name}`"
+            @click="$emit('refresh', card)"
+          >
+            <OTooltip
+              :content="
+                preview?.cachedDataDiffersFromTimeRange
+                  ? t('metrics.explorer.card.refreshToApplyTimeRange')
+                  : t('metrics.explorer.card.refreshTooltip')
+              "
+            />
+          </OButton>
+        </div>
+
+        <!-- Last Refreshed — always the rightmost element, the SAME element the
+             dashboard panel bar carries (PanelErrorButtons): 🕑 with the
+             relative tooltip. `ml-1.25` matches PanelErrorButtons' spacing. A
+             card restored from cache says how old its data really is instead of
+             passing it off as live. -->
         <span
           v-if="preview?.lastTriggeredAt"
           class="lastRefreshedAt mr-0.5 ml-1.25 shrink-0 overflow-hidden text-[smaller] text-ellipsis whitespace-nowrap"
@@ -165,22 +230,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :full-time-prefix="t('metrics.explorer.card.lastRefreshedPrefix')"
           />
         </span>
-
-        <!-- Refresh — always visible, rightmost with the clock (the freshness
-             cluster). Re-runs this card's query, dropping the cached response so
-             a metric that has started emitting shows up. -->
-        <OButton
-          v-if="!card.unsupported"
-          variant="ghost"
-          size="icon"
-          icon-left="refresh"
-          :loading="preview?.status === 'loading'"
-          :aria-label="t('metrics.explorer.card.refreshAria', { name: card.name })"
-          :data-test="`metrics-explorer-card-refresh-${card.name}`"
-          @click="$emit('refresh', card)"
-        >
-          <OTooltip :content="t('metrics.explorer.card.refreshTooltip')" />
-        </OButton>
       </div>
     </div>
 
@@ -413,42 +462,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </button>
       </div>
     </div>
-
-    <!-- The footer pads itself now that the frame is flush, mirroring how the
-         panel bar pads itself. -->
-    <div class="text-3xs flex items-center justify-between gap-2 px-2 py-1">
-      <!-- The function actually in effect, so a ⚙ override is visible on the
-           card rather than silently identical to the default. -->
-      <span class="text-text-secondary truncate opacity-70">{{
-        preview?.footerLabel || card.footerLabel
-      }}</span>
-
-      <div class="flex flex-none items-center gap-1.5">
-        <!-- Cached data fetched for a differently-sized window. Same warning the
-             dashboards raise on a panel. -->
-        <span
-          v-if="preview?.cachedDataDiffersFromTimeRange"
-          class="text-warning-600 inline-flex cursor-help"
-          :data-test="`metrics-explorer-card-cached-differs-${card.name}`"
-        >
-          <OTooltip
-            :content="t('metrics.explorer.card.cachedDiffers')"
-            max-width="360px"
-            :delay="200"
-          />
-          <OIcon name="running-with-errors" size="xs" />
-        </span>
-
-        <span class="text-text-secondary opacity-70">{{ unitLabel }}</span>
-        <!-- Badge text is never the sole carrier of meaning — the footer
-             function label sits right beside it. -->
-        <OTag
-          type="metricType"
-          :value="card.typeFilterBucket"
-          :data-test="`metrics-explorer-card-badge-${card.name}`"
-        />
-      </div>
-    </div>
   </div>
 </template>
 
@@ -570,6 +583,16 @@ export default defineComponent({
         : { unit: null, unitCustom: null },
     );
     const unitLabel = computed(() => UNIT_LABELS[props.preview?.unit ?? props.card.unit] ?? "");
+
+    /**
+     * The header's at-rest info: "sum(rate) · c/s" — the function actually in
+     * effect (so a ⚙ override is visible on the card rather than silently
+     * identical to the default), then the unit.
+     */
+    const restInfo = computed(() => {
+      const fn = props.preview?.footerLabel || props.card.footerLabel;
+      return [fn, unitLabel.value].filter(Boolean).join(" · ");
+    });
 
     /**
      * The failure, in full: the message, then the backend's internal cause and
@@ -725,7 +748,7 @@ export default defineComponent({
       badgeLabel,
       o2Unit,
       bucketO2Unit,
-      unitLabel,
+      restInfo,
       errorTooltip,
       staleTooltip,
       errorReport,

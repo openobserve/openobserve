@@ -158,14 +158,20 @@
             >
               {{ t("onlineEvals.scorer.detail.producesSection") }}
             </h4>
-            <div v-if="producesConfig" class="sd-produces" data-test="scorer-detail-produces">
+            <div
+              v-if="producesConfig"
+              class="sd-produces text-text-heading"
+              data-test="scorer-detail-produces"
+            >
               <OIcon name="rule" size="xs" />
               <span class="sd-produces__name">{{ producesConfig.name }}</span>
-              <span class="sd-produces__version"
+              <span class="sd-produces__version text-text-secondary"
                 >{{ t("onlineEvals.versionPrefix") }}{{ producesConfig.version }}</span
               >
-              <span class="sd-produces__sep">·</span>
-              <span class="sd-produces__type">{{ dataTypeOf(producesConfig) }}</span>
+              <span class="sd-produces__sep text-text-secondary">·</span>
+              <span class="sd-produces__type text-text-secondary">{{
+                dataTypeOf(producesConfig)
+              }}</span>
             </div>
             <OEmptyState
               v-else
@@ -189,7 +195,9 @@
                 {{ t("onlineEvals.scorer.detail.variablesSuffix") }}
               </OTag>
             </h4>
-            <pre class="sd-code" data-test="scorer-detail-template">{{ row.template }}</pre>
+            <pre class="sd-code text-text-heading" data-test="scorer-detail-template">{{
+              row.template
+            }}</pre>
           </section>
 
           <section v-if="outputSchemaPretty" class="flex flex-col gap-2 px-5">
@@ -198,7 +206,7 @@
             >
               {{ t("onlineEvals.scorer.detail.outputSchemaSection") }}
             </h4>
-            <pre class="sd-code sd-code--mono">{{ outputSchemaPretty }}</pre>
+            <pre class="sd-code sd-code--mono text-text-heading">{{ outputSchemaPretty }}</pre>
           </section>
 
           <section class="flex flex-col gap-2 px-5">
@@ -233,12 +241,12 @@
             <ul class="sd-versions">
               <li class="sd-versions__item sd-versions__item--active">
                 <div class="sd-versions__head">
-                  <span class="sd-versions__label"
+                  <span class="sd-versions__label text-text-heading"
                     >{{ t("onlineEvals.versionPrefix") }}{{ row.version }}</span
                   >
                   <OTag type="activeVersionFlag" value="active" />
                 </div>
-                <div v-if="updatedAt" class="sd-versions__meta">
+                <div v-if="updatedAt" class="sd-versions__meta text-text-secondary">
                   {{ t("onlineEvals.scorer.detail.lastUpdated") }}
                   <span>{{ formatTimestamp(updatedAt) }}</span>
                 </div>
@@ -320,8 +328,12 @@
                 >
                   <OIcon name="play-arrow" size="xs" />
                   <span>{{ job.name }}</span>
-                  <span class="sd-used-list__meta">{{ job.status }}</span>
-                  <OIcon name="chevron-right" size="xs" class="sd-used-list__chevron" />
+                  <span class="sd-used-list__meta text-text-secondary">{{ job.status }}</span>
+                  <OIcon
+                    name="chevron-right"
+                    size="xs"
+                    class="sd-used-list__chevron text-text-secondary"
+                  />
                 </OButton>
               </li>
             </ul>
@@ -765,7 +777,6 @@ function relativeTime(timestampMs: number): string {
   border: 0.0625rem solid color-mix(in srgb, var(--color-primary-600) 30%, transparent);
   border-radius: 0.3125rem;
   font-size: var(--text-xs);
-  color: var(--color-text-heading, currentColor);
 }
 
 .sd-produces__name {
@@ -775,7 +786,6 @@ function relativeTime(timestampMs: number): string {
 .sd-produces__version,
 .sd-produces__sep,
 .sd-produces__type {
-  color: var(--color-text-secondary, var(--color-text-secondary));
   font-size: var(--text-2xs);
 }
 
@@ -788,7 +798,6 @@ function relativeTime(timestampMs: number): string {
   font-family: var(--font-mono);
   font-size: var(--text-xs);
   line-height: 1.55;
-  color: var(--color-text-heading, currentColor);
   white-space: pre-wrap;
   word-break: break-word;
   max-height: 12.5rem;
@@ -830,13 +839,11 @@ function relativeTime(timestampMs: number): string {
 .sd-versions__label {
   font-weight: 700;
   font-size: var(--text-compact);
-  color: var(--color-text-heading, currentColor);
 }
 
 .sd-versions__meta {
   margin-top: 0.375rem;
   font-size: var(--text-2xs);
-  color: var(--color-text-secondary, var(--color-text-secondary));
 }
 
 /* — Used by tab — */
@@ -878,11 +885,9 @@ function relativeTime(timestampMs: number): string {
   font-size: var(--text-3xs);
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: var(--color-text-secondary, var(--color-text-secondary));
 }
 
 .sd-used-list__chevron {
-  color: var(--color-text-secondary, var(--color-text-secondary));
   opacity: 0.5;
 }
 

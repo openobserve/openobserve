@@ -90,17 +90,21 @@ import CreateProtocolCheck from "./CreateProtocolCheck.vue";
 // ── Stubs ────────────────────────────────────────────────────────────────
 const baseStubs = {
   OPageHeader: {
-    template: '<div data-test="synthetics-header"><slot /></div>',
+    template: '<div data-test="synthetics-header"><slot name="title" /><slot /></div>',
     props: ["title", "subtitle", "back"],
   },
+  // Mirrors the real OButton slot contract (OButton.vue): only `icon-left`,
+  // default and `icon-right` are rendered. Any other slot name (e.g. `suffix`)
+  // is silently dropped — which is exactly the bug this stub must surface.
   OButton: {
     template:
-      '<button :data-test="$attrs[\'data-test\']" :disabled="disabled"><slot name="prefix" /><slot name="suffix" /><slot /></button>',
+      '<button :data-test="$attrs[\'data-test\']" :disabled="disabled"><slot name="icon-left" /><slot /><slot name="icon-right" /></button>',
     props: ["variant", "size", "disabled", "loading", "class", "iconLeft"],
     inheritAttrs: true,
   },
+  // Renders an identifiable marker per icon name so slot placement is assertable.
   OIcon: {
-    template: "<span />",
+    template: '<span :data-test="`icon-${name}`" />',
     props: ["name", "size", "class"],
   },
   ODialog: {
@@ -132,6 +136,9 @@ const baseStubs = {
   CheckSshConfig: {
     template: '<div data-test="synthetics-ssh-config" />',
     props: ["check"],
+  },
+  BetaBadge: {
+    template: '<span data-test="beta-badge">BETA</span>',
   },
 };
 
@@ -180,6 +187,24 @@ describe("CreateProtocolCheck", () => {
 
       expect(wrapper.find('[data-test="synthetics-create-cancel-btn"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="synthetics-create-save-btn"]').exists()).toBe(true);
+    });
+
+    // The footer actions are deliberately text-only — no leading or trailing
+    // icons. The stub renders OButton's real slots, so a stray icon would show.
+    it("should render the footer save button without an icon", async () => {
+      wrapper = mountPage("http");
+      await flushPromises();
+
+      const saveBtn = wrapper.find('[data-test="synthetics-create-save-btn"]');
+      expect(saveBtn.exists()).toBe(true);
+      expect(saveBtn.find('[data-test^="icon-"]').exists()).toBe(false);
+    });
+
+    it("should render the Beta badge in the page title", async () => {
+      wrapper = mountPage("http");
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="beta-badge"]').exists()).toBe(true);
     });
   });
 

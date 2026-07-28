@@ -165,6 +165,24 @@ vi.mock("@/composables/synthetics/syntheticResultsSchema", () => {
   };
 });
 
+vi.mock("vuex", () => ({
+  useStore: () => ({
+    state: {
+      selectedOrganization: { identifier: "test-org" },
+    },
+  }),
+}));
+
+vi.mock("vue-router", () => ({
+  useRoute: () => ({
+    query: {},
+  }),
+  useRouter: () => ({
+    push: vi.fn(),
+    replace: vi.fn(),
+  }),
+}));
+
 import MonitorRuns from "./MonitorRuns.vue";
 
 // ── Stubs for every child component ─────────────────────────────────────
@@ -208,6 +226,10 @@ const baseStubs = {
     template: "<span />",
     props: ["value", "unit", "mode", "emptyLabel"],
   },
+  OTooltip: {
+    template: "<span><slot /></span>",
+    props: ["content", "class"],
+  },
   OBadge: {
     template: "<span :data-test=\"$attrs['data-test']\"><slot /></span>",
     props: ["variant", "size", "dot", "class"],
@@ -224,6 +246,7 @@ const baseStubs = {
     inheritAttrs: true,
   },
   OTable: {
+    name: "OTable",
     template: '<table data-test="monitor-runs-runs-table" />',
     props: [
       "columns",
@@ -232,6 +255,9 @@ const baseStubs = {
       "pagination",
       "pageSize",
       "pageSizeOptions",
+      "sorting",
+      "sortBy",
+      "sortOrder",
       "rowKey",
       "showGlobalFilter",
       "enableColumnResize",
@@ -262,6 +288,7 @@ const baseStubs = {
     inheritAttrs: true,
   },
   MonitorStatusTimeline: {
+    name: "MonitorStatusTimeline",
     template: '<div data-test="monitor-status-timeline" />',
     props: [
       "segments",
@@ -291,7 +318,12 @@ const baseStubs = {
 // But the simplest way is to just show all content.
 
 function mountRuns(
-  props: { monitorId: string; monitorName: string; monitorStatus?: string } = {
+  props: {
+    monitorId: string;
+    monitorName: string;
+    monitorStatus?: string;
+    checkType?: string;
+  } = {
     monitorId: "mon-1",
     monitorName: "Test Monitor",
   },
@@ -380,6 +412,273 @@ describe("MonitorRuns", () => {
       wrapper = mountRuns();
       wrapper.vm.$emit("refresh");
       expect(wrapper.emitted("refresh")).toBeTruthy();
+    });
+  });
+
+  describe("breakdown cards visibility", () => {
+    it("should render device breakdown card when checkType is browser", () => {
+      wrapper = mountRuns({
+        monitorId: "mon-1",
+        monitorName: "Test Monitor",
+        checkType: "browser",
+      });
+      expect(wrapper.text()).toContain("synthetics.runs.passRateByDevice");
+    });
+
+    it("should not render device breakdown card when checkType is not browser", () => {
+      wrapper = mountRuns({
+        monitorId: "mon-1",
+        monitorName: "Test Monitor",
+        checkType: "http",
+      });
+      expect(wrapper.text()).not.toContain("synthetics.runs.passRateByDevice");
+    });
+
+    it("should render protocol duration by location card when checkType is not browser", () => {
+      wrapper = mountRuns({
+        monitorId: "mon-1",
+        monitorName: "Test Monitor",
+        checkType: "http",
+      });
+      expect(wrapper.text()).toContain("synthetics.runs.durationByLocation");
+    });
+
+    it("should not render protocol duration by location card when checkType is browser", () => {
+      wrapper = mountRuns({
+        monitorId: "mon-1",
+        monitorName: "Test Monitor",
+        checkType: "browser",
+      });
+      expect(wrapper.text()).not.toContain("synthetics.runs.durationByLocation");
+    });
+
+    it("should render browser and device filters when checkType is browser", () => {
+      wrapper = mountRuns({
+        monitorId: "mon-1",
+        monitorName: "Test Monitor",
+        checkType: "browser",
+      });
+      expect(wrapper.find('[data-test="monitor-runs-filter-browser"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="monitor-runs-filter-device"]').exists()).toBe(true);
+    });
+
+    it("should not render browser and device filters when checkType is not browser", () => {
+      wrapper = mountRuns({
+        monitorId: "mon-1",
+        monitorName: "Test Monitor",
+        checkType: "http",
+      });
+      expect(wrapper.find('[data-test="monitor-runs-filter-browser"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="monitor-runs-filter-device"]').exists()).toBe(false);
+    });
+  });
+
+  describe("steps tab visibility", () => {
+    it("should render steps tab when checkType is browser", () => {
+      wrapper = mountRuns({
+        monitorId: "mon-1",
+        monitorName: "Test Monitor",
+        checkType: "browser",
+      });
+      expect(wrapper.find('[data-test="monitor-runs-tab-steps"]').exists()).toBe(true);
+    });
+
+    it("should not render steps tab when checkType is not browser", () => {
+      wrapper = mountRuns({
+        monitorId: "mon-1",
+        monitorName: "Test Monitor",
+        checkType: "http",
+      });
+      expect(wrapper.find('[data-test="monitor-runs-tab-steps"]').exists()).toBe(false);
+    });
+  });
+
+  describe("runs table sorting", () => {
+    // The runs table is the only OTable mounted with client pagination — the
+    // steps table below it uses pagination="none".
+    function runsTable(w: VueWrapper) {
+      const table = w
+        .findAllComponents({ name: "OTable" })
+        .find((t) => t.props("pagination") === "client");
+      expect(table).toBeTruthy();
+      return table!;
+    }
+
+    it("should open sorted by last run, newest first", async () => {
+      wrapper = mountRuns({
+        monitorId: "mon-1",
+        monitorName: "Test Monitor",
+        checkType: "browser",
+      });
+      await flushPromises();
+
+      const table = runsTable(wrapper);
+      expect(table.props("sorting")).toBe("client");
+      expect(table.props("sortBy")).toBe("last_run_at");
+      expect(table.props("sortOrder")).toBe("desc");
+    });
+
+    it("should mark every runs column sortable", async () => {
+      wrapper = mountRuns({
+        monitorId: "mon-1",
+        monitorName: "Test Monitor",
+        checkType: "browser",
+      });
+      await flushPromises();
+
+      const columns = runsTable(wrapper).props("columns") as any[];
+      expect(columns.map((c) => c.id)).toEqual([
+        "status",
+        "last_run_at",
+        "duration",
+        "location",
+        "browser",
+        "device",
+        "trigger_type",
+        "scheduled_at",
+      ]);
+      for (const col of columns) {
+        expect(col.sortable, `column "${col.id}" should be sortable`).toBe(true);
+      }
+    });
+
+    it("should sort on raw values rather than the formatted ones the cells render", async () => {
+      wrapper = mountRuns({
+        monitorId: "mon-1",
+        monitorName: "Test Monitor",
+        checkType: "browser",
+      });
+      await flushPromises();
+
+      const columns = runsTable(wrapper).props("columns") as any[];
+      const accessorFor = (id: string) => columns.find((c) => c.id === id)?.accessorKey;
+
+      // Sorting "duration" on the fmtDur() string would order 900ms after 1.2s;
+      // sorting "status" on the translated label would depend on the locale.
+      expect(accessorFor("duration")).toBe("durationMs");
+      expect(accessorFor("status")).toBe("statusRank");
+      expect(accessorFor("location")).toBe("locationName");
+      expect(accessorFor("device")).toBe("deviceName");
+    });
+
+    it("should expose the raw sort fields on every row", async () => {
+      mockSyntheticsServiceGetLocations.mockResolvedValue({
+        data: {
+          locations: [
+            { id: "us-east-1", label: "US East", region: "N. Virginia" },
+            { id: "eu-west-1", label: "EU West", region: "Ireland" },
+          ],
+        },
+      });
+
+      wrapper = mountRuns({
+        monitorId: "mon-1",
+        monitorName: "Test Monitor",
+        checkType: "browser",
+      });
+      await flushPromises();
+
+      const rows = runsTable(wrapper).props("data") as any[];
+      expect(rows).toHaveLength(2);
+
+      // run-001 passed in 1240ms, run-002 failed in 29340ms.
+      expect(rows[0].durationMs).toBe(1240);
+      expect(rows[1].durationMs).toBe(29340);
+      // Failures rank ahead of passes so an ascending sort surfaces them first.
+      expect(rows[0].statusRank).toBeGreaterThan(rows[1].statusRank);
+
+      expect(rows[0].locationName).toBe("US East (N. Virginia)");
+      expect(rows[1].locationName).toBe("EU West (Ireland)");
+    });
+  });
+
+  describe("location label resolution", () => {
+    it("should resolve location labels in locationDurationBreakdown when locations are loaded", async () => {
+      mockSyntheticsServiceGetLocations.mockResolvedValue({
+        data: {
+          locations: [
+            { id: "us-east-1", label: "US East", region: "N. Virginia" },
+            { id: "eu-west-1", label: "EU West", region: "Ireland" },
+            { id: "ap-south-1", label: "AP South", region: "Mumbai" },
+          ],
+        },
+      });
+
+      wrapper = mountRuns({
+        monitorId: "mon-1",
+        monitorName: "Test Monitor",
+        checkType: "http",
+      });
+      await flushPromises();
+
+      // locationDisplayLabel produces "Name (region)" — check that the DOM
+      // contains resolved labels rather than raw IDs like "us-east-1"
+      // Mock data has runs only from us-east-1 and eu-west-1
+      const text = wrapper.text();
+      expect(text).toContain("US East (N. Virginia)");
+      expect(text).toContain("EU West (Ireland)");
+    });
+
+    it("should resolve location labels in pass rate by location breakdown", async () => {
+      mockSyntheticsServiceGetLocations.mockResolvedValue({
+        data: {
+          locations: [
+            { id: "us-east-1", label: "US East", region: "N. Virginia" },
+            { id: "eu-west-1", label: "EU West", region: "Ireland" },
+          ],
+        },
+      });
+
+      wrapper = mountRuns({
+        monitorId: "mon-1",
+        monitorName: "Test Monitor",
+        checkType: "browser",
+      });
+      await flushPromises();
+
+      const text = wrapper.text();
+      expect(text).toContain("US East (N. Virginia)");
+      expect(text).toContain("EU West (Ireland)");
+    });
+
+    it("should resolve location labels in timeline segments when locations are loaded", async () => {
+      mockSyntheticsServiceGetLocations.mockResolvedValue({
+        data: {
+          locations: [
+            { id: "us-east-1", label: "US East", region: "N. Virginia" },
+            { id: "eu-west-1", label: "EU West", region: "Ireland" },
+          ],
+        },
+      });
+
+      wrapper = mountRuns({
+        monitorId: "mon-1",
+        monitorName: "Test Monitor",
+        checkType: "browser",
+      });
+      await flushPromises();
+
+      const timeline = wrapper.findComponent({ name: "MonitorStatusTimeline" });
+      expect(timeline.exists()).toBe(true);
+
+      const segments = timeline.props("segments") as any[];
+      expect(segments.length).toBeGreaterThan(0);
+
+      // Collect all execution locations from timeline segments
+      const allLocations = new Set<string>();
+      for (const seg of segments) {
+        for (const exec of seg.executions) {
+          allLocations.add(exec.location as string);
+        }
+      }
+
+      // Should contain only resolved display labels, not raw IDs
+      expect(allLocations.has("US East (N. Virginia)")).toBe(true);
+      expect(allLocations.has("EU West (Ireland)")).toBe(true);
+
+      // Should NOT contain raw IDs (locationLabel resolves them)
+      expect(allLocations.has("us-east-1")).toBe(false);
+      expect(allLocations.has("eu-west-1")).toBe(false);
     });
   });
 });

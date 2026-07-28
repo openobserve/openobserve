@@ -42,19 +42,28 @@
 
     <!-- Monitor name -->
     <template #cell-name="{ row }">
-      <div class="flex min-w-0 items-center gap-1.5 overflow-hidden">
-        <span class="truncate">{{ (row as any).name || "—" }}</span>
-      </div>
       <OTooltip
         v-if="(row as any).name"
         :content="(row as any).name"
         content-class="max-w-[25rem] whitespace-normal break-words text-xs"
-      />
+      >
+        <div class="flex min-w-0 items-center gap-1.5 overflow-hidden">
+          <span class="cursor-help truncate">{{ (row as any).name || "—" }}</span>
+        </div>
+      </OTooltip>
+      <span v-else class="truncate">—</span>
     </template>
 
     <!-- URL / Endpoint -->
     <template #cell-url="{ row }">
-      <span class="truncate">{{ (row as any).url || "—" }}</span>
+      <OTooltip
+        v-if="(row as any).url"
+        :content="(row as any).url"
+        content-class="max-w-[25rem] whitespace-normal break-words text-xs"
+      >
+        <span class="cursor-help truncate">{{ (row as any).url }}</span>
+      </OTooltip>
+      <span v-else class="truncate">—</span>
     </template>
 
     <!-- HTTP Method badge (API mode) -->
@@ -165,20 +174,24 @@
 
     <!-- Locations with tooltip (monitors mode) -->
     <template #cell-locations="{ row }">
-      <div
-        class="flex cursor-default items-center gap-1"
-        @mouseenter="showLoc($event, (row as any).locations)"
-        @mouseleave="hideLoc"
+      <OTooltip
+        v-if="(row as any).locations?.length"
+        :content="formatLocationsList((row as any).locations)"
+        content-class="max-w-[20rem] whitespace-pre-wrap text-xs"
+        :delay="0"
       >
-        <span class="max-w-[4.375rem] truncate text-xs">{{
-          locationLabel((row as any).locations[0])
-        }}</span>
-        <span
-          v-if="(row as any).locations.length > 1"
-          class="rounded-default shrink-0 bg-[var(--color-surface-subtle)] px-1 py-0.5 text-xs font-bold whitespace-nowrap"
-          >+{{ (row as any).locations.length - 1 }}</span
-        >
-      </div>
+        <div class="flex cursor-help items-center gap-1">
+          <span class="max-w-[4.375rem] truncate text-xs">{{
+            locationLabel((row as any).locations[0])
+          }}</span>
+          <span
+            v-if="(row as any).locations.length > 1"
+            class="rounded-default shrink-0 bg-[var(--color-surface-subtle)] px-1 py-0.5 text-xs font-bold whitespace-nowrap"
+            >+{{ (row as any).locations.length - 1 }}</span
+          >
+        </div>
+      </OTooltip>
+      <span v-else class="text-xs">—</span>
     </template>
 
     <!-- Interval (monitors mode) -->
@@ -386,19 +399,6 @@
       </div>
     </template>
   </OTable>
-
-  <!-- Locations tooltip -->
-  <Teleport to="body">
-    <div
-      v-if="locTip.show"
-      class="loc-float-tip"
-      :style="{ left: locTip.x + 'px', top: locTip.y + 'px' }"
-    >
-      <div v-for="l in locTip.locs" :key="l" class="loc-float-item">
-        <span class="loc-float-dot" />{{ locationLabel(l) }}
-      </div>
-    </div>
-  </Teleport>
 
   <!-- Spark bar detail tooltip -->
   <Teleport to="body">
@@ -745,24 +745,9 @@ const columns = computed<OTableColumnDef[]>(() => {
   return cols;
 });
 
-// ── Locations tooltip ─────────────────────────────────────────────────
-
-const locTip = ref({ show: false, x: 0, y: 0, locs: [] as string[] });
-let locHideTimer: ReturnType<typeof setTimeout> | null = null;
-
-const showLoc = (e: MouseEvent, locs: string[]) => {
-  if (locHideTimer) {
-    clearTimeout(locHideTimer);
-    locHideTimer = null;
-  }
-  const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-  locTip.value = { show: true, x: rect.left, y: rect.bottom + 6, locs };
-};
-const hideLoc = () => {
-  locHideTimer = setTimeout(() => {
-    locTip.value.show = false;
-  }, 120);
-};
+function formatLocationsList(locations: string[]): string {
+  return locations.map((l) => locationLabel(l)).join("\n");
+}
 
 // ── Spark tooltip ─────────────────────────────────────────────────────
 
@@ -798,7 +783,6 @@ const keepSparkTip = () => {
 };
 
 onUnmounted(() => {
-  if (locHideTimer) clearTimeout(locHideTimer);
   if (sparkHideTimer) clearTimeout(sparkHideTimer);
 });
 </script>

@@ -122,7 +122,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           v-if="
                             event.type === 'ai_analysis_begin' ||
                             event.type === 'ai_analysis_complete' ||
-                            event.type === 'ai_analysis_failed'
+                            event.type === 'ai_analysis_failed' ||
+                            event.type === 'ai_analysis_cancelled'
                           "
                         >
                           <span
@@ -427,6 +428,8 @@ const getEventIcon = (event: any): string => {
       return "check";
     case "ai_analysis_failed":
       return "error-outline";
+    case "ai_analysis_cancelled":
+      return "cancel";
     default:
       return "circle";
   }
@@ -461,6 +464,8 @@ const getEventBadgeColor = (event: any): string => {
       return "var(--color-ai-accent)";
     case "ai_analysis_failed":
       return "var(--color-error-500)";
+    case "ai_analysis_cancelled":
+      return "var(--color-grey-500)";
     default:
       return "var(--color-grey-500)";
   }
@@ -506,6 +511,8 @@ const getEventBadgeText = (event: any): string => {
       return "AI Complete";
     case "ai_analysis_failed":
       return "AI Failed";
+    case "ai_analysis_cancelled":
+      return "AI Cancelled";
     default:
       return event.type;
   }
@@ -595,6 +602,11 @@ const getInlineEventText = (event: any): string => {
 
     case "ai_analysis_failed":
       return bold(data.reason || "Analysis failed");
+
+    // A user-cancelled event carries user_id, so it renders through the user-event
+    // branch which already prefixes the username — don't repeat it here.
+    case "ai_analysis_cancelled":
+      return data.user_id ? "cancelled the analysis" : "Analysis cancelled";
 
     default:
       return "";

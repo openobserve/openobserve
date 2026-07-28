@@ -218,7 +218,7 @@ test.describe('JavaScript Transform Type', { tag: ['@jsTransformType', '@functio
     // - test_create_js_function_in_meta_org_success
   });
 
-  test.describe('Non-Meta Organization - JavaScript Blocked', () => {
+  test.describe('Non-Meta Organization - JavaScript edition-gated', () => {
     test.beforeEach(async ({ page }) => {
       // Switch to a non-meta organization (self-hosted: 'default', cloud: user's own org)
       const nonMetaOrg = getNonMetaOrg();
@@ -235,33 +235,36 @@ test.describe('JavaScript Transform Type', { tag: ['@jsTransformType', '@functio
 
     // NOTE: Consolidated from meta-org "JS radio NOT visible" + "VRL functions work" tests
     // Both validations preserved: JS hidden check + VRL creation
-    test('P0: Non-meta org - JS hidden, VRL works', { tag: ['@smoke', '@P0'] }, async ({ page }) => {
-      // SKIPPED — asserts the OSS-only rule, but runs on the enterprise build.
-      // JS is no longer _meta-only: AddFunction.vue offers it whenever
-      // `isEnterprise || isCloud || org === "_meta"`, so on ENT/cloud the JS radio
-      // is visible in EVERY org and step 1 below fails. The rule still holds on OSS.
-      // Re-enabling needs an edition signal, which is awkward: Vite bakes
-      // VITE_OPENOBSERVE_ENTERPRISE into the bundle at build time and /config
-      // exposes no edition key, so it can't be detected at runtime.
-      // TODO(QA): move to the OSS suite, or branch on an edition env var.
-      // NOTE: step 2 (VRL function creation in a non-meta org) is edition-agnostic
-      // and is lost while this is skipped.
-      test.skip(true, 'JS is allowed in all orgs on enterprise/cloud builds; OSS-only assertion');
-
+    test('P0: Non-meta org - JS radio edition-gated, VRL works', { tag: ['@smoke', '@P0'] }, async ({ page }) => {
+      // JS radio visibility in a non-meta org is EDITION-dependent (see file header):
+      //   OSS      -> JS is _meta-only, so the radio is HIDDEN here.
+      //   ENT/cloud-> JS is offered in every org, so the radio is VISIBLE here.
+      // We detect the edition at runtime from the header edition button label
+      // (data-test="upgrade-to-enterprise-btn"), which is driven by the SAME
+      // build-time flags (config.isEnterprise/isCloud via @/aws-exports) that gate
+      // the JS radio — so it's the exact source of truth, no CI env var needed.
+      // Step 2 (VRL create in a non-meta org) is edition-agnostic and always runs.
       const nonMetaOrg = getNonMetaOrg();
-      testLogger.info(`Test: Non-meta org (${nonMetaOrg}) - JS hidden, VRL works`);
+      const edition = await pm.editionFeaturesPage.detectEdition();
+      testLogger.info(`Test: Non-meta org (${nonMetaOrg}) - edition=${edition}`);
 
-      // Step 1: Verify JS radio is hidden, VRL is visible
+      // Step 1: VRL is always visible; JS radio visibility depends on edition.
       await pm.functionsPage.clickAddFunctionButton(nonMetaOrg);
       await pm.functionsPage.expectVrlRadioVisible();
       testLogger.info('VRL radio button visible');
 
-      const isJsRadioVisible = await pm.functionsPage.isJsRadioVisible();
-      expect(isJsRadioVisible).toBe(false);
-      testLogger.info(`JavaScript radio button correctly hidden in ${nonMetaOrg} org`);
+      if (edition === 'opensource') {
+        const isJsRadioVisible = await pm.functionsPage.isJsRadioVisible();
+        expect(isJsRadioVisible).toBe(false);
+        testLogger.info(`OSS: JavaScript radio correctly hidden in ${nonMetaOrg} org`);
+      } else {
+        // enterprise / cloud
+        await pm.functionsPage.expectJsRadioVisible();
+        testLogger.info(`${edition}: JavaScript radio correctly visible in ${nonMetaOrg} org`);
+      }
       await pm.functionsPage.clickCancelButton();
 
-      // Step 2: Create VRL function to verify it works
+      // Step 2 (edition-agnostic): Create a VRL function to verify it works.
       const functionName = `nonmeta_vrl_fn_${Date.now()}`;
       const vrlCode = '.processed = true\n.org = "non_meta"';
 
@@ -283,26 +286,62 @@ test.describe('JavaScript Transform Type', { tag: ['@jsTransformType', '@functio
       await pm.functionsPage.deleteFunctionByName(functionName, nonMetaOrg);
     });
 
-    // NOTE: API tests for JavaScript function blocking in default org have been migrated to:
-    // tests/api-testing/tests/test_functions_meta_org_restriction.py
-    // - test_create_js_function_in_default_org_blocked
-    // - test_test_js_function_in_default_org_blocked
+    // Edition-agnostic: a VRL runtime error surfaces in the error-details section
+    // (mirrors the JS ReferenceError case in the _meta describe). VRL works in every
+    // org on every edition, so this runs unconditionally. Covers the VRL half of the
+    // "runtime errors now render per-event" behaviour change (PR #13156).
+    test('P1: VRL runtime error surfaces in error-details', { tag: ['@P1', '@errorHandling'] }, async ({ page }) => {
+      const nonMetaOrg = getNonMetaOrg();
+      testLogger.info(`Test: VRL runtime error in error-details (${nonMetaOrg} org)`);
+
+      // to_int!(.s) compiles fine but aborts at runtime when .s can't be coerced.
+      const functionName = `nonmeta_vrl_err_${Date.now()}`;
+      const vrlCode = '.x = to_int!(.s)';
+
+      await pm.functionsPage.clickAddFunctionButton(nonMetaOrg);
+      await pm.functionsPage.fillFunctionName(functionName);
+      // VRL is the default type
+      await pm.functionsPage.enterFunctionCode(vrlCode);
+
+      // Run against an event that triggers the runtime abort.
+      await pm.functionsPage.testFunctionExecution('[{"s":"notanumber"}]');
+
+      // The per-event VRL runtime error renders in the error-details section
+      // (200 response with results[].message, not a 400).
+      await pm.functionsPage.expectFunctionErrorContains('runtime error');
+      testLogger.info('VRL runtime error rendered in error-details section');
+      await pm.functionsPage.clickCancelButton();
+    });
+
+    // NOTE: API tests for JavaScript function behaviour in default org live in:
+    // tests/api-testing/tests/pipelines/test_functions_meta_org_restriction.py
+    // - test_create_js_function_in_default_org_allowed
+    // - test_test_js_function_in_default_org_allowed
   });
 
   test.describe('Organization Switching & VRL Control', () => {
     // NOTE: Consolidated from meta-org "Org switching" + "VRL always visible" tests
     // Both validations preserved: JS visibility changes with org + VRL always visible
     test('P1: Radio visibility across orgs', { tag: ['@P1', '@orgSwitching', '@control'] }, async ({ page }) => {
-      // SKIPPED — same reason as 'P0: Non-meta org - JS hidden, VRL works' above:
-      // steps 1 and 3 expect the JS radio hidden in a non-meta org, which is only
-      // true on OSS. TODO(QA): move to the OSS suite, or branch on an edition env var.
-      // NOTE: step 2 (JS visible in _meta) is edition-agnostic and is lost meanwhile.
-      test.skip(true, 'JS is allowed in all orgs on enterprise/cloud builds; OSS-only assertion');
-
+      // JS radio visibility in a NON-meta org is edition-gated (OSS hides it,
+      // ENT/cloud shows it); in the _meta org JS is ALWAYS visible on every
+      // edition. VRL is always visible everywhere. We detect the edition from
+      // the header edition button (same build-flag source as the JS gate).
       const nonMetaOrg = getNonMetaOrg();
-      testLogger.info(`Test: Radio visibility across orgs (non-meta: ${nonMetaOrg})`);
+      const edition = await pm.editionFeaturesPage.detectEdition();
+      testLogger.info(`Test: Radio visibility across orgs (non-meta: ${nonMetaOrg}, edition=${edition})`);
 
-      // Step 1: Non-meta org - JS hidden, VRL visible
+      const expectJsRadioForNonMeta = async (label) => {
+        if (edition === 'opensource') {
+          await pm.functionsPage.expectJsRadioHidden();
+          testLogger.info(`OSS: JS hidden in ${nonMetaOrg} org (${label})`);
+        } else {
+          await pm.functionsPage.expectJsRadioVisible();
+          testLogger.info(`${edition}: JS visible in ${nonMetaOrg} org (${label})`);
+        }
+      };
+
+      // Step 1: Non-meta org - VRL visible, JS edition-gated
       await page.goto(`${process.env.ZO_BASE_URL}/web/pipeline/functions?org_identifier=${nonMetaOrg}`);
       await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
       await page.waitForTimeout(2000);
@@ -310,11 +349,10 @@ test.describe('JavaScript Transform Type', { tag: ['@jsTransformType', '@functio
       await pm.functionsPage.clickAddFunctionButton(nonMetaOrg);
       await pm.functionsPage.expectVrlRadioVisible();
       testLogger.info(`VRL visible in ${nonMetaOrg} org`);
-      await pm.functionsPage.expectJsRadioHidden();
-      testLogger.info(`JS hidden in ${nonMetaOrg} org`);
+      await expectJsRadioForNonMeta('step 1');
       await pm.functionsPage.clickCancelButton();
 
-      // Step 2: Switch to _meta org - JS visible, VRL visible
+      // Step 2 (edition-agnostic): Switch to _meta org - JS visible, VRL visible
       await page.goto(`${process.env.ZO_BASE_URL}/web/pipeline/functions?org_identifier=_meta`);
       await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
       await page.waitForTimeout(2000);
@@ -323,10 +361,10 @@ test.describe('JavaScript Transform Type', { tag: ['@jsTransformType', '@functio
       await pm.functionsPage.expectVrlRadioVisible();
       testLogger.info('VRL visible in _meta org');
       await pm.functionsPage.expectJsRadioVisible();
-      testLogger.info('JS visible in _meta org');
+      testLogger.info('JS visible in _meta org (always, every edition)');
       await pm.functionsPage.clickCancelButton();
 
-      // Step 3: Switch back to non-meta - JS hidden again, VRL still visible
+      // Step 3: Switch back to non-meta - JS gated again, VRL still visible
       await page.goto(`${process.env.ZO_BASE_URL}/web/pipeline/functions?org_identifier=${nonMetaOrg}`);
       await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
       await page.waitForTimeout(2000);
@@ -334,8 +372,7 @@ test.describe('JavaScript Transform Type', { tag: ['@jsTransformType', '@functio
       await pm.functionsPage.clickAddFunctionButton(nonMetaOrg);
       await pm.functionsPage.expectVrlRadioVisible();
       testLogger.info('VRL still visible after switching back');
-      await pm.functionsPage.expectJsRadioHidden();
-      testLogger.info(`JS hidden after switching back to ${nonMetaOrg}`);
+      await expectJsRadioForNonMeta('step 3');
       await pm.functionsPage.clickCancelButton();
     });
   });

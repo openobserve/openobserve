@@ -18,8 +18,8 @@ const agentWithId: GenAiAgentListItem = {
 
 describe("llmAgentFilter", () => {
   it("keys agent options by stream + id (not display name)", () => {
-    expect(agentOptionKey(agentWithId)).toBe("traces/prod_traces/agent-123");
-    expect(agentOptionKey({ ...agentWithId, id: null })).toBe("traces/prod_traces/support-agent");
+    expect(agentOptionKey(agentWithId)).toBe("traces/prod_traces/agent-123//");
+    expect(agentOptionKey({ ...agentWithId, id: null })).toBe("traces/prod_traces/support-agent//");
   });
 
   it("returns an empty predicate for no agent / All Agents", () => {
@@ -45,6 +45,17 @@ describe("llmAgentFilter", () => {
     expect(
       buildAgentTraceFilter({ ...agentWithId, id: null, name: "o'brien" }, "default"),
     ).toContain(`gen_ai_agent_name = 'o''brien'`);
+  });
+
+  it("adds a version predicate when the agent has a version", () => {
+    const where = buildAgentTraceFilter({ ...agentWithId, version: "1.3.0" }, "default");
+    expect(where).toContain("gen_ai_agent_id = 'agent-123'");
+    expect(where).toContain("gen_ai_agent_version = '1.3.0'");
+  });
+
+  it("adds an env predicate when the agent has an env", () => {
+    const where = buildAgentTraceFilter({ ...agentWithId, env: "production" }, "default");
+    expect(where).toContain("gen_ai_agent_env = 'production'");
   });
 
   it("builds a session-membership filter that keeps full matching sessions", () => {
