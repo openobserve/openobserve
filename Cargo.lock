@@ -13798,7 +13798,6 @@ name = "web"
 version = "0.1.0"
 dependencies = [
  "axum",
- "config",
  "mime_guess",
  "rust-embed-for-web",
  "tokio",
