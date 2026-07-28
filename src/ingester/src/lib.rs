@@ -38,8 +38,9 @@ pub use immutable::{
     read_from_immutable,
 };
 pub use pack::{
-    PackSegment, PackSegmentMeta, PendingStream, get_pending_streams, get_segment_index_stats,
-    mark_segments_consumed, read_from_pack, read_segment,
+    PackSegment, PackSegmentMeta, PendingStreamStats, get_pending_stream_stats,
+    get_segment_index_stats, get_stream_segments, mark_segments_consumed, read_from_pack,
+    read_segment,
 };
 use snafu::ResultExt;
 use tokio::sync::{Mutex, mpsc};

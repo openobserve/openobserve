@@ -351,8 +351,31 @@ pub struct PackSegment {
     pub meta: Arc<PackSegmentMeta>,
 }
 
+/// Segments of one stream plus cached aggregates, so the mover snapshot can
+/// copy a few numbers per stream instead of walking and cloning segments.
+#[derive(Default)]
+struct StreamSegments {
+    segments: Vec<PackSegment>,
+    total_original_size: i64,
+    total_compressed_size: i64,
+    oldest_registered_at: i64,
+}
+
+impl StreamSegments {
+    fn recompute(&mut self) {
+        self.total_original_size = self.segments.iter().map(|s| s.meta.original_size).sum();
+        self.total_compressed_size = self.segments.iter().map(|s| s.meta.length as i64).sum();
+        self.oldest_registered_at = self
+            .segments
+            .iter()
+            .map(|s| s.registered_at)
+            .min()
+            .unwrap_or(0);
+    }
+}
+
 /// In-memory segment index: `org/stream_type/stream_name` -> segments.
-static PACK_SEGMENTS: Lazy<RwAHashMap<Arc<str>, Vec<PackSegment>>> = Lazy::new(Default::default);
+static PACK_SEGMENTS: Lazy<RwAHashMap<Arc<str>, StreamSegments>> = Lazy::new(Default::default);
 
 /// Per-pack bookkeeping for consumption and deletion.
 struct PackEntry {
@@ -389,19 +412,26 @@ pub async fn register_pack(
         );
     }
     let mut w = PACK_SEGMENTS.write().await;
+    let mut touched = Vec::new();
     for seg in footer.segments.iter() {
         if consumed.contains(&seg.offset) {
             continue;
         }
-        let key = segment_index_key(&seg.org_id, &footer.stream_type, &seg.stream_name);
-        w.entry(Arc::from(key.as_str()))
-            .or_default()
-            .push(PackSegment {
-                pack_path: pack_path.clone(),
-                memtable_id: footer.memtable_id,
-                registered_at,
-                meta: Arc::new(seg.clone()),
-            });
+        let key: Arc<str> =
+            Arc::from(segment_index_key(&seg.org_id, &footer.stream_type, &seg.stream_name));
+        w.entry(key.clone()).or_default().segments.push(PackSegment {
+            pack_path: pack_path.clone(),
+            memtable_id: footer.memtable_id,
+            registered_at,
+            meta: Arc::new(seg.clone()),
+        });
+        touched.push(key);
+    }
+    touched.dedup();
+    for key in touched {
+        if let Some(v) = w.get_mut(&key) {
+            v.recompute();
+        }
     }
 }
 
@@ -459,10 +489,11 @@ async fn read_consumed_sidecar(pack_path: &Path) -> HashSet<u64> {
 #[cfg(test)]
 async fn unregister_pack(path: &Path) {
     let mut w = PACK_SEGMENTS.write().await;
-    for (_, segments) in w.iter_mut() {
-        segments.retain(|s| s.pack_path.as_path() != path);
+    for (_, v) in w.iter_mut() {
+        v.segments.retain(|s| s.pack_path.as_path() != path);
+        v.recompute();
     }
-    w.retain(|_, v| !v.is_empty());
+    w.retain(|_, v| !v.segments.is_empty());
     drop(w);
     let mut w = PACK_REGISTRY.write().await;
     w.retain(|p, _| p.as_path() != path);
@@ -472,7 +503,7 @@ async fn unregister_pack(path: &Path) {
 pub async fn get_segment_index_stats() -> (usize, usize) {
     let r = PACK_SEGMENTS.read().await;
     let streams = r.len();
-    let segments = r.values().map(|v| v.len()).sum();
+    let segments = r.values().map(|v| v.segments.len()).sum();
     (streams, segments)
 }
 
@@ -528,40 +559,55 @@ async fn delete_pack_file(path: &Path) {
     }
 }
 
-/// A stream with pending (not yet uploaded) pack segments.
-pub struct PendingStream {
+/// Aggregates of one stream's pending segments, for the mover flush decision.
+pub struct PendingStreamStats {
     pub org_id: String,
     pub stream_type: String,
     pub stream_name: String,
-    pub segments: Vec<PackSegment>,
     pub total_original_size: i64,
     pub total_compressed_size: i64,
     pub oldest_registered_at: i64,
 }
 
-/// Snapshot all streams with pending segments, for the pack mover job.
-pub async fn get_pending_streams() -> Vec<PendingStream> {
+/// Snapshot the aggregates of all pending streams. Copies only the cached
+/// per-stream numbers (no segment walking or cloning), so the read-lock hold
+/// stays short even with hundreds of thousands of streams — a long hold would
+/// queue writers and, with the write-preferring RwLock, stall new searches.
+pub async fn get_pending_stream_stats() -> Vec<PendingStreamStats> {
     let r = PACK_SEGMENTS.read().await;
     let mut result = Vec::with_capacity(r.len());
-    for (key, segments) in r.iter() {
-        if segments.is_empty() {
+    for (key, v) in r.iter() {
+        if v.segments.is_empty() {
             continue;
         }
         let parts: Vec<&str> = key.splitn(3, '/').collect();
         if parts.len() != 3 {
             continue;
         }
-        result.push(PendingStream {
+        result.push(PendingStreamStats {
             org_id: parts[0].to_string(),
             stream_type: parts[1].to_string(),
             stream_name: parts[2].to_string(),
-            segments: segments.clone(),
-            total_original_size: segments.iter().map(|s| s.meta.original_size).sum(),
-            total_compressed_size: segments.iter().map(|s| s.meta.length as i64).sum(),
-            oldest_registered_at: segments.iter().map(|s| s.registered_at).min().unwrap_or(0),
+            total_original_size: v.total_original_size,
+            total_compressed_size: v.total_compressed_size,
+            oldest_registered_at: v.oldest_registered_at,
         });
     }
     result
+}
+
+/// Get the pending segments of one stream (fetched by the mover worker right
+/// before uploading, so it also picks up segments added after the snapshot).
+pub async fn get_stream_segments(
+    org_id: &str,
+    stream_type: &str,
+    stream_name: &str,
+) -> Vec<PackSegment> {
+    let key = segment_index_key(org_id, stream_type, stream_name);
+    let r = PACK_SEGMENTS.read().await;
+    r.get(key.as_str())
+        .map(|v| v.segments.clone())
+        .unwrap_or_default()
 }
 
 /// Mark segments as consumed: remove them from the index and delete packs
@@ -587,14 +633,16 @@ pub async fn mark_segments_consumed(
     let key = segment_index_key(org_id, stream_type, stream_name);
     {
         let mut w = PACK_SEGMENTS.write().await;
-        if let Some(list) = w.get_mut(key.as_str()) {
-            list.retain(|s| {
+        if let Some(v) = w.get_mut(key.as_str()) {
+            v.segments.retain(|s| {
                 !segments
                     .iter()
                     .any(|(p, offset)| s.pack_path == *p && s.meta.offset == *offset)
             });
-            if list.is_empty() {
+            if v.segments.is_empty() {
                 w.remove(key.as_str());
+            } else {
+                v.recompute();
             }
         }
     }
@@ -635,7 +683,7 @@ pub async fn read_from_pack(
     let segments = {
         let r = PACK_SEGMENTS.read().await;
         match r.get(key.as_str()) {
-            Some(v) => v.clone(),
+            Some(v) => v.segments.clone(),
             None => return Ok((Vec::new(), ScanStats::new())),
         }
     };
@@ -1037,20 +1085,20 @@ mod tests {
         )
         .await;
 
-        // both streams are pending
-        let pending = get_pending_streams().await;
-        let seg_a = pending
+        // both streams are pending, with cached aggregates
+        let pending = get_pending_stream_stats().await;
+        let stats_a = pending
             .iter()
-            .find(|p| p.stream_name == "stream_a" && p.segments.iter().any(|s| s.memtable_id == 555))
+            .find(|p| p.stream_name == "stream_a" && p.org_id == "org1")
             .expect("stream_a pending");
-        assert_eq!(seg_a.org_id, "org1");
-        assert_eq!(seg_a.stream_type, "logs");
-        assert!(seg_a.total_original_size > 0);
-        assert!(seg_a.oldest_registered_at > 0);
+        assert_eq!(stats_a.stream_type, "logs");
+        assert!(stats_a.total_original_size > 0);
+        assert!(stats_a.total_compressed_size > 0);
+        assert!(stats_a.oldest_registered_at > 0);
 
         // consume stream_a only: pack must remain (stream_b not consumed yet)
-        let consumed_a = seg_a
-            .segments
+        let consumed_a = get_stream_segments("org1", "logs", "stream_a")
+            .await
             .iter()
             .filter(|s| s.memtable_id == 555)
             .map(|s| (s.pack_path.clone(), s.meta.offset))
@@ -1059,13 +1107,8 @@ mod tests {
         assert!(pack.path.exists());
 
         // consume stream_b: pack fully consumed -> file deleted
-        let pending = get_pending_streams().await;
-        let seg_b = pending
-            .iter()
-            .find(|p| p.stream_name == "stream_b" && p.segments.iter().any(|s| s.memtable_id == 555))
-            .expect("stream_b pending");
-        let consumed_b = seg_b
-            .segments
+        let consumed_b = get_stream_segments("org1", "logs", "stream_b")
+            .await
             .iter()
             .filter(|s| s.memtable_id == 555)
             .map(|s| (s.pack_path.clone(), s.meta.offset))
@@ -1116,13 +1159,8 @@ mod tests {
             &consumed,
         )
         .await;
-        let pending = get_pending_streams().await;
-        assert!(
-            !pending
-                .iter()
-                .any(|p| p.segments.iter().any(|s| s.memtable_id == 777
-                    && s.meta.stream_name == "stream_a"))
-        );
+        let segs_a = get_stream_segments("org1", "logs", "stream_a").await;
+        assert!(!segs_a.iter().any(|s| s.memtable_id == 777));
 
         // consuming the remaining stream deletes the pack and the sidecar
         let seg_b = &pack.footer.segments[1];
@@ -1188,14 +1226,14 @@ mod tests {
 
         let r = PACK_SEGMENTS.read().await;
         let segs = r.get("org1/logs/stream_a").expect("registered");
-        assert!(segs.iter().any(|s| s.memtable_id == 77));
+        assert!(segs.segments.iter().any(|s| s.memtable_id == 77));
         drop(r);
 
         unregister_pack(&pack.path).await;
         let r = PACK_SEGMENTS.read().await;
         assert!(
             r.get("org1/logs/stream_a")
-                .map(|v| v.iter().all(|s| s.memtable_id != 77))
+                .map(|v| v.segments.iter().all(|s| s.memtable_id != 77))
                 .unwrap_or(true)
         );
     }

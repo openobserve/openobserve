@@ -40,7 +40,7 @@ use infra::{
     },
     storage,
 };
-use ingester::{PackSegment, PendingStream};
+use ingester::{PackSegment, PendingStreamStats};
 use schema::generate_schema_for_defined_schema_fields;
 use search::datafusion::merge::{self, MergeParquetResult};
 use tantivy_utils::index_builder::create_tantivy_index;
@@ -51,7 +51,7 @@ static PROCESSING_STREAMS: std::sync::LazyLock<RwLock<HashSet<String>>> =
 
 pub async fn run() -> Result<(), anyhow::Error> {
     let cfg = get_config();
-    let (tx, rx) = tokio::sync::mpsc::channel::<PendingStream>(1);
+    let (tx, rx) = tokio::sync::mpsc::channel::<PendingStreamStats>(1);
     let rx = Arc::new(Mutex::new(rx));
     for thread_id in 0..cfg.limit.file_move_thread_num {
         let rx = rx.clone();
@@ -108,7 +108,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
             continue;
         }
 
-        let pending = ingester::get_pending_streams().await;
+        let pending = ingester::get_pending_stream_stats().await;
         let cfg = get_config();
         for ps in pending.into_iter() {
             // when draining, flush everything regardless of the thresholds
@@ -151,7 +151,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
 
 /// Flush when pending segments are big enough or the oldest exceeded the
 /// retention time (same thresholds as the legacy mover).
-fn should_flush(ps: &PendingStream, cfg: &config::Config) -> bool {
+fn should_flush(ps: &PendingStreamStats, cfg: &config::Config) -> bool {
     let max_file_size = std::cmp::min(
         cfg.limit.max_file_size_on_disk as i64,
         cfg.compact.max_file_size as i64,
@@ -167,19 +167,29 @@ fn should_flush(ps: &PendingStream, cfg: &config::Config) -> bool {
     ps.oldest_registered_at <= expired_at
 }
 
-async fn move_stream_segments(thread_id: usize, ps: PendingStream) -> Result<(), anyhow::Error> {
+async fn move_stream_segments(
+    thread_id: usize,
+    ps: PendingStreamStats,
+) -> Result<(), anyhow::Error> {
     let cfg = get_config();
     let org_id = ps.org_id.clone();
     let stream_type = StreamType::from(ps.stream_type.as_str());
     let stream_name = ps.stream_name.clone();
 
+    // fetch the segments here instead of carrying them in the snapshot, so
+    // the snapshot stays cheap and the list is fresh at upload time
+    let segments = ingester::get_stream_segments(&ps.org_id, &ps.stream_type, &ps.stream_name).await;
+    if segments.is_empty() {
+        return Ok(());
+    }
+
     // check if we are allowed to ingest or just delete the segments
     if db::compact::retention::is_deleting_stream(&org_id, stream_type, &stream_name, None) {
         log::warn!(
             "[INGESTER:PACK:JOB:{thread_id}] the stream [{org_id}/{stream_type}/{stream_name}] is deleting, drop {} segments",
-            ps.segments.len()
+            segments.len()
         );
-        consume_segments(&org_id, stream_type, &stream_name, &ps.segments).await;
+        consume_segments(&org_id, stream_type, &stream_name, &segments).await;
         return Ok(());
     }
 
@@ -190,9 +200,9 @@ async fn move_stream_segments(thread_id: usize, ps: PendingStream) -> Result<(),
     if latest_schema.fields().is_empty() {
         log::warn!(
             "[INGESTER:PACK:JOB:{thread_id}] the stream [{org_id}/{stream_type}/{stream_name}] was deleted, drop {} segments",
-            ps.segments.len()
+            segments.len()
         );
-        consume_segments(&org_id, stream_type, &stream_name, &ps.segments).await;
+        consume_segments(&org_id, stream_type, &stream_name, &segments).await;
         return Ok(());
     }
 
@@ -204,7 +214,7 @@ async fn move_stream_segments(thread_id: usize, ps: PendingStream) -> Result<(),
     {
         stream_data_retention_days = settings.data_retention;
     }
-    let mut segments = ps.segments;
+    let mut segments = segments;
     if stream_data_retention_days > 0 {
         let date = config::utils::time::now()
             - Duration::try_days(stream_data_retention_days).unwrap();
@@ -560,12 +570,11 @@ mod tests {
         total_original_size: i64,
         total_compressed_size: i64,
         oldest_registered_at: i64,
-    ) -> PendingStream {
-        PendingStream {
+    ) -> PendingStreamStats {
+        PendingStreamStats {
             org_id: "org".to_string(),
             stream_type: "metrics".to_string(),
             stream_name: "s1".to_string(),
-            segments: Vec::new(),
             total_original_size,
             total_compressed_size,
             oldest_registered_at,
