@@ -368,8 +368,14 @@ fn segment_index_key(org_id: &str, stream_type: &str, stream_name: &str) -> Stri
     format!("{org_id}/{stream_type}/{stream_name}")
 }
 
-/// Register all segments of a finalized pack into the in-memory index.
-pub async fn register_pack(path: PathBuf, footer: &PackFooter, registered_at: i64) {
+/// Register the segments of a finalized pack into the in-memory index,
+/// skipping segments already recorded as consumed in the sidecar file.
+pub async fn register_pack(
+    path: PathBuf,
+    footer: &PackFooter,
+    registered_at: i64,
+    consumed: &HashSet<u64>,
+) {
     let pack_path = Arc::new(path);
     {
         let mut w = PACK_REGISTRY.write().await;
@@ -377,13 +383,16 @@ pub async fn register_pack(path: PathBuf, footer: &PackFooter, registered_at: i6
             pack_path.clone(),
             PackEntry {
                 total: footer.segments.len(),
-                consumed: 0,
+                consumed: consumed.len(),
                 readers: 0,
             },
         );
     }
     let mut w = PACK_SEGMENTS.write().await;
     for seg in footer.segments.iter() {
+        if consumed.contains(&seg.offset) {
+            continue;
+        }
         let key = segment_index_key(&seg.org_id, &footer.stream_type, &seg.stream_name);
         w.entry(Arc::from(key.as_str()))
             .or_default()
@@ -393,6 +402,56 @@ pub async fn register_pack(path: PathBuf, footer: &PackFooter, registered_at: i6
                 registered_at,
                 meta: Arc::new(seg.clone()),
             });
+    }
+}
+
+/// Sidecar file recording consumed segment offsets, so partial consumption
+/// survives a restart without re-uploading (and duplicating) segments.
+fn consumed_sidecar_path(pack_path: &Path) -> PathBuf {
+    let mut p = pack_path.as_os_str().to_owned();
+    p.push(".consumed");
+    PathBuf::from(p)
+}
+
+/// serialize sidecar appends so concurrent workers cannot interleave lines
+static CONSUMED_APPEND_LOCK: Lazy<tokio::sync::Mutex<()>> =
+    Lazy::new(|| tokio::sync::Mutex::new(()));
+
+async fn append_consumed_sidecar(pack_path: &Path, offsets: &[u64]) {
+    if offsets.is_empty() {
+        return;
+    }
+    let path = consumed_sidecar_path(pack_path);
+    let mut data = String::with_capacity(offsets.len() * 12);
+    for offset in offsets {
+        data.push_str(&offset.to_string());
+        data.push('\n');
+    }
+    let _guard = CONSUMED_APPEND_LOCK.lock().await;
+    let ret = async {
+        let mut f = fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&path)
+            .await?;
+        f.write_all(data.as_bytes()).await?;
+        f.sync_all().await
+    }
+    .await;
+    if let Err(e) = ret {
+        // worst case the segments are re-uploaded after a restart
+        log::error!(
+            "[INGESTER:PACK] write consumed sidecar {} failed: {e}",
+            path.display()
+        );
+    }
+}
+
+async fn read_consumed_sidecar(pack_path: &Path) -> HashSet<u64> {
+    let path = consumed_sidecar_path(pack_path);
+    match fs::read_to_string(&path).await {
+        Ok(data) => data.lines().filter_map(|l| l.trim().parse().ok()).collect(),
+        Err(_) => HashSet::new(),
     }
 }
 
@@ -454,6 +513,7 @@ async fn end_read(paths: &[Arc<PathBuf>]) {
 }
 
 async fn delete_pack_file(path: &Path) {
+    let _ = fs::remove_file(consumed_sidecar_path(path)).await;
     match fs::remove_file(path).await {
         Ok(_) => {
             log::info!("[INGESTER:PACK] deleted consumed pack file: {}", path.display());
@@ -514,6 +574,15 @@ pub async fn mark_segments_consumed(
 ) {
     if segments.is_empty() {
         return;
+    }
+    // record the consumption in the sidecar first, so a restart does not
+    // re-upload (duplicate) already consumed segments
+    let mut by_pack: HashMap<Arc<PathBuf>, Vec<u64>> = HashMap::new();
+    for (path, offset) in segments {
+        by_pack.entry(path.clone()).or_default().push(*offset);
+    }
+    for (path, offsets) in by_pack.iter() {
+        append_consumed_sidecar(path.as_path(), offsets).await;
     }
     let key = segment_index_key(org_id, stream_type, stream_name);
     {
@@ -666,8 +735,8 @@ pub(crate) async fn init() -> Result<()> {
         .unwrap_or_default();
     let mut packs = 0;
     let mut segments = 0;
-    for pack_file in pack_files {
-        let footer = match read_footer(&pack_file).await {
+    for pack_file in pack_files.iter() {
+        let footer = match read_footer(pack_file).await {
             Ok(v) => v,
             Err(e) => {
                 log::error!(
@@ -677,18 +746,36 @@ pub(crate) async fn init() -> Result<()> {
                 continue;
             }
         };
+        let consumed = read_consumed_sidecar(pack_file).await;
+        // crashed between full consumption and deletion
+        if footer.segments.iter().all(|s| consumed.contains(&s.offset)) {
+            delete_pack_file(pack_file).await;
+            continue;
+        }
         packs += 1;
-        segments += footer.segments.len();
+        segments += footer.segments.len() - consumed.len();
         // mtime keeps the flush-by-age condition working across restarts
-        let registered_at = fs::metadata(&pack_file)
+        let registered_at = fs::metadata(pack_file)
             .await
             .ok()
             .and_then(|m| m.modified().ok())
             .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
             .map(|d| d.as_micros() as i64)
             .unwrap_or_else(config::utils::time::now_micros);
-        register_pack(pack_file, &footer, registered_at).await;
+        register_pack(pack_file.clone(), &footer, registered_at, &consumed).await;
     }
+
+    // delete orphan sidecar files whose pack is gone
+    let sidecar_files = crate::wal::wal_scan_files(&pack_dir, "consumed")
+        .await
+        .unwrap_or_default();
+    for sidecar in sidecar_files {
+        let pack_file = sidecar.with_extension("");
+        if !pack_file.exists() {
+            let _ = fs::remove_file(&sidecar).await;
+        }
+    }
+
     if packs > 0 {
         log::info!("[INGESTER:PACK] registered {packs} pack files with {segments} segments");
     }
@@ -881,6 +968,7 @@ mod tests {
             pack.path.clone(),
             &pack.footer,
             config::utils::time::now_micros(),
+            &Default::default(),
         )
         .await;
 
@@ -945,6 +1033,7 @@ mod tests {
             pack.path.clone(),
             &pack.footer,
             config::utils::time::now_micros(),
+            &Default::default(),
         )
         .await;
 
@@ -990,6 +1079,65 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_consumed_sidecar_survives_restart() {
+        let dir = tempfile::tempdir().unwrap();
+        let finished = write_test_pack(dir.path(), 777).await;
+        let pack = &finished[0];
+        fs::rename(&pack.tmp_path, &pack.path).await.unwrap();
+        register_pack(
+            pack.path.clone(),
+            &pack.footer,
+            config::utils::time::now_micros(),
+            &Default::default(),
+        )
+        .await;
+
+        // consume stream_a only: the sidecar records its offset
+        let pack_path = Arc::new(pack.path.clone());
+        let seg_a = &pack.footer.segments[0];
+        mark_segments_consumed(
+            "org1",
+            "logs",
+            "stream_a",
+            &[(pack_path.clone(), seg_a.offset)],
+        )
+        .await;
+        let consumed = read_consumed_sidecar(&pack.path).await;
+        assert!(consumed.contains(&seg_a.offset));
+        assert_eq!(consumed.len(), 1);
+
+        // simulate a restart: re-register from footer + sidecar,
+        // the consumed segment must not come back as pending
+        unregister_pack(&pack.path).await;
+        register_pack(
+            pack.path.clone(),
+            &pack.footer,
+            config::utils::time::now_micros(),
+            &consumed,
+        )
+        .await;
+        let pending = get_pending_streams().await;
+        assert!(
+            !pending
+                .iter()
+                .any(|p| p.segments.iter().any(|s| s.memtable_id == 777
+                    && s.meta.stream_name == "stream_a"))
+        );
+
+        // consuming the remaining stream deletes the pack and the sidecar
+        let seg_b = &pack.footer.segments[1];
+        mark_segments_consumed(
+            "org1",
+            "logs",
+            "stream_b",
+            &[(pack_path.clone(), seg_b.offset)],
+        )
+        .await;
+        assert!(!pack.path.exists());
+        assert!(!consumed_sidecar_path(&pack.path).exists());
+    }
+
+    #[tokio::test]
     async fn test_reader_guard_defers_pack_deletion() {
         let dir = tempfile::tempdir().unwrap();
         let finished = write_test_pack(dir.path(), 666).await;
@@ -999,6 +1147,7 @@ mod tests {
             pack.path.clone(),
             &pack.footer,
             config::utils::time::now_micros(),
+            &Default::default(),
         )
         .await;
 
@@ -1033,6 +1182,7 @@ mod tests {
             pack.path.clone(),
             &pack.footer,
             config::utils::time::now_micros(),
+            &Default::default(),
         )
         .await;
 

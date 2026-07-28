@@ -226,6 +226,7 @@ impl Immutable {
                 pack.path.clone(),
                 &pack.footer,
                 config::utils::time::now_micros(),
+                &Default::default(),
             )
             .await;
             log::info!(
