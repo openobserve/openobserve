@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
 import EnrichmentSchema from "./EnrichmentSchema.vue";
 import { createStore } from "vuex";
-import { createI18n } from "vue-i18n";
 import { nextTick } from "vue";
 
 // Create mock functions
@@ -63,31 +62,6 @@ const mockStore = createStore({
   },
 });
 
-const mockI18n = createI18n({
-  locale: "en",
-  messages: {
-    en: {
-      logStream: {
-        schemaHeader: "Schema",
-        docsCount: "Documents",
-        storageSize: "Storage Size",
-        compressedSize: "Compressed Size",
-        propertyName: "Property Name",
-        propertyType: "Property Type",
-      },
-      alerts: {
-        stream_name: "Stream Name",
-      },
-      search: {
-        searchField: "Search fields",
-        showing: "Showing",
-        of: "of",
-        recordsPerPage: "records per page",
-      },
-    },
-  },
-});
-
 function buildMountOptions(store: any = mockStore, props: Record<string, unknown> = {}) {
   return {
     props: {
@@ -96,7 +70,7 @@ function buildMountOptions(store: any = mockStore, props: Record<string, unknown
       ...props,
     },
     global: {
-      plugins: [mockI18n],
+      plugins: [],
       provide: {
         $store: store,
         store,
@@ -151,7 +125,7 @@ describe("EnrichmentSchema.vue Branch Coverage", () => {
     it("should set the drawer title from the i18n schemaHeader key", async () => {
       wrapper = mount(EnrichmentSchema, buildMountOptions());
       await flushPromises();
-      expect(wrapper.find('[data-test-stub="o-drawer"]').attributes("data-title")).toBe("Schema");
+      expect(wrapper.find('[data-test-stub="o-drawer"]').attributes("data-title")).toBe("Stream Detail");
     });
 
     it('should pass size "lg" to ODrawer', async () => {
@@ -209,7 +183,7 @@ describe("EnrichmentSchema.vue Branch Coverage", () => {
       await nextTick();
 
       const streamElements = wrapper.findAll('[data-test="schema-stream-title-text"]');
-      const hasDocCountElement = streamElements.some((el) => el.text().includes("Documents"));
+      const hasDocCountElement = streamElements.some((el) => el.text().includes("Docs Count"));
       expect(hasDocCountElement).toBe(true);
     });
 
@@ -229,7 +203,7 @@ describe("EnrichmentSchema.vue Branch Coverage", () => {
       await nextTick();
 
       const streamElements = wrapper.findAll('[data-test="schema-stream-title-text"]');
-      const hasDocCountElement = streamElements.some((el) => el.text().includes("Documents"));
+      const hasDocCountElement = streamElements.some((el) => el.text().includes("Docs Count"));
       expect(hasDocCountElement).toBe(false);
     });
   });

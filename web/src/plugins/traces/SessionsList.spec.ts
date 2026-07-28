@@ -76,18 +76,6 @@ vi.mock("vuex", () => ({
   })),
 }));
 
-vi.mock("vue-i18n", () => ({
-  useI18n: vi.fn(() => ({
-    t: (key: string, params?: Record<string, any>) => {
-      if (params) {
-        // Simple interpolation for count pill and other keys
-        return key + JSON.stringify(params);
-      }
-      return key;
-    },
-  })),
-}));
-
 // The component now renders sessions through the design-system OTable
 // (props: `data`/`columns`/`loading`, emits `row-click`, cell slots receive
 // `{ row }`). The mock mirrors just that contract.
@@ -291,7 +279,7 @@ describe("SessionsList — error state", () => {
 
     const wrapper = await mountComponent();
     const text = wrapper.text();
-    expect(text).toContain("traces.sessionsList.failedToLoad");
+    expect(text).toContain("Failed to load sessions");
     expect(text).toContain("Connection refused");
   });
 
@@ -305,7 +293,7 @@ describe("SessionsList — error state", () => {
     const wrapper = await mountComponent();
     const retryBtn = wrapper.find(".o-button");
     expect(retryBtn.exists()).toBe(true);
-    expect(retryBtn.text()).toContain("traces.sessionsList.retry");
+    expect(retryBtn.text()).toContain("Retry");
   });
 });
 

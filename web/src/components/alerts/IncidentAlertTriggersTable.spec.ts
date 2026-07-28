@@ -16,7 +16,6 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
 import IncidentAlertTriggersTable from "./IncidentAlertTriggersTable.vue";
-import { createI18n } from "vue-i18n";
 
 // ---------------------------------------------------------------------------
 // Helpers & factories
@@ -45,31 +44,7 @@ function makeAlerts(count = 3, overrides: Record<string, any> = {}) {
   );
 }
 
-function makeI18n() {
-  return createI18n({
-    legacy: false,
-    locale: "en",
-    messages: {
-      en: {
-        alerts: {
-          incidents: {
-            correlationServiceDiscovery: "Service Discovery",
-            correlationPrimaryMatch: "Primary Match",
-            correlationSecondaryMatch: "Secondary Match",
-            correlationAlertId: "Alert ID",
-            correlationServiceDiscoveryTooltip: "Tooltip SD",
-            correlationPrimaryMatchTooltip: "Tooltip PM",
-            correlationSecondaryMatchTooltip: "Tooltip SM",
-            correlationAlertIdTooltip: "Tooltip AI",
-          },
-        },
-      },
-    },
-  });
-}
-
 function mountComp(props: Record<string, any> = {}) {
-  const i18n = makeI18n();
   return mount(IncidentAlertTriggersTable, {
     props: {
       triggers: makeAlerts(3),
@@ -77,7 +52,6 @@ function mountComp(props: Record<string, any> = {}) {
       ...props,
     },
     global: {
-      plugins: [i18n],
       stubs: {
         OTable: {
           template: `

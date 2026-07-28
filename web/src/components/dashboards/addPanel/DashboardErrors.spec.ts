@@ -17,12 +17,6 @@ import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
 import DashboardErrors from "./DashboardErrors.vue";
 
 // Mock vue-i18n
-vi.mock("vue-i18n", () => ({
-  useI18n: () => ({
-    t: vi.fn((key: string) => key),
-  }),
-}));
-
 // Use vi.hoisted so the mock store is available when the hoisted vi.mock factory runs
 const { mockStore } = vi.hoisted(() => ({
   mockStore: {

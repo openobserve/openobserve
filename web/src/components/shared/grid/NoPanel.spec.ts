@@ -15,21 +15,8 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
-import { createI18n } from "vue-i18n";
 
 import NoPanel from "./NoPanel.vue";
-
-const i18n = createI18n({
-  legacy: false,
-  locale: "en",
-  messages: {
-    en: {
-      panel: {
-        add: "Add Panel",
-      },
-    },
-  },
-});
 
 // Stubs for components not under test
 const oBtnStub = {
@@ -42,7 +29,6 @@ const oBtnStub = {
 function mountNoPanel(props: Record<string, unknown> = {}) {
   return mount(NoPanel, {
     global: {
-      plugins: [i18n],
       stubs: {
         OButton: oBtnStub,
       },

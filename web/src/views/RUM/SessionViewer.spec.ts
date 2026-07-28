@@ -16,7 +16,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
 import { createRouter, createWebHistory } from "vue-router";
-import { createI18n } from "vue-i18n";
 
 // --- Module-level mocks (hoisted by Vitest before any import) ---
 
@@ -109,14 +108,10 @@ function createTestRouter() {
   });
 }
 
-function createTestI18n() {
-  return createI18n({ legacy: false, locale: "en", messages: { en: {} } });
-}
-
-function mountSessionViewer(router = createTestRouter(), i18n = createTestI18n()) {
+function mountSessionViewer(router = createTestRouter()) {
   return mount(SessionViewer, {
     global: {
-      plugins: [router, i18n],
+      plugins: [router],
       stubs: {
         // Stub heavyweight child components — not the subjects of these tests
         VideoPlayer: { template: '<div data-test="stub-video-player" />' },
