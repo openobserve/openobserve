@@ -752,6 +752,33 @@ pub async fn mark_segments_consumed(
 /// Read all pack segments of a stream as record batches. Segments are fully
 /// materialized, so no lock is needed afterwards; `skip_memtable_ids` avoids
 /// duplicates with data still readable in memory.
+/// RAII holder for pack read guards: releases the reader counters even when
+/// the query future is cancelled mid-read (drop spawns the async release).
+struct ReadGuards {
+    paths: Vec<Arc<PathBuf>>,
+}
+
+impl ReadGuards {
+    async fn release(mut self) {
+        let paths = std::mem::take(&mut self.paths);
+        end_read(&paths).await;
+    }
+}
+
+impl Drop for ReadGuards {
+    fn drop(&mut self) {
+        if self.paths.is_empty() {
+            return;
+        }
+        let paths = std::mem::take(&mut self.paths);
+        if let Ok(handle) = tokio::runtime::Handle::try_current() {
+            handle.spawn(async move {
+                end_read(&paths).await;
+            });
+        }
+    }
+}
+
 pub async fn read_from_pack(
     org_id: &str,
     stream_type: &str,
@@ -761,24 +788,34 @@ pub async fn read_from_pack(
     skip_memtable_ids: &HashSet<u64>,
 ) -> Result<(Vec<(Arc<Schema>, Vec<RecordBatch>)>, ScanStats)> {
     let key = segment_index_key(org_id, stream_type, stream_name);
-    let segments = {
+    // snapshot the segments and acquire the read guards atomically (under the
+    // segment index lock), so the mover cannot consume and delete a pack in
+    // between: any pack present in the snapshot is guaranteed guardable
+    let (mut segments, pack_count, guards) = {
         let r = PACK_SEGMENTS.read().await;
-        match r.get(key.as_str()) {
+        let segments = match r.get(key.as_str()) {
             Some(v) => v.segments.clone(),
             None => return Ok((Vec::new(), ScanStats::new())),
-        }
+        };
+        let mut pack_paths = segments
+            .iter()
+            .map(|s| s.pack_path.clone())
+            .collect::<Vec<_>>();
+        pack_paths.sort();
+        pack_paths.dedup();
+        let acquired = begin_read(&pack_paths).await;
+        (segments, pack_paths.len(), ReadGuards { paths: acquired })
     };
 
-    let mut pack_paths = segments
-        .iter()
-        .map(|s| s.pack_path.clone())
-        .collect::<Vec<_>>();
-    pack_paths.sort();
-    pack_paths.dedup();
-    let acquired = begin_read(&pack_paths).await;
+    // segments of a pack we could not guard were consumed concurrently and
+    // are already readable from object storage - the only tolerated skip
+    if guards.paths.len() != pack_count {
+        let acquired: HashSet<&Arc<PathBuf>> = guards.paths.iter().collect();
+        segments.retain(|s| acquired.contains(&s.pack_path));
+    }
 
     let result = read_segments(segments, time_range, partition_filters, skip_memtable_ids).await;
-    end_read(&acquired).await;
+    guards.release().await;
     result
 }
 
@@ -806,23 +843,15 @@ async fn read_segments(
         ) {
             continue;
         }
-        let data = match read_segment(
+        // the caller holds read guards on every involved pack, so the file
+        // cannot be deleted concurrently: any IO error here is a real
+        // failure and must fail the query instead of returning partial data
+        let data = read_segment(
             segment.pack_path.as_path(),
             segment.meta.offset,
             segment.meta.length,
         )
-        .await
-        {
-            Ok(v) => v,
-            Err(e) => {
-                // pack consumed and deleted concurrently, data is on storage
-                log::warn!(
-                    "[INGESTER:PACK] read segment from {} failed: {e}, skip",
-                    segment.pack_path.display()
-                );
-                continue;
-            }
-        };
+        .await?;
         let (schema, batches) = config::utils::parquet::read_recordbatch_from_bytes(
             FileFormat::Parquet,
             bytes::Bytes::from(data),
