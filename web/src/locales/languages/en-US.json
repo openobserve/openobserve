@@ -1053,6 +1053,7 @@
   },
   "rum": {
     "noSessionReplay": "No session replay available",
+    "loadingSessionReplay": "Loading session replay…",
     "seek": "Seek",
     "sessionMetricsAria": "Session metrics summary",
     "frustration": "{count} Frustration | {count} Frustrations",
