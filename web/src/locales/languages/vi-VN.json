@@ -7736,7 +7736,6 @@
       "scoreConfigs": "Cấu hình các tiêu chí chấm điểm được sử dụng bởi các đánh giá của bạn"
     },
     "agentGraph": {
-      "allAgents": "Tất cả tác nhân",
       "stream": "Luồng",
       "agent": "Tác nhân",
       "noAgentsTitle": "Không tìm thấy tác nhân nào",
@@ -9621,7 +9620,7 @@
         "assertionValue": "Giá trị",
         "assertions": "Khẳng định",
         "body": "Nội dung yêu cầu",
-        "bodyPlaceholder": "{\"key\": \"value\"}",
+        "bodyPlaceholder": "{'{'}\"key\": \"value\"{'}'}",
         "fields": {
           "body": "Nội dung phản hồi",
           "response_time_ms": "Thời gian phản hồi (ms)",

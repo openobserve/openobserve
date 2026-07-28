@@ -24,7 +24,7 @@ use config::{
         alert::Alert,
         incidents::{
             AlertEdge, AlertNode, CorrelationReason, EdgeType, Incident, IncidentAlert,
-            IncidentCorrelationOutcome, IncidentTopology, IncidentWithAlerts,
+            IncidentCorrelationOutcome, IncidentEvent, IncidentTopology, IncidentWithAlerts,
         },
     },
     utils::json::{Map, Value},
@@ -808,6 +808,20 @@ async fn create_new_incident(
         );
     }
 
+    // error in sending workflow trigger should not block the incident flow
+    if let Err(e) = crate::incidents::send_incident_event_trigger(
+        org_id,
+        &incident.id,
+        IncidentEvent::created(),
+    )
+    .await
+    {
+        log::error!(
+            "error triggering workflow for incident created for {org_id} incident id {} : {e}",
+            incident.id
+        );
+    }
+
     // Add the first alert to the incident
     infra::table::alert_incidents::add_alert_to_incident(
         &incident.id,
@@ -895,7 +909,7 @@ async fn create_new_incident(
             && o2_cfg.incidents.rca_enabled
             && !o2_cfg.ai.agent_url.is_empty()
         {
-            if let Err(e) = infra::table::incident_events::append(
+            if let Err(e) = crate::incidents::append_event(
                 org_id,
                 &incident.id,
                 config::meta::alerts::incidents::IncidentEvent::ai_analysis_begin(),
@@ -910,13 +924,15 @@ async fn create_new_incident(
 
             let org_id_rca = org_id.to_string();
             let incident_id_rca = incident.id.clone();
-            tokio::spawn(async move {
+            let handle = tokio::spawn(async move {
                 if let Err(e) = trigger_rca_for_incident(
                     org_id_rca.clone(),
                     incident_id_rca.clone(),
                     false,
                     true,
                     "system@openobserve.ai".to_string(),
+                    // First analysis for this incident — there is nothing to build on.
+                    false,
                 )
                 .await
                 {
@@ -933,7 +949,9 @@ async fn create_new_incident(
                     )
                     .await;
                 }
+                unregister_rca_task(&org_id_rca, &incident_id_rca);
             });
+            register_rca_task(org_id, &incident.id, handle.abort_handle());
         }
     }
 
@@ -985,6 +1003,19 @@ async fn find_or_create_incident(
             {
                 log::error!(
                     "[Incidents] Failed to record alert event for incident {}: {e}",
+                    incident.id
+                );
+            }
+
+            if let Err(e) = crate::incidents::send_incident_event_trigger(
+                org_id,
+                &incident.id,
+                IncidentEvent::alert(&alert_id, &alert.name, triggered_at),
+            )
+            .await
+            {
+                log::error!(
+                    "error triggering workflow for alert added for {org_id} incident id {} : {e}",
                     incident.id
                 );
             }
@@ -1060,6 +1091,20 @@ async fn find_or_create_incident(
                 );
             }
 
+            if !is_new_alert_type
+                && let Err(e) = crate::incidents::send_incident_event_trigger(
+                    org_id,
+                    &existing.id,
+                    IncidentEvent::alert(&alert.get_unique_key(), &alert.name, triggered_at),
+                )
+                .await
+            {
+                log::error!(
+                    "error triggering workflow for incident created for {org_id} incident id {} : {e}",
+                    existing.id
+                );
+            }
+
             let updated = infra::table::alert_incidents::get(org_id, &existing.id)
                 .await?
                 .ok_or_else(|| anyhow::anyhow!("Incident not found"))?;
@@ -1080,7 +1125,7 @@ async fn find_or_create_incident(
                 )
                 .await?;
 
-                if let Err(e) = infra::table::incident_events::append(
+                if let Err(e) = crate::incidents::append_event(
                     org_id,
                     &existing.id,
                     config::meta::alerts::incidents::IncidentEvent::dimensions_upgraded(
@@ -1144,19 +1189,22 @@ async fn find_or_create_incident(
                         .await
                         .unwrap_or_default();
                     if !is_analysis_in_flight(&events, cooldown * 2) {
-                        let _ = infra::table::incident_events::append(
+                        let _ = crate::incidents::append_event(
                             &org_id_rca,
                             &incident_id_rca,
                             config::meta::alerts::incidents::IncidentEvent::ai_analysis_begin(),
                         )
                         .await;
-                        tokio::spawn(async move {
+                        let handle = tokio::spawn(async move {
                             if let Err(e) = trigger_rca_for_incident(
                                 org_id_rca.clone(),
                                 incident_id_rca.clone(),
                                 true,
                                 true,
                                 "system@openobserve.ai".to_string(),
+                                // Fresh analysis: a new alert type changes the picture,
+                                // so the agent should reassess rather than extend.
+                                false,
                             )
                             .await
                             {
@@ -1172,7 +1220,9 @@ async fn find_or_create_incident(
                                     Some(&e),
                                 ).await;
                             }
+                            unregister_rca_task(&org_id_rca, &incident_id_rca);
                         });
+                        register_rca_task(org_id, &existing.id, handle.abort_handle());
                     } else {
                         log::debug!(
                             "[INCIDENTS::RCA] Analysis already in-flight for {incident_id_rca}, skipping NewAlertTypeJoined trigger"
@@ -1424,7 +1474,7 @@ pub async fn enrich_with_topology(
             } else {
                 // Query service graph to check for a known dependency
                 let raw_sg_edges = match service_graph::query_edges_from_stream_internal(
-                    org_id, None, None, None,
+                    org_id, None, None, None, None,
                 )
                 .await
                 {
@@ -1500,6 +1550,82 @@ pub async fn enrich_with_topology(
 /// # Note
 /// Errors are logged but not propagated to caller.
 ///
+/// Abort handles for in-flight RCA runs, keyed by `{org_id}/{incident_id}`.
+///
+/// Registered when a run is spawned and removed when it settles. A cancel request
+/// looks the incident up here and aborts the task; if the entry is missing (another
+/// node owns the run, or the process restarted) the caller still writes the terminal
+/// `AIAnalysisCancelled` event so the in-flight guard is released.
+#[cfg(feature = "enterprise")]
+static RCA_ABORT_HANDLES: std::sync::LazyLock<dashmap::DashMap<String, tokio::task::AbortHandle>> =
+    std::sync::LazyLock::new(dashmap::DashMap::new);
+
+#[cfg(feature = "enterprise")]
+fn rca_task_key(org_id: &str, incident_id: &str) -> String {
+    format!("{org_id}/{incident_id}")
+}
+
+/// Track a spawned RCA task so it can be cancelled later.
+#[cfg(feature = "enterprise")]
+pub fn register_rca_task(org_id: &str, incident_id: &str, handle: tokio::task::AbortHandle) {
+    RCA_ABORT_HANDLES.insert(rca_task_key(org_id, incident_id), handle);
+}
+
+/// Stop tracking a run once it has settled. Safe to call when nothing is registered.
+#[cfg(feature = "enterprise")]
+pub fn unregister_rca_task(org_id: &str, incident_id: &str) {
+    RCA_ABORT_HANDLES.remove(&rca_task_key(org_id, incident_id));
+}
+
+/// Cancel the in-flight RCA run for an incident.
+///
+/// Aborts the local task when this node owns it, then records the terminal
+/// `AIAnalysisCancelled` event. The event is written even when no local handle exists,
+/// so a run stranded by a restart can be cleared without waiting for the stale window.
+///
+/// Re-checks in-flight state here, after the abort handle has been atomically removed,
+/// rather than trusting a check made by the caller. The caller's check is separated from
+/// this call by an await, during which a fresh analysis can start — cancelling then would
+/// abort the wrong run. Returns `Ok(None)` when nothing was in flight.
+///
+/// Returns `Ok(Some(true))` if a local task was actually aborted.
+#[cfg(feature = "enterprise")]
+pub async fn cancel_rca_for_incident(
+    org_id: &str,
+    incident_id: &str,
+    user_id: Option<String>,
+    stale_threshold_minutes: u64,
+) -> Result<Option<bool>, anyhow::Error> {
+    let aborted = match RCA_ABORT_HANDLES.remove(&rca_task_key(org_id, incident_id)) {
+        Some((_, handle)) => {
+            handle.abort();
+            true
+        }
+        None => false,
+    };
+
+    // Authoritative check: no local handle means the run may be on another node, or may
+    // never have existed. Consult the event log before writing a terminal event, so a
+    // cancel for an already-settled run doesn't leave a spurious event behind.
+    if !aborted {
+        let events = infra::table::incident_events::get(org_id, incident_id).await?;
+        if !is_analysis_in_flight(&events, stale_threshold_minutes) {
+            return Ok(None);
+        }
+    }
+
+    infra::table::incident_events::append(
+        org_id,
+        incident_id,
+        config::meta::alerts::incidents::IncidentEvent::ai_analysis_cancelled(user_id),
+    )
+    .await?;
+
+    log::info!("[INCIDENTS::RCA] Cancelled analysis for {incident_id} (local_task={aborted})");
+
+    Ok(Some(aborted))
+}
+
 /// Returns true if an analysis is currently in-flight (started but not yet completed).
 ///
 /// An in-flight analysis is detected by finding an `AIAnalysisBegin` event with no
@@ -1515,14 +1641,18 @@ pub fn is_analysis_in_flight(
     let stale_cutoff =
         chrono::Utc::now().timestamp_micros() - (stale_threshold_minutes as i64 * 60 * 1_000_000);
 
-    // Walk backwards: find the last terminal event (Complete OR Failed), then
+    // Walk backwards: find the last terminal event (Complete, Failed OR Cancelled), then
     // check if a non-stale AIAnalysisBegin comes after it. AIAnalysisFailed is
     // also terminal — leaving it out would keep the in-flight lock held until
     // stale_threshold expires after every failed RCA, blocking manual retries.
+    // AIAnalysisCancelled is terminal for the same reason: an explicit cancel must
+    // free the guard immediately so the user can retry straight away.
     let last_terminal_pos = events.iter().rposition(|e| {
         matches!(
             e.event_type,
-            IncidentEventType::AIAnalysisComplete | IncidentEventType::AIAnalysisFailed { .. }
+            IncidentEventType::AIAnalysisComplete
+                | IncidentEventType::AIAnalysisFailed { .. }
+                | IncidentEventType::AIAnalysisCancelled { .. }
         )
     });
 
@@ -1570,7 +1700,7 @@ async fn emit_analysis_failure(
 
     let error_details = error.map(|e| format!("{:#}", e).chars().take(500).collect::<String>());
 
-    if let Err(e) = infra::table::incident_events::append(
+    if let Err(e) = crate::incidents::append_event(
         org_id,
         incident_id,
         IncidentEvent::ai_analysis_failed(reason, trigger_type, error_details),
@@ -1597,6 +1727,9 @@ pub async fn trigger_rca_for_incident(
     // Email of the user who triggered the analysis, used for AI usage tracking.
     // For automated/system-initiated calls, use "system@openobserve.ai".
     _user_email: String,
+    // When true, the previous report is sent to the agent so it extends that analysis.
+    // Automatic triggers pass false so each run stands on its own.
+    build_on_previous: bool,
 ) -> Result<(), anyhow::Error> {
     use config::meta::alerts::incidents::IncidentTopology;
     use o2_enterprise::enterprise::{
@@ -1655,7 +1788,7 @@ pub async fn trigger_rca_for_incident(
 
     // Emit AIAnalysisBegin only when the caller hasn't already done so
     if !begin_already_emitted
-        && let Err(e) = infra::table::incident_events::append(
+        && let Err(e) = crate::incidents::append_event(
             &org_id,
             &incident_id,
             config::meta::alerts::incidents::IncidentEvent::ai_analysis_begin(),
@@ -1720,20 +1853,23 @@ pub async fn trigger_rca_for_incident(
     }
 
     // Analyze incident
-    match client.analyze_incident(&incident, &auth_header).await {
+    match client
+        .analyze_incident(&incident, &auth_header, build_on_previous)
+        .await
+    {
         Ok(rca_result) => {
             log::info!(
                 "[INCIDENTS::RCA] RCA completed for {incident_id}: {} chars",
                 rca_result.len()
             );
 
-            // Update topology_context with suggested_root_cause
+            // Update topology_context with the new report, archiving the previous one
             let mut topology = incident
                 .topology_context
                 .and_then(|ctx| serde_json::from_value::<IncidentTopology>(ctx).ok())
                 .unwrap_or_default();
 
-            topology.suggested_root_cause = Some(rca_result);
+            topology.record_rca_result(rca_result, config.incidents.rca_history_limit);
 
             if let Err(e) =
                 infra::table::alert_incidents::update_topology(&org_id, &incident_id, &topology)
@@ -1744,7 +1880,7 @@ pub async fn trigger_rca_for_incident(
             }
 
             // Emit AIAnalysisComplete on success
-            if let Err(e) = infra::table::incident_events::append(
+            if let Err(e) = crate::incidents::append_event(
                 &org_id,
                 &incident_id,
                 config::meta::alerts::incidents::IncidentEvent::ai_analysis_complete(),
@@ -1844,7 +1980,7 @@ pub async fn update_status(
         _ => None,
     };
     if let Some(evt) = event
-        && let Err(e) = infra::table::incident_events::append(org_id, incident_id, evt).await
+        && let Err(e) = crate::incidents::append_event(org_id, incident_id, evt).await
     {
         log::error!("[Incidents] Failed to record status event: {e}");
     }
@@ -1863,13 +1999,13 @@ pub async fn update_status(
             .unwrap_or_default();
         if !is_analysis_in_flight(&events, cooldown * 2) {
             // Emit Begin synchronously so the frontend sees it on the next poll
-            let _ = infra::table::incident_events::append(
+            let _ = crate::incidents::append_event(
                 &org_id_rca,
                 &incident_id_rca,
                 config::meta::alerts::incidents::IncidentEvent::ai_analysis_begin(),
             )
             .await;
-            tokio::spawn(async move {
+            let handle = tokio::spawn(async move {
                 // reanalysis on reopen: deduct credits and report usage;
                 // begin_already_emitted=true skips cooldown/in-flight guards
                 if let Err(e) = trigger_rca_for_incident(
@@ -1878,6 +2014,8 @@ pub async fn update_status(
                     true, // reanalysis — deduct credits and report usage
                     true, // begin already emitted above
                     "system@openobserve.ai".to_string(),
+                    // Reopened incidents get a fresh read of the current state.
+                    false,
                 )
                 .await
                 {
@@ -1892,7 +2030,9 @@ pub async fn update_status(
                     )
                     .await;
                 }
+                unregister_rca_task(&org_id_rca, &incident_id_rca);
             });
+            register_rca_task(org_id, incident_id, handle.abort_handle());
         } else {
             log::debug!(
                 "[INCIDENTS::RCA] Analysis already in-flight for {incident_id_rca}, skipping Reopened trigger"
@@ -1934,7 +2074,7 @@ pub async fn update_title(
     let updated = infra::table::alert_incidents::update_title(org_id, incident_id, title).await?;
 
     if from_title != title
-        && let Err(e) = infra::table::incident_events::append(
+        && let Err(e) = crate::incidents::append_event(
             org_id,
             incident_id,
             config::meta::alerts::incidents::IncidentEvent::title_changed(
@@ -1969,7 +2109,7 @@ pub async fn update_severity(
 
     // Emit severity override event and notify only when the severity actually changed
     if from_severity != to_severity {
-        if let Err(e) = infra::table::incident_events::append(
+        if let Err(e) = crate::incidents::append_event(
             org_id,
             incident_id,
             config::meta::alerts::incidents::IncidentEvent::severity_override(

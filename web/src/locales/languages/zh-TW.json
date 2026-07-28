@@ -7731,7 +7731,6 @@
       "scoreConfigs": "設定評估所使用的評分標準"
     },
     "agentGraph": {
-      "allAgents": "所有代理",
       "stream": "串流",
       "agent": "代理",
       "noAgentsTitle": "找不到任何代理",
@@ -9616,7 +9615,7 @@
         "assertionValue": "值",
         "assertions": "斷言",
         "body": "請求主體",
-        "bodyPlaceholder": "{\"key\": \"value\"}",
+        "bodyPlaceholder": "{'{'}\"key\": \"value\"{'}'}",
         "fields": {
           "body": "回應主體",
           "response_time_ms": "回應時間 (毫秒)",

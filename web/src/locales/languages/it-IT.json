@@ -7736,7 +7736,6 @@
       "scoreConfigs": "Configura le rubriche di punteggio utilizzate nelle tue valutazioni"
     },
     "agentGraph": {
-      "allAgents": "Tutti gli agenti",
       "stream": "Stream",
       "agent": "Agente",
       "noAgentsTitle": "Nessun agente trovato",
@@ -9621,7 +9620,7 @@
         "assertionValue": "Valore",
         "assertions": "Asserzioni",
         "body": "Corpo della richiesta",
-        "bodyPlaceholder": "{\"key\": \"value\"}",
+        "bodyPlaceholder": "{'{'}\"key\": \"value\"{'}'}",
         "fields": {
           "body": "Corpo della risposta",
           "response_time_ms": "Tempo di risposta (ms)",

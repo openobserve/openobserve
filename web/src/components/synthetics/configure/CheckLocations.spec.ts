@@ -212,6 +212,34 @@ describe("CheckLocations", () => {
 
       expect(wrapper.find('[data-test="synthetics-check-locations-group"]').exists()).toBe(false);
     });
+
+    it("should show the private setup CTA instead of the plain empty state when allowPrivate", () => {
+      wrapper = mountCheckLocations({
+        locations: [] as SyntheticsLocation[],
+        allowPrivate: true,
+      });
+
+      expect(wrapper.find('[data-test="synthetics-check-locations-empty"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="synthetics-check-locations-private-empty"]').exists()).toBe(
+        true,
+      );
+      expect(
+        wrapper.find('[data-test="synthetics-check-locations-private-empty-cta"]').exists(),
+      ).toBe(true);
+    });
+
+    it("should emit setup-agent from the CTA when no locations exist at all", async () => {
+      wrapper = mountCheckLocations({
+        locations: [] as SyntheticsLocation[],
+        allowPrivate: true,
+      });
+
+      await wrapper
+        .find('[data-test="synthetics-check-locations-private-empty-cta"]')
+        .trigger("click");
+
+      expect(wrapper.emitted("setup-agent")).toBeTruthy();
+    });
   });
 
   describe("pre-selected locations", () => {
