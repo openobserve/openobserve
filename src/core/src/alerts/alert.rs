@@ -929,6 +929,8 @@ pub async fn trigger_by_id<C: ConnectionTrait>(
             synthetic_row,
             notify,
             now,
+            // Manual trigger of a native alert — not externally ingested.
+            None,
         )
         .await
         {
@@ -1011,6 +1013,8 @@ pub async fn trigger_by_name(
             synthetic_row,
             notify,
             now,
+            // Manual trigger of a native alert — not externally ingested.
+            None,
         )
         .await
         {

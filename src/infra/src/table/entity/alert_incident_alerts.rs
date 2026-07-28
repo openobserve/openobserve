@@ -31,6 +31,17 @@ pub struct Model {
     /// service_discovery, trace_based, scope_match, workload_match, alert_id
     pub correlation_reason: Option<String>,
     pub created_at: i64,
+    /// Originating system for alerts pushed in over the external ingest
+    /// webhook (e.g. "alertmanager", "datadog"). `None` for native
+    /// OpenObserve alerts, which are resolvable from the `alerts` table.
+    pub source: Option<String>,
+    /// Deep link back into the originating system.
+    pub external_url: Option<String>,
+    /// Free-form annotations from the originating system, stored as a JSON
+    /// object. Display only — never used for correlation.
+    pub annotations: Option<String>,
+    /// When the originating system reported this alert resolved.
+    pub resolved_at: Option<i64>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
@@ -64,11 +75,34 @@ mod tests {
             alert_name: "High Error Rate".to_string(),
             correlation_reason: Some("service_discovery".to_string()),
             created_at: 1000,
+            source: None,
+            external_url: None,
+            annotations: None,
+            resolved_at: None,
         };
         assert_eq!(m.incident_id, "inc-1");
         assert_eq!(m.alert_id, "alert-1");
         assert_eq!(m.alert_fired_at, 1000);
         assert_eq!(m.alert_name, "High Error Rate");
         assert!(m.correlation_reason.is_some());
+        assert!(m.source.is_none(), "native alerts carry no source");
+    }
+
+    #[test]
+    fn test_external_model_construction() {
+        let m = Model {
+            incident_id: "inc-1".to_string(),
+            alert_id: "ext-alert-1".to_string(),
+            alert_fired_at: 1000,
+            alert_name: "HighErrorRate".to_string(),
+            correlation_reason: Some("primary_match".to_string()),
+            created_at: 1000,
+            source: Some("alertmanager".to_string()),
+            external_url: Some("https://alertmanager.example.com/#/alerts".to_string()),
+            annotations: Some(r#"{"summary":"error rate above 5%"}"#.to_string()),
+            resolved_at: None,
+        };
+        assert_eq!(m.source.as_deref(), Some("alertmanager"));
+        assert!(m.external_url.is_some());
     }
 }

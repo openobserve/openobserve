@@ -391,6 +391,16 @@ pub struct IncidentAlert {
     pub alert_fired_at: i64,
     pub correlation_reason: CorrelationReason,
     pub created_at: i64,
+    /// Originating system for externally-ingested alerts; `None` for alerts
+    /// evaluated by OpenObserve itself.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source: Option<String>,
+    /// Deep link back into the originating system.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub external_url: Option<String>,
+    /// Display-only annotations from the originating system.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub annotations: Option<HashMap<String, String>>,
 }
 
 /// Incident with its alerts (for detail view)
@@ -890,6 +900,236 @@ impl IncidentEvent {
             &self.event_type,
             IncidentEventType::Alert { alert_id: id, .. } if id == alert_id
         )
+    }
+}
+
+// ── External alert ingest ────────────────────────────────────────────────────
+//
+// Alerts pushed in by systems outside OpenObserve (Alertmanager, Datadog,
+// Grafana, …). They never become rows in the `alerts` table; they are turned
+// into a synthetic in-memory Alert and fed straight to the correlation engine,
+// which groups on `labels` exactly as it does for native alerts.
+
+/// Lifecycle state of an externally-ingested alert.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ExternalAlertStatus {
+    #[default]
+    Firing,
+    Resolved,
+}
+
+/// Maximum accepted label/annotation entries. Correlation only ever reads a
+/// handful of identity dimensions, so a generous cap still leaves no way to
+/// use the endpoint as unbounded storage.
+pub const MAX_EXTERNAL_ALERT_LABELS: usize = 64;
+/// Maximum accepted length of any single label key or value.
+pub const MAX_EXTERNAL_ALERT_LABEL_LEN: usize = 1024;
+/// Fixed KSUID timestamp prefix for synthetic external alert ids (2014-05-13).
+/// External ids encode identity, not creation time — the prefix is constant so
+/// the same rule always renders to the same id.
+const EXTERNAL_ALERT_ID_EPOCH: i64 = 1_400_000_000;
+
+/// Payload accepted by `POST /api/v2/{org_id}/alerts/incidents/ingest`.
+#[derive(Debug, Clone, Deserialize, Serialize, ToSchema)]
+pub struct ExternalAlertPayload {
+    /// Originating system, e.g. "alertmanager". Namespaces the synthetic
+    /// alert id so two systems' identically-named alerts stay distinct.
+    pub source: String,
+
+    /// Name of the alert rule in the originating system. Together with
+    /// `source` this forms the alert's stable identity — repeated deliveries
+    /// of the same rule suppress notification, a different rule joining the
+    /// incident escalates it.
+    pub alert_name: String,
+
+    /// Idempotency key. Two deliveries carrying the same `dedup_key` are the
+    /// same firing, not two firings.
+    #[serde(default)]
+    pub dedup_key: Option<String>,
+
+    /// Severity in the originating system's vocabulary — "critical", "P1",
+    /// "warning", "error", … Mapped onto `IncidentSeverity`; unrecognised
+    /// values fall back to the configured default.
+    #[serde(default)]
+    pub severity: Option<String>,
+
+    /// Whether the alert is currently firing or has resolved upstream.
+    #[serde(default)]
+    pub status: ExternalAlertStatus,
+
+    /// Firing time in epoch microseconds. Defaults to receipt time.
+    #[serde(default)]
+    pub timestamp: Option<i64>,
+
+    /// Identity labels. This is the only part of the payload that drives
+    /// correlation — an empty map means the alert cannot match anything and
+    /// gets an incident to itself.
+    #[serde(default)]
+    pub labels: HashMap<String, String>,
+
+    /// Display-only context (summary, runbook, description).
+    #[serde(default)]
+    pub annotations: HashMap<String, String>,
+
+    /// Deep link back into the originating system.
+    #[serde(default)]
+    pub external_url: Option<String>,
+}
+
+impl ExternalAlertPayload {
+    /// Reject payloads that cannot correlate or that abuse the endpoint.
+    ///
+    /// Note that an empty `labels` map is explicitly *allowed* — such an alert
+    /// is isolated into its own incident, which is the documented behaviour
+    /// for an alert with no matching attributes.
+    pub fn validate(&self) -> Result<(), String> {
+        if self.source.trim().is_empty() {
+            return Err("`source` must not be empty".to_string());
+        }
+        if self.source.len() > 128 {
+            return Err("`source` must be 128 characters or fewer".to_string());
+        }
+        if self.alert_name.trim().is_empty() {
+            return Err("`alert_name` must not be empty".to_string());
+        }
+        if self.alert_name.len() > 512 {
+            return Err("`alert_name` must be 512 characters or fewer".to_string());
+        }
+        if self.labels.len() > MAX_EXTERNAL_ALERT_LABELS {
+            return Err(format!(
+                "`labels` must contain {MAX_EXTERNAL_ALERT_LABELS} entries or fewer"
+            ));
+        }
+        if self.annotations.len() > MAX_EXTERNAL_ALERT_LABELS {
+            return Err(format!(
+                "`annotations` must contain {MAX_EXTERNAL_ALERT_LABELS} entries or fewer"
+            ));
+        }
+        for (k, v) in self.labels.iter().chain(self.annotations.iter()) {
+            if k.len() > MAX_EXTERNAL_ALERT_LABEL_LEN || v.len() > MAX_EXTERNAL_ALERT_LABEL_LEN {
+                return Err(format!(
+                    "label/annotation keys and values must be \
+                     {MAX_EXTERNAL_ALERT_LABEL_LEN} characters or fewer (offending key: `{k}`)"
+                ));
+            }
+        }
+        if let Some(url) = &self.external_url
+            && url.len() > 2048
+        {
+            return Err("`external_url` must be 2048 characters or fewer".to_string());
+        }
+        Ok(())
+    }
+
+    /// Stable identity for this alert *rule* — not this firing.
+    ///
+    /// The correlation engine distinguishes "this alert type is already in the
+    /// incident" (suppress) from "a new alert type joined" (notify) purely by
+    /// alert id, so the id must be identical across every delivery of the same
+    /// rule and different for every other rule. A hash of
+    /// `org_id/source/alert_name` gives exactly that without a registry.
+    ///
+    /// The value is rendered as a KSUID so it is indistinguishable in shape
+    /// from a native alert id: the 4-byte timestamp prefix is fixed (external
+    /// ids carry no meaningful creation time) and the 16-byte payload is the
+    /// hash.
+    pub fn alert_id(&self, org_id: &str) -> String {
+        external_alert_id(org_id, &self.source, &self.alert_name)
+    }
+
+    /// Identity of a single *firing*, used for idempotent redelivery.
+    ///
+    /// Falls back to the alert identity when the sender supplies no
+    /// `dedup_key`, which makes repeated deliveries of a keyless alert
+    /// collapse onto one another rather than inflating `alert_count`.
+    pub fn dedup_identity(&self, org_id: &str) -> String {
+        match self.dedup_key.as_deref().map(str::trim) {
+            Some(key) if !key.is_empty() => {
+                format!("{}/{}/{}", org_id, self.source, key)
+            }
+            _ => format!("{}/{}", org_id, self.alert_id(org_id)),
+        }
+    }
+}
+
+/// What ingesting one external alert actually did.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ExternalIngestAction {
+    /// No open incident matched, so a new one was opened. Notified.
+    IncidentCreated,
+    /// This alert type appeared in an existing incident for the first time —
+    /// an escalation signal. Notified.
+    AlertJoined,
+    /// This alert type was already in the incident. Notification suppressed by
+    /// design; `alert_count` still advanced.
+    AlertRepeated,
+    /// A delivery carrying an already-seen `dedup_key`. Nothing was written.
+    DuplicateIgnored,
+    /// The alert was marked resolved and the incident still has other alerts
+    /// firing, so it stays open.
+    AlertResolved,
+    /// The alert was marked resolved and it was the last one firing, so the
+    /// incident was resolved too.
+    IncidentResolved,
+    /// A resolve arrived for an alert with no open incident — the incident was
+    /// already closed, or the alert was never ingested. Nothing was written.
+    NothingToResolve,
+}
+
+/// Response body of the external alert ingest endpoint.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct ExternalIngestResponse {
+    /// What happened.
+    pub action: ExternalIngestAction,
+    /// The stable synthetic alert id this payload maps to. Deterministic from
+    /// `(org, source, alert_name)`, so callers can correlate their own logs.
+    pub alert_id: String,
+    /// Incident this alert belongs to, when there is one.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub incident_id: Option<String>,
+    /// Why it correlated the way it did.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub correlation_reason: Option<CorrelationReason>,
+}
+
+/// Derive the stable synthetic alert id for an external alert rule.
+///
+/// Kept as a free function so the resolve path can rebuild the id from
+/// `(source, alert_name)` without constructing a whole payload.
+pub fn external_alert_id(org_id: &str, source: &str, alert_name: &str) -> String {
+    use svix_ksuid::{Ksuid, KsuidLike};
+
+    let digest = sha256::digest(format!("{org_id}\u{0}{source}\u{0}{alert_name}"));
+    // `sha256::digest` returns lowercase hex; the first 32 chars are 16 bytes,
+    // exactly the KSUID payload width.
+    let mut payload = [0u8; 16];
+    hex::decode_to_slice(&digest[..32], &mut payload)
+        .expect("sha256 digest is valid hex of sufficient length");
+
+    // Fixed epoch: an external id encodes identity, not creation time. Passing
+    // `None` would stamp the current time and break stability outright.
+    Ksuid::from_seconds(Some(EXTERNAL_ALERT_ID_EPOCH), Some(&payload)).to_string()
+}
+
+/// Map an external severity string onto an incident severity.
+///
+/// Accepts the vocabularies actually seen in the wild — Prometheus/Grafana
+/// (`critical`/`warning`/`info`), PagerDuty-style (`P1`..`P4`), Datadog
+/// (`error`), and bare numerics. Returns `None` when nothing matches, leaving
+/// the caller's default in place rather than guessing.
+pub fn map_external_severity(raw: &str) -> Option<IncidentSeverity> {
+    match raw.trim().to_ascii_lowercase().as_str() {
+        "p1" | "1" | "critical" | "crit" | "fatal" | "emergency" | "disaster" => {
+            Some(IncidentSeverity::P1)
+        }
+        "p2" | "2" | "error" | "high" | "major" => Some(IncidentSeverity::P2),
+        "p3" | "3" | "warning" | "warn" | "medium" | "average" => Some(IncidentSeverity::P3),
+        "p4" | "4" | "info" | "information" | "informational" | "low" | "minor" | "debug" => {
+            Some(IncidentSeverity::P4)
+        }
+        _ => None,
     }
 }
 
@@ -2122,5 +2362,169 @@ mod tests {
             event.event_type,
             IncidentEventType::AIAnalysisComplete
         ));
+    }
+
+    // ── External alert ingest ────────────────────────────────────────────────
+
+    fn ext_payload(source: &str, alert_name: &str) -> ExternalAlertPayload {
+        ExternalAlertPayload {
+            source: source.to_string(),
+            alert_name: alert_name.to_string(),
+            dedup_key: None,
+            severity: None,
+            status: ExternalAlertStatus::Firing,
+            timestamp: None,
+            labels: HashMap::new(),
+            annotations: HashMap::new(),
+            external_url: None,
+        }
+    }
+
+    #[test]
+    fn test_external_alert_id_is_stable_across_calls() {
+        let a = ext_payload("alertmanager", "HighErrorRate");
+        let b = ext_payload("alertmanager", "HighErrorRate");
+        assert_eq!(a.alert_id("org1"), b.alert_id("org1"));
+    }
+
+    #[test]
+    fn test_external_alert_id_is_never_empty() {
+        // The regression this guards: a synthetic Alert with `id: None` makes
+        // Alert::get_unique_key() return "", collapsing every external alert
+        // onto one identity and wrongly suppressing notifications.
+        let id = ext_payload("datadog", "CPUHigh").alert_id("org1");
+        assert!(!id.is_empty());
+        assert_eq!(id.len(), 27, "must be KSUID-shaped like a native alert id");
+    }
+
+    #[test]
+    fn test_external_alert_id_parses_as_ksuid() {
+        // get_incident_with_alerts parses alert_id as a Ksuid; a non-parsing id
+        // would be silently skipped there.
+        use std::str::FromStr;
+        let id = ext_payload("grafana", "DiskFull").alert_id("org1");
+        assert!(svix_ksuid::Ksuid::from_str(&id).is_ok());
+    }
+
+    #[test]
+    fn test_external_alert_id_differs_by_source_name_and_org() {
+        let base = ext_payload("alertmanager", "HighErrorRate").alert_id("org1");
+        assert_ne!(
+            base,
+            ext_payload("datadog", "HighErrorRate").alert_id("org1")
+        );
+        assert_ne!(
+            base,
+            ext_payload("alertmanager", "LowDiskSpace").alert_id("org1")
+        );
+        assert_ne!(
+            base,
+            ext_payload("alertmanager", "HighErrorRate").alert_id("org2")
+        );
+    }
+
+    #[test]
+    fn test_dedup_identity_prefers_explicit_key() {
+        let mut p = ext_payload("alertmanager", "HighErrorRate");
+        p.dedup_key = Some("abc123".to_string());
+        let with_key = p.dedup_identity("org1");
+
+        // Same key, different rule name → still the same firing identity.
+        let mut q = ext_payload("alertmanager", "SomethingElse");
+        q.dedup_key = Some("abc123".to_string());
+        assert_eq!(with_key, q.dedup_identity("org1"));
+    }
+
+    #[test]
+    fn test_dedup_identity_falls_back_to_alert_identity() {
+        let p = ext_payload("alertmanager", "HighErrorRate");
+        let q = ext_payload("alertmanager", "HighErrorRate");
+        assert_eq!(p.dedup_identity("org1"), q.dedup_identity("org1"));
+
+        // A blank key must not be treated as a real key.
+        let mut blank = ext_payload("alertmanager", "HighErrorRate");
+        blank.dedup_key = Some("   ".to_string());
+        assert_eq!(blank.dedup_identity("org1"), p.dedup_identity("org1"));
+    }
+
+    #[test]
+    fn test_validate_accepts_minimal_payload() {
+        assert!(
+            ext_payload("alertmanager", "HighErrorRate")
+                .validate()
+                .is_ok()
+        );
+    }
+
+    #[test]
+    fn test_validate_allows_empty_labels() {
+        // Documented behaviour: no labels → cannot correlate → own incident.
+        let p = ext_payload("alertmanager", "HighErrorRate");
+        assert!(p.labels.is_empty());
+        assert!(p.validate().is_ok());
+    }
+
+    #[test]
+    fn test_validate_rejects_blank_source_and_name() {
+        assert!(ext_payload("   ", "HighErrorRate").validate().is_err());
+        assert!(ext_payload("alertmanager", "").validate().is_err());
+    }
+
+    #[test]
+    fn test_validate_rejects_oversized_label_maps() {
+        let mut p = ext_payload("alertmanager", "HighErrorRate");
+        for i in 0..(MAX_EXTERNAL_ALERT_LABELS + 1) {
+            p.labels.insert(format!("k{i}"), "v".to_string());
+        }
+        assert!(p.validate().is_err());
+    }
+
+    #[test]
+    fn test_validate_rejects_oversized_label_value() {
+        let mut p = ext_payload("alertmanager", "HighErrorRate");
+        p.labels.insert(
+            "service".to_string(),
+            "x".repeat(MAX_EXTERNAL_ALERT_LABEL_LEN + 1),
+        );
+        assert!(p.validate().is_err());
+    }
+
+    #[test]
+    fn test_status_defaults_to_firing_when_absent() {
+        let p: ExternalAlertPayload =
+            serde_json::from_str(r#"{"source":"alertmanager","alert_name":"X"}"#).unwrap();
+        assert_eq!(p.status, ExternalAlertStatus::Firing);
+        assert!(p.labels.is_empty());
+    }
+
+    #[test]
+    fn test_status_deserializes_resolved() {
+        let p: ExternalAlertPayload = serde_json::from_str(
+            r#"{"source":"alertmanager","alert_name":"X","status":"resolved"}"#,
+        )
+        .unwrap();
+        assert_eq!(p.status, ExternalAlertStatus::Resolved);
+    }
+
+    #[test]
+    fn test_map_external_severity_known_vocabularies() {
+        assert_eq!(
+            map_external_severity("critical"),
+            Some(IncidentSeverity::P1)
+        );
+        assert_eq!(map_external_severity("P1"), Some(IncidentSeverity::P1));
+        assert_eq!(map_external_severity("error"), Some(IncidentSeverity::P2));
+        assert_eq!(
+            map_external_severity(" Warning "),
+            Some(IncidentSeverity::P3)
+        );
+        assert_eq!(map_external_severity("info"), Some(IncidentSeverity::P4));
+    }
+
+    #[test]
+    fn test_map_external_severity_unknown_returns_none() {
+        // None means "keep the configured default" rather than guessing.
+        assert_eq!(map_external_severity("spicy"), None);
+        assert_eq!(map_external_severity(""), None);
     }
 }

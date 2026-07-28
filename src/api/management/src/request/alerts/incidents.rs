@@ -882,6 +882,91 @@ pub struct CommentRequest {
     pub comment: String,
 }
 
+/// IngestExternalAlert
+#[cfg(feature = "enterprise")]
+#[utoipa::path(
+    post,
+    path = "/v2/{org_id}/alerts/incidents/ingest",
+    context_path = "/api",
+    tag = "Incidents",
+    operation_id = "IngestExternalAlert",
+    summary = "Ingest an alert from an external system",
+    description = "Accepts an alert from a system outside OpenObserve (Alertmanager, Datadog, \
+                   Grafana, …) and correlates it into an incident. Alerts whose identity labels \
+                   match — whether they came from this endpoint or from OpenObserve's own alert \
+                   evaluation — land in the same incident. An alert with no matching labels gets \
+                   an incident of its own.",
+    security(("Authorization" = [])),
+    params(("org_id" = String, Path, description = "Organization name")),
+    request_body(
+        content = config::meta::alerts::incidents::ExternalAlertPayload,
+        description = "Normalized external alert",
+        content_type = "application/json",
+    ),
+    responses(
+        (status = 200, description = "Correlated", content_type = "application/json", body = config::meta::alerts::incidents::ExternalIngestResponse),
+        (status = 400, description = "Invalid payload", content_type = "application/json", body = ()),
+        (status = 403, description = "Incidents disabled or enterprise feature", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "create"})),
+    )
+)]
+pub async fn ingest_external_alert(
+    Path(org_id): Path<String>,
+    Json(payload): Json<config::meta::alerts::incidents::ExternalAlertPayload>,
+) -> Response {
+    // Gated on the same switch as the rest of incidents — an endpoint that
+    // accepted alerts while correlation was off would silently drop them.
+    if !o2_enterprise::enterprise::common::config::get_config()
+        .incidents
+        .enabled
+    {
+        return MetaHttpResponse::forbidden("Incident correlation is not enabled");
+    }
+
+    if let Err(e) = payload.validate() {
+        return MetaHttpResponse::bad_request(e);
+    }
+
+    match openobserve_core::alerts::incidents::ingest_external_alert(&org_id, &payload).await {
+        Ok(result) => MetaHttpResponse::json(result),
+        Err(e) => MetaHttpResponse::internal_error(e),
+    }
+}
+
+/// Ingest an external alert (OSS)
+#[cfg(not(feature = "enterprise"))]
+#[utoipa::path(
+    post,
+    path = "/v2/{org_id}/alerts/incidents/ingest",
+    context_path = "/api",
+    tag = "Incidents",
+    operation_id = "IngestExternalAlert",
+    summary = "Ingest an alert from an external system",
+    description = "Accepts an alert from a system outside OpenObserve and correlates it into an \
+                   incident. This endpoint is only available with enterprise features enabled.",
+    security(("Authorization" = [])),
+    params(("org_id" = String, Path, description = "Organization name")),
+    request_body(
+        content = config::meta::alerts::incidents::ExternalAlertPayload,
+        description = "Normalized external alert",
+        content_type = "application/json",
+    ),
+    responses(
+        (status = 403, description = "Enterprise feature", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "create"})),
+    )
+)]
+pub async fn ingest_external_alert(
+    _path: Path<String>,
+    _payload: Json<config::meta::alerts::incidents::ExternalAlertPayload>,
+) -> Response {
+    MetaHttpResponse::forbidden("Not Supported")
+}
+
 #[cfg(not(feature = "enterprise"))]
 #[utoipa::path(
     post,

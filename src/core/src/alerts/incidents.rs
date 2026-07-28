@@ -482,6 +482,10 @@ pub async fn correlate_alert_to_incident(
     result_row: &Map<String, Value>,
     notify_rows: &[Map<String, Value>],
     triggered_at: i64,
+    // Provenance for alerts pushed in over the external ingest webhook. `None`
+    // for alerts OpenObserve evaluated itself, which are the overwhelming
+    // majority and are resolvable from the `alerts` table.
+    external: Option<&infra::table::alert_incidents::ExternalAlertMeta>,
 ) -> Result<Option<IncidentCorrelationOutcome>, anyhow::Error> {
     // Extract labels from result row as HashMap
     let mut labels: HashMap<String, String> = result_row
@@ -579,6 +583,7 @@ pub async fn correlate_alert_to_incident(
         triggered_at,
         &correlation_reason,
         &service_name,
+        external,
     )
     .await?;
 
@@ -784,6 +789,7 @@ async fn create_new_incident(
     triggered_at: i64,
     correlation_reason: &str,
     service_name: &str,
+    external: Option<&infra::table::alert_incidents::ExternalAlertMeta>,
 ) -> Result<IncidentCorrelationOutcome, anyhow::Error> {
     let severity = o2_enterprise::enterprise::alerts::incidents::determine_severity(None);
 
@@ -829,6 +835,7 @@ async fn create_new_incident(
         &alert.name,
         triggered_at,
         correlation_reason,
+        external,
     )
     .await?;
 
@@ -971,6 +978,7 @@ async fn find_or_create_incident(
     triggered_at: i64,
     correlation_reason: &str,
     service_name: &str,
+    external: Option<&infra::table::alert_incidents::ExternalAlertMeta>,
 ) -> Result<IncidentCorrelationOutcome, anyhow::Error> {
     use config::meta::alerts::incidents::{DimensionRelationship, KeyType};
 
@@ -989,6 +997,7 @@ async fn find_or_create_incident(
                 &alert.name,
                 triggered_at,
                 correlation_reason,
+                external,
             )
             .await?;
 
@@ -1073,6 +1082,7 @@ async fn find_or_create_incident(
                 &alert.name,
                 triggered_at,
                 correlation_reason,
+                external,
             )
             .await?;
 
@@ -1162,6 +1172,9 @@ async fn find_or_create_incident(
                         &alert.name,
                         triggered_at,
                         correlation_reason,
+                        external.map(|e| e.source.as_str()),
+                        external.and_then(|e| e.external_url.as_deref()),
+                        external.and_then(|e| e.annotations.as_deref()),
                     )
                     .await
             {
@@ -1250,6 +1263,7 @@ async fn find_or_create_incident(
         triggered_at,
         correlation_reason,
         service_name,
+        external,
     )
     .await
 }
@@ -1299,6 +1313,12 @@ pub async fn get_incident_with_alerts(
                 .and_then(|r| CorrelationReason::try_from(r.as_str()).ok())
                 .unwrap_or(CorrelationReason::AlertId),
             created_at: a.created_at,
+            source: a.source.clone(),
+            external_url: a.external_url.clone(),
+            annotations: a
+                .annotations
+                .as_deref()
+                .and_then(|raw| serde_json::from_str(raw).ok()),
         })
         .collect();
 
@@ -1315,6 +1335,13 @@ pub async fn get_incident_with_alerts(
         // We'll need to get these from the alert record itself
         // For now, let's try to get the alert by ID from the first matching trigger
         if let Some(trigger) = incident_alerts.iter().find(|a| a.alert_name == alert_name) {
+            // Externally-ingested alerts have no row in the `alerts` table by
+            // design — the junction row carries everything about them, and the
+            // client renders those from `triggers`. Looking them up here would
+            // always miss and log a spurious warning.
+            if trigger.source.is_some() {
+                continue;
+            }
             // Parse alert_id as Ksuid
             if let Ok(alert_ksuid) = trigger.alert_id.parse() {
                 match super::alert::get_by_id_db(&incident_org_id, alert_ksuid).await {
@@ -1336,6 +1363,269 @@ pub async fn get_incident_with_alerts(
         triggers,
         alerts,
     }))
+}
+
+// ── External alert ingest ────────────────────────────────────────────────────
+
+/// How long a `dedup_key` is honoured for. A sender retrying a delivery does so
+/// within seconds; a genuinely new firing of the same rule hours later must not
+/// be swallowed. Deliberately shorter than any realistic incident lifetime.
+const EXTERNAL_DEDUP_WINDOW_MINUTES: i64 = 30;
+
+/// Ingest one alert pushed in by a system outside OpenObserve and correlate it
+/// into an incident.
+///
+/// The alert never becomes a row in the `alerts` table. It is turned into a
+/// synthetic in-memory [`Alert`] and handed to the same
+/// [`correlate_alert_to_incident`] path that native alerts take, so external
+/// and native alerts land in the same incident whenever their identity labels
+/// agree — and in separate incidents when they do not.
+///
+/// Three properties this function is responsible for:
+///
+/// - **Stable identity.** The synthetic alert's id is derived from `(org, source, alert_name)`,
+///   never generated fresh. Correlation tells "this alert type is already here" from "a new alert
+///   type joined" purely by alert id, so a fresh id per delivery would notify on every repeat and a
+///   missing id (`Alert::get_unique_key()` returns `""` when `id` is `None`) would collapse every
+///   external alert into one identity and suppress notifications that should fire.
+/// - **Idempotency.** Senders retry. A repeated `dedup_key` inside
+///   [`EXTERNAL_DEDUP_WINDOW_MINUTES`] is dropped rather than inflating `alert_count`.
+/// - **Resolution.** `status: resolved` closes out the alert's contribution and resolves the
+///   incident once nothing in it is still firing.
+#[cfg(feature = "enterprise")]
+pub async fn ingest_external_alert(
+    org_id: &str,
+    payload: &config::meta::alerts::incidents::ExternalAlertPayload,
+) -> Result<config::meta::alerts::incidents::ExternalIngestResponse, anyhow::Error> {
+    use config::meta::alerts::incidents::{ExternalAlertStatus, ExternalIngestAction};
+
+    payload
+        .validate()
+        .map_err(|e| anyhow::anyhow!("invalid external alert payload: {e}"))?;
+
+    let alert_id = payload.alert_id(org_id);
+    let triggered_at = payload
+        .timestamp
+        .unwrap_or_else(|| chrono::Utc::now().timestamp_micros());
+
+    if payload.status == ExternalAlertStatus::Resolved {
+        return resolve_external_alert(org_id, payload, &alert_id, triggered_at).await;
+    }
+
+    // Idempotency. Reuses the alert dedup-state table (and its existing
+    // cleanup job) rather than introducing a parallel store; the dedup
+    // identity is the fingerprint.
+    let fingerprint = payload.dedup_identity(org_id);
+    let db = &infra::db::connect_to_orm().await;
+    if let Ok(Some(state)) = crate::alerts::deduplication::get_dedup_state(db, &fingerprint).await
+        && crate::alerts::deduplication::is_within_window(&state, EXTERNAL_DEDUP_WINDOW_MINUTES)
+    {
+        log::debug!(
+            "[incidents] Dropping duplicate external alert {}/{} (dedup identity {fingerprint})",
+            payload.source,
+            payload.alert_name,
+        );
+        return Ok(config::meta::alerts::incidents::ExternalIngestResponse {
+            action: ExternalIngestAction::DuplicateIgnored,
+            alert_id,
+            incident_id: None,
+            correlation_reason: None,
+        });
+    }
+
+    let alert = synthetic_alert(org_id, payload, &alert_id)?;
+
+    // Labels are the whole correlation input; nothing else in the payload
+    // influences which incident this lands in.
+    let mut result_row = Map::new();
+    for (k, v) in &payload.labels {
+        result_row.insert(k.clone(), Value::String(v.clone()));
+    }
+    result_row.insert(
+        "_o2_external_source".to_string(),
+        Value::String(payload.source.clone()),
+    );
+
+    let external = infra::table::alert_incidents::ExternalAlertMeta {
+        source: payload.source.clone(),
+        external_url: payload.external_url.clone(),
+        annotations: if payload.annotations.is_empty() {
+            None
+        } else {
+            Some(serde_json::to_string(&payload.annotations)?)
+        },
+    };
+
+    let notify = std::slice::from_ref(&result_row);
+    let outcome =
+        correlate_alert_to_incident(&alert, &result_row, notify, triggered_at, Some(&external))
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("incident correlation returned no outcome"))?;
+
+    // Record the delivery so a retry inside the window is recognised. A
+    // failure here costs idempotency for this one alert, not the ingest.
+    if let Err(e) = crate::alerts::deduplication::save_dedup_state(
+        db,
+        crate::alerts::deduplication::DedupStateParams {
+            org_id,
+            fingerprint: &fingerprint,
+            alert_id: &alert_id,
+            first_seen_at: triggered_at,
+            last_seen_at: triggered_at,
+            occurrence_count: 1,
+        },
+    )
+    .await
+    {
+        log::warn!("[incidents] Failed to persist external alert dedup state: {e}");
+    }
+
+    let (action, correlation_reason) = match &outcome {
+        IncidentCorrelationOutcome::NewIncidentCreated { .. } => {
+            (ExternalIngestAction::IncidentCreated, None)
+        }
+        IncidentCorrelationOutcome::NewAlertTypeJoined { .. } => {
+            (ExternalIngestAction::AlertJoined, None)
+        }
+        IncidentCorrelationOutcome::ExistingAlertRepeated { .. } => {
+            (ExternalIngestAction::AlertRepeated, None)
+        }
+    };
+
+    log::info!(
+        "[incidents] External alert {}/{} from {} correlated to incident {} ({:?})",
+        org_id,
+        payload.alert_name,
+        payload.source,
+        outcome.incident_id(),
+        action,
+    );
+
+    Ok(config::meta::alerts::incidents::ExternalIngestResponse {
+        action,
+        alert_id,
+        incident_id: Some(outcome.incident_id().to_string()),
+        correlation_reason,
+    })
+}
+
+/// Build the throwaway [`Alert`] handed to the correlation engine.
+///
+/// Only the fields correlation actually reads are populated: `org_id`, `name`,
+/// `id`, and `destinations`. `query_condition` stays at its default — the
+/// condition-dimension enrichment step simply finds nothing to add, which is
+/// correct for an alert OpenObserve did not evaluate.
+///
+/// `destinations` is deliberately empty: routing for an incident is owned by
+/// the native alerts in it. An external sender does not get to pick who gets
+/// paged.
+#[cfg(feature = "enterprise")]
+fn synthetic_alert(
+    org_id: &str,
+    payload: &config::meta::alerts::incidents::ExternalAlertPayload,
+    alert_id: &str,
+) -> Result<Alert, anyhow::Error> {
+    use std::str::FromStr;
+
+    // Built by mutation rather than struct-update syntax: `Alert` has private
+    // fields, so `..Default::default()` is not usable from outside `config`.
+    let mut alert = Alert::default();
+    alert.org_id = org_id.to_string();
+    alert.name = payload.alert_name.clone();
+    alert.creates_incident = true;
+    alert.destinations = vec![];
+    alert.id = Some(
+        svix_ksuid::Ksuid::from_str(alert_id)
+            .map_err(|e| anyhow::anyhow!("derived alert id is not a valid KSUID: {e}"))?,
+    );
+    Ok(alert)
+}
+
+/// Handle `status: resolved` for an externally-ingested alert.
+#[cfg(feature = "enterprise")]
+async fn resolve_external_alert(
+    org_id: &str,
+    payload: &config::meta::alerts::incidents::ExternalAlertPayload,
+    alert_id: &str,
+    resolved_at: i64,
+) -> Result<config::meta::alerts::incidents::ExternalIngestResponse, anyhow::Error> {
+    use config::meta::alerts::incidents::{ExternalIngestAction, ExternalIngestResponse};
+
+    let open =
+        infra::table::alert_incidents::find_open_incidents_containing_alert(org_id, alert_id)
+            .await?;
+
+    if open.is_empty() {
+        log::debug!(
+            "[incidents] Resolve for external alert {}/{} matched no open incident",
+            payload.source,
+            payload.alert_name,
+        );
+        return Ok(ExternalIngestResponse {
+            action: ExternalIngestAction::NothingToResolve,
+            alert_id: alert_id.to_string(),
+            incident_id: None,
+            correlation_reason: None,
+        });
+    }
+
+    // An alert can legitimately sit in more than one open incident. Resolve its
+    // contribution to each; report the last incident that closed outright, or
+    // failing that the first one touched.
+    let mut incident_closed: Option<String> = None;
+    let mut touched: Option<String> = None;
+    let mut any_change = false;
+
+    for incident in &open {
+        let resolution =
+            infra::table::alert_incidents::mark_alert_resolved(&incident.id, alert_id, resolved_at)
+                .await?;
+
+        any_change |= resolution.changed;
+        touched.get_or_insert_with(|| incident.id.clone());
+
+        if resolution.changed
+            && let Err(e) = infra::table::incident_events::append(
+                org_id,
+                &incident.id,
+                config::meta::alerts::incidents::IncidentEvent::comment(
+                    format!("{} (external)", payload.source),
+                    format!("Alert `{}` resolved upstream", payload.alert_name),
+                ),
+            )
+            .await
+        {
+            log::warn!(
+                "[incidents] Failed to record resolve event on incident {}: {e}",
+                incident.id
+            );
+        }
+
+        if resolution.all_resolved {
+            infra::table::alert_incidents::update_status(org_id, &incident.id, "resolved").await?;
+            incident_closed = Some(incident.id.clone());
+            log::info!(
+                "[incidents] Incident {} resolved — every alert in it has resolved upstream",
+                incident.id
+            );
+        }
+    }
+
+    let action = if incident_closed.is_some() {
+        ExternalIngestAction::IncidentResolved
+    } else if any_change {
+        ExternalIngestAction::AlertResolved
+    } else {
+        // Every matching row was already resolved — a repeated resolve.
+        ExternalIngestAction::NothingToResolve
+    };
+
+    Ok(ExternalIngestResponse {
+        action,
+        alert_id: alert_id.to_string(),
+        incident_id: incident_closed.or(touched),
+        correlation_reason: None,
+    })
 }
 
 /// List incidents for an organization
@@ -2131,6 +2421,93 @@ pub async fn update_severity(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // ── Synthetic alert construction ─────────────────────────────────────────
+    //
+    // These pin the properties the correlation engine silently depends on. The
+    // ingest path itself needs a database, so it is covered by integration
+    // tests; what is unit-testable — and what actually broke in review — is the
+    // shape of the Alert handed to correlation.
+
+    #[cfg(feature = "enterprise")]
+    fn payload(
+        source: &str,
+        alert_name: &str,
+    ) -> config::meta::alerts::incidents::ExternalAlertPayload {
+        config::meta::alerts::incidents::ExternalAlertPayload {
+            source: source.to_string(),
+            alert_name: alert_name.to_string(),
+            dedup_key: None,
+            severity: None,
+            status: config::meta::alerts::incidents::ExternalAlertStatus::Firing,
+            timestamp: None,
+            labels: HashMap::new(),
+            annotations: HashMap::new(),
+            external_url: None,
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_synthetic_alert_has_a_non_empty_unique_key() {
+        // Alert::get_unique_key() returns "" when `id` is None. If that reached
+        // the junction table, every external alert would share one identity and
+        // NewAlertTypeJoined could never fire — notifications for genuinely new
+        // alert types would be silently suppressed.
+        let p = payload("alertmanager", "HighErrorRate");
+        let id = p.alert_id("org1");
+        let alert = synthetic_alert("org1", &p, &id).unwrap();
+
+        assert!(!alert.get_unique_key().is_empty());
+        assert_eq!(alert.get_unique_key(), id);
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_synthetic_alert_identity_is_stable_across_deliveries() {
+        // Two deliveries of the same rule must produce the same alert id, or
+        // every repeat would look like a new alert type and re-notify.
+        let a = payload("alertmanager", "HighErrorRate");
+        let b = payload("alertmanager", "HighErrorRate");
+        let a_alert = synthetic_alert("org1", &a, &a.alert_id("org1")).unwrap();
+        let b_alert = synthetic_alert("org1", &b, &b.alert_id("org1")).unwrap();
+
+        assert_eq!(a_alert.get_unique_key(), b_alert.get_unique_key());
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_synthetic_alert_identity_differs_per_rule() {
+        let a = payload("alertmanager", "HighErrorRate");
+        let b = payload("alertmanager", "LowDiskSpace");
+        let a_alert = synthetic_alert("org1", &a, &a.alert_id("org1")).unwrap();
+        let b_alert = synthetic_alert("org1", &b, &b.alert_id("org1")).unwrap();
+
+        assert_ne!(a_alert.get_unique_key(), b_alert.get_unique_key());
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_synthetic_alert_carries_no_destinations() {
+        // Notification routing belongs to the native alerts in an incident. An
+        // external sender must not be able to pick who gets paged.
+        let p = payload("datadog", "CPUHigh");
+        let alert = synthetic_alert("org1", &p, &p.alert_id("org1")).unwrap();
+
+        assert!(alert.destinations.is_empty());
+        assert!(alert.creates_incident);
+        assert_eq!(alert.org_id, "org1");
+        assert_eq!(alert.name, "CPUHigh");
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_synthetic_alert_rejects_a_non_ksuid_id() {
+        // get_incident_with_alerts parses alert_id as a Ksuid. Constructing the
+        // Alert must fail loudly rather than emit a row that renders wrong.
+        let p = payload("alertmanager", "HighErrorRate");
+        assert!(synthetic_alert("org1", &p, "not-a-ksuid").is_err());
+    }
 
     #[test]
     fn test_merge_dimensions_adds_new_keys() {

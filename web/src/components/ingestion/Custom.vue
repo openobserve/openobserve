@@ -51,6 +51,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }"
         :label="t('ingestion.tracesLabel')"
       />
+      <ORouteTab
+        name="ingestAlerts"
+        data-test="ingestion-custom-tab-ingestAlerts"
+        :to="{
+          name: 'ingestAlerts',
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        }"
+        :label="t('ingestion.alertsLabel')"
+      />
     </template>
 
     <div class="h-full overflow-hidden">
@@ -102,6 +113,7 @@ export default defineComponent({
       "cloudwatchMetrics",
     ];
     const traceRoutes = ["tracesOTLP", "ingestTracesFromOtel"];
+    const alertRoutes = ["ingestAlertsWebhook"];
     const rumRoutes = ["frontendMonitoring"];
     const logRoutes = [
       "curl",
@@ -123,14 +135,22 @@ export default defineComponent({
           ? "ingestMetrics"
           : traceRoutes.includes(router.currentRoute.value.name as string)
             ? "ingestTraces"
-            : "ingestLogs",
+            : alertRoutes.includes(router.currentRoute.value.name as string)
+              ? "ingestAlerts"
+              : "ingestLogs",
     );
 
     onBeforeMount(() => {
       // Parent container routes: navigating to these redirects to their first child.
       // Leaf child routes (tracesOTLP, ingestTracesFromOtel, logRoutes members, etc.)
       // are intentionally excluded here — they just set the active tab below.
-      const ingestRoutes = ["ingestLogs", "ingestTraces", "ingestMetrics", "rumMonitoring"];
+      const ingestRoutes = [
+        "ingestLogs",
+        "ingestTraces",
+        "ingestMetrics",
+        "ingestAlerts",
+        "rumMonitoring",
+      ];
 
       if (ingestRoutes.includes(router.currentRoute.value.name)) {
         router.push({
@@ -148,6 +168,8 @@ export default defineComponent({
         tabs.value = "ingestMetrics";
       } else if (traceRoutes.includes(router.currentRoute.value.name)) {
         tabs.value = "ingestTraces";
+      } else if (alertRoutes.includes(router.currentRoute.value.name)) {
+        tabs.value = "ingestAlerts";
       } else if (ingestRoutes.includes(router.currentRoute.value.name)) {
         tabs.value = router.currentRoute.value.name;
       } else if (rumRoutes.includes(router.currentRoute.value.name)) {
@@ -206,6 +228,7 @@ export default defineComponent({
       rumRoutes,
       traceRoutes,
       metricRoutes,
+      alertRoutes,
     };
   },
 });

@@ -37,6 +37,8 @@ import CloudWatchMetricConfig from "@/components/ingestion/metrics/CloudWatchMet
 import IngestLogs from "@/components/ingestion/logs/Index.vue";
 import IngestMetrics from "@/components/ingestion/metrics/Index.vue";
 import IngestTraces from "@/components/ingestion/traces/Index.vue";
+import IngestAlerts from "@/components/ingestion/alerts/Index.vue";
+import IncidentWebhook from "@/components/ingestion/alerts/IncidentWebhook.vue";
 import Recommended from "@/components/ingestion/Recommended.vue";
 import Custom from "@/components/ingestion/Custom.vue";
 import LogstashDatasource from "@/components/ingestion/logs/LogstashDatasource.vue";
@@ -322,6 +324,24 @@ const useIngestionRoutes = () => {
                   path: "otel",
                   name: "ingestTracesFromOtel",
                   component: OtelConfig,
+                  beforeEnter(to: any, from: any, next: any) {
+                    routeGuard(to, from, next);
+                  },
+                },
+              ],
+            },
+            {
+              path: "alerts",
+              name: "ingestAlerts",
+              component: IngestAlerts,
+              beforeEnter(to: any, from: any, next: any) {
+                routeGuard(to, from, next);
+              },
+              children: [
+                {
+                  path: "webhook",
+                  name: "ingestAlertsWebhook",
+                  component: IncidentWebhook,
                   beforeEnter(to: any, from: any, next: any) {
                     routeGuard(to, from, next);
                   },

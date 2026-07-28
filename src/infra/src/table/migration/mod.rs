@@ -141,6 +141,7 @@ mod m20260720_000001_create_workflows_table;
 mod m20260723_000001_add_env_version_to_gen_ai_agents;
 mod m20260724_000001_add_name_is_default_to_synthetics_probe_tokens;
 mod m20260724_000002_add_token_id_to_synthetics_agents;
+mod m20260727_000001_add_external_source_to_incident_alerts;
 mod m20260728_000001_create_workflows_associations_table;
 
 pub struct Migrator;
@@ -272,6 +273,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260723_000001_add_env_version_to_gen_ai_agents::Migration),
             Box::new(m20260724_000001_add_name_is_default_to_synthetics_probe_tokens::Migration),
             Box::new(m20260724_000002_add_token_id_to_synthetics_agents::Migration),
+            Box::new(m20260727_000001_add_external_source_to_incident_alerts::Migration),
             Box::new(m20260728_000001_create_workflows_associations_table::Migration),
         ]
     }
