@@ -1131,6 +1131,12 @@ pub struct Common {
         help = "Enable shared memtable across multiple organizations"
     )]
     pub feature_shared_memtable_enabled: bool,
+    #[env_config(
+        name = "ZO_FEATURE_WAL_PACK_ENABLED",
+        default = false,
+        help = "Persist memtables into packed wal files (one file per rotation instead of one file per stream)"
+    )]
+    pub feature_wal_pack_enabled: bool,
     #[env_config(name = "ZO_UI_ENABLED", default = true)]
     pub ui_enabled: bool,
     #[env_config(name = "ZO_UI_SQL_BASE64_ENABLED", default = false)]
