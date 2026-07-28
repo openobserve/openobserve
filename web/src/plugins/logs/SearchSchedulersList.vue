@@ -108,7 +108,7 @@
             />
           </template>
           <template #expansion="{ row }">
-            <div class="app-tabs-schedule-list h-fit w-fit px-4 py-0">
+            <div class="app-tabs-schedule-list h-fit w-fit px-4 py-2">
               <AppTabs
                 data-test="expanded-list-tabs"
                 class="mr-3"

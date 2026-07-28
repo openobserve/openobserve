@@ -100,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :row-height="24"
               :show-global-filter="false"
               :global-filter="detailSearchQuery"
-              class="o2-table o2-row-md o2-schema-table log-detail-source-table border-card-glass-border w-full border border-solid"
+              class="o2-table o2-schema-table log-detail-source-table border-card-glass-border w-full border border-solid"
             >
               <template #toolbar>
                 <OSearchInput
