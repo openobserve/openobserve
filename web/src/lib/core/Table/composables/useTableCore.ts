@@ -164,6 +164,9 @@ export function useTableCore<TData>(
 
   // Track column order for drag-reorder
   const columnOrder = ref<string[]>([]) as Ref<string[]>;
+  // Set once the user drag-reorders a column. Until then the parent's columns
+  // array is the single source of order truth (see the sync watch below).
+  const userReorderedColumns = ref(false);
 
   // Track column sizing — seeded with persisted values when provided
   const columnSizing = ref<Record<string, number>>(props.initialColumnSizes ?? {});
@@ -385,10 +388,28 @@ export function useTableCore<TData>(
     },
   });
 
-  // Sync columnOrder when columns change
+  // Sync columnOrder when columns change.
+  //
+  // Two regimes:
+  // - Before any user drag, the parent's array order is authoritative — a parent
+  //   that re-orders its columns prop IN PLACE (same ids, new order — e.g. the
+  //   dashboard column_order config re-sorting a PromQL table) must see that
+  //   order rendered. Merging here instead kept the stale first-render order and
+  //   appended "new" ids after it, so the reorder silently never applied.
+  // - After a user drag, preserve their order and only append/drop ids: the
+  //   watch also fires when effectiveColumns recomputes for unrelated reasons
+  //   (visibility toggles), and adopting the prop order then would wipe the
+  //   user's arrangement.
   watch(
     () => effectiveColumns.value.map((c) => c.id),
     (newIds) => {
+      if (!userReorderedColumns.value) {
+        const same =
+          newIds.length === columnOrder.value.length &&
+          newIds.every((id, i) => id === columnOrder.value[i]);
+        if (!same) columnOrder.value = [...newIds];
+        return;
+      }
       const existing = columnOrder.value.filter((id) => newIds.includes(id));
       const added = newIds.filter((id) => !existing.includes(id));
       columnOrder.value = [...existing, ...added];
@@ -423,6 +444,7 @@ export function useTableCore<TData>(
     table,
     effectiveColumns,
     columnOrder,
+    userReorderedColumns,
     columnSizing,
     sortingState,
     isClientSort,

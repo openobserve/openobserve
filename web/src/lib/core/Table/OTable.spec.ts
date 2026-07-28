@@ -88,6 +88,77 @@ describe("OTable", () => {
       expect(rows.length).toBe(5);
     });
 
+    it("should follow the parent's order when the columns prop is reordered in place", async () => {
+      // Same ids, new order — the dashboard column_order config does exactly
+      // this. The internal columnOrder state must adopt the prop order (it
+      // previously kept the first-render order and the reorder never applied).
+      wrapper = mount(OTable, {
+        props: { data: makeRows(3), columns: makeColumns() },
+      });
+      const headerIds = () =>
+        wrapper
+          .findAll("thead th[data-test^='o2-table-th-']")
+          .map((th) => th.attributes("data-test"));
+      expect(headerIds()).toEqual([
+        "o2-table-th-id",
+        "o2-table-th-name",
+        "o2-table-th-email",
+        "o2-table-th-status",
+      ]);
+
+      const reordered = makeColumns();
+      reordered.push(reordered.shift()!); // [name, email, status, id]
+      await wrapper.setProps({ columns: reordered });
+      await nextTick();
+
+      expect(headerIds()).toEqual([
+        "o2-table-th-name",
+        "o2-table-th-email",
+        "o2-table-th-status",
+        "o2-table-th-id",
+      ]);
+    });
+
+    it("should keep the user's drag order when the columns prop changes afterwards", async () => {
+      // After a user drag, the prop order is no longer authoritative: a columns
+      // recompute (new array, ids unchanged or extended) must preserve the
+      // dragged arrangement and only append genuinely new columns.
+      wrapper = mount(OTable, {
+        props: { data: makeRows(3), columns: makeColumns() },
+      });
+      const headerIds = () =>
+        wrapper
+          .findAll("thead th[data-test^='o2-table-th-']")
+          .map((th) => th.attributes("data-test"));
+
+      // Simulate the header's drag-reorder event: [status, id, name, email]
+      wrapper
+        .findComponent(OTableHeader)
+        .vm.$emit("update:column-order", ["status", "id", "name", "email"]);
+      await nextTick();
+      expect(headerIds()).toEqual([
+        "o2-table-th-status",
+        "o2-table-th-id",
+        "o2-table-th-name",
+        "o2-table-th-email",
+      ]);
+
+      // Parent re-emits its columns in original order plus a new column — the
+      // dragged order must survive, with the new column appended.
+      const next = makeColumns();
+      next.push({ id: "extra", header: "Extra", accessorKey: "status", size: 80 });
+      await wrapper.setProps({ columns: next });
+      await nextTick();
+
+      expect(headerIds()).toEqual([
+        "o2-table-th-status",
+        "o2-table-th-id",
+        "o2-table-th-name",
+        "o2-table-th-email",
+        "o2-table-th-extra",
+      ]);
+    });
+
     it("renders cell content", () => {
       wrapper = mount(OTable, {
         props: { data: makeRows(3), columns: makeColumns() },

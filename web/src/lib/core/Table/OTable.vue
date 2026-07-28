@@ -283,7 +283,8 @@ provide(OTableCellActionsKey, {
 });
 
 // ── Core table instance ─────────────────────────────────────────
-const { table, effectiveColumns, columnOrder, columnSizing, columnSizeVars } = useTableCore<TData>(
+const { table, effectiveColumns, columnOrder, userReorderedColumns, columnSizing, columnSizeVars } =
+  useTableCore<TData>(
   {
     get data() {
       return tree.enabled.value ? tree.flatRows.value : props.data;
@@ -961,6 +962,7 @@ defineExpose({
     frozen.value = false;
   },
   resetColumnOrder: () => {
+    userReorderedColumns.value = false;
     columnOrder.value = props.columns.map((c) => c.id);
   },
   resetPersistedColumns: () => {
@@ -1179,6 +1181,7 @@ defineExpose({
             @sort="sorting.handleSort"
             @update:column-order="
               (order: string[]) => {
+                userReorderedColumns = true;
                 columnOrder = order;
                 emit('column-order-change', order);
               }
