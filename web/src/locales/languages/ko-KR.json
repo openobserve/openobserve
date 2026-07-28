@@ -9620,7 +9620,7 @@
         "assertionValue": "값",
         "assertions": "어설션",
         "body": "요청 본문",
-        "bodyPlaceholder": "{\"key\": \"value\"}",
+        "bodyPlaceholder": "{'{'}\"key\": \"value\"{'}'}",
         "fields": {
           "body": "응답 본문",
           "response_time_ms": "응답 시간 (ms)",

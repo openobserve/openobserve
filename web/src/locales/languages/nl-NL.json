@@ -9620,7 +9620,7 @@
         "assertionValue": "Waarde",
         "assertions": "Asserties",
         "body": "Aanvraagtekst",
-        "bodyPlaceholder": "{\"key\": \"value\"}",
+        "bodyPlaceholder": "{'{'}\"key\": \"value\"{'}'}",
         "fields": {
           "body": "Reactietekst",
           "response_time_ms": "Reactietijd (ms)",

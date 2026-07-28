@@ -2402,7 +2402,7 @@
     "periodGreaterThanZero": "Period should be greater than 0",
     "frequencyGreaterThanSeconds": "Frequency should be greater than {seconds} seconds.",
     "minimumFrequencyMinutes": "Minimum frequency should be {minutes} minutes",
-    "streamSelectionNameInvalid": "Use alphanumeric and '+=,.@-_' characters only, without spaces.",
+    "streamSelectionNameInvalid": "Use alphanumeric and '+=,.{'@'}-_' characters only, without spaces.",
     "functionAlreadyAssociated": "Function is already associated",
     "atLeastOneCondition": "Please add at least one condition",
     "fillAllConditionFields": "Please fill in all condition fields (column, operator and value are required)",
@@ -7230,7 +7230,7 @@
     "skillContentRequired": "Skill content is required",
     "genericConfig": "Configuration",
     "genericData": "JSON config",
-    "genericDataPlaceholder": "{}",
+    "genericDataPlaceholder": "{'{}'}",
     "invalidJson": "Must be valid JSON"
   },
   "cipherKey": {
@@ -9830,7 +9830,7 @@
         "assertionValue": "Value",
         "assertions": "Assertions",
         "body": "Request body",
-        "bodyPlaceholder": "{\"key\": \"value\"}",
+        "bodyPlaceholder": "{'{'}\"key\": \"value\"{'}'}",
         "fields": {
           "body": "Response body",
           "response_time_ms": "Response time (ms)",
