@@ -282,6 +282,22 @@ fn build_ancestor_joins(stream_name: &str, depth: usize) -> String {
         .join("\n                    ")
 }
 
+/// The env SELECT + trailing GROUP-BY fragments spliced into the agent-edge SQL.
+/// Part B (Agent Graph) is ENV-ONLY / version-agnostic by design: agent edges
+/// carry the agent's `env` so topology stays stable across versions — never a
+/// version column. env is schema-gated: when the stream lacks `gen_ai_agent_env`
+/// both fragments are empty, so the emitted SQL is byte-identical to today.
+/// `aliased` picks the `c.`-qualified form used in the parent-link (aliased `c`)
+/// queries; the flat (no-alias) queries use the bare column.
+#[cfg(feature = "enterprise")]
+fn env_fragments(has_agent_env: bool, aliased: bool) -> (&'static str, &'static str) {
+    match (has_agent_env, aliased) {
+        (false, _) => ("", ""),
+        (true, false) => (", gen_ai_agent_env AS agent_env", ", gen_ai_agent_env"),
+        (true, true) => (", c.gen_ai_agent_env AS agent_env", ", c.gen_ai_agent_env"),
+    }
+}
+
 /// Process a single trace stream
 #[cfg(feature = "enterprise")]
 /// Aggregate one trace stream into service-graph edge hits for a window WITHOUT
@@ -477,6 +493,20 @@ async fn compute_stream_edges(
             "gen_ai_agent_name"
         };
 
+        // Agent `env` (Part B: env-only / version-agnostic). Emit it on every
+        // agent edge so topology can scope by env — but NOT by version. Same
+        // hard-error rule as agent_id: referencing a column absent from the
+        // stream schema fails, so env is schema-gated independently and the
+        // column/GROUP-BY vanish (SQL byte-identical to today) when absent.
+        let has_agent_env = infra::schema::get(org_id, stream_name, StreamType::Traces)
+            .await
+            .map(|s| s.field_with_name("gen_ai_agent_env").is_ok())
+            .unwrap_or(false);
+        // env fragments: flat (bare col) for no-alias queries, `_c` (c.-qualified)
+        // for the parent-link aliased queries. Empty when env is absent.
+        let (env_sel_flat, env_grp_flat) = env_fragments(has_agent_env, false);
+        let (env_sel_c, env_grp_c) = env_fragments(has_agent_env, true);
+
         // Stream schema, used to gate optional columns (parent link, model cols).
         let model_schema = infra::schema::get(org_id, stream_name, StreamType::Traces).await;
 
@@ -567,14 +597,14 @@ async fn compute_stream_edges(
         let m = metrics("");
         let agent_sql = format!(
             r#"SELECT service_name AS client, {agent_ident} AS server,
-                'agent' AS connection_type, {m}
+                'agent' AS connection_type{env_sel_flat}, {m}
             FROM "{stream_name}"
             WHERE _timestamp >= {start_time} AND _timestamp < {end_time}
                 AND gen_ai_operation_name = 'invoke_agent'
                 AND service_name IS NOT NULL AND service_name != ''
                 AND ({agent_ident}) IS NOT NULL AND ({agent_ident}) != ''
                 AND service_name != ({agent_ident})
-            GROUP BY service_name, {agent_ident}"#,
+            GROUP BY service_name, {agent_ident}{env_grp_flat}"#,
         );
 
         // 2) agent → tool  and  3) agent → model. These key the `from` on the
@@ -590,26 +620,26 @@ async fn compute_stream_edges(
                 format!(
                     r#"{trace_agent_cte}
                     SELECT {tool_from} AS client, c.gen_ai_tool_name AS server,
-                        'tool' AS connection_type, {mc}
+                        'tool' AS connection_type{env_sel_c}, {mc}
                     FROM "{stream_name}" AS c
                     {ancestor_joins}
                     WHERE c._timestamp >= {start_time} AND c._timestamp < {end_time}
                         AND c.gen_ai_tool_name IS NOT NULL AND c.gen_ai_tool_name != ''
                         AND ({tool_from}) IS NOT NULL AND ({tool_from}) != ''
                         AND ({tool_from}) != c.gen_ai_tool_name
-                    GROUP BY {tool_from}, c.gen_ai_tool_name"#,
+                    GROUP BY {tool_from}, c.gen_ai_tool_name{env_grp_c}"#,
                 ),
                 format!(
                     r#"{trace_agent_cte}
                     SELECT {model_from} AS client, {model_expr_c} AS server,
-                        'model' AS connection_type, {mc}
+                        'model' AS connection_type{env_sel_c}, {mc}
                     FROM "{stream_name}" AS c
                     {ancestor_joins}
                     WHERE c._timestamp >= {start_time} AND c._timestamp < {end_time}
                         AND {model_predicate_c}
                         AND ({model_from}) IS NOT NULL AND ({model_from}) != ''
                         AND ({model_from}) != ({model_expr_c})
-                    GROUP BY {model_from}, {model_expr_c}"#,
+                    GROUP BY {model_from}, {model_expr_c}{env_grp_c}"#,
                     model_expr_c = model_expr.replace("gen_ai_", "c.gen_ai_"),
                     model_predicate_c = model_predicate.replace("gen_ai_", "c.gen_ai_"),
                 ),
@@ -619,23 +649,23 @@ async fn compute_stream_edges(
             (
                 format!(
                     r#"SELECT {agent_or_service} AS client, gen_ai_tool_name AS server,
-                        'tool' AS connection_type, {m}
+                        'tool' AS connection_type{env_sel_flat}, {m}
                     FROM "{stream_name}"
                     WHERE _timestamp >= {start_time} AND _timestamp < {end_time}
                         AND gen_ai_tool_name IS NOT NULL AND gen_ai_tool_name != ''
                         AND ({agent_or_service}) IS NOT NULL AND ({agent_or_service}) != ''
                         AND ({agent_or_service}) != gen_ai_tool_name
-                    GROUP BY {agent_or_service}, gen_ai_tool_name"#,
+                    GROUP BY {agent_or_service}, gen_ai_tool_name{env_grp_flat}"#,
                 ),
                 format!(
                     r#"SELECT {agent_or_service} AS client, {model_expr} AS server,
-                        'model' AS connection_type, {m}
+                        'model' AS connection_type{env_sel_flat}, {m}
                     FROM "{stream_name}"
                     WHERE _timestamp >= {start_time} AND _timestamp < {end_time}
                         AND {model_predicate}
                         AND ({agent_or_service}) IS NOT NULL AND ({agent_or_service}) != ''
                         AND ({agent_or_service}) != ({model_expr})
-                    GROUP BY {agent_or_service}, {model_expr}"#,
+                    GROUP BY {agent_or_service}, {model_expr}{env_grp_flat}"#,
                 ),
             )
         };
@@ -838,6 +868,60 @@ mod test {
         // With agent-id, the CTE also carries it.
         let (cte_id, _) = super::build_trace_agent_cte("mystream", true, 100, 200);
         assert!(cte_id.contains("MAX(gen_ai_agent_id) AS gen_ai_agent_id"));
+    }
+
+    // Part B is ENV-ONLY / version-agnostic: agent edges carry the agent's env
+    // (never its version) so topology stays stable across versions. env is
+    // schema-gated — a stream lacking `gen_ai_agent_env` must produce SQL
+    // byte-identical to today (empty fragments). Guards both the fragment shape
+    // and the "no version column, ever" rule for Part B.
+    #[test]
+    fn test_env_fragments_present_when_gated() {
+        // flat (no-alias) branch: bare column.
+        let (sel, grp) = super::env_fragments(true, false);
+        assert_eq!(sel, ", gen_ai_agent_env AS agent_env");
+        assert_eq!(grp, ", gen_ai_agent_env");
+        // c-aliased branch: qualified column.
+        let (sel_c, grp_c) = super::env_fragments(true, true);
+        assert_eq!(sel_c, ", c.gen_ai_agent_env AS agent_env");
+        assert_eq!(grp_c, ", c.gen_ai_agent_env");
+        // env only — never version, in any fragment.
+        for f in [sel, grp, sel_c, grp_c] {
+            assert!(f.contains("gen_ai_agent_env"));
+            assert!(
+                !f.contains("gen_ai_agent_version"),
+                "Part B is version-agnostic: {f}"
+            );
+        }
+    }
+
+    // Absent env column ⇒ empty fragments ⇒ SQL byte-identical to today.
+    #[test]
+    fn test_env_fragments_absent_yields_empty() {
+        assert_eq!(super::env_fragments(false, false), ("", ""));
+        assert_eq!(super::env_fragments(false, true), ("", ""));
+    }
+
+    // End-to-end: the service→agent SQL string built with env present must carry
+    // the raw `gen_ai_agent_env` column in BOTH the SELECT and the GROUP BY, and
+    // must never reference a version column.
+    #[test]
+    fn test_service_agent_sql_carries_env_not_version() {
+        let agent_ident = "gen_ai_agent_name";
+        let (env_sel_flat, env_grp_flat) = super::env_fragments(true, false);
+        let sql = format!(
+            r#"SELECT service_name AS client, {agent_ident} AS server,
+                'agent' AS connection_type{env_sel_flat}, metrics
+            FROM "stream"
+            WHERE _timestamp >= 100 AND _timestamp < 200
+                AND gen_ai_operation_name = 'invoke_agent'
+            GROUP BY service_name, {agent_ident}{env_grp_flat}"#,
+        );
+        // env appears in SELECT (as agent_env) and in GROUP BY.
+        assert!(sql.contains("gen_ai_agent_env AS agent_env"));
+        assert!(sql.contains("GROUP BY service_name, gen_ai_agent_name, gen_ai_agent_env"));
+        // version never appears.
+        assert!(!sql.contains("gen_ai_agent_version"));
     }
 
     #[test]

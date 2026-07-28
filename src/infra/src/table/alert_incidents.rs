@@ -690,6 +690,7 @@ mod tests {
             edges: vec![edge],
             related_incident_ids: vec![],
             suggested_root_cause: Some("# RCA Analysis\n\nTest markdown".to_string()),
+            previous_analyses: vec![],
         };
 
         // Serialize to JSON

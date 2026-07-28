@@ -29,6 +29,9 @@ pub struct ServiceGraphQuery {
     pub end_time: Option<i64>,
     pub filter: Option<String>,
     pub stream_name: Option<String>,
+    pub agent_id: Option<String>,
+    pub agent_name: Option<String>,
+    pub agent_env: Option<String>,
 }
 
 /// GetCurrentTopology
@@ -73,12 +76,23 @@ pub async fn get_current_topology(
             (now - window_micros, now)
         };
 
+    // Build the optional agent predicate (ENV-ONLY, version-agnostic).
+    // When no env is selected, `agent_pred` is None and the emitted SQL is
+    // byte-identical to the pre-B4 query (backward compatible). The
+    // `_o2_service_graph` stream has NO `agent_version` column, so we never
+    // reference version here.
+    let agent_pred: Option<String> = query.agent_env.as_deref().map(|env| {
+        let escaped = env.replace('\'', "''");
+        format!("agent_env = '{escaped}'")
+    });
+
     // 1. Query current window
     let edges = match query_edges_from_stream_internal(
         &org_id,
         query.stream_name.as_deref(),
         Some(start_time),
         Some(end_time),
+        agent_pred.as_deref(),
     )
     .await
     {
@@ -123,6 +137,7 @@ pub async fn get_current_topology(
         query.stream_name.as_deref(),
         Some(prev_start),
         Some(prev_end),
+        agent_pred.as_deref(),
     )
     .await
     .unwrap_or_else(|e| {
@@ -206,16 +221,62 @@ fn aggregate_baselines(
         .collect()
 }
 
+/// Build the SQL used to read edge records from the `_o2_service_graph` stream.
+///
+/// Pure helper (no DB access) so the query construction can be unit-tested.
+///
+/// `agent_pred` is an optional, caller-built predicate fragment (e.g.
+/// `agent_env = 'prod'`) appended to the WHERE clause. When `None`, the emitted
+/// SQL is byte-identical to the pre-B4 query so behavior is unchanged.
+///
+/// NOTE: This stream is version-agnostic — there is no `agent_version` column,
+/// so predicates must never reference it.
+#[cfg(feature = "enterprise")]
+fn build_edges_sql(
+    stream_name: &str,
+    stream_filter: Option<&str>,
+    start_time: i64,
+    end_time: i64,
+    org_id: &str,
+    agent_pred: Option<&str>,
+) -> String {
+    let agent_clause = agent_pred
+        .map(|p| format!("\n             AND {p}"))
+        .unwrap_or_default();
+    if let Some(stream) = stream_filter {
+        format!(
+            "SELECT * FROM \"{}\"
+             WHERE _timestamp >= {} AND _timestamp < {}
+             AND org_id = '{}'
+             AND trace_stream_name = '{}'{}
+             LIMIT 10000",
+            stream_name, start_time, end_time, org_id, stream, agent_clause
+        )
+    } else {
+        format!(
+            "SELECT * FROM \"{}\"
+             WHERE _timestamp >= {} AND _timestamp < {}
+             AND org_id = '{}'{}
+             LIMIT 10000",
+            stream_name, start_time, end_time, org_id, agent_clause
+        )
+    }
+}
+
 #[cfg(feature = "enterprise")]
 /// Query edge records from the _o2_service_graph stream
 ///
 /// Internal version exposed for incident topology enrichment.
 /// Supports optional custom time range via start_time/end_time parameters.
+///
+/// `agent_pred` is an optional predicate fragment (env-only, version-agnostic)
+/// appended to the WHERE clause to scope edges to the selected agent env.
 pub async fn query_edges_from_stream_internal(
     org_id: &str,
     stream_filter: Option<&str>,
     custom_start_time: Option<i64>,
     custom_end_time: Option<i64>,
+    agent_pred: Option<&str>,
 ) -> Result<Vec<serde_json::Value>, infra::errors::Error> {
     use config::meta::stream::StreamType;
 
@@ -232,24 +293,14 @@ pub async fn query_edges_from_stream_internal(
         };
 
     // Query pre-aggregated edge state (already summarized per minute)
-    let sql = if let Some(stream) = stream_filter {
-        format!(
-            "SELECT * FROM \"{}\"
-             WHERE _timestamp >= {} AND _timestamp < {}
-             AND org_id = '{}'
-             AND trace_stream_name = '{}'
-             LIMIT 10000",
-            stream_name, start_time, end_time, org_id, stream
-        )
-    } else {
-        format!(
-            "SELECT * FROM \"{}\"
-             WHERE _timestamp >= {} AND _timestamp < {}
-             AND org_id = '{}'
-             LIMIT 10000",
-            stream_name, start_time, end_time, org_id
-        )
-    };
+    let sql = build_edges_sql(
+        stream_name,
+        stream_filter,
+        start_time,
+        end_time,
+        org_id,
+        agent_pred,
+    );
 
     // Build search request
     let req = config::meta::search::Request {
@@ -587,6 +638,68 @@ mod tests {
         let records = vec![make_record(Some("svc-a"), "svc-b", 100, 200, 300, 0)];
         let result = aggregate_baselines(records);
         assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_build_edges_sql_none_pred_is_byte_identical_unfiltered() {
+        // When agent_pred is None and no stream filter, the SQL must be
+        // byte-identical to the pre-B4 baseline query.
+        let expected = "SELECT * FROM \"_o2_service_graph\"
+             WHERE _timestamp >= 100 AND _timestamp < 200
+             AND org_id = 'org1'
+             LIMIT 10000";
+        let sql = build_edges_sql("_o2_service_graph", None, 100, 200, "org1", None);
+        assert_eq!(sql, expected);
+    }
+
+    #[test]
+    fn test_build_edges_sql_none_pred_is_byte_identical_stream_filtered() {
+        // When agent_pred is None with a stream filter, the SQL must be
+        // byte-identical to the pre-B4 stream-filtered query.
+        let expected = "SELECT * FROM \"_o2_service_graph\"
+             WHERE _timestamp >= 100 AND _timestamp < 200
+             AND org_id = 'org1'
+             AND trace_stream_name = 'my_stream'
+             LIMIT 10000";
+        let sql = build_edges_sql(
+            "_o2_service_graph",
+            Some("my_stream"),
+            100,
+            200,
+            "org1",
+            None,
+        );
+        assert_eq!(sql, expected);
+    }
+
+    #[test]
+    fn test_build_edges_sql_with_pred_unfiltered() {
+        let sql = build_edges_sql(
+            "_o2_service_graph",
+            None,
+            100,
+            200,
+            "org1",
+            Some("agent_env = 'prod'"),
+        );
+        assert!(sql.contains("agent_env = 'prod'"));
+        assert!(sql.contains("AND agent_env = 'prod'"));
+        assert!(sql.contains("LIMIT 10000"));
+    }
+
+    #[test]
+    fn test_build_edges_sql_with_pred_stream_filtered() {
+        let sql = build_edges_sql(
+            "_o2_service_graph",
+            Some("my_stream"),
+            100,
+            200,
+            "org1",
+            Some("agent_env = 'prod'"),
+        );
+        assert!(sql.contains("agent_env = 'prod'"));
+        assert!(sql.contains("AND trace_stream_name = 'my_stream'"));
+        assert!(sql.contains("AND agent_env = 'prod'"));
     }
 
     #[test]
