@@ -1078,9 +1078,9 @@ impl Synthetic {
                 .get("steps")
                 .and_then(|s| s.as_array())
                 .is_some_and(|steps| {
-                    steps.iter().any(|step| {
-                        step.get("action").and_then(|a| a.as_str()) == Some("assert")
-                    })
+                    steps
+                        .iter()
+                        .any(|step| step.get("action").and_then(|a| a.as_str()) == Some("assert"))
                 });
             if !has_assertion {
                 warnings.push(SyntheticWarning {
@@ -1484,8 +1484,8 @@ fn validate_v2_steps(steps: &[serde_json::Value]) -> Result<(), String> {
     let mut seen_ids = std::collections::HashSet::new();
 
     for (i, raw) in steps.iter().enumerate() {
-        let step: BrowserStepV2 = serde_json::from_value(raw.clone())
-            .map_err(|e| format!("config.steps[{i}]: {e}"))?;
+        let step: BrowserStepV2 =
+            serde_json::from_value(raw.clone()).map_err(|e| format!("config.steps[{i}]: {e}"))?;
 
         if step.id.is_empty() {
             return Err(format!("config.steps[{i}]: 'id' must not be empty"));
@@ -1552,7 +1552,10 @@ fn validate_v2_steps(steps: &[serde_json::Value]) -> Result<(), String> {
 
         if needs_locator {
             let locator = step.locator.as_ref().ok_or_else(|| {
-                format!("config.steps[{i}]: '{}' step requires a 'locator'", step.action)
+                format!(
+                    "config.steps[{i}]: '{}' step requires a 'locator'",
+                    step.action
+                )
             })?;
             if locator.candidates.is_empty() && locator.user_override.is_none() {
                 return Err(format!(
@@ -1623,8 +1626,8 @@ fn validate_browser_config(
         ));
     }
     let attempts = i64::from(retries) + 1;
-    let worst_case_ms =
-        attempts * i64::from(budget_ms) + i64::from(retries) * i64::from(wait_before_retry_secs) * 1_000;
+    let worst_case_ms = attempts * i64::from(budget_ms)
+        + i64::from(retries) * i64::from(wait_before_retry_secs) * 1_000;
     let lease_ms = BROWSER_LEASE_SECS * 1_000;
     if worst_case_ms > lease_ms {
         return Err(format!(
@@ -2183,7 +2186,9 @@ mod tests {
     #[test]
     fn test_v2_accepts_exactly_the_nine_action_vocabulary() {
         let (locs, brs, devs) = allowed();
-        for action in ["click", "fill", "press", "select", "check", "uncheck", "upload"] {
+        for action in [
+            "click", "fill", "press", "select", "check", "uncheck", "upload",
+        ] {
             let mut step = v2_click_step();
             step["action"] = serde_json::json!(action);
             if action == "fill" || action == "select" {
@@ -2204,7 +2209,15 @@ mod tests {
         // of these, so the recorder never emitted one and the player could never
         // replay one. `type`/`keydown` are redundant aliases of fill/press.
         let (locs, brs, devs) = allowed();
-        for action in ["hover", "scroll", "wait", "waitFor", "screenshot", "type", "keydown"] {
+        for action in [
+            "hover",
+            "scroll",
+            "wait",
+            "waitFor",
+            "screenshot",
+            "type",
+            "keydown",
+        ] {
             let mut step = v2_click_step();
             step["action"] = serde_json::json!(action);
             let s = v2_synthetic(serde_json::json!([v2_nav_step(), step]));
@@ -2232,7 +2245,10 @@ mod tests {
         let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
         assert!(err.contains("2 (wait)"), "{err}");
         assert!(err.contains("4 (hover)"), "{err}");
-        assert!(!err.contains("3 ("), "the healthy click must not be named: {err}");
+        assert!(
+            !err.contains("3 ("),
+            "the healthy click must not be named: {err}"
+        );
         // Q-10.b: the remedy is offered in the message, not left to be guessed.
         assert!(err.contains("steps_version 2"), "{err}");
     }
@@ -2303,7 +2319,10 @@ mod tests {
         ]));
         let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
         assert!(err.contains("element_vissible"), "{err}");
-        assert!(err.contains("element_visible"), "the known set must be listed: {err}");
+        assert!(
+            err.contains("element_visible"),
+            "the known set must be listed: {err}"
+        );
         assert!(err.contains("steps[1]"), "the index must be named: {err}");
     }
 
@@ -2528,7 +2547,10 @@ mod tests {
             }
         ]);
         let v2 = v2_synthetic(big_steps.clone());
-        assert!(v2.validate(&locs, &brs, &devs, true).is_ok(), "v2 should allow ~150KB");
+        assert!(
+            v2.validate(&locs, &brs, &devs, true).is_ok(),
+            "v2 should allow ~150KB"
+        );
 
         let mut v1 = valid_browser_synthetic();
         v1.config["steps"] = serde_json::json!([
