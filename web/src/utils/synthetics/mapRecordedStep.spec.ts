@@ -26,19 +26,10 @@ describe("mapRecordedStep", () => {
       selector: undefined,
       selectorType: undefined,
       value: "https://app.example.com/login",
-      // 10000 is the recorder's blanket stamp, not a user choice — dropped so
-      // the step inherits the check-level timeout.
-      timeout: 30000,
+      timeout: 10000,
       code: "",
-      wire: { ...wire, id: expect.any(String), timeout_ms: undefined },
+      wire: { ...wire, id: expect.any(String) }, // wire.id is now the step's own UUID
     });
-  });
-
-  it("should keep a per-step timeout the author actually set", () => {
-    const wire: WireStep = { id: "s2", action: "click", selector: "#x", timeout_ms: 45000 };
-    const step = mapWireStep(wire);
-    expect(step.timeout).toBe(45000);
-    expect(step.wire?.timeout_ms).toBe(45000);
   });
 
   it("should preserve the original extension step verbatim on wire", () => {
@@ -58,11 +49,7 @@ describe("mapRecordedStep", () => {
       code: "await page.locator('#login-btn').click();",
     };
     // wire is spread with the step's own UUID assigned to wire.id.
-    expect(mapWireStep(wire).wire).toEqual({
-      ...wire,
-      id: expect.any(String),
-      timeout_ms: undefined,
-    });
+    expect(mapWireStep(wire).wire).toEqual({ ...wire, id: expect.any(String) });
   });
 
   describe("applyWireValue", () => {
