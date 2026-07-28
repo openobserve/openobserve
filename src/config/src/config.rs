@@ -113,8 +113,9 @@ pub const ID_COL_NAME: &str = "_o2_id";
 pub const ORIGINAL_DATA_COL_NAME: &str = "_original";
 pub const ALL_VALUES_COL_NAME: &str = "_all_values";
 
-/// Internal columns are implicitly part of every user-defined schema:
-/// never persisted in `defined_schema_fields` and exempt from the UDS limit.
+/// Internal columns are part of the effective UDS and exempt from its field
+/// limit. Most remain implicit; the LLM schema migration also persists
+/// `_o2_ingest_ts` for streams that already have UDS enabled.
 pub fn is_uds_internal_column(name: &str) -> bool {
     name == TIMESTAMP_COL_NAME
         || name == O2_INGEST_TS_COL_NAME
