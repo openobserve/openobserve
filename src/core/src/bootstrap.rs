@@ -52,34 +52,19 @@ impl schema::OrganizationProvisioner for CoreOrganizationProvisioner {
     }
 }
 
-pub async fn init() -> Result<(), anyhow::Error> {
-    schema::set_organization_provisioner(Arc::new(CoreOrganizationProvisioner))
-        .map_err(|_| anyhow::anyhow!("organization provisioner is already initialized"))?;
-    usage_reporting::set_batch_publisher(Arc::new(CoreBatchPublisher))
-        .map_err(|_| anyhow::anyhow!("usage batch publisher is already initialized"))?;
-    #[cfg(feature = "enterprise")]
-    audit::set_audit_publisher(Arc::new(CoreAuditPublisher))
-        .map_err(|_| anyhow::anyhow!("audit publisher is already initialized"))?;
-
-    // the license is bound to the instance id: generate a new one only when
-    // it is genuinely absent, never because the db errored on the read
+/// The license is bound to the instance id: generate a new one only when it
+/// is genuinely absent, never because the db errored on the read.
+async fn get_or_create_instance_id() -> Result<String, anyhow::Error> {
     const MAX_RETRIES: usize = 5;
-    let mut instance_id = None;
     let mut last_err = None;
     for attempt in 1..=MAX_RETRIES {
         match metas::instance::get().await {
-            Ok(Some(instance)) => {
-                instance_id = Some(instance);
-                last_err = None;
-                break;
-            }
+            Ok(Some(instance)) => return Ok(instance),
             Ok(None) => {
                 log::info!("Generating new instance id");
                 let id = ider::generate();
                 metas::instance::set(&id).await?;
-                instance_id = Some(id);
-                last_err = None;
-                break;
+                return Ok(id);
             }
             Err(e) => {
                 log::warn!(
@@ -90,12 +75,22 @@ pub async fn init() -> Result<(), anyhow::Error> {
             }
         }
     }
-    if let Some(e) = last_err {
-        return Err(anyhow::anyhow!(
-            "failed to get instance id after {MAX_RETRIES} attempts: {e}; refusing to generate a new instance id, the license is bound to it"
-        ));
-    }
-    cache_instance_id(&instance_id.unwrap());
+    Err(anyhow::anyhow!(
+        "failed to get instance id after {MAX_RETRIES} attempts: {}; refusing to generate a new instance id, the license is bound to it",
+        last_err.unwrap()
+    ))
+}
+
+pub async fn init() -> Result<(), anyhow::Error> {
+    schema::set_organization_provisioner(Arc::new(CoreOrganizationProvisioner))
+        .map_err(|_| anyhow::anyhow!("organization provisioner is already initialized"))?;
+    usage_reporting::set_batch_publisher(Arc::new(CoreBatchPublisher))
+        .map_err(|_| anyhow::anyhow!("usage batch publisher is already initialized"))?;
+    #[cfg(feature = "enterprise")]
+    audit::set_audit_publisher(Arc::new(CoreAuditPublisher))
+        .map_err(|_| anyhow::anyhow!("audit publisher is already initialized"))?;
+
+    cache_instance_id(&get_or_create_instance_id().await?);
 
     wal::init()?;
     // because of asynchronous, we need to wait for a while
