@@ -304,7 +304,10 @@ jobs:
                 "dashboard-multi-sql.spec.js",
                 "crossLinkMultiStream.spec.js",
                 "dashboards-form-validation.spec.js",
-              ]
+              ]         
+          - testfolder: "Dashboards-Isolated"
+            browser: "chrome"
+            run_files: ["dashboard-favorites.spec.js"]
           - testfolder: "Dashboards-Settings"
             browser: "chrome"
             run_files:
@@ -612,7 +615,7 @@ jobs:
               "Logs-Builder-Basic"|"Logs-Builder-Advanced"|"Logs-Core"|"Logs-Features")
                 ACTUAL_FOLDER="Logs"
                 ;;
-              "Dashboards-Core"|"Dashboards-Settings"|"Dashboards-Charts"|"Dashboards-Streaming"|"Dashboards-Variables"|"Dashboard-Table-Pagination"|"Dashboard-Pivot-Table"|"Dashboards-Panel-Level-DateTime-Config"|"Dashboard-Config-Settings")
+              "Dashboards-Core"|"Dashboards-Settings"|"Dashboards-Charts"|"Dashboards-Streaming"|"Dashboards-Variables"|"Dashboard-Table-Pagination"|"Dashboard-Pivot-Table"|"Dashboards-Panel-Level-DateTime-Config"|"Dashboard-Config-Settings"|"Dashboards-Isolated")
                 ACTUAL_FOLDER="Dashboards"
                 ;;
               "RUM-Token")
@@ -652,17 +655,20 @@ jobs:
         run: cat o2.log
 
   merge_reports:
-    timeout-minutes: 15
-    name: Merge Reports
+    timeout-minutes: 20
+    name: Merge Reports & Report to Kinora
     needs: [ui_integration_tests]
     if: ${{ !cancelled() && needs.ui_integration_tests.result != 'skipped' }}
     # eks runner: `playwright merge-reports` silently stops mid-merge (exits 0, ~3 of N blobs, no
     # output) on the ubicloud and github-hosted runners — but works on the eks runners (same as ENT).
+    # This job also uploads the merged run to the self-hosted Kinora dashboard (see the last two
+    # steps) — folded in here to reuse the merge instead of re-downloading/re-merging in a 2nd job.
     runs-on:
       labels: eks-openobserve-standard-4
     permissions:
       contents: read
-      actions: read  # the no-blobs investigation reads run/job state from the Actions API
+      actions: read          # the no-blobs investigation reads run/job state from the Actions API
+      pull-requests: write   # upsert the single sticky Kinora comment on PRs
     outputs:
       # Compact Playwright stats (expected/unexpected/flaky/skipped) from the merged report.json,
       # consumed by report_to_openobserve to record per-test counts in ci_test_runs.
@@ -815,6 +821,64 @@ jobs:
           retention-days: 1
           if-no-files-found: warn
 
+      # Report to Kinora — reuses the report.json + trace.zips this job just merged (all on this
+      # runner), so there is NO second artifact download or merge. Fully non-fatal.
+      - name: Report to Kinora (upload merged run + traces)
+        id: kinora
+        if: ${{ vars.UPLOAD_TO_KINORA != 'false' }}
+        continue-on-error: true
+        env:
+          KINORA_TOKEN: ${{ secrets.KINORA_TOKEN }}
+          KINORA_URL: ${{ secrets.KINORA_URL }}
+          KINORA_PROJECT: openobserve-e2e
+        run: |
+          cd tests/ui-testing
+          if [ ! -f playwright-results/report.json ]; then
+            echo "::notice::No merged report.json — skipping Kinora upload."
+            exit 0
+          fi
+          echo "::group::Uploading to Kinora ($KINORA_PROJECT)"
+          if OUT=$(npx --yes @kinora/cli upload playwright-results/report.json \
+                     --project "$KINORA_PROJECT" \
+                     --git-repo-url "https://github.com/${{ github.repository }}" 2>&1); then
+            echo "$OUT"
+          else
+            echo "::warning::Kinora CLI upload failed (exit $?) — continuing (non-fatal)."
+            echo "$OUT"; echo "::endgroup::"; exit 0
+          fi
+          echo "::endgroup::"
+          # Match the CLI's "(run <uuid>)" form specifically so stray log text can't match.
+          RUN_ID=$(printf '%s\n' "$OUT" | grep -oiE '\(run [0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\)' | head -1 | grep -oiE '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}')
+          if [ -n "$RUN_ID" ]; then
+            RUN_URL="${KINORA_URL%/}/projects/$KINORA_PROJECT/runs/$RUN_ID"
+            echo "run_url=$RUN_URL" >> "$GITHUB_OUTPUT"
+            echo "::notice::Kinora run: $RUN_URL"
+          else
+            echo "::warning::Kinora upload did not return a run id (see log above)."
+          fi
+
+      - name: Upsert Kinora report comment on PR
+        if: ${{ github.event_name == 'pull_request' && steps.kinora.outputs.run_url != '' }}
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          RUN_URL: ${{ steps.kinora.outputs.run_url }}
+        run: |
+          MARKER="<!-- kinora-report -->"
+          # printf only interprets % in the format string; $RUN_URL is a %s arg, so it is safe.
+          BODY=$(printf '%s\n### 📊 Kinora report\nPlaywright run uploaded to Kinora — **[View run in Kinora](%s)**\n\n<sub>Updated for `%s` · run attempt %s. This comment updates in place on every push (no new comments).</sub>' \
+            "$MARKER" "$RUN_URL" "${HEAD_SHA:0:9}" "${{ github.run_attempt }}")
+          CID=$(gh api "repos/$REPO/issues/$PR_NUMBER/comments" --paginate \
+                  -q ".[] | select(.body | contains(\"$MARKER\")) | .id" | head -1)
+          if [ -n "$CID" ]; then
+            gh api -X PATCH "repos/$REPO/issues/comments/$CID" -f body="$BODY" >/dev/null && echo "Updated existing Kinora comment ($CID)."
+          else
+            gh api -X POST "repos/$REPO/issues/$PR_NUMBER/comments" -f body="$BODY" >/dev/null && echo "Posted new Kinora comment."
+          fi
+
   # OpenObserve metrics — its own job so playwright_summary never depends on it. Emits one
   # retry-aware run-summary doc (ci_test_runs, suite=ui) + per-test flaky/failed rows
   # (ci_test_results). The step is continue-on-error and the poster scripts never fail.
@@ -871,101 +935,6 @@ jobs:
             if [ "$(jq 'length' "$FLAKY_FILE" 2>/dev/null || echo 0)" -gt 0 ]; then
               bash .github/scripts/o2-report.sh ci_test_results "$FLAKY_FILE"
             fi
-          fi
-
-  # Kinora upload — its own job for clean isolation (alongside report_openobserve).
-  # Downloads the raw blob reports and merges them locally so trace.zip
-  # attachments resolve on THIS runner, then uploads the run (+ traces) to the self-hosted
-  # Kinora dashboard and updates a single sticky PR comment. Fully non-fatal.
-  report_kinora:
-    timeout-minutes: 20
-    name: Report to Kinora
-    needs: [ui_integration_tests, merge_reports]
-    if: ${{ !cancelled() && needs.ui_integration_tests.result != 'skipped' && vars.UPLOAD_TO_KINORA != 'false' }}
-    runs-on:
-      labels: eks-openobserve-standard-4
-    permissions:
-      contents: read
-      actions: read          # download the blob-report artifacts
-      pull-requests: write   # upsert the single sticky Kinora comment on PRs
-    steps:
-      - name: Clone the current repo
-        uses: actions/checkout@v5
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v7
-        with:
-          node-version: 22
-
-      - name: Install project dependencies
-        env:
-          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'  # merge-reports needs no browsers
-        run: cd tests/ui-testing && npm ci
-
-      - name: Download blob reports from GitHub Actions Artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: tests/ui-testing/all-blob-reports
-          pattern: blob-report-*-attempt-${{ github.run_attempt }}
-          merge-multiple: true  # flatten blob zips into one dir so merge-reports finds them
-
-      - name: Merge blobs and upload to Kinora
-        id: kinora
-        continue-on-error: true
-        env:
-          KINORA_TOKEN: ${{ secrets.KINORA_TOKEN }}
-          KINORA_URL: ${{ secrets.KINORA_URL }}
-          KINORA_PROJECT: openobserve-e2e
-        run: |
-          cd tests/ui-testing
-          if [ ! -d all-blob-reports ] || [ -z "$(ls -A all-blob-reports 2>/dev/null)" ]; then
-            echo "::notice::No blob reports found — skipping Kinora upload (tests may have been skipped)."
-            exit 0
-          fi
-          # Merge locally so attachment (trace.zip) paths resolve on this runner. JSON is written
-          # to the file via PLAYWRIGHT_JSON_OUTPUT_NAME, so stdout only carries merge progress.
-          PLAYWRIGHT_JSON_OUTPUT_NAME=kinora-report.json \
-            npx playwright merge-reports --reporter json ./all-blob-reports
-          echo "::group::Uploading to Kinora ($KINORA_PROJECT)"
-          if OUT=$(npx --yes @kinora/cli upload kinora-report.json \
-                     --project "$KINORA_PROJECT" \
-                     --git-repo-url "https://github.com/${{ github.repository }}" 2>&1); then
-            echo "$OUT"
-          else
-            echo "::warning::Kinora CLI upload failed (exit $?) — continuing (non-fatal)."
-            echo "$OUT"; echo "::endgroup::"; exit 0
-          fi
-          echo "::endgroup::"
-          # Match the CLI's "(run <uuid>)" form specifically so stray log text can't match.
-          RUN_ID=$(printf '%s\n' "$OUT" | grep -oiE '\(run [0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\)' | head -1 | grep -oiE '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}')
-          if [ -n "$RUN_ID" ]; then
-            RUN_URL="${KINORA_URL%/}/projects/$KINORA_PROJECT/runs/$RUN_ID"
-            echo "run_url=$RUN_URL" >> "$GITHUB_OUTPUT"
-            echo "::notice::Kinora run: $RUN_URL"
-          else
-            echo "::warning::Kinora upload did not return a run id (see log above)."
-          fi
-
-      - name: Upsert Kinora report comment on PR
-        if: ${{ github.event_name == 'pull_request' && steps.kinora.outputs.run_url != '' }}
-        continue-on-error: true
-        env:
-          GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          RUN_URL: ${{ steps.kinora.outputs.run_url }}
-        run: |
-          MARKER="<!-- kinora-report -->"
-          # printf only interprets % in the format string; $RUN_URL is a %s arg, so it is safe.
-          BODY=$(printf '%s\n### 📊 Kinora report\nPlaywright run uploaded to Kinora — **[View run in Kinora](%s)**\n\n<sub>Updated for `%s` · run attempt %s. This comment updates in place on every push (no new comments).</sub>' \
-            "$MARKER" "$RUN_URL" "${HEAD_SHA:0:9}" "${{ github.run_attempt }}")
-          CID=$(gh api "repos/$REPO/issues/$PR_NUMBER/comments" --paginate \
-                  -q ".[] | select(.body | contains(\"$MARKER\")) | .id" | head -1)
-          if [ -n "$CID" ]; then
-            gh api -X PATCH "repos/$REPO/issues/comments/$CID" -f body="$BODY" >/dev/null && echo "Updated existing Kinora comment ($CID)."
-          else
-            gh api -X POST "repos/$REPO/issues/$PR_NUMBER/comments" -f body="$BODY" >/dev/null && echo "Posted new Kinora comment."
           fi
 
   playwright_summary:

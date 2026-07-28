@@ -32,6 +32,8 @@ use ::db::folders;
 pub mod functions;
 pub mod functions_cache;
 pub mod http;
+#[cfg(feature = "enterprise")]
+pub mod incidents;
 pub mod ingestion;
 pub mod ingestion_tokens;
 pub mod kv;

@@ -7736,7 +7736,6 @@
       "scoreConfigs": "평가에 사용되는 채점 루브릭을 구성합니다."
     },
     "agentGraph": {
-      "allAgents": "모든 에이전트",
       "stream": "스트림",
       "agent": "에이전트",
       "noAgentsTitle": "에이전트를 찾을 수 없음",
@@ -9621,7 +9620,7 @@
         "assertionValue": "값",
         "assertions": "어설션",
         "body": "요청 본문",
-        "bodyPlaceholder": "{\"key\": \"value\"}",
+        "bodyPlaceholder": "{'{'}\"key\": \"value\"{'}'}",
         "fields": {
           "body": "응답 본문",
           "response_time_ms": "응답 시간 (ms)",

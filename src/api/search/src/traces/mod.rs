@@ -34,7 +34,7 @@ use openobserve_api_common::extractors::Headers;
 #[cfg(feature = "cloud")]
 use openobserve_core::ingestion::check_ingestion_allowed;
 // Re-export agent-signals read API handler
-pub use openobserve_core::traces::agent_signals::get_agent_signals;
+pub use openobserve_core::traces::agent_signals::{compare_agent_versions, get_agent_signals};
 // Re-export service graph API handlers
 pub use openobserve_core::traces::service_graph::{self, get_current_topology, get_edge_history};
 use openobserve_core::{auth::UserEmail, traces};

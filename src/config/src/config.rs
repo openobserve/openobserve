@@ -52,7 +52,7 @@ pub type RwAHashSet<K> = tokio::sync::RwLock<HashSet<K>>;
 pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 
 // for DDL commands and migrations
-pub const DB_SCHEMA_VERSION: u64 = 53;
+pub const DB_SCHEMA_VERSION: u64 = 55;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -113,8 +113,9 @@ pub const ID_COL_NAME: &str = "_o2_id";
 pub const ORIGINAL_DATA_COL_NAME: &str = "_original";
 pub const ALL_VALUES_COL_NAME: &str = "_all_values";
 
-/// Internal columns are implicitly part of every user-defined schema:
-/// never persisted in `defined_schema_fields` and exempt from the UDS limit.
+/// Internal columns are part of the effective UDS and exempt from its field
+/// limit. Most remain implicit; the LLM schema migration also persists
+/// `_o2_ingest_ts` for streams that already have UDS enabled.
 pub fn is_uds_internal_column(name: &str) -> bool {
     name == TIMESTAMP_COL_NAME
         || name == O2_INGEST_TS_COL_NAME
@@ -1130,6 +1131,12 @@ pub struct Common {
         help = "Enable shared memtable across multiple organizations"
     )]
     pub feature_shared_memtable_enabled: bool,
+    #[env_config(
+        name = "ZO_FEATURE_WAL_PACK_ENABLED",
+        default = false,
+        help = "Persist memtables into packed wal files (one file per rotation instead of one file per stream)"
+    )]
+    pub feature_wal_pack_enabled: bool,
     #[env_config(name = "ZO_UI_ENABLED", default = true)]
     pub ui_enabled: bool,
     #[env_config(name = "ZO_UI_SQL_BASE64_ENABLED", default = false)]

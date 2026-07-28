@@ -334,6 +334,9 @@ pub fn register_builtin_udfs(ctx: &SessionContext) {
         ctx.register_udaf(AggregateUDF::from(
             o2_enterprise::enterprise::search::datafusion::udaf::approx_topk_distinct::ApproxTopKDistinct::new(),
         ));
+        ctx.register_udaf(AggregateUDF::from(
+            o2_enterprise::enterprise::search::datafusion::udaf::ddsketch::DDSketchAgg::new(),
+        ));
     }
 }
 
