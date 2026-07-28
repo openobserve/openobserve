@@ -39,12 +39,19 @@ pub mod version {
 }
 
 pub mod instance {
-    use infra::errors::Result;
+    use infra::errors::{DbError, Error, Result};
 
     use super::db;
 
+    /// Returns `Ok(None)` only when the instance id is genuinely not stored
+    /// yet. Other errors (db unreachable/overloaded) propagate: the caller
+    /// must NOT generate a new instance id then, the license is bound to it.
     pub async fn get() -> Result<Option<String>> {
-        let ret = db::get("/instance/").await?;
+        let ret = match db::get("/instance/").await {
+            Ok(v) => v,
+            Err(Error::DbError(DbError::KeyNotExists(_))) => return Ok(None),
+            Err(e) => return Err(e),
+        };
         let loc_value = String::from_utf8_lossy(&ret).to_string();
         let loc_value = loc_value.trim().trim_matches('"').to_string();
         let value = Some(loc_value);

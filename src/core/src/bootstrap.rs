@@ -61,16 +61,41 @@ pub async fn init() -> Result<(), anyhow::Error> {
     audit::set_audit_publisher(Arc::new(CoreAuditPublisher))
         .map_err(|_| anyhow::anyhow!("audit publisher is already initialized"))?;
 
-    let instance_id = match metas::instance::get().await {
-        Ok(Some(instance)) => instance,
-        Ok(None) | Err(_) => {
-            log::info!("Generating new instance id");
-            let id = ider::generate();
-            let _ = metas::instance::set(&id).await;
-            id
+    // the license is bound to the instance id: generate a new one only when
+    // it is genuinely absent, never because the db errored on the read
+    const MAX_RETRIES: usize = 5;
+    let mut instance_id = None;
+    let mut last_err = None;
+    for attempt in 1..=MAX_RETRIES {
+        match metas::instance::get().await {
+            Ok(Some(instance)) => {
+                instance_id = Some(instance);
+                last_err = None;
+                break;
+            }
+            Ok(None) => {
+                log::info!("Generating new instance id");
+                let id = ider::generate();
+                metas::instance::set(&id).await?;
+                instance_id = Some(id);
+                last_err = None;
+                break;
+            }
+            Err(e) => {
+                log::warn!(
+                    "error in getting instance id (attempt {attempt}/{MAX_RETRIES}): {e}, retrying..."
+                );
+                last_err = Some(e);
+                tokio::time::sleep(std::time::Duration::from_secs(attempt as u64 * 2)).await;
+            }
         }
-    };
-    cache_instance_id(&instance_id);
+    }
+    if let Some(e) = last_err {
+        return Err(anyhow::anyhow!(
+            "failed to get instance id after {MAX_RETRIES} attempts: {e}; refusing to generate a new instance id, the license is bound to it"
+        ));
+    }
+    cache_instance_id(&instance_id.unwrap());
 
     wal::init()?;
     // because of asynchronous, we need to wait for a while
