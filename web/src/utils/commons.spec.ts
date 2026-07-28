@@ -907,9 +907,7 @@ describe("Commons Utility Functions", () => {
                     query:
                       'SELECT histogram(event_time) AS "event_time" FROM "x" GROUP BY event_time',
                     fields: {
-                      x: [
-                        { alias: "event_time", column: "event_time", isDerived: false },
-                      ],
+                      x: [{ alias: "event_time", column: "event_time", isDerived: false }],
                     },
                   },
                 ],
@@ -919,8 +917,7 @@ describe("Commons Utility Functions", () => {
         ],
       };
 
-      mockStore.state.organizationData.allDashboardData[dashboardId] =
-        mockDashboard;
+      mockStore.state.organizationData.allDashboardData[dashboardId] = mockDashboard;
       (dashboardService.save as any).mockResolvedValue({
         data: { success: true },
       });
