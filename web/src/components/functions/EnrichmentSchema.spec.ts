@@ -125,7 +125,9 @@ describe("EnrichmentSchema.vue Branch Coverage", () => {
     it("should set the drawer title from the i18n schemaHeader key", async () => {
       wrapper = mount(EnrichmentSchema, buildMountOptions());
       await flushPromises();
-      expect(wrapper.find('[data-test-stub="o-drawer"]').attributes("data-title")).toBe("Stream Detail");
+      expect(wrapper.find('[data-test-stub="o-drawer"]').attributes("data-title")).toBe(
+        "Stream Detail",
+      );
     });
 
     it('should pass size "lg" to ODrawer', async () => {
