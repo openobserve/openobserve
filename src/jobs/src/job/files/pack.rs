@@ -28,11 +28,11 @@ use config::{
     FileFormat, cluster, get_config,
     meta::stream::{FileMeta, StreamType},
     metrics,
-    utils::{parquet::generate_filename_with_time_range, schema_ext::SchemaExt, time::now_micros},
+    utils::{parquet::generate_filename_with_time_range, time::now_micros},
 };
 use datafusion::datasource::{MemTable, TableProvider};
 use db;
-use hashbrown::{HashMap, HashSet};
+use hashbrown::HashSet;
 use infra::{
     schema::{
         get_stream_setting_bloom_filter_fields, get_stream_setting_fts_fields,
@@ -403,13 +403,7 @@ async fn upload_chunk(
     } else {
         // merge multiple segments in memory
         let mut shared_fields = HashSet::new();
-        let mut schema_groups: HashMap<
-            String,
-            (
-                Arc<Schema>,
-                Vec<datafusion::arrow::record_batch::RecordBatch>,
-            ),
-        > = HashMap::new();
+        let mut raw_batches = Vec::new();
         for data in bufs {
             let (schema, batches) = config::utils::parquet::read_recordbatch_from_bytes(
                 FileFormat::Parquet,
@@ -417,20 +411,22 @@ async fn upload_chunk(
             )
             .await?;
             shared_fields.extend(schema.fields().iter().cloned());
-            let entry = schema_groups
-                .entry(schema.hash_key())
-                .or_insert_with(|| (schema.clone(), Vec::new()));
-            entry.1.extend(batches);
+            raw_batches.extend(batches);
         }
         let mut fields = shared_fields.into_iter().collect::<Vec<_>>();
         fields.sort_by(|a, b| a.name().cmp(b.name()));
         fields.dedup_by(|a, b| a.name() == b.name());
         let union_schema = Arc::new(Schema::new(fields));
 
-        let mut tables: Vec<Arc<dyn TableProvider>> = Vec::with_capacity(schema_groups.len());
-        for (_, (schema, batches)) in schema_groups {
-            tables.push(Arc::new(MemTable::try_new(schema, vec![batches])?) as _);
+        // align every batch to the union schema: segments can differ in
+        // fields and field order (schema evolution), and the union plan
+        // rejects inputs whose schemas are not identical
+        let mut batches = Vec::with_capacity(raw_batches.len());
+        for batch in raw_batches {
+            batches.push(adapt_batch_to_schema(&batch, &union_schema)?);
         }
+        let tables: Vec<Arc<dyn TableProvider>> =
+            vec![Arc::new(MemTable::try_new(union_schema.clone(), vec![batches])?) as _];
 
         let new_file_meta = FileMeta {
             min_ts,
@@ -543,6 +539,36 @@ async fn upload_chunk(
     Ok((account, new_file_key, new_file_meta))
 }
 
+/// Align a record batch to the target schema: reorder columns, fill missing
+/// fields with nulls, cast mismatched types.
+fn adapt_batch_to_schema(
+    batch: &datafusion::arrow::record_batch::RecordBatch,
+    schema: &Arc<Schema>,
+) -> Result<datafusion::arrow::record_batch::RecordBatch, anyhow::Error> {
+    let batch_schema = batch.schema();
+    let mut cols = Vec::with_capacity(schema.fields().len());
+    for field in schema.fields() {
+        match batch_schema.index_of(field.name()) {
+            Ok(idx) => {
+                let col = batch.column(idx);
+                if col.data_type() == field.data_type() {
+                    cols.push(col.clone());
+                } else {
+                    cols.push(datafusion::arrow::compute::cast(col, field.data_type())?);
+                }
+            }
+            Err(_) => cols.push(datafusion::arrow::array::new_null_array(
+                field.data_type(),
+                batch.num_rows(),
+            )),
+        }
+    }
+    Ok(datafusion::arrow::record_batch::RecordBatch::try_new(
+        schema.clone(),
+        cols,
+    )?)
+}
+
 /// Remove segments from the index and release their wal usage bytes.
 async fn consume_segments(
     org_id: &str,
@@ -581,6 +607,61 @@ mod tests {
             total_compressed_size,
             oldest_registered_at,
         }
+    }
+
+    #[test]
+    fn test_adapt_batch_to_schema_aligns_order_and_fills_missing() {
+        use datafusion::arrow::{
+            array::{Int64Array, StringArray},
+            record_batch::RecordBatch,
+        };
+
+        // batch 1: fields in one order, no "scan_files"
+        let schema1 = Arc::new(Schema::new(vec![
+            arrow_schema::Field::new("_timestamp", arrow_schema::DataType::Int64, false),
+            arrow_schema::Field::new("event", arrow_schema::DataType::Utf8, true),
+        ]));
+        let batch1 = RecordBatch::try_new(
+            schema1,
+            vec![
+                Arc::new(Int64Array::from(vec![1i64, 2])),
+                Arc::new(StringArray::from(vec!["a", "b"])),
+            ],
+        )
+        .unwrap();
+        // batch 2: evolved schema, new field appended at the end
+        let schema2 = Arc::new(Schema::new(vec![
+            arrow_schema::Field::new("_timestamp", arrow_schema::DataType::Int64, false),
+            arrow_schema::Field::new("event", arrow_schema::DataType::Utf8, true),
+            arrow_schema::Field::new("scan_files", arrow_schema::DataType::Int64, true),
+        ]));
+        let batch2 = RecordBatch::try_new(
+            schema2,
+            vec![
+                Arc::new(Int64Array::from(vec![3i64])),
+                Arc::new(StringArray::from(vec!["c"])),
+                Arc::new(Int64Array::from(vec![7i64])),
+            ],
+        )
+        .unwrap();
+
+        // union schema sorted by name, like upload_chunk builds it
+        let union_schema = Arc::new(Schema::new(vec![
+            arrow_schema::Field::new("_timestamp", arrow_schema::DataType::Int64, false),
+            arrow_schema::Field::new("event", arrow_schema::DataType::Utf8, true),
+            arrow_schema::Field::new("scan_files", arrow_schema::DataType::Int64, true),
+        ]));
+
+        let a1 = adapt_batch_to_schema(&batch1, &union_schema).unwrap();
+        let a2 = adapt_batch_to_schema(&batch2, &union_schema).unwrap();
+        // both batches now share the exact same schema (fields and order)
+        assert_eq!(a1.schema(), union_schema);
+        assert_eq!(a2.schema(), union_schema);
+        // the missing column is null-filled
+        assert_eq!(a1.column(2).null_count(), 2);
+        assert_eq!(a2.column(2).null_count(), 0);
+        assert_eq!(a1.num_rows(), 2);
+        assert_eq!(a2.num_rows(), 1);
     }
 
     #[test]

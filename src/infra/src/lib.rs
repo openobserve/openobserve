@@ -76,8 +76,12 @@ fn is_db_schema_version_missing(e: &errors::Error) -> bool {
 
 fn is_table_missing_message(msg: &str) -> bool {
     // sqlite: "no such table: meta"
+    // sqlite fresh install, the db directory/file is created by db_init:
+    // "(code: 14) unable to open database file"
     // postgres: "relation \"meta\" does not exist"
-    msg.contains("no such table") || (msg.contains("relation") && msg.contains("does not exist"))
+    msg.contains("no such table")
+        || msg.contains("unable to open database file")
+        || (msg.contains("relation") && msg.contains("does not exist"))
 }
 
 #[cfg(test)]
@@ -102,6 +106,12 @@ mod schema_version_tests {
         let e = errors::Error::DbError(errors::DbError::DBOperError(
             "error returned from database: relation \"meta\" does not exist".to_string(),
             "/meta/kv/version".to_string(),
+        ));
+        assert!(is_db_schema_version_missing(&e));
+        // sqlite fresh install: the db directory does not exist yet
+        let e = errors::Error::DbError(errors::DbError::DBOperError(
+            "error returned from database: (code: 14) unable to open database file".to_string(),
+            "/db_schema_version/".to_string(),
         ));
         assert!(is_db_schema_version_missing(&e));
     }
