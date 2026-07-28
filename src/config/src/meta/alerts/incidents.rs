@@ -941,17 +941,20 @@ const MAX_PLAUSIBLE_MICROS: i64 = 4_102_444_800_000_000;
 pub struct ExternalAlertPayload {
     /// Originating system, e.g. "alertmanager". Namespaces the synthetic
     /// alert id so two systems' identically-named alerts stay distinct.
+    #[schema(min_length = 1, max_length = 128, example = "alertmanager")]
     pub source: String,
 
     /// Name of the alert rule in the originating system. Together with
     /// `source` this forms the alert's stable identity — repeated deliveries
     /// of the same rule suppress notification, a different rule joining the
     /// incident escalates it.
+    #[schema(min_length = 1, max_length = 512, example = "HighErrorRate")]
     pub alert_name: String,
 
     /// Idempotency key. Two deliveries carrying the same `dedup_key` are the
     /// same firing, not two firings.
     #[serde(default)]
+    #[schema(max_length = 512)]
     pub dedup_key: Option<String>,
 
     /// Severity in the originating system's vocabulary — "critical", "P1",
@@ -965,7 +968,16 @@ pub struct ExternalAlertPayload {
     pub status: ExternalAlertStatus,
 
     /// Firing time in epoch microseconds. Defaults to receipt time.
+    ///
+    /// Bounds are declared so generated clients and fuzzers see the same
+    /// constraint the handler enforces — a seconds- or millisecond-precision
+    /// value is rejected rather than silently ageing the incident out.
     #[serde(default)]
+    #[schema(
+        minimum = 946_684_800_000_000i64,
+        maximum = 4_102_444_800_000_000i64,
+        example = 1_753_612_800_000_000i64
+    )]
     pub timestamp: Option<i64>,
 
     /// Identity labels. This is the only part of the payload that drives
@@ -978,8 +990,14 @@ pub struct ExternalAlertPayload {
     #[serde(default)]
     pub annotations: HashMap<String, String>,
 
-    /// Deep link back into the originating system.
+    /// Deep link back into the originating system. Must be `http` or `https` —
+    /// the pattern is declared so the schema matches what `validate` enforces.
     #[serde(default)]
+    #[schema(
+        max_length = 2048,
+        pattern = "^https?://",
+        example = "https://alertmanager.example.com/#/alerts"
+    )]
     pub external_url: Option<String>,
 }
 
