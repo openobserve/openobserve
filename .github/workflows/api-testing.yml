@@ -31,6 +31,7 @@ env:
   ZO_CREATE_ORG_THROUGH_INGESTION: true
   ZO_INGEST_ALLOWED_UPTO: 48  # Allow backdated data ingestion for backfill tests
   ZO_SSRF_ALLOW_LOOPBACK: true  # Allow localhost destinations in API tests
+  O2_INCIDENTS_ENABLED: true  # Incident correlation + external alert ingest tests
 
 jobs:
   check_changes:

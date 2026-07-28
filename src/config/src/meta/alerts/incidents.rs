@@ -2473,6 +2473,33 @@ mod tests {
     }
 
     #[test]
+    fn test_empty_existing_dims_reports_superset() {
+        // Documents the trap rather than the desired outcome: an empty
+        // existing set reports NewIsSuperset, i.e. "compatible with anything".
+        // find_or_create_incident must therefore skip dimensionless incidents
+        // explicitly — otherwise the first alert that fails to correlate
+        // becomes a magnet absorbing every unrelated alert after it.
+        let existing = HashMap::new();
+        let new = HashMap::from([("service".to_string(), "checkout".to_string())]);
+
+        assert!(matches!(
+            DimensionRelationship::check(&existing, &new),
+            DimensionRelationship::NewIsSuperset
+        ));
+    }
+
+    #[test]
+    fn test_differing_values_on_a_shared_key_are_incompatible() {
+        let existing = HashMap::from([("service".to_string(), "checkout".to_string())]);
+        let new = HashMap::from([("service".to_string(), "payments".to_string())]);
+
+        assert!(matches!(
+            DimensionRelationship::check(&existing, &new),
+            DimensionRelationship::Incompatible
+        ));
+    }
+
+    #[test]
     fn test_effective_dedup_key_returns_the_supplied_key() {
         let mut p = ext_payload("alertmanager", "HighErrorRate");
         p.dedup_key = Some("abc123".to_string());

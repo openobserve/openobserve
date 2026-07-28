@@ -1068,6 +1068,18 @@ async fn find_or_create_incident(
             let existing_dims: HashMap<String, String> =
                 serde_json::from_value(existing.group_values.clone()).unwrap_or_default();
 
+            // An incident with no dimensions correlated on nothing — it is
+            // isolated by alert id. `DimensionRelationship::check` reports
+            // `NewIsSuperset` for an empty existing set, which reads as
+            // "compatible with anything", so without this guard the first
+            // alert that fails to correlate becomes a magnet that absorbs
+            // every unrelated alert that follows it.
+            //
+            // Empty means "identity unknown", not "matches everything".
+            if existing_dims.is_empty() {
+                continue;
+            }
+
             let relationship = DimensionRelationship::check(&existing_dims, group_values);
 
             let join_incident = matches!(
