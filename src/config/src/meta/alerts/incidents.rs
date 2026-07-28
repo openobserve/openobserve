@@ -929,6 +929,12 @@ pub const MAX_EXTERNAL_ALERT_LABEL_LEN: usize = 1024;
 /// External ids encode identity, not creation time — the prefix is constant so
 /// the same rule always renders to the same id.
 const EXTERNAL_ALERT_ID_EPOCH: i64 = 1_400_000_000;
+/// 2000-01-01T00:00:00Z in microseconds. A `timestamp` below this is almost
+/// certainly seconds or milliseconds sent by mistake.
+const MIN_PLAUSIBLE_MICROS: i64 = 946_684_800_000_000;
+/// 2100-01-01T00:00:00Z in microseconds. Above this, a bad value would pin
+/// `last_alert_at` into the future and keep the incident from ever ageing out.
+const MAX_PLAUSIBLE_MICROS: i64 = 4_102_444_800_000_000;
 
 /// Payload accepted by `POST /api/v2/{org_id}/alerts/incidents/ingest`.
 #[derive(Debug, Clone, Deserialize, Serialize, ToSchema)]
@@ -1014,10 +1020,33 @@ impl ExternalAlertPayload {
                 ));
             }
         }
-        if let Some(url) = &self.external_url
-            && url.len() > 2048
-        {
-            return Err("`external_url` must be 2048 characters or fewer".to_string());
+        if let Some(url) = &self.external_url {
+            if url.len() > 2048 {
+                return Err("`external_url` must be 2048 characters or fewer".to_string());
+            }
+            // Scheme allowlist, not a blocklist. This value is stored and handed
+            // back to clients as a link to render, so a `javascript:` or `data:`
+            // URL here is stored XSS waiting for whoever wires up the incident
+            // detail view. Rejecting at the boundary keeps that trap unset.
+            let lowered = url.trim().to_ascii_lowercase();
+            if !(lowered.starts_with("http://") || lowered.starts_with("https://")) {
+                return Err("`external_url` must be an http:// or https:// URL".to_string());
+            }
+        }
+        if let Some(ts) = self.timestamp {
+            // `timestamp` is microseconds. Senders routinely have seconds or
+            // milliseconds to hand, and passing those silently is worse than
+            // rejecting: a seconds value lands the incident in 1970, which the
+            // auto-resolve sweep immediately treats as stale and closes, so the
+            // alert vanishes rather than erroring. Bounds are constants rather
+            // than clock-relative so validation stays pure and testable.
+            if !(MIN_PLAUSIBLE_MICROS..=MAX_PLAUSIBLE_MICROS).contains(&ts) {
+                return Err(format!(
+                    "`timestamp` must be epoch microseconds between {MIN_PLAUSIBLE_MICROS} and \
+                     {MAX_PLAUSIBLE_MICROS} (got {ts} — if this is seconds or milliseconds, \
+                     multiply by 1_000_000 or 1_000)"
+                ));
+            }
         }
         Ok(())
     }
@@ -2487,6 +2516,71 @@ mod tests {
             "x".repeat(MAX_EXTERNAL_ALERT_LABEL_LEN + 1),
         );
         assert!(p.validate().is_err());
+    }
+
+    #[test]
+    fn test_validate_rejects_non_http_external_url() {
+        // Stored XSS guard: this value is handed back to clients as a link.
+        for bad in [
+            "javascript:alert(1)",
+            "JavaScript:alert(1)",
+            "data:text/html;base64,PHNjcmlwdD4=",
+            "file:///etc/passwd",
+            "//evil.example.com",
+        ] {
+            let mut p = ext_payload("alertmanager", "HighErrorRate");
+            p.external_url = Some(bad.to_string());
+            assert!(p.validate().is_err(), "{bad} must be rejected");
+        }
+    }
+
+    #[test]
+    fn test_validate_accepts_http_and_https_external_url() {
+        for good in [
+            "https://alertmanager.example.com/#/alerts",
+            "http://localhost:9093/#/alerts",
+            "  https://example.com/x  ",
+        ] {
+            let mut p = ext_payload("alertmanager", "HighErrorRate");
+            p.external_url = Some(good.to_string());
+            assert!(p.validate().is_ok(), "{good} must be accepted");
+        }
+    }
+
+    #[test]
+    fn test_validate_rejects_seconds_and_millis_timestamps() {
+        // The trap this closes: a seconds-precision timestamp lands the incident
+        // in 1970, where the auto-resolve sweep immediately closes it — the
+        // alert disappears instead of erroring.
+        let seconds = 1_753_612_800_i64;
+        let millis = seconds * 1_000;
+
+        for bad in [0, 1, seconds, millis, -1] {
+            let mut p = ext_payload("alertmanager", "HighErrorRate");
+            p.timestamp = Some(bad);
+            assert!(p.validate().is_err(), "{bad} must be rejected");
+        }
+    }
+
+    #[test]
+    fn test_validate_rejects_absurd_future_timestamp() {
+        let mut p = ext_payload("alertmanager", "HighErrorRate");
+        p.timestamp = Some(i64::MAX);
+        assert!(p.validate().is_err());
+    }
+
+    #[test]
+    fn test_validate_accepts_micros_timestamp() {
+        let mut p = ext_payload("alertmanager", "HighErrorRate");
+        p.timestamp = Some(1_753_612_800_000_000);
+        assert!(p.validate().is_ok());
+    }
+
+    #[test]
+    fn test_validate_allows_absent_timestamp() {
+        let p = ext_payload("alertmanager", "HighErrorRate");
+        assert!(p.timestamp.is_none());
+        assert!(p.validate().is_ok());
     }
 
     #[test]
