@@ -675,6 +675,60 @@ pub enum IncidentEventType {
         /// User who cancelled the run. `None` when cancelled by the system.
         user_id: Option<String>,
     },
+
+    /// Forward-compatibility catch-all for event types this binary does not know.
+    ///
+    /// During a rolling deploy an old node reads rows written by a newer node. Without
+    /// this variant a single unrecognized `type` tag fails the whole `Vec<IncidentEvent>`
+    /// parse; combined with `unwrap_or_default()` on the read path that silently yields an
+    /// empty timeline, which the next `append` then writes back — destroying every prior
+    /// event. Capturing unknown events verbatim keeps them intact across the round-trip.
+    ///
+    /// CAUTION: this variant absorbs MORE than genuinely-unknown event types. Because
+    /// serde falls back to it whenever the tagged variants fail, a *known* tag carrying a
+    /// malformed payload (e.g. `{"type":"Comment","data":{"user_id":5}}` — `user_id` must
+    /// be a string) also lands here rather than raising a decode error. Preserving the row
+    /// is still the right trade, but it means an unknown-variant count is NOT a schema-drift
+    /// alarm on its own. Use [`IncidentEventType::is_known_tag`] to tell the two apart.
+    ///
+    /// Must stay LAST: `#[serde(untagged)]` variants are only tried after all tagged ones.
+    #[serde(untagged)]
+    Unknown(serde_json::Value),
+}
+
+impl IncidentEventType {
+    /// Every `type` tag this binary can decode, in serialized form.
+    ///
+    /// Kept next to the enum so a new variant that omits its tag here is easy to spot in
+    /// review; `test_known_tags_matches_variants` fails if the two drift apart.
+    pub const KNOWN_TAGS: &'static [&'static str] = &[
+        "Created",
+        "Alert",
+        "SeverityUpgrade",
+        "SeverityOverride",
+        "Acknowledged",
+        "Resolved",
+        "Reopened",
+        "DimensionsUpgraded",
+        "TitleChanged",
+        "AssignmentChanged",
+        "Comment",
+        "ai_analysis_begin",
+        "ai_analysis_complete",
+        "ai_analysis_failed",
+        "ai_analysis_cancelled",
+    ];
+
+    /// True when `raw` carries a `type` tag this binary recognizes.
+    ///
+    /// Distinguishes the two populations that both decode to [`Self::Unknown`]:
+    /// a tag from a newer node (benign, expected during a rolling deploy) versus a known
+    /// tag whose payload failed to parse (a real schema bug worth alerting on).
+    pub fn is_known_tag(raw: &serde_json::Value) -> bool {
+        raw.get("type")
+            .and_then(|t| t.as_str())
+            .is_some_and(|tag| Self::KNOWN_TAGS.contains(&tag))
+    }
 }
 
 impl IncidentEvent {
@@ -831,6 +885,166 @@ impl IncidentEvent {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A node that predates an event type must still recover the whole timeline.
+    ///
+    /// Without the `Unknown` catch-all the array parse fails on the first unrecognized
+    /// tag, and callers that decode-then-write persist the truncated result — silently
+    /// destroying every prior event during a rolling deploy.
+    #[test]
+    fn test_unknown_event_type_preserves_timeline() {
+        let stored = serde_json::json!([
+            {"timestamp": 1, "type": "Created"},
+            {"timestamp": 2, "type": "some_future_event", "data": {"foo": "bar"}},
+            {"timestamp": 3, "type": "ai_analysis_complete"},
+        ]);
+
+        let events: Vec<IncidentEvent> = serde_json::from_value(stored.clone()).unwrap();
+        assert_eq!(events.len(), 3, "unknown tag must not discard other events");
+        assert!(matches!(
+            events[1].event_type,
+            IncidentEventType::Unknown(_)
+        ));
+
+        // The unknown event must survive a read/write cycle byte-for-byte, otherwise an
+        // old node rewriting the row would strip data a newer node depends on.
+        let rewritten = serde_json::to_value(&events).unwrap();
+        assert_eq!(rewritten, stored, "unknown events must round-trip verbatim");
+    }
+
+    /// A known tag with a malformed payload is absorbed by `Unknown` rather than erroring.
+    ///
+    /// This is the wide net documented on the variant: it preserves the row, but it means
+    /// an `Unknown` count alone cannot be read as "events from a newer node". `is_known_tag`
+    /// is what separates the two, and the read path logs them at different levels.
+    #[test]
+    fn test_malformed_known_event_is_absorbed_but_detectable() {
+        // `user_id` must be a string; a number makes the tagged variant fail to decode.
+        let raw = serde_json::json!({
+            "timestamp": 9,
+            "type": "Comment",
+            "data": {"user_id": 5, "comment": "hi"},
+        });
+
+        let event: IncidentEvent = serde_json::from_value(raw).unwrap();
+        let IncidentEventType::Unknown(inner) = &event.event_type else {
+            panic!("malformed known event should fall through to Unknown");
+        };
+
+        // The distinguishing signal: the tag is one we own, so this is schema drift, not
+        // a forward-compatible event from a newer binary.
+        assert!(
+            IncidentEventType::is_known_tag(inner),
+            "known tag must be detectable inside Unknown"
+        );
+
+        // A genuinely unknown type must NOT be flagged as drift.
+        let future = serde_json::json!({"timestamp": 1, "type": "some_future_event"});
+        let future_event: IncidentEvent = serde_json::from_value(future).unwrap();
+        let IncidentEventType::Unknown(future_inner) = &future_event.event_type else {
+            panic!("unknown type should decode to Unknown");
+        };
+        assert!(!IncidentEventType::is_known_tag(future_inner));
+    }
+
+    /// `KNOWN_TAGS` must list exactly the tags the enum actually serializes.
+    ///
+    /// Guards the hand-maintained list: a new variant whose tag is not added here would
+    /// make its malformed payloads look like benign forward-compat events.
+    #[test]
+    fn test_known_tags_matches_variants() {
+        // One representative value per variant; the payloads are irrelevant, only the tag.
+        let variants = vec![
+            IncidentEventType::Created,
+            IncidentEventType::Alert {
+                alert_id: "a".into(),
+                alert_name: "n".into(),
+                count: 1,
+                first_at: 1,
+                last_at: 1,
+            },
+            IncidentEventType::SeverityUpgrade {
+                from: IncidentSeverity::P3,
+                to: IncidentSeverity::P1,
+                reason: "r".into(),
+            },
+            IncidentEventType::SeverityOverride {
+                from: IncidentSeverity::P3,
+                to: IncidentSeverity::P1,
+                user_id: "u".into(),
+            },
+            IncidentEventType::Acknowledged {
+                user_id: "u".into(),
+            },
+            IncidentEventType::Resolved { user_id: None },
+            IncidentEventType::Reopened {
+                user_id: "u".into(),
+                reason: "r".into(),
+            },
+            IncidentEventType::DimensionsUpgraded {
+                from_key: "a".into(),
+                to_key: "b".into(),
+            },
+            IncidentEventType::TitleChanged {
+                from: "a".into(),
+                to: "b".into(),
+                user_id: "u".into(),
+            },
+            IncidentEventType::AssignmentChanged {
+                from: None,
+                to: None,
+            },
+            IncidentEventType::Comment {
+                user_id: "u".into(),
+                comment: "c".into(),
+            },
+            IncidentEventType::AIAnalysisBegin,
+            IncidentEventType::AIAnalysisComplete,
+            IncidentEventType::AIAnalysisFailed {
+                reason: "r".into(),
+                trigger_type: AnalysisTriggerType::Manual,
+                error_details: None,
+            },
+            IncidentEventType::AIAnalysisCancelled { user_id: None },
+        ];
+
+        let mut actual: Vec<String> = variants
+            .iter()
+            .map(|v| {
+                serde_json::to_value(v).unwrap()["type"]
+                    .as_str()
+                    .expect("every known variant serializes a string tag")
+                    .to_string()
+            })
+            .collect();
+        let mut expected: Vec<String> = IncidentEventType::KNOWN_TAGS
+            .iter()
+            .map(|s| s.to_string())
+            .collect();
+        actual.sort();
+        expected.sort();
+        assert_eq!(
+            actual, expected,
+            "KNOWN_TAGS is out of sync with the enum variants"
+        );
+    }
+
+    /// Known variants must still win over the untagged catch-all.
+    #[test]
+    fn test_known_event_types_not_captured_as_unknown() {
+        let event = IncidentEvent {
+            timestamp: 5,
+            event_type: IncidentEventType::AIAnalysisCancelled {
+                user_id: Some("bob".into()),
+            },
+        };
+        let json = serde_json::to_value(&event).unwrap();
+        let roundtrip: IncidentEvent = serde_json::from_value(json).unwrap();
+        assert!(matches!(
+            roundtrip.event_type,
+            IncidentEventType::AIAnalysisCancelled { .. }
+        ));
+    }
 
     #[test]
     fn test_incident_event_serde_created() {
