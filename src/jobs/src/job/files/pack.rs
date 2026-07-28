@@ -40,7 +40,7 @@ use infra::{
     },
     storage,
 };
-use ingester::pack::{PackSegment, PendingStream};
+use ingester::{PackSegment, PendingStream};
 use schema::generate_schema_for_defined_schema_fields;
 use search::datafusion::merge::{self, MergeParquetResult};
 use tantivy_utils::index_builder::create_tantivy_index;
@@ -108,7 +108,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
             continue;
         }
 
-        let pending = ingester::pack::get_pending_streams().await;
+        let pending = ingester::get_pending_streams().await;
         let cfg = get_config();
         for ps in pending.into_iter() {
             // when draining, flush everything regardless of the thresholds
@@ -131,7 +131,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
         #[cfg(feature = "enterprise")]
         if is_draining {
             // If draining and no more segments to process, we can exit
-            let (pending_streams, _) = ingester::pack::get_segment_index_stats().await;
+            let (pending_streams, _) = ingester::get_segment_index_stats().await;
             let processing_count = PROCESSING_STREAMS.read().await.len();
             if pending_streams == 0 && processing_count == 0 {
                 log::info!(
@@ -371,7 +371,7 @@ async fn upload_chunk(
     // read all segment bytes
     let mut bufs = Vec::with_capacity(chunk.len());
     for seg in chunk.iter() {
-        let data = ingester::pack::read_segment(
+        let data = ingester::read_segment(
             seg.pack_path.as_path(),
             seg.meta.offset,
             seg.meta.length,
@@ -544,7 +544,7 @@ async fn consume_segments(
         .iter()
         .map(|s| (s.pack_path.clone(), s.meta.offset))
         .collect::<Vec<_>>();
-    ingester::pack::mark_segments_consumed(org_id, stream_type.as_str(), stream_name, &consumed)
+    ingester::mark_segments_consumed(org_id, stream_type.as_str(), stream_name, &consumed)
         .await;
     let total_bytes: i64 = segments.iter().map(|s| s.meta.length as i64).sum();
     metrics::INGEST_WAL_USED_BYTES

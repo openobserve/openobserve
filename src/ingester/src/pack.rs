@@ -397,7 +397,8 @@ pub async fn register_pack(path: PathBuf, footer: &PackFooter, registered_at: i6
 }
 
 /// Remove a pack from the index and registry without deleting the file.
-pub async fn unregister_pack(path: &Path) {
+#[cfg(test)]
+async fn unregister_pack(path: &Path) {
     let mut w = PACK_SEGMENTS.write().await;
     for (_, segments) in w.iter_mut() {
         segments.retain(|s| s.pack_path.as_path() != path);

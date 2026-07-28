@@ -17,7 +17,7 @@ mod entry;
 pub mod errors;
 mod immutable;
 mod memtable;
-pub mod pack;
+mod pack;
 mod partition;
 mod rwmap;
 mod stream;
@@ -37,7 +37,10 @@ pub use immutable::{
     check_persist_done, get_immutables_cache_stats, get_processing_tables_cache_stats,
     read_from_immutable,
 };
-pub use pack::read_from_pack;
+pub use pack::{
+    PackSegment, PackSegmentMeta, PendingStream, get_pending_streams, get_segment_index_stats,
+    mark_segments_consumed, read_from_pack, read_segment,
+};
 use snafu::ResultExt;
 use tokio::sync::{Mutex, mpsc};
 pub use wal::collect_wal_parquet_metrics;
