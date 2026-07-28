@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, fmt::Debug, sync::LazyLock as Lazy};
+use std::{collections::HashMap, fmt::Debug};
 
 use axum::{
     Json,
@@ -32,7 +32,6 @@ use config::{
     meta::user::UserRole,
     utils::{hash::get_passcode_hash, json},
 };
-use regex::Regex;
 #[cfg(feature = "enterprise")]
 use {
     crate::users::get_user, db::user::is_root_user, jsonwebtoken::TokenData,
@@ -94,36 +93,15 @@ pub fn resolve_write_method(method: &str, path_columns: &[&str]) -> String {
     resolved
 }
 
-pub static RE_OFGA_UNSUPPORTED_NAME: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r#"[:#?\s'"%&]+"#).unwrap());
-static RE_SPACE_AROUND: Lazy<Regex> = Lazy::new(|| {
-    let char_pattern = r#"[^a-zA-Z0-9:#?'"&%\s]"#;
-    let pattern = format!(r"(\s+{char_pattern}\s+)|(\s+{char_pattern})|({char_pattern}\s+)");
-    Regex::new(&pattern).unwrap()
-});
-
-// Email validation lives in the shared `config` crate so the OSS auth layer and the enterprise
-// domain-management blocklist validate identically. Re-exported here to preserve the existing
-// `crate::auth::{EMAIL_REGEX, is_valid_email}` API.
-pub use config::utils::str::{EMAIL_REGEX, is_valid_email};
-
-pub fn into_ofga_supported_format(name: &str) -> String {
-    // remove spaces around special characters
-    let result = RE_SPACE_AROUND.replace_all(name, |caps: &regex::Captures| {
-        caps.iter()
-            .find_map(|m| m)
-            .map(|m| m.as_str().trim())
-            .unwrap_or("")
-            .to_string()
-    });
-    RE_OFGA_UNSUPPORTED_NAME
-        .replace_all(&result, "_")
-        .to_string()
-}
-
-pub fn is_ofga_unsupported(name: &str) -> bool {
-    RE_OFGA_UNSUPPORTED_NAME.is_match(name)
-}
+// Email validation and OpenFGA name sanitization live in the shared `config` crate so the OSS
+// auth layer, the enterprise domain-management blocklist, and the enterprise OpenFGA route checks
+// all use identical logic. Re-exported here to preserve the existing
+// `crate::auth::{EMAIL_REGEX, is_valid_email, into_ofga_supported_format, is_ofga_unsupported,
+// RE_OFGA_UNSUPPORTED_NAME}` API.
+pub use config::utils::str::{
+    EMAIL_REGEX, RE_OFGA_UNSUPPORTED_NAME, into_ofga_supported_format, is_ofga_unsupported,
+    is_valid_email,
+};
 
 #[cfg(feature = "enterprise")]
 pub fn is_ofga_object_visible(
@@ -822,27 +800,6 @@ mod tests {
     }
 
     #[test]
-    fn test_is_ofga_unsupported() {
-        assert!(is_ofga_unsupported("abc:123"));
-        assert!(is_ofga_unsupported("name with space"));
-        assert!(is_ofga_unsupported("foo&bar"));
-        assert!(!is_ofga_unsupported("valid_name"));
-        assert!(!is_ofga_unsupported("name_with_underscores"));
-    }
-
-    #[test]
-    fn test_into_ofga_supported_format() {
-        assert_eq!(into_ofga_supported_format("foo:bar"), "foo_bar");
-        assert_eq!(into_ofga_supported_format("foo bar"), "foo_bar");
-        assert_eq!(into_ofga_supported_format("foo#bar"), "foo_bar");
-        assert_eq!(into_ofga_supported_format("foo : bar"), "foo_bar");
-        assert_eq!(into_ofga_supported_format(" a  & b "), "_a_b_");
-        assert_eq!(into_ofga_supported_format("a   b"), "a_b");
-        assert_eq!(into_ofga_supported_format("a:b#c?d e"), "a_b_c_d_e");
-        assert_eq!(into_ofga_supported_format("foo & bar % baz"), "foo_bar_baz");
-    }
-
-    #[test]
     fn test_generate_presigned_url() {
         let password = "password";
         let salt = "saltsalt";
@@ -966,63 +923,6 @@ mod tests {
     }
 
     #[test]
-    fn test_ofga_format_conversion_comprehensive() {
-        // Basic replacements
-        assert_eq!(into_ofga_supported_format("test"), "test");
-        assert_eq!(into_ofga_supported_format("test_name"), "test_name");
-        assert_eq!(into_ofga_supported_format("123"), "123");
-
-        // Special characters
-        assert_eq!(into_ofga_supported_format("a:b"), "a_b");
-        assert_eq!(into_ofga_supported_format("a#b"), "a_b");
-        assert_eq!(into_ofga_supported_format("a?b"), "a_b");
-        assert_eq!(into_ofga_supported_format("a'b"), "a_b");
-        assert_eq!(into_ofga_supported_format("a\"b"), "a_b");
-        assert_eq!(into_ofga_supported_format("a%b"), "a_b");
-        assert_eq!(into_ofga_supported_format("a&b"), "a_b");
-
-        // Multiple spaces
-        assert_eq!(into_ofga_supported_format("a   b"), "a_b");
-        assert_eq!(into_ofga_supported_format("  a  b  "), "_a_b_");
-
-        // Complex combinations
-        assert_eq!(
-            into_ofga_supported_format("test:name with spaces"),
-            "test_name_with_spaces"
-        );
-        assert_eq!(into_ofga_supported_format("a & b : c # d"), "a_b_c_d");
-
-        // Edge cases
-        assert_eq!(into_ofga_supported_format(""), "");
-        assert_eq!(into_ofga_supported_format(":::"), "_");
-        assert_eq!(into_ofga_supported_format("   "), "_");
-    }
-
-    #[test]
-    fn test_ofga_unsupported_detection() {
-        // Supported characters (should return false)
-        assert!(!is_ofga_unsupported("valid"));
-        assert!(!is_ofga_unsupported("valid123"));
-        assert!(!is_ofga_unsupported("valid_name"));
-        assert!(!is_ofga_unsupported("CamelCase"));
-        assert!(!is_ofga_unsupported(""));
-
-        // Unsupported characters (should return true)
-        assert!(is_ofga_unsupported("has:colon"));
-        assert!(is_ofga_unsupported("has#hash"));
-        assert!(is_ofga_unsupported("has?question"));
-        assert!(is_ofga_unsupported("has space"));
-        assert!(is_ofga_unsupported("has'quote"));
-        assert!(is_ofga_unsupported("has\"doublequote"));
-        assert!(is_ofga_unsupported("has%percent"));
-        assert!(is_ofga_unsupported("has&ampersand"));
-
-        // Mixed cases
-        assert!(is_ofga_unsupported("valid:invalid"));
-        assert!(is_ofga_unsupported("valid invalid"));
-    }
-
-    #[test]
     fn test_generate_presigned_url_variations() {
         let username = "testuser";
         let password = "testpass";
@@ -1094,13 +994,11 @@ mod tests {
 
     #[test]
     fn test_regex_compilation() {
-        // Test that the regexes compile without panicking
+        // Smoke-test the re-exported regexes compile and behave. Exhaustive
+        // coverage lives in `config::utils::str` where they are defined.
         assert!(RE_OFGA_UNSUPPORTED_NAME.is_match("test:name"));
-        assert!(RE_SPACE_AROUND.is_match("a @ b")); // @ is not in the exclusion list, so this should match
-        assert!(EMAIL_REGEX.is_match("test@example.com"));
-
-        // Test that the regexes work as expected
         assert!(!RE_OFGA_UNSUPPORTED_NAME.is_match("valid_name"));
+        assert!(EMAIL_REGEX.is_match("test@example.com"));
         assert!(!EMAIL_REGEX.is_match("invalid-email"));
     }
 
