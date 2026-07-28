@@ -791,7 +791,7 @@ pub async fn read_from_pack(
     // snapshot the segments and acquire the read guards atomically (under the
     // segment index lock), so the mover cannot consume and delete a pack in
     // between: any pack present in the snapshot is guaranteed guardable
-    let (mut segments, pack_count, guards) = {
+    let (segments, guards) = {
         let r = PACK_SEGMENTS.read().await;
         let segments = match r.get(key.as_str()) {
             Some(v) => v.segments.clone(),
@@ -804,15 +804,8 @@ pub async fn read_from_pack(
         pack_paths.sort();
         pack_paths.dedup();
         let acquired = begin_read(&pack_paths).await;
-        (segments, pack_paths.len(), ReadGuards { paths: acquired })
+        (segments, ReadGuards { paths: acquired })
     };
-
-    // segments of a pack we could not guard were consumed concurrently and
-    // are already readable from object storage - the only tolerated skip
-    if guards.paths.len() != pack_count {
-        let acquired: HashSet<&Arc<PathBuf>> = guards.paths.iter().collect();
-        segments.retain(|s| acquired.contains(&s.pack_path));
-    }
 
     let result = read_segments(segments, time_range, partition_filters, skip_memtable_ids).await;
     guards.release().await;
