@@ -86,6 +86,19 @@ pub async fn read_from_immutable(
     Ok((ids, batches))
 }
 
+/// Delete a file, treating NotFound as success: the wal/lock file may already
+/// be deleted by the startup recovery or replay tasks.
+async fn remove_file_if_exists(path: &PathBuf) -> Result<()> {
+    match fs::remove_file(path).await {
+        Ok(_) => Ok(()),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            log::warn!("file already deleted: {}", path.display());
+            Ok(())
+        }
+        Err(e) => Err(e).context(DeleteFileSnafu { path }),
+    }
+}
+
 impl Immutable {
     pub(crate) fn new(idx: usize, key: WriterKey, memtable: MemTable) -> Self {
         Self { idx, key, memtable }
@@ -124,9 +137,7 @@ impl Immutable {
             .await
             .context(WriteDataSnafu)?;
         // 3. delete wal file
-        fs::remove_file(wal_path)
-            .await
-            .context(DeleteFileSnafu { path: wal_path })?;
+        remove_file_if_exists(wal_path).await?;
         // 4. rename the tmp files to parquet files
         for (path, stat) in paths {
             persist_stat += stat;
@@ -135,9 +146,7 @@ impl Immutable {
                 .context(RenameFileSnafu { path: &path })?;
         }
         // 5. delete the lock file
-        fs::remove_file(&done_path)
-            .await
-            .context(DeleteFileSnafu { path: &done_path })?;
+        remove_file_if_exists(&done_path).await?;
         Ok(persist_stat)
     }
 
@@ -167,9 +176,7 @@ impl Immutable {
 
         // empty memtable: nothing was written, just delete the wal file
         if finished.is_empty() {
-            fs::remove_file(wal_path)
-                .await
-                .context(DeleteFileSnafu { path: wal_path })?;
+            remove_file_if_exists(wal_path).await?;
             return Ok(persist_stat);
         }
 
@@ -184,9 +191,7 @@ impl Immutable {
             .await
             .context(WriteDataSnafu)?;
         // 3. delete wal file
-        fs::remove_file(wal_path)
-            .await
-            .context(DeleteFileSnafu { path: wal_path })?;
+        remove_file_if_exists(wal_path).await?;
         // 4. rename the tmp files to pack files and register the segments
         for pack in finished.iter() {
             fs::rename(&pack.tmp_path, &pack.path)
@@ -209,9 +214,7 @@ impl Immutable {
             );
         }
         // 5. delete the lock file
-        fs::remove_file(&done_path)
-            .await
-            .context(DeleteFileSnafu { path: &done_path })?;
+        remove_file_if_exists(&done_path).await?;
 
         // update metrics
         for (org_id, bytes) in bytes_by_org {
