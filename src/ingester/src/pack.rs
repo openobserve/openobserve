@@ -946,7 +946,13 @@ pub(crate) async fn init() -> Result<()> {
             continue;
         }
         packs += 1;
-        segments += footer.segments.len() - consumed.len();
+        // count only sidecar offsets that exist in the footer: garbage
+        // records would otherwise underflow the pending count
+        segments += footer
+            .segments
+            .iter()
+            .filter(|s| !consumed.contains(&s.offset))
+            .count();
         // mtime keeps the flush-by-age condition working across restarts
         let registered_at = fs::metadata(pack_file)
             .await
