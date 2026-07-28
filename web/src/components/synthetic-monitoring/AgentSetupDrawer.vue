@@ -48,11 +48,44 @@
             />
           </div>
 
+          <!-- Which agent to install. The two are different programs, not two
+               modes of one: net probe = Go binary/image, browser = Playwright
+               image. Both register into the SAME location when given the same
+               location name, so an operator who wants a private location that
+               serves every check type installs one of each. -->
+          <div class="flex flex-col gap-1">
+            <span class="text-text-muted text-xs font-medium uppercase">
+              {{ t("synthetics.privateLocations.setup.typeTitle") }}
+            </span>
+            <OTabs v-model="agentType" dense bordered data-test="synthetics-agent-setup-type-tabs">
+              <OTab name="protocol" :label="t('synthetics.privateLocations.setup.typeProtocol')" />
+              <OTab name="browser" :label="t('synthetics.privateLocations.setup.typeBrowser')" />
+            </OTabs>
+            <p class="text-text-muted text-xs" data-test="synthetics-agent-setup-type-hint">
+              {{
+                isBrowser
+                  ? t("synthetics.privateLocations.setup.typeBrowserHint")
+                  : t("synthetics.privateLocations.setup.typeProtocolHint")
+              }}
+            </p>
+          </div>
+
           <OTabs v-model="platform" dense bordered data-test="synthetics-agent-setup-platform-tabs">
             <OTab name="docker" :label="t('synthetics.privateLocations.setup.tabDocker')" />
             <OTab name="k8s" :label="t('synthetics.privateLocations.setup.tabK8s')" />
-            <OTab name="linux" :label="t('synthetics.privateLocations.setup.tabLinux')" />
-            <OTab name="windows" :label="t('synthetics.privateLocations.setup.tabWindows')" />
+            <!-- Native-binary platforms ship the Go agent only — install.sh's
+                 linux path downloads a release binary and the Windows path is
+                 install.ps1, neither of which can run Chromium. -->
+            <OTab
+              v-if="!isBrowser"
+              name="linux"
+              :label="t('synthetics.privateLocations.setup.tabLinux')"
+            />
+            <OTab
+              v-if="!isBrowser"
+              name="windows"
+              :label="t('synthetics.privateLocations.setup.tabWindows')"
+            />
           </OTabs>
 
           <div class="relative">
@@ -149,8 +182,9 @@ const props = defineProps<{
   scriptUrl?: string | null;
   /** Pre-fills the agent name — used when recovering a specific known agent. */
   agentName?: string | null;
-  /** Which agent to install. `browser` adds `--type=browser`, which selects the
-   *  Playwright browser-probe image; default `protocol` installs the Go agent. */
+  /** Which agent the type tabs open on. `browser` adds `--type=browser`, which
+   *  selects the Playwright browser-probe image; default `protocol` installs the
+   *  Go agent. The operator can switch tabs either way once open. */
   agentType?: "protocol" | "browser";
 }>();
 const emit = defineEmits<{ (e: "update:open", open: boolean): void }>();
@@ -158,13 +192,29 @@ const emit = defineEmits<{ (e: "update:open", open: boolean): void }>();
 const { t } = useI18n();
 
 const platform = ref<string | number>("docker");
+const agentType = ref<string | number>("protocol");
 const draftLocation = ref("");
 const draftAgentName = ref("");
+
+const isBrowser = computed(() => agentType.value === "browser");
+
+// The browser probe is container-only, so switching to it while sitting on a
+// native-binary tab has to move the platform too — otherwise the hidden tab
+// stays selected and the command composes an install that cannot work.
+watch(isBrowser, (browser) => {
+  if (browser && (platform.value === "linux" || platform.value === "windows")) {
+    platform.value = "docker";
+  }
+});
 
 watch(
   () => props.open,
   (open) => {
     if (!open) return;
+    // The caller's agentType is the opening default (the browser check page
+    // opens this wanting a browser agent), not a lock — the operator can flip
+    // tabs to install the other kind for the same location.
+    agentType.value = props.agentType || "protocol";
     // Start BLANK (not an auto-generated `private-location-XXXX`) so the operator
     // deliberately names the location — and reuses that name across agents (a
     // location is a pool of interchangeable agents, not one location per agent).
@@ -172,6 +222,10 @@ watch(
     draftLocation.value = props.locationName || "";
     draftAgentName.value = props.agentName || "";
   },
+  // immediate: a caller that mounts the drawer already open (or re-mounts it on
+  // route entry) never fires the transition, and would otherwise show a command
+  // seeded from the defaults instead of its own props.
+  { immediate: true },
 );
 
 const canCompose = computed(() => !!props.scriptUrl && !!props.o2Url);
@@ -214,8 +268,8 @@ const composedCommand = computed(() => {
   } else {
     lines.push(`  --location="${draftLocation.value || "<location-name>"}" \\`);
   }
-  // Browser agents run the Playwright image (container-only — docker/k8s/linux).
-  if (props.agentType === "browser") lines.push(`  --type=browser \\`);
+  // Browser agents run the Playwright image (container-only — docker/k8s).
+  if (isBrowser.value) lines.push(`  --type=browser \\`);
   if (draftAgentName.value) lines.push(`  --agent-name="${draftAgentName.value}"`);
   // Join continuation lines; the last line carries no trailing backslash.
   return lines.map((l, i) => (i === lines.length - 1 ? l.replace(/ \\$/, "") : l)).join("\n");

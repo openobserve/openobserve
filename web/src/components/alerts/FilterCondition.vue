@@ -56,10 +56,10 @@
         @create="onColumnCreate"
         @update:model-value="() => emits('input:update', 'conditions', condition)"
       />
-      <OTooltip
-        v-if="condition.column && store.state.isAiChatEnabled"
-        :content="condition.column"
-      />
+      <!-- Reveal-on-hover: the column select is narrow and long field names
+           (e.g. `gen_ai_system`) truncate. Show the full value on hover
+           regardless of AI-chat mode — truncation happens in every mode. -->
+      <OTooltip v-if="condition.column" :content="condition.column" />
     </div>
     <div class="ml-0">
       <OFormSelect
@@ -73,10 +73,7 @@
         data-test="alert-conditions-operator-select"
         @update:model-value="() => emits('input:update', 'conditions', condition)"
       />
-      <OTooltip
-        v-if="condition.operator && store.state.isAiChatEnabled"
-        :content="condition.operator"
-      />
+      <OTooltip v-if="condition.operator" :content="condition.operator" />
     </div>
     <div class="ml-0">
       <OFormInput
@@ -88,7 +85,7 @@
         data-test="alert-conditions-value-input"
         @update:model-value="() => emits('input:update', 'conditions', condition)"
       />
-      <OTooltip v-if="condition.value && store.state.isAiChatEnabled" :content="condition.value" />
+      <OTooltip v-if="condition.value" :content="condition.value" />
     </div>
   </div>
 </template>

@@ -304,7 +304,10 @@ jobs:
                 "dashboard-multi-sql.spec.js",
                 "crossLinkMultiStream.spec.js",
                 "dashboards-form-validation.spec.js",
-              ]
+              ]         
+          - testfolder: "Dashboards-Isolated"
+            browser: "chrome"
+            run_files: ["dashboard-favorites.spec.js"]
           - testfolder: "Dashboards-Settings"
             browser: "chrome"
             run_files:
@@ -403,7 +406,7 @@ jobs:
                 "traces-autocomplete-suggestions.spec.js",
               ]
           # The RUM ingest/token/sourcemaps routes are part of the standard
-          # (OSS) router (src/api/src/handler/http/router/mod.rs), so these specs run
+          # (OSS) router (src/api/http/src/handler/http/router/mod.rs), so these specs run
           # against the OSS binary built by this workflow. Ingestion-auth
           # negative cases live in the API suite (tests/api-testing/tests/rum).
           - testfolder: "RUM"
@@ -612,7 +615,7 @@ jobs:
               "Logs-Builder-Basic"|"Logs-Builder-Advanced"|"Logs-Core"|"Logs-Features")
                 ACTUAL_FOLDER="Logs"
                 ;;
-              "Dashboards-Core"|"Dashboards-Settings"|"Dashboards-Charts"|"Dashboards-Streaming"|"Dashboards-Variables"|"Dashboard-Table-Pagination"|"Dashboard-Pivot-Table"|"Dashboards-Panel-Level-DateTime-Config"|"Dashboard-Config-Settings")
+              "Dashboards-Core"|"Dashboards-Settings"|"Dashboards-Charts"|"Dashboards-Streaming"|"Dashboards-Variables"|"Dashboard-Table-Pagination"|"Dashboard-Pivot-Table"|"Dashboards-Panel-Level-DateTime-Config"|"Dashboard-Config-Settings"|"Dashboards-Isolated")
                 ACTUAL_FOLDER="Dashboards"
                 ;;
               "RUM-Token")

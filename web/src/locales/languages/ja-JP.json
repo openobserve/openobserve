@@ -7736,7 +7736,6 @@
       "scoreConfigs": "評価に使用するスコアリングルーブリックを設定します"
     },
     "agentGraph": {
-      "allAgents": "全エージェント",
       "stream": "ストリーム",
       "agent": "エージェント",
       "noAgentsTitle": "エージェントが見つかりません",
@@ -9621,7 +9620,7 @@
         "assertionValue": "値",
         "assertions": "アサーション",
         "body": "リクエストボディ",
-        "bodyPlaceholder": "{\"key\": \"value\"}",
+        "bodyPlaceholder": "{'{'}\"key\": \"value\"{'}'}",
         "fields": {
           "body": "レスポンスボディ",
           "response_time_ms": "応答時間（ms）",

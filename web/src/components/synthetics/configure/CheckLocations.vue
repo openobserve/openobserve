@@ -81,8 +81,13 @@ function agentSubtext(location: SyntheticsLocation): string {
       </h3>
     </div>
     <div class="flex flex-col gap-3 px-3 py-2">
+      <!-- Rendered whenever private locations are allowed, even with zero
+           locations of any kind — the private subsection's empty state carries
+           the "set up private agent" CTA, which is the only way out of a
+           no-locations org. Without private support an empty list has nothing
+           actionable, so it falls through to the plain empty state below. -->
       <OCheckboxGroup
-        v-if="locations.length"
+        v-if="locations.length || allowPrivate"
         v-model="selectedLocations"
         data-test="synthetics-check-locations-group"
       >
