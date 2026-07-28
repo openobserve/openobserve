@@ -52,8 +52,8 @@ const { triggerSubmit, conditionSubmit, functionSubmit, destinationSubmit, makeB
     }),
   }));
 
-vi.mock("@/plugins/workflows/nodes/WorkflowAlertTrigger.vue", () =>
-  makeBodyStub("WorkflowAlertTrigger", () => triggerSubmit()),
+vi.mock("@/plugins/workflows/nodes/WorkflowTrigger.vue", () =>
+  makeBodyStub("WorkflowTrigger", () => triggerSubmit()),
 );
 vi.mock("@/plugins/workflows/nodes/WorkflowCondition.vue", () =>
   makeBodyStub("WorkflowCondition", () => conditionSubmit()),
@@ -165,7 +165,7 @@ describe("WorkflowNodeDrawer", () => {
     it("renders the trigger title", () => {
       stageNode("workflow_trigger");
       wrapper = mountDrawer();
-      expect(drawerProps(wrapper).title).toBe(t("workflow.node.alertTrigger"));
+      expect(drawerProps(wrapper).title).toBe(t("workflow.triggerKind.alertFired.node"));
     });
 
     it("falls back to the raw dialog name when the node type is unknown", () => {
@@ -177,7 +177,7 @@ describe("WorkflowNodeDrawer", () => {
 
   describe("body switching", () => {
     it.each([
-      ["workflow_trigger", "WorkflowAlertTrigger"],
+      ["workflow_trigger", "WorkflowTrigger"],
       ["condition", "WorkflowCondition"],
       ["function", "WorkflowFunction"],
       ["destination", "WorkflowDestination"],

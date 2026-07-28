@@ -27,6 +27,8 @@ use config::{
     },
     utils::time::now_micros,
 };
+#[cfg(feature = "enterprise")]
+use infra::table::workflows::WorkflowTriggerEntity;
 use infra::{
     db::{ORM_CLIENT, connect_to_orm},
     table::alerts as table,
@@ -34,7 +36,9 @@ use infra::{
 use sea_orm::{ConnectionTrait, TransactionTrait};
 use svix_ksuid::Ksuid;
 
-use crate as db;
+#[cfg(feature = "enterprise")]
+use crate::workflows::{AssociationDeleteEvent, WorkflowTriggerType};
+use crate::{self as db};
 
 /// Gets the alert and its parent folder.
 pub async fn get_by_id<C: ConnectionTrait>(
@@ -207,6 +211,21 @@ pub async fn create<C: TransactionTrait>(
         e
     });
 
+    #[cfg(feature = "enterprise")]
+    if let Some(ref id) = alert.id {
+        let alert_id = id.to_string();
+        for w in &alert.workflows {
+            db::workflows::associate_workflow(
+                org_id,
+                &w,
+                &alert_id,
+                WorkflowTriggerEntity::Alert.to_string(),
+                WorkflowTriggerType::AlertFired.to_string(),
+            )
+            .await?;
+        }
+    }
+
     Ok(alert)
 }
 
@@ -277,6 +296,13 @@ pub async fn delete_by_id<C: ConnectionTrait>(
     };
     let alert_id_str = alert_id.to_string();
 
+    #[cfg(feature = "enterprise")]
+    db::workflows::delete_workflow_association(AssociationDeleteEvent::Entity {
+        org_id: org_id.to_string(),
+        entity_id: alert_id_str.clone(),
+    })
+    .await?;
+
     table::delete_by_id(conn, org_id, alert_id).await?;
     infra::coordinator::alerts::emit_delete_event(org_id, &alert_id_str).await?;
     #[cfg(feature = "enterprise")]
@@ -313,6 +339,13 @@ pub async fn delete_by_name(
         return Ok(());
     };
     let alert_id_str = alert_id.to_string();
+
+    #[cfg(feature = "enterprise")]
+    db::workflows::delete_workflow_association(AssociationDeleteEvent::Entity {
+        org_id: org_id.to_string(),
+        entity_id: alert_id_str.clone(),
+    })
+    .await?;
 
     table::delete_by_name(client, org_id, "default", stream_type, stream_name, name).await?;
     infra::coordinator::alerts::emit_delete_event(org_id, &alert_id_str).await?;

@@ -144,7 +144,7 @@ pub struct Node {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub meta: Option<HashMap<String, String>>,
     /// Visual position for UI rendering
-    position: Position,
+    pub position: Position,
     /// Node role in the pipeline. MUST be one of:
     /// - "input": Source stream node (first node in pipeline)
     /// - "output": Destination stream node (last node in pipeline)
@@ -534,9 +534,15 @@ impl Serialize for ConditionParams {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, ToSchema)]
-struct Position {
+pub struct Position {
     x: f32,
     y: f32,
+}
+
+impl Position {
+    pub fn is_valid(&self) -> bool {
+        !self.x.is_nan() && !self.y.is_nan() && !self.x.is_infinite() && !self.y.is_infinite()
+    }
 }
 
 impl MemorySize for Position {
