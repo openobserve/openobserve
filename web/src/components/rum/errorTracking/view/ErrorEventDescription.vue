@@ -44,6 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import { rumField } from "@/utils/rum/fields";
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 
@@ -59,7 +60,7 @@ const props = defineProps({
 // resource : resource_url
 // error : error_message
 // view : view_referrer -> view_ur
-// action :  _oo_action_target_text : _oo_action_target_selector
+// action :  <ns>_action_target_text : <ns>_action_target_selector  (_o2_ or _oo_)
 const getDescription = computed(() => {
   if (props.column["type"] === "resource") {
     return props.column["resource_url"];
@@ -72,7 +73,9 @@ const getDescription = computed(() => {
     return props.column["view_url"];
   } else if (props.column["type"] === "action") {
     return (
-      props.column["_oo_action_target_text"] + " : " + props.column["_oo_action_target_selector"]
+      rumField(props.column, "action_target_text") +
+      " : " +
+      rumField(props.column, "action_target_selector")
     );
   }
   return "";

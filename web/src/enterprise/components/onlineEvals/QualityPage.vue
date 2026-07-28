@@ -42,6 +42,8 @@
         :key="kpi.id"
         :kpi="kpi"
         :delta="deltaByKpi[kpi.id] ?? null"
+        :clickable="kpi.id === 'scorerFailures' && (kpi.value ?? 0) > 0"
+        @activate="openScorerFailures"
       />
     </KpiCardRow>
 
@@ -146,8 +148,13 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
-import type { AgentFilterSelection } from "./utils/agentFilterSql";
+import {
+  buildEvaluatorAgentFilterWhere,
+  combineWhere,
+  type AgentFilterSelection,
+} from "./utils/agentFilterSql";
 import type { QualityScope, ScopeCounts } from "./utils/qualityScope";
+import { b64EncodeUnicode } from "@/utils/zincutils";
 
 const props = defineProps<{
   scoreConfigs: ScoreConfig[];
@@ -281,6 +288,25 @@ const numericRange = computed(() => {
 
 async function refreshAll() {
   await Promise.all([refresh(), refreshConfigs(), refreshDetail(), refreshCharts(), refreshRuns()]);
+}
+
+function openScorerFailures() {
+  const filter = combineWhere(
+    "attributes_status IN ('error', 'timeout')",
+    buildEvaluatorAgentFilterWhere(props.agentFilter ?? null),
+  );
+  router
+    .push({
+      name: "traces",
+      query: {
+        stream: "_evaluator",
+        query: b64EncodeUnicode(filter ?? "attributes_status IN ('error', 'timeout')"),
+        from: props.dateWindow.startUs,
+        to: props.dateWindow.endUs,
+        org_identifier: route.query.org_identifier,
+      },
+    })
+    .catch(() => {});
 }
 
 const isAnyLoading = computed(

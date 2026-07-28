@@ -319,16 +319,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                     <!-- Clickable Trace Button -->
                     <OButton
-                      v-if="item._oo_trace_id"
+                      v-if="rumField(item, 'trace_id')"
                       variant="outline"
                       size="xs"
                       :title="t('common.viewTraceDetails')"
                       data-test="view-trace-btn"
                       class="ml-2 h-5! px-1.5"
-                      @click.stop="navigateToSpecificTrace(item._oo_trace_id)"
+                      @click.stop="navigateToSpecificTrace(rumField(item, 'trace_id'))"
                     >
                       <OIcon name="account-tree" size="xs" />
-                      <span v-if="item._oo_trace_id">{{ t("common.viewTrace") }}</span>
+                      <span v-if="rumField(item, 'trace_id')">{{ t("common.viewTrace") }}</span>
                     </OButton>
                   </div>
                 </div>
@@ -442,6 +442,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import { rumField } from "@/utils/rum/fields";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
@@ -571,7 +572,7 @@ const fetchRelatedResources = async () => {
     relatedResources.value = res.data.hits || [];
 
     // Auto-select first resource with trace_id for trace correlation
-    const resourceWithTrace = relatedResources.value.find((r: any) => r._oo_trace_id);
+    const resourceWithTrace = relatedResources.value.find((r: any) => rumField(r, "trace_id"));
     if (resourceWithTrace) {
       selectedResourceWithTrace.value = resourceWithTrace;
     }
@@ -594,7 +595,7 @@ watch(
 
 const viewResourceDetails = (resource: any) => {
   // Update selected resource for trace correlation
-  if (resource._oo_trace_id) {
+  if (rumField(resource, "trace_id")) {
     selectedResourceWithTrace.value = resource;
   }
 
@@ -611,7 +612,7 @@ const navigateToSpecificTrace = (traceId: string) => {
   if (!traceId) return;
 
   // Find the resource with this trace_id to get timing information
-  const resource = relatedResources.value.find((r: any) => r._oo_trace_id === traceId);
+  const resource = relatedResources.value.find((r: any) => rumField(r, "trace_id") === traceId);
 
   // Use resource timing if available, otherwise use event timing
   const startTime = resource?.date

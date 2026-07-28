@@ -127,17 +127,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Body -->
     <div
       v-if="!props.spans || props.spans.length === 0"
-      class="text-text-muted flex flex-1 items-center justify-center text-sm"
+      class="text-text-secondary flex flex-1 items-center justify-center text-sm"
     >
       {{ t("traces.threadView.noSpansLoaded") }}
     </div>
     <div
       v-else-if="turns.length === 0"
-      class="text-text-muted flex flex-1 items-center justify-center text-sm"
+      class="text-text-secondary flex flex-1 items-center justify-center px-4 text-center text-sm"
     >
-      {{ t("traces.threadView.noLlmTurns") }}
-      <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- code sample: GenAI semantic-convention attribute name/value, must not be translated -->
-      <code>gen_ai.operation.name = chat</code>.
+      <!-- Single inline span: the message, the <code> token and the period must
+           flow as one text run. As separate flex items the browser strips the
+           whitespace between them, dropping the space after "with". The space is
+           concatenated into the interpolation so no template-whitespace
+           collapsing (or formatter re-wrap) can drop it. -->
+      <!-- eslint-disable vue/no-bare-strings-in-template -- code sample: GenAI semantic-convention attribute name/value, must not be translated -->
+      <span>
+        {{ t("traces.threadView.noLlmTurns") + " " }}
+        <code class="text-text-body font-mono">gen_ai.operation.name = chat</code>.
+      </span>
+      <!-- eslint-enable vue/no-bare-strings-in-template -->
     </div>
     <div v-else class="thread-scroll-body bg-surface-base flex-1 overflow-auto px-4 py-3">
       <!-- System prompt (global — identical across traces in a session). -->
@@ -199,7 +207,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="thread-bubble thread-bubble--user thread-user-row rounded-default text-text-body mb-4 ml-auto flex w-fit max-w-[40%] items-start gap-2.5 border border-(--color-indigo-100) bg-[image:var(--color-chat-bubble-user)] px-3.5 py-2.5 text-sm leading-normal break-words whitespace-pre-wrap shadow-[0_0.0625rem_0.125rem_color-mix(in_srgb,var(--color-black)_6%,transparent)] dark:border-[color-mix(in_srgb,var(--color-indigo-900)_55%,var(--color-grey-700))] dark:shadow-[0_0.0625rem_0.125rem_color-mix(in_srgb,var(--color-white)_8%,transparent)]"
         >
           <div
-            class="thread-user-avatar justify-content-center text-2xs inline-flex h-6 w-6 shrink-0 cursor-default items-center rounded-full bg-[image:var(--color-gradient-ai)] font-bold text-white dark:bg-[image:linear-gradient(135deg,var(--color-indigo-600)_0%,var(--color-indigo-500)_100%)]"
+            class="thread-user-avatar text-2xs inline-flex h-6 w-6 shrink-0 cursor-default items-center justify-center rounded-full bg-[image:var(--color-gradient-ai)] font-bold text-white dark:bg-[image:linear-gradient(135deg,var(--color-indigo-600)_0%,var(--color-indigo-500)_100%)]"
             :title="group.userId || t('traces.threadView.user')"
           >
             <OIcon name="person" size="sm" />

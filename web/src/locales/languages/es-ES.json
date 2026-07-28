@@ -9620,7 +9620,7 @@
         "assertionValue": "Valor",
         "assertions": "Aserciones",
         "body": "Cuerpo de la solicitud",
-        "bodyPlaceholder": "{\"key\": \"value\"}",
+        "bodyPlaceholder": "{'{'}\"key\": \"value\"{'}'}",
         "fields": {
           "body": "Cuerpo de la respuesta",
           "response_time_ms": "Tiempo de respuesta (ms)",

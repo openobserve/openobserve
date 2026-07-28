@@ -9620,7 +9620,7 @@
         "assertionValue": "値",
         "assertions": "アサーション",
         "body": "リクエストボディ",
-        "bodyPlaceholder": "{\"key\": \"value\"}",
+        "bodyPlaceholder": "{'{'}\"key\": \"value\"{'}'}",
         "fields": {
           "body": "レスポンスボディ",
           "response_time_ms": "応答時間（ms）",
