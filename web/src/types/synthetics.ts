@@ -36,14 +36,45 @@ export type StepAction =
   | "assert"
   | "screenshot";
 
+// ── Version-2 locator bundle ────────────────────────────────────────────────
+// A v1 step identifies its element with a single selector, so any cosmetic
+// markup change breaks the monitor. A v2 step carries every way the recorder
+// could find the element, ordered most-stable-first, and the runner falls back
+// through them.
+//
+// Ordering matters and is not cosmetic: candidates only agree while the markup
+// is unchanged. Once it changes — the case fallback exists for — a lower-ranked
+// candidate may match a *different* element, so rank is what breaks ties.
+
+/** Ordered most stable to least. `css`/`xpath` are structural and brittle. */
+export type LocatorKind = "test_attribute" | "role" | "text" | "css" | "xpath";
+
+export interface LocatorCandidate {
+  kind: LocatorKind;
+  value: string;
+}
+
+export interface StepLocator {
+  /**
+   * Machine-derived evidence from the recording session. Read-only in the UI:
+   * author intent is expressed only by pinning, which keeps the stored list
+   * byte-comparable for the self-healing precondition.
+   */
+  candidates: LocatorCandidate[];
+  /** Author-pinned. When set, used exclusively — never falls back. */
+  user_override?: LocatorCandidate | null;
+}
+
 export interface BrowserStep {
   id: string;
   action: StepAction;
   name?: string;
   selector?: string;
   selectorType?: SelectorType;
+  /** Version-2 locator bundle. Absent on v1 steps, which use `selector`. */
+  locator?: StepLocator;
   value?: string;
-  timeout?: number; // ms, default 30000
+  timeout?: number; // ms; undefined = runner's per-category default
   code: string;
   // Original, untouched extension step (see WireStep). Preserved for replay,
   // which sends the rich step back to the extension verbatim. Absent on
