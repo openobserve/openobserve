@@ -87,202 +87,212 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </template>
 
-    <!-- Tabs (only shown if multiple analysis types available) -->
-    <OTabs
-      v-if="showTabs"
-      v-model="activeAnalysisType"
-      dense
-      class="px-page-edge border-card-glass-border text-text-secondary! insights-dashboard-tabs border-b border-solid"
-      align="left"
-    >
-      <OTab
-        v-for="tab in availableTabs"
-        :key="tab.name"
-        :name="tab.name"
-        :label="tab.label"
-        :icon="tab.icon"
-        :data-test="`traces-analysis-dashboard-${tab.name}-tab`"
-        class="min-h-12"
-      />
-    </OTabs>
-
-    <!-- Dashboard Content with Sidebar -->
-    <div class="analysis-content bg-surface-subtle flex min-h-0 flex-1 overflow-hidden pt-2">
-      <!-- Collapsed dimension sidebar bar (shown when hidden) -->
-      <div
-        v-if="!showDimensionSelector"
-        class="bg-surface-panel! flex h-full w-12.5 shrink-0 cursor-pointer flex-col items-center justify-start gap-1.5 overflow-y-auto pt-2"
-        data-test="dimension-selector-collapsed-bar"
-        @click="toggleDimensionSelector"
+    <!-- Wrapper gives the drawer's own (block-level) scroll body a definite
+         height so the flex/min-h-0 sizing below actually bounds analysis-content
+         instead of growing to fit all content — otherwise the dimension list and
+         the charts share the drawer's outer scrollbar instead of scrolling independently. -->
+    <div class="flex h-full min-h-0 flex-col">
+      <!-- Tabs (only shown if multiple analysis types available) -->
+      <OTabs
+        v-if="showTabs"
+        v-model="activeAnalysisType"
+        dense
+        class="px-page-edge border-card-glass-border text-text-secondary! insights-dashboard-tabs shrink-0 border-b border-solid"
+        align="left"
       >
-        <OIcon name="expand-all" size="sm" class="mt-2.5 rotate-90 text-xl" />
-        <div class="text-xs font-bold [text-orientation:mixed] [writing-mode:vertical-rl]">
-          {{ t("traces.tracesAnalysisDashboard.dimensions") }}
+        <OTab
+          v-for="tab in availableTabs"
+          :key="tab.name"
+          :name="tab.name"
+          :label="tab.label"
+          :icon="tab.icon"
+          :data-test="`traces-analysis-dashboard-${tab.name}-tab`"
+          class="min-h-12"
+        />
+      </OTabs>
+
+      <!-- Dashboard Content with Sidebar -->
+      <div class="analysis-content bg-surface-subtle flex min-h-0 flex-1 overflow-hidden pt-2">
+        <!-- Collapsed dimension sidebar bar (shown when hidden) -->
+        <div
+          v-if="!showDimensionSelector"
+          class="bg-surface-panel! flex h-full w-12.5 shrink-0 cursor-pointer flex-col items-center justify-start gap-1.5 overflow-y-auto pt-2"
+          data-test="dimension-selector-collapsed-bar"
+          @click="toggleDimensionSelector"
+        >
+          <OIcon name="expand-all" size="sm" class="mt-2.5 rotate-90 text-xl" />
+          <div class="text-xs font-bold [text-orientation:mixed] [writing-mode:vertical-rl]">
+            {{ t("traces.tracesAnalysisDashboard.dimensions") }}
+          </div>
         </div>
-      </div>
 
-      <OSplitter
-        v-model="splitterModel"
-        :limits="splitterLimits"
-        :style="{ width: showDimensionSelector ? '100%' : 'calc(100% - 50px)', height: '100%' }"
-        class="analysis-splitter-smooth [transition:all_0.3s_ease]"
-        @update:model-value="onSplitterUpdate"
-      >
-        <!-- LEFT: Dimension Selector Sidebar -->
-        <template #before>
-          <div class="relative-position h-full">
-            <div
-              v-if="showDimensionSelector"
-              class="dimension-sidebar bg-card-glass-bg flex h-full flex-col"
-              data-test="dimension-selector-sidebar"
-            >
-              <!-- Sidebar Header with collapse button -->
+        <OSplitter
+          v-model="splitterModel"
+          :limits="splitterLimits"
+          :style="{ width: showDimensionSelector ? '100%' : 'calc(100% - 50px)', height: '100%' }"
+          class="analysis-splitter-smooth [transition:all_0.3s_ease]"
+          @update:model-value="onSplitterUpdate"
+        >
+          <!-- LEFT: Dimension Selector Sidebar -->
+          <template #before>
+            <div class="relative-position h-full">
               <div
-                class="border-card-glass-border flex shrink-0 items-center justify-between border-b border-solid px-3 py-2"
+                v-if="showDimensionSelector"
+                class="dimension-sidebar bg-card-glass-bg flex h-full flex-col"
+                data-test="dimension-selector-sidebar"
               >
-                <span class="text-sm font-semibold">{{
-                  t("traces.tracesAnalysisDashboard.dimensions")
-                }}</span>
-                <OButton
-                  variant="outline"
-                  size="icon-xs-sq"
-                  class="rotate-90"
-                  icon-left="unfold-less"
-                  :title="t('traces.tracesAnalysisDashboard.collapseDimensions')"
-                  data-test="dimension-selector-collapse-btn"
-                  @click="toggleDimensionSelector"
-                />
-              </div>
-              <!-- Search Input -->
-              <div class="border-card-glass-border border-solid p-2.5">
-                <OSearchInput
-                  v-model="dimensionSearchText"
-                  :placeholder="t('search.searchDimension')"
-                  clearable
-                  class="w-full"
-                  data-test="dimension-search-input"
-                />
-              </div>
-
-              <!-- Dimension List -->
-              <div class="dimension-list-container flex-1 overflow-y-auto px-[0.325rem]">
-                <ul v-if="filteredDimensions.length > 0" class="flex flex-col">
-                  <li
-                    v-for="dimension in filteredDimensions"
-                    :key="dimension.value"
-                    class="dimension-list-item hover:bg-interactive-hover-bg flex items-center gap-2 border-none! px-3 py-1"
-                  >
-                    <div class="flex shrink-0 items-center">
-                      <OCheckbox
-                        :model-value="selectedDimensions.includes(dimension.value)"
-                        @update:model-value="toggleDimension(dimension.value)"
-                        size="xs"
-                        :data-test="`dimension-checkbox-${dimension.value}`"
-                      />
-                    </div>
-                    <div class="flex min-w-0 flex-1 flex-col">
-                      <span
-                        class="dimension-label text-text-secondary! cursor-pointer truncate text-sm [line-height:1.25rem]"
-                      >
-                        {{ dimension.label }}
-                        <OTooltip
-                          side="top"
-                          align="center"
-                          :side-offset="8"
-                          :delay="500"
-                          max-width="300px"
-                          :content="dimension.label"
-                        />
-                      </span>
-                    </div>
-                  </li>
-                </ul>
-
-                <!-- No results message -->
-                <div v-else class="text-text-muted p-4 text-center">
-                  {{ t("search.noResult") }}
-                </div>
-              </div>
-
-              <!-- Selected Count Footer -->
-              <div class="border-card-glass-border border-t border-solid p-3 text-xs font-normal">
-                {{ selectedDimensions.length }}
-                {{ t("latencyInsights.dimensionsSelected") }}
-              </div>
-            </div>
-          </div>
-        </template>
-
-        <template #separator>
-          <div
-            class="h-full w-1 bg-transparent transition-colors duration-300 hover:bg-[var(--color-orange-500)]"
-          ></div>
-        </template>
-
-        <!-- RIGHT: Dashboard Charts -->
-        <template #after>
-          <div class="h-full">
-            <div class="relative-position h-full w-full overflow-auto">
-              <!-- Loading State -->
-              <div v-if="loading" class="flex h-full flex-col items-center justify-center py-20">
-                <OSpinner
-                  size="lg"
-                  class="mb-4"
-                  data-test="traces-analysis-dashboard-loading-indicator"
-                />
-                <div class="text-base">
-                  {{ t("latencyInsights.analyzingDimensions") }}
-                </div>
-                <div class="text-text-secondary mt-2 text-xs">
-                  {{
-                    t("latencyInsights.computingDistributions", {
-                      count: selectedDimensions.length,
-                    })
-                  }}
-                </div>
-              </div>
-
-              <!-- Error State -->
-              <div
-                v-else-if="error"
-                data-test="traces-analysis-dashboard-error"
-                class="flex h-full flex-col items-center justify-center py-20"
-              >
-                <OIcon name="error-outline" class="mb-4" style="width: 3.75rem; height: 3.75rem" />
-                <div class="mb-2 text-base">
-                  {{ t("latencyInsights.failedToLoad") }}
-                </div>
-                <div class="text-text-secondary text-sm">{{ error }}</div>
-                <OButton
-                  variant="outline"
-                  size="sm-action"
-                  class="mt-4"
-                  data-test="traces-analysis-dashboard-retry-btn"
-                  @click="loadAnalysis"
+                <!-- Sidebar Header with collapse button -->
+                <div
+                  class="border-card-glass-border flex shrink-0 items-center justify-between border-b border-solid px-3 py-2"
                 >
-                  {{ t("latencyInsights.retryButton") }}
-                </OButton>
-              </div>
+                  <span class="text-sm font-semibold">{{
+                    t("traces.tracesAnalysisDashboard.dimensions")
+                  }}</span>
+                  <OButton
+                    variant="outline"
+                    size="icon-xs-sq"
+                    class="rotate-90"
+                    icon-left="unfold-less"
+                    :title="t('traces.tracesAnalysisDashboard.collapseDimensions')"
+                    data-test="dimension-selector-collapse-btn"
+                    @click="toggleDimensionSelector"
+                  />
+                </div>
+                <!-- Search Input -->
+                <div class="border-card-glass-border border-solid p-2.5">
+                  <OSearchInput
+                    v-model="dimensionSearchText"
+                    :placeholder="t('search.searchDimension')"
+                    clearable
+                    class="w-full"
+                    data-test="dimension-search-input"
+                  />
+                </div>
 
-              <!-- Dashboard -->
-              <RenderDashboardCharts
-                v-else-if="dashboardData"
-                :key="`${activeAnalysisType}-${dashboardRenderKey}`"
-                ref="dashboardChartsRef"
-                :dashboardData="dashboardData"
-                :currentTimeObj="currentTimeObj"
-                :viewOnly="false"
-                :allowAlertCreation="false"
-                :simplifiedPanelView="true"
-                :searchType="props.streamType === 'logs' ? 'insights' : 'dashboards'"
-                @variablesManagerReady="onVariablesManagerReady"
-                @onDeletePanel="handlePanelDelete"
-                class="trace-analysis-dashboards p-[0.4rem]"
-              />
+                <!-- Dimension List -->
+                <div class="dimension-list-container flex-1 overflow-y-auto px-[0.325rem]">
+                  <ul v-if="filteredDimensions.length > 0" class="flex flex-col">
+                    <li
+                      v-for="dimension in filteredDimensions"
+                      :key="dimension.value"
+                      class="dimension-list-item hover:bg-interactive-hover-bg flex items-center gap-2 border-none! px-3 py-1"
+                    >
+                      <div class="flex shrink-0 items-center">
+                        <OCheckbox
+                          :model-value="selectedDimensions.includes(dimension.value)"
+                          @update:model-value="toggleDimension(dimension.value)"
+                          size="xs"
+                          :data-test="`dimension-checkbox-${dimension.value}`"
+                        />
+                      </div>
+                      <div class="flex min-w-0 flex-1 flex-col">
+                        <span
+                          class="dimension-label text-text-secondary! cursor-pointer truncate text-sm [line-height:1.25rem]"
+                        >
+                          {{ dimension.label }}
+                          <OTooltip
+                            side="top"
+                            align="center"
+                            :side-offset="8"
+                            :delay="500"
+                            max-width="300px"
+                            :content="dimension.label"
+                          />
+                        </span>
+                      </div>
+                    </li>
+                  </ul>
+
+                  <!-- No results message -->
+                  <div v-else class="text-text-muted p-4 text-center">
+                    {{ t("search.noResult") }}
+                  </div>
+                </div>
+
+                <!-- Selected Count Footer -->
+                <div class="border-card-glass-border border-t border-solid p-3 text-xs font-normal">
+                  {{ selectedDimensions.length }}
+                  {{ t("latencyInsights.dimensionsSelected") }}
+                </div>
+              </div>
             </div>
-          </div>
-        </template>
-      </OSplitter>
+          </template>
+
+          <template #separator>
+            <div
+              class="h-full w-1 bg-transparent transition-colors duration-300 hover:bg-[var(--color-orange-500)]"
+            ></div>
+          </template>
+
+          <!-- RIGHT: Dashboard Charts -->
+          <template #after>
+            <div class="h-full">
+              <div class="relative-position h-full w-full overflow-auto">
+                <!-- Loading State -->
+                <div v-if="loading" class="flex h-full flex-col items-center justify-center py-20">
+                  <OSpinner
+                    size="lg"
+                    class="mb-4"
+                    data-test="traces-analysis-dashboard-loading-indicator"
+                  />
+                  <div class="text-base">
+                    {{ t("latencyInsights.analyzingDimensions") }}
+                  </div>
+                  <div class="text-text-secondary mt-2 text-xs">
+                    {{
+                      t("latencyInsights.computingDistributions", {
+                        count: selectedDimensions.length,
+                      })
+                    }}
+                  </div>
+                </div>
+
+                <!-- Error State -->
+                <div
+                  v-else-if="error"
+                  data-test="traces-analysis-dashboard-error"
+                  class="flex h-full flex-col items-center justify-center py-20"
+                >
+                  <OIcon
+                    name="error-outline"
+                    class="mb-4"
+                    style="width: 3.75rem; height: 3.75rem"
+                  />
+                  <div class="mb-2 text-base">
+                    {{ t("latencyInsights.failedToLoad") }}
+                  </div>
+                  <div class="text-text-secondary text-sm">{{ error }}</div>
+                  <OButton
+                    variant="outline"
+                    size="sm-action"
+                    class="mt-4"
+                    data-test="traces-analysis-dashboard-retry-btn"
+                    @click="loadAnalysis"
+                  >
+                    {{ t("latencyInsights.retryButton") }}
+                  </OButton>
+                </div>
+
+                <!-- Dashboard -->
+                <RenderDashboardCharts
+                  v-else-if="dashboardData"
+                  :key="`${activeAnalysisType}-${dashboardRenderKey}`"
+                  ref="dashboardChartsRef"
+                  :dashboardData="dashboardData"
+                  :currentTimeObj="currentTimeObj"
+                  :viewOnly="false"
+                  :allowAlertCreation="false"
+                  :simplifiedPanelView="true"
+                  :searchType="props.streamType === 'logs' ? 'insights' : 'dashboards'"
+                  @variablesManagerReady="onVariablesManagerReady"
+                  @onDeletePanel="handlePanelDelete"
+                  class="trace-analysis-dashboards p-[0.4rem]"
+                />
+              </div>
+            </div>
+          </template>
+        </OSplitter>
+      </div>
     </div>
   </ODrawer>
 </template>
