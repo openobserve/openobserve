@@ -64,6 +64,10 @@ pub struct GenAiAgentListItem {
     pub id: Option<String>,
     pub source_stream: String,
     pub source_stream_type: String,
+    pub env: Option<String>,
+    pub version: Option<String>,
+    pub first_seen: Option<i64>,
+    pub last_seen: Option<i64>,
 }
 
 #[cfg(not(feature = "enterprise"))]
@@ -131,7 +135,9 @@ pub async fn get_agent_mapping(
             return MetaHttpResponse::forbidden("Unauthorized Access");
         }
 
-        let config = db::system_settings::get_gen_ai_agent_mapping_config(&org_id).await;
+        // Settings editor shows the user's SAVED config (empty when none) — not
+        // the effective defaults; "Apply defaults" fetches the template separately.
+        let config = db::system_settings::get_saved_gen_ai_agent_mapping_config(&org_id).await;
         MetaHttpResponse::json(config)
     }
 
@@ -421,5 +427,9 @@ fn agent_item_from_registry_row(
         id: row.agent_id,
         source_stream: row.stream_name,
         source_stream_type: row.stream_type,
+        env: row.env,
+        version: row.agent_version,
+        first_seen: Some(row.first_seen),
+        last_seen: Some(row.last_seen),
     })
 }

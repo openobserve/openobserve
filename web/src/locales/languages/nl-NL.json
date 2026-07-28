@@ -7736,7 +7736,6 @@
       "scoreConfigs": "Configureer de scorerubrieken die voor uw evaluaties worden gebruikt"
     },
     "agentGraph": {
-      "allAgents": "Alle agenten",
       "stream": "Stream",
       "agent": "Agent",
       "noAgentsTitle": "Geen agents gevonden",

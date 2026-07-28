@@ -7736,7 +7736,6 @@
       "scoreConfigs": "Skonfiguruj kryteria oceny używane w twoich ewaluacjach"
     },
     "agentGraph": {
-      "allAgents": "Wszyscy agenci",
       "stream": "Strumień",
       "agent": "Agent",
       "noAgentsTitle": "Nie znaleziono agentów",

@@ -1,4 +1,5 @@
 import type { GenAiAgentListItem } from "@/services/gen-ai-agent-mapping.service";
+import { formatAgentOption } from "@/plugins/traces/agentOptionFormat";
 
 export const ALL_AGENTS_VALUE = "__all__";
 
@@ -14,9 +15,10 @@ export function agentFilterKey(agent: AgentFilterSelection): string {
 }
 
 export function agentFilterLabel(agent: AgentFilterSelection): string {
-  // Display the agent identity only — the source stream is part of the filter
-  // KEY (see agentFilterKey) for uniqueness, but it's noise in the dropdown.
-  return agent.id ? `${agent.name} (${agent.id})` : agent.name;
+  // Display the agent identity plus env/version — the source stream is part of
+  // the filter KEY (see agentFilterKey) for uniqueness, but it's noise in the
+  // dropdown. Delegates to the shared formatter so all agent dropdowns match.
+  return formatAgentOption(agent);
 }
 
 // `_llm_scores` and `_evaluator` carry the agent identity denormalized onto
@@ -30,7 +32,18 @@ export function buildScoresAgentFilterWhere(
   const field = agent.id ? "agent_id" : "agent_name";
   const value = agent.id ?? agent.name;
   if (!value) return null;
-  return `${field} = '${escapeSqlString(String(value))}'`;
+  // env/version are denormalized onto every _llm_scores row (agent_env /
+  // agent_version), so a selected (agent, env, version) variant filters by exact
+  // match — same as agent_id. Rows written before this change have NULL columns
+  // and won't match a version filter until the target is re-evaluated.
+  const clauses = [`${field} = '${escapeSqlString(String(value))}'`];
+  if (agent.version) {
+    clauses.push(`agent_version = '${escapeSqlString(String(agent.version))}'`);
+  }
+  if (agent.env) {
+    clauses.push(`agent_env = '${escapeSqlString(String(agent.env))}'`);
+  }
+  return clauses.join(" AND ");
 }
 
 export function buildEvaluatorAgentFilterWhere(

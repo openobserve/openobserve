@@ -1058,6 +1058,7 @@ pub fn service_routes() -> Router {
             .route("/{org_id}/traces/service_graph/edge/history", get(traces::get_edge_history))
             // Agent behavior signals (loop / failure / cost) — reads the derived _agent_signals stream
             .route("/{org_id}/traces/agent_signals", get(traces::get_agent_signals))
+            .route("/{org_id}/traces/agent_signals/compare", post(traces::compare_agent_versions))
 
             // Patterns
             .route("/{org_id}/streams/{stream_name}/patterns/extract", post(patterns::extract_patterns))
