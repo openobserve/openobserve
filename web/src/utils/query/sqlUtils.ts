@@ -935,7 +935,7 @@ export const convertQueryIntoSingleLine = async (query: any) => {
 };
 
 export const getStreamNameFromQuery = async (query: any) => {
-  let streamName = null;
+  let streamName: string | null = null;
   try {
     await importSqlParser();
     try {
