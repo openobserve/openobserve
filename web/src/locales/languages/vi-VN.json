@@ -7736,7 +7736,6 @@
       "scoreConfigs": "Cấu hình các tiêu chí chấm điểm được sử dụng bởi các đánh giá của bạn"
     },
     "agentGraph": {
-      "allAgents": "Tất cả tác nhân",
       "stream": "Luồng",
       "agent": "Tác nhân",
       "noAgentsTitle": "Không tìm thấy tác nhân nào",

@@ -7736,7 +7736,6 @@
       "scoreConfigs": "Configurez les grilles de notation utilisées pour vos évaluations"
     },
     "agentGraph": {
-      "allAgents": "Tous les agents",
       "stream": "Flux",
       "agent": "Agent",
       "noAgentsTitle": "Aucun agent trouvé",

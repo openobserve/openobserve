@@ -7736,7 +7736,6 @@
       "scoreConfigs": "評価に使用するスコアリングルーブリックを設定します"
     },
     "agentGraph": {
-      "allAgents": "全エージェント",
       "stream": "ストリーム",
       "agent": "エージェント",
       "noAgentsTitle": "エージェントが見つかりません",

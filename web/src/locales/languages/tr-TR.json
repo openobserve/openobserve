@@ -7736,7 +7736,6 @@
       "scoreConfigs": "Değerlendirmeleriniz tarafından kullanılan puanlama derecelerini yapılandırın"
     },
     "agentGraph": {
-      "allAgents": "Tüm ajanlar",
       "stream": "Akış",
       "agent": "Ajan",
       "noAgentsTitle": "Hiçbir ajan bulunamadı",

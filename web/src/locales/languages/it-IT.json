@@ -7736,7 +7736,6 @@
       "scoreConfigs": "Configura le rubriche di punteggio utilizzate nelle tue valutazioni"
     },
     "agentGraph": {
-      "allAgents": "Tutti gli agenti",
       "stream": "Stream",
       "agent": "Agente",
       "noAgentsTitle": "Nessun agente trovato",
