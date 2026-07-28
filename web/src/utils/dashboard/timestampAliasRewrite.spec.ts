@@ -23,27 +23,19 @@ import {
 
 describe("pickReplacementAlias (collision-avoiding suffix)", () => {
   it("returns `ts` when the query has no `ts` output column", () => {
-    expect(
-      pickReplacementAlias(
-        'SELECT histogram(_timestamp) AS "_timestamp" FROM t',
-      ),
-    ).toBe("ts");
+    expect(pickReplacementAlias('SELECT histogram(_timestamp) AS "_timestamp" FROM t')).toBe("ts");
   });
 
   it("bumps to `ts_1` when `ts` is already an alias", () => {
     expect(
-      pickReplacementAlias(
-        'SELECT foo AS "ts", histogram(_timestamp) AS "_timestamp" FROM t',
-      ),
+      pickReplacementAlias('SELECT foo AS "ts", histogram(_timestamp) AS "_timestamp" FROM t'),
     ).toBe("ts_1");
   });
 
   it("bumps to `ts_1` when `ts` is a bare selected column", () => {
-    expect(
-      pickReplacementAlias(
-        'SELECT ts, histogram(_timestamp) AS "_timestamp" FROM t',
-      ),
-    ).toBe("ts_1");
+    expect(pickReplacementAlias('SELECT ts, histogram(_timestamp) AS "_timestamp" FROM t')).toBe(
+      "ts_1",
+    );
   });
 
   it("finds the first free suffix (`ts_2` when `ts` and `ts_1` are taken)", () => {
@@ -56,9 +48,7 @@ describe("pickReplacementAlias (collision-avoiding suffix)", () => {
 
   it("does NOT bump when `ts` only appears in WHERE (not an output column)", () => {
     expect(
-      pickReplacementAlias(
-        'SELECT histogram(_timestamp) AS "_timestamp" FROM t WHERE ts > 0',
-      ),
+      pickReplacementAlias('SELECT histogram(_timestamp) AS "_timestamp" FROM t WHERE ts > 0'),
     ).toBe("ts");
   });
 });
@@ -66,35 +56,25 @@ describe("pickReplacementAlias (collision-avoiding suffix)", () => {
 describe("rewriteQueryTimestampAlias", () => {
   it('rewrites AS "_timestamp"', () => {
     expect(
-      rewriteQueryTimestampAlias(
-        'SELECT histogram(_timestamp) AS "_timestamp" FROM "x"',
-      ),
+      rewriteQueryTimestampAlias('SELECT histogram(_timestamp) AS "_timestamp" FROM "x"'),
     ).toBe('SELECT histogram(_timestamp) AS "ts" FROM "x"');
   });
 
   it("rewrites AS '_timestamp'", () => {
     expect(
-      rewriteQueryTimestampAlias(
-        "SELECT histogram(_timestamp) AS '_timestamp' FROM \"x\"",
-      ),
+      rewriteQueryTimestampAlias("SELECT histogram(_timestamp) AS '_timestamp' FROM \"x\""),
     ).toBe("SELECT histogram(_timestamp) AS 'ts' FROM \"x\"");
   });
 
   it("rewrites unquoted AS _timestamp", () => {
-    expect(
-      rewriteQueryTimestampAlias(
-        'SELECT histogram(_timestamp) AS _timestamp FROM "x"',
-      ),
-    ).toBe('SELECT histogram(_timestamp) AS ts FROM "x"');
+    expect(rewriteQueryTimestampAlias('SELECT histogram(_timestamp) AS _timestamp FROM "x"')).toBe(
+      'SELECT histogram(_timestamp) AS ts FROM "x"',
+    );
   });
 
   it("is case-insensitive on the AS keyword", () => {
-    expect(rewriteQueryTimestampAlias('SELECT a as "_timestamp"')).toBe(
-      'SELECT a as "ts"',
-    );
-    expect(rewriteQueryTimestampAlias('SELECT a As "_timestamp"')).toBe(
-      'SELECT a As "ts"',
-    );
+    expect(rewriteQueryTimestampAlias('SELECT a as "_timestamp"')).toBe('SELECT a as "ts"');
+    expect(rewriteQueryTimestampAlias('SELECT a As "_timestamp"')).toBe('SELECT a As "ts"');
   });
 
   it("leaves the source column untouched when there is no _timestamp alias (histogram/WHERE/ORDER)", () => {
@@ -146,8 +126,7 @@ describe("rewriteQueryTimestampAlias", () => {
   });
 
   it("does not rename _timestamp in the WHERE clause even when the alias is defined", () => {
-    const sql =
-      'SELECT foo AS "_timestamp" FROM "x" WHERE _timestamp > 0 GROUP BY _timestamp';
+    const sql = 'SELECT foo AS "_timestamp" FROM "x" WHERE _timestamp > 0 GROUP BY _timestamp';
     expect(rewriteQueryTimestampAlias(sql)).toBe(
       'SELECT foo AS "ts" FROM "x" WHERE _timestamp > 0 GROUP BY ts',
     );
@@ -169,9 +148,9 @@ describe("rewriteQueryTimestampAlias", () => {
   });
 
   it("honors a custom timestamp column name", () => {
-    expect(
-      rewriteQueryTimestampAlias('SELECT a AS "@ts" FROM "x"', "@ts", "ts"),
-    ).toBe('SELECT a AS "ts" FROM "x"');
+    expect(rewriteQueryTimestampAlias('SELECT a AS "@ts" FROM "x"', "@ts", "ts")).toBe(
+      'SELECT a AS "ts" FROM "x"',
+    );
   });
 
   it("returns falsy input unchanged", () => {
@@ -225,8 +204,7 @@ describe("rewriteQueryTimestampAlias — complex queries (never corrupt)", () =>
   });
 
   it("does NOT rename a table alias `FROM x AS _timestamp`", () => {
-    const sql =
-      'SELECT a AS "_timestamp" FROM "x" AS _timestamp GROUP BY _timestamp';
+    const sql = 'SELECT a AS "_timestamp" FROM "x" AS _timestamp GROUP BY _timestamp';
     expect(rewriteQueryTimestampAlias(sql)).toBe(
       'SELECT a AS "ts" FROM "x" AS _timestamp GROUP BY ts',
     );
@@ -253,8 +231,7 @@ describe("rewriteQueryTimestampAlias — complex queries (never corrupt)", () =>
       'SELECT a AS "_timestamp" FROM t GROUP BY _timestamp ' +
       "UNION SELECT _timestamp FROM u GROUP BY _timestamp";
     expect(rewriteQueryTimestampAlias(sql)).toBe(
-      'SELECT a AS "ts" FROM t GROUP BY ts ' +
-        "UNION SELECT _timestamp FROM u GROUP BY _timestamp",
+      'SELECT a AS "ts" FROM t GROUP BY ts ' + "UNION SELECT _timestamp FROM u GROUP BY _timestamp",
     );
   });
 
@@ -321,8 +298,7 @@ describe("rewriteQueryTimestampAlias — complex queries (never corrupt)", () =>
   // --- Self-alias `_timestamp AS _timestamp` → `_timestamp AS ts` (alias only) ---
 
   it("renames a self-alias inside a sub-query (only the alias, not the expression)", () => {
-    const sql =
-      'SELECT a FROM (SELECT _timestamp as _timestamp, x FROM "logs") s';
+    const sql = 'SELECT a FROM (SELECT _timestamp as _timestamp, x FROM "logs") s';
     expect(rewriteQueryTimestampAlias(sql)).toBe(
       'SELECT a FROM (SELECT _timestamp as ts, x FROM "logs") s',
     );
@@ -343,16 +319,14 @@ describe("rewriteQueryTimestampAlias — complex queries (never corrupt)", () =>
   });
 
   it("renames a top-level self-alias (only the alias)", () => {
-    const sql =
-      'SELECT _timestamp as _timestamp, count(*) as c FROM "logs" GROUP BY _timestamp';
+    const sql = 'SELECT _timestamp as _timestamp, count(*) as c FROM "logs" GROUP BY _timestamp';
     expect(rewriteQueryTimestampAlias(sql)).toBe(
       'SELECT _timestamp as ts, count(*) as c FROM "logs" GROUP BY ts',
     );
   });
 
   it("renames a quoted self-alias inside a sub-query (only the alias)", () => {
-    const sql =
-      'SELECT a FROM (SELECT _timestamp AS "_timestamp" FROM "logs") s';
+    const sql = 'SELECT a FROM (SELECT _timestamp AS "_timestamp" FROM "logs") s';
     expect(rewriteQueryTimestampAlias(sql)).toBe(
       'SELECT a FROM (SELECT _timestamp AS "ts" FROM "logs") s',
     );
@@ -381,7 +355,8 @@ describe("normalizeReservedTimestampAlias", () => {
 
   it("rewrites the SQL string (alias + GROUP BY/ORDER BY refs) and the matching field alias", () => {
     const data = wrap(makePanel());
-    normalizeReservedTimestampAlias(data);
+    const changed = normalizeReservedTimestampAlias(data);
+    expect(changed).toBe(true); // signals the caller to persist
 
     const query = data.tabs[0].panels[0].queries[0];
     expect(query.query).toBe(
@@ -436,9 +411,7 @@ describe("normalizeReservedTimestampAlias", () => {
   it("does NOT rename a VRL-derived _timestamp field (never in the SQL)", () => {
     const panel = {
       config: {
-        override_config: [
-          { field: { matchBy: "name", value: "_timestamp" }, config: [] },
-        ],
+        override_config: [{ field: { matchBy: "name", value: "_timestamp" }, config: [] }],
       },
       queries: [
         {
@@ -465,12 +438,9 @@ describe("normalizeReservedTimestampAlias", () => {
       queries: [
         {
           customQuery: true,
-          query:
-            'SELECT _timestamp, count(*) AS "y_axis_1" FROM "x" GROUP BY _timestamp',
+          query: 'SELECT _timestamp, count(*) AS "y_axis_1" FROM "x" GROUP BY _timestamp',
           fields: {
-            x: [
-              { alias: "_timestamp", column: "_timestamp", isDerived: false },
-            ],
+            x: [{ alias: "_timestamp", column: "_timestamp", isDerived: false }],
             y: [{ alias: "y_axis_1", column: "count", isDerived: false }],
           },
         },
@@ -496,18 +466,12 @@ describe("normalizeReservedTimestampAlias", () => {
                 {
                   query: 'SELECT lat AS "_timestamp" FROM "x"',
                   fields: {
-                    latitude: {
-                      alias: "_timestamp",
-                      column: "lat",
-                      isDerived: false,
-                    },
+                    latitude: { alias: "_timestamp", column: "lat", isDerived: false },
                   },
                 },
                 {
                   query: 'SELECT b AS "_timestamp" FROM "y"',
-                  fields: {
-                    x: [{ alias: "_timestamp", column: "b", isDerived: false }],
-                  },
+                  fields: { x: [{ alias: "_timestamp", column: "b", isDerived: false }] },
                 },
               ],
             },
@@ -526,25 +490,20 @@ describe("normalizeReservedTimestampAlias", () => {
       const panel = {
         queryType,
         config: {
-          override_config: [
-            { field: { matchBy: "name", value: "_timestamp" }, config: [] },
-          ],
+          override_config: [{ field: { matchBy: "name", value: "_timestamp" }, config: [] }],
         },
         queries: [
           {
             // PromQL never has `AS _timestamp`, but assert the panel is skipped wholesale
             query: 'histogram_quantile(0.9, rate(x[5m])) AS "_timestamp"',
-            fields: {
-              x: [
-                { alias: "_timestamp", column: "_timestamp", isDerived: false },
-              ],
-            },
+            fields: { x: [{ alias: "_timestamp", column: "_timestamp", isDerived: false }] },
           },
         ],
       };
       const data = wrap(panel);
       const before = JSON.parse(JSON.stringify(data));
-      normalizeReservedTimestampAlias(data);
+      const changed = normalizeReservedTimestampAlias(data);
+      expect(changed, `queryType=${queryType}`).toBe(false); // skipped → no persist
       expect(data, `queryType=${queryType}`).toEqual(before); // untouched
     }
   });
@@ -552,9 +511,7 @@ describe("normalizeReservedTimestampAlias", () => {
   it("uses a collision-free alias (ts_1) consistently across SQL, field, and config", () => {
     const panel = {
       config: {
-        override_config: [
-          { field: { matchBy: "name", value: "_timestamp" }, config: [] },
-        ],
+        override_config: [{ field: { matchBy: "name", value: "_timestamp" }, config: [] }],
       },
       queries: [
         {
@@ -563,9 +520,7 @@ describe("normalizeReservedTimestampAlias", () => {
             'SELECT foo AS "ts", histogram(_timestamp) AS "_timestamp" ' +
             "FROM t GROUP BY _timestamp ORDER BY _timestamp",
           fields: {
-            x: [
-              { alias: "_timestamp", column: "_timestamp", isDerived: false },
-            ],
+            x: [{ alias: "_timestamp", column: "_timestamp", isDerived: false }],
             y: [{ alias: "ts", column: "foo", isDerived: false }],
           },
         },
@@ -575,28 +530,25 @@ describe("normalizeReservedTimestampAlias", () => {
 
     // `ts` is taken by `foo AS "ts"`, so `_timestamp` becomes `ts_1` everywhere
     expect(panel.queries[0].query).toBe(
-      'SELECT foo AS "ts", histogram(_timestamp) AS "ts_1" ' +
-        "FROM t GROUP BY ts_1 ORDER BY ts_1",
+      'SELECT foo AS "ts", histogram(_timestamp) AS "ts_1" ' + "FROM t GROUP BY ts_1 ORDER BY ts_1",
     );
     expect(panel.queries[0].fields.x[0].alias).toBe("ts_1");
     expect(panel.queries[0].fields.y[0].alias).toBe("ts"); // the pre-existing ts column untouched
     expect(panel.config.override_config[0].field.value).toBe("ts_1");
   });
 
-  it("is idempotent", () => {
+  it("is idempotent — returns true on the first pass, false on the second", () => {
     const data = wrap(makePanel());
-    normalizeReservedTimestampAlias(data);
+    expect(normalizeReservedTimestampAlias(data)).toBe(true);
     const once = JSON.parse(JSON.stringify(data));
-    normalizeReservedTimestampAlias(data);
+    expect(normalizeReservedTimestampAlias(data)).toBe(false);
     expect(data).toEqual(once);
   });
 
-  it("is a no-op for dashboards without tabs/panels/queries", () => {
-    expect(() => normalizeReservedTimestampAlias(undefined)).not.toThrow();
-    expect(() => normalizeReservedTimestampAlias({})).not.toThrow();
-    expect(() => normalizeReservedTimestampAlias({ tabs: [{}] })).not.toThrow();
-    expect(() =>
-      normalizeReservedTimestampAlias({ tabs: [{ panels: [{}] }] }),
-    ).not.toThrow();
+  it("is a no-op (returns false) for dashboards without tabs/panels/queries", () => {
+    expect(normalizeReservedTimestampAlias(undefined)).toBe(false);
+    expect(normalizeReservedTimestampAlias({})).toBe(false);
+    expect(normalizeReservedTimestampAlias({ tabs: [{}] })).toBe(false);
+    expect(normalizeReservedTimestampAlias({ tabs: [{ panels: [{}] }] })).toBe(false);
   });
 });
