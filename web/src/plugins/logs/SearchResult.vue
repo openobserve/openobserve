@@ -555,6 +555,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <JsonPreview
                 :value="row"
                 :index="logsRowIndex(row)"
+                class="px-2 py-1.5"
                 mode="expanded"
                 :highlight-query="searchObj.data.highlightQuery"
                 :hide-search-term-actions="false"
@@ -2290,6 +2291,12 @@ export default defineComponent({
 .logs-results-otable :deep([data-test^="o2-table-expand-"] svg) {
   width: 0.875rem !important;
   height: 0.875rem !important;
+}
+
+/* The shared expanded-row fill reads as a grey slab against the dense log rows,
+   which is not how the logs grid looked before. Keep the normal cell surface. */
+.logs-results-otable :deep([data-test^="o2-table-expanded-row-"]) {
+  background-color: var(--color-table-cell-bg);
 }
 
 /* keep(generated-content): pin-breakdown tooltip. The rows are built from data
