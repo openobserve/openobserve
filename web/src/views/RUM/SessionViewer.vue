@@ -76,7 +76,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         separatorClass="bg-card-glass-border w-px! hover:bg-theme-accent"
       >
         <template #before>
+          <!-- Mobile SDKs record wireframes (not a DOM); play them with the wireframe
+               player. Browser sessions use the rrweb-based VideoPlayer. -->
+          <MobileSessionPlayer
+            v-if="isMobileReplay"
+            :segments="segments"
+            :events="segmentEvents"
+            class="h-full"
+          />
           <VideoPlayer
+            v-else
             ref="videoPlayerRef"
             :events="segmentEvents"
             :segments="segments"
@@ -113,6 +122,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts" setup>
 import PlayerEventsSidebar from "@/components/rum/PlayerEventsSidebar.vue";
 import VideoPlayer from "@/components/rum/VideoPlayer.vue";
+import MobileSessionPlayer from "@/components/rum/MobileSessionPlayer.vue";
+import { isMobileReplaySource } from "@/composables/rum/useMobileSessionReplay";
 import EventDetailDrawer from "@/components/rum/EventDetailDrawer.vue";
 import { cloneDeep } from "lodash-es";
 import { computed, onBeforeMount, ref, watch } from "vue";
@@ -154,6 +165,12 @@ const isLoading = ref<boolean[]>([]);
 const { buildQueryPayload } = useQuery();
 const segments = ref<any[]>([]);
 const segmentEvents = ref<any[]>([]);
+
+// Mobile sessions carry wireframe records (source: react-native/ios/android) → the
+// wireframe player; browser sessions use the rrweb VideoPlayer.
+const isMobileReplay = computed(() =>
+  isMobileReplaySource(sessionState.data.selectedSession?.source),
+);
 const { sessionState } = useSessionsReplay();
 const videoPlayerRef = ref<any>(null);
 const splitterSize = ref(600);

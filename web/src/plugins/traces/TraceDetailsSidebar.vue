@@ -181,6 +181,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTooltip :content="viewLogsTooltipContent" />
             </span>
           </span>
+
+          <OButton
+            v-if="showEvaluateButton && canPreviewSpan"
+            variant="primary"
+            size="xs"
+            class="ml-1"
+            data-test="trace-details-sidebar-evaluate-span-btn"
+            @click.stop="evaluateSpan"
+          >
+            {{ t("onlineEvals.manualEvaluation.titles.span") }}
+          </OButton>
         </div>
       </div>
 
@@ -913,6 +924,10 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    showEvaluateButton: {
+      type: Boolean,
+      default: false,
+    },
   },
   components: {
     OSeparator,
@@ -954,6 +969,7 @@ export default defineComponent({
     "add-filter",
     "apply-filter-immediately",
     "add-field-to-table",
+    "evaluate",
     "update:activeTab",
   ],
   setup(props, { emit }) {
@@ -1451,6 +1467,10 @@ export default defineComponent({
         const queryDetails = buildQueryDetails(props.span);
         navigateToLogs(queryDetails);
       }
+    };
+
+    const evaluateSpan = () => {
+      emit("evaluate", props.span);
     };
 
     const getStartTime = computed(() => {
@@ -1960,6 +1980,7 @@ export default defineComponent({
       getDuration,
       getTTFT,
       viewSpanLogs,
+      evaluateSpan,
       getStartTime,
       copySpanId,
       copyAttributesToClipboard,
