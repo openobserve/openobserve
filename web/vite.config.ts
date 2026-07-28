@@ -31,9 +31,7 @@ const runNode = (scriptPath: string, env: NodeJS.ProcessEnv): Promise<void> =>
     const child = spawn("node", [scriptPath], { stdio: "inherit", env });
     child.on("error", reject); // process could not be started at all
     child.on("close", (code) =>
-      code === 0
-        ? resolve()
-        : reject(new Error(`fetch-datasource-content exited with ${code}`)),
+      code === 0 ? resolve() : reject(new Error(`fetch-datasource-content exited with ${code}`)),
     );
   });
 import vue from "@vitejs/plugin-vue";
@@ -69,16 +67,10 @@ const enterpriseResolverPlugin = {
     if (source.startsWith("@zo/")) {
       const fileName = source.replace("@zo/", "");
 
-      const enterprisePath = path.resolve(
-        __dirname,
-        `./src/enterprise/${fileName}`,
-      );
+      const enterprisePath = path.resolve(__dirname, `./src/enterprise/${fileName}`);
       const defaultPath = path.resolve(__dirname, `./src/${fileName}`);
 
-      if (
-        process.env.VITE_OPENOBSERVE_CLOUD == "true" &&
-        (await fs.pathExists(enterprisePath))
-      ) {
+      if (process.env.VITE_OPENOBSERVE_CLOUD == "true" && (await fs.pathExists(enterprisePath))) {
         return enterprisePath;
       }
 
@@ -118,22 +110,18 @@ const datasourceContentPlugin = {
   async config(_config: any, env: { command: string }) {
     // env.command is "build" (vite build / CI / prod) or "serve" (dev server).
     const isBuild = env?.command === "build";
-    await runNode(
-      path.resolve(__dirname, "scripts/fetch-datasource-content.mjs"),
-      {
-        // Inherit the parent env (PATH, etc.) so git/node resolve, and so any
-        // DS_CONTENT_* the dev set (REPO/REF/TIMEOUT) flows through to the script.
-        ...process.env,
-        // Policy flags (the `?? ` lets an explicitly-set env var override):
-        //   STRICT: a failed fetch exits non-zero → build fails. On for builds,
-        //   off for dev (dev falls back to cache / the legacy snippet).
-        DS_CONTENT_STRICT:
-          process.env.DS_CONTENT_STRICT ?? (isBuild ? "1" : ""),
-        //   FORCE: re-fetch the latest instead of reusing the cached generated/
-        //   dir. On for builds (always ship fresh), off for dev (fast restarts).
-        DS_CONTENT_FORCE: process.env.DS_CONTENT_FORCE ?? (isBuild ? "1" : ""),
-      },
-    );
+    await runNode(path.resolve(__dirname, "scripts/fetch-datasource-content.mjs"), {
+      // Inherit the parent env (PATH, etc.) so git/node resolve, and so any
+      // DS_CONTENT_* the dev set (REPO/REF/TIMEOUT) flows through to the script.
+      ...process.env,
+      // Policy flags (the `?? ` lets an explicitly-set env var override):
+      //   STRICT: a failed fetch exits non-zero → build fails. On for builds,
+      //   off for dev (dev falls back to cache / the legacy snippet).
+      DS_CONTENT_STRICT: process.env.DS_CONTENT_STRICT ?? (isBuild ? "1" : ""),
+      //   FORCE: re-fetch the latest instead of reusing the cached generated/
+      //   dir. On for builds (always ship fresh), off for dev (fast restarts).
+      DS_CONTENT_FORCE: process.env.DS_CONTENT_FORCE ?? (isBuild ? "1" : ""),
+    });
   },
 };
 
@@ -153,9 +141,7 @@ export default defineConfig(({ mode }) => {
   // are kept in dev only when their namespace matches VITE_DEBUG_GROUPS
   // (.env, comma-separated, supports trailing-* wildcards). loadEnv reads
   // every .env* file. console.error/warn are never filtered or stripped.
-  const allowedGroups = (
-    loadEnv(mode, process.cwd(), "").VITE_DEBUG_GROUPS ?? ""
-  )
+  const allowedGroups = (loadEnv(mode, process.cwd(), "").VITE_DEBUG_GROUPS ?? "")
     .split(",")
     .map((g) => g.trim())
     .filter(Boolean);
@@ -163,15 +149,13 @@ export default defineConfig(({ mode }) => {
   const debugFilterPlugin = {
     name: "vite-plugin-debug-filter",
     transform(code: string, id: string) {
-      if (isProd || id.includes("node_modules") || !id.match(/\.(vue|ts|js)$/))
-        return;
+      if (isProd || id.includes("node_modules") || !id.match(/\.(vue|ts|js)$/)) return;
       return {
         code: code.replace(
           /console\.(?:log|debug|info)\(\s*['"`]([^'"`]+)['"`]/g,
           (match, namespace) => {
             const isAllowed = allowedGroups.some((group) => {
-              if (group.endsWith("*"))
-                return namespace.startsWith(group.slice(0, -1));
+              if (group.endsWith("*")) return namespace.startsWith(group.slice(0, -1));
               return namespace === group || namespace.startsWith(`${group}:`);
             });
             // `false &&` instead of commenting out: multi-line calls stay
@@ -221,18 +205,17 @@ export default defineConfig(({ mode }) => {
         autoInstall: false,
       }),
       vueJsx(),
-      (monacoEditorPlugin as any).default({
-        customDistPath: () => path.resolve(__dirname, "dist/monacoeditorwork"),
-      }),
+      !isTesting &&
+        (monacoEditorPlugin as any).default({
+          customDistPath: () => path.resolve(__dirname, "dist/monacoeditorwork"),
+        }),
       isTesting && monacoEditorTestResolver(),
     ].filter(Boolean),
     css: {},
     resolve: {
       alias: {
         "@": fileURLToPath(new URL("./src", import.meta.url)),
-        "@enterprise": fileURLToPath(
-          new URL("./src/enterprise", import.meta.url),
-        ),
+        "@enterprise": fileURLToPath(new URL("./src/enterprise", import.meta.url)),
         stream: "rollup-plugin-node-polyfills/polyfills/stream",
         events: "rollup-plugin-node-polyfills/polyfills/events",
         assert: "assert",
@@ -258,10 +241,7 @@ export default defineConfig(({ mode }) => {
         output: {
           manualChunks: {
             "o2cs-analytics": ["@rudderstack/analytics-js"],
-            "o2cs-oo-rum": [
-              "@openobserve/browser-logs",
-              "@openobserve/browser-rum",
-            ],
+            "o2cs-oo-rum": ["@openobserve/browser-logs", "@openobserve/browser-rum"],
             "o2cs-date-fns": ["date-fns", "date-fns-tz"],
             // monaco-editor removed from manualChunks to enable true lazy loading
             // "monaco-editor": ["monaco-editor"],

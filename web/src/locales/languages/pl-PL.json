@@ -7736,7 +7736,6 @@
       "scoreConfigs": "Skonfiguruj kryteria oceny używane w twoich ewaluacjach"
     },
     "agentGraph": {
-      "allAgents": "Wszyscy agenci",
       "stream": "Strumień",
       "agent": "Agent",
       "noAgentsTitle": "Nie znaleziono agentów",
@@ -9592,6 +9591,8 @@
       "modalSubtitle": "Wybierz, co chcesz monitorować",
       "modalTitle": "Utwórz sprawdzenie",
       "pageTitle": "Nowe sprawdzenie {label}",
+      "saveAndContinue": "Zapisz i kontynuuj",
+      "saveAndExit": "Zapisz i zakończ",
       "saveCheck": "Zapisz sprawdzenie",
       "saveFailed": "Nie udało się zapisać sprawdzenia.",
       "saved": "Sprawdzenie zapisano pomyślnie.",

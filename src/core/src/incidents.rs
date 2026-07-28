@@ -147,6 +147,14 @@ async fn get_event_metadata(
             metadata.push(("analysis_trigger_type", trigger_type.to_string().into()));
             metadata.push(("error_details", error_details.unwrap_or_default().into()));
         }
+        IncidentEventType::AIAnalysisCancelled { user_id } => {
+            metadata.push(("event_type", "ai_analysis_cancelled".into()));
+            metadata.push(("user_id", user_id.into()));
+        }
+        IncidentEventType::Unknown(value) => {
+            metadata.push(("event_type", "unknown".into()));
+            metadata.push(("value", value.into()));
+        }
     }
 
     let ret: HashMap<_, _> = metadata

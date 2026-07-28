@@ -18,6 +18,7 @@
 // Render tests for CreateBrowserTest.vue — browser test creation/editing page.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { nextTick } from "vue";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -127,8 +128,9 @@ const baseStubs = {
     props: ["title", "subtitle", "back"],
   },
   OButton: {
+    // Slot names mirror the real OButton (icon-left / default / icon-right).
     template:
-      '<button :data-test="$attrs[\'data-test\']" :disabled="disabled"><slot name="prefix" /><slot /></button>',
+      '<button :data-test="$attrs[\'data-test\']" :disabled="disabled"><slot name="icon-left" /><slot /><slot name="icon-right" /></button>',
     props: ["variant", "size", "disabled", "loading", "class", "iconLeft"],
     inheritAttrs: true,
   },
@@ -235,6 +237,39 @@ function mountPage(props: Record<string, unknown> = {}) {
   });
 }
 
+/** Mount in edit mode with a loaded check that passes the save schema. */
+async function mountValidEdit() {
+  mockServiceGet.mockResolvedValue({
+    data: {
+      name: "Test Check",
+      url: "https://example.com",
+      folder: "folder-1",
+      journey: [],
+    },
+  });
+  const w = mountPage({ editId: "check-123" });
+  await flushPromises();
+  return w;
+}
+
+/**
+ * Mount in create mode and walk the gate → Journey → Configure flow so the
+ * step 2 footer (with the primary save button) is rendered.
+ */
+async function mountCreateAtConfigure(name = "Brand New Check") {
+  const w = mountPage();
+  await flushPromises();
+
+  await w.find('[data-test="synthetics-create-url-input"]').setValue("https://example.com");
+  await w.find('[data-test="synthetics-create-name-input"]').setValue(name);
+  await w.find('[data-test="synthetics-create-build-btn"]').trigger("click");
+  await flushPromises();
+
+  await w.find('[data-test="synthetics-create-continue-btn"]').trigger("click");
+  await flushPromises();
+  return w;
+}
+
 describe("CreateBrowserTest", () => {
   let wrapper: VueWrapper;
 
@@ -325,7 +360,7 @@ describe("CreateBrowserTest", () => {
       expect(mockServiceGet).not.toHaveBeenCalled();
     });
 
-    it("should render 'Update Check' button in Journey step footer when editId is set", async () => {
+    it("should render 'Save & Continue' and 'Save & Exit' in the Journey footer when editId is set", async () => {
       mockServiceGet.mockResolvedValue({
         data: { name: "Test Check", url: "https://example.com", journey: [] },
       });
@@ -333,12 +368,13 @@ describe("CreateBrowserTest", () => {
       wrapper = mountPage({ editId: "check-123" });
       await flushPromises();
 
-      expect(wrapper.find('[data-test="synthetics-create-save-from-journey-btn"]').exists()).toBe(
-        true,
-      );
+      expect(wrapper.find('[data-test="synthetics-create-save-continue-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="synthetics-create-save-exit-btn"]').exists()).toBe(true);
+      // The plain (non-saving) Continue button is create-mode only
+      expect(wrapper.find('[data-test="synthetics-create-continue-btn"]').exists()).toBe(false);
     });
 
-    it("should NOT render 'Update Check' button when editId is not set, even in editor phase", async () => {
+    it("should render only Cancel + Continue in the Journey footer when editId is not set", async () => {
       wrapper = mountPage();
       await flushPromises();
 
@@ -351,13 +387,223 @@ describe("CreateBrowserTest", () => {
       await flushPromises();
 
       // We are now in the editor phase on step 1 — verify footer buttons
-      // Continue and Cancel should be present
       expect(wrapper.find('[data-test="synthetics-create-continue-btn"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="synthetics-create-cancel-btn"]').exists()).toBe(true);
-      // Update Check button should NOT appear (no editId)
-      expect(wrapper.find('[data-test="synthetics-create-save-from-journey-btn"]').exists()).toBe(
+      // Neither save action appears without an editId — there is nothing to update yet
+      expect(wrapper.find('[data-test="synthetics-create-save-continue-btn"]').exists()).toBe(
         false,
       );
+      expect(wrapper.find('[data-test="synthetics-create-save-exit-btn"]').exists()).toBe(false);
+    });
+  });
+
+  describe("edit mode — Journey footer save actions", () => {
+    it("'Save & Exit' should update the check and navigate back to the list", async () => {
+      wrapper = await mountValidEdit();
+
+      await wrapper.find('[data-test="synthetics-create-save-exit-btn"]').trigger("click");
+      await flushPromises();
+
+      expect(mockServiceUpdate).toHaveBeenCalledTimes(1);
+      expect(mockServiceUpdate).toHaveBeenCalledWith(
+        "default",
+        "check-123",
+        expect.anything(),
+        "folder-1",
+      );
+      expect(mockRouterPush).toHaveBeenCalledWith({
+        name: "synthetics",
+        query: { folder: "folder-1" },
+      });
+    });
+
+    it("'Save & Continue' should update the check and advance to Configure without navigating", async () => {
+      wrapper = await mountValidEdit();
+
+      await wrapper.find('[data-test="synthetics-create-save-continue-btn"]').trigger("click");
+      await flushPromises();
+
+      expect(mockServiceUpdate).toHaveBeenCalledTimes(1);
+      expect(mockRouterPush).not.toHaveBeenCalled();
+      // Step 2 footer is now rendered — Go Back only exists on the Configure step
+      expect(wrapper.find('[data-test="synthetics-create-back-to-journey-btn"]').exists()).toBe(
+        true,
+      );
+    });
+
+    it("should not navigate when the update request fails", async () => {
+      mockServiceUpdate.mockRejectedValue({ response: { status: 500, data: {} } });
+      wrapper = await mountValidEdit();
+
+      await wrapper.find('[data-test="synthetics-create-save-exit-btn"]').trigger("click");
+      await flushPromises();
+
+      expect(mockServiceUpdate).toHaveBeenCalledTimes(1);
+      expect(mockRouterPush).not.toHaveBeenCalled();
+      expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ variant: "error" }));
+    });
+
+    it("should not navigate when validation fails", async () => {
+      mockServiceGet.mockResolvedValue({
+        data: { name: "", url: "https://example.com", journey: [] },
+      });
+      wrapper = mountPage({ editId: "check-123" });
+      await flushPromises();
+
+      await wrapper.find('[data-test="synthetics-create-save-exit-btn"]').trigger("click");
+      await flushPromises();
+
+      expect(mockServiceUpdate).not.toHaveBeenCalled();
+      expect(mockRouterPush).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("edit mode — check deleted while editing (404)", () => {
+    const notFound = { response: { status: 404, data: {} } };
+
+    it("'Save & Exit' should navigate to the list once, without a folder query", async () => {
+      mockServiceUpdate.mockRejectedValue(notFound);
+      wrapper = await mountValidEdit();
+
+      await wrapper.find('[data-test="synthetics-create-save-exit-btn"]').trigger("click");
+      await flushPromises();
+
+      // persist() already navigated for the 404 case — onSaveAndExit must bail
+      // out instead of pushing a second, folder-scoped route on top of it.
+      expect(mockRouterPush).toHaveBeenCalledTimes(1);
+      expect(mockRouterPush).toHaveBeenCalledWith({ name: "synthetics" });
+    });
+
+    it("'Save & Exit' should warn (not error) when the check no longer exists", async () => {
+      mockServiceUpdate.mockRejectedValue(notFound);
+      wrapper = await mountValidEdit();
+
+      await wrapper.find('[data-test="synthetics-create-save-exit-btn"]').trigger("click");
+      await flushPromises();
+
+      expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ variant: "warning" }));
+      expect(mockToast).not.toHaveBeenCalledWith(expect.objectContaining({ variant: "error" }));
+    });
+
+    it("'Save & Continue' should not advance to Configure", async () => {
+      mockServiceUpdate.mockRejectedValue(notFound);
+      wrapper = await mountValidEdit();
+
+      await wrapper.find('[data-test="synthetics-create-save-continue-btn"]').trigger("click");
+      await flushPromises();
+
+      // Still on the Journey step: Go Back only exists on Configure.
+      expect(wrapper.find('[data-test="synthetics-create-back-to-journey-btn"]').exists()).toBe(
+        false,
+      );
+      expect(mockRouterPush).toHaveBeenCalledTimes(1);
+      expect(mockRouterPush).toHaveBeenCalledWith({ name: "synthetics" });
+    });
+
+    it("should clear the saving state after the 404 early return", async () => {
+      mockServiceUpdate.mockRejectedValue(notFound);
+      wrapper = await mountValidEdit();
+
+      await wrapper.find('[data-test="synthetics-create-save-exit-btn"]').trigger("click");
+      await flushPromises();
+
+      expect(
+        wrapper.findComponent('[data-test="synthetics-create-save-exit-btn"]').props("loading"),
+      ).toBe(false);
+    });
+  });
+
+  describe("saving state", () => {
+    it("should mark the save buttons as loading while the request is in flight", async () => {
+      let resolveUpdate: (value: unknown) => void = () => {};
+      mockServiceUpdate.mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            resolveUpdate = resolve;
+          }),
+      );
+      wrapper = await mountValidEdit();
+
+      const saveExitBtn = () =>
+        wrapper.findComponent('[data-test="synthetics-create-save-exit-btn"]');
+      expect(saveExitBtn().props("loading")).toBe(false);
+
+      await wrapper.find('[data-test="synthetics-create-save-exit-btn"]').trigger("click");
+      await nextTick();
+      expect(saveExitBtn().props("loading")).toBe(true);
+
+      resolveUpdate({});
+      await flushPromises();
+      expect(saveExitBtn().props("loading")).toBe(false);
+    });
+  });
+
+  describe("Configure footer save action", () => {
+    it("should update and navigate back to the list in edit mode", async () => {
+      wrapper = await mountValidEdit();
+
+      // The only way to reach Configure in edit mode is Save & Continue.
+      await wrapper.find('[data-test="synthetics-create-save-continue-btn"]').trigger("click");
+      await flushPromises();
+      mockServiceUpdate.mockClear();
+      mockRouterPush.mockClear();
+
+      await wrapper.find('[data-test="synthetics-create-save-btn"]').trigger("click");
+      await flushPromises();
+
+      expect(mockServiceUpdate).toHaveBeenCalledTimes(1);
+      expect(mockRouterPush).toHaveBeenCalledWith({
+        name: "synthetics",
+        query: { folder: "folder-1" },
+      });
+    });
+
+    it("should create (not update) and navigate back to the list in create mode", async () => {
+      wrapper = await mountCreateAtConfigure();
+
+      await wrapper.find('[data-test="synthetics-create-save-btn"]').trigger("click");
+      await flushPromises();
+
+      expect(mockServiceUpdate).not.toHaveBeenCalled();
+      expect(mockServiceCreate).toHaveBeenCalledTimes(1);
+      expect(mockServiceCreate).toHaveBeenCalledWith(
+        "default",
+        expect.objectContaining({ name: "Brand New Check" }),
+        "default",
+      );
+      expect(mockRouterPush).toHaveBeenCalledWith({
+        name: "synthetics",
+        query: { folder: "default" },
+      });
+    });
+
+    it("should not create or navigate when the check has no name", async () => {
+      wrapper = await mountCreateAtConfigure("");
+
+      await wrapper.find('[data-test="synthetics-create-save-btn"]').trigger("click");
+      await flushPromises();
+
+      expect(mockServiceCreate).not.toHaveBeenCalled();
+      expect(mockRouterPush).not.toHaveBeenCalled();
+      expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ variant: "error" }));
+    });
+  });
+
+  describe("create mode — Continue to Configure", () => {
+    it("should advance to Configure without persisting anything", async () => {
+      wrapper = await mountCreateAtConfigure();
+
+      // Configure-only footer buttons are rendered…
+      expect(wrapper.find('[data-test="synthetics-create-back-to-journey-btn"]').exists()).toBe(
+        true,
+      );
+      expect(wrapper.find('[data-test="synthetics-create-save-btn"]').exists()).toBe(true);
+      // …and the Journey-step Continue button is gone.
+      expect(wrapper.find('[data-test="synthetics-create-continue-btn"]').exists()).toBe(false);
+      // Continue is pure navigation — nothing is written until the user saves.
+      expect(mockServiceCreate).not.toHaveBeenCalled();
+      expect(mockServiceUpdate).not.toHaveBeenCalled();
+      expect(mockRouterPush).not.toHaveBeenCalled();
     });
   });
 
@@ -373,7 +619,7 @@ describe("CreateBrowserTest", () => {
       wrapper = mountPage({ editId: "check-123" });
       await flushPromises();
 
-      const saveBtn = wrapper.find('[data-test="synthetics-create-save-from-journey-btn"]');
+      const saveBtn = wrapper.find('[data-test="synthetics-create-save-exit-btn"]');
       expect(saveBtn.exists()).toBe(true);
 
       await saveBtn.trigger("click");
@@ -394,7 +640,7 @@ describe("CreateBrowserTest", () => {
       wrapper = mountPage({ editId: "check-123" });
       await flushPromises();
 
-      const saveBtn = wrapper.find('[data-test="synthetics-create-save-from-journey-btn"]');
+      const saveBtn = wrapper.find('[data-test="synthetics-create-save-exit-btn"]');
       await saveBtn.trigger("click");
       await flushPromises();
 
