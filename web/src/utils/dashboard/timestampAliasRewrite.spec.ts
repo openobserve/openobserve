@@ -355,7 +355,8 @@ describe("normalizeReservedTimestampAlias", () => {
 
   it("rewrites the SQL string (alias + GROUP BY/ORDER BY refs) and the matching field alias", () => {
     const data = wrap(makePanel());
-    normalizeReservedTimestampAlias(data);
+    const changed = normalizeReservedTimestampAlias(data);
+    expect(changed).toBe(true); // signals the caller to persist
 
     const query = data.tabs[0].panels[0].queries[0];
     expect(query.query).toBe(
@@ -501,7 +502,8 @@ describe("normalizeReservedTimestampAlias", () => {
       };
       const data = wrap(panel);
       const before = JSON.parse(JSON.stringify(data));
-      normalizeReservedTimestampAlias(data);
+      const changed = normalizeReservedTimestampAlias(data);
+      expect(changed, `queryType=${queryType}`).toBe(false); // skipped → no persist
       expect(data, `queryType=${queryType}`).toEqual(before); // untouched
     }
   });
@@ -535,18 +537,18 @@ describe("normalizeReservedTimestampAlias", () => {
     expect(panel.config.override_config[0].field.value).toBe("ts_1");
   });
 
-  it("is idempotent", () => {
+  it("is idempotent — returns true on the first pass, false on the second", () => {
     const data = wrap(makePanel());
-    normalizeReservedTimestampAlias(data);
+    expect(normalizeReservedTimestampAlias(data)).toBe(true);
     const once = JSON.parse(JSON.stringify(data));
-    normalizeReservedTimestampAlias(data);
+    expect(normalizeReservedTimestampAlias(data)).toBe(false);
     expect(data).toEqual(once);
   });
 
-  it("is a no-op for dashboards without tabs/panels/queries", () => {
-    expect(() => normalizeReservedTimestampAlias(undefined)).not.toThrow();
-    expect(() => normalizeReservedTimestampAlias({})).not.toThrow();
-    expect(() => normalizeReservedTimestampAlias({ tabs: [{}] })).not.toThrow();
-    expect(() => normalizeReservedTimestampAlias({ tabs: [{ panels: [{}] }] })).not.toThrow();
+  it("is a no-op (returns false) for dashboards without tabs/panels/queries", () => {
+    expect(normalizeReservedTimestampAlias(undefined)).toBe(false);
+    expect(normalizeReservedTimestampAlias({})).toBe(false);
+    expect(normalizeReservedTimestampAlias({ tabs: [{}] })).toBe(false);
+    expect(normalizeReservedTimestampAlias({ tabs: [{ panels: [{}] }] })).toBe(false);
   });
 });

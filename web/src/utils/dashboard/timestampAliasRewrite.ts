@@ -552,8 +552,12 @@ export function normalizeReservedTimestampAlias(
   data: any,
   tsCol: string = RESERVED_TS_ALIAS,
   base: string = RESERVED_TS_ALIAS_REPLACEMENT,
-): void {
-  if (!data?.tabs) return;
+): boolean {
+  if (!data?.tabs) return false;
+
+  // Whether any alias was rewritten — lets the caller persist the fix (save +
+  // re-fetch) only when the dashboard actually changed.
+  let changedAny = false;
 
   for (const tab of data.tabs) {
     if (!tab?.panels) continue;
@@ -580,7 +584,12 @@ export function normalizeReservedTimestampAlias(
         }
       }
 
-      if (renamedAny) renameReservedAliasInPanelConfig(panel.config, tsCol, chosenAlias);
+      if (renamedAny) {
+        renameReservedAliasInPanelConfig(panel.config, tsCol, chosenAlias);
+        changedAny = true;
+      }
     }
   }
+
+  return changedAny;
 }
