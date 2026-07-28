@@ -1132,8 +1132,11 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     for (const message of messages) {
       let node: HTMLElement | null = message.parentElement;
       while (node && node !== form) {
+        // [data-inline-edit-trigger] is OInlineEdit's display-mode button: an
+        // inline-edited field has NO input in the DOM until it is opened, so
+        // without this the header name field would never be reachable here.
         const control = node.querySelector<HTMLElement>(
-          'input:not([type="hidden"]), textarea, [role="combobox"], button[aria-haspopup]',
+          'input:not([type="hidden"]), textarea, [role="combobox"], button[aria-haspopup], [data-inline-edit-trigger]',
         );
         if (control) {
           control.focus();
@@ -1186,15 +1189,20 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     });
   };
 
-  // Focus a topbar select/input by its Vue component ref
+  // Focus a topbar select/input by its Vue component ref. A component that
+  // exposes its own focus() owns the decision (OInlineEdit has no input in the
+  // DOM until it opens, so "focus me" means "open the editor"); everything else
+  // falls back to the first input inside its root.
   const focusTopbarField = (fieldRef: any) => {
     nextTick(() => {
       const el = fieldRef?.value?.$el as HTMLElement | null;
-      if (el) {
-        el.scrollIntoView({ behavior: "smooth", block: "center" });
-        const input = el.querySelector("input") as HTMLElement | null;
-        input?.focus();
+      el?.scrollIntoView({ behavior: "smooth", block: "center" });
+      if (typeof fieldRef?.value?.focus === "function") {
+        fieldRef.value.focus();
+        return;
       }
+      const input = el?.querySelector("input") as HTMLElement | null;
+      input?.focus();
     });
   };
 
@@ -1215,7 +1223,9 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
           variant: "error",
           message: t("alerts.messages.anomalyDetectionNameRequired"),
         });
-        focusTopbarField(anomalyNameRef);
+        // One inline-edit control now serves both alert and anomaly names, so
+        // step1Ref is the anomaly name field too.
+        focusTopbarField(step1Ref);
         return false;
       }
       return true;

@@ -363,6 +363,10 @@
     }
   },
   "common": {
+    "inlineEdit": {
+      "editHint": "Click to rename",
+      "autoHint": "Click to rename. Until you do, this name is generated from your configuration and keeps up as you change it."
+    },
     "beta": "Beta",
     "close": "Close",
     "cancel": "Cancel",
@@ -2162,7 +2166,10 @@
     "deleteNodeConfirm": "Are you sure you want to delete this step? This can't be undone.",
     "backToList": "Back To Workflows",
     "namePlaceholder": "Untitled Workflow",
+    "renameHint": "Click to rename this workflow",
+    "editMode": "Edit Workflow",
     "descriptionPlaceholder": "Description (Optional)",
+    "description": "Description",
     "test": {
       "button": "Test",
       "title": "Test Workflow",
@@ -2302,6 +2309,7 @@
     "associateFunction": "Associate Function",
     "derivedStream": "Derived Stream",
     "pipelineName": "Enter Pipeline Name",
+    "renameHint": "Click to rename this pipeline",
     "flatteningLbl": "After Flattening",
     "streamTitle": "Associate Stream",
     "conditionTitle": "Associate Condition",
@@ -2473,6 +2481,7 @@
     "add": "New function",
     "search": "Search Function",
     "name": "Enter Function Name",
+    "renameHint": "Click to rename this function",
     "function": "Function Detail",
     "save": "Save",
     "jsfunction": "JavaScript Function",
@@ -2806,6 +2815,13 @@
     "createdBy": "Created by"
   },
   "dashboard": {
+    "autoName": {
+      "recordCount": "record count",
+      "measure": "{fn} of {field}",
+      "measureByDimension": "{subject} by {dimension}",
+      "andMore": "{subject} +{count} more",
+      "streamOverview": "{stream} overview"
+    },
     "selectField": "Field",
     "selectIndex": "Stream",
     "selectStreamType": "Stream Type",
@@ -3917,6 +3933,8 @@
   },
   "panel": {
     "header": "Panel",
+    "namePlaceholder": "Untitled panel",
+    "renameHint": "Click to rename this panel",
     "add": "Add Panel",
     "save": "Save",
     "cancel": "Cancel",
@@ -5030,6 +5048,20 @@
     "editJson": "Edit Alert JSON",
     "additional_settings": "Additional Settings",
     "alertNamePlaceholder": "Alert name",
+    "renameHint": "Click to rename this alert",
+    "modeInFolder": "{mode} in",
+    "addAlertMode": "Add Alert",
+    "editAlertMode": "Edit Alert",
+    "addAnomalyMode": "Add Anomaly Detection",
+    "editAnomalyMode": "Edit Anomaly Detection",
+    "autoName": {
+      "anomaly": "anomaly_{stream}",
+      "realTime": "realtime_{stream}",
+      "queryAlert": "{stream}_query_alert",
+      "streamAlert": "{stream}_alert",
+      "aggregation": "{stream}_{fn}_{field}",
+      "condition": "{stream}_{column}_{operator}_{value}"
+    },
     "nameRequired": "Alert name is required.",
     "nameNoSpecialChars": "Alert name cannot contain ':', '#', '?', '&', '%', quotes or space characters. Use underscores (_) instead.",
     "anomalyNamePlaceholder": "Anomaly name",

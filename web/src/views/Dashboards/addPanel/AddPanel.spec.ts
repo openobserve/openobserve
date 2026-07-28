@@ -644,11 +644,20 @@ describe("AddPanel.vue", () => {
       expect(typeof title).toBeDefined();
     });
 
-    it("should compute inputStyle with correct width", () => {
-      const style = wrapper.vm.inputStyle;
+    it("should expose the auto-name state for the header's Auto badge", () => {
+      // The panel title is inline-edited in the header and auto-named until the
+      // user types; the badge reads this flag.
+      expect(wrapper.vm.panelAutoName).toBeDefined();
+      expect(typeof wrapper.vm.panelAutoName.markManual).toBe("function");
+      expect(typeof wrapper.vm.panelAutoName.onCommit).toBe("function");
+      expect(typeof wrapper.vm.panelAutoName.isAuto.value).toBe("boolean");
+    });
 
-      expect(style).toHaveProperty("width");
-      expect(style.width).toBe("200px");
+    it("should stop auto-naming the panel once the user types a title", async () => {
+      wrapper.vm.panelAutoName.markManual();
+      await nextTick();
+
+      expect(wrapper.vm.panelAutoName.isAuto.value).toBe(false);
     });
   });
 
@@ -1300,32 +1309,12 @@ describe("AddPanel.vue", () => {
       expect(wrapper.vm.disable).toBe(false);
     });
 
-    // Note: inputStyle computed property tests need proper reactive title setup
-    // These are commented out due to reactivity timing issues
-    /*
-    it("should handle inputStyle computed property with long title", async () => {
-      wrapper.vm.dashboardPanelData.data.title = "This is a very long panel title that should trigger the width calculation and go beyond normal limits";
+    it("should re-arm auto-naming when the title is cleared and committed", async () => {
+      wrapper.vm.panelAutoName.markManual();
+      wrapper.vm.panelAutoName.onCommit("");
       await nextTick();
-      const style = wrapper.vm.inputStyle;
-      expect(style.width).toBe('400px');
-    });
 
-    it("should handle inputStyle computed property with short title", async () => {
-      wrapper.vm.dashboardPanelData.data.title = "Short";  
-      await nextTick();
-      const style = wrapper.vm.inputStyle;
-      expect(style.width).toBe('100px');
-    });
-    */
-
-    it("should handle inputStyle computed property with empty title", () => {
-      // Set empty title
-      wrapper.vm.dashboardPanelData.data.title = "";
-
-      const style = wrapper.vm.inputStyle;
-
-      expect(style).toHaveProperty("width");
-      expect(style.width).toBe("200px"); // Default width for empty title
+      expect(wrapper.vm.panelAutoName.isAuto.value).toBe(true);
     });
   });
 
@@ -1526,39 +1515,17 @@ describe("AddPanel.vue", () => {
       expect(wrapper.vm.errorData.errors.length).toBeGreaterThan(0);
     });
 
-    it("should handle inputStyle with actual title content", () => {
-      // Test lines 1568-1572 - Title width calculation
-      wrapper.vm.dashboardPanelData.data.title = "Test Dashboard Panel Title";
+    it("should leave a user-typed title alone regardless of its length", async () => {
+      // The header control sizes itself from its own content, so a long title is
+      // no longer a width calculation — it just has to survive untouched.
+      const longTitle =
+        "This is a very long dashboard panel title that a user typed themselves";
+      wrapper.vm.panelAutoName.markManual();
+      wrapper.vm.dashboardPanelData.data.title = longTitle;
+      await nextTick();
 
-      const style = wrapper.vm.inputStyle;
-
-      expect(style).toHaveProperty("width");
-
-      // If the inputStyle actually calculates based on title, it should not be 200px
-      // Otherwise it uses the default 200px for empty/unset title
-      const width = style.width;
-      expect(typeof width).toBe("string");
-      expect(width).toMatch(/^\d+px$/); // Should be a valid CSS width
-    });
-
-    it("should handle very long title in inputStyle", () => {
-      // Test max width capping at 400px
-      wrapper.vm.dashboardPanelData.data.title =
-        "This is a very long dashboard panel title that should exceed the maximum width limit and be capped at 400 pixels";
-
-      const style = wrapper.vm.inputStyle;
-
-      expect(style).toHaveProperty("width");
-
-      // Test that it returns a valid CSS width value
-      const width = style.width;
-      expect(typeof width).toBe("string");
-      expect(width).toMatch(/^\d+px$/);
-
-      // If the title is being processed, should be either calculated or capped
-      // If not processed, falls back to default
-      const widthNum = parseInt(width.replace("px", ""));
-      expect(widthNum).toBeGreaterThan(0);
+      expect(wrapper.vm.dashboardPanelData.data.title).toBe(longTitle);
+      expect(wrapper.vm.panelAutoName.isAuto.value).toBe(false);
     });
 
     it.skip("should handle updateVrlFunctionFieldList with auto SQL fields", () => {
@@ -4391,18 +4358,12 @@ describe("AddPanel.vue", () => {
         }
       });
 
-      it("should test inputStyle computed with long title", () => {
-        wrapper.vm.dashboardPanelData.data.title = "A".repeat(100);
-        const style = wrapper.vm.inputStyle;
-        expect(style).toBeDefined();
-        expect(style.width).toBeDefined();
-      });
+      it("should keep panelTitle in step with a title set on the editor state", async () => {
+        wrapper.vm.panelAutoName.markManual();
+        wrapper.vm.dashboardPanelData.data.title = "Checkout latency";
+        await nextTick();
 
-      it("should test inputStyle computed with short title", () => {
-        wrapper.vm.dashboardPanelData.data.title = "Test";
-        const style = wrapper.vm.inputStyle;
-        expect(style).toBeDefined();
-        expect(style.width).toBeDefined();
+        expect(wrapper.vm.panelTitle.title).toBe("Checkout latency");
       });
 
       it("should test panelTitle computed property", () => {
