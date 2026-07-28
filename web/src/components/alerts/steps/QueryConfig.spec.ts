@@ -162,6 +162,13 @@ vi.mock("@/utils/zincutils", () => ({
   }),
   isAboveMinRefreshInterval: vi.fn(() => true),
   describeCron: vi.fn((cron: string) => `Every ${cron}`),
+  resolveBrowserTimezone: vi.fn((tz: string) => {
+    if (typeof tz === "string" && tz.toLowerCase().startsWith("browser time")) {
+      const inner = tz.match(/\(([^)]+)\)/)?.[1]?.trim();
+      return inner || Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+    }
+    return tz;
+  }),
 }));
 
 describe("QueryConfig.vue", () => {
@@ -303,6 +310,33 @@ describe("QueryConfig.vue", () => {
     if (host) {
       host.unmount();
     }
+  });
+
+  describe("Timezone Options", () => {
+    it("lists 'Browser Time' and 'UTC' shortcuts at the top of the options", () => {
+      const options = wrapper.vm.filteredTimezones;
+      expect(options[0].startsWith("Browser Time (")).toBe(true);
+      expect(options[1]).toBe("UTC");
+      expect(options.length).toBeGreaterThan(2);
+    });
+
+    it("onCronTimezoneChange stores 'UTC' unchanged", async () => {
+      wrapper.vm.onCronTimezoneChange("UTC");
+      await nextTick();
+      expect(wrapper.vm.cronTimezone).toBe("UTC");
+    });
+
+    it("onCronTimezoneChange passes a raw IANA zone through unchanged", async () => {
+      wrapper.vm.onCronTimezoneChange("Asia/Kolkata");
+      await nextTick();
+      expect(wrapper.vm.cronTimezone).toBe("Asia/Kolkata");
+    });
+
+    it("onCronTimezoneChange resolves a 'Browser Time (<zone>)' pick to the inner IANA zone", async () => {
+      wrapper.vm.onCronTimezoneChange("Browser Time (America/Los_Angeles)");
+      await nextTick();
+      expect(wrapper.vm.cronTimezone).toBe("America/Los_Angeles");
+    });
   });
 
   describe("Initialization", () => {

@@ -89,6 +89,24 @@ export const getLocalTime = (datetime: string) => {
   }
 };
 
+/**
+ * "Browser Time (<zone>)" is a display-only label that some schedule pickers
+ * historically persisted (e.g. alerts created on older releases). It is NOT a
+ * valid IANA zone, so passing it to Luxon/the backend yields a NaN tz_offset.
+ * Resolve it to the plain IANA zone named inside the parentheses. Any other
+ * value (a real IANA zone, "UTC", empty) is returned unchanged.
+ */
+export const resolveBrowserTimezone = (timezone: string): string => {
+  if (
+    typeof timezone === "string" &&
+    timezone.toLowerCase().startsWith("browser time")
+  ) {
+    const inner = timezone.match(/\(([^)]+)\)/)?.[1]?.trim();
+    return inner || Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+  }
+  return timezone;
+};
+
 export const convertDateToTimestamp = (date: string, time: string, timezone: string) => {
   const browserTime = "Browser Time (" + Intl.DateTimeFormat().resolvedOptions().timeZone + ")";
 
