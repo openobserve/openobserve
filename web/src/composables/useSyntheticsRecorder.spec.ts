@@ -54,6 +54,9 @@ function emitStreamEvent(payload: Record<string, unknown>) {
   );
 }
 
+/** Mirrors REPLAY_TIMEOUT_MS in the composable — the replay watchdog window. */
+const REPLAY_TIMEOUT_MS = 15 * 60 * 1000;
+
 /** Let the 500 ms probe delay + any pending microtasks settle. */
 async function settleProbeDelay() {
   await vi.advanceTimersByTimeAsync(500);
@@ -341,13 +344,49 @@ describe("useSyntheticsRecorder", () => {
       expect(sentCmd).toMatchObject({ action: "stopReplay" });
     });
 
-    it("should return null when the command times out", async () => {
+    it("should stay running past the one-shot command timeout while steps stream in", async () => {
+      // Regression: a real journey takes far longer than COMMAND_TIMEOUT_MS.
+      // The extension only answers the `replay` command once the whole journey
+      // has finished, so a blanket short timeout made the UI fall back to
+      // "idle" a few steps in while the extension kept replaying.
+      const journey: WireStep[] = [
+        { id: "s1", action: "navigate", url: "https://x.test" },
+        { id: "s2", action: "click", selector: "#login" },
+        { id: "s3", action: "click", selector: "#logout" },
+      ];
+      const r = useSyntheticsRecorder();
+      const promise = r.replay(journey);
+
+      await settleProbeDelay();
+
+      // Two steps land inside the first four seconds.
+      await vi.advanceTimersByTimeAsync(2000);
+      emitStreamEvent({ method: "stepReplayResult", stepId: "s1", passed: true, duration_ms: 900 });
+      await vi.advanceTimersByTimeAsync(2000);
+      emitStreamEvent({ method: "stepReplayResult", stepId: "s2", passed: true, duration_ms: 800 });
+
+      // Past the one-shot timeout the replay is still in flight.
+      await vi.advanceTimersByTimeAsync(5000);
+      expect(r.replayPhase.value).toBe("running");
+      expect(r.isReplaying.value).toBe(true);
+
+      // The extension finally answers, 30s in.
+      await vi.advanceTimersByTimeAsync(21000);
+      emitStreamEvent({ method: "stepReplayResult", stepId: "s3", passed: true, duration_ms: 700 });
+      respondToLastCommand({ success: true, passed: true });
+
+      expect(await promise).toEqual({ success: true, passed: true });
+      expect(r.replayPhase.value).toBe("passed");
+      expect(r.isReplaying.value).toBe(false);
+      expect(r.stepResults.size).toBe(3);
+    });
+
+    it("should give up when the extension never answers the replay command", async () => {
       const r = useSyntheticsRecorder();
       const promise = r.replay(steps);
 
-      // Let probe delay + command timeout fire
       await settleProbeDelay();
-      await vi.advanceTimersByTimeAsync(4000);
+      await vi.advanceTimersByTimeAsync(REPLAY_TIMEOUT_MS);
 
       const res = await promise;
       expect(res).toBeNull();

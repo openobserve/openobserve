@@ -53,6 +53,18 @@ const useSyntheticsRecorder = () => {
   const BRIDGE_CHANNEL = "oo-bridge";
   const COMMAND_TIMEOUT_MS = 4000;
 
+  // `replay` is the one command the extension answers only when the whole
+  // journey has finished — the service worker resolves it from handleReplay,
+  // after the last step. Racing it against COMMAND_TIMEOUT_MS made the UI fall
+  // back to "idle" four seconds in while the extension kept replaying in its
+  // own window. A single step alone may legitimately take 60 s (the flat
+  // preview timeout, P1.R.1), so this is not a journey bound — it is a
+  // last-resort watchdog for a bridge that died without answering. Sized to
+  // LEASE_SECS = 900 (D-9), the outer bound one attempt is ever contained in;
+  // anything shorter would make the preview stricter than production (X-8.1).
+  // See docs/synthetics/reliability/synthetics-recorded-test-reliability-spec.md.
+  const REPLAY_TIMEOUT_MS = 15 * 60 * 1000;
+
   let nonceCounter = 0;
   function nextNonce(): string {
     return `${Date.now()}_${nonceCounter++}_${Math.random().toString(36).slice(2, 8)}`;
@@ -117,19 +129,32 @@ const useSyntheticsRecorder = () => {
     bridgeDataHandler?.(msg);
   });
 
-  /** One-shot command via postMessage. Resolves `null` when the extension is unreachable. */
-  function sendCommand<T>(command: RecorderCommand): Promise<T | null> {
+  /**
+   * One-shot command via postMessage. Resolves `null` when the extension is
+   * unreachable. `timeoutMs` is how long to wait for the ack — long-running
+   * commands (`replay`) pass their own window.
+   */
+  function sendCommand<T>(
+    command: RecorderCommand,
+    timeoutMs: number = COMMAND_TIMEOUT_MS,
+  ): Promise<T | null> {
     const nonce = nextNonce();
 
-    const timeout = new Promise<null>((resolve) =>
-      setTimeout(() => {
+    let timer: ReturnType<typeof setTimeout>;
+    const timeout = new Promise<null>((resolve) => {
+      timer = setTimeout(() => {
         pendingCommands.delete(nonce);
         resolve(null);
-      }, COMMAND_TIMEOUT_MS),
-    );
+      }, timeoutMs);
+    });
 
     const promise = new Promise<T | null>((resolve) => {
-      pendingCommands.set(nonce, resolve);
+      pendingCommands.set(nonce, (response) => {
+        // Release the watchdog — a replay's is 15 minutes long, and leaving one
+        // armed per replay would keep the timer alive well past the answer.
+        clearTimeout(timer);
+        resolve(response);
+      });
     });
     window.postMessage(
       { ch: BRIDGE_CHANNEL, dir: "to-ext", nonce, msg: { type: "synthetics-command", command } },
@@ -347,11 +372,14 @@ const useSyntheticsRecorder = () => {
     // intercept property access — postMessage structured clone sees the proxy,
     // not the underlying object, and silently drops all fields.
     const plainSteps = JSON.parse(JSON.stringify(resolvedSteps)) as WireStep[];
-    const res = await sendCommand<ReplayResponse>({
-      action: "replay",
-      steps: plainSteps,
-      targetUrl,
-    });
+    const res = await sendCommand<ReplayResponse>(
+      {
+        action: "replay",
+        steps: plainSteps,
+        targetUrl,
+      },
+      REPLAY_TIMEOUT_MS,
+    );
     isReplaying.value = false;
     replayResult.value = res;
     if (res) {
