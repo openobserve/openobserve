@@ -128,6 +128,10 @@ const TEXT_ATTRS = [
   "full-time-prefix",
   "legend-healthy",
   "legend-avg",
+  "reveal-tooltip",
+  "hide-tooltip",
+  "unstable-dimension-tooltip",
+  "date-disabled-tooltip",
 ];
 const TEXT_ATTR_SET = new Set(TEXT_ATTRS);
 
@@ -410,6 +414,25 @@ export default [
       // The bound-prop half of the same rule (see TEXT_ATTRS above).
       "local/no-bare-bound-text-props": "error",
       //
+      // `t` must come from the typed wrapper, otherwise it returns an unbranded
+      // `string` and the I18nText checks in <script> silently pass for hardcoded
+      // copy. useI18nTyped() returns the very same composer — it is a type-level
+      // cast, so there is no runtime cost or behaviour change.
+      // (src/types/i18n.ts is the one file allowed to import it — see below.)
+      "no-restricted-imports": [
+        "error",
+        {
+          paths: [
+            {
+              name: "vue-i18n",
+              importNames: ["useI18n"],
+              message:
+                "Import useI18nTyped from '@/types/i18n' instead (or gt() outside a setup context) — useI18n() returns an unbranded string and defeats the I18nText check.",
+            },
+          ],
+        },
+      ],
+      //
       // Catches components used in <template> but never imported/registered
       // (e.g. <date-time> instead of <DateTime>) — this class of bug is
       // invisible to vue-tsc (unresolved tags aren't a template type error
@@ -548,6 +571,21 @@ export default [
     rules: {
       "vue/no-bare-strings-in-template": "off",
       "local/no-bare-bound-text-props": "off",
+    },
+  },
+  {
+    // The typed wrapper itself, and the i18n bootstrap, are the only places that
+    // may reach vue-i18n directly — everything else goes through @/types/i18n.
+    files: ["src/types/i18n.ts", "src/locales/**"],
+    rules: {
+      "no-restricted-imports": "off",
+    },
+  },
+  {
+    // Tests build their own i18n instances as fixtures.
+    files: ["**/*.{spec,test}.{js,ts,jsx,tsx}", "**/__tests__/**", "**/test/**"],
+    rules: {
+      "no-restricted-imports": "off",
     },
   },
   {

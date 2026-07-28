@@ -3434,7 +3434,9 @@
       "fullIntegrationDocs": "Full integration docs:",
       "arrow": "→",
       "stuck": "Stuck?",
-      "askOnSlack": "Ask on Slack"
+      "askOnSlack": "Ask on Slack",
+      "revealToken": "Reveal Token",
+      "hideToken": "Hide Token"
     },
     "instrumentBeforeImportTitle": "Instrument Before Importing The Client",
     "instrumentBeforeImportBody": "If your app runs but no spans arrive, instrumentation likely loaded after the client was imported. Re-order so the init runs first:",

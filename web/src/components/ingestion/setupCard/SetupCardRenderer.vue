@@ -590,8 +590,8 @@ function fireConfetti() {
               :code="subStream(displayCode(step)?.raw) || ''"
               :code-masked="subStream(displayCode(step)?.masked)"
               data-test="ai-code"
-              reveal-tooltip="Reveal Token"
-              hide-tooltip="Hide Token"
+              :reveal-tooltip="t('ingestion.setupCard.revealToken')"
+              :hide-tooltip="t('ingestion.setupCard.hideToken')"
               @copy="onStepCopy(step, i)"
             >
               <template v-if="displayCode(step)?.downloadEnv" #actions>
@@ -795,8 +795,8 @@ function fireConfetti() {
               :code="subStream(extras.advanced.code.raw) || ''"
               :code-masked="subStream(extras.advanced.code.masked)"
               data-test="ai-advanced-code"
-              reveal-tooltip="Reveal Token"
-              hide-tooltip="Hide Token"
+              :reveal-tooltip="t('ingestion.setupCard.revealToken')"
+              :hide-tooltip="t('ingestion.setupCard.hideToken')"
             />
           </div>
         </OCollapsible>

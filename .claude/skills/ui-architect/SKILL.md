@@ -233,9 +233,36 @@ read it once, it is the backbone of everything below.
    >   { label: raw("trace_id"),     field: "trace_id" },  // a field name, not prose
    > ];
    > ```
-   > To get a `t()` that returns `I18nText`, use `useI18nTyped()` from the same
-   > module in place of `useI18n()`. Adoption is per-file; plain `useI18n()` still
-   > works everywhere else.
+   > **Getting a `t()` that returns `I18nText`** — the whole app already does this:
+   > - **In a component** → `const { t } = useI18nTyped()` (from `@/types/i18n`).
+   >   Never import `useI18n` from `vue-i18n` directly; `useI18nTyped()` hands back
+   >   the exact same composer, just typed, so everything else is unchanged.
+   > - **Outside a setup context** (a composable reached from a plain function, a
+   >   util, service-layer error handling) → `gt("some.key")` from the same module.
+   >   `useI18n()` may only be called during setup; `gt` reads the shared instance.
+   >
+   > **Non-translatable text uses `raw()`** — a server-provided error message, an
+   > identifier, a code token. It accepts nullish, so the usual fallback chain reads
+   > naturally and stays type-safe:
+   > ```ts
+   > toast({
+   >   variant: "error",
+   >   message: raw(err.response?.data?.message) || t("alerts.saveFailed"),
+   > });
+   > ```
+   > Never reach for `raw()` to silence the checker on real UI copy — that is exactly
+   > the bug the brand exists to catch. `grep -rn "raw(" src` is the review surface.
+   >
+   > **Composed text is a type error, by design.** `"Deleted " + n + " rows"`,
+   > `cond ? "Yes" : "No"` and `` `Saved ${name}` `` all widen to `string`, so they
+   > cannot satisfy `I18nText`. Use vue-i18n interpolation instead —
+   > `t("x.deletedRows", { count: n })` with `"Deleted {count} rows"` in en-US.json —
+   > and a plural message (`"one | many"` + `t(key, params, count)`) when singular and
+   > plural really differ. The same rule is enforced in `<template>` by
+   > `local/no-bare-bound-text-props`.
+   >
+   > Toast/notification copy added by this convention lives under `toastMessages.*`,
+   > grouped by module.
 
 ## Structural decisions
 
@@ -382,6 +409,9 @@ considering the UI done:
       i18n key is declared `I18nText` / `I18nKey` (from `@/types/i18n`), not bare
       `string` — that is what guards `<script>`, which the ESLint rules cannot see.
       Non-translatable values use `raw("…")`. Verified by `npm run type-check:app`.
+- [ ] Translation is obtained via **`useI18nTyped()`** (components) or **`gt()`**
+      (outside setup) — never `useI18n` imported straight from `vue-i18n`, which
+      returns unbranded `string` and silently defeats the check.
 - [ ] `data-test` on every interactive and key output element, pattern
       `<module>-<filename>-<descriptor>` (see the project FE rules).
 - [ ] New component uses `<script setup lang="ts">`, no `// @ts-nocheck`.

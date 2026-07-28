@@ -522,7 +522,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :get-dimension-options="getDimensionOptions"
       :has-pending-changes="hasPendingChanges"
       :show-apply-button="true"
-      unstable-dimension-tooltip="Unstable dimension - changes on pod restart. Default: All values."
+      :unstable-dimension-tooltip="t('correlation.unstableDimensionTooltip')"
       @update:dimension="handleDimensionUpdate"
       @apply="applyDimensionChanges"
     />
