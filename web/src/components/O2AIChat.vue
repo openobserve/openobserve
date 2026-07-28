@@ -2360,7 +2360,7 @@ export default defineComponent({
                     if (!isActive()) {
                       try {
                         const orgId = store.state.selectedOrganization.identifier;
-                        await fetch(
+                        const res = await fetch(
                           `${store.state.API_ENDPOINT}/api/${orgId}/ai/confirm/${ctxSessionId}`,
                           {
                             method: "POST",
@@ -2369,6 +2369,14 @@ export default defineComponent({
                             body: JSON.stringify({ approved: false }),
                           },
                         );
+                        // Nothing to show the user (this stream is detached),
+                        // but a silent failure here leaves the agent paused
+                        // until it times out, so make it visible in the log.
+                        if (!res.ok) {
+                          console.error(
+                            `Auto-deny not registered (HTTP ${res.status}) for background stream ${ctxSessionId}`,
+                          );
+                        }
                       } catch (error) {
                         console.error(
                           "Error auto-denying confirmation for background stream:",
@@ -2383,7 +2391,7 @@ export default defineComponent({
                       // Auto-approve navigation without showing confirmation
                       try {
                         const orgId = store.state.selectedOrganization.identifier;
-                        await fetch(
+                        const res = await fetch(
                           `${store.state.API_ENDPOINT}/api/${orgId}/ai/confirm/${ctxSessionId}`,
                           {
                             method: "POST",
@@ -2392,6 +2400,11 @@ export default defineComponent({
                             body: JSON.stringify({ approved: true }),
                           },
                         );
+                        if (!res.ok) {
+                          console.error(
+                            `Auto-approval not registered (HTTP ${res.status}) for session ${ctxSessionId}`,
+                          );
+                        }
                       } catch (error) {
                         console.error("Error auto-confirming navigation:", error);
                       }
@@ -3581,6 +3594,85 @@ export default defineComponent({
       }
     };
 
+    /**
+     * Whether an error body says the session's owning replica can't serve it.
+     *
+     * Keyed on an explicit server code rather than the status alone: reseeding
+     * means abandoning the current session, so it must happen only when the
+     * server has actually said the session is unreachable — never as a guess
+     * from a generic failure.
+     */
+    const isSessionOwnerUnavailable = (errorBody: any): boolean => {
+      const code = errorBody?.detail?.code ?? errorBody?.code;
+      return code === "session_owner_unavailable";
+    };
+
+    /**
+     * Surface a message inline in the transcript, matching how stream errors
+     * are rendered (this component shows errors in the conversation itself
+     * rather than as toasts).
+     */
+    const appendErrorBlock = (message: string, recoverable = false) => {
+      const block: ContentBlock = { type: "error", message, recoverable };
+      const msgs = chatMessages.value;
+      const last = msgs[msgs.length - 1];
+      if (last && last.role === "assistant") {
+        if (!last.contentBlocks) last.contentBlocks = [];
+        last.contentBlocks.push(block);
+      } else {
+        msgs.push({ role: "assistant", content: "", contentBlocks: [block] });
+      }
+    };
+
+    /**
+     * POST a confirmation answer and report whether it actually landed.
+     *
+     * The response used to be discarded at every call site, which made the
+     * worst case invisible: if the answer reaches a server that has no record
+     * of the pending confirmation (a lost session, or — with multiple o2-ai
+     * replicas — the wrong one), it 404s, the UI shows the action as confirmed,
+     * and the agent stays paused until it times out and auto-DENIES. The user
+     * sees their "Approve" quietly turn into a decline.
+     *
+     * Returns true when the confirmation was accepted.
+     */
+    const sendConfirmation = async (
+      sessionId: string,
+      approved: boolean,
+    ): Promise<boolean> => {
+      try {
+        const orgId = store.state.selectedOrganization.identifier;
+        const res = await fetch(
+          `${store.state.API_ENDPOINT}/api/${orgId}/ai/confirm/${sessionId}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({ approved }),
+          },
+        );
+
+        if (!res.ok) {
+          console.error(
+            `Confirmation not registered (HTTP ${res.status}) for session ${sessionId}`,
+          );
+          appendErrorBlock(
+            approved
+              ? "Your approval could not be delivered — the assistant may have already cancelled this action. Please check the result before retrying."
+              : "Your response could not be delivered — the assistant may have already cancelled this action.",
+          );
+          return false;
+        }
+        return true;
+      } catch (error) {
+        console.error("Error sending confirmation:", error);
+        appendErrorBlock(
+          "Your response could not be delivered. Please check your connection and try again.",
+        );
+        return false;
+      }
+    };
+
     const handleToolConfirm = async () => {
       resolveConfirmationBlock(true);
 
@@ -3596,20 +3688,7 @@ export default defineComponent({
 
       if (!currentSessionId.value) return;
 
-      try {
-        const orgId = store.state.selectedOrganization.identifier;
-        await fetch(
-          `${store.state.API_ENDPOINT}/api/${orgId}/ai/confirm/${currentSessionId.value}`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            credentials: "include",
-            body: JSON.stringify({ approved: true }),
-          },
-        );
-      } catch (error) {
-        console.error("Error confirming action:", error);
-      }
+      await sendConfirmation(currentSessionId.value, true);
       pendingConfirmation.value = null;
     };
 
@@ -3625,20 +3704,7 @@ export default defineComponent({
 
       if (!currentSessionId.value) return;
 
-      try {
-        const orgId = store.state.selectedOrganization.identifier;
-        await fetch(
-          `${store.state.API_ENDPOINT}/api/${orgId}/ai/confirm/${currentSessionId.value}`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            credentials: "include",
-            body: JSON.stringify({ approved: false }),
-          },
-        );
-      } catch (error) {
-        console.error("Error cancelling action:", error);
-      }
+      await sendConfirmation(currentSessionId.value, false);
       pendingConfirmation.value = null;
     };
 
@@ -3661,20 +3727,7 @@ export default defineComponent({
 
       if (!currentSessionId.value) return;
 
-      try {
-        const orgId = store.state.selectedOrganization.identifier;
-        await fetch(
-          `${store.state.API_ENDPOINT}/api/${orgId}/ai/confirm/${currentSessionId.value}`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            credentials: "include",
-            body: JSON.stringify({ approved: true }),
-          },
-        );
-      } catch (error) {
-        console.error("Error confirming action:", error);
-      }
+      await sendConfirmation(currentSessionId.value, true);
       pendingConfirmation.value = null;
     };
 
@@ -4172,6 +4225,11 @@ export default defineComponent({
       // Create new AbortController for this request - enables cancellation via Stop button
       currentAbortController.value = new AbortController();
 
+      // Reseed state for this turn: at most one restore attempt, and a pending
+      // notice to show once the replacement request succeeds.
+      let hasReseeded = false;
+      let reseedNotice = false;
+
       try {
         // Don't add empty assistant message here - wait for actual content
         await scrollToLoadingIndicator(); // Scroll directly to loading indicator
@@ -4206,10 +4264,66 @@ export default defineComponent({
           } catch (_) {
             // body may not be JSON
           }
+
+          // The conversation's session is gone — it lived on an o2-ai replica
+          // that no longer has it. The transcript is still here in the browser,
+          // though, so start a fresh session and resend: fetchAiChat posts
+          // chatMessages, and the server seeds the new session from it. This
+          // restores the DIALOGUE only (tool results and workspace state are
+          // not recoverable), which the notice below makes explicit.
+          //
+          // Deliberately narrow: only this specific code, and only once. A
+          // blanket retry on 5xx would throw away perfectly good sessions, and
+          // retrying a persistently-unavailable owner would loop.
+          if (isSessionOwnerUnavailable(errorBody) && !hasReseeded) {
+            hasReseeded = true;
+            console.warn(
+              `Session ${currentSessionId.value} is no longer available; restoring the conversation in a new session.`,
+            );
+
+            // A NEW id: the old one may still be owned by a replica that has
+            // the session but is unreachable, so reusing it would be refused
+            // again. Note this reassigns currentSessionId while
+            // streamSessionId (captured above) stays pinned to the original —
+            // the streaming-state cleanup keys off that, and must not shift.
+            currentSessionId.value = getUUIDv7();
+            reseedNotice = true;
+
+            response = await fetchAiChat(
+              chatMessages.value,
+              "",
+              store.state.selectedOrganization.identifier,
+              currentAbortController.value?.signal,
+              undefined,
+              currentSessionId.value,
+              hasImages ? messagesToSend : undefined,
+            );
+          }
+        }
+
+        // Re-check: the reseed above may have produced a fresh response.
+        if (!response.ok) {
+          let errorBody = null;
+          try {
+            errorBody = await response.json();
+          } catch (_) {
+            // body may not be JSON
+          }
           const err: any = new Error(errorBody?.message || `Server error (${response.status})`);
           err.status = response.status;
           err.errorBody = errorBody;
           throw err;
+        }
+
+        // Tell the user the conversation was restored, before its content
+        // arrives — silently continuing would hide that the assistant no longer
+        // has the tool results or file state from earlier in the conversation.
+        if (reseedNotice) {
+          reseedNotice = false;
+          appendErrorBlock(
+            "This conversation was interrupted and has been restored. Earlier messages are preserved, but any files, queries or other actions from before the interruption were not carried over.",
+            true,
+          );
         }
 
         if (!response.body) {
@@ -5650,6 +5764,10 @@ export default defineComponent({
       handleToolCancel,
       handleToolAlwaysConfirm,
       handleNavigationAction,
+      sendConfirmation,
+      // Session restore
+      isSessionOwnerUnavailable,
+      appendErrorBlock,
       // Auto navigation
       isAutoNavigationEnabled,
       processedMessages,

@@ -736,4 +736,101 @@ describe("O2AIChat", () => {
       });
     });
   });
+  describe("session restore (HA)", () => {
+    // A conversation's session lives on one o2-ai replica. When that replica
+    // can no longer serve it, the transcript is still in the browser, so the UI
+    // restores the conversation into a fresh session instead of dead-ending.
+
+    describe("isSessionOwnerUnavailable", () => {
+      it("should detect the code nested under detail (FastAPI shape)", () => {
+        wrapper = mountO2AIChat({ isOpen: true });
+        const fn = (wrapper.vm as any).isSessionOwnerUnavailable;
+        expect(fn({ detail: { code: "session_owner_unavailable" } })).toBe(true);
+      });
+
+      it("should detect the code at the top level", () => {
+        wrapper = mountO2AIChat({ isOpen: true });
+        const fn = (wrapper.vm as any).isSessionOwnerUnavailable;
+        expect(fn({ code: "session_owner_unavailable" })).toBe(true);
+      });
+
+      it("should NOT treat other failures as a lost session", () => {
+        // Restoring means abandoning the current session, so anything short of
+        // an explicit server code must not trigger it.
+        wrapper = mountO2AIChat({ isOpen: true });
+        const fn = (wrapper.vm as any).isSessionOwnerUnavailable;
+        expect(fn({ detail: { code: "some_other_error" } })).toBe(false);
+        expect(fn({ message: "Server error (503)" })).toBe(false);
+        expect(fn({})).toBe(false);
+        expect(fn(null)).toBe(false);
+        expect(fn(undefined)).toBe(false);
+      });
+    });
+
+    describe("sendConfirmation", () => {
+      it("should report success when the confirmation is accepted", async () => {
+        wrapper = mountO2AIChat({ isOpen: true });
+        global.fetch = vi.fn().mockResolvedValue({ ok: true, status: 200 });
+
+        const ok = await (wrapper.vm as any).sendConfirmation("sess-1", true);
+
+        expect(ok).toBe(true);
+        expect((wrapper.vm as any).chatMessages).toHaveLength(0);
+      });
+
+      it("should surface a 404 instead of silently reporting success", async () => {
+        // This is the bug the .ok check exists for: a dropped confirmation used
+        // to look identical to an accepted one, while the agent stayed paused
+        // and eventually auto-denied.
+        wrapper = mountO2AIChat({ isOpen: true });
+        global.fetch = vi.fn().mockResolvedValue({ ok: false, status: 404 });
+
+        const ok = await (wrapper.vm as any).sendConfirmation("sess-1", true);
+
+        expect(ok).toBe(false);
+        const msgs = (wrapper.vm as any).chatMessages;
+        expect(msgs.length).toBeGreaterThan(0);
+        expect(msgs[msgs.length - 1].contentBlocks[0].type).toBe("error");
+      });
+
+      it("should surface a network failure", async () => {
+        wrapper = mountO2AIChat({ isOpen: true });
+        global.fetch = vi.fn().mockRejectedValue(new Error("network down"));
+
+        const ok = await (wrapper.vm as any).sendConfirmation("sess-1", false);
+
+        expect(ok).toBe(false);
+        expect((wrapper.vm as any).chatMessages.length).toBeGreaterThan(0);
+      });
+    });
+
+    describe("appendErrorBlock", () => {
+      it("should attach to the trailing assistant message", () => {
+        wrapper = mountO2AIChat({ isOpen: true });
+        (wrapper.vm as any).chatMessages = [
+          { role: "user", content: "hi" },
+          { role: "assistant", content: "hello", contentBlocks: [] },
+        ];
+
+        (wrapper.vm as any).appendErrorBlock("something went wrong");
+
+        const msgs = (wrapper.vm as any).chatMessages;
+        expect(msgs).toHaveLength(2);
+        expect(msgs[1].contentBlocks).toHaveLength(1);
+        expect(msgs[1].contentBlocks[0].message).toBe("something went wrong");
+      });
+
+      it("should start a new assistant message when the last is from the user", () => {
+        wrapper = mountO2AIChat({ isOpen: true });
+        (wrapper.vm as any).chatMessages = [{ role: "user", content: "hi" }];
+
+        (wrapper.vm as any).appendErrorBlock("restored", true);
+
+        const msgs = (wrapper.vm as any).chatMessages;
+        expect(msgs).toHaveLength(2);
+        expect(msgs[1].role).toBe("assistant");
+        expect(msgs[1].contentBlocks[0].recoverable).toBe(true);
+      });
+    });
+  });
 });
