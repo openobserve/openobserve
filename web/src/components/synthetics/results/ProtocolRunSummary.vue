@@ -167,24 +167,56 @@ const timingBars = computed(() => {
   }));
 });
 
-// Per-assertion verdict: the record only has a bool + first-failure detail, so
-// when the run failed on an assertion we mark the row whose field appears at
-// the start of `error` (probe detail format: "status 503 eq 200" etc.).
+// `assertions_passed` is omitted by the probe when the request never produced a
+// response (connection refused, EOF, timeout) — there was nothing to assert
+// against, so the checker returns before evaluating. That absent case maps to
+// null here and is NOT a pass: rendering it as one told the operator their
+// `status_code eq 200` held on a run that never got a status code.
+const assertionsEvaluated = computed(() => run.value?.assertionsPassed != null);
+
+// The probe's failure detail leads with its own word for the field, which is not
+// always the field name the check config uses. Only needed on the legacy path
+// below — probes that echo per-assertion results carry the field name verbatim.
+const PROBE_FIELD_WORD: Record<string, string> = {
+  status_code: "status",
+  response_time_ms: "response_time",
+};
+
+// Per-assertion verdicts.
+//
+// Preferred source is the probe's own `assertions` array: one row per assertion
+// with its real verdict, so a run where several assertions fail shows all of
+// them. Records written before the probe echoed that array carry only a single
+// roll-up bool plus the FIRST failure's message, and the best that can be done
+// there is to mark whichever row that message names — which is why a legacy
+// multi-failure run still shows only one red row.
 const assertionRows = computed(() => {
   if (!run.value) return [];
+
+  const reported = run.value.assertions;
+  if (reported.length) {
+    return reported.map((a) => ({
+      field: a.field,
+      operator: a.operator,
+      value: a.value,
+      failed: !a.passed,
+      detail: a.detail,
+    }));
+  }
+
   const passedAll = run.value.assertionsPassed;
   return assertionDefs.value.map((a) => {
     let failed = false;
     if (passedAll === false && run.value) {
       const err = run.value.error;
-      const fieldWord = a.field === "status_code" ? "status" : a.field;
+      const fieldWord = PROBE_FIELD_WORD[a.field] ?? a.field;
       failed = run.value.errorClass === "assertion" && err.startsWith(fieldWord);
     }
-    return { ...a, failed };
+    return { ...a, failed, detail: "" };
   });
 });
 
-const showAssertions = computed(() => run.value?.type === "http" && assertionDefs.value.length > 0);
+const showAssertions = computed(() => run.value?.type === "http" && assertionRows.value.length > 0);
 </script>
 
 <template>
@@ -327,13 +359,22 @@ const showAssertions = computed(() => run.value?.type === "http" && assertionDef
             </h3>
             <OBadge
               class="ml-2"
-              :variant="run.assertionsPassed === false ? 'error' : 'success'"
+              :variant="
+                !assertionsEvaluated
+                  ? 'default'
+                  : run.assertionsPassed === false
+                    ? 'error'
+                    : 'success'
+              "
               size="sm"
+              data-test="synthetics-protocol-run-assertions-badge"
             >
               {{
-                run.assertionsPassed === false
-                  ? t("synthetics.protocolRun.assertionsFailed")
-                  : t("synthetics.protocolRun.assertionsPassed")
+                !assertionsEvaluated
+                  ? t("synthetics.protocolRun.assertionsNotEvaluated")
+                  : run.assertionsPassed === false
+                    ? t("synthetics.protocolRun.assertionsFailed")
+                    : t("synthetics.protocolRun.assertionsPassed")
               }}
             </OBadge>
           </div>
@@ -345,13 +386,31 @@ const showAssertions = computed(() => run.value?.type === "http" && assertionDef
               :data-test="`synthetics-protocol-run-assertion-${i}`"
             >
               <OBadge
-                :variant="a.failed ? 'error' : 'success'"
+                :variant="!assertionsEvaluated ? 'default' : a.failed ? 'error' : 'success'"
                 size="sm"
-                :icon="a.failed ? 'cancel' : 'check-circle'"
+                :icon="!assertionsEvaluated ? 'remove' : a.failed ? 'cancel' : 'check-circle'"
               />
-              <span class="font-mono text-xs">{{ a.field }} {{ a.operator }} {{ a.value }}</span>
+              <span class="font-mono text-xs" :class="assertionsEvaluated ? '' : 'text-text-muted'"
+                >{{ a.field }} {{ a.operator }} {{ a.value }}</span
+              >
+              <!-- The probe's own comparison for this row, e.g. "status 503 eq
+                   200" — failures only, and only from probes that report
+                   per-assertion results. -->
+              <span
+                v-if="a.detail"
+                class="text-status-error-text font-mono text-xs"
+                :data-test="`synthetics-protocol-run-assertion-detail-${i}`"
+                >— {{ a.detail }}</span
+              >
             </li>
           </ul>
+          <p
+            v-if="!assertionsEvaluated"
+            class="text-text-muted px-3 pb-2 text-xs"
+            data-test="synthetics-protocol-run-assertions-not-evaluated-hint"
+          >
+            {{ t("synthetics.protocolRun.assertionsNotEvaluatedHint") }}
+          </p>
         </div>
 
         <!-- ── TLS certificate ── -->

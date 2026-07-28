@@ -9771,6 +9771,8 @@
       "assertions": "Assertions",
       "assertionsFailed": "Failed",
       "assertionsPassed": "Passed",
+      "assertionsNotEvaluated": "Not evaluated",
+      "assertionsNotEvaluatedHint": "The request never returned a response, so nothing was asserted.",
       "certExpires": "Expires {date}",
       "completed": "completed",
       "daysRemaining": "{days} days remaining",
