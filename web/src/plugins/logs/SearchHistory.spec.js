@@ -184,10 +184,6 @@ describe("SearchHistory Component", () => {
       expect(columns[1].accessorKey).toBe("sql");
     });
 
-    it("initializes with correct default props", () => {
-      expect(wrapper.props("isClicked")).toBe(false);
-    });
-
     it("sets up correct initial data structure", () => {
       expect(wrapper.vm.dateTimeToBeSent).toEqual({
         valueType: "relative",
@@ -300,6 +296,9 @@ describe("SearchHistory Component", () => {
       const relativeDateTime = {
         valueType: "relative",
         relativeTimePeriod: "15m",
+      };
+      wrapper.vm.searchDateTimeRef = {
+        setAbsoluteTime: vi.fn(),
       };
 
       await wrapper.vm.updateDateTime(relativeDateTime);

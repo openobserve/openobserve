@@ -108,6 +108,10 @@ describe("SearchSchedulersList Component", () => {
     // Clear all mocks before each test
     vi.clearAllMocks();
 
+    // Component now fetches on mount (standalone route); default the list API to an
+    // empty result so mounting resolves cleanly. Individual tests override as needed.
+    searchService.get_scheduled_search_list.mockResolvedValue({ data: [] });
+
     // Mount component with default props and data
     wrapper = mount(SearchSchedulersList, {
       global: {
@@ -160,8 +164,11 @@ describe("SearchSchedulersList Component", () => {
   });
 
   describe("Component Initialization", () => {
-    it("initializes with correct default state", () => {
-      expect(wrapper.vm.columnsToBeRendered).toEqual([]);
+    it("initializes with correct default state", async () => {
+      await flushPromises();
+      // Columns are a fixed schema, generated up front so the loading skeleton
+      // has a shape (they no longer start empty).
+      expect(wrapper.vm.columnsToBeRendered.length).toBeGreaterThan(0);
       expect(wrapper.vm.dataToBeLoaded).toEqual([]);
       expect(wrapper.vm.expandedIds).toEqual([]);
       expect(wrapper.vm.isLoading).toBe(false);
@@ -170,7 +177,7 @@ describe("SearchSchedulersList Component", () => {
   });
 
   describe("Data Fetching", () => {
-    it("fetches search schedulers when isClicked becomes true", async () => {
+    it("fetches search schedulers via fetchSearchHistory", async () => {
       const mockResponse = {
         data: [
           {
@@ -192,17 +199,10 @@ describe("SearchSchedulersList Component", () => {
         ],
       };
 
-      searchService.get_scheduled_search_list.mockImplementation(() =>
-        Promise.resolve(mockResponse),
-      );
+      searchService.get_scheduled_search_list.mockResolvedValue(mockResponse);
 
-      // First ensure isLoading is false
-      wrapper.vm.isLoading = false;
-      await nextTick();
-
-      // Then trigger the watcher
-      await wrapper.setProps({ isClicked: true });
-      await nextTick();
+      // Fetch is now triggered on mount / refresh, not via an isClicked prop.
+      await wrapper.vm.fetchSearchHistory();
       await flushPromises();
 
       expect(searchService.get_scheduled_search_list).toHaveBeenCalledWith({
@@ -220,12 +220,8 @@ describe("SearchSchedulersList Component", () => {
 
       searchService.get_scheduled_search_list.mockImplementation(() => promise);
 
-      // First ensure isLoading is false
-      wrapper.vm.isLoading = false;
-      await nextTick();
-
-      // Then trigger the watcher
-      await wrapper.setProps({ isClicked: true });
+      // Kick off a fetch without awaiting so we can observe the in-flight state.
+      wrapper.vm.fetchSearchHistory();
       await nextTick();
 
       // Check loading state is true during fetch
@@ -321,9 +317,11 @@ describe("SearchSchedulersList Component", () => {
       });
     });
 
-    it("emits closeSearchHistory event", async () => {
+    it("navigates back to logs on closeSearchHistory", async () => {
+      // Standalone route: close now navigates to the Logs route (no history to pop
+      // in jsdom) instead of emitting to a parent overlay.
       await wrapper.vm.closeSearchHistory();
-      expect(wrapper.emitted().closeSearchHistory).toBeTruthy();
+      expect(routerPushMock).toHaveBeenCalledWith({ name: "logs" });
     });
   });
 

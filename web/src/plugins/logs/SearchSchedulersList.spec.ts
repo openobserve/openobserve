@@ -1,4 +1,4 @@
-import { mount } from "@vue/test-utils";
+import { mount, flushPromises } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import SearchSchedulersList from "@/plugins/logs/SearchSchedulersList.vue";
 import i18n from "@/locales";
@@ -152,13 +152,11 @@ describe("SearchSchedulersList Component", () => {
       expect(wrapper.vm.$options.name).toBe("SearchSchedulersList");
     });
 
-    it("should initialize with correct default props", () => {
-      expect(wrapper.props("isClicked")).toBe(false);
-    });
-
-    it("should initialize with correct default data", () => {
+    it("should initialize with correct default data", async () => {
+      await flushPromises();
       expect(wrapper.vm.dataToBeLoaded).toEqual([]);
-      expect(wrapper.vm.columnsToBeRendered).toEqual([]);
+      // Columns are a fixed schema, generated up front (for the loading skeleton).
+      expect(wrapper.vm.columnsToBeRendered.length).toBeGreaterThan(0);
       expect(wrapper.vm.expandedIds).toEqual([]);
       expect(wrapper.vm.isLoading).toBe(false);
       expect(wrapper.vm.showSearchResults).toBe(false);
@@ -184,36 +182,28 @@ describe("SearchSchedulersList Component", () => {
       );
     });
 
-    it("should initialize dateTimeToBeSent correctly", () => {
-      expect(wrapper.vm.dateTimeToBeSent).toEqual({
-        valueType: "relative",
-        relativeTimePeriod: "15m",
-        startTime: 0,
-        endTime: 0,
-      });
-    });
   });
 
-  describe("Props and Emits", () => {
-    it("should emit closeSearchHistory", async () => {
+  describe("Navigation", () => {
+    it("should navigate back to logs on closeSearchHistory", async () => {
+      // Standalone route: close navigates to the Logs route (no history to pop in
+      // jsdom) instead of emitting to a parent overlay.
       wrapper.vm.closeSearchHistory();
       await nextTick();
-      expect(wrapper.emitted().closeSearchHistory).toBeTruthy();
+      expect(mockRouter.push).toHaveBeenCalledWith({ name: "logs" });
     });
 
-    it("should have correct prop types", () => {
-      expect(typeof wrapper.props("isClicked")).toBe("boolean");
-    });
-
-    it("should initialize with correct isLoading state", () => {
+    it("should initialize with correct isLoading state", async () => {
+      await flushPromises();
       expect(wrapper.vm.isLoading).toBe(false);
     });
   });
 
   describe("Column Generation", () => {
-    it("should return empty array for empty data", () => {
-      const columns = wrapper.vm.generateColumns([]);
-      expect(columns).toEqual([]);
+    it("should generate the fixed column schema", () => {
+      // Columns are static (no longer derived from data), so they're non-empty.
+      const columns = wrapper.vm.generateColumns();
+      expect(columns.length).toBeGreaterThan(0);
     });
 
     it("should generate correct columns for data", () => {
@@ -599,38 +589,6 @@ describe("SearchSchedulersList Component", () => {
     });
   });
 
-  describe("DateTime Management", () => {
-    it("should update datetime correctly", async () => {
-      const mockDateTime = {
-        valueType: "absolute",
-        startTime: 1000000,
-        endTime: 2000000,
-      };
-
-      wrapper.vm.searchDateTimeRef = { setAbsoluteTime: vi.fn() };
-
-      await wrapper.vm.updateDateTime(mockDateTime);
-
-      expect(wrapper.vm.dateTimeToBeSent).toEqual(mockDateTime);
-      expect(wrapper.vm.searchDateTimeRef.setAbsoluteTime).toHaveBeenCalledWith(1000000, 2000000);
-    });
-
-    it("should handle datetime with different valueType", async () => {
-      const mockDateTime = {
-        valueType: "relative",
-        relativeTimePeriod: "1h",
-        startTime: 0,
-        endTime: 0,
-      };
-
-      wrapper.vm.searchDateTimeRef = { setAbsoluteTime: vi.fn() };
-
-      await wrapper.vm.updateDateTime(mockDateTime);
-
-      expect(wrapper.vm.dateTimeToBeSent).toEqual(mockDateTime);
-    });
-  });
-
   describe("Computed Properties", () => {
     it("should calculate delay message for seconds", () => {
       store.state.zoConfig.usage_publish_interval = 30;
@@ -809,11 +767,18 @@ describe("SearchSchedulersList Component", () => {
       // Mock config to be non-enterprise
       const configMock = await import("@/aws-exports");
       configMock.default.isEnterprise = "false";
+      // The component fetches on mount (when enterprise was still true); ignore that
+      // call and assert only that the direct fetch below short-circuits.
+      searchService.get_scheduled_search_list.mockClear();
 
-      const result = await wrapper.vm.fetchSearchHistory();
+      try {
+        const result = await wrapper.vm.fetchSearchHistory();
 
-      expect(result).toBeUndefined();
-      expect(searchService.get_scheduled_search_list).not.toHaveBeenCalled();
+        expect(result).toBeUndefined();
+        expect(searchService.get_scheduled_search_list).not.toHaveBeenCalled();
+      } finally {
+        configMock.default.isEnterprise = "true";
+      }
     });
   });
 
@@ -858,7 +823,6 @@ describe("SearchSchedulersList Component", () => {
 
     it("should have utility functions available", () => {
       expect(typeof wrapper.vm.copyToClipboard).toBe("function");
-      expect(typeof wrapper.vm.updateDateTime).toBe("function");
       expect(typeof wrapper.vm.onExpandedIdsChange).toBe("function");
     });
 

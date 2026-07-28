@@ -138,12 +138,13 @@ const useRoutes = () => {
       beforeEnter(to: any, from: any, next: any) {
         // Back-compat: Search History / Scheduler used to be `?action=…` overlays
         // on /logs. Redirect old bookmarks / shared links to the standalone routes.
-        if (to.query.action === "history") {
-          next({ name: "searchHistory", query: { org_identifier: to.query.org_identifier } });
+        const action = to.query?.action;
+        if (action === "history") {
+          next({ name: "searchHistory", query: { org_identifier: to.query?.org_identifier } });
           return;
         }
-        if (to.query.action === "search_scheduler") {
-          next({ name: "searchScheduler", query: { org_identifier: to.query.org_identifier } });
+        if (action === "search_scheduler") {
+          next({ name: "searchScheduler", query: { org_identifier: to.query?.org_identifier } });
           return;
         }
         routeGuard(to, from, next);
