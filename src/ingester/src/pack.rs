@@ -450,8 +450,13 @@ fn consumed_sidecar_path(pack_path: &Path) -> PathBuf {
 /// one append per consumed stream, tens of thousands for a large pack). Also
 /// serializes appends so concurrent workers cannot interleave lines. Handles
 /// are dropped in delete_pack_file; live packs are few so the map stays small.
-static CONSUMED_FILES: Lazy<tokio::sync::Mutex<HashMap<PathBuf, fs::File>>> =
+static CONSUMED_FILES: Lazy<tokio::sync::Mutex<HashMap<PathBuf, (fs::File, u32)>>> =
     Lazy::new(Default::default);
+
+/// fsync the sidecar every N appends: a successful write() already survives a
+/// process crash (page cache), the periodic fsync only bounds how many chunks
+/// can be re-uploaded after a power loss / kernel crash.
+const CONSUMED_SYNC_EVERY: u32 = 32;
 
 async fn append_consumed_sidecar(pack_path: &Path, offsets: &[u64]) {
     if offsets.is_empty() {
@@ -472,7 +477,7 @@ async fn append_consumed_sidecar(pack_path: &Path, offsets: &[u64]) {
             .await
         {
             Ok(f) => {
-                files.insert(path.clone(), f);
+                files.insert(path.clone(), (f, 0));
             }
             Err(e) => {
                 // worst case the segments are re-uploaded after a restart
@@ -484,10 +489,15 @@ async fn append_consumed_sidecar(pack_path: &Path, offsets: &[u64]) {
             }
         }
     }
-    let f = files.get_mut(&path).unwrap();
+    let (f, writes) = files.get_mut(&path).unwrap();
     let ret = async {
         f.write_all(data.as_bytes()).await?;
-        f.sync_all().await
+        *writes += 1;
+        if *writes >= CONSUMED_SYNC_EVERY {
+            *writes = 0;
+            f.sync_all().await?;
+        }
+        Ok::<(), std::io::Error>(())
     }
     .await;
     if let Err(e) = ret {
