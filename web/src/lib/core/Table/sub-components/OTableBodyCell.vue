@@ -82,7 +82,9 @@ const slotAlignClass = computed(() => {
 // Slotted content truncates to one line unless `wrap` is on, mirroring the
 // default (non-slot) behaviour.
 const slotContentClass = computed(() =>
-  props.wrap ? "min-w-0 flex-1 break-words whitespace-normal" : "truncate min-w-0 flex-1",
+  // wrap-anywhere (not break-words): it lowers the cell's min-content width, so
+  // unbreakable runs (JSON, URLs, ids) wrap instead of forcing the column wide.
+  props.wrap ? "min-w-0 flex-1 wrap-anywhere whitespace-normal" : "truncate min-w-0 flex-1",
 );
 
 const isPinned = computed(() => props.cell.column.getIsPinned?.() ?? false);
@@ -250,7 +252,7 @@ function onCellActionsLeave() {
           : 'bg-table-cell-bg group-hover/row:bg-table-row-hover-bg transition-colors duration-150'
         : '',
       wrap
-        ? 'break-words whitespace-normal'
+        ? 'wrap-anywhere whitespace-normal'
         : horizontalScroll?.value
           ? 'whitespace-nowrap'
           : isAction

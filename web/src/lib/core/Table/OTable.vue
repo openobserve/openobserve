@@ -1109,12 +1109,17 @@ defineExpose({
             // body total cells release while the header stays put. min-w-full keeps
             // the table filling the container when the content is narrower (sticky
             // is inert without overflow, so the release bug can't occur there).
+            // Wrap mode fits the container instead of scrolling: without min-w-max
+            // the stored column sizes act as preferences (not minimums), so auto
+            // layout compresses columns and the wrap-anywhere cells absorb the rest.
             props.horizontalScroll
-              ? isDelegatedScroll
-                ? 'min-w-max'
-                : props.stickyColTotals
-                  ? 'w-max min-w-full'
-                  : 'w-full min-w-max'
+              ? props.wrap && !props.stickyColTotals
+                ? 'w-full'
+                : isDelegatedScroll
+                  ? 'min-w-max'
+                  : props.stickyColTotals
+                    ? 'w-max min-w-full'
+                    : 'w-full min-w-max'
               : useComputedWidth && frozen
                 ? ''
                 : 'w-full',
