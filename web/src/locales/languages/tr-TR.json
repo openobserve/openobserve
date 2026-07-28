@@ -9592,6 +9592,8 @@
       "modalSubtitle": "İzlemek istediğiniz şeyi seçin",
       "modalTitle": "Bir Kontrol Oluşturun",
       "pageTitle": "Yeni {label} Kontrol",
+      "saveAndContinue": "Kaydet ve devam et",
+      "saveAndExit": "Kaydet ve çık",
       "saveCheck": "Kontrolü kaydet",
       "saveFailed": "Kontrol kaydedilemedi.",
       "saved": "Kontrol başarıyla kaydedildi.",

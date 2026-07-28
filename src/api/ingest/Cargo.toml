@@ -1,0 +1,47 @@
+[package]
+name = "openobserve-api-ingest"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[lib]
+path = "src/lib.rs"
+
+[features]
+default = []
+enterprise = [
+    "dep:o2_enterprise",
+    "openobserve-api-common/enterprise",
+    "openobserve-core/enterprise",
+]
+cloud = [
+    "enterprise",
+    "o2_enterprise/cloud",
+    "openobserve-core/cloud",
+    "openobserve-api-common/cloud",
+]
+vectorscan = ["openobserve-core/vectorscan"]
+
+[dependencies]
+axum.workspace = true
+chrono.workspace = true
+common.workspace = true
+config.workspace = true
+flate2.workspace = true
+hashbrown.workspace = true
+infra.workspace = true
+ingestion-common.workspace = true
+log.workspace = true
+o2_enterprise = { workspace = true, optional = true, default-features = false }
+openobserve-api-common.workspace = true
+openobserve-core.workspace = true
+opentelemetry-proto.workspace = true
+prost.workspace = true
+proto.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+snap.workspace = true
+tokio.workspace = true
+tower.workspace = true
+utoipa.workspace = true

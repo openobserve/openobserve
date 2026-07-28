@@ -9592,6 +9592,8 @@
       "modalSubtitle": "Escolha o que deseja monitorar",
       "modalTitle": "Criar uma verificação",
       "pageTitle": "Nova verificação {label}",
+      "saveAndContinue": "Salvar e continuar",
+      "saveAndExit": "Salvar e sair",
       "saveCheck": "Salvar verificação",
       "saveFailed": "Falha ao salvar a verificação.",
       "saved": "Verificação salva com sucesso.",

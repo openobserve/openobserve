@@ -9592,6 +9592,8 @@
       "modalSubtitle": "모니터링할 항목 선택",
       "modalTitle": "검사 생성",
       "pageTitle": "새 {label} 검사",
+      "saveAndContinue": "저장 후 계속",
+      "saveAndExit": "저장 후 종료",
       "saveCheck": "검사 저장",
       "saveFailed": "검사 저장에 실패했습니다.",
       "saved": "검사가 성공적으로 저장되었습니다.",
