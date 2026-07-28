@@ -397,13 +397,22 @@ pub async fn register_pack(
     consumed: &HashSet<u64>,
 ) {
     let pack_path = Arc::new(path);
+    // count only sidecar offsets that exist in the footer: a partially
+    // written sidecar record can parse as a garbage offset, and trusting
+    // consumed.len() would over-count and delete the pack before every real
+    // segment is uploaded
+    let consumed_count = footer
+        .segments
+        .iter()
+        .filter(|s| consumed.contains(&s.offset))
+        .count();
     {
         let mut w = PACK_REGISTRY.write().await;
         w.insert(
             pack_path.clone(),
             PackEntry {
                 total: footer.segments.len(),
-                consumed: consumed.len(),
+                consumed: consumed_count,
                 readers: 0,
             },
         );
@@ -515,7 +524,18 @@ async fn sidecar_append_once(
 async fn read_consumed_sidecar(pack_path: &Path) -> HashSet<u64> {
     let path = consumed_sidecar_path(pack_path);
     match fs::read_to_string(&path).await {
-        Ok(data) => data.lines().filter_map(|l| l.trim().parse().ok()).collect(),
+        Ok(data) => {
+            // ignore a trailing partial line: a crash mid-append can leave a
+            // truncated record that parses as a wrong offset
+            let complete = match data.rfind('\n') {
+                Some(i) => &data[..=i],
+                None => "",
+            };
+            complete
+                .lines()
+                .filter_map(|l| l.trim().parse().ok())
+                .collect()
+        }
         Err(_) => HashSet::new(),
     }
 }
@@ -1257,6 +1277,77 @@ mod tests {
         .await;
         assert!(!pack.path.exists());
         assert!(!consumed_sidecar_path(&pack.path).exists());
+    }
+
+    #[tokio::test]
+    async fn test_garbage_sidecar_offsets_do_not_over_count() {
+        // 3-segment pack; sidecar records one real offset and one garbage
+        // value (a partially written record) - the pack must NOT be deleted
+        // until every real segment is consumed
+        let dir = tempfile::tempdir().unwrap();
+        let mut writer = PackWriter::new(0, 888, "logs", 1024 * 1024);
+        writer.dir = dir.path().to_path_buf();
+        for (i, stream) in ["sa", "sb", "sc"].iter().enumerate() {
+            writer
+                .append_segment(
+                    "org1",
+                    stream,
+                    "2026/07/28/08",
+                    b"parquet-bytes-aaaa",
+                    &test_file_meta(1, 2, 1, 100 * (i as i64 + 1)),
+                )
+                .await
+                .unwrap();
+        }
+        let (finished, ..) = writer.finish().await.unwrap();
+        let pack = &finished[0];
+        fs::rename(&pack.tmp_path, &pack.path).await.unwrap();
+
+        let seg0 = pack.footer.segments[0].offset;
+        let consumed = HashSet::from_iter([seg0, 1212345u64]); // garbage entry
+        register_pack(
+            pack.path.clone(),
+            &pack.footer,
+            config::utils::time::now_micros(),
+            &consumed,
+        )
+        .await;
+
+        let pack_path = Arc::new(pack.path.clone());
+        // consume the second real segment: 2 of 3 real segments consumed,
+        // the pack must survive (the garbage entry must not count)
+        mark_segments_consumed(
+            "org1",
+            "logs",
+            "sb",
+            &[(pack_path.clone(), pack.footer.segments[1].offset)],
+        )
+        .await
+        .unwrap();
+        assert!(pack.path.exists());
+
+        // consuming the last real segment deletes the pack
+        mark_segments_consumed(
+            "org1",
+            "logs",
+            "sc",
+            &[(pack_path.clone(), pack.footer.segments[2].offset)],
+        )
+        .await
+        .unwrap();
+        assert!(!pack.path.exists());
+    }
+
+    #[tokio::test]
+    async fn test_sidecar_trailing_partial_line_is_ignored() {
+        let dir = tempfile::tempdir().unwrap();
+        let pack_path = dir.path().join("1.0.pack");
+        // "20" is a truncated record (no trailing newline), must be dropped
+        fs::write(consumed_sidecar_path(&pack_path), "0\n100\n20")
+            .await
+            .unwrap();
+        let consumed = read_consumed_sidecar(&pack_path).await;
+        assert_eq!(consumed, HashSet::from_iter([0u64, 100]));
     }
 
     #[tokio::test]
