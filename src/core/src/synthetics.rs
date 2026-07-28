@@ -112,6 +112,22 @@ fn status_headline(n: &CheckNotification) -> String {
     }
 }
 
+/// `checked_at` (microseconds) as a readable UTC stamp, e.g.
+/// "2026-07-28 01:24:51 UTC".
+///
+/// Every destination gets this rather than a raw epoch. Slack's `<!date^…>`
+/// markup is still used where it applies, but only ever with this as its
+/// fallback text — the fallback is what an operator actually reads whenever the
+/// markup is not interpreted, which is exactly when a bare epoch is useless.
+#[cfg(feature = "enterprise")]
+fn checked_at_utc(checked_at_micros: i64) -> String {
+    chrono::DateTime::from_timestamp_micros(checked_at_micros)
+        .map(|dt| dt.format("%Y-%m-%d %H:%M:%S UTC").to_string())
+        // Out-of-range only for a nonsense timestamp; showing the raw value
+        // beats dropping the field and leaving the reader with nothing.
+        .unwrap_or_else(|| checked_at_micros.to_string())
+}
+
 /// Deep link to the monitor's results page in the UI.
 #[cfg(feature = "enterprise")]
 fn run_url(n: &CheckNotification) -> String {
@@ -142,8 +158,9 @@ fn build_slack_json(n: &CheckNotification) -> String {
     if let Some(e) = n.error.as_deref().filter(|e| !e.is_empty()) {
         lines.push(format!("*Error:* ```{e}```"));
     }
+    let checked_human = checked_at_utc(n.checked_at);
     lines.push(format!(
-        "*Time:* <!date^{checked_secs}^{{date_time_secs}}|{checked_secs}>"
+        "*Time:* <!date^{checked_secs}^{{date_time_secs}}|{checked_human}>"
     ));
 
     serde_json::json!({ "text": lines.join("\n") }).to_string()
@@ -165,6 +182,7 @@ fn build_plain_text(n: &CheckNotification) -> String {
     if let Some(e) = n.error.as_deref().filter(|e| !e.is_empty()) {
         lines.push(format!("Error: {e}"));
     }
+    lines.push(format!("Time: {}", checked_at_utc(n.checked_at)));
     lines.push(format!("Run details: {}", run_url(n)));
     lines.join("\n")
 }
@@ -198,6 +216,8 @@ fn build_email_html(n: &CheckNotification) -> String {
         <td style="padding:6px 12px;font-weight:bold;color:{color};">{status}</td></tr>
     <tr><td style="padding:6px 12px;color:#666;">Locations checked</td>
         <td style="padding:6px 12px;">{jobs}</td></tr>
+    <tr><td style="padding:6px 12px;color:#666;">Time</td>
+        <td style="padding:6px 12px;">{checked_at}</td></tr>
     {error_row}
   </table>
   <p style="margin-top:12px;">
@@ -211,6 +231,7 @@ fn build_email_html(n: &CheckNotification) -> String {
         target = html_escape(&n.target),
         status = n.status.to_uppercase(),
         jobs = if n.job_count > 0 { n.job_count } else { 1 },
+        checked_at = checked_at_utc(n.checked_at),
         url = run_url(n),
     )
 }
@@ -313,6 +334,34 @@ pub async fn location_staleness_watcher() {
             )
             .await;
         }
+    }
+}
+
+#[cfg(all(test, feature = "enterprise"))]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn checked_at_utc_formats_micros_as_readable_utc() {
+        // 1785201891 s → 2026-07-28 01:24:51 UTC
+        assert_eq!(
+            checked_at_utc(1_785_201_891_000_000),
+            "2026-07-28 01:24:51 UTC"
+        );
+    }
+
+    #[test]
+    fn checked_at_utc_keeps_second_precision() {
+        // Sub-second remainder is dropped, not rounded up.
+        assert_eq!(
+            checked_at_utc(1_785_201_891_999_999),
+            "2026-07-28 01:24:51 UTC"
+        );
+    }
+
+    #[test]
+    fn checked_at_utc_falls_back_to_the_raw_value_when_out_of_range() {
+        assert_eq!(checked_at_utc(i64::MAX), i64::MAX.to_string());
     }
 }
 
