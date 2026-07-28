@@ -1433,7 +1433,7 @@ pub async fn enrich_with_topology(
             } else {
                 // Query service graph to check for a known dependency
                 let raw_sg_edges = match service_graph::query_edges_from_stream_internal(
-                    org_id, None, None, None,
+                    org_id, None, None, None, None,
                 )
                 .await
                 {
@@ -1542,13 +1542,19 @@ pub fn unregister_rca_task(org_id: &str, incident_id: &str) {
 /// `AIAnalysisCancelled` event. The event is written even when no local handle exists,
 /// so a run stranded by a restart can be cleared without waiting for the stale window.
 ///
-/// Returns `true` if a local task was actually aborted.
+/// Re-checks in-flight state here, after the abort handle has been atomically removed,
+/// rather than trusting a check made by the caller. The caller's check is separated from
+/// this call by an await, during which a fresh analysis can start — cancelling then would
+/// abort the wrong run. Returns `Ok(None)` when nothing was in flight.
+///
+/// Returns `Ok(Some(true))` if a local task was actually aborted.
 #[cfg(feature = "enterprise")]
 pub async fn cancel_rca_for_incident(
     org_id: &str,
     incident_id: &str,
     user_id: Option<String>,
-) -> Result<bool, anyhow::Error> {
+    stale_threshold_minutes: u64,
+) -> Result<Option<bool>, anyhow::Error> {
     let aborted = match RCA_ABORT_HANDLES.remove(&rca_task_key(org_id, incident_id)) {
         Some((_, handle)) => {
             handle.abort();
@@ -1556,6 +1562,16 @@ pub async fn cancel_rca_for_incident(
         }
         None => false,
     };
+
+    // Authoritative check: no local handle means the run may be on another node, or may
+    // never have existed. Consult the event log before writing a terminal event, so a
+    // cancel for an already-settled run doesn't leave a spurious event behind.
+    if !aborted {
+        let events = infra::table::incident_events::get(org_id, incident_id).await?;
+        if !is_analysis_in_flight(&events, stale_threshold_minutes) {
+            return Ok(None);
+        }
+    }
 
     infra::table::incident_events::append(
         org_id,
@@ -1566,7 +1582,7 @@ pub async fn cancel_rca_for_incident(
 
     log::info!("[INCIDENTS::RCA] Cancelled analysis for {incident_id} (local_task={aborted})");
 
-    Ok(aborted)
+    Ok(Some(aborted))
 }
 
 /// Returns true if an analysis is currently in-flight (started but not yet completed).

@@ -143,6 +143,11 @@
           >
             {{ shortId(row.agentId) }}
           </span>
+          <OAgentBadges
+            :env="row.agentEnv"
+            :version="row.agentVersion"
+            data-test="quality-runs-agent-badges"
+          />
         </div>
       </template>
     </OTable>
@@ -154,6 +159,7 @@ import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OAgentBadges from "@/components/shared/OAgentBadges.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import type { ScoreConfig } from "@/services/online-evals.service";

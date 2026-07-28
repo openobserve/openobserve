@@ -31,6 +31,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <template #header-right>
       <div class="flex items-center gap-2">
+        <!-- Agent nodes: show which env/version variant this node represents. -->
+        <OAgentBadges
+          v-if="selectedNode?.service_type === 'agent'"
+          :env="agentEnvVersion.env"
+          :version="agentEnvVersion.version"
+          data-test="service-graph-node-agent-badges"
+        />
         <OTag type="serviceStatus" :value="serviceHealth.status" data-test="service-health-badge">{{
           serviceHealth.text
         }}</OTag>
@@ -610,6 +617,8 @@ import {
 } from "@/utils/metrics/metricGrouping";
 import { buildChipDimensionsFromFilters } from "@/services/service_streams";
 import { buildWorkloadChipDimensions } from "@/composables/useMetricSubjectButtons";
+import genAiAgentMappingService from "@/services/gen-ai-agent-mapping.service";
+import OAgentBadges from "@/components/shared/OAgentBadges.vue";
 import { normalizeSeverity } from "@/utils/sourceEventSeverity";
 import DeployedCode from "@/components/icons/DeployedCode.vue";
 import { useI18n } from "vue-i18n";
@@ -875,6 +884,7 @@ export default defineComponent({
     OIcon,
     ServiceCatalogBarCell,
     AgentNodeBehaviorTab,
+    OAgentBadges,
   },
   props: {
     selectedNode: {
@@ -1534,6 +1544,49 @@ export default defineComponent({
         props.selectedNode?.service_type === "agent" &&
         props.streamFilter !== "all" &&
         !!props.streamFilter,
+    );
+
+    // env/version for the clicked agent node. The graph topology doesn't carry
+    // these, so resolve them from the discovered-agents registry: fetch the
+    // agents for this stream and match the node's name. Cached per stream.
+    const agentEnvVersion = ref<{ env: string | null; version: string | null }>({
+      env: null,
+      version: null,
+    });
+    const loadAgentEnvVersion = async () => {
+      agentEnvVersion.value = { env: null, version: null };
+      if (
+        props.selectedNode?.service_type !== "agent" ||
+        !props.streamFilter ||
+        props.streamFilter === "all"
+      ) {
+        return;
+      }
+      try {
+        const org = store.state.selectedOrganization?.identifier;
+        if (!org) return;
+        const res = await genAiAgentMappingService.listAgents(
+          org,
+          Math.trunc(props.timeRange.startTime * 1000),
+          Math.trunc(props.timeRange.endTime * 1000),
+        );
+        const match = res.agents.find(
+          (a) => a.source_stream === props.streamFilter && a.name === behaviorAgentName.value,
+        );
+        if (match) {
+          agentEnvVersion.value = {
+            env: match.env ?? null,
+            version: match.version ?? null,
+          };
+        }
+      } catch {
+        // Non-fatal: badges simply don't render if the lookup fails.
+      }
+    };
+    watch(
+      () => [props.selectedNode?.id, props.selectedNode?.service_type, props.streamFilter],
+      loadAgentEnvVersion,
+      { immediate: true },
     );
 
     // Tabs actually shown. For inferred services use the registry tabs;
@@ -2412,6 +2465,7 @@ export default defineComponent({
       isInferred,
       showBehaviorTab,
       behaviorAgentName,
+      agentEnvVersion,
       serviceNameField,
       streamFieldSet,
       formatNumber,
