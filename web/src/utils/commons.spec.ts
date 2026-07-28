@@ -762,6 +762,137 @@ describe("Commons Utility Functions", () => {
     });
   });
 
+  describe("getDashboard — reserved _timestamp alias", () => {
+    it("normalizes a _timestamp output alias, then saves and re-fetches (like duplicate panel ids)", async () => {
+      const dashboardId = "dashboard-ts";
+      const folderId = "test-folder";
+      const mockDashboard = {
+        tabs: [
+          {
+            panels: [
+              {
+                config: {},
+                queries: [
+                  {
+                    customQuery: true,
+                    query:
+                      'SELECT histogram(_timestamp) AS "_timestamp" FROM "x" GROUP BY _timestamp',
+                    fields: {
+                      x: [
+                        { alias: "_timestamp", column: "_timestamp", isDerived: false },
+                      ],
+                    },
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      };
+
+      mockStore.state.organizationData.allDashboardData[dashboardId] =
+        mockDashboard;
+      (dashboardService.save as any).mockResolvedValue({
+        data: { success: true },
+      });
+      (dashboardService.get_Dashboard as any).mockResolvedValue({
+        data: { version: 1, v1: mockDashboard, hash: 123 },
+      });
+
+      const result = await getDashboard(mockStore, dashboardId, folderId);
+
+      // alias normalized in place (SQL string + field alias)
+      const query = mockDashboard.tabs[0].panels[0].queries[0];
+      expect(query.query).toContain('AS "ts"');
+      expect(query.query).toContain("GROUP BY ts");
+      expect(query.query).not.toContain('AS "_timestamp"');
+      expect(query.fields.x[0].alias).toBe("ts");
+      expect(query.fields.x[0].column).toBe("_timestamp"); // source preserved
+
+      // persisted like duplicate panel ids: saved and re-fetched
+      expect(dashboardService.save).toHaveBeenCalled();
+      expect(dashboardService.get_Dashboard).toHaveBeenCalled();
+      expect(result).toBe(mockDashboard);
+    });
+
+    it("does not save when no query uses the reserved alias", async () => {
+      const dashboardId = "dashboard-clean";
+      const mockDashboard = {
+        tabs: [
+          {
+            panels: [
+              {
+                config: {},
+                queries: [
+                  {
+                    customQuery: true,
+                    query: 'SELECT count(*) AS "ts" FROM "x"',
+                    fields: { x: [] },
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      };
+
+      mockStore.state.organizationData.allDashboardData[dashboardId] =
+        mockDashboard;
+      (dashboardService.save as any).mockResolvedValue({
+        data: { success: true },
+      });
+
+      await getDashboard(mockStore, dashboardId, "test-folder");
+
+      expect(dashboardService.save).not.toHaveBeenCalled();
+    });
+
+    it("uses the configured timestamp_column (zoConfig) as the reserved alias", async () => {
+      const dashboardId = "dashboard-custom-ts";
+      mockStore.state.zoConfig = { timestamp_column: "event_time" };
+      const mockDashboard = {
+        tabs: [
+          {
+            panels: [
+              {
+                config: {},
+                queries: [
+                  {
+                    customQuery: true,
+                    query:
+                      'SELECT histogram(event_time) AS "event_time" FROM "x" GROUP BY event_time',
+                    fields: {
+                      x: [
+                        { alias: "event_time", column: "event_time", isDerived: false },
+                      ],
+                    },
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      };
+
+      mockStore.state.organizationData.allDashboardData[dashboardId] =
+        mockDashboard;
+      (dashboardService.save as any).mockResolvedValue({
+        data: { success: true },
+      });
+      (dashboardService.get_Dashboard as any).mockResolvedValue({
+        data: { version: 1, v1: mockDashboard, hash: 123 },
+      });
+
+      await getDashboard(mockStore, dashboardId, "test-folder");
+
+      const query = mockDashboard.tabs[0].panels[0].queries[0];
+      expect(query.query).toContain('AS "ts"');
+      expect(query.query).not.toContain('AS "event_time"');
+      expect(query.fields.x[0].alias).toBe("ts");
+      expect(dashboardService.save).toHaveBeenCalled();
+    });
+  });
+
   describe("addVariable", () => {
     it("should add variable to dashboard with empty variables", async () => {
       const dashboardId = "dashboard-1";
