@@ -35,8 +35,8 @@ const props = defineProps<{
   disableRowReorder?: (row: any) => boolean;
   /** When true, the global filter is active — drag is auto-disabled. */
   globalFilterActive?: boolean;
-  /** Unique row identifier field (used as VueDraggableNext item-key). */
-  rowKey?: string;
+  /** Unique row identifier field or resolver (used as VueDraggableNext item-key). */
+  rowKey?: string | ((row: any) => string);
   /** Virtual scroll: virtual items from useTableVirtualization */
   virtualRows?: {
     index: number;
