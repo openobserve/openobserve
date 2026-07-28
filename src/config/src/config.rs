@@ -1132,10 +1132,10 @@ pub struct Common {
     pub feature_shared_memtable_enabled: bool,
     #[env_config(
         name = "ZO_FEATURE_WAL_PACK_ENABLED",
-        default = false,
-        help = "Persist memtables into packed wal files (one file per rotation instead of one file per stream). NOTE: requires the pack-aware file mover; keep disabled until the full pipeline supports packs"
+        default = "",
+        help = "Persist memtables into packed wal files (one file per rotation instead of one file per stream). Empty to disable, a comma-separated list of stream types (e.g. 'metrics') to enable for those types, or 'all' to enable for every stream type"
     )]
-    pub feature_wal_pack_enabled: bool,
+    pub feature_wal_pack_enabled: String,
     #[env_config(name = "ZO_UI_ENABLED", default = true)]
     pub ui_enabled: bool,
     #[env_config(name = "ZO_UI_SQL_BASE64_ENABLED", default = false)]

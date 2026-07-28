@@ -84,21 +84,21 @@ pub async fn search_parquet(
     )
     .await?;
 
-    // search in wal pack segments
-    if get_config().common.feature_wal_pack_enabled {
-        let (pack_tables, pack_stats) = search_pack_segments(
-            query,
-            schema,
-            search_partition_keys,
-            sorted_by_time,
-            index_condition,
-            fst_fields,
-            &memtable_ids,
-        )
-        .await?;
-        tables.extend(pack_tables);
-        scan_stats.add(&pack_stats);
-    }
+    // search in wal pack segments. not gated by the pack feature flag: packs
+    // already on disk must stay searchable even after the flag is turned off
+    // (the segment index lookup is a no-op when there are no packs)
+    let (pack_tables, pack_stats) = search_pack_segments(
+        query,
+        schema,
+        search_partition_keys,
+        sorted_by_time,
+        index_condition,
+        fst_fields,
+        &memtable_ids,
+    )
+    .await?;
+    tables.extend(pack_tables);
+    scan_stats.add(&pack_stats);
 
     Ok((tables, scan_stats, ids))
 }

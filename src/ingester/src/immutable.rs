@@ -92,7 +92,7 @@ impl Immutable {
     }
 
     pub(crate) async fn persist(&self, wal_path: &PathBuf) -> Result<PersistStat> {
-        if config::get_config().common.feature_wal_pack_enabled {
+        if crate::pack::wal_pack_enabled(&self.key.stream_type) {
             self.persist_pack(wal_path).await
         } else {
             self.persist_files(wal_path).await

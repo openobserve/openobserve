@@ -62,6 +62,31 @@ use crate::{
 
 pub const PACK_DIR_PREFIX: &str = "pack";
 pub const PACK_FILE_EXT: &str = "pack";
+
+/// Whether the packed persist format is enabled for the given stream type.
+///
+/// `ZO_FEATURE_WAL_PACK_ENABLED` is empty (disabled), a comma-separated list
+/// of stream types, or `all`. `true`/`false` are accepted as aliases of
+/// `all`/empty. This only gates the write path: packs already on disk are
+/// always searched, uploaded and recycled regardless of the flag.
+pub fn wal_pack_enabled(stream_type: &str) -> bool {
+    wal_pack_enabled_for(
+        &config::get_config().common.feature_wal_pack_enabled,
+        stream_type,
+    )
+}
+
+fn wal_pack_enabled_for(value: &str, stream_type: &str) -> bool {
+    let v = value.trim().to_lowercase();
+    if v.is_empty() || v == "false" {
+        return false;
+    }
+    if v == "all" || v == "true" {
+        return true;
+    }
+    v.split(',')
+        .any(|s| s.trim().eq_ignore_ascii_case(stream_type))
+}
 const PACK_MAGIC: [u8; 8] = *b"O2PACK\x00\x01";
 const PACK_VERSION: u16 = 1;
 // footer_len(u32) + footer_hash(u64) + version(u16) + magic(8)
@@ -909,6 +934,25 @@ mod tests {
         assert!(batches.is_empty());
 
         unregister_pack(&pack.path).await;
+    }
+
+    #[test]
+    fn test_wal_pack_enabled_parsing() {
+        // disabled
+        assert!(!wal_pack_enabled_for("", "metrics"));
+        assert!(!wal_pack_enabled_for("false", "metrics"));
+        assert!(!wal_pack_enabled_for("  ", "logs"));
+        // enabled for all
+        assert!(wal_pack_enabled_for("all", "metrics"));
+        assert!(wal_pack_enabled_for("true", "logs"));
+        assert!(wal_pack_enabled_for("All", "traces"));
+        // per stream type
+        assert!(wal_pack_enabled_for("metrics", "metrics"));
+        assert!(!wal_pack_enabled_for("metrics", "logs"));
+        assert!(wal_pack_enabled_for("metrics,logs", "logs"));
+        assert!(wal_pack_enabled_for("metrics, logs", "logs"));
+        assert!(wal_pack_enabled_for("Metrics", "metrics"));
+        assert!(!wal_pack_enabled_for("metrics,traces", "logs"));
     }
 
     #[tokio::test]
