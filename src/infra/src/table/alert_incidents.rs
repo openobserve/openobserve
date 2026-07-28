@@ -107,6 +107,9 @@ pub struct ExternalAlertMeta {
     /// is what already threads from the ingest handler down to incident
     /// creation.
     pub severity: Option<String>,
+    /// Idempotency key supplied by the sender, persisted so a redelivery of
+    /// the same firing can be recognised.
+    pub dedup_key: Option<String>,
 }
 
 pub async fn add_alert_to_incident(
@@ -162,6 +165,7 @@ pub async fn add_alert_to_incident(
         external_url: Set(external.and_then(|e| e.external_url.clone())),
         annotations: Set(external.and_then(|e| e.annotations.clone())),
         resolved_at: Set(None),
+        dedup_key: Set(external.and_then(|e| e.dedup_key.clone())),
     };
 
     alert_link
@@ -312,6 +316,33 @@ pub async fn get_incident_alerts(
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
 }
 
+/// Whether this exact firing has already been recorded.
+///
+/// Idempotency for externally-ingested alerts is answered from the junction
+/// table rather than `alert_dedup_state`: that table's `alert_id` carries a
+/// foreign key to `alerts`, and an externally-ingested alert has no row there
+/// by design, so every write against it fails the constraint.
+///
+/// `since` bounds how long a key is honoured, so a genuine re-fire of the same
+/// rule much later is not mistaken for a redelivery.
+pub async fn external_alert_already_seen(
+    alert_id: &str,
+    dedup_key: &str,
+    since: i64,
+) -> Result<bool, errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+
+    let count = alert_incident_alerts::Entity::find()
+        .filter(alert_incident_alerts::Column::AlertId.eq(alert_id))
+        .filter(alert_incident_alerts::Column::DedupKey.eq(dedup_key))
+        .filter(alert_incident_alerts::Column::AlertFiredAt.gte(since))
+        .count(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+
+    Ok(count > 0)
+}
+
 /// Outcome of marking one alert resolved inside an incident.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct AlertResolution {
@@ -391,14 +422,19 @@ pub async fn find_open_incidents_containing_alert(
 ) -> Result<Vec<alert_incidents::Model>, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
 
+    // Select the id column only, deduplicated. A long-lived alert accumulates
+    // one junction row per firing, so loading whole models here would drag the
+    // entire history (annotations text included) across the wire just to
+    // collect a handful of distinct incident ids.
     let incident_ids: Vec<String> = alert_incident_alerts::Entity::find()
+        .select_only()
+        .column(alert_incident_alerts::Column::IncidentId)
+        .distinct()
         .filter(alert_incident_alerts::Column::AlertId.eq(alert_id))
+        .into_tuple::<String>()
         .all(client)
         .await
-        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?
-        .into_iter()
-        .map(|m| m.incident_id)
-        .collect();
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
 
     if incident_ids.is_empty() {
         return Ok(vec![]);

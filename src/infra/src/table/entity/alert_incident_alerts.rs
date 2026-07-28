@@ -42,6 +42,11 @@ pub struct Model {
     pub annotations: Option<String>,
     /// When the originating system reported this alert resolved.
     pub resolved_at: Option<i64>,
+    /// Idempotency key supplied by the sender, used to recognise a redelivery
+    /// of the same firing. Kept here rather than in `alert_dedup_state`, whose
+    /// `alert_id` carries a foreign key to `alerts` that an externally-ingested
+    /// alert can never satisfy.
+    pub dedup_key: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
@@ -79,6 +84,7 @@ mod tests {
             external_url: None,
             annotations: None,
             resolved_at: None,
+            dedup_key: None,
         };
         assert_eq!(m.incident_id, "inc-1");
         assert_eq!(m.alert_id, "alert-1");
@@ -101,6 +107,7 @@ mod tests {
             external_url: Some("https://alertmanager.example.com/#/alerts".to_string()),
             annotations: Some(r#"{"summary":"error rate above 5%"}"#.to_string()),
             resolved_at: None,
+            dedup_key: None,
         };
         assert_eq!(m.source.as_deref(), Some("alertmanager"));
         assert!(m.external_url.is_some());

@@ -1183,6 +1183,7 @@ async fn find_or_create_incident(
                         external.map(|e| e.source.as_str()),
                         external.and_then(|e| e.external_url.as_deref()),
                         external.and_then(|e| e.annotations.as_deref()),
+                        external.and_then(|e| e.dedup_key.as_deref()),
                     )
                     .await
             {
@@ -1420,25 +1421,32 @@ pub async fn ingest_external_alert(
         return resolve_external_alert(org_id, payload, &alert_id, triggered_at).await;
     }
 
-    // Idempotency. Reuses the alert dedup-state table (and its existing
-    // cleanup job) rather than introducing a parallel store; the dedup
-    // identity is the fingerprint.
-    let fingerprint = payload.dedup_identity(org_id);
-    let db = &infra::db::connect_to_orm().await;
-    if let Ok(Some(state)) = crate::alerts::deduplication::get_dedup_state(db, &fingerprint).await
-        && crate::alerts::deduplication::is_within_window(&state, EXTERNAL_DEDUP_WINDOW_MINUTES)
-    {
-        log::debug!(
-            "[incidents] Dropping duplicate external alert {}/{} (dedup identity {fingerprint})",
-            payload.source,
-            payload.alert_name,
-        );
-        return Ok(config::meta::alerts::incidents::ExternalIngestResponse {
-            action: ExternalIngestAction::DuplicateIgnored,
-            alert_id,
-            incident_id: None,
-            correlation_reason: None,
-        });
+    // Idempotency, answered from the junction table.
+    //
+    // This deliberately does NOT use `alert_dedup_state`: that table's
+    // `alert_id` has a foreign key to `alerts` (fk_alert_dedup_alert), and an
+    // externally-ingested alert has no row there by design, so every write
+    // against it fails the constraint and dedup silently never happens.
+    //
+    // Only an explicit `dedup_key` deduplicates. Without one there is nothing
+    // that distinguishes a retry from a genuine re-fire of the same rule, and
+    // silently swallowing the latter loses real signal.
+    if let Some(key) = payload.effective_dedup_key() {
+        let since = triggered_at - EXTERNAL_DEDUP_WINDOW_MINUTES * 60 * 1_000_000;
+        if infra::table::alert_incidents::external_alert_already_seen(&alert_id, key, since).await?
+        {
+            log::debug!(
+                "[incidents] Dropping duplicate external alert {}/{} (dedup_key {key})",
+                payload.source,
+                payload.alert_name,
+            );
+            return Ok(config::meta::alerts::incidents::ExternalIngestResponse {
+                action: ExternalIngestAction::DuplicateIgnored,
+                alert_id,
+                incident_id: None,
+                correlation_reason: None,
+            });
+        }
     }
 
     let alert = synthetic_alert(org_id, payload, &alert_id)?;
@@ -1471,6 +1479,11 @@ pub async fn ingest_external_alert(
             .as_deref()
             .and_then(config::meta::alerts::incidents::map_external_severity)
             .map(|s| s.to_string()),
+        // Persisted on the junction row by `add_alert_to_incident`; that write
+        // is what makes the next redelivery recognisable. No separate
+        // bookkeeping step, so there is no window where the alert is recorded
+        // but its dedup key is not.
+        dedup_key: payload.effective_dedup_key().map(str::to_string),
     };
 
     let notify = std::slice::from_ref(&result_row);
@@ -1478,24 +1491,6 @@ pub async fn ingest_external_alert(
         correlate_alert_to_incident(&alert, &result_row, notify, triggered_at, Some(&external))
             .await?
             .ok_or_else(|| anyhow::anyhow!("incident correlation returned no outcome"))?;
-
-    // Record the delivery so a retry inside the window is recognised. A
-    // failure here costs idempotency for this one alert, not the ingest.
-    if let Err(e) = crate::alerts::deduplication::save_dedup_state(
-        db,
-        crate::alerts::deduplication::DedupStateParams {
-            org_id,
-            fingerprint: &fingerprint,
-            alert_id: &alert_id,
-            first_seen_at: triggered_at,
-            last_seen_at: triggered_at,
-            occurrence_count: 1,
-        },
-    )
-    .await
-    {
-        log::warn!("[incidents] Failed to persist external alert dedup state: {e}");
-    }
 
     let (action, correlation_reason) = match &outcome {
         IncidentCorrelationOutcome::NewIncidentCreated { .. } => {

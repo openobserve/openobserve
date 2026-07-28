@@ -1067,18 +1067,20 @@ impl ExternalAlertPayload {
         external_alert_id(org_id, &self.source, &self.alert_name)
     }
 
-    /// Identity of a single *firing*, used for idempotent redelivery.
+    /// The idempotency key to deduplicate on, or `None` when the sender
+    /// supplied none.
     ///
-    /// Falls back to the alert identity when the sender supplies no
-    /// `dedup_key`, which makes repeated deliveries of a keyless alert
-    /// collapse onto one another rather than inflating `alert_count`.
-    pub fn dedup_identity(&self, org_id: &str) -> String {
-        match self.dedup_key.as_deref().map(str::trim) {
-            Some(key) if !key.is_empty() => {
-                format!("{}/{}/{}", org_id, self.source, key)
-            }
-            _ => format!("{}/{}", org_id, self.alert_id(org_id)),
-        }
+    /// A blank or whitespace-only key is treated as absent — it is a sender
+    /// bug, and honouring it would collapse unrelated firings together.
+    ///
+    /// There is deliberately no fallback identity for keyless payloads.
+    /// Without a key nothing distinguishes a retry from a genuine re-fire of
+    /// the same rule, and silently swallowing the latter loses real signal.
+    pub fn effective_dedup_key(&self) -> Option<&str> {
+        self.dedup_key
+            .as_deref()
+            .map(str::trim)
+            .filter(|k| !k.is_empty())
     }
 }
 
@@ -2453,27 +2455,40 @@ mod tests {
     }
 
     #[test]
-    fn test_dedup_identity_prefers_explicit_key() {
+    fn test_effective_dedup_key_returns_the_supplied_key() {
         let mut p = ext_payload("alertmanager", "HighErrorRate");
         p.dedup_key = Some("abc123".to_string());
-        let with_key = p.dedup_identity("org1");
-
-        // Same key, different rule name → still the same firing identity.
-        let mut q = ext_payload("alertmanager", "SomethingElse");
-        q.dedup_key = Some("abc123".to_string());
-        assert_eq!(with_key, q.dedup_identity("org1"));
+        assert_eq!(p.effective_dedup_key(), Some("abc123"));
     }
 
     #[test]
-    fn test_dedup_identity_falls_back_to_alert_identity() {
-        let p = ext_payload("alertmanager", "HighErrorRate");
-        let q = ext_payload("alertmanager", "HighErrorRate");
-        assert_eq!(p.dedup_identity("org1"), q.dedup_identity("org1"));
+    fn test_effective_dedup_key_trims_surrounding_whitespace() {
+        let mut p = ext_payload("alertmanager", "HighErrorRate");
+        p.dedup_key = Some("  abc123  ".to_string());
+        assert_eq!(p.effective_dedup_key(), Some("abc123"));
+    }
 
-        // A blank key must not be treated as a real key.
-        let mut blank = ext_payload("alertmanager", "HighErrorRate");
-        blank.dedup_key = Some("   ".to_string());
-        assert_eq!(blank.dedup_identity("org1"), p.dedup_identity("org1"));
+    #[test]
+    fn test_effective_dedup_key_treats_blank_as_absent() {
+        // Honouring a blank key would make it match every other blank-keyed
+        // payload and collapse unrelated firings into one.
+        for blank in ["", "   ", "\t\n"] {
+            let mut p = ext_payload("alertmanager", "HighErrorRate");
+            p.dedup_key = Some(blank.to_string());
+            assert_eq!(
+                p.effective_dedup_key(),
+                None,
+                "{blank:?} must read as absent"
+            );
+        }
+    }
+
+    #[test]
+    fn test_effective_dedup_key_absent_means_no_deduplication() {
+        // Deliberate: with no key there is nothing to tell a retry from a
+        // genuine re-fire, so the ingest path must not invent an identity.
+        let p = ext_payload("alertmanager", "HighErrorRate");
+        assert_eq!(p.effective_dedup_key(), None);
     }
 
     #[test]

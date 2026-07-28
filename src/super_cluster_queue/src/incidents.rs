@@ -75,6 +75,7 @@ pub(crate) async fn process_msg(msg: IncidentMessage) -> Result<()> {
             source,
             external_url,
             annotations,
+            dedup_key,
         } => {
             log::debug!(
                 "[SUPER_CLUSTER:incidents] Add alert to org_id={org_id} incident id={incident_id} alert={alert_id}",
@@ -90,6 +91,7 @@ pub(crate) async fn process_msg(msg: IncidentMessage) -> Result<()> {
                 // link to it, and the peer already received it on the
                 // `Create` message. Nothing to carry here.
                 severity: None,
+                dedup_key,
             });
             alert_incidents::add_alert_to_incident(
                 &incident_id,

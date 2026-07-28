@@ -77,10 +77,52 @@ impl MigrationTrait for Migration {
                     )
                     .to_owned(),
             )
+            .await?;
+        manager
+            .alter_table(
+                Table::alter()
+                    .table(AlertIncidentAlerts::Table)
+                    .add_column_if_not_exists(
+                        ColumnDef::new(AlertIncidentAlerts::DedupKey)
+                            .string_len(512)
+                            .null(),
+                    )
+                    .to_owned(),
+            )
+            .await?;
+        // Idempotency lookups filter on (alert_id, dedup_key) and are on the
+        // hot ingest path, so they get their own index.
+        manager
+            .create_index(
+                Index::create()
+                    .if_not_exists()
+                    .name("idx_incident_alerts_dedup")
+                    .table(AlertIncidentAlerts::Table)
+                    .col(AlertIncidentAlerts::AlertId)
+                    .col(AlertIncidentAlerts::DedupKey)
+                    .to_owned(),
+            )
             .await
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .drop_index(
+                Index::drop()
+                    .if_exists()
+                    .name("idx_incident_alerts_dedup")
+                    .table(AlertIncidentAlerts::Table)
+                    .to_owned(),
+            )
+            .await?;
+        manager
+            .alter_table(
+                Table::alter()
+                    .table(AlertIncidentAlerts::Table)
+                    .drop_column(AlertIncidentAlerts::DedupKey)
+                    .to_owned(),
+            )
+            .await?;
         manager
             .alter_table(
                 Table::alter()
@@ -119,12 +161,17 @@ impl MigrationTrait for Migration {
 #[derive(DeriveIden)]
 enum AlertIncidentAlerts {
     Table,
+    AlertId,
     Source,
     ExternalUrl,
     Annotations,
     /// When the originating system reported this alert resolved. An incident
     /// auto-resolves once every distinct alert in it has a value here.
     ResolvedAt,
+    /// Idempotency key supplied by the sender. Lives here rather than in
+    /// `alert_dedup_state`, which carries a foreign key to `alerts` that an
+    /// externally-ingested alert can never satisfy.
+    DedupKey,
 }
 
 #[cfg(test)]
