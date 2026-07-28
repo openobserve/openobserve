@@ -52,8 +52,9 @@ impl schema::OrganizationProvisioner for CoreOrganizationProvisioner {
     }
 }
 
-/// The license is bound to the instance id: generate a new one only when it
-/// is genuinely absent, never because the db errored on the read.
+/// The instance id must stay stable for the lifetime of the deployment:
+/// generate a new one only when it is genuinely absent, never because the db
+/// errored on the read.
 async fn get_or_create_instance_id() -> Result<String, anyhow::Error> {
     const MAX_RETRIES: usize = 5;
     let mut last_err = None;
@@ -76,7 +77,7 @@ async fn get_or_create_instance_id() -> Result<String, anyhow::Error> {
         }
     }
     Err(anyhow::anyhow!(
-        "failed to get instance id after {MAX_RETRIES} attempts: {}; refusing to generate a new instance id, the license is bound to it",
+        "failed to get instance id after {MAX_RETRIES} attempts: {}; refusing to generate a new instance id against an unhealthy database",
         last_err.unwrap()
     ))
 }

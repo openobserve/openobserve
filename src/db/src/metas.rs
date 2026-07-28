@@ -45,7 +45,7 @@ pub mod instance {
 
     /// Returns `Ok(None)` only when the instance id is genuinely not stored
     /// yet. Other errors (db unreachable/overloaded) propagate: the caller
-    /// must NOT generate a new instance id then, the license is bound to it.
+    /// must NOT generate a new instance id then.
     pub async fn get() -> Result<Option<String>> {
         let ret = match db::get("/instance/").await {
             Ok(v) => v,
