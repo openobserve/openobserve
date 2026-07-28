@@ -97,8 +97,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               row-key="_rowKey"
               pagination="none"
               :default-columns="false"
+              :row-height="24"
+              :show-global-filter="false"
+              :global-filter="detailSearchQuery"
               class="o2-table o2-row-md o2-schema-table log-detail-source-table border-card-glass-border w-full border border-solid"
             >
+              <template #toolbar>
+                <OSearchInput
+                  v-model="detailSearchQuery"
+                  data-test="log-detail-table-search-input"
+                  class="flex-1"
+                  :placeholder="t('common.search')"
+                />
+              </template>
               <template #cell-field="{ value }">
                 <div
                   :data-test="`log-detail-${value}-key`"
@@ -458,6 +469,7 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 const defaultValue: any = () => {
   return {
@@ -491,6 +503,7 @@ export default defineComponent({
     OSpinner,
     OIcon,
     OTable,
+    OSearchInput,
   },
   emits: [
     "showPrevDetail",
@@ -659,6 +672,8 @@ export default defineComponent({
     ];
 
     // Transform rowData object into array of rows
+    const detailSearchQuery = ref("");
+
     const tableRows = computed<
       { _rowKey: string; field: string; value: string | number | boolean }[]
     >(() => {
@@ -1027,6 +1042,7 @@ export default defineComponent({
       statusColor,
       tableColumns,
       tableRows,
+      detailSearchQuery,
       serviceStreamsEnabled,
       tabOrder,
       onTabReorder,
