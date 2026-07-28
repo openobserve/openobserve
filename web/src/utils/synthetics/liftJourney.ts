@@ -7,7 +7,12 @@ import type {
   SelectorType,
   StepAction,
 } from "@/types/synthetics";
-import { RETIRED_ACTIONS } from "@/constants/synthetics";
+import {
+  DEFAULT_SETTLE_BUDGET_MS,
+  MAX_SETTLE_BUDGET_MS,
+  MIN_SETTLE_BUDGET_MS,
+  RETIRED_ACTIONS,
+} from "@/constants/synthetics";
 
 /**
  * In-place upgrade of a version-1 journey to version 2, without re-recording.
@@ -198,16 +203,11 @@ export function liftJourney(steps: BrowserStep[]): LiftResult {
 function sleepBudgetMs(step: BrowserStep): number | null {
   const fromValue = Number(step.value);
   const raw = step.timeout ?? (Number.isFinite(fromValue) && fromValue > 0 ? fromValue : undefined);
-  const budget = raw ?? DEFAULT_SLEEP_BUDGET_MS;
+  const budget = raw ?? DEFAULT_SETTLE_BUDGET_MS;
   if (!Number.isFinite(budget) || budget <= 0) return null;
   return Math.min(Math.max(Math.round(budget), MIN_SETTLE_BUDGET_MS), MAX_SETTLE_BUDGET_MS);
 }
 
-/** What the probe sleeps for when a legacy `wait` carries no duration. */
-const DEFAULT_SLEEP_BUDGET_MS = 30000;
-/** Matches the server-side range check on `settle.budget_ms`. */
-const MIN_SETTLE_BUDGET_MS = 100;
-const MAX_SETTLE_BUDGET_MS = 60000;
 
 /**
  * Whether a journey needs lifting at all — used to decide if the upgrade

@@ -2,32 +2,22 @@
 // Copyright 2026 OpenObserve Inc.
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import type { BrowserStep, ReplayPhase, StepReplayResult, WireStep } from "@/types/synthetics";
+import type { BrowserStep, ReplayPhase, StepReplayResult } from "@/types/synthetics";
 import type { StepDotState } from "./JourneySteps.vue";
 import useSyntheticsRecorder from "@/composables/useSyntheticsRecorder";
 import { getUUIDv7 } from "@/utils/zincutils";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
-import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import JourneySteps from "./JourneySteps.vue";
 import UpgradeJourneyBanner from "./UpgradeJourneyBanner.vue";
 import ZeroAssertionNotice from "./ZeroAssertionNotice.vue";
-import {
-  ACTION_LABELS,
-  SELECTOR_ACTIONS as SELECTOR_ACTIONS_CONST,
-  VALUE_ACTIONS as VALUE_ACTIONS_CONST,
-  VALUE_LABELS,
-  SELECTOR_TYPE_OPTIONS,
-  actionOptions,
-  VALUE_WIDTH_MAP,
-  VALUE_TOOLTIP_MAP,
-} from "@/constants/synthetics";
+import BrowserJourneyStepEditor from "./BrowserJourneyStepEditor.vue";
+import { SELECTOR_ACTIONS as SELECTOR_ACTIONS_CONST } from "@/constants/synthetics";
 
 const props = defineProps<{
   modelValue: BrowserStep[];
@@ -449,44 +439,16 @@ function getRowStatusColor(row: BrowserStep): string | undefined {
   return undefined;
 }
 
-// ── Inline editor helpers ──────────────────────────────────────────────────
-const selectorActions = SELECTOR_ACTIONS_CONST;
-const valueActions = VALUE_ACTIONS_CONST;
-const selectorTypeOptions = SELECTOR_TYPE_OPTIONS;
-
-function valueActionLabel(action: string): string {
-  return VALUE_LABELS[action] || t("synthetics.journey.valueFallback");
-}
-
-function valueWidthClass(action: string): string {
-  return VALUE_WIDTH_MAP[action] || "w-152!";
-}
-
-function valueTooltip(action: string): string | undefined {
-  return VALUE_TOOLTIP_MAP[action];
-}
-
-function handleStepUpdate(row: BrowserStep, patch: Partial<BrowserStep>) {
+// ── Inline editor ──────────────────────────────────────────────────────────
+// BrowserJourneyStepEditor owns the field rendering AND the wire sync, and
+// emits a complete replacement step. Keeping a second copy of that logic here
+// is what let the two editors drift apart in the first place.
+function handleStepReplace(row: BrowserStep, next: BrowserStep) {
   const idx = findIndex(row);
   if (idx < 0) return;
-  const next = [...props.modelValue];
-
-  // Sync edits into the recorded wire step so the API receives the updated
-  // values. journeyToWireSteps prefers wire over UI fields, so without this
-  // sync, edits to recorded steps are silently discarded on save.
-  let wire = next[idx].wire ? { ...next[idx].wire } : undefined;
-  if (wire) {
-    if (patch.name !== undefined) wire.name = patch.name;
-    if (patch.selector !== undefined) wire.selector = patch.selector;
-    if (patch.selectorType !== undefined)
-      wire.selector_type = patch.selectorType.toLowerCase() as WireStep["selector_type"];
-    if (patch.value !== undefined) wire.value = patch.value;
-    if (patch.timeout !== undefined) wire.timeout_ms = patch.timeout;
-    if (patch.action !== undefined) wire = undefined; // action changed → wire metadata is no longer accurate
-  }
-
-  next[idx] = { ...next[idx], wire, ...patch };
-  emit("update:modelValue", next);
+  const steps = [...props.modelValue];
+  steps[idx] = next;
+  emit("update:modelValue", steps);
 }
 
 function openChromeExtensions() {
@@ -919,105 +881,32 @@ function openChromeExtensions() {
       @insert-below="handleInsertBelow"
       @retry-replay="emit('replay')"
     >
-      <!-- Inline editor (expanded content) -->
+      <!-- Inline editor (expanded content) — the same component the recording
+           panel renders, so an author sees the same fields either way -->
       <template #expansion="{ row }">
-        <div class="flex flex-col gap-3 px-8 pt-3 pb-3">
-          <!-- Action + Step name in one row -->
-          <div class="flex gap-2">
-            <OSelect
-              :model-value="row.action"
-              :label="t('synthetics.journey.actionLabel')"
-              :options="actionOptions"
-              class="w-50! shrink-0"
-              :error="firstStepError && props.modelValue[0]?.id === row.id"
-              :error-message="
-                firstStepError && props.modelValue[0]?.id === row.id
-                  ? t('synthetics.validation.firstStepMustNavigate')
-                  : ''
-              "
-              data-test="synthetics-journey-step-action-select"
-              @update:model-value="
-                (v: any) => {
-                  handleStepUpdate(row, { action: v as any });
-                  clearFirstStepError();
-                }
-              "
-            />
-            <OInput
-              :model-value="row.name ?? ''"
-              :label="t('synthetics.journey.stepNameOptional')"
-              :placeholder="t('synthetics.journey.stepNamePlaceholder')"
-              class="w-100!"
-              data-test="synthetics-journey-step-name-input"
-              @update:model-value="(v: any) => handleStepUpdate(row, { name: v })"
-            />
-          </div>
-          <!-- Selector type + selector (when applicable) -->
-          <template v-if="selectorActions.includes(row.action)">
-            <div class="flex w-fit! gap-2">
-              <OSelect
-                :model-value="row.selectorType ?? 'CSS'"
-                :label="t('synthetics.journey.selectorTypeLabel')"
-                :options="selectorTypeOptions"
-                class="w-50! shrink-0"
-                data-test="synthetics-journey-step-selector-type-select"
-                @update:model-value="(v: any) => handleStepUpdate(row, { selectorType: v })"
-              />
-              <OInput
-                :model-value="row.selector ?? ''"
-                :label="t('synthetics.journey.selectorLabel')"
-                placeholder="#my-button or .class-name"
-                class="w-100!"
-                :required="true"
-                :error="selectorErrors.has(row.id)"
-                :error-message="
-                  selectorErrors.has(row.id)
-                    ? t('synthetics.validation.selectorRequired', {
-                        step:
-                          row.name ||
-                          t('synthetics.results.steps.step', {
-                            step: props.modelValue.indexOf(row) + 1,
-                          }),
-                      })
-                    : ''
-                "
-                data-test="synthetics-journey-step-selector-input"
-                @update:model-value="
-                  (v: any) => {
-                    handleStepUpdate(row, { selector: v });
-                    clearSelectorError(row.id);
-                  }
-                "
-              />
-            </div>
-          </template>
-          <!-- Value (action-specific label) -->
-          <OInput
-            v-if="valueActions.includes(row.action)"
-            :model-value="row.value ?? ''"
-            :label="valueActionLabel(row.action)"
-            :placeholder="valueActionLabel(row.action)"
-            :class="valueWidthClass(row.action)"
-            data-test="synthetics-journey-step-value-input"
-            @update:model-value="(v: any) => handleStepUpdate(row, { value: v })"
-          >
-            <template v-if="valueTooltip(row.action)" #tooltip>
-              <OTooltip :content="valueTooltip(row.action)!" />
-            </template>
-          </OInput>
-          <!-- Timeout -->
-          <OInput
-            :model-value="String(row.timeout ?? '')"
-            :label="t('synthetics.journey.timeoutLabel')"
-            :placeholder="t('synthetics.journey.timeoutPlaceholder')"
-            type="number"
-            class="w-50!"
-            data-test="synthetics-journey-step-timeout-input"
-            @update:model-value="
-              (v: any) => handleStepUpdate(row, { timeout: v ? Number(v) : undefined })
-            "
-          />
-        </div>
+        <BrowserJourneyStepEditor
+          class="px-8 pt-3 pb-3"
+          :step="row"
+          :action-error-message="
+            firstStepError && props.modelValue[0]?.id === row.id
+              ? t('synthetics.validation.firstStepMustNavigate')
+              : ''
+          "
+          :selector-error-message="
+            selectorErrors.has(row.id)
+              ? t('synthetics.validation.selectorRequired', {
+                  step:
+                    row.name ||
+                    t('synthetics.results.steps.step', {
+                      step: props.modelValue.indexOf(row) + 1,
+                    }),
+                })
+              : ''
+          "
+          @update:step="(next: BrowserStep) => handleStepReplace(row, next)"
+          @action-edited="clearFirstStepError"
+          @selector-edited="clearSelectorError(row.id)"
+        />
       </template>
     </JourneySteps>
 

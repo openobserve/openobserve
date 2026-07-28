@@ -81,8 +81,41 @@ function mapValue(wire: WireStep, action: StepAction): string | undefined {
       // A recorded upload carries its paths in `files`; the editor shows the
       // first. Reading `value` alone would render the step blank.
       return wire.files?.[0] ?? wire.value;
+    case "select":
+      // A recorded select carries the chosen option in `options`
+      // (actionMapper.ts). Reading `value` alone rendered the Option field
+      // blank and then saved that blank back over the recorded choice.
+      return wire.options?.[0] ?? wire.value;
     default:
       return wire.value;
+  }
+}
+
+/**
+ * Inverse of {@link mapValue}: write the editor's single `value` back into the
+ * wire field this action actually replays from.
+ *
+ * The editor keeps one `value` per step, but the wire spreads it across
+ * `url`/`key`/`text`/`files`/`options`/`value` by action. Patching only
+ * `wire.value` — as the editor used to — left the replayed step carrying the
+ * *recorded* URL or key while the UI and the saved payload showed the edited
+ * one. Save and preview disagreeing about what the step does is worse than
+ * either being wrong.
+ */
+export function applyValueToWire(wire: WireStep, action: StepAction, value: string): WireStep {
+  switch (action) {
+    case "navigate":
+      return { ...wire, url: value };
+    case "press":
+      return { ...wire, key: value };
+    case "assert":
+      return { ...wire, text: value };
+    case "upload":
+      return { ...wire, files: value ? [value] : [] };
+    case "select":
+      return { ...wire, options: value ? [value] : [] };
+    default:
+      return { ...wire, value };
   }
 }
 
@@ -171,10 +204,14 @@ export function buildWireFromStep(step: BrowserStep): WireStep | null {
       return base;
     case "upload":
       return { ...base, files: step.value ? [step.value] : [] };
-    case "assert":
-      // Lean steps can't express assert subtype; default to assertText when a
-      // value is present, else assertVisible.
-      return step.value !== undefined && step.value !== "" ? { ...base, text: step.value } : base;
+    case "assert": {
+      // Lean steps can't express assert subtype; default to assertText when
+      // there is something to compare, else assertVisible. The typed assertion
+      // is the author's channel now (the generic Expected input was removed as
+      // dead — v2 drops `value` on assert), so read `expected` first.
+      const expected = step.assertion?.expected ?? step.value;
+      return expected !== undefined && expected !== "" ? { ...base, text: expected } : base;
+    }
     case "hover":
       return base;
     case "scroll":

@@ -3,6 +3,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { BrowserStep, WireStep } from "@/types/synthetics";
 import {
+  applyValueToWire,
   buildWireFromStep,
   defaultTimeoutFor,
   journeyToWireSteps,
@@ -272,5 +273,73 @@ describe("mapRecordedStep", () => {
     expect(steps).toHaveLength(2);
     expect(steps[0].action).toBe("navigate");
     expect(steps[1].action).toBe("click");
+  });
+
+  // ── Value round-trip ──────────────────────────────────────────────────────
+  // The editor keeps one `value` per step; the wire spreads it across
+  // url/key/text/files/options/value by action. Reading and writing must agree,
+  // or the editor shows one thing and replay does another.
+
+  it("should surface a recorded select's option as the editor value", () => {
+    const mapped = mapWireStep({ id: "s1", action: "select", options: ["India"] });
+    expect(mapped.value).toBe("India");
+  });
+
+  it.each([
+    ["navigate", "url", "https://new.test"],
+    ["press", "key", "Tab"],
+    ["assert", "text", "Welcome"],
+    ["type", "value", "hello"],
+  ] as const)("applyValueToWire should write a %s value to wire.%s", (action, field, value) => {
+    const wire = applyValueToWire({ id: "s1", action }, action, value);
+    expect(wire[field as keyof typeof wire]).toBe(value);
+  });
+
+  it("applyValueToWire should write list-valued actions as single-entry lists", () => {
+    expect(applyValueToWire({ id: "s1", action: "upload" }, "upload", "/tmp/a.pdf").files).toEqual([
+      "/tmp/a.pdf",
+    ]);
+    expect(applyValueToWire({ id: "s1", action: "select" }, "select", "India").options).toEqual([
+      "India",
+    ]);
+  });
+
+  it("applyValueToWire should clear a list-valued field when the value is cleared", () => {
+    expect(
+      applyValueToWire({ id: "s1", action: "upload", files: ["/tmp/a.pdf"] }, "upload", "").files,
+    ).toEqual([]);
+  });
+
+  it("applyValueToWire should preserve the extension metadata it does not own", () => {
+    const wire: WireStep = {
+      id: "s1",
+      action: "navigate",
+      url: "https://old.test",
+      pageAlias: "page",
+      framePath: ["main"],
+    };
+    const next = applyValueToWire(wire, "navigate", "https://new.test");
+    expect(next.pageAlias).toBe("page");
+    expect(next.framePath).toEqual(["main"]);
+  });
+
+  it("should round-trip an edited navigate URL back out to replay", () => {
+    const mapped = mapWireStep({ id: "s1", action: "navigate", url: "https://old.test" });
+    const edited: BrowserStep = {
+      ...mapped,
+      value: "https://new.test",
+      wire: applyValueToWire(mapped.wire!, "navigate", "https://new.test"),
+    };
+    expect(journeyToWireSteps([edited])[0].url).toBe("https://new.test");
+  });
+
+  it("should build an assert wire step from the typed assertion's expected value", () => {
+    const wire = buildWireFromStep({
+      id: "s1",
+      action: "assert",
+      code: "",
+      assertion: { kind: "element_text", expected: "Signed in" },
+    });
+    expect(wire?.text).toBe("Signed in");
   });
 });

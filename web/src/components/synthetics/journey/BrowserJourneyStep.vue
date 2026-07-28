@@ -3,25 +3,8 @@
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { copyToClipboard } from "@/utils/clipboard";
-import type {
-  BrowserStep,
-  SelectorType,
-  StepAssertion,
-  StepLocator,
-  StepReplayResult,
-  WireStep,
-} from "@/types/synthetics";
-import {
-  ACTION_ICONS,
-  ACTION_LABELS,
-  SELECTOR_ACTIONS,
-  VALUE_ACTIONS,
-  VALUE_LABELS,
-  SELECTOR_TYPE_OPTIONS,
-  actionOptions,
-  isRetiredAction,
-} from "@/constants/synthetics";
-import { defaultTimeoutFor } from "@/utils/synthetics/mapRecordedStep";
+import type { BrowserStep, StepReplayResult } from "@/types/synthetics";
+import { ACTION_ICONS, ACTION_LABELS } from "@/constants/synthetics";
 
 /**
  * Replay status dot states.
@@ -30,14 +13,11 @@ import { defaultTimeoutFor } from "@/utils/synthetics/mapRecordedStep";
  */
 export type StepDotState = "pending" | "active" | "pass" | "fail" | "skip";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
-import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
-import BrowserJourneyLocator from "./BrowserJourneyLocator.vue";
-import BrowserJourneyAssertion from "./BrowserJourneyAssertion.vue";
+import BrowserJourneyStepEditor from "./BrowserJourneyStepEditor.vue";
 
 const { t } = useI18n();
 
@@ -66,7 +46,6 @@ const emit = defineEmits<{
 }>();
 
 // ── Computed from shared constants ──────────────────────────────────
-const selectorTypeOptions = SELECTOR_TYPE_OPTIONS;
 const actionIcon = computed(() => ACTION_ICONS[props.step.action]);
 const actionLabel = computed(() => ACTION_LABELS[props.step.action]);
 const displayName = computed(() => props.step.name || actionLabel.value);
@@ -81,135 +60,6 @@ const selectorPreview = computed(() => {
   const locator = props.step.locator;
   const effective = locator?.user_override ?? locator?.candidates?.[0];
   return effective?.value || props.step.selector || props.step.value || "";
-});
-const showSelector = computed(() => SELECTOR_ACTIONS.includes(props.step.action));
-const showValue = computed(() => VALUE_ACTIONS.includes(props.step.action));
-const valueLabel = computed(
-  () => VALUE_LABELS[props.step.action] || t("synthetics.journey.valueFallback"),
-);
-
-function update(patch: Partial<BrowserStep>) {
-  // Patch edited fields into wire instead of clearing it, so replay still has
-  // the original extension metadata (framePath, pageAlias, position, snapshot).
-  // Action changes clear wire since the step type fundamentally changed.
-  let wire = props.step.wire ? { ...props.step.wire } : undefined;
-  if (wire) {
-    if (patch.name !== undefined) wire.name = patch.name;
-    if (patch.selector !== undefined) wire.selector = patch.selector;
-    if (patch.selectorType !== undefined)
-      wire.selector_type = patch.selectorType.toLowerCase() as WireStep["selector_type"];
-    if (patch.value !== undefined) wire.value = patch.value;
-    if (patch.timeout !== undefined) wire.timeout_ms = patch.timeout;
-    // The preview needs these to report what it cannot simulate, so they travel
-    // with the replayed step rather than being dropped on edit.
-    if (patch.locator !== undefined) wire.locator = patch.locator;
-    if (patch.assertion !== undefined) wire.assertion = patch.assertion;
-    if (patch.optional !== undefined) wire.optional = patch.optional;
-    if (patch.alwaysRun !== undefined) wire.always_run = patch.alwaysRun;
-    if (patch.action !== undefined) wire = undefined; // action changed — wire metadata is no longer accurate
-  }
-  emit("update:step", { ...props.step, wire, ...patch });
-}
-
-// Computed getters/setters for inline editor fields
-const actionComputed = computed({
-  get: () => props.step.action,
-  set: (v: BrowserStep["action"]) => update({ action: v }),
-});
-
-const nameComputed = computed({
-  get: () => props.step.name ?? "",
-  set: (v: string) => update({ name: v }),
-});
-
-const selectorTypeComputed = computed({
-  get: () => props.step.selectorType ?? "CSS",
-  set: (v: string | number | boolean | null | undefined) =>
-    update({ selectorType: (v as SelectorType) ?? undefined }),
-});
-
-const selectorComputed = computed({
-  get: () => props.step.selector ?? "",
-  set: (v: string) => update({ selector: v }),
-});
-
-const valueComputed = computed({
-  get: () => props.step.value ?? "",
-  set: (v: string) => update({ value: v }),
-});
-
-const timeoutComputed = computed({
-  get: () => String(props.step.timeout ?? ""),
-  set: (v: string) => update({ timeout: v ? Number(v) : undefined }),
-});
-
-// ── Timeout guard rails (spec P1.1.4, P1.1.5) ───────────────────────────────
-// The recorder no longer stamps a timeout, so this field renders empty — which
-// reads as "no timeout" and invites authors to fill it in needlessly. Show the
-// default the runner will actually apply, so an author can see what they would
-// be overriding before they override it.
-const timeoutDefault = computed(() => defaultTimeoutFor(props.step.action));
-
-// Lowering below the category default is permitted — it is the author's call —
-// but a step timeout shorter than the application's real response time is
-// precisely the condition that produced the observed production failures.
-// Advisory only: it must never block saving.
-const timeoutBelowDefault = computed(() => {
-  const explicit = props.step.timeout;
-  return explicit !== undefined && explicit < timeoutDefault.value;
-});
-
-// ── Version-2 blocks (spec P2.5.4) ──────────────────────────────────────────
-// A v1 step and a v2 step coexist in the same editor: the v1 selector pair
-// renders when there is no bundle, the Locator block when there is. Showing both
-// would suggest two independent ways to identify the element, when in fact only
-// one of them is what the runner reads.
-const hasLocatorBundle = computed(
-  () => !!(props.step.locator?.candidates?.length || props.step.locator?.user_override),
-);
-
-function updateLocator(locator: StepLocator) {
-  update({ locator });
-}
-
-function updateAssertion(assertion: StepAssertion) {
-  update({ assertion });
-}
-
-const optionalComputed = computed({
-  get: () => !!props.step.optional,
-  set: (v: boolean) => update({ optional: v }),
-});
-
-const alwaysRunComputed = computed({
-  get: () => !!props.step.alwaysRun,
-  set: (v: boolean) => update({ alwaysRun: v }),
-});
-
-/** Settle evidence is read-only: it is what the recording observed, not a setting. */
-const settleSummary = computed(() => {
-  const settle = props.step.settle;
-  if (!settle) return [];
-  const lines: string[] = [];
-  if (settle.navigation) {
-    lines.push(t("synthetics.journey.settleNavigation", { pattern: settle.navigation.url_pattern }));
-  }
-  for (const r of settle.responses ?? []) {
-    lines.push(
-      t("synthetics.journey.settleResponse", {
-        method: r.method ?? "",
-        pattern: r.url_pattern,
-      }),
-    );
-  }
-  if (settle.observed_duration_ms !== undefined) {
-    lines.push(
-      t("synthetics.journey.settleObserved", {
-        seconds: (settle.observed_duration_ms / 1000).toFixed(1),
-      }),
-    );
-  }
-  return lines;
 });
 
 // ── Status dot visual mapping (combines with step number during replay) ─────
@@ -503,124 +353,14 @@ function toggleExpanded() {
       </div>
     </div>
 
-    <!-- Inline editor (expanded) -->
-    <div v-if="expanded" class="flex w-32! flex-col gap-3 px-8 pt-3 pb-3">
-      <!-- Action select -->
-      <OSelect
-        v-model="actionComputed"
-        :label="t('synthetics.journey.actionLabel')"
-        :options="actionOptions"
-        class="w-[25rem]!"
-        data-test="synthetics-journey-step-action-select"
-      />
+    <!-- Inline editor (expanded) — same component the edit view renders, so
+         both surfaces always offer the same fields -->
+    <BrowserJourneyStepEditor
+      v-if="expanded"
+      class="px-8 pt-3 pb-3"
+      :step="step"
+      @update:step="emit('update:step', $event)"
+    />
 
-      <!-- Step name -->
-      <OInput
-        v-model="nameComputed"
-        :label="t('synthetics.journey.stepNameOptional')"
-        :placeholder="t('synthetics.journey.stepNamePlaceholder')"
-        data-test="synthetics-journey-step-name-input"
-      />
-
-      <!-- Version-2 Locator block, or the v1 selector pair — never both -->
-      <BrowserJourneyLocator
-        v-if="hasLocatorBundle && step.locator"
-        :locator="step.locator"
-        @update:locator="updateLocator"
-      />
-
-      <!-- Selector type + selector (when applicable) -->
-      <template v-else-if="showSelector">
-        <div class="flex gap-2">
-          <OSelect
-            v-model="selectorTypeComputed"
-            :label="t('synthetics.journey.selectorTypeLabel')"
-            :options="selectorTypeOptions"
-            class="w-[25rem]! shrink-0"
-            data-test="synthetics-journey-step-selector-type-select"
-          />
-          <OInput
-            v-model="selectorComputed"
-            :label="t('synthetics.journey.selectorLabel')"
-            placeholder="#my-button or .class-name"
-            class="flex-1"
-            data-test="synthetics-journey-step-selector-input"
-          />
-        </div>
-      </template>
-
-      <!-- Value (action-specific label) -->
-      <OInput
-        v-if="showValue"
-        v-model="valueComputed"
-        :label="valueLabel"
-        :placeholder="valueLabel"
-        data-test="synthetics-journey-step-value-input"
-      />
-
-      <!-- Typed assertion — what this step actually verifies -->
-      <BrowserJourneyAssertion
-        v-if="step.action === 'assert'"
-        :assertion="step.assertion"
-        @update:assertion="updateAssertion"
-      />
-
-      <!-- Settle evidence: observed while recording, read-only here -->
-      <div
-        v-if="settleSummary.length"
-        class="flex flex-col gap-1"
-        data-test="synthetics-journey-step-settle"
-      >
-        <span class="text-text-secondary text-xs">{{ t("synthetics.journey.settleLabel") }}</span>
-        <p
-          v-for="line in settleSummary"
-          :key="line"
-          class="text-text-secondary m-0 font-mono text-xs"
-        >
-          {{ line }}
-        </p>
-      </div>
-
-      <!-- Step-level flow control (spec P5.3) -->
-      <div class="flex flex-col gap-1">
-        <OCheckbox
-          v-model="optionalComputed"
-          :label="t('synthetics.journey.optionalLabel')"
-          data-test="synthetics-journey-step-optional-checkbox"
-        />
-        <OCheckbox
-          v-model="alwaysRunComputed"
-          :label="t('synthetics.journey.alwaysRunLabel')"
-          data-test="synthetics-journey-step-always-run-checkbox"
-        />
-      </div>
-
-      <!-- Timeout — placeholder shows the runner default this step would get -->
-      <OInput
-        v-model="timeoutComputed"
-        :label="t('synthetics.journey.timeoutLabel')"
-        :placeholder="String(timeoutDefault)"
-        type="number"
-        data-test="synthetics-journey-step-timeout-input"
-      />
-      <p
-        v-if="timeoutBelowDefault"
-        class="text-status-warning-text m-0 flex items-start gap-1 text-xs"
-        data-test="synthetics-journey-step-timeout-warning"
-      >
-        <OIcon name="warning" size="xs" class="mt-0.5 shrink-0" aria-hidden="true" />
-        <span>{{ t("synthetics.journey.timeoutBelowDefaultWarning", { default: timeoutDefault }) }}</span>
-      </p>
-
-      <!-- Retired action notice (spec X-9) -->
-      <p
-        v-if="isRetiredAction(step.action)"
-        class="text-status-warning-text m-0 flex items-start gap-1 text-xs"
-        data-test="synthetics-journey-step-retired-action"
-      >
-        <OIcon name="warning" size="xs" class="mt-0.5 shrink-0" aria-hidden="true" />
-        <span>{{ t("synthetics.journey.retiredActionWarning", { action: actionLabel }) }}</span>
-      </p>
-    </div>
   </div>
 </template>

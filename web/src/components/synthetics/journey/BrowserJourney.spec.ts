@@ -248,6 +248,69 @@ describe("BrowserJourney recording", () => {
     expect(updatedSteps[0].wire.selector).toBe("#new");
   });
 
+  // Regression: this view used to inline its own, thinner copy of the step
+  // editor. It rendered no locator bundle, no settle block, no assertion editor
+  // and no optional/always-run checkboxes, so which fields an author could see
+  // depended on whether they were recording or editing a saved check.
+  it("should render the full step editor, not a reduced copy of it", async () => {
+    const step = {
+      id: "s1",
+      action: "click",
+      name: "Sign in",
+      code: "",
+      locator: { candidates: [{ kind: "test_attribute", value: '[data-test="sign-in"]' }] },
+      settle: {
+        navigation: { url_pattern: "**/web/**" },
+        responses: [{ url_pattern: "**/auth/login", method: "POST", required: false }],
+        budget_ms: 5000,
+      },
+      wire: { id: "w1", action: "click" },
+    };
+
+    wrapper = mount(BrowserJourney, {
+      props: { modelValue: [step] },
+      global: { stubs: { ...STUBS, JourneySteps: JourneyStepsStubWithExpansion } },
+    });
+
+    for (const dt of [
+      "synthetics-journey-step-editor",
+      "synthetics-journey-step-locator",
+      "synthetics-journey-step-settle",
+      "synthetics-journey-step-settle-required-0",
+      "synthetics-journey-step-settle-budget-input",
+      "synthetics-journey-step-optional-checkbox",
+      "synthetics-journey-step-always-run-checkbox",
+      "synthetics-journey-step-timeout-input",
+    ]) {
+      expect(wrapper.find(`[data-test="${dt}"]`).exists(), dt).toBe(true);
+    }
+  });
+
+  it("should route an edited navigate URL to wire.url so replay uses it", async () => {
+    const step = {
+      id: "s1",
+      action: "navigate",
+      name: "Open page",
+      value: "https://old.test",
+      code: "",
+      wire: { id: "w1", action: "navigate", url: "https://old.test" },
+    };
+
+    wrapper = mount(BrowserJourney, {
+      props: { modelValue: [step] },
+      global: { stubs: { ...STUBS, JourneySteps: JourneyStepsStubWithExpansion } },
+    });
+
+    await wrapper
+      .find('[data-test="synthetics-journey-step-value-input"]')
+      .setValue("https://new.test");
+
+    const emitted = wrapper.emitted("update:modelValue")!;
+    const next = emitted[emitted.length - 1][0] as any[];
+    expect(next[0].value).toBe("https://new.test");
+    expect(next[0].wire.url).toBe("https://new.test");
+  });
+
   it("should emit clear-results when modelValue becomes empty", async () => {
     wrapper = mountJourney({
       modelValue: [{ id: "s1", action: "click", name: "Step 1", code: "" }],

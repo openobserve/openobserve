@@ -54,14 +54,27 @@ export const SELECTOR_ACTIONS: readonly StepAction[] = [
   "assert",
 ];
 
+/**
+ * Actions whose step carries an author-editable value.
+ *
+ * `upload` is here because a recorded upload's file path is mapped into
+ * `step.value` and saved back out as `files` — omitting it meant the path was
+ * stored and replayed but had no input, so an author could neither see it nor
+ * change it.
+ *
+ * `assert` is deliberately absent: BrowserJourneyAssertion owns the expected
+ * value for an assert step, and a v2 payload drops `value` on assert
+ * (buildV2Steps `v2Value`). A second, generic Expected input took typing and
+ * silently discarded it at save.
+ */
 export const VALUE_ACTIONS: readonly StepAction[] = [
   "navigate",
   "type",
   "select",
   "press",
+  "upload",
   "scroll",
   "wait",
-  "assert",
 ];
 
 /**
@@ -143,10 +156,17 @@ export const VALUE_LABELS: Record<string, string> = {
   type: "Text to type",
   select: "Option",
   press: "Key",
+  upload: "File path",
   scroll: "To (px or selector)",
   wait: "Duration (ms)",
-  assert: "Expected",
 };
+
+// ── Settle budget (spec P3.3, P3.4.3) ────────────────────────────────────
+/** What the probe sleeps for when a legacy `wait` carries no duration. */
+export const DEFAULT_SETTLE_BUDGET_MS = 30000;
+/** Matches the server-side range check on `settle.budget_ms`. */
+export const MIN_SETTLE_BUDGET_MS = 100;
+export const MAX_SETTLE_BUDGET_MS = 60000;
 
 // ── Value field widths ───────────────────────────────────────────────────
 export const VALUE_WIDTH_MAP: Record<string, string> = {

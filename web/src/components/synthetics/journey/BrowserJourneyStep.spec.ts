@@ -482,4 +482,162 @@ describe("BrowserJourneyStep", () => {
       expect(dot.exists()).toBe(true);
     });
   });
+
+  // ── Value inputs per action ───────────────────────────────────────────────
+  describe("value input", () => {
+    const valueInput = () => wrapper.find('[data-test="synthetics-journey-step-value-input"]');
+
+    it("should render the file path input for an upload step", () => {
+      wrapper = mountStep({
+        step: makeStep({ action: "upload", value: "/tmp/a.pdf" }),
+        expanded: true,
+      });
+
+      expect(valueInput().exists()).toBe(true);
+      expect(valueInput().attributes("value")).toBe("/tmp/a.pdf");
+    });
+
+    it("should render the option input for a select step", () => {
+      wrapper = mountStep({
+        step: makeStep({ action: "select", value: "India" }),
+        expanded: true,
+      });
+
+      expect(valueInput().attributes("value")).toBe("India");
+    });
+
+    it("should not render a generic value input for an assert step", () => {
+      // BrowserJourneyAssertion owns the expected value; a second input took
+      // typing and had it dropped at save (buildV2Steps drops `value` on assert).
+      wrapper = mountStep({
+        step: makeStep({ action: "assert", assertion: { kind: "element_text", expected: "Hi" } }),
+        expanded: true,
+      });
+
+      expect(valueInput().exists()).toBe(false);
+    });
+  });
+
+  // ── Wire round-trip on edit ───────────────────────────────────────────────
+  describe("value edits reach the replayed wire step", () => {
+    function editedWire(step: BrowserStep, newValue: string) {
+      wrapper = mountStep({ step, expanded: true });
+      const input = wrapper.find('[data-test="synthetics-journey-step-value-input"]');
+      input.setValue(newValue);
+      const emitted = wrapper.emitted("update:step") as BrowserStep[][];
+      return emitted[0][0].wire!;
+    }
+
+    it("should write an edited navigate URL to wire.url, not wire.value", async () => {
+      const step = makeStep({
+        action: "navigate",
+        value: "https://old.test",
+        wire: { id: "step-1", action: "navigate", url: "https://old.test", pageAlias: "page" },
+      });
+
+      const wire = editedWire(step, "https://new.test");
+
+      expect(wire.url).toBe("https://new.test");
+      expect(wire.pageAlias).toBe("page"); // extension metadata survives the edit
+    });
+
+    it("should write an edited press key to wire.key", async () => {
+      const step = makeStep({
+        action: "press",
+        value: "Enter",
+        wire: { id: "step-1", action: "press", key: "Enter" },
+      });
+
+      expect(editedWire(step, "Tab").key).toBe("Tab");
+    });
+
+    it("should write an edited select option to wire.options", async () => {
+      const step = makeStep({
+        action: "select",
+        value: "India",
+        wire: { id: "step-1", action: "select", options: ["India"] },
+      });
+
+      expect(editedWire(step, "Japan").options).toEqual(["Japan"]);
+    });
+  });
+
+  // ── Settle block (spec P4.1.5, P3.4.3) ────────────────────────────────────
+  describe("settle", () => {
+    const settleStep = () =>
+      makeStep({
+        action: "click",
+        settle: {
+          navigation: { url_pattern: "**/web/**" },
+          responses: [{ url_pattern: "**/api/login", method: "POST", required: false }],
+          observed_duration_ms: 1200,
+          budget_ms: 5000,
+        },
+        wire: { id: "step-1", action: "click" },
+      });
+
+    it("should let the author mark a recorded response as required", async () => {
+      wrapper = mountStep({ step: settleStep(), expanded: true });
+
+      const checkbox = wrapper.find('[data-test="synthetics-journey-step-settle-required-0"]');
+      expect(checkbox.exists()).toBe(true);
+
+      await checkbox.setValue(true);
+
+      const emitted = wrapper.emitted("update:step") as BrowserStep[][];
+      const next = emitted[0][0];
+      expect(next.settle?.responses?.[0].required).toBe(true);
+      // ...and it travels with the replayed step, not just the saved one.
+      expect(next.wire?.settle?.responses?.[0].required).toBe(true);
+    });
+
+    it("should show the settle budget and let the author change it", async () => {
+      wrapper = mountStep({ step: settleStep(), expanded: true });
+
+      const budget = wrapper.find('[data-test="synthetics-journey-step-settle-budget-input"]');
+      expect(budget.attributes("value")).toBe("5000");
+
+      await budget.setValue("12000");
+
+      const emitted = wrapper.emitted("update:step") as BrowserStep[][];
+      expect(emitted[0][0].settle?.budget_ms).toBe(12000);
+    });
+
+    it("should drop the budget when the field is cleared", async () => {
+      wrapper = mountStep({ step: settleStep(), expanded: true });
+
+      await wrapper
+        .find('[data-test="synthetics-journey-step-settle-budget-input"]')
+        .setValue("");
+
+      const emitted = wrapper.emitted("update:step") as BrowserStep[][];
+      const next = emitted[0][0];
+      expect(next.settle?.budget_ms).toBeUndefined();
+      expect(next.settle?.navigation?.url_pattern).toBe("**/web/**"); // evidence kept
+    });
+
+    it("should warn when the budget falls outside the server-accepted range", () => {
+      const step = settleStep();
+      step.settle!.budget_ms = 90000;
+      wrapper = mountStep({ step, expanded: true });
+
+      expect(
+        wrapper.find('[data-test="synthetics-journey-step-settle-budget-warning"]').exists(),
+      ).toBe(true);
+    });
+
+    it("should not warn for a budget inside the range", () => {
+      wrapper = mountStep({ step: settleStep(), expanded: true });
+
+      expect(
+        wrapper.find('[data-test="synthetics-journey-step-settle-budget-warning"]').exists(),
+      ).toBe(false);
+    });
+
+    it("should render nothing when the step has no settle evidence", () => {
+      wrapper = mountStep({ step: makeStep({ action: "click" }), expanded: true });
+
+      expect(wrapper.find('[data-test="synthetics-journey-step-settle"]').exists()).toBe(false);
+    });
+  });
 });
