@@ -220,3 +220,21 @@ export const VALUE_TOOLTIP_MAP: Record<string, string> = {
   press: 'Press a keyboard key by its key name, e.g. "Enter", "Tab", "Escape", "ArrowDown".',
   assert: 'Assertion expression, e.g. "text=Hello" or "visible" to check element visibility.',
 };
+
+// ── Recorder locator configuration ───────────────────────────────────────────
+
+/**
+ * The test-id attribute the recorder selects on, unless a monitor overrides it.
+ *
+ * `data-test` because that is what OpenObserve's own frontend marks interactive
+ * elements with, and self-monitoring is the acceptance test for this feature.
+ * Playwright's own default is `data-testid`; sending nothing meant every
+ * recording fell back to that, so an O2 page only produced test-attribute
+ * candidates because upstream's generator carries a hardcoded fallback list
+ * that happens to include `data-test`.
+ *
+ * An application using anything outside that list — `data-qa`, `data-cy`,
+ * `data-pw`, `data-automation-id` — produced no test-attribute candidates at
+ * all, and every step silently degraded to role/text/css.
+ */
+export const DEFAULT_TEST_ID_ATTR = "data-test";

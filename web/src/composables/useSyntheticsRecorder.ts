@@ -17,6 +17,7 @@ import type {
   WireStep,
 } from "@/types/synthetics";
 import { substituteVariables } from "@/utils/synthetics/mapRecordedStep";
+import { DEFAULT_TEST_ID_ATTR } from "@/constants/synthetics";
 
 /**
  * Encapsulates all communication with the OpenObserve Extension (playwright-crx)
@@ -252,7 +253,7 @@ const useSyntheticsRecorder = () => {
    * `targetUrl` is kept only for the local recording banner — the extension
    * command itself takes no URL.
    */
-  async function startRecording(targetUrl: string): Promise<void> {
+  async function startRecording(targetUrl: string, testIdAttr?: string): Promise<void> {
     error.value = "";
     liveSteps.value = [];
     currentUrl.value = targetUrl;
@@ -272,7 +273,17 @@ const useSyntheticsRecorder = () => {
       isRecording.value = false;
     };
 
-    const res = await sendCommand<RecorderStartResponse>({ action: "startRecording", targetUrl });
+    // The extension defaults to Playwright's `data-testid` when this is absent,
+    // and it was absent on every recording ever made — the field existed on the
+    // command type but nothing populated it. O2 markup uses `data-test`, which
+    // only produced test-attribute candidates because upstream's generator
+    // happens to carry a hardcoded fallback list containing it. An app on
+    // `data-qa` or `data-cy` got none at all, silently.
+    const res = await sendCommand<RecorderStartResponse>({
+      action: "startRecording",
+      targetUrl,
+      testIdAttr: testIdAttr || DEFAULT_TEST_ID_ATTR,
+    });
     if (!res?.success) {
       console.debug("Disconnect ---", res);
       error.value = res?.error || "Failed to start recording.";
