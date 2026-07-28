@@ -451,6 +451,11 @@ export function normalizeReservedTimestampAlias(
     for (const panel of tab.panels) {
       if (!panel?.queries) continue;
 
+      // The `_timestamp` output-alias rule is SQL-only — skip PromQL panels.
+      if (panel.queryType === "promql" || panel.queryType === "promql-builder") {
+        continue;
+      }
+
       let renamedAny = false;
       for (const query of panel.queries) {
         let sqlHadAlias = false;

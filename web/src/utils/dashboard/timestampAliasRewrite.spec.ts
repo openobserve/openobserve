@@ -456,6 +456,28 @@ describe("normalizeReservedTimestampAlias", () => {
     expect(data.tabs[0].panels[0].queries[1].fields.x[0].alias).toBe("ts");
   });
 
+  it("skips PromQL panels (SQL-only rule)", () => {
+    for (const queryType of ["promql", "promql-builder"]) {
+      const panel = {
+        queryType,
+        config: {
+          override_config: [{ field: { matchBy: "name", value: "_timestamp" }, config: [] }],
+        },
+        queries: [
+          {
+            // PromQL never has `AS _timestamp`, but assert the panel is skipped wholesale
+            query: 'histogram_quantile(0.9, rate(x[5m])) AS "_timestamp"',
+            fields: { x: [{ alias: "_timestamp", column: "_timestamp", isDerived: false }] },
+          },
+        ],
+      };
+      const data = wrap(panel);
+      const before = JSON.parse(JSON.stringify(data));
+      normalizeReservedTimestampAlias(data);
+      expect(data, `queryType=${queryType}`).toEqual(before); // untouched
+    }
+  });
+
   it("is idempotent", () => {
     const data = wrap(makePanel());
     normalizeReservedTimestampAlias(data);
