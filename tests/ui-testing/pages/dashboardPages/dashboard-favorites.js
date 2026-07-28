@@ -113,13 +113,22 @@ export default class DashboardFavorites {
   // against that still-in-flight request and lose the favorite server-side
   // while the DOM already looked correct. Wait for the response so callers
   // get a genuinely persisted state, not just the optimistic one.
+  //
+  // The settings/v2/user/{userId} endpoint is keyed only by user, not by
+  // which setting is being saved — setting_key travels in the POST body, not
+  // the URL. Matching on URL alone can resolve on an unrelated user-setting
+  // save (e.g. home_dashboard) that happens to land in the same window,
+  // letting a caller proceed before the favorites save actually completed.
+  // Check the request body's setting_key so this only resolves on the right
+  // save.
   async waitForFavoritesPersisted(action) {
     await Promise.all([
-      this.page.waitForResponse(
-        (response) =>
-          /\/settings\/v2\/user\//.test(response.url()) &&
-          response.status() === 200
-      ),
+      this.page.waitForResponse((response) => {
+        if (!/\/settings\/v2\/user\//.test(response.url())) return false;
+        if (response.status() !== 200) return false;
+        const body = response.request().postDataJSON();
+        return body?.setting_key === "favorite_dashboards";
+      }),
       action(),
     ]);
   }
