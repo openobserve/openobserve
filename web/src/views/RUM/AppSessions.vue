@@ -945,7 +945,7 @@ const getSessions = () => {
       },
       "RUM",
     )
-    .then((res) => {
+    .then(async (res) => {
       const hits = res.data.hits;
 
       hasCompleteResult.value = true;
@@ -956,7 +956,7 @@ const getSessions = () => {
         // time range (they would return 0), and activity sparklines are per-row. Zero the
         // KPI state directly instead of spending 4 more searches to be told the same.
         clearWindowAggregates();
-        return "empty";
+        return "empty" as const;
       }
 
       // Store all session data from _rumdata
@@ -980,7 +980,8 @@ const getSessions = () => {
       const sessionIds = hits.map((hit: any) => hit.session_id);
 
       // Query 2: Get start/end times from _sessionreplay
-      return getSessionTimeFromReplay(req, sessionIds, signal);
+      await getSessionTimeFromReplay(req, sessionIds, signal);
+      return "loaded" as const;
     })
     .catch((err) => {
       // A superseded load is not a failure — leave the rows and the editor alone so the
