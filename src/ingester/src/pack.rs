@@ -469,45 +469,49 @@ async fn append_consumed_sidecar(pack_path: &Path, offsets: &[u64]) {
         data.push('\n');
     }
     let mut files = CONSUMED_FILES.lock().await;
-    if !files.contains_key(&path) {
-        match fs::OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(&path)
-            .await
-        {
-            Ok(f) => {
-                files.insert(path.clone(), (f, 0));
-            }
+    for attempt in 1..=3 {
+        match sidecar_append_once(&mut files, &path, &data).await {
+            Ok(_) => return,
             Err(e) => {
-                // worst case the segments are re-uploaded after a restart
-                log::error!(
-                    "[INGESTER:PACK] open consumed sidecar {} failed: {e}",
+                // drop the handle so the next attempt reopens the file.
+                // duplicate offset lines from a partially applied attempt
+                // are harmless, the reader collects them into a set
+                files.remove(&path);
+                log::warn!(
+                    "[INGESTER:PACK] write consumed sidecar {} failed (attempt {attempt}/3): {e}",
                     path.display()
                 );
-                return;
             }
         }
     }
-    let (f, writes) = files.get_mut(&path).unwrap();
-    let ret = async {
-        f.write_all(data.as_bytes()).await?;
-        *writes += 1;
-        if *writes >= CONSUMED_SYNC_EVERY {
-            *writes = 0;
-            f.sync_all().await?;
-        }
-        Ok::<(), std::io::Error>(())
+    // worst case the segments are re-uploaded after a restart
+    log::error!(
+        "[INGESTER:PACK] write consumed sidecar {} failed after 3 attempts, segments may be re-uploaded after a restart",
+        path.display()
+    );
+}
+
+async fn sidecar_append_once(
+    files: &mut HashMap<PathBuf, (fs::File, u32)>,
+    path: &PathBuf,
+    data: &str,
+) -> std::io::Result<()> {
+    if !files.contains_key(path) {
+        let f = fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(path)
+            .await?;
+        files.insert(path.clone(), (f, 0));
     }
-    .await;
-    if let Err(e) = ret {
-        log::error!(
-            "[INGESTER:PACK] write consumed sidecar {} failed: {e}",
-            path.display()
-        );
-        // drop the handle so the next append reopens the file
-        files.remove(&path);
+    let (f, writes) = files.get_mut(path).unwrap();
+    f.write_all(data.as_bytes()).await?;
+    *writes += 1;
+    if *writes >= CONSUMED_SYNC_EVERY {
+        *writes = 0;
+        f.sync_all().await?;
     }
+    Ok(())
 }
 
 async fn read_consumed_sidecar(pack_path: &Path) -> HashSet<u64> {

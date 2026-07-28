@@ -118,9 +118,10 @@ pub async fn init() -> errors::Result<()> {
     pack::init().await?;
 
     // replay wal files
+    let process_start = std::time::SystemTime::now();
     tokio::task::spawn(async move {
         // wal/files can hold millions of files, clean orphans in the background
-        if let Err(e) = wal::clean_orphan_par_files().await {
+        if let Err(e) = wal::clean_orphan_par_files(process_start).await {
             log::error!("Clean orphan par files error: {e}");
         }
         log::info!("Scanning wal files from {wal_dir:?}");

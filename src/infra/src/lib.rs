@@ -61,13 +61,23 @@ pub async fn get_db_schema_version() -> Result<u64, anyhow::Error> {
 fn is_db_schema_version_missing(e: &errors::Error) -> bool {
     match e {
         errors::Error::DbError(errors::DbError::KeyNotExists(_)) => true,
-        // meta table not created yet: fresh SQL install
+        // meta table not created yet: fresh install. the sqlite/postgres
+        // Db::get() wrap the sqlx error text into DBOperError
+        errors::Error::DbError(errors::DbError::DBOperError(msg, _)) => {
+            is_table_missing_message(msg)
+        }
         errors::Error::SqlxError(sqlx::Error::Database(e)) => {
             e.code().as_deref() == Some("42P01") // postgres: undefined_table
-                || e.message().contains("no such table") // sqlite
+                || is_table_missing_message(e.message())
         }
         _ => false,
     }
+}
+
+fn is_table_missing_message(msg: &str) -> bool {
+    // sqlite: "no such table: meta"
+    // postgres: "relation \"meta\" does not exist"
+    msg.contains("no such table") || (msg.contains("relation") && msg.contains("does not exist"))
 }
 
 #[cfg(test)]
@@ -81,10 +91,33 @@ mod schema_version_tests {
     }
 
     #[test]
+    fn test_missing_meta_table_is_fresh_install() {
+        // sqlite and postgres Db::get() wrap the table-missing error into
+        // DBOperError with the sqlx message text
+        let e = errors::Error::DbError(errors::DbError::DBOperError(
+            "error returned from database: (code: 1) no such table: meta".to_string(),
+            "/meta/kv/version".to_string(),
+        ));
+        assert!(is_db_schema_version_missing(&e));
+        let e = errors::Error::DbError(errors::DbError::DBOperError(
+            "error returned from database: relation \"meta\" does not exist".to_string(),
+            "/meta/kv/version".to_string(),
+        ));
+        assert!(is_db_schema_version_missing(&e));
+    }
+
+    #[test]
     fn test_other_errors_are_not_fresh_install() {
         let e = errors::Error::Message("connection refused".to_string());
         assert!(!is_db_schema_version_missing(&e));
         let e = errors::Error::SqlxError(sqlx::Error::PoolTimedOut);
+        assert!(!is_db_schema_version_missing(&e));
+        // a db-level operation error that is not table-missing must not be
+        // treated as a fresh install
+        let e = errors::Error::DbError(errors::DbError::DBOperError(
+            "connection reset by peer".to_string(),
+            "/meta/kv/version".to_string(),
+        ));
         assert!(!is_db_schema_version_missing(&e));
     }
 }

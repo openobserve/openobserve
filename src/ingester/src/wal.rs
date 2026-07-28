@@ -110,8 +110,10 @@ pub(crate) async fn check_uncompleted_lock_files() -> Result<()> {
 }
 
 // delete orphan .par files (crash before the lock file was written); walks
-// the whole wal/files tree, only call from a background task
-pub(crate) async fn clean_orphan_par_files() -> Result<()> {
+// the whole wal/files tree, only call from a background task. only files
+// older than `process_start` are deleted: ingestion is already running while
+// this scans, and a fresh .par may belong to an in-flight persist
+pub(crate) async fn clean_orphan_par_files(process_start: std::time::SystemTime) -> Result<()> {
     let cfg = config::get_config();
     let parquet_dir = PathBuf::from(&cfg.common.data_wal_dir).join("files");
     // create wal dir if not exists
@@ -120,6 +122,13 @@ pub(crate) async fn clean_orphan_par_files() -> Result<()> {
     })?;
     let par_files = wal_scan_files(parquet_dir, "par").await.unwrap_or_default();
     for par_file in par_files.iter() {
+        let created_by_this_process = std::fs::metadata(par_file)
+            .and_then(|m| m.modified())
+            .map(|mtime| mtime >= process_start)
+            .unwrap_or(true);
+        if created_by_this_process {
+            continue;
+        }
         log::warn!("delete uncompleted par file: {par_file:?}");
         std::fs::remove_file(par_file).context(DeleteFileSnafu { path: par_file })?;
     }
