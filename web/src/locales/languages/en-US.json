@@ -10467,6 +10467,7 @@
   "synthetics": {
     "zeroPlaceholder": "0",
     "onePlaceholder": "1",
+    "versionPrefix": "v",
     "tokens": {
       "title": "Synthetics Tokens",
       "explanation": "Org-level o2syn_ tokens your private agents use to authenticate when they pull jobs. Public (Lambda) locations use the default token automatically; create a named token and embed it in a region's agents to scope that region's blast radius.",

@@ -145,6 +145,7 @@ const NON_TRANSLATABLE = [
   "×",
   "→",
   "≠",
+  "~", // "approximately" prefix on a numeric rate (e.g. ~12 checks/min)
   "$",
   "fx",
   // Decorative glyphs / emoji — visual only, no language content.

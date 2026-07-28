@@ -66,7 +66,7 @@
             }}<span class="text-text-muted">/{{ (row as any).agents_total ?? 0 }}</span></span
           >
           <span v-if="(row as any).version" class="text-text-muted truncate text-xs"
-            >v{{ (row as any).version }}</span
+            >{{ t("synthetics.versionPrefix") }}{{ (row as any).version }}</span
           >
         </div>
       </template>
