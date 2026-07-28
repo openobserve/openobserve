@@ -16,6 +16,8 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import JourneySteps from "./JourneySteps.vue";
+import UpgradeJourneyBanner from "./UpgradeJourneyBanner.vue";
+import ZeroAssertionNotice from "./ZeroAssertionNotice.vue";
 import {
   ACTION_LABELS,
   SELECTOR_ACTIONS as SELECTOR_ACTIONS_CONST,
@@ -607,6 +609,23 @@ function openChromeExtensions() {
         </OButton>
       </div>
     </div>
+
+    <!-- Version-2 upgrade offer. Sits above the steps because saving is refused
+         while a retired action remains, and the remedy belongs next to the
+         problem rather than in a menu. -->
+    <UpgradeJourneyBanner
+      v-if="!readonly"
+      :steps="modelValue"
+      @upgrade="(steps) => emit('update:modelValue', steps)"
+    />
+
+    <!-- A journey that verifies nothing can pass against a broken application,
+         so the author is offered an assertion rather than left to think of it. -->
+    <ZeroAssertionNotice
+      v-if="!readonly"
+      :steps="modelValue"
+      @add-assertion="(step) => emit('update:modelValue', [...modelValue, step])"
+    />
 
     <!-- Incognito blocked warning card (pre-flight failure) -->
     <div

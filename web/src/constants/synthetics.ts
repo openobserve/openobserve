@@ -1,6 +1,11 @@
 // Copyright 2026 OpenObserve Inc.
 
-import type { StepAction, SelectorType, SyntheticCheckType } from "@/types/synthetics";
+import type {
+  AssertionKind,
+  StepAction,
+  SelectorType,
+  SyntheticCheckType,
+} from "@/types/synthetics";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 
 // ── Action labels (capitalized) ──────────────────────────────────────────
@@ -10,6 +15,9 @@ export const ACTION_LABELS: Record<StepAction, string> = {
   type: "Type",
   select: "Select",
   press: "Press",
+  check: "Check",
+  uncheck: "Uncheck",
+  upload: "Upload",
   hover: "Hover",
   scroll: "Scroll",
   wait: "Wait",
@@ -24,6 +32,9 @@ export const ACTION_ICONS: Record<StepAction, IconName> = {
   type: "keyboard",
   select: "checklist",
   press: "keyboard",
+  check: "check-box",
+  uncheck: "toggle-off",
+  upload: "upload-file",
   hover: "touch-app",
   scroll: "swap-vert",
   wait: "hourglass-empty",
@@ -36,6 +47,9 @@ export const SELECTOR_ACTIONS: readonly StepAction[] = [
   "click",
   "type",
   "select",
+  "check",
+  "uncheck",
+  "upload",
   "hover",
   "assert",
 ];
@@ -72,6 +86,35 @@ export const RETIRED_ACTIONS: readonly StepAction[] = ["hover", "scroll", "wait"
 
 export function isRetiredAction(action: StepAction): boolean {
   return RETIRED_ACTIONS.includes(action);
+}
+
+// ── Assertion kinds (spec P5.1) ──────────────────────────────────────────
+/**
+ * Closed set, mirroring the server's. The probe FAILS an unknown kind rather
+ * than passing it, so a typo that got past the UI would show up as every run
+ * failing rather than as an error at save time.
+ */
+export const ASSERTION_KINDS: readonly AssertionKind[] = [
+  "element_visible",
+  "element_not_visible",
+  "element_text",
+  "url_matches",
+  "page_title",
+  "element_attribute",
+];
+
+/** The two visibility kinds ask "is it there?" — there is nothing to compare. */
+export function assertionNeedsExpected(kind: AssertionKind): boolean {
+  return kind !== "element_visible" && kind !== "element_not_visible";
+}
+
+export function assertionNeedsAttribute(kind: AssertionKind): boolean {
+  return kind === "element_attribute";
+}
+
+/** Kinds that describe the page rather than an element, so they need no locator. */
+export function isPageLevelAssertion(kind: AssertionKind): boolean {
+  return kind === "url_matches" || kind === "page_title";
 }
 
 // ── Action dropdown options ──────────────────────────────────────────────

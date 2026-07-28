@@ -42,7 +42,8 @@ export type LiftChangeKind =
   | "locator_created"
   | "timeout_cleared"
   | "step_dropped"
-  | "action_renamed";
+  | "action_renamed"
+  | "sleep_converted";
 
 export interface LiftChange {
   stepId: string;
@@ -155,12 +156,58 @@ export function liftJourney(steps: BrowserStep[]): LiftResult {
   const lifted: BrowserStep[] = [];
 
   for (const step of steps) {
+    // A sleep is not information about the page, but the DURATION an author
+    // chose is: it says "this step needs longer than usual". So the sleep step
+    // disappears while its budget moves onto the step it was waiting for
+    // (P3.4.3). Dropping it outright would silently tighten the journey.
+    if (step.action === "wait") {
+      const previous = lifted[lifted.length - 1];
+      const budget = sleepBudgetMs(step);
+      if (previous && budget !== null) {
+        previous.settle = { ...previous.settle, budget_ms: budget };
+        changes.push({
+          stepId: step.id,
+          stepName: describe(step),
+          kind: "sleep_converted",
+          detail: `Removed the ${Math.round(budget / 1000)}s sleep and gave "${describe(previous)}" a ${Math.round(budget / 1000)}s settle budget instead. The run now waits for the page and continues as soon as it is ready, rather than always waiting the full time.`,
+        });
+        continue;
+      }
+      // A leading sleep has nothing to attach to: there is no preceding step
+      // whose settling it could describe.
+      liftStep(step, changes);
+      continue;
+    }
+
     const next = liftStep(step, changes);
     if (next) lifted.push(next);
   }
 
   return { steps: lifted, changes, noop: changes.length === 0 };
 }
+
+/**
+ * The sleep duration a `wait` step represents, clamped to what a settle budget
+ * may be.
+ *
+ * A `wait` stores its duration in `timeout` (the probe sleeps for that long) but
+ * hand-built steps sometimes carry it in `value` instead, so both are read. The
+ * runner's own default is used when neither says anything — the same 30s the
+ * probe would have slept.
+ */
+function sleepBudgetMs(step: BrowserStep): number | null {
+  const fromValue = Number(step.value);
+  const raw = step.timeout ?? (Number.isFinite(fromValue) && fromValue > 0 ? fromValue : undefined);
+  const budget = raw ?? DEFAULT_SLEEP_BUDGET_MS;
+  if (!Number.isFinite(budget) || budget <= 0) return null;
+  return Math.min(Math.max(Math.round(budget), MIN_SETTLE_BUDGET_MS), MAX_SETTLE_BUDGET_MS);
+}
+
+/** What the probe sleeps for when a legacy `wait` carries no duration. */
+const DEFAULT_SLEEP_BUDGET_MS = 30000;
+/** Matches the server-side range check on `settle.budget_ms`. */
+const MIN_SETTLE_BUDGET_MS = 100;
+const MAX_SETTLE_BUDGET_MS = 60000;
 
 /**
  * Whether a journey needs lifting at all — used to decide if the upgrade

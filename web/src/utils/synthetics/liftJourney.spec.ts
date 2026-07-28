@@ -96,6 +96,50 @@ describe("liftJourney", () => {
     expect(drop!.detail).toMatch(/sleep/i);
   });
 
+  // ── Sleeps become settle budgets (spec P3.4.3 / T3-6) ────────────────────
+
+  it("converts a sleep into a settle budget on the preceding step", () => {
+    const { steps, changes } = liftJourney([
+      step({ id: "s1", action: "click" }),
+      step({ id: "s2", action: "wait", timeout: 30000, selector: undefined }),
+      step({ id: "s3", action: "assert" }),
+    ]);
+    expect(steps.map((s) => s.id)).toEqual(["s1", "s3"]);
+    expect(steps[0].settle?.budget_ms).toBe(30000);
+    const converted = changes.find((c) => c.kind === "sleep_converted");
+    expect(converted?.stepId).toBe("s2");
+    expect(converted?.detail).toMatch(/settle budget/i);
+  });
+
+  // The duration is the one piece of a sleep that carries author intent — "this
+  // step needs longer than usual". Dropping it would silently tighten the run.
+  it("keeps the author's duration, reading it from value when timeout is unset", () => {
+    const { steps } = liftJourney([
+      step({ id: "s1", action: "click" }),
+      step({ id: "s2", action: "wait", value: "5000", selector: undefined }),
+    ]);
+    expect(steps[0].settle?.budget_ms).toBe(5000);
+  });
+
+  it("clamps a converted budget into the range the server accepts", () => {
+    const { steps } = liftJourney([
+      step({ id: "s1", action: "click" }),
+      step({ id: "s2", action: "wait", timeout: 120000, selector: undefined }),
+    ]);
+    expect(steps[0].settle?.budget_ms).toBe(60000);
+  });
+
+  // Nothing to attach it to, so it is a plain drop rather than a silent no-op.
+  it("drops a leading sleep, since there is no step whose settling it describes", () => {
+    const { steps, changes } = liftJourney([
+      step({ id: "s1", action: "wait", timeout: 30000, selector: undefined }),
+      step({ id: "s2", action: "click" }),
+    ]);
+    expect(steps.map((s) => s.id)).toEqual(["s2"]);
+    expect(changes.some((c) => c.kind === "step_dropped")).toBe(true);
+    expect(changes.some((c) => c.kind === "sleep_converted")).toBe(false);
+  });
+
   it("explains hover separately, since dropping it can change behaviour", () => {
     const { changes } = liftJourney([step({ id: "s5", action: "hover" })]);
     expect(changes[0].detail).toMatch(/re-record/i);

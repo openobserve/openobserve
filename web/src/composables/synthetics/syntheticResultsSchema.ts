@@ -863,6 +863,26 @@ function timeBucketKey(tsMs: number, bucketMs: number): number {
   return Math.floor(tsMs / bucketMs) * bucketMs;
 }
 
+/**
+ * The selector to show for a recorded step, whichever schema version it uses.
+ *
+ * A v1 step has one `selector`. A v2 step has a locator bundle instead, so
+ * reading `selector` alone leaves every v2 run showing empty selectors in
+ * results — a regression that would look like missing data rather than a schema
+ * mismatch (spec P2.5.6).
+ *
+ * A pinned `user_override` wins, because that is the locator the run actually
+ * used; otherwise it is the primary candidate, which is what the run would have
+ * started from.
+ */
+export function effectiveSelector(step: Record<string, any>): string | null {
+  const pinned = step?.locator?.user_override;
+  if (pinned?.value) return str(pinned.value);
+  const primary = step?.locator?.candidates?.[0];
+  if (primary?.value) return str(primary.value);
+  return step?.selector ? str(step.selector) : null;
+}
+
 export function aggregateStepStats(
   rawHits: Record<string, unknown>[],
   startMicros: number,
@@ -898,7 +918,7 @@ export function aggregateStepStats(
     for (const rs of recordedSteps) {
       stepDefs.set(str(rs.id), {
         name: str(rs.name) || str(rs.id),
-        selector: rs.selector ? str(rs.selector) : null,
+        selector: effectiveSelector(rs),
       });
     }
 

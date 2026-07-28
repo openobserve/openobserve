@@ -9,15 +9,22 @@ const ACTION_MAP: Record<string, StepAction> = {
   navigate: "navigate",
   click: "click",
   type: "type",
+  // The version-2 wire name for typing. Both map to the UI's `type`.
+  fill: "type",
   press: "press",
   select: "select",
+  // Version-2 additions: a checkbox interaction is no longer collapsed to a
+  // click, which used to make the journey depend on the box's starting state.
+  check: "check",
+  uncheck: "uncheck",
+  upload: "upload",
   hover: "hover",
   scroll: "scroll",
   wait: "wait",
   waitFor: "wait",
   assert: "assert",
   screenshot: "screenshot",
-  setInputFiles: "type",
+  setInputFiles: "upload",
 };
 
 const SELECTOR_TYPE_MAP: Record<string, SelectorType> = {
@@ -70,6 +77,10 @@ function mapValue(wire: WireStep, action: StepAction): string | undefined {
       return wire.key ?? wire.value;
     case "assert":
       return wire.text ?? wire.value;
+    case "upload":
+      // A recorded upload carries its paths in `files`; the editor shows the
+      // first. Reading `value` alone would render the step blank.
+      return wire.files?.[0] ?? wire.value;
     default:
       return wire.value;
   }
@@ -91,6 +102,14 @@ export function mapWireStep(wire: WireStep): BrowserStep {
     // guess back — the previous `?? 30000` was unreachable anyway, because the
     // extension always sent 10000.
     timeout: wire.timeout_ms,
+    // Version-2 evidence rides through untouched. It is machine-derived and
+    // read-only in the editor: the only author channel is pinning a candidate,
+    // which keeps the stored list byte-comparable for the healing precondition.
+    locator: wire.locator,
+    settle: wire.settle,
+    assertion: wire.assertion,
+    optional: wire.optional,
+    alwaysRun: wire.always_run,
     code: wire.code || "",
     // Keep the original extension step untouched for replay (full fidelity).
     wire: {
@@ -126,6 +145,13 @@ export function buildWireFromStep(step: BrowserStep): WireStep | null {
     selector_type: step.selectorType ? WIRE_SELECTOR_TYPE_MAP[step.selectorType] : undefined,
     // Only carry a timeout the author actually set; absence means runner default.
     timeout_ms: step.timeout,
+    // Sent back so the preview can report what it cannot simulate (spec P5.S.3)
+    // rather than diverging from the probe in silence.
+    locator: step.locator,
+    settle: step.settle,
+    assertion: step.assertion,
+    optional: step.optional,
+    always_run: step.alwaysRun,
     pageAlias: "page",
     framePath: [],
   };
@@ -140,6 +166,11 @@ export function buildWireFromStep(step: BrowserStep): WireStep | null {
       return { ...base, key: step.value };
     case "select":
       return { ...base, options: step.value ? [step.value] : [] };
+    case "check":
+    case "uncheck":
+      return base;
+    case "upload":
+      return { ...base, files: step.value ? [step.value] : [] };
     case "assert":
       // Lean steps can't express assert subtype; default to assertText when a
       // value is present, else assertVisible.

@@ -23,9 +23,24 @@ describe("synthetics action vocabulary", () => {
     }
   });
 
+  // The picker offers the version-2 vocabulary, which is exactly Playwright's
+  // recorder action model minus what a monitor cannot use. `check`/`uncheck`
+  // joined it when the recorder stopped collapsing a checkbox interaction to a
+  // click (X-9.3), and `upload` when a file input stopped being surfaced as a
+  // `type` step.
   it("offers exactly the actions the player and probe can both execute", () => {
     expect(actionOptions.map((o) => o.value).sort()).toEqual(
-      ["assert", "click", "navigate", "press", "select", "type"].sort(),
+      [
+        "assert",
+        "check",
+        "click",
+        "navigate",
+        "press",
+        "select",
+        "type",
+        "uncheck",
+        "upload",
+      ].sort(),
     );
   });
 

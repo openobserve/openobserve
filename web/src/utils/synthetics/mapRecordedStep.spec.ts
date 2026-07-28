@@ -189,8 +189,39 @@ describe("mapRecordedStep", () => {
     expect(mapWireStep({ id: "s6", action: "waitFor" }).action).toBe("wait");
   });
 
-  it("should map setInputFiles to the type action", () => {
-    expect(mapWireStep({ id: "s7", action: "setInputFiles" }).action).toBe("type");
+  // A file upload used to be surfaced as a `type` step, which described neither
+  // what was recorded nor what would be replayed. It has its own action now.
+  it("should map setInputFiles to the upload action", () => {
+    expect(mapWireStep({ id: "s7", action: "setInputFiles" }).action).toBe("upload");
+  });
+
+  // X-9.3 — a checkbox interaction is no longer collapsed to a click, which used
+  // to make the replayed journey depend on the box's starting state.
+  it("should keep check and uncheck distinct from click", () => {
+    expect(mapWireStep({ id: "s8", action: "check" }).action).toBe("check");
+    expect(mapWireStep({ id: "s9", action: "uncheck" }).action).toBe("uncheck");
+  });
+
+  it("should carry version-2 evidence through untouched", () => {
+    const step = mapWireStep({
+      id: "s10",
+      action: "click",
+      selector: '[data-test="login-sign-in"]',
+      locator: {
+        candidates: [
+          { kind: "test_attribute", value: '[data-test="login-sign-in"]' },
+          { kind: "role", value: 'role=button[name="Sign In"]' },
+        ],
+      },
+      settle: {
+        navigation: { url_pattern: "**/web/**" },
+        responses: [{ url_pattern: "**/auth/login", method: "POST", required: false }],
+        observed_duration_ms: 1800,
+      },
+    });
+    expect(step.locator?.candidates).toHaveLength(2);
+    expect(step.settle?.navigation?.url_pattern).toBe("**/web/**");
+    expect(step.settle?.observed_duration_ms).toBe(1800);
   });
 
   it("should default unknown actions to click and warn", () => {
