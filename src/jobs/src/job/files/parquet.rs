@@ -855,7 +855,15 @@ async fn merge_files(
     // Enterprise: Extract service metadata during data processing
     // This runs BEFORE indexing checks to ensure all stream types are discovered
     #[cfg(feature = "enterprise")]
-    queue_service_streams_if_needed(&org_id, stream_type, &stream_name, file_format, &new_file_key, &buf).await;
+    queue_service_streams_if_needed(
+        &org_id,
+        stream_type,
+        &stream_name,
+        file_format,
+        &new_file_key,
+        &buf,
+    )
+    .await;
 
     // skip index generation if not enabled or not supported by stream type
     if !cfg.common.inverted_index_enabled || !stream_type.support_index() {

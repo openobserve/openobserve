@@ -178,7 +178,8 @@ async fn move_stream_segments(
 
     // fetch the segments here instead of carrying them in the snapshot, so
     // the snapshot stays cheap and the list is fresh at upload time
-    let segments = ingester::get_stream_segments(&ps.org_id, &ps.stream_type, &ps.stream_name).await;
+    let segments =
+        ingester::get_stream_segments(&ps.org_id, &ps.stream_type, &ps.stream_name).await;
     if segments.is_empty() {
         return Ok(());
     }
@@ -216,8 +217,8 @@ async fn move_stream_segments(
     }
     let mut segments = segments;
     if stream_data_retention_days > 0 {
-        let date = config::utils::time::now()
-            - Duration::try_days(stream_data_retention_days).unwrap();
+        let date =
+            config::utils::time::now() - Duration::try_days(stream_data_retention_days).unwrap();
         let retention_end = date.format("%Y/%m/%d").to_string();
         let (expired, retained): (Vec<_>, Vec<_>) = segments
             .into_iter()
@@ -381,12 +382,9 @@ async fn upload_chunk(
     // read all segment bytes
     let mut bufs = Vec::with_capacity(chunk.len());
     for seg in chunk.iter() {
-        let data = ingester::read_segment(
-            seg.pack_path.as_path(),
-            seg.meta.offset,
-            seg.meta.length,
-        )
-        .await?;
+        let data =
+            ingester::read_segment(seg.pack_path.as_path(), seg.meta.offset, seg.meta.length)
+                .await?;
         bufs.push(data);
     }
 
@@ -405,8 +403,13 @@ async fn upload_chunk(
     } else {
         // merge multiple segments in memory
         let mut shared_fields = HashSet::new();
-        let mut schema_groups: HashMap<String, (Arc<Schema>, Vec<datafusion::arrow::record_batch::RecordBatch>)> =
-            HashMap::new();
+        let mut schema_groups: HashMap<
+            String,
+            (
+                Arc<Schema>,
+                Vec<datafusion::arrow::record_batch::RecordBatch>,
+            ),
+        > = HashMap::new();
         for data in bufs {
             let (schema, batches) = config::utils::parquet::read_recordbatch_from_bytes(
                 FileFormat::Parquet,
@@ -554,8 +557,7 @@ async fn consume_segments(
         .iter()
         .map(|s| (s.pack_path.clone(), s.meta.offset))
         .collect::<Vec<_>>();
-    ingester::mark_segments_consumed(org_id, stream_type.as_str(), stream_name, &consumed)
-        .await;
+    ingester::mark_segments_consumed(org_id, stream_type.as_str(), stream_name, &consumed).await;
     let total_bytes: i64 = segments.iter().map(|s| s.meta.length as i64).sum();
     metrics::INGEST_WAL_USED_BYTES
         .with_label_values(&[org_id, stream_type.as_str()])

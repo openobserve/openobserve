@@ -113,7 +113,14 @@ impl MemTable {
                 (org_id, stream_name.as_ref())
             };
             let (part_schema_size, partitions) = stream
-                .persist(id, idx, org_id, stream_type, stream_name, pack.as_deref_mut())
+                .persist(
+                    id,
+                    idx,
+                    org_id,
+                    stream_type,
+                    stream_name,
+                    pack.as_deref_mut(),
+                )
                 .await?;
             schema_size += part_schema_size;
             paths.extend(partitions);
