@@ -19,6 +19,7 @@ import { computed, ComputedRef } from "vue";
 import { ref } from "vue";
 import { deepCopy } from "@/utils/zincutils";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { gt } from "@/types/i18n";
 
 const getStreamsPromise: any = ref(null);
 
@@ -68,7 +69,7 @@ const useStreams = () => {
             const dismiss = notify
               ? toast({
                   variant: "loading",
-                  message: "Please wait while loading streams...",
+                  message: gt("toastMessages.composables.pleaseWaitWhileLoadingStreams"),
                   timeout: 0,
                 })
               : () => {};
@@ -188,7 +189,7 @@ const useStreams = () => {
           const dismiss = notify
             ? toast({
                 variant: "loading",
-                message: "Please wait while loading streams...",
+                message: gt("toastMessages.composables.pleaseWaitWhileLoadingStreams"),
                 timeout: 5000,
               })
             : () => {};

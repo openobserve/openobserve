@@ -39,7 +39,7 @@
 
 <script lang="ts">
 import { defineComponent, inject, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import ValueMappingPopUp from "./ValueMappingPopUp.vue";
 import { onBeforeMount } from "vue";
@@ -50,7 +50,7 @@ export default defineComponent({
   components: { ValueMappingPopUp, OButton },
   props: [],
   setup() {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
     const { dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey);
 

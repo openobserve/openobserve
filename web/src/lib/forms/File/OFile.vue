@@ -5,9 +5,9 @@ import type { FileProps, FileEmits, FileSlots, FileValue } from "./OFile.types";
 import { computed, ref, useAttrs, useId } from "vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 defineOptions({ inheritAttrs: false });
 const $attrs = useAttrs();
@@ -66,7 +66,7 @@ function emitFiles(fileList: FileList | File[] | null) {
         .map((t) => t.trim())
         .join(", ");
       toast({
-        message: `"${names}" is not a supported file type. Only ${allowed} files are allowed.`,
+        message: t("toastMessages.File.isNotASupportedFileType", { p0: names, p1: allowed }),
         variant: "error",
       });
       emit("type-error", rejected);

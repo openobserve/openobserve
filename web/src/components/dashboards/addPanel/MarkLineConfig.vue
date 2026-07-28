@@ -61,7 +61,7 @@
 <script lang="ts">
 import { defineComponent, inject } from "vue";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import { onBeforeMount } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -74,7 +74,7 @@ export default defineComponent({
   components: { OButton, OSelect, OInput, OIcon },
   setup() {
     const store = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
 
     const markLineTypeOptions = [
       { label: t("dashboard.markLineAverage"), value: "average" },

@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import type { ComputedRef, InjectionKey } from "vue";
+import type { I18nKey } from "@/types/i18n";
 
 export interface NavItem {
   title: string;
@@ -47,7 +48,7 @@ export const RailIndicatorActiveKey: InjectionKey<ComputedRef<boolean>> = Symbol
  */
 export interface SubnavChild {
   /** i18n key for the label, translated in the flyout. */
-  titleKey: string;
+  titleKey: I18nKey;
   /** OIcon registry name — matches the sub-page's own icon. */
   icon: string;
   /** Route name — used for navigation, active-state, and hasRoute gating. */

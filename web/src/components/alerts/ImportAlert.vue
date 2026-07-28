@@ -295,7 +295,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref, onMounted, computed, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import alertsService from "../../services/alerts";
@@ -355,7 +355,7 @@ export default defineComponent({
     }[];
 
     type AlertErrors = (ErrorMessage | string)[][];
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const router = useRouter();
 
@@ -514,7 +514,7 @@ export default defineComponent({
       if (allAlertsCreated) {
         toast({
           variant: "success",
-          message: "Alert(s) imported successfully",
+          message: t("toastMessages.alerts.alertSImportedSuccessfully"),
         });
 
         // Delay navigation to allow Monaco editor to complete all debounced operations
@@ -598,7 +598,7 @@ export default defineComponent({
       } catch (e: any) {
         toast({
           variant: "error",
-          message: "Error importing Alert(s) please check the JSON",
+          message: t("toastMessages.alerts.errorImportingAlertSPleaseCheck"),
         });
         return false;
       }

@@ -251,7 +251,7 @@ import {
   defineAsyncComponent,
   watch,
 } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, raw } from "@/types/i18n";
 import { isJsFunction } from "@/utils/functionLanguage";
 import DateTime from "@/components/DateTime.vue";
 import FullViewContainer from "@/components/functions/FullViewContainer.vue";
@@ -371,7 +371,7 @@ const store = useStore();
 
 let parser: any = null;
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const expandState = ref({
   stream: true,
@@ -596,7 +596,7 @@ const getResults = async () => {
       // This case happens when user enters invalid query and then switches to real time alert
       toast({
         variant: "error",
-        message: "Invalid SQL Query : " + err.response?.data?.message,
+        message: raw("Invalid SQL Query : " + err.response?.data?.message),
       });
     })
     .finally(() => {
@@ -611,7 +611,7 @@ const isInputValid = () => {
     eventsErrorMsg.value = `Invalid events: ${e?.message}`;
     toast({
       variant: "error",
-      message: eventsErrorMsg.value,
+      message: raw(eventsErrorMsg.value),
     });
     return false;
   }

@@ -247,7 +247,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, nextTick } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import modelPricingService from "@/services/model_pricing";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -261,7 +261,7 @@ const props = defineProps({
 });
 const emit = defineEmits(["update:modelValue"]);
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 const orgIdentifier = computed(() => store.state.selectedOrganization?.identifier || "");
 

@@ -136,7 +136,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import useIsMetaOrg from "@/composables/useIsMetaOrg";
 import { ref, defineComponent, computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { useStore } from "vuex";
 import QueryList from "@/components/queries/QueryList.vue";
@@ -211,7 +211,7 @@ export default defineComponent({
     const { isMetaOrg } = useIsMetaOrg();
     const loadingState = ref(false);
 
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const showListSchemaDialog = ref(false);
 
     const listSchema = (row: any) => {

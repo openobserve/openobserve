@@ -169,7 +169,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts" setup>
 import { ref, computed, watch, onUnmounted } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import TurnPreviewCard from "./TurnPreviewCard.vue";
@@ -185,7 +185,7 @@ const props = defineProps<{
 // Emitted when a bar is clicked — the parent scrolls/expands that turn (S5).
 const emit = defineEmits<{ (e: "jump", turn: number): void }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 type Metric = "cost" | "latency" | "tokens";
 const metric = ref<Metric>("cost");

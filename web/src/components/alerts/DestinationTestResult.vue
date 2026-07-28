@@ -188,7 +188,7 @@ limitations under the License. -->
 </template>
 
 <script setup lang="ts">
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import { formatDate } from "@/utils/date";
 import type { TestResult } from "@/utils/prebuilt-templates/types";
@@ -219,7 +219,7 @@ interface Emits {
 defineEmits<Emits>();
 
 // Composables
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const errorDetailsOpen = ref(false);
 

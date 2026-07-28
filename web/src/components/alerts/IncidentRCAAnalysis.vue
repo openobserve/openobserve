@@ -272,7 +272,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import DOMPurify from "dompurify";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -363,7 +363,7 @@ export default defineComponent({
   },
   emits: ["trigger-rca", "cancel-rca", "view-report", "copy-report", "download-report"],
   setup(props) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
 
     // A run is active whether it was started here (rcaLoading) or in the background
     // (analysisInFlight); both render the same banner and both are cancellable.

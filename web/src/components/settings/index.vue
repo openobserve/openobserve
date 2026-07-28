@@ -57,7 +57,7 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import SectionRail from "@/components/common/SectionRail.vue";
 import { type SectionHubGroup, type SectionHubItem } from "@/components/common/SectionHub.vue";
 import { defineComponent, ref, onBeforeMount, onActivated, onUpdated, computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
 import { useRouter, useRoute } from "vue-router";
@@ -74,7 +74,7 @@ export default defineComponent({
     SectionRail,
   },
   setup() {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const { isDark } = useTheme();
     const router: any = useRouter();

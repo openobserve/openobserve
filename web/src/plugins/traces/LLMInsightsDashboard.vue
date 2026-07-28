@@ -292,7 +292,7 @@ import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import type { AcceptableValue } from "reka-ui";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useLLMInsights } from "./composables/useLLMInsights";
 import { splitNumberWithUnit, splitDuration, splitCost } from "./llmInsightsDashboard.utils";
 import KpiSparkline from "./KpiSparkline.vue";
@@ -318,7 +318,7 @@ import VersionCompareView from "@/enterprise/components/AIObservability/VersionC
 import { useVersionCompare } from "./composables/useVersionCompare";
 
 const { getStreams } = useStreams();
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const router = useRouter();
 const route = useRoute();
 const store = useStore();

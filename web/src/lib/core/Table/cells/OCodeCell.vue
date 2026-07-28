@@ -10,7 +10,7 @@
 
 import { computed, ref } from "vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 
 const props = withDefaults(
   defineProps<{
@@ -41,7 +41,7 @@ async function handleCopy(e: MouseEvent) {
   }
 }
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 </script>
 
 <template>

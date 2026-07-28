@@ -206,7 +206,7 @@
 
 <script lang="ts">
 import { computed, defineComponent, ref, watch, onMounted, type PropType } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { timestampToTimezoneDate } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import { colorizeQuery } from "@/utils/query/colorizeQuery";
@@ -246,7 +246,7 @@ export default defineComponent({
     },
   },
   setup(props: any) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const queryData = computed<QueryInspectorQuery[]>(() => props.metaData?.queries || []);
     const searchQuery = ref("");

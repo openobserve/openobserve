@@ -141,7 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, useSlots } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -208,7 +208,7 @@ const emit = defineEmits<{
 }>();
 
 const slots = useSlots();
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 // Widen to the interface: the `satisfies` map keeps per-key literal types,
 // and unioning 25 literals breaks `?.actions` on entries without actions.

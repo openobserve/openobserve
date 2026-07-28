@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { getImageURL } from "@/utils/zincutils";
 import { moveModuleToAnotherFolder } from "@/utils/commons";
@@ -101,7 +101,7 @@ export default defineComponent({
         )?.name ?? "",
       value: props.activeFolderId,
     });
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const { showPositiveNotification, showErrorNotification } = useNotifications();
 
     const onSubmit = useLoading(async () => {
@@ -117,7 +117,9 @@ export default defineComponent({
         await moveModuleToAnotherFolder(store, data, props.type, props.activeFolderId);
 
         showPositiveNotification(
-          `${props?.type?.charAt?.(0)?.toUpperCase() + props?.type?.slice?.(1)} moved successfully`,
+          t("toastMessages.sidebar.movedSuccessfully", {
+            p0: props?.type?.charAt?.(0)?.toUpperCase() + props?.type?.slice?.(1),
+          }),
           {
             timeout: 5000,
           },

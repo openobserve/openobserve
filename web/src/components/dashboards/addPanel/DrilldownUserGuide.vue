@@ -200,13 +200,13 @@
 import { ref } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 
 export default {
   components: { OButton, OTooltip },
   name: "DrilldownUserGuide",
   setup() {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const showUserGuide = ref(false);
 
     const userGuideBtnRef: any = ref(null);

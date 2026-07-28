@@ -235,7 +235,7 @@ import type { TimelineItemVariant } from "@/lib/data/Timeline/OTimelineItem.type
 import OTag from "@/lib/core/Badge/OTag.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 
 interface Props {
   modelValue: boolean;
@@ -252,7 +252,7 @@ const props = defineProps<Props>();
 const emit = defineEmits<Emits>();
 
 const store = useStore();
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const { confirm } = useConfirmDialog();
 
@@ -319,7 +319,7 @@ const cancelJob = async () => {
   if (!job.value || !job.value.pipeline_id) {
     toast({
       variant: "error",
-      message: "Job information not available. Please try again.",
+      message: t("toastMessages.pipelines.jobInformationNotAvailablePleaseTry"),
     });
     return;
   }
@@ -333,7 +333,7 @@ const cancelJob = async () => {
 
     toast({
       variant: "success",
-      message: "Backfill job canceled successfully",
+      message: t("toastMessages.pipelines.backfillJobCanceledSuccessfully"),
     });
 
     emit("job-canceled");

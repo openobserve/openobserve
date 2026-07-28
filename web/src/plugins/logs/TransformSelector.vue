@@ -134,7 +134,7 @@ import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { searchState } from "@/composables/useLogs/searchState";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { getImageURL } from "@/utils/zincutils";
@@ -154,7 +154,7 @@ const props = withDefaults(
 
 const emit = defineEmits(["select:function", "save:function"]);
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const { searchObj } = searchState();
 

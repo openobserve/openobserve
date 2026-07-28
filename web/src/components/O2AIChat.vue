@@ -1390,7 +1390,7 @@ import {
   computed,
   onUnmounted,
 } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useRouter, useRoute } from "vue-router";
 import { useTypewriterPlaceholder } from "@/components/ai-assistant/welcome/useTypewriterPlaceholder";
 import hljs from "highlight.js";
@@ -1590,7 +1590,7 @@ export default defineComponent({
     const lastTraceId = ref<string | null>(null); // OTEL trace_id from last workflow for feedback correlation
     const store = useStore();
     const { isDark } = useTheme();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const isMac = navigator.platform.toUpperCase().indexOf("MAC") >= 0;
     const chatUpdated = computed(() => store.state.chatUpdated);
 
@@ -2002,7 +2002,7 @@ export default defineComponent({
 
         // Show user notification about successful cancellation
         toast({
-          message: "Response generation stopped",
+          message: t("toastMessages.components.responseGenerationStopped"),
           variant: "info",
         });
 
@@ -4489,7 +4489,9 @@ export default defineComponent({
       if (file.size > MAX_IMAGE_SIZE_BYTES) {
         toast({
           variant: "error",
-          message: `Image exceeds 2MB limit (${(file.size / 1024 / 1024).toFixed(1)}MB)`,
+          message: t("toastMessages.components.imageExceeds2mbLimitMb", {
+            p0: (file.size / 1024 / 1024).toFixed(1),
+          }),
         });
         return false;
       }
@@ -4498,7 +4500,7 @@ export default defineComponent({
       if (!ALLOWED_IMAGE_TYPES.includes(file.type as any)) {
         toast({
           variant: "error",
-          message: "Only PNG and JPEG images are supported",
+          message: t("toastMessages.components.onlyPngAndJpegImagesAre"),
         });
         return false;
       }
@@ -4669,7 +4671,7 @@ export default defineComponent({
         reader.onerror = () => {
           toast({
             variant: "error",
-            message: `Failed to read image: ${file.name}`,
+            message: t("toastMessages.components.failedToReadImage", { p0: file.name }),
           });
           resolve(false);
         };
@@ -5591,7 +5593,7 @@ export default defineComponent({
         await saveToHistory();
         toast({
           variant: "success",
-          message: "Thanks for your feedback!",
+          message: t("toastMessages.components.thanksForYourFeedback"),
         });
       }
     };
@@ -5614,7 +5616,7 @@ export default defineComponent({
         await saveToHistory();
         toast({
           variant: "success",
-          message: "Thanks for your feedback!",
+          message: t("toastMessages.components.thanksForYourFeedback"),
         });
       }
     };

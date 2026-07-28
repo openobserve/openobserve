@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import useDragAndDrop from "./useDnD";
 import { ref, computed, type PropType } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
@@ -265,7 +265,7 @@ const navigateToFunction = (functionName: string | undefined) => {
 // userClickedNode/userSelectedNode. Adding a downstream node is done via the
 // hover-`+` step picker (useDnD.addNodeAfter).)
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const router = useRouter();
 const store = useStore();
 

@@ -320,9 +320,9 @@ import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 interface SemanticGroup {
   id: string;
@@ -406,7 +406,7 @@ const loadFile = async (value: FileValue) => {
     await previewDiff(groups);
   } catch (error: any) {
     toast({
-      message: `Failed to parse JSON: ${error.message}`,
+      message: t("toastMessages.alerts.failedToParseJson", { p0: error.message }),
       variant: "error",
     });
     clearFile();
@@ -434,7 +434,9 @@ const previewDiff = async (groups: SemanticGroup[]) => {
     );
   } catch (error: any) {
     toast({
-      message: `Failed to preview changes: ${error.response?.data?.error || error.message}`,
+      message: t("toastMessages.alerts.failedToPreviewChanges", {
+        p0: error.response?.data?.error || error.message,
+      }),
       variant: "error",
     });
   }
@@ -520,7 +522,7 @@ const handleApply = () => {
   handleOpenChange(false);
 
   toast({
-    message: `Applied ${changeCount} changes`,
+    message: t("toastMessages.alerts.appliedChanges", { p0: changeCount }),
     variant: "success",
   });
 };

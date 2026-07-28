@@ -34,6 +34,7 @@ import { useRouter, useRoute } from "vue-router";
 import AddAlert from "@/components/alerts/AddAlert.vue";
 import destinationService from "@/services/alert_destination";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { gt } from "@/types/i18n";
 
 export default defineComponent({
   name: "AddAlertView",
@@ -57,7 +58,7 @@ export default defineComponent({
       } catch (error) {
         toast({
           variant: "error",
-          message: "Error while pulling destinations.",
+          message: gt("toastMessages.views.errorWhilePullingDestinations"),
         });
       }
     };
@@ -94,7 +95,7 @@ export default defineComponent({
       if (!destinations.value.length) {
         toast({
           variant: "warning",
-          message: "No destinations found. Please create a destination first.",
+          message: gt("toastMessages.views.noDestinationsFoundPleaseCreateA"),
         });
         router.push({
           name: "alertList",

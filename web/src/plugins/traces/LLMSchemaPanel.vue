@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts" setup>
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue";
 import { type LLMPanelDef, renderPanelSql, panelI18nKey } from "./config/llmInsightsPanels";
 import { buildLLMPanelSchema } from "./llmPanelSchema";
@@ -86,7 +86,7 @@ interface Props {
 
 const props = defineProps<Props>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 // Title/subtitle come from the en.json `aiObservability.panels.<id>` copy.
 const displayTitle = computed(() => t(`${panelI18nKey(props.panel.id)}.title`));

@@ -354,7 +354,7 @@ import useTheme from "@/composables/useTheme";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -389,7 +389,7 @@ const emit = defineEmits<{
   (e: "create-alert", pattern: any): void;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 // Window-wide occurrences for the selected pattern, read from the SAME cache the
 // rows use. Opening a row is therefore a cache hit and shows its real count

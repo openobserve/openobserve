@@ -503,7 +503,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts" setup>
 import { ref, computed, onBeforeMount } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, raw } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter, useRoute } from "vue-router";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -524,7 +524,7 @@ import {
   type ModelPricingTier,
 } from "./ModelPricingEditor.schema";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 const router = useRouter();
 const route = useRoute();
@@ -819,7 +819,7 @@ function goBack() {
 }
 
 function notifyWarn(message: string) {
-  toast({ variant: "error", message });
+  toast({ variant: "error", message: raw(message) });
 }
 
 /** Show error notification only for non-403 errors.
@@ -829,7 +829,7 @@ function notifyError(prefix: string, e: any) {
   const msg = e?.response?.data?.message || e?.message || t("modelPricing.errUnknown");
   toast({
     variant: "error",
-    message: `${prefix}: ${msg}`,
+    message: t("toastMessages.settings.message", { p0: prefix, p1: msg }),
     timeout: 5000,
   });
 }

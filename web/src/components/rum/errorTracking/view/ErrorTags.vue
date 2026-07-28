@@ -70,10 +70,10 @@ import ip from "@/assets/images/rum/ip_ad.png";
 import windows from "@/assets/images/rum/windows.png";
 import mac from "@/assets/images/rum/mac.png";
 import linux from "@/assets/images/rum/linux.png";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const props = defineProps({
   error: {
@@ -120,7 +120,7 @@ const getOsIcon = () => {
 };
 
 const getOsVersion = computed(() => {
-  let version = t("rum.versionPrefix");
+  let version: string = t("rum.versionPrefix");
 
   if (!props.error.user_agent_os_major) return version + t("rum.unknown");
 
@@ -134,7 +134,7 @@ const getOsVersion = computed(() => {
 });
 
 const getBrowserVersion = computed(() => {
-  let version = t("rum.versionPrefix");
+  let version: string = t("rum.versionPrefix");
 
   if (!props.error.user_agent_user_agent_major) return version + t("rum.unknown");
 

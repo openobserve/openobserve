@@ -71,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -100,7 +100,7 @@ const emit = defineEmits<{
   "update:service": [value: string];
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 // OSelect treats "" as "no selection" (placeholder), so the All option
 // needs a real sentinel value; the emitted contract stays "" = all.

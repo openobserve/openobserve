@@ -131,7 +131,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref, toRef, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useRoute, useRouter } from "vue-router";
 import type { ScoreConfig } from "@/services/online-evals.service";
 import { useQualityData, type DateWindow } from "./composables/useQualityData";
@@ -193,7 +193,7 @@ const agentModel = computed<string>({
   set: (value) => emit("update:agentKey", value),
 });
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const route = useRoute();
 const router = useRouter();
 

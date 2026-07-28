@@ -32,6 +32,7 @@ import useSearchConnection from "@/composables/useLogs/useSearchConnection";
 import useSearchResponseHandler from "@/composables/useLogs/useSearchResponseHandler";
 import useSearchHistogramManager from "@/composables/useLogs/useSearchHistogramManager";
 import useSearchPagination from "@/composables/useLogs/useSearchPagination";
+import { gt } from "@/types/i18n";
 
 export const useSearchStream = () => {
   const { showErrorNotification } = useNotifications();
@@ -71,7 +72,7 @@ export const useSearchStream = () => {
     } catch (error: any) {
       console.error("Search operation failed:", error);
       searchObj.loading = false;
-      showErrorNotification("Error occurred during the search operation.");
+      showErrorNotification(gt("toastMessages.useLogs.errorOccurredDuringTheSearchOperation"));
     }
   };
 

@@ -136,7 +136,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import OFieldRow from "@/lib/lists/FieldList/OFieldRow.vue";
 import OFieldLabel from "@/lib/lists/FieldList/OFieldLabel.vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 
 interface Props {
   field: any;
@@ -241,7 +241,7 @@ const handleToggle = (val: boolean) => {
 
 defineExpose({ reset: () => fieldValuesPanelRef.value?.reset() });
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 </script>
 
 <style scoped>

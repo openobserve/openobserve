@@ -1,7 +1,7 @@
 <!-- Copyright 2026 OpenObserve Inc. -->
 <script setup lang="ts">
 import { ref, computed, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -49,7 +49,7 @@ const emit = defineEmits<{
   (e: "apply:template", name: string): void;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const title = computed(() => {
   switch (props.topic) {

@@ -27,7 +27,7 @@
 <script lang="ts">
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import { computed, defineComponent, inject, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 
 export default defineComponent({
@@ -37,7 +37,7 @@ export default defineComponent({
     // Destructure props and emit if needed
     const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
     const { dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey);
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
 
     const colorModeOptions = [
       { label: t("dashboard.none"), value: "" },

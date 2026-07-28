@@ -1,13 +1,13 @@
 ﻿<script setup lang="ts">
 import { computed } from "vue";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useGreeting } from "./useGreeting";
 import { getImageURL } from "@/utils/zincutils";
 import { useTheme } from "@/composables/useTheme";
 
 const store = useStore();
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const email = computed<string>(() => store.state.userInfo?.email ?? "");
 const role = computed<string>(() => store.state.currentuser?.role ?? "");

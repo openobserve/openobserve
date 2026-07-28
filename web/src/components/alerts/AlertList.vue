@@ -709,7 +709,7 @@ import { useRouter } from "vue-router";
 import useStreams from "@/composables/useStreams";
 
 import { convertUnixToDateFormat as convertUnixToFormat } from "@/utils/date";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, raw } from "@/types/i18n";
 import { debounce } from "lodash-es";
 import alertsService from "@/services/alerts";
 import destinationService from "@/services/alert_destination";
@@ -790,7 +790,7 @@ export default defineComponent({
   emits: ["update:changeRecordPerPage", "update:maxRecordToReturn"],
   setup() {
     const store = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const router = useRouter();
     const { track } = useReo();
     const formData: Ref<Alert | {}> = ref({});
@@ -1425,7 +1425,7 @@ export default defineComponent({
       }
       const dismiss = toast({
         variant: "loading",
-        message: "Please wait while loading alerts...",
+        message: t("toastMessages.alerts.pleaseWaitWhileLoadingAlerts"),
         timeout: 0,
       });
       if (query) {
@@ -1554,7 +1554,7 @@ export default defineComponent({
         dismiss();
         toast({
           variant: "error",
-          message: "Error while pulling alerts.",
+          message: t("toastMessages.alerts.errorWhilePullingAlerts"),
         });
       } finally {
         loading.value = false;
@@ -1563,7 +1563,7 @@ export default defineComponent({
     const getAlertById = async (id: string) => {
       const dismiss = toast({
         variant: "loading",
-        message: "Please wait while loading alert...",
+        message: t("toastMessages.alerts.pleaseWaitWhileLoadingAlert"),
         timeout: 0,
       });
       try {
@@ -1771,7 +1771,7 @@ export default defineComponent({
             console.error("AlertList: Failed to load alert", error);
             toast({
               variant: "error",
-              message: "Failed to load alert for editing",
+              message: t("toastMessages.alerts.failedToLoadAlertForEditing"),
             });
           }
         }
@@ -1800,7 +1800,7 @@ export default defineComponent({
         .catch(() =>
           toast({
             variant: "error",
-            message: "Error while fetching destinations.",
+            message: t("toastMessages.alerts.errorWhileFetchingDestinations"),
           }),
         );
     };
@@ -1816,7 +1816,7 @@ export default defineComponent({
         .catch(() =>
           toast({
             variant: "error",
-            message: "Error while fetching templates.",
+            message: t("toastMessages.alerts.errorWhileFetchingTemplates"),
           }),
         );
     };
@@ -1852,21 +1852,21 @@ export default defineComponent({
         if (!toBeClonestreamType.value) {
           toast({
             variant: "error",
-            message: "Please select stream type ",
+            message: t("toastMessages.alerts.pleaseSelectStreamType"),
           });
           return;
         }
         if (!toBeClonestreamName.value) {
           toast({
             variant: "error",
-            message: "Please select stream name",
+            message: t("toastMessages.alerts.pleaseSelectStreamName"),
           });
           return;
         }
         isSubmitting.value = true;
         const dismiss = toast({
           variant: "loading",
-          message: "Please wait...",
+          message: t("toastMessages.alerts.pleaseWait"),
           timeout: 0,
         });
         try {
@@ -1884,7 +1884,7 @@ export default defineComponent({
           dismiss();
           toast({
             variant: "success",
-            message: "Anomaly detection cloned successfully",
+            message: t("toastMessages.alerts.anomalyDetectionClonedSuccessfully"),
           });
           showForm.value = false;
           await getAlertsFn(store, folderIdToBeCloned.value);
@@ -1904,28 +1904,28 @@ export default defineComponent({
       if (!toBeClonedAlert.value) {
         toast({
           variant: "error",
-          message: "Alert not found",
+          message: t("toastMessages.alerts.alertNotFound"),
         });
         return;
       }
       if (!toBeClonestreamType.value) {
         toast({
           variant: "error",
-          message: "Please select stream type ",
+          message: t("toastMessages.alerts.pleaseSelectStreamType"),
         });
         return;
       }
       if (!toBeClonestreamName.value) {
         toast({
           variant: "error",
-          message: "Please select stream name",
+          message: t("toastMessages.alerts.pleaseSelectStreamName"),
         });
         return;
       }
       isSubmitting.value = true;
       const dismiss = toast({
         variant: "loading",
-        message: "Please wait...",
+        message: t("toastMessages.alerts.pleaseWait"),
         timeout: 0,
       });
 
@@ -1954,7 +1954,7 @@ export default defineComponent({
             if (res.data.code == 200) {
               toast({
                 variant: "success",
-                message: "Alert Cloned Successfully",
+                message: t("toastMessages.alerts.alertClonedSuccessfully"),
               });
               showForm.value = false;
               await getAlertsFn(store, folderIdToBeCloned.value);
@@ -2133,7 +2133,7 @@ export default defineComponent({
           });
           toast({
             variant: "success",
-            message: isEnabled ? "Alert Resumed Successfully" : "Alert Paused Successfully",
+            message: raw(isEnabled ? "Alert Resumed Successfully" : "Alert Paused Successfully"),
           });
         })
         .finally(() => {
@@ -2258,7 +2258,7 @@ export default defineComponent({
         row.status = "training";
         toast({
           variant: "success",
-          message: "Retraining triggered",
+          message: t("toastMessages.alerts.retrainingTriggered"),
         });
       } catch (error: any) {
         toast({
@@ -2416,7 +2416,7 @@ export default defineComponent({
       if (!query) return;
       const dismiss = toast({
         variant: "loading",
-        message: "Please wait while searching for dashboards...",
+        message: t("toastMessages.alerts.pleaseWaitWhileSearchingForDashboards"),
         timeout: 0,
       });
       dismiss();
@@ -2487,7 +2487,7 @@ export default defineComponent({
       try {
         const dismiss = toast({
           variant: "loading",
-          message: "Exporting alerts...",
+          message: t("toastMessages.alerts.exportingAlerts"),
           timeout: 0, // Set timeout to 0 to keep it showing until dismissed
         });
 
@@ -2521,7 +2521,10 @@ export default defineComponent({
         dismiss();
         toast({
           variant: "success",
-          message: `Successfully exported ${selectedAlertsToExport.length} alert${selectedAlertsToExport.length > 1 ? "s" : ""}`,
+          message: t("toastMessages.alerts.successfullyExportedAlert", {
+            p0: selectedAlertsToExport.length,
+            p1: selectedAlertsToExport.length > 1 ? "s" : "",
+          }),
         });
         selectedAlerts.value = [];
         allSelectedAlerts.value = false;
@@ -2529,7 +2532,7 @@ export default defineComponent({
         console.error("Error exporting alerts:", error);
         toast({
           variant: "error",
-          message: "Error exporting alerts. Please try again.",
+          message: t("toastMessages.alerts.errorExportingAlertsPleaseTryAgain"),
         });
       }
     };
@@ -2612,7 +2615,9 @@ export default defineComponent({
     const bulkToggleAlerts = async (action: "pause" | "resume") => {
       const dismiss = toast({
         variant: "loading",
-        message: `${action === "resume" ? "Resuming" : "Pausing"} alerts...`,
+        message: t("toastMessages.alerts.alerts", {
+          p0: action === "resume" ? "Resuming" : "Pausing",
+        }),
         timeout: 0,
       });
       try {
@@ -2626,7 +2631,7 @@ export default defineComponent({
         if (alertsToToggle.length === 0) {
           toast({
             variant: "error",
-            message: `No alerts to ${action}`,
+            message: t("toastMessages.alerts.noAlertsTo", { p0: action }),
           });
           dismiss();
           return;
@@ -2649,7 +2654,7 @@ export default defineComponent({
           dismiss();
           toast({
             variant: "success",
-            message: `Alerts ${action}d successfully`,
+            message: t("toastMessages.alerts.alertsDSuccessfully", { p0: action }),
           });
         }
         // Refresh alerts
@@ -2663,7 +2668,7 @@ export default defineComponent({
         console.error(`Error ${action}ing alerts:`, error);
         toast({
           variant: "error",
-          message: `Error ${action}ing alerts. Please try again.`,
+          message: t("toastMessages.alerts.errorIngAlertsPleaseTryAgain", { p0: action }),
         });
       }
     };
@@ -2679,7 +2684,7 @@ export default defineComponent({
       bulkDeleteLoading.value = true;
       const dismiss = toast({
         variant: "loading",
-        message: "Deleting alerts...",
+        message: t("toastMessages.alerts.deletingAlerts"),
         timeout: 0,
       });
 
@@ -2687,7 +2692,7 @@ export default defineComponent({
         if (selectedAlerts.value.length === 0) {
           toast({
             variant: "error",
-            message: "No alerts selected for deletion",
+            message: t("toastMessages.alerts.noAlertsSelectedForDeletion"),
           });
           dismiss();
           return;
@@ -2716,27 +2721,32 @@ export default defineComponent({
             // Partial success
             toast({
               variant: "warning",
-              message: `${successCount} alert(s) deleted successfully, ${failCount} failed`,
+              message: t("toastMessages.alerts.alertSDeletedSuccessfullyFailed", {
+                p0: successCount,
+                p1: failCount,
+              }),
               timeout: 5000,
             });
           } else if (failCount > 0) {
             // All failed
             toast({
               variant: "error",
-              message: `Failed to delete ${failCount} alert(s)`,
+              message: t("toastMessages.alerts.failedToDeleteAlertS", { p0: failCount }),
             });
           } else {
             // All successful
             toast({
               variant: "success",
-              message: `${successCount} alert(s) deleted successfully`,
+              message: t("toastMessages.alerts.alertSDeletedSuccessfully", { p0: successCount }),
             });
           }
         } else {
           // Fallback success message
           toast({
             variant: "success",
-            message: `${selectedAlerts.value.length} alert(s) deleted successfully`,
+            message: t("toastMessages.alerts.alertSDeletedSuccessfully", {
+              p0: selectedAlerts.value.length,
+            }),
           });
         }
 

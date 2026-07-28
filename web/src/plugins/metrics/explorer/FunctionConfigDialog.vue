@@ -223,7 +223,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { computed, defineComponent, ref, watch, type PropType } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import MetricCardChart from "./MetricCardChart.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -295,7 +295,7 @@ export default defineComponent({
   },
   emits: ["update:modelValue", "apply", "restore"],
   setup(props, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
 
     const variants = computed<any[]>(() => props.defaults?.variants ?? []);
     const variantById = (id: string) => variants.value.find((v) => v.id === id) ?? null;

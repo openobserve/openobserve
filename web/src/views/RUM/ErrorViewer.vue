@@ -66,11 +66,11 @@ import useErrorTracking from "@/composables/useErrorTracking";
 import searchService from "@/services/search";
 import ErrorStackTrace from "@/components/rum/errorTracking/view/ErrorStackTrace.vue";
 import TraceCorrelationCard from "@/components/rum/correlation/TraceCorrelationCard.vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const isLoading = ref<boolean[]>([]);
 const router = useRouter();

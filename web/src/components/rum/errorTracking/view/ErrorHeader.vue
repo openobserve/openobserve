@@ -57,11 +57,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts" setup>
 import { useRouter } from "vue-router";
 import { copyToClipboard } from "@/utils/clipboard";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const router = useRouter();
 defineProps({
   error: {

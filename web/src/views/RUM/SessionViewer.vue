@@ -50,7 +50,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-if="frustrationCount > 0"
           class="flex items-center truncate text-xs"
-          :title="t('rum.frustrationSignalsDetected', { count: frustrationCount }, frustrationCount)"
+          :title="
+            t('rum.frustrationSignalsDetected', { count: frustrationCount }, frustrationCount)
+          "
           data-test="session-viewer-frustration-summary"
         >
           <OIcon
@@ -130,7 +132,7 @@ import { cloneDeep } from "lodash-es";
 import { computed, onBeforeMount, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import searchService from "@/services/search";
 import useQuery from "@/composables/useQuery";
 import useSessionsReplay from "@/composables/useSessionReplay";
@@ -161,7 +163,7 @@ const sessionId = ref("1");
 const currentTime = ref(0);
 const router = useRouter();
 const store = useStore();
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const isLoading = ref<boolean[]>([]);
 const { buildQueryPayload } = useQuery();
 const segments = ref<any[]>([]);

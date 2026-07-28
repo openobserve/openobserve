@@ -171,7 +171,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
@@ -213,7 +213,7 @@ const emit = defineEmits<{
   (e: "refresh"): void;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const typeFilter = ref<DataType | null>(null);
 const selectedIds = ref<string[]>([]);
 

@@ -1176,7 +1176,7 @@ import {
   type Ref,
 } from "vue";
 import { type SqlErrorRange } from "@/utils/query/sqlDiagnostics";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import {
   b64EncodeUnicode,
@@ -1320,7 +1320,7 @@ export default defineComponent({
     "update:triggerCondition",
   ],
   setup(props, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
 
     // Descendant step: the AddAlert orchestrator owns the ONE form and provides

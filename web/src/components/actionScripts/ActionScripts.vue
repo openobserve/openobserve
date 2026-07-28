@@ -249,7 +249,7 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import useStreams from "@/composables/useStreams";
 
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import NoData from "@/components/shared/grid/NoData.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import segment from "@/services/segment_analytics";
@@ -318,7 +318,7 @@ export default defineComponent({
   emits: ["updated:fields", "update:changeRecordPerPage", "update:maxRecordToReturn"],
   setup() {
     const store = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const router = useRouter();
     const alerts: Ref<Alert[]> = ref([]);
     const actionsScriptRows: Ref<ActionScriptList[]> = ref([]);
@@ -453,7 +453,7 @@ export default defineComponent({
     const getActionScripts = () => {
       const dismiss = toast({
         variant: "loading",
-        message: "Please wait while loading actions...",
+        message: t("toastMessages.actionScripts.pleaseWaitWhileLoadingActions"),
         timeout: 0,
       });
 
@@ -508,7 +508,7 @@ export default defineComponent({
           dismiss();
           toast({
             variant: "error",
-            message: "Error while pulling Actions.",
+            message: t("toastMessages.actionScripts.errorWhilePullingActions"),
           });
         })
         .finally(() => {
@@ -642,7 +642,7 @@ export default defineComponent({
         if (selectedActionScripts.value.length === 0) {
           toast({
             variant: "warning",
-            message: "No action scripts selected",
+            message: t("toastMessages.actionScripts.noActionScriptsSelected"),
           });
           confirmBulkDelete.value = false;
           return;
@@ -661,17 +661,24 @@ export default defineComponent({
         if (successful.length > 0 && unsuccessful.length === 0) {
           toast({
             variant: "success",
-            message: `Successfully deleted ${successful.length} action script(s)`,
+            message: t("toastMessages.actionScripts.successfullyDeletedActionScriptS", {
+              p0: successful.length,
+            }),
           });
         } else if (successful.length > 0 && unsuccessful.length > 0) {
           toast({
             variant: "warning",
-            message: `Deleted ${successful.length} action script(s). Failed to delete ${unsuccessful.length} action script(s)`,
+            message: t("toastMessages.actionScripts.deletedActionScriptSFailedTo", {
+              p0: successful.length,
+              p1: unsuccessful.length,
+            }),
           });
         } else if (unsuccessful.length > 0) {
           toast({
             variant: "error",
-            message: `Failed to delete ${unsuccessful.length} action script(s)`,
+            message: t("toastMessages.actionScripts.failedToDeleteActionScriptS", {
+              p0: unsuccessful.length,
+            }),
           });
         }
 

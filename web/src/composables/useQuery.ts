@@ -2,6 +2,7 @@ import { useStore } from "vuex";
 import useNotifications from "@/composables/useNotifications";
 import { b64EncodeUnicode, addSpacesToOperators } from "@/utils/zincutils";
 import { onBeforeMount, onBeforeUnmount } from "vue";
+import { gt } from "@/types/i18n";
 
 interface BuildQueryPayload {
   from?: number;
@@ -186,7 +187,7 @@ const useQuery = () => {
 
       return req;
     } catch (e: any) {
-      showErrorNotification("Invalid SQL Syntax");
+      showErrorNotification(gt("toastMessages.composables.invalidSqlSyntax"));
     }
   };
 

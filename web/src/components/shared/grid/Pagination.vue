@@ -111,7 +111,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { getImageURL } from "../../../utils/zincutils";
@@ -132,7 +132,7 @@ export default defineComponent({
   ] as string[],
   emits: ["update", "update:maxRecordToReturn", "update:changeRecordPerPage"],
   setup(props, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const router = useRouter();
     const maxRecords = ref(props.maxRecordToReturn);
     const store = useStore();

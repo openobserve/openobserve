@@ -180,7 +180,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts" setup>
 import { ref, onActivated, computed, watch, defineAsyncComponent } from "vue";
 import type { Ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, raw } from "@/types/i18n";
 
 import templateService from "@/services/alert_templates";
 import { useStore } from "vuex";
@@ -223,7 +223,7 @@ const props = withDefaults(
 const emit = defineEmits(["get:templates", "cancel:hideform"]);
 
 const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const splitterModel: Ref<number> = ref(75);
 const store = useStore();
 const router = useRouter();
@@ -357,7 +357,7 @@ const isTemplateBodyValid = (bodyValue: string) => {
   if (!result.valid) {
     toast({
       variant: "error",
-      message: getTemplateValidationErrorMessage(),
+      message: raw(getTemplateValidationErrorMessage()),
       timeout: 1500,
     });
   }

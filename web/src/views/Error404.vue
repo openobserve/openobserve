@@ -69,10 +69,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from "vue";
 import { useRouter } from "vue-router";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const router = useRouter();
 const countdown = ref(10);
 let timer: ReturnType<typeof setInterval>;

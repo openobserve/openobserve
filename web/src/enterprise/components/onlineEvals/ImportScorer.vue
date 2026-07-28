@@ -166,7 +166,7 @@ the Free Software Foundation, either version 3 of the License, or
 
 <script setup lang="ts">
 import { computed, reactive, ref, toRef } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 
 import BaseImport from "@/components/common/BaseImport.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
@@ -199,7 +199,7 @@ const emit = defineEmits<{
   (e: "saved"): void;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const baseImportRef = ref<any>(null);
 const isImporting = ref(false);
@@ -421,13 +421,16 @@ async function importJson({ jsonStr, jsonArray }: { jsonStr: string; jsonArray: 
 
   if (successCount === payloads.length) {
     toast({
-      message: `Successfully imported ${successCount} scorer(s)`,
+      message: t("toastMessages.onlineEvals.successfullyImportedScorerS", { p0: successCount }),
       variant: "success",
     });
     setTimeout(() => emit("saved"), 500);
   } else if (successCount > 0) {
     toast({
-      message: `Imported ${successCount} of ${payloads.length} scorer(s)`,
+      message: t("toastMessages.onlineEvals.importedOfScorerS", {
+        p0: successCount,
+        p1: payloads.length,
+      }),
       variant: "warning",
     });
     emit("saved");

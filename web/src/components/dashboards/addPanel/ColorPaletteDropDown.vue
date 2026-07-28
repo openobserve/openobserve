@@ -144,7 +144,7 @@ import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import { getColorPalette } from "@/utils/dashboard/colorPalette";
 import { computed, inject, onBeforeMount, defineComponent } from "vue";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -166,7 +166,7 @@ export default defineComponent({
   name: "ColorPaletteDropdown",
   components: { OToggleGroup, OToggleGroupItem, OSelect, OSelectItem, OSelectGroup },
   setup() {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
 
     const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
     const { dashboardPanelData, promqlMode } = useDashboardPanelData(dashboardPanelDataPageKey);

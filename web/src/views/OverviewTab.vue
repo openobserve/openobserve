@@ -506,7 +506,7 @@ const _anomalyCache = new Map<
   string,
   { ts: number; startTime: number; endTime: number; data: any[] }
 >();
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { b64EncodeUnicode } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -528,7 +528,7 @@ const AlertHistoryDrawer = defineAsyncComponent(
   () => import("@/components/alerts/AlertHistoryDrawer.vue"),
 );
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 const router = useRouter();
 

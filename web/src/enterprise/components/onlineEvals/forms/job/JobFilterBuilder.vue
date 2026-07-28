@@ -38,7 +38,7 @@
 
 <script setup lang="ts">
 import { computed, inject } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import FilterGroup from "@/components/alerts/FilterGroup.vue";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
 import {
@@ -67,7 +67,7 @@ const emit = defineEmits<{
   (e: "update:group", value: V2Group): void;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const form: any = inject(FORM_CONTEXT_KEY, null);
 
 const streamFields = computed(() =>

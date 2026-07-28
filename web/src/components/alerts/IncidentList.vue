@@ -251,7 +251,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref, shallowRef, computed, onMounted, watch, nextTick } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter, useRoute } from "vue-router";
 import { formatToReadable } from "@/utils/date";
@@ -294,7 +294,7 @@ export default defineComponent({
     OToggleGroupItem,
   },
   setup() {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const router = useRouter();
     const route = useRoute();
@@ -798,7 +798,7 @@ export default defineComponent({
       await loadIncidents();
       toast({
         variant: "success",
-        message: "Incidents refreshed",
+        message: t("toastMessages.alerts.incidentsRefreshed"),
         timeout: 1500,
       });
     };

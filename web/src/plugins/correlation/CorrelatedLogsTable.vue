@@ -295,7 +295,7 @@ import {
   resolveSetId,
   type SubjectButtonSpec,
 } from "@/composables/useMetricSubjectButtons";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -332,7 +332,7 @@ const emit = defineEmits<{
 }>();
 
 // Composables
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 const router = useRouter();
 const { searchObj } = searchState();
@@ -979,14 +979,14 @@ const handleAddFieldToTable = (field: string) => {
     // Show success notification
     toast({
       variant: "success",
-      message: `Column "${field}" added to table`,
+      message: t("toastMessages.correlation.columnAddedToTable", { p0: field }),
       timeout: 1500,
     });
   } else {
     // Field is already visible, show info notification
     toast({
       variant: "info",
-      message: `Column "${field}" is already visible`,
+      message: t("toastMessages.correlation.columnIsAlreadyVisible", { p0: field }),
       timeout: 1500,
     });
   }

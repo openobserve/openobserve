@@ -99,7 +99,7 @@ import usePermissions from "@/composables/iam/usePermissions";
 import { cloneDeep } from "lodash-es";
 import type { Ref } from "vue";
 import { ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { getRoles } from "@/services/iam";
 import { useStore } from "vuex";
 import { TABLE_CHECKBOX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
@@ -142,7 +142,7 @@ const userSearchKey = ref("");
 
 const usersDisplay = ref("selected");
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const usersDisplayOptions = [
   {

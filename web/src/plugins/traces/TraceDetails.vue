@@ -874,7 +874,7 @@ import {
 import { SPAN_KIND_MAP } from "@/utils/traces/constants";
 import useResizer from "@/composables/useResizer";
 import { copyToClipboard } from "@/utils/clipboard";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import useStreams from "@/composables/useStreams";
 import useRumSpanBuilder from "@/composables/rum/useRumSpanBuilder";
 import { b64EncodeUnicode, formatLargeNumber } from "@/utils/zincutils";
@@ -1232,7 +1232,7 @@ export default defineComponent({
 
     const streamSearchValue = ref<string>("");
 
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
 
     const router = useRouter();
 

@@ -199,7 +199,7 @@ import {
   reactive,
   nextTick,
 } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRoute } from "vue-router";
 import { getDashboard, deleteVariable, updateDashboard } from "../../../utils/commons";
@@ -237,7 +237,7 @@ export default defineComponent({
   emits: ["save"],
   setup(props, { emit }) {
     const store: any = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const route = useRoute();
     const isAddVariable = ref(false);
 

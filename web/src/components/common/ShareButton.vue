@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref, onBeforeUnmount, computed, type PropType } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { copyToClipboard } from "@/utils/clipboard";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -112,7 +112,7 @@ export default defineComponent({
   },
   emits: ["copy:success", "copy:error", "shorten:success", "shorten:error"],
   setup(props, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
 
     const isLoading = ref(false);
@@ -216,7 +216,7 @@ export default defineComponent({
       if (!props.url) {
         toast({
           variant: "warning",
-          message: "No URL to share",
+          message: t("toastMessages.common.noUrlToShare"),
         });
         return;
       }

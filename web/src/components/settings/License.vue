@@ -466,7 +466,7 @@
 
 <script lang="ts">
 import { defineComponent, ref, onMounted, computed, watch, defineAsyncComponent } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, raw } from "@/types/i18n";
 import licenseServer from "@/services/license_server";
 import { useStore } from "vuex";
 import DOMPurify from "dompurify";
@@ -507,7 +507,7 @@ export default defineComponent({
     OCardSection,
   },
   setup() {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const { confirm } = useConfirmDialog();
     const loading = ref(false);
     const licenseData = ref<any>({});
@@ -585,10 +585,11 @@ export default defineComponent({
         console.error("Error updating license:", error);
         toast({
           variant: "error",
-          message:
+          message: raw(
             t("about.failed_to_update_license") +
-            " : " +
-            (e?.response?.data?.message || t("settings.licensePage.unexpectedError")),
+              " : " +
+              (e?.response?.data?.message || t("settings.licensePage.unexpectedError")),
+          ),
         });
       }
     };
@@ -617,10 +618,11 @@ export default defineComponent({
         console.error("Error refreshing license:", error);
         toast({
           variant: "error",
-          message:
+          message: raw(
             t("about.failed_to_refresh_license") +
-            " : " +
-            (e?.response?.data?.message || t("settings.licensePage.unexpectedError")),
+              " : " +
+              (e?.response?.data?.message || t("settings.licensePage.unexpectedError")),
+          ),
         });
       }
     };

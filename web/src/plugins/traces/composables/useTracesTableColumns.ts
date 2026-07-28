@@ -38,7 +38,7 @@ import { ref } from "vue";
 import { type ColumnDef } from "@tanstack/vue-table";
 import { useStore } from "vuex";
 import { timestampToTimezoneDate } from "@/utils/zincutils";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { SPAN_KIND_MAP } from "@/utils/traces/constants";
 
 /** IDs of LLM columns injected at runtime — never stored in selectedFields. */
@@ -159,7 +159,7 @@ export function useTracesTableColumns() {
    */
   const columns = ref<ColumnDef<Record<string, any>>[]>([]);
   const store = useStore();
-  const { t } = useI18n();
+  const { t } = useI18nTyped();
 
   const buildColumns = (
     showLlmColumns: boolean,

@@ -261,7 +261,7 @@ import {
   nextTick,
   defineAsyncComponent,
 } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import useLogs from "../../composables/useLogs";
@@ -354,7 +354,7 @@ export default defineComponent({
   setup(props, { emit }) {
     const store = useStore();
     const router = useRouter();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const { reorderSelectedFields, getFilterExpressionByFieldType, extractValueQuery } = useLogs();
 
     const { filterHitsColumns, extractFields, getStreamList } = useStreamFields();

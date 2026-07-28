@@ -222,7 +222,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref, computed, onMounted } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, raw } from "@/types/i18n";
 import { useStore } from "vuex";
 import regexPatternsService from "@/services/regex_pattern";
 import { RegexPatternCache } from "@/utils/regexPatternCache";
@@ -270,7 +270,7 @@ export default defineComponent({
   },
   emits: ["import-patterns"],
   setup(props, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
 
     const patterns = ref<BuiltInPattern[]>([]);
@@ -381,7 +381,7 @@ export default defineComponent({
       } catch (e: any) {
         error.value = e.response?.data?.message || e.message || t("regex_patterns.failed_to_load");
         toast({
-          message: error.value,
+          message: raw(error.value),
           variant: "error",
         });
       } finally {

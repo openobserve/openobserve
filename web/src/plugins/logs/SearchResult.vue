@@ -629,7 +629,7 @@ import {
 import { copyToClipboard } from "@/utils/clipboard";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 
 import { byString } from "../../utils/json";
 import { getImageURL, useLocalWrapContent } from "../../utils/zincutils";
@@ -915,7 +915,7 @@ export default defineComponent({
   setup(props, { emit }) {
     // Accessing nested JavaScript objects and arrays by string path
     // https://stackoverflow.com/questions/6491463/accessing-nested-javascript-objects-and-arrays-by-string-path
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const { isDark } = useTheme();
     const searchListContainer = ref<HTMLElement | null>(null);

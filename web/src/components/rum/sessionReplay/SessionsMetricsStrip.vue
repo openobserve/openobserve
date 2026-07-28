@@ -52,7 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { durationFormatter } from "@/utils/zincutils";
 
 export type SessionsMetricCardKey = "sessions" | "errors" | "frustrated" | "duration" | "bounced";
@@ -78,7 +78,7 @@ const emit = defineEmits<{
   select: [card: SessionsMetricCardKey];
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const rate = (count: number) =>
   props.total > 0 ? `${((count / props.total) * 100).toFixed(1)}%` : "";

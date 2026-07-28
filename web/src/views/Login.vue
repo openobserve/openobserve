@@ -57,6 +57,7 @@ import {
 } from "@/utils/zincutils";
 import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { gt } from "@/types/i18n";
 
 export default defineComponent({
   name: "LoginPage",
@@ -345,7 +346,7 @@ export default defineComponent({
           if (res.data.data.id == 0) {
             const dismiss = toast({
               variant: "loading",
-              message: "Please wait while creating new user...",
+              message: gt("toastMessages.views.pleaseWaitWhileCreatingNewUser"),
               timeout: 0,
             });
 
@@ -372,7 +373,7 @@ export default defineComponent({
         .catch((error) => {
           toast({
             variant: "loading",
-            message: "Error while verifying user...",
+            message: gt("toastMessages.views.errorWhileVerifyingUser"),
             timeout: 0,
           });
           if (error.status === 403) this.signout();

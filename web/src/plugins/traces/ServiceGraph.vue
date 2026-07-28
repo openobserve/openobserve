@@ -365,7 +365,7 @@ import {
 import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
 import { useRouter } from "vue-router";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import serviceGraphService from "@/services/service_graph";
 import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
 import ServiceGraphSidePanel from "./ServiceGraphNodeSidePanel.vue";
@@ -496,7 +496,7 @@ export default defineComponent({
     const store = useStore();
     const { isDark } = useTheme();
     const router = useRouter();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const { getStreams } = useStreams();
     const { searchObj } = useTraces();
 

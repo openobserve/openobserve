@@ -188,7 +188,7 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { VueDraggableNext as draggable } from "vue-draggable-next";
 import { PromqlStep, PromqlStepSpec } from "@/components/promql/types";
 import { promqlRenderer } from "@/components/promql/operations/queryModeller";
@@ -202,7 +202,7 @@ const emit = defineEmits<{
   "update:operations": [value: PromqlStep[]];
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const showOperationSelector = ref(false);
 
 // Access shared label options from meta

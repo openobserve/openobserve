@@ -84,7 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, raw } from "@/types/i18n";
 import { useStore } from "vuex";
 
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
@@ -103,7 +103,7 @@ import {
 } from "@/plugins/workflows/useWorkflowCanvas";
 import { buildTestSampleText } from "@/plugins/workflows/testSample";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 
 const running = ref(false);
@@ -198,7 +198,7 @@ const run = async () => {
   if (r.ok) workflowObj.testRun.show = false;
   else
     toast({
-      message: r.error || t("workflow.test.runError"),
+      message: raw(r.error || t("workflow.test.runError")),
       variant: "error",
     });
 };

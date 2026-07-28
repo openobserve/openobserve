@@ -15,7 +15,7 @@
 
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 
 import { searchState } from "@/composables/useLogs/searchState";
 import { useSearchStream } from "@/composables/useLogs/useSearchStream";
@@ -31,7 +31,7 @@ import useStreamFields from "@/composables/useLogs/useStreamFields";
 export const usePagination = () => {
   const store = useStore();
   const router = useRouter();
-  const { t } = useI18n();
+  const { t } = useI18nTyped();
   let { searchObj, searchObjDebug, searchAggData, notificationMsg } = searchState();
 
   const { getHistogramTitle } = useHistogram();

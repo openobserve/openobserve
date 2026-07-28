@@ -51,7 +51,7 @@ import { useLocalOrganization, getPath } from "../utils/zincutils";
 import organizationsService from "../services/organizations";
 import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 
 export default defineComponent({
   name: "PageUser",
@@ -108,7 +108,7 @@ export default defineComponent({
   setup() {
     const $store = useStore();
     const $router = useRouter();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
 
     return {
       $router,

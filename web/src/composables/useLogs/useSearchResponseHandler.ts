@@ -27,7 +27,7 @@ import {
 } from "@/ts/interfaces/query";
 import { logsErrorMessage } from "@/utils/common";
 import { getFunctionErrorMessage } from "@/utils/zincutils";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { convertDateToTimestamp } from "@/utils/date";
 import { useLogsHighlighter } from "@/composables/useLogsHighlighter";
 import { rangesFromServerError } from "@/utils/query/sqlDiagnostics";
@@ -49,7 +49,7 @@ export const useSearchResponseHandler = () => {
   const { clearCache } = useLogsHighlighter();
 
   const store = useStore();
-  const { t } = useI18n();
+  const { t } = useI18nTyped();
 
   const {
     searchObj,

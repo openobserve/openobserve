@@ -227,7 +227,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineAsyncComponent, defineComponent, ref, computed, watch } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, raw } from "@/types/i18n";
 
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
@@ -272,7 +272,7 @@ export default defineComponent({
   ],
   setup(props, { emit }) {
     const store = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const router = useRouter();
     const jsTransforms: any = ref([]);
     const formData: any = ref({});
@@ -332,7 +332,7 @@ export default defineComponent({
       // return ;
       const dismiss = toast({
         variant: "loading",
-        message: "Please wait while loading functions...",
+        message: t("toastMessages.functions.pleaseWaitWhileLoadingFunctions"),
         timeout: 0,
       });
 
@@ -374,7 +374,7 @@ export default defineComponent({
           if (err?.response?.status && err?.response?.status != 403) {
             toast({
               variant: "error",
-              message: "Error while pulling function.",
+              message: t("toastMessages.functions.errorWhilePullingFunction"),
             });
           }
         })
@@ -498,11 +498,10 @@ export default defineComponent({
           if (err.response.data.code == 409) {
             toast({
               variant: "error",
-              message:
-                "Function deletion failed as it is associated with pipelines. Click on view button to get associated pipelines.",
+              message: t("toastMessages.functions.functionDeletionAssociatedPipelines"),
               timeout: 10000,
               action: {
-                label: "View",
+                label: t("toastMessages.functions.view"),
                 handler: () => {
                   forceRemoveFunction(err.response.data["message"]);
                 },
@@ -513,7 +512,9 @@ export default defineComponent({
           if (err.response.status != 403) {
             toast({
               variant: "error",
-              message: JSON.stringify(err.response.data["message"]) || "Function deletion failed.",
+              message: raw(
+                JSON.stringify(err.response.data["message"]) || "Function deletion failed.",
+              ),
             });
           }
         });
@@ -600,7 +601,7 @@ export default defineComponent({
       bulkDeleteLoading.value = true;
       const dismiss = toast({
         variant: "loading",
-        message: "Deleting functions...",
+        message: t("toastMessages.functions.deletingFunctions"),
         timeout: 0,
       });
 
@@ -608,7 +609,7 @@ export default defineComponent({
         if (selectedFunctions.value.length === 0) {
           toast({
             variant: "error",
-            message: "No functions selected for deletion",
+            message: t("toastMessages.functions.noFunctionsSelectedForDeletion"),
           });
           dismiss();
           return;
@@ -636,27 +637,34 @@ export default defineComponent({
             // Partial success
             toast({
               variant: "warning",
-              message: `${successCount} function(s) deleted successfully, ${failCount} failed`,
+              message: t("toastMessages.functions.functionSDeletedSuccessfullyFailed", {
+                p0: successCount,
+                p1: failCount,
+              }),
               timeout: 5000,
             });
           } else if (failCount > 0) {
             // All failed
             toast({
               variant: "error",
-              message: `Failed to delete ${failCount} function(s)`,
+              message: t("toastMessages.functions.failedToDeleteFunctionS", { p0: failCount }),
             });
           } else {
             // All successful
             toast({
               variant: "success",
-              message: `${successCount} function(s) deleted successfully`,
+              message: t("toastMessages.functions.functionSDeletedSuccessfully", {
+                p0: successCount,
+              }),
             });
           }
         } else {
           // Fallback success message
           toast({
             variant: "success",
-            message: `${selectedFunctions.value.length} function(s) deleted successfully`,
+            message: t("toastMessages.functions.functionSDeletedSuccessfully", {
+              p0: selectedFunctions.value.length,
+            }),
           });
         }
 

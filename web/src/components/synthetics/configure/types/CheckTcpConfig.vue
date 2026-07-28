@@ -1,14 +1,14 @@
 <script setup lang="ts">
 // Copyright 2026 OpenObserve Inc.
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import type { ProtocolCheck, TcpCheckConfig } from "@/types/synthetics";
 import OInput from "@/lib/forms/Input/OInput.vue";
 
 const props = defineProps<{ check: ProtocolCheck }>();
 const emit = defineEmits<{ "update:check": [value: ProtocolCheck] }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const cfg = computed<TcpCheckConfig>(() => props.check.tcp!);
 

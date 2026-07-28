@@ -121,6 +121,9 @@ const mockI18n = createI18n({
       common: {
         move: "Move",
       },
+      toastMessages: {
+        sidebar: { movedSuccessfully: "{p0} moved successfully" },
+      },
     },
   },
 });

@@ -429,7 +429,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, computed, watch } from "vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import destinationService from "@/services/alert_destination";
 import { useStore } from "vuex";
 import type { DestinationData, Headers } from "@/ts/interfaces";
@@ -453,7 +453,7 @@ const props = defineProps<{
 
 const emit = defineEmits(["created", "updated", "cancel"]);
 const store = useStore();
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 // Co-located Zod schema (factory keeps the required message i18n-driven).
 const destinationSchema = makeDestinationSchema(t);
@@ -1060,14 +1060,14 @@ const createDestination = (value?: DestinationForm) => {
   if (!(name && url && v.method)) {
     toast({
       variant: "error",
-      message: "Please fill required fields",
+      message: t("toastMessages.NodeForm.pleaseFillRequiredFields"),
       timeout: 1500,
     });
     return;
   }
   const dismiss = toast({
     variant: "loading",
-    message: "Please wait...",
+    message: t("toastMessages.NodeForm.pleaseWait"),
     timeout: 0,
   });
   // Headers from the form (form-owned array-field). Only non-empty rows persist.

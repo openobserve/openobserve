@@ -31,6 +31,7 @@ import { checkIfConfigChangeRequiredApiCallOrNot } from "@/utils/dashboard/check
 import { processQueryMetadataErrors } from "@/utils/zincutils";
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 import useNotifications from "@/composables/useNotifications";
+import { gt } from "@/types/i18n";
 
 /**
  * Options for usePanelEditor composable
@@ -316,7 +317,7 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
         validatePanel(errors, true);
 
         if (errors.length) {
-          showErrorNotification("There are some errors, please fix them and try again");
+          showErrorNotification(gt("toastMessages.composables.thereAreSomeErrorsPleaseFix"));
           // Do not return early — query still fires to allow partial results
         }
       }

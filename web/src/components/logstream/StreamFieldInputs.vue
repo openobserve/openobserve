@@ -107,7 +107,7 @@
 </template>
 
 <script lang="ts" setup>
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { inject } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
@@ -145,7 +145,7 @@ const props = defineProps({
   },
 });
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 // The parent's form (provided by <OForm>). Rows are read reactively so add /
 // delete re-render immediately (a form.state.values read inside a computed would

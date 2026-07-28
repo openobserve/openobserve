@@ -113,7 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts" setup>
 import useStreams from "@/composables/useStreams";
 import { ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
@@ -143,7 +143,7 @@ const { getStreams } = useStreams();
 
 const isFetchingStreams = ref(false);
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 // Co-located schema (factory keeps the required message i18n-driven).
 const addPipelineSchema = makeAddPipelineSchema(t);

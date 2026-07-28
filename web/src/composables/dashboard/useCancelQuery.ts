@@ -2,6 +2,7 @@ import { ref } from "vue";
 import useNotifications from "@/composables/useNotifications";
 import queryService from "../../services/search";
 import { useStore } from "vuex";
+import { gt } from "@/types/i18n";
 
 /**
  * Provides a composable to cancel running queries.
@@ -45,7 +46,7 @@ const useCancelQuery = () => {
         const isCancelled = res.data.some((item: any) => item.is_success);
 
         if (isCancelled) {
-          showPositiveNotification("Running query canceled successfully", {
+          showPositiveNotification(gt("toastMessages.dashboard.runningQueryCanceledSuccessfully"), {
             timeout: 3000,
           });
         }

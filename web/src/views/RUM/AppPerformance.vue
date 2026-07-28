@@ -88,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 // @ts-nocheck
 import { defineComponent, ref, watch, onMounted, nextTick, computed, onActivated } from "vue";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { getDashboard } from "@/utils/commons.ts";
 import { parseDuration, generateDurationLabel } from "@/utils/date";
@@ -117,7 +117,7 @@ export default defineComponent({
     OPageLayout,
   },
   setup() {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
 
     const activePerformanceTab = ref("overview");
     const activePerformanceComponent = ref(null);

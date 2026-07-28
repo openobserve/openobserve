@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { ref, onMounted, defineAsyncComponent, provide } from "vue";
 import { useRouter } from "vue-router";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import {
   parseSQL,
@@ -150,7 +150,7 @@ const emit = defineEmits<{
 // Setup
 // ============================================================================
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const router = useRouter();
 const panelEditorRef = ref<any>(null);
 const showAddToDashboardDialog = ref(false);

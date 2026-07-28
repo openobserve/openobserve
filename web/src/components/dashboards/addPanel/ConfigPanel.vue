@@ -1729,7 +1729,7 @@ import { type SwitchValue } from "@/lib/forms/Switch/OSwitch.types";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import { getUnitOptions } from "@/composables/dashboard/useColumnFormatting";
 import { computed, defineComponent, inject, nextTick, onBeforeMount, onMounted, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import Drilldown from "./Drilldown.vue";
 import ValueMapping from "./ValueMapping.vue";
 import ColorBySeries from "./ColorBySeries.vue";
@@ -1837,7 +1837,7 @@ export default defineComponent({
     const toggleItemValue = (value: unknown) =>
       value === null || value === undefined ? TOGGLE_AUTO : value;
 
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
 
     const basemapTypeOptions = [

@@ -21,9 +21,9 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import { pauseTimer, resumeTimer, isPageVisible } from "./useToast";
 import { ToastRoot, ToastTitle, ToastDescription, ToastClose } from "reka-ui";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 defineOptions({ inheritAttrs: false });
 

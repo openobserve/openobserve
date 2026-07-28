@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, ref } from "vue";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import templateService from "@/services/alert_templates";
 import destinationService from "@/services/alert_destination";
 
@@ -36,7 +36,7 @@ export default defineComponent({
   name: "AppAlerts",
   setup() {
     const store = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const activeTab: any = ref("destinations");
     const templates = ref([]);
     const destinations = ref([]);

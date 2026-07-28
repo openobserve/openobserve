@@ -45,7 +45,7 @@ import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
 import { useRouter } from "vue-router";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import MenuLink from "@/components/MenuLink.vue";
 import config from "@/aws-exports";
@@ -64,7 +64,7 @@ const props = defineProps<{
 
 const store = useStore();
 const router: any = useRouter();
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const isLinkMode = computed(() => !!props.parentItem);
 

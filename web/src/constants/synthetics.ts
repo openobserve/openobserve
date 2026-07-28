@@ -2,6 +2,7 @@
 
 import type { StepAction, SelectorType, SyntheticCheckType } from "@/types/synthetics";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
+import type { I18nKey } from "@/types/i18n";
 
 // ── Action labels (capitalized) ──────────────────────────────────────────
 export const ACTION_LABELS: Record<StepAction, string> = {
@@ -89,8 +90,8 @@ export const VALUE_WIDTH_MAP: Record<string, string> = {
 export interface CheckTypeCard {
   type: SyntheticCheckType;
   icon: IconName;
-  labelKey: string;
-  descKey: string;
+  labelKey: I18nKey;
+  descKey: I18nKey;
 }
 
 export const CHECK_TYPE_CARDS: CheckTypeCard[] = [

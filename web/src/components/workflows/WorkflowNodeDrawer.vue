@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import WorkflowAlertTrigger from "@/plugins/workflows/nodes/WorkflowAlertTrigger.vue";
@@ -76,7 +76,7 @@ import WorkflowFunction from "@/plugins/workflows/nodes/WorkflowFunction.vue";
 import WorkflowDestination from "@/plugins/workflows/nodes/WorkflowDestination.vue";
 import useWorkflowCanvas, { workflowObj, nodeMeta } from "@/plugins/workflows/useWorkflowCanvas";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const { commitNode, cancelNodeDrawer, requestDeleteNode } = useWorkflowCanvas();
 
 const meta = computed(() => nodeMeta(workflowObj.dialog.name));

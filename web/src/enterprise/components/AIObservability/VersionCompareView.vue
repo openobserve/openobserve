@@ -197,7 +197,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import { debounce } from "lodash-es";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OContent from "@/lib/core/Content/OContent.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -250,7 +250,7 @@ const emit = defineEmits<{
   ): void;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const align = ref<AlignMode>("sinceRollout");
 

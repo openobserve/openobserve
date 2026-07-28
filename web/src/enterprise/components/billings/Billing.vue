@@ -169,7 +169,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 // @ts-ignore
 import { defineComponent, ref, computed, onMounted, provide, reactive, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import config from "@/aws-exports";
@@ -200,7 +200,7 @@ export default defineComponent({
     DateTimePickerDashboard,
   },
   setup() {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const router: any = useRouter();
     // Default/fallback tab is "plans" — that's where /billings redirects on

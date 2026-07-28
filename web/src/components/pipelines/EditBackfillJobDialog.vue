@@ -141,7 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { ref, computed, watch, nextTick } from "vue";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
@@ -171,7 +171,7 @@ const props = defineProps<Props>();
 const emit = defineEmits<Emits>();
 
 const store = useStore();
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const { confirm } = useConfirmDialog();
 
@@ -304,7 +304,7 @@ const updateBackfillJobRequest = async (value: BackfillForm) => {
 
     toast({
       variant: "success",
-      message: "Backfill job updated successfully",
+      message: t("toastMessages.pipelines.backfillJobUpdatedSuccessfully"),
     });
 
     emit("job-updated");

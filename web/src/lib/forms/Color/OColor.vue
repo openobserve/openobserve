@@ -19,9 +19,9 @@ import {
 } from "reka-ui";
 import type { Color } from "reka-ui";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 defineOptions({ inheritAttrs: false });
 const $attrs = useAttrs();

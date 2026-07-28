@@ -6,7 +6,7 @@
 // flow; the per-type request card is slotted into CheckConfigure.
 import { computed, onMounted, ref, type Component } from "vue";
 import { useRoute, useRouter, onBeforeRouteLeave } from "vue-router";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import type {
   AgentSetup,
@@ -47,7 +47,7 @@ const props = defineProps<{
 const router = useRouter();
 const route = useRoute();
 const store = useStore();
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const typeConfigCards: Record<ProtocolCheckType, Component> = {
   http: CheckHttpConfig,

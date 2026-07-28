@@ -161,7 +161,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { getUUID } from "@/utils/zincutils";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { buildConditionsString } from "@/utils/alerts/conditionsFormatter";
@@ -268,7 +268,7 @@ const showPreview = ref(true);
 
 const store = useStore();
 const { isDark } = useTheme();
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const label = ref(props.group.logicalOperator?.toLowerCase() || "and");
 

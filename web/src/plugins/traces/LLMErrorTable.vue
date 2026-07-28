@@ -86,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts" setup>
 import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OTable from "@/lib/core/Table/OTable.vue";
 import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { type LLMPanelDef, renderPanelSql, panelI18nKey } from "./config/llmInsightsPanels";
@@ -118,7 +118,7 @@ const emit = defineEmits<{
   (e: "view-trace", traceId: string): void;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 // Title/subtitle come from the en.json `aiObservability.panels.<id>` copy.
 const displayTitle = computed(() => t(`${panelI18nKey(props.panel.id)}.title`));

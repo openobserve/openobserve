@@ -174,7 +174,7 @@ import {
   onMounted,
   type PropType,
 } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { generateDurationLabel } from "../utils/date";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -216,7 +216,7 @@ export default defineComponent({
   emits: ["update:modelValue", "trigger"],
   setup(props: any, { emit }) {
     const router = useRouter();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
 
     const btnRefreshInterval = ref(false);
     let intervalInstance = 0;

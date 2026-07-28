@@ -183,7 +183,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, raw } from "@/types/i18n";
 import { useStore } from "vuex";
 
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
@@ -203,7 +203,7 @@ import {
   executeTestRun,
 } from "@/plugins/workflows/useWorkflowCanvas";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 
 const nodeId = computed(() => workflowObj.testRun.resultDrawer.nodeId);
@@ -334,7 +334,7 @@ const replay = async () => {
   if (r.ok) close();
   else
     toast({
-      message: r.error || t("workflow.test.runError"),
+      message: raw(r.error || t("workflow.test.runError")),
       variant: "error",
     });
 };

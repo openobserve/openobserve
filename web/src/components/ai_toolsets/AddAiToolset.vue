@@ -329,7 +329,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineAsyncComponent, defineComponent, ref, computed, onMounted } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import aiToolsetsService from "@/services/ai_toolsets";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -369,7 +369,7 @@ export default defineComponent({
   setup(_, { emit }) {
     const store = useStore();
     const router = useRouter();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
 
     // Co-located Zod schema (factory keeps the messages i18n-driven).
     const addAiToolsetSchema = makeAddAiToolsetSchema(t);
@@ -642,7 +642,7 @@ export default defineComponent({
         // `form.useStore` reads above re-render automatically.
         form.reset(record);
       } catch {
-        toast({ variant: "error", message: "Failed to load toolset" });
+        toast({ variant: "error", message: t("toastMessages.aitoolsets.failedToLoadToolset") });
       }
     };
 

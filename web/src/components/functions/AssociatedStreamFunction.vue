@@ -167,7 +167,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref, onActivated, onMounted, watch, computed } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, raw } from "@/types/i18n";
 import jsTransformService from "../../services/jstransform";
 
 import streamService from "../../services/stream";
@@ -203,7 +203,7 @@ export default defineComponent({
   emits: ["update:changeRecordPerPage", "update:maxRecordToReturn"],
   setup() {
     const store = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const router = useRouter();
     const logStream = ref([]);
     const showIndexSchemaDialog = ref(false);
@@ -365,7 +365,7 @@ export default defineComponent({
         previousOrgIdentifier.value = store.state.selectedOrganization.identifier;
         const dismiss = toast({
           variant: "loading",
-          message: "Please wait while loading streams...",
+          message: t("toastMessages.functions.pleaseWaitWhileLoadingStreams"),
           timeout: 0,
         });
 
@@ -407,7 +407,7 @@ export default defineComponent({
             dismiss();
             toast({
               variant: "error",
-              message: "Error while pulling stream.",
+              message: t("toastMessages.functions.errorWhilePullingStream"),
             });
           });
       }
@@ -442,7 +442,7 @@ export default defineComponent({
         .catch((err) => {
           toast({
             variant: "error",
-            message: JSON.stringify(err.response.data["error"]) || "Function fetching failed",
+            message: raw(JSON.stringify(err.response.data["error"]) || "Function fetching failed"),
           });
         });
     };
@@ -491,7 +491,7 @@ export default defineComponent({
         .catch((err) => {
           toast({
             variant: "error",
-            message: JSON.stringify(err.response.data["error"]) || "Function creation failed",
+            message: raw(JSON.stringify(err.response.data["error"]) || "Function creation failed"),
           });
         })
         .finally(() => {
@@ -539,7 +539,7 @@ export default defineComponent({
         .then((res: any) => {
           if (res.data.code == 200) {
             toast({
-              message: "Stream deleted successfully.",
+              message: t("toastMessages.functions.streamDeletedSuccessfully"),
               variant: "success",
             });
             getLogStream();
@@ -547,7 +547,7 @@ export default defineComponent({
         })
         .catch(() => {
           toast({
-            message: "Error while deleting stream.",
+            message: t("toastMessages.functions.errorWhileDeletingStream"),
             variant: "error",
           });
         });

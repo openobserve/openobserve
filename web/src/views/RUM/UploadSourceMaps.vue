@@ -100,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter, useRoute } from "vue-router";
 import sourcemapsService from "@/services/sourcemaps";
@@ -112,7 +112,7 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { makeUploadSourceMapsSchema, type UploadSourceMapsForm } from "./UploadSourceMaps.schema";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 const router = useRouter();
 const route = useRoute();
@@ -160,7 +160,7 @@ const uploadSourceMaps = async (value: UploadSourceMapsForm) => {
 
     toast({
       variant: "success",
-      message: "Source maps uploaded successfully",
+      message: t("toastMessages.RUM.sourceMapsUploadedSuccessfully"),
     });
 
     // Navigate back to source maps list

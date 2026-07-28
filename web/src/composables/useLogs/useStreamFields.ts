@@ -15,7 +15,7 @@
 
 import { nextTick, ref } from "vue";
 import { byString } from "@/utils/json";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import config from "@/aws-exports";
@@ -54,7 +54,7 @@ export const useStreamFields = () => {
 
   const store = useStore();
   const router = useRouter();
-  const { t } = useI18n();
+  const { t } = useI18nTyped();
 
   let {
     searchObj,

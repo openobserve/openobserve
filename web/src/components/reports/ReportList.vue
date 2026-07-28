@@ -328,7 +328,7 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import reports from "@/services/reports";
 import { debounce } from "lodash-es";
 import AppTabs from "@/components/common/AppTabs.vue";
@@ -351,7 +351,7 @@ const MoveAcrossFolders = defineAsyncComponent(
   () => import("@/components/common/sidebar/MoveAcrossFolders.vue"),
 );
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const router = useRouter();
 const { track } = useReo();
 const store = useStore();
@@ -499,7 +499,7 @@ const loadReports = async (folderId: string, nameQuery?: string) => {
   isLoadingReports.value = true;
   const dismiss = toast({
     variant: "loading",
-    message: "Please wait while fetching reports...",
+    message: t("toastMessages.reports.pleaseWaitWhileFetchingReports"),
     timeout: 0,
   });
 
@@ -701,7 +701,7 @@ const toggleReportState = (report: any) => {
   const state = report.enabled ? "Stopping" : "Starting";
   const dismiss = toast({
     variant: "loading",
-    message: `${state} report "${report.name}"`,
+    message: t("toastMessages.reports.report", { p0: state, p1: report.name }),
     timeout: 0,
   });
   reportsStateLoadingMap.value[report.report_id] = true;
@@ -720,7 +720,9 @@ const toggleReportState = (report: any) => {
       filterReports();
       toast({
         variant: "success",
-        message: `${!report.enabled ? "Started" : "Stopped"} report successfully.`,
+        message: t("toastMessages.reports.reportSuccessfully2", {
+          p0: !report.enabled ? "Started" : "Stopped",
+        }),
       });
     })
     .catch((err) => {
@@ -746,7 +748,11 @@ const confirmDeleteReport = (report: any) => {
 
 const deleteReport = () => {
   const { report_id, name } = deleteDialog.value.data;
-  const dismiss = toast({ variant: "loading", message: `Deleting report "${name}"`, timeout: 0 });
+  const dismiss = toast({
+    variant: "loading",
+    message: t("toastMessages.reports.deletingReport", { p0: name }),
+    timeout: 0,
+  });
 
   reports
     .deleteReportById(store.state.selectedOrganization.identifier, report_id)
@@ -756,7 +762,7 @@ const deleteReport = () => {
       );
       invalidateFolderCache(activeFolderId.value);
       filterReports();
-      toast({ variant: "success", message: "Report deleted successfully." });
+      toast({ variant: "success", message: t("toastMessages.reports.reportDeletedSuccessfully") });
     })
     .catch((err: any) => {
       if (err?.response?.status !== 403) {
@@ -776,10 +782,14 @@ const openBulkDeleteDialog = () => {
 
 const bulkDeleteReports = async () => {
   bulkDeleteLoading.value = true;
-  const dismiss = toast({ variant: "loading", message: "Deleting reports...", timeout: 0 });
+  const dismiss = toast({
+    variant: "loading",
+    message: t("toastMessages.reports.deletingReports"),
+    timeout: 0,
+  });
   try {
     if (!selectedReports.value.length) {
-      toast({ variant: "error", message: "No reports selected for deletion" });
+      toast({ variant: "error", message: t("toastMessages.reports.noReportsSelectedForDeletion") });
       dismiss();
       return;
     }
@@ -795,13 +805,22 @@ const bulkDeleteReports = async () => {
     if (unsuccessful.length && successful.length) {
       toast({
         variant: "warning",
-        message: `${successful.length} deleted, ${unsuccessful.length} failed`,
+        message: t("toastMessages.reports.deletedFailed", {
+          p0: successful.length,
+          p1: unsuccessful.length,
+        }),
         timeout: 5000,
       });
     } else if (unsuccessful.length) {
-      toast({ variant: "error", message: `Failed to delete ${unsuccessful.length} report(s)` });
+      toast({
+        variant: "error",
+        message: t("toastMessages.reports.failedToDeleteReportS", { p0: unsuccessful.length }),
+      });
     } else {
-      toast({ variant: "success", message: `${successful.length} report(s) deleted successfully` });
+      toast({
+        variant: "success",
+        message: t("toastMessages.reports.reportSDeletedSuccessfully", { p0: successful.length }),
+      });
     }
 
     const successfulIds = new Set(successful);

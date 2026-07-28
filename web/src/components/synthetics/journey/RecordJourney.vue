@@ -1,13 +1,13 @@
 <script setup lang="ts">
 // Copyright 2026 OpenObserve Inc.
 import { onMounted, onUnmounted, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import type { BrowserStep } from "@/types/synthetics";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import BrowserJourneyStep from "./BrowserJourneyStep.vue";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const props = defineProps<{
   startUrl: string;

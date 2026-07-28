@@ -787,7 +787,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import { computed, defineComponent, onBeforeMount, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
 import { convertUnixToDateFormat as convertUnixToFormat, formatTimestamp } from "@/utils/date";
@@ -912,7 +912,7 @@ export default defineComponent({
       start: number;
       end: number;
     }
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const { isDark } = useTheme();
     const indexData: any = ref(defaultValue());
@@ -1203,7 +1203,7 @@ export default defineComponent({
           loadingState.value = false;
           if (res.data.code == 200) {
             toast({
-              message: "Field(s) deleted successfully.",
+              message: t("toastMessages.logstream.fieldSDeletedSuccessfully"),
               variant: "success",
             });
             confirmQueryModeChangeDialog.value = false;
@@ -1399,7 +1399,7 @@ export default defineComponent({
     const getSchema = async () => {
       dismiss = toast({
         variant: "loading",
-        message: "Please wait while loading stats...",
+        message: t("toastMessages.logstream.pleaseWaitWhileLoadingStats"),
         timeout: 0,
       });
 
@@ -1465,7 +1465,7 @@ export default defineComponent({
 
       if (showDataRetention.value && dataRetentionDays.value < 1) {
         toast({
-          message: "Invalid Data Retention Period: Retention period must be at least 1 day.",
+          message: t("toastMessages.logstream.invalidDataRetentionPeriodRetentionPeriod"),
           variant: "error",
         });
         return;
@@ -1643,7 +1643,7 @@ export default defineComponent({
               isDialogOpen.value = false;
               toast({
                 variant: "success",
-                message: "Stream settings updated successfully.",
+                message: t("toastMessages.logstream.streamSettingsUpdatedSuccessfully"),
               });
             },
           );
@@ -2043,7 +2043,11 @@ export default defineComponent({
         if (maxFieldsLength && newSchemaFieldLength > maxFieldsLength) {
           toast({
             variant: "error",
-            message: `Cannot add fields. Maximum allowed fields in User Defined Schema is ${maxFieldsLength}. Current: ${currentDefinedSchemaLength}, Attempting to add: ${selectedFieldsSet.size}`,
+            message: t("toastMessages.logstream.cannotAddFieldsMaximumAllowedFields", {
+              p0: maxFieldsLength,
+              p1: currentDefinedSchemaLength,
+              p2: selectedFieldsSet.size,
+            }),
           });
           selectedFields.value = [];
           return;

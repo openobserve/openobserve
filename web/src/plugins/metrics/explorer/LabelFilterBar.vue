@@ -302,7 +302,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -341,7 +341,7 @@ const emit = defineEmits<{
   (e: "focus-picker"): void;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 /* ------------------------------------------------------ chip overflow */
 

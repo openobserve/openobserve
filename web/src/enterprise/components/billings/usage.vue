@@ -247,7 +247,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref, onMounted, watch, computed, inject } from "vue";
 import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import BillingService from "@/services/billings";
 import organizations from "@/services/organizations";
 import { useRouter } from "vue-router";
@@ -273,7 +273,7 @@ export default defineComponent({
     ConfirmDialog,
   },
   setup() {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const { isDark } = useTheme();
     const router = useRouter();
@@ -454,7 +454,7 @@ export default defineComponent({
     const getUsage = () => {
       const dismiss = toast({
         variant: "loading",
-        message: "Please wait while loading usage data...",
+        message: t("toastMessages.billings.pleaseWaitWhileLoadingUsageData"),
         timeout: 0,
       });
       dataLoading.value = true;

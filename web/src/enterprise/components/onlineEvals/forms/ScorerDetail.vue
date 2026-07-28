@@ -346,7 +346,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -383,7 +383,7 @@ const emit = defineEmits<{
   (e: "view-job", row: EvalJob): void;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 const orgId = computed(() => store.state.selectedOrganization?.identifier ?? "default");
 

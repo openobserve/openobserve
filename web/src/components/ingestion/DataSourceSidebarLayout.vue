@@ -84,7 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import ORouteTab from "@/lib/navigation/Tabs/ORouteTab.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
@@ -137,7 +137,7 @@ const emit = defineEmits<{
   (e: "update:modelValue", value: string | number): void;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 // Splitter width is local state seeded from the prop; resizing stays internal.
 const splitterWidthModel = ref(props.splitterWidth);

@@ -276,7 +276,7 @@ import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 // @ts-nocheck
 import { defineComponent, ref, watch, computed, onMounted, nextTick, onUnmounted } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import QueryTypeSelector from "../addPanel/QueryTypeSelector.vue";
@@ -342,7 +342,7 @@ export default defineComponent({
   },
   setup() {
     const router = useRouter();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const { showErrorNotification, showPositiveNotification } = useNotifications();
     const store = useStore();
     const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");

@@ -1147,7 +1147,7 @@ import { ref, computed, onMounted, watch, nextTick } from "vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRenderer.vue";
 import OTagInput from "@/lib/forms/TagInput/OTagInput.vue";
 import serviceStreamsService from "@/services/service_streams";
@@ -1201,7 +1201,7 @@ const props = defineProps<{
 
 const store = useStore();
 const { isDark: isDarkTheme } = useTheme();
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 // ─── State ────────────────────────────────────────────────────────────────────
 
@@ -3101,10 +3101,7 @@ async function saveConfig() {
     if (sets.length === 0) {
       toast({
         variant: "warning",
-        message: t(
-          "settings.correlation.identityConfigNoSets",
-          "Configure at least one identity set before saving.",
-        ),
+        message: t("settings.correlation.identityConfigNoSets"),
       });
       return;
     }

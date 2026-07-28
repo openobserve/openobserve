@@ -115,9 +115,9 @@ import { getStartedSchema, getStartedDefaults, type GetStartedForm } from "./Get
 import { useStore } from "vuex";
 import billings from "@/services/billings";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 const store = useStore();
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const emit = defineEmits(["removeFirstTimeLogin"]);
 const formRef = ref(null);
 
@@ -133,12 +133,12 @@ const doSubmit = async (value: GetStartedForm) => {
     // onboarding form is done, so they don't stack on top of this full-screen dialog.
     window.dispatchEvent(new CustomEvent("o2:onboarding-complete"));
     toast({
-      message: "Thank you for your feedback",
+      message: t("toastMessages.login.thankYouForYourFeedback"),
       variant: "success",
     });
   } else {
     toast({
-      message: "Something went wrong",
+      message: t("toastMessages.login.somethingWentWrong"),
       variant: "error",
     });
   }

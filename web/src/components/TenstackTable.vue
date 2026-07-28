@@ -1066,7 +1066,7 @@ import {
   getFilteredRowModel,
 } from "@tanstack/vue-table";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { VueDraggableNext as VueDraggable } from "vue-draggable-next";
 import { debounce } from "lodash-es";
 import { copyToClipboard } from "@/utils/clipboard";
@@ -1273,7 +1273,7 @@ const props = defineProps({
   },
 });
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const emits = defineEmits([
   "closeColumn",

@@ -145,7 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import type { ErrorDiff } from "@/services/gen-ai-agent-mapping.service";
@@ -160,7 +160,7 @@ const props = withDefaults(
   { versionA: "", versionB: "" },
 );
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 // Human labels for the two arms — the real version when known, else the generic
 // "Version A/B" fallback so the panel is never blank.

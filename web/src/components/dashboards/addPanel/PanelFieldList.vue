@@ -395,7 +395,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch, onMounted, inject } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
@@ -425,7 +425,7 @@ const props = defineProps<{
 const dashboardPanelDataPageKey: string = inject("dashboardPanelDataPageKey", "dashboard");
 
 const store = useStore();
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const { getStreams } = useStreams();
 const { showErrorNotification } = useNotifications();
 const { parsePromQlQuery } = usePromqlSuggestions();

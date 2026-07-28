@@ -1,5 +1,5 @@
 import { ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import onlineEvalsService, {
   type EvalJob,
   type Provider,
@@ -10,7 +10,7 @@ import { entityId } from "../utils/evalEntity";
 import { showError } from "../utils/evalFormat";
 
 export function useOnlineEvalsData() {
-  const { t } = useI18n();
+  const { t } = useI18nTyped();
   const jobs = ref<EvalJob[]>([]);
   const scorers = ref<Scorer[]>([]);
   const scoreConfigs = ref<ScoreConfig[]>([]);

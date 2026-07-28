@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 // @ts-nocheck
 import { defineComponent, ref, watch, onMounted, onActivated, nextTick, type Ref } from "vue";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { reactive } from "vue";
 import searchService from "@/services/search";
 import apiDashboard from "@/utils/rum/api.json";
@@ -80,7 +80,7 @@ export default defineComponent({
   },
   emits: ["variablesManagerReady"],
   setup(props, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const currentDashboardData = reactive({
       data: {},

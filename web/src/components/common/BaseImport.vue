@@ -207,7 +207,7 @@ import {
   onBeforeUnmount,
   type PropType,
 } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import axios from "axios";
 import AppTabs from "./AppTabs.vue";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
@@ -329,7 +329,7 @@ export default defineComponent({
   },
   emits: ["back", "cancel", "import", "update:jsonStr", "update:jsonArray", "update:activeTab"],
   setup(props, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
 
     // State
     const jsonStr = ref<any>("");
@@ -417,7 +417,7 @@ export default defineComponent({
                   resolve(jsonArray);
                 } catch (error) {
                   toast({
-                    message: `Error parsing JSON from file ${file.name}`,
+                    message: t("toastMessages.common.errorParsingJsonFromFile", { p0: file.name }),
                     variant: "error",
                   });
                   resolve([]);
@@ -458,20 +458,20 @@ export default defineComponent({
               emit("update:jsonArray", jsonArrayOfObj.value);
             } else {
               toast({
-                message: "Invalid JSON format in the URL",
+                message: t("toastMessages.common.invalidJsonFormatInTheUrl"),
                 variant: "error",
               });
             }
           } catch (parseError) {
             toast({
-              message: "Invalid JSON format",
+              message: t("toastMessages.common.invalidJsonFormat"),
               variant: "error",
             });
           }
         }
       } catch (error) {
         toast({
-          message: "Error fetching data",
+          message: t("toastMessages.common.errorFetchingData"),
           variant: "error",
         });
       }

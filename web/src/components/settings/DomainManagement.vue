@@ -477,7 +477,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { ref, reactive, onMounted, onActivated, watch, computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
@@ -517,7 +517,7 @@ interface Domain {
   blockedEmails: string[];
 }
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 // Dialog state for domain/email removal confirmations
 const confirmRemoveDomainOpen = ref(false);

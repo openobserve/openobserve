@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // Copyright 2026 OpenObserve Inc.
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue";
 import { CHECK_TYPE_CARDS, type CheckTypeCard } from "@/constants/synthetics";
@@ -23,7 +23,7 @@ const emit = defineEmits<{
   select: [type: SyntheticCheckType];
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 function isDisabled(card: CheckTypeCard): boolean {
   return props.disabledTypes.includes(card.type);

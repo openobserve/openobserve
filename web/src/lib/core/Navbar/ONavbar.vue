@@ -86,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * navigation (ArrowUp/ArrowDown) and Tab trapping.
  */
 import { computed, provide, ref, watch, nextTick, onMounted, onBeforeUnmount } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import type { NavbarProps, NavbarEmits, NavbarSlots, RailEntry } from "./ONavbar.types";
 import { RailIndicatorActiveKey } from "./ONavbar.types";
@@ -105,7 +105,7 @@ const emit = defineEmits<NavbarEmits>();
 
 defineSlots<NavbarSlots>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 // Reshape the flat link list into rail entries: daily-use links stay top-level,
 // config / occasional items fold into flyout groups. Split out pinned-bottom

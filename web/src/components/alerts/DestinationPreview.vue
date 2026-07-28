@@ -398,7 +398,7 @@ limitations under the License.
 
 <script lang="ts" setup>
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import { copyToClipboard } from "@/utils/clipboard";
@@ -419,7 +419,7 @@ const props = defineProps({
 });
 
 const emit = defineEmits(["update:modelValue"]);
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const isOpen = computed({
   get: () => props.modelValue,

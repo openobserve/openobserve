@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { PROMPT_SUGGESTIONS } from "./welcomeContent";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const emit = defineEmits<{ (e: "select", prompt: string): void }>();
 

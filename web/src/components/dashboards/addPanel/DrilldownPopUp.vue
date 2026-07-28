@@ -237,7 +237,7 @@ import { defineAsyncComponent, inject, nextTick, reactive, ref } from "vue";
 import OFormToggleGroup from "@/lib/core/ToggleGroup/OFormToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import { defineComponent } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { watch } from "vue";
 import { useStore } from "vuex";
 import { useRoute } from "vue-router";
@@ -300,7 +300,7 @@ export default defineComponent({
   },
   emits: ["close"],
   setup(props, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const route = useRoute();
     const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");

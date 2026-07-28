@@ -409,7 +409,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { ref, nextTick, onMounted, watch } from "vue";
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import {
   getUUID,
@@ -473,7 +473,7 @@ const defaultActionScript = {
   type: "scheduled",
 };
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const router = useRouter();
 
 const originalActionScriptData: Ref<string> = ref("");
@@ -826,7 +826,7 @@ const saveActionScript = async (value: EditScriptForm) => {
 
   const dismiss = toast({
     variant: "loading",
-    message: "Please wait...",
+    message: t("toastMessages.actionScripts.pleaseWait"),
     timeout: 0,
   });
   const actionId: string = (router.currentRoute.value.query?.id || "") as string;
@@ -835,7 +835,9 @@ const saveActionScript = async (value: EditScriptForm) => {
     .then(() => {
       toast({
         variant: "success",
-        message: `Action ${isEditingActionScript.value ? "updated" : "saved"} successfully.`,
+        message: t("toastMessages.actionScripts.actionSuccessfully", {
+          p0: isEditingActionScript.value ? "updated" : "saved",
+        }),
       });
       goToActionScripts();
       emit("getActionScripts");

@@ -198,7 +198,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 defineOptions({ name: "SourceMaps" });
 
 import { ref, onMounted, computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import sourcemapsService from "@/services/sourcemaps";
@@ -217,7 +217,7 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 const router = useRouter();
 
@@ -444,7 +444,11 @@ const deleteSourceMap = async () => {
 
     toast({
       variant: "success",
-      message: `Source maps deleted successfully for ${sourceMap.service} (${sourceMap.version}) in ${sourceMap.env}`,
+      message: t("toastMessages.RUM.sourceMapsDeletedSuccessfullyForIn", {
+        p0: sourceMap.service,
+        p1: sourceMap.version,
+        p2: sourceMap.env,
+      }),
     });
 
     // Remove from local list

@@ -194,9 +194,9 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const props = defineProps({
   traceId: {
@@ -282,7 +282,7 @@ const viewTraceDetails = () => {
   // This will be implemented once we know the trace viewer route
   toast({
     variant: "info",
-    message: "Trace detail view coming soon",
+    message: t("toastMessages.correlation.traceDetailViewComingSoon"),
   });
 };
 
@@ -290,7 +290,7 @@ const refreshTraceData = () => {
   fetchCorrelation();
   toast({
     variant: "info",
-    message: "Refreshing trace data...",
+    message: t("toastMessages.correlation.refreshingTraceData"),
     timeout: 1000,
   });
 };

@@ -187,7 +187,7 @@ import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { getImageURL, useLocalOrganization } from "@/utils/zincutils";
 import azureMarketplace from "@/services/azureMarketplace";
 import organizationsService from "@/services/organizations";
@@ -217,7 +217,7 @@ export default defineComponent({
     const store = useStore();
     const { isDark } = useTheme();
     const router = useRouter();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
 
     // Factory-built so the required messages resolve through i18n.
     const azureCreateOrgSchema = makeAzureCreateOrgSchema(t);

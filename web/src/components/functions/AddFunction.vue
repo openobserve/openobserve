@@ -182,7 +182,7 @@ import {
 } from "vue";
 
 import jsTransformService from "../../services/jstransform";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import config from "@/aws-exports";
 import segment from "../../services/segment_analytics";
@@ -269,7 +269,7 @@ export default defineComponent({
       transType: "0",
     });
     const indexOptions = ref([]);
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const editorRef: any = ref(null);
     const functionEditorPlaceholderFlag = ref(true);
     const { placeholder: vrlPlaceholder } = useVrlPlaceholder();
@@ -425,7 +425,7 @@ export default defineComponent({
     const onSubmit = async (value: AddFunctionForm) => {
       const loadingNotification = toast({
         variant: "loading",
-        message: "Please wait...",
+        message: t("toastMessages.functions.pleaseWait"),
         timeout: 0,
       });
 

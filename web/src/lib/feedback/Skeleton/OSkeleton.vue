@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import type { SkeletonProps } from "./OSkeleton.types";
 import { computed, useAttrs } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const props = withDefaults(defineProps<SkeletonProps>(), {
   type: "rect",

@@ -40,7 +40,7 @@ import {
   type Ref,
 } from "vue";
 import * as echarts from "echarts";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 
 // Import all components and renderers once for generic usage
 import {
@@ -108,7 +108,7 @@ export default defineComponent({
     // conversion must preserve). Cast the payload to emit's event-name param type.
     type EmitEvent = Parameters<typeof emit>[0];
 
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const chartRef: Ref<HTMLElement | null> = ref(null);
     let chart: echarts.EChartsType | null = null;
 

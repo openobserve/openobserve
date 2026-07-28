@@ -1,14 +1,14 @@
 <script setup lang="ts">
 import type { InnerLoadingProps } from "./OInnerLoading.types";
 import OSpinner from "../Spinner/OSpinner.vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 
 withDefaults(defineProps<InnerLoadingProps>(), {
   size: "xs",
   scrim: true,
 });
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 </script>
 
 <template>

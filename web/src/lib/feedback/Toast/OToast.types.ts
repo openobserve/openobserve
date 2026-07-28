@@ -1,3 +1,5 @@
+import type { I18nText } from "@/types/i18n";
+
 export type ToastVariant = "success" | "error" | "warning" | "info" | "loading" | "default";
 
 // Positions cover the subset actually used in the codebase
@@ -10,10 +12,10 @@ export type ToastPosition =
   | "bottom-left";
 
 export interface ToastAction {
-  label: string;
+  label: I18nText;
   handler: () => void;
   /** When provided, temporarily replaces the button label after click (e.g. "Copied!"). */
-  successLabel?: string;
+  successLabel?: I18nText;
 }
 
 /** A single entry in the collapsible "affected sections" detail list */
@@ -28,9 +30,9 @@ export interface ToastOptions {
   /** Visual style + icon set */
   variant?: ToastVariant;
   /** Primary message text — plain string only (no HTML) */
-  message: string;
+  message: I18nText;
   /** Optional bold title above message */
-  title?: string;
+  title?: I18nText;
   /** Numeric count rendered as an OBadge next to the title */
   titleCount?: number;
   /** Auto-dismiss delay in ms. 0 = persistent. Defaults per variant. */

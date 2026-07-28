@@ -79,7 +79,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import AiPageShell from "@/enterprise/components/AIObservability/AiPageShell.vue";
 import AgentBehaviorPanel from "./AgentBehaviorPanel.vue";
 import AiScopeBar from "@/enterprise/components/AIObservability/AiScopeBar.vue";
@@ -91,7 +91,7 @@ import { useChildRefresh } from "@/enterprise/composables/useChildRefresh";
 
 defineOptions({ name: "AgentBehaviorPage" });
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const { getStreams } = useStreams();
 const store = useStore();
 

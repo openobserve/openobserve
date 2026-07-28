@@ -81,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts" setup>
 import { ref, computed, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
@@ -96,7 +96,7 @@ import {
   type SemanticGroupItemForm,
 } from "./SemanticGroupItem.schema";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 interface SemanticGroup {
   id: string;

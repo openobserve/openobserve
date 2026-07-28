@@ -81,7 +81,7 @@ import { computed, inject, ref } from "vue";
 import { defineComponent } from "vue";
 import AddTab from "@/components/dashboards/tabs/AddTab.vue";
 import { useRoute } from "vue-router";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 
 export default defineComponent({
   name: "TabList",
@@ -104,7 +104,7 @@ export default defineComponent({
   },
   emits: ["refresh"],
   setup(props, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const route = useRoute();
     const showAddTabDialog = ref(false);
     const isHovered = ref(false);

@@ -56,7 +56,7 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import { createFolderByType, updateFolderByType } from "@/utils/commons";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import useNotifications from "@/composables/useNotifications";
 import { useReo } from "@/services/reodotdev_analytics";
@@ -86,7 +86,7 @@ export default defineComponent({
   emits: ["update:modelValue", "update:open"],
   setup(props, { emit }) {
     const store: any = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const addFolderSchema = makeAddFolderSchema(t);
     const { showPositiveNotification, showErrorNotification } = useNotifications();
     const { track } = useReo();
@@ -123,7 +123,7 @@ export default defineComponent({
             description,
           };
           await updateFolderByType(store, props.folderId, payload, props.type);
-          showPositiveNotification("Folder updated successfully", {
+          showPositiveNotification(t("toastMessages.sidebar.folderUpdatedSuccessfully"), {
             timeout: 2000,
           });
           emit("update:modelValue", payload);
@@ -132,7 +132,7 @@ export default defineComponent({
           const newFolder: any = await createFolderByType(store, { name, description }, props.type);
           emit("update:modelValue", newFolder);
           emit("update:open", false);
-          showPositiveNotification("Folder added successfully", {
+          showPositiveNotification(t("toastMessages.sidebar.folderAddedSuccessfully"), {
             timeout: 2000,
           });
         }

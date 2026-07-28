@@ -96,7 +96,7 @@ import GroupRoles from "./GroupRoles.vue";
 import GroupUsers from "./GroupUsers.vue";
 import AppTabs from "@/components/common/AppTabs.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useRouter, onBeforeRouteLeave } from "vue-router";
 import { onBeforeMount } from "vue";
 import { getGroup, updateGroup } from "@/services/iam";
@@ -118,7 +118,7 @@ const store = useStore();
 
 const router = useRouter();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const groupDetails = ref({
   group_name: "dev",

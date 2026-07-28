@@ -406,7 +406,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref, onMounted, computed, defineAsyncComponent } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import pipelinesService from "../../services/pipelines";
@@ -463,7 +463,7 @@ export default defineComponent({
     }[];
 
     type PipelineErrors = (ErrorMessage | string)[][];
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const router = useRouter();
 
@@ -686,7 +686,7 @@ export default defineComponent({
 
       if (allPipelinesCreated) {
         toast({
-          message: "Pipeline(s) imported successfully",
+          message: t("toastMessages.pipeline.pipelineSImportedSuccessfully"),
           variant: "success",
         });
 
@@ -722,7 +722,7 @@ export default defineComponent({
         }
       } catch (e: any) {
         toast({
-          message: "Error importing Pipeline(s) please check the JSON",
+          message: t("toastMessages.pipeline.errorImportingPipelineSPleaseCheck"),
           variant: "error",
         });
         return false;

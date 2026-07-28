@@ -242,7 +242,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, raw } from "@/types/i18n";
 import { useStore } from "vuex";
 import { computed } from "vue";
 import useTheme from "@/composables/useTheme";
@@ -296,7 +296,7 @@ export default defineComponent({
     OFormTextarea,
   },
   setup(props, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
 
     const store = useStore();
     const { isDark } = useTheme();
@@ -470,7 +470,7 @@ export default defineComponent({
         if (e.response.status != 403) {
           toast({
             message:
-              e.response?.data?.message ||
+              raw(e.response?.data?.message) ||
               (props.isEdit
                 ? t("settings.addRegexPattern.updateFailed")
                 : t("settings.addRegexPattern.createFailed")),
@@ -499,7 +499,7 @@ export default defineComponent({
       } catch (error) {
         const e = error as { response?: { data?: { message?: string } } };
         toast({
-          message: e.response?.data?.message || t("settings.addRegexPattern.testFailed"),
+          message: raw(e.response?.data?.message || t("settings.addRegexPattern.testFailed")),
           variant: "error",
         });
       } finally {

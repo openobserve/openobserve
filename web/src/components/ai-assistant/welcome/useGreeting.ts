@@ -1,5 +1,5 @@
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 
 /**
  * Builds a time-of-day greeting using the user's local timezone.
@@ -7,7 +7,7 @@ import { useI18n } from "vue-i18n";
  * name from the local part of the email.
  */
 export function useGreeting(email: () => string | undefined) {
-  const { t } = useI18n();
+  const { t } = useI18nTyped();
 
   const displayName = computed(() => {
     const raw = (email() ?? "").trim();

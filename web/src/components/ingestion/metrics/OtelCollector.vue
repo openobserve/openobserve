@@ -17,9 +17,9 @@ import ContentCopy from "@/components/CopyContent.vue";
 import IngestionContent from "@/components/ingestion/IngestionContent.vue";
 import { getEndPoint, getIngestionURL } from "../../../utils/zincutils";
 import config from "@/aws-exports";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const props = defineProps({
   currOrgIdentifier: {

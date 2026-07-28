@@ -5,7 +5,7 @@
 // timing waterfall, and assertion outcomes. No steps/screenshots/replay
 // (those are browser-run concepts).
 import { computed, onMounted, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useRoute } from "vue-router";
 import { useStore } from "vuex";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
@@ -36,7 +36,7 @@ const emit = defineEmits<{
   ): void;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 const route = useRoute();
 // The check's folder (name), carried on the results-page route as ?folder=.

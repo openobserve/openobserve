@@ -28,7 +28,7 @@
 
 <script lang="ts">
 import { defineComponent, ref, computed, inject, onBeforeMount } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OverrideConfigPopup from "../OverrideConfigPopup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
@@ -49,7 +49,7 @@ export default defineComponent({
     },
   },
   setup(props) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
     const { dashboardPanelData, promqlMode, fetchPromQLLabels } =
       useDashboardPanelData(dashboardPanelDataPageKey);

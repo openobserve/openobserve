@@ -420,7 +420,7 @@ import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
 import useSqlSuggestions from "@/composables/useSuggestions";
 import { useSqlEditorDiagnostics } from "@/composables/useSqlEditorDiagnostics";
 import { rangesFromServerError, type SqlErrorRange } from "@/utils/query/sqlDiagnostics";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTableColumnToggle from "@/lib/core/Table/sub-components/OTableColumnToggle.vue";
 import useExternalColumnToggle from "@/composables/useExternalColumnToggle";
@@ -513,7 +513,7 @@ const { getTimeInterval, buildQueryPayload, parseQuery } = useQuery();
 const { sessionState } = useSession();
 const store = useStore();
 const isLoading = ref<boolean[]>([]);
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const dateTime = ref({
   startTime: 0,
   endTime: 0,

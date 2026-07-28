@@ -181,7 +181,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 <script lang="ts" setup>
 import { computed, onMounted, ref, type Ref, onBeforeMount, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, raw } from "@/types/i18n";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ConditionBuilder from "@/components/flow/forms/ConditionBuilder.vue";
 import { getUUID } from "@/utils/zincutils";
@@ -212,7 +212,7 @@ interface ConditionGroup {
   items?: (FilterCondition | ConditionGroup)[];
 }
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const store = useStore();
 
@@ -507,7 +507,7 @@ const saveCondition = async () => {
     console.error("Error saving condition:", error);
     toast({
       variant: "error",
-      message: "Error saving condition: " + (error as Error).message,
+      message: raw("Error saving condition: " + (error as Error).message),
       timeout: 5000,
     });
     emit("cancel:hideform");

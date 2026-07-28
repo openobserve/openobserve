@@ -416,7 +416,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, defineComponent, onBeforeMount, onMounted, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 
 import AddEnrichmentTable from "./AddEnrichmentTable.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -469,7 +469,7 @@ export default defineComponent({
   emits: ["updated:fields", "update:changeRecordPerPage", "update:maxRecordToReturn"],
   setup() {
     const store = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const router = useRouter();
     const jsTransforms: any = ref([]);
     const formData: any = ref({});
@@ -598,7 +598,7 @@ export default defineComponent({
       loading.value = true;
       const dismiss = toast({
         variant: "loading",
-        message: "Please wait while loading enrichment tables...",
+        message: t("toastMessages.functions.pleaseWaitWhileLoadingEnrichmentTables"),
         timeout: 0,
       });
 
@@ -811,7 +811,9 @@ export default defineComponent({
         .then((res: any) => {
           if (res.data.code == 200) {
             toast({
-              message: `${selectedDelete.value.name} deleted successfully.`,
+              message: t("toastMessages.functions.deletedSuccessfully", {
+                p0: selectedDelete.value.name,
+              }),
               variant: "success",
             });
             resetStreamType("enrichment_tables");
@@ -881,17 +883,24 @@ export default defineComponent({
 
           if (successfulDeletions > 0 && failedDeletions === 0) {
             toast({
-              message: `Successfully deleted ${successfulDeletions} enrichment table(s).`,
+              message: t("toastMessages.functions.successfullyDeletedEnrichmentTableS", {
+                p0: successfulDeletions,
+              }),
               variant: "success",
             });
           } else if (successfulDeletions > 0 && failedDeletions > 0) {
             toast({
-              message: `Deleted ${successfulDeletions} enrichment table(s). Failed to delete ${failedDeletions} enrichment table(s).`,
+              message: t("toastMessages.functions.deletedEnrichmentTableSFailedTo", {
+                p0: successfulDeletions,
+                p1: failedDeletions,
+              }),
               variant: "warning",
             });
           } else if (failedDeletions > 0) {
             toast({
-              message: `Failed to delete ${failedDeletions} enrichment table(s).`,
+              message: t("toastMessages.functions.failedToDeleteEnrichmentTableS", {
+                p0: failedDeletions,
+              }),
               variant: "error",
             });
           }
@@ -920,7 +929,7 @@ export default defineComponent({
 
       const dismiss = toast({
         variant: "loading",
-        message: "Redirecting to explorer...",
+        message: t("toastMessages.functions.redirectingToExplorer"),
         timeout: 0,
       });
 

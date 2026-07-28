@@ -128,10 +128,10 @@ import { ref, computed, onMounted, watch } from "vue";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 
 const store = useStore();
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const props = defineProps<{
   variant: "header" | "home";

@@ -33,7 +33,7 @@ import { getEndPoint, getImageURL, getIngestionURL } from "../../../utils/zincut
 import CopyContent from "@/components/CopyContent.vue";
 import IngestionContent from "@/components/ingestion/IngestionContent.vue";
 import IngestionDocLink from "@/components/ingestion/IngestionDocLink.vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 
 export default defineComponent({
   name: "traces-otlp",
@@ -47,7 +47,7 @@ export default defineComponent({
   },
   components: { CopyContent, IngestionContent, IngestionDocLink },
   setup() {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const endpoint: any = ref({
       url: "",

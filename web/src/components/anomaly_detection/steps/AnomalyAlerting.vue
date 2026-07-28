@@ -122,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { computed, defineComponent, type PropType } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -151,7 +151,7 @@ export default defineComponent({
   emits: ["refresh:destinations"],
 
   setup(props) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const router = useRouter();
     const store = useStore();
 

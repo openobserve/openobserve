@@ -21,7 +21,7 @@ export type StepDotState = "pending" | "active" | "pass" | "fail" | "skip";
 
 <script setup lang="ts" generic="TData extends Record<string, any>">
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
@@ -32,7 +32,7 @@ import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import type { StepAction } from "@/types/synthetics";
 import { ACTION_LABELS, ACTION_ICONS } from "@/constants/synthetics";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 // ── Props ──────────────────────────────────────────────────────────
 const props = withDefaults(

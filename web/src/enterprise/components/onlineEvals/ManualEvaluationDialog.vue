@@ -58,7 +58,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import onlineEvalsService, {
   type EvalJob,
   type EvalTargetScope,
@@ -92,7 +92,7 @@ const emit = defineEmits<{
   (event: "submitted", result: ManualEvalJobResult): void;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const formId = "manual-evaluation-form";
 const loadedJobs = ref<EvalJob[]>([]);
 const loadingJobs = ref(false);

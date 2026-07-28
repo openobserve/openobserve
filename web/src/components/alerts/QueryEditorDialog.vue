@@ -514,7 +514,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { ref, computed, watch, type PropType, onMounted, inject, type Ref } from "vue";
 import { type SqlErrorRange } from "@/utils/query/sqlDiagnostics";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -602,7 +602,7 @@ const emit = defineEmits([
   "validate-sql",
 ]);
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 const { isDark } = useTheme();
 const { buildQueryPayload } = useQuery();

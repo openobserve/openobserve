@@ -1050,7 +1050,7 @@ import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import { ref, computed, watch, defineAsyncComponent, provide, nextTick } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, raw } from "@/types/i18n";
 import useNotifications from "@/composables/useNotifications";
 import useTraces from "@/composables/useTraces";
 import {
@@ -1150,7 +1150,7 @@ const emit = defineEmits<{
 const { showErrorNotification } = useNotifications();
 const store = useStore();
 const router = useRouter();
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const { generateDashboard, generateLogsDashboard } = useMetricsCorrelationDashboard();
 const { semanticGroups, loadSemanticGroups } = useServiceCorrelation();
 const { formatTracesMetaData } = useTraces();
@@ -2020,7 +2020,7 @@ const getDimensionOptions = (key: string, currentValue: string) => {
   // Add the original value option if it exists and is not already SELECT_ALL_VALUE
   if (originalValue && originalValue !== SELECT_ALL_VALUE) {
     options.push({
-      label: isUnstable ? `${originalValue} (current)` : originalValue,
+      label: raw(isUnstable ? `${originalValue} (current)` : originalValue),
       value: originalValue,
     });
   }
@@ -2029,7 +2029,7 @@ const getDimensionOptions = (key: string, currentValue: string) => {
   // This preserves previously selected values in the dropdown
   if (currentValue && currentValue !== SELECT_ALL_VALUE && currentValue !== originalValue) {
     options.push({
-      label: currentValue,
+      label: raw(currentValue),
       value: currentValue,
     });
   }
@@ -2208,7 +2208,7 @@ const loadDashboard = async () => {
     // console.error("[TelemetryCorrelationDashboard] Error loading correlation dashboard:", err);
     const message: string = err.message || t("correlation.failedToLoad");
     error.value = message;
-    showErrorNotification(message);
+    showErrorNotification(raw(message));
   } finally {
     loading.value = false;
   }
@@ -2922,7 +2922,7 @@ const loadCorrelatedTraces = async () => {
   } catch (err: any) {
     const message: string = err.message || t("correlation.tracesError");
     tracesError.value = message;
-    showErrorNotification(message);
+    showErrorNotification(raw(message));
   } finally {
     tracesLoading.value = false;
   }

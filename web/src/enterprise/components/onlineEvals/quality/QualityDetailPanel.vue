@@ -271,7 +271,7 @@
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -344,7 +344,7 @@ const emit = defineEmits<{
   (e: "runs-pagination-change", value: QualityRunsPagination): void;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const threshold = computed(() => thresholdForConfig(props.config));
 const unhealthyKpi = computed(() => props.kpis.find((kpi) => kpi.id === "unhealthy"));

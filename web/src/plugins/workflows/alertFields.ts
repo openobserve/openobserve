@@ -14,6 +14,8 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+import type { I18nKey } from "@/types/i18n";
+
 // Fields available to a workflow Condition. A workflow has no upstream stream
 // node (unlike a pipeline), so conditions branch on the fired-alert payload.
 // The backend flattens the `{ meta: {...} }` envelope, so the alert fields are
@@ -41,7 +43,7 @@ export interface TriggerOutputVar {
   ref: string;
   type: string;
   /** i18n key for the field's description. */
-  descKey: string;
+  descKey: I18nKey;
   /** For enum fields — the literal values, rendered like `"a" | "b"`. */
   enumValues?: string[];
 }

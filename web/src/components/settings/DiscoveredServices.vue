@@ -477,7 +477,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from "vue";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import serviceStreamsService from "@/services/service_streams";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
@@ -500,7 +500,7 @@ defineEmits<{
   (e: "navigate-to-configuration"): void;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 interface ServiceRecord {
   id: string;

@@ -67,6 +67,7 @@ import { restoreMetricsStream } from "@/utils/streamPersist";
 import { PanelEditor } from "@/components/dashboards/PanelEditor";
 import type { PanelEditorVariablesData } from "@/components/dashboards/PanelEditor";
 import AddToDashboard from "../AddToDashboard.vue";
+import { raw } from "@/types/i18n";
 
 export default defineComponent({
   name: "MetricsVisualize",
@@ -181,7 +182,7 @@ export default defineComponent({
       const errors: string[] = [];
       validatePanel(errors, true);
       if (errors.length) {
-        showErrorNotification(errors[0]);
+        showErrorNotification(raw(errors[0]));
         return;
       }
       showAddToDashboardDialog.value = true;

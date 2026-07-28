@@ -137,7 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts" setup>
 import { computed, onMounted, ref, watch, type Ref, onActivated, provide } from "vue";
 import { rangesFromServerError, type SqlErrorRange } from "@/utils/query/sqlDiagnostics";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { getTimezoneOffset, getUUID } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import useStreams from "@/composables/useStreams";
@@ -222,7 +222,7 @@ const props = defineProps({
   },
 });
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const store = useStore();
 
@@ -589,7 +589,7 @@ const validateSqlQuery = async () => {
             : "Invalid SQL Query";
           toast({
             variant: "error",
-            message: `${message}`,
+            message: t("toastMessages.NodeForm.message", { p0: message }),
           });
 
           // Locate the offending token in the SQL and squiggle it in the editor.

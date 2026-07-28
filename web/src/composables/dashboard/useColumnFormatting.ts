@@ -17,7 +17,7 @@
 // `ColumnOverrideUI` shape and (de)serializes to/from the persisted
 // `config.override_config` array on load/save.
 
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { OVERRIDE_CONFIG_TYPES } from "@/utils/dashboard/tableConfigUtils";
 
 // null means "not set" → renderer falls back to the panel-level default.
@@ -203,7 +203,7 @@ export const getUnitOptions = (
 
 /** i18n-bound option lists for the formatting controls. */
 export const useColumnFormattingOptions = () => {
-  const { t } = useI18n();
+  const { t } = useI18nTyped();
 
   const unitOptions = getUnitOptions(t);
 

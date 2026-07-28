@@ -454,7 +454,7 @@ import { defineComponent, ref, onMounted } from "vue";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
 import { getImageURL } from "../utils/zincutils";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import config from "@/aws-exports";
 import licenseServer from "@/services/license_server";
@@ -481,7 +481,7 @@ export default defineComponent({
     const { isDark } = useTheme();
     const router = useRouter();
     const pageData = ref("Page Data");
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const licenseData = ref<any>(null);
     const loadingLicense = ref(false);
 
@@ -526,7 +526,7 @@ export default defineComponent({
 
     const copyToClipboard = (text: string) => {
       navigator.clipboard.writeText(text).then(() => {
-        toast({ message: "Copied to clipboard", variant: "success" });
+        toast({ message: t("toastMessages.views.copiedToClipboard"), variant: "success" });
       });
     };
 
@@ -552,7 +552,7 @@ export default defineComponent({
         });
       } else {
         toast({
-          message: "You are not authorized to manage the license.",
+          message: t("toastMessages.views.youAreNotAuthorizedToManage"),
           variant: "error",
         });
       }

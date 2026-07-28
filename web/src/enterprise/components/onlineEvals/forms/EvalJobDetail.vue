@@ -468,7 +468,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -524,7 +524,7 @@ function handleOpenChange(value: boolean) {
   if (!value) emit("close");
 }
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const router = useRouter();
 const store = useStore();
 const orgId = computed(() => store.state.selectedOrganization?.identifier ?? "default");

@@ -21,6 +21,7 @@ import searchService from "@/services/search";
 import useNotifications from "@/composables/useNotifications";
 import useHistogram from "@/composables/useLogs/useHistogram";
 import useStreamFields from "@/composables/useLogs/useStreamFields";
+import { gt } from "@/types/i18n";
 import {
   SearchAroundParams,
   StreamField,
@@ -223,7 +224,9 @@ export const useSearchAround = () => {
     } catch (error: unknown) {
       searchObj.loading = false;
       const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
-      showErrorNotification(`Error while fetching data: ${errorMessage}`);
+      showErrorNotification(
+        gt("toastMessages.useLogs.errorWhileFetchingData", { p0: errorMessage }),
+      );
     }
   };
 

@@ -325,10 +325,10 @@ import ConfirmDialog from "../ConfirmDialog.vue";
 import { timestampToTimezoneDate } from "../../utils/zincutils";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 
 const store = useStore();
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 // Refs
 const qTableRef = ref();
@@ -441,7 +441,7 @@ const loadJobs = async () => {
     console.error("Error loading backfill jobs:", error);
     toast({
       variant: "error",
-      message: "Failed to load backfill jobs",
+      message: t("toastMessages.pipelines.failedToLoadBackfillJobs"),
     });
   } finally {
     loading.value = false;
@@ -580,7 +580,7 @@ const pauseJob = async (pipelineId: string, jobId: string) => {
 
     toast({
       variant: "success",
-      message: "Backfill job paused successfully",
+      message: t("toastMessages.pipelines.backfillJobPausedSuccessfully"),
     });
 
     loadJobs();
@@ -605,7 +605,7 @@ const resumeJob = async (pipelineId: string, jobId: string) => {
 
     toast({
       variant: "success",
-      message: "Backfill job resumed successfully",
+      message: t("toastMessages.pipelines.backfillJobResumedSuccessfully"),
     });
 
     loadJobs();
@@ -629,7 +629,7 @@ const deleteJob = async (pipelineId: string, jobId: string) => {
 
     toast({
       variant: "success",
-      message: "Backfill job deleted successfully",
+      message: t("toastMessages.pipelines.backfillJobDeletedSuccessfully"),
     });
 
     loadJobs();

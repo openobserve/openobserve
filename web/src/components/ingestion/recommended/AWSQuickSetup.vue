@@ -320,7 +320,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, ref, computed } from "vue";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import { getEndPoint, getIngestionURL } from "@/utils/zincutils";
@@ -358,7 +358,7 @@ export default defineComponent({
   },
   setup() {
     const store = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
 
     const deploymentMode = ref<"single" | "stackset">("single");
     const stackSetModel = ref<"self" | "service">("self");
@@ -448,7 +448,7 @@ export default defineComponent({
       if (!endpoint?.url) {
         toast({
           variant: "error",
-          message: "Invalid ingestion endpoint. Please check configuration.",
+          message: t("toastMessages.recommended.invalidIngestionEndpointPleaseCheckConfiguration"),
         });
         return;
       }
@@ -457,7 +457,7 @@ export default defineComponent({
       if (!organizationId || !email || !passcode) {
         toast({
           variant: "error",
-          message: "Missing organization credentials. Please refresh the page.",
+          message: t("toastMessages.recommended.missingOrganizationCredentialsPleaseRefreshThe"),
         });
         return;
       }
@@ -468,7 +468,7 @@ export default defineComponent({
         if (targetRegions.value.length === 0) {
           toast({
             variant: "warning",
-            message: "Select at least one target region.",
+            message: t("toastMessages.recommended.selectAtLeastOneTargetRegion"),
           });
           return;
         }
@@ -501,7 +501,7 @@ export default defineComponent({
       if (!url) {
         toast({
           variant: "warning",
-          message: "CloudFormation template not available yet",
+          message: t("toastMessages.recommended.cloudformationTemplateNotAvailableYet"),
         });
         return;
       }
@@ -514,7 +514,7 @@ export default defineComponent({
       });
       toast({
         variant: "info",
-        message: "Opening AWS Console to deploy complete integration stack",
+        message: t("toastMessages.recommended.openingAwsConsoleToDeployComplete"),
       });
     };
 
@@ -534,7 +534,7 @@ export default defineComponent({
 
       toast({
         variant: "info",
-        message: "AWS StackSets console opened. Use the parameter values below to complete setup.",
+        message: t("toastMessages.recommended.awsStacksetsConsoleOpenedUseThe"),
         timeout: 5000,
       });
     };

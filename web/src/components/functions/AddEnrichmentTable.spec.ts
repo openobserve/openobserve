@@ -96,6 +96,12 @@ describe("AddEnrichmentTable.vue", () => {
       globalInjection: true,
       messages: {
         en: {
+          toastMessages: {
+            functions: {
+              pleaseWait: "Please wait...",
+              enrichmentTableCreatedSuccessfully: "Enrichment table created successfully",
+            },
+          },
           function: {
             addEnrichmentTable: "Add Enrichment Table",
             updateEnrichmentTable: "Update Enrichment Table",

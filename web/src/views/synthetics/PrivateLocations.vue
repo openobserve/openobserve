@@ -148,7 +148,7 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { useRouter } from "vue-router";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -169,7 +169,7 @@ const emit = defineEmits<{
   (e: "delete", row: SyntheticLocation): void;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const router = useRouter();
 const search = ref("");
 

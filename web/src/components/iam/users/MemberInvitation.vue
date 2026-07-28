@@ -55,7 +55,7 @@ import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import organizationsService from "@/services/organizations";
 import segment from "@/services/segment_analytics";
 import usersService from "@/services/users";
@@ -79,7 +79,7 @@ export default defineComponent({
   emits: ["inviteSent"],
   setup(props: any, { emit }) {
     const store = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
 
     const memberInvitationSchema = makeMemberInvitationSchema(t);
 

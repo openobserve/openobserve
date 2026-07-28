@@ -202,9 +202,9 @@ import {
   type ThemeModeColors,
 } from "@/constants/themes";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 const { isDark } = useTheme();
 const { isOpen } = usePredefinedThemes();
@@ -408,7 +408,10 @@ const applyTheme = (theme: PredefinedTheme, themeMode: "light" | "dark") => {
 
   toast({
     variant: "success",
-    message: `${themeDisplayName(theme.name)} applied to ${themeMode} mode successfully!`,
+    message: t("toastMessages.components.appliedToModeSuccessfully", {
+      p0: themeDisplayName(theme.name),
+      p1: themeMode,
+    }),
   });
 };
 
@@ -470,7 +473,7 @@ const applyCustomTheme = (themeMode: "light" | "dark") => {
 
   toast({
     variant: "success",
-    message: `Custom color applied to ${themeMode} mode successfully!`,
+    message: t("toastMessages.components.customColorAppliedToModeSuccessfully", { p0: themeMode }),
   });
 };
 
@@ -513,8 +516,8 @@ const resetToDefaultTheme = () => {
     variant: "success",
     message:
       orgLightColor || orgDarkColor
-        ? "Theme reset to organization settings!"
-        : "Theme reset to default colors!",
+        ? t("toastMessages.components.themeResetToOrganization")
+        : t("toastMessages.components.themeResetToDefault"),
   });
 };
 </script>

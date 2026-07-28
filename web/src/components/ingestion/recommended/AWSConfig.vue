@@ -74,7 +74,7 @@ import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import { defineComponent, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useRoute } from "vue-router";
 import config from "../../../aws-exports";
 import { useStore } from "vuex";
@@ -108,7 +108,7 @@ export default defineComponent({
     AWSIndividualServices,
   },
   setup(props) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const route = useRoute();
 

@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref, watch, computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { getImageURL } from "../../utils/zincutils";
 import { moveDashboardToAnotherFolder } from "../../utils/commons";
@@ -91,7 +91,7 @@ export default defineComponent({
       )?.name,
       value: props.activeFolderId,
     });
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const { showPositiveNotification, showErrorNotification } = useNotifications();
 
     // Reset selection to current folder whenever the drawer reopens so the

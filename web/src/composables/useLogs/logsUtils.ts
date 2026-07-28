@@ -32,6 +32,7 @@ import { Parser } from "@openobserve/node-sql-parser/build/datafusionsql";
 import { TimestampRange, ParsedSQLResult, TimePeriodUnit } from "@/ts/interfaces";
 import { TIME_MULTIPLIERS } from "@/utils/logs/constants";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { gt } from "@/types/i18n";
 
 interface SQLColumn {
   expr?: {
@@ -392,7 +393,7 @@ export const logsUtils = () => {
   const showCancelSearchNotification = () => {
     toast({
       variant: "info",
-      message: "Running query cancelled successfully",
+      message: gt("toastMessages.useLogs.runningQueryCancelledSuccessfully"),
     });
   };
 

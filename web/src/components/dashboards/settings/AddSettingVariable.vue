@@ -529,7 +529,7 @@ import {
   computed,
   nextTick,
 } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useSelectAutoComplete } from "../../../composables/useSelectAutocomplete";
 import { useStore } from "vuex";
 import { addVariable, getDashboard, updateVariable } from "../../../utils/commons";
@@ -614,7 +614,7 @@ export default defineComponent({
       customMultiSelectValue: [],
       escapeSingleQuotes: false,
     });
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const addSettingVariableSchema = makeAddSettingVariableSchema(t);
     const form = useOForm<AddSettingVariableForm>({
       defaultValues: addSettingVariableDefaults(),

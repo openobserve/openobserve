@@ -49,7 +49,7 @@
 import { computed, defineComponent, ref, watch, type Ref, type PropType } from "vue";
 import { useStore } from "vuex";
 import { getImageURL } from "@/utils/zincutils";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { getFoldersList, getPanelId } from "@/utils/commons";
 import { addPanel } from "@/utils/commons";
 import SelectFolderDropdown from "@/components/dashboards/SelectFolderDropdown.vue";
@@ -112,7 +112,7 @@ export default defineComponent({
 
     const activeFolderId = ref("default");
     const activeTabId: any = ref(null);
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
 
     const { showErrorNotification, showConfictErrorNotificationWithRefreshBtn } =
       useNotifications();

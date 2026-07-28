@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { computed, defineComponent, inject } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
 
@@ -55,7 +55,7 @@ export default defineComponent({
   name: "PageAddEncryptionMechanism",
   components: { OFormSelect },
   setup() {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
 
     // Read the (form-owned) mechanism type reactively from the parent OForm so
     // the conditional algorithm select shows/hides as it changes. `useStore`

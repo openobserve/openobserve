@@ -93,7 +93,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import organizations from "@/services/organizations";
 import { useStore } from "vuex";
 import CrossLinkManager from "@/components/cross-linking/CrossLinkManager.vue";
@@ -109,7 +109,7 @@ import {
   type OrganizationSettingsForm,
 } from "./OrganizationSettings.schema";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const store = useStore();
 

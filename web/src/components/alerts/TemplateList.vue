@@ -257,7 +257,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts" setup>
 import { ref, onActivated, onMounted, watch, defineAsyncComponent, computed } from "vue";
 import type { Ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import templateService from "@/services/alert_templates";
 import ConfirmDialog from "../ConfirmDialog.vue";
@@ -283,7 +283,7 @@ import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 const AddTemplate = defineAsyncComponent(() => import("@/components/alerts/AddTemplate.vue"));
 
 const store = useStore();
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const router = useRouter();
 const { track } = useReo();
 const templates: Ref<Template[]> = ref([]);
@@ -361,7 +361,7 @@ const loading = ref(false);
 const getTemplates = () => {
   const dismiss = toast({
     variant: "loading",
-    message: "Please wait while loading templates...",
+    message: t("toastMessages.alerts.pleaseWaitWhileLoadingTemplates"),
     timeout: 0,
   });
 
@@ -380,7 +380,7 @@ const getTemplates = () => {
       if (err.response.status !== 403) {
         toast({
           variant: "error",
-          message: "Error while pulling templates.",
+          message: t("toastMessages.alerts.errorWhilePullingTemplates"),
         });
       }
     })
@@ -475,7 +475,9 @@ const deleteTemplate = () => {
       .then(() => {
         toast({
           variant: "success",
-          message: `Template ${confirmDelete.value.data.name} deleted successfully`,
+          message: t("toastMessages.alerts.templateDeletedSuccessfully", {
+            p0: confirmDelete.value.data.name,
+          }),
         });
 
         getTemplates();
@@ -586,17 +588,22 @@ const bulkDeleteTemplates = () => {
       if (successful.length > 0 && unsuccessful.length === 0) {
         toast({
           variant: "success",
-          message: `Successfully deleted ${successful.length} template(s)`,
+          message: t("toastMessages.alerts.successfullyDeletedTemplateS", {
+            p0: successful.length,
+          }),
         });
       } else if (successful.length > 0 && unsuccessful.length > 0) {
         toast({
           variant: "warning",
-          message: `Deleted ${successful.length} template(s), but ${unsuccessful.length} failed`,
+          message: t("toastMessages.alerts.deletedTemplateSButFailed", {
+            p0: successful.length,
+            p1: unsuccessful.length,
+          }),
         });
       } else if (unsuccessful.length > 0) {
         toast({
           variant: "error",
-          message: `Failed to delete ${unsuccessful.length} template(s)`,
+          message: t("toastMessages.alerts.failedToDeleteTemplateS", { p0: unsuccessful.length }),
         });
       }
 

@@ -553,7 +553,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- UsageTab: self-contained home usage dashboard showing streams, functions, dashboards, alerts, and pipelines summary with animated counters and charts. -->
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import orgService from "@/services/organizations";
@@ -575,7 +575,7 @@ import KpiCardRow from "@/components/common/KpiCardRow.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import HomeNoDataState from "@/views/HomeNoDataState.vue";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 const router = useRouter();
 
@@ -645,7 +645,7 @@ const getSummary = (org_id: any) => {
   isLoadingSummary.value = true;
   const dismiss = toast({
     variant: "loading",
-    message: "Please wait while loading summary...",
+    message: t("toastMessages.views.pleaseWaitWhileLoadingSummary"),
     timeout: 0,
   });
   orgService
@@ -716,7 +716,7 @@ const getSummary = (org_id: any) => {
       dismiss();
       toast({
         variant: "error",
-        message: "Error while pulling summary.",
+        message: t("toastMessages.views.errorWhilePullingSummary"),
       });
     })
     .finally(() => {

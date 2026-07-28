@@ -23,7 +23,7 @@ import {
   nextTick,
   type Ref,
 } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, raw } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { cloneDeep, debounce } from "lodash-es";
@@ -214,7 +214,7 @@ export type AlertFormValues = PayloadFormData & {
 
 export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   const store: any = useStore();
-  const { t } = useI18n();
+  const { t } = useI18nTyped();
   const router = useRouter();
   const { track } = useReo();
   const { getAllFunctions } = useFunctions();
@@ -2117,7 +2117,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
 
       toast({
         variant: "error",
-        message: message,
+        message: raw(message),
         timeout: 6000,
       });
 

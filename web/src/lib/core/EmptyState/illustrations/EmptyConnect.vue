@@ -334,9 +334,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 
 withDefaults(defineProps<{ width?: number; animated?: boolean }>(), { width: 260, animated: true });
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 </script>

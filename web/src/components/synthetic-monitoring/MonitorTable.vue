@@ -441,7 +441,7 @@
 
 <script setup lang="ts">
 import { computed, onUnmounted, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { COL } from "@/lib/core/Table/OTable.types";
@@ -515,7 +515,7 @@ const emit = defineEmits<{
   "empty-action": [actionId: string];
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const localSelectedIds = computed({
   get: () => props.selectedIds ?? [],

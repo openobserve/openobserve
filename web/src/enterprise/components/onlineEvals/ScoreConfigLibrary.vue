@@ -111,9 +111,9 @@ import {
   type CatalogScoreConfig,
 } from "@/services/online-evals-catalog.service";
 import { showError } from "./utils/evalFormat";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, raw } from "@/types/i18n";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const props = defineProps<{
   orgId: string;
@@ -252,7 +252,7 @@ async function importSelected() {
     if (failCount) parts.push(`${failCount} failed`);
     toast({
       variant: failCount > 0 && successCount === 0 ? "error" : "success",
-      message: parts.join(" · "),
+      message: raw(parts.join(" · ")),
     });
   }
 }

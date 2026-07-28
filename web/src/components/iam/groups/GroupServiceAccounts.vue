@@ -105,7 +105,7 @@ import { cloneDeep } from "lodash-es";
 import { watch } from "vue";
 import type { Ref } from "vue";
 import { ref, onBeforeMount } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { TABLE_CHECKBOX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 
@@ -143,7 +143,7 @@ const usersDisplay = ref("selected");
 
 const store = useStore();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const usersDisplayOptions = [
   {

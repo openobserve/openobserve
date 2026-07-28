@@ -7,6 +7,7 @@ import { b64EncodeUnicode } from "@/utils/zincutils";
 import alertsService from "@/services/alerts";
 import { transformFEToBE } from "./alertDataTransforms";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { gt } from "@/types/i18n";
 
 export interface PayloadFormData {
   name: string;
@@ -236,7 +237,7 @@ export const prepareAndSaveAlert = async (data: any, context: SaveAlertContext):
   try {
     const dismiss = toast({
       variant: "loading",
-      message: "Please wait...",
+      message: gt("toastMessages.alerts.pleaseWait"),
       timeout: 0,
     });
 
@@ -249,7 +250,7 @@ export const prepareAndSaveAlert = async (data: any, context: SaveAlertContext):
       emit("update:list", activeFolderId.value);
       toast({
         variant: "success",
-        message: "Alert updated successfully.",
+        message: gt("toastMessages.alerts.alertUpdatedSuccessfully"),
       });
     } else {
       await alertsService.create_by_alert_id(
@@ -260,7 +261,7 @@ export const prepareAndSaveAlert = async (data: any, context: SaveAlertContext):
       emit("update:list", activeFolderId.value);
       toast({
         variant: "success",
-        message: "Alert saved successfully.",
+        message: gt("toastMessages.alerts.alertSavedSuccessfully"),
       });
     }
     dismiss();

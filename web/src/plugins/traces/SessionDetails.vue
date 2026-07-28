@@ -909,7 +909,7 @@ import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { copyToClipboard } from "@/utils/clipboard";
 import { formatDate } from "@/utils/date";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import {
   useSessions,
   type SessionDetail,
@@ -942,7 +942,7 @@ const ManualEvaluationDialog = defineAsyncComponent(
   () => import("@/enterprise/components/onlineEvals/ManualEvaluationDialog.vue"),
 );
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const route = useRoute();
 const router = useRouter();
 const store = useStore();

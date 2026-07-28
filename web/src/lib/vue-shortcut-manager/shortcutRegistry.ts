@@ -1,5 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
 
+import type { I18nKey } from "@/types/i18n";
 /**
  * Single source of truth for every keyboard shortcut in the app.
  *
@@ -28,7 +29,7 @@ export interface ShortcutEntry {
   /** Stable, globally-unique id. */
   id: string;
   /** i18n key under shortcuts.actions.* */
-  descriptionKey: string;
+  descriptionKey: I18nKey;
   /** Same combo on every platform. */
   key?: string;
   /** Platform-specific combo (Windows / Linux). Pairs with `keyForMac`. */
@@ -53,7 +54,7 @@ export interface ShortcutGroup {
 
 export interface ShortcutModule {
   /** i18n key under shortcuts.modules.* */
-  titleKey: string;
+  titleKey: I18nKey;
   /** pageKeys (ShortcutGroup.pageKey) grouped under this module, in display order */
   pages: string[];
 }

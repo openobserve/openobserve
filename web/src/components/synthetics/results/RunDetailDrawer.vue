@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // Copyright 2026 OpenObserve Inc.
 import { computed, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
@@ -16,7 +16,7 @@ import {
 } from "@/composables/synthetics/syntheticResultsSchema";
 import syntheticsService from "@/services/synthetics";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const props = defineProps<{
   runId: string;

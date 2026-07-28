@@ -16,6 +16,7 @@
 import { toast, toastRecords, updateToast } from "@/lib/feedback/Toast/useToast";
 import type { ToastDetail } from "@/lib/feedback/Toast/OToast.types";
 import { copyToClipboard } from "@/utils/clipboard";
+import { raw, gt } from "@/types/i18n";
 
 // ── Friendly name overrides ──────────────────────────────────────────────────
 
@@ -124,7 +125,12 @@ function flushGroupedToast(): void {
   if (activeToastId !== null) {
     const record = toastRecords.find((r) => r.id === activeToastId && r.open);
     if (record) {
-      updateToast(activeToastId, { title, message, details, titleCount: details.length });
+      updateToast(activeToastId, {
+        title: raw(title),
+        message: raw(message),
+        details,
+        titleCount: details.length,
+      });
       return;
     }
     // Toast was dismissed before the debounce fired
@@ -135,11 +141,15 @@ function flushGroupedToast(): void {
   // No explicit timeout — the default error timeout (30 s) applies.
   toast({
     variant: "error",
-    title,
-    message,
+    title: raw(title),
+    message: raw(message),
     titleCount: details.length,
     details,
-    action: { label: "Copy details", handler: copyDetails, successLabel: "Copied!" },
+    action: {
+      label: gt("toastMessages.composables.copyDetails"),
+      handler: copyDetails,
+      successLabel: gt("toastMessages.composables.copied"),
+    },
     onDismiss: onToastDismissed,
   });
 

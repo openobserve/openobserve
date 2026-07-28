@@ -606,7 +606,7 @@ import {
   watch,
   type CSSProperties,
 } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 
 import type {
@@ -695,7 +695,7 @@ const emit = defineEmits<PanelEditorEmits>();
 // Setup
 // ============================================================================
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 
 // Resolve configuration (merge props with presets)

@@ -112,7 +112,7 @@
 <script lang="ts">
 import { defineComponent, ref, watch, computed, type PropType } from "vue";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import CrossLinkUserGuide from "./CrossLinkUserGuide.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
@@ -159,7 +159,7 @@ export default defineComponent({
   emits: ["update:modelValue", "save", "cancel"],
   setup(props, { emit }) {
     const store = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const dialogVisible = computed({
       get: () => props.modelValue,
       set: (val) => emit("update:modelValue", val),

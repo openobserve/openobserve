@@ -367,7 +367,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, computed, onMounted, watch } from "vue";
 
 defineOptions({ name: "OrgStorageEditor" });
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
 import config from "@/aws-exports";
@@ -394,7 +394,7 @@ const emit = defineEmits<{
 
 const store = useStore();
 const { isDark } = useTheme();
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const step = ref(1);
 const selectedProvider = ref("");

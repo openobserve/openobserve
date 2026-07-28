@@ -80,7 +80,7 @@
 import { ref, computed, watch } from "vue";
 import type { PropType } from "vue";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, raw } from "@/types/i18n";
 import { useLoading } from "@/composables/useLoading";
 import { annotationService } from "@/services/dashboard_annotations";
 import useNotifications from "@/composables/useNotifications";
@@ -129,7 +129,7 @@ const emit = defineEmits<{
 }>();
 
 const store = useStore();
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const isOpen = ref(true);
 const showDeleteConfirm = ref(false);
 
@@ -242,7 +242,7 @@ const handleSave = async () => {
         );
       } catch (error) {
         showErrorNotification(
-          errorMessage(error) ??
+          raw(errorMessage(error)) ||
             t("dashboard.addAnnotation.failedUpdateAnnotation", { error: errorMessage(error) }),
         );
         return;
@@ -257,7 +257,7 @@ const handleSave = async () => {
         );
       } catch (error) {
         showErrorNotification(
-          errorMessage(error) ??
+          raw(errorMessage(error)) ||
             t("dashboard.addAnnotation.failedCreateAnnotation", { error: errorMessage(error) }),
         );
         return;

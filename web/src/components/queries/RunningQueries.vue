@@ -144,7 +144,7 @@ import useIsMetaOrg from "@/composables/useIsMetaOrg";
 import SearchService from "@/services/search";
 import { onBeforeMount, ref, defineComponent, computed, toRaw, watch } from "vue";
 
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import QueryList from "@/components/queries/QueryList.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -309,7 +309,7 @@ export default defineComponent({
       data: null as any,
     });
 
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const showListSchemaDialog = ref(false);
 
     const listSchema = (row: any) => {
@@ -580,7 +580,7 @@ export default defineComponent({
 
     const getRunningQueries = () => {
       const dismiss = toast({
-        message: "Fetching running queries...",
+        message: t("toastMessages.queries.fetchingRunningQueries"),
         variant: "loading",
         timeout: 0,
       });
@@ -621,7 +621,7 @@ export default defineComponent({
           getRunningQueries();
 
           toast({
-            message: "Query cancelled",
+            message: t("toastMessages.queries.queryCancelled"),
             variant: "info",
           });
         })

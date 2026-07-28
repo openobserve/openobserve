@@ -166,7 +166,7 @@ import { defineComponent, ref, onBeforeMount } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, gt } from "@/types/i18n";
 import authService from "@/services/auth";
 import organizationsService from "@/services/organizations";
 import {
@@ -197,7 +197,7 @@ export default defineComponent({
     const store = useStore();
     const router = useRouter();
     const { isDark } = useTheme();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const name = ref("");
     const password = ref("");
     const confirmpassword = ref("");
@@ -259,7 +259,7 @@ export default defineComponent({
       if (nameValue == "" || passwordValue == "") {
         toast({
           variant: "warning",
-          message: "Please input valid username or password.",
+          message: t("toastMessages.login.pleaseInputValidUsernameOrPassword"),
         });
       } else {
         submitting.value = true;
@@ -403,14 +403,14 @@ export default defineComponent({
               submitting.value = false;
               toast({
                 variant: "error",
-                message: "Invalid username or password",
+                message: t("toastMessages.login.invalidUsernameOrPassword"),
               });
             });
         } catch (e) {
           submitting.value = false;
           toast({
             variant: "warning",
-            message: "Please fill all the fields and try again.",
+            message: t("toastMessages.login.pleaseFillAllTheFieldsAnd"),
           });
         }
       }
@@ -441,7 +441,7 @@ export default defineComponent({
   },
   methods: {
     selected(item: any) {
-      toast({ message: `Selected suggestion "${item.label}"` });
+      toast({ message: gt("toastMessages.login.selectedSuggestion", { p0: item.label }) });
     },
   },
 });

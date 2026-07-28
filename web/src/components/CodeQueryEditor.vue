@@ -84,7 +84,7 @@ import { useTheme } from "@/composables/useTheme";
 import { debounce } from "lodash-es";
 import searchState from "@/composables/useLogs/searchState";
 import { useNLQuery } from "@/composables/useNLQuery";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, raw } from "@/types/i18n";
 import useNotifications from "@/composables/useNotifications";
 import { getImageURL } from "@/utils/zincutils";
 import { isAuthError } from "@/utils/authErrors";
@@ -185,7 +185,7 @@ export default defineComponent({
   setup(props, { emit }) {
     const store = useStore();
     const { isDark } = useTheme();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const { showErrorNotification } = useNotifications();
     const editorRef: any = ref();
     let editorObj: any = null;
@@ -449,7 +449,7 @@ export default defineComponent({
           const errorMsg = isAuthError(streamingResponse.value)
             ? streamingResponse.value
             : t("search.nlQueryGenerationFailed");
-          showErrorNotification(errorMsg);
+          showErrorNotification(raw(errorMsg));
           if (isAuthError(streamingResponse.value)) {
             return; // Auth error already handled, don't trigger catch block
           }

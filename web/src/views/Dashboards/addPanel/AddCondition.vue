@@ -124,7 +124,7 @@ import { type SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import { defineComponent, ref, computed, toRef, watch, inject } from "vue";
 import OCombobox from "@/lib/forms/Combobox/OCombobox.vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useSelectAutoComplete } from "../../../composables/useSelectAutocomplete";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import StreamFieldSelect from "@/components/dashboards/addPanel/StreamFieldSelect.vue";
@@ -159,7 +159,7 @@ export default defineComponent({
     const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
     const { getAllSelectedStreams, getStreamNameFromStreamAlias, dashboardPanelData } =
       useDashboardPanelData(dashboardPanelDataPageKey);
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const searchTerm = ref("");
 
     // Same reference as props.condition; mutation targets its nested fields only.

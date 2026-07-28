@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useVirtualizer } from "@tanstack/vue-virtual";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -55,7 +55,7 @@ const emit = defineEmits<{
   (e: "select", org: OrgOption): void;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const open = ref(false);
 const searchQuery = ref("");

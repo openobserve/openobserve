@@ -1363,7 +1363,7 @@ import {
   onBeforeUnmount,
   onUnmounted,
 } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
 import { useRouter } from "vue-router";
@@ -1424,7 +1424,7 @@ export default defineComponent({
   },
   emits: ["close", "status-updated", "sendToAiChat"],
   setup(props, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const router = useRouter();
     const { confirm } = useConfirmDialog();
@@ -2361,7 +2361,7 @@ export default defineComponent({
         console.error("Failed to load incident details:", error);
         toast({
           variant: "error",
-          message: "Failed to load incident details",
+          message: t("toastMessages.alerts.failedToLoadIncidentDetails"),
         });
       } finally {
         loading.value = false;
@@ -2708,7 +2708,7 @@ export default defineComponent({
 
         toast({
           variant: "success",
-          message: `Incident status updated to ${response.data.status}`,
+          message: t("toastMessages.alerts.incidentStatusUpdatedTo", { p0: response.data.status }),
         });
         // Mark data as stale so incident list will refresh
         store.dispatch("incidents/setShouldRefresh", true);
@@ -2758,7 +2758,7 @@ export default defineComponent({
 
         toast({
           variant: "success",
-          message: `Incident severity updated to ${data.severity}`,
+          message: t("toastMessages.alerts.incidentSeverityUpdatedTo", { p0: data.severity }),
         });
         // Mark data as stale so incident list will refresh
         store.dispatch("incidents/setShouldRefresh", true);
@@ -2769,7 +2769,7 @@ export default defineComponent({
           if (data.analysis_in_flight) {
             toast({
               variant: "info",
-              message: "AI analysis is already running for this incident",
+              message: t("toastMessages.alerts.aiAnalysisIsAlreadyRunningFor"),
             });
           } else {
             const ok = await confirm({
@@ -2784,7 +2784,7 @@ export default defineComponent({
                 await incidentsService.triggerRca(org, incidentId, { reanalysis: true });
                 toast({
                   variant: "success",
-                  message: "AI reanalysis started",
+                  message: t("toastMessages.alerts.aiReanalysisStarted"),
                 });
                 await loadDetails(incidentId);
               } catch (e: any) {

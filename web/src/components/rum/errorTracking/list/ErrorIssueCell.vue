@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import { parseTopFrame, routeFromUrl } from "@/utils/rum/errorIssueUtils";
 
@@ -84,7 +84,7 @@ const props = defineProps<{
   };
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 // "handled" is the only safe state — treat missing/other values as unhandled.
 const isUnhandled = computed(() => props.issue.error_handling !== "handled");

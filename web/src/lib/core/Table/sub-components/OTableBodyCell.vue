@@ -8,7 +8,7 @@ import { useSanitizedHtml } from "../composables/useSanitizedHtml";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { OTableTreeContextKey } from "../composables/useTableTree";
 import { copyToClipboard } from "@/utils/clipboard";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 
 const { sanitize } = useSanitizedHtml();
 
@@ -175,7 +175,7 @@ function handleClick() {
   });
 }
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 </script>
 
 <template>

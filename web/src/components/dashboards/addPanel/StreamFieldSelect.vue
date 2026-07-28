@@ -16,7 +16,7 @@
 
 <script lang="ts">
 import { defineComponent, ref, watch, computed, inject } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import useStreams from "@/composables/useStreams";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -44,7 +44,7 @@ export default defineComponent({
   components: { OSelect },
 
   setup(props, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
 
     const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
 

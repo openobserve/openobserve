@@ -21,7 +21,7 @@
 
 <script lang="ts">
 import { computed, ref, useSlots } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { getImageURL } from "@/utils/zincutils";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -48,7 +48,7 @@ export default {
     const slots = useSlots();
     const hasDropdownSlot = computed(() => !!slots["dropdown"]);
     const isDropdownOpen = ref(false);
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
 
     return {
       hasDropdownSlot,

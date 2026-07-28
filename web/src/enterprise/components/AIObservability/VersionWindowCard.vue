@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import type { Win } from "@/plugins/traces/versionCompare/windows";
@@ -75,7 +75,7 @@ const props = defineProps<{
   deltaHours: number;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 function formatWindow(win: Win): string {
   return formatDuration((win.end - win.start) / 3_600_000_000);

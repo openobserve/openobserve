@@ -235,7 +235,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { ref, computed, watch } from "vue";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, raw } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
@@ -267,7 +267,7 @@ const props = defineProps<Props>();
 const emit = defineEmits<Emits>();
 
 const store = useStore();
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const show = computed({
   get: () => props.modelValue,
@@ -434,7 +434,7 @@ const createBackfillJobRequest = async (value: BackfillForm) => {
 
     toast({
       variant: "success",
-      message: "Backfill job created successfully",
+      message: t("toastMessages.pipelines.backfillJobCreatedSuccessfully"),
     });
 
     emit("success", response.job_id);
@@ -447,7 +447,7 @@ const createBackfillJobRequest = async (value: BackfillForm) => {
 
     toast({
       variant: "error",
-      message: errorMessage.value,
+      message: raw(errorMessage.value),
       timeout: 5000,
     });
   }

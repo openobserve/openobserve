@@ -355,7 +355,7 @@ import BaseImport from "@/components/common/BaseImport.vue";
 import alertsService from "@/services/alerts";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 
 interface SemanticGroup {
   id: string;
@@ -375,7 +375,7 @@ interface SemanticGroupDiff {
   unchanged: SemanticGroup[];
 }
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const router = useRouter();
 const store = useStore();
 
@@ -418,7 +418,7 @@ const loadFile = async (value: FileValue) => {
     await previewDiff(groups);
   } catch (error: any) {
     toast({
-      message: `Failed to parse JSON: ${error.message}`,
+      message: t("toastMessages.alerts.failedToParseJson", { p0: error.message }),
       variant: "error",
     });
     clearFile();
@@ -448,7 +448,9 @@ const previewDiff = async (groups: SemanticGroup[]) => {
     );
   } catch (error: any) {
     toast({
-      message: `Failed to preview changes: ${error.response?.data?.error || error.message}`,
+      message: t("toastMessages.alerts.failedToPreviewChanges", {
+        p0: error.response?.data?.error || error.message,
+      }),
       variant: "error",
     });
   }
@@ -536,7 +538,9 @@ const applyChanges = async () => {
     await alertsService.saveSemanticGroups(org, finalGroups);
 
     toast({
-      message: `Successfully applied ${selectedAdditions.value.length + selectedModifications.value.length} changes`,
+      message: t("toastMessages.alerts.successfullyAppliedChanges", {
+        p0: selectedAdditions.value.length + selectedModifications.value.length,
+      }),
       variant: "success",
     });
 
@@ -544,7 +548,9 @@ const applyChanges = async () => {
     handleBack();
   } catch (error: any) {
     toast({
-      message: `Failed to save changes: ${error.response?.data?.error || error.message}`,
+      message: t("toastMessages.alerts.failedToSaveChanges", {
+        p0: error.response?.data?.error || error.message,
+      }),
       variant: "error",
     });
   } finally {
@@ -576,7 +582,7 @@ const handleJsonUpdate = async (jsonArray: any[]) => {
     await previewDiff(jsonArray);
   } catch (error: any) {
     toast({
-      message: `Invalid JSON: ${error.message}`,
+      message: t("toastMessages.alerts.invalidJson", { p0: error.message }),
       variant: "error",
     });
   } finally {

@@ -18,6 +18,7 @@ import { shallowMount } from "@vue/test-utils";
 import ImportTemplate from "./ImportTemplate.vue";
 import { createStore } from "vuex";
 import { createI18n } from "vue-i18n";
+import enLocale from "@/locales/languages/en-US.json";
 import { ref } from "vue";
 
 // ─── Service mocks ────────────────────────────────────────────────────────────
@@ -66,7 +67,7 @@ const mockStore = createStore({
 
 const mockI18n = createI18n({
   locale: "en",
-  messages: { en: {} },
+  messages: { en: enLocale },
 });
 
 // ─── BaseImport stub ──────────────────────────────────────────────────────────

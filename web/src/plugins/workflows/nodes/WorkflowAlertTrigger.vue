@@ -68,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts" setup>
 import { defineAsyncComponent } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { workflowObj } from "@/plugins/workflows/useWorkflowCanvas";
 import { buildTestSampleText } from "@/plugins/workflows/testSample";
 
@@ -76,7 +76,7 @@ import { buildTestSampleText } from "@/plugins/workflows/testSample";
 // (Function node, Test dialog, Step Result drawer), so this adds no new chunk.
 const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const savedData = workflowObj.currentSelectedNodeData?.data || {};
 const triggerKind = savedData.trigger_kind || "alert_fired";

@@ -38,6 +38,7 @@ import useSearchBar from "@/composables/useLogs/useSearchBar";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
 import useStreamingSearch from "@/composables/useStreamingSearch";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { raw, gt } from "@/types/i18n";
 
 const useLogs = () => {
   const store = useStore();
@@ -131,9 +132,9 @@ const useLogs = () => {
           .then(() => {
             toast({
               variant: "success",
-              message: "Job added successfully",
+              message: gt("toastMessages.composables.jobAddedSuccessfully"),
               action: {
-                label: "Go To Job Scheduler",
+                label: gt("toastMessages.composables.goToJobScheduler"),
                 handler: () => routeToSearchSchedule(),
               },
             });
@@ -146,7 +147,9 @@ const useLogs = () => {
       }
     } catch (e: any) {
       searchObj.loading = false;
-      showErrorNotification(notificationMsg.value || "Error occurred during the search operation.");
+      showErrorNotification(
+        raw(notificationMsg.value || "Error occurred during the search operation."),
+      );
       throw e;
       // notificationMsg.value = "";
     }
@@ -200,7 +203,9 @@ const useLogs = () => {
         if (searchObj.meta.logsVisualizeToggle == "logs") {
           toast({
             variant: "info",
-            message: `Live mode is enabled. Only top ${searchObj.meta.resultGrid.rowsPerPage} results are shown.`,
+            message: gt("toastMessages.composables.liveModeIsEnabledOnlyTop", {
+              p0: searchObj.meta.resultGrid.rowsPerPage,
+            }),
           });
         }
       } else {

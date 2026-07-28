@@ -92,7 +92,7 @@ import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { searchState } from "@/composables/useLogs/searchState";
 import { getImageURL } from "@/utils/zincutils";
 import { useStore } from "vuex";
@@ -109,7 +109,7 @@ const props = withDefaults(
 
 const emit = defineEmits(["select:function", "save:function"]);
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const { searchObj } = searchState();
 

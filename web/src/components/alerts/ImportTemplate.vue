@@ -186,7 +186,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref, computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import templateService from "@/services/alert_templates";
@@ -226,7 +226,7 @@ export default defineComponent({
     }[];
     type templateErrors = (ErrorMessage | string)[][];
 
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const router = useRouter();
 
@@ -327,7 +327,7 @@ export default defineComponent({
       // Only redirect and show success message if ALL templates were imported successfully
       if (successCount === totalCount) {
         toast({
-          message: `Successfully imported template(s)`,
+          message: t("toastMessages.alerts.successfullyImportedTemplateS"),
           variant: "success",
         });
 
@@ -359,7 +359,7 @@ export default defineComponent({
         return hasCreatedTemplate;
       } catch (e: any) {
         toast({
-          message: "Error importing Template please check the JSON",
+          message: t("toastMessages.alerts.errorImportingTemplatePleaseCheckThe"),
           variant: "error",
         });
         return false;

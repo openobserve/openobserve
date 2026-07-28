@@ -108,7 +108,7 @@ import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import AddRole from "@/components/iam/roles/AddRole.vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import config from "@/aws-exports";
 import service_accounts from "@/services/service_accounts";
@@ -153,7 +153,7 @@ export default defineComponent({
   emits: ["update:modelValue", "updated", "update:open"],
   setup(props) {
     const store: any = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const { track } = useReo();
 
     // Form-base: the OForm owns the only editable fields (name + first_name +

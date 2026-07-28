@@ -157,7 +157,7 @@ const props = defineProps({
 });
 
 import { ref, computed, watch, inject } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 
@@ -180,7 +180,7 @@ watch(
 
 const store = useStore();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 // The injected OForm — condition values are name-bound to it (form mode is the
 // only mode now); also used to write the AND/OR toggle below.

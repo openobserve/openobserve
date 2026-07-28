@@ -189,7 +189,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -235,7 +235,7 @@ const emit = defineEmits<{
   (e: "update:spanSelectorBindings", value: Record<string, string>): void;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const systemVariablesDrawerOpen = ref(false);
 const targetScopeName = computed(() => t(`onlineEvals.job.targetScopes.${props.targetScope}`));
 const systemProvidedTitle = computed(() =>

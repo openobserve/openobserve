@@ -56,7 +56,7 @@ import { defineComponent, inject, ref } from "vue";
 import { getImageURL } from "../../../utils/zincutils";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 export default defineComponent({
@@ -66,7 +66,7 @@ export default defineComponent({
 
   setup(props) {
     const store = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     // array of charts
     const chartsArray = ref([
       {

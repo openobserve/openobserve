@@ -4,7 +4,7 @@
 // HTTP request + assertions card. Edits `check.http` and re-emits the whole
 // check — same update:check contract as the other configure sections.
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import type { HttpCheckConfig, ProtocolCheck } from "@/types/synthetics";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -15,7 +15,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 const props = defineProps<{ check: ProtocolCheck }>();
 const emit = defineEmits<{ "update:check": [value: ProtocolCheck] }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const cfg = computed<HttpCheckConfig>(() => props.check.http!);
 

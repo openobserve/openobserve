@@ -183,7 +183,7 @@ import {
   onMounted,
   defineAsyncComponent,
 } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import {
   addPanel,
   checkIfVariablesAreLoaded,
@@ -260,7 +260,7 @@ export default defineComponent({
     // This will be used to copy the chart data to the chart renderer component
     // This will deep copy the data object without reactivity and pass it on to the chart renderer
     const chartData = ref();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const router = useRouter();
     const route = useRoute();
     const store = useStore();

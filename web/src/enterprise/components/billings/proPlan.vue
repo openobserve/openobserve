@@ -132,7 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, raw } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -144,13 +144,13 @@ export default defineComponent({
   components: { OSeparator, OButton, OTag, OIcon, OCard },
   props: ["planType", "billingProvider", "subscriptionType", "features", "pricingError"],
   setup(props, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const planName = "pay-as-you-go";
     const btnCancelSubscription = ref(t("billing.manageSubscription"));
     const btnSubscribe = ref(t("billing.subscribe"));
 
     const cancelSubscription = () => {
-      btnCancelSubscription.value = "Loading...";
+      btnCancelSubscription.value = t("common.loadingEllipsis");
       setTimeout(function () {
         btnCancelSubscription.value = t("billing.manageSubscription");
       }, 1000);
@@ -158,7 +158,7 @@ export default defineComponent({
     };
 
     const onSubscribe = () => {
-      btnSubscribe.value = "Loading...";
+      btnSubscribe.value = t("common.loadingEllipsis");
       setTimeout(function () {
         btnSubscribe.value = t("billing.subscribe");
       }, 1000);

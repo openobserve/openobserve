@@ -13,7 +13,7 @@ import { useRouter } from "vue-router";
 import shortURL from "@/services/short_url";
 import { useStore } from "vuex";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 
 export default defineComponent({
   name: "ShortUrl",
@@ -27,7 +27,7 @@ export default defineComponent({
   setup(props) {
     const router = useRouter();
     const store = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
 
     const routeToHome = () => {
       router.replace({

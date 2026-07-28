@@ -122,7 +122,7 @@ the Free Software Foundation, either version 3 of the License, or
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, raw } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -142,7 +142,7 @@ import {
 import { entityId } from "./utils/evalEntity";
 import { showError } from "./utils/evalFormat";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const props = defineProps<{
   orgId: string;
@@ -252,7 +252,10 @@ watch(selectedNames, (val) => emit("update:selected-count", val.size), {
 async function importSelected() {
   if (isImporting.value || selectedNames.value.size === 0) return;
   if (!selectedProviderId.value) {
-    toast({ variant: "warning", message: "Select a provider before importing scorers." });
+    toast({
+      variant: "warning",
+      message: t("toastMessages.onlineEvals.selectAProviderBeforeImportingScorers"),
+    });
     return;
   }
   isImporting.value = true;
@@ -291,7 +294,7 @@ async function importSelected() {
     if (failCount) parts.push(`${failCount} failed`);
     toast({
       variant: failCount > 0 && successCount === 0 ? "error" : "success",
-      message: parts.join(" · "),
+      message: raw(parts.join(" · ")),
     });
   }
 }

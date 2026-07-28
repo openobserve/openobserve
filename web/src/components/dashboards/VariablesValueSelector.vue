@@ -95,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { onMounted, onUnmounted, ref, watch, PropType, inject, computed, nextTick } from "vue";
 import { defineComponent, reactive } from "vue";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import VariableQueryValueSelector from "./settings/VariableQueryValueSelector.vue";
 import VariableCustomValueSelector from "./settings/VariableCustomValueSelector.vue";
 import VariableAdHocValueSelector from "./settings/VariableAdHocValueSelector.vue";
@@ -167,7 +167,7 @@ export default defineComponent({
   },
   setup(props: any, { emit }) {
     const store = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     // Alias preserves the same prop reference for in-place mutation.
     const initialVariableValuesModel = computed(() => props.initialVariableValues);
     // Try to inject variablesManager from parent (for backward compatibility)

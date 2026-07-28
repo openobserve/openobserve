@@ -4,7 +4,7 @@
 import type { RangeProps, RangeEmits, RangeSlots, RangeValue } from "./ORange.types";
 import { computed, ref, useAttrs, useId } from "vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 
 defineOptions({ inheritAttrs: false });
 const $attrs = useAttrs();
@@ -361,7 +361,7 @@ function onHorizCancel() {
   hDragging = null;
 }
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 </script>
 
 <template>

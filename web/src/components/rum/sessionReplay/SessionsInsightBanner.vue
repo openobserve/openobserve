@@ -65,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 
 export interface InsightPayload {
@@ -90,7 +90,7 @@ const emit = defineEmits<{
   "open-error-tracking": [];
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 // Show the path, not the full URL — the origin is the same for every view.
 const viewPath = computed(() => {

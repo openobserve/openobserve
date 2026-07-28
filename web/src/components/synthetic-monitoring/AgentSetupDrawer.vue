@@ -159,7 +159,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -189,7 +189,7 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{ (e: "update:open", open: boolean): void }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const platform = ref<string | number>("docker");
 const agentType = ref<string | number>("protocol");

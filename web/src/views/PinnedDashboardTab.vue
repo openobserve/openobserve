@@ -95,9 +95,9 @@ import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const props = defineProps<{ dashboardId: string; folderId: string }>();
 const emit = defineEmits<{

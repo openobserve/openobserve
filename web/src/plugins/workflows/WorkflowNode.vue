@@ -130,7 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -142,7 +142,7 @@ const props = defineProps<{
   data: any;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const { editNode, requestDeleteNode, openStepPicker } = useWorkflowCanvas();
 
 // Test result badge state — read from the last Test run. Null (no run, or this

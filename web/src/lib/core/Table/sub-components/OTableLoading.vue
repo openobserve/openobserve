@@ -4,9 +4,9 @@
 import { computed, inject } from "vue";
 import type { Column } from "@tanstack/vue-table";
 import { TABLE_CHECKBOX_COL_SIZE, type OTableColumnDef } from "../OTable.types";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const props = defineProps<{
   /** Number of skeleton rows. Default: 10 */

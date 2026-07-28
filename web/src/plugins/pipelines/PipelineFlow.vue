@@ -182,7 +182,7 @@ import FlowNodeCard from "@/components/flow/FlowNodeCard.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import DropzoneBackground from "./DropzoneBackground.vue";
 import useDragAndDrop from "./useDnD";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 
 /* import the required styles */
 
@@ -200,7 +200,7 @@ export default {
     FlowNodeCard,
   },
   setup() {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const {
       onDragStart,
       onDragOver,

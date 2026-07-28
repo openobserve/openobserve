@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref, watch, defineAsyncComponent, computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import { provide, inject, toRefs, onActivated } from "vue";
@@ -100,7 +100,7 @@ export default defineComponent({
   emits: ["handleChartApiError", "searchRequestTraceIdsUpdated"],
   setup(props, { emit }) {
     const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "logs");
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const { dashboardPanelData, resetAggregationFunction, validatePanel } =
       useDashboardPanelData(dashboardPanelDataPageKey);

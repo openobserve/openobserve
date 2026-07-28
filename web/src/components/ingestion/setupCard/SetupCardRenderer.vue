@@ -48,7 +48,7 @@ import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
 import { safeHttpUrl } from "./subs";
 import type { CardSubstitutions, RichCardContent, RichCardStep, StepChipKind } from "./types";
 import { useStreamDetect, prefersReducedMotion } from "./useStreamDetect";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 
 const props = defineProps<{
   /** The integration's rich content (already token-substituted). */
@@ -70,7 +70,7 @@ const store = useStore();
 const router = useRouter();
 const { getStreams } = useStreams();
 const { isDark } = useTheme();
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 // The detected stream type drives the status copy + the "View …" destination.
 // traces / logs land in their explorers; metrics (which fan out into many

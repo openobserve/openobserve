@@ -16,6 +16,7 @@
 import { ref, type Ref } from "vue";
 import settings from "@/services/settings";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { raw } from "@/types/i18n";
 
 export interface HomeDashboard {
   dashboardId: string;
@@ -61,7 +62,7 @@ export function useHomeDashboard() {
       await settings.setOrgSetting(org, SETTING_KEY, d, SETTING_CATEGORY);
     } catch (e: any) {
       homeDashboard.value = prev; // revert
-      toast({ variant: "error", message: errMessage(e, "set") });
+      toast({ variant: "error", message: raw(errMessage(e, "set")) });
     }
   };
 
@@ -79,7 +80,7 @@ export function useHomeDashboard() {
       // null, don't revert, don't toast. Only real errors revert.
       if (e?.response?.status === 404) return;
       homeDashboard.value = prev; // revert
-      toast({ variant: "error", message: errMessage(e, "remove") });
+      toast({ variant: "error", message: raw(errMessage(e, "remove")) });
     }
   };
 

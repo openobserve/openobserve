@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -36,7 +36,7 @@ const props = defineProps<{
   events?: any[];
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 // Skip gaps longer than this (ms) when "Skip inactivity" is on.
 const SKIP_THRESHOLD_MS = 1500;

@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { ref, onMounted, nextTick, computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import AiPageShell from "@/enterprise/components/AIObservability/AiPageShell.vue";
 import LLMInsightsDashboard from "@/plugins/traces/LLMInsightsDashboard.vue";
 import { useAiDateController } from "@/enterprise/composables/useAiDateController";
@@ -48,7 +48,7 @@ import { useChildRefresh } from "@/enterprise/composables/useChildRefresh";
 
 defineOptions({ name: "AILLMInsightsPage" });
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 // Shared across LLM Insights, LLM Sessions, and Quality — picking a window
 // on any of the three lands on the other two (singleton ref + localStorage

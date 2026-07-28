@@ -143,7 +143,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
@@ -189,7 +189,7 @@ const emit = defineEmits<{
   (e: "update:binding", value: string): void;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const drawerOpen = ref(false);
 const formId = computed(
   () => `span-selector-form-${props.scorerId.replace(/[^a-zA-Z0-9_-]/g, "-")}`,

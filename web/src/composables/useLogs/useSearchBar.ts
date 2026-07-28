@@ -35,6 +35,7 @@ import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
 import { isCrossLinkingEnabledForStream } from "@/utils/crossLinking";
 import config from "@/aws-exports";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { raw, gt } from "@/types/i18n";
 
 export const useSearchBar = () => {
   const { getStream, isStreamExists, isStreamFetched } = useStreams();
@@ -84,7 +85,7 @@ export const useSearchBar = () => {
       });
       return;
     } catch (e) {
-      showErrorNotification("Error while fetching functions");
+      showErrorNotification(gt("toastMessages.useLogs.errorWhileFetchingFunctions"));
     }
   };
 
@@ -106,7 +107,7 @@ export const useSearchBar = () => {
       });
       return;
     } catch (e) {
-      showErrorNotification("Error while fetching actions");
+      showErrorNotification(gt("toastMessages.useLogs.errorWhileFetchingActions"));
     }
   };
 
@@ -847,7 +848,9 @@ export const useSearchBar = () => {
       //   e,
       // );
       searchObj.loading = false;
-      showErrorNotification(notificationMsg.value || "Error occurred during the search operation.");
+      showErrorNotification(
+        raw(notificationMsg.value || "Error occurred during the search operation."),
+      );
       notificationMsg.value = "";
     }
   };
@@ -883,7 +886,7 @@ export const useSearchBar = () => {
               searchObj.data.isOperationCancelled = false;
               toast({
                 variant: "info",
-                message: "Running query cancelled successfully",
+                message: gt("toastMessages.useLogs.runningQueryCancelledSuccessfully"),
               });
             }
           })
@@ -902,7 +905,7 @@ export const useSearchBar = () => {
       } catch (error) {
         toast({
           variant: "error",
-          message: "Failed to cancel running query",
+          message: gt("toastMessages.useLogs.failedToCancelRunningQuery"),
         });
         resolve(true);
       }
@@ -927,7 +930,7 @@ export const useSearchBar = () => {
       });
     } catch (error: any) {
       console.error("Failed to cancel WebSocket searches:", error);
-      showErrorNotification("Failed to cancel search operations");
+      showErrorNotification(gt("toastMessages.useLogs.failedToCancelSearchOperations"));
     }
   };
 

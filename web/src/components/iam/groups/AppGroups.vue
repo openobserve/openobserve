@@ -159,7 +159,7 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { cloneDeep } from "lodash-es";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
@@ -176,7 +176,7 @@ import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 
 const showAddGroup = ref(false);
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const { track } = useReo();
 

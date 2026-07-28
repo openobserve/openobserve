@@ -166,7 +166,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { defineAsyncComponent, ref, computed, onMounted } from "vue";
 import type { AcceptableValue } from "reka-ui";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import AiPageShell from "@/enterprise/components/AIObservability/AiPageShell.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -190,7 +190,7 @@ import { useAgentScope } from "@/enterprise/composables/useAgentScope";
 
 defineOptions({ name: "AIAgentGraphPage" });
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 const { searchObj } = useTraces();
 

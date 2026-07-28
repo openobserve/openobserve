@@ -147,7 +147,7 @@ const handleKeyDown = (event: KeyboardEvent) => {
 
 // Watch for external prop changes
 import { watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 watch(
   () => props.modelValue,
   (newValue) => {
@@ -156,7 +156,7 @@ watch(
   { immediate: true },
 );
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 </script>
 
 <style scoped>

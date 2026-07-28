@@ -165,9 +165,9 @@ import {
   convertTimeFromMicroToMilli,
   timestampToTimezoneDate,
 } from "@/utils/zincutils";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 type ChipKind = "context" | "subject";
 

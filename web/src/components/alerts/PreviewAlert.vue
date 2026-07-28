@@ -50,7 +50,7 @@ import { reactive } from "vue";
 import { onBeforeMount } from "vue";
 import { cloneDeep } from "lodash-es";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import searchService from "@/services/search";
 import { b64EncodeUnicode, smartDecodeVrlFunction } from "@/utils/zincutils";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -234,7 +234,7 @@ const evaluationStatus = ref<{
   wouldTrigger: boolean;
   reason: string;
 } | null>(null);
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const store = useStore();
 

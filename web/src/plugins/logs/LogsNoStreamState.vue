@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import EmptyStateIngestionCard from "@/lib/core/EmptyState/EmptyStateIngestionCard.vue";
 import EmptyStateIngestionChip from "@/lib/core/EmptyState/EmptyStateIngestionChip.vue";
@@ -83,7 +83,7 @@ const emit = defineEmits<{
   "pick-stream": [stream: string];
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 // Show up to 3 recently used streams (deduplicated, most recent first).
 const recentStreams = computed<string[]>(() => {

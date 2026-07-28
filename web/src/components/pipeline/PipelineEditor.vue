@@ -217,7 +217,7 @@ import { onBeforeRouteLeave, useRouter } from "vue-router";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import StepPickerDialog from "@/components/flow/StepPickerDialog.vue";
 import NodePalette from "@/components/flow/NodePalette.vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -464,7 +464,7 @@ const toggleJsonEditorAIChat = () => {
   store.dispatch("setIsAiChatEnabled", !store.state.isAiChatEnabled);
 };
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const validationErrors = ref<string[]>([]);
 

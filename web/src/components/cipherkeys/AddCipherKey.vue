@@ -166,7 +166,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 <script lang="ts" setup>
 import { ref, computed, onMounted, onActivated } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import AddOpenobserveType from "@/components/cipherkeys/AddOpenobserveType.vue";
@@ -190,7 +190,7 @@ import {
 } from "@/components/cipherkeys/AddCipherKey.schema";
 
 const emit = defineEmits(["cancel:hideform"]);
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const router = useRouter();
 const store = useStore();
 
@@ -258,7 +258,7 @@ const setupTemplateData = () => {
     isUpdatingCipherKey.value = true;
     const name = String(router.currentRoute.value.query.name || "");
     if (name === "") {
-      toast({ variant: "error", message: "Invalid cipher key name" });
+      toast({ variant: "error", message: t("toastMessages.cipherkeys.invalidCipherKeyName") });
       emit("cancel:hideform");
       return;
     }
@@ -317,7 +317,7 @@ const onFormSubmit = async (value: AddCipherKeyForm) => {
 const createCipherKey = async (value: AddCipherKeyForm) => {
   const dismiss = toast({
     variant: "loading",
-    message: "Please wait while processing your request...",
+    message: t("toastMessages.cipherkeys.pleaseWaitWhileProcessingYourRequest"),
     timeout: 0,
   });
   try {
@@ -332,7 +332,10 @@ const createCipherKey = async (value: AddCipherKeyForm) => {
       isUpdate: isUpdatingCipherKey.value,
     } as any);
     dismiss();
-    toast({ variant: "success", message: "Cipher key created successfully" });
+    toast({
+      variant: "success",
+      message: t("toastMessages.cipherkeys.cipherKeyCreatedSuccessfully"),
+    });
     emit("cancel:hideform");
   } catch (error: any) {
     dismiss();
@@ -345,13 +348,13 @@ const createCipherKey = async (value: AddCipherKeyForm) => {
 const updateCipherKey = async (value: AddCipherKeyForm) => {
   const current = JSON.stringify(form.state.values ?? value);
   if (current === originalData.value) {
-    toast({ variant: "success", message: "No changes detected" });
+    toast({ variant: "success", message: t("toastMessages.cipherkeys.noChangesDetected") });
     emit("cancel:hideform");
     return;
   }
   const dismiss = toast({
     variant: "loading",
-    message: "Please wait while processing your request...",
+    message: t("toastMessages.cipherkeys.pleaseWaitWhileProcessingYourRequest"),
     timeout: 0,
   });
   try {
@@ -363,7 +366,10 @@ const updateCipherKey = async (value: AddCipherKeyForm) => {
       value.name,
     );
     dismiss();
-    toast({ variant: "success", message: "Cipher key updated successfully" });
+    toast({
+      variant: "success",
+      message: t("toastMessages.cipherkeys.cipherKeyUpdatedSuccessfully"),
+    });
     emit("cancel:hideform");
   } catch (error: any) {
     dismiss();

@@ -475,7 +475,7 @@ import {
   watch,
   type PropType,
 } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import useTheme from "@/composables/useTheme";
 import MetricCardChart from "./MetricCardChart.vue";
 import RelativeTime from "@/components/common/RelativeTime.vue";
@@ -565,7 +565,7 @@ export default defineComponent({
     "zoom",
   ],
   setup(props, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const root = ref<HTMLElement | null>(null);
     const { isDark } = useTheme();
 

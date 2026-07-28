@@ -16,6 +16,7 @@
 import { ref, type Ref } from "vue";
 import settings from "@/services/settings";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { gt } from "@/types/i18n";
 
 export interface FavoriteDashboard {
   dashboardId: string;
@@ -69,8 +70,8 @@ export function useFavoriteDashboards() {
         variant: "error",
         message:
           e?.response?.status === 403
-            ? "You don't have permission to change favorites"
-            : "Couldn't update favorite dashboards",
+            ? gt("toastMessages.composables.noPermissionToChangeFavorites")
+            : gt("toastMessages.composables.couldNotUpdateFavoriteDashboards"),
       });
     }
   };

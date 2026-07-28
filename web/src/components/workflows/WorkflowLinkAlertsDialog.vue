@@ -138,7 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
@@ -153,7 +153,7 @@ import alertsService from "@/services/alerts";
 const props = defineProps<{ workflowId: string; workflowName: string }>();
 const emit = defineEmits<{ (e: "close"): void; (e: "linked"): void }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 
 const orgId = () => store.state.selectedOrganization.identifier as string;

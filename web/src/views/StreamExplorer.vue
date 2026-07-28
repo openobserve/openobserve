@@ -41,7 +41,7 @@
 import { onBeforeMount, onMounted, ref } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { cloneDeep } from "lodash-es";
 
 import SearchBar from "@/components/logstream/explore/SearchBar.vue";
@@ -59,7 +59,7 @@ type SearchBarInstance = InstanceType<typeof SearchBar>;
 
 const store = useStore();
 const router = useRouter();
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const streamData = ref<any>(null);
 const searchBarRef = ref<SearchBarInstance | null>(null);

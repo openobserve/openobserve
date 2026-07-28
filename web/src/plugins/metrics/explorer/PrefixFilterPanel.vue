@@ -108,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -138,7 +138,7 @@ const emit = defineEmits<{
   (e: "clear"): void;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const search = ref("");
 

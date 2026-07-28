@@ -343,7 +343,7 @@ import {
   type SyntheticLocation,
 } from "@/types/synthetics";
 import { CHECK_TYPE_CARDS } from "@/constants/synthetics";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import syntheticsService from "@/services/synthetics";
 import { locationDisplayLabel } from "@/utils/synthetics/format";
 import { getFoldersListByType } from "@/utils/commons";
@@ -353,7 +353,7 @@ import { useConfirmDialog } from "@/composables/useConfirmDialog";
 const router = useRouter();
 const route = useRoute();
 const store = useStore();
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const { confirm } = useConfirmDialog();
 
 // ── API types ──────────────────────────────────────────────────────────

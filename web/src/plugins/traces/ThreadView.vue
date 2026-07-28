@@ -328,7 +328,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 export interface Props {
@@ -373,7 +373,7 @@ import ThreadToolCalls from "./ThreadToolCalls.vue";
 import { renderMarkdown } from "./markdown";
 
 const store = useStore();
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 interface ThreadHead {
   systemPrompt: string;

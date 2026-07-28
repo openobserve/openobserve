@@ -171,7 +171,7 @@
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import type { ScorerTestResult } from "@/services/online-evals.service";
 import { formatTemplateVariable } from "../../utils/evalFormat";
@@ -192,7 +192,7 @@ const emit = defineEmits<{
   (e: "update:inputs", value: Record<string, string>): void;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 function updateInput(variable: string, value: string) {
   emit("update:inputs", { ...props.inputs, [variable]: value });

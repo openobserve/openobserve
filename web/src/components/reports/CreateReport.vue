@@ -613,7 +613,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { ref, computed, watch, nextTick, onBeforeMount } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { useLocalTimezone } from "@/utils/zincutils";
 import VariablesInput from "@/components/alerts/VariablesInput.vue";
@@ -712,7 +712,7 @@ const defaultReport = {
   report_type: "PDF",
 };
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const router = useRouter();
 const store = useStore();
 
@@ -1305,7 +1305,7 @@ const saveReport = async (value: CreateReportForm) => {
 
   const dismiss = toast({
     variant: "loading",
-    message: "Please wait...",
+    message: t("toastMessages.reports.pleaseWait"),
     timeout: 0,
   });
 
@@ -1326,7 +1326,9 @@ const saveReport = async (value: CreateReportForm) => {
 
       toast({
         variant: "success",
-        message: `Report ${isEditingReport.value ? "updated" : "saved"} successfully.`,
+        message: t("toastMessages.reports.reportSuccessfully", {
+          p0: isEditingReport.value ? "updated" : "saved",
+        }),
       });
       goToReports();
     })
@@ -1452,14 +1454,17 @@ const setupEditingReport = async (report: any) => {
   if (folderOptions.value.some((f) => f.value === report.dashboards[0].folder)) {
     folder = report.dashboards[0].folder;
   } else {
-    toast({ variant: "error", message: "Selected folder has been deleted!" });
+    toast({ variant: "error", message: t("toastMessages.reports.selectedFolderHasBeenDeleted") });
   }
 
   let dashboard = "";
   if (dashboardOptions.value.some((d) => d.value === report.dashboards[0].dashboard)) {
     dashboard = report.dashboards[0].dashboard;
   } else {
-    toast({ variant: "error", message: "Selected dashboard has been deleted!" });
+    toast({
+      variant: "error",
+      message: t("toastMessages.reports.selectedDashboardHasBeenDeleted"),
+    });
   }
 
   setDashboardTabOptions(dashboard);
@@ -1471,7 +1476,7 @@ const setupEditingReport = async (report: any) => {
   } else {
     toast({
       variant: "error",
-      message: "Selected dashboard tab has been deleted!",
+      message: t("toastMessages.reports.selectedDashboardTabHasBeenDeleted"),
     });
   }
 

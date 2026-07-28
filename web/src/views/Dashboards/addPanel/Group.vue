@@ -76,7 +76,7 @@ import { defineComponent, ref, computed } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import AddCondition from "./AddCondition.vue";
 
 export default defineComponent({
@@ -116,7 +116,7 @@ export default defineComponent({
   },
   emits: ["add-condition", "add-group", "remove-group", "logical-operator-change"],
   setup(props, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const showAddMenu = ref(false);
 
     // Same reference as props.group; mutation targets its nested fields only.

@@ -71,7 +71,7 @@ import { defineComponent, computed, inject } from "vue";
 import { useStore } from "vuex";
 import { useRouter, RouterLink } from "vue-router";
 import { useTheme } from "@/composables/useTheme";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { RailIndicatorActiveKey } from "@/lib/core/Navbar/ONavbar.types";
 
@@ -149,7 +149,7 @@ export default defineComponent({
   },
   emits: ["trigger"],
   setup(props, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const router: any = useRouter();
 

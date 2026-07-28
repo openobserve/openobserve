@@ -18,9 +18,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import CopyContent from "@/components/CopyContent.vue";
 import IngestionContent from "@/components/ingestion/IngestionContent.vue";
 import useIngestion from "@/composables/useIngestion";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const name = "python";
 const { languagesContent, languagesDocURLs } = useIngestion();
 const content = languagesContent.replace("[STREAM_NAME]", name.replace(" ", "_").toLowerCase());

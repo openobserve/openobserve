@@ -3,6 +3,7 @@ import useNotifications from "../useNotifications";
 import { getDashboard } from "@/utils/commons";
 import { useStore } from "vuex";
 import { getUTCTimestampFromZonedTimestamp } from "@/utils/dashboard/dateTimeUtils";
+import { gt } from "@/types/i18n";
 
 export const useAnnotationsData = (
   organization: string,
@@ -88,7 +89,7 @@ export const useAnnotationsData = (
   // Watch for annotation mode to show notification
   watch(isAddAnnotationMode, () => {
     if (isAddAnnotationMode.value) {
-      showInfoNotification("Click on the chart data or select a range to add an annotation", {});
+      showInfoNotification(gt("toastMessages.dashboard.clickOnTheChartDataOr"), {});
     }
   });
 

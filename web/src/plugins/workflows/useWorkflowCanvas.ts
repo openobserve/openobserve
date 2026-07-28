@@ -38,6 +38,8 @@ import { detectCycle } from "@/composables/flow/detectCycle";
 import { makeEdge } from "@/composables/flow/makeEdge";
 import { getTruncatedConditions } from "@/utils/conditionPreview";
 import workflowService from "@/services/workflows";
+import type { I18nKey } from "@/types/i18n";
+import { gt } from "@/types/i18n";
 
 export type WorkflowNodeCategory = "trigger" | "logic" | "action";
 
@@ -45,11 +47,11 @@ export interface WorkflowNodeMeta {
   /** Colour/behaviour family. */
   category: WorkflowNodeCategory;
   /** Small uppercase label above the title (i18n key). */
-  kindKey: string;
+  kindKey: I18nKey;
   /** Node title (i18n key). */
-  titleKey: string;
+  titleKey: I18nKey;
   /** Short description (i18n key), shown in the step picker. */
-  descKey: string;
+  descKey: I18nKey;
   /** OIcon registry name for the node's glyph (fallback when no `image`). */
   icon: IconName;
   /**
@@ -140,8 +142,8 @@ export const nodeConfigDetail = (data: any, maxLen = 28): string => {
 // v1; the rest are shown as "coming soon" so the picker is clearly extensible.
 export interface WorkflowTriggerType {
   key: string;
-  labelKey: string;
-  descKey: string;
+  labelKey: I18nKey;
+  descKey: I18nKey;
   icon: IconName;
   enabled: boolean;
 }
@@ -518,7 +520,7 @@ export default function useWorkflowCanvas() {
     // one incoming edge per node
     if (edges.some((e: any) => e.target === connection.target)) {
       toast({
-        message: "Only one incoming connection to a step is allowed",
+        message: gt("toastMessages.workflows.onlyOneIncomingConnectionToA"),
         variant: "warning",
       });
       return;
@@ -526,7 +528,7 @@ export default function useWorkflowCanvas() {
 
     if (detectCycle(edges, connection)) {
       toast({
-        message: "This connection would create a loop",
+        message: gt("toastMessages.workflows.thisConnectionWouldCreateALoop"),
         variant: "warning",
       });
       return;
@@ -558,7 +560,7 @@ export default function useWorkflowCanvas() {
     const node = wf.nodes.find((n: any) => n.id === nodeId);
     if (node?.data?.node_type === "workflow_trigger") {
       toast({
-        message: "The trigger starts the workflow and can't be deleted",
+        message: gt("toastMessages.workflows.theTriggerStartsTheWorkflowAnd"),
         variant: "warning",
       });
       return;
@@ -575,7 +577,7 @@ export default function useWorkflowCanvas() {
     // The trigger anchors the workflow and can't be removed.
     if (node?.data?.node_type === "workflow_trigger") {
       toast({
-        message: "The trigger starts the workflow and can't be deleted",
+        message: gt("toastMessages.workflows.theTriggerStartsTheWorkflowAnd"),
         variant: "warning",
       });
       return;
@@ -662,7 +664,7 @@ export default function useWorkflowCanvas() {
   }
   function warnTriggerFirst() {
     toast({
-      message: "Choose a trigger node to start your workflow",
+      message: gt("toastMessages.workflows.chooseATriggerNodeToStart"),
       variant: "warning",
     });
   }
@@ -678,7 +680,7 @@ export default function useWorkflowCanvas() {
     if (!src) return;
     if (isTerminal(src)) {
       toast({
-        message: "This branch already ends in a Destination.",
+        message: gt("toastMessages.workflows.thisBranchAlreadyEndsInA"),
         variant: "warning",
       });
       return;

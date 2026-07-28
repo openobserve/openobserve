@@ -119,9 +119,9 @@ import { ref } from "vue";
 
 import { OEmptyState, type EmptyStatePresetName } from "@/lib/core/EmptyState";
 import OButton from "@/lib/core/Button/OButton.vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 // local dark-mode preview wrapper so reviewers can flip themes without changing
 // their global setting (mirrors the app's `.dark` class on a scoped root).

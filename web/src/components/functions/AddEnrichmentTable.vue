@@ -242,7 +242,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, ref, computed } from "vue";
 import jsTransformService from "../../services/jstransform";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, raw } from "@/types/i18n";
 import { useStore } from "vuex";
 import segment from "../../services/segment_analytics";
 import { useReo } from "@/services/reodotdev_analytics";
@@ -302,7 +302,7 @@ export default defineComponent({
     const store: any = useStore();
     const disableColor: any = ref(props.isUpdating ? "grey-5" : "");
     const indexOptions = ref([]);
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const editorRef: any = ref(null);
     let editorobj: any = null;
     const isFetchingStreams = ref(false);
@@ -394,7 +394,7 @@ export default defineComponent({
 
       const dismiss = toast({
         variant: "loading",
-        message: "Please wait...",
+        message: t("toastMessages.functions.pleaseWait"),
         timeout: 0,
       });
 
@@ -439,8 +439,8 @@ export default defineComponent({
             variant: "success",
             message:
               value.updateMode === "reload"
-                ? "Enrichment table reload started. Processing in background..."
-                : "Enrichment table job started. Processing in background...",
+                ? t("toastMessages.functions.enrichmentReloadStarted")
+                : t("toastMessages.functions.enrichmentJobStarted"),
           });
         } catch (err: any) {
           compilationErr.value = err.response?.data?.["message"] || err.message || "Unknown error";
@@ -494,7 +494,8 @@ export default defineComponent({
             toast({
               variant: "error",
               message:
-                JSON.stringify(err.response?.data?.["error"]) || "Enrichment Table creation failed",
+                raw(JSON.stringify(err.response?.data?.["error"])) ||
+                t("toastMessages.functions.enrichmentCreationFailed"),
             });
           }
           dismiss();

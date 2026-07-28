@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import type { I18nKey } from "@/types/i18n";
 /**
  * Prebuilt destination types
  */
@@ -51,7 +52,7 @@ export type CredentialValidatorResult = true | ValidationMessage;
  */
 export interface CredentialField {
   key: string;
-  labelKey: string;
+  labelKey: I18nKey;
   type: "text" | "password" | "email" | "select" | "toggle";
   required: boolean;
   hint?: string;

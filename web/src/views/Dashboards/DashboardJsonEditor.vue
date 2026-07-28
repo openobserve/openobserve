@@ -50,7 +50,7 @@
 
 <script lang="ts">
 import { defineComponent, ref, onMounted, watch, computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { defineAsyncComponent } from "vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
@@ -79,7 +79,7 @@ export default defineComponent({
   },
   emits: ["close", "update:open"],
   setup(props) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const jsonContent = ref("");
     const isValidJson = ref(true);

@@ -907,7 +907,7 @@ import {
   onMounted,
   onBeforeMount,
 } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
 import {
@@ -1083,7 +1083,7 @@ const getColumns = computed(() => {
   ];
 });
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 // ── Form descendant ───────────────────────────────────────────────────────────
 // ScheduledPipeline is rendered INSIDE Query's <OForm>; it injects that form and

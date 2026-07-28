@@ -232,7 +232,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { ref, onMounted, defineComponent, computed } from "vue";
 import type { Ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -265,7 +265,7 @@ export default defineComponent({
   },
   setup() {
     const filterQuery = ref("");
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const { confirm } = useConfirmDialog();
 

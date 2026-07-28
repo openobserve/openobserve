@@ -58,7 +58,7 @@
 
 <script lang="ts">
 import { defineComponent, ref, onMounted, watch, computed, defineAsyncComponent } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { getImageURL } from "@/utils/zincutils";
 import O2AIChat from "../O2AIChat.vue";
@@ -99,7 +99,7 @@ export default defineComponent({
   },
   emits: ["close", "saveJson"],
   setup(props, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const { isDark } = useTheme();
     const jsonContent = ref("");

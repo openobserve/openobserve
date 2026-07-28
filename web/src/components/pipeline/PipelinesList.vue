@@ -443,7 +443,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, computed, watch, onMounted } from "vue";
 import { normalizeNodeErrorMessages } from "@/utils/pipelines/nodeErrors";
 import { MarkerType } from "@vue-flow/core";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, raw } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import StreamSelection from "./StreamSelection.vue";
 import pipelineService from "@/services/pipelines";
@@ -475,7 +475,7 @@ import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import { COL } from "@/lib/core/Table/OTable.types";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const router = useRouter();
 
 // Row original data rendered by the pipelines table. Only the fields read in the
@@ -594,7 +594,7 @@ const togglePipelineState = (row: any, from_now: boolean) => {
         ? `${row.name} state resumed successfully`
         : `${row.name} state paused successfully`;
       toast({
-        message: message,
+        message: raw(message),
         variant: "success",
       });
       await getPipelines();
@@ -831,7 +831,7 @@ const openDeleteDialog = (pipeline: any) => {
 
 const savePipeline = (data: any) => {
   const dismiss = toast({
-    message: "saving pipeline...",
+    message: t("toastMessages.pipeline.savingPipeline"),
     variant: "loading",
     timeout: 0,
   });
@@ -846,7 +846,7 @@ const savePipeline = (data: any) => {
       dismiss();
       showCreatePipeline.value = false;
       toast({
-        message: "Pipeline created successfully",
+        message: t("toastMessages.pipeline.pipelineCreatedSuccessfully"),
         variant: "success",
       });
     })
@@ -863,7 +863,7 @@ const savePipeline = (data: any) => {
 
 const deletePipeline = async () => {
   const dismiss = toast({
-    message: "deleting pipeline...",
+    message: t("toastMessages.pipeline.deletingPipeline"),
     variant: "loading",
     timeout: 0,
   });
@@ -876,7 +876,7 @@ const deletePipeline = async () => {
     })
     .then(async () => {
       toast({
-        message: "Pipeline deleted successfully",
+        message: t("toastMessages.pipeline.pipelineDeletedSuccessfully"),
         variant: "success",
       });
     })
@@ -949,7 +949,9 @@ const exportBulkPipelines = () => {
 
   selectedPipelineIds.value = [];
   toast({
-    message: `${pipelinesToExport.length} pipelines exported successfully`,
+    message: t("toastMessages.pipeline.pipelinesExportedSuccessfully", {
+      p0: pipelinesToExport.length,
+    }),
     variant: "success",
   });
 };
@@ -986,7 +988,9 @@ const goToBackfillJobs = () => {
 const bulkTogglePipelines = async (action: "pause" | "resume") => {
   const dismiss = toast({
     variant: "loading",
-    message: `${action === "resume" ? "Resuming" : "Pausing"} pipelines...`,
+    message: t("toastMessages.pipeline.pipelines", {
+      p0: action === "resume" ? "Resuming" : "Pausing",
+    }),
     timeout: 0,
   });
   try {
@@ -999,7 +1003,7 @@ const bulkTogglePipelines = async (action: "pause" | "resume") => {
     if (pipelinesToToggle.length === 0) {
       toast({
         variant: "error",
-        message: `No pipelines to ${action}`,
+        message: t("toastMessages.pipeline.noPipelinesTo", { p0: action }),
       });
       dismiss();
       return;
@@ -1021,7 +1025,7 @@ const bulkTogglePipelines = async (action: "pause" | "resume") => {
       dismiss();
       toast({
         variant: "success",
-        message: `Pipelines ${action}d successfully`,
+        message: t("toastMessages.pipeline.pipelinesDSuccessfully", { p0: action }),
       });
     }
 
@@ -1033,7 +1037,7 @@ const bulkTogglePipelines = async (action: "pause" | "resume") => {
     console.error(`Error ${action}ing pipelines:`, error);
     toast({
       variant: "error",
-      message: `Error ${action}ing pipelines. Please try again.`,
+      message: t("toastMessages.pipeline.errorIngPipelinesPleaseTryAgain", { p0: action }),
     });
   }
 };
@@ -1050,7 +1054,7 @@ const bulkDeletePipelines = async () => {
   bulkDeleteLoading.value = true;
   const dismiss = toast({
     variant: "loading",
-    message: "Deleting pipelines...",
+    message: t("toastMessages.pipeline.deletingPipelines"),
     timeout: 0,
   });
 
@@ -1058,7 +1062,7 @@ const bulkDeletePipelines = async () => {
     if (selectedPipelines.value.length === 0) {
       toast({
         variant: "error",
-        message: "No pipelines selected for deletion",
+        message: t("toastMessages.pipeline.noPipelinesSelectedForDeletion"),
       });
       dismiss();
       return;
@@ -1086,27 +1090,32 @@ const bulkDeletePipelines = async () => {
         // Partial success
         toast({
           variant: "warning",
-          message: `${successCount} pipeline(s) deleted successfully, ${failCount} failed`,
+          message: t("toastMessages.pipeline.pipelineSDeletedSuccessfullyFailed", {
+            p0: successCount,
+            p1: failCount,
+          }),
           timeout: 5000,
         });
       } else if (failCount > 0) {
         // All failed
         toast({
           variant: "error",
-          message: `Failed to delete ${failCount} pipeline(s)`,
+          message: t("toastMessages.pipeline.failedToDeletePipelineS", { p0: failCount }),
         });
       } else {
         // All successful
         toast({
           variant: "success",
-          message: `${successCount} pipeline(s) deleted successfully`,
+          message: t("toastMessages.pipeline.pipelineSDeletedSuccessfully", { p0: successCount }),
         });
       }
     } else {
       // Fallback success message
       toast({
         variant: "success",
-        message: `${selectedPipelines.value.length} pipeline(s) deleted successfully`,
+        message: t("toastMessages.pipeline.pipelineSDeletedSuccessfully", {
+          p0: selectedPipelines.value.length,
+        }),
       });
     }
 

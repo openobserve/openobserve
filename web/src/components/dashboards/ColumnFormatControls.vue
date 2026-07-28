@@ -200,7 +200,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { computed, defineComponent, PropType } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
@@ -232,7 +232,7 @@ export default defineComponent({
     isNumeric: { type: Boolean, default: false },
   },
   setup(props) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const { unitOptions, fieldTypeOptions, alignOptions, conditionOperators } =
       useColumnFormattingOptions();
 

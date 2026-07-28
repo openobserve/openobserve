@@ -175,7 +175,7 @@ import {
   onBeforeMount,
 } from "vue";
 
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { getDashboard, getPanel, checkIfVariablesAreLoaded } from "../../../utils/commons";
 import { useRoute } from "vue-router";
 import { useStore } from "vuex";
@@ -255,7 +255,7 @@ export default defineComponent({
     const chartData = ref();
     const showLegendsDialog = ref(false);
     const panelSchemaRendererRef: any = ref(null);
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const route = useRoute();
     const store = useStore();
 

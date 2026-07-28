@@ -86,7 +86,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { PromqlBuilderQuery } from "@/components/promql/types";
 import { promqlRenderer } from "@/components/promql/operations/queryModeller";
 import MetricSelector from "@/components/promql/components/MetricSelector.vue";
@@ -101,7 +101,7 @@ import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 // State
 const visualQuery = ref<PromqlBuilderQuery>({
