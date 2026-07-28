@@ -197,7 +197,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :columns="tableColumns"
             :wrap="wrapTableCells"
             :loading="isLoading"
-            :row-key="correlatedTimestampCol"
+            :row-key="correlatedRowKey"
             :default-columns="false"
             :show-global-filter="false"
             pagination="none"
@@ -1188,12 +1188,16 @@ watch(
 const getCorrelatedRowStatusColor = (row: any): string | undefined =>
   extractStatusFromLog(row)?.color;
 
-// The parent tracks expandedRows as row objects while the table keys expansion
-// by _timestamp, so translate between the two.
+// Row identity is the row's position in the current page, NOT its `_timestamp`:
+// a timestamp repeats across rows ingested in the same batch, and keying on it
+// expanded every row sharing the value off a single click. `expandedRows` holds
+// row objects, so translate them through the same page-index map.
+const correlatedRowKey = (row: any): string => String(correlatedHitIndexMap.value.get(row) ?? -1);
 const correlatedExpandedIds = computed<string[]>(() =>
   (expandedRows.value || [])
-    .map((r: any) => (r != null ? String(r[correlatedTimestampCol.value]) : ""))
-    .filter(Boolean),
+    .map((r: any) => correlatedHitIndexMap.value.get(r))
+    .filter((i: number | undefined): i is number => i != null)
+    .map(String),
 );
 const onCorrelatedExpandedIdsChange = (newIds: string[]) => {
   const prev = new Set(correlatedExpandedIds.value);
@@ -1211,7 +1215,7 @@ const onCorrelatedExpandedIdsChange = (newIds: string[]) => {
         break;
       }
   if (toggled == null) return;
-  const row = pagedRows().find((r: any) => String(r?.[correlatedTimestampCol.value]) === toggled);
+  const row = pagedRows()[Number(toggled)];
   if (row) handleExpandRow(row);
 };
 

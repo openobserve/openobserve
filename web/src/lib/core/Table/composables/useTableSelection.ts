@@ -9,7 +9,7 @@ export function useTableSelection<TData>(
   props: {
     selection: OTableSelectionMode;
     selectedIds?: string[];
-    rowKey?: string;
+    rowKey?: string | ((row: TData) => string);
     /**
      * Predicate that decides whether a row participates in selection. When
      * provided, "Select All" and the indeterminate / all-selected state of
@@ -41,7 +41,9 @@ export function useTableSelection<TData>(
   );
 
   function getRowId(row: TData): string {
-    return (row as any)[keyField.value]?.toString() ?? "";
+    const key = keyField.value;
+    if (typeof key === "function") return key(row);
+    return (row as any)[key]?.toString() ?? "";
   }
 
   function isRowSelected(row: TData): boolean {

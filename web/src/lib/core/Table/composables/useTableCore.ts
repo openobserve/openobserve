@@ -40,7 +40,7 @@ export function useTableCore<TData>(
     sortOrder?: "asc" | "desc";
     sortFieldMap?: Record<string, string>;
     globalFilter?: string;
-    rowKey?: string;
+    rowKey?: string | ((row: TData) => string);
     enableColumnResize?: boolean;
     enableColumnReorder?: boolean;
     enableColumnPin?: boolean;

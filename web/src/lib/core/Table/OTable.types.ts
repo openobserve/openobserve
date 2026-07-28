@@ -235,8 +235,11 @@ export interface OTableProps<TData = any> {
    *  (renders with `cursor: not-allowed` and ignores toggles). E.g. block bulk
    *  selection of the root user in IAM. */
   isRowSelectable?: (row: TData) => boolean;
-  /** Field used as unique row identifier */
-  rowKey?: string;
+  /** Field used as unique row identifier, or a resolver for rows that have no
+   *  naturally unique field. Pass a resolver when the obvious candidate can
+   *  repeat across rows (e.g. log hits sharing a `_timestamp`), otherwise every
+   *  row with the same value expands/selects as one. */
+  rowKey?: string | ((row: TData) => string);
 
   // ── Expansion ──
   expansion?: OTableExpansionMode;

@@ -483,7 +483,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data="searchObj.data.queryResults?.hits || []"
             :wrap="searchObj.meta.toggleSourceWrap"
             :loading="searchObj.loading"
-            :row-key="logsTimestampCol"
+            :row-key="logsRowKey"
             :row-height="20"
             virtual-scroll
             :fill-height="false"
@@ -2060,15 +2060,14 @@ export default defineComponent({
       return classes.join(" ");
     };
 
-    // The parent tracks `expandedLogs` as hit indices while the table keys
-    // expansion by rowKey (_timestamp), so translate between the two.
+    // Row identity is the hit's position, NOT its `_timestamp`: a timestamp
+    // repeats across hits ingested in the same batch (an enrichment table gives
+    // every row the upload time), and keying on it expanded every row sharing
+    // the value off a single click. The parent already tracks `expandedLogs` as
+    // hit indices, so use those directly.
+    const logsRowKey = (row: any): string => String(logsRowIndex(row));
     const expandedLogIds = computed<string[]>(() =>
-      ((props.expandedLogs as number[]) || [])
-        .map((idx) => {
-          const hit = searchObj.data.queryResults?.hits?.[idx];
-          return hit != null ? String(hit[logsTimestampCol.value]) : "";
-        })
-        .filter(Boolean),
+      ((props.expandedLogs as number[]) || []).map(String),
     );
     const onExpandedLogIdsChange = (newIds: string[]) => {
       const prev = new Set(expandedLogIds.value);
@@ -2086,9 +2085,8 @@ export default defineComponent({
             break;
           }
       if (toggled == null) return;
-      const hits = searchObj.data.queryResults?.hits || [];
-      const idx = hits.findIndex((h: any) => String(h?.[logsTimestampCol.value]) === toggled);
-      if (idx !== -1) expandLog(idx);
+      const idx = Number(toggled);
+      if (Number.isInteger(idx) && idx >= 0) expandLog(idx);
     };
 
     const openLogDetailsByRow = (row: any) => openLogDetails(row, logsRowIndex(row));
@@ -2115,6 +2113,7 @@ export default defineComponent({
       logsTimestampCol,
       logsCellHtml,
       logsRowIndex,
+      logsRowKey,
       getLogRowStatusColor,
       getLogRowClass,
       expandedLogIds,
