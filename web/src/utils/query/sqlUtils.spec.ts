@@ -2704,6 +2704,30 @@ describe("sqlUtils", () => {
       expect(result).toBe("simple_stream");
     });
 
+    it("should resolve a sub-query in FROM to its base table", async () => {
+      // AST shape the parser produces for `FROM (SELECT ... FROM inner_stream)`
+      mockAstify.mockReturnValue({
+        from: [{ expr: { ast: { from: [{ table: "inner_stream" }] } } }],
+      });
+      const result = await getStreamNameFromQuery(
+        "SELECT histogram(_timestamp) AS ts FROM (SELECT _timestamp FROM inner_stream) GROUP BY ts",
+      );
+      expect(result).toBe("inner_stream");
+    });
+
+    it("should return the first (main) table for a JOIN", async () => {
+      mockAstify.mockReturnValue({
+        from: [
+          { table: "main_stream" },
+          { table: "joined_stream", join: "INNER JOIN" },
+        ],
+      });
+      const result = await getStreamNameFromQuery(
+        "SELECT * FROM main_stream JOIN joined_stream ON a = b",
+      );
+      expect(result).toBe("main_stream");
+    });
+
     it("should handle empty query", async () => {
       const result = await getStreamNameFromQuery("");
       expect(result).toBe(null);
