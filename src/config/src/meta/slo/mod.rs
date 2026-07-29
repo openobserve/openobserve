@@ -47,6 +47,7 @@ use utoipa::ToSchema;
 use super::alerts::Operator;
 
 pub mod budget;
+pub mod budget_rows;
 pub mod condition;
 pub mod coverage;
 pub mod generation;
