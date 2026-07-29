@@ -25,6 +25,7 @@ import {
   applyColumnOverrides,
   formatNumericValue,
   resolveIsNumber,
+  resolveMetricValueStyle,
 } from "./tableConfigUtils";
 
 describe("tableConfigUtils", () => {
@@ -353,6 +354,109 @@ describe("tableConfigUtils", () => {
         },
       ]);
       expect(maps.fieldTypeMap.amount).toBe("text");
+    });
+  });
+
+  describe("value mapping — threshold ops + colors", () => {
+    it("matches gt/lt/gte/lte threshold mappings", () => {
+      const cache = buildValueMappingCache([
+        { type: "gt", value: "90", text: "High", color: "#f00" },
+      ]);
+      expect(lookupValueMapping(95, cache)).toBe("High");
+      expect(lookupValueMapping(50, cache)).toBeNull();
+      expect(lookupValueMappingFull(95, cache)?.color).toBe("#f00");
+    });
+    it("caches a mapping that only has a text color (no text/color)", () => {
+      const cache = buildValueMappingCache([{ type: "value", value: "1", textColor: "#0f0" }]);
+      expect(cache).not.toBeNull();
+      expect(lookupValueMappingFull(1, cache)?.textColor).toBe("#0f0");
+    });
+  });
+
+  describe("resolveMetricValueStyle (mappings)", () => {
+    const base = {
+      mappings: undefined as any,
+      unit: "",
+      customUnit: "",
+      decimals: 2,
+      panelBackground: "",
+    };
+
+    it("falls back to formatted value, no text color, panel background", () => {
+      const r = resolveMetricValueStyle(100, { ...base, panelBackground: "#eee" });
+      expect(r.text).toContain("100");
+      expect(r.textColor).toBeUndefined();
+      expect(r.bgColor).toBe("#eee");
+    });
+
+    it("maps a value to a string with text color + background (color)", () => {
+      const r = resolveMetricValueStyle(1, {
+        ...base,
+        mappings: [{ type: "value", value: "1", text: "Up", textColor: "#fff", color: "#0f0" }],
+      });
+      expect(r.text).toBe("Up");
+      expect(r.textColor).toBe("#fff");
+      expect(r.bgColor).toBe("#0f0");
+    });
+
+    it("applies a threshold mapping's background (color) to a metric value", () => {
+      const r = resolveMetricValueStyle(95, {
+        ...base,
+        mappings: [{ type: "gte", value: "90", text: "High", color: "#900" }],
+      });
+      expect(r.text).toBe("High");
+      expect(r.bgColor).toBe("#900");
+    });
+  });
+
+  describe("backward compatibility (legacy mappings)", () => {
+    it("caches and matches a legacy value+color mapping (old requireField 'color')", () => {
+      const cache = buildValueMappingCache([
+        { type: "value", value: "1", text: "Up", color: "#16a34a" },
+      ]);
+      expect(cache).not.toBeNull();
+      expect(lookupValueMapping(1, cache)).toBe("Up");
+      // The pre-existing call shape (requireField: "color") still resolves.
+      expect(lookupValueMappingFull(1, cache, "color")?.color).toBe("#16a34a");
+    });
+
+    it("still matches legacy range and regex mappings", () => {
+      const range = buildValueMappingCache([{ type: "range", from: "0", to: "10", text: "Low" }]);
+      expect(lookupValueMapping(5, range)).toBe("Low");
+      const regex = buildValueMappingCache([{ type: "regex", pattern: "/err/i", text: "Error" }]);
+      expect(lookupValueMapping("server error", regex)).toBe("Error");
+    });
+
+    it("resolveMetricValueStyle with no mappings reproduces legacy metric output", () => {
+      // Old metric: unit-formatted value, background = panel background, no explicit
+      // text color (caller applies auto-contrast).
+      const r = resolveMetricValueStyle(7, {
+        mappings: undefined,
+        unit: "",
+        customUnit: "",
+        decimals: 2,
+        panelBackground: "#123456",
+      });
+      expect(r.text).toContain("7");
+      expect(r.textColor).toBeUndefined();
+      expect(r.bgColor).toBe("#123456");
+    });
+
+    it("resolveMetricValueStyle applies a legacy color mapping as background, no text color", () => {
+      const r = resolveMetricValueStyle(1, {
+        mappings: [{ type: "value", value: "1", text: "Up", color: "#16a34a" }],
+        unit: "",
+        customUnit: "",
+        decimals: 2,
+        panelBackground: "",
+      });
+      expect(r.text).toBe("Up");
+      expect(r.bgColor).toBe("#16a34a");
+      expect(r.textColor).toBeUndefined();
+    });
+
+    it("ignores a mapping that has neither text nor any color (unchanged)", () => {
+      expect(buildValueMappingCache([{ type: "value", value: "5" }])).toBeNull();
     });
   });
 });

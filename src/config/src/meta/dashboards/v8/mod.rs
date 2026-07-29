@@ -503,10 +503,14 @@ pub struct Mapping {
     pattern: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", rename = "match")]
     matchh: Option<String>,
+    // Background color of a mapped value (existing field — unchanged for back-compat).
     #[serde(skip_serializing_if = "Option::is_none")]
     color: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     text: Option<String>,
+    // Optional text color for a mapped value; the background stays `color`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    text_color: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
@@ -1311,6 +1315,7 @@ mod tests {
             matchh: Some("exact".to_string()),
             color: Some("red".to_string()),
             text: Some("zero".to_string()),
+            ..Default::default()
         };
         let json = serde_json::to_string(&m).unwrap();
         assert!(json.contains("type"));
@@ -1321,6 +1326,46 @@ mod tests {
         assert!(json.contains("match"));
         assert!(json.contains("color"));
         assert!(json.contains("text"));
+    }
+
+    #[test]
+    fn test_mapping_text_color_roundtrip() {
+        // A value mapping may carry a display text plus a text color; background stays `color`.
+        let m: Mapping = serde_json::from_value(serde_json::json!({
+            "type": "gt",
+            "value": "90",
+            "text": "High",
+            "textColor": "#ffffff",
+            "color": "#dc2626"
+        }))
+        .unwrap();
+        assert_eq!(m.text_color, Some("#ffffff".to_string()));
+        assert_eq!(m.color, Some("#dc2626".to_string()));
+
+        let back = serde_json::to_value(&m).unwrap();
+        assert_eq!(back["textColor"], "#ffffff");
+        assert_eq!(back["color"], "#dc2626");
+        assert!(back.get("bgColor").is_none());
+    }
+
+    #[test]
+    fn test_mapping_legacy_without_text_color_roundtrips_unchanged() {
+        // A pre-existing mapping (no textColor) must deserialize and re-serialize
+        // unchanged — text_color stays None and `textColor` is never emitted.
+        let m: Mapping = serde_json::from_value(serde_json::json!({
+            "type": "value",
+            "value": "1",
+            "text": "Up",
+            "color": "#16a34a"
+        }))
+        .unwrap();
+        assert_eq!(m.text_color, None);
+        assert_eq!(m.color, Some("#16a34a".to_string()));
+
+        let back = serde_json::to_value(&m).unwrap();
+        assert!(back.get("textColor").is_none());
+        assert_eq!(back["color"], "#16a34a");
+        assert_eq!(back["text"], "Up");
     }
 
     #[test]

@@ -13,9 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { formatUnitValue, getUnitValue } from "../../convertDataIntoUnitValue";
 import { calculateOptimalFontSize } from "../../chartDimensionUtils";
 import { getContrastColor } from "../../chartColorUtils";
+import { resolveMetricValueStyle } from "../../tableConfigUtils";
 import { type SQLContext } from "../shared/types";
 import { chartColor, chartNumber } from "../../../chartTheme";
 
@@ -67,14 +67,16 @@ export function applyMetricChart(ctx: SQLContext): void {
 
   const key1 = yAxisKeys?.[0];
   const yAxisValue = getAxisDataFromKey(key1);
-  const unitValue = getUnitValue(
-    yAxisValue?.length > 0 ? yAxisValue[0] : 0,
-    panelSchema?.config?.unit,
-    panelSchema?.config?.unit_custom,
-    panelSchema?.config?.decimals,
-  );
-  const metricText = formatUnitValue(unitValue);
-  options.backgroundColor = panelSchema?.config?.background?.value?.color ?? "";
+  const rawValue = yAxisValue?.length > 0 ? yAxisValue[0] : 0;
+  const metricStyle = resolveMetricValueStyle(rawValue, {
+    mappings: panelSchema?.config?.mappings,
+    unit: panelSchema?.config?.unit,
+    customUnit: panelSchema?.config?.unit_custom,
+    decimals: panelSchema?.config?.decimals,
+    panelBackground: panelSchema?.config?.background?.value?.color ?? "",
+  });
+  const metricText = metricStyle.text;
+  options.backgroundColor = metricStyle.bgColor;
   options.dataset = { source: [[]] };
   options.tooltip = {
     show: false,
@@ -88,21 +90,24 @@ export function applyMetricChart(ctx: SQLContext): void {
   options.polar = {};
   options.xAxis = [];
   options.yAxis = [];
-  const metricFillColor = getContrastColor(
-    panelSchema?.config?.background?.value?.color,
-    chartColor("--color-chart-metric-text"),
-    chartNumber("--chart-metric-contrast-threshold", 0.5),
-  );
+  // metric value color: explicit mapping text color wins; otherwise auto-contrast.
+  const metricFillColor =
+    metricStyle.textColor ??
+    getContrastColor(
+      metricStyle.bgColor,
+      chartColor("--color-chart-metric-text"),
+      chartNumber("--chart-metric-contrast-threshold", 0.5),
+    );
   const metricFieldLabel = panelSchema?.queries?.[0]?.fields?.y?.[0]?.label || key1;
   options.series = [
     {
       ...defaultSeriesProps,
       _metricText: metricText,
       _metricFillColor: metricFillColor,
+      _metricBgColor: metricStyle.bgColor,
       _metricLabel: metricFieldLabel,
       renderItem: function (params: any) {
         try {
-          const backgroundColor = panelSchema?.config?.background?.value?.color;
           return {
             type: "text",
             style: {
@@ -117,14 +122,10 @@ export function applyMetricChart(ctx: SQLContext): void {
               verticalAlign: "middle",
               x: params?.coordSys?.cx,
               y: params?.coordSys?.cy,
-              fill: getContrastColor(
-                backgroundColor,
-                chartColor("--color-chart-metric-text"),
-                chartNumber("--chart-metric-contrast-threshold", 0.5),
-              ),
+              fill: metricFillColor,
             },
           };
-        } catch (error) {
+        } catch {
           return "";
         }
       },

@@ -173,11 +173,23 @@ export default defineComponent({
         return `background-color: ${hex}; color: ${isColorDark(hex) ? "#ffffff" : "#000000"}`;
       }
 
-      // 2) Value-mapping color (valid hex only; else fall through).
-      const found = lookupValueMappingFull(value, valueMappingCache.value, "color");
-      if (found?.color && /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/i.test(found.color)) {
-        const hex = found.color;
-        return `background-color: ${hex}; color: ${isColorDark(hex) ? "#ffffff" : "#000000"}`;
+      // 2) Value-mapping colors — `color` is the background, `textColor` the text.
+      const found = lookupValueMappingFull(value, valueMappingCache.value);
+      if (found) {
+        const isHex = (c: any) =>
+          typeof c === "string" && /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/i.test(c);
+        const bg = isHex(found.color) ? found.color : "";
+        const txt = isHex(found.textColor)
+          ? found.textColor
+          : bg
+            ? isColorDark(bg)
+              ? "#ffffff"
+              : "#000000"
+            : "";
+        const parts: string[] = [];
+        if (bg) parts.push(`background-color: ${bg}`);
+        if (txt) parts.push(`color: ${txt}`);
+        if (parts.length) return parts.join("; ");
       }
 
       // 3) Conditional styling rules — last matching rule wins, so later rules

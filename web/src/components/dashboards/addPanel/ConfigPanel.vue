@@ -1165,7 +1165,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Section: Value Transformations -->
     <OCollapsible
       variant="config"
-      v-if="dashboardPanelData.data.type == 'table'"
+      v-if="dashboardPanelData.data.type == 'table' || dashboardPanelData.data.type == 'metric'"
       v-show="isSectionVisible('valueTransformations')"
       :model-value="isExpanded('valueTransformations')"
       :icon="SECTION_ICONS.valueTransformations"

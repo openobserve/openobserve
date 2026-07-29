@@ -225,16 +225,6 @@ describe("ValueMappingPopUp", () => {
       expect(typeof wrapper.vm.removeValueMappingByIndex).toBe("function");
     });
 
-    it("should expose setColorByIndex as a function", () => {
-      wrapper = createWrapper();
-      expect(typeof wrapper.vm.setColorByIndex).toBe("function");
-    });
-
-    it("should expose removeColorByIndex as a function", () => {
-      wrapper = createWrapper();
-      expect(typeof wrapper.vm.removeColorByIndex).toBe("function");
-    });
-
     it("should expose applyValueMapping as a function", () => {
       wrapper = createWrapper();
       expect(typeof wrapper.vm.applyValueMapping).toBe("function");
@@ -270,9 +260,13 @@ describe("ValueMappingPopUp", () => {
     it("should have the value/range/regex mapping types defined", () => {
       wrapper = createWrapper();
       expect(wrapper.vm.mappingTypes).toEqual([
-        { label: "Value", value: "value" },
-        { label: "Range", value: "range" },
-        { label: "Regex", value: "regex" },
+        { label: "Equals", value: "value" },
+        { label: "Between", value: "range" },
+        { label: "Matches regex", value: "regex" },
+        { label: "Greater than", value: "gt" },
+        { label: "Less than", value: "lt" },
+        { label: "Greater than or equal", value: "gte" },
+        { label: "Less than or equal", value: "lte" },
       ]);
     });
 
@@ -395,30 +389,26 @@ describe("ValueMappingPopUp", () => {
   });
 
   describe("Color Management", () => {
-    it("should keep the mapping color when one is provided", () => {
+    it("should keep the mapping color (background) when one is provided", () => {
       const mappings = [{ type: "value", value: "test", text: "Test", color: "#ff0000" }];
       wrapper = createWrapper({ valueMapping: mappings });
       expect(wrapper.vm.editedValueMapping[0].color).toBe("#ff0000");
     });
 
-    it("should show the Set color button when mapping color is null", () => {
-      const mappings = [{ type: "value", value: "test", text: "Test", color: null }];
-      wrapper = createWrapper({ valueMapping: mappings });
-      expect(wrapper.text()).toContain("Set color");
+    it("should render text-color and background swatch pickers per mapping", () => {
+      wrapper = createWrapper();
+      expect(
+        wrapper.find('[data-test="dashboard-addpanel-config-value-mapping-text-color-0"]').exists(),
+      ).toBe(true);
+      expect(
+        wrapper.find('[data-test="dashboard-addpanel-config-value-mapping-bg-color-0"]').exists(),
+      ).toBe(true);
     });
 
-    it("should set color to #000000 when setColorByIndex is called", () => {
-      const mappings = [{ type: "value", value: "test", text: "Test", color: null }];
+    it("should preserve an explicit text color from the prop", () => {
+      const mappings = [{ type: "value", value: "1", text: "One", color: null, textColor: "#0f0" }];
       wrapper = createWrapper({ valueMapping: mappings });
-      wrapper.vm.setColorByIndex(0);
-      expect(wrapper.vm.editedValueMapping[0].color).toBe("#000000");
-    });
-
-    it("should clear color when removeColorByIndex is called", () => {
-      const mappings = [{ type: "value", value: "test", text: "Test", color: "#ff0000" }];
-      wrapper = createWrapper({ valueMapping: mappings });
-      wrapper.vm.removeColorByIndex(0);
-      expect(wrapper.vm.editedValueMapping[0].color).toBe(null);
+      expect(wrapper.vm.editedValueMapping[0].textColor).toBe("#0f0");
     });
   });
 
@@ -667,6 +657,36 @@ describe("ValueMappingPopUp", () => {
         wrapper
           .find('[data-test="dashboard-addpanel-config-value-mapping-type-select-0"]')
           .exists(),
+      ).toBe(true);
+    });
+  });
+
+  describe("Backward Compatibility", () => {
+    it("loads a legacy mapping (color, no textColor) without mutating it", () => {
+      const legacy = [{ type: "value", value: "1", text: "Up", color: "#16a34a" }];
+      wrapper = createWrapper({ valueMapping: legacy });
+      expect(wrapper.vm.editedValueMapping[0]).toEqual({
+        type: "value",
+        value: "1",
+        text: "Up",
+        color: "#16a34a",
+      });
+      // No textColor is injected into an untouched legacy mapping.
+      expect("textColor" in wrapper.vm.editedValueMapping[0]).toBe(false);
+    });
+
+    it("emits legacy mappings unchanged on save", () => {
+      const legacy = [{ type: "range", from: "0", to: "10", text: "Low", color: "#ff0000" }];
+      wrapper = createWrapper({ valueMapping: legacy });
+      wrapper.vm.applyValueMapping();
+      expect(wrapper.emitted("save")![0][0]).toEqual(legacy);
+    });
+
+    it("renders the value input for a legacy value-type mapping", () => {
+      const legacy = [{ type: "value", value: "1", text: "Up", color: "#16a34a" }];
+      wrapper = createWrapper({ valueMapping: legacy });
+      expect(
+        wrapper.find('[data-test="dashboard-addpanel-config-value-mapping-value-input-0"]').exists(),
       ).toBe(true);
     });
   });

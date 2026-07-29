@@ -67,9 +67,11 @@ export const buildValueMappingCache = (mappings: any): Map<any, any> | null => {
 
   mappings.forEach((mapping: any) => {
     if (!mapping) return;
-    const hasText = mapping.text != null && mapping.text !== "";
-    const hasColor = mapping.color != null && mapping.color !== "";
-    if (!hasText && !hasColor) return;
+    // A mapping is cached when it carries any effect: text, background, or text color.
+    const nonEmpty = (v: any) => v != null && v !== "";
+    if (!nonEmpty(mapping.text) && !nonEmpty(mapping.color) && !nonEmpty(mapping.textColor)) {
+      return;
+    }
 
     const hasRange =
       mapping.from !== undefined &&
@@ -85,6 +87,9 @@ export const buildValueMappingCache = (mappings: any): Map<any, any> | null => {
     } else if (type === "range") {
       // Range mapping – encoded key so direct + range share the same Map
       cache.set(`__range_${mapping.from}_${mapping.to}`, mapping);
+    } else if (type === "gt" || type === "lt" || type === "gte" || type === "lte") {
+      // Threshold mapping – numeric comparison happens during lookup.
+      cache.set(`__op_${type}_${mapping.value}`, mapping);
     } else if (mapping.value !== undefined && mapping.value !== null) {
       cache.set(mapping.value, mapping);
     }
@@ -100,7 +105,7 @@ export const buildValueMappingCache = (mappings: any): Map<any, any> | null => {
 export const lookupValueMappingFull = (
   value: any,
   cache: Map<any, any> | null,
-  requireField?: "text" | "color",
+  requireField?: "text" | "color" | "textColor",
 ): any | null => {
   if (!cache) return null;
 
@@ -125,6 +130,25 @@ export const lookupValueMappingFull = (
         if (!isNaN(from) && !isNaN(to) && numValue >= from && numValue <= to && ok(mapping)) {
           return mapping;
         }
+      }
+    }
+  }
+
+  // Threshold match (gt/lt/gte/lte) — numeric comparison against the operand.
+  if (!Number.isNaN(numValue)) {
+    for (const [key, mapping] of cache.entries()) {
+      if (typeof key === "string" && key.startsWith("__op_")) {
+        const rest = key.slice(5); // "__op_".length === 5
+        const sep = rest.indexOf("_");
+        const op = rest.slice(0, sep);
+        const operand = parseFloat(rest.slice(sep + 1));
+        if (Number.isNaN(operand) || !ok(mapping)) continue;
+        const hit =
+          (op === "gt" && numValue > operand) ||
+          (op === "lt" && numValue < operand) ||
+          (op === "gte" && numValue >= operand) ||
+          (op === "lte" && numValue <= operand);
+        if (hit) return mapping;
       }
     }
   }
@@ -379,4 +403,49 @@ export const formatNumericValue = (
   return !Number.isNaN(val)
     ? `${formatUnitValue(getUnitValue(val, unit ?? "", customUnit ?? "", decimals)) ?? 0}`
     : val;
+};
+
+// ---------------------------------------------------------------------------
+// Metric single-value styling (driven by config.mappings)
+// ---------------------------------------------------------------------------
+
+export interface ResolvedMetricStyle {
+  /** Display text: mapped string when a mapping matched, else the unit-formatted value. */
+  text: string;
+  /** Explicit text color; undefined means the caller applies its contrast fallback. */
+  textColor?: string;
+  /** Final background color ("" when none). */
+  bgColor: string;
+}
+
+export interface MetricStyleOptions {
+  mappings: any;
+  unit: string | null | undefined;
+  customUnit: string | null | undefined;
+  decimals: number | null | undefined;
+  panelBackground: string;
+}
+
+/**
+ * Resolve display text, text color, and background for a single metric value from
+ * `config.mappings` (value / range / regex / thresholds → text + colors). Precedence:
+ *   text: mapping text → unit-formatted value
+ *   fill: mapping textColor → (caller contrast fallback)
+ *   bg:   mapping color → panel background
+ */
+export const resolveMetricValueStyle = (
+  rawValue: unknown,
+  opts: MetricStyleOptions,
+): ResolvedMetricStyle => {
+  const { mappings, unit, customUnit, decimals, panelBackground } = opts;
+  const cache = buildValueMappingCache(mappings);
+  const mapping = lookupValueMappingFull(rawValue, cache);
+
+  const formatted = formatNumericValue(rawValue, null, unit, customUnit, decimals ?? 2);
+  const mappedText = mapping?.text;
+  const text = mappedText != null && mappedText !== "" ? mappedText : formatted;
+  const textColor = mapping?.textColor || undefined;
+  const bgColor = mapping?.color || panelBackground || "";
+
+  return { text, textColor, bgColor };
 };

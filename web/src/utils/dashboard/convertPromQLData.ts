@@ -30,6 +30,7 @@ import { chartColor, chartNumber } from "@/utils/chartTheme";
 import { calculateBottomLegendHeight, calculateRightLegendWidth } from "./legendConfiguration";
 import { convertPromQLChartData } from "./promql/convertPromQLChartData";
 import { calculateMetricFontSize } from "./sql/charts/convertSQLMetricChart";
+import { resolveMetricValueStyle } from "./tableConfigUtils";
 import { getPromqlLegendName, getLegendPosition } from "./promql/shared/legendBuilder";
 import { getPropsByChartTypeForSeries } from "./promqlChartSeriesProps";
 import { applyMeasuredYAxisLeftInset } from "./chartDimensionUtils";
@@ -950,14 +951,23 @@ export const convertPromQLData = async (
             const values = metric.values.sort((a: any, b: any) => a[0] - b[0]);
             const latestValue = values[values.length - 1]?.[1] ?? 0;
 
-            const unitValue = getUnitValue(
-              latestValue,
-              panelSchema.config?.unit,
-              panelSchema.config?.unit_custom,
-              panelSchema.config?.decimals,
-            );
-            options.backgroundColor = panelSchema.config?.background?.value?.color ?? "";
-            const metricText = formatUnitValue(unitValue);
+            const metricStyle = resolveMetricValueStyle(latestValue, {
+              mappings: panelSchema.config?.mappings,
+              unit: panelSchema.config?.unit,
+              customUnit: panelSchema.config?.unit_custom,
+              decimals: panelSchema.config?.decimals,
+              panelBackground: panelSchema.config?.background?.value?.color ?? "",
+            });
+            options.backgroundColor = metricStyle.bgColor;
+            const metricText = metricStyle.text;
+            // metric value color: explicit mapping text color wins; otherwise auto-contrast.
+            const metricFillColor =
+              metricStyle.textColor ??
+              getContrastColor(
+                metricStyle.bgColor,
+                chartColor("--color-chart-metric-text"),
+                chartNumber("--chart-metric-contrast-threshold", 0.5),
+              );
             const series: any[] = [
               {
                 type: "custom",
@@ -965,7 +975,6 @@ export const convertPromQLData = async (
                 coordinateSystem: "polar",
                 _metricText: metricText,
                 renderItem: function (params: any) {
-                  const backgroundColor = panelSchema?.config?.background?.value?.color;
                   return {
                     type: "text",
                     style: {
@@ -980,11 +989,7 @@ export const convertPromQLData = async (
                       verticalAlign: "middle",
                       x: params?.coordSys?.cx,
                       y: params?.coordSys?.cy,
-                      fill: getContrastColor(
-                        backgroundColor,
-                        chartColor("--color-chart-metric-text"),
-                        chartNumber("--chart-metric-contrast-threshold", 0.5),
-                      ),
+                      fill: metricFillColor,
                     },
                   };
                 },

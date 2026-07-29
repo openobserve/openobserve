@@ -341,16 +341,21 @@ export const convertMultiSQLData = async (
     allMetricSeries.forEach((s: any, idx: number) => {
       const cell = gridData?.gridArray?.[idx];
       if (!cell) return;
-      const cx = ((parseFloat(cell.left) + parseFloat(cell.width) / 2) / 100) * panelW;
-      const cy = ((parseFloat(cell.top) + parseFloat(cell.height) / 2) / 100) * panelH;
+      const cellLeft = (parseFloat(cell.left) / 100) * panelW;
+      const cellTop = (parseFloat(cell.top) / 100) * panelH;
+      const cellWidth = (parseFloat(cell.width) / 100) * panelW;
+      const cellHeight = (parseFloat(cell.height) / 100) * panelH;
+      const cx = cellLeft + cellWidth / 2;
+      const cy = cellTop + cellHeight / 2;
       const fill = s?._metricFillColor ?? chartColor("--color-text-heading");
+      const cellBg = s?._metricBgColor;
       // Grid-cell rect (px) is the hover zone; cx/cy/fontSize place + size the
       // copy icon beside the number, clamped inside the cell.
       s._metricLayout = {
-        left: (parseFloat(cell.left) / 100) * panelW,
-        top: (parseFloat(cell.top) / 100) * panelH,
-        width: (parseFloat(cell.width) / 100) * panelW,
-        height: (parseFloat(cell.height) / 100) * panelH,
+        left: cellLeft,
+        top: cellTop,
+        width: cellWidth,
+        height: cellHeight,
         cx,
         cy: cy - labelFontSize / 2 - 2,
         fontSize: sharedFontSize,
@@ -360,44 +365,52 @@ export const convertMultiSQLData = async (
       };
       s.renderItem = () => {
         try {
-          return {
-            type: "group",
-            children: [
-              {
-                type: "text",
-                style: {
-                  text: s._metricText ?? "",
-                  fontSize: sharedFontSize,
-                  fontWeight: 500,
-                  align: "center",
-                  verticalAlign: "middle",
-                  x: cx,
-                  y: cy - labelFontSize / 2 - 2,
-                  fill,
-                },
-              },
-              {
-                type: "text",
-                style: {
-                  text: s._metricLabel ?? "",
-                  fontSize: labelFontSize,
-                  fontWeight: 400,
-                  align: "center",
-                  verticalAlign: "middle",
-                  x: cx,
-                  y: cy + sharedFontSize / 2 + 4,
-                  fill,
-                  opacity: 0.65,
-                },
-              },
-            ],
-          };
+          const children: any[] = [];
+          // per-cell mapped background drawn behind the value
+          if (cellBg) {
+            children.push({
+              type: "rect",
+              shape: { x: cellLeft, y: cellTop, width: cellWidth, height: cellHeight },
+              style: { fill: cellBg },
+              silent: true,
+            });
+          }
+          children.push({
+            type: "text",
+            style: {
+              text: s._metricText ?? "",
+              fontSize: sharedFontSize,
+              fontWeight: 500,
+              align: "center",
+              verticalAlign: "middle",
+              x: cx,
+              y: cy - labelFontSize / 2 - 2,
+              fill,
+            },
+          });
+          children.push({
+            type: "text",
+            style: {
+              text: s._metricLabel ?? "",
+              fontSize: labelFontSize,
+              fontWeight: 400,
+              align: "center",
+              verticalAlign: "middle",
+              x: cx,
+              y: cy + sharedFontSize / 2 + 4,
+              fill,
+              opacity: 0.65,
+            },
+          });
+          return { type: "group", children };
         } catch {
           return "";
         }
       };
     });
 
+    // Canvas base = panel background; each cell paints its own mapped background.
+    options[0].options.backgroundColor = panelSchema?.config?.background?.value?.color ?? "";
     options[0].options.series = allMetricSeries;
     return options[0];
   }
