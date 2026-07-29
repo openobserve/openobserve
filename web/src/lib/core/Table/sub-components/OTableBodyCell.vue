@@ -6,6 +6,7 @@ import { computed, inject, ref, useSlots } from "vue";
 import { FlexRender } from "@tanstack/vue-table";
 import { useSanitizedHtml } from "../composables/useSanitizedHtml";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import { OTableTreeContextKey } from "../composables/useTableTree";
 import { OTableCellActionsKey } from "../OTable.types";
 import { PIVOT_TABLE_TOTAL_COLUMN_WIDTH } from "@/utils/dashboard/constants";
@@ -388,17 +389,18 @@ function onCellActionsLeave() {
         <span v-else :class="[defaultTextClass, copyValueClass]">
           {{ displayValue }}
         </span>
-        <button
-          type="button"
+        <OButton
+          variant="ghost"
+          size="icon-xs-sq"
           :data-test="`o2-table-cell-copy-${cell.column.id}`"
           :data-copied="copied ? 'true' : undefined"
-          class="rounded-default text-text-muted hover:text-text-body hover:bg-button-ghost-hover-bg inline-flex shrink-0 cursor-pointer items-center border-0 bg-transparent p-0.5 leading-none opacity-0 transition-opacity group-hover/cell:opacity-100"
+          class="h-4! min-h-0! w-4! shrink-0 opacity-0 transition-opacity group-hover/cell:opacity-100"
           :class="align === 'right' ? 'order-first mr-1' : 'ml-1'"
           :title="copied ? 'Copied!' : 'Copy'"
           @click="handleCopy"
         >
-          <OIcon :name="copied ? 'check' : 'content-copy'" size="xs" />
-        </button>
+          <OIcon :name="copied ? 'check' : 'content-copy'" size="sm" />
+        </OButton>
       </div>
       <!-- Custom cell render via TanStack FlexRender -->
       <FlexRender
