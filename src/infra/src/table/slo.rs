@@ -38,10 +38,38 @@
 //!   90-day window is real corruption that no amount of eventual consistency repairs.
 
 use config::meta::slo::slice::Writer;
-use sea_orm::{ConnectionTrait, DatabaseConnection, TransactionTrait};
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, Condition, ConnectionTrait, DatabaseConnection, EntityTrait,
+    QueryFilter, Set, TransactionTrait,
+    sea_query::{Expr, Func, SimpleExpr},
+};
 
 use super::entity::slo_status;
 use crate::errors;
+
+/// `COALESCE(col, 0) + delta` — the increment applied in SQL rather than
+/// read-modify-write in Rust. Two passes that overlap must both land; a
+/// Rust-side `good + delta` would lose one silently.
+///
+/// `COALESCE` is what turns "not yet measured" (NULL) into the first
+/// measurement, so a fresh generation does not need a zero row seeded first.
+fn increment(col: slo_status::Column, delta: f64) -> SimpleExpr {
+    Expr::expr(Func::coalesce([
+        Expr::col(col).into(),
+        Expr::val(0.0).into(),
+    ]))
+    .add(delta)
+}
+
+fn increment_i32(col: slo_status::Column, delta: i32) -> SimpleExpr {
+    Expr::expr(Func::coalesce([Expr::col(col).into(), Expr::val(0).into()])).add(delta)
+}
+
+fn row_of(slo_id: &str, group_key: &str) -> Condition {
+    Condition::all()
+        .add(slo_status::Column::SloId.eq(slo_id))
+        .add(slo_status::Column::GroupKey.eq(group_key))
+}
 
 /// One group's contribution to the running window aggregate.
 #[derive(Debug, Clone, PartialEq)]
@@ -91,8 +119,25 @@ pub async fn apply_status(
     db: &DatabaseConnection,
     write: &StatusWrite,
 ) -> Result<WriteOutcome, errors::Error> {
-    let _ = (db, write);
-    todo!("slo::apply_status")
+    let txn = db.begin().await?;
+    let outcome = match apply_status_in_txn(&txn, write).await {
+        Ok(outcome) => outcome,
+        Err(e) => {
+            // Best-effort: the rollback failing does not change what the
+            // caller needs to know, which is that the write did not apply.
+            let _ = txn.rollback().await;
+            return Err(e);
+        }
+    };
+    // A fenced write applied nothing, so there is nothing to commit — but
+    // rolling back is what makes that true even if a caller later adds work
+    // before the fence check.
+    if matches!(outcome, WriteOutcome::FencedByGeneration { .. }) {
+        let _ = txn.rollback().await;
+        return Ok(outcome);
+    }
+    txn.commit().await?;
+    Ok(outcome)
 }
 
 /// The same work against an already-open transaction, so callers can compose
@@ -101,8 +146,98 @@ pub async fn apply_status_in_txn<C: ConnectionTrait>(
     txn: &C,
     write: &StatusWrite,
 ) -> Result<WriteOutcome, errors::Error> {
-    let _ = (txn, write);
-    todo!("slo::apply_status_in_txn")
+    // The fence, first: everything below is arithmetic that must not happen
+    // at all if the definition moved underneath this pass (D59).
+    let rollup = slo_status::Entity::find_by_id((
+        write.slo_id.clone(),
+        slo_status::ROLLUP_GROUP_KEY.to_string(),
+    ))
+    .one(txn)
+    .await?;
+    if let Some(existing) = &rollup
+        && existing.definition_generation != write.definition_generation
+    {
+        return Ok(WriteOutcome::FencedByGeneration {
+            expected: write.definition_generation,
+            found: existing.definition_generation,
+        });
+    }
+
+    for d in &write.deltas {
+        let updated = slo_status::Entity::update_many()
+            .col_expr(
+                slo_status::Column::Good,
+                increment(slo_status::Column::Good, d.good_delta),
+            )
+            .col_expr(
+                slo_status::Column::Total,
+                increment(slo_status::Column::Total, d.total_delta),
+            )
+            .col_expr(
+                slo_status::Column::CoveredSlices,
+                increment_i32(slo_status::Column::CoveredSlices, d.covered_slices_delta),
+            )
+            .col_expr(
+                slo_status::Column::ComputedAt,
+                Expr::value(write.computed_at),
+            )
+            .filter(row_of(&write.slo_id, &d.group_key))
+            .exec(txn)
+            .await?;
+
+        if updated.rows_affected == 0 {
+            // First sight of this group under this generation. The row is
+            // born carrying the generation it was written under, so a later
+            // bump can tell old rows from new ones.
+            slo_status::ActiveModel {
+                slo_id: Set(write.slo_id.clone()),
+                group_key: Set(d.group_key.clone()),
+                definition_generation: Set(write.definition_generation),
+                good: Set(Some(d.good_delta)),
+                total: Set(Some(d.total_delta)),
+                covered_slices: Set(Some(d.covered_slices_delta)),
+                computed_at: Set(Some(write.computed_at)),
+                ..Default::default()
+            }
+            .insert(txn)
+            .await?;
+        }
+    }
+
+    // The watermark and the trailing buffer live on the rollup row only, and
+    // only the incremental writer owns them: backfill fills history *behind*
+    // the watermark, so advancing it would publish slices the incremental
+    // writer has not reached.
+    if write.writer == Writer::Incremental
+        && let Some(wm) = write.watermark_end
+    {
+        slo_status::Entity::update_many()
+            .col_expr(slo_status::Column::WatermarkEnd, Expr::value(wm))
+            .filter(row_of(&write.slo_id, slo_status::ROLLUP_GROUP_KEY))
+            // A forward clamp. Expressed as a filter rather than a Rust-side
+            // comparison so two overlapping passes cannot walk it backwards:
+            // readers have already been shown everything below it.
+            .filter(
+                Condition::any()
+                    .add(slo_status::Column::WatermarkEnd.is_null())
+                    .add(slo_status::Column::WatermarkEnd.lt(wm)),
+            )
+            .exec(txn)
+            .await?;
+    }
+
+    if let Some(trailing) = &write.trailing_slices {
+        slo_status::Entity::update_many()
+            .col_expr(
+                slo_status::Column::TrailingSlices,
+                Expr::value(trailing.clone()),
+            )
+            .filter(row_of(&write.slo_id, slo_status::ROLLUP_GROUP_KEY))
+            .exec(txn)
+            .await?;
+    }
+
+    Ok(WriteOutcome::Applied)
 }
 
 /// Read one status row. `group_key = ""` is the rollup.
@@ -111,8 +246,11 @@ pub async fn load_status(
     slo_id: &str,
     group_key: &str,
 ) -> Result<Option<slo_status::Model>, errors::Error> {
-    let _ = (db, slo_id, group_key);
-    todo!("slo::load_status")
+    Ok(
+        slo_status::Entity::find_by_id((slo_id.to_string(), group_key.to_string()))
+            .one(db)
+            .await?,
+    )
 }
 
 /// Create the rollup row for a new generation.
@@ -126,8 +264,15 @@ pub async fn init_generation(
     slo_id: &str,
     definition_generation: i32,
 ) -> Result<(), errors::Error> {
-    let _ = (db, slo_id, definition_generation);
-    todo!("slo::init_generation")
+    slo_status::ActiveModel {
+        slo_id: Set(slo_id.to_string()),
+        group_key: Set(slo_status::ROLLUP_GROUP_KEY.to_string()),
+        definition_generation: Set(definition_generation),
+        ..Default::default()
+    }
+    .insert(db)
+    .await?;
+    Ok(())
 }
 
 /// Bump the SLO to a new generation, clearing every running aggregate — the
@@ -137,8 +282,24 @@ pub async fn bump_generation(
     slo_id: &str,
     new_generation: i32,
 ) -> Result<(), errors::Error> {
-    let _ = (db, slo_id, new_generation);
-    todo!("slo::bump_generation")
+    let txn = db.begin().await?;
+    // Delete rather than null out: the group set itself belongs to the old
+    // definition, so a group that no longer exists under the new one must not
+    // linger as an empty row that reads as an observed group.
+    slo_status::Entity::delete_many()
+        .filter(slo_status::Column::SloId.eq(slo_id))
+        .exec(&txn)
+        .await?;
+    slo_status::ActiveModel {
+        slo_id: Set(slo_id.to_string()),
+        group_key: Set(slo_status::ROLLUP_GROUP_KEY.to_string()),
+        definition_generation: Set(new_generation),
+        ..Default::default()
+    }
+    .insert(&txn)
+    .await?;
+    txn.commit().await?;
+    Ok(())
 }
 
 /// Recompute a status row from its slices — the reconciliation path.
@@ -152,8 +313,18 @@ pub async fn reconcile_from_slices(
     group_key: &str,
     recomputed: (f64, f64, i32),
 ) -> Result<(), errors::Error> {
-    let _ = (db, slo_id, group_key, recomputed);
-    todo!("slo::reconcile_from_slices")
+    let (good, total, covered) = recomputed;
+    // Assignment, not increment: this is a rebuild from the source of truth,
+    // and the watermark is deliberately untouched — reconciliation repairs the
+    // aggregate, not the read clamp.
+    slo_status::Entity::update_many()
+        .col_expr(slo_status::Column::Good, Expr::value(good))
+        .col_expr(slo_status::Column::Total, Expr::value(total))
+        .col_expr(slo_status::Column::CoveredSlices, Expr::value(covered))
+        .filter(row_of(slo_id, group_key))
+        .exec(db)
+        .await?;
+    Ok(())
 }
 
 #[cfg(test)]

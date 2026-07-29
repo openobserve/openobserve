@@ -435,7 +435,7 @@ pub fn parse_predicate(
     field: &'static str,
     fragment: &str,
 ) -> Result<ValidatedPredicate, QuerySafetyError> {
-    use sqlparser::{ast::Expr, dialect::GenericDialect, parser::Parser};
+    use sqlparser::{dialect::GenericDialect, parser::Parser};
 
     if fragment.trim().is_empty() {
         // An empty scope means "all rows" to the caller; it must not be
