@@ -8871,7 +8871,7 @@
       "validation": {
         "nameRequired": "Job name is required",
         "streamRequired": "A stream is required",
-        "idleWindowMinimum": "Inactief venster moet ten minste 45 seconden zijn",
+        "idleWindowMinimum": "Inactief venster moet ten minste 1 seconde zijn",
         "samplingValueRequired": "A sampling value is required"
       }
     }

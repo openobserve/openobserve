@@ -8871,7 +8871,7 @@
       "validation": {
         "nameRequired": "Job name is required",
         "streamRequired": "A stream is required",
-        "idleWindowMinimum": "アイドルウィンドウは45秒以上である必要があります",
+        "idleWindowMinimum": "アイドルウィンドウは1秒以上である必要があります",
         "samplingValueRequired": "A sampling value is required"
       }
     }

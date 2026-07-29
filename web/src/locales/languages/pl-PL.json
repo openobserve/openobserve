@@ -8871,7 +8871,7 @@
       "validation": {
         "nameRequired": "Nazwa zadania jest wymagana",
         "streamRequired": "Strumień jest wymagany",
-        "idleWindowMinimum": "Okno bezczynności musi wynosić co najmniej 45 sekund",
+        "idleWindowMinimum": "Okno bezczynności musi wynosić co najmniej 1 sekundę",
         "samplingValueRequired": "Wartość próbkowania jest wymagana"
       }
     }

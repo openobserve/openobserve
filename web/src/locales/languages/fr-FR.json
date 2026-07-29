@@ -8871,7 +8871,7 @@
       "validation": {
         "nameRequired": "Job name is required",
         "streamRequired": "A stream is required",
-        "idleWindowMinimum": "La fenêtre d'inactivité doit être d'au moins 45 secondes",
+        "idleWindowMinimum": "La fenêtre d'inactivité doit être d'au moins 1 seconde",
         "samplingValueRequired": "A sampling value is required"
       }
     }

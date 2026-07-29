@@ -9043,7 +9043,7 @@
       "validation": {
         "nameRequired": "Job name is required",
         "streamRequired": "A stream is required",
-        "idleWindowMinimum": "Idle window must be at least 45 seconds",
+        "idleWindowMinimum": "Idle window must be at least 1 second",
         "samplingValueRequired": "A sampling value is required"
       }
     }

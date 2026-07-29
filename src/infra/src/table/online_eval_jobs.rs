@@ -38,12 +38,14 @@ use crate::{
 /// Valid job states.
 pub const VALID_STATUSES: &[&str] = &["draft", "active", "paused", "degraded", "archived"];
 
-/// Lowest configurable idle window, matching the default scheduler poll interval.
-pub const MIN_COMPLETION_IDLE_WINDOW_SECS: i64 = 45;
-/// The design spec calls for a 30s trace idle timeout; readiness is resolved
-/// at scheduler scan granularity (one poll interval), so anything below the
-/// 45s floor behaves identically to it — the floor is the effective spec value.
-pub const DEFAULT_TRACE_IDLE_WINDOW_SECS: i64 = MIN_COMPLETION_IDLE_WINDOW_SECS;
+/// Any positive idle window is sound: readiness fires only once the observed
+/// ingest-time silence reaches the window, so a window shorter than one
+/// scheduler pass just gets its firing quantized to the next pass. The floor
+/// only rejects nonsensical (zero/negative) values; a window smaller than
+/// real gaps inside a trace splits it into resumed cycles, which is the
+/// user's own cost/latency tradeoff.
+pub const MIN_COMPLETION_IDLE_WINDOW_SECS: i64 = 1;
+pub const DEFAULT_TRACE_IDLE_WINDOW_SECS: i64 = 30;
 pub const DEFAULT_TRACE_MAX_AGE_SECS: i64 = 30 * 60;
 /// Sessions span user think-time between traces, so their idle window is far
 /// wider than a trace's.
@@ -414,7 +416,7 @@ fn validate_completion_window(
     max_age_secs: i64,
 ) -> Result<(), &'static str> {
     if idle_window_secs < MIN_COMPLETION_IDLE_WINDOW_SECS {
-        return Err("Completion idle window must be at least 45 seconds");
+        return Err("Completion idle window must be at least 1 second");
     }
     if max_age_secs <= 0 {
         return Err("Completion max age must be greater than zero");
@@ -980,9 +982,9 @@ mod tests {
 
     #[test]
     fn invalid_completion_window_env_overrides_fall_back_to_defaults() {
-        // Below the 45-second idle floor.
+        // Zero/negative idle is nonsensical.
         assert_eq!(
-            resolve_window_defaults("trace", Some(10), None, 180, 1800),
+            resolve_window_defaults("trace", Some(0), None, 180, 1800),
             (180, 1800)
         );
         // Idle exceeding max age.
@@ -1260,21 +1262,23 @@ mod tests {
     }
 
     #[test]
-    fn test_completion_config_enforces_scheduler_poll_interval_minimum() {
+    fn test_completion_config_rejects_a_non_positive_idle_window() {
         let below_minimum = TraceEvalConfig {
             idle_window_secs: MIN_COMPLETION_IDLE_WINDOW_SECS - 1,
             ..TraceEvalConfig::default()
         };
         assert_eq!(
             below_minimum.validate(),
-            Err("Completion idle window must be at least 45 seconds")
+            Err("Completion idle window must be at least 1 second")
         );
 
-        let at_minimum = TraceEvalConfig {
-            idle_window_secs: MIN_COMPLETION_IDLE_WINDOW_SECS,
+        // Sub-poll-interval windows are valid; the scheduler just quantizes
+        // their firing to its next scan pass.
+        let sub_pass_window = TraceEvalConfig {
+            idle_window_secs: 10,
             ..TraceEvalConfig::default()
         };
-        assert!(at_minimum.validate().is_ok());
+        assert!(sub_pass_window.validate().is_ok());
     }
 
     #[test]

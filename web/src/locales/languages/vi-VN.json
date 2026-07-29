@@ -8871,7 +8871,7 @@
       "validation": {
         "nameRequired": "Tên công việc là bắt buộc",
         "streamRequired": "Một luồng là bắt buộc",
-        "idleWindowMinimum": "Thời gian chờ tối thiểu phải là 45 giây",
+        "idleWindowMinimum": "Thời gian chờ tối thiểu phải là 1 giây",
         "samplingValueRequired": "Một giá trị lấy mẫu là bắt buộc"
       }
     }

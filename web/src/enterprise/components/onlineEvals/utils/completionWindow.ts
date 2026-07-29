@@ -11,15 +11,18 @@ export interface CompletionWindowDefaults {
 }
 
 // LLM Observability Phase 2.6 §8 Parameter Baselines.
-export const MIN_COMPLETION_IDLE_WINDOW_SECS = 45;
+// Any positive idle window is valid: the scheduler fires once the observed
+// silence reaches the window, quantized to its scan pass. The floor only
+// rejects zero/negative values.
+export const MIN_COMPLETION_IDLE_WINDOW_SECS = 1;
 
 export const TRACE_COMPLETION_WINDOW_DEFAULTS: CompletionWindowDefaults = {
-  idleWindowSecs: 2 * 60,
+  idleWindowSecs: 30,
   maxAgeSecs: 30 * 60,
 };
 
 export const SESSION_COMPLETION_WINDOW_DEFAULTS: CompletionWindowDefaults = {
-  idleWindowSecs: 2 * 60,
+  idleWindowSecs: 30 * 60,
   maxAgeSecs: 4 * 60 * 60,
 };
 

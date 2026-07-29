@@ -8871,7 +8871,7 @@
       "validation": {
         "nameRequired": "Job name is required",
         "streamRequired": "A stream is required",
-        "idleWindowMinimum": "空闲窗口必须至少为45秒",
+        "idleWindowMinimum": "空闲窗口必须至少为1秒",
         "samplingValueRequired": "A sampling value is required"
       }
     }

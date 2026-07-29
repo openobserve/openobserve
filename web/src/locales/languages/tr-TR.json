@@ -8871,7 +8871,7 @@
       "validation": {
         "nameRequired": "Job name is required",
         "streamRequired": "A stream is required",
-        "idleWindowMinimum": "Boşta kalma süresi en az 45 saniye olmalıdır",
+        "idleWindowMinimum": "Boşta kalma süresi en az 1 saniye olmalıdır",
         "samplingValueRequired": "A sampling value is required"
       }
     }
