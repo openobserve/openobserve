@@ -16,6 +16,8 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import JourneySteps from "./JourneySteps.vue";
 import UpgradeJourneyBanner from "./UpgradeJourneyBanner.vue";
 import ZeroAssertionNotice from "./ZeroAssertionNotice.vue";
+import TestIdMisconfiguredNotice from "./TestIdMisconfiguredNotice.vue";
+import { DEFAULT_TEST_ID_ATTR } from "@/constants/synthetics";
 import BrowserJourneyStepEditor from "./BrowserJourneyStepEditor.vue";
 import { SELECTOR_ACTIONS as SELECTOR_ACTIONS_CONST } from "@/constants/synthetics";
 
@@ -23,6 +25,11 @@ const props = defineProps<{
   modelValue: BrowserStep[];
   readonly?: boolean;
   startUrl?: string; // URL shown in the recording banner
+  /**
+   * DOM attribute the recorder selects on, from the monitor's config.
+   * Absent falls back to DEFAULT_TEST_ID_ATTR — see useSyntheticsRecorder.
+   */
+  testIdAttr?: string;
   extensionReady?: boolean; // when false, Record button triggers need-extension-setup
   autoRecord?: boolean; // if true, start recording immediately on mount
   /** Owned by the parent (CreateBrowserTest). */
@@ -263,7 +270,7 @@ defineExpose({
 });
 
 function startRecording() {
-  recorder.startRecording(props.startUrl ?? "").catch((err) => {
+  recorder.startRecording(props.startUrl ?? "", props.testIdAttr).catch((err) => {
     console.log("error ---", err);
     recorder.error.value = err instanceof Error ? err.message : String(err);
   });
@@ -587,6 +594,14 @@ function openChromeExtensions() {
       v-if="!readonly"
       :steps="modelValue"
       @add-assertion="(step) => emit('update:modelValue', [...modelValue, step])"
+    />
+
+    <!-- Zero test attributes across a whole recording is a misconfiguration,
+         not a property of the page, and it is otherwise completely silent. -->
+    <TestIdMisconfiguredNotice
+      v-if="!readonly"
+      :steps="modelValue"
+      :test-id-attr="testIdAttr ?? DEFAULT_TEST_ID_ATTR"
     />
 
     <!-- Incognito blocked warning card (pre-flight failure) -->
