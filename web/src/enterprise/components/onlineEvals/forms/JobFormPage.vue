@@ -276,10 +276,11 @@
         >
           {{ t("onlineEvals.buttons.cancel") }}
         </OButton>
-        <template v-if="mode === 'create'">
-          <!-- Both create actions submit through the form (so Enter + schema
+        <template v-if="showActivateChoice">
+          <!-- Both actions submit through the form (so Enter + schema
              validation apply); the click sets which one before the form submit
-             fires, and loading is form-driven (isSubmitting). -->
+             fires, and loading is form-driven (isSubmitting). Shown for create
+             and for editing a draft — a draft can be kept or promoted. -->
           <OButton
             data-test="job-form-save-draft-btn"
             type="submit"
@@ -332,7 +333,6 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import useStreams from "@/composables/useStreams";
 import onlineEvalsService, {
   type EvalJob,
-  type EvalTargetScope,
   type Scorer,
   type SpanSelector,
 } from "@/services/online-evals.service";
@@ -358,6 +358,7 @@ import {
 import { buildConditionsString } from "@/utils/alerts/conditionsFormatter";
 import {
   buildJobInputMappingPayload,
+  mappingUsesSystemProvidedSpans,
   normalizeJobInputMappings,
   syncJobInputMappings,
 } from "../utils/jobMappings";
@@ -420,9 +421,18 @@ const inputMappings = ref(initInputMappings(props.row));
 const spanSelectors = ref(initSpanSelectors(props.row));
 const spanSelectorBindings = ref(initSpanSelectorBindings(props.row));
 const scorerVersions = ref(initScorerVersions(props.row));
-// Which create-mode submit was triggered (draft vs. create-and-activate). Set
-// on click before the form submit fires; loading is form-driven (isSubmitting).
+// Which submit was triggered (save-as-draft vs. save-and-activate). Set on
+// click before the form submit fires; loading is form-driven (isSubmitting).
 const activateOnSave = ref(false);
+
+// A draft has never run, so both create and draft-edit offer the same explicit
+// choice: keep it a draft, or promote it to active. Editing a job that already
+// has a run state (active/paused/degraded) shows a single Save that preserves
+// that state — a config edit must never silently flip enablement.
+const isDraft = computed(() => (props.row?.status ?? "draft") === "draft");
+const showActivateChoice = computed(
+  () => props.mode === "create" || (props.mode === "edit" && isDraft.value),
+);
 
 // SQL WHERE body built from the filter builder — feeds the live "matched
 // spans" count in the preview panel. Built from the CLEANED group (incomplete
@@ -708,6 +718,7 @@ function syncMappings() {
     props.scorers,
     inputMappings.value,
     scorerVersions.value,
+    formValues.value.targetScope,
   );
   inputMappings.value = nextMappings;
   scorerVersions.value = nextVersions;
@@ -730,14 +741,15 @@ async function onSubmit(value: JobForm) {
     showError(new Error(t("onlineEvals.job.selectAtLeastOne")), t("onlineEvals.job.saveError"));
     return;
   }
-  // Mirrors the backend's validate_for_activation(): EVERY trace scorer needs a
-  // Span Selector binding, whether or not its prompt uses {{ spans }}. Keep this
-  // in step with online_eval_jobs.rs — relaxing it here just trades a clear
-  // client-side message for a server rejection.
+  const scorersMissingSpanSelectors = selectedScorers.value.filter(
+    (scorer) =>
+      mappingUsesSystemProvidedSpans(inputMappings.value[entityId(scorer)]) &&
+      !spanSelectorBindings.value[entityId(scorer)],
+  );
   if (
     value.targetScope === "trace" &&
     (activateOnSave.value || (props.mode === "edit" && props.row?.status === "active")) &&
-    value.scorerIds.some((scorerId) => !spanSelectorBindings.value[scorerId])
+    scorersMissingSpanSelectors.length
   ) {
     showError(
       new Error(t("onlineEvals.job.spanSelector.validation.binding")),
@@ -766,11 +778,7 @@ async function onSubmit(value: JobForm) {
         id,
         version: scorerVersions.value[id] ?? null,
       })),
-      inputMapping: buildJobInputMappingPayload(
-        value.scorerIds,
-        inputMappings.value,
-        value.targetScope as EvalTargetScope,
-      ),
+      inputMapping: buildJobInputMappingPayload(value.scorerIds, inputMappings.value),
       spanSelectors: value.targetScope === "trace" ? spanSelectors.value : [],
       spanSelectorBindings: value.targetScope === "trace" ? spanSelectorBindings.value : {},
       ...completionConfigs,
@@ -783,12 +791,30 @@ async function onSubmit(value: JobForm) {
 
     if (props.mode === "edit" && props.row) {
       await onlineEvalsService.jobs.update(props.orgId, props.row.id, payload);
-      toast({
-        variant: "success",
-        message: t("onlineEvals.saved", {
-          label: t("onlineEvals.singular.jobs"),
-        }),
-      });
+      // Promote a draft to active when the user chose Save & Activate. Only
+      // drafts surface that button (showActivateChoice), so activateAfter can
+      // only be true for a draft here; the isDraft guard is defensive and
+      // matches the template (a missing status is treated as draft).
+      if (activateAfter && isDraft.value) {
+        try {
+          await onlineEvalsService.jobs.activate(props.orgId, props.row.id);
+          toast({
+            variant: "success",
+            message: t("onlineEvals.job.savedAndActivated"),
+          });
+        } catch (activateErr: any) {
+          // Config saved but activation failed — surface the activation error
+          // specifically so the user knows the edit landed but it's still a draft.
+          showError(activateErr, t("onlineEvals.job.savedButActivateFailed"));
+        }
+      } else {
+        toast({
+          variant: "success",
+          message: t("onlineEvals.saved", {
+            label: t("onlineEvals.singular.jobs"),
+          }),
+        });
+      }
     } else {
       const created = await onlineEvalsService.jobs.create(props.orgId, payload);
       if (activateAfter && created?.id) {

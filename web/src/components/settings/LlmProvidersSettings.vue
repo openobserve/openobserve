@@ -110,15 +110,6 @@
             <span class="font-mono text-xs">{{ defaultModelOf(row) || "—" }}</span>
           </template>
 
-          <template #cell-isDefault="{ row }">
-            <OTag
-              v-if="booleanOf(row, 'isDefault', 'is_default')"
-              type="providerDefaultFlag"
-              value="default"
-            />
-            <span v-else class="text-text-body">—</span>
-          </template>
-
           <template #cell-actions="{ row }">
             <div class="actions-container flex items-center">
               <OButton
@@ -169,7 +160,6 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import onlineEvalsService, { type Provider } from "@/services/online-evals.service";
 import {
-  booleanOf,
   defaultModelOf,
   providerTypeOf,
 } from "@/enterprise/components/onlineEvals/utils/evalEntity";
@@ -237,16 +227,6 @@ const columns = computed(() => [
     resizable: true,
     hideable: true,
     size: COL.defaultModel,
-    meta: { align: "left" },
-  },
-  {
-    id: "isDefault",
-    header: t("llmProviders.columns.default"),
-    accessorFn: (row: Provider) => booleanOf(row, "isDefault", "is_default"),
-    sortable: true,
-    resizable: true,
-    hideable: true,
-    size: COL.toggle,
     meta: { align: "left" },
   },
   {

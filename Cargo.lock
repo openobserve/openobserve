@@ -5620,6 +5620,7 @@ dependencies = [
  "arrow",
  "arrow-schema",
  "byteorder",
+ "bytes",
  "chrono",
  "config",
  "datafusion",
@@ -5632,6 +5633,7 @@ dependencies = [
  "serde",
  "serde_json",
  "snafu 0.9.0",
+ "tempfile",
  "tokio",
  "wal",
 ]
@@ -7724,6 +7726,7 @@ dependencies = [
  "common",
  "compaction",
  "config",
+ "datafusion",
  "db",
  "enrichment-data",
  "futures",
@@ -7763,6 +7766,7 @@ name = "openobserve-mcp"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "base64 0.22.1",
  "bytes",
  "config",
  "futures-util",
@@ -13795,7 +13799,6 @@ name = "web"
 version = "0.1.0"
 dependencies = [
  "axum",
- "config",
  "mime_guess",
  "rust-embed-for-web",
  "tokio",

@@ -11,6 +11,7 @@ wal.workspace = true
 arrow.workspace = true
 arrow-schema.workspace = true
 byteorder.workspace = true
+bytes.workspace = true
 chrono.workspace = true
 futures.workspace = true
 hashbrown.workspace = true
@@ -22,6 +23,9 @@ serde.workspace = true
 serde_json.workspace = true
 snafu.workspace = true
 tokio.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
 
 [[bin]]
 name = "wal-reader"

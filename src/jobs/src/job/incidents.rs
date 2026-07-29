@@ -84,7 +84,7 @@ async fn auto_resolve_stale_incidents() -> Result<(), anyhow::Error> {
 
         // Emit Resolved events for each auto-resolved incident
         for (org_id, incident_id) in &resolved_ids {
-            if let Err(e) = infra::table::incident_events::append(
+            if let Err(e) = openobserve_core::incidents::append_event(
                 org_id,
                 incident_id,
                 config::meta::alerts::incidents::IncidentEvent::resolved(None),

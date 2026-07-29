@@ -35,7 +35,7 @@ use vortex::{
     VortexSessionDefault,
     array::{ArrayRef, arrow::FromArrowArray},
     dtype::{DType, arrow::FromArrowType},
-    file::{VortexWriteOptions, WriteStrategyBuilder},
+    file::VortexWriteOptions,
     io::session::RuntimeSessionExt,
     session::VortexSession,
 };
@@ -44,7 +44,7 @@ use crate::datafusion::{
     exec::DataFusionContextBuilder,
     merge::{MergeParquetResult, append_metadata},
     table_provider::uniontable::NewUnionTable,
-    vortex::{Utf8Compressor, VORTEX_RUNTIME},
+    vortex::{VORTEX_RUNTIME, vortex_write_strategy},
 };
 
 const TIMESTAMP_ALIAS: &str = "_timestamp_alias";
@@ -215,10 +215,8 @@ async fn write_downsampled_vortex(
             let session = VortexSession::default().with_tokio();
             let dtype = DType::from_arrow(schema.as_ref());
 
-            // Helper to create write options - need to recreate for each writer
-            let strategy = WriteStrategyBuilder::default()
-                .with_compressor(Utf8Compressor::default())
-                .build();
+            // Reuse the strategy across files; write options are recreated for each writer.
+            let strategy = vortex_write_strategy();
 
             let write_options =
                 VortexWriteOptions::new(session.clone()).with_strategy(strategy.clone());

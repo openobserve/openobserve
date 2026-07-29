@@ -50,7 +50,11 @@ use crate::{entry::RecordBatchEntry, errors::*, immutable, memtable, writer::Wri
 //    files actually wrote to disk completely, need to continue step 4 and 5
 // 4. the process is killed before step 5, so there are some .parquet files and have lock file, the
 //    files actually wrote to disk completely, need to continue step 5
-pub(crate) async fn check_uncompleted_parquet_files() -> Result<()> {
+//
+// only scans the small wal/logs dir, must run synchronously before the pack
+// index rebuild and wal replay; the expensive orphan .par sweep is in
+// clean_orphan_par_files
+pub(crate) async fn check_uncompleted_lock_files() -> Result<()> {
     let cfg = config::get_config();
     // 1. get all .lock files
     let wal_dir = PathBuf::from(&cfg.common.data_wal_dir).join(crate::WAL_DIR_DEFAULT_PREFIX);
@@ -78,13 +82,18 @@ pub(crate) async fn check_uncompleted_parquet_files() -> Result<()> {
             let line = line.context(ReadFileSnafu { path: lock_file })?;
             par_files.push(line);
         }
-        // rename the .par file to .parquet
+        // rename the .par file to .parquet, and the .pack.tmp file to .pack
         for par_file in par_files.iter() {
             let par_file = PathBuf::from(par_file);
-            let parquet_file = par_file.with_extension("parquet");
-            log::warn!("rename par file: {par_file:?} to parquet");
+            let target_file = if par_file.to_string_lossy().ends_with(".pack.tmp") {
+                // strip the .tmp suffix to finalize the pack file
+                par_file.with_extension("")
+            } else {
+                par_file.with_extension("parquet")
+            };
+            log::warn!("rename uncompleted file: {par_file:?} to {target_file:?}");
             if par_file.exists() {
-                std::fs::rename(&par_file, &parquet_file)
+                std::fs::rename(&par_file, &target_file)
                     .context(RenameFileSnafu { path: par_file })?;
             }
         }
@@ -95,7 +104,17 @@ pub(crate) async fn check_uncompleted_parquet_files() -> Result<()> {
         })?;
     }
 
-    // 4. delete all the .par files
+    log::info!("Check uncompleted lock files done");
+
+    Ok(())
+}
+
+// delete orphan .par files (crash before the lock file was written); walks
+// the whole wal/files tree, only call from a background task. only files
+// older than `process_start` are deleted: ingestion is already running while
+// this scans, and a fresh .par may belong to an in-flight persist
+pub(crate) async fn clean_orphan_par_files(process_start: std::time::SystemTime) -> Result<()> {
+    let cfg = config::get_config();
     let parquet_dir = PathBuf::from(&cfg.common.data_wal_dir).join("files");
     // create wal dir if not exists
     create_dir_all(&parquet_dir).context(OpenDirSnafu {
@@ -103,11 +122,18 @@ pub(crate) async fn check_uncompleted_parquet_files() -> Result<()> {
     })?;
     let par_files = wal_scan_files(parquet_dir, "par").await.unwrap_or_default();
     for par_file in par_files.iter() {
+        let created_by_this_process = std::fs::metadata(par_file)
+            .and_then(|m| m.modified())
+            .map(|mtime| mtime >= process_start)
+            .unwrap_or(true);
+        if created_by_this_process {
+            continue;
+        }
         log::warn!("delete uncompleted par file: {par_file:?}");
         std::fs::remove_file(par_file).context(DeleteFileSnafu { path: par_file })?;
     }
 
-    log::info!("Check uncompleted parquet files done");
+    log::info!("Clean orphan par files done");
 
     Ok(())
 }

@@ -9620,7 +9620,7 @@
         "assertionValue": "Değer",
         "assertions": "Doğrulamalar",
         "body": "İstek gövdesi",
-        "bodyPlaceholder": "{\"key\": \"value\"}",
+        "bodyPlaceholder": "{'{'}\"key\": \"value\"{'}'}",
         "fields": {
           "body": "Yanıt gövdesi",
           "response_time_ms": "Yanıt süresi (ms)",

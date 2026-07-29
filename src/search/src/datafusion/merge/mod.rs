@@ -29,9 +29,20 @@ use datafusion::{
 };
 use futures::TryStreamExt;
 use parquet::{arrow::AsyncArrowWriter, file::metadata::KeyValue};
+use vortex::{
+    VortexSessionDefault,
+    array::{ArrayRef, arrow::FromArrowArray},
+    dtype::{DType, arrow::FromArrowType},
+    file::VortexWriteOptions,
+    io::session::RuntimeSessionExt,
+    session::VortexSession,
+};
 
 use super::table_provider::uniontable::NewUnionTable;
-use crate::datafusion::exec::DataFusionContextBuilder;
+use crate::datafusion::{
+    exec::DataFusionContextBuilder,
+    vortex::{VORTEX_RUNTIME, vortex_write_strategy},
+};
 
 #[cfg(feature = "enterprise")]
 pub mod downsampling;
@@ -242,10 +253,41 @@ async fn write_parquet(
 
 async fn write_vortex(
     schema: Arc<Schema>,
-    rx: tokio::sync::mpsc::Receiver<RecordBatch>,
+    mut rx: tokio::sync::mpsc::Receiver<RecordBatch>,
     read_task: tokio::task::JoinHandle<Result<()>>,
 ) -> Result<Vec<u8>> {
-    crate::datafusion::vortex::write_vortex(schema, rx, read_task).await
+    let writer_task = VORTEX_RUNTIME.spawn_blocking(move || {
+        VORTEX_RUNTIME.block_on(async move {
+            let mut buf = Vec::new();
+            let session = VortexSession::default().with_tokio();
+            let dtype = DType::from_arrow(schema.as_ref());
+            let write_options =
+                VortexWriteOptions::new(session.clone()).with_strategy(vortex_write_strategy());
+            let mut writer = write_options.writer(&mut buf, dtype);
+
+            while let Some(batch) = rx.recv().await {
+                let array: ArrayRef = ArrayRef::from_arrow(batch, false).map_err(|e| {
+                    DataFusionError::Execution(format!(
+                        "Failed to convert arrow array to vortex array: {e}"
+                    ))
+                })?;
+                writer.push(array).await?;
+            }
+
+            writer.finish().await?;
+
+            Ok::<Vec<u8>, anyhow::Error>(buf)
+        })
+    });
+
+    read_task
+        .await
+        .map_err(|e| DataFusionError::External(Box::new(e)))??;
+
+    writer_task
+        .await
+        .map_err(|e| DataFusionError::Execution(format!("Vortex runtime task failed: {e}")))?
+        .map_err(|e| DataFusionError::Execution(format!("Failed to write vortex file: {e}")))
 }
 
 pub fn append_metadata(
