@@ -1,15 +1,15 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<bom xmlns="http://cyclonedx.org/schema/bom/1.3" serialNumber="urn:uuid:3ddc9fd2-03a3-43d5-a7bd-1ed484686137" version="1">
+<?xml version="1.0" encoding="utf-8"?>
+<bom xmlns="http://cyclonedx.org/schema/bom/1.3" serialNumber="urn:uuid:95a2e5d2-09eb-439f-bfb1-263dd329d64b" version="1">
   <metadata>
-    <timestamp>2026-07-29T08:21:36.747893000Z</timestamp>
+    <timestamp>2026-07-29T08:37:07.332481000Z</timestamp>
     <tools>
       <tool>
         <vendor>CycloneDX</vendor>
         <name>cargo-cyclonedx</name>
-        <version>0.5.7</version>
+        <version>0.5.9</version>
       </tool>
     </tools>
-    <component type="library" bom-ref="path+file:///Users/huaijinhao/gitrepo/openobserve/openobserve/src/cipher#openobserve-cipher@0.1.0">
+    <component type="library" bom-ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/cipher#openobserve-cipher@0.1.0">
       <name>openobserve-cipher</name>
       <version>0.1.0</version>
       <scope>required</scope>
@@ -18,7 +18,7 @@
       </licenses>
       <purl>pkg:cargo/openobserve-cipher@0.1.0?download_url=file://.</purl>
       <components>
-        <component type="library" bom-ref="path+file:///Users/huaijinhao/gitrepo/openobserve/openobserve/src/cipher#openobserve-cipher@0.1.0 bin-target-0">
+        <component type="library" bom-ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/cipher#openobserve-cipher@0.1.0 bin-target-0">
           <name>openobserve_cipher</name>
           <version>0.1.0</version>
           <purl>pkg:cargo/openobserve-cipher@0.1.0?download_url=file://.#src/lib.rs</purl>
@@ -31,7 +31,7 @@
   </metadata>
   <components>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#aho-corasick@1.1.4">
-      <author>Andrew Gallant &lt;jamslam@gmail.com&gt;</author>
+      <author>Andrew Gallant &lt;jamslam@gmail.com></author>
       <name>aho-corasick</name>
       <version>1.1.4</version>
       <description>Fast multiple substring searching.</description>
@@ -53,7 +53,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#allocator-api2@0.2.21">
-      <author>Zakarum &lt;zaq.dev@icloud.com&gt;</author>
+      <author>Zakarum &lt;zaq.dev@icloud.com></author>
       <name>allocator-api2</name>
       <version>0.2.21</version>
       <description>Mirror of Rust's allocator API</description>
@@ -78,7 +78,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#cfg-if@1.0.4">
-      <author>Alex Crichton &lt;alex@alexcrichton.com&gt;</author>
+      <author>Alex Crichton &lt;alex@alexcrichton.com></author>
       <name>cfg-if</name>
       <version>1.0.4</version>
       <description>A macro to ergonomically define an item depending on a large number of #[cfg] parameters. Structured like an if-else chain, the first matching branch is the item that gets emitted. </description>
@@ -115,7 +115,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#foldhash@0.2.0">
-      <author>Orson Peters &lt;orsonpeters@gmail.com&gt;</author>
+      <author>Orson Peters &lt;orsonpeters@gmail.com></author>
       <name>foldhash</name>
       <version>0.2.0</version>
       <description>A fast, non-cryptographic, minimally DoS-resistant hashing algorithm.</description>
@@ -134,7 +134,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#hashbrown@0.16.1">
-      <author>Amanieu d'Antras &lt;amanieu@gmail.com&gt;</author>
+      <author>Amanieu d'Antras &lt;amanieu@gmail.com></author>
       <name>hashbrown</name>
       <version>0.16.1</version>
       <description>A Rust port of Google's SwissTable hash map</description>
@@ -192,7 +192,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#itoa@1.0.17">
-      <author>David Tolnay &lt;dtolnay@gmail.com&gt;</author>
+      <author>David Tolnay &lt;dtolnay@gmail.com></author>
       <name>itoa</name>
       <version>1.0.17</version>
       <description>Fast integer primitive to string conversion</description>
@@ -233,7 +233,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#lock_api@0.4.14">
-      <author>Amanieu d'Antras &lt;amanieu@gmail.com&gt;</author>
+      <author>Amanieu d'Antras &lt;amanieu@gmail.com></author>
       <name>lock_api</name>
       <version>0.4.14</version>
       <description>Wrappers to create fully-featured Mutex and RwLock types. Compatible with no_std.</description>
@@ -252,7 +252,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#memchr@2.8.0">
-      <author>Andrew Gallant &lt;jamslam@gmail.com&gt;, bluss</author>
+      <author>Andrew Gallant &lt;jamslam@gmail.com>, bluss</author>
       <name>memchr</name>
       <version>2.8.0</version>
       <description>Provides extremely fast (uses SIMD on x86_64, aarch64 and wasm32) routines for 1, 2 or 3 byte search and single substring search. </description>
@@ -277,7 +277,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#parking_lot@0.12.5">
-      <author>Amanieu d'Antras &lt;amanieu@gmail.com&gt;</author>
+      <author>Amanieu d'Antras &lt;amanieu@gmail.com></author>
       <name>parking_lot</name>
       <version>0.12.5</version>
       <description>More compact and efficient implementations of the standard synchronization primitives.</description>
@@ -296,7 +296,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#parking_lot_core@0.9.12">
-      <author>Amanieu d'Antras &lt;amanieu@gmail.com&gt;</author>
+      <author>Amanieu d'Antras &lt;amanieu@gmail.com></author>
       <name>parking_lot_core</name>
       <version>0.9.12</version>
       <description>An advanced API for creating custom synchronization primitives.</description>
@@ -315,7 +315,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#proc-macro2@1.0.106">
-      <author>David Tolnay &lt;dtolnay@gmail.com&gt;, Alex Crichton &lt;alex@alexcrichton.com&gt;</author>
+      <author>David Tolnay &lt;dtolnay@gmail.com>, Alex Crichton &lt;alex@alexcrichton.com></author>
       <name>proc-macro2</name>
       <version>1.0.106</version>
       <description>A substitute implementation of the compiler's `proc_macro` API to decouple token-based libraries from the procedural macro use case.</description>
@@ -337,7 +337,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#quote@1.0.45">
-      <author>David Tolnay &lt;dtolnay@gmail.com&gt;</author>
+      <author>David Tolnay &lt;dtolnay@gmail.com></author>
       <name>quote</name>
       <version>1.0.45</version>
       <description>Quasi-quoting macro quote!(...)</description>
@@ -359,7 +359,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#regex-automata@0.4.14">
-      <author>The Rust Project Developers, Andrew Gallant &lt;jamslam@gmail.com&gt;</author>
+      <author>The Rust Project Developers, Andrew Gallant &lt;jamslam@gmail.com></author>
       <name>regex-automata</name>
       <version>0.4.14</version>
       <description>Automata construction and matching using regular expressions.</description>
@@ -384,7 +384,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#regex-syntax@0.8.10">
-      <author>The Rust Project Developers, Andrew Gallant &lt;jamslam@gmail.com&gt;</author>
+      <author>The Rust Project Developers, Andrew Gallant &lt;jamslam@gmail.com></author>
       <name>regex-syntax</name>
       <version>0.8.10</version>
       <description>A regular expression parser.</description>
@@ -409,7 +409,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#regex@1.12.3">
-      <author>The Rust Project Developers, Andrew Gallant &lt;jamslam@gmail.com&gt;</author>
+      <author>The Rust Project Developers, Andrew Gallant &lt;jamslam@gmail.com></author>
       <name>regex</name>
       <version>1.12.3</version>
       <description>An implementation of regular expressions for Rust. This implementation uses finite automata and guarantees linear time matching on all inputs. </description>
@@ -456,7 +456,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#serde@1.0.228">
-      <author>Erick Tryzelaar &lt;erick.tryzelaar@gmail.com&gt;, David Tolnay &lt;dtolnay@gmail.com&gt;</author>
+      <author>Erick Tryzelaar &lt;erick.tryzelaar@gmail.com>, David Tolnay &lt;dtolnay@gmail.com></author>
       <name>serde</name>
       <version>1.0.228</version>
       <description>A generic serialization/deserialization framework</description>
@@ -481,7 +481,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#serde_core@1.0.228">
-      <author>Erick Tryzelaar &lt;erick.tryzelaar@gmail.com&gt;, David Tolnay &lt;dtolnay@gmail.com&gt;</author>
+      <author>Erick Tryzelaar &lt;erick.tryzelaar@gmail.com>, David Tolnay &lt;dtolnay@gmail.com></author>
       <name>serde_core</name>
       <version>1.0.228</version>
       <description>Serde traits only, with no support for derive -- use the `serde` crate instead</description>
@@ -506,7 +506,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#serde_derive@1.0.228">
-      <author>Erick Tryzelaar &lt;erick.tryzelaar@gmail.com&gt;, David Tolnay &lt;dtolnay@gmail.com&gt;</author>
+      <author>Erick Tryzelaar &lt;erick.tryzelaar@gmail.com>, David Tolnay &lt;dtolnay@gmail.com></author>
       <name>serde_derive</name>
       <version>1.0.228</version>
       <description>Macros 1.1 implementation of #[derive(Serialize, Deserialize)]</description>
@@ -531,7 +531,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#serde_json@1.0.149">
-      <author>Erick Tryzelaar &lt;erick.tryzelaar@gmail.com&gt;, David Tolnay &lt;dtolnay@gmail.com&gt;</author>
+      <author>Erick Tryzelaar &lt;erick.tryzelaar@gmail.com>, David Tolnay &lt;dtolnay@gmail.com></author>
       <name>serde_json</name>
       <version>1.0.149</version>
       <description>A JSON serialization file format</description>
@@ -575,7 +575,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#syn@2.0.117">
-      <author>David Tolnay &lt;dtolnay@gmail.com&gt;</author>
+      <author>David Tolnay &lt;dtolnay@gmail.com></author>
       <name>syn</name>
       <version>2.0.117</version>
       <description>Parser for Rust source code</description>
@@ -597,7 +597,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#unicode-ident@1.0.24">
-      <author>David Tolnay &lt;dtolnay@gmail.com&gt;</author>
+      <author>David Tolnay &lt;dtolnay@gmail.com></author>
       <name>unicode-ident</name>
       <version>1.0.24</version>
       <description>Determine whether characters have the XID_Start or XID_Continue properties according to Unicode Standard Annex #31</description>
@@ -619,7 +619,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#utoipa-gen@5.4.0">
-      <author>Juha Kukkonen &lt;juha7kukkonen@gmail.com&gt;</author>
+      <author>Juha Kukkonen &lt;juha7kukkonen@gmail.com></author>
       <name>utoipa-gen</name>
       <version>5.4.0</version>
       <description>Code generation implementation for utoipa</description>
@@ -638,7 +638,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#utoipa@5.4.0">
-      <author>Juha Kukkonen &lt;juha7kukkonen@gmail.com&gt;</author>
+      <author>Juha Kukkonen &lt;juha7kukkonen@gmail.com></author>
       <name>utoipa</name>
       <version>5.4.0</version>
       <description>Compile time generated OpenAPI documentation for Rust</description>
@@ -657,7 +657,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#zmij@1.0.21">
-      <author>David Tolnay &lt;dtolnay@gmail.com&gt;</author>
+      <author>David Tolnay &lt;dtolnay@gmail.com></author>
       <name>zmij</name>
       <version>1.0.21</version>
       <description>A double-to-string conversion algorithm based on Schubfach and yy</description>
@@ -680,7 +680,7 @@
     </component>
   </components>
   <dependencies>
-    <dependency ref="path+file:///Users/huaijinhao/gitrepo/openobserve/openobserve/src/cipher#openobserve-cipher@0.1.0">
+    <dependency ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/cipher#openobserve-cipher@0.1.0">
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#hashbrown@0.16.1" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#parking_lot@0.12.5" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#serde@1.0.228" />

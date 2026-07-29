@@ -1,15 +1,15 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<bom xmlns="http://cyclonedx.org/schema/bom/1.3" serialNumber="urn:uuid:d8298fd2-9d43-4b52-93ab-032e80dc9324" version="1">
+<?xml version="1.0" encoding="utf-8"?>
+<bom xmlns="http://cyclonedx.org/schema/bom/1.3" serialNumber="urn:uuid:92af863e-3ddc-4500-8aec-ecacc04e1b1a" version="1">
   <metadata>
-    <timestamp>2026-07-29T08:21:36.602211000Z</timestamp>
+    <timestamp>2026-07-29T08:37:07.192189000Z</timestamp>
     <tools>
       <tool>
         <vendor>CycloneDX</vendor>
         <name>cargo-cyclonedx</name>
-        <version>0.5.7</version>
+        <version>0.5.9</version>
       </tool>
     </tools>
-    <component type="library" bom-ref="path+file:///Users/huaijinhao/gitrepo/openobserve/openobserve/src/proto#0.1.0">
+    <component type="library" bom-ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/proto#0.1.0">
       <name>proto</name>
       <version>0.1.0</version>
       <scope>required</scope>
@@ -18,7 +18,7 @@
       </licenses>
       <purl>pkg:cargo/proto@0.1.0?download_url=file://.</purl>
       <components>
-        <component type="library" bom-ref="path+file:///Users/huaijinhao/gitrepo/openobserve/openobserve/src/proto#0.1.0 bin-target-0">
+        <component type="library" bom-ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/proto#0.1.0 bin-target-0">
           <name>proto</name>
           <version>0.1.0</version>
           <purl>pkg:cargo/proto@0.1.0?download_url=file://.#src/lib.rs</purl>
@@ -38,7 +38,7 @@
       <licenses>
         <expression>MIT OR Apache-2.0</expression>
       </licenses>
-      <purl>pkg:cargo/object_store@0.13.2?vcs_url=git%2Bhttps://github.com/openobserve/arrow-rs-object-store%3Fbranch=openobserve-v0.13.2%4001c97b4d3f7857a1af87f0b66b68d329d3ccd9fd</purl>
+      <purl>pkg:cargo/object_store@0.13.2?vcs_url=git%2Bhttps://github.com/openobserve/arrow-rs-object-store%4001c97b4d3f7857a1af87f0b66b68d329d3ccd9fd</purl>
       <externalReferences>
         <reference type="vcs">
           <url>https://github.com/apache/arrow-rs-object-store</url>
@@ -46,7 +46,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="git+https://github.com/openobserve/datafusion?rev=869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b#datafusion-catalog-listing@54.0.0">
-      <author>Apache DataFusion &lt;dev@datafusion.apache.org&gt;</author>
+      <author>Apache DataFusion &lt;dev@datafusion.apache.org></author>
       <name>datafusion-catalog-listing</name>
       <version>54.0.0</version>
       <description>datafusion-catalog-listing</description>
@@ -54,7 +54,7 @@
       <licenses>
         <expression>Apache-2.0</expression>
       </licenses>
-      <purl>pkg:cargo/datafusion-catalog-listing@54.0.0?vcs_url=git%2Bhttps://github.com/openobserve/datafusion%3Frev=869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b%40869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b</purl>
+      <purl>pkg:cargo/datafusion-catalog-listing@54.0.0?vcs_url=git%2Bhttps://github.com/openobserve/datafusion%40869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b</purl>
       <externalReferences>
         <reference type="website">
           <url>https://datafusion.apache.org</url>
@@ -65,7 +65,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="git+https://github.com/openobserve/datafusion?rev=869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b#datafusion-catalog@54.0.0">
-      <author>Apache DataFusion &lt;dev@datafusion.apache.org&gt;</author>
+      <author>Apache DataFusion &lt;dev@datafusion.apache.org></author>
       <name>datafusion-catalog</name>
       <version>54.0.0</version>
       <description>datafusion-catalog</description>
@@ -73,7 +73,7 @@
       <licenses>
         <expression>Apache-2.0</expression>
       </licenses>
-      <purl>pkg:cargo/datafusion-catalog@54.0.0?vcs_url=git%2Bhttps://github.com/openobserve/datafusion%3Frev=869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b%40869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b</purl>
+      <purl>pkg:cargo/datafusion-catalog@54.0.0?vcs_url=git%2Bhttps://github.com/openobserve/datafusion%40869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b</purl>
       <externalReferences>
         <reference type="website">
           <url>https://datafusion.apache.org</url>
@@ -84,7 +84,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="git+https://github.com/openobserve/datafusion?rev=869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b#datafusion-common-runtime@54.0.0">
-      <author>Apache DataFusion &lt;dev@datafusion.apache.org&gt;</author>
+      <author>Apache DataFusion &lt;dev@datafusion.apache.org></author>
       <name>datafusion-common-runtime</name>
       <version>54.0.0</version>
       <description>Common Runtime functionality for DataFusion query engine</description>
@@ -92,7 +92,7 @@
       <licenses>
         <expression>Apache-2.0</expression>
       </licenses>
-      <purl>pkg:cargo/datafusion-common-runtime@54.0.0?vcs_url=git%2Bhttps://github.com/openobserve/datafusion%3Frev=869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b%40869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b</purl>
+      <purl>pkg:cargo/datafusion-common-runtime@54.0.0?vcs_url=git%2Bhttps://github.com/openobserve/datafusion%40869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b</purl>
       <externalReferences>
         <reference type="website">
           <url>https://datafusion.apache.org</url>
@@ -103,7 +103,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="git+https://github.com/openobserve/datafusion?rev=869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b#datafusion-common@54.0.0">
-      <author>Apache DataFusion &lt;dev@datafusion.apache.org&gt;</author>
+      <author>Apache DataFusion &lt;dev@datafusion.apache.org></author>
       <name>datafusion-common</name>
       <version>54.0.0</version>
       <description>Common functionality for DataFusion query engine</description>
@@ -111,7 +111,7 @@
       <licenses>
         <expression>Apache-2.0</expression>
       </licenses>
-      <purl>pkg:cargo/datafusion-common@54.0.0?vcs_url=git%2Bhttps://github.com/openobserve/datafusion%3Frev=869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b%40869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b</purl>
+      <purl>pkg:cargo/datafusion-common@54.0.0?vcs_url=git%2Bhttps://github.com/openobserve/datafusion%40869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b</purl>
       <externalReferences>
         <reference type="website">
           <url>https://datafusion.apache.org</url>
@@ -122,7 +122,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="git+https://github.com/openobserve/datafusion?rev=869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b#datafusion-datasource-arrow@54.0.0">
-      <author>Apache DataFusion &lt;dev@datafusion.apache.org&gt;</author>
+      <author>Apache DataFusion &lt;dev@datafusion.apache.org></author>
       <name>datafusion-datasource-arrow</name>
       <version>54.0.0</version>
       <description>datafusion-datasource-arrow</description>
@@ -130,7 +130,7 @@
       <licenses>
         <expression>Apache-2.0</expression>
       </licenses>
-      <purl>pkg:cargo/datafusion-datasource-arrow@54.0.0?vcs_url=git%2Bhttps://github.com/openobserve/datafusion%3Frev=869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b%40869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b</purl>
+      <purl>pkg:cargo/datafusion-datasource-arrow@54.0.0?vcs_url=git%2Bhttps://github.com/openobserve/datafusion%40869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b</purl>
       <externalReferences>
         <reference type="website">
           <url>https://datafusion.apache.org</url>
@@ -141,7 +141,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="git+https://github.com/openobserve/datafusion?rev=869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b#datafusion-datasource-csv@54.0.0">
-      <author>Apache DataFusion &lt;dev@datafusion.apache.org&gt;</author>
+      <author>Apache DataFusion &lt;dev@datafusion.apache.org></author>
       <name>datafusion-datasource-csv</name>
       <version>54.0.0</version>
       <description>datafusion-datasource-csv</description>
@@ -149,7 +149,7 @@
       <licenses>
         <expression>Apache-2.0</expression>
       </licenses>
-      <purl>pkg:cargo/datafusion-datasource-csv@54.0.0?vcs_url=git%2Bhttps://github.com/openobserve/datafusion%3Frev=869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b%40869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b</purl>
+      <purl>pkg:cargo/datafusion-datasource-csv@54.0.0?vcs_url=git%2Bhttps://github.com/openobserve/datafusion%40869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b</purl>
       <externalReferences>
         <reference type="website">
           <url>https://datafusion.apache.org</url>
@@ -160,7 +160,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="git+https://github.com/openobserve/datafusion?rev=869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b#datafusion-datasource-json@54.0.0">
-      <author>Apache DataFusion &lt;dev@datafusion.apache.org&gt;</author>
+      <author>Apache DataFusion &lt;dev@datafusion.apache.org></author>
       <name>datafusion-datasource-json</name>
       <version>54.0.0</version>
       <description>datafusion-datasource-json</description>
@@ -168,7 +168,7 @@
       <licenses>
         <expression>Apache-2.0</expression>
       </licenses>
-      <purl>pkg:cargo/datafusion-datasource-json@54.0.0?vcs_url=git%2Bhttps://github.com/openobserve/datafusion%3Frev=869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b%40869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b</purl>
+      <purl>pkg:cargo/datafusion-datasource-json@54.0.0?vcs_url=git%2Bhttps://github.com/openobserve/datafusion%40869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b</purl>
       <externalReferences>
         <reference type="website">
           <url>https://datafusion.apache.org</url>
@@ -179,7 +179,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="git+https://github.com/openobserve/datafusion?rev=869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b#datafusion-datasource-parquet@54.0.0">
-      <author>Apache DataFusion &lt;dev@datafusion.apache.org&gt;</author>
+      <author>Apache DataFusion &lt;dev@datafusion.apache.org></author>
       <name>datafusion-datasource-parquet</name>
       <version>54.0.0</version>
       <description>datafusion-datasource-parquet</description>
@@ -187,7 +187,7 @@
       <licenses>
         <expression>Apache-2.0</expression>
       </licenses>
-      <purl>pkg:cargo/datafusion-datasource-parquet@54.0.0?vcs_url=git%2Bhttps://github.com/openobserve/datafusion%3Frev=869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b%40869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b</purl>
+      <purl>pkg:cargo/datafusion-datasource-parquet@54.0.0?vcs_url=git%2Bhttps://github.com/openobserve/datafusion%40869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b</purl>
       <externalReferences>
         <reference type="website">
           <url>https://datafusion.apache.org</url>
@@ -198,7 +198,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="git+https://github.com/openobserve/datafusion?rev=869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b#datafusion-datasource@54.0.0">
-      <author>Apache DataFusion &lt;dev@datafusion.apache.org&gt;</author>
+      <author>Apache DataFusion &lt;dev@datafusion.apache.org></author>
       <name>datafusion-datasource</name>
       <version>54.0.0</version>
       <description>datafusion-datasource</description>
@@ -206,7 +206,7 @@
       <licenses>
         <expression>Apache-2.0</expression>
       </licenses>
-      <purl>pkg:cargo/datafusion-datasource@54.0.0?vcs_url=git%2Bhttps://github.com/openobserve/datafusion%3Frev=869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b%40869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b</purl>
+      <purl>pkg:cargo/datafusion-datasource@54.0.0?vcs_url=git%2Bhttps://github.com/openobserve/datafusion%40869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b</purl>
       <externalReferences>
         <reference type="website">
           <url>https://datafusion.apache.org</url>
@@ -217,7 +217,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="git+https://github.com/openobserve/datafusion?rev=869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b#datafusion-doc@54.0.0">
-      <author>Apache DataFusion &lt;dev@datafusion.apache.org&gt;</author>
+      <author>Apache DataFusion &lt;dev@datafusion.apache.org></author>
       <name>datafusion-doc</name>
       <version>54.0.0</version>
       <description>Documentation module for DataFusion query engine</description>
@@ -225,7 +225,7 @@
       <licenses>
         <expression>Apache-2.0</expression>
       </licenses>
-      <purl>pkg:cargo/datafusion-doc@54.0.0?vcs_url=git%2Bhttps://github.com/openobserve/datafusion%3Frev=869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b%40869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b</purl>
+      <purl>pkg:cargo/datafusion-doc@54.0.0?vcs_url=git%2Bhttps://github.com/openobserve/datafusion%40869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b</purl>
       <externalReferences>
         <reference type="website">
           <url>https://datafusion.apache.org</url>
@@ -236,7 +236,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="git+https://github.com/openobserve/datafusion?rev=869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b#datafusion-execution@54.0.0">
-      <author>Apache DataFusion &lt;dev@datafusion.apache.org&gt;</author>
+      <author>Apache DataFusion &lt;dev@datafusion.apache.org></author>
       <name>datafusion-execution</name>
       <version>54.0.0</version>
       <description>Execution configuration support for DataFusion query engine</description>
@@ -244,7 +244,7 @@
       <licenses>
         <expression>Apache-2.0</expression>
       </licenses>
-      <purl>pkg:cargo/datafusion-execution@54.0.0?vcs_url=git%2Bhttps://github.com/openobserve/datafusion%3Frev=869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b%40869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b</purl>
+      <purl>pkg:cargo/datafusion-execution@54.0.0?vcs_url=git%2Bhttps://github.com/openobserve/datafusion%40869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b</purl>
       <externalReferences>
         <reference type="website">
           <url>https://datafusion.apache.org</url>
@@ -255,7 +255,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="git+https://github.com/openobserve/datafusion?rev=869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b#datafusion-expr-common@54.0.0">
-      <author>Apache DataFusion &lt;dev@datafusion.apache.org&gt;</author>
+      <author>Apache DataFusion &lt;dev@datafusion.apache.org></author>
       <name>datafusion-expr-common</name>
       <version>54.0.0</version>
       <description>Logical plan and expression representation for DataFusion query engine</description>
@@ -263,7 +263,7 @@
       <licenses>
         <expression>Apache-2.0</expression>
       </licenses>
-      <purl>pkg:cargo/datafusion-expr-common@54.0.0?vcs_url=git%2Bhttps://github.com/openobserve/datafusion%3Frev=869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b%40869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b</purl>
+      <purl>pkg:cargo/datafusion-expr-common@54.0.0?vcs_url=git%2Bhttps://github.com/openobserve/datafusion%40869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b</purl>
       <externalReferences>
         <reference type="website">
           <url>https://datafusion.apache.org</url>
@@ -274,7 +274,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="git+https://github.com/openobserve/datafusion?rev=869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b#datafusion-expr@54.0.0">
-      <author>Apache DataFusion &lt;dev@datafusion.apache.org&gt;</author>
+      <author>Apache DataFusion &lt;dev@datafusion.apache.org></author>
       <name>datafusion-expr</name>
       <version>54.0.0</version>
       <description>Logical plan and expression representation for DataFusion query engine</description>
@@ -282,7 +282,7 @@
       <licenses>
         <expression>Apache-2.0</expression>
       </licenses>
-      <purl>pkg:cargo/datafusion-expr@54.0.0?vcs_url=git%2Bhttps://github.com/openobserve/datafusion%3Frev=869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b%40869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b</purl>
+      <purl>pkg:cargo/datafusion-expr@54.0.0?vcs_url=git%2Bhttps://github.com/openobserve/datafusion%40869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b</purl>
       <externalReferences>
         <reference type="website">
           <url>https://datafusion.apache.org</url>
@@ -293,7 +293,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="git+https://github.com/openobserve/datafusion?rev=869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b#datafusion-functions-aggregate-common@54.0.0">
-      <author>Apache DataFusion &lt;dev@datafusion.apache.org&gt;</author>
+      <author>Apache DataFusion &lt;dev@datafusion.apache.org></author>
       <name>datafusion-functions-aggregate-common</name>
       <version>54.0.0</version>
       <description>Utility functions for implementing aggregate functions for the DataFusion query engine</description>
@@ -301,7 +301,7 @@
       <licenses>
         <expression>Apache-2.0</expression>
       </licenses>
-      <purl>pkg:cargo/datafusion-functions-aggregate-common@54.0.0?vcs_url=git%2Bhttps://github.com/openobserve/datafusion%3Frev=869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b%40869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b</purl>
+      <purl>pkg:cargo/datafusion-functions-aggregate-common@54.0.0?vcs_url=git%2Bhttps://github.com/openobserve/datafusion%40869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b</purl>
       <externalReferences>
         <reference type="website">
           <url>https://datafusion.apache.org</url>
@@ -312,7 +312,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="git+https://github.com/openobserve/datafusion?rev=869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b#datafusion-functions-table@54.0.0">
-      <author>Apache DataFusion &lt;dev@datafusion.apache.org&gt;</author>
+      <author>Apache DataFusion &lt;dev@datafusion.apache.org></author>
       <name>datafusion-functions-table</name>
       <version>54.0.0</version>
       <description>Traits and types for logical plans and expressions for DataFusion query engine</description>
@@ -320,7 +320,7 @@
       <licenses>
         <expression>Apache-2.0</expression>
       </licenses>
-      <purl>pkg:cargo/datafusion-functions-table@54.0.0?vcs_url=git%2Bhttps://github.com/openobserve/datafusion%3Frev=869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b%40869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b</purl>
+      <purl>pkg:cargo/datafusion-functions-table@54.0.0?vcs_url=git%2Bhttps://github.com/openobserve/datafusion%40869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b</purl>
       <externalReferences>
         <reference type="website">
           <url>https://datafusion.apache.org</url>
@@ -331,7 +331,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="git+https://github.com/openobserve/datafusion?rev=869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b#datafusion-functions-window-common@54.0.0">
-      <author>Apache DataFusion &lt;dev@datafusion.apache.org&gt;</author>
+      <author>Apache DataFusion &lt;dev@datafusion.apache.org></author>
       <name>datafusion-functions-window-common</name>
       <version>54.0.0</version>
       <description>Common functions for implementing user-defined window functions for the DataFusion query engine</description>
@@ -339,7 +339,7 @@
       <licenses>
         <expression>Apache-2.0</expression>
       </licenses>
-      <purl>pkg:cargo/datafusion-functions-window-common@54.0.0?vcs_url=git%2Bhttps://github.com/openobserve/datafusion%3Frev=869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b%40869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b</purl>
+      <purl>pkg:cargo/datafusion-functions-window-common@54.0.0?vcs_url=git%2Bhttps://github.com/openobserve/datafusion%40869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b</purl>
       <externalReferences>
         <reference type="website">
           <url>https://datafusion.apache.org</url>
@@ -350,7 +350,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="git+https://github.com/openobserve/datafusion?rev=869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b#datafusion-functions@54.0.0">
-      <author>Apache DataFusion &lt;dev@datafusion.apache.org&gt;</author>
+      <author>Apache DataFusion &lt;dev@datafusion.apache.org></author>
       <name>datafusion-functions</name>
       <version>54.0.0</version>
       <description>Function packages for the DataFusion query engine</description>
@@ -358,7 +358,7 @@
       <licenses>
         <expression>Apache-2.0</expression>
       </licenses>
-      <purl>pkg:cargo/datafusion-functions@54.0.0?vcs_url=git%2Bhttps://github.com/openobserve/datafusion%3Frev=869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b%40869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b</purl>
+      <purl>pkg:cargo/datafusion-functions@54.0.0?vcs_url=git%2Bhttps://github.com/openobserve/datafusion%40869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b</purl>
       <externalReferences>
         <reference type="website">
           <url>https://datafusion.apache.org</url>
@@ -369,7 +369,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="git+https://github.com/openobserve/datafusion?rev=869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b#datafusion-macros@54.0.0">
-      <author>Apache DataFusion &lt;dev@datafusion.apache.org&gt;</author>
+      <author>Apache DataFusion &lt;dev@datafusion.apache.org></author>
       <name>datafusion-macros</name>
       <version>54.0.0</version>
       <description>Procedural macros for DataFusion query engine</description>
@@ -377,7 +377,7 @@
       <licenses>
         <expression>Apache-2.0</expression>
       </licenses>
-      <purl>pkg:cargo/datafusion-macros@54.0.0?vcs_url=git%2Bhttps://github.com/openobserve/datafusion%3Frev=869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b%40869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b</purl>
+      <purl>pkg:cargo/datafusion-macros@54.0.0?vcs_url=git%2Bhttps://github.com/openobserve/datafusion%40869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b</purl>
       <externalReferences>
         <reference type="website">
           <url>https://datafusion.apache.org</url>
@@ -388,7 +388,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="git+https://github.com/openobserve/datafusion?rev=869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b#datafusion-physical-expr-adapter@54.0.0">
-      <author>Apache DataFusion &lt;dev@datafusion.apache.org&gt;</author>
+      <author>Apache DataFusion &lt;dev@datafusion.apache.org></author>
       <name>datafusion-physical-expr-adapter</name>
       <version>54.0.0</version>
       <description>Physical expression schema adaptation utilities for DataFusion</description>
@@ -396,7 +396,7 @@
       <licenses>
         <expression>Apache-2.0</expression>
       </licenses>
-      <purl>pkg:cargo/datafusion-physical-expr-adapter@54.0.0?vcs_url=git%2Bhttps://github.com/openobserve/datafusion%3Frev=869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b%40869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b</purl>
+      <purl>pkg:cargo/datafusion-physical-expr-adapter@54.0.0?vcs_url=git%2Bhttps://github.com/openobserve/datafusion%40869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b</purl>
       <externalReferences>
         <reference type="website">
           <url>https://datafusion.apache.org</url>
@@ -407,7 +407,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="git+https://github.com/openobserve/datafusion?rev=869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b#datafusion-physical-expr-common@54.0.0">
-      <author>Apache DataFusion &lt;dev@datafusion.apache.org&gt;</author>
+      <author>Apache DataFusion &lt;dev@datafusion.apache.org></author>
       <name>datafusion-physical-expr-common</name>
       <version>54.0.0</version>
       <description>Common functionality of physical expression for DataFusion query engine</description>
@@ -415,7 +415,7 @@
       <licenses>
         <expression>Apache-2.0</expression>
       </licenses>
-      <purl>pkg:cargo/datafusion-physical-expr-common@54.0.0?vcs_url=git%2Bhttps://github.com/openobserve/datafusion%3Frev=869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b%40869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b</purl>
+      <purl>pkg:cargo/datafusion-physical-expr-common@54.0.0?vcs_url=git%2Bhttps://github.com/openobserve/datafusion%40869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b</purl>
       <externalReferences>
         <reference type="website">
           <url>https://datafusion.apache.org</url>
@@ -426,7 +426,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="git+https://github.com/openobserve/datafusion?rev=869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b#datafusion-physical-expr@54.0.0">
-      <author>Apache DataFusion &lt;dev@datafusion.apache.org&gt;</author>
+      <author>Apache DataFusion &lt;dev@datafusion.apache.org></author>
       <name>datafusion-physical-expr</name>
       <version>54.0.0</version>
       <description>Physical expression implementation for DataFusion query engine</description>
@@ -434,7 +434,7 @@
       <licenses>
         <expression>Apache-2.0</expression>
       </licenses>
-      <purl>pkg:cargo/datafusion-physical-expr@54.0.0?vcs_url=git%2Bhttps://github.com/openobserve/datafusion%3Frev=869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b%40869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b</purl>
+      <purl>pkg:cargo/datafusion-physical-expr@54.0.0?vcs_url=git%2Bhttps://github.com/openobserve/datafusion%40869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b</purl>
       <externalReferences>
         <reference type="website">
           <url>https://datafusion.apache.org</url>
@@ -445,7 +445,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="git+https://github.com/openobserve/datafusion?rev=869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b#datafusion-physical-plan@54.0.0">
-      <author>Apache DataFusion &lt;dev@datafusion.apache.org&gt;</author>
+      <author>Apache DataFusion &lt;dev@datafusion.apache.org></author>
       <name>datafusion-physical-plan</name>
       <version>54.0.0</version>
       <description>Physical (ExecutionPlan) implementations for DataFusion query engine</description>
@@ -453,7 +453,7 @@
       <licenses>
         <expression>Apache-2.0</expression>
       </licenses>
-      <purl>pkg:cargo/datafusion-physical-plan@54.0.0?vcs_url=git%2Bhttps://github.com/openobserve/datafusion%3Frev=869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b%40869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b</purl>
+      <purl>pkg:cargo/datafusion-physical-plan@54.0.0?vcs_url=git%2Bhttps://github.com/openobserve/datafusion%40869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b</purl>
       <externalReferences>
         <reference type="website">
           <url>https://datafusion.apache.org</url>
@@ -464,7 +464,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="git+https://github.com/openobserve/datafusion?rev=869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b#datafusion-proto-common@54.0.0">
-      <author>Apache DataFusion &lt;dev@datafusion.apache.org&gt;</author>
+      <author>Apache DataFusion &lt;dev@datafusion.apache.org></author>
       <name>datafusion-proto-common</name>
       <version>54.0.0</version>
       <description>Protobuf serialization of DataFusion common types</description>
@@ -472,7 +472,7 @@
       <licenses>
         <expression>Apache-2.0</expression>
       </licenses>
-      <purl>pkg:cargo/datafusion-proto-common@54.0.0?vcs_url=git%2Bhttps://github.com/openobserve/datafusion%3Frev=869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b%40869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b</purl>
+      <purl>pkg:cargo/datafusion-proto-common@54.0.0?vcs_url=git%2Bhttps://github.com/openobserve/datafusion%40869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b</purl>
       <externalReferences>
         <reference type="website">
           <url>https://datafusion.apache.org</url>
@@ -483,7 +483,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="git+https://github.com/openobserve/datafusion?rev=869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b#datafusion-proto@54.0.0">
-      <author>Apache DataFusion &lt;dev@datafusion.apache.org&gt;</author>
+      <author>Apache DataFusion &lt;dev@datafusion.apache.org></author>
       <name>datafusion-proto</name>
       <version>54.0.0</version>
       <description>Protobuf serialization of DataFusion logical plan expressions</description>
@@ -491,7 +491,7 @@
       <licenses>
         <expression>Apache-2.0</expression>
       </licenses>
-      <purl>pkg:cargo/datafusion-proto@54.0.0?vcs_url=git%2Bhttps://github.com/openobserve/datafusion%3Frev=869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b%40869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b</purl>
+      <purl>pkg:cargo/datafusion-proto@54.0.0?vcs_url=git%2Bhttps://github.com/openobserve/datafusion%40869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b</purl>
       <externalReferences>
         <reference type="website">
           <url>https://datafusion.apache.org</url>
@@ -502,7 +502,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="git+https://github.com/openobserve/datafusion?rev=869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b#datafusion-pruning@54.0.0">
-      <author>Apache DataFusion &lt;dev@datafusion.apache.org&gt;</author>
+      <author>Apache DataFusion &lt;dev@datafusion.apache.org></author>
       <name>datafusion-pruning</name>
       <version>54.0.0</version>
       <description>DataFusion Pruning Logic</description>
@@ -510,7 +510,7 @@
       <licenses>
         <expression>Apache-2.0</expression>
       </licenses>
-      <purl>pkg:cargo/datafusion-pruning@54.0.0?vcs_url=git%2Bhttps://github.com/openobserve/datafusion%3Frev=869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b%40869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b</purl>
+      <purl>pkg:cargo/datafusion-pruning@54.0.0?vcs_url=git%2Bhttps://github.com/openobserve/datafusion%40869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b</purl>
       <externalReferences>
         <reference type="website">
           <url>https://datafusion.apache.org</url>
@@ -521,7 +521,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="git+https://github.com/openobserve/datafusion?rev=869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b#datafusion-session@54.0.0">
-      <author>Apache DataFusion &lt;dev@datafusion.apache.org&gt;</author>
+      <author>Apache DataFusion &lt;dev@datafusion.apache.org></author>
       <name>datafusion-session</name>
       <version>54.0.0</version>
       <description>datafusion-session</description>
@@ -529,7 +529,7 @@
       <licenses>
         <expression>Apache-2.0</expression>
       </licenses>
-      <purl>pkg:cargo/datafusion-session@54.0.0?vcs_url=git%2Bhttps://github.com/openobserve/datafusion%3Frev=869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b%40869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b</purl>
+      <purl>pkg:cargo/datafusion-session@54.0.0?vcs_url=git%2Bhttps://github.com/openobserve/datafusion%40869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b</purl>
       <externalReferences>
         <reference type="website">
           <url>https://datafusion.apache.org</url>
@@ -540,7 +540,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#adler2@2.0.1">
-      <author>Jonas Schievink &lt;jonasschievink@gmail.com&gt;, oyvindln &lt;oyvindln@users.noreply.github.com&gt;</author>
+      <author>Jonas Schievink &lt;jonasschievink@gmail.com>, oyvindln &lt;oyvindln@users.noreply.github.com></author>
       <name>adler2</name>
       <version>2.0.1</version>
       <description>A simple clean-room implementation of the Adler-32 checksum</description>
@@ -562,7 +562,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#ahash@0.8.12">
-      <author>Tom Kaitchuck &lt;Tom.Kaitchuck@gmail.com&gt;</author>
+      <author>Tom Kaitchuck &lt;Tom.Kaitchuck@gmail.com></author>
       <name>ahash</name>
       <version>0.8.12</version>
       <description>A non-cryptographic hash function using AES-NI for high performance</description>
@@ -584,7 +584,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#aho-corasick@1.1.4">
-      <author>Andrew Gallant &lt;jamslam@gmail.com&gt;</author>
+      <author>Andrew Gallant &lt;jamslam@gmail.com></author>
       <name>aho-corasick</name>
       <version>1.1.4</version>
       <description>Fast multiple substring searching.</description>
@@ -606,10 +606,10 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#alloc-no-stdlib@2.0.4">
-      <author>Daniel Reiter Horn &lt;danielrh@dropbox.com&gt;</author>
+      <author>Daniel Reiter Horn &lt;danielrh@dropbox.com></author>
       <name>alloc-no-stdlib</name>
       <version>2.0.4</version>
-      <description>A dynamic allocator that may be used with or without the stdlib. This allows a package with nostd to allocate memory dynamically and be used either with a custom allocator, items on the stack, or by a package that wishes to simply use Box&lt;&gt;. It also provides options to use calloc or a mutable global variable for pre-zeroed memory</description>
+      <description>A dynamic allocator that may be used with or without the stdlib. This allows a package with nostd to allocate memory dynamically and be used either with a custom allocator, items on the stack, or by a package that wishes to simply use Box&lt;>. It also provides options to use calloc or a mutable global variable for pre-zeroed memory</description>
       <scope>required</scope>
       <hashes>
         <hash alg="SHA-256">cc7bb162ec39d46ab1ca8c77bf72e890535becd1751bb45f64c597edb4c8c6b3</hash>
@@ -631,7 +631,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#alloc-stdlib@0.2.2">
-      <author>Daniel Reiter Horn &lt;danielrh@dropbox.com&gt;</author>
+      <author>Daniel Reiter Horn &lt;danielrh@dropbox.com></author>
       <name>alloc-stdlib</name>
       <version>0.2.2</version>
       <description>A dynamic allocator example that may be used with the stdlib</description>
@@ -656,7 +656,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#allocator-api2@0.2.21">
-      <author>Zakarum &lt;zaq.dev@icloud.com&gt;</author>
+      <author>Zakarum &lt;zaq.dev@icloud.com></author>
       <name>allocator-api2</name>
       <version>0.2.21</version>
       <description>Mirror of Rust's allocator API</description>
@@ -681,7 +681,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#anyhow@1.0.103">
-      <author>David Tolnay &lt;dtolnay@gmail.com&gt;</author>
+      <author>David Tolnay &lt;dtolnay@gmail.com></author>
       <name>anyhow</name>
       <version>1.0.103</version>
       <description>Flexible concrete Error type built on std::error::Error</description>
@@ -721,7 +721,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#arrayref@0.3.9">
-      <author>David Roundy &lt;roundyd@physics.oregonstate.edu&gt;</author>
+      <author>David Roundy &lt;roundyd@physics.oregonstate.edu></author>
       <name>arrayref</name>
       <version>0.3.9</version>
       <description>Macros to take array references of slices</description>
@@ -765,7 +765,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#arrow-arith@58.3.0">
-      <author>Apache Arrow &lt;dev@arrow.apache.org&gt;</author>
+      <author>Apache Arrow &lt;dev@arrow.apache.org></author>
       <name>arrow-arith</name>
       <version>58.3.0</version>
       <description>Arrow arithmetic kernels</description>
@@ -787,7 +787,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#arrow-array@58.3.0">
-      <author>Apache Arrow &lt;dev@arrow.apache.org&gt;</author>
+      <author>Apache Arrow &lt;dev@arrow.apache.org></author>
       <name>arrow-array</name>
       <version>58.3.0</version>
       <description>Array abstractions for Apache Arrow</description>
@@ -809,7 +809,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#arrow-buffer@58.3.0">
-      <author>Apache Arrow &lt;dev@arrow.apache.org&gt;</author>
+      <author>Apache Arrow &lt;dev@arrow.apache.org></author>
       <name>arrow-buffer</name>
       <version>58.3.0</version>
       <description>Buffer abstractions for Apache Arrow</description>
@@ -831,7 +831,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#arrow-cast@58.3.0">
-      <author>Apache Arrow &lt;dev@arrow.apache.org&gt;</author>
+      <author>Apache Arrow &lt;dev@arrow.apache.org></author>
       <name>arrow-cast</name>
       <version>58.3.0</version>
       <description>Cast kernel and utilities for Apache Arrow</description>
@@ -853,7 +853,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#arrow-csv@58.3.0">
-      <author>Apache Arrow &lt;dev@arrow.apache.org&gt;</author>
+      <author>Apache Arrow &lt;dev@arrow.apache.org></author>
       <name>arrow-csv</name>
       <version>58.3.0</version>
       <description>Support for parsing CSV format to and from the Arrow format</description>
@@ -875,7 +875,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#arrow-data@58.3.0">
-      <author>Apache Arrow &lt;dev@arrow.apache.org&gt;</author>
+      <author>Apache Arrow &lt;dev@arrow.apache.org></author>
       <name>arrow-data</name>
       <version>58.3.0</version>
       <description>Array data abstractions for Apache Arrow</description>
@@ -897,7 +897,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#arrow-ipc@58.3.0">
-      <author>Apache Arrow &lt;dev@arrow.apache.org&gt;</author>
+      <author>Apache Arrow &lt;dev@arrow.apache.org></author>
       <name>arrow-ipc</name>
       <version>58.3.0</version>
       <description>Support for the Arrow IPC format</description>
@@ -919,7 +919,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#arrow-json@58.3.0">
-      <author>Apache Arrow &lt;dev@arrow.apache.org&gt;</author>
+      <author>Apache Arrow &lt;dev@arrow.apache.org></author>
       <name>arrow-json</name>
       <version>58.3.0</version>
       <description>Support for parsing JSON format to and from the Arrow format</description>
@@ -941,7 +941,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#arrow-ord@58.3.0">
-      <author>Apache Arrow &lt;dev@arrow.apache.org&gt;</author>
+      <author>Apache Arrow &lt;dev@arrow.apache.org></author>
       <name>arrow-ord</name>
       <version>58.3.0</version>
       <description>Ordering kernels for arrow arrays</description>
@@ -963,7 +963,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#arrow-row@58.3.0">
-      <author>Apache Arrow &lt;dev@arrow.apache.org&gt;</author>
+      <author>Apache Arrow &lt;dev@arrow.apache.org></author>
       <name>arrow-row</name>
       <version>58.3.0</version>
       <description>Arrow row format</description>
@@ -985,7 +985,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#arrow-schema@58.3.0">
-      <author>Apache Arrow &lt;dev@arrow.apache.org&gt;</author>
+      <author>Apache Arrow &lt;dev@arrow.apache.org></author>
       <name>arrow-schema</name>
       <version>58.3.0</version>
       <description>Defines the logical types for arrow arrays</description>
@@ -1007,7 +1007,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#arrow-select@58.3.0">
-      <author>Apache Arrow &lt;dev@arrow.apache.org&gt;</author>
+      <author>Apache Arrow &lt;dev@arrow.apache.org></author>
       <name>arrow-select</name>
       <version>58.3.0</version>
       <description>Selection kernels for arrow arrays</description>
@@ -1029,7 +1029,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#arrow-string@58.3.0">
-      <author>Apache Arrow &lt;dev@arrow.apache.org&gt;</author>
+      <author>Apache Arrow &lt;dev@arrow.apache.org></author>
       <name>arrow-string</name>
       <version>58.3.0</version>
       <description>String kernels for arrow arrays</description>
@@ -1051,7 +1051,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#arrow@58.3.0">
-      <author>Apache Arrow &lt;dev@arrow.apache.org&gt;</author>
+      <author>Apache Arrow &lt;dev@arrow.apache.org></author>
       <name>arrow</name>
       <version>58.3.0</version>
       <description>Rust implementation of Apache Arrow</description>
@@ -1073,7 +1073,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#async-compression@0.4.41">
-      <author>Wim Looman &lt;wim@nemo157.com&gt;, Allen Bui &lt;fairingrey@gmail.com&gt;</author>
+      <author>Wim Looman &lt;wim@nemo157.com>, Allen Bui &lt;fairingrey@gmail.com></author>
       <name>async-compression</name>
       <version>0.4.41</version>
       <description>Adaptors between compression crates and Rust's modern asynchronous IO types. </description>
@@ -1092,7 +1092,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#async-trait@0.1.89">
-      <author>David Tolnay &lt;dtolnay@gmail.com&gt;</author>
+      <author>David Tolnay &lt;dtolnay@gmail.com></author>
       <name>async-trait</name>
       <version>0.1.89</version>
       <description>Type erasure for async trait methods</description>
@@ -1136,7 +1136,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#atomic-waker@1.1.2">
-      <author>Stjepan Glavina &lt;stjepang@gmail.com&gt;, Contributors to futures-rs</author>
+      <author>Stjepan Glavina &lt;stjepang@gmail.com>, Contributors to futures-rs</author>
       <name>atomic-waker</name>
       <version>1.1.2</version>
       <description>A synchronization primitive for task wakeup</description>
@@ -1155,7 +1155,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#autocfg@1.5.0">
-      <author>Josh Stone &lt;cuviper@gmail.com&gt;</author>
+      <author>Josh Stone &lt;cuviper@gmail.com></author>
       <name>autocfg</name>
       <version>1.5.0</version>
       <description>Automatic cfg for Rust compiler features</description>
@@ -1290,7 +1290,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#base64@0.22.1">
-      <author>Marshall Pierce &lt;marshall@mpierce.org&gt;</author>
+      <author>Marshall Pierce &lt;marshall@mpierce.org></author>
       <name>base64</name>
       <version>0.22.1</version>
       <description>encodes and decodes base64 as bytes or utf8</description>
@@ -1359,7 +1359,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#blake3@1.8.3">
-      <author>Jack O'Connor &lt;oconnor663@gmail.com&gt;, Samuel Neves</author>
+      <author>Jack O'Connor &lt;oconnor663@gmail.com>, Samuel Neves</author>
       <name>blake3</name>
       <version>1.8.3</version>
       <description>the BLAKE3 hash function</description>
@@ -1425,7 +1425,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#brotli-decompressor@5.0.0">
-      <author>Daniel Reiter Horn &lt;danielrh@dropbox.com&gt;, The Brotli Authors</author>
+      <author>Daniel Reiter Horn &lt;danielrh@dropbox.com>, The Brotli Authors</author>
       <name>brotli-decompressor</name>
       <version>5.0.0</version>
       <description>A brotli decompressor that with an interface avoiding the rust stdlib. This makes it suitable for embedded devices and kernels. It is designed with a pluggable allocator so that the standard lib's allocator may be employed. The default build also includes a stdlib allocator and stream interface. Disable this with --features=no-stdlib. Alternatively, --features=unsafe turns off array bounds checks and memory initialization but provides a safe interface for the caller.  Without adding the --features=unsafe argument, all included code is safe. For compression in addition to this library, download https://github.com/dropbox/rust-brotli </description>
@@ -1450,7 +1450,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#brotli@8.0.2">
-      <author>Daniel Reiter Horn &lt;danielrh@dropbox.com&gt;, The Brotli Authors</author>
+      <author>Daniel Reiter Horn &lt;danielrh@dropbox.com>, The Brotli Authors</author>
       <name>brotli</name>
       <version>8.0.2</version>
       <description>A brotli compressor and decompressor that with an interface avoiding the rust stdlib. This makes it suitable for embedded devices and kernels. It is designed with a pluggable allocator so that the standard lib's allocator may be employed. The default build also includes a stdlib allocator and stream interface. Disable this with --features=no-stdlib. All included code is safe.</description>
@@ -1475,7 +1475,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#byteorder@1.5.0">
-      <author>Andrew Gallant &lt;jamslam@gmail.com&gt;</author>
+      <author>Andrew Gallant &lt;jamslam@gmail.com></author>
       <name>byteorder</name>
       <version>1.5.0</version>
       <description>Library for reading/writing numbers in big-endian and little-endian.</description>
@@ -1500,7 +1500,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#bytes@1.11.1">
-      <author>Carl Lerche &lt;me@carllerche.com&gt;, Sean McArthur &lt;sean@seanmonstar.com&gt;</author>
+      <author>Carl Lerche &lt;me@carllerche.com>, Sean McArthur &lt;sean@seanmonstar.com></author>
       <name>bytes</name>
       <version>1.11.1</version>
       <description>Types and traits for working with bytes</description>
@@ -1543,7 +1543,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#camino@1.2.3">
-      <author>Without Boats &lt;saoirse@without.boats&gt;, Ashley Williams &lt;ashley666ashley@gmail.com&gt;, Steve Klabnik &lt;steve@steveklabnik.com&gt;, Rain &lt;rain@sunshowers.io&gt;</author>
+      <author>Without Boats &lt;saoirse@without.boats>, Ashley Williams &lt;ashley666ashley@gmail.com>, Steve Klabnik &lt;steve@steveklabnik.com>, Rain &lt;rain@sunshowers.io></author>
       <name>camino</name>
       <version>1.2.3</version>
       <description>UTF-8 paths</description>
@@ -1589,7 +1589,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#cargo_metadata@0.19.2">
-      <author>Oliver Schneider &lt;git-spam-no-reply9815368754983@oli-obk.de&gt;</author>
+      <author>Oliver Schneider &lt;git-spam-no-reply9815368754983@oli-obk.de></author>
       <name>cargo_metadata</name>
       <version>0.19.2</version>
       <description>structured access to the output of `cargo metadata`</description>
@@ -1608,7 +1608,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#cc@1.2.56">
-      <author>Alex Crichton &lt;alex@alexcrichton.com&gt;</author>
+      <author>Alex Crichton &lt;alex@alexcrichton.com></author>
       <name>cc</name>
       <version>1.2.56</version>
       <description>A build-time dependency for Cargo build scripts to assist in invoking the native C compiler to compile native C code into a static archive to be linked into Rust code. </description>
@@ -1633,7 +1633,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#cfg-if@1.0.4">
-      <author>Alex Crichton &lt;alex@alexcrichton.com&gt;</author>
+      <author>Alex Crichton &lt;alex@alexcrichton.com></author>
       <name>cfg-if</name>
       <version>1.0.4</version>
       <description>A macro to ergonomically define an item depending on a large number of #[cfg] parameters. Structured like an if-else chain, the first matching branch is the item that gets emitted. </description>
@@ -1652,7 +1652,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#cfg_aliases@0.2.1">
-      <author>Zicklag &lt;zicklag@katharostech.com&gt;</author>
+      <author>Zicklag &lt;zicklag@katharostech.com></author>
       <name>cfg_aliases</name>
       <version>0.2.1</version>
       <description>A tiny utility to help save you a lot of effort with long winded `#[cfg()]` checks.</description>
@@ -1744,7 +1744,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#cmake@0.1.57">
-      <author>Alex Crichton &lt;alex@alexcrichton.com&gt;</author>
+      <author>Alex Crichton &lt;alex@alexcrichton.com></author>
       <name>cmake</name>
       <version>0.1.57</version>
       <description>A build dependency for running `cmake` to build a native library </description>
@@ -1769,7 +1769,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#comfy-table@7.2.2">
-      <author>Arne Beer &lt;contact@arne.beer&gt;</author>
+      <author>Arne Beer &lt;contact@arne.beer></author>
       <name>comfy-table</name>
       <version>7.2.2</version>
       <description>An easy to use library for building beautiful tables with automatic content wrapping</description>
@@ -1794,7 +1794,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#compression-codecs@0.4.37">
-      <author>Wim Looman &lt;wim@nemo157.com&gt;, Allen Bui &lt;fairingrey@gmail.com&gt;</author>
+      <author>Wim Looman &lt;wim@nemo157.com>, Allen Bui &lt;fairingrey@gmail.com></author>
       <name>compression-codecs</name>
       <version>0.4.37</version>
       <description>Adaptors for various compression algorithms. </description>
@@ -1813,7 +1813,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#compression-core@0.4.31">
-      <author>Wim Looman &lt;wim@nemo157.com&gt;, Allen Bui &lt;fairingrey@gmail.com&gt;</author>
+      <author>Wim Looman &lt;wim@nemo157.com>, Allen Bui &lt;fairingrey@gmail.com></author>
       <name>compression-core</name>
       <version>0.4.31</version>
       <description>Abstractions for compression algorithms. </description>
@@ -1879,7 +1879,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#const-random-macro@0.1.16">
-      <author>Tom Kaitchuck &lt;Tom.Kaitchuck@gmail.com&gt;</author>
+      <author>Tom Kaitchuck &lt;Tom.Kaitchuck@gmail.com></author>
       <name>const-random-macro</name>
       <version>0.1.16</version>
       <description>Provides the procedural macro used by const-random</description>
@@ -1901,7 +1901,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#const-random@0.1.18">
-      <author>Tom Kaitchuck &lt;Tom.Kaitchuck@gmail.com&gt;</author>
+      <author>Tom Kaitchuck &lt;Tom.Kaitchuck@gmail.com></author>
       <name>const-random</name>
       <version>0.1.18</version>
       <description>Provides compile time random number generation.</description>
@@ -1923,7 +1923,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#constant_time_eq@0.4.2">
-      <author>Cesar Eduardo Barros &lt;cesarb@cesarb.eti.br&gt;</author>
+      <author>Cesar Eduardo Barros &lt;cesarb@cesarb.eti.br></author>
       <name>constant_time_eq</name>
       <version>0.4.2</version>
       <description>Compares two equal-sized byte strings in constant time.</description>
@@ -2030,7 +2030,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#crc32fast@1.5.0">
-      <author>Sam Rijs &lt;srijs@airpost.net&gt;, Alex Crichton &lt;alex@alexcrichton.com&gt;</author>
+      <author>Sam Rijs &lt;srijs@airpost.net>, Alex Crichton &lt;alex@alexcrichton.com></author>
       <name>crc32fast</name>
       <version>1.5.0</version>
       <description>Fast, SIMD-accelerated CRC32 (IEEE) checksum computation</description>
@@ -2070,7 +2070,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#crunchy@0.2.4">
-      <author>Eira Fransham &lt;jackefransham@gmail.com&gt;</author>
+      <author>Eira Fransham &lt;jackefransham@gmail.com></author>
       <name>crunchy</name>
       <version>0.2.4</version>
       <description>Crunchy unroller: deterministically unroll constant loops</description>
@@ -2136,7 +2136,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#csv-core@0.1.13">
-      <author>Andrew Gallant &lt;jamslam@gmail.com&gt;</author>
+      <author>Andrew Gallant &lt;jamslam@gmail.com></author>
       <name>csv-core</name>
       <version>0.1.13</version>
       <description>Bare bones CSV parsing with no_std support.</description>
@@ -2161,7 +2161,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#csv@1.4.0">
-      <author>Andrew Gallant &lt;jamslam@gmail.com&gt;</author>
+      <author>Andrew Gallant &lt;jamslam@gmail.com></author>
       <name>csv</name>
       <version>1.4.0</version>
       <description>Fast CSV parsing with support for serde.</description>
@@ -2186,7 +2186,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#dashmap@6.1.0">
-      <author>Acrimon &lt;joel.wejdenstal@gmail.com&gt;</author>
+      <author>Acrimon &lt;joel.wejdenstal@gmail.com></author>
       <name>dashmap</name>
       <version>6.1.0</version>
       <description>Blazing fast concurrent HashMap for Rust.</description>
@@ -2255,7 +2255,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#displaydoc@0.2.5">
-      <author>Jane Lusby &lt;jlusby@yaah.dev&gt;</author>
+      <author>Jane Lusby &lt;jlusby@yaah.dev></author>
       <name>displaydoc</name>
       <version>0.2.5</version>
       <description>A derive macro for implementing the display Trait via a doc comment and string interpolation </description>
@@ -2280,7 +2280,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#dunce@1.0.5">
-      <author>Kornel &lt;kornel@geekhood.net&gt;</author>
+      <author>Kornel &lt;kornel@geekhood.net></author>
       <name>dunce</name>
       <version>1.0.5</version>
       <description>Normalize Windows paths to the most compatible format, avoiding UNC where possible</description>
@@ -2327,7 +2327,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#encoding_rs@0.8.35">
-      <author>Henri Sivonen &lt;hsivonen@hsivonen.fi&gt;</author>
+      <author>Henri Sivonen &lt;hsivonen@hsivonen.fi></author>
       <name>encoding_rs</name>
       <version>0.8.35</version>
       <description>A Gecko-oriented implementation of the Encoding Standard</description>
@@ -2370,7 +2370,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#erased-serde@0.4.10">
-      <author>David Tolnay &lt;dtolnay@gmail.com&gt;</author>
+      <author>David Tolnay &lt;dtolnay@gmail.com></author>
       <name>erased-serde</name>
       <version>0.4.10</version>
       <description>Type-erased Serialize and Serializer traits</description>
@@ -2392,7 +2392,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#errno@0.3.14">
-      <author>Chris Wong &lt;lambda.fairy@gmail.com&gt;, Dan Gohman &lt;dev@sunfishcode.online&gt;</author>
+      <author>Chris Wong &lt;lambda.fairy@gmail.com>, Dan Gohman &lt;dev@sunfishcode.online></author>
       <name>errno</name>
       <version>0.3.14</version>
       <description>Cross-platform interface to the `errno` variable.</description>
@@ -2414,7 +2414,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#fastrand@2.3.0">
-      <author>Stjepan Glavina &lt;stjepang@gmail.com&gt;</author>
+      <author>Stjepan Glavina &lt;stjepang@gmail.com></author>
       <name>fastrand</name>
       <version>2.3.0</version>
       <description>A simple and fast random number generator</description>
@@ -2476,7 +2476,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#flatbuffers@25.12.19">
-      <author>Robert Winslow &lt;hello@rwinslow.com&gt;, FlatBuffers Maintainers</author>
+      <author>Robert Winslow &lt;hello@rwinslow.com>, FlatBuffers Maintainers</author>
       <name>flatbuffers</name>
       <version>25.12.19</version>
       <description>Official FlatBuffers Rust runtime library.</description>
@@ -2498,7 +2498,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#flate2@1.1.9">
-      <author>Alex Crichton &lt;alex@alexcrichton.com&gt;, Josh Triplett &lt;josh@joshtriplett.org&gt;</author>
+      <author>Alex Crichton &lt;alex@alexcrichton.com>, Josh Triplett &lt;josh@joshtriplett.org></author>
       <name>flate2</name>
       <version>1.1.9</version>
       <description>DEFLATE compression and decompression exposed as Read/BufRead/Write streams. Supports miniz_oxide and multiple zlib implementations. Supports zlib, gzip, and raw deflate streams. </description>
@@ -2523,7 +2523,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#fnv@1.0.7">
-      <author>Alex Crichton &lt;alex@alexcrichton.com&gt;</author>
+      <author>Alex Crichton &lt;alex@alexcrichton.com></author>
       <name>fnv</name>
       <version>1.0.7</version>
       <description>Fowler–Noll–Vo hash function</description>
@@ -2545,7 +2545,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#foldhash@0.1.5">
-      <author>Orson Peters &lt;orsonpeters@gmail.com&gt;</author>
+      <author>Orson Peters &lt;orsonpeters@gmail.com></author>
       <name>foldhash</name>
       <version>0.1.5</version>
       <description>A fast, non-cryptographic, minimally DoS-resistant hashing algorithm.</description>
@@ -2564,7 +2564,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#foldhash@0.2.0">
-      <author>Orson Peters &lt;orsonpeters@gmail.com&gt;</author>
+      <author>Orson Peters &lt;orsonpeters@gmail.com></author>
       <name>foldhash</name>
       <version>0.2.0</version>
       <description>A fast, non-cryptographic, minimally DoS-resistant hashing algorithm.</description>
@@ -2602,7 +2602,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#fs_extra@1.3.0">
-      <author>Denis Kurilenko &lt;webdesus@gmail.com&gt;</author>
+      <author>Denis Kurilenko &lt;webdesus@gmail.com></author>
       <name>fs_extra</name>
       <version>1.3.0</version>
       <description>Expanding std::fs and std::io. Recursively copy folders with information about process and much more.</description>
@@ -2816,7 +2816,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#generic-array@0.14.7">
-      <author>Bartłomiej Kamiński &lt;fizyk20@gmail.com&gt;, Aaron Trent &lt;novacrazy@gmail.com&gt;</author>
+      <author>Bartłomiej Kamiński &lt;fizyk20@gmail.com>, Aaron Trent &lt;novacrazy@gmail.com></author>
       <name>generic-array</name>
       <version>0.14.7</version>
       <description>Generic types implementing functionality of arrays</description>
@@ -2929,7 +2929,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#h2@0.4.13">
-      <author>Carl Lerche &lt;me@carllerche.com&gt;, Sean McArthur &lt;sean@seanmonstar.com&gt;</author>
+      <author>Carl Lerche &lt;me@carllerche.com>, Sean McArthur &lt;sean@seanmonstar.com></author>
       <name>h2</name>
       <version>0.4.13</version>
       <description>An HTTP/2 client and server</description>
@@ -2951,7 +2951,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#half@2.7.1">
-      <author>Kathryn Long &lt;squeeself@gmail.com&gt;</author>
+      <author>Kathryn Long &lt;squeeself@gmail.com></author>
       <name>half</name>
       <version>2.7.1</version>
       <description>Half-precision floating point f16 and bf16 types for Rust implementing the IEEE 754-2008 standard binary16 and bfloat16 types.</description>
@@ -2970,7 +2970,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#hashbrown@0.14.5">
-      <author>Amanieu d'Antras &lt;amanieu@gmail.com&gt;</author>
+      <author>Amanieu d'Antras &lt;amanieu@gmail.com></author>
       <name>hashbrown</name>
       <version>0.14.5</version>
       <description>A Rust port of Google's SwissTable hash map</description>
@@ -2989,7 +2989,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#hashbrown@0.15.5">
-      <author>Amanieu d'Antras &lt;amanieu@gmail.com&gt;</author>
+      <author>Amanieu d'Antras &lt;amanieu@gmail.com></author>
       <name>hashbrown</name>
       <version>0.15.5</version>
       <description>A Rust port of Google's SwissTable hash map</description>
@@ -3026,7 +3026,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#hdrhistogram@7.5.4">
-      <author>Jon Gjengset &lt;jon@thesquareplanet.com&gt;, Marshall Pierce &lt;marshall@mpierce.org&gt;</author>
+      <author>Jon Gjengset &lt;jon@thesquareplanet.com>, Marshall Pierce &lt;marshall@mpierce.org></author>
       <name>hdrhistogram</name>
       <version>7.5.4</version>
       <description>A port of HdrHistogram to Rust</description>
@@ -3051,7 +3051,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#heck@0.4.1">
-      <author>Without Boats &lt;woboats@gmail.com&gt;</author>
+      <author>Without Boats &lt;woboats@gmail.com></author>
       <name>heck</name>
       <version>0.4.1</version>
       <description>heck is a case conversion library.</description>
@@ -3076,7 +3076,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#hex@0.4.3">
-      <author>KokaKiwi &lt;kokakiwi@kokakiwi.net&gt;</author>
+      <author>KokaKiwi &lt;kokakiwi@kokakiwi.net></author>
       <name>hex</name>
       <version>0.4.3</version>
       <description>Encoding and decoding data into/from hexadecimal representation.</description>
@@ -3098,7 +3098,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#http-body-util@0.1.3">
-      <author>Carl Lerche &lt;me@carllerche.com&gt;, Lucio Franco &lt;luciofranco14@gmail.com&gt;, Sean McArthur &lt;sean@seanmonstar.com&gt;</author>
+      <author>Carl Lerche &lt;me@carllerche.com>, Lucio Franco &lt;luciofranco14@gmail.com>, Sean McArthur &lt;sean@seanmonstar.com></author>
       <name>http-body-util</name>
       <version>0.1.3</version>
       <description>Combinators and adapters for HTTP request or response bodies. </description>
@@ -3120,7 +3120,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#http-body@1.0.1">
-      <author>Carl Lerche &lt;me@carllerche.com&gt;, Lucio Franco &lt;luciofranco14@gmail.com&gt;, Sean McArthur &lt;sean@seanmonstar.com&gt;</author>
+      <author>Carl Lerche &lt;me@carllerche.com>, Lucio Franco &lt;luciofranco14@gmail.com>, Sean McArthur &lt;sean@seanmonstar.com></author>
       <name>http-body</name>
       <version>1.0.1</version>
       <description>Trait representing an asynchronous, streaming, HTTP request or response body. </description>
@@ -3142,7 +3142,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#http@1.4.0">
-      <author>Alex Crichton &lt;alex@alexcrichton.com&gt;, Carl Lerche &lt;me@carllerche.com&gt;, Sean McArthur &lt;sean@seanmonstar.com&gt;</author>
+      <author>Alex Crichton &lt;alex@alexcrichton.com>, Carl Lerche &lt;me@carllerche.com>, Sean McArthur &lt;sean@seanmonstar.com></author>
       <name>http</name>
       <version>1.4.0</version>
       <description>A set of types for representing HTTP requests and responses. </description>
@@ -3164,7 +3164,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#httparse@1.10.1">
-      <author>Sean McArthur &lt;sean@seanmonstar.com&gt;</author>
+      <author>Sean McArthur &lt;sean@seanmonstar.com></author>
       <name>httparse</name>
       <version>1.10.1</version>
       <description>A tiny, safe, speedy, zero-copy HTTP/1.x parser.</description>
@@ -3186,7 +3186,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#httpdate@1.0.3">
-      <author>Pyfisch &lt;pyfisch@posteo.org&gt;</author>
+      <author>Pyfisch &lt;pyfisch@posteo.org></author>
       <name>httpdate</name>
       <version>1.0.3</version>
       <description>HTTP date parsing and formatting</description>
@@ -3275,7 +3275,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#hyper-timeout@0.5.2">
-      <author>Herman J. Radtke III &lt;herman@hermanradtke.com&gt;</author>
+      <author>Herman J. Radtke III &lt;herman@hermanradtke.com></author>
       <name>hyper-timeout</name>
       <version>0.5.2</version>
       <description>A connect, read and write timeout aware connector to be used with hyper Client.</description>
@@ -3300,7 +3300,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#hyper-util@0.1.20">
-      <author>Sean McArthur &lt;sean@seanmonstar.com&gt;</author>
+      <author>Sean McArthur &lt;sean@seanmonstar.com></author>
       <name>hyper-util</name>
       <version>0.1.20</version>
       <description>hyper utilities</description>
@@ -3325,7 +3325,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#hyper@1.8.1">
-      <author>Sean McArthur &lt;sean@seanmonstar.com&gt;</author>
+      <author>Sean McArthur &lt;sean@seanmonstar.com></author>
       <name>hyper</name>
       <version>1.8.1</version>
       <description>A protective and efficient HTTP library for all.</description>
@@ -3350,7 +3350,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#iana-time-zone@0.1.65">
-      <author>Andrew Straw &lt;strawman@astraw.com&gt;, René Kijewski &lt;rene.kijewski@fu-berlin.de&gt;, Ryan Lopopolo &lt;rjl@hyperbo.la&gt;</author>
+      <author>Andrew Straw &lt;strawman@astraw.com>, René Kijewski &lt;rene.kijewski@fu-berlin.de>, Ryan Lopopolo &lt;rjl@hyperbo.la></author>
       <name>iana-time-zone</name>
       <version>0.1.65</version>
       <description>get the IANA time zone for the current system</description>
@@ -3588,7 +3588,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#integer-encoding@3.0.4">
-      <author>Lewin Bormann &lt;lbo@spheniscida.de&gt;</author>
+      <author>Lewin Bormann &lt;lbo@spheniscida.de></author>
       <name>integer-encoding</name>
       <version>3.0.4</version>
       <description>varint+zigzag and fixedint integer encoding/decoding (https://developers.google.com/protocol-buffers/docs/encoding)</description>
@@ -3610,7 +3610,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#inventory@0.3.22">
-      <author>David Tolnay &lt;dtolnay@gmail.com&gt;</author>
+      <author>David Tolnay &lt;dtolnay@gmail.com></author>
       <name>inventory</name>
       <version>0.3.22</version>
       <description>Typed distributed plugin registration</description>
@@ -3632,7 +3632,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#ipnet@2.12.0">
-      <author>Kris Price &lt;kris@krisprice.nz&gt;</author>
+      <author>Kris Price &lt;kris@krisprice.nz></author>
       <name>ipnet</name>
       <version>2.12.0</version>
       <description>Provides types and useful methods for working with IPv4 and IPv6 network addresses, commonly called IP prefixes. The new `IpNet`, `Ipv4Net`, and `Ipv6Net` types build on the existing `IpAddr`, `Ipv4Addr`, and `Ipv6Addr` types already provided in Rust's standard library and align to their design to stay consistent. The module also provides useful traits that extend `Ipv4Addr` and `Ipv6Addr` with methods for `Add`, `Sub`, `BitAnd`, and `BitOr` operations. The module only uses stable feature so it is guaranteed to compile using the stable toolchain.</description>
@@ -3654,7 +3654,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#iri-string@0.7.10">
-      <author>YOSHIOKA Takuma &lt;nop_thread@nops.red&gt;</author>
+      <author>YOSHIOKA Takuma &lt;nop_thread@nops.red></author>
       <name>iri-string</name>
       <version>0.7.10</version>
       <description>IRI as string types</description>
@@ -3695,7 +3695,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#itoa@1.0.17">
-      <author>David Tolnay &lt;dtolnay@gmail.com&gt;</author>
+      <author>David Tolnay &lt;dtolnay@gmail.com></author>
       <name>itoa</name>
       <version>1.0.17</version>
       <description>Fast integer primitive to string conversion</description>
@@ -3717,7 +3717,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#jobserver@0.1.34">
-      <author>Alex Crichton &lt;alex@alexcrichton.com&gt;</author>
+      <author>Alex Crichton &lt;alex@alexcrichton.com></author>
       <name>jobserver</name>
       <version>0.1.34</version>
       <description>An implementation of the GNU Make jobserver for Rust. </description>
@@ -3742,7 +3742,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#lexical-core@1.0.6">
-      <author>Alex Huszagh &lt;ahuszagh@gmail.com&gt;</author>
+      <author>Alex Huszagh &lt;ahuszagh@gmail.com></author>
       <name>lexical-core</name>
       <version>1.0.6</version>
       <description>Lexical, to- and from-string conversion routines.</description>
@@ -3761,7 +3761,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#lexical-parse-float@1.0.6">
-      <author>Alex Huszagh &lt;ahuszagh@gmail.com&gt;</author>
+      <author>Alex Huszagh &lt;ahuszagh@gmail.com></author>
       <name>lexical-parse-float</name>
       <version>1.0.6</version>
       <description>Efficient parsing of floats from strings.</description>
@@ -3780,7 +3780,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#lexical-parse-integer@1.0.6">
-      <author>Alex Huszagh &lt;ahuszagh@gmail.com&gt;</author>
+      <author>Alex Huszagh &lt;ahuszagh@gmail.com></author>
       <name>lexical-parse-integer</name>
       <version>1.0.6</version>
       <description>Efficient parsing of integers from strings.</description>
@@ -3799,7 +3799,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#lexical-util@1.0.7">
-      <author>Alex Huszagh &lt;ahuszagh@gmail.com&gt;</author>
+      <author>Alex Huszagh &lt;ahuszagh@gmail.com></author>
       <name>lexical-util</name>
       <version>1.0.7</version>
       <description>Shared utilities for lexical creates.</description>
@@ -3818,7 +3818,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#lexical-write-float@1.0.6">
-      <author>Alex Huszagh &lt;ahuszagh@gmail.com&gt;</author>
+      <author>Alex Huszagh &lt;ahuszagh@gmail.com></author>
       <name>lexical-write-float</name>
       <version>1.0.6</version>
       <description>Efficient formatting of floats to strings.</description>
@@ -3837,7 +3837,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#lexical-write-integer@1.0.6">
-      <author>Alex Huszagh &lt;ahuszagh@gmail.com&gt;</author>
+      <author>Alex Huszagh &lt;ahuszagh@gmail.com></author>
       <name>lexical-write-integer</name>
       <version>1.0.6</version>
       <description>Efficient formatting of integers to strings.</description>
@@ -3896,7 +3896,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#liblzma-sys@0.4.5">
-      <author>Alex Crichton &lt;alex@alexcrichton.com&gt;, Portable-Network-Archive Developers</author>
+      <author>Alex Crichton &lt;alex@alexcrichton.com>, Portable-Network-Archive Developers</author>
       <name>liblzma-sys</name>
       <version>0.4.5</version>
       <description>Raw bindings to liblzma which contains an implementation of LZMA and xz stream encoding/decoding.  High level Rust bindings are available in the `liblzma` crate. </description>
@@ -3921,7 +3921,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#liblzma@0.4.6">
-      <author>Alex Crichton &lt;alex@alexcrichton.com&gt;, Portable-Network-Archive Developers</author>
+      <author>Alex Crichton &lt;alex@alexcrichton.com>, Portable-Network-Archive Developers</author>
       <name>liblzma</name>
       <version>0.4.6</version>
       <description>Rust bindings to liblzma providing Read/Write streams as well as low-level in-memory encoding/decoding. forked from xz2. </description>
@@ -3943,7 +3943,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#libm@0.2.16">
-      <author>Alex Crichton &lt;alex@alexcrichton.com&gt;, Amanieu d'Antras &lt;amanieu@gmail.com&gt;, Jorge Aparicio &lt;japaricious@gmail.com&gt;, Trevor Gross &lt;tg@trevorgross.com&gt;</author>
+      <author>Alex Crichton &lt;alex@alexcrichton.com>, Amanieu d'Antras &lt;amanieu@gmail.com>, Jorge Aparicio &lt;japaricious@gmail.com>, Trevor Gross &lt;tg@trevorgross.com></author>
       <name>libm</name>
       <version>0.2.16</version>
       <description>libm in pure Rust</description>
@@ -3962,7 +3962,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#libz-sys@1.1.24">
-      <author>Alex Crichton &lt;alex@alexcrichton.com&gt;, Josh Triplett &lt;josh@joshtriplett.org&gt;, Sebastian Thiel &lt;sebastian.thiel@icloud.com&gt;</author>
+      <author>Alex Crichton &lt;alex@alexcrichton.com>, Josh Triplett &lt;josh@joshtriplett.org>, Sebastian Thiel &lt;sebastian.thiel@icloud.com></author>
       <name>libz-sys</name>
       <version>1.1.24</version>
       <description>Low-level bindings to the system libz library (also known as zlib).</description>
@@ -4006,7 +4006,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#lock_api@0.4.14">
-      <author>Amanieu d'Antras &lt;amanieu@gmail.com&gt;</author>
+      <author>Amanieu d'Antras &lt;amanieu@gmail.com></author>
       <name>lock_api</name>
       <version>0.4.14</version>
       <description>Wrappers to create fully-featured Mutex and RwLock types. Compatible with no_std.</description>
@@ -4047,7 +4047,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#lru-slab@0.1.2">
-      <author>Benjamin Saunders &lt;ben.e.saunders@gmail.com&gt;</author>
+      <author>Benjamin Saunders &lt;ben.e.saunders@gmail.com></author>
       <name>lru-slab</name>
       <version>0.1.2</version>
       <description>Pre-allocated storage with constant-time LRU tracking</description>
@@ -4066,7 +4066,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#lz4_flex@0.13.1">
-      <author>Pascal Seitz &lt;pascal.seitz@gmail.com&gt;, Arthur Silva &lt;arthurprs@gmail.com&gt;, ticki &lt;Ticki@users.noreply.github.com&gt;</author>
+      <author>Pascal Seitz &lt;pascal.seitz@gmail.com>, Arthur Silva &lt;arthurprs@gmail.com>, ticki &lt;Ticki@users.noreply.github.com></author>
       <name>lz4_flex</name>
       <version>0.13.1</version>
       <description>Fastest LZ4 implementation in Rust, no unsafe by default.</description>
@@ -4088,7 +4088,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#matchit@0.8.4">
-      <author>Ibraheem Ahmed &lt;ibraheem@ibraheem.ca&gt;</author>
+      <author>Ibraheem Ahmed &lt;ibraheem@ibraheem.ca></author>
       <name>matchit</name>
       <version>0.8.4</version>
       <description>A high performance, zero-copy URL router.</description>
@@ -4151,7 +4151,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#memchr@2.8.0">
-      <author>Andrew Gallant &lt;jamslam@gmail.com&gt;, bluss</author>
+      <author>Andrew Gallant &lt;jamslam@gmail.com>, bluss</author>
       <name>memchr</name>
       <version>2.8.0</version>
       <description>Provides extremely fast (uses SIMD on x86_64, aarch64 and wasm32) routines for 1, 2 or 3 byte search and single substring search. </description>
@@ -4176,7 +4176,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#mime@0.3.17">
-      <author>Sean McArthur &lt;sean@seanmonstar.com&gt;</author>
+      <author>Sean McArthur &lt;sean@seanmonstar.com></author>
       <name>mime</name>
       <version>0.3.17</version>
       <description>Strongly Typed Mimes</description>
@@ -4198,7 +4198,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#miniz_oxide@0.8.9">
-      <author>Frommi &lt;daniil.liferenko@gmail.com&gt;, oyvindln &lt;oyvindln@users.noreply.github.com&gt;, Rich Geldreich richgel99@gmail.com</author>
+      <author>Frommi &lt;daniil.liferenko@gmail.com>, oyvindln &lt;oyvindln@users.noreply.github.com>, Rich Geldreich richgel99@gmail.com</author>
       <name>miniz_oxide</name>
       <version>0.8.9</version>
       <description>DEFLATE compression and decompression library rewritten in Rust based on miniz</description>
@@ -4223,7 +4223,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#mio@1.2.1">
-      <author>Carl Lerche &lt;me@carllerche.com&gt;, Thomas de Zeeuw &lt;thomasdezeeuw@gmail.com&gt;, Tokio Contributors &lt;team@tokio.rs&gt;</author>
+      <author>Carl Lerche &lt;me@carllerche.com>, Thomas de Zeeuw &lt;thomasdezeeuw@gmail.com>, Tokio Contributors &lt;team@tokio.rs></author>
       <name>mio</name>
       <version>1.2.1</version>
       <description>Lightweight non-blocking I/O.</description>
@@ -4245,7 +4245,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#multer@3.1.0">
-      <author>Rousan Ali &lt;hello@rousan.io&gt;</author>
+      <author>Rousan Ali &lt;hello@rousan.io></author>
       <name>multer</name>
       <version>3.1.0</version>
       <description>An async parser for `multipart/form-data` content-type in Rust.</description>
@@ -4267,7 +4267,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#multimap@0.10.1">
-      <author>Håvar Nøvik &lt;havar.novik@gmail.com&gt;</author>
+      <author>Håvar Nøvik &lt;havar.novik@gmail.com></author>
       <name>multimap</name>
       <version>0.10.1</version>
       <description>A multimap implementation.</description>
@@ -4407,7 +4407,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#once_cell@1.21.3">
-      <author>Aleksey Kladov &lt;aleksey.kladov@gmail.com&gt;</author>
+      <author>Aleksey Kladov &lt;aleksey.kladov@gmail.com></author>
       <name>once_cell</name>
       <version>1.21.3</version>
       <description>Single assignment cells and lazy values.</description>
@@ -4429,7 +4429,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#ordered-float@2.10.1">
-      <author>Jonathan Reem &lt;jonathan.reem@gmail.com&gt;, Matt Brubeck &lt;mbrubeck@limpet.net&gt;</author>
+      <author>Jonathan Reem &lt;jonathan.reem@gmail.com>, Matt Brubeck &lt;mbrubeck@limpet.net></author>
       <name>ordered-float</name>
       <version>2.10.1</version>
       <description>Wrappers for total ordering on floats</description>
@@ -4448,7 +4448,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#parking_lot@0.12.5">
-      <author>Amanieu d'Antras &lt;amanieu@gmail.com&gt;</author>
+      <author>Amanieu d'Antras &lt;amanieu@gmail.com></author>
       <name>parking_lot</name>
       <version>0.12.5</version>
       <description>More compact and efficient implementations of the standard synchronization primitives.</description>
@@ -4467,7 +4467,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#parking_lot_core@0.9.12">
-      <author>Amanieu d'Antras &lt;amanieu@gmail.com&gt;</author>
+      <author>Amanieu d'Antras &lt;amanieu@gmail.com></author>
       <name>parking_lot_core</name>
       <version>0.9.12</version>
       <description>An advanced API for creating custom synchronization primitives.</description>
@@ -4486,7 +4486,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#parquet@58.3.0">
-      <author>Apache Arrow &lt;dev@arrow.apache.org&gt;</author>
+      <author>Apache Arrow &lt;dev@arrow.apache.org></author>
       <name>parquet</name>
       <version>58.3.0</version>
       <description>Apache Parquet implementation in Rust</description>
@@ -4508,7 +4508,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#paste@1.0.15">
-      <author>David Tolnay &lt;dtolnay@gmail.com&gt;</author>
+      <author>David Tolnay &lt;dtolnay@gmail.com></author>
       <name>paste</name>
       <version>1.0.15</version>
       <description>Macros for all your token pasting needs</description>
@@ -4571,7 +4571,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#phf@0.12.1">
-      <author>Steven Fackler &lt;sfackler@gmail.com&gt;</author>
+      <author>Steven Fackler &lt;sfackler@gmail.com></author>
       <name>phf</name>
       <version>0.12.1</version>
       <description>Runtime support for perfect hash function data structures</description>
@@ -4590,7 +4590,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#phf_shared@0.12.1">
-      <author>Steven Fackler &lt;sfackler@gmail.com&gt;</author>
+      <author>Steven Fackler &lt;sfackler@gmail.com></author>
       <name>phf_shared</name>
       <version>0.12.1</version>
       <description>Support code shared by PHF libraries</description>
@@ -4663,7 +4663,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#pin-utils@0.1.0">
-      <author>Josef Brandl &lt;mail@josefbrandl.de&gt;</author>
+      <author>Josef Brandl &lt;mail@josefbrandl.de></author>
       <name>pin-utils</name>
       <version>0.1.0</version>
       <description>Utilities for pinning </description>
@@ -4685,7 +4685,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#pkg-config@0.3.32">
-      <author>Alex Crichton &lt;alex@alexcrichton.com&gt;</author>
+      <author>Alex Crichton &lt;alex@alexcrichton.com></author>
       <name>pkg-config</name>
       <version>0.3.32</version>
       <description>A library to run the pkg-config system tool at build time in order to be used in Cargo build scripts. </description>
@@ -4748,7 +4748,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#prettyplease@0.2.37">
-      <author>David Tolnay &lt;dtolnay@gmail.com&gt;</author>
+      <author>David Tolnay &lt;dtolnay@gmail.com></author>
       <name>prettyplease</name>
       <version>0.2.37</version>
       <description>A minimal `syn` syntax tree pretty-printer</description>
@@ -4773,7 +4773,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#proc-macro2@1.0.106">
-      <author>David Tolnay &lt;dtolnay@gmail.com&gt;, Alex Crichton &lt;alex@alexcrichton.com&gt;</author>
+      <author>David Tolnay &lt;dtolnay@gmail.com>, Alex Crichton &lt;alex@alexcrichton.com></author>
       <name>proc-macro2</name>
       <version>1.0.106</version>
       <description>A substitute implementation of the compiler's `proc_macro` API to decouple token-based libraries from the procedural macro use case.</description>
@@ -4795,7 +4795,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#prost-build@0.14.3">
-      <author>Dan Burkert &lt;dan@danburkert.com&gt;, Lucio Franco &lt;luciofranco14@gmail.com&gt;, Casper Meijn &lt;casper@meijn.net&gt;, Tokio Contributors &lt;team@tokio.rs&gt;</author>
+      <author>Dan Burkert &lt;dan@danburkert.com>, Lucio Franco &lt;luciofranco14@gmail.com>, Casper Meijn &lt;casper@meijn.net>, Tokio Contributors &lt;team@tokio.rs></author>
       <name>prost-build</name>
       <version>0.14.3</version>
       <description>Generate Prost annotated Rust types from Protocol Buffers files.</description>
@@ -4814,7 +4814,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#prost-derive@0.14.3">
-      <author>Dan Burkert &lt;dan@danburkert.com&gt;, Lucio Franco &lt;luciofranco14@gmail.com&gt;, Casper Meijn &lt;casper@meijn.net&gt;, Tokio Contributors &lt;team@tokio.rs&gt;</author>
+      <author>Dan Burkert &lt;dan@danburkert.com>, Lucio Franco &lt;luciofranco14@gmail.com>, Casper Meijn &lt;casper@meijn.net>, Tokio Contributors &lt;team@tokio.rs></author>
       <name>prost-derive</name>
       <version>0.14.3</version>
       <description>Generate encoding and decoding implementations for Prost annotated types.</description>
@@ -4833,7 +4833,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#prost-types@0.14.3">
-      <author>Dan Burkert &lt;dan@danburkert.com&gt;, Lucio Franco &lt;luciofranco14@gmail.com&gt;, Casper Meijn &lt;casper@meijn.net&gt;, Tokio Contributors &lt;team@tokio.rs&gt;</author>
+      <author>Dan Burkert &lt;dan@danburkert.com>, Lucio Franco &lt;luciofranco14@gmail.com>, Casper Meijn &lt;casper@meijn.net>, Tokio Contributors &lt;team@tokio.rs></author>
       <name>prost-types</name>
       <version>0.14.3</version>
       <description>Prost definitions of Protocol Buffers well known types.</description>
@@ -4852,7 +4852,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#prost-wkt-build@0.7.1">
-      <author>fdeantoni &lt;fdeantoni@gmail.com&gt;</author>
+      <author>fdeantoni &lt;fdeantoni@gmail.com></author>
       <name>prost-wkt-build</name>
       <version>0.7.1</version>
       <description>Helper crate for prost to allow JSON serialization and deserialization of Well Known Types.</description>
@@ -4874,7 +4874,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#prost-wkt-types@0.7.1">
-      <author>fdeantoni &lt;fdeantoni@gmail.com&gt;</author>
+      <author>fdeantoni &lt;fdeantoni@gmail.com></author>
       <name>prost-wkt-types</name>
       <version>0.7.1</version>
       <description>Helper crate for prost to allow JSON serialization and deserialization of Well Known Types.</description>
@@ -4896,7 +4896,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#prost-wkt@0.7.1">
-      <author>fdeantoni &lt;fdeantoni@gmail.com&gt;</author>
+      <author>fdeantoni &lt;fdeantoni@gmail.com></author>
       <name>prost-wkt</name>
       <version>0.7.1</version>
       <description>Helper crate for prost to allow JSON serialization and deserialization of Well Known Types.</description>
@@ -4918,7 +4918,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#prost@0.14.3">
-      <author>Dan Burkert &lt;dan@danburkert.com&gt;, Lucio Franco &lt;luciofranco14@gmail.com&gt;, Casper Meijn &lt;casper@meijn.net&gt;, Tokio Contributors &lt;team@tokio.rs&gt;</author>
+      <author>Dan Burkert &lt;dan@danburkert.com>, Lucio Franco &lt;luciofranco14@gmail.com>, Casper Meijn &lt;casper@meijn.net>, Tokio Contributors &lt;team@tokio.rs></author>
       <name>prost</name>
       <version>0.14.3</version>
       <description>A Protocol Buffers implementation for the Rust Language.</description>
@@ -4937,7 +4937,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#psm@0.1.30">
-      <author>Simonas Kazlauskas &lt;psm@kazlauskas.me&gt;</author>
+      <author>Simonas Kazlauskas &lt;psm@kazlauskas.me></author>
       <name>psm</name>
       <version>0.1.30</version>
       <description>Portable Stack Manipulation: stack manipulation and introspection routines</description>
@@ -4959,7 +4959,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#pulldown-cmark-to-cmark@22.0.0">
-      <author>Sebastian Thiel &lt;byronimo@gmail.com&gt;, Dylan Owen &lt;dyltotheo@gmail.com&gt;, Alessandro Ogier &lt;alessandro.ogier@gmail.com&gt;, Zixian Cai &lt;2891235+caizixian@users.noreply.github.com&gt;, Andrew Lyjak &lt;andrew.lyjak@gmail.com&gt;</author>
+      <author>Sebastian Thiel &lt;byronimo@gmail.com>, Dylan Owen &lt;dyltotheo@gmail.com>, Alessandro Ogier &lt;alessandro.ogier@gmail.com>, Zixian Cai &lt;2891235+caizixian@users.noreply.github.com>, Andrew Lyjak &lt;andrew.lyjak@gmail.com></author>
       <name>pulldown-cmark-to-cmark</name>
       <version>22.0.0</version>
       <description>Convert pulldown-cmark Events back to the string they were parsed from</description>
@@ -4984,7 +4984,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#pulldown-cmark@0.13.1">
-      <author>Raph Levien &lt;raph.levien@gmail.com&gt;, Marcus Klaas de Vries &lt;mail@marcusklaas.nl&gt;</author>
+      <author>Raph Levien &lt;raph.levien@gmail.com>, Marcus Klaas de Vries &lt;mail@marcusklaas.nl></author>
       <name>pulldown-cmark</name>
       <version>0.13.1</version>
       <description>A pull parser for CommonMark</description>
@@ -5078,7 +5078,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#quote@1.0.45">
-      <author>David Tolnay &lt;dtolnay@gmail.com&gt;</author>
+      <author>David Tolnay &lt;dtolnay@gmail.com></author>
       <name>quote</name>
       <version>1.0.45</version>
       <description>Quasi-quoting macro quote!(...)</description>
@@ -5250,7 +5250,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#recursive-proc-macro-impl@0.1.1">
-      <author>Orson Peters &lt;orsonpeters@gmail.com&gt;</author>
+      <author>Orson Peters &lt;orsonpeters@gmail.com></author>
       <name>recursive-proc-macro-impl</name>
       <version>0.1.1</version>
       <description>Procedural macros for the recursive crate.</description>
@@ -5269,7 +5269,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#recursive@0.1.1">
-      <author>Orson Peters &lt;orsonpeters@gmail.com&gt;</author>
+      <author>Orson Peters &lt;orsonpeters@gmail.com></author>
       <name>recursive</name>
       <version>0.1.1</version>
       <description>Easy recursion without stack overflows.</description>
@@ -5288,7 +5288,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#regex-automata@0.4.14">
-      <author>The Rust Project Developers, Andrew Gallant &lt;jamslam@gmail.com&gt;</author>
+      <author>The Rust Project Developers, Andrew Gallant &lt;jamslam@gmail.com></author>
       <name>regex-automata</name>
       <version>0.4.14</version>
       <description>Automata construction and matching using regular expressions.</description>
@@ -5313,7 +5313,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#regex-syntax@0.8.10">
-      <author>The Rust Project Developers, Andrew Gallant &lt;jamslam@gmail.com&gt;</author>
+      <author>The Rust Project Developers, Andrew Gallant &lt;jamslam@gmail.com></author>
       <name>regex-syntax</name>
       <version>0.8.10</version>
       <description>A regular expression parser.</description>
@@ -5338,7 +5338,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#regex@1.12.3">
-      <author>The Rust Project Developers, Andrew Gallant &lt;jamslam@gmail.com&gt;</author>
+      <author>The Rust Project Developers, Andrew Gallant &lt;jamslam@gmail.com></author>
       <name>regex</name>
       <version>1.12.3</version>
       <description>An implementation of regular expressions for Rust. This implementation uses finite automata and guarantees linear time matching on all inputs. </description>
@@ -5363,7 +5363,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#reqwest@0.12.28">
-      <author>Sean McArthur &lt;sean@seanmonstar.com&gt;</author>
+      <author>Sean McArthur &lt;sean@seanmonstar.com></author>
       <name>reqwest</name>
       <version>0.12.28</version>
       <description>higher level HTTP client library</description>
@@ -5446,7 +5446,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#rustix@1.1.4">
-      <author>Dan Gohman &lt;dev@sunfishcode.online&gt;, Jakub Konka &lt;kubkon@jakubkonka.com&gt;</author>
+      <author>Dan Gohman &lt;dev@sunfishcode.online>, Jakub Konka &lt;kubkon@jakubkonka.com></author>
       <name>rustix</name>
       <version>1.1.4</version>
       <description>Safe Rust bindings to POSIX/Unix/Linux/Winsock-like syscalls</description>
@@ -5552,7 +5552,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#ryu@1.0.23">
-      <author>David Tolnay &lt;dtolnay@gmail.com&gt;</author>
+      <author>David Tolnay &lt;dtolnay@gmail.com></author>
       <name>ryu</name>
       <version>1.0.23</version>
       <description>Fast floating point to string conversion</description>
@@ -5574,7 +5574,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#same-file@1.0.6">
-      <author>Andrew Gallant &lt;jamslam@gmail.com&gt;</author>
+      <author>Andrew Gallant &lt;jamslam@gmail.com></author>
       <name>same-file</name>
       <version>1.0.6</version>
       <description>A simple crate for determining whether two file paths point to the same file. </description>
@@ -5621,7 +5621,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#security-framework-sys@2.17.0">
-      <author>Steven Fackler &lt;sfackler@gmail.com&gt;, Kornel &lt;kornel@geekhood.net&gt;</author>
+      <author>Steven Fackler &lt;sfackler@gmail.com>, Kornel &lt;kornel@geekhood.net></author>
       <name>security-framework-sys</name>
       <version>2.17.0</version>
       <description>Apple `Security.framework` low-level FFI bindings</description>
@@ -5643,7 +5643,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#security-framework@3.7.0">
-      <author>Steven Fackler &lt;sfackler@gmail.com&gt;, Kornel &lt;kornel@geekhood.net&gt;</author>
+      <author>Steven Fackler &lt;sfackler@gmail.com>, Kornel &lt;kornel@geekhood.net></author>
       <name>security-framework</name>
       <version>3.7.0</version>
       <description>Security.framework bindings for macOS and iOS</description>
@@ -5668,7 +5668,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#semver@1.0.27">
-      <author>David Tolnay &lt;dtolnay@gmail.com&gt;</author>
+      <author>David Tolnay &lt;dtolnay@gmail.com></author>
       <name>semver</name>
       <version>1.0.27</version>
       <description>Parser and evaluator for Cargo's flavor of Semantic Versioning</description>
@@ -5690,7 +5690,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#seq-macro@0.3.6">
-      <author>David Tolnay &lt;dtolnay@gmail.com&gt;</author>
+      <author>David Tolnay &lt;dtolnay@gmail.com></author>
       <name>seq-macro</name>
       <version>0.3.6</version>
       <description>Macro to repeat sequentially indexed copies of a fragment of code.</description>
@@ -5712,7 +5712,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#serde@1.0.228">
-      <author>Erick Tryzelaar &lt;erick.tryzelaar@gmail.com&gt;, David Tolnay &lt;dtolnay@gmail.com&gt;</author>
+      <author>Erick Tryzelaar &lt;erick.tryzelaar@gmail.com>, David Tolnay &lt;dtolnay@gmail.com></author>
       <name>serde</name>
       <version>1.0.228</version>
       <description>A generic serialization/deserialization framework</description>
@@ -5737,7 +5737,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#serde_core@1.0.228">
-      <author>Erick Tryzelaar &lt;erick.tryzelaar@gmail.com&gt;, David Tolnay &lt;dtolnay@gmail.com&gt;</author>
+      <author>Erick Tryzelaar &lt;erick.tryzelaar@gmail.com>, David Tolnay &lt;dtolnay@gmail.com></author>
       <name>serde_core</name>
       <version>1.0.228</version>
       <description>Serde traits only, with no support for derive -- use the `serde` crate instead</description>
@@ -5762,7 +5762,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#serde_derive@1.0.228">
-      <author>Erick Tryzelaar &lt;erick.tryzelaar@gmail.com&gt;, David Tolnay &lt;dtolnay@gmail.com&gt;</author>
+      <author>Erick Tryzelaar &lt;erick.tryzelaar@gmail.com>, David Tolnay &lt;dtolnay@gmail.com></author>
       <name>serde_derive</name>
       <version>1.0.228</version>
       <description>Macros 1.1 implementation of #[derive(Serialize, Deserialize)]</description>
@@ -5787,7 +5787,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#serde_json@1.0.149">
-      <author>Erick Tryzelaar &lt;erick.tryzelaar@gmail.com&gt;, David Tolnay &lt;dtolnay@gmail.com&gt;</author>
+      <author>Erick Tryzelaar &lt;erick.tryzelaar@gmail.com>, David Tolnay &lt;dtolnay@gmail.com></author>
       <name>serde_json</name>
       <version>1.0.149</version>
       <description>A JSON serialization file format</description>
@@ -5809,7 +5809,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#serde_path_to_error@0.1.20">
-      <author>David Tolnay &lt;dtolnay@gmail.com&gt;</author>
+      <author>David Tolnay &lt;dtolnay@gmail.com></author>
       <name>serde_path_to_error</name>
       <version>0.1.20</version>
       <description>Path to the element that failed to deserialize</description>
@@ -5831,7 +5831,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#serde_urlencoded@0.7.1">
-      <author>Anthony Ramine &lt;n.oxyde@gmail.com&gt;</author>
+      <author>Anthony Ramine &lt;n.oxyde@gmail.com></author>
       <name>serde_urlencoded</name>
       <version>0.7.1</version>
       <description>`x-www-form-urlencoded` meets Serde</description>
@@ -5875,7 +5875,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#shlex@1.3.0">
-      <author>comex &lt;comexk@gmail.com&gt;, Fenhl &lt;fenhl@fenhl.net&gt;, Adrian Taylor &lt;adetaylor@chromium.org&gt;, Alex Touchet &lt;alextouchet@outlook.com&gt;, Daniel Parks &lt;dp+git@oxidized.org&gt;, Garrett Berg &lt;googberg@gmail.com&gt;</author>
+      <author>comex &lt;comexk@gmail.com>, Fenhl &lt;fenhl@fenhl.net>, Adrian Taylor &lt;adetaylor@chromium.org>, Alex Touchet &lt;alextouchet@outlook.com>, Daniel Parks &lt;dp+git@oxidized.org>, Garrett Berg &lt;googberg@gmail.com></author>
       <name>shlex</name>
       <version>1.3.0</version>
       <description>Split a string into shell words, like Python's shlex.</description>
@@ -5894,7 +5894,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#signal-hook-registry@1.4.8">
-      <author>Michal 'vorner' Vaner &lt;vorner@vorner.cz&gt;, Masaki Hara &lt;ackie.h.gmai@gmail.com&gt;</author>
+      <author>Michal 'vorner' Vaner &lt;vorner@vorner.cz>, Masaki Hara &lt;ackie.h.gmai@gmail.com></author>
       <name>signal-hook-registry</name>
       <version>1.4.8</version>
       <description>Backend crate for signal-hook</description>
@@ -5916,7 +5916,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#simd-adler32@0.3.8">
-      <author>Marvin Countryman &lt;me@maar.vin&gt;</author>
+      <author>Marvin Countryman &lt;me@maar.vin></author>
       <name>simd-adler32</name>
       <version>0.3.8</version>
       <description>A SIMD-accelerated Adler-32 hash algorithm implementation.</description>
@@ -5935,7 +5935,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#simdutf8@0.1.5">
-      <author>Hans Kratz &lt;hans@appfour.com&gt;</author>
+      <author>Hans Kratz &lt;hans@appfour.com></author>
       <name>simdutf8</name>
       <version>0.1.5</version>
       <description>SIMD-accelerated UTF-8 validation.</description>
@@ -5960,7 +5960,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#siphasher@1.0.2">
-      <author>Frank Denis &lt;github@pureftpd.org&gt;</author>
+      <author>Frank Denis &lt;github@pureftpd.org></author>
       <name>siphasher</name>
       <version>1.0.2</version>
       <description>SipHash-2-4, SipHash-1-3 and 128-bit variants in pure Rust</description>
@@ -5985,7 +5985,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#slab@0.4.12">
-      <author>Carl Lerche &lt;me@carllerche.com&gt;</author>
+      <author>Carl Lerche &lt;me@carllerche.com></author>
       <name>slab</name>
       <version>0.4.12</version>
       <description>Pre-allocated storage for a uniform data type</description>
@@ -6026,7 +6026,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#snap@1.1.1">
-      <author>Andrew Gallant &lt;jamslam@gmail.com&gt;</author>
+      <author>Andrew Gallant &lt;jamslam@gmail.com></author>
       <name>snap</name>
       <version>1.1.1</version>
       <description>A pure Rust implementation of the Snappy compression algorithm. Includes streaming compression and decompression. </description>
@@ -6051,7 +6051,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#socket2@0.6.4">
-      <author>Alex Crichton &lt;alex@alexcrichton.com&gt;, Thomas de Zeeuw &lt;thomasdezeeuw@gmail.com&gt;</author>
+      <author>Alex Crichton &lt;alex@alexcrichton.com>, Thomas de Zeeuw &lt;thomasdezeeuw@gmail.com></author>
       <name>socket2</name>
       <version>0.6.4</version>
       <description>Utilities for handling networking sockets with a maximal amount of configuration possible intended. </description>
@@ -6076,7 +6076,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#spin@0.9.9">
-      <author>Mathijs van de Nes &lt;git@mathijs.vd-nes.nl&gt;, John Ericson &lt;git@JohnEricson.me&gt;, Joshua Barretto &lt;joshua.s.barretto@gmail.com&gt;</author>
+      <author>Mathijs van de Nes &lt;git@mathijs.vd-nes.nl>, John Ericson &lt;git@JohnEricson.me>, Joshua Barretto &lt;joshua.s.barretto@gmail.com></author>
       <name>spin</name>
       <version>0.9.9</version>
       <description>Spin-based synchronization primitives</description>
@@ -6095,7 +6095,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#sqlparser@0.62.0">
-      <author>Apache DataFusion &lt;dev@datafusion.apache.org&gt;</author>
+      <author>Apache DataFusion &lt;dev@datafusion.apache.org></author>
       <name>sqlparser</name>
       <version>0.62.0</version>
       <description>Extensible SQL Lexer and Parser with support for ANSI SQL:2011</description>
@@ -6145,7 +6145,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#stable_deref_trait@1.2.1">
-      <author>Robert Grosse &lt;n210241048576@gmail.com&gt;</author>
+      <author>Robert Grosse &lt;n210241048576@gmail.com></author>
       <name>stable_deref_trait</name>
       <version>1.2.1</version>
       <description>An unsafe marker trait for types like Box and Rc that dereference to a stable address even when moved, and hence can be used with libraries such as owning_ref and rental. </description>
@@ -6167,7 +6167,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#stacker@0.1.23">
-      <author>Alex Crichton &lt;alex@alexcrichton.com&gt;, Simonas Kazlauskas &lt;stacker@kazlauskas.me&gt;</author>
+      <author>Alex Crichton &lt;alex@alexcrichton.com>, Simonas Kazlauskas &lt;stacker@kazlauskas.me></author>
       <name>stacker</name>
       <version>0.1.23</version>
       <description>A stack growth library useful when implementing deeply recursive algorithms that may accidentally blow the stack. </description>
@@ -6192,7 +6192,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#subtle@2.6.1">
-      <author>Isis Lovecruft &lt;isis@patternsinthevoid.net&gt;, Henry de Valence &lt;hdevalence@hdevalence.ca&gt;</author>
+      <author>Isis Lovecruft &lt;isis@patternsinthevoid.net>, Henry de Valence &lt;hdevalence@hdevalence.ca></author>
       <name>subtle</name>
       <version>2.6.1</version>
       <description>Pure-Rust traits and utilities for constant-time cryptographic implementations.</description>
@@ -6217,7 +6217,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#syn@2.0.117">
-      <author>David Tolnay &lt;dtolnay@gmail.com&gt;</author>
+      <author>David Tolnay &lt;dtolnay@gmail.com></author>
       <name>syn</name>
       <version>2.0.117</version>
       <description>Parser for Rust source code</description>
@@ -6239,7 +6239,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#sync_wrapper@1.0.2">
-      <author>Actyx AG &lt;developer@actyx.io&gt;</author>
+      <author>Actyx AG &lt;developer@actyx.io></author>
       <name>sync_wrapper</name>
       <version>1.0.2</version>
       <description>A tool for enlisting the compiler's help in proving the absence of concurrency</description>
@@ -6264,7 +6264,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#synstructure@0.13.2">
-      <author>Nika Layzell &lt;nika@thelayzells.com&gt;</author>
+      <author>Nika Layzell &lt;nika@thelayzells.com></author>
       <name>synstructure</name>
       <version>0.13.2</version>
       <description>Helper methods and macros for custom derives</description>
@@ -6324,7 +6324,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#tempfile@3.26.0">
-      <author>Steven Allen &lt;steven@stebalien.com&gt;, The Rust Project Developers, Ashley Mannix &lt;ashleymannix@live.com.au&gt;, Jason White &lt;me@jasonwhite.io&gt;</author>
+      <author>Steven Allen &lt;steven@stebalien.com>, The Rust Project Developers, Ashley Mannix &lt;ashleymannix@live.com.au>, Jason White &lt;me@jasonwhite.io></author>
       <name>tempfile</name>
       <version>3.26.0</version>
       <description>A library for managing temporary files and directories.</description>
@@ -6349,7 +6349,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#thiserror-impl@2.0.18">
-      <author>David Tolnay &lt;dtolnay@gmail.com&gt;</author>
+      <author>David Tolnay &lt;dtolnay@gmail.com></author>
       <name>thiserror-impl</name>
       <version>2.0.18</version>
       <description>Implementation detail of the `thiserror` crate</description>
@@ -6368,7 +6368,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#thiserror@2.0.18">
-      <author>David Tolnay &lt;dtolnay@gmail.com&gt;</author>
+      <author>David Tolnay &lt;dtolnay@gmail.com></author>
       <name>thiserror</name>
       <version>2.0.18</version>
       <description>derive(Error)</description>
@@ -6390,7 +6390,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#thrift@0.17.0">
-      <author>Apache Thrift Developers &lt;dev@thrift.apache.org&gt;</author>
+      <author>Apache Thrift Developers &lt;dev@thrift.apache.org></author>
       <name>thrift</name>
       <version>0.17.0</version>
       <description>Rust bindings for the Apache Thrift RPC system</description>
@@ -6415,7 +6415,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#tiny-keccak@2.0.2">
-      <author>debris &lt;marek.kotewicz@gmail.com&gt;</author>
+      <author>debris &lt;marek.kotewicz@gmail.com></author>
       <name>tiny-keccak</name>
       <version>2.0.2</version>
       <description>An implementation of Keccak derived functions.</description>
@@ -6453,7 +6453,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#tinyvec@1.10.0">
-      <author>Lokathor &lt;zefria@gmail.com&gt;</author>
+      <author>Lokathor &lt;zefria@gmail.com></author>
       <name>tinyvec</name>
       <version>1.10.0</version>
       <description>`tinyvec` provides 100% safe vec-like data structures.</description>
@@ -6472,7 +6472,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#tinyvec_macros@0.1.1">
-      <author>Soveu &lt;marx.tomasz@gmail.com&gt;</author>
+      <author>Soveu &lt;marx.tomasz@gmail.com></author>
       <name>tinyvec_macros</name>
       <version>0.1.1</version>
       <description>Some macros for tiny containers</description>
@@ -6491,7 +6491,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#tokio-macros@2.7.0">
-      <author>Tokio Contributors &lt;team@tokio.rs&gt;</author>
+      <author>Tokio Contributors &lt;team@tokio.rs></author>
       <name>tokio-macros</name>
       <version>2.7.0</version>
       <description>Tokio's proc macros. </description>
@@ -6537,7 +6537,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#tokio-stream@0.1.18">
-      <author>Tokio Contributors &lt;team@tokio.rs&gt;</author>
+      <author>Tokio Contributors &lt;team@tokio.rs></author>
       <name>tokio-stream</name>
       <version>0.1.18</version>
       <description>Utilities to work with `Stream` and `tokio`. </description>
@@ -6559,7 +6559,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#tokio-util@0.7.18">
-      <author>Tokio Contributors &lt;team@tokio.rs&gt;</author>
+      <author>Tokio Contributors &lt;team@tokio.rs></author>
       <name>tokio-util</name>
       <version>0.7.18</version>
       <description>Additional utilities for working with Tokio. </description>
@@ -6581,7 +6581,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#tokio@1.52.3">
-      <author>Tokio Contributors &lt;team@tokio.rs&gt;</author>
+      <author>Tokio Contributors &lt;team@tokio.rs></author>
       <name>tokio</name>
       <version>1.52.3</version>
       <description>An event-driven, non-blocking I/O platform for writing asynchronous I/O backed applications. </description>
@@ -6603,7 +6603,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#tonic-build@0.14.5">
-      <author>Lucio Franco &lt;luciofranco14@gmail.com&gt;</author>
+      <author>Lucio Franco &lt;luciofranco14@gmail.com></author>
       <name>tonic-build</name>
       <version>0.14.5</version>
       <description>Codegen module of `tonic` gRPC implementation. </description>
@@ -6625,7 +6625,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#tonic-prost-build@0.14.5">
-      <author>Lucio Franco &lt;luciofranco14@gmail.com&gt;</author>
+      <author>Lucio Franco &lt;luciofranco14@gmail.com></author>
       <name>tonic-prost-build</name>
       <version>0.14.5</version>
       <description>Prost build integration for tonic</description>
@@ -6647,7 +6647,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#tonic-prost@0.14.5">
-      <author>Lucio Franco &lt;luciofranco14@gmail.com&gt;</author>
+      <author>Lucio Franco &lt;luciofranco14@gmail.com></author>
       <name>tonic-prost</name>
       <version>0.14.5</version>
       <description>Prost codec implementation for tonic</description>
@@ -6669,7 +6669,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#tonic@0.14.5">
-      <author>Lucio Franco &lt;luciofranco14@gmail.com&gt;</author>
+      <author>Lucio Franco &lt;luciofranco14@gmail.com></author>
       <name>tonic</name>
       <version>0.14.5</version>
       <description>A gRPC over HTTP/2 implementation focused on high performance, interoperability, and flexibility. </description>
@@ -6691,7 +6691,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#tower-http@0.6.8">
-      <author>Tower Maintainers &lt;team@tower-rs.com&gt;</author>
+      <author>Tower Maintainers &lt;team@tower-rs.com></author>
       <name>tower-http</name>
       <version>0.6.8</version>
       <description>Tower middleware and utilities for HTTP clients and servers</description>
@@ -6713,7 +6713,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#tower-layer@0.3.3">
-      <author>Tower Maintainers &lt;team@tower-rs.com&gt;</author>
+      <author>Tower Maintainers &lt;team@tower-rs.com></author>
       <name>tower-layer</name>
       <version>0.3.3</version>
       <description>Decorates a `Service` to allow easy composition between `Service`s. </description>
@@ -6738,7 +6738,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#tower-service@0.3.3">
-      <author>Tower Maintainers &lt;team@tower-rs.com&gt;</author>
+      <author>Tower Maintainers &lt;team@tower-rs.com></author>
       <name>tower-service</name>
       <version>0.3.3</version>
       <description>Trait representing an asynchronous, request / response based, client or server. </description>
@@ -6763,7 +6763,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#tower@0.5.3">
-      <author>Tower Maintainers &lt;team@tower-rs.com&gt;</author>
+      <author>Tower Maintainers &lt;team@tower-rs.com></author>
       <name>tower</name>
       <version>0.5.3</version>
       <description>Tower is a library of modular and reusable components for building robust clients and servers. </description>
@@ -6785,7 +6785,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#tracing-attributes@0.1.31">
-      <author>Tokio Contributors &lt;team@tokio.rs&gt;, Eliza Weisman &lt;eliza@buoyant.io&gt;, David Barsky &lt;dbarsky@amazon.com&gt;</author>
+      <author>Tokio Contributors &lt;team@tokio.rs>, Eliza Weisman &lt;eliza@buoyant.io>, David Barsky &lt;dbarsky@amazon.com></author>
       <name>tracing-attributes</name>
       <version>0.1.31</version>
       <description>Procedural macro attributes for automatically instrumenting functions. </description>
@@ -6807,7 +6807,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#tracing-core@0.1.36">
-      <author>Tokio Contributors &lt;team@tokio.rs&gt;</author>
+      <author>Tokio Contributors &lt;team@tokio.rs></author>
       <name>tracing-core</name>
       <version>0.1.36</version>
       <description>Core primitives for application-level tracing. </description>
@@ -6829,7 +6829,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#tracing@0.1.44">
-      <author>Eliza Weisman &lt;eliza@buoyant.io&gt;, Tokio Contributors &lt;team@tokio.rs&gt;</author>
+      <author>Eliza Weisman &lt;eliza@buoyant.io>, Tokio Contributors &lt;team@tokio.rs></author>
       <name>tracing</name>
       <version>0.1.44</version>
       <description>Application-level tracing for Rust. </description>
@@ -6851,7 +6851,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#try-lock@0.2.5">
-      <author>Sean McArthur &lt;sean@seanmonstar.com&gt;</author>
+      <author>Sean McArthur &lt;sean@seanmonstar.com></author>
       <name>try-lock</name>
       <version>0.2.5</version>
       <description>A lightweight atomic lock.</description>
@@ -6876,7 +6876,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#twox-hash@2.1.2">
-      <author>Jake Goulding &lt;jake.goulding@gmail.com&gt;</author>
+      <author>Jake Goulding &lt;jake.goulding@gmail.com></author>
       <name>twox-hash</name>
       <version>2.1.2</version>
       <description>A Rust implementation of the XXHash and XXH3 algorithms</description>
@@ -6898,7 +6898,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#typeid@1.0.3">
-      <author>David Tolnay &lt;dtolnay@gmail.com&gt;</author>
+      <author>David Tolnay &lt;dtolnay@gmail.com></author>
       <name>typeid</name>
       <version>1.0.3</version>
       <description>Const TypeId and non-'static TypeId</description>
@@ -6941,7 +6941,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#typetag-impl@0.2.21">
-      <author>David Tolnay &lt;dtolnay@gmail.com&gt;</author>
+      <author>David Tolnay &lt;dtolnay@gmail.com></author>
       <name>typetag-impl</name>
       <version>0.2.21</version>
       <description>Implementation detail of the typetag crate</description>
@@ -6963,7 +6963,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#typetag@0.2.21">
-      <author>David Tolnay &lt;dtolnay@gmail.com&gt;</author>
+      <author>David Tolnay &lt;dtolnay@gmail.com></author>
       <name>typetag</name>
       <version>0.2.21</version>
       <description>Serde serializable and deserializable trait objects</description>
@@ -6985,7 +6985,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#unicase@2.9.0">
-      <author>Sean McArthur &lt;sean@seanmonstar.com&gt;</author>
+      <author>Sean McArthur &lt;sean@seanmonstar.com></author>
       <name>unicase</name>
       <version>2.9.0</version>
       <description>A case-insensitive wrapper around strings.</description>
@@ -7007,7 +7007,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#unicode-ident@1.0.24">
-      <author>David Tolnay &lt;dtolnay@gmail.com&gt;</author>
+      <author>David Tolnay &lt;dtolnay@gmail.com></author>
       <name>unicode-ident</name>
       <version>1.0.24</version>
       <description>Determine whether characters have the XID_Start or XID_Continue properties according to Unicode Standard Annex #31</description>
@@ -7029,7 +7029,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#unicode-segmentation@1.12.0">
-      <author>kwantam &lt;kwantam@gmail.com&gt;, Manish Goregaokar &lt;manishsmail@gmail.com&gt;</author>
+      <author>kwantam &lt;kwantam@gmail.com>, Manish Goregaokar &lt;manishsmail@gmail.com></author>
       <name>unicode-segmentation</name>
       <version>1.12.0</version>
       <description>This crate provides Grapheme Cluster, Word and Sentence boundaries according to Unicode Standard Annex #29 rules. </description>
@@ -7051,7 +7051,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#unicode-width@0.2.2">
-      <author>kwantam &lt;kwantam@gmail.com&gt;, Manish Goregaokar &lt;manishsmail@gmail.com&gt;</author>
+      <author>kwantam &lt;kwantam@gmail.com>, Manish Goregaokar &lt;manishsmail@gmail.com></author>
       <name>unicode-width</name>
       <version>0.2.2</version>
       <description>Determine displayed width of `char` and `str` types according to Unicode Standard Annex #11 rules. </description>
@@ -7073,7 +7073,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#untrusted@0.7.1">
-      <author>Brian Smith &lt;brian@briansmith.org&gt;</author>
+      <author>Brian Smith &lt;brian@briansmith.org></author>
       <name>untrusted</name>
       <version>0.7.1</version>
       <description>Safe, fast, zero-panic, zero-crashing, zero-allocation parsing of untrusted inputs in Rust.</description>
@@ -7095,7 +7095,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#untrusted@0.9.0">
-      <author>Brian Smith &lt;brian@briansmith.org&gt;</author>
+      <author>Brian Smith &lt;brian@briansmith.org></author>
       <name>untrusted</name>
       <version>0.9.0</version>
       <description>Safe, fast, zero-panic, zero-crashing, zero-allocation parsing of untrusted inputs in Rust.</description>
@@ -7139,7 +7139,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#utf8_iter@1.0.4">
-      <author>Henri Sivonen &lt;hsivonen@hsivonen.fi&gt;</author>
+      <author>Henri Sivonen &lt;hsivonen@hsivonen.fi></author>
       <name>utf8_iter</name>
       <version>1.0.4</version>
       <description>Iterator by char over potentially-invalid UTF-8 in &amp;[u8]</description>
@@ -7164,7 +7164,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#uuid@1.23.3">
-      <author>Ashley Mannix&lt;ashleymannix@live.com.au&gt;, Dylan DPC&lt;dylan.dpc@gmail.com&gt;, Hunar Roop Kahlon&lt;hunar.roop@gmail.com&gt;</author>
+      <author>Ashley Mannix&lt;ashleymannix@live.com.au>, Dylan DPC&lt;dylan.dpc@gmail.com>, Hunar Roop Kahlon&lt;hunar.roop@gmail.com></author>
       <name>uuid</name>
       <version>1.23.3</version>
       <description>A library to generate and parse UUIDs.</description>
@@ -7189,7 +7189,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#vcpkg@0.2.15">
-      <author>Jim McGrath &lt;jimmc2@gmail.com&gt;</author>
+      <author>Jim McGrath &lt;jimmc2@gmail.com></author>
       <name>vcpkg</name>
       <version>0.2.15</version>
       <description>A library to find native dependencies in a vcpkg tree at build time in order to be used in Cargo build scripts. </description>
@@ -7211,7 +7211,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#version_check@0.9.5">
-      <author>Sergio Benitez &lt;sb@sergio.bz&gt;</author>
+      <author>Sergio Benitez &lt;sb@sergio.bz></author>
       <name>version_check</name>
       <version>0.9.5</version>
       <description>Tiny crate to check the version of the installed/running rustc.</description>
@@ -7233,7 +7233,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#walkdir@2.5.0">
-      <author>Andrew Gallant &lt;jamslam@gmail.com&gt;</author>
+      <author>Andrew Gallant &lt;jamslam@gmail.com></author>
       <name>walkdir</name>
       <version>2.5.0</version>
       <description>Recursively walk a directory.</description>
@@ -7258,7 +7258,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#want@0.3.1">
-      <author>Sean McArthur &lt;sean@seanmonstar.com&gt;</author>
+      <author>Sean McArthur &lt;sean@seanmonstar.com></author>
       <name>want</name>
       <version>0.3.1</version>
       <description>Detect when another Future wants a result.</description>
@@ -7320,7 +7320,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#yoke-derive@0.8.1">
-      <author>Manish Goregaokar &lt;manishsmail@gmail.com&gt;</author>
+      <author>Manish Goregaokar &lt;manishsmail@gmail.com></author>
       <name>yoke-derive</name>
       <version>0.8.1</version>
       <description>Custom derive for the yoke crate</description>
@@ -7339,7 +7339,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#yoke@0.8.1">
-      <author>Manish Goregaokar &lt;manishsmail@gmail.com&gt;</author>
+      <author>Manish Goregaokar &lt;manishsmail@gmail.com></author>
       <name>yoke</name>
       <version>0.8.1</version>
       <description>Abstraction allowing borrowed data to be carried along with the backing data it borrows from</description>
@@ -7358,7 +7358,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#zerocopy-derive@0.8.40">
-      <author>Joshua Liebow-Feeser &lt;joshlf@google.com&gt;, Jack Wrenn &lt;jswrenn@amazon.com&gt;</author>
+      <author>Joshua Liebow-Feeser &lt;joshlf@google.com>, Jack Wrenn &lt;jswrenn@amazon.com></author>
       <name>zerocopy-derive</name>
       <version>0.8.40</version>
       <description>Custom derive for traits from the zerocopy crate</description>
@@ -7377,7 +7377,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#zerocopy@0.8.40">
-      <author>Joshua Liebow-Feeser &lt;joshlf@google.com&gt;, Jack Wrenn &lt;jswrenn@amazon.com&gt;</author>
+      <author>Joshua Liebow-Feeser &lt;joshlf@google.com>, Jack Wrenn &lt;jswrenn@amazon.com></author>
       <name>zerocopy</name>
       <version>0.8.40</version>
       <description>Zerocopy makes zero-cost memory manipulation effortless. We write "unsafe" so you don't have to.</description>
@@ -7396,7 +7396,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#zerofrom-derive@0.1.6">
-      <author>Manish Goregaokar &lt;manishsmail@gmail.com&gt;</author>
+      <author>Manish Goregaokar &lt;manishsmail@gmail.com></author>
       <name>zerofrom-derive</name>
       <version>0.1.6</version>
       <description>Custom derive for the zerofrom crate</description>
@@ -7415,7 +7415,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#zerofrom@0.1.6">
-      <author>Manish Goregaokar &lt;manishsmail@gmail.com&gt;</author>
+      <author>Manish Goregaokar &lt;manishsmail@gmail.com></author>
       <name>zerofrom</name>
       <version>0.1.6</version>
       <description>ZeroFrom trait for constructing</description>
@@ -7497,7 +7497,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#zerovec-derive@0.11.2">
-      <author>Manish Goregaokar &lt;manishsmail@gmail.com&gt;</author>
+      <author>Manish Goregaokar &lt;manishsmail@gmail.com></author>
       <name>zerovec-derive</name>
       <version>0.11.2</version>
       <description>Custom derive for the zerovec crate</description>
@@ -7556,7 +7556,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#zmij@1.0.21">
-      <author>David Tolnay &lt;dtolnay@gmail.com&gt;</author>
+      <author>David Tolnay &lt;dtolnay@gmail.com></author>
       <name>zmij</name>
       <version>1.0.21</version>
       <description>A double-to-string conversion algorithm based on Schubfach and yy</description>
@@ -7578,7 +7578,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#zstd-safe@7.2.4">
-      <author>Alexandre Bury &lt;alexandre.bury@gmail.com&gt;</author>
+      <author>Alexandre Bury &lt;alexandre.bury@gmail.com></author>
       <name>zstd-safe</name>
       <version>7.2.4</version>
       <description>Safe low-level bindings for the zstd compression library.</description>
@@ -7597,7 +7597,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#zstd-sys@2.0.16+zstd.1.5.7">
-      <author>Alexandre Bury &lt;alexandre.bury@gmail.com&gt;</author>
+      <author>Alexandre Bury &lt;alexandre.bury@gmail.com></author>
       <name>zstd-sys</name>
       <version>2.0.16+zstd.1.5.7</version>
       <description>Low-level bindings for the zstd compression library.</description>
@@ -7619,7 +7619,7 @@
       </externalReferences>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#zstd@0.13.3">
-      <author>Alexandre Bury &lt;alexandre.bury@gmail.com&gt;</author>
+      <author>Alexandre Bury &lt;alexandre.bury@gmail.com></author>
       <name>zstd</name>
       <version>0.13.3</version>
       <description>Binding for the zstd compression library.</description>
@@ -8038,7 +8038,7 @@
       <dependency ref="git+https://github.com/openobserve/datafusion?rev=869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b#datafusion-physical-plan@54.0.0" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#parking_lot@0.12.5" />
     </dependency>
-    <dependency ref="path+file:///Users/huaijinhao/gitrepo/openobserve/openobserve/src/proto#0.1.0">
+    <dependency ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/proto#0.1.0">
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#cargo_metadata@0.19.2" />
       <dependency ref="git+https://github.com/openobserve/datafusion?rev=869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b#datafusion-proto@54.0.0" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#prost@0.14.3" />
