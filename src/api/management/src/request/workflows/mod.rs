@@ -385,9 +385,8 @@ pub async fn test_workflow(
 ) -> Response {
     let mut workflow = inputs.workflow;
     workflow.org_id = org_id.clone();
-    workflow.id = format!("test-{}",config::ider::uuid());
-    match workflows::test_workflow(&org_id, workflow, inputs.inputs, inputs.from_node).await
-    {
+    workflow.id = format!("test-{}", config::ider::uuid());
+    match workflows::test_workflow(&org_id, workflow, inputs.inputs, inputs.from_node).await {
         Ok(v) => MetaHttpResponse::json(WorkflowTestResult { errors: v.errors }),
         Err(e) => MetaHttpResponse::bad_request(e),
     }
@@ -429,7 +428,7 @@ pub async fn trigger_workflow(
             MetaHttpResponse::message(StatusCode::OK, "Workflow triggered successfully")
                 .with_trace_id(trace_id),
         ),
-        Err(e) => MetaHttpResponse::internal_error(e),
+        Err(e) => MetaHttpResponse::bad_request(e),
     }
 }
 

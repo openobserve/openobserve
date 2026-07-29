@@ -360,7 +360,7 @@ fn is_permitted(workflow_id: &str, org_id: &str, permitted: Option<&Vec<String>>
 }
 
 pub async fn delete_workflow(org_id: &str, id: &str) -> Result<(), anyhow::Error> {
-    let associations = db::workflows::get_workflow_associations(&org_id, &id).await?;
+    let associations = db::workflows::get_workflow_associations(org_id, id).await?;
     if associations
         .iter()
         .any(|a| a.trigger_type != WorkflowTriggerType::IncidentEvent.to_string())
@@ -400,6 +400,10 @@ pub async fn trigger_workflow(
     inputs: Vec<serde_json::Value>,
     user_id: &str,
 ) -> Result<String, anyhow::Error> {
+    if db::workflows::get_workflow(org_id, id).await?.is_none() {
+        return Err(anyhow::anyhow!("workflow with id {id} not found"));
+    }
+
     let metadata = [("event_type", "manual"), ("user_id", user_id)]
         .into_iter()
         .map(|(k, v)| (k.into(), v.into()))

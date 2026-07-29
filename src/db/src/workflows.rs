@@ -288,7 +288,7 @@ pub async fn delete_workflow_association(
         AssociationDeleteEvent::Entity { org_id, entity_id } => {
             org = org_id;
             entity = entity_id;
-            infra::table::workflows::delete_association_by_entity(&org_id, &entity_id).await?;
+            infra::table::workflows::delete_association_by_entity(org_id, entity_id).await?;
         }
         AssociationDeleteEvent::Workflow {
             org_id,
@@ -296,12 +296,12 @@ pub async fn delete_workflow_association(
         } => {
             org = org_id;
             workflow = workflow_id;
-            infra::table::workflows::delete_association_by_workflow(&org_id, &workflow_id).await?;
+            infra::table::workflows::delete_association_by_workflow(org_id, workflow_id).await?;
         }
         AssociationDeleteEvent::Trigger { org_id, trigger } => {
             org = org_id;
             trigger_type = trigger;
-            infra::table::workflows::delete_association_by_trigger(&org_id, &trigger).await?;
+            infra::table::workflows::delete_association_by_trigger(org_id, trigger).await?;
         }
         AssociationDeleteEvent::Specific {
             org_id,
