@@ -28,9 +28,15 @@ vi.mock("vuex", () => ({
   })),
 }));
 
+// Hoisted: `vi.mock` factories run before module init, so a plain `const` here
+// would still be undefined when the factory closes over it.
+const { getStreamMock } = vi.hoisted(() => ({
+  getStreamMock: vi.fn(),
+}));
+
 vi.mock("@/composables/useStreams", () => ({
   default: () => ({
-    getStream: vi.fn().mockRejectedValue(new Error("no stream")),
+    getStream: getStreamMock,
   }),
 }));
 
@@ -39,6 +45,9 @@ import useSyntheticResults from "./useSyntheticResults";
 describe("useSyntheticResults", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Schema unknown by default: optional columns fall back to literals, which
+    // is the shape most of these cases assert against.
+    getStreamMock.mockRejectedValue(new Error("no stream"));
   });
 
   it("should map raw search responses into typed state via the adapters", async () => {
@@ -75,15 +84,49 @@ describe("useSyntheticResults", () => {
     expect(hasLoadedOnce.value).toBe(true);
   });
 
-  it("should issue five scoped queries against the logs page type", async () => {
+  it("issues one query per panel, all against the logs page type", async () => {
     executeQuery.mockResolvedValue([]);
     const { fetchAll } = useSyntheticResults();
     await fetchAll("mon-1", 1, 100);
-    // KPI, last-run, histogram, runs, steps (via stream)
-    expect(executeQuery).toHaveBeenCalledTimes(5);
+
+    // KPI, last-run, histogram, runs, the step tally, and the step DEFINITIONS.
+    // The last is a second, bounded query rather than a column on the tally:
+    // `recorded_steps` is ~4 KB per row and near-identical within a config
+    // version, so selecting it across the 5000-row aggregation shipped the same
+    // payload thousands of times. Counting calls is the only thing that notices
+    // if those two silently recombine.
+    //
+    // `getStream` is mocked to reject here, so the schema is unknown and the
+    // retry-attribution query does not fire — see the case below.
+    expect(executeQuery).toHaveBeenCalledTimes(6);
     for (const call of executeQuery.mock.calls) {
       expect(call[3]).toBe("logs");
     }
+  });
+
+  it("adds the retry-attribution query only when the column exists", async () => {
+    // `retry_step_ids` replaces reading `retry_history` on every row of the step
+    // tally, so it is additive-then-subtractive: the 7th query buys back a blob
+    // column. Gated on the schema because a stream that has never recorded a
+    // retry does not have the field, and naming an absent column is rejected
+    // outright by the search API.
+    executeQuery.mockResolvedValue([]);
+    getStreamMock.mockResolvedValueOnce({
+      schema: [{ name: "attempts" }, { name: "retry_history" }, { name: "retry_step_ids" }],
+    });
+    getStreamMock.mockResolvedValueOnce({
+      schema: [{ name: "attempts" }, { name: "retry_history" }, { name: "retry_step_ids" }],
+    });
+
+    const { fetchAll } = useSyntheticResults();
+    await fetchAll("mon-1", 1, 100);
+
+    const sql = executeQuery.mock.calls.map((c) => String(c[0]));
+    expect(sql.some((q) => q.includes("retry_step_ids") && q.includes("attempts > 1"))).toBe(true);
+    // And the tally stops selecting the blob it replaces.
+    const tally = sql.find((q) => q.includes("last_attempt_steps"));
+    expect(tally).toBeDefined();
+    expect(tally).not.toContain("retry_history");
   });
 
   it("should not query when monitorId or the time range is missing", async () => {
