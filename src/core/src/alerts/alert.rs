@@ -279,7 +279,9 @@ pub async fn save(
     }
 }
 
-async fn create_default_alerts_folder(org_id: &str) -> Result<Folder, AlertError> {
+/// `pub(crate)` because SLOs live in these same folders (§6b, D28) and their
+/// save path needs the identical create-on-demand behaviour.
+pub(crate) async fn create_default_alerts_folder(org_id: &str) -> Result<Folder, AlertError> {
     let default_folder = Folder {
         folder_id: DEFAULT_FOLDER.to_owned(),
         name: "default".to_owned(),

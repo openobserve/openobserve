@@ -44,6 +44,13 @@
       </OButton>
     </template>
 
+    <!-- SLOs share the ALERT folder namespace (there is no FolderType::Slos),
+         so `type="alerts"` is not a copy-paste slip — it is what makes a
+         "payments" folder hold that team's alerts and its SLOs together. -->
+    <template #sidebar>
+      <FolderList type="alerts" @update:activeFolderId="onFolderChange" />
+    </template>
+
     <OStatStrip
       v-if="!loading"
       :items="stats"
@@ -54,6 +61,8 @@
     />
 
     <OTable
+      v-model:selected-ids="selectedIds"
+      selection="multiple"
       :data="visibleRows"
       :columns="columns"
       row-key="id"
@@ -63,12 +72,24 @@
       :page-size-options="[25, 50, 100]"
       :show-global-filter="false"
       table-id="slos-list"
+      :persist-columns="true"
+      :column-visibility="defaultColumnVisibility"
       :enable-column-resize="true"
       data-test="slos-slolist-table"
       @row-click="onRowClick"
     >
       <template #toolbar>
         <div class="flex w-full items-center gap-2">
+          <OButton
+            v-if="selectedIds.length"
+            variant="outline"
+            size="sm-action"
+            icon-left="drive_file_move"
+            data-test="slos-slolist-move-selected"
+            @click="openMove(selectedRows)"
+          >
+            {{ t("slos.moveSelected", { count: selectedIds.length }) }}
+          </OButton>
           <OToggleGroup
             v-model="typeFilter"
             data-test="slos-slolist-type-filter"
@@ -186,6 +207,10 @@
         </div>
       </template>
 
+      <template #cell-folder="{ row }">
+        <span class="text-text-secondary">{{ folderName(row.folder_id) }}</span>
+      </template>
+
       <template #cell-actions="{ row }">
         <div class="flex items-center gap-1" @click.stop>
           <OButton
@@ -195,6 +220,14 @@
             :title="t('slos.edit')"
             :data-test="`slos-slolist-edit-${row.name}`"
             @click="goToEdit(row)"
+          />
+          <OButton
+            variant="ghost"
+            size="xs"
+            icon-left="drive_file_move"
+            :title="t('slos.move')"
+            :data-test="`slos-slolist-move-${row.name}`"
+            @click="openMove([row])"
           />
           <OButton
             variant="ghost"
@@ -249,15 +282,43 @@
         </OButton>
       </template>
     </ODialog>
+
+    <ODialog
+      v-model:open="moveDialog"
+      :title="t('slos.moveTitle', { count: pendingMove.length })"
+      data-test="slos-slolist-move-dialog"
+    >
+      <SelectFolderDropDown
+        type="alerts"
+        :active-folder-id="moveTarget"
+        @folder-selected="onMoveTargetSelected"
+      />
+      <template #footer>
+        <OButton variant="outline" size="sm-action" @click="moveDialog = false">
+          {{ t("common.cancel") }}
+        </OButton>
+        <OButton
+          variant="primary"
+          size="sm-action"
+          :disabled="!moveTarget || moveTarget === activeFolderId"
+          data-test="slos-slolist-move-confirm"
+          @click="doMove"
+        >
+          {{ t("slos.move") }}
+        </OButton>
+      </template>
+    </ODialog>
   </OPageLayout>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
-import { useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 
+import FolderList from "@/components/common/sidebar/FolderList.vue";
+import SelectFolderDropDown from "@/components/common/sidebar/SelectFolderDropDown.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
@@ -293,6 +354,7 @@ import {
 
 const { t } = useI18n();
 const router = useRouter();
+const route = useRoute();
 const store = useStore();
 
 const rows = ref<SloListItem[]>([]);
@@ -303,8 +365,24 @@ const typeFilter = ref("all");
 const healthFilter = ref<string | null>(null);
 const deleteDialog = ref(false);
 const pendingDelete = ref<SloListItem | null>(null);
+const selectedIds = ref<string[]>([]);
+const moveDialog = ref(false);
+const moveTarget = ref("");
+const pendingMove = ref<SloListItem[]>([]);
+
+// The route is the source of truth for the active folder, so a reload or a
+// shared link lands on the same folder the rail is showing.
+const activeFolderId = computed(() => (route.query.folder as string) || "default");
 
 const org = computed(() => store.state.selectedOrganization?.identifier);
+
+const selectedRows = computed(() => rows.value.filter((r) => selectedIds.value.includes(r.id)));
+
+/** Folder ids are opaque; the rail and this column show the human name. */
+function folderName(folderId: string): string {
+  const folders = store.state.organizationData?.foldersByType?.alerts ?? [];
+  return folders.find((f: any) => f.folderId === folderId)?.name || folderId;
+}
 
 const typeOptions = computed(() => [
   { value: "all", label: t("slos.type.all"), icon: "format_list_bulleted" },
@@ -329,8 +407,21 @@ const columns = computed<OTableColumnDef<SloListItem>[]>(() => [
   { id: "coverage", header: t("slos.column.coverage"), accessor: (r) => r.status?.coverage ?? 0, sortable: true, size: 100 },
   { id: "window", header: t("slos.column.window"), accessor: (r) => r.window_secs, size: 100 },
   { id: "tags", header: t("slos.column.tags"), accessor: (r) => (r.tags || []).join(","), size: 180 },
+  {
+    id: "folder",
+    header: t("slos.column.folder"),
+    accessor: (r) => r.folder_id,
+    sortable: true,
+    hideable: true,
+    size: 140,
+  },
   { id: "actions", header: t("slos.column.actions"), accessor: () => "", size: 120 },
 ]);
+
+// The list is folder-scoped, so every row shows the same folder — the column
+// is only worth its width after a move, or when checking where something
+// landed. Available via the column toggle, off by default.
+const defaultColumnVisibility = { folder: false };
 
 function health(row: SloListItem): SloHealth {
   return sloHealth(row.status);
@@ -428,12 +519,59 @@ async function load() {
   loading.value = true;
   error.value = null;
   try {
-    const res = await sloService.list(org.value);
+    const res = await sloService.list(org.value, activeFolderId.value);
     rows.value = res.data?.list ?? [];
+    // Selection is per-folder; carrying ids across a folder switch would let a
+    // bulk move act on rows no longer on screen.
+    selectedIds.value = [];
   } catch (e: any) {
     error.value = e?.response?.data?.message || e?.message || t("slos.loadFailed");
   } finally {
     loading.value = false;
+  }
+}
+
+function onFolderChange(folderId: string) {
+  if (folderId === activeFolderId.value) return;
+  router.push({
+    name: "sloList",
+    query: { ...route.query, org_identifier: org.value, folder: folderId },
+  });
+  load();
+}
+
+function openMove(targets: SloListItem[]) {
+  if (!targets.length) return;
+  pendingMove.value = targets;
+  moveTarget.value = "";
+  moveDialog.value = true;
+}
+
+function onMoveTargetSelected(folder: any) {
+  moveTarget.value = folder?.folderId ?? folder?.value ?? "";
+}
+
+async function doMove() {
+  const targets = pendingMove.value;
+  const dst = moveTarget.value;
+  moveDialog.value = false;
+  if (!targets.length || !dst) return;
+  try {
+    await sloService.move(
+      org.value,
+      targets.map((r) => r.id),
+      dst,
+    );
+    // They left the folder being shown, so drop them rather than re-fetching.
+    const moved = new Set(targets.map((r) => r.id));
+    rows.value = rows.value.filter((r) => !moved.has(r.id));
+    selectedIds.value = selectedIds.value.filter((id) => !moved.has(id));
+    toast({
+      variant: "success",
+      message: t("slos.moved", { count: targets.length, folder: folderName(dst) }),
+    });
+  } catch (e: any) {
+    toast({ variant: "error", message: e?.response?.data?.message || t("slos.moveFailed") });
   }
 }
 

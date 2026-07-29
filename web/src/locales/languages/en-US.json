@@ -10680,7 +10680,8 @@
       "tags": "Tags",
       "actions": "Actions",
       "group": "Group",
-      "sli": "SLI"
+      "sli": "SLI",
+      "folder": "Folder"
     },
     "stat": {
       "status": "Status ({window})",
@@ -10727,7 +10728,8 @@
       "maxBurnRate": "Max burn rate",
       "reservation": "Reservation",
       "sliType": "SLI type",
-      "owner": "Owner"
+      "owner": "Owner",
+      "folder": "Folder"
     },
     "empty": {
       "title": "No SLOs yet",
@@ -10779,6 +10781,11 @@
         "mid": "Mid burn — notify",
         "slow": "Slow burn — ticket"
       }
-    }
+    },
+    "move": "Move",
+    "moveTitle": "Move {count} SLO(s) to another folder",
+    "moveSelected": "Move {count} selected",
+    "moved": "Moved {count} SLO(s) to {folder}",
+    "moveFailed": "Move failed"
   }
 }

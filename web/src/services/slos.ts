@@ -37,6 +37,15 @@ const slos = {
     return http().delete(`/api/${org_identifier}/slos/${slo_id}`);
   },
 
+  // Separate from update so a relocation can never carry a definition change,
+  // which would bump the SLO's generation and discard its measurement.
+  move: (org_identifier: string, slo_ids: string[], dst_folder_id: string) => {
+    return http().post(`/api/${org_identifier}/slos/move`, {
+      slo_ids,
+      dst_folder_id,
+    });
+  },
+
   // Separate from update so pausing can never carry a definition change with
   // it — and therefore can never bump the generation or discard measurement.
   setEnabled: (org_identifier: string, slo_id: string, value: boolean) => {

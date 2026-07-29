@@ -29,7 +29,7 @@
 use config::meta::slo::{SliType, Slo, SloDefinition};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, IntoActiveModel, ModelTrait,
-    PaginatorTrait, QueryFilter, QueryOrder, Set, TransactionTrait,
+    PaginatorTrait, QueryFilter, QueryOrder, Set, TransactionTrait, sea_query::Expr,
 };
 
 use super::entity::{slo_status, slos};
@@ -275,6 +275,46 @@ pub async fn set_enabled(
     active.updated_at = Set(now);
     active.update(db).await?;
     Ok(true)
+}
+
+/// Relocate SLOs into another folder.
+///
+/// Deliberately NOT expressed as an `update()`. That path diffs the definition
+/// to decide the writing epoch, and a folder is not part of the definition — so
+/// routing a move through it would mean rebuilding a full `Slo` from a request
+/// that only names ids, and any drift in that reconstruction would bump the
+/// generation and discard up to 90 days of measurement (D59). This writes
+/// `folder_id` and the edit stamps, nothing else.
+///
+/// Returns the number of rows actually moved, which is how the caller detects
+/// ids that do not exist or belong to another org.
+///
+/// The `(org, folder_id, name)` unique index still applies, so a move that
+/// would collide with a same-named SLO already in the destination fails the
+/// whole statement — no partial move.
+pub async fn move_to_folder(
+    db: &DatabaseConnection,
+    org: &str,
+    ids: &[String],
+    dst_folder_id: &str,
+    now: i64,
+    editor: Option<&str>,
+) -> Result<u64, Error> {
+    if ids.is_empty() {
+        return Ok(0);
+    }
+    let res = slos::Entity::update_many()
+        .col_expr(slos::Column::FolderId, Expr::value(dst_folder_id))
+        .col_expr(slos::Column::UpdatedAt, Expr::value(now))
+        .col_expr(
+            slos::Column::LastEditedBy,
+            Expr::value(editor.map(str::to_string)),
+        )
+        .filter(slos::Column::Org.eq(org))
+        .filter(slos::Column::Id.is_in(ids.to_vec()))
+        .exec(db)
+        .await?;
+    Ok(res.rows_affected)
 }
 
 // ---------------------------------------------------------------------------
@@ -642,6 +682,98 @@ mod tests {
 
         assert_eq!(list(&db, ORG, None).await.unwrap().len(), 2);
         assert_eq!(list(&db, ORG, Some("payments")).await.unwrap().len(), 1);
+    }
+
+    // ===================== moving between folders =========================
+
+    #[tokio::test]
+    async fn move_relocates_the_named_slos_and_reports_the_count() {
+        let db = db().await;
+        create(&db, &slo(), 1_000, None).await.unwrap();
+        let mut other = slo();
+        other.id = "slo11111111111111111111111".into();
+        other.name = "latency".into();
+        create(&db, &other, 1_000, None).await.unwrap();
+
+        let moved = move_to_folder(&db, ORG, &[ID.to_string()], "payments", 2_000, Some("me"))
+            .await
+            .unwrap();
+
+        assert_eq!(moved, 1);
+        assert_eq!(list(&db, ORG, Some("payments")).await.unwrap().len(), 1);
+        // The one not named stays put.
+        let stayed = list(&db, ORG, Some("default")).await.unwrap();
+        assert_eq!(stayed.len(), 1);
+        assert_eq!(stayed[0].id, other.id);
+    }
+
+    /// The whole reason this is not routed through `update()`: a folder is not
+    /// part of the definition, so moving must not start a new writing epoch —
+    /// which would discard every slice measured so far (D59).
+    #[tokio::test]
+    async fn move_does_not_bump_the_generation() {
+        let db = db().await;
+        create(&db, &slo(), 1_000, None).await.unwrap();
+        let before = get(&db, ORG, ID).await.unwrap().unwrap();
+
+        move_to_folder(&db, ORG, &[ID.to_string()], "payments", 2_000, Some("me"))
+            .await
+            .unwrap();
+
+        let after = get(&db, ORG, ID).await.unwrap().unwrap();
+        assert_eq!(after.definition_generation, before.definition_generation);
+        assert_eq!(after.folder_id, "payments");
+        // And the definition itself is untouched.
+        assert_eq!(after.name, before.name);
+        assert_eq!(after.target, before.target);
+    }
+
+    #[tokio::test]
+    async fn move_ignores_slos_belonging_to_another_org() {
+        let db = db().await;
+        create(&db, &slo(), 1_000, None).await.unwrap();
+
+        let moved = move_to_folder(&db, "someone-else", &[ID.to_string()], "payments", 2_000, None)
+            .await
+            .unwrap();
+
+        assert_eq!(moved, 0);
+        assert_eq!(get(&db, ORG, ID).await.unwrap().unwrap().folder_id, "default");
+    }
+
+    /// `(org, folder_id, name)` is unique, so a colliding move fails whole —
+    /// the caller must not be told a partial move succeeded.
+    #[tokio::test]
+    async fn move_into_a_folder_holding_the_same_name_fails_and_moves_nothing() {
+        let db = db().await;
+        create(&db, &slo(), 1_000, None).await.unwrap();
+        let mut twin = slo();
+        twin.id = "slo11111111111111111111111".into();
+        twin.folder_id = "payments".into(); // same name, different folder
+        create(&db, &twin, 1_000, None).await.unwrap();
+
+        let err = move_to_folder(&db, ORG, &[ID.to_string()], "payments", 2_000, None)
+            .await
+            .unwrap_err();
+
+        assert!(
+            format!("{err}").to_lowercase().contains("unique")
+                || format!("{err}").to_lowercase().contains("duplicate"),
+            "expected a unique-violation, got: {err}"
+        );
+        assert_eq!(get(&db, ORG, ID).await.unwrap().unwrap().folder_id, "default");
+    }
+
+    #[tokio::test]
+    async fn move_with_no_ids_is_a_no_op() {
+        let db = db().await;
+        create(&db, &slo(), 1_000, None).await.unwrap();
+        assert_eq!(
+            move_to_folder(&db, ORG, &[], "payments", 2_000, None)
+                .await
+                .unwrap(),
+            0
+        );
     }
 
     #[tokio::test]

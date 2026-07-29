@@ -839,6 +839,8 @@ pub fn service_routes() -> Router {
             "/{org_id}/slos",
             get(slos::list_slos).post(slos::create_slo),
         )
+        // Before the {slo_id} catch-all, or "move" is parsed as an SLO id.
+        .route("/{org_id}/slos/move", post(slos::move_slos))
         .route("/{org_id}/slos/{slo_id}/enable", put(slos::enable_slo))
         .route("/{org_id}/slos/{slo_id}/groups", get(slos::get_slo_groups))
         .route(

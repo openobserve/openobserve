@@ -30,15 +30,19 @@
 
 use config::{
     get_config,
-    meta::slo::{
-        Slo, SloValidationError,
-        budget_rows::{groups_reserved, rows_for_reservation},
-        validate_query_safety, validate_slo,
+    meta::{
+        folder::{DEFAULT_FOLDER, FolderType},
+        slo::{
+            Slo, SloValidationError,
+            budget_rows::{groups_reserved, rows_for_reservation},
+            validate_query_safety, validate_slo,
+        },
     },
     utils::time::now_micros,
 };
 use infra::table::{
-    slo_backfill_jobs as backfill_jobs, slo_budget, slos as slos_table, slos::GenerationEffect,
+    folders, slo_backfill_jobs as backfill_jobs, slo_budget, slos as slos_table,
+    slos::GenerationEffect,
 };
 
 /// Why a save was rejected.
@@ -52,6 +56,15 @@ pub enum SloError {
     /// `UNIQUE constraint failed: slos.org, slos.folder_id, slos.name` from a
     /// 500 — which is what it did before end-to-end testing.
     DuplicateName(String),
+    /// The destination folder does not exist. Its own variant so the handler
+    /// can answer 404 instead of persisting an SLO into a folder nothing will
+    /// ever list — `slos.folder_id` carries no foreign key, so an unchecked
+    /// id is accepted by the database and then invisible in the UI.
+    FolderNotFound(String),
+    /// A move collided with a same-named SLO already in the destination. The
+    /// unique index fails the whole statement without naming the loser, so
+    /// this carries no name — and nothing moved.
+    MoveNameConflict,
     Db(String),
 }
 
@@ -63,6 +76,11 @@ impl std::fmt::Display for SloError {
             Self::DuplicateName(n) => {
                 write!(f, "an SLO named \"{n}\" already exists in this folder")
             }
+            Self::FolderNotFound(id) => write!(f, "folder \"{id}\" not found"),
+            Self::MoveNameConflict => write!(
+                f,
+                "the destination folder already has an SLO with one of these names; nothing was moved"
+            ),
         }
     }
 }
@@ -109,6 +127,29 @@ pub fn validate(slo: &Slo) -> Result<(), SloError> {
     Ok(())
 }
 
+/// Ensure an SLO's folder exists before anything is written into it.
+///
+/// SLOs live in **alert** folders — there is no `FolderType::Slos`, because an
+/// SLO is alerting configuration and is authorized as `alerts` (§6b, D28). So
+/// this asks the same question `alerts::alert::create` asks, of the same rows.
+///
+/// A missing `default` is created rather than rejected, matching the alert
+/// path: a fresh org has no folder rows at all until something is saved, and
+/// the handler defaults `folder_id` to `default` — so rejecting here would
+/// make the first SLO in a new org impossible to create.
+async fn ensure_folder(org: &str, folder_id: &str) -> Result<(), SloError> {
+    if folders::exists(org, folder_id, FolderType::Alerts).await? {
+        return Ok(());
+    }
+    if folder_id == DEFAULT_FOLDER {
+        crate::alerts::alert::create_default_alerts_folder(org)
+            .await
+            .map_err(|e| SloError::Db(e.to_string()))?;
+        return Ok(());
+    }
+    Err(SloError::FolderNotFound(folder_id.to_string()))
+}
+
 /// What an SLO reserves against its org's row budget.
 pub fn reservation(slo: &Slo) -> (i64, i64) {
     let cfg = get_config();
@@ -128,6 +169,9 @@ pub async fn create(slo: &mut Slo) -> Result<(), SloError> {
         .ok_or_else(|| SloError::Db("database not initialized".into()))?;
 
     validate(slo)?;
+    // Before the budget charge: a bad folder should cost nothing, and the
+    // charge is the step whose rollback is fiddly.
+    ensure_folder(&slo.org, &slo.folder_id).await?;
 
     let (groups, rows) = reservation(slo);
     slo.groups_reserved = groups;
@@ -169,6 +213,8 @@ pub async fn update(slo: &mut Slo) -> Result<(), SloError> {
         .ok_or_else(|| SloError::Db("database not initialized".into()))?;
 
     validate(slo)?;
+    // An update carries `folder_id` too, so it is also a move.
+    ensure_folder(&slo.org, &slo.folder_id).await?;
 
     let existing = slos_table::get(db, &slo.org, &slo.id)
         .await?
@@ -220,6 +266,35 @@ pub async fn update(slo: &mut Slo) -> Result<(), SloError> {
         }
     }
     Ok(())
+}
+
+/// Move SLOs into another (alert) folder.
+///
+/// Separate from `update` because a move is not an edit of the definition: it
+/// must never bump the generation, and the caller only has ids, not full
+/// definitions. Returns the number of rows moved so the handler can answer 404
+/// when nothing matched.
+pub async fn move_to_folder(
+    org: &str,
+    ids: &[String],
+    dst_folder_id: &str,
+    editor: Option<&str>,
+) -> Result<u64, SloError> {
+    let db = infra::db::ORM_CLIENT
+        .get()
+        .ok_or_else(|| SloError::Db("database not initialized".into()))?;
+
+    ensure_folder(org, dst_folder_id).await?;
+
+    let now = now_micros() / 1_000_000;
+    match slos_table::move_to_folder(db, org, ids, dst_folder_id, now, editor).await {
+        Ok(n) => Ok(n),
+        // The destination already holds an SLO of the same name. Its own
+        // variant because the name is not known here — the unique index fails
+        // the whole statement without saying which row lost.
+        Err(e) if is_duplicate_name(&e) => Err(SloError::MoveNameConflict),
+        Err(e) => Err(e.into()),
+    }
 }
 
 pub async fn delete(org: &str, id: &str) -> Result<bool, SloError> {

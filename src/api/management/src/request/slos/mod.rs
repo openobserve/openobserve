@@ -263,6 +263,72 @@ pub async fn delete_slo(Path((org_id, slo_id)): Path<(String, String)>) -> Respo
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
+pub struct MoveSlosRequestBody {
+    /// The SLOs to relocate.
+    pub slo_ids: Vec<String>,
+    /// Destination folder. An **alert** folder — SLOs share the alert folder
+    /// namespace rather than having a type of their own.
+    pub dst_folder_id: String,
+}
+
+/// Move SLOs between folders.
+#[utoipa::path(
+    post,
+    path = "/{org_id}/slos/move",
+    context_path = "/api",
+    tag = "SLOs",
+    operation_id = "MoveSlos",
+    summary = "Move SLOs between folders",
+    description = "Relocates one or more SLOs into another folder. SLOs share the alert folder namespace, so the destination is an alert folder. A move never changes an SLO's definition and never restarts its measurement.",
+    security(("Authorization" = [])),
+    params(("org_id" = String, Path, description = "Organization identifier")),
+    request_body(content = inline(MoveSlosRequestBody), description = "The SLOs and the destination folder", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Moved", content_type = "application/json", body = MetaHttpResponse),
+        (status = 404, description = "Not Found", content_type = "application/json", body = MetaHttpResponse),
+        (status = 409, description = "Name already used in the destination", content_type = "application/json", body = MetaHttpResponse),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "SLOs", "operation": "update"})),
+    )
+)]
+#[tracing::instrument(skip_all, fields(org_id = %org_id))]
+pub async fn move_slos(
+    Path(org_id): Path<String>,
+    Headers(user_email): Headers<UserEmail>,
+    Json(req_body): Json<MoveSlosRequestBody>,
+) -> Response {
+    if let Some(r) = disabled() {
+        return r;
+    }
+    if req_body.slo_ids.is_empty() {
+        return MetaHttpResponse::error(
+            StatusCode::BAD_REQUEST.as_u16(),
+            "no SLOs given to move".to_string(),
+        )
+        .into_response();
+    }
+    match slo_service::move_to_folder(
+        &org_id,
+        &req_body.slo_ids,
+        &req_body.dst_folder_id,
+        Some(&user_email.user_id),
+    )
+    .await
+    {
+        // Nothing matched: every id was unknown or belonged to another org.
+        // Reported rather than passed off as success, which is what a bare
+        // "moved" would do for a typo'd id.
+        Ok(0) => not_found(),
+        Ok(n) => MetaHttpResponse::json(MetaHttpResponse::message(
+            StatusCode::OK,
+            if n == 1 { "SLO moved" } else { "SLOs moved" },
+        )),
+        Err(e) => save_error(e),
+    }
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct EnableQuery {
     pub value: bool,
 }
@@ -359,7 +425,8 @@ fn save_error(e: openobserve_core::slo::service::SloError) -> Response {
         SloError::Budget(_) => StatusCode::PAYLOAD_TOO_LARGE,
         SloError::NotFound => StatusCode::NOT_FOUND,
         // A name clash is the user's to fix, not a server fault.
-        SloError::DuplicateName(_) => StatusCode::CONFLICT,
+        SloError::DuplicateName(_) | SloError::MoveNameConflict => StatusCode::CONFLICT,
+        SloError::FolderNotFound(_) => StatusCode::NOT_FOUND,
         SloError::Db(_) => StatusCode::INTERNAL_SERVER_ERROR,
     };
     if status == StatusCode::INTERNAL_SERVER_ERROR {

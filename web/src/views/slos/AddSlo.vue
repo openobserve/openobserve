@@ -90,6 +90,19 @@
               data-test="slos-addslo-tags"
             />
           </div>
+          <div class="mt-3">
+            <label class="text-text-secondary mb-1 block text-xs">
+              {{ t("slos.field.folder") }}
+            </label>
+            <!-- type="alerts": SLOs live in alert folders (there is no SLO
+                 folder type), so this offers the same folders the Alerts page
+                 does. -->
+            <SelectFolderDropDown
+              type="alerts"
+              :active-folder-id="form.folder_id"
+              @folder-selected="onFolderSelected"
+            />
+          </div>
         </SloSection>
   
           <SloSection :title="t('slos.section.sli')">
@@ -292,6 +305,7 @@ import { useStore } from "vuex";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import SloSection from "@/components/slos/SloSection.vue";
+import SelectFolderDropDown from "@/components/common/sidebar/SelectFolderDropDown.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import ORadioCards from "@/lib/forms/OptionGroup/OOptionGroup.vue";
@@ -328,6 +342,10 @@ const form = reactive<any>({
   group_by: null,
   groups_estimate: null,
   enabled: true,
+  // An ALERT folder — SLOs share that namespace rather than having their own
+  // folder type. Seeded from the folder the list was showing so "New SLO" from
+  // inside a folder lands in it, not in default.
+  folder_id: (route.query.folder as string) || "default",
 });
 
 const groupByList = ref<string[]>([]);
@@ -429,8 +447,14 @@ function definitionKey(): string {
 
 const backTarget = computed(() => ({
   name: "sloList",
-  query: { org_identifier: org.value },
+  // Carry the folder back, or cancelling out of a folder lands on default and
+  // the SLO just saved looks like it vanished.
+  query: { org_identifier: org.value, folder: form.folder_id },
 }));
+
+function onFolderSelected(folder: any) {
+  form.folder_id = folder?.folderId ?? folder?.value ?? form.folder_id;
+}
 
 async function load() {
   if (!isEdit.value || !org.value) return;
