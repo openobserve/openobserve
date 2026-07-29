@@ -484,99 +484,99 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OContextMenu @update:open="onContextMenuOpenChange">
             <template #trigger>
               <div class="contents" @contextmenu.capture="handleTableContextMenu">
-          <OTable
-            ref="searchTableRef"
-            :columns="getColumns || []"
-            :data="searchObj.data.queryResults?.hits || []"
-            :wrap="searchObj.meta.toggleSourceWrap"
-            :loading="searchObj.loading"
-            :row-key="logsRowKey"
-            :row-height="20"
-            virtual-scroll
-            :fill-height="false"
-            :scroll-el="scrollContainerRef"
-            :horizontal-scroll="true"
-            :scroll-margin="0"
-            :default-columns="false"
-            :show-global-filter="false"
-            :frame="false"
-            pagination="none"
-            sorting="none"
-            :enable-column-reorder="true"
-            :pinned-first-column="logsTimestampCol"
-            :enable-column-resize="true"
-            :get-row-status-color="getLogRowStatusColor"
-            :row-class="getLogRowClass"
-            expansion="multiple"
-            :expanded-ids="expandedLogIds"
-            data-test="logs-search-result-logs-table"
-            class="logs-results-otable w-full"
-            :class="[
-              !searchObj.meta.showHistogram ||
-              (searchObj.meta.showHistogram && searchObj.data.histogram.errorCode == -1)
-                ? 'min-h-full!'
-                : 'min-h-[calc(100%-6.25rem)]!',
-            ]"
-            @update:columnSizes="handleColumnSizesUpdate"
-            @column-order-change="handleColumnOrderUpdate"
-            @close-column="closeColumn"
-            @cell-contextmenu="handleCellContextMenu"
-            @row-click="openLogDetailsByRow"
-            @update:expandedIds="onExpandedLogIdsChange"
-          >
-            <!-- FTS-highlighted cell content; falls back to the plain value. -->
-            <template
-              v-for="col in getColumns || []"
-              :key="col.id"
-              #[`cell-${col.id}`]="{ row, value }"
-            >
-              <span
-                v-if="logsCellHtml(col.id, row)"
-                class="log-cell-html"
-                v-html="logsCellHtml(col.id, row)"
-              />
-              <span v-else>{{ value }}</span>
-            </template>
+                <OTable
+                  ref="searchTableRef"
+                  :columns="getColumns || []"
+                  :data="searchObj.data.queryResults?.hits || []"
+                  :wrap="searchObj.meta.toggleSourceWrap"
+                  :loading="searchObj.loading"
+                  :row-key="logsRowKey"
+                  :row-height="20"
+                  virtual-scroll
+                  :fill-height="false"
+                  :scroll-el="scrollContainerRef"
+                  :horizontal-scroll="true"
+                  :scroll-margin="0"
+                  :default-columns="false"
+                  :show-global-filter="false"
+                  :frame="false"
+                  pagination="none"
+                  sorting="none"
+                  :enable-column-reorder="true"
+                  :pinned-first-column="logsTimestampCol"
+                  :enable-column-resize="true"
+                  :get-row-status-color="getLogRowStatusColor"
+                  :row-class="getLogRowClass"
+                  expansion="multiple"
+                  :expanded-ids="expandedLogIds"
+                  data-test="logs-search-result-logs-table"
+                  class="logs-results-otable w-full"
+                  :class="[
+                    !searchObj.meta.showHistogram ||
+                    (searchObj.meta.showHistogram && searchObj.data.histogram.errorCode == -1)
+                      ? 'min-h-full!'
+                      : 'min-h-[calc(100%-6.25rem)]!',
+                  ]"
+                  @update:columnSizes="handleColumnSizesUpdate"
+                  @column-order-change="handleColumnOrderUpdate"
+                  @close-column="closeColumn"
+                  @cell-contextmenu="handleCellContextMenu"
+                  @row-click="openLogDetailsByRow"
+                  @update:expandedIds="onExpandedLogIdsChange"
+                >
+                  <!-- FTS-highlighted cell content; falls back to the plain value. -->
+                  <template
+                    v-for="col in getColumns || []"
+                    :key="col.id"
+                    #[`cell-${col.id}`]="{ row, value }"
+                  >
+                    <span
+                      v-if="logsCellHtml(col.id, row)"
+                      class="log-cell-html"
+                      v-html="logsCellHtml(col.id, row)"
+                    />
+                    <span v-else>{{ value }}</span>
+                  </template>
 
-            <!-- Per-cell hover actions: AI button on the timestamp cell; copy /
+                  <!-- Per-cell hover actions: AI button on the timestamp cell; copy /
                  add-search-term on closable field cells. -->
-            <template #cell-hover-actions="{ row, column, active }">
-              <O2AIContextAddBtn
-                v-if="active && column.id === logsTimestampCol"
-                class="ai-btn"
-                data-test="logs-search-result-ai-btn"
-                @send-to-ai-chat="sendToAiChat(JSON.stringify(row), true)"
-              />
-              <CellActions
-                v-else-if="active && column.meta?.closable && row[column.id] != null"
-                :column="column"
-                :row="row"
-                :selected-stream-fields="searchObj.data.stream.selectedStreamFields"
-                :hide-search-term-actions="false"
-                @copy="copyLogToClipboard"
-                @add-search-term="addSearchTerm"
-                @send-to-ai-chat="sendToAiChat"
-              />
-            </template>
+                  <template #cell-hover-actions="{ row, column, active }">
+                    <O2AIContextAddBtn
+                      v-if="active && column.id === logsTimestampCol"
+                      class="ai-btn"
+                      data-test="logs-search-result-ai-btn"
+                      @send-to-ai-chat="sendToAiChat(JSON.stringify(row), true)"
+                    />
+                    <CellActions
+                      v-else-if="active && column.meta?.closable && row[column.id] != null"
+                      :column="column"
+                      :row="row"
+                      :selected-stream-fields="searchObj.data.stream.selectedStreamFields"
+                      :hide-search-term-actions="false"
+                      @copy="copyLogToClipboard"
+                      @add-search-term="addSearchTerm"
+                      @send-to-ai-chat="sendToAiChat"
+                    />
+                  </template>
 
-            <!-- Expanded row → JSON preview -->
-            <template #expansion="{ row }">
-              <JsonPreview
-                :value="row"
-                :index="logsRowIndex(row)"
-                class="px-2 py-1.5"
-                mode="expanded"
-                :highlight-query="searchObj.data.highlightQuery"
-                :hide-search-term-actions="false"
-                @copy="copyLogToClipboard"
-                @add-field-to-table="addFieldToTable"
-                @add-search-term="addSearchTerm"
-                @view-trace="redirectToTraces"
-                @show-correlation="openLogDetailsWithCorrelation"
-                @send-to-ai-chat="sendToAiChat"
-              />
-            </template>
-          </OTable>
+                  <!-- Expanded row → JSON preview -->
+                  <template #expansion="{ row }">
+                    <JsonPreview
+                      :value="row"
+                      :index="logsRowIndex(row)"
+                      class="px-2 py-1.5"
+                      mode="expanded"
+                      :highlight-query="searchObj.data.highlightQuery"
+                      :hide-search-term-actions="false"
+                      @copy="copyLogToClipboard"
+                      @add-field-to-table="addFieldToTable"
+                      @add-search-term="addSearchTerm"
+                      @view-trace="redirectToTraces"
+                      @show-correlation="openLogDetailsWithCorrelation"
+                      @send-to-ai-chat="sendToAiChat"
+                    />
+                  </template>
+                </OTable>
               </div>
             </template>
 

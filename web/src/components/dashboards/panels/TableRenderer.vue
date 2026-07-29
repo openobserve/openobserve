@@ -82,9 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                shows the row count alone, so it drops the bar chrome. -->
           <div
             class="flex w-full items-center"
-            :class="
-              showPagination ? 'border-border-default min-h-10 border-t px-3 py-1' : 'pr-2'
-            "
+            :class="showPagination ? 'border-border-default min-h-10 border-t px-3 py-1' : 'pr-2'"
             data-test="dashboard-table-pagination"
           >
             <div class="flex-1" />

@@ -447,12 +447,7 @@ describe("OTable", () => {
           expansion: "none",
         },
       });
-      expect(getDraggable(wrapper).props("modelValue")).toEqual([
-        "id",
-        "name",
-        "email",
-        "status",
-      ]);
+      expect(getDraggable(wrapper).props("modelValue")).toEqual(["id", "name", "email", "status"]);
     });
   });
 
