@@ -9737,8 +9737,6 @@
       "replaying": "Replaying…",
       "retry": "Retry",
       "selectedCount": "{count} selected",
-      "selectorLabel": "Selector",
-      "selectorTypeLabel": "Selector type",
       "showStackTrace": "Show",
       "showWindow": "Show window",
       "stepCount": "({count} steps)",

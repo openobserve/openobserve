@@ -211,42 +211,10 @@ describe("BrowserJourney recording", () => {
     expect(wrapper.find('[data-test="synthetics-journey-stop-btn"]').exists()).toBe(true);
   });
 
-  it("should sync selector edit into step.wire when handleStepUpdate fires", async () => {
-    const wire = {
-      id: "w1",
-      action: "click",
-      selector: "#old",
-      name: "Old Click",
-      selector_type: "css",
-    };
-    const step = {
-      id: "s1",
-      action: "click",
-      name: "Old Click",
-      selector: "#old",
-      timeout: 30000,
-      code: "",
-      wire,
-    };
-
-    wrapper = mount(BrowserJourney, {
-      props: { modelValue: [step] },
-      global: {
-        stubs: { ...STUBS, JourneySteps: JourneyStepsStubWithExpansion },
-      },
-    });
-
-    // The expansion slot renders an OInput for the selector with
-    // data-test="synthetics-journey-step-selector-input". Update its value.
-    const selectorInput = wrapper.find('[data-test="synthetics-journey-step-selector-input"]');
-    await selectorInput.setValue("#new");
-
-    const emitted = wrapper.emitted("update:modelValue");
-    expect(emitted).toBeTruthy();
-    const updatedSteps = emitted![emitted!.length - 1][0] as any[];
-    expect(updatedSteps[0].selector).toBe("#new");
-    expect(updatedSteps[0].wire.selector).toBe("#new");
-  });
+  // The v1 counterpart of this test — editing the bare `selector` input and
+  // asserting it reached `wire.selector` — was deleted with the v1 authoring path.
+  // The mechanism it guarded (an edit must land in `wire`, or journeyToWireSteps
+  // discards it at replay time) is covered by the navigate-URL test below.
 
   // Regression: this view used to inline its own, thinner copy of the step
   // editor. It rendered no locator bundle, no settle block, no assertion editor
@@ -448,5 +416,29 @@ describe("BrowserJourney step creation", () => {
     const steps = lastEmittedSteps(wrapper);
     expect(steps).toHaveLength(2);
     expect(steps[1].timeout).toBeUndefined();
+  });
+});
+
+// A created step is a version-2 step: its identity is the locator bundle, never a
+// bare `selector`. Seeding the bundle empty is what makes the editor render the
+// Locator block from the start, and what keeps isV2Journey true once the author
+// supplies a locator (SE-18).
+describe("BrowserJourney step creation is version 2", () => {
+  let wrapper: VueWrapper;
+
+  afterEach(() => {
+    wrapper?.unmount();
+    vi.restoreAllMocks();
+  });
+
+  it("should seed an empty locator bundle and write no v1 selector fields", async () => {
+    wrapper = mountJourney({ modelValue: [] });
+    await wrapper.find('[data-test="synthetics-journey-add-step-btn"]').trigger("click");
+
+    const emitted = wrapper.emitted("update:modelValue")!;
+    const steps = emitted[emitted.length - 1][0] as any[];
+    expect(steps[0].locator).toEqual({ candidates: [], user_override: null });
+    expect(steps[0].selector).toBeUndefined();
+    expect(steps[0].selectorType).toBeUndefined();
   });
 });

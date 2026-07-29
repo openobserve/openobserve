@@ -154,3 +154,23 @@ describe("buildV2Step", () => {
     expect(buildV2Steps([nav(), step()]).map((s) => s.id)).toEqual(["s1", "s2"]);
   });
 });
+
+// SE-18 regression. `steps_version` describes the whole array, so isV2Journey
+// uses .every(): one hand-added step without a locator flipped an entire recorded
+// journey to v1, sending every other step's bundle, settle and assertion down the
+// untyped path. A seeded bundle plus an author-supplied pin keeps it v2.
+describe("SE-18: a completed manual step does not downgrade the journey", () => {
+  it("stays version 2 when a hand-added step names its element via locator", () => {
+    const journey: BrowserStep[] = [
+      { id: "s1", action: "navigate", name: "Open app", value: "https://example.com", code: "" },
+      {
+        id: "s2",
+        action: "click",
+        name: "Sign in",
+        code: "",
+        locator: { candidates: [], user_override: { kind: "css", value: "#sign-in" } },
+      },
+    ];
+    expect(isV2Journey(journey)).toBe(true);
+  });
+});

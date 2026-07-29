@@ -405,6 +405,11 @@ function handleInsertBelow(row: BrowserStep) {
     action: "click",
     name: "",
     code: "",
+    // A new step is a version-2 step: its identity is the locator bundle, never a
+    // bare `selector`. Seeding it empty is what makes the editor render the
+    // Locator block from the start, and what lets isV2Journey stay true once the
+    // author supplies a locator instead of flipping the journey to v1 (SE-18).
+    locator: { candidates: [], user_override: null },
   });
   emit("update:modelValue", next);
 }
@@ -420,7 +425,14 @@ function handleUpdateExpanded(ids: string[]) {
 function addStep() {
   emit("update:modelValue", [
     ...props.modelValue,
-    { id: getUUIDv7(true), action: "click", name: "", code: "" },
+    {
+      id: getUUIDv7(true),
+      action: "click",
+      name: "",
+      code: "",
+      // See handleInsertBelow — a new step is version 2.
+      locator: { candidates: [], user_override: null },
+    },
   ]);
 }
 function duplicateCapturedStep(index: number, step: BrowserStep) {

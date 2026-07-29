@@ -1,11 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
 
-import type {
-  AssertionKind,
-  StepAction,
-  SelectorType,
-  SyntheticCheckType,
-} from "@/types/synthetics";
+import type { AssertionKind, StepAction, SyntheticCheckType } from "@/types/synthetics";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 
 // ── Action labels (capitalized) ──────────────────────────────────────────
@@ -138,17 +133,10 @@ export const actionOptions = (Object.keys(ACTION_LABELS) as StepAction[])
     value: a,
   }));
 
-// ── Selector type options ────────────────────────────────────────────────
-export const SELECTOR_TYPE_OPTIONS: readonly {
-  label: string;
-  value: SelectorType;
-}[] = [
-  { label: "CSS", value: "CSS" },
-  { label: "XPath", value: "XPath" },
-  { label: "Text", value: "Text" },
-  { label: "TestID", value: "TestID" },
-  { label: "Role", value: "Role" },
-];
+// The selector-type picker (CSS / XPath / Text / TestID / Role) is gone with the
+// v1 authoring path: a version-2 step names its element with a locator bundle,
+// whose value carries its own engine prefix. `SelectorType` itself survives in
+// types/synthetics.ts for liftJourney, which issue 006 owns.
 
 // ── Value field labels (action-specific) ─────────────────────────────────
 export const VALUE_LABELS: Record<string, string> = {

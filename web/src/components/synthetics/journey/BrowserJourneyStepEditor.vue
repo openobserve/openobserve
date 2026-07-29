@@ -4,27 +4,24 @@ import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import type {
   BrowserStep,
-  SelectorType,
   SettleResponse,
   StepAssertion,
   StepLocator,
-  WireStep,
 } from "@/types/synthetics";
 import {
   DEFAULT_SETTLE_BUDGET_MS,
   MAX_SETTLE_BUDGET_MS,
   MIN_SETTLE_BUDGET_MS,
-  SELECTOR_ACTIONS,
   VALUE_ACTIONS,
   VALUE_LABELS,
   VALUE_TOOLTIP_MAP,
   VALUE_WIDTH_MAP,
-  SELECTOR_TYPE_OPTIONS,
   ACTION_LABELS,
   actionOptions,
   isRetiredAction,
 } from "@/constants/synthetics";
 import { applyValueToWire, defaultTimeoutFor } from "@/utils/synthetics/mapRecordedStep";
+import { stepNeedsTarget } from "@/utils/synthetics/stepTarget";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -75,9 +72,9 @@ function update(patch: Partial<BrowserStep>) {
   let wire = props.step.wire ? { ...props.step.wire } : undefined;
   if (wire) {
     if (patch.name !== undefined) wire.name = patch.name;
-    if (patch.selector !== undefined) wire.selector = patch.selector;
-    if (patch.selectorType !== undefined)
-      wire.selector_type = patch.selectorType.toLowerCase() as WireStep["selector_type"];
+    // No `selector` / `selectorType` sync: the editor has no control that can
+    // produce either patch since the v1 authoring path was deleted. A version-2
+    // step names its element through `locator`, handled below.
     if (patch.value !== undefined) wire = applyValueToWire(wire, props.step.action, patch.value);
     if (patch.timeout !== undefined) wire.timeout_ms = patch.timeout;
     // The preview needs these to report what it cannot simulate, so they travel
@@ -93,9 +90,31 @@ function update(patch: Partial<BrowserStep>) {
 }
 
 // ── Field bindings ──────────────────────────────────────────────────────────
-const selectorTypeOptions = SELECTOR_TYPE_OPTIONS;
 const actionLabel = computed(() => ACTION_LABELS[props.step.action]);
-const showSelector = computed(() => SELECTOR_ACTIONS.includes(props.step.action));
+
+/**
+ * Does this step name an element?
+ *
+ * One rule, shared with the save-time validator (`stepIsMissingTarget`), so the
+ * form cannot ask for a target the validator ignores — nor omit one it requires.
+ * Page-level assertions (`url_matches`, `page_title`) describe the page and need
+ * no element at all, which is why this is not simply `SELECTOR_ACTIONS.includes`.
+ *
+ * It also governs requiredness: the block renders only when a target is needed,
+ * so whenever it is visible a target is mandatory. There is no separate
+ * conditional-`required` binding to keep in step.
+ */
+const showTarget = computed(() => stepNeedsTarget(props.step));
+
+/**
+ * Never hand `BrowserJourneyLocator` a fresh object literal from the template —
+ * a new identity on every render defeats its prop watchers. A step that somehow
+ * carries no bundle falls back to an empty one, computed once.
+ */
+const effectiveLocator = computed<StepLocator>(
+  () => props.step.locator ?? { candidates: [], user_override: null },
+);
+
 const showValue = computed(() => VALUE_ACTIONS.includes(props.step.action));
 const valueLabel = computed(
   () => VALUE_LABELS[props.step.action] || t("synthetics.journey.valueFallback"),
@@ -114,20 +133,6 @@ const actionComputed = computed({
 const nameComputed = computed({
   get: () => props.step.name ?? "",
   set: (v: string) => update({ name: v }),
-});
-
-const selectorTypeComputed = computed({
-  get: () => props.step.selectorType ?? "CSS",
-  set: (v: string | number | boolean | null | undefined) =>
-    update({ selectorType: (v as SelectorType) ?? undefined }),
-});
-
-const selectorComputed = computed({
-  get: () => props.step.selector ?? "",
-  set: (v: string) => {
-    update({ selector: v });
-    emit("selector-edited");
-  },
 });
 
 const valueComputed = computed({
@@ -156,14 +161,13 @@ const timeoutBelowDefault = computed(() => {
   return explicit !== undefined && explicit < timeoutDefault.value;
 });
 
-// ── Version-2 blocks (spec P2.5.4) ──────────────────────────────────────────
-// A v1 step and a v2 step coexist in the same editor: the v1 selector pair
-// renders when there is no bundle, the Locator block when there is. Showing both
-// would suggest two independent ways to identify the element, when in fact only
-// one of them is what the runner reads.
-const hasLocatorBundle = computed(
-  () => !!(props.step.locator?.candidates?.length || props.step.locator?.user_override),
-);
+// ── Version-2 blocks ────────────────────────────────────────────────────────
+// There is one targeting UI. The v1 Selector-type + Selector pair used to render
+// when a step carried no bundle, which meant a hand-added step and a recorded one
+// presented two unrelated editors (SE-7) — and a hand-added step that named its
+// element the v1 way flipped the whole journey to steps_version 1, because
+// isV2Journey reads `locator`, not `selector` (SE-18). No v1 journeys exist, so
+// the fork served no case and is gone. See `showTarget` for the render condition.
 
 function updateLocator(locator: StepLocator) {
   update({ locator });
@@ -273,34 +277,14 @@ const settleBudgetOutOfRange = computed(() => {
       />
     </div>
 
-    <!-- Version-2 Locator block, or the v1 selector pair — never both -->
+    <!-- Target — the locator bundle is the only way a step names its element.
+         `stepNeedsTarget` is the same rule the save-time validator uses, so the
+         block appears exactly when a target is required. -->
     <BrowserJourneyLocator
-      v-if="hasLocatorBundle && step.locator"
-      :locator="step.locator"
+      v-if="showTarget"
+      :locator="effectiveLocator"
       @update:locator="updateLocator"
     />
-
-    <template v-else-if="showSelector">
-      <div class="flex w-fit! gap-2">
-        <OSelect
-          v-model="selectorTypeComputed"
-          :label="t('synthetics.journey.selectorTypeLabel')"
-          :options="selectorTypeOptions"
-          class="w-50! shrink-0"
-          data-test="synthetics-journey-step-selector-type-select"
-        />
-        <OInput
-          v-model="selectorComputed"
-          :label="t('synthetics.journey.selectorLabel')"
-          placeholder="#my-button or .class-name"
-          class="w-100!"
-          :required="true"
-          :error="!!selectorErrorMessage"
-          :error-message="selectorErrorMessage ?? ''"
-          data-test="synthetics-journey-step-selector-input"
-        />
-      </div>
-    </template>
 
     <!-- Value (action-specific label) -->
     <OInput
