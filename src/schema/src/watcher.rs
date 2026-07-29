@@ -36,8 +36,8 @@ use config::{
 use infra::{
     cache,
     schema::{
-        STREAM_RECORD_ID_GENERATOR, STREAM_SCHEMAS, STREAM_SCHEMAS_LATEST, STREAM_SETTINGS,
-        SchemaCache, unwrap_stream_settings,
+        STREAM_RECORD_ID_GENERATOR, STREAM_SCHEMAS, STREAM_SCHEMAS_LATEST, SchemaCache,
+        unwrap_stream_settings,
     },
 };
 
@@ -158,10 +158,7 @@ async fn watch(
                         LOCAL_NODE_ID.load(Ordering::Relaxed),
                     ));
                 }
-                let mut w = STREAM_SETTINGS.write().await;
-                w.insert(item_key.to_string(), settings);
-                infra::schema::set_stream_settings_atomic(w.clone());
-                drop(w);
+                infra::schema::put_stream_settings(item_key.to_string(), Arc::new(settings)).await;
                 let mut w = STREAM_SCHEMAS_LATEST.write().await;
                 w.insert(
                     item_key.to_string(),
@@ -229,10 +226,7 @@ async fn watch(
                 w.remove(item_key);
                 drop(w);
                 STREAM_RECORD_ID_GENERATOR.remove(item_key);
-                let mut w = STREAM_SETTINGS.write().await;
-                w.remove(item_key);
-                infra::schema::set_stream_settings_atomic(w.clone());
-                drop(w);
+                infra::schema::remove_stream_settings(item_key).await;
                 cache::stats::remove_stream_stats(org_id, stream_name, stream_type);
                 if let Err(e) =
                     ::db::compact::files::del_offset(org_id, stream_type, stream_name).await

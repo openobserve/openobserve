@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::atomic::Ordering;
+use std::sync::{Arc, atomic::Ordering};
 
 use arrow_schema::{DataType, Field, Schema};
 use bytes::Bytes;
@@ -24,8 +24,8 @@ use config::{
 };
 use hashbrown::{HashMap, HashSet};
 use infra::schema::{
-    STREAM_RECORD_ID_GENERATOR, STREAM_SCHEMAS, STREAM_SCHEMAS_LATEST, STREAM_SETTINGS,
-    SchemaCache, unwrap_stream_settings,
+    STREAM_RECORD_ID_GENERATOR, STREAM_SCHEMAS, STREAM_SCHEMAS_LATEST, SchemaCache,
+    unwrap_stream_settings,
 };
 #[cfg(feature = "enterprise")]
 use {
@@ -94,6 +94,7 @@ pub async fn set_stream_is_llm(
 ) -> Result<(), anyhow::Error> {
     let mut settings = infra::schema::get_settings(org_id, stream_name, stream_type)
         .await
+        .map(|s| (*s).clone())
         .unwrap_or_default();
     settings.is_llm_stream = is_llm_stream;
 
@@ -167,6 +168,7 @@ async fn ensure_gen_ai_fields_in_defined_schema_fields(
 ) -> Result<(), anyhow::Error> {
     let mut settings = infra::schema::get_settings(org_id, stream_name, stream_type)
         .await
+        .map(|s| (*s).clone())
         .unwrap_or_default();
     if append_gen_ai_fields_to_defined_schema_fields(&mut settings.defined_schema_fields) {
         let mut metadata = std::collections::HashMap::with_capacity(1);
@@ -485,6 +487,7 @@ pub async fn cache() -> Result<(), anyhow::Error> {
     log::info!("Stream schemas Cached {items_num} schemas");
     let keys_num = schemas.keys().len();
     let keys = schemas.keys().map(|k| k.to_string()).collect::<Vec<_>>();
+    let mut settings_batch = Vec::with_capacity(keys_num);
     for (i, item_key) in keys.iter().enumerate() {
         let Some(mut schema_versions) = schemas.remove(item_key) else {
             continue;
@@ -517,9 +520,7 @@ pub async fn cache() -> Result<(), anyhow::Error> {
                 LOCAL_NODE_ID.load(Ordering::Relaxed),
             ));
         }
-        let mut w = STREAM_SETTINGS.write().await;
-        w.insert(item_key.to_string(), settings);
-        drop(w);
+        settings_batch.push((item_key.to_string(), Arc::new(settings)));
         let mut w = STREAM_SCHEMAS_LATEST.write().await;
         w.insert(
             item_key.to_string(),
@@ -548,11 +549,9 @@ pub async fn cache() -> Result<(), anyhow::Error> {
             log::info!("Stream schemas Cached progress: {}/{}", i, keys.len());
         }
     }
-    // sync the atomic cache once after the loop; cloning the settings map per
-    // stream inside the loop is O(n^2) and stalls startup with many streams
-    let w = STREAM_SETTINGS.read().await;
-    infra::schema::set_stream_settings_atomic(w.clone());
-    drop(w);
+    // insert all settings and publish the read snapshot once; publishing per
+    // stream inside the loop would be O(n^2) and stall startup with many streams
+    infra::schema::put_stream_settings_batch(settings_batch).await;
     log::info!("Stream schemas Cached {keys_num} streams");
     Ok(())
 }
