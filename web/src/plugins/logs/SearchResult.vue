@@ -296,6 +296,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               (searchObj.data?.queryResults?.aggs?.length > 0 ||
                 (plotChart && Object.keys(plotChart)?.length > 0))
             "
+            ref="histogramChartWrap"
             class="histogram-chart"
             @click="onHistogramAreaClick"
           >
@@ -1457,6 +1458,27 @@ export default defineComponent({
 
     const histogramChart: any = ref(null);
 
+    // ECharts sizes its canvas from the element it was mounted into, and only
+    // re-measures when told to. The histogram wrapper is locked to an explicit
+    // pixel width (histogramPinStyle), so a viewport change — docking or
+    // undocking devtools, for instance — moves the box underneath a canvas that
+    // never hears about it, and the chart is left at the old size. ECharts' own
+    // window-resize handler is no help: it fires before the new width has been
+    // applied, so it re-measures the stale box.
+    //
+    // Watching the chart's own element removes the ordering problem entirely —
+    // the observer fires once the new box is real, whatever caused it.
+    const histogramChartWrap = ref<HTMLElement | null>(null);
+    let chartResizeObserver: ResizeObserver | null = null;
+
+    watch(histogramChartWrap, (el) => {
+      chartResizeObserver?.disconnect();
+      chartResizeObserver = null;
+      if (!el) return;
+      chartResizeObserver = new ResizeObserver(() => histogramChart.value?.chart?.resize());
+      chartResizeObserver.observe(el);
+    });
+
     const closePinnedTooltip = () => {
       pinnedTooltip.value.visible = false;
       // Restore tooltip mouse tracking
@@ -1568,6 +1590,7 @@ export default defineComponent({
       window.removeEventListener("themeColorChanged", handleThemeColorChange);
       containerResizeObserver?.disconnect();
       histogramResizeObserver?.disconnect();
+      chartResizeObserver?.disconnect();
       // Clear any pending debounce timer
       if (debounceTimer) {
         clearTimeout(debounceTimer);
@@ -2337,6 +2360,7 @@ export default defineComponent({
       handleCellContextMenu,
       onContextMenuOpenChange,
       histogramChart,
+      histogramChartWrap,
       pinnedTooltip,
       closePinnedTooltip,
       onHistogramAreaClick,
