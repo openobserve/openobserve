@@ -601,15 +601,19 @@ async function verifySharedAuth(baseUrl) {
     await menuItem.waitFor({ state: 'visible', timeout: 15000 });
     testLogger.info('[alpha1] Shared auth verified — menu visible');
 
-    // Re-apply org switch + persist if active org doesn't match target
+    // ALWAYS perform the real dropdown switch to this shard's org, then persist.
+    // The previous guard read org_identifier from page.url() — but we just
+    // navigated with that param, so it always equalled targetOrg and the switch
+    // was skipped. A URL ?org_identifier= alone does NOT update the Pinia store,
+    // so skipping left the store on the shared barrier org; each test then fell
+    // back to the user's DEFAULT org (a different, trial-expired org) instead of
+    // this shard's org. Forcing the dropdown switch + re-saving storageState makes
+    // every test in this shard inherit the correct active org.
     if (targetOrg && targetOrg !== 'default') {
-      const activeOrg = new URL(page.url()).searchParams.get('org_identifier');
-      if (activeOrg !== targetOrg) {
-        testLogger.info(`[alpha1] Active org (${activeOrg}) != target (${targetOrg}); re-switching`);
-        await switchOrgViaDropdown(page, targetOrg);
-        await context.storageState({ path: AUTH_FILE });
-        testLogger.info(`[alpha1] Auth state re-saved with target org active`);
-      }
+      testLogger.info(`[alpha1] Switching shared session to shard org: ${targetOrg}`);
+      await switchOrgViaDropdown(page, targetOrg);
+      await context.storageState({ path: AUTH_FILE });
+      testLogger.info(`[alpha1] Auth state re-saved with ${targetOrg} active`);
     }
 
     // Re-fetch THIS shard's own org passcode via the session. The downloaded
