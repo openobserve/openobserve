@@ -17,80 +17,33 @@
 // harmless for a binary this size (only slows panic unwinding), so silence it.
 #![allow(linker_messages)]
 
-use std::{
-    cmp::max,
-    collections::HashMap,
-    net::SocketAddr,
-    str::FromStr,
-    time::{Duration, SystemTime},
-};
+#[cfg(feature = "tokio-console")]
+use std::net::SocketAddr;
+use std::time::{Duration, SystemTime};
 
-use arrow_flight::flight_service_server::FlightServiceServer;
 use common::{infra::cluster, meta};
 use config::{
-    META_ORG_ID,
-    cluster::LOCAL_NODE,
-    get_config,
+    META_ORG_ID, get_config,
     meta::triggers::{Trigger, TriggerModule, TriggerStatus},
     utils::size::bytes_to_human_readable,
 };
 use db::{self, scheduler::TriggerModule::QueryRecommendations};
 use infra::runtime::{create_grpc_runtime, create_job_runtime};
-use openobserve::{cli::basic::cli, migration};
-use openobserve_api::{
-    handler::{
-        grpc::{
-            auth::check_auth,
-            flight::FlightServiceImpl,
-            request::{
-                event::Eventer,
-                ingest::Ingester,
-                logs::LogsServer,
-                metrics::{ingester::MetricsIngester, querier::MetricsQuerier},
-                query_cache::QueryCacheServerImpl,
-                stream::StreamServiceImpl,
-                traces::TraceServer,
-            },
-        },
-        http::router::*,
-    },
-    router,
+use openobserve::{
+    cli::basic::cli,
+    migration,
+    telemetry::{enable_tracing, setup_logs},
 };
+use openobserve_api_http::handler::http::router::*;
 use openobserve_core::{bootstrap, metadata};
 use openobserve_jobs::job;
-use openobserve_node::{cluster_info::ClusterInfoService, node::NodeService};
-use opentelemetry::{KeyValue, global, trace::TracerProvider};
-use opentelemetry_otlp::{WithExportConfig, WithHttpConfig, WithTonicConfig};
-use opentelemetry_proto::tonic::collector::{
-    logs::v1::logs_service_server::LogsServiceServer,
-    metrics::v1::metrics_service_server::MetricsServiceServer,
-    trace::v1::trace_service_server::TraceServiceServer,
-};
-use opentelemetry_sdk::{Resource, propagation::TraceContextPropagator};
-use proto::cluster_rpc::{
-    cluster_info_service_server::ClusterInfoServiceServer, event_server::EventServer,
-    ingest_server::IngestServer, metrics_server::MetricsServer,
-    node_service_server::NodeServiceServer, query_cache_server::QueryCacheServer,
-    search_server::SearchServer, streams_server::StreamsServer,
-};
-use search_service::SEARCH_SERVER;
 use tokio::sync::oneshot;
-use tonic::{
-    codec::CompressionEncoding,
-    metadata::{MetadataKey, MetadataMap, MetadataValue},
-    transport::{Identity, ServerTlsConfig},
-};
-use tower_http::{compression::CompressionLayer, trace::TraceLayer};
-use tracing_appender::non_blocking::WorkerGuard;
-use tracing_opentelemetry::OpenTelemetryLayer;
-use tracing_subscriber::Registry;
-use utoipa::OpenApi;
-use web::ui_routes;
 #[cfg(feature = "enterprise")]
-use {
-    config::Config,
-    o2_enterprise::enterprise::{ai, common::config::O2Config},
-};
+use tower_http::trace::TraceLayer;
+use tracing_appender::non_blocking::WorkerGuard;
+use utoipa::OpenApi;
+#[cfg(feature = "enterprise")]
+use {config::Config, o2_enterprise::enterprise::common::config::O2Config};
 
 #[cfg(feature = "mimalloc")]
 #[global_allocator]
@@ -98,9 +51,6 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 #[cfg(feature = "jemalloc")]
 #[global_allocator]
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
-use tracing_subscriber::{
-    EnvFilter, filter::LevelFilter as TracingLevelFilter, fmt::Layer, prelude::*,
-};
 
 #[cfg(feature = "profiling")]
 #[allow(non_upper_case_globals)]
@@ -323,11 +273,9 @@ async fn main() -> Result<(), anyhow::Error> {
 
         let _guard = rt.enter();
         rt.block_on(async move {
-            let ret = if config::cluster::LOCAL_NODE.is_router() {
-                init_router_grpc_server(grpc_init_tx, grpc_shutdown_rx, grpc_stopped_tx).await
-            } else {
-                init_common_grpc_server(grpc_init_tx, grpc_shutdown_rx, grpc_stopped_tx).await
-            };
+            let ret =
+                openobserve_api_grpc::server::run(grpc_init_tx, grpc_shutdown_rx, grpc_stopped_tx)
+                    .await;
             if let Err(e) = ret {
                 log::error!("gRPC server init failed: {e}");
                 std::process::exit(1);
@@ -423,7 +371,7 @@ async fn main() -> Result<(), anyhow::Error> {
     };
 
     // init http server
-    if let Err(e) = init_http_server().await {
+    if let Err(e) = openobserve_api_http::server::run(web::ui_routes).await {
         log::error!("HTTP server runs failed: {e}");
     }
     log::info!("HTTP server stopped");
@@ -483,857 +431,10 @@ async fn main() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-async fn init_common_grpc_server(
-    init_tx: oneshot::Sender<()>,
-    shutdown_rx: oneshot::Receiver<()>,
-    stopped_tx: oneshot::Sender<()>,
-) -> Result<(), anyhow::Error> {
-    let cfg = get_config();
-    let ip = if !cfg.grpc.addr.is_empty() {
-        cfg.grpc.addr.clone()
-    } else {
-        "0.0.0.0".to_string()
-    };
-    let gaddr: SocketAddr = format!("{}:{}", ip, cfg.grpc.port).parse()?;
-    let event_svc = EventServer::new(Eventer)
-        .send_compressed(CompressionEncoding::Gzip)
-        .accept_compressed(CompressionEncoding::Gzip)
-        .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
-        .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
-    let search_svc = SearchServer::new(SEARCH_SERVER.clone())
-        .send_compressed(CompressionEncoding::Gzip)
-        .accept_compressed(CompressionEncoding::Gzip)
-        .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
-        .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
-    let metrics_svc = MetricsServer::new(MetricsQuerier)
-        .send_compressed(CompressionEncoding::Gzip)
-        .accept_compressed(CompressionEncoding::Gzip)
-        .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
-        .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
-    let metrics_ingest_svc = MetricsServiceServer::new(MetricsIngester)
-        .send_compressed(CompressionEncoding::Gzip)
-        .accept_compressed(CompressionEncoding::Gzip)
-        .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
-        .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
-    let logs_svc = LogsServiceServer::new(LogsServer)
-        .send_compressed(CompressionEncoding::Gzip)
-        .accept_compressed(CompressionEncoding::Gzip)
-        .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
-        .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
-    let trace_svc = TraceServiceServer::new(TraceServer)
-        .send_compressed(CompressionEncoding::Gzip)
-        .accept_compressed(CompressionEncoding::Gzip)
-        .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
-        .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
-    let query_cache_svc = QueryCacheServer::new(QueryCacheServerImpl)
-        .send_compressed(CompressionEncoding::Gzip)
-        .accept_compressed(CompressionEncoding::Gzip)
-        .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
-        .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
-    let ingest_svc = IngestServer::new(Ingester)
-        .send_compressed(CompressionEncoding::Gzip)
-        .accept_compressed(CompressionEncoding::Gzip)
-        .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
-        .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
-    let streams_svc = StreamsServer::new(StreamServiceImpl)
-        .send_compressed(CompressionEncoding::Gzip)
-        .accept_compressed(CompressionEncoding::Gzip)
-        .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
-        .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
-    // Batches are already ZSTD-compressed (Arrow IPC); gzip is dropped client-side only.
-    // Server keeps compression so old clients still work during a rolling upgrade.
-    let flight_svc = FlightServiceServer::new(FlightServiceImpl)
-        .send_compressed(CompressionEncoding::Gzip)
-        .accept_compressed(CompressionEncoding::Gzip)
-        .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
-        .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
-    let node_svc = NodeServiceServer::new(NodeService)
-        .send_compressed(CompressionEncoding::Gzip)
-        .accept_compressed(CompressionEncoding::Gzip)
-        .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
-        .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
-    let cluster_info_svc = ClusterInfoServiceServer::new(ClusterInfoService)
-        .send_compressed(CompressionEncoding::Gzip)
-        .accept_compressed(CompressionEncoding::Gzip)
-        .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
-        .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
-
-    log::info!(
-        "starting gRPC server {} at {}",
-        if cfg.grpc.tls_enabled { "with TLS" } else { "" },
-        gaddr
-    );
-    init_tx.send(()).ok();
-
-    let builder = if cfg.grpc.tls_enabled {
-        let cert = std::fs::read_to_string(&cfg.grpc.tls_cert_path)?;
-        let key = std::fs::read_to_string(&cfg.grpc.tls_key_path)?;
-        let identity = Identity::from_pem(cert, key);
-        tonic::transport::Server::builder().tls_config(ServerTlsConfig::new().identity(identity))?
-    } else {
-        tonic::transport::Server::builder()
-    };
-    let builder = builder
-        .initial_stream_window_size(config::GRPC_HTTP2_STREAM_WINDOW_SIZE)
-        .initial_connection_window_size(config::GRPC_HTTP2_CONNECTION_WINDOW_SIZE)
-        .http2_adaptive_window(Some(cfg.grpc.http2_adaptive_window))
-        .tcp_nodelay(true);
-    let ret = builder
-        .layer(tonic::service::InterceptorLayer::new(check_auth))
-        .add_service(event_svc)
-        .add_service(search_svc)
-        .add_service(metrics_svc)
-        .add_service(metrics_ingest_svc)
-        .add_service(trace_svc)
-        .add_service(logs_svc)
-        .add_service(query_cache_svc)
-        .add_service(ingest_svc)
-        .add_service(streams_svc)
-        .add_service(flight_svc)
-        .add_service(node_svc)
-        .add_service(cluster_info_svc)
-        .serve_with_shutdown(gaddr, async {
-            shutdown_rx.await.ok();
-            log::info!("gRPC server starts shutting down");
-        })
-        .await;
-    if let Err(e) = ret {
-        return Err(anyhow::anyhow!("{e}"));
-    }
-
-    stopped_tx.send(()).ok();
-    Ok(())
-}
-
-async fn init_router_grpc_server(
-    init_tx: oneshot::Sender<()>,
-    shutdown_rx: oneshot::Receiver<()>,
-    stopped_tx: oneshot::Sender<()>,
-) -> Result<(), anyhow::Error> {
-    let cfg = get_config();
-    let gaddr: SocketAddr = format!("0.0.0.0:{}", cfg.grpc.port).parse()?;
-    let logs_svc = LogsServiceServer::new(router::grpc::ingest::logs::LogsServer)
-        .send_compressed(CompressionEncoding::Gzip)
-        .accept_compressed(CompressionEncoding::Gzip)
-        .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
-        .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
-    let metrics_svc = MetricsServiceServer::new(router::grpc::ingest::metrics::MetricsServer)
-        .send_compressed(CompressionEncoding::Gzip)
-        .accept_compressed(CompressionEncoding::Gzip)
-        .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
-        .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
-    let traces_svc = TraceServiceServer::new(router::grpc::ingest::traces::TraceServer)
-        .send_compressed(CompressionEncoding::Gzip)
-        .accept_compressed(CompressionEncoding::Gzip)
-        .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
-        .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
-
-    log::info!(
-        "starting gRPC server {} at {}",
-        if cfg.grpc.tls_enabled { "with TLS" } else { "" },
-        gaddr
-    );
-    init_tx.send(()).ok();
-
-    let builder = if cfg.grpc.tls_enabled {
-        let cert = std::fs::read_to_string(&cfg.grpc.tls_cert_path)?;
-        let key = std::fs::read_to_string(&cfg.grpc.tls_key_path)?;
-        let identity = Identity::from_pem(cert, key);
-        tonic::transport::Server::builder().tls_config(ServerTlsConfig::new().identity(identity))?
-    } else {
-        tonic::transport::Server::builder()
-    };
-    let builder = builder
-        .initial_stream_window_size(config::GRPC_HTTP2_STREAM_WINDOW_SIZE)
-        .initial_connection_window_size(config::GRPC_HTTP2_CONNECTION_WINDOW_SIZE)
-        .http2_adaptive_window(Some(cfg.grpc.http2_adaptive_window))
-        .tcp_nodelay(true);
-    let ret = builder
-        .layer(tonic::service::InterceptorLayer::new(check_auth))
-        .add_service(logs_svc)
-        .add_service(metrics_svc)
-        .add_service(traces_svc)
-        .serve_with_shutdown(gaddr, async {
-            shutdown_rx.await.ok();
-            log::info!("gRPC server starts shutting down");
-        })
-        .await;
-    if let Err(e) = ret {
-        return Err(anyhow::anyhow!("{e}"));
-    }
-
-    stopped_tx.send(()).ok();
-    Ok(())
-}
-
-/// Resolve the HTTP listen address from config
-fn http_server_addr() -> Result<SocketAddr, anyhow::Error> {
-    let cfg = get_config();
-    let haddr = if cfg.http.ipv6_enabled {
-        format!("[::]:{}", cfg.http.port).parse()?
-    } else {
-        let ip = if !cfg.http.addr.is_empty() {
-            cfg.http.addr.clone()
-        } else {
-            "0.0.0.0".to_string()
-        };
-        format!("{}:{}", ip, cfg.http.port).parse()?
-    };
-    Ok(haddr)
-}
-
-/// Apply the middlewares shared by all HTTP servers: access log, slow log and
-/// client IP resolution
-fn apply_common_middlewares(app: axum::Router) -> axum::Router {
-    let cfg = get_config();
-    let ip_sources = config::axum::middlewares::resolve_client_ip_sources(&cfg.http.real_ip_source);
-    log::info!(
-        "HTTP client IP sources (in order, implicit ConnectInfo fallback): {}",
-        cfg.http.real_ip_source
-    );
-    app.layer(config::axum::middlewares::AccessLogLayer::new(
-        config::axum::middlewares::get_http_access_log_format(),
-    ))
-    .layer(config::axum::middlewares::SlowLogLayer::new(
-        cfg.limit.http_slow_log_threshold,
-    ))
-    .layer(axum::middleware::from_fn(
-        config::axum::middlewares::extract_real_ip,
-    ))
-    .layer(axum::Extension(ip_sources))
-}
-
-/// Serve `app` on `haddr`, with TLS if configured. Graceful shutdown is
-/// bounded by ZO_HTTP_SHUTDOWN_TIMEOUT so long-lived connections (SSE,
-/// websocket) cannot block process exit.
-async fn serve_http(haddr: SocketAddr, app: axum::Router) -> Result<(), anyhow::Error> {
-    let cfg = get_config();
-    let handle = axum_server::Handle::new();
-    let shutdown_timeout = cfg.limit.http_shutdown_timeout;
-
-    // Spawn task to handle shutdown signal
-    tokio::spawn({
-        let handle = handle.clone();
-        async move {
-            shutdown_signal().await;
-            handle.graceful_shutdown(Some(Duration::from_secs(max(1, shutdown_timeout))));
-        }
-    });
-
-    let service = app.into_make_service_with_connect_info::<SocketAddr>();
-    if cfg.http.tls_enabled {
-        let tls_config = axum_server::tls_rustls::RustlsConfig::from_pem_file(
-            &cfg.http.tls_cert_path,
-            &cfg.http.tls_key_path,
-        )
-        .await?;
-        axum_server::bind_rustls(haddr, tls_config)
-            .handle(handle)
-            .serve(service)
-            .await?;
-    } else {
-        axum_server::bind(haddr)
-            .handle(handle)
-            .serve(service)
-            .await?;
-    }
-
-    Ok(())
-}
-
-async fn init_http_server() -> Result<(), anyhow::Error> {
-    let cfg = get_config();
-    let haddr = http_server_addr()?;
-    log::info!(
-        "Starting {} server at: {haddr}",
-        if cfg.http.tls_enabled {
-            "HTTPS"
-        } else {
-            "HTTP"
-        }
-    );
-
-    // Build the router
-    let app = apply_common_middlewares(create_app_router(ui_routes)).layer(CompressionLayer::new());
-    // Skip the request tracing layer when tracing is enabled only for search
-    let app = if !cfg.common.tracing_enabled
-        && (cfg.common.tracing_search_enabled || cfg.common.search_inspector_enabled)
-    {
-        app
-    } else {
-        app.layer(TraceLayer::new_for_http())
-    };
-
-    serve_http(haddr, app).await
-}
-
-/// Signal handler for graceful shutdown
-async fn shutdown_signal() {
-    #[cfg(unix)]
-    {
-        use tokio::signal::unix::{SignalKind, signal};
-
-        let mut sigquit = signal(SignalKind::quit()).unwrap();
-        let mut sigterm = signal(SignalKind::terminate()).unwrap();
-        let mut sigint = signal(SignalKind::interrupt()).unwrap();
-
-        tokio::select! {
-            _ = sigquit.recv() =>  log::info!("SIGQUIT received"),
-            _ = sigterm.recv() =>  log::info!("SIGTERM received"),
-            _ = sigint.recv() =>   log::info!("SIGINT received"),
-        }
-    }
-
-    #[cfg(not(unix))]
-    {
-        use tokio::signal::windows::*;
-
-        let mut sigbreak = ctrl_break().unwrap();
-        let mut sigint = ctrl_c().unwrap();
-        let mut sigquit = ctrl_close().unwrap();
-        let mut sigterm = ctrl_shutdown().unwrap();
-
-        tokio::select! {
-            _ = sigbreak.recv() =>  log::info!("ctrl-break received"),
-            _ = sigquit.recv() =>  log::info!("ctrl-c received"),
-            _ = sigterm.recv() =>  log::info!("ctrl-close received"),
-            _ = sigint.recv() =>   log::info!("ctrl-shutdown received"),
-        }
-    }
-
-    // offline the node
-    if let Err(e) = cluster::set_offline().await {
-        log::error!("set offline failed: {e}");
-    }
-    log::info!("Node is offline");
-}
-
-/// Setup the tracing related components
-pub(crate) fn setup_logs() -> tracing_appender::non_blocking::WorkerGuard {
-    use tracing_subscriber::fmt::writer::BoxMakeWriter;
-
-    let cfg = get_config();
-    let (writer, guard) = if cfg.log.file_dir.is_empty() {
-        let (non_blocking, _guard) = tracing_appender::non_blocking(std::io::stdout());
-        (BoxMakeWriter::new(non_blocking), _guard)
-    } else {
-        let file_name_prefix = if cfg.log.file_name_prefix.is_empty() {
-            format!("o2.{}.log", cfg.common.instance_name.as_str())
-        } else {
-            cfg.log.file_name_prefix.to_string()
-        };
-        let file_appender = tracing_appender::rolling::daily(&cfg.log.file_dir, file_name_prefix);
-        let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
-        (BoxMakeWriter::new(non_blocking), _guard)
-    };
-    let layer = if cfg.log.json_format {
-        Layer::default()
-            .with_writer(writer)
-            .with_timer(config::meta::logger::CustomTimeFormat)
-            .with_ansi(false)
-            .json()
-            .with_current_span(false)
-            .with_span_list(false)
-            .boxed()
-    } else {
-        Layer::default()
-            .with_writer(writer)
-            .with_ansi(false)
-            .with_target(true)
-            .event_format(config::meta::logger::O2Formatter::default())
-            .boxed()
-    };
-
-    tracing_subscriber::registry()
-        .with(
-            EnvFilter::builder()
-                .with_default_directive(TracingLevelFilter::INFO.into())
-                .from_env_lossy(),
-        )
-        .with(layer)
-        .init();
-    guard
-}
-
-/// Custom span processor that filters spans based on their name prefix
-#[cfg(feature = "enterprise")]
-#[derive(Debug)]
-struct FilteringSpanProcessor<P> {
-    inner: P,
-    prefix_filter: Option<String>,
-}
-
-#[cfg(feature = "enterprise")]
-impl<P> FilteringSpanProcessor<P> {
-    fn new(inner: P, prefix_filter: Option<String>) -> Self {
-        Self {
-            inner,
-            prefix_filter,
-        }
-    }
-}
-
-#[cfg(feature = "enterprise")]
-impl<P: opentelemetry_sdk::trace::SpanProcessor> opentelemetry_sdk::trace::SpanProcessor
-    for FilteringSpanProcessor<P>
-{
-    fn on_start(&self, span: &mut opentelemetry_sdk::trace::Span, cx: &opentelemetry::Context) {
-        // Always call inner on_start - we can only filter on_end when we have the full span data
-        self.inner.on_start(span, cx);
-    }
-
-    fn on_end(&self, span: opentelemetry_sdk::trace::SpanData) {
-        // If no filter is set, pass through all spans
-        if let Some(prefix) = &self.prefix_filter {
-            let span_name = span.name.as_ref();
-            // Only process spans that match the prefix
-            if !span_name.starts_with(prefix) {
-                return;
-            }
-        }
-        self.inner.on_end(span);
-    }
-
-    fn force_flush(&self) -> Result<(), opentelemetry_sdk::error::OTelSdkError> {
-        self.inner.force_flush()
-    }
-
-    fn shutdown(&self) -> Result<(), opentelemetry_sdk::error::OTelSdkError> {
-        self.inner.shutdown()
-    }
-
-    fn shutdown_with_timeout(
-        &self,
-        timeout: std::time::Duration,
-    ) -> Result<(), opentelemetry_sdk::error::OTelSdkError> {
-        self.inner.shutdown_with_timeout(timeout)
-    }
-}
-
-/// Custom SpanExporter that ingests traces directly into the _meta org.
-/// This is used by the search inspector feature to ensure search profiling
-/// traces are always available in the _meta org, regardless of where the user's
-/// OTLP endpoint points.
-///
-/// Handles both single-node and multi-node deployments:
-/// - Ingester nodes: calls `handle_otlp_request` directly
-/// - Non-ingester nodes (e.g. queriers): forwards via gRPC to an ingester
-#[derive(Debug)]
-struct MetaOrgTraceExporter {
-    resource: opentelemetry_proto::transform::common::tonic::ResourceAttributesWithSchema,
-}
-
-impl MetaOrgTraceExporter {
-    fn new(
-        resource: opentelemetry_proto::transform::common::tonic::ResourceAttributesWithSchema,
-    ) -> Self {
-        Self { resource }
-    }
-}
-
-impl opentelemetry_sdk::trace::SpanExporter for MetaOrgTraceExporter {
-    fn export(
-        &self,
-        batch: Vec<opentelemetry_sdk::trace::SpanData>,
-    ) -> impl std::future::Future<Output = opentelemetry_sdk::error::OTelSdkResult> + Send {
-        // Convert SpanData to ExportTraceServiceRequest synchronously
-        // so we don't hold a borrow on &self across await points
-        let resource_spans =
-            opentelemetry_proto::transform::trace::tonic::group_spans_by_resource_and_scope(
-                batch,
-                &self.resource,
-            );
-        let request = opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest {
-            resource_spans,
-        };
-
-        async move {
-            if LOCAL_NODE.is_ingester() {
-                // Ingest directly on ingester nodes
-                match openobserve_core::traces::handle_otlp_request(
-                    META_ORG_ID,
-                    request,
-                    config::meta::otlp::OtlpRequestType::HttpJson,
-                    None,
-                    ingestion_common::IngestUser::SystemJob(
-                        ingestion_common::SystemJobType::SelfReporting,
-                    ),
-                )
-                .await
-                {
-                    Ok(resp) if resp.status().is_success() => {
-                        log::debug!("[SEARCH-INSPECTOR] Successfully ingested traces to _meta org");
-                        Ok(())
-                    }
-                    Ok(resp) => {
-                        log::error!(
-                            "[SEARCH-INSPECTOR] Error ingesting traces to _meta org: status={}",
-                            resp.status()
-                        );
-                        Err(opentelemetry_sdk::error::OTelSdkError::InternalFailure(
-                            format!("Failed to ingest traces: status={}", resp.status()),
-                        ))
-                    }
-                    Err(e) => {
-                        log::error!("[SEARCH-INSPECTOR] Error ingesting traces to _meta org: {e}");
-                        Err(opentelemetry_sdk::error::OTelSdkError::InternalFailure(
-                            format!("Failed to ingest traces: {e}"),
-                        ))
-                    }
-                }
-            } else {
-                // Forward to an ingester node via gRPC
-                let cfg = get_config();
-                let token = match config::meta::cluster::get_internal_grpc_token()
-                    .parse::<tonic::metadata::MetadataValue<_>>()
-                {
-                    Ok(token) => token,
-                    Err(e) => {
-                        log::error!("[SEARCH-INSPECTOR] Failed to parse internal gRPC token: {e}");
-                        return Err(opentelemetry_sdk::error::OTelSdkError::InternalFailure(
-                            format!("Failed to parse gRPC token: {e}"),
-                        ));
-                    }
-                };
-
-                let (_addr, channel) = match openobserve_node::grpc::get_ingester_channel().await {
-                    Ok(v) => v,
-                    Err(e) => {
-                        log::error!("[SEARCH-INSPECTOR] Failed to get ingester channel: {e}");
-                        return Err(opentelemetry_sdk::error::OTelSdkError::InternalFailure(
-                            format!("No ingester available: {e}"),
-                        ));
-                    }
-                };
-
-                let client = opentelemetry_proto::tonic::collector::trace::v1::trace_service_client::TraceServiceClient::with_interceptor(
-                    channel,
-                    move |mut req: tonic::Request<()>| {
-                        req.metadata_mut().insert("authorization", token.clone());
-                        Ok(req)
-                    },
-                );
-
-                let org_header_key: MetadataKey<_> = cfg.grpc.org_header_key.parse().unwrap();
-                let mut grpc_request = tonic::Request::new(request);
-                grpc_request.metadata_mut().insert(
-                    org_header_key,
-                    META_ORG_ID
-                        .parse::<tonic::metadata::MetadataValue<_>>()
-                        .unwrap(),
-                );
-
-                match client
-                    .send_compressed(CompressionEncoding::Gzip)
-                    .accept_compressed(CompressionEncoding::Gzip)
-                    .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
-                    .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
-                    .export(grpc_request)
-                    .await
-                {
-                    Ok(_) => {
-                        log::debug!(
-                            "[SEARCH-INSPECTOR] Successfully forwarded traces to ingester for _meta org"
-                        );
-                        Ok(())
-                    }
-                    Err(e) => {
-                        log::error!("[SEARCH-INSPECTOR] Error forwarding traces to ingester: {e}");
-                        Err(opentelemetry_sdk::error::OTelSdkError::InternalFailure(
-                            format!("Failed to forward traces to ingester: {e}"),
-                        ))
-                    }
-                }
-            }
-        }
-    }
-}
-
-fn enable_tracing() -> Result<opentelemetry_sdk::trace::SdkTracerProvider, anyhow::Error> {
-    let cfg = get_config();
-    opentelemetry::global::set_text_map_propagator(TraceContextPropagator::new());
-
-    let mut tracer_builder = opentelemetry_sdk::trace::SdkTracerProvider::builder();
-
-    // Add main OpenObserve OTLP exporter (if general tracing is enabled)
-    if cfg.common.tracing_enabled || cfg.common.tracing_search_enabled {
-        tracer_builder = if cfg.common.otel_otlp_grpc_url.is_empty() {
-            tracer_builder.with_span_processor(
-            opentelemetry_sdk::trace::span_processor_with_async_runtime::BatchSpanProcessor::builder(
-                {
-                    let mut headers = HashMap::new();
-                    headers.insert(
-                        cfg.common.tracing_header_key.clone(),
-                        cfg.common.tracing_header_value.clone(),
-                    );
-                    opentelemetry_otlp::SpanExporter::builder()
-                        .with_http()
-                        .with_http_client(
-                            reqwest::Client::builder()
-                        .danger_accept_invalid_certs(true)
-                        .timeout(Duration::from_secs(10))           // Overall request timeout
-                        .connect_timeout(Duration::from_secs(5))    // Connection establishment timeout
-                        .pool_idle_timeout(Duration::from_secs(60)) // How long to keep idle connections
-                        .pool_max_idle_per_host(10) // How many idle connections to keep per host
-                        .build()?,
-                        )
-                        .with_endpoint(&cfg.common.otel_otlp_url)
-                        .with_headers(headers)
-                        .build()?
-                },
-                opentelemetry_sdk::runtime::Tokio,
-            )
-            .build(),
-        )
-        } else {
-            tracer_builder.with_span_processor(
-            opentelemetry_sdk::trace::span_processor_with_async_runtime::BatchSpanProcessor::builder(
-                {
-                    let mut metadata = MetadataMap::new();
-                    metadata.insert(
-                        MetadataKey::from_str(&cfg.common.tracing_header_key).unwrap(),
-                        MetadataValue::from_str(&cfg.common.tracing_header_value).unwrap(),
-                    );
-                    metadata.insert(
-                        MetadataKey::from_str(&cfg.grpc.org_header_key).unwrap(),
-                        MetadataValue::from_str(&cfg.common.tracing_grpc_header_org).unwrap(),
-                    );
-                    metadata.insert(
-                        MetadataKey::from_str(&cfg.grpc.stream_header_key).unwrap(),
-                        MetadataValue::from_str(&cfg.common.tracing_grpc_header_stream_name)
-                            .unwrap(),
-                    );
-                    opentelemetry_otlp::SpanExporter::builder()
-                        .with_tonic()
-                        .with_endpoint(&cfg.common.otel_otlp_grpc_url)
-                        .with_metadata(metadata)
-                        .with_protocol(opentelemetry_otlp::Protocol::Grpc)
-                        .build()?
-                },
-                opentelemetry_sdk::runtime::Tokio,
-            )
-            .build(),
-        )
-        };
-        log::info!("Main OpenObserve OTLP exporter configured");
-    }
-
-    // Handle AI tracing (enterprise feature)
-    #[cfg(feature = "enterprise")]
-    {
-        use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
-        let o2_cfg = get_o2_config();
-
-        // If AI tracing is enabled but general tracing is NOT enabled,
-        // we need to add OpenObserve OTLP exporter for AI traces
-        if o2_cfg.ai.tracing_enabled
-            && !cfg.common.tracing_enabled
-            && !cfg.common.tracing_search_enabled
-        {
-            log::info!("AI tracing enabled independently - configuring OpenObserve OTLP exporter");
-
-            // Add OpenObserve exporter for AI traces
-            if !cfg.common.otel_otlp_url.is_empty() {
-                let mut headers = HashMap::new();
-                headers.insert(
-                    cfg.common.tracing_header_key.clone(),
-                    cfg.common.tracing_header_value.clone(),
-                );
-
-                let oo_exporter = opentelemetry_otlp::SpanExporter::builder()
-                    .with_http()
-                    .with_http_client(
-                        reqwest::Client::builder()
-                            .danger_accept_invalid_certs(true)
-                            .timeout(Duration::from_secs(10))
-                            .connect_timeout(Duration::from_secs(5))
-                            .pool_idle_timeout(Duration::from_secs(60))
-                            .pool_max_idle_per_host(10)
-                            .build()?,
-                    )
-                    .with_endpoint(&cfg.common.otel_otlp_url)
-                    .with_headers(headers)
-                    .build()?;
-
-                let oo_processor = opentelemetry_sdk::trace::span_processor_with_async_runtime::BatchSpanProcessor::builder(
-                    oo_exporter,
-                    opentelemetry_sdk::runtime::Tokio,
-                )
-                .build();
-
-                // Wrap with filtering processor to only send AI traces
-                let filtered_processor = FilteringSpanProcessor::new(
-                    oo_processor,
-                    Some("ai.".to_string()), // Only send spans starting with "ai."
-                );
-
-                tracer_builder = tracer_builder.with_span_processor(filtered_processor);
-                log::info!(
-                    "AI traces (ai.* spans only) will be sent to OpenObserve: {}",
-                    cfg.common.otel_otlp_url
-                );
-            } else if !cfg.common.otel_otlp_grpc_url.is_empty() {
-                let mut metadata = MetadataMap::new();
-                metadata.insert(
-                    MetadataKey::from_str(&cfg.common.tracing_header_key).unwrap(),
-                    MetadataValue::from_str(&cfg.common.tracing_header_value).unwrap(),
-                );
-
-                let oo_exporter = opentelemetry_otlp::SpanExporter::builder()
-                    .with_tonic()
-                    .with_endpoint(&cfg.common.otel_otlp_grpc_url)
-                    .with_metadata(metadata)
-                    .with_protocol(opentelemetry_otlp::Protocol::Grpc)
-                    .build()?;
-
-                let oo_processor = opentelemetry_sdk::trace::span_processor_with_async_runtime::BatchSpanProcessor::builder(
-                    oo_exporter,
-                    opentelemetry_sdk::runtime::Tokio,
-                )
-                .build();
-
-                // Wrap with filtering processor to only send AI traces
-                let filtered_processor = FilteringSpanProcessor::new(
-                    oo_processor,
-                    Some("ai.".to_string()), // Only send spans starting with "ai."
-                );
-
-                tracer_builder = tracer_builder.with_span_processor(filtered_processor);
-                log::info!(
-                    "AI traces (ai.* spans only) will be sent to OpenObserve (gRPC): {}",
-                    cfg.common.otel_otlp_grpc_url
-                );
-            } else {
-                log::warn!(
-                    "AI tracing enabled but ZO_OTEL_OTLP_URL not configured - AI traces will not be exported"
-                );
-            }
-        }
-
-        // Additionally, if O2_AI_EVAL_OTLP_ENDPOINT is set, send AI traces to evaluation platform
-        // too
-        let eval_endpoint = std::env::var("O2_AI_EVAL_OTLP_ENDPOINT")
-            .ok()
-            .or_else(|| o2_cfg.ai.eval_otlp_endpoint.clone())
-            .filter(|s| !s.is_empty());
-
-        if let Some(endpoint) = eval_endpoint {
-            log::info!(
-                "Configuring additional AI evaluation OTLP exporter to: {}",
-                endpoint
-            );
-
-            let eval_exporter = opentelemetry_otlp::SpanExporter::builder()
-                .with_tonic()
-                .with_endpoint(endpoint)
-                .with_timeout(std::time::Duration::from_secs(10))
-                .build()?;
-
-            let eval_processor = opentelemetry_sdk::trace::span_processor_with_async_runtime::BatchSpanProcessor::builder(
-                eval_exporter,
-                opentelemetry_sdk::runtime::Tokio,
-            )
-            .build();
-
-            // Wrap with filtering processor to only send AI traces
-            let filtered_eval_processor =
-                FilteringSpanProcessor::new(eval_processor, Some("ai.".to_string()));
-
-            tracer_builder = tracer_builder.with_span_processor(filtered_eval_processor);
-            log::info!(
-                "AI evaluation OTLP exporter configured - AI traces (ai.* spans only) will be sent to evaluation platform"
-            );
-        }
-    }
-
-    // Build resource attributes (base + extra envs)
-    let mut resource_attrs = vec![
-        KeyValue::new("service.name", cfg.common.node_role.to_string()),
-        KeyValue::new("service.instance", cfg.common.instance_name.to_string()),
-        KeyValue::new("service.version", config::VERSION),
-    ];
-    for env_name in cfg
-        .common
-        .tracing_extra_envs
-        .split(',')
-        .map(str::trim)
-        .filter(|s| !s.is_empty())
-    {
-        if let Ok(val) = std::env::var(env_name)
-            && !val.is_empty()
-        {
-            resource_attrs.push(KeyValue::new(env_name.to_lowercase(), val));
-        }
-    }
-
-    // If search inspector is enabled, add a span processor that ingests traces
-    // directly into the _meta org. This ensures search profiling data is always
-    // available in _meta regardless of where the user's OTLP endpoint points.
-    if cfg.common.search_inspector_enabled {
-        let resource = Resource::builder()
-            .with_attributes(resource_attrs.clone())
-            .build();
-        let resource_attrs =
-            opentelemetry_proto::transform::common::tonic::ResourceAttributesWithSchema::from(
-                &resource,
-            );
-        let meta_exporter = MetaOrgTraceExporter::new(resource_attrs);
-        let meta_processor =
-            opentelemetry_sdk::trace::span_processor_with_async_runtime::BatchSpanProcessor::builder(
-                meta_exporter,
-                opentelemetry_sdk::runtime::Tokio,
-            )
-            .build();
-        tracer_builder = tracer_builder.with_span_processor(meta_processor);
-        log::info!(
-            "Search inspector OTLP exporter configured - traces will be ingested to _meta org"
-        );
-    }
-
-    // Add UUID v7 ID generator and resource attributes
-    tracer_builder = tracer_builder.with_id_generator({
-        #[cfg(feature = "enterprise")]
-        {
-            ai::agent::tracing::UuidV7IdGenerator
-        }
-        #[cfg(not(feature = "enterprise"))]
-        {
-            opentelemetry_sdk::trace::RandomIdGenerator::default()
-        }
-    });
-
-    let tracer =
-        tracer_builder.with_resource(Resource::builder().with_attributes(resource_attrs).build());
-
-    // build
-    let tracer = tracer.build();
-
-    let layer = if cfg.log.json_format {
-        tracing_subscriber::fmt::layer()
-            .with_ansi(false)
-            .json()
-            .boxed()
-    } else {
-        tracing_subscriber::fmt::layer().with_ansi(false).boxed()
-    };
-
-    global::set_tracer_provider(tracer.clone());
-    Registry::default()
-        .with(tracing_subscriber::EnvFilter::new(&cfg.log.level))
-        .with(layer)
-        .with(OpenTelemetryLayer::new(
-            tracer.tracer("tracing-otel-subscriber"),
-        ))
-        .init();
-
-    // Return the tracer provider
-    Ok(tracer)
-}
-
 #[cfg(feature = "enterprise")]
 async fn init_action_server() -> Result<(), anyhow::Error> {
     let cfg = get_config();
-    let haddr = http_server_addr()?;
+    let haddr = openobserve_api_http::server::server_addr()?;
 
     // Setup the namespace
     o2_enterprise::enterprise::actions::action_deployer::init().await?;
@@ -1348,10 +449,10 @@ async fn init_action_server() -> Result<(), anyhow::Error> {
     );
 
     // Build the router for action server
-    let app =
-        apply_common_middlewares(create_action_server_router()).layer(TraceLayer::new_for_http());
+    let app = openobserve_api_http::server::apply_common_middlewares(create_action_server_router())
+        .layer(TraceLayer::new_for_http());
 
-    serve_http(haddr, app).await?;
+    openobserve_api_http::server::serve(haddr, app).await?;
 
     log::info!("HTTP server stopped");
 
@@ -1378,7 +479,7 @@ pub fn create_action_server_router() -> axum::Router {
         middleware,
         routing::{get, post},
     };
-    use openobserve_api::handler::http::{request::action_server, router::cors_layer};
+    use openobserve_api_http::handler::http::{request::action_server, router::cors_layer};
 
     let cfg = get_config();
 
@@ -1396,7 +497,7 @@ pub fn create_action_server_router() -> axum::Router {
                 .put(action_server::patch_action),
         )
         .layer(middleware::from_fn(
-            openobserve_api_management::auth::action_server::auth_middleware,
+            openobserve_api_common::auth::action_server::auth_middleware,
         ))
         .layer(cors_layer());
 
@@ -1441,8 +542,10 @@ async fn init_enterprise() -> Result<(), anyhow::Error> {
 
     o2_enterprise::enterprise::pipeline::pipeline_file_server::PipelineFileServer::run().await?;
     if o2cfg.rate_limit.rate_limit_enabled && o2_openfga::config::get_config().enabled {
-        o2_ratelimit::init(openobserve_api::handler::http::router::openapi::openapi_info().await)
-            .await?;
+        o2_ratelimit::init(
+            openobserve_api_http::handler::http::router::openapi::openapi_info().await,
+        )
+        .await?;
     }
 
     Ok(())
@@ -1470,46 +573,7 @@ fn check_ratelimit_config(cfg: &Config, o2cfg: &O2Config) -> Result<(), anyhow::
 
 #[cfg(test)]
 mod tests {
-    use tokio::runtime::Runtime;
-
     use super::*;
-
-    #[test]
-    fn test_setup_logs() {
-        let _guard = setup_logs();
-
-        // Just verify that the guard is valid and the logs setup doesn't panic
-    }
-
-    #[test]
-    fn test_enable_tracing_error_handling() {
-        // Test that enable_tracing handles configuration errors gracefully
-        // This test verifies the function exists and can be called
-        // In a real environment, tracing setup might fail due to network issues
-
-        // We can't easily test the actual tracing setup without mocking external services
-        // But we can ensure the function signature and basic error handling work
-        let result = std::panic::catch_unwind(|| {
-            // Just verify the function can be called
-            let rt = Runtime::new().unwrap();
-            rt.block_on(async {
-                // This might fail in test environment due to missing config
-                // but that's expected and we're testing error handling
-                let _ = enable_tracing();
-            });
-        });
-
-        // The test should pass regardless of whether enable_tracing() succeeds or fails
-        // In test environments, it may fail due to:
-        // 1. Global subscriber already set by another test (when running in parallel)
-        // 2. Missing configuration
-        // 3. Network issues
-        // We're testing that it doesn't panic unexpectedly beyond expected tracing setup issues
-        // Don't assert result.is_ok() because parallel tests will fail due to global subscriber
-        // conflicts (expected in test environment when tests run in parallel)
-        // The important thing is that we can call the function without unexpected panics
-        let _ = result;
-    }
 
     #[cfg(feature = "enterprise")]
     #[test]
@@ -1615,20 +679,6 @@ mod tests {
         assert!(!wait_for_send);
         assert!(server_stop);
         assert!(wait_for_stop);
-    }
-
-    #[test]
-    fn test_resource_key_value_creation() {
-        use opentelemetry::KeyValue;
-
-        // Test KeyValue creation patterns used in tracing setup
-        let service_name = KeyValue::new("service.name", "test-service");
-        let service_instance = KeyValue::new("service.instance", "test-instance");
-        let service_version = KeyValue::new("service.version", "1.0.0");
-
-        assert_eq!(service_name.key.as_str(), "service.name");
-        assert_eq!(service_instance.key.as_str(), "service.instance");
-        assert_eq!(service_version.key.as_str(), "service.version");
     }
 
     #[tokio::test]

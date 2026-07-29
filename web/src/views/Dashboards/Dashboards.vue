@@ -338,6 +338,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :description="
                   showFavoritesOnly && !filterQuery ? t('dashboard.noFavoritesMessage') : undefined
                 "
+                :hide-action="showFavoritesOnly && !filterQuery"
                 :filtered="!!filterQuery"
                 @action="
                   (id) =>

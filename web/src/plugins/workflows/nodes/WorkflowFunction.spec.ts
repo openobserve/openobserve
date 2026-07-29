@@ -47,7 +47,16 @@ vi.mock("@/components/flow/forms/FunctionPicker.vue", () => ({
 
 import { workflowObj } from "@/plugins/workflows/useWorkflowCanvas";
 import { buildTestSample } from "@/plugins/workflows/testSample";
+import { buildIncidentSample } from "@/plugins/workflows/incidentSample";
 import WorkflowFunction from "./WorkflowFunction.vue";
+
+// The "Events" sample comes from the CURRENT trigger's kind, so seed a trigger
+// node in the graph. Default = alert; individual tests override it.
+const seedTrigger = (kind = "alert_fired") => {
+  workflowObj.currentSelectedWorkflow.nodes = [
+    { id: "t1", data: { node_type: "workflow_trigger", trigger_kind: kind } },
+  ];
+};
 
 function createWrapper() {
   return mount(WorkflowFunction, { global: { plugins: [i18n, store] } });
@@ -59,10 +68,12 @@ describe("WorkflowFunction", () => {
   beforeEach(() => {
     workflowObj.currentSelectedNodeData = null;
     workflowObj.dialog.expand = false;
+    seedTrigger();
     pickerSubmit.mockReset();
   });
   afterEach(() => {
     workflowObj.currentSelectedNodeData = null;
+    workflowObj.currentSelectedWorkflow.nodes = [];
     workflowObj.dialog.expand = false;
     vi.clearAllMocks();
   });
@@ -98,13 +109,29 @@ describe("WorkflowFunction", () => {
       expect(picker(wrapper).props("initialAfterFlatten")).toBe(true);
     });
 
-    it("seeds the inline editor with the fired-alert sample payload", () => {
+    it("seeds the inline editor with the fired-alert sample for an alert trigger", () => {
+      seedTrigger("alert_fired");
       const wrapper = createWrapper();
       const events = picker(wrapper).props("sampleEvents");
       expect(events).toEqual(buildTestSample());
       // the envelope the trigger emits: { meta: {...}, data: [ row ] }
       expect(events[0]).toHaveProperty("meta.alert_name");
       expect(Array.isArray(events[0].data)).toBe(true);
+    });
+
+    it("seeds the incident sample for an incident trigger", () => {
+      seedTrigger("incident_event");
+      const wrapper = createWrapper();
+      const events = picker(wrapper).props("sampleEvents");
+      expect(events).toEqual(buildIncidentSample());
+      expect(events[0]).toHaveProperty("meta.incident_id");
+      expect(events[0]).toHaveProperty("meta.event_type");
+    });
+
+    it("seeds no sample when the workflow has no trigger", () => {
+      workflowObj.currentSelectedWorkflow.nodes = [];
+      const wrapper = createWrapper();
+      expect(picker(wrapper).props("sampleEvents")).toEqual([]);
     });
 
     it("locks the inline editor to JavaScript and seeds a concise comment", () => {

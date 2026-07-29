@@ -300,7 +300,12 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
 
     await setupTableChart(pm, page, 'expanded_timeseries');
 
-    // Get the current table header order before reordering
+    // Get the current table header order before reordering. Wait for the table
+    // to actually render headers first — capturing a 0 baseline makes the
+    // post-save "settles back to baseline" poll below impossible to satisfy.
+    await expect
+      .poll(async () => await pm.metricsPage.getPromqlTableHeaderCount(), { timeout: 10000 })
+      .toBeGreaterThan(0);
     const initialHeaderCount = await pm.metricsPage.getPromqlTableHeaderCount();
     testLogger.info(`Initial table has ${initialHeaderCount} columns`);
 

@@ -7736,7 +7736,6 @@
       "scoreConfigs": "평가에 사용되는 채점 루브릭을 구성합니다."
     },
     "agentGraph": {
-      "allAgents": "모든 에이전트",
       "stream": "스트림",
       "agent": "에이전트",
       "noAgentsTitle": "에이전트를 찾을 수 없음",
@@ -9592,6 +9591,8 @@
       "modalSubtitle": "모니터링할 항목 선택",
       "modalTitle": "검사 생성",
       "pageTitle": "새 {label} 검사",
+      "saveAndContinue": "저장 후 계속",
+      "saveAndExit": "저장 후 종료",
       "saveCheck": "검사 저장",
       "saveFailed": "검사 저장에 실패했습니다.",
       "saved": "검사가 성공적으로 저장되었습니다.",
@@ -9619,7 +9620,7 @@
         "assertionValue": "값",
         "assertions": "어설션",
         "body": "요청 본문",
-        "bodyPlaceholder": "{\"key\": \"value\"}",
+        "bodyPlaceholder": "{'{'}\"key\": \"value\"{'}'}",
         "fields": {
           "body": "응답 본문",
           "response_time_ms": "응답 시간 (ms)",

@@ -133,6 +133,18 @@ export const NAV_GROUPS: NavGroupDef[] = [
       { titleKey: "menu.report", icon: "description", name: "reports", requires: "reports" },
     ],
   },
+  {
+    key: "experience",
+    titleKey: "menu.experience",
+    icon: "devices",
+    // RUM's route always exists; Synthetics is feature-gated, so land on RUM.
+    parentLink: "/rum",
+    absorbs: ["rum", "synthetics"],
+    children: [
+      { titleKey: "menu.rum", icon: "devices", name: "RUM", requires: "rum" },
+      { titleKey: "menu.synthetic", icon: "radar", name: "synthetics", requires: "synthetics" },
+    ],
+  },
 ];
 
 /**

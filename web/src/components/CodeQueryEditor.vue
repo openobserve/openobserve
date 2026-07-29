@@ -19,6 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       data-test="query-editor"
       class="logs-query-editor bg-card-glass-bg min-h-0 flex-1"
+      :class="{ 'promql-mode': language === 'promql' }"
       ref="editorRef"
       :id="editorId"
     />
@@ -78,6 +79,7 @@ const loadMonaco = async () => {
 };
 
 import { vrlLanguageDefinition } from "@/utils/query/vrlLanguageDefinition";
+import { loadPromqlLanguage } from "@/utils/query/promqlLanguageDefinition";
 
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
@@ -537,6 +539,12 @@ export default defineComponent({
       // Register custom languages after Monaco is loaded
       if (props.language === "promql") {
         monaco.languages.register({ id: "promql" });
+
+        // Official monaco-promql grammar, verbatim — without a tokenizer the
+        // query renders monochrome (#9779, #9793).
+        const promql = await loadPromqlLanguage();
+        monaco.languages.setMonarchTokensProvider("promql", promql.language as any);
+        monaco.languages.setLanguageConfiguration("promql", promql.languageConfiguration as any);
       }
       if (props.language === "vrl") {
         monaco.languages.register({ id: "vrl" });
@@ -548,7 +556,10 @@ export default defineComponent({
       monaco.editor.defineTheme("myCustomTheme", {
         base: "vs", // can also be vs-dark or hc-black
         inherit: true, // can also be false to completely replace the builtin rules
-        rules: [{ token: "comment", background: "FFFFFF" }],
+        rules: [
+          { token: "comment", background: "FFFFFF" },
+          // PromQL: no rules on purpose — built-in "vs" colours via inherit.
+        ],
         colors: {
           "editor.foreground": "#000000",
           "editor.background": "#fafafa",
@@ -566,6 +577,7 @@ export default defineComponent({
           { token: "string", foreground: "CE9178" },
           { token: "string.sql", foreground: "CE9178" },
           { token: "string.vrl", foreground: "CE9178" },
+          // PromQL: no rules on purpose — built-in "vs-dark" colours via inherit.
         ],
         colors: {},
       });
@@ -1206,5 +1218,17 @@ export default defineComponent({
   background-color: color-mix(in srgb, var(--color-status-negative) 10%, transparent);
   text-decoration: underline;
   text-decoration-color: var(--color-status-negative);
+}
+
+/* PromQL brackets render plain (like Prometheus). The rainbow colours are
+   theme-global and the disable option doesn't strip these classes — repaint. */
+.logs-query-editor.promql-mode :deep(.bracket-highlighting-0),
+.logs-query-editor.promql-mode :deep(.bracket-highlighting-1),
+.logs-query-editor.promql-mode :deep(.bracket-highlighting-2),
+.logs-query-editor.promql-mode :deep(.bracket-highlighting-3),
+.logs-query-editor.promql-mode :deep(.bracket-highlighting-4),
+.logs-query-editor.promql-mode :deep(.bracket-highlighting-5),
+.logs-query-editor.promql-mode :deep(.bracket-highlighting-6) {
+  color: var(--vscode-editor-foreground, var(--color-text-body)) !important;
 }
 </style>

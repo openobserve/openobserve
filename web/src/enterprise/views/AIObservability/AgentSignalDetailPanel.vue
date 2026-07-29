@@ -18,8 +18,7 @@
   <ODrawer
     :open="open"
     side="right"
-    size="xl"
-    bleed
+    :width="55"
     :title="title"
     data-test="agent-signal-detail-panel"
     @update:open="(v: boolean) => emit('update:open', v)"
@@ -32,36 +31,47 @@
       </div>
     </template>
 
-    <div class="flex min-h-full flex-col" data-test="agent-signal-detail-body">
+    <section
+      class="flex min-h-full flex-col gap-3 overflow-auto px-5 pt-4 pb-6"
+      data-test="agent-signal-detail-body"
+    >
       <!-- Headline: the finding, stated plainly -->
-      <div
-        class="px-page-edge flex items-start gap-2 pt-4 pb-3"
-        data-test="agent-signal-detail-headline"
-      >
+      <div class="flex items-start gap-2" data-test="agent-signal-detail-headline">
         <OIcon :name="signalIcon" size="sm" class="mt-0.5 shrink-0" :class="signalIconColor" />
         <div class="flex flex-col gap-1">
-          <p class="text-compact text-text-heading m-0 leading-normal">
-            {{ headline }}
-          </p>
+          <div class="flex flex-wrap items-center gap-2">
+            <p class="text-compact text-text-heading m-0 leading-normal">
+              {{ headline }}
+            </p>
+            <OAgentBadges
+              :env="agentEnv"
+              :version="agentVersion"
+              data-test="agent-signal-detail-badges"
+            />
+          </div>
           <p class="text-2xs text-text-secondary m-0 leading-normal">
             {{ explanation }}
           </p>
         </div>
       </div>
 
-      <!-- FAILURE: the real error messages behind the class -->
-      <template v-if="signalType === 'failure'">
-        <PanelSectionHeader :title="t('aiObservability.behavior.detail.errorsTitle')" />
+      <!-- FAILURE: the real error messages (the "read it, know the fix" section) -->
+      <section
+        v-if="signalType === 'failure'"
+        class="card-container bg-surface-base border-border-default rounded-surface border px-3.5 py-3 pb-3.5"
+      >
+        <header class="mb-1.5 flex items-center gap-1.5">
+          <OIcon name="error-outline" size="xs" class="text-badge-error-soft-text" />
+          <h4 class="text-compact text-text-heading m-0 font-semibold">
+            {{ t("aiObservability.behavior.detail.errorsTitle") }}
+          </h4>
+        </header>
         <OTable
           data-test="agent-signal-detail-errors"
           :data="errorRows"
           :columns="errorColumns"
           :default-columns="false"
           :frame="false"
-          :show-global-filter="false"
-          :loading="loading"
-          :footer-title="t('aiObservability.behavior.detail.footerErrors')"
-          :empty-message="t('aiObservability.behavior.detail.noErrors')"
           wrap
         >
           <!-- Show the condensed one-liner; reveal the full raw error on demand
@@ -90,41 +100,54 @@
             </div>
           </template>
         </OTable>
-      </template>
+        <OEmptyState
+          v-if="!loading && errorRows.length === 0"
+          preset="no-data"
+          :title="t('aiObservability.behavior.detail.noErrors')"
+        />
+      </section>
 
-      <!-- Worst traces first, ranked by what makes them bad -->
-      <PanelSectionHeader
-        :title="tracesTitle"
-        :hint="t('aiObservability.behavior.detail.tracesHint')"
-      />
-      <OTable
-        data-test="agent-signal-detail-traces"
-        :data="traceRows"
-        :columns="traceColumns"
-        :default-columns="false"
-        :frame="false"
-        :show-global-filter="false"
-        :loading="loading"
-        :footer-title="t('aiObservability.behavior.detail.footerTraces')"
-        :empty-message="t('aiObservability.behavior.detail.noTraces')"
-        pagination="client"
-        :page-size="10"
-        :page-size-options="[10, 20, 50]"
-        @row-click="openTrace"
+      <!-- LOOP / COST: the worst traces, ranked by what makes them bad -->
+      <section
+        class="card-container bg-surface-base border-border-default rounded-surface border px-3.5 py-3 pb-3.5"
       >
-        <!-- Trace id renders with an "open in new tab" icon so it's clear the
-               row opens the trace in a new browser tab, not in place. -->
-        <template #cell-trace_id="{ row }">
-          <span
-            class="text-text-link inline-flex items-center gap-1 hover:underline"
-            :title="t('aiObservability.behavior.detail.openInNewTab')"
-          >
-            <span class="truncate font-mono">{{ row.trace_id }}</span>
-            <OIcon name="open-in-new" size="xs" class="shrink-0 opacity-70" />
+        <header class="mb-1.5 flex items-center justify-between gap-2">
+          <h4 class="text-compact text-text-heading m-0 font-semibold">
+            {{ tracesTitle }}
+          </h4>
+          <span class="text-2xs text-text-secondary">
+            {{ t("aiObservability.behavior.detail.tracesHint") }}
           </span>
-        </template>
-      </OTable>
-    </div>
+        </header>
+        <OTable
+          data-test="agent-signal-detail-traces"
+          :data="traceRows"
+          :columns="traceColumns"
+          :default-columns="false"
+          :frame="false"
+          pagination="client"
+          :page-size="10"
+          @row-click="openTrace"
+        >
+          <!-- Trace id renders with an "open in new tab" icon so it's clear the
+               row opens the trace in a new browser tab, not in place. -->
+          <template #cell-trace_id="{ row }">
+            <span
+              class="text-text-link inline-flex items-center gap-1 hover:underline"
+              :title="t('aiObservability.behavior.detail.openInNewTab')"
+            >
+              <OIcon name="open-in-new" size="xs" class="opacity-70" />
+              <span class="truncate font-mono">{{ row.trace_id }}</span>
+            </span>
+          </template>
+        </OTable>
+        <OEmptyState
+          v-if="!loading && traceRows.length === 0"
+          preset="no-data"
+          :title="t('aiObservability.behavior.detail.noTraces')"
+        />
+      </section>
+    </section>
   </ODrawer>
 </template>
 
@@ -135,12 +158,14 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OAgentBadges from "@/components/shared/OAgentBadges.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import PanelSectionHeader from "./PanelSectionHeader.vue";
 import searchService from "@/services/search";
 import { escapeSingleQuotes } from "@/utils/queryUtils";
+import { buildAgentClimbFilter } from "./agentClimbFilter";
 
 interface SignalRow {
   signalType: "loop" | "failure" | "cost";
@@ -165,6 +190,8 @@ const props = defineProps<{
   sourceStream?: string;
   startTime?: number;
   endTime?: number;
+  agentEnv?: string | null;
+  agentVersion?: string | null;
 }>();
 
 const emit = defineEmits<{ (e: "update:open", v: boolean): void }>();
@@ -197,12 +224,10 @@ const signalType = computed(() => props.row?.signalType);
 
 // Signal-type iconography — a distinct icon + accent per drawer so the subject
 // (looping / failing / costly) reads at a glance.
-// Same glyph the Looping-patterns / Failures summary tiles and table headers use,
-// so the drawer visibly belongs to the row/section it opened from.
 const signalIcon = computed(() => {
-  if (signalType.value === "loop") return "restart-alt";
+  if (signalType.value === "loop") return "autorenew";
   if (signalType.value === "cost") return "attach-money";
-  return "error-outline"; // failure
+  return "warning"; // failure
 });
 const signalIconColor = computed(() => {
   if (signalType.value === "loop") return "text-badge-warning-soft-text";
@@ -379,9 +404,13 @@ const ancestorJoins = (stream: string) => {
   return joins.join(" ");
 };
 
-/** Agent-scoping predicate on the CLIMBED agent (not the span-local column). */
+/** Agent-scoping predicate on the CLIMBED agent (not the span-local column),
+ *  further narrowed to the selected env/version variant when present. */
 const agentClimbFilter = (agent?: string) =>
-  agent ? `${callerExpr()} = '${escapeSingleQuotes(agent)}'` : "1=1";
+  buildAgentClimbFilter(callerExpr(), agent, {
+    env: props.agentEnv,
+    version: props.agentVersion,
+  });
 
 /**
  * Condense a raw error string into a scannable one-liner. Framework errors are
