@@ -334,6 +334,8 @@ import Redo from "~icons/material-symbols/redo";
 import Tab from "~icons/material-symbols/tab-outline";
 import Web from "~icons/material-symbols/web";
 import SmartDisplay from "~icons/material-symbols/smart-display-outline";
+import AndroidIcon from "~icons/material-symbols/android";
+import PhoneIphoneIcon from "~icons/material-symbols/phone-iphone-outline";
 
 // Brand mark (not a Material Symbol) — a local inline SVG component. See McpLogo.vue.
 import McpLogo from "./McpLogo.vue";
@@ -665,6 +667,8 @@ export const iconRegistry = {
   redo: Redo,
   tab: Tab,
   web: Web,
+  android: AndroidIcon,
+  "phone-iphone": PhoneIphoneIcon,
 
   // Batch 3: Synthetics / browser-check icons (2026-06-22)
   // (duplicate "person-pin-circle" from batch 2 removed — keep the first entry at line 624)

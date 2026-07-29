@@ -2628,6 +2628,8 @@
     "rumPlatform": "Platform",
     "rumPlatformBrowser": "Browser",
     "rumPlatformReactNative": "React Native",
+    "rumPlatformAndroid": "Android",
+    "rumPlatformIOS": "iOS",
     "npmStepTitle": "NPM Installation Method",
     "recommendedLabel": "Recommended",
     "customLabel": "Custom",

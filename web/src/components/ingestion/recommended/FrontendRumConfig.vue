@@ -39,6 +39,8 @@ import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import type { CardSubstitutions, RichCardContent } from "@/components/ingestion/setupCard/types";
 import rumCard from "@/components/ingestion/setupCard/content/rum";
 import rumReactNativeCard from "@/components/ingestion/setupCard/content/rumReactNative";
+import rumAndroidCard from "@/components/ingestion/setupCard/content/rumAndroid";
+import rumIOSCard from "@/components/ingestion/setupCard/content/rumIOS";
 
 defineProps<{
   currOrgIdentifier?: string;
@@ -88,6 +90,32 @@ const PLATFORMS: {
     icon: "smartphone",
     build: () =>
       rumReactNativeCard({
+        endpoint: endpoint.value,
+        org: org.value,
+        rumToken: rumToken.value,
+        rumTokenMasked: maskText(rumToken.value),
+        insecureHTTP: insecureHTTP.value,
+      }),
+  },
+  {
+    id: "android",
+    labelKey: "ingestion.rumPlatformAndroid",
+    icon: "android",
+    build: () =>
+      rumAndroidCard({
+        endpoint: endpoint.value,
+        org: org.value,
+        rumToken: rumToken.value,
+        rumTokenMasked: maskText(rumToken.value),
+        insecureHTTP: insecureHTTP.value,
+      }),
+  },
+  {
+    id: "ios",
+    labelKey: "ingestion.rumPlatformIOS",
+    icon: "phone-iphone",
+    build: () =>
+      rumIOSCard({
         endpoint: endpoint.value,
         org: org.value,
         rumToken: rumToken.value,
