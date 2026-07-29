@@ -360,7 +360,7 @@ fn is_permitted(workflow_id: &str, org_id: &str, permitted: Option<&Vec<String>>
 }
 
 pub async fn delete_workflow(org_id: &str, id: &str) -> Result<(), anyhow::Error> {
-    let associations = db::workflows::get_workflow_associations(&org_id, &id).await?;
+    let associations = db::workflows::get_workflow_associations(org_id, id).await?;
     if associations
         .iter()
         .any(|a| a.trigger_type != WorkflowTriggerType::IncidentEvent.to_string())

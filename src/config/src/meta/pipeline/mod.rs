@@ -98,7 +98,7 @@ impl MemorySize for Pipeline {
 // TODO YJDoc2: in a separate PR, use this fn in the pipeline validation below, so we have
 // same logic for pipelines and workflows as intended
 pub fn validate_nodes_edges(nodes: &[Node], edges: &[Edge]) -> Result<(), anyhow::Error> {
-    if nodes.len() < 2 || edges.len() < 1 {
+    if nodes.len() < 2 || edges.is_empty() {
         return Err(anyhow!(
             "there must be more than 1 node and at least 1 edge"
         ));

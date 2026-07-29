@@ -1095,7 +1095,7 @@ async fn find_or_create_incident(
                 && let Err(e) = crate::incidents::send_incident_event_trigger(
                     org_id,
                     &existing.id,
-                    IncidentEvent::alert(&alert.get_unique_key(), &alert.name, triggered_at),
+                    IncidentEvent::alert(alert.get_unique_key(), &alert.name, triggered_at),
                 )
                 .await
             {
