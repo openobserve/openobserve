@@ -409,30 +409,8 @@ export interface EvidenceEvent {
   initiatedTs: number | null;
   durationMs: number | null;
   firstParty: boolean;
-}
-
-/** One step's events, in the order they were initiated. */
-export interface EvidenceGroup {
-  stepId: string;
-  /** Resolved from `recorded_steps`; falls back to the raw id, never blank. */
-  stepName: string;
-  events: EvidenceEvent[];
-  /** True for the step the run failed on — the panel anchors and marks it. */
-  failing: boolean;
-}
-
-export interface EvidenceBundle {
-  events: EvidenceEvent[];
-  groups: EvidenceGroup[];
-  counts: {
-    all: number;
-    consoleErrors: number;
-    pageErrors: number;
-    requestsFailed: number;
-    nonNon2xx: number;
-  };
-  /** A `truncation` event in the stream, or `evidence_truncated` on the record. */
-  truncated: boolean;
+  /** Resolved step name, filled by `foldEvidenceBundle`. Null when unattributed. */
+  stepName?: string | null;
 }
 
 function evidenceNum(v: unknown): number | null {
@@ -489,72 +467,95 @@ export function isEvidenceAnomaly(e: EvidenceEvent): boolean {
 }
 
 /**
+ * One kind of event, in the order the events were initiated.
+ *
+ * Grouped by KIND, not by step. Step grouping reads well in a wireframe and
+ * degenerates on real data: a live 158-event bundle held only two distinct
+ * `step_id`s, so it produced one group of 136 and one of 22 — the grouping told
+ * the reader nothing the flat list didn't. Kind also matches what devtools
+ * trains people to expect (Console / Network).
+ *
+ * Attribution is not lost, it moves: every row carries its resolved step name.
+ */
+export interface EvidenceGroup {
+  kind: "pageErrors" | "requestsFailed" | "console" | "network";
+  events: EvidenceEvent[];
+  /** True when any event in the group is an anomaly — drives the header accent. */
+  hasAnomaly: boolean;
+}
+
+export interface EvidenceBundle {
+  events: EvidenceEvent[];
+  groups: EvidenceGroup[];
+  counts: {
+    all: number;
+    consoleErrors: number;
+    pageErrors: number;
+    requestsFailed: number;
+    nonNon2xx: number;
+  };
+  /** A `truncation` event in the stream, or `evidence_truncated` on the record. */
+  truncated: boolean;
+}
+
+/** Severity order: what to read first, not what there is most of. */
+const EVIDENCE_GROUP_ORDER: EvidenceGroup["kind"][] = [
+  "pageErrors",
+  "requestsFailed",
+  "console",
+  "network",
+];
+
+function groupKindOf(e: EvidenceEvent): EvidenceGroup["kind"] {
+  if (e.kind === "pageerror" || e.kind === "crash") return "pageErrors";
+  if (e.kind === "requestfailed") return "requestsFailed";
+  if (e.kind === "console" || e.kind === "dialog") return "console";
+  return "network";
+}
+
+/**
  * Fold a bundle into the panel's view model.
  *
- * Grouped by step and ordered by step order, because attribution is the whole
- * point: "what was the page doing when step 20 timed out" is unanswerable from a
- * flat time-ordered list of 2000 events.
- *
- * The failing step gets a group EVEN WITH ZERO EVENTS. "Nothing happened here"
- * is a finding — it is what distinguishes a locator that never matched from a
- * request that 500'd — and it is the common case, so omitting the group would
- * leave the panel looking broken on exactly the runs people open it for.
+ * `stepDefs` resolves each event's `step_id` to a name for display on the row.
+ * An unresolved id renders as the id — never blank, and never guessed from the
+ * check's current config, which would relabel history after an edit.
  */
 export function foldEvidenceBundle(
   events: EvidenceEvent[],
-  /** step_id -> name, from `recorded_steps`. Unresolved ids render as the id. */
   stepDefs: Map<string, { name: string }> | Map<string, { name: string; selector: string | null }>,
-  /** Step order, so groups sort the way the journey ran. */
-  stepOrder: string[],
-  failingStepId: string | null,
   recordTruncated = false,
 ): EvidenceBundle {
-  const byStep = new Map<string, EvidenceEvent[]>();
-  for (const e of events) {
-    // Unattributed events are kept under a stable bucket rather than dropped —
-    // an event nobody could attribute is still evidence.
-    const key = e.stepId ?? "";
-    const list = byStep.get(key);
+  const named = events.map((e) => ({
+    ...e,
+    stepName: e.stepId ? (stepDefs.get(e.stepId)?.name || e.stepId) : null,
+  }));
+
+  const byKind = new Map<EvidenceGroup["kind"], EvidenceEvent[]>();
+  for (const e of named) {
+    const k = groupKindOf(e);
+    const list = byKind.get(k);
     if (list) list.push(e);
-    else byStep.set(key, [e]);
+    else byKind.set(k, [e]);
   }
 
-  const rank = new Map(stepOrder.map((id, i) => [id, i]));
-  const ids = new Set([...byStep.keys()].filter(Boolean));
-  if (failingStepId) ids.add(failingStepId);
-
-  const groups: EvidenceGroup[] = [...ids]
-    .sort((a, b) => (rank.get(a) ?? Number.MAX_SAFE_INTEGER) - (rank.get(b) ?? Number.MAX_SAFE_INTEGER))
-    .map((stepId) => ({
-      stepId,
-      stepName: stepDefs.get(stepId)?.name || stepId,
-      failing: stepId === failingStepId,
-      events: [...(byStep.get(stepId) ?? [])].sort(
-        (x, y) => (x.initiatedTs ?? x.ts) - (y.initiatedTs ?? y.ts),
-      ),
-    }));
-
-  const unattributed = byStep.get("") ?? [];
-  if (unattributed.length) {
-    groups.push({
-      stepId: "",
-      stepName: "",
-      failing: false,
-      events: [...unattributed].sort((x, y) => (x.initiatedTs ?? x.ts) - (y.initiatedTs ?? y.ts)),
-    });
-  }
+  const groups: EvidenceGroup[] = EVIDENCE_GROUP_ORDER.filter((k) => byKind.has(k)).map((kind) => {
+    const list = [...byKind.get(kind)!].sort(
+      (x, y) => (x.initiatedTs ?? x.ts) - (y.initiatedTs ?? y.ts),
+    );
+    return { kind, events: list, hasAnomaly: list.some(isEvidenceAnomaly) };
+  });
 
   return {
-    events,
+    events: named,
     groups,
     counts: {
-      all: events.length,
-      consoleErrors: events.filter((e) => e.kind === "console" && e.level === "error").length,
-      pageErrors: events.filter((e) => e.kind === "pageerror" || e.kind === "crash").length,
-      requestsFailed: events.filter((e) => e.kind === "requestfailed").length,
-      nonNon2xx: events.filter((e) => e.kind === "response" && (e.status ?? 0) >= 400).length,
+      all: named.length,
+      consoleErrors: named.filter((e) => e.kind === "console" && e.level === "error").length,
+      pageErrors: named.filter((e) => e.kind === "pageerror" || e.kind === "crash").length,
+      requestsFailed: named.filter((e) => e.kind === "requestfailed").length,
+      nonNon2xx: named.filter((e) => e.kind === "response" && (e.status ?? 0) >= 400).length,
     },
-    truncated: recordTruncated || events.some((e) => e.kind === "truncation"),
+    truncated: recordTruncated || named.some((e) => e.kind === "truncation"),
   };
 }
 

@@ -9769,6 +9769,10 @@
       "title": "RUM 與工作階段重播"
     },
     "evidence": {
+      "groupPageErrors": "Page errors",
+      "groupFailedReq": "Failed requests",
+      "groupConsole": "Console",
+      "groupNetwork": "Network",
       "title": "Evidence · {count} events",
       "filterAll": "All",
       "filterConsole": "Console errors",

@@ -183,8 +183,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :evidence-key="evidenceKey"
                 :resolve-url="screenshotUrl"
                 :step-defs="evidenceStepDefs"
-                :step-order="evidenceStepOrder"
-                :failing-step-id="evidenceFailingStepId"
                 :record-truncated="synthetics.runDetail.value?.evidenceTruncated ?? false"
                 :run-passed="currentRun.status === 'pass'"
               />
@@ -890,15 +888,6 @@ const evidenceStepDefs = computed(() => {
   }
   return m;
 });
-
-/** Step order as the journey ran, so evidence groups sort correctly. */
-const evidenceStepOrder = computed(() =>
-  (synthetics.runDetail.value?.recordedSteps ?? []).map((rs) => rs.id),
-);
-
-const evidenceFailingStepId = computed(
-  () => currentAttempt.value?.failedStep ?? synthetics.runDetail.value?.failedStep ?? null,
-);
 
 // ── Display model for the current run (mapped from SyntheticRunDetail) ─────
 interface DisplayRun {

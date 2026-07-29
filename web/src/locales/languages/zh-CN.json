@@ -9774,6 +9774,10 @@
       "title": "RUM与会话回放"
     },
     "evidence": {
+      "groupPageErrors": "Page errors",
+      "groupFailedReq": "Failed requests",
+      "groupConsole": "Console",
+      "groupNetwork": "Network",
       "title": "Evidence · {count} events",
       "filterAll": "All",
       "filterConsole": "Console errors",

@@ -33,7 +33,6 @@ import { useI18n } from "vue-i18n";
 
 import {
   foldEvidenceBundle,
-  isEvidenceAnomaly,
   parseEvidenceNdjson,
   type EvidenceEvent,
 } from "@/composables/synthetics/syntheticResultsSchema";
@@ -45,12 +44,8 @@ const props = defineProps<{
   evidenceKey: string | null;
   /** Resolves a key to a fetchable URL. Already presigned for every attempt. */
   resolveUrl: (key: string) => string;
-  /** step_id -> definition, for naming groups. */
+  /** step_id -> definition, for naming the step on each row. */
   stepDefs: Map<string, { name: string; selector: string | null }>;
-  /** Step order as the journey ran, so groups sort correctly. */
-  stepOrder: string[];
-  /** The step the run failed on, anchored and marked. */
-  failingStepId: string | null;
   /** `evidence_truncated` from the record. */
   recordTruncated?: boolean;
   /** Whether capture is switched off for this check, vs merely not kept. */
@@ -107,14 +102,20 @@ watch(
 );
 
 const bundle = computed(() =>
-  foldEvidenceBundle(
-    events.value,
-    props.stepDefs,
-    props.stepOrder,
-    props.failingStepId,
-    props.recordTruncated ?? false,
-  ),
+  foldEvidenceBundle(events.value, props.stepDefs, props.recordTruncated ?? false),
 );
+
+/**
+ * Grouped by kind, so the labels come from one place.
+ *
+ * Severity order, not volume order: page errors before a wall of 200s.
+ */
+const GROUP_LABEL: Record<string, string> = {
+  pageErrors: "synthetics.evidence.groupPageErrors",
+  requestsFailed: "synthetics.evidence.groupFailedReq",
+  console: "synthetics.evidence.groupConsole",
+  network: "synthetics.evidence.groupNetwork",
+};
 
 function matches(e: EvidenceEvent): boolean {
   if (firstPartyOnly.value && !e.firstParty) return false;
@@ -132,11 +133,12 @@ function matches(e: EvidenceEvent): boolean {
   }
 }
 
-/** Groups after filtering. The failing group survives even when emptied. */
+/** Groups after filtering. An emptied group disappears — unlike a zero-count
+ *  chip, an empty section header carries no information. */
 const visibleGroups = computed(() =>
   bundle.value.groups
     .map((g) => ({ ...g, events: g.events.filter(matches) }))
-    .filter((g) => g.events.length > 0 || g.failing),
+    .filter((g) => g.events.length > 0),
 );
 
 const chips = computed(() => {
@@ -274,46 +276,42 @@ const downloadUrl = computed(() =>
           {{ t("synthetics.evidence.noEvents") }}
         </div>
 
-        <!-- Grouped by step, ordered as the journey ran. -->
-        <div v-for="g in visibleGroups" :key="g.stepId || 'unattributed'" class="flex flex-col gap-1">
+        <!-- Grouped by kind. Step attribution moved onto the row: a live
+             158-event bundle had only two distinct step_ids, so grouping by step
+             produced one section of 136 and told the reader nothing. -->
+        <div v-for="g in visibleGroups" :key="g.kind" class="flex flex-col gap-1">
           <div
             class="border-border-default flex items-center gap-2 border-b pb-1 text-xs"
-            :class="g.failing ? 'text-status-error-text' : 'text-text-secondary'"
-            :data-test="`synthetics-evidence-group-${g.stepId || 'unattributed'}`"
+            :class="g.hasAnomaly ? 'text-status-error-text' : 'text-text-secondary'"
+            :data-test="`synthetics-evidence-group-${g.kind}`"
           >
-            <OIcon v-if="g.failing" name="cancel" size="xs" />
-            <span class="truncate">
-              {{ g.stepId ? g.stepName : t("synthetics.evidence.unattributed") }}
-            </span>
-            <span v-if="g.failing" class="shrink-0">
-              · {{ t("synthetics.evidence.failedHere") }}
-            </span>
+            <OIcon v-if="g.hasAnomaly" name="warning" size="xs" />
+            <span>{{ t(GROUP_LABEL[g.kind]) }}</span>
+            <span class="text-text-secondary">{{ g.events.length }}</span>
           </div>
-
-          <!-- "Nothing happened here" is a finding, and the common one: it is what
-               separates a locator that never matched from a request that 500'd. -->
-          <p
-            v-if="!g.events.length"
-            class="text-text-secondary pl-1 text-xs italic"
-            data-test="synthetics-evidence-group-empty"
-          >
-            {{ t("synthetics.evidence.noEventsInStep") }}
-          </p>
 
           <div
             v-for="(e, i) in g.events"
-            :key="`${g.stepId}-${i}`"
+            :key="`${g.kind}-${i}`"
             class="hover:bg-surface-raised flex items-start gap-2 rounded px-1 py-0.5 font-mono text-xs"
             :class="e.firstParty ? '' : 'opacity-60'"
           >
             <span class="w-10 shrink-0 text-right" :class="statusClass(e)">
               {{ e.kind === "response" ? (e.status ?? "—") : e.kind === "requestfailed" ? "—" : "" }}
             </span>
-            <span class="text-text-secondary w-12 shrink-0">{{ e.method ?? e.kind }}</span>
+            <span class="text-text-secondary w-12 shrink-0">{{ e.method ?? e.level ?? "" }}</span>
             <span class="min-w-0 flex-1 truncate" :title="e.url ?? e.text ?? e.message ?? ''">
               {{ shortUrl(e.url) || e.text || e.message || e.kind }}
             </span>
-            <span class="text-text-secondary w-16 shrink-0">{{ e.resourceType ?? "" }}</span>
+            <!-- Which step this belongs to. Attribution kept, just not as the
+                 grouping axis. -->
+            <span
+              class="text-text-secondary w-40 shrink-0 truncate"
+              :title="e.stepName ?? ''"
+              data-test="synthetics-evidence-row-step"
+            >
+              {{ e.stepName ?? t("synthetics.evidence.unattributed") }}
+            </span>
             <span class="text-text-secondary w-14 shrink-0 text-right">
               {{ e.durationMs != null ? `${e.durationMs}ms` : "" }}
             </span>
@@ -325,14 +323,9 @@ const downloadUrl = computed(() =>
             >
               {{ t("synthetics.evidence.stack") }}
             </button>
-            <OIcon
-              v-if="isEvidenceAnomaly(e)"
-              name="warning"
-              size="xs"
-              class="text-status-warning-text shrink-0"
-            />
           </div>
         </div>
+
       </template>
     </template>
   </div>

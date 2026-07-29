@@ -29,7 +29,6 @@ const STEP_DEFS = new Map([
   ["s19", { name: "Navigate to /web/login", selector: null }],
   ["fa1", { name: 'Assert visible [data-test="element-that-never-exists"]', selector: null }],
 ]);
-const STEP_ORDER = ["s19", "fa1"];
 
 describe("evidence bundle parsing", () => {
   it("parses NDJSON line by line, not as a JSON document", () => {
@@ -77,71 +76,76 @@ describe("anomaly classification", () => {
 });
 
 describe("evidence grouping", () => {
-  const fold = (text = NDJSON, failing: string | null = "fa1") =>
-    foldEvidenceBundle(parseEvidenceNdjson(text), STEP_DEFS, STEP_ORDER, failing);
+  const fold = (text = NDJSON) => foldEvidenceBundle(parseEvidenceNdjson(text), STEP_DEFS);
 
-  it("gives the failing step a group even with zero events", () => {
-    // The common case, and the one people open the panel for: a locator timed
-    // out and the network was fine. Omitting the group would leave the panel
-    // looking broken on exactly those runs.
-    const g = fold().groups.find((x) => x.stepId === "fa1")!;
-    expect(g).toBeTruthy();
-    expect(g.events).toHaveLength(0);
-    expect(g.failing).toBe(true);
+  it("groups by kind, not by step", () => {
+    // Step grouping reads well in a wireframe and degenerates on real data: a
+    // live 158-event bundle held two distinct step_ids, so it produced one
+    // section of 136 and one of 22 and told the reader nothing.
+    expect(fold().groups.map((g) => g.kind)).toEqual(["console", "network"]);
   });
 
-  it("orders groups the way the journey ran, not by event count", () => {
-    expect(fold().groups.map((g) => g.stepId)).toEqual(["s19", "fa1"]);
-  });
-
-  it("orders events within a group by when they were initiated", () => {
-    const g = fold().groups.find((x) => x.stepId === "s19")!;
-    expect(g.events.map((e) => e.initiatedTs)).toEqual([
-      1785356285501, 1785356285900, 1785356286200, undefined ?? null,
+  it("orders groups by severity, not by volume", () => {
+    // 153 responses must not bury one page error.
+    const text = [
+      '{"ts":5,"kind":"response","status":200,"initiated_ts":5}',
+      '{"ts":1,"kind":"pageerror","message":"boom"}',
+      '{"ts":2,"kind":"requestfailed","url":"https://x/y"}',
+      '{"ts":3,"kind":"console","level":"error","text":"bad"}',
+    ].join("\n");
+    expect(fold(text).groups.map((g) => g.kind)).toEqual([
+      "pageErrors",
+      "requestsFailed",
+      "console",
+      "network",
     ]);
   });
 
-  it("resolves step names, and falls back to the id rather than blank", () => {
-    const [known] = fold().groups;
-    expect(known.stepName).toBe("Navigate to /web/login");
-    const unknown = foldEvidenceBundle(
-      parseEvidenceNdjson('{"ts":1,"kind":"response","status":200,"step_id":"s99"}'),
-      STEP_DEFS,
-      STEP_ORDER,
-      null,
-    );
-    expect(unknown.groups[0].stepName).toBe("s99");
+  it("orders events within a group by when they were initiated", () => {
+    const g = fold().groups.find((x) => x.kind === "network")!;
+    expect(g.events.map((e) => e.initiatedTs)).toEqual([
+      1785356285501, 1785356285900, 1785356286200,
+    ]);
   });
 
-  it("keeps unattributed events instead of dropping them", () => {
-    // An event nobody could attribute is still evidence.
-    const b = foldEvidenceBundle(
-      parseEvidenceNdjson('{"ts":1,"kind":"pageerror","message":"boom"}'),
-      STEP_DEFS,
-      STEP_ORDER,
-      null,
-    );
-    expect(b.groups.at(-1)!.stepId).toBe("");
-    expect(b.groups.at(-1)!.events).toHaveLength(1);
+  it("flags a group that contains an anomaly", () => {
+    const groups = fold().groups;
+    // network holds the 502, console holds the error.
+    expect(groups.find((g) => g.kind === "network")!.hasAnomaly).toBe(true);
+    expect(groups.find((g) => g.kind === "console")!.hasAnomaly).toBe(true);
+    // All-200 network is not flagged.
+    const clean = fold('{"ts":1,"kind":"response","status":200}');
+    expect(clean.groups[0].hasAnomaly).toBe(false);
+  });
+
+  it("resolves the step name onto each row, falling back to the id", () => {
+    // Attribution is kept; it just moved off the grouping axis.
+    const g = fold().groups.find((x) => x.kind === "network")!;
+    expect(g.events[0].stepName).toBe("Navigate to /web/login");
+    const unknown = fold('{"ts":1,"kind":"response","status":200,"step_id":"s99"}');
+    expect(unknown.groups[0].events[0].stepName).toBe("s99");
+  });
+
+  it("leaves an unattributed event's step name null rather than guessing", () => {
+    const b = fold('{"ts":1,"kind":"pageerror","message":"boom"}');
+    expect(b.groups[0].events[0].stepName).toBeNull();
   });
 
   it("counts each anomaly kind separately", () => {
-    const c = fold().counts;
-    expect(c).toMatchObject({ all: 4, consoleErrors: 1, nonNon2xx: 1, pageErrors: 0, requestsFailed: 0 });
+    expect(fold().counts).toMatchObject({
+      all: 4,
+      consoleErrors: 1,
+      nonNon2xx: 1,
+      pageErrors: 0,
+      requestsFailed: 0,
+    });
   });
 
   it("reports truncation from either the record or a truncation event", () => {
     expect(fold().truncated).toBe(false);
+    expect(foldEvidenceBundle(parseEvidenceNdjson(NDJSON), STEP_DEFS, true).truncated).toBe(true);
     expect(
-      foldEvidenceBundle(parseEvidenceNdjson(NDJSON), STEP_DEFS, STEP_ORDER, null, true).truncated,
-    ).toBe(true);
-    expect(
-      foldEvidenceBundle(
-        parseEvidenceNdjson('{"ts":1,"kind":"truncation"}'),
-        STEP_DEFS,
-        STEP_ORDER,
-        null,
-      ).truncated,
+      foldEvidenceBundle(parseEvidenceNdjson('{"ts":1,"kind":"truncation"}'), STEP_DEFS).truncated,
     ).toBe(true);
   });
 });
@@ -153,8 +157,6 @@ describe("EvidencePanel", () => {
         evidenceKey: "synthetics/org/mon/2026/07/29/RUN/EXEC/attempt-1-evidence.ndjson",
         resolveUrl: (k: string) => `/artifact?key=${k}`,
         stepDefs: STEP_DEFS,
-        stepOrder: STEP_ORDER,
-        failingStepId: "fa1",
         ...props,
       },
       global: { plugins: [i18n] },
@@ -169,13 +171,22 @@ describe("EvidencePanel", () => {
     })) as any;
   });
 
-  it("fetches the bundle and renders a group per step", async () => {
+  it("fetches the bundle and renders a section per kind", async () => {
     const w = mountPanel();
     await flushPromises();
     expect(w.find('[data-test="synthetics-evidence-panel"]').exists()).toBe(true);
-    expect(w.find('[data-test="synthetics-evidence-group-s19"]').exists()).toBe(true);
-    expect(w.find('[data-test="synthetics-evidence-group-fa1"]').exists()).toBe(true);
-    expect(w.find('[data-test="synthetics-evidence-group-empty"]').exists()).toBe(true);
+    expect(w.find('[data-test="synthetics-evidence-group-network"]').exists()).toBe(true);
+    expect(w.find('[data-test="synthetics-evidence-group-console"]').exists()).toBe(true);
+    // No page errors in this bundle, so no empty section header for them.
+    expect(w.find('[data-test="synthetics-evidence-group-pageErrors"]').exists()).toBe(false);
+  });
+
+  it("shows which step each row belongs to", async () => {
+    const w = mountPanel();
+    await flushPromises();
+    expect(w.find('[data-test="synthetics-evidence-row-step"]').text()).toContain(
+      "Navigate to /web/login",
+    );
   });
 
   it("refetches when the attempt changes, so bundles never cross labels", async () => {

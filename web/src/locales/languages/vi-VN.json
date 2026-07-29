@@ -9774,6 +9774,10 @@
       "title": "RUM & Phát lại phiên"
     },
     "evidence": {
+      "groupPageErrors": "Page errors",
+      "groupFailedReq": "Failed requests",
+      "groupConsole": "Console",
+      "groupNetwork": "Network",
       "title": "Evidence · {count} events",
       "filterAll": "All",
       "filterConsole": "Console errors",
