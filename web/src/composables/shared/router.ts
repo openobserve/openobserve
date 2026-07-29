@@ -434,6 +434,19 @@ const useRoutes = () => {
       },
     },
     {
+      // Alert status page. Replaces the row-click side panel, and is where a
+      // multi-alert's per-group state lives (alerts_2.md §5.4).
+      path: "alerts/detail/:alert_id",
+      name: "alertDetail",
+      component: () => import("@/views/alerts/AlertDetail.vue"),
+      meta: {
+        title: "Alert Detail",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    },
+    {
       path: "alerts/add",
       name: "addAlert",
       component: () => import("@/views/AddAlertView.vue"),

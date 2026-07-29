@@ -5270,6 +5270,72 @@
       "invalidTargetType": "Invalid target type",
       "unknownDestinationType": "Unknown destination type",
       "testFailedUnknownError": "Test failed with unknown error"
+    },
+    "configuration": "Configuration",
+    "streamName": "Stream Name",
+    "silence": "Silence",
+    "multiAlert": {
+      "badge": "Multi-alert",
+      "label": "Alert aggregation",
+      "simple": "Simple alert",
+      "perGroup": "Multi alert",
+      "evaluationMode": "Evaluation",
+      "simpleDescription": "One alert for the whole query. Groups are collapsed into a single result.",
+      "perGroupDescription": "Evaluate every group independently — each group alerts, recovers and notifies on its own.",
+      "requiresGroupBy": "Add at least one Group By column to alert per group.",
+      "countGateConflict": "Per-group alerting fires on any breaching group, so the group-count threshold must be \"at least 1\".",
+      "operatorConflict": "Per-group alerting needs an ordered comparison (>, >=, <, <=).",
+      "incidentConflict": "Per-group alerting cannot yet be combined with incident creation.",
+      "multiTimeRangeConflict": "Per-group alerting cannot be combined with multi-window comparison.",
+      "groupedButSimple": "This alert groups by {columns}, but evaluates as a single result — every group collapses into one state, one silence window and one notification. Turn on per-group alerting to give each group its own level, recovery and page.",
+      "enableCta": "Enable per-group alerting"
+    },
+    "groups": {
+      "tab": "Groups",
+      "level": "Level",
+      "group": "Group",
+      "since": "Since",
+      "lastOutcome": "Last outcome",
+      "lastNotified": "Last notified",
+      "silencedUntil": "Silenced until",
+      "lastSeen": "Last seen",
+      "viewHistory": "View this group's history",
+      "searchPlaceholder": "Filter groups, e.g. host:web-01",
+      "refresh": "Refresh",
+      "emptyTitle": "No groups tracked yet",
+      "emptyDescription": "This alert has not completed an evaluation that observed any group.",
+      "critical": "Critical",
+      "warning": "Warning",
+      "ok": "Ok",
+      "firingTotal": "Firing",
+      "observedTotal": "Groups",
+      "nOfMFiring": "{firing} of {observed} groups firing",
+      "groupedBy": "grouped by {columns}",
+      "groupBy": "Group by",
+      "criticalCondition": "Critical condition",
+      "warningCondition": "Warning condition",
+      "schedule": "Schedule",
+      "capBanner": "This alert observed {observed} groups, more than the tracked-group cap of {cap}. Groups beyond the cap are evaluated and counted but have no state row and cannot notify.",
+      "filteredBy": "Showing history for",
+      "clearFilter": "Clear",
+      "when": "When",
+      "change": "Level change",
+      "outcome": "Outcome",
+      "value": "Value",
+      "rollupRow": "All groups (rollup)",
+      "noHistoryTitle": "No transitions recorded",
+      "noHistoryDescription": "Level changes appear here as groups start firing, escalate or recover.",
+      "historyOnlyForMulti": "Per-group history is available for multi-alerts only. This alert evaluates as a single result.",
+      "firingCount": "{count} firing",
+      "ofNGroups": "of {count} groups",
+      "evaluation": "Evaluation",
+      "range1h": "1h",
+      "range6h": "6h",
+      "range24h": "24h",
+      "chartUnavailable": "No chart available for this alert's query.",
+      "eventCount": "Events",
+      "notFoundTitle": "Alert not found",
+      "notFoundDescription": "This alert no longer exists, or you do not have access to it. It may have been deleted."
     }
   },
   "alert_templates": {
@@ -8483,7 +8549,7 @@
           "inputOutput": {
             "span": "Map these to the span fields holding the input and output.",
             "trace": "Input and output from the trace's root span.",
-            "session": "Not available \u2014 a session has no single input or output."
+            "session": "Not available — a session has no single input or output."
           },
           "statistics": {
             "span": "Map this name like any other scorer variable when evaluating a single span.",
@@ -8501,7 +8567,7 @@
             "session": "Traces in time order, represented as conversation turns."
           }
         },
-        "indexDescription": "{spansVar} and {stepsVar} arrive as JSON arrays. Reference the whole variable \u2014 indexed access like {indexedVar} is not supported."
+        "indexDescription": "{spansVar} and {stepsVar} arrive as JSON arrays. Reference the whole variable — indexed access like {indexedVar} is not supported."
       },
       "identitySection": "Identity",
       "judgeSection": "Judge configuration",
@@ -8522,7 +8588,7 @@
       "includeReasoningLabel": "Include Reasoning",
       "includeReasoningHint": "The judge explains why it gave that score, saved with each result.",
       "extraFieldsLabel": "Extra Metadata Fields (Optional)",
-      "extraFieldsHint": "Ask the judge to return extra values with each score \u2014 a category or a confidence, for example.",
+      "extraFieldsHint": "Ask the judge to return extra values with each score — a category or a confidence, for example.",
       "extraFields": {
         "colName": "Field Name",
         "colType": "Type",
@@ -8833,7 +8899,7 @@
         "variableCount": "{count} variables",
         "systemProvided": {
           "title": "{scope} Variables",
-          "description": "OpenObserve supplies these values from the {scope} itself. A scorer prompt can use them directly \u2014 no mapping needed.",
+          "description": "OpenObserve supplies these values from the {scope} itself. A scorer prompt can use them directly — no mapping needed.",
           "badge": "System provided",
           "selectorRequired": "Span Selector required",
           "columns": {
@@ -8874,7 +8940,7 @@
         "customSchema": "Custom Fields",
         "defaultSchemaHelp": "These eight fields are read from every matching span. Anything missing comes through empty.",
         "fields": "Fields",
-        "fieldsHelp": "Only these fields are read \u2014 nothing else is sent to the scorer.",
+        "fieldsHelp": "Only these fields are read — nothing else is sent to the scorer.",
         "maximumSpans": "Maximum Spans",
         "budget": "Limits how many spans are selected from the trace.",
         "validation": {

@@ -1231,70 +1231,50 @@ describe("AlertList - ODialog/ODrawer migration", () => {
     expect(spy).toHaveBeenCalled();
   });
 
-  it("AlertHistoryDrawer is rendered with v-model:open bound to showAlertDetailsDrawer", async () => {
+  // The alert details side panel was removed: a multi-alert's per-group table,
+  // its group history and the cap banner do not fit a drawer, and a routed
+  // page is linkable and back-navigable. Clicking a row now navigates.
+  it("row click routes to the alert detail page instead of opening a drawer", async () => {
     const wrapper: any = await mountAlertList();
     await waitData(wrapper);
 
-    const drawer = wrapper.findComponent({ name: "AlertHistoryDrawer" });
-    expect(drawer.exists()).toBe(true);
-    expect(drawer.props("open")).toBe(false);
+    expect(wrapper.findComponent({ name: "AlertHistoryDrawer" }).exists()).toBe(false);
 
-    wrapper.vm.showAlertDetailsDrawer = true;
-    await wrapper.vm.$nextTick();
-    expect(drawer.props("open")).toBe(true);
-  });
-
-  it("AlertHistoryDrawer receives alertId and alertType bound from selectedAlertDetails", async () => {
-    const wrapper: any = await mountAlertList();
-    await waitData(wrapper);
-
-    wrapper.vm.selectedAlertDetails = {
-      alert_id: "alert-1",
-      alert_type: "Scheduled",
-    };
-    wrapper.vm.showAlertDetailsDrawer = true;
-    await wrapper.vm.$nextTick();
-
-    const drawer = wrapper.findComponent({ name: "AlertHistoryDrawer" });
-    expect(drawer.props("alertId")).toBe("alert-1");
-    expect(drawer.props("alertType")).toBe("Scheduled");
-  });
-
-  it("AlertHistoryDrawer renders empty alertId fallback when no selectedAlertDetails", async () => {
-    const wrapper: any = await mountAlertList();
-    await waitData(wrapper);
-
-    wrapper.vm.selectedAlertDetails = null;
-    await wrapper.vm.$nextTick();
-
-    const drawer = wrapper.findComponent({ name: "AlertHistoryDrawer" });
-    expect(drawer.props("alertId")).toBe("");
-  });
-
-  it("AlertHistoryDrawer 'edit' event invokes editAlertFromDrawer handler", async () => {
-    const wrapper: any = await mountAlertList();
-    await waitData(wrapper);
-
+    const push = vi.spyOn(wrapper.vm.router, "push").mockResolvedValue(undefined as any);
     const row = wrapper.vm.filteredResults[0];
-    const drawer = wrapper.findComponent({ name: "AlertHistoryDrawer" });
-    // ensure handler exists and does not throw
-    expect(typeof wrapper.vm.editAlertFromDrawer).toBe("function");
-    await drawer.vm.$emit("edit", row);
+    wrapper.vm.triggerExpand(row);
     await flushPromises();
-    // After firing edit the details drawer should close
-    expect(wrapper.vm.showAlertDetailsDrawer).toBe(false);
+
+    expect(push).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: "alertDetail",
+        params: { alert_id: row.alert_id },
+      }),
+    );
+    push.mockRestore();
   });
 
-  it("AlertHistoryDrawer update:open=false closes showAlertDetailsDrawer", async () => {
+  it("row click without an alert id does not navigate", async () => {
     const wrapper: any = await mountAlertList();
     await waitData(wrapper);
 
-    wrapper.vm.showAlertDetailsDrawer = true;
-    await wrapper.vm.$nextTick();
-
-    const drawer = wrapper.findComponent({ name: "AlertHistoryDrawer" });
-    await drawer.vm.$emit("update:open", false);
+    const push = vi.spyOn(wrapper.vm.router, "push").mockResolvedValue(undefined as any);
+    wrapper.vm.triggerExpand({});
     await flushPromises();
-    expect(wrapper.vm.showAlertDetailsDrawer).toBe(false);
+
+    expect(push).not.toHaveBeenCalled();
+    push.mockRestore();
+  });
+
+  it("formatGroupCount marks a lower-bound count with the >= it was persisted with", async () => {
+    // The marker is not decoration: past the M-6 cap the stored number is the
+    // most the evaluation could see, so printing it bare understates an
+    // incident.
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+
+    expect(wrapper.vm.formatGroupCount(3, false)).toBe("3");
+    expect(wrapper.vm.formatGroupCount(3, true)).toBe("\u22653");
+    expect(wrapper.vm.formatGroupCount(0, undefined)).toBe("0");
   });
 });

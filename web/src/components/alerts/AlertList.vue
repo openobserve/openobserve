@@ -306,6 +306,52 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span v-else class="text-text-secondary">—</span>
               </template>
 
+              <!--
+                Multi-alert fan-out summary (§5.4). Both counts come from the
+                rollup row and are PRE-cap, so they keep telling the truth when
+                the M-6 cap truncates what is actually tracked. Each is rendered
+                with a `≥` when its persisted lower-bound marker says the fetch
+                page could not prove exactness — under-reporting silently is the
+                failure M-6 forbids.
+              -->
+              <template #cell-groups="{ row }">
+                <div
+                  v-if="
+                    row.multi_alert &&
+                    row.groups_observed !== undefined &&
+                    row.groups_observed !== null
+                  "
+                  class="flex flex-wrap items-center gap-1"
+                  :data-test="`alert-list-${row.name}-groups`"
+                >
+                  <OTag
+                    v-if="row.groups_firing"
+                    type="alertLevel"
+                    value="critical"
+                    :label="
+                      t('alerts.groups.firingCount', {
+                        count: formatGroupCount(
+                          row.groups_firing,
+                          row.groups_firing_is_lower_bound,
+                        ),
+                      })
+                    "
+                    size="sm"
+                  />
+                  <span class="text-text-secondary text-2xs">
+                    {{
+                      t("alerts.groups.ofNGroups", {
+                        count: formatGroupCount(
+                          row.groups_observed,
+                          row.groups_observed_is_lower_bound,
+                        ),
+                      })
+                    }}
+                  </span>
+                </div>
+                <span v-else class="text-text-secondary">—</span>
+              </template>
+
               <template #cell-last_outcome="{ row }">
                 <!--
                   Only rendered for enabled alerts: a disabled alert keeps
@@ -674,15 +720,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-move-to-another-folder-dialog"
       />
 
-      <!-- Alert Details Dialog -->
-      <AlertHistoryDrawer
-        v-model:open="showAlertDetailsDrawer"
-        :alert-details="selectedAlertDetails"
-        :alert-id="selectedAlertDetails?.alert_id || ''"
-        :alert-type="selectedAlertDetails?.alert_type"
-        @edit="editAlertFromDrawer"
-        data-test="alert-details-dialog"
-      />
     </template>
   </div>
 </template>
@@ -737,13 +774,11 @@ import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import AlertHistoryDrawer from "@/components/alerts/AlertHistoryDrawer.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
-import { buildConditionsString } from "@/utils/alerts/conditionsFormatter";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -776,7 +811,6 @@ export default defineComponent({
     OInput,
     OTooltip,
     SelectFolderDropDown,
-    AlertHistoryDrawer,
     OButton,
     OIcon,
     ODialog,
@@ -811,6 +845,17 @@ export default defineComponent({
     const showAddAlertDialog: any = ref(false);
     const selectedDelete: any = ref(null);
     const isUpdated: any = ref(false);
+    /**
+     * Render a multi-alert group count, marking it as a lower bound when the
+     * evaluation could not prove exactness (§5.4).
+     *
+     * The `≥` is not decoration: past the M-6 cap, or when the whole fetch page
+     * was still firing, the stored number is the most the evaluation could see,
+     * not the real total. Printing it bare would understate an incident.
+     */
+    const formatGroupCount = (count: number, isLowerBound?: boolean) =>
+      isLowerBound ? `≥${count}` : String(count);
+
     const confirmDelete = ref<boolean>(false);
     const splitterModel = ref(200);
     const showForm = ref(false);
@@ -857,63 +902,20 @@ export default defineComponent({
     ]);
     const activeFolderId = ref<any>(router.currentRoute.value.query.folder ?? "default");
     const showMoveAlertDialog = ref(false);
-    const showAlertDetailsDrawer = ref(false);
-    const selectedAlertDetails: Ref<any> = ref(null);
-
+    // Clicking a row opens the alert's own status page. It replaced a side
+    // drawer: a multi-alert's per-group table, group history and cap banner
+    // do not fit a panel, and a routed page is linkable and back-navigable.
     const triggerExpand = (row: any) => {
-      // Open drawer instead of inline expansion
-      const alert = row;
-
-      // LAZY CONVERSION: Convert conditions on-demand only when expanding
-      // This improves performance by avoiding conversion of all alerts on list load
-      let displayConditions = "--";
-      if (alert.rawCondition && Object.keys(alert.rawCondition).length) {
-        if (alert.rawCondition.type == "custom") {
-          const conditionData = alert.rawCondition.conditions;
-
-          // Detect format by structure, not by version field (more reliable)
-          if (conditionData?.filterType === "group") {
-            // V2 format: {filterType: "group", logicalOperator: "AND", conditions: [...]}
-            displayConditions = transformV2ToExpression(conditionData);
-          } else if (conditionData?.version === 2 && conditionData?.conditions) {
-            // V2 format with version wrapper: {version: 2, conditions: {filterType: "group", ...}}
-            displayConditions = transformV2ToExpression(conditionData.conditions);
-          } else if (conditionData?.or || conditionData?.and) {
-            // V1 format: {or: [...]} or {and: [...]}
-            displayConditions = transformToExpression(conditionData);
-          } else if (Array.isArray(conditionData) && conditionData.length > 0) {
-            // V0 format (legacy): flat array [{column, operator, value}, ...]
-            // V0 had implicit AND between all conditions (no groups)
-            const parts = conditionData.map((item: any) => {
-              const column = item.column || "field";
-              const operator = item.operator || "=";
-              const value = typeof item.value === "string" ? `'${item.value}'` : item.value;
-              return `${column} ${operator} ${value}`;
-            });
-            displayConditions = parts.length > 0 ? `(${parts.join(" AND ")})` : "--";
-          } else {
-            // Unknown format or empty
-            displayConditions = typeof conditionData === "string" ? conditionData : "--";
-          }
-        } else if (alert.rawCondition.sql) {
-          displayConditions = alert.rawCondition.sql;
-        } else if (alert.rawCondition.promql) {
-          displayConditions = alert.rawCondition.promql;
-        }
-      }
-
-      // Set selectedAlertDetails with converted conditions
-      selectedAlertDetails.value = {
-        ...alert,
-        conditions: displayConditions,
-      };
-
-      showAlertDetailsDrawer.value = true;
+      if (!row?.alert_id) return;
+      router.push({
+        name: "alertDetail",
+        params: { alert_id: row.alert_id },
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
+          folder: row.folder_id || router.currentRoute.value.query.folder || "default",
+        },
+      });
     };
-
-    // ESC and click-outside dismissal are handled by ODrawer itself (reka-ui
-    // DismissableLayer → @escape-key-down / @interact-outside), which also knows
-    // to ignore clicks inside portaled dropdowns opened from within the drawer.
 
     onMounted(() => {
       window.addEventListener("resize", onWindowResize);
@@ -1226,6 +1228,21 @@ export default defineComponent({
           size: COL.status,
           meta: { align: "left" },
         },
+        // "groups" — multi-alert fan-out summary (alerts_2.md §5.4). Blank for
+        // every alert that has not opted in to per-group evaluation. Not
+        // sortable: the value is a composite of two counts plus their
+        // exactness, so a single sort order would misrepresent it.
+        {
+          id: "groups",
+          accessorKey: "groups_observed",
+          header: t("alerts.groups.tab"),
+          cell: " ",
+          sortable: false,
+          resizable: true,
+          hideable: true,
+          size: 170,
+          meta: { align: "left" },
+        },
         // "tags" — the selection primitive (PT-6). Not sortable: a tag list has
         // no meaningful order and sorting by it would imply one.
         {
@@ -1518,6 +1535,18 @@ export default defineComponent({
             // Severity axis (alerts_2.md Feature 1) — independent of outcome.
             level: data.level ?? null,
             level_since: data.level_since ?? null,
+            // Whether the alert CURRENTLY evaluates per group. The counts
+            // below survive an opt-out (§5.3 leaves the rollup row alone), so
+            // without this flag a simple alert would keep advertising the
+            // group summary from back when it was a multi-alert.
+            multi_alert: !!data.condition?.aggregation?.multi_alert,
+            // Multi-alert fan-out counts (§5.4). `undefined` — not 0 — for an
+            // alert that never opted in, so the cell can render "—" rather
+            // than claiming it observed zero groups.
+            groups_observed: data.groups_observed,
+            groups_firing: data.groups_firing,
+            groups_observed_is_lower_bound: data.groups_observed_is_lower_bound,
+            groups_firing_is_lower_bound: data.groups_firing_is_lower_bound,
             last_outcome_at: data.last_outcome_at ?? null,
             last_outcome_since: data.last_outcome_since ?? null,
             selected: false,
@@ -2373,16 +2402,6 @@ export default defineComponent({
       });
     };
 
-    const editAlertFromDrawer = async () => {
-      if (!selectedAlertDetails.value) return;
-
-      // Close the drawer first
-      showAlertDetailsDrawer.value = false;
-
-      // Reuse the same edit flow as the listing page
-      await editAlert(selectedAlertDetails.value);
-    };
-
     const moveAlertToAnotherFolder = (row: any) => {
       showMoveAlertDialog.value = true;
       if (row.type === "anomaly") {
@@ -2604,18 +2623,6 @@ export default defineComponent({
       return wrap ? `(${joined})` : joined;
     }
 
-    // V2 format: {filterType: "group", logicalOperator: "AND", conditions: [...]}
-    // Uses shared buildConditionsString utility for consistency
-    function transformV2ToExpression(group: any, isRoot = true): string {
-      const result = buildConditionsString(group, {
-        sqlMode: false, // Display format (lowercase operators)
-        addWherePrefix: false,
-        formatValues: false, // Simple display without type-aware formatting
-      });
-
-      // Wrap in parentheses if it's the root level and has content
-      return isRoot && result ? `(${result})` : result;
-    }
     //this function is used to filter the alerts by the local search not the global search
     //this will be used when the user is searching for the alerts in the same folder
     const filterAlertsByQuery = (query: string) => {
@@ -2916,7 +2923,6 @@ export default defineComponent({
       updateActiveFolderId,
       activeFolderId,
       editAlert,
-      editAlertFromDrawer,
       deleteAlertByAlertId,
       showMoveAlertDialog,
       selectedAlertToMove,
@@ -2933,8 +2939,7 @@ export default defineComponent({
       clearSearchHistory,
       filteredResults,
       triggerExpand,
-      showAlertDetailsDrawer,
-      selectedAlertDetails,
+      formatGroupCount,
       allSelectedAlerts,
       copyToClipboard,
       openMenu,

@@ -383,9 +383,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </div>
 
-                <!-- no. of groups row — visible only when group-by fields are added -->
-                <div
+                <!-- Simple vs Multi alert (M-9) — only once a group-by exists -->
+                <AlertMultiToggle
                   v-if="selectedFunction !== 'total_events' && hasLogGroupByFields"
+                  :enabled="isMultiAlert"
+                  @change="onMultiAlertChange"
+                />
+
+                <!-- no. of groups row — visible only when group-by fields are
+                     added, and NOT for a multi-alert: per-group evaluation
+                     fires on any breaching group, so a group-count rule has no
+                     meaning there and M-10 rejects it at save time. -->
+                <div
+                  v-if="
+                    selectedFunction !== 'total_events' &&
+                    hasLogGroupByFields &&
+                    !isMultiAlert
+                  "
                   class="rounded-default text-compact flex items-start gap-3 px-3 py-2"
                   data-test="alert-having-groups-row"
                 >
@@ -750,9 +764,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </div>
 
-                <!-- no. of groups row — visible only when group-by fields are added -->
-                <div
+                <!-- Simple vs Multi alert (M-9) — only once a group-by exists -->
+                <AlertMultiToggle
                   v-if="selectedFunction !== 'total_events' && hasMetricGroupByFields"
+                  :enabled="isMultiAlert"
+                  @change="onMultiAlertChange"
+                />
+
+                <!-- no. of groups row — hidden for a multi-alert, see the log
+                     branch above for why. -->
+                <div
+                  v-if="
+                    selectedFunction !== 'total_events' &&
+                    hasMetricGroupByFields &&
+                    !isMultiAlert
+                  "
                   class="rounded-default text-compact flex items-start gap-3 px-3 py-2"
                 >
                   <span
@@ -1651,6 +1677,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import AlertMultiToggle from "@/components/alerts/AlertMultiToggle.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OFormCheckbox from "@/lib/forms/Checkbox/OFormCheckbox.vue";
@@ -1667,6 +1694,7 @@ export default defineComponent({
   components: {
     OFormCheckbox,
     OTag,
+    AlertMultiToggle,
     FilterGroup,
     QueryEditorDialog,
     CustomConfirmDialog,
@@ -2367,10 +2395,61 @@ export default defineComponent({
     const hasLogGroupByFields = computed(
       () => logGroupByStore.value.filter((f: string) => f?.trim()).length > 0,
     );
+    // Per-group evaluation opt-in (M-9). Read through the form store so the
+    // template stays live; `false` for every alert that predates the field,
+    // which is the whole backward-compatibility guarantee.
+    const multiAlertStore = form.useStore(
+      (s: any) => !!s.values?.query_condition?.aggregation?.multi_alert,
+    );
+    const isMultiAlert = computed(() => multiAlertStore.value);
+
+    /**
+     * Keep the group-count gate consistent with the M-10 rule when the toggle
+     * flips.
+     *
+     * Turning per-group evaluation ON forces the gate to the only shape M-10
+     * accepts — "at least 1 group" — because any other count rule is rejected
+     * at save time. Doing it here means the user sees a valid form instead of
+     * a 400 after pressing Save; the count row is hidden at the same time, so
+     * the value they can no longer see is never left in a state that would be
+     * refused.
+     */
+    const onMultiAlertChange = (value: unknown) => {
+      if (!value) return;
+      setFV("trigger_condition.operator", ">=");
+      setFV("trigger_condition.threshold", 1);
+    };
+
+    /**
+     * Give the Simple/Multi choice a real `false` to select.
+     *
+     * An alert saved before this feature has no `multi_alert` key at all, so
+     * the field reads `undefined` and a two-option control would render with
+     * NEITHER option selected — which looks broken and hides the alert's
+     * actual (simple) behaviour. Writing the explicit `false` costs nothing:
+     * the API skips serializing it, so this never turns into a stored change.
+     */
+    const normalizeMultiAlertFlag = () => {
+      if (fv("query_condition.aggregation.multi_alert") === undefined) {
+        setFV("query_condition.aggregation.multi_alert", false);
+      }
+    };
+
     // Whether metric group-by has at least one non-empty field
     const hasMetricGroupByFields = computed(
       () => metricGroupByStore.value.filter((f: string) => f?.trim()).length > 0,
     );
+
+    // The choice only appears once a group-by exists, so normalise then —
+    // that is the moment it becomes visible and needs a selected option.
+    watch(
+      () => [hasLogGroupByFields.value, hasMetricGroupByFields.value],
+      ([log, metric]) => {
+        if (log || metric) normalizeMultiAlertFlag();
+      },
+      { immediate: true },
+    );
+
 
     // name="trigger_condition.operator" owns the value, but it is NOT written yet
     // when this runs — field.handleChange commits after us — so the new operator
@@ -3414,6 +3493,8 @@ export default defineComponent({
       restoreDefaultThreshold,
       hasLogGroupByFields,
       hasMetricGroupByFields,
+      isMultiAlert,
+      onMultiAlertChange,
       checkEveryFrequency,
       onCheckEveryChange,
       restoreDefaultFrequency,
