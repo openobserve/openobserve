@@ -374,6 +374,70 @@ describe("OTable", () => {
       expect(emitted.at(-1)![0]).toEqual(["status", "id", "name", "email"]);
     });
 
+    it("should mark the pinned-first column so Sortable filters it out of drags", () => {
+      wrapper = mount(OTable, {
+        props: {
+          data: makeRows(2),
+          columns: makeColumns(),
+          enableColumnReorder: true,
+          pinnedFirstColumn: "id",
+        },
+      });
+      expect(getDraggable(wrapper).attributes("filter")).toBe(".o2-table-th-pinned-first");
+      expect(wrapper.find('[data-test="o2-table-th-id"]').classes()).toContain(
+        "o2-table-th-pinned-first",
+      );
+      expect(wrapper.find('[data-test="o2-table-th-name"]').classes()).not.toContain(
+        "o2-table-th-pinned-first",
+      );
+    });
+
+    it("should pull the pinned column back to the front when a drop displaces it", async () => {
+      wrapper = mount(OTable, {
+        props: {
+          data: makeRows(2),
+          columns: makeColumns(),
+          enableColumnReorder: true,
+          pinnedFirstColumn: "id",
+        },
+      });
+      const draggable = getDraggable(wrapper);
+      const [id, name, email, status] = draggable.props("modelValue") as string[];
+
+      // "status" dropped in front of the pinned "id".
+      draggable.vm.$emit("update:modelValue", [status, id, name, email]);
+      await nextTick();
+
+      const emitted = wrapper.emitted("column-order-change") as any[][];
+      expect(emitted.at(-1)![0]).toEqual(["id", "status", "name", "email"]);
+    });
+
+    it("should leave the order alone when the pinned column is already first", async () => {
+      wrapper = mount(OTable, {
+        props: {
+          data: makeRows(2),
+          columns: makeColumns(),
+          enableColumnReorder: true,
+          pinnedFirstColumn: "id",
+        },
+      });
+      const draggable = getDraggable(wrapper);
+      const [id, name, email, status] = draggable.props("modelValue") as string[];
+
+      draggable.vm.$emit("update:modelValue", [id, status, name, email]);
+      await nextTick();
+
+      const emitted = wrapper.emitted("column-order-change") as any[][];
+      expect(emitted.at(-1)![0]).toEqual(["id", "status", "name", "email"]);
+    });
+
+    it("should not mark any header when no column is pinned", () => {
+      wrapper = mount(OTable, {
+        props: { data: makeRows(2), columns: makeColumns(), enableColumnReorder: true },
+      });
+      expect(wrapper.findAll(".o2-table-th-pinned-first")).toHaveLength(0);
+    });
+
     it("should have no gutter entries when the table has no gutter headers", () => {
       wrapper = mount(OTable, {
         props: {

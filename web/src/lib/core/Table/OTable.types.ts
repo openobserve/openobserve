@@ -292,6 +292,12 @@ export interface OTableProps<TData = any> {
   showIndex?: boolean;
   enableColumnResize?: boolean;
   enableColumnReorder?: boolean;
+  /**
+   * Column id that is locked to the first position (e.g. the timestamp column in
+   * logs). It cannot be picked up by a drag, and any reorder that would push it
+   * out of slot 0 is normalised back. Only meaningful with `enableColumnReorder`.
+   */
+  pinnedFirstColumn?: string;
   enableColumnPin?: boolean;
   /** Show the per-column value-filter dropdown on `filterable` columns (client-side) */
   enableColumnFilter?: boolean;

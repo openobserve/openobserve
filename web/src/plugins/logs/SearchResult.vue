@@ -503,6 +503,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             pagination="none"
             sorting="none"
             :enable-column-reorder="true"
+            :pinned-first-column="logsTimestampCol"
             :enable-column-resize="true"
             :get-row-status-color="getLogRowStatusColor"
             :row-class="getLogRowClass"

@@ -445,7 +445,9 @@ const columnMgmt = useTableColumnManagement(
     },
     columnOrder,
     columnIds,
-    pinnedFirstColumn: undefined,
+    get pinnedFirstColumn() {
+      return props.pinnedFirstColumn;
+    },
   },
   emit,
 );
@@ -1176,6 +1178,7 @@ defineExpose({
             :expansion-enabled="expansion.isEnabled.value"
             :enable-row-reorder="props.enableRowReorder"
             :enable-column-reorder="props.enableColumnReorder"
+            :pinned-first-column="props.pinnedFirstColumn"
             :enable-column-resize="props.enableColumnResize"
             :enable-column-filter="props.enableColumnFilter"
             :is-resizing="columnMgmt.isResizing.value"

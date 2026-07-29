@@ -24,6 +24,9 @@ const props = defineProps<{
   expansionEnabled?: boolean;
   enableRowReorder?: boolean;
   enableColumnReorder?: boolean;
+  /** Column id locked to slot 0 — not draggable, and normalised back if a drop
+   *  would displace it. */
+  pinnedFirstColumn?: string;
   enableColumnResize?: boolean;
   isResizing?: boolean;
   sortingEnabled?: boolean;
@@ -163,6 +166,14 @@ const renderedColumnIds = computed(() =>
 
 const draggableOrder = computed(() => [...gutterIds.value, ...renderedColumnIds.value]);
 
+// The pinned column can't be picked up (Sortable `filter` below), but another
+// column can still be dropped in front of it — pull it back to slot 0.
+function pinFirst(order: string[]): string[] {
+  const pinned = props.pinnedFirstColumn;
+  if (!pinned || order[0] === pinned || !order.includes(pinned)) return order;
+  return [pinned, ...order.filter((id) => id !== pinned)];
+}
+
 function handleDraggableUpdate(next: string[]): void {
   const reordered = next.filter((id) => !id.startsWith(GUTTER_SENTINEL));
   // Splice the new visible order back into the full order, leaving hidden
@@ -172,7 +183,7 @@ function handleDraggableUpdate(next: string[]): void {
   const fullOrder = props.columnOrder.map((id) => (visible.has(id) ? reordered[cursor++] : id));
   // A rendered column missing from `columnOrder` (order not yet synced) would be
   // dropped by the map above — fall back to the visible order in that case.
-  emit("update:columnOrder", cursor === reordered.length ? fullOrder : reordered);
+  emit("update:columnOrder", pinFirst(cursor === reordered.length ? fullOrder : reordered));
 }
 
 function isAutoWidthColumn(header: any): boolean {
@@ -379,6 +390,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
       :animation="200"
       :sort="!isResizing"
       handle=".table-head"
+      filter=".o2-table-th-pinned-first"
       tag="tr"
       :class="['bg-table-header-bg', columnOrder.length > 1 ? 'cursor-move' : '']"
       :style="{
@@ -436,6 +448,9 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
           dense ? 'h-8' : 'h-9',
           'border-table-header-border border-b',
           'group',
+          // Sortable's `filter` selector — this header can't start a drag, so it
+          // must not advertise the move cursor the draggable <tr> sets either.
+          header.id === pinnedFirstColumn ? 'o2-table-th-pinned-first cursor-default' : '',
           header.column.getIsPinned?.() ? 'bg-table-header-bg' : '',
           (header.column.columnDef.meta as any)?.headerClass ?? '',
         ]"
