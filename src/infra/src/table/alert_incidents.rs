@@ -19,7 +19,8 @@
 
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder,
-    QuerySelect, Set, TransactionTrait, sea_query::LockType,
+    QuerySelect, Set, TransactionTrait,
+    sea_query::{Expr, LockType},
 };
 use svix_ksuid::KsuidLike;
 
@@ -83,12 +84,41 @@ pub async fn create(
 ///
 /// The check and the insert happen inside the same transaction to avoid the
 /// read-then-write race that would occur if they were separate operations.
+/// Provenance for an alert that was pushed in over the external ingest
+/// webhook rather than evaluated by OpenObserve.
+///
+/// Native alerts pass `None` and resolve their details from the `alerts`
+/// table; external alerts have no such row, so the junction row has to carry
+/// enough to render them on its own.
+#[derive(Debug, Clone, Default)]
+pub struct ExternalAlertMeta {
+    /// Originating system, e.g. "alertmanager".
+    pub source: String,
+    /// Deep link back into the originating system.
+    pub external_url: Option<String>,
+    /// JSON object of display-only annotations.
+    pub annotations: Option<String>,
+    /// Severity the originating system reported, already normalized to
+    /// "P1".."P4". `None` when the sender supplied nothing recognizable, which
+    /// leaves the incident's default severity in place.
+    ///
+    /// Not persisted on the junction row — severity belongs to the incident,
+    /// not to one alert's link to it. It rides along here because this struct
+    /// is what already threads from the ingest handler down to incident
+    /// creation.
+    pub severity: Option<String>,
+    /// Idempotency key supplied by the sender, persisted so a redelivery of
+    /// the same firing can be recognised.
+    pub dedup_key: Option<String>,
+}
+
 pub async fn add_alert_to_incident(
     incident_id: &str,
     alert_id: &str,
     alert_name: &str,
     alert_fired_at: i64,
     correlation_reason: &str,
+    external: Option<&ExternalAlertMeta>,
 ) -> Result<bool, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let now = chrono::Utc::now().timestamp_micros();
@@ -131,6 +161,11 @@ pub async fn add_alert_to_incident(
         alert_name: Set(alert_name.to_string()),
         correlation_reason: Set(Some(correlation_reason.to_string())),
         created_at: Set(now),
+        source: Set(external.map(|e| e.source.clone())),
+        external_url: Set(external.and_then(|e| e.external_url.clone())),
+        annotations: Set(external.and_then(|e| e.annotations.clone())),
+        resolved_at: Set(None),
+        dedup_key: Set(external.and_then(|e| e.dedup_key.clone())),
     };
 
     alert_link
@@ -276,6 +311,139 @@ pub async fn get_incident_alerts(
     alert_incident_alerts::Entity::find()
         .filter(alert_incident_alerts::Column::IncidentId.eq(incident_id))
         .order_by_desc(alert_incident_alerts::Column::AlertFiredAt)
+        .all(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
+}
+
+/// Whether this exact firing has already been recorded.
+///
+/// Idempotency for externally-ingested alerts is answered from the junction
+/// table rather than `alert_dedup_state`: that table's `alert_id` carries a
+/// foreign key to `alerts`, and an externally-ingested alert has no row there
+/// by design, so every write against it fails the constraint.
+///
+/// `since` bounds how long a key is honoured, so a genuine re-fire of the same
+/// rule much later is not mistaken for a redelivery.
+pub async fn external_alert_already_seen(
+    alert_id: &str,
+    dedup_key: &str,
+    since: i64,
+) -> Result<bool, errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+
+    let count = alert_incident_alerts::Entity::find()
+        .filter(alert_incident_alerts::Column::AlertId.eq(alert_id))
+        .filter(alert_incident_alerts::Column::DedupKey.eq(dedup_key))
+        .filter(alert_incident_alerts::Column::AlertFiredAt.gte(since))
+        .count(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+
+    Ok(count > 0)
+}
+
+/// Outcome of marking one alert resolved inside an incident.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AlertResolution {
+    /// At least one junction row moved from unresolved to resolved.
+    pub changed: bool,
+    /// Every distinct alert in the incident is now resolved, so the incident
+    /// itself has nothing left firing.
+    pub all_resolved: bool,
+}
+
+/// Mark every firing of `alert_id` within an incident as resolved.
+///
+/// An alert can appear many times in one incident (the junction PK includes
+/// `alert_fired_at`), and the originating system resolves the *rule*, not an
+/// individual firing — so all of its rows resolve together.
+///
+/// Returns whether anything changed and whether the incident is now fully
+/// resolved, leaving the decision to close the incident to the caller.
+pub async fn mark_alert_resolved(
+    incident_id: &str,
+    alert_id: &str,
+    resolved_at: i64,
+) -> Result<AlertResolution, errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+
+    let txn = client
+        .begin()
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+
+    // Serialise with concurrent add/resolve on the same incident, so the
+    // "is everything resolved now" check below cannot race a fresh firing.
+    let _incident = alert_incidents::Entity::find_by_id(incident_id)
+        .lock(LockType::Update)
+        .one(&txn)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?
+        .ok_or_else(|| Error::DbError(DbError::SeaORMError("Incident not found".to_string())))?;
+
+    let updated = alert_incident_alerts::Entity::update_many()
+        .col_expr(
+            alert_incident_alerts::Column::ResolvedAt,
+            Expr::value(Some(resolved_at)),
+        )
+        .filter(alert_incident_alerts::Column::IncidentId.eq(incident_id))
+        .filter(alert_incident_alerts::Column::AlertId.eq(alert_id))
+        .filter(alert_incident_alerts::Column::ResolvedAt.is_null())
+        .exec(&txn)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+
+    let still_firing = alert_incident_alerts::Entity::find()
+        .filter(alert_incident_alerts::Column::IncidentId.eq(incident_id))
+        .filter(alert_incident_alerts::Column::ResolvedAt.is_null())
+        .count(&txn)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+
+    txn.commit()
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+
+    Ok(AlertResolution {
+        changed: updated.rows_affected > 0,
+        all_resolved: still_firing == 0,
+    })
+}
+
+/// Find any open incident that already contains a given alert_id.
+///
+/// Unlike [`find_open_incident_by_alert_id`], this does not restrict to
+/// AlertId-keyed incidents — an externally-ingested alert that resolves may
+/// have joined an incident keyed on shared dimensions.
+pub async fn find_open_incidents_containing_alert(
+    org_id: &str,
+    alert_id: &str,
+) -> Result<Vec<alert_incidents::Model>, errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+
+    // Select the id column only, deduplicated. A long-lived alert accumulates
+    // one junction row per firing, so loading whole models here would drag the
+    // entire history (annotations text included) across the wire just to
+    // collect a handful of distinct incident ids.
+    let incident_ids: Vec<String> = alert_incident_alerts::Entity::find()
+        .select_only()
+        .column(alert_incident_alerts::Column::IncidentId)
+        .distinct()
+        .filter(alert_incident_alerts::Column::AlertId.eq(alert_id))
+        .into_tuple::<String>()
+        .all(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+
+    if incident_ids.is_empty() {
+        return Ok(vec![]);
+    }
+
+    alert_incidents::Entity::find()
+        .filter(alert_incidents::Column::OrgId.eq(org_id))
+        .filter(alert_incidents::Column::Id.is_in(incident_ids))
+        .filter(alert_incidents::Column::Status.ne("resolved"))
         .all(client)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))

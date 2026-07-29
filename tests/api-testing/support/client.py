@@ -110,6 +110,11 @@ class OpenObserveClient:
         return AlertsAPI(self)
 
     @property
+    def incidents(self):
+        from .endpoints.incidents import IncidentsAPI
+        return IncidentsAPI(self)
+
+    @property
     def folders(self):
         from .endpoints.folders import FoldersAPI
         return FoldersAPI(self)

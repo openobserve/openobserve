@@ -72,16 +72,34 @@ pub(crate) async fn process_msg(msg: IncidentMessage) -> Result<()> {
             alert_name,
             alert_fired_at,
             correlation_reason,
+            source,
+            external_url,
+            annotations,
+            dedup_key,
         } => {
             log::debug!(
                 "[SUPER_CLUSTER:incidents] Add alert to org_id={org_id} incident id={incident_id} alert={alert_id}",
             );
+            // `source` present means the alert was pushed in over the external
+            // ingest webhook on the originating cluster and has no row in this
+            // cluster's `alerts` table either.
+            let external = source.map(|source| alert_incidents::ExternalAlertMeta {
+                source,
+                external_url,
+                annotations,
+                // Severity is a property of the incident, not of one alert's
+                // link to it, and the peer already received it on the
+                // `Create` message. Nothing to carry here.
+                severity: None,
+                dedup_key,
+            });
             alert_incidents::add_alert_to_incident(
                 &incident_id,
                 &alert_id,
                 &alert_name,
                 alert_fired_at,
                 &correlation_reason,
+                external.as_ref(),
             )
             .await?;
         }

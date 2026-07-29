@@ -1081,6 +1081,8 @@ async fn handle_alert_triggers(
                 first_row,
                 &data,
                 triggered_at,
+                // Scheduler-evaluated alert — not externally ingested.
+                None,
             )
             .await
             {
