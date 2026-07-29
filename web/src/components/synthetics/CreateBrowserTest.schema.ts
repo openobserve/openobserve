@@ -67,7 +67,10 @@ export const makeBrowserCheckSaveSchema = (t: (_key: string) => string) =>
           z.object({
             id: z.string(),
             action: z.string(),
-            name: z.string().optional(),
+            // The string a failed run displays, so it cannot be blank. Recorded
+            // steps arrive named from the recorder, which is why requiring it
+            // lands on hand-added steps rather than on every recording.
+            name: z.string().trim().min(1, t("synthetics.validation.stepNameRequired")),
             selector: z.string().optional(),
             selectorType: z.string().optional(),
             value: z.string().optional(),

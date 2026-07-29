@@ -46,6 +46,7 @@ const props = defineProps<{
   step: BrowserStep;
   /** Validation from the host view; absent in contexts that do not validate. */
   actionErrorMessage?: string;
+  nameErrorMessage?: string;
   selectorErrorMessage?: string;
 }>();
 
@@ -267,8 +268,11 @@ const settleBudgetOutOfRange = computed(() => {
       />
       <OInput
         v-model="nameComputed"
-        :label="t('synthetics.journey.stepNameOptional')"
-        :placeholder="t('synthetics.journey.stepNamePlaceholder')"
+        :label="t('synthetics.journey.stepNameLabel')"
+        :placeholder="t('synthetics.journey.stepNamePurposePlaceholder')"
+        :required="true"
+        :error="!!nameErrorMessage"
+        :error-message="nameErrorMessage ?? ''"
         class="w-100!"
         data-test="synthetics-journey-step-name-input"
       />

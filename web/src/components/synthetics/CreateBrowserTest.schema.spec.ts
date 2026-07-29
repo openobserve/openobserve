@@ -18,12 +18,16 @@ import { makeBrowserCheckSaveSchema } from "./CreateBrowserTest.schema";
 
 const t = (key: string) => key;
 
+// Most journey fixtures below exercise the target and first-step rules, not names,
+// so a name is supplied by default — step name is required (D10) and every fixture
+// would otherwise trip that rule for reasons unrelated to what it is testing. A
+// case that IS about names passes an explicit `name`, which wins over the default.
 function form(journey: unknown[]) {
   return {
     name: "check",
     url: "https://app.test",
     locations: ["us-east"],
-    journey,
+    journey: journey.map((step) => ({ name: "Step", ...(step as Record<string, unknown>) })),
   };
 }
 
@@ -116,5 +120,65 @@ describe("makeBrowserCheckSaveSchema journey validation", () => {
 
     expect(result.success).toBe(false);
     expect(issuePaths(result)).toContain("journey.0.action");
+  });
+});
+
+// The step name is the string a failed run displays, and it was optional. Enforced
+// by min(1).trim() in this schema rather than a second validation path, matching
+// the monitor-level name rule. Recorded steps arrive already named from the
+// recorder, so the friction lands on hand-added steps (D10).
+describe("makeBrowserCheckSaveSchema step name", () => {
+  const schema = makeBrowserCheckSaveSchema(t);
+  const pin = { candidates: [], user_override: { kind: "css", value: "#go" } };
+
+  it("should reject a step with a blank name", () => {
+    const result = schema.safeParse(
+      form([
+        { id: "1", action: "navigate", value: "https://app.test" },
+        { id: "2", action: "click", name: "", locator: pin },
+      ]),
+    );
+
+    expect(result.success).toBe(false);
+    expect(issuePaths(result)).toContain("journey.1.name");
+  });
+
+  it("should reject a whitespace-only name", () => {
+    const result = schema.safeParse(
+      form([
+        { id: "1", action: "navigate", value: "https://app.test" },
+        { id: "2", action: "click", name: "   ", locator: pin },
+      ]),
+    );
+
+    expect(result.success).toBe(false);
+    expect(issuePaths(result)).toContain("journey.1.name");
+  });
+
+  it("should report the message the editor binds to the field", () => {
+    const result = schema.safeParse(
+      form([{ id: "1", action: "navigate", value: "https://app.test", name: "" }]),
+    );
+
+    const issue = (result as any).error.issues.find(
+      (i: { path: PropertyKey[] }) => i.path.join(".") === "journey.0.name",
+    );
+    expect(issue.message).toBe("synthetics.validation.stepNameRequired");
+  });
+
+  it("should accept a recorded journey, which arrives already named", () => {
+    const result = schema.safeParse(
+      form([
+        { id: "1", action: "navigate", value: "https://app.test", name: "Open app" },
+        {
+          id: "2",
+          action: "click",
+          name: 'Click on [data-test="sign-in"]',
+          locator: { candidates: [{ kind: "test_attribute", value: '[data-test="sign-in"]' }] },
+        },
+      ]),
+    );
+
+    expect(result.success).toBe(true);
   });
 });

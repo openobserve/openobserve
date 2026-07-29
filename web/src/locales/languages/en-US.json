@@ -9741,8 +9741,9 @@
       "showWindow": "Show window",
       "stepCount": "({count} steps)",
       "stepHeader": "Step",
-      "stepNameOptional": "Step name (optional)",
+      "stepNameLabel": "Step name",
       "stepNamePlaceholder": "Enter a descriptive name",
+      "stepNamePurposePlaceholder": "Sign in with valid credentials",
       "stepNumberAria": "Step {number} {state}",
       "steps": "Steps",
       "stop": "Stop",
@@ -10358,6 +10359,7 @@
       "locationsRequired": "Select at least one location",
       "nameRequired": "Name is required",
       "selectorRequired": "Selector is required for \"{step}\"",
+      "stepNameRequired": "Give this step a name — it is what run results show",
       "urlInvalid": "Enter a valid URL starting with http:// or https://",
       "urlRequired": "Starting URL is required",
       "fixHighlightedFields": "Fix the highlighted fields before saving"
