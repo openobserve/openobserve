@@ -199,8 +199,9 @@ def test_delete_workflow(create_session, base_url, pipeline_destination):
 
 def test_test_workflow(create_session, base_url, workflow):
     """CT-14a — the test endpoint runs the graph and returns a per-node result object."""
-    body = {"inputs": [{"meta": {}, "data": []}], "from_node": "trigger-1"}
-    resp = create_session.post(f"{base_url}api/{ORG_ID}/workflows/{workflow['id']}/test", json=body)
+    workflow_body = _workflow_payload(workflow["name"], workflow["dest"])["workflow"]
+    body = {"inputs": [{"meta": {}, "data": []}], "from_node": "trigger-1", "workflow": workflow_body }
+    resp = create_session.post(f"{base_url}api/{ORG_ID}/workflows/test", json=body)
     assert resp.status_code == 200, f"test failed: {resp.status_code} {resp.text[:300]}"
 
 
