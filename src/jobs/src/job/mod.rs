@@ -752,7 +752,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
                     }
                     let max_rows = o2_enterprise::enterprise::common::config::get_config()
                         .llm_eval_config
-                        .max_buffer_size
+                        .max_search_rows
                         .saturating_mul(10)
                         .max(10_001);
                     let size = eval_scheduler_fetch_size(total, max_rows)?;
