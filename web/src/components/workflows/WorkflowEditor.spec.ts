@@ -173,7 +173,6 @@ const placeTrigger = (id = "t1") => {
 };
 const dialogByTitle = (w: any, title: string) =>
   w.findAllComponents(ConfirmDialogStub).find((d: any) => d.props("title") === title)!;
-const saveTestDialog = (w: any) => dialogByTitle(w, t("workflow.test.saveToTestTitle"));
 const deleteDialog = (w: any) => dialogByTitle(w, t("workflow.deleteNodeTitle"));
 const palette = (w: any) => w.findComponent({ name: "NodePalette" });
 
@@ -1114,18 +1113,23 @@ describe("WorkflowEditor", () => {
       await flushPromises();
     };
 
-    it("prompts to save first when the workflow has never been saved", async () => {
+    // Test now dry-runs the whole in-memory graph (sent in the request), so it
+    // opens the Test dialog directly whether the workflow is brand-new, has
+    // unsaved edits, or is a clean saved workflow — there is no save-first prompt.
+    it("opens the Test dialog directly for a workflow that has never been saved", async () => {
       wrapper = mountEditor();
       await flushPromises();
 
       await clickTest(wrapper);
 
-      expect(saveTestDialog(wrapper).props("modelValue")).toBe(true);
-      expect(workflowObj.testRun.show).toBe(false);
-      expect(wrapper.find('[data-test="WorkflowTestDialog"]').exists()).toBe(false);
+      expect(workflowObj.testRun.show).toBe(true);
+      expect(wrapper.find('[data-test="WorkflowTestDialog"]').exists()).toBe(true);
+      // No persistence happens just by opening Test.
+      expect(createWorkflow).not.toHaveBeenCalled();
+      expect(updateWorkflow).not.toHaveBeenCalled();
     });
 
-    it("prompts to save first when there are unsaved edits", async () => {
+    it("opens the Test dialog directly when there are unsaved edits", async () => {
       hydrateWorkflow(savedGraph());
       mockRouter.currentRoute.value = { query: { id: "wf-1" } };
       wrapper = mountEditor();
@@ -1134,8 +1138,8 @@ describe("WorkflowEditor", () => {
 
       await clickTest(wrapper);
 
-      expect(saveTestDialog(wrapper).props("modelValue")).toBe(true);
-      expect(workflowObj.testRun.show).toBe(false);
+      expect(workflowObj.testRun.show).toBe(true);
+      expect(updateWorkflow).not.toHaveBeenCalled();
     });
 
     it("opens the Test dialog directly for a clean saved workflow", async () => {
@@ -1148,61 +1152,6 @@ describe("WorkflowEditor", () => {
 
       expect(workflowObj.testRun.show).toBe(true);
       expect(wrapper.find('[data-test="WorkflowTestDialog"]').exists()).toBe(true);
-      expect(saveTestDialog(wrapper).props("modelValue")).toBe(false);
-    });
-
-    it("saves then opens the Test dialog on Save & Test", async () => {
-      hydrateWorkflow(savedGraph());
-      mockRouter.currentRoute.value = { query: { id: "wf-1" } };
-      wrapper = mountEditor();
-      await flushPromises();
-      workflowObj.dirtyFlag = true;
-      await clickTest(wrapper);
-
-      saveTestDialog(wrapper).vm.$emit("update:ok");
-      await flushPromises();
-
-      expect(updateWorkflow).toHaveBeenCalledTimes(1);
-      expect(workflowObj.testRun.show).toBe(true);
-      expect(saveTestDialog(wrapper).props("modelValue")).toBe(false);
-    });
-
-    it("does not open the Test dialog when the Save & Test save fails", async () => {
-      hydrateWorkflow(savedGraph());
-      mockRouter.currentRoute.value = { query: { id: "wf-1" } };
-      updateWorkflow.mockRejectedValue(new Error("nope"));
-      wrapper = mountEditor();
-      await flushPromises();
-      workflowObj.dirtyFlag = true;
-      await clickTest(wrapper);
-
-      saveTestDialog(wrapper).vm.$emit("update:ok");
-      await flushPromises();
-
-      expect(workflowObj.testRun.show).toBe(false);
-    });
-
-    it("dismisses the Save & Test prompt on cancel", async () => {
-      wrapper = mountEditor();
-      await flushPromises();
-      await clickTest(wrapper);
-
-      saveTestDialog(wrapper).vm.$emit("update:cancel");
-      await nextTick();
-
-      expect(saveTestDialog(wrapper).props("modelValue")).toBe(false);
-      expect(createWorkflow).not.toHaveBeenCalled();
-    });
-
-    it("dismisses the Save & Test prompt when the dialog closes itself (v-model)", async () => {
-      wrapper = mountEditor();
-      await flushPromises();
-      await clickTest(wrapper);
-
-      saveTestDialog(wrapper).vm.$emit("update:modelValue", false);
-      await nextTick();
-
-      expect(saveTestDialog(wrapper).props("modelValue")).toBe(false);
     });
 
     it("renders the per-step result drawer when a node's badge opens it", async () => {
