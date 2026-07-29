@@ -1023,6 +1023,7 @@ pub async fn feedback(Path(org_id): Path<String>, in_req: axum::extract::Request
     ),
     responses(
         (status = StatusCode::OK, description = "Confirmation forwarded", body = Object),
+        (status = StatusCode::BAD_REQUEST, description = "Invalid session ID, malformed body, or AI agent not configured", body = Object),
         (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = Object),
     ),
     extensions(

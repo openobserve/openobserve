@@ -3602,8 +3602,14 @@ export default defineComponent({
      * server has actually said the session is unreachable — never as a guess
      * from a generic failure.
      */
-    const isSessionOwnerUnavailable = (errorBody: any): boolean => {
-      const code = errorBody?.detail?.code ?? errorBody?.code;
+    const isSessionOwnerUnavailable = (errorBody: unknown): boolean => {
+      // `unknown`, not `any`: this comes straight from response.json(), so the
+      // shape is whatever the server sent. Narrow before reading, or a
+      // non-object body (a string, null) would throw here and mask the real
+      // error the user should have seen.
+      if (typeof errorBody !== "object" || errorBody === null) return false;
+      const body = errorBody as { code?: unknown; detail?: { code?: unknown } };
+      const code = body.detail?.code ?? body.code;
       return code === "session_owner_unavailable";
     };
 
