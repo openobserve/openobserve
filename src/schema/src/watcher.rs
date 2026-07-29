@@ -224,19 +224,13 @@ async fn watch(
                 }
                 let mut w = STREAM_SCHEMAS.write().await;
                 w.remove(item_key);
-                w.shrink_to_fit();
                 drop(w);
                 let mut w = STREAM_SCHEMAS_LATEST.write().await;
                 w.remove(item_key);
-                w.shrink_to_fit();
                 drop(w);
-                {
-                    STREAM_RECORD_ID_GENERATOR.remove(item_key);
-                    STREAM_RECORD_ID_GENERATOR.shrink_to_fit();
-                }
+                STREAM_RECORD_ID_GENERATOR.remove(item_key);
                 let mut w = STREAM_SETTINGS.write().await;
                 w.remove(item_key);
-                w.shrink_to_fit();
                 infra::schema::set_stream_settings_atomic(w.clone());
                 drop(w);
                 cache::stats::remove_stream_stats(org_id, stream_name, stream_type);
