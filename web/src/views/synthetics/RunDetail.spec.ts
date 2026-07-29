@@ -48,6 +48,8 @@ vi.mock("vuex", () => ({
   }),
 }));
 
+const mockRunDetailRef: { value: any } = { value: null };
+
 const mockRunDetail = {
   timestamp: Date.now() / 1000,
   scheduledTs: Date.now() / 1000,
@@ -70,6 +72,51 @@ const mockRunDetail = {
   network: null,
   webVitals: null,
   traceKey: null,
+  // Fields the tab bar, attempt selector and evidence panel read. The fixture
+  // predated all of them, so it could not have caught a panel that never
+  // rendered.
+  initMs: 0,
+  startedTs: 0,
+  queueDelayMs: null,
+  statusReason: "",
+  errorSource: "",
+  failureDetail: null,
+  evidenceByStep: [],
+  evidenceKey: null,
+  evidenceTruncated: false,
+};
+
+/** A retried execution: two attempts, the second deciding. */
+const mockRetriedDetail = {
+  ...mockRunDetail,
+  status: "failed",
+  attempts: 2,
+  failedStep: "fa1",
+  evidenceKey: "synthetics/org/mon/2026/07/29/RUN/EXEC/attempt-1-evidence.ndjson",
+  retryHistory: [
+    {
+      attempt: 0,
+      status: "failed",
+      durationMs: 57795,
+      failedStep: "fa1",
+      steps: [],
+      failureDetail: null,
+      screenshotKeys: new Map(),
+      traceKey: null,
+      evidenceKey: "…/evidence.ndjson",
+    },
+    {
+      attempt: 1,
+      status: "failed",
+      durationMs: 58341,
+      failedStep: "fa1",
+      steps: [],
+      failureDetail: null,
+      screenshotKeys: new Map(),
+      traceKey: null,
+      evidenceKey: "…/attempt-1-evidence.ndjson",
+    },
+  ],
 };
 
 // ── Controllable `loading` ref shared with the mocked composable, so
@@ -96,7 +143,7 @@ vi.mock("@/composables/useSyntheticResults", () => ({
     },
     buckets: { value: [] },
     runs: { value: [] },
-    runDetail: { value: { ...mockRunDetail } },
+    runDetail: mockRunDetailRef,
     loading: mockLoading,
     error: { value: null },
     hasLoadedOnce: { value: true },
@@ -169,6 +216,7 @@ describe("RunDetail", () => {
   let wrapper: VueWrapper;
 
   beforeEach(async () => {
+    mockRunDetailRef.value = { ...mockRunDetail };
     wrapper = mountComponent();
     await flushPromises();
   });
@@ -284,5 +332,46 @@ describe("RunDetail", () => {
 
       w.unmount();
     });
+  });
+});
+
+// ── Tabs and the attempt selector ───────────────────────────────────────────
+//
+// Both were previously "verified" from a screenshot, and both were wrong twice.
+// These assert the DOM.
+
+describe("RunDetail — steps / evidence tabs", () => {
+  beforeEach(() => {
+    mockRunDetailRef.value = { ...mockRunDetail };
+  });
+
+  afterEach(() => {
+    mockRunDetailRef.value = { ...mockRunDetail };
+  });
+
+  it("renders both tabs, with Steps selected first", async () => {
+    const w = mountComponent();
+    await flushPromises();
+    expect(w.find('[data-test="synthetics-run-detail-tab-steps"]').exists()).toBe(true);
+    expect(w.find('[data-test="synthetics-run-detail-tab-evidence"]').exists()).toBe(true);
+    w.unmount();
+  });
+
+  it("hides the attempt selector on a run that never retried", async () => {
+    const w = mountComponent();
+    await flushPromises();
+    // One attempt means nothing to select; a control with a single option is
+    // noise in an already-dense drawer.
+    expect(w.find('[data-test="synthetics-run-detail-attempt-select"]').exists()).toBe(false);
+    w.unmount();
+  });
+
+  it("shows the attempt selector on a retried run", async () => {
+    mockRunDetailRef.value = { ...mockRetriedDetail } as any;
+    const w = mountComponent();
+    await flushPromises();
+    expect(w.find('[data-test="synthetics-run-detail-attempt-select"]').exists()).toBe(true);
+    expect(w.find('[data-test="synthetics-run-detail-attempt-dropdown"]').exists()).toBe(true);
+    w.unmount();
   });
 });

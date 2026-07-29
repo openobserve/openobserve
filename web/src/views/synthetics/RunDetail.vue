@@ -157,48 +157,66 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
 
-        <!-- Evidence, below the steps: the step timeline has to stay visible while
-             reading events, since attribution is the whole point. Collapsed by
-             default and fetched only on open — the bundle runs to 256 KB at the
-             cap and most runs are never inspected this deeply. -->
-        <OCard v-if="!loading && !isErrorRun" class="mt-2 gap-0 p-0">
-          <OCardSection role="header" class="gap-2">
-            <button
-              type="button"
-              class="text-text-body flex w-full items-center gap-2 text-left text-sm"
-              data-test="synthetics-run-detail-evidence-toggle"
-              @click="evidenceOpen = !evidenceOpen"
-            >
-              <OIcon :name="evidenceOpen ? 'expand_more' : 'chevron_right'" size="sm" />
-              {{ t("synthetics.runDetail.evidenceSection") }}
-              <span v-if="!evidenceKey" class="text-text-secondary text-xs">
-                — {{ t("synthetics.evidence.none") }}
-              </span>
-            </button>
-          </OCardSection>
-          <template v-if="evidenceOpen">
-            <OSeparator />
-            <OCardSection role="body" class="p-0">
+        <!-- Attempts: a compact selector, because the info bar is already six
+             chips wide and a retried run adds nothing the chip does not say. -->
+        <div
+          v-if="!loading && attemptViews.length > 1"
+          class="flex items-center gap-2 px-2 pt-3"
+          data-test="synthetics-run-detail-attempt-select"
+        >
+          <span class="text-text-secondary text-xs">
+            {{ t("synthetics.runDetail.attemptsLabel", { count: attemptViews.length }) }}
+          </span>
+          <OSelect
+            v-model="selectedAttemptValue"
+            :options="attemptOptions"
+            size="sm"
+            class="w-56"
+            data-test="synthetics-run-detail-attempt-dropdown"
+          />
+          <!-- Superseded attempts keep only a compact timeline; the full
+               forensics are retained for the attempt that decided the run. -->
+          <span
+            v-if="currentAttempt?.compact"
+            class="text-text-secondary text-xs"
+            data-test="synthetics-run-detail-attempt-reduced"
+          >
+            {{ t("synthetics.runDetail.attemptReducedDetail") }}
+          </span>
+        </div>
+
+        <!-- Steps and Evidence are siblings, not stacked. Stacking them pushed
+             a 158-row event list above the step table and broke the drawer's
+             scroll: OTabPanels owns the scroll container (`grow scroll="y"`). -->
+        <OTabs
+          v-if="!loading"
+          v-model="detailTab"
+          class="border-border-default mt-2 shrink-0 border-b px-2"
+        >
+          <OTab name="steps" data-test="synthetics-run-detail-tab-steps">
+            {{ t("synthetics.runs.tabSteps") }}
+          </OTab>
+          <OTab name="evidence" data-test="synthetics-run-detail-tab-evidence">
+            {{ t("synthetics.runDetail.evidenceSection") }}
+          </OTab>
+        </OTabs>
+
+        <div class="min-h-0 flex-1">
+          <OTabPanels v-model="detailTab" grow scroll="y" class="h-full min-h-0">
+            <OTabPanel name="evidence">
+              <!-- v-if, not v-show: this is what makes the fetch happen on open
+                   rather than with the record. -->
               <EvidencePanel
+                v-if="detailTab === 'evidence'"
                 :evidence-key="evidenceKey"
                 :resolve-url="screenshotUrl"
                 :step-defs="evidenceStepDefs"
                 :record-truncated="synthetics.runDetail.value?.evidenceTruncated ?? false"
                 :run-passed="currentRun.status === 'pass'"
               />
-            </OCardSection>
-          </template>
-        </OCard>
+            </OTabPanel>
 
-        <!-- Attempts strip — hidden entirely on a run that never retried. -->
-        <AttemptStrip
-          v-if="!loading"
-          class="pt-3"
-          :attempts="attemptViews"
-          :selected="selectedAttempt"
-          @select="selectedAttempt = $event"
-        />
-
+            <OTabPanel name="steps">
         <!-- Steps skeleton -->
         <template v-if="loading">
           <OCard class="gap-0 p-0">
@@ -488,6 +506,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
         </div>
+            </OTabPanel>
+          </OTabPanels>
+        </div>
       </div>
     </div>
   </OPageLayout>
@@ -564,8 +585,12 @@ import JourneySteps from "@/components/synthetics/journey/JourneySteps.vue";
 import type { StepDotState } from "@/components/synthetics/journey/JourneySteps.vue";
 import useSyntheticResults from "@/composables/useSyntheticResults";
 import ProtocolRunSummary from "@/components/synthetics/results/ProtocolRunSummary.vue";
-import AttemptStrip from "@/components/synthetics/results/AttemptStrip.vue";
 import EvidencePanel from "@/components/synthetics/results/EvidencePanel.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import OTab from "@/lib/navigation/Tabs/OTab.vue";
+import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
+import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import { buildAttemptViews } from "@/composables/synthetics/syntheticResultsSchema";
 import type {
   AttemptView,
@@ -872,7 +897,8 @@ function screenshotUrl(key: string | null): string {
 // The panel reads the BUNDLE, not `evidence_by_step`: that field is an anomaly
 // index and is empty whenever the network behaved, which is the common shape of
 // a browser failure (a locator that never matched).
-const evidenceOpen = ref(false);
+/** Which panel the drawer is showing. Steps first — it is what the run is. */
+const detailTab = ref<"steps" | "evidence">("steps");
 
 /** The SELECTED attempt's own bundle — attempt 0 bare, retries `attempt-N-`. */
 const evidenceKey = computed(
@@ -970,6 +996,32 @@ watch(attemptViews, (views) => {
 const currentAttempt = computed<AttemptView | null>(
   () => attemptViews.value[selectedAttempt.value] ?? null,
 );
+
+/**
+ * Options for the attempt selector.
+ *
+ * Labelled 1-based ("Attempt 2 of 3") while `attempt` on the record is 0-based;
+ * displaying the raw index invites off-by-one bug reports. The deciding attempt
+ * is marked, because that is the one the record's top-level fields describe —
+ * and on a flaky run it is the attempt that PASSED while the run reads warning.
+ */
+const attemptOptions = computed(() =>
+  attemptViews.value.map((a, i) => ({
+    label:
+      `${t("synthetics.runDetail.attemptN", { n: a.attempt + 1 })} · ${fmtDur(a.durationMs)}` +
+      ` · ${a.status === "passed" ? t("synthetics.results.passed") : t("synthetics.results.failed")}` +
+      (a.decided ? ` · ${t("synthetics.runDetail.attemptDecided")}` : ""),
+    value: String(i),
+  })),
+);
+
+/** OSelect works in strings; the index is the identity. */
+const selectedAttemptValue = computed({
+  get: () => String(selectedAttempt.value),
+  set: (v: string) => {
+    selectedAttempt.value = Number(v);
+  },
+});
 
 // ── State ─────────────────────────────────────────────────────────────────
 const stackOpen = ref(true);

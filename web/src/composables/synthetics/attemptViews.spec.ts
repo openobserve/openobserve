@@ -1,27 +1,20 @@
 // Copyright 2026 OpenObserve Inc.
 
 import { describe, it, expect } from "vitest";
-import { mount } from "@vue/test-utils";
 
-import i18n from "@/locales";
-import AttemptStrip from "./AttemptStrip.vue";
-import {
-  buildAttemptViews,
-  mapRunDetail,
-} from "@/composables/synthetics/syntheticResultsSchema";
+import { buildAttemptViews, mapRunDetail } from "./syntheticResultsSchema";
 
 // ── Driven by a real ingested row, not a hand-tuned fixture ─────────────────
 //
-// This component has been built twice and shipped twice without rendering: once
+// The attempts view was built twice and shipped twice without appearing: once
 // because the run-detail query never selected `attempts` or `retry_history`, and
-// once because `mapRunDetail` read `rawHit.attempt` (a field no record has ever
-// carried) so the count was 0 and the visibility guard hid the strip forever.
+// once because `mapRetryHistory` guarded on `Array.isArray` while the search API
+// returns blob columns as JSON STRINGS — so it returned [] for every real record.
+// `mapRunDetail` also read `rawHit.attempt`, a field no record has ever carried.
 //
-// Both faults were invisible to a component test using a purpose-built props
-// object, and both were only caught by looking at a screenshot. So the input
-// here is the shape the stream actually returns — column aliases and all,
-// `retry_history` as the JSON STRING the search API hands back — pushed through
-// the real mapper and the real fold.
+// All three were invisible to a test built around a purpose-made object and were
+// only caught from a screenshot. So the input here is the shape the stream
+// actually returns, column aliases and all, pushed through the real mapper.
 
 /** One execution of `intro test (expect fail)`, retries=1, as ingested. */
 function ingestedRow(over: Record<string, unknown> = {}) {
@@ -82,28 +75,12 @@ function ingestedRow(over: Record<string, unknown> = {}) {
 const viewsFor = (over: Record<string, unknown> = {}) =>
   buildAttemptViews(mapRunDetail(ingestedRow(over))!);
 
-function mountStrip(over: Record<string, unknown> = {}, selected?: number) {
-  const attempts = viewsFor(over);
-  return mount(AttemptStrip, {
-    props: { attempts, selected: selected ?? attempts.length - 1 },
-    global: { plugins: [i18n] },
-  });
-}
-
-describe("AttemptStrip", () => {
-  it("renders one button per attempt from an ingested row", () => {
-    const wrapper = mountStrip();
-    expect(wrapper.find('[data-test="synthetics-attempt-strip"]').exists()).toBe(true);
-    expect(wrapper.findAll('[data-test^="synthetics-attempt-"]').length).toBeGreaterThanOrEqual(2);
-    expect(wrapper.find('[data-test="synthetics-attempt-0"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="synthetics-attempt-1"]').exists()).toBe(true);
-  });
-
-  it("is hidden entirely on a run that never retried", () => {
-    // Not "renders an empty strip" — a single-attempt run has nothing to switch
-    // between, and an empty container still costs vertical space in a dense drawer.
-    const wrapper = mountStrip({ attempts: 1, retry_history: "" });
-    expect(wrapper.find('[data-test="synthetics-attempt-strip"]').exists()).toBe(false);
+describe("attempt views", () => {
+  it("yields one view per attempt, so the selector has something to select", () => {
+    // A single-attempt run yields exactly one view; the caller hides the
+    // selector rather than rendering a control with one option.
+    expect(viewsFor()).toHaveLength(2);
+    expect(viewsFor({ attempts: 1, retry_history: "" })).toHaveLength(1);
   });
 
   it("marks the last attempt as the one that decided the run", () => {
@@ -113,21 +90,6 @@ describe("AttemptStrip", () => {
     // attempt passed while the run reports `warning`.
     expect(views[1].compact).toBe(false);
     expect(views[0].compact).toBe(true);
-  });
-
-  it("selects the deciding attempt by default and emits the index on click", async () => {
-    const wrapper = mountStrip();
-    expect(wrapper.find('[data-test="synthetics-attempt-1"]').attributes("aria-pressed")).toBe(
-      "true",
-    );
-    await wrapper.find('[data-test="synthetics-attempt-0"]').trigger("click");
-    expect(wrapper.emitted("select")?.[0]).toEqual([0]);
-  });
-
-  it("explains the reduced detail on a superseded attempt only", () => {
-    const sel = "[data-test='synthetics-attempt-reduced-detail']";
-    expect(mountStrip({}, 0).find(sel).exists()).toBe(true);
-    expect(mountStrip({}, 1).find(sel).exists()).toBe(false);
   });
 
   it("keeps each attempt's own artifacts rather than the survivor's", () => {
