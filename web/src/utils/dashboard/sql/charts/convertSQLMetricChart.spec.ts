@@ -110,8 +110,7 @@ describe("applyMetricChart", () => {
     it("exposes the formatted value as _metricText for copy", () => {
       const ctx = makeMockContext();
       applyMetricChart(ctx);
-      // getUnitValue/formatUnitValue are mocked passthrough → raw value string.
-      expect(ctx.options.series[0]._metricText).toBe("100");
+      expect(ctx.options.series[0]._metricText).toBe("300");
     });
 
     it("stores _metricLayout sized to the panel for icon positioning", () => {
@@ -134,7 +133,7 @@ describe("applyMetricChart", () => {
       // each side (the value is centered, so free width splits evenly),
       // capped by the panel height so the value also fits vertically.
       expect(calculateOptimalFontSize).toHaveBeenCalledWith(
-        "100",
+        "300",
         800 - 2 * METRIC_COPY_BTN_SLOT_PX,
         400,
       );
@@ -272,8 +271,8 @@ describe("applyMetricChart", () => {
     const renderItem = ctx.options.series[0].renderItem;
     const params = { coordSys: { cx: 200, cy: 150 } };
     const result = renderItem(params, null);
-    // getUnitValue mock returns the value as-is; formatUnitValue mock converts to string
-    // yAxisValue[0] is 100 from mock
-    expect(result.style.text).toBe("100");
+    // getUnitValue mock returns the value as-is; formatUnitValue mock converts to string.
+    // Uses the LAST value of the series (mock y1 = [100, 200, 300]).
+    expect(result.style.text).toBe("300");
   });
 });

@@ -67,7 +67,7 @@ export function applyMetricChart(ctx: SQLContext): void {
 
   const key1 = yAxisKeys?.[0];
   const yAxisValue = getAxisDataFromKey(key1);
-  const rawValue = yAxisValue?.length > 0 ? yAxisValue[0] : 0;
+  const rawValue = yAxisValue?.length > 0 ? yAxisValue[yAxisValue.length - 1] : 0;
   const metricStyle = resolveMetricValueStyle(rawValue, {
     mappings: panelSchema?.config?.mappings,
     unit: panelSchema?.config?.unit,
