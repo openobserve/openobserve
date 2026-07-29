@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           class="bg-button-primary! absolute"
           :style="{
-            width: '2px',
+            width: '0.125rem',
             left: playerState.progressWidth - 2 + 'px',
             bottom: '-0.3125rem',
             height: '0.9375rem',
@@ -70,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="absolute cursor-pointer"
           :class="getEventMarkerClass(event)"
           :style="{
-            width: event.frustration_types && event.frustration_types.length > 0 ? '3px' : '2px',
+            width: event.frustration_types && event.frustration_types.length > 0 ? '0.1875rem' : '0.125rem',
             left: (event.relativeTime / playerState.totalTime) * playerState.width + 'px',
             bottom: '-0.3125rem',
             height:

@@ -446,7 +446,7 @@ function getIcon(data: NodeData | undefined, ioType: string | undefined) {
           >
             {{ nodeErrorCount }}
           </span>
-          <OTooltip side="top" align="center" :sideOffset="10" max-width="600px">
+          <OTooltip side="top" align="center" :sideOffset="10" max-width="37.5rem">
             <template #content>
               <div class="max-h-75 overflow-y-auto">
                 {{ getNodeErrorInfo || "Error occurred" }}

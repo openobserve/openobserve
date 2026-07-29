@@ -87,7 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <img
             :src="getBtnLogo"
             class="transition-transform duration-[600ms] ease-[ease] group-hover:rotate-180"
-            style="width: 18px; height: 18px"
+            style="width: 1.125rem; height: 1.125rem"
           />
         </OButton>
       </div>
@@ -245,7 +245,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-if="sqlStatusState === 'sql-status-bar--error'"
                       side="top"
                       align="center"
-                      :max-width="'520px'"
+                      :max-width="'32.5rem'"
                       :content="localSqlQueryErrorMsg || sqlQueryErrorMsg"
                     />
                   </div>

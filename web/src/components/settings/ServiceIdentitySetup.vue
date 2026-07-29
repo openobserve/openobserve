@@ -340,7 +340,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OTooltip
                       side="top"
                       :content="t('settings.correlation.addFieldTooltip')"
-                      max-width="240px"
+                      max-width="15rem"
                     />
                   </OButton>
                 </div>
@@ -403,7 +403,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OTooltip
                     side="top"
                     :content="t('settings.correlation.addGroupTooltip')"
-                    max-width="240px"
+                    max-width="15rem"
                   />
                 </OButton>
                 <OButton
@@ -594,7 +594,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
             :style="
               activeEnvironment === env.key
-                ? 'margin-bottom: -1px; padding-bottom: 9px; background-color: var(--color-card-glass-solid); border-color: var(--color-card-glass-border);'
+                ? 'margin-bottom: -1px; padding-bottom: 0.5625rem; background-color: var(--color-card-glass-solid); border-color: var(--color-card-glass-border);'
                 : ''
             "
             @click="activeEnvironment = env.key"
@@ -640,7 +640,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span
                     v-for="val in card.values.slice(0, 5)"
                     :key="val"
-                    class="text-2xs box-border inline-flex h-5.5 max-w-[calc(50%-4px)] cursor-pointer items-center gap-1 rounded-full border px-2 py-0.5 transition-opacity hover:opacity-70"
+                    class="text-2xs box-border inline-flex h-5.5 max-w-[calc(50%-0.25rem)] cursor-pointer items-center gap-1 rounded-full border px-2 py-0.5 transition-opacity hover:opacity-70"
                     :class="card.theme.pill"
                     :title="val"
                     @click.stop="openInsightDialogByIdx(val, idx)"
@@ -664,7 +664,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <template #trigger>
                       <span
-                        class="text-2xs box-border h-5.5 max-w-[calc(50%-4px)] cursor-pointer rounded-full px-2 py-0.5 transition-opacity hover:opacity-70"
+                        class="text-2xs box-border h-5.5 max-w-[calc(50%-0.25rem)] cursor-pointer rounded-full px-2 py-0.5 transition-opacity hover:opacity-70"
                         :class="'text-text-secondary'"
                         >+{{ card.values.length - 5 }}</span
                       >
@@ -818,7 +818,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="text-2xs text-text-label mb-2 font-medium tracking-wide">
                   {{ t("settings.serviceIdentitySetup.streamSources") }}
                 </div>
-                <div style="height: 40vh; min-height: 180px">
+                <div style="height: 40vh; min-height: 11.25rem">
                   <CustomChartRenderer :data="insightChartData.options" />
                 </div>
                 <!-- Legend -->
@@ -2014,9 +2014,9 @@ const insightRelatedDimensions = computed<RelatedDimension[]>(() => {
 const insightPanelWidth = computed(() => {
   const dims = (insightData.value as any)?.relatedDimensions;
   const colCount = dims?.length ?? 0;
-  if (colCount <= 2) return "480px";
-  if (colCount === 3) return "640px";
-  return "800px"; // 4+
+  if (colCount <= 2) return "30rem";
+  if (colCount === 3) return "40rem";
+  return "50rem"; // 4+
 });
 
 const insightPanelWidthPct = computed(() => {
@@ -2061,7 +2061,7 @@ const insightChartData = computed(() => {
           fontSize: 12,
         },
         backgroundColor: isDarkTheme.value ? "rgba(0,0,0,1)" : "rgba(255,255,255,1)",
-        extraCssText: "max-height: 240px; overflow-y: auto;",
+        extraCssText: "max-height: 15rem; overflow-y: auto;",
         formatter: function (params: any) {
           const names: string[] = params.data?.streamNames ?? [];
           const header = `${params.marker} ${params.name} : <b>${params.value} streams (${params.percent}%)</b>`;
@@ -2069,10 +2069,10 @@ const insightChartData = computed(() => {
           const list = names
             .map(
               (n) =>
-                `<div style="padding:1px 0;padding-left:14px;font-size: var(--text-2xs);">${n}</div>`,
+                `<div style="padding:1px 0;padding-left:0.875rem;font-size: var(--text-2xs);">${n}</div>`,
             )
             .join("");
-          return header + '<div style="margin-top:4px;">' + list + "</div>";
+          return header + '<div style="margin-top:0.25rem;">' + list + "</div>";
         },
       },
       color: streamDetails.map((sd) => STREAM_TYPE_COLORS[sd.streamType] ?? "#9ca3af"),

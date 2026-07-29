@@ -1451,7 +1451,7 @@ export default defineComponent({
 
     const inputStyle = computed(() => {
       if (!dashboardPanelData.data.title) {
-        return { width: "200px", transition: "width 0.2s ease" };
+        return { width: "12.5rem", transition: "width 0.2s ease" };
       }
 
       // Grow with the title, but clamp to a 200px floor so the inside label

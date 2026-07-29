@@ -25,7 +25,7 @@ const props = withDefaults(defineProps<TooltipProps>(), {
   sideOffset: 4,
   alignOffset: 0,
   delay: 700,
-  maxWidth: "320px",
+  maxWidth: "20rem",
   disabled: false,
   hoverable: false,
   // MUST stay explicitly undefined. Vue casts an absent Boolean prop to `false`,

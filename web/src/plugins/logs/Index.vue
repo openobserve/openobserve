@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :horizontal="true"
         unit="px"
         :limits="[85, 400]"
-        :separatorStyle="{ height: '10px', marginTop: '-5px', marginBottom: '-5px', zIndex: '10' }"
+        :separatorStyle="{ height: '0.625rem', marginTop: '-0.3125rem', marginBottom: '-0.3125rem', zIndex: '10' }"
         @update:model-value="onSplitterUpdate"
       >
         <template v-slot:before>
@@ -75,9 +75,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="logs-splitter-smooth h-full max-h-full w-full overflow-hidden"
               separatorClass="field-list-separator"
               :separatorStyle="{
-                width: '10px',
-                marginLeft: '-5px',
-                marginRight: '-5px',
+                width: '0.625rem',
+                marginLeft: '-0.3125rem',
+                marginRight: '-0.3125rem',
                 zIndex: '10',
               }"
               @update:model-value="onSplitterUpdate"

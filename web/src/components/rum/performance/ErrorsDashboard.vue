@@ -127,7 +127,7 @@ export default defineComponent({
         field: (row: any) => row["error_count"],
         align: "left",
         sortable: true,
-        style: { width: "56px" },
+        style: { width: "3.5rem" },
       },
     ];
 

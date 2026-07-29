@@ -23,7 +23,7 @@
             :disabled="disableName"
             required
             tabindex="0"
-            style="min-width: 300px"
+            style="min-width: 18.75rem"
           />
         </div>
         <!-- Transform Type Radio Buttons -->

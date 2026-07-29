@@ -27,7 +27,7 @@ const logoSrc = computed(() =>
     <div class="welcome-hero__row flex items-center gap-3.5">
       <div class="welcome-hero__logo-wrap relative inline-flex">
         <span
-          class="welcome-hero__logo-halo pointer-events-none absolute inset-[-18px] z-0 rounded-full bg-[radial-gradient(closest-side,rgba(123,97,255,0.35),rgba(245,158,11,0.12)_55%,transparent_70%)] blur-[14px]"
+          class="welcome-hero__logo-halo pointer-events-none absolute inset-[-1.125rem] z-0 rounded-full bg-[radial-gradient(closest-side,rgba(123,97,255,0.35),rgba(245,158,11,0.12)_55%,transparent_70%)] blur-[14px]"
           aria-hidden="true"
         ></span>
         <img :src="logoSrc" alt="O2 Assistant" class="welcome-hero__logo relative z-1 h-14 w-14" />

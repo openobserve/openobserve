@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="dashboard-config-aggregation"
     >
       <template #tooltip>
-        <OTooltip max-width="300px">
+        <OTooltip max-width="18.75rem">
           <template #content>
             <b>{{ t("dashboard.promQLChartConfig.aggTooltipTitle") }}</b>
             {{ t("dashboard.promQLChartConfig.aggTooltipDesc") }}
@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-config-geo-lat-label"
       >
         <template #tooltip>
-          <OTooltip max-width="300px">
+          <OTooltip max-width="18.75rem">
             <template #content>
               {{ t("dashboard.promQLChartConfig.geoLatTooltip") }}
             </template>
@@ -82,7 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-config-geo-lon-label"
       >
         <template #tooltip>
-          <OTooltip max-width="300px">
+          <OTooltip max-width="18.75rem">
             <template #content>
               {{ t("dashboard.promQLChartConfig.geoLonTooltip") }}
             </template>
@@ -97,7 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-config-geo-weight-label"
       >
         <template #tooltip>
-          <OTooltip max-width="300px">
+          <OTooltip max-width="18.75rem">
             <template #content>
               {{ t("dashboard.promQLChartConfig.geoWeightTooltip") }}
             </template>
@@ -115,7 +115,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-config-maps-name-label"
       >
         <template #tooltip>
-          <OTooltip max-width="300px">
+          <OTooltip max-width="18.75rem">
             <template #content>
               {{ t("dashboard.promQLChartConfig.mapsNameTooltip") }}
             </template>
@@ -135,7 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-config-promql-table-mode"
       >
         <template #tooltip>
-          <OTooltip max-width="300px">
+          <OTooltip max-width="18.75rem">
             <template #content>
               <b>{{ t("dashboard.promQLChartConfig.promqlTableModeTooltipTitle") }}</b>
               {{ t("dashboard.promQLChartConfig.promqlTableModeTooltipDesc") }}
@@ -163,7 +163,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-config-table-aggregations"
         >
           <template #tooltip>
-            <OTooltip max-width="350px">
+            <OTooltip max-width="21.875rem">
               <template #content>
                 <b>{{ t("dashboard.promQLChartConfig.tableAggTooltipTitle") }}</b>
                 {{ t("dashboard.promQLChartConfig.tableAggTooltipDesc") }}
@@ -203,7 +203,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @create="addToVisibleColumns"
         >
           <template #tooltip>
-            <OTooltip max-width="400px">
+            <OTooltip max-width="25rem">
               <template #content>
                 <b>{{ t("dashboard.promQLChartConfig.visibleColumnsTitle") }}</b>
                 <br /><br />
@@ -234,7 +234,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @create="addToHiddenColumns"
         >
           <template #tooltip>
-            <OTooltip max-width="400px">
+            <OTooltip max-width="25rem">
               <template #content>
                 <b>{{ t("dashboard.promQLChartConfig.hiddenColumnsTitle") }}</b>
                 <br /><br />
@@ -274,7 +274,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="lg"
         >
           <template #tooltip>
-            <OTooltip max-width="300px">
+            <OTooltip max-width="18.75rem">
               <template #content>
                 <b>{{ t("dashboard.promQLChartConfig.stickyFirstColumnTooltipTitle") }}</b>
                 {{ t("dashboard.promQLChartConfig.stickyFirstColumnTooltipDesc") }}
@@ -298,7 +298,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @create="addToStickyColumns"
         >
           <template #tooltip>
-            <OTooltip max-width="400px">
+            <OTooltip max-width="25rem">
               <template #content>
                 <b>{{ t("dashboard.promQLChartConfig.stickyColumns") }}</b>
                 <br /><br />

@@ -108,7 +108,7 @@
             </h4>
             <div
               v-if="healthyLabel"
-              class="rounded-default flex items-baseline gap-2 border border-[color-mix(in_srgb,var(--color-status-success-text)_35%,transparent)] bg-[color-mix(in_srgb,var(--color-status-success-text)_8%,transparent)] p-[12px_14px]"
+              class="rounded-default flex items-baseline gap-2 border border-[color-mix(in_srgb,var(--color-status-success-text)_35%,transparent)] bg-[color-mix(in_srgb,var(--color-status-success-text)_8%,transparent)] p-[0.75rem_0.875rem]"
             >
               <span class="text-status-success-text text-lg font-bold">{{ thresholdSign }}</span>
               <span class="text-text-body font-mono text-sm font-bold">{{ healthyLabel }}</span>
@@ -177,7 +177,7 @@
           </p>
           <ul class="m-0 flex list-none flex-col gap-2 p-0">
             <li
-              class="bg-card-bg rounded-default border border-[color-mix(in_srgb,var(--color-primary-600,#3F7994)_30%,transparent)] bg-[color-mix(in_srgb,var(--color-primary-600,#3F7994)_5%,var(--color-card-bg))]! p-[12px_14px]"
+              class="bg-card-bg rounded-default border border-[color-mix(in_srgb,var(--color-primary-600,#3F7994)_30%,transparent)] bg-[color-mix(in_srgb,var(--color-primary-600,#3F7994)_5%,var(--color-card-bg))]! p-[0.75rem_0.875rem]"
             >
               <div class="flex items-center gap-2">
                 <span
@@ -203,7 +203,7 @@
           </p>
           <div
             v-if="usedByScorers.length === 0"
-            class="rounded-default text-text-secondary inline-flex items-center gap-1.5 bg-[color-mix(in_srgb,var(--color-text-secondary)_6%,transparent)] p-[8px_10px] text-xs"
+            class="rounded-default text-text-secondary inline-flex items-center gap-1.5 bg-[color-mix(in_srgb,var(--color-text-secondary)_6%,transparent)] p-[0.5rem_0.625rem] text-xs"
           >
             <OIcon name="info" size="xs" />
             <span>{{ t("onlineEvals.scoreConfig.detail.usedByEmpty") }}</span>

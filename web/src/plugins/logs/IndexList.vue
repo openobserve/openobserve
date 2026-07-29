@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :delay="500"
           side="bottom"
           align="start"
-          max-width="280px"
+          max-width="17.5rem"
           :content="searchObj.data.stream.selectedStream.join(', ')"
         />
       </div>

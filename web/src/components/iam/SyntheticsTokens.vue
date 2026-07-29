@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="text-text-secondary cursor-help"
           data-test="synthetics-tokens-info-icon"
         />
-        <OTooltip :content="t('synthetics.tokens.explanation')" max-width="360px" />
+        <OTooltip :content="t('synthetics.tokens.explanation')" max-width="22.5rem" />
       </span>
     </template>
     <template #subtitle>

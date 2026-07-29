@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div
         class="text-text-secondary text-sm"
-        style="max-width: 500px; margin: 0 auto; font-size: var(--text-compact)"
+        style="max-width: 31.25rem; margin: 0 auto; font-size: var(--text-compact)"
       >
         {{ t("rum.sourceMapsNotAvailableBody") }}
       </div>
@@ -108,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             'border-bottom': `1px solid ${borderColor}`,
             'border-left': `1px solid ${borderColor}`,
             'border-right': `1px solid ${borderColor}`,
-            'border-radius': stackTrace.stack.length === 1 ? '0 0 4px 4px' : '',
+            'border-radius': stackTrace.stack.length === 1 ? '0 0 0.25rem 0.25rem' : '',
             'background-color': backgroundColor,
           }"
         >
@@ -166,7 +166,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :query="stackTrace.stack[0].source_info.source"
                 :read-only="true"
                 language="javascript"
-                style="height: 200px"
+                style="height: 12.5rem"
               />
             </div>
           </div>
@@ -180,7 +180,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             'border-bottom': `1px solid ${borderColor}`,
             'border-left': `1px solid ${borderColor}`,
             'border-right': `1px solid ${borderColor}`,
-            'border-radius': '0 0 4px 4px',
+            'border-radius': '0 0 0.25rem 0.25rem',
             'background-color': backgroundColor,
           }"
         >
@@ -262,7 +262,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :query="frame.source_info.source"
                     :read-only="true"
                     language="javascript"
-                    style="height: 200px"
+                    style="height: 12.5rem"
                   />
                 </div>
               </div>

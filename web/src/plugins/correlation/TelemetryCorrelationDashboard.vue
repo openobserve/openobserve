@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             valueKey="value"
             @update:model-value="onPendingDimensionChange"
             class="dimension-dropdown"
-            style="min-width: 120px"
+            style="min-width: 7.5rem"
           />
           <OTooltip
             v-if="unstableDimensionKeys.has(key)"
@@ -555,7 +555,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-if="loading"
           class="flex flex-1 flex-col items-center justify-center gap-3"
-          style="min-height: 300px"
+          style="min-height: 18.75rem"
         >
           <OSpinner size="sm" />
           <div class="text-sm opacity-70">

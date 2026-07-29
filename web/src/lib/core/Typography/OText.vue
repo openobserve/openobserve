@@ -73,7 +73,7 @@ const variantClasses: Record<NonNullable<TextProps["variant"]>, string> = {
   mono: [
     "text-xs font-mono",
     // tabular figures + tight tracking for IDs/counts/timestamps.
-    "[font-feature-settings:'tnum'] tracking-[-0.2px]",
+    "[font-feature-settings:'tnum'] tracking-[-0.0125rem]",
     "text-typography-mono",
     "leading-none",
   ].join(" "),

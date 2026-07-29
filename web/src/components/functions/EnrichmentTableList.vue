@@ -149,7 +149,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OIcon name="check-circle" size="sm" class="text-status-positive">
                       <OTooltip>
                         <template #content>
-                          <div style="max-width: 300px">
+                          <div style="max-width: 18.75rem">
                             <strong>Status: All Completed</strong><br />
                             {{ row.urlJobs.length }} URL job(s) completed<br />
                             <br />
@@ -163,7 +163,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OIcon name="sync" size="sm" class="animate-spin">
                       <OTooltip>
                         <template #content>
-                          <div style="max-width: 300px">
+                          <div style="max-width: 18.75rem">
                             <strong>Status: Processing</strong><br />
                             One or more jobs are currently processing<br />
                             <br />
@@ -185,7 +185,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <OTooltip>
                         <template #content>
-                          <div style="max-width: 350px">
+                          <div style="max-width: 21.875rem">
                             <strong>Status: Failed</strong><br />
                             One or more jobs have failed<br />
                             <br />
@@ -199,7 +199,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OIcon name="schedule" size="sm">
                       <OTooltip>
                         <template #content>
-                          <div style="max-width: 300px">
+                          <div style="max-width: 18.75rem">
                             <strong>Status: Pending</strong><br />
                             Job(s) waiting to be processed<br />
                             <br />

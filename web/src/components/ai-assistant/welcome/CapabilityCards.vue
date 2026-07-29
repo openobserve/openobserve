@@ -18,7 +18,7 @@ const emit = defineEmits<{ (e: "select", prompt: string): void }>();
       :key="card.id"
       role="button"
       tabindex="0"
-      class="capability-card group/card border-border-default rounded-default bg-card-bg relative isolate min-h-33 cursor-pointer overflow-hidden border px-4 py-4 pb-[1.125rem] transition-[border-color,box-shadow,translate,background] duration-200 ease-[ease] [--accent:123,97,255] [--card-tint:linear-gradient(155deg,rgba(var(--accent),0.1)_0%,rgba(var(--accent),0.02)_40%,transparent_70%)] hover:-translate-y-[3px] hover:border-[rgba(var(--accent),0.5)] hover:shadow-[0_1px_2px_rgba(0,0,0,0.04),0_12px_28px_-10px_rgba(var(--accent),0.35)] focus-visible:border-[rgba(var(--accent),0.7)] focus-visible:shadow-[0_0_0_2px_rgba(var(--accent),0.45)] focus-visible:outline-none"
+      class="capability-card group/card border-border-default rounded-default bg-card-bg relative isolate min-h-33 cursor-pointer overflow-hidden border px-4 py-4 pb-[1.125rem] transition-[border-color,box-shadow,translate,background] duration-200 ease-[ease] [--accent:123,97,255] [--card-tint:linear-gradient(155deg,rgba(var(--accent),0.1)_0%,rgba(var(--accent),0.02)_40%,transparent_70%)] hover:-translate-y-[0.1875rem] hover:border-[rgba(var(--accent),0.5)] hover:shadow-[0_1px_2px_rgba(0,0,0,0.04),0_12px_28px_-10px_rgba(var(--accent),0.35)] focus-visible:border-[rgba(var(--accent),0.7)] focus-visible:shadow-[0_0_0_2px_rgba(var(--accent),0.45)] focus-visible:outline-none"
       :class="{
         '[--accent:123,97,255]': card.id === 'query',
         '[--accent:245,158,11]': card.id === 'incident',
@@ -50,7 +50,7 @@ const emit = defineEmits<{ (e: "select", prompt: string): void }>();
         {{ t(`aiAssistant.capabilities.${card.id}.description`) }}
       </div>
       <span
-        class="capability-card__chevron absolute top-3.5 right-3.5 z-1 inline-flex h-5.5 w-5.5 translate-x-[-4px] translate-y-[4px] items-center justify-center rounded-full bg-[rgba(var(--accent),0.15)] text-[rgba(var(--accent),1)] opacity-0 transition-[opacity,translate] duration-200 ease-[ease] group-hover/card:translate-x-0 group-hover/card:translate-y-0 group-hover/card:opacity-100"
+        class="capability-card__chevron absolute top-3.5 right-3.5 z-1 inline-flex h-5.5 w-5.5 translate-x-[-0.25rem] translate-y-[0.25rem] items-center justify-center rounded-full bg-[rgba(var(--accent),0.15)] text-[rgba(var(--accent),1)] opacity-0 transition-[opacity,translate] duration-200 ease-[ease] group-hover/card:translate-x-0 group-hover/card:translate-y-0 group-hover/card:opacity-100"
         aria-hidden="true"
       >
         <OIcon name="arrow-forward" size="xs" />

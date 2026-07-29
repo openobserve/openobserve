@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="mb-3 text-sm font-medium">
               Select Destination Type <span class="text-status-error-text">*</span>
             </div>
-            <div class="mb-4 grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-3">
+            <div class="mb-4 grid grid-cols-[repeat(auto-fill,minmax(8.75rem,1fr))] gap-3">
               <div
                 v-for="destType in destinationTypes"
                 :key="destType.value"

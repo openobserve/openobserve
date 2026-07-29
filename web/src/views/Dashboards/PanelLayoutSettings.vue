@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >Approximately <strong>{{ getRowCount }}</strong> table rows will be displayed</span
             >
             <OIcon name="info-outline" class="shrink-0 cursor-pointer" size="xs" />
-            <OTooltip content="1 unit = 30px" />
+            <OTooltip content="1 unit = 1.875rem" />
           </div>
         </div>
       </div>

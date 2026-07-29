@@ -64,7 +64,7 @@
           v-model:query="unflattendData"
           ref="queryEditorRef"
           :editor-id="`logs-json-preview-unflattened-json-editor-${previewId}`"
-          class="w-[calc(100%-16px)]!"
+          class="w-[calc(100%-1rem)]!"
           :class="[mode, mode === 'expanded' ? 'h-75! max-w-256!' : 'h-[calc(100vh-250px)]!']"
           language="json"
         />
@@ -208,7 +208,7 @@
           <img
             :src="regexIconForContextMenu"
             class="mr-2"
-            style="width: 14px; height: 14px"
+            style="width: 0.875rem; height: 0.875rem"
             alt=""
           />
           {{ t("logs.jsonPreview.createRegexPattern") }}

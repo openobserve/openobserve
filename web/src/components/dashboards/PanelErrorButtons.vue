@@ -19,7 +19,7 @@
       icon-left="warning"
       data-test="panel-error-data"
     >
-      <OTooltip side="bottom" align="end" max-width="420px" hoverable>
+      <OTooltip side="bottom" align="end" max-width="26.25rem" hoverable>
         <template #content
           ><div class="whitespace-pre-wrap">{{ error }}</div></template
         >
@@ -32,7 +32,7 @@
       icon-left="warning"
       data-test="panel-max-duration-warning"
     >
-      <OTooltip side="bottom" align="end" max-width="420px" hoverable>
+      <OTooltip side="bottom" align="end" max-width="26.25rem" hoverable>
         <template #content
           ><div class="whitespace-pre-wrap" data-test="panel-max-duration-warning-content">
             {{ maxQueryRangeWarning }}
@@ -60,7 +60,7 @@
       icon-left="warning"
       data-test="panel-x-alias-inconsistency-warning"
     >
-      <OTooltip side="bottom" align="end" max-width="420px" hoverable>
+      <OTooltip side="bottom" align="end" max-width="26.25rem" hoverable>
         <template #content>
           <div class="whitespace-pre-wrap">{{ t("dashboard.xAliasInconsistencyWarning") }}</div>
         </template>

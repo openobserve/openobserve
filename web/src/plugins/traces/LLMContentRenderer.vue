@@ -65,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="message-item mb-2 h-full"
               :style="{
                 border: '1px solid var(--color-border-default)',
-                borderRadius: '8px',
+                borderRadius: '0.5rem',
               }"
             >
               <div
@@ -164,7 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="message-item mb-2 h-full"
               :style="{
                 border: '1px solid var(--color-border-default)',
-                borderRadius: '8px',
+                borderRadius: '0.5rem',
               }"
             >
               <div

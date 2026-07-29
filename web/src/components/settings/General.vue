@@ -219,7 +219,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="store.state.zoConfig.custom_logo_text.length > 20"
                 side="top"
                 align="center"
-                max-width="250px"
+                max-width="15.625rem"
                 :content="store.state.zoConfig.custom_logo_text"
               />
             </span>

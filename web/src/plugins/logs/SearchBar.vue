@@ -1625,7 +1625,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="mb-1 text-left">
           {{ t("search.noOfRecords") }}:
           <OIcon name="info-outline" size="sm" class="ml-1 cursor-pointer" />
-          <OTooltip side="right" align="center" max-width="300px">
+          <OTooltip side="right" align="center" max-width="18.75rem">
             <template #content>
               <span class="text-sm">{{ t("search.noOfRecordsTooltip") }}</span>
             </template>
@@ -1706,7 +1706,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :class="localSavedViews.length > 0 ? 'border-card-glass-border border-r' : ''"
             :style="localSavedViews.length > 0 ? 'width: 60%' : 'width: 100%'"
           >
-            <div class="flex flex-col" style="max-height: 486px; min-height: 280px">
+            <div class="flex flex-col" style="max-height: 30.375rem; min-height: 17.5rem">
               <OTable
                 data-test="log-search-saved-view-list-fields-table"
                 :data="searchObj.data.savedViews"
@@ -1798,7 +1798,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <div class="ml-0 flex w-[40%] flex-col pl-3" v-if="localSavedViews.length > 0">
-            <div class="flex flex-col" style="max-height: 480px; min-height: 280px">
+            <div class="flex flex-col" style="max-height: 30rem; min-height: 17.5rem">
               <OTable
                 data-test="log-search-saved-view-favorite-list-fields-table"
                 :data="localSavedViews"

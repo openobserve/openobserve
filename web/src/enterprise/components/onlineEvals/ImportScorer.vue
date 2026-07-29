@@ -18,7 +18,7 @@ the Free Software Foundation, either version 3 of the License, or
     @import="importJson"
   >
     <template #output-content>
-      <div class="flex h-full w-full flex-col" style="min-width: 380px">
+      <div class="flex h-full w-full flex-col" style="min-width: 23.75rem">
         <div
           v-if="errors.length"
           class="text-text-heading shrink-0 py-3 text-center text-sm font-semibold"
@@ -50,7 +50,7 @@ the Free Software Foundation, either version 3 of the License, or
                   data-test="scorer-import-name-error"
                 >
                   {{ err.message }}
-                  <div class="mt-1" style="width: 320px">
+                  <div class="mt-1" style="width: 20rem">
                     <OInput
                       :data-test="`scorer-import-name-input-${err.itemIndex}`"
                       v-model="nameFixers[err.itemIndex]"
@@ -66,7 +66,7 @@ the Free Software Foundation, either version 3 of the License, or
                   data-test="scorer-import-name-conflict-error"
                 >
                   {{ err.message }}
-                  <div class="mt-1" style="width: 320px">
+                  <div class="mt-1" style="width: 20rem">
                     <OInput
                       :data-test="`scorer-import-rename-input-${err.itemIndex}`"
                       v-model="nameFixers[err.itemIndex]"
@@ -82,7 +82,7 @@ the Free Software Foundation, either version 3 of the License, or
                   data-test="scorer-import-type-error"
                 >
                   {{ err.message }}
-                  <div class="mt-1" style="width: 320px">
+                  <div class="mt-1" style="width: 20rem">
                     <OSelect
                       :data-test="`scorer-import-type-select-${err.itemIndex}`"
                       v-model="typeFixers[err.itemIndex]"
@@ -99,7 +99,7 @@ the Free Software Foundation, either version 3 of the License, or
                   data-test="scorer-import-score-config-ref-error"
                 >
                   {{ err.message }}
-                  <div class="mt-1" style="width: 320px">
+                  <div class="mt-1" style="width: 20rem">
                     <OSelect
                       :data-test="`scorer-import-score-config-select-${err.itemIndex}`"
                       v-model="scoreConfigFixers[err.itemIndex]"
@@ -116,7 +116,7 @@ the Free Software Foundation, either version 3 of the License, or
                   data-test="scorer-import-provider-ref-error"
                 >
                   {{ err.message }}
-                  <div class="mt-1" style="width: 320px">
+                  <div class="mt-1" style="width: 20rem">
                     <OSelect
                       :data-test="`scorer-import-provider-select-${err.itemIndex}`"
                       v-model="providerFixers[err.itemIndex]"

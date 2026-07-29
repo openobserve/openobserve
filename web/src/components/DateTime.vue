@@ -52,7 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
       <div
         id="date-time-menu"
-        class="date-time-dialog z-10001 max-h-(--reka-popper-available-height,600px) w-81.25 overflow-y-auto"
+        class="date-time-dialog z-10001 max-h-(--reka-popper-available-height,37.5rem) w-81.25 overflow-y-auto"
         @keydown.capture="onPickerKeydown"
       >
         <div class="flex items-center gap-1 px-3 py-2">
@@ -139,7 +139,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         "
                         side="right"
                         align="center"
-                        max-width="300px"
+                        max-width="18.75rem"
                         :content="queryRangeRestrictionMsg"
                       />
                     </OButton>
@@ -153,7 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OTooltip
                     side="right"
                     align="center"
-                    max-width="300px"
+                    max-width="18.75rem"
                     v-if="queryRangeRestrictionInHour > 0"
                     :content="queryRangeRestrictionMsg"
                   />
@@ -193,7 +193,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OTooltip
                   side="right"
                   align="center"
-                  max-width="300px"
+                  max-width="18.75rem"
                   v-if="queryRangeRestrictionInHour > 0"
                   :content="queryRangeRestrictionMsg"
                 />

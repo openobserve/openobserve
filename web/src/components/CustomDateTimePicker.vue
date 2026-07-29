@@ -3,8 +3,8 @@
     <template #trigger>
       <OButton
         :style="{
-          width: changeStyle ? '170px' : '180px',
-          height: changeStyle ? '40px' : '',
+          width: changeStyle ? '10.625rem' : '11.25rem',
+          height: changeStyle ? '2.5rem' : '',
         }"
         data-test="date-time-btn"
         variant="outline"

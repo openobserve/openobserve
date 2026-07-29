@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               store.state.zoConfig?.custom_logo_dark_img != null
             "
             :src="`data:image; base64, ` + store.state.zoConfig?.custom_logo_dark_img"
-            style="max-width: 150px; max-height: 32px"
+            style="max-width: 9.375rem; max-height: 2rem"
           />
           <!-- Light mode: Show light logo, fallback to dark logo -->
           <img
@@ -66,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               store.state.zoConfig?.custom_logo_img != null
             "
             :src="`data:image; base64, ` + store.state.zoConfig?.custom_logo_img"
-            style="max-width: 150px; max-height: 32px"
+            style="max-width: 9.375rem; max-height: 2rem"
           />
           <!-- Fallback: Show whichever logo exists (dark or light) -->
           <img
@@ -75,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               store.state.zoConfig?.custom_logo_dark_img != null
             "
             :src="`data:image; base64, ` + store.state.zoConfig?.custom_logo_dark_img"
-            style="max-width: 150px; max-height: 32px"
+            style="max-width: 9.375rem; max-height: 2rem"
           />
           <img
             v-else-if="
@@ -83,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               store.state.zoConfig?.custom_logo_img != null
             "
             :src="`data:image; base64, ` + store.state.zoConfig?.custom_logo_img"
-            style="max-width: 150px; max-height: 32px"
+            style="max-width: 9.375rem; max-height: 2rem"
           />
         </a>
 

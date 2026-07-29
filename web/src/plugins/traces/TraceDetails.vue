@@ -707,7 +707,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 v-if="isSidebarOpen && (selectedSpanId || showTraceDetails)"
                 class="border-l-solid border-l-card-glass-border h-full overflow-hidden border-l"
-                style="width: 40%; min-width: 300px"
+                style="width: 40%; min-width: 18.75rem"
               >
                 <TraceDetailsSidebar
                   data-test="trace-details-thread-sidebar"
@@ -736,7 +736,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="flex min-h-0 flex-1 items-center justify-center"
             >
               <div class="p-10 text-center" style="color: var(--color-text-secondary)">
-                <OIcon name="table-chart" class="mb-4" style="width: 48px; height: 48px" />
+                <OIcon name="table-chart" class="mb-4" style="width: 3rem; height: 3rem" />
                 <div class="mb-2 font-semibold" style="font-size: var(--text-base)">
                   {{ t("traces.spansTableView") }}
                 </div>

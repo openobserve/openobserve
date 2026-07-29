@@ -95,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click.stop
       >
         <OIcon name="remove" size="xs" />
-        <OTooltip side="top" align="center" :side-offset="8" max-width="320px">
+        <OTooltip side="top" align="center" :side-offset="8" max-width="20rem">
           <template #content>
             <div class="p-2 text-left text-xs">
               {{ t("workflow.test.notVerified") }}
@@ -114,7 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span v-if="errorCount > 1" class="wf-test-count text-status-negative bg-white">{{
           errorCount
         }}</span>
-        <OTooltip side="top" align="center" :side-offset="8" max-width="360px">
+        <OTooltip side="top" align="center" :side-offset="8" max-width="22.5rem">
           <template #content>
             <div class="flex flex-col gap-1 p-2 text-left">
               <div v-for="(m, i) in errorMessages" :key="i" class="text-xs leading-[1.35]">

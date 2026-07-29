@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="py-2"
               :placeholder="t('alerts.column')"
               :creatable="props.enableNewValueMode"
-              style="min-width: 220px"
+              style="min-width: 13.75rem"
               data-test="alert-conditions-select-column"
               @create="(val: string) => setRowColumn(index, val)"
             />
@@ -65,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :name="`${namePrefix}[${index}].operator`"
               :options="triggerOperators"
               class="py-2"
-              style="min-width: 120px"
+              style="min-width: 7.5rem"
               data-test="alert-conditions-operator-select"
             />
           </div>
@@ -74,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :name="`${namePrefix}[${index}].value`"
               :placeholder="t('common.value')"
               class="py-2"
-              style="min-width: 150px"
+              style="min-width: 9.375rem"
               data-test="alert-conditions-value-input"
             />
           </div>

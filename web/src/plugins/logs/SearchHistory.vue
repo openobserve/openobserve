@@ -227,7 +227,7 @@
                    the query blocks above. -->
           <div v-show="activeTab === 'more_details'" class="px-4">
             <QueryEditor
-              style="height: 200px"
+              style="height: 12.5rem"
               :ref="`QueryEditorRef${row.trace_id + row.sql}`"
               :editor-id="`search-query-editor${row.trace_id + row.sql}`"
               :debounceTime="600"

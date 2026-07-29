@@ -623,7 +623,7 @@ export default defineComponent({
           },
           enterable: true,
           backgroundColor: "rgba(255,255,255,1)",
-          extraCssText: "max-height: 200px; overflow: auto; max-width: 400px",
+          extraCssText: "max-height: 12.5rem; overflow: auto; max-width: 25rem",
           axisPointer: {
             type: "cross",
             label: {

@@ -293,7 +293,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div class="mb-3" v-if="isDialogOpen">
                       <OCard class="flex w-screen max-w-full flex-col">
                         <!-- Header Section -->
-                        <OCardSection class="p-0" style="padding: 4px 16px 4px 16px">
+                        <OCardSection class="p-0" style="padding: 0.25rem 1rem 0.25rem 1rem">
                           <div class="flex items-center justify-between">
                             <div class="text-xl font-semibold">Add Field(s)</div>
                             <div>
@@ -310,7 +310,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <!-- Main Content (Scrollable if necessary) -->
                         <OCardSection
                           class="mb-0.5 flex-1 overflow-y-auto p-0"
-                          style="padding: 0px 16px 0px 16px"
+                          style="padding: 0px 1rem 0px 1rem"
                         >
                           <OForm :form="newSchemaFieldsForm" @keyup="onAddFieldsKeyup">
                             <StreamFieldsInputs
@@ -400,7 +400,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               clearable
                               size="sm"
                               :data-test="`schema-field-${row.name}-index-type-select`"
-                              style="width: 190px"
+                              style="width: 11.875rem"
                               @update:model-value="
                                 (val) => updateIndexType({ row }, enforceMaxIndexTypes(val))
                               "

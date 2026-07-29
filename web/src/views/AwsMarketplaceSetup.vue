@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="mx-auto max-w-125 p-6 pt-15">
       <!-- No Token Error -->
       <div v-if="state === 'no_token'" class="text-center">
-        <OIcon name="warning" style="width: 80px; height: 80px" />
+        <OIcon name="warning" style="width: 5rem; height: 5rem" />
         <h5 class="mt-3">No Marketplace Token Found</h5>
         <p class="text-text-secondary">
           Please start the registration process from AWS Marketplace.
@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Error State -->
       <div v-else-if="state === 'error'" class="text-center">
-        <OIcon name="error" style="width: 80px; height: 80px" />
+        <OIcon name="error" style="width: 5rem; height: 5rem" />
         <h5 class="mt-3">{{ errorMessage }}</h5>
         <OButton variant="primary" size="sm-action" class="mt-4" @click="resetAndRetry"
           >Try Again</OButton
@@ -53,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Org Selection/Creation -->
       <div v-else-if="state === 'select_org'" class="text-center">
-        <OIcon name="cloud" style="width: 60px; height: 60px" />
+        <OIcon name="cloud" style="width: 3.75rem; height: 3.75rem" />
         <h4 class="mt-3">Complete AWS Marketplace Setup</h4>
         <p class="text-text-secondary mb-4">
           Link your AWS Marketplace subscription to an organization
@@ -155,7 +155,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Success State -->
       <div v-else-if="state === 'success'" class="text-center">
-        <OIcon name="check-circle" style="width: 80px; height: 80px" />
+        <OIcon name="check-circle" style="width: 5rem; height: 5rem" />
         <h4 class="mt-3">Subscription Activated!</h4>
         <p class="text-text-secondary">Your AWS Marketplace subscription is now active.</p>
         <OButton variant="primary" size="sm-action" class="mt-4" @click="goToDashboard"
@@ -165,7 +165,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Payment Failed State -->
       <div v-else-if="state === 'payment_failed'" class="text-center">
-        <OIcon name="error" style="width: 80px; height: 80px" />
+        <OIcon name="error" style="width: 5rem; height: 5rem" />
         <h5 class="mt-3">Payment Failed</h5>
         <p class="text-text-secondary">
           There was an issue with your AWS Marketplace payment. Please check your AWS account or

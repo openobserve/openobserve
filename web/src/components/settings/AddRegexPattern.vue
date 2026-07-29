@@ -223,7 +223,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         class="ml-2 max-w-full"
         v-if="store.state.isAiChatEnabled"
-        style="width: 35%; min-width: 75px; height: calc(100vh - 90px) !important"
+        style="width: 35%; min-width: 4.6875rem; height: calc(100vh - 90px) !important"
       >
         <O2AIChat
           :aiChatInputContext="inputContext"

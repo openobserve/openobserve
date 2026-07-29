@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :readonly="isUpdating"
               :disabled="isUpdating"
               data-test="add-pipeline-name-input"
-              style="min-width: 480px"
+              style="min-width: 30rem"
             />
           </div>
           <div data-test="add-pipeline-description-input" class="alert-name-input o2-input mb-2">
@@ -52,7 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               name="description"
               :label="t('alerts.description')"
               data-test="add-pipeline-description-input"
-              style="min-width: 480px"
+              style="min-width: 30rem"
             />
           </div>
           <div
@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :readonly="isUpdating"
               :disabled="isUpdating"
               data-test="add-pipeline-stream-type-select"
-              style="min-width: 220px"
+              style="min-width: 13.75rem"
             />
           </div>
           <div data-test="add-pipeline-stream-select" class="o2-input pt-0">
@@ -83,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :readonly="isUpdating"
               :disabled="isUpdating"
               data-test="add-pipeline-stream-select"
-              style="min-width: 250px"
+              style="min-width: 15.625rem"
             />
           </div>
         </div>

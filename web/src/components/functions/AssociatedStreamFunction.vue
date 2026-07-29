@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template #expansion>
-        <div v-show="loadingFunctions" class="py-1 pl-3" style="height: 60px">
+        <div v-show="loadingFunctions" class="py-1 pl-3" style="height: 3.75rem">
           <OInnerLoading :showing="loadingFunctions" label="Fetching functions..." size="sm" />
         </div>
         <div v-show="!loadingFunctions">

@@ -19,14 +19,14 @@
           :key="argIndex + '-' + arg.type"
           class="flex w-full flex-col"
         >
-          <div class="flex" :style="{ marginLeft: isChild ? '-48px' : '0px' }">
+          <div class="flex" :style="{ marginLeft: isChild ? '-3rem' : '0px' }">
             <div class="relative mr-2 min-h-12.5 w-3">
               <!-- Vertical Line using top & bottom instead of height -->
               <div
                 class="bg-accent absolute top-0 w-px opacity-50"
                 :style="{
-                  bottom: argIndex === fields.args.length - 1 ? 'calc(100% - 32px)' : '0',
-                  left: '6px',
+                  bottom: argIndex === fields.args.length - 1 ? 'calc(100% - 2rem)' : '0',
+                  left: '0.375rem',
                 }"
               ></div>
 

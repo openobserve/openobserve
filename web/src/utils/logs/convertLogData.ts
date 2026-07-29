@@ -301,15 +301,15 @@ export const convertStackedLogData = (
         formatter: (tooltipParams: any[]) => {
           if (!tooltipParams?.length) return "";
 
-          let html = `<div style="min-width:190px;padding:4px 0;">`;
-          html += `<div style="font-size:11px;font-weight:500;opacity:0.65;padding:0 10px 4px;margin-bottom:0;border-bottom:1px solid rgba(128,128,128,0.15);color:${textColor}">${esc(tooltipParams[0].axisValueLabel)}</div>`;
+          let html = `<div style="min-width:11.875rem;padding:0.25rem 0;">`;
+          html += `<div style="font-size:0.6875rem;font-weight:500;opacity:0.65;padding:0 0.625rem 0.25rem;margin-bottom:0;border-bottom:1px solid rgba(128,128,128,0.15);color:${textColor}">${esc(tooltipParams[0].axisValueLabel)}</div>`;
 
           tooltipParams.forEach((p: any) => {
             html += `
-              <div style="display:flex;align-items:center;gap:6px;padding:1px 10px;">
+              <div style="display:flex;align-items:center;gap:0.375rem;padding:1px 0.625rem;">
                 ${p.marker}
-                <span style="flex:1;color:${textColor};font-size:12px">${esc(p.seriesName)}</span>
-                <span style="font-weight:600;color:${textColor};min-width:32px;text-align:right;font-size:12px">${esc(formatCount(p.value[1]))}</span>
+                <span style="flex:1;color:${textColor};font-size:0.75rem">${esc(p.seriesName)}</span>
+                <span style="font-weight:600;color:${textColor};min-width:2rem;text-align:right;font-size:0.75rem">${esc(formatCount(p.value[1]))}</span>
               </div>`;
             // p.marker is ECharts-generated HTML (a colored dot span) — intentionally not escaped
           });

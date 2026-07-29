@@ -65,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTooltip
                 v-if="fingerprintFields?.length > 0"
                 :content="fingerprintFields.join(', ')"
-                max-width="400px"
+                max-width="25rem"
               />
             </div>
           </div>
@@ -94,9 +94,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div
                 style="
-                  min-width: 90px;
+                  min-width: 5.625rem;
                   margin-left: 0 !important;
-                  height: 28px;
+                  height: 1.75rem;
                   font-weight: normal;
                 "
                 class="bg-surface-subtle flex items-center justify-center"

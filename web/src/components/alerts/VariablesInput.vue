@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :name="`${namePrefix}[${index}].value`"
             :placeholder="t('common.value')"
             tabindex="0"
-            style="min-width: 250px"
+            style="min-width: 15.625rem"
           />
         </div>
         <div class="ml-0 w-1/6">

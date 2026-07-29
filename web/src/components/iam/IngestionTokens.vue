@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="text-text-secondary cursor-help"
           data-test="ingestion-tokens-info-icon"
         />
-        <OTooltip :content="t('ingestion.orgLevelExplanation')" max-width="360px" />
+        <OTooltip :content="t('ingestion.orgLevelExplanation')" max-width="22.5rem" />
       </span>
     </template>
     <!-- Short summary subtitle; the full explanation is in the title info tooltip. -->

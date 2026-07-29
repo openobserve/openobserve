@@ -5,7 +5,7 @@
 <template>
   <div
     class="flame-graph-view bg-card-glass-bg! flex h-full w-full flex-col bg-white"
-    style="min-height: 400px"
+    style="min-height: 25rem"
   >
     <!-- Upper area: controls + ruler + chart -->
     <div class="flex min-h-0 flex-1 flex-col">
@@ -38,7 +38,7 @@
             v-for="(tick, index) in timelineTicks"
             :key="'lbl-' + index"
             class="text-3xs text-text-secondary absolute leading-none whitespace-nowrap"
-            style="top: 50%; padding-left: 3px"
+            style="top: 50%; padding-left: 0.1875rem"
             :style="{ left: tick.left, transform: tick.transform }"
             >{{ tick.label }}</span
           >
@@ -56,7 +56,7 @@
           <div
             v-if="cursorVisible"
             class="pointer-events-none absolute z-20 flex flex-col items-center"
-            style="top: 2px; transform: translateX(-50%)"
+            style="top: 0.125rem; transform: translateX(-50%)"
             :style="{ left: cursorX + 'px' }"
           >
             <div
@@ -69,9 +69,9 @@
               style="
                 width: 0;
                 height: 0;
-                border-left: 4px solid transparent;
-                border-right: 4px solid transparent;
-                border-top: 5px solid rgba(30, 30, 30, 0.9);
+                border-left: 0.25rem solid transparent;
+                border-right: 0.25rem solid transparent;
+                border-top: 0.3125rem solid rgba(30, 30, 30, 0.9);
                 margin-top: 0;
               "
             ></div>
@@ -109,7 +109,7 @@
       <div
         v-if="!hasData"
         class="absolute inset-0 flex items-center justify-center bg-white"
-        style="top: 60px"
+        style="top: 3.75rem"
       >
         <div class="text-text-secondary text-center">
           <div class="text-sm">{{ t("traces.flameGraphView.noSpansToDisplay") }}</div>
@@ -121,7 +121,7 @@
     <div
       v-if="sidebarVisible"
       class="bg-border-default hover:bg-accent h-1 flex-shrink-0 cursor-row-resize transition-colors"
-      style="min-height: 4px"
+      style="min-height: 0.25rem"
       data-test="flame-graph-resizer"
       @mousedown="startResize"
     ></div>
@@ -387,22 +387,22 @@ const chartOptions = computed(() => {
         const percentage = ((span.durationMs / props.traceDuration) * 100).toFixed(2);
 
         return `
-          <div style="padding: 4px 0;">
-            <div style="font-weight: bold; margin-bottom: 6px;">${escapeHtml(span.operationName)}</div>
+          <div style="padding: 0.25rem 0;">
+            <div style="font-weight: bold; margin-bottom: 0.375rem;">${escapeHtml(span.operationName)}</div>
             <div style="font-size: var(--text-2xs); line-height: 1.6;">
-              <div style="display: flex; justify-content: space-between; gap: 16px;">
+              <div style="display: flex; justify-content: space-between; gap: 1rem;">
                 <span style="color: var(--color-flame-tooltip-label);">${t("traces.flameGraphView.service")}</span>
                 <span>${escapeHtml(span.serviceName)}</span>
               </div>
-              <div style="display: flex; justify-content: space-between; gap: 16px;">
+              <div style="display: flex; justify-content: space-between; gap: 1rem;">
                 <span style="color: var(--color-flame-tooltip-label);">${t("traces.flameGraphView.duration")}</span>
                 <span>${formatDuration(span.durationMs)}</span>
               </div>
-              <div style="display: flex; justify-content: space-between; gap: 16px;">
+              <div style="display: flex; justify-content: space-between; gap: 1rem;">
                 <span style="color: var(--color-flame-tooltip-label);">${t("traces.flameGraphView.percentOfTrace")}</span>
                 <span>${percentage}%</span>
               </div>
-              ${span.hasError ? `<div style="color: var(--color-flame-tooltip-error); margin-top: 4px;">${t("traces.flameGraphView.hasErrors")}</div>` : ""}
+              ${span.hasError ? `<div style="color: var(--color-flame-tooltip-error); margin-top: 0.25rem;">${t("traces.flameGraphView.hasErrors")}</div>` : ""}
             </div>
           </div>
         `;
@@ -473,7 +473,7 @@ const chartOptions = computed(() => {
                     style: {
                       text: data[params.dataIndex].spanData.operationName,
                       fill: "#ffffff",
-                      font: "11px Inter, sans-serif",
+                      font: "0.6875rem Inter, sans-serif",
                       overflow: "truncate",
                       width: rectWidth - 8,
                     },

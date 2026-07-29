@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="create-report-page flex min-h-0 w-full flex-1 flex-col"
     >
       <div class="bg-card-glass-bg flex min-h-0 flex-1 overflow-auto">
-        <div ref="addAlertFormRef" class="my-3 px-4" style="width: 1024px">
+        <div ref="addAlertFormRef" class="my-3 px-4" style="width: 64rem">
           <OForm :id="formId" :form="form" class="create-report-form">
             <div class="flex items-start gap-4 px-2 pt-3">
               <div data-test="add-report-name-input" class="o2-input">
@@ -70,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 color="input-border"
                 class="showLabelOnTop"
                 tabindex="0"
-                style="width: 600px"
+                style="width: 37.5rem"
               />
             </div>
 
@@ -124,7 +124,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           required
                           :loading="isFetchingFolders"
                           @update:model-value="(v: any) => onFolderSelection(v, index)"
-                          style="min-width: 250px !important; width: 100% !important"
+                          style="min-width: 15.625rem !important; width: 100% !important"
                         />
                       </div>
                       <div
@@ -140,7 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           required
                           :loading="isFetchingDashboard || isFetchingFolders"
                           @update:model-value="(v: any) => onDashboardSelection(v, index)"
-                          style="min-width: 250px !important; width: 100% !important"
+                          style="min-width: 15.625rem !important; width: 100% !important"
                         />
                       </div>
                       <div
@@ -155,7 +155,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :label="t('reports.dashboardTab')"
                           required
                           :loading="isFetchingDashboard || isFetchingFolders"
-                          style="min-width: 250px !important; width: 100% !important"
+                          style="min-width: 15.625rem !important; width: 100% !important"
                         />
                       </div>
                     </div>
@@ -197,7 +197,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             :label="t('reports.reportType')"
                             color="input-border"
                             class="showLabelOnTop"
-                            style="min-width: 180px"
+                            style="min-width: 11.25rem"
                           />
                         </div>
 
@@ -212,7 +212,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             :options="attachmentTypeOptions(dashboard.report_type)"
                             :label="t('reports.attachmentType')"
                             class="showLabelOnTop"
-                            style="min-width: 200px"
+                            style="min-width: 12.5rem"
                           />
                         </div>
                       </div>
@@ -259,7 +259,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               :label="t('reports.dimensionWidth')"
                               color="input-border"
                               class="showLabelOnTop"
-                              style="min-width: 120px"
+                              style="min-width: 7.5rem"
                               placeholder="e.g. 1440"
                               data-test="add-report-dimension-width"
                             />
@@ -272,7 +272,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               :label="t('reports.dimensionHeight')"
                               color="input-border"
                               class="showLabelOnTop"
-                              style="min-width: 120px"
+                              style="min-width: 7.5rem"
                               placeholder="e.g. 900"
                               data-test="add-report-dimension-height"
                             />
@@ -343,7 +343,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <div
                         data-test="add-report-schedule-custom-interval-input"
                         class="o2-input mr-2 pt-0"
-                        style="width: 320px"
+                        style="width: 20rem"
                       >
                         <div class="text-text-secondary mb-1 font-bold">
                           {{ t("reports.cronExpression") + " *" }}
@@ -374,7 +374,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :label="t('logStream.timezone')"
                           required
                           class="timezone-select showLabelOnTop"
-                          style="width: 300px"
+                          style="width: 18.75rem"
                         />
                       </div>
                     </div>
@@ -411,7 +411,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <div
                         data-test="add-report-schedule-custom-interval-input"
                         class="o2-input mr-2 pt-0"
-                        style="width: 160px"
+                        style="width: 10rem"
                       >
                         <OFormInput
                           name="customInterval"
@@ -426,7 +426,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <div
                         data-test="add-report-schedule-custom-frequency-select"
                         class="o2-input pt-0"
-                        style="width: 160px"
+                        style="width: 10rem"
                       >
                         <OFormSelect
                           name="customPeriod"
@@ -471,7 +471,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :label="t('logStream.timezone')"
                           required
                           class="timezone-select showLabelOnTop"
-                          style="width: 300px"
+                          style="width: 18.75rem"
                         />
                       </div>
                     </div>
@@ -519,7 +519,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :label="t('reports.title')"
                       required
                       tabindex="0"
-                      style="width: 400px"
+                      style="width: 25rem"
                     />
                   </div>
 
@@ -560,7 +560,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="add-report-image-preview-toggle"
                     />
                     <OIcon name="info-outline" class="ml-2 cursor-pointer" size="sm">
-                      <OTooltip max-width="320px">
+                      <OTooltip max-width="20rem">
                         <template #content
                           >Captures a PNG screenshot of the dashboard and embeds it inline in the
                           email body alongside the PDF attachment for a quick visual

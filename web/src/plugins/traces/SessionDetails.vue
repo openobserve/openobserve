@@ -91,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Lower: conversation (left) + rail (right) -->
-          <div class="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_340px] gap-2.5">
+          <div class="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_21.25rem] gap-2.5">
             <!-- Conversation column: toolbar + panel -->
             <div class="flex min-h-0 min-w-0 flex-col">
               <div class="mb-2.5 flex flex-shrink-0 items-center gap-2">
@@ -228,7 +228,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       size="xs"
                       class="text-text-muted ml-[0.15rem] cursor-default"
                     />
-                    <OTooltip max-width="280px">
+                    <OTooltip max-width="17.5rem">
                       <template #content>
                         <div class="flex min-w-57.5 flex-col gap-2">
                           <div class="text-text-heading text-xs font-semibold">
@@ -302,7 +302,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Lower area: conversation column (left) + hotspot rail (right). Full-page
            scroll — the column grows with content; the rail sticks (items-start so
            it doesn't stretch to the tall conversation's height). -->
-          <div class="grid grid-cols-[minmax(0,1fr)_340px] items-start gap-2.5">
+          <div class="grid grid-cols-[minmax(0,1fr)_21.25rem] items-start gap-2.5">
             <!-- Conversation column: toolbar + panel -->
             <div class="flex min-h-0 min-w-0 flex-col">
               <!-- Conversation toolbar: search (fills width) + status + model filters.
@@ -727,7 +727,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- Hover: which turns this (deduped) tool actually ran in. side="left"
                    (like the Cost/Slowest hovers) so it opens to the side instead of
                    covering the rows above it. -->
-                    <OTooltip side="left" :delay="120" max-width="220px" content-class="p-0!">
+                    <OTooltip side="left" :delay="120" max-width="13.75rem" content-class="p-0!">
                       <template #content>
                         <div class="text-text-body w-50 px-3 py-2.25 text-xs">
                           <div class="mb-0.5 font-bold break-words">{{ row.name }}</div>

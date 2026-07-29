@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="traces-trace-dag-empty-container"
       class="flex h-125 flex-col items-center justify-center p-6"
     >
-      <OIcon name="info" style="width: 48px; height: 48px" />
+      <OIcon name="info" style="width: 3rem; height: 3rem" />
       <div class="text-text-muted mt-3">{{ t("traces.traceDAG.noData") }}</div>
     </div>
 
@@ -68,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="bg-info border-surface-base h-2 w-2 rounded-full border-2 shadow-[0_1px_3px_rgba(0,0,0,0.15)]"
           />
           <div
-            class="rounded-default bg-surface-base border-info flex min-h-7 max-w-45 min-w-20 cursor-pointer flex-col items-center justify-center border-2 p-[6px_12px] text-center shadow-[0_2px_6px_rgba(0,0,0,0.1)] transition-all duration-200 hover:[transform:translateY(-2px)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.15)]"
+            class="rounded-default bg-surface-base border-info flex min-h-7 max-w-45 min-w-20 cursor-pointer flex-col items-center justify-center border-2 p-[0.375rem_0.75rem] text-center shadow-[0_2px_6px_rgba(0,0,0,0.1)] transition-all duration-200 hover:[transform:translateY(-0.125rem)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.15)]"
             :class="[
               {
                 'border-status-negative! bg-status-error-bg!': data.span_status === 'ERROR',

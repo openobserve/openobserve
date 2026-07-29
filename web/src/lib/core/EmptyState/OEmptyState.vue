@@ -301,7 +301,7 @@ onBeforeUnmount(() => mq?.removeEventListener?.("change", syncMotion));
 const showBackdrop = computed(() => props.backdrop ?? size.value !== "inline");
 const dotGridStyle =
   "background-image: radial-gradient(var(--empty-dot) 1.25px, transparent 1.25px);" +
-  "background-size: 30px 30px;" +
+  "background-size: 1.875rem 1.875rem;" +
   "-webkit-mask-image: radial-gradient(ellipse 60% 62% at 50% 44%, #000 0%, transparent 70%);" +
   "mask-image: radial-gradient(ellipse 60% 62% at 50% 44%, #000 0%, transparent 70%);";
 

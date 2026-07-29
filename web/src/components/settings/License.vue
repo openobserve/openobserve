@@ -50,7 +50,7 @@
                   name="licenseKey"
                   :rows="8"
                   :placeholder="t('about.paste_license_placeholder')"
-                  style="min-height: 200px"
+                  style="min-height: 12.5rem"
                 />
                 <div v-if="isLicenseKeyAutoFilled" class="mt-2 mb-3">
                   <div
@@ -239,7 +239,7 @@
                   name="licenseKey"
                   :rows="6"
                   :placeholder="t('about.paste_new_license_placeholder')"
-                  style="min-height: 150px"
+                  style="min-height: 9.375rem"
                 />
                 <div v-if="isLicenseKeyAutoFilled" class="mt-2 mb-3">
                   <div

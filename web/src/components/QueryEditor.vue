@@ -195,7 +195,7 @@ const props = withDefaults(defineProps<Props>(), {
   suggestions: () => [],
   debounceTime: 500,
   nlpMode: undefined,
-  editorHeight: "200px",
+  editorHeight: "12.5rem",
   hideNlToggle: false,
   disableAi: false,
   disableAiReason: "",

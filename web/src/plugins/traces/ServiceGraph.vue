@@ -1038,7 +1038,7 @@ export default defineComponent({
         backdrop-filter: blur(24px) saturate(180%);
         -webkit-backdrop-filter: blur(24px) saturate(180%);
         border: 1px solid ${isDarkInit ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.06)"};
-        border-radius: 14px;
+        border-radius: 0.875rem;
         display: none;
         box-shadow: 0 12px 40px rgba(0,0,0,${isDarkInit ? "0.5" : "0.14"}), 0 1px 0 rgba(255,255,255,${isDarkInit ? "0.04" : "0"}) inset;
         overflow: hidden;
@@ -1248,8 +1248,8 @@ export default defineComponent({
         tooltipEl.style.pointerEvents = "none";
         tooltipEl.style.width = "";
         tooltipEl.style.height = "";
-        tooltipEl.style.padding = "9px 13px";
-        tooltipEl.style.fontSize = "12px";
+        tooltipEl.style.padding = "0.5625rem 0.8125rem";
+        tooltipEl.style.fontSize = "0.75rem";
         tooltipEl.style.lineHeight = "1.5";
         tooltipEl.style.fontFamily = '-apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif';
         tooltipEl.style.letterSpacing = "0.01em";

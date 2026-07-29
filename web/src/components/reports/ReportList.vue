@@ -197,7 +197,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   v-if="reportsStateLoadingMap[row.report_id]"
                   data-test="report-list-toggle-report-state-loader"
-                  style="display: inline-block; width: 33.14px"
+                  style="display: inline-block; width: 2.07125rem"
                   class="flex h-auto items-center justify-center"
                 >
                   <OSpinner size="xs" />

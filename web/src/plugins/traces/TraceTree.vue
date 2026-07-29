@@ -155,8 +155,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :style="{
                       position: 'absolute',
                       left: '0.5rem',
-                      bottom: '-6px',
-                      height: '5px',
+                      bottom: '-0.375rem',
+                      height: '0.3125rem',
                       borderLeft: '1.5px solid var(--color-card-glass-border)',
                       pointerEvents: 'none',
                       zIndex: 1,

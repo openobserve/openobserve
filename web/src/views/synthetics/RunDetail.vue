@@ -215,7 +215,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
               <pre
                 v-if="stackOpen && currentRun.errorStack"
-                class="text-2xs text-text-body bg-code-bg rounded-default mt-2 overflow-auto p-[10px_12px] font-mono leading-[1.6] whitespace-pre-wrap"
+                class="text-2xs text-text-body bg-code-bg rounded-default mt-2 overflow-auto p-[0.625rem_0.75rem] font-mono leading-[1.6] whitespace-pre-wrap"
                 data-test="synthetics-run-detail-error-stack"
                 >{{ currentRun.errorStack }}</pre
               >

@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="bg-card-glass-bg overflow-auto"
           style="max-height: calc(100vh - var(--navbar-height) - 157px)"
         >
-          <div ref="addAlertFormRef" class="px-4 pb-3" style="width: 1024px">
+          <div ref="addAlertFormRef" class="px-4 pb-3" style="width: 64rem">
             <div class="create-report-form">
               <div data-test="add-action-script-name-input-wrapper" class="report-name-input pt-3">
                 <OFormInput
@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   required
                   class="showLabelOnTop"
                   tabindex="0"
-                  style="width: 400px"
+                  style="width: 25rem"
                   help-text="Characters like :, ?, /, #, and spaces are not allowed."
                 />
               </div>
@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :label="t('reports.description')"
                   class="showLabelOnTop"
                   tabindex="0"
-                  style="width: 800px"
+                  style="width: 50rem"
                 />
               </div>
 
@@ -181,7 +181,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <div
                           data-test="add-action-script-cron-input"
                           class="mr-2 pt-2"
-                          style="width: 320px"
+                          style="width: 20rem"
                         >
                           <div
                             class="text-text-secondary mb-1 font-bold"
@@ -232,7 +232,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             :loading="isFetchingServiceAccounts"
                             class="showLabelOnTop no-case mb-[2.4rem]"
                             disabled
-                            style="min-width: 250px !important; width: 250px !important"
+                            style="min-width: 15.625rem !important; width: 15.625rem !important"
                           />
                         </div>
                       </div>
@@ -290,7 +290,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="no-case py-2"
                         labelKey="label"
                         valueKey="value"
-                        style="min-width: 250px !important; width: 250px !important"
+                        style="min-width: 15.625rem !important; width: 15.625rem !important"
                       />
                     </div>
                   </div>

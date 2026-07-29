@@ -218,7 +218,7 @@ body {
     font-size: var(--text-compact);
     color: var(--color-text-code);
     font-feature-settings: "tnum";
-    letter-spacing: -0.2px;
+    letter-spacing: -0.0125rem;
   }
 
   pre,

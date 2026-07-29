@@ -74,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <OTooltip
               :content="t('aiObservability.agentGraph.versionAgnosticHint')"
-              max-width="300px"
+              max-width="18.75rem"
             />
           </OIcon>
         </template>

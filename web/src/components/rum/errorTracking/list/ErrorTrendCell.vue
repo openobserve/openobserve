@@ -128,7 +128,7 @@ onMounted(() => {
       }
     },
     // Prefetch slightly ahead of the fold so scrolling feels instant.
-    { rootMargin: "200px 0px" },
+    { rootMargin: "12.5rem 0px" },
   );
   observer.observe(rootEl.value);
 });

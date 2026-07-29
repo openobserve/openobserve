@@ -36,10 +36,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Filters mode -->
         <div v-if="queryMode === 'filters'" class="mb-4! flex items-start pb-0!">
-          <div class="flex items-center font-semibold" style="width: 178px; min-height: 36px">
+          <div class="flex items-center font-semibold" style="width: 11.125rem; min-height: 2.25rem">
             {{ t("alerts.anomaly.filters") }}
           </div>
-          <div style="width: calc(100% - 190px)">
+          <div style="width: calc(100% - 11.875rem)">
             <!-- :key must be the array INDEX — the fields bind by index-based
                  name and do not re-bind, so a stable-id key would leave inputs
                  shifted on a mid-list delete. -->
@@ -53,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :options="filteredStreamFields"
                 :placeholder="filter.field ? '' : t('alerts.anomaly.fieldPlaceholder')"
                 class="alert-v3-select filter-field-select"
-                style="width: 200px"
+                style="width: 12.5rem"
                 :loading="loadingFields"
               >
                 <template #empty>
@@ -70,14 +70,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :name="`filters[${idx}].operator`"
                 :options="filterOperators"
                 class="alert-v3-select"
-                style="width: 110px"
+                style="width: 6.875rem"
               />
               <OFormInput
                 v-if="operatorNeedsValue(filter.operator)"
                 :name="`filters[${idx}].value`"
                 :placeholder="t('alerts.placeholders.value')"
                 class="alert-v3-input"
-                style="max-width: 160px"
+                style="max-width: 10rem"
               />
               <OButton
                 variant="ghost"
@@ -94,10 +94,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Custom SQL mode -->
         <div v-if="queryMode === 'custom_sql'" class="mb-4! flex items-start pb-0!">
-          <div class="flex items-center font-semibold" style="width: 190px; height: 36px">
+          <div class="flex items-center font-semibold" style="width: 11.875rem; height: 2.25rem">
             SQL <span class="text-status-error-text ml-1">*</span>
           </div>
-          <div style="width: calc(100% - 190px)">
+          <div style="width: calc(100% - 11.875rem)">
             <div
               class="custom-sql-editor-wrapper rounded-default h-35 overflow-hidden border"
               :class="hasSqlError ? 'border-input-border-error' : 'border-border-default'"
@@ -174,7 +174,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :options="detectionFunctions"
                 data-test="anomaly-detection-function"
                 class="alert-v3-select"
-                style="width: 110px"
+                style="width: 6.875rem"
                 @update:model-value="onDetectionFunctionChange"
               />
               <OFormSelect
@@ -185,7 +185,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :loading="loadingFields"
                 data-test="anomaly-detection-function-field"
                 class="alert-v3-select"
-                style="width: 140px"
+                style="width: 8.75rem"
               >
                 <template #empty>
                   <div class="text-muted-foreground px-3 py-2">
@@ -210,7 +210,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OTooltip
                   side="right"
                   align="center"
-                  max-width="300px"
+                  max-width="18.75rem"
                   :content="t('alerts.anomaly.detectionResolutionTooltip')"
                 />
               </OIcon>
@@ -222,7 +222,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   type="number"
                   min="1"
                   class="alert-v3-input"
-                  style="width: 87px"
+                  style="width: 5.4375rem"
                   data-test="anomaly-histogram-interval-value"
                 >
                   <!-- Message rendered below at pair width — see histogramIntervalError. -->
@@ -234,7 +234,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   label-key="label"
                   value-key="value"
                   class="alert-v3-select"
-                  style="min-width: 100px"
+                  style="min-width: 6.25rem"
                   data-test="anomaly-histogram-interval-unit"
                 />
               </div>
@@ -252,14 +252,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Detection Resolution alone (custom_sql mode) -->
         <div v-else class="mb-4! flex items-start pb-0!">
-          <div class="flex items-center font-semibold" style="width: 190px; height: 36px">
+          <div class="flex items-center font-semibold" style="width: 11.875rem; height: 2.25rem">
             {{ t("alerts.anomaly.detectionResolution") }}
             <span class="text-status-error-text ml-1">*</span>
             <OIcon name="info" size="sm" class="text-icon-color ml-1 cursor-pointer">
               <OTooltip
                 side="right"
                 align="center"
-                max-width="300px"
+                max-width="18.75rem"
                 :content="t('alerts.anomaly.detectionResolutionTooltip')"
               />
             </OIcon>
@@ -271,7 +271,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 type="number"
                 min="1"
                 class="alert-v3-input"
-                style="width: 87px"
+                style="width: 5.4375rem"
                 data-test="anomaly-histogram-interval-value"
               >
                 <!-- Message rendered below at pair width — see histogramIntervalError. -->
@@ -283,7 +283,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 label-key="label"
                 value-key="value"
                 class="alert-v3-select"
-                style="min-width: 100px"
+                style="min-width: 6.25rem"
                 data-test="anomaly-histogram-interval-unit"
               />
             </div>
@@ -311,7 +311,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OTooltip
                   side="right"
                   align="center"
-                  max-width="300px"
+                  max-width="18.75rem"
                   :content="t('alerts.anomaly.checkEveryTooltip')"
                 />
               </OIcon>
@@ -323,7 +323,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   type="number"
                   min="1"
                   class="alert-v3-input"
-                  style="width: 87px"
+                  style="width: 5.4375rem"
                   data-test="anomaly-schedule-interval-value"
                 >
                   <!-- Message rendered below at pair width — see scheduleIntervalError. -->
@@ -335,7 +335,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   label-key="label"
                   value-key="value"
                   class="alert-v3-select"
-                  style="min-width: 100px"
+                  style="min-width: 6.25rem"
                   data-test="anomaly-schedule-interval-unit"
                 />
               </div>
@@ -360,7 +360,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OTooltip
                   side="right"
                   align="center"
-                  max-width="300px"
+                  max-width="18.75rem"
                   :content="t('alerts.anomaly.lookBackWindowTooltip')"
                 />
               </OIcon>
@@ -372,7 +372,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   type="number"
                   min="1"
                   class="alert-v3-input"
-                  style="width: 87px"
+                  style="width: 5.4375rem"
                   data-test="anomaly-detection-window-value"
                 >
                   <!-- Message rendered below at pair width — see detectionWindowError. -->
@@ -384,7 +384,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   label-key="label"
                   value-key="value"
                   class="alert-v3-select"
-                  style="min-width: 100px"
+                  style="min-width: 6.25rem"
                   data-test="anomaly-detection-window-unit"
                 />
               </div>
@@ -411,7 +411,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("alerts.trainingWindow") }}
               <span class="text-status-error-text ml-1">*</span>
               <OIcon name="info" size="sm" class="text-icon-color ml-1 cursor-pointer">
-                <OTooltip side="right" align="center" max-width="300px">
+                <OTooltip side="right" align="center" max-width="18.75rem">
                   <!-- Uses a #content slot (not :content) so the font-size
                        span survives. -->
                   <template #content
@@ -429,7 +429,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :min="1"
                 data-test="anomaly-training-window"
                 class="alert-v3-input"
-                style="width: 87px"
+                style="width: 5.4375rem"
               />
               <span class="static-text text-xs" :class="'text-text-secondary'">
                 {{
@@ -453,7 +453,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OTooltip
                   side="right"
                   align="center"
-                  max-width="300px"
+                  max-width="18.75rem"
                   :content="t('alerts.anomaly.retrainEveryTooltip')"
                 />
               </OIcon>
@@ -465,25 +465,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               value-key="value"
               data-test="anomaly-retrain-interval"
               class="alert-v3-select"
-              style="max-width: 200px"
+              style="max-width: 12.5rem"
             />
           </div>
         </div>
 
         <!-- Threshold / Sensitivity -->
         <div class="mb-4! flex items-start pb-0!">
-          <div class="flex items-center pt-1 font-semibold" style="width: 190px">
+          <div class="flex items-center pt-1 font-semibold" style="width: 11.875rem">
             {{ t("alerts.sensitivity") }}
             <OIcon name="info" size="sm" class="text-icon-color ml-1 cursor-pointer">
               <OTooltip
                 side="right"
                 align="center"
-                max-width="300px"
+                max-width="18.75rem"
                 :content="t('alerts.anomaly.sensitivityTooltip')"
               />
             </OIcon>
           </div>
-          <div style="width: calc(100% - 190px)">
+          <div style="width: calc(100% - 11.875rem)">
             <!-- Chart + Slider container -->
             <div class="w-full">
               <!-- Header row: range labels + load button -->
@@ -541,7 +541,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :forceLoad="true"
                     searchType="ui"
                     class="w-full"
-                    style="height: 180px"
+                    style="height: 11.25rem"
                     data-test="anomaly-sensitivity-chart"
                     @series-data-update="onSeriesDataUpdate"
                   />

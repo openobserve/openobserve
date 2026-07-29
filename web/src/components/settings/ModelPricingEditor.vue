@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OIcon name="info" size="xs" :class="'text-text-secondary'" />
                     <OTooltip
                       side="right"
-                      max-width="300px"
+                      max-width="18.75rem"
                       :content="t('modelPricing.modelNameTooltip')"
                     />
                   </OButton>
@@ -87,7 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <OIcon name="info" size="xs" :class="'text-text-secondary'" />
                       <OTooltip
                         side="right"
-                        max-width="300px"
+                        max-width="18.75rem"
                         :content="t('modelPricing.matchPatternTooltip')"
                       />
                     </OButton>

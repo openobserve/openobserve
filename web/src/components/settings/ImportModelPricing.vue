@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #output-content>
       <div
         class="border-border-default flex h-full w-full flex-col border-l"
-        style="min-width: 400px"
+        style="min-width: 25rem"
       >
         <div
           v-if="modelPricingErrorsToDisplay.length > 0"
@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                   >
                     {{ errorMessage.message }}
-                    <div style="width: 300px">
+                    <div style="width: 18.75rem">
                       <OInput
                         data-test="model-pricing-import-name-input"
                         v-model="userSelectedModelPricingName[index]"
@@ -81,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                   >
                     {{ errorMessage.message }}
-                    <div style="width: 300px">
+                    <div style="width: 18.75rem">
                       <OInput
                         data-test="model-pricing-import-pattern-input"
                         v-model="userSelectedModelPricingPattern[index]"

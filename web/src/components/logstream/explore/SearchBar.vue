@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
-    <div class="flex h-[calc(100%-40px)]!">
+    <div class="flex h-[calc(100%-2.5rem)]!">
       <div class="border-border-default flex h-25 flex-col border-t">
         <b>Query Editor:</b>
         <CodeQueryEditor

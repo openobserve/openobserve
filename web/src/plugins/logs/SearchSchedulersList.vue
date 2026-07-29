@@ -216,7 +216,7 @@
                 class="mb-2 flex max-h-screen w-[calc(95vw-2.5rem)] min-w-[calc(90vw-1.25rem)] flex-col overflow-hidden px-4 py-0 text-left"
               >
                 <QueryEditor
-                  style="height: 130px"
+                  style="height: 8.125rem"
                   :key="row.trace_id"
                   :ref="`QueryEditorRef${row.trace_id}`"
                   :editor-id="`alerts-query-editor${row.trace_id}`"

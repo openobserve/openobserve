@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
-      <div class="mb-2.5 text-xl font-bold tracking-[-0.2px]">
+      <div class="mb-2.5 text-xl font-bold tracking-[-0.0125rem]">
         {{ t("billing.billingGroup.plansManagedTitle") }}
       </div>
       <div class="mb-6 max-w-110 text-sm leading-[1.65] opacity-65">

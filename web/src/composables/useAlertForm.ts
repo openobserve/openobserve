@@ -460,7 +460,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
 
   const anomalySummarySectionStyle = computed(() => {
     if (!showAnomalySummary.value) return { flex: "0 0 auto" };
-    return { flex: "1", minHeight: "150px" };
+    return { flex: "1", minHeight: "9.375rem" };
   });
 
   // ── Expand / UI State ───────────────────────────────────────────────────

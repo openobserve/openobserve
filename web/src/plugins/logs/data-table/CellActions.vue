@@ -23,7 +23,7 @@
         :data-test="`log-details-include-field-${row[column.id]}`"
         :title="t('logs.cellActions.includeTerm')"
       >
-        <OIcon name="" style="height: 8px; width: 8px">
+        <OIcon name="" style="height: 0.5rem; width: 0.5rem">
           <EqualIcon class="size-full" />
         </OIcon>
       </OButton>
@@ -36,7 +36,7 @@
         :title="t('logs.cellActions.excludeTerm')"
         :data-test="`log-details-exclude-field-${row[column.id]}`"
       >
-        <OIcon name="" style="height: 8px; width: 8px">
+        <OIcon name="" style="height: 0.5rem; width: 0.5rem">
           <NotEqualIcon class="size-full" />
         </OIcon>
       </OButton>
@@ -47,7 +47,7 @@
       v-if="!hideAi"
       @send-to-ai-chat="sendToAiChat(JSON.stringify(row[column.id]))"
       class="border border-solid border-white"
-      :size="'6px'"
+      :size="'0.375rem'"
       :imageHeight="'16px'"
       :imageWidth="'16px'"
     />

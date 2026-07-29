@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #output-content>
       <div
         class="border-border-default flex h-full w-full flex-col border-l"
-        style="min-width: 400px"
+        style="min-width: 25rem"
       >
         <div
           v-if="pipelineErrorsToDisplay.length > 0"
@@ -66,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     {{ errorMessage.message }}
 
-                    <div style="width: 300px">
+                    <div style="width: 18.75rem">
                       <OInput
                         data-test="pipeline-import-name-input"
                         :model-value="userSelectedPipelineName[index] || ''"
@@ -97,7 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                   >
                     {{ errorMessage.message }}
-                    <div style="width: 300px">
+                    <div style="width: 18.75rem">
                       <OSelect
                         data-test="pipeline-import-source-stream-name-input"
                         :model-value="userSelectedStreamName[index] || ''"
@@ -129,7 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :options="streamTypes"
                         :label="t('alerts.streamType') + ' *'"
                         class="showLabelOnTop no-case py-2"
-                        style="width: 300px"
+                        style="width: 18.75rem"
                         :error="touchedStreamType[index] && !userSelectedStreamType[index]"
                         :error-message="
                           touchedStreamType[index] && !userSelectedStreamType[index]
@@ -157,7 +157,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div>
                       <QueryEditor
                         class="w-full"
-                        style="height: 200px"
+                        style="height: 12.5rem"
                         data-test="pipeline-import-sql-query-input"
                         :model-value="userSelectedSqlQuery[index] || ''"
                         :label="'SQL Query'"
@@ -188,7 +188,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :options="destinationStreamTypes"
                         :label="t('alerts.streamType') + ' *'"
                         class="showLabelOnTop no-case py-2"
-                        style="width: 300px"
+                        style="width: 18.75rem"
                         :error="
                           touchedDestinationStreamType[index] &&
                           !userSelectedDestinationStreamType[index]
@@ -215,7 +215,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-else-if="typeof errorMessage === 'object' && errorMessage.field == 'org_id'"
                   >
                     {{ errorMessage.message }}
-                    <div style="width: 300px">
+                    <div style="width: 18.75rem">
                       <OSelect
                         data-test="pipeline-import-org-id-input"
                         :model-value="userSelectedOrgId[index] || null"
@@ -250,7 +250,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :options="existingFunctions"
                         :label="'Function Name'"
                         class="showLabelOnTop no-case py-2"
-                        style="width: 300px"
+                        style="width: 18.75rem"
                         :error="
                           touchedFunctionName[errorMessage.nodeIndex] &&
                           !userSelectedFunctionName[errorMessage.nodeIndex]
@@ -286,7 +286,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :options="pipelineDestinations"
                         :label="'Remote Destination'"
                         class="showLabelOnTop no-case py-2"
-                        style="width: 300px"
+                        style="width: 18.75rem"
                         :error="
                           touchedRemoteDestination[index] && !userSelectedRemoteDestination[index]
                         "
@@ -320,7 +320,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :label="'Timezone'"
                         searchable
                         class="showLabelOnTop no-case py-2"
-                        style="width: 300px"
+                        style="width: 18.75rem"
                         :error="touchedTimezone[index] && !userSelectedTimezone[index]"
                         :error-message="
                           touchedTimezone[index] && !userSelectedTimezone[index]

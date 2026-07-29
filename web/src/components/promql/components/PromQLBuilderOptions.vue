@@ -40,7 +40,7 @@
                 search-regex="(?:{([^}]*)(?:{.*})*$|([a-zA-Z-_]+)$)"
                 data-test="dashboard-promql-builder-legend"
                 :value-replace-fn="selectPromQlNameOption"
-                style="width: 260px"
+                style="width: 16.25rem"
               />
               <OIcon
                 name="info"
@@ -48,7 +48,7 @@
                 data-test="promql-builder-options-field-info-icon"
                 class="pointer-events-auto absolute top-1/2 right-2 z-10 -translate-y-1/2 cursor-pointer opacity-60 hover:opacity-100"
               >
-                <OTooltip side="top" max-width="250px">
+                <OTooltip side="top" max-width="15.625rem">
                   <template #content>
                     ({{ t("dashboard.optional") }})
                     <b>{{ t("metrics.promQLBuilderOptions.legend") }}</b>
@@ -80,11 +80,11 @@
               type="text"
               :placeholder="t('metrics.promQLBuilderOptions.stepValuePlaceholder')"
               data-test="dashboard-promql-builder-step-value"
-              style="width: 140px"
+              style="width: 8.75rem"
             >
               <template v-slot:icon-right>
                 <OIcon name="info" size="sm" class="cursor-pointer">
-                  <OTooltip side="top" max-width="250px">
+                  <OTooltip side="top" max-width="15.625rem">
                     <template #content>
                       ({{ t("dashboard.optional") }})
                       <b>{{ t("metrics.promQLBuilderOptions.step") }}</b>
@@ -120,7 +120,7 @@
               labelKey="label"
               valueKey="value"
               data-test="dashboard-promql-builder-query-type"
-              style="width: 120px"
+              style="width: 7.5rem"
             />
             <OIcon
               name="info"
@@ -128,7 +128,7 @@
               data-test="promql-builder-options-field-info-icon"
               class="cursor-pointer"
             >
-              <OTooltip side="top" max-width="250px">
+              <OTooltip side="top" max-width="15.625rem">
                 <template #content>
                   <b>{{ t("metrics.promQLBuilderOptions.queryType") }}</b
                   ><br />

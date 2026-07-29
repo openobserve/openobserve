@@ -32,8 +32,8 @@ interface Props {
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  width: "100px",
-  height: "16px",
+  width: "6.25rem",
+  height: "1rem",
   variant: "custom",
   rounded: false,
   circle: false,

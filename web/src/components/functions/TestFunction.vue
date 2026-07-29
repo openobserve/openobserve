@@ -45,7 +45,7 @@
             labelKey="label"
             valueKey="value"
             @update:model-value="updateStreams()"
-            style="width: 100px"
+            style="width: 6.25rem"
           />
         </div>
         <div class="function-stream-select-input w-75">
@@ -58,7 +58,7 @@
             :loading="isFetchingStreams"
             :placeholder="t('pipeline.selectStream')"
             searchable
-            style="min-width: 120px"
+            style="min-width: 7.5rem"
             @search="filterStreams"
             @update:model-value="updateQuery"
           />
@@ -153,10 +153,10 @@
             imageWidth="24px"
             :class="'mr-4 px-2'"
             style="
-              width: 32px !important;
-              height: 32px !important;
-              min-width: 32px !important;
-              min-height: 32px !important;
+              width: 2rem !important;
+              height: 2rem !important;
+              min-width: 2rem !important;
+              min-height: 2rem !important;
             "
           />
         </template>

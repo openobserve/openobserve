@@ -278,7 +278,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OTag type="alertStatus" :value="row.status" />
                   <OTooltip
                     v-if="row.status === 'failed' && row.last_error"
-                    :max-width="'400px'"
+                    :max-width="'25rem'"
                     :content="row.last_error"
                   />
                 </span>
@@ -329,7 +329,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div
                     data-test="alert-list-loading-alert"
                     v-if="alertStateLoadingMap[row.uuid]"
-                    style="display: inline-block; width: 33.14px; height: auto"
+                    style="display: inline-block; width: 2.07125rem; height: auto"
                     class="ml-1 flex items-center justify-center"
                     :title="`Turning ${row.enabled ? 'Off' : 'On'}`"
                   >

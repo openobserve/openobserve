@@ -18,7 +18,7 @@ the Free Software Foundation, either version 3 of the License, or
     @import="importJson"
   >
     <template #output-content>
-      <div class="flex h-full w-full flex-col" style="min-width: 380px">
+      <div class="flex h-full w-full flex-col" style="min-width: 23.75rem">
         <div
           v-if="errors.length"
           class="text-text-heading shrink-0 py-3 text-center text-sm font-semibold"
@@ -50,7 +50,7 @@ the Free Software Foundation, either version 3 of the License, or
                   data-test="score-config-import-name-error"
                 >
                   {{ err.message }}
-                  <div class="mt-1" style="width: 320px">
+                  <div class="mt-1" style="width: 20rem">
                     <OInput
                       :data-test="`score-config-import-name-input-${err.itemIndex}`"
                       v-model="nameFixers[err.itemIndex]"
@@ -66,7 +66,7 @@ the Free Software Foundation, either version 3 of the License, or
                   data-test="score-config-import-name-conflict-error"
                 >
                   {{ err.message }}
-                  <div class="mt-1" style="width: 320px">
+                  <div class="mt-1" style="width: 20rem">
                     <OInput
                       :data-test="`score-config-import-rename-input-${err.itemIndex}`"
                       v-model="nameFixers[err.itemIndex]"
@@ -82,7 +82,7 @@ the Free Software Foundation, either version 3 of the License, or
                   data-test="score-config-import-datatype-error"
                 >
                   {{ err.message }}
-                  <div class="mt-1" style="width: 320px">
+                  <div class="mt-1" style="width: 20rem">
                     <OSelect
                       :data-test="`score-config-import-datatype-select-${err.itemIndex}`"
                       v-model="dataTypeFixers[err.itemIndex]"
@@ -99,7 +99,7 @@ the Free Software Foundation, either version 3 of the License, or
                   data-test="score-config-import-numeric-range-error"
                 >
                   {{ err.message }}
-                  <div class="mt-1 flex gap-2" style="width: 320px">
+                  <div class="mt-1 flex gap-2" style="width: 20rem">
                     <OInput
                       :data-test="`score-config-import-min-input-${err.itemIndex}`"
                       v-model="numericRangeFixers[err.itemIndex].min"
@@ -123,7 +123,7 @@ the Free Software Foundation, either version 3 of the License, or
                   data-test="score-config-import-categories-error"
                 >
                   {{ err.message }}
-                  <div class="mt-1" style="width: 320px">
+                  <div class="mt-1" style="width: 20rem">
                     <OInput
                       :data-test="`score-config-import-categories-input-${err.itemIndex}`"
                       v-model="categoriesFixers[err.itemIndex]"

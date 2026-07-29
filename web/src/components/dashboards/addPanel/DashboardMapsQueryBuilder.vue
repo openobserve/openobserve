@@ -90,7 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
                       .fields.name.isDerived
                       ? 'auto'
-                      : '771px',
+                      : '48.1875rem',
                 }"
               >
                 <div>
@@ -207,7 +207,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
                       .fields.value_for_maps.isDerived
                       ? 'auto'
-                      : '771px',
+                      : '48.1875rem',
                 }"
               >
                 <div>
