@@ -71,10 +71,21 @@
         <div class="flex w-full items-center gap-2">
           <OToggleGroup
             v-model="typeFilter"
-            :options="typeOptions"
-            size="sm"
             data-test="slos-slolist-type-filter"
-          />
+          >
+            <OToggleGroupItem
+              v-for="opt in typeOptions"
+              :key="opt.value"
+              :value="opt.value"
+              size="sm"
+              :data-test="`slos-slolist-type-filter-${opt.value}`"
+            >
+              <template v-if="opt.icon" #icon-left>
+                <OIcon :name="opt.icon" size="sm" />
+              </template>
+              {{ opt.label }}
+            </OToggleGroupItem>
+          </OToggleGroup>
           <OSearchInput
             v-model="search"
             class="flex-1"
@@ -259,6 +270,8 @@ import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import type { SloListItem } from "@/ts/interfaces/slo";

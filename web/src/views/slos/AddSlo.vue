@@ -56,16 +56,16 @@
       v-if="isEdit && definitionChanged"
       variant="warning"
       icon="restart_alt"
-      :title="t('slos.regenerate.title')"
       class="mb-3"
       data-test="slos-addslo-regen-warning"
     >
+      <span class="font-bold">{{ t("slos.regenerate.title") }}</span>
       {{ t("slos.regenerate.body") }}
     </OBanner>
 
     <div class="grid grid-cols-1 lg:grid-cols-[1fr_22rem] gap-4">
       <div class="flex flex-col gap-4">
-        <OContent :title="t('slos.section.identity')">
+        <SloSection :title="t('slos.section.identity')">
           <OInput
             v-model="form.name"
             :label="t('slos.field.name')"
@@ -80,134 +80,163 @@
             class="mt-3"
             data-test="slos-addslo-description"
           />
-          <OTagInput
-            v-model="form.tags"
-            :label="t('slos.field.tags')"
-            class="mt-3"
-            data-test="slos-addslo-tags"
-          />
-        </OContent>
-
-        <OContent :title="t('slos.section.sli')">
-          <ORadioCards
-            v-model="form.sli_type"
-            :options="sliTypeOptions"
-            data-test="slos-addslo-sli-type"
-          />
-
-          <template v-if="form.sli_type === 'count'">
-            <div class="grid grid-cols-2 gap-3 mt-3">
-              <OSelect
-                v-model="form.config.stream_type"
-                :label="t('slos.field.streamType')"
-                :options="streamTypeOptions"
-                data-test="slos-addslo-stream-type"
-              />
-              <OInput
-                v-model="form.config.stream"
-                :label="t('slos.field.stream')"
-                required
-                data-test="slos-addslo-stream"
-              />
-            </div>
-            <OInput
-              v-model="form.config.scope"
-              :label="t('slos.field.scope')"
-              :hint="t('slos.field.scopeHint')"
-              class="mt-3"
-              placeholder="service = 'checkout'"
-              data-test="slos-addslo-scope"
+          <!-- OTagInput's root is `h-full`; without a constraining wrapper it
+               stretches to fill the section and swallows what follows. -->
+          <div class="mt-3">
+            <OTagInput
+              v-model="form.tags"
+              :label="t('slos.field.tags')"
+              placeholder=""
+              data-test="slos-addslo-tags"
             />
-            <OInput
-              v-model="form.config.good_expr"
-              :label="t('slos.field.goodWhen')"
-              :hint="t('slos.field.goodWhenHint')"
-              class="mt-3"
-              required
-              placeholder="status_code < 500"
-              data-test="slos-addslo-good-expr"
-            />
-          </template>
-
-          <template v-else-if="form.sli_type === 'time_slice'">
-            <div class="grid grid-cols-2 gap-3 mt-3">
-              <OSelect
-                v-model="form.config.stream_type"
-                :label="t('slos.field.streamType')"
-                :options="streamTypeOptions"
-              />
-              <OInput v-model="form.config.stream" :label="t('slos.field.stream')" required />
-            </div>
-            <OInput
-              v-model="form.config.query"
-              :label="t('slos.field.aggregate')"
-              :hint="t('slos.field.aggregateHint')"
-              class="mt-3"
-              required
-              placeholder="approx_percentile_cont(duration_ms, 0.95)"
-            />
-            <div class="grid grid-cols-2 gap-3 mt-3">
-              <OSelect
-                v-model="form.config.comparator"
-                :label="t('slos.field.comparator')"
-                :options="comparatorOptions"
-              />
-              <OInput
-                v-model.number="form.config.threshold"
-                :label="t('slos.field.threshold')"
-                type="number"
-              />
-            </div>
-            <OInput v-model="form.config.scope" :label="t('slos.field.scope')" class="mt-3" />
-          </template>
-
-          <OBanner v-else variant="info" class="mt-3">
-            {{ t("slos.alertSli.unavailable") }}
-          </OBanner>
-        </OContent>
-
-        <OContent :title="t('slos.section.objective')">
-          <div class="grid grid-cols-2 gap-3">
-            <OInput
-              v-model.number="form.target"
-              :label="t('slos.field.target')"
-              type="number"
-              step="0.001"
-              suffix="%"
-              required
-              data-test="slos-addslo-target"
-            />
-            <div class="flex items-end pb-2 text-compact text-text-secondary">
-              {{ budgetHint }}
-            </div>
           </div>
-
-          <OToggleGroup
-            v-model="form.window_secs"
-            :label="t('slos.field.window')"
-            :options="windowOptions"
-            class="mt-3"
-            data-test="slos-addslo-window"
-          />
-          <OToggleGroup
-            v-model="form.slice_interval_secs"
-            :label="t('slos.field.sliceInterval')"
-            :options="sliceOptions"
-            class="mt-3"
-            data-test="slos-addslo-slice"
-          />
-          <p v-if="isGrouped" class="text-compact text-text-secondary mt-1">
-            {{ t("slos.groupedSliceNote") }}
-          </p>
-        </OContent>
-
-        <OContent :title="t('slos.section.grouping')">
-          <OTagInput
-            v-model="groupByList"
-            :label="t('slos.field.groupBy')"
-            :placeholder="t('slos.field.groupByPlaceholder')"
-            data-test="slos-addslo-group-by"
-          />
+        </SloSection>
+  
+          <SloSection :title="t('slos.section.sli')">
+            <ORadioCards
+              v-model="form.sli_type"
+              :options="sliTypeOptions"
+              data-test="slos-addslo-sli-type"
+            />
+  
+            <template v-if="form.sli_type === 'count'">
+              <div class="grid grid-cols-2 gap-3 mt-3">
+                <OSelect
+                  v-model="form.config.stream_type"
+                  :label="t('slos.field.streamType')"
+                  :options="streamTypeOptions"
+                  data-test="slos-addslo-stream-type"
+                />
+                <OInput
+                  v-model="form.config.stream"
+                  :label="t('slos.field.stream')"
+                  required
+                  data-test="slos-addslo-stream"
+                />
+              </div>
+              <OInput
+                v-model="form.config.scope"
+                :label="t('slos.field.scope')"
+                :hint="t('slos.field.scopeHint')"
+                class="mt-3"
+                placeholder="service = 'checkout'"
+                data-test="slos-addslo-scope"
+              />
+              <OInput
+                v-model="form.config.good_expr"
+                :label="t('slos.field.goodWhen')"
+                :hint="t('slos.field.goodWhenHint')"
+                class="mt-3"
+                required
+                placeholder="status_code < 500"
+                data-test="slos-addslo-good-expr"
+              />
+            </template>
+  
+            <template v-else-if="form.sli_type === 'time_slice'">
+              <div class="grid grid-cols-2 gap-3 mt-3">
+                <OSelect
+                  v-model="form.config.stream_type"
+                  :label="t('slos.field.streamType')"
+                  :options="streamTypeOptions"
+                />
+                <OInput v-model="form.config.stream" :label="t('slos.field.stream')" required />
+              </div>
+              <OInput
+                v-model="form.config.query"
+                :label="t('slos.field.aggregate')"
+                :hint="t('slos.field.aggregateHint')"
+                class="mt-3"
+                required
+                placeholder="approx_percentile_cont(duration_ms, 0.95)"
+              />
+              <div class="grid grid-cols-2 gap-3 mt-3">
+                <OSelect
+                  v-model="form.config.comparator"
+                  :label="t('slos.field.comparator')"
+                  :options="comparatorOptions"
+                />
+                <OInput
+                  v-model.number="form.config.threshold"
+                  :label="t('slos.field.threshold')"
+                  type="number"
+                />
+              </div>
+              <OInput v-model="form.config.scope" :label="t('slos.field.scope')" class="mt-3" />
+            </template>
+  
+            <OBanner v-else variant="info" class="mt-3">
+              {{ t("slos.alertSli.unavailable") }}
+            </OBanner>
+          </SloSection>
+  
+          <SloSection :title="t('slos.section.objective')">
+            <div class="grid grid-cols-2 gap-3">
+              <OInput
+                v-model.number="form.target"
+                :label="t('slos.field.target')"
+                type="number"
+                step="0.001"
+                suffix="%"
+                required
+                data-test="slos-addslo-target"
+              />
+              <div class="flex items-end pb-2 text-compact text-text-secondary">
+                {{ budgetHint }}
+              </div>
+            </div>
+  
+            <!-- OToggleGroup renders OToggleGroupItem children; it has no
+                 `options` prop. Passing one rendered an empty bar, which left
+                 S-3's rolling window and S-4's slice interval unreachable. -->
+            <OToggleGroup
+              v-model="form.window_secs"
+              :label="t('slos.field.window')"
+              class="mt-3"
+              data-test="slos-addslo-window"
+            >
+              <OToggleGroupItem
+                v-for="opt in windowOptions"
+                :key="opt.value"
+                :value="opt.value"
+                size="sm"
+                :data-test="`slos-addslo-window-${opt.value}`"
+              >
+                {{ opt.label }}
+              </OToggleGroupItem>
+            </OToggleGroup>
+            <OToggleGroup
+              v-model="form.slice_interval_secs"
+              :label="t('slos.field.sliceInterval')"
+              class="mt-3"
+              data-test="slos-addslo-slice"
+            >
+              <OToggleGroupItem
+                v-for="opt in sliceOptions"
+                :key="opt.value"
+                :value="opt.value"
+                :disabled="opt.disable"
+                size="sm"
+                :data-test="`slos-addslo-slice-${opt.value}`"
+              >
+                {{ opt.label }}
+              </OToggleGroupItem>
+            </OToggleGroup>
+            <p v-if="isGrouped" class="text-compact text-text-secondary mt-1">
+              {{ t("slos.groupedSliceNote") }}
+            </p>
+          </SloSection>
+  
+          <SloSection :title="t('slos.section.grouping')">
+            <!-- Constraining wrapper: OTagInput's root is `h-full`. -->
+            <div>
+              <OTagInput
+                v-model="groupByList"
+                :label="t('slos.field.groupBy')"
+                placeholder=""
+                data-test="slos-addslo-group-by"
+              />
+            </div>
           <OInput
             v-if="isGrouped"
             v-model.number="form.groups_estimate"
@@ -217,12 +246,12 @@
             class="mt-3"
             data-test="slos-addslo-groups-estimate"
           />
-        </OContent>
+        </SloSection>
       </div>
 
       <!-- Summary. Mirrors the backend's own arithmetic so a budget rejection
            at save time is never the first time a user sees the numbers. -->
-      <OContent :title="t('slos.section.summary')" class="h-fit sticky top-4">
+      <SloSection :title="t('slos.section.summary')" class="h-fit sticky top-4">
         <dl class="grid grid-cols-[8rem_1fr] gap-y-2 text-compact">
           <dt class="text-text-secondary">{{ t("slos.field.sliType") }}</dt>
           <dd>{{ sliTypeLabel(form.sli_type) }}</dd>
@@ -249,7 +278,7 @@
         <OBanner variant="info" class="mt-3">
           {{ t("slos.backfillNote") }}
         </OBanner>
-      </OContent>
+      </SloSection>
     </div>
   </OPageLayout>
 </template>
@@ -262,13 +291,14 @@ import { useStore } from "vuex";
 
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OContent from "@/lib/core/Content/OContent.vue";
+import SloSection from "@/components/slos/SloSection.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import ORadioCards from "@/lib/forms/OptionGroup/OOptionGroup.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTagInput from "@/lib/forms/TagInput/OTagInput.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import sloService from "@/services/slos";
 import { formatTarget, formatWindow, sliTypeLabel } from "@/composables/useSloFormat";

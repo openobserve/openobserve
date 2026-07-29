@@ -39,12 +39,20 @@
       {{ sloSummary }}
     </p>
 
-    <OToggleGroup
-      v-model="model.kind"
-      :options="kindOptions"
-      size="sm"
-      data-test="slos-sloalertcondition-kind"
-    />
+    <OToggleGroup v-model="model.kind" data-test="slos-sloalertcondition-kind">
+      <OToggleGroupItem
+        v-for="opt in kindOptions"
+        :key="opt.value"
+        :value="opt.value"
+        size="sm"
+        :data-test="`slos-sloalertcondition-kind-${opt.value}`"
+      >
+        <template v-if="opt.icon" #icon-left>
+          <OIcon :name="opt.icon" size="sm" />
+        </template>
+        {{ opt.label }}
+      </OToggleGroupItem>
+    </OToggleGroup>
 
     <template v-if="model.kind === 'burn_rate'">
       <div>
@@ -59,7 +67,7 @@
             v-for="p in presets"
             :key="p.key"
             type="button"
-            class="text-left rounded-md border p-3 hover:border-primary transition-colors"
+            class="text-left rounded-default border p-3 hover:border-primary transition-colors"
             :class="isActivePreset(p) ? 'border-primary bg-primary/5' : 'border-border'"
             :data-test="`slos-sloalertcondition-preset-${p.key}`"
             @click="applyPreset(p)"
@@ -162,7 +170,10 @@
 
     <!-- Stated, not omitted: someone will look for the count row that every
          other alert family has, and its absence needs a reason. -->
-    <OBanner variant="info" icon="block" :title="t('slos.alert.noCountGate')">
+    <!-- OBanner has no `title` prop; the heading has to be rendered as
+         content or it silently disappears into a DOM attribute. -->
+    <OBanner variant="info" icon="block">
+      <span class="font-bold">{{ t("slos.alert.noCountGate") }}</span>
       {{ t("slos.alert.noCountGateBody") }}
     </OBanner>
   </div>
@@ -178,6 +189,8 @@ import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import sloService from "@/services/slos";
 import type { Slo } from "@/ts/interfaces/slo";
 import { formatTimeToExhaust, formatWindow } from "@/composables/useSloFormat";

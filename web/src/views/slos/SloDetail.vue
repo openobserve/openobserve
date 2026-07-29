@@ -84,10 +84,10 @@
       v-if="status?.no_data"
       variant="warning"
       icon="ac_unit"
-      :title="t('slos.frozen.title')"
       class="mb-3"
       data-test="slos-slodetail-frozen-banner"
     >
+      <span class="font-bold">{{ t("slos.frozen.title") }}</span>
       {{
         t("slos.frozen.body", {
           coverage: formatCoverage(status?.coverage),
