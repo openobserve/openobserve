@@ -994,6 +994,8 @@
     "sessionLabel": "Sessions",
     "learnWebVitalsLabel": "Learn more about Web Vitals",
     "clickHereLabel": "Click here",
+    "webVitalsBrowserOnlyTitle": "Web Vitals need the Browser RUM SDK",
+    "webVitalsBrowserOnlyDescription": "Core Web Vitals — LCP, INP, CLS, FCP, TTFB and page load — are collected only by the Browser RUM SDK. This stream has no browser performance data yet. If you're instrumenting a mobile app, use the Sessions and Errors tabs for mobile telemetry.",
     "skipInactivity": "Skip Inactivity",
     "error": "Error",
     "sessionType": "Session Type",

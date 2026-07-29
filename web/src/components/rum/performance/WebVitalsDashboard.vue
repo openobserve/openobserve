@@ -18,52 +18,94 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <div class="rounded-default relative-position">
-    <div class="performance-dashboard" :class="isLoading.length ? 'invisible' : 'visible'">
-      <div
-        data-test="learn-web-vitals-link"
-        class="rounded-default bg-badge-indigo-soft-bg mt-2 ml-3 flex w-fit items-center px-2 py-1 text-sm font-bold"
-      >
-        <OIcon name="info" size="sm" class="mr-1" />
-        {{ t("rum.learnWebVitalsLabel") }}
-        <a
-          href="https://web.dev/articles/vitals"
-          title="https://web.dev/articles/vitals"
-          class="text-badge-indigo-soft-text ml-1"
-          target="_blank"
-        >
-          {{ t("rum.clickHereLabel") }}
-        </a>
-      </div>
-      <RenderDashboardCharts
-        ref="webVitalsChartsRef"
-        :viewOnly="true"
-        :frame="false"
-        :dashboardData="currentDashboardData.data"
-        :currentTimeObj="dateTime"
-        searchType="RUM"
-        @variablesManagerReady="onVariablesManagerReady"
-        @updated:data-zoom="onDataZoom"
-      />
-    </div>
+    <!-- Resolving the _rumdata schema to decide whether browser Web Vitals exist -->
     <div
-      v-show="isLoading.length"
-      class="absolute top-0 flex h-[calc(100vh-15.625rem)] w-full items-center justify-center pb-4 text-center"
+      v-if="!schemaResolved"
+      data-test="web-vitals-dashboard-schema-loading"
+      class="flex h-[calc(100vh-15.625rem)] w-full items-center justify-center pb-4 text-center"
     >
       <div>
         <OSpinner size="md" class="mx-auto block" />
         <div class="w-full text-center">Loading Dashboard</div>
       </div>
     </div>
+
+    <!--
+      Mobile-only stream: the browser Web Vital columns don't exist, so the
+      dashboard queries would fail. Show a friendly explanation instead of
+      firing six doomed queries.
+    -->
+    <OEmptyState
+      v-else-if="showBrowserOnlyEmpty"
+      data-test="web-vitals-dashboard-browser-only-empty"
+      size="block"
+      illustration="browser-check"
+      :hide-action="true"
+    >
+      <template #title>{{ t("rum.webVitalsBrowserOnlyTitle") }}</template>
+      <template #description>{{ t("rum.webVitalsBrowserOnlyDescription") }}</template>
+    </OEmptyState>
+
+    <!-- Browser RUM data present (or schema inconclusive): render the dashboard -->
+    <template v-else>
+      <div class="performance-dashboard" :class="isLoading.length ? 'invisible' : 'visible'">
+        <div
+          data-test="learn-web-vitals-link"
+          class="rounded-default bg-badge-indigo-soft-bg mt-2 ml-3 flex w-fit items-center px-2 py-1 text-sm font-bold"
+        >
+          <OIcon name="info" size="sm" class="mr-1" />
+          {{ t("rum.learnWebVitalsLabel") }}
+          <a
+            href="https://web.dev/articles/vitals"
+            title="https://web.dev/articles/vitals"
+            class="text-badge-indigo-soft-text ml-1"
+            target="_blank"
+          >
+            {{ t("rum.clickHereLabel") }}
+          </a>
+        </div>
+        <RenderDashboardCharts
+          ref="webVitalsChartsRef"
+          :viewOnly="true"
+          :frame="false"
+          :dashboardData="currentDashboardData.data"
+          :currentTimeObj="dateTime"
+          searchType="RUM"
+          @variablesManagerReady="onVariablesManagerReady"
+          @updated:data-zoom="onDataZoom"
+        />
+      </div>
+      <div
+        v-show="isLoading.length"
+        class="absolute top-0 flex h-[calc(100vh-15.625rem)] w-full items-center justify-center pb-4 text-center"
+      >
+        <div>
+          <OSpinner size="md" class="mx-auto block" />
+          <div class="w-full text-center">Loading Dashboard</div>
+        </div>
+      </div>
+    </template>
   </div>
 </template>
 
 <script lang="ts">
 // @ts-nocheck
-import { defineComponent, ref, watch, onActivated, nextTick, onMounted, type Ref } from "vue";
+import {
+  defineComponent,
+  ref,
+  computed,
+  watch,
+  onActivated,
+  nextTick,
+  onMounted,
+  type Ref,
+} from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { getDashboard } from "@/utils/commons.ts";
+import usePerformance from "@/composables/rum/usePerformance";
+import useStreams from "@/composables/useStreams";
 import {
   parseDuration,
   generateDurationLabel,
@@ -77,6 +119,7 @@ import overviewDashboard from "@/utils/rum/web_vitals.json";
 import { convertDashboardSchemaVersion } from "../../../utils/dashboard/convertDashboardSchemaVersion";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 
 export default defineComponent({
   name: "WebVitalsDashboard",
@@ -84,6 +127,7 @@ export default defineComponent({
     RenderDashboardCharts,
     OSpinner,
     OIcon,
+    OEmptyState,
   },
   props: {
     dateTime: {
@@ -97,9 +141,75 @@ export default defineComponent({
     const route = useRoute();
     const router = useRouter();
     const store = useStore();
+    const { performanceState } = usePerformance();
+    const { getStream } = useStreams();
     const currentDashboardData = reactive({
       data: {},
     });
+
+    // Columns the Web Vitals dashboard (web_vitals.json) selects from _rumdata.
+    // These land in the schema only once the Browser RUM SDK has ingested data;
+    // a mobile-only stream has none of them, so naming them fails the whole
+    // panel query. Gate on their presence rather than firing queries that
+    // cannot run and surfacing raw SQL errors to the user.
+    const WEB_VITAL_FIELDS = [
+      "view_largest_contentful_paint",
+      "view_interaction_to_next_paint",
+      "view_cumulative_layout_shift",
+      "view_first_contentful_paint",
+      "view_first_byte",
+      "view_loading_time",
+    ];
+
+    // Set once we've either read the shared schema or attempted our own fetch —
+    // guards against rendering the dashboard before we know which SDK fed it.
+    const schemaResolved = ref(false);
+
+    // The _rumdata schema map (fieldName -> field) shared via usePerformance,
+    // populated by the parent RUM view or our own defensive fetch below.
+    const rumSchema = computed(() => performanceState.data.streams?.["_rumdata"]?.schema);
+
+    // A non-empty schema is "known"; an empty/absent one is inconclusive.
+    const rumSchemaKnown = computed(
+      () => !!rumSchema.value && Object.keys(rumSchema.value).length > 0,
+    );
+
+    const hasBrowserWebVitals = computed(() =>
+      WEB_VITAL_FIELDS.some((field) => !!rumSchema.value?.[field]),
+    );
+
+    // Only claim "mobile-only" when we have a real schema that lacks every
+    // Web Vital field. If the schema is inconclusive (fetch failed), fall back
+    // to rendering the dashboard so a browser user is never shown the empty
+    // state on a transient error.
+    const showBrowserOnlyEmpty = computed(
+      () => schemaResolved.value && rumSchemaKnown.value && !hasBrowserWebVitals.value,
+    );
+
+    // Ensure the _rumdata schema is available. The parent RUM view normally
+    // loads it into the shared state, but fetch it ourselves if it isn't there
+    // yet so this tab is correct regardless of parent timing. getStream is
+    // cached, so this is cheap when the schema is already resolved.
+    const ensureRumSchema = async () => {
+      try {
+        if (rumSchemaKnown.value) return;
+
+        const stream = await getStream("_rumdata", "logs", true);
+        const schemaMap: Record<string, any> = {};
+        (stream?.schema ?? []).forEach((field: any) => {
+          schemaMap[field.name] = field;
+        });
+        performanceState.data.streams["_rumdata"] = {
+          schema: schemaMap,
+          name: "_rumdata",
+        };
+      } catch {
+        // Leave the schema inconclusive — showBrowserOnlyEmpty stays false, so
+        // the dashboard renders as before rather than hiding the feature.
+      } finally {
+        schemaResolved.value = true;
+      }
+    };
     const showDashboardSettingsDialog = ref(false);
     const viewOnly = ref(true);
     const eventLog = ref([]);
@@ -122,6 +232,9 @@ export default defineComponent({
     };
 
     onMounted(async () => {
+      // Fire-and-forget: ensureRumSchema handles its own errors and flips
+      // schemaResolved in its finally, so the gate resolves independently.
+      ensureRumSchema();
       await loadDashboard();
       updateLayout();
     });
@@ -241,6 +354,8 @@ export default defineComponent({
       isLoading,
       updateLayout,
       router,
+      schemaResolved,
+      showBrowserOnlyEmpty,
     };
   },
 });

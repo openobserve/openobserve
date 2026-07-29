@@ -1,12 +1,38 @@
-import { mount } from "@vue/test-utils";
+import { mount, flushPromises } from "@vue/test-utils";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { nextTick } from "vue";
+import { nextTick, reactive } from "vue";
 import { createI18n } from "vue-i18n";
 import WebVitalsDashboard from "./WebVitalsDashboard.vue";
+import { convertDashboardSchemaVersion as mockConvertDashboardSchemaVersion } from "../../../utils/dashboard/convertDashboardSchemaVersion";
 
 // ---------------------------------------------------------------------------
 // Module mocks
 // ---------------------------------------------------------------------------
+
+// Shared reactive `_rumdata` schema state, mirroring the module-level singleton
+// that the real usePerformance() composable exposes. Declared with a `mock`
+// prefix so the vi.mock factories below are allowed to reference it.
+const mockPerformanceState = reactive({
+  data: {
+    datetime: {
+      startTime: 0,
+      endTime: 0,
+      relativeTimePeriod: "15m",
+      valueType: "relative",
+    },
+    streams: {} as Record<string, any>,
+  },
+});
+
+const mockGetStream = vi.fn();
+
+vi.mock("@/composables/rum/usePerformance", () => ({
+  default: () => ({ performanceState: mockPerformanceState }),
+}));
+
+vi.mock("@/composables/useStreams", () => ({
+  default: () => ({ getStream: mockGetStream }),
+}));
 
 vi.mock("@/views/Dashboards/RenderDashboardCharts.vue", () => ({
   default: {
@@ -43,11 +69,17 @@ vi.mock("@/utils/date", () => ({
 const mockRouterPush = vi.fn();
 const mockRouterReplace = vi.fn();
 
+// Mutable so individual tests can exercise the `route.query.folder ?? "default"`
+// fallback branches in goBackToDashboardList/addPanelData.
+const mockRouteQuery: Record<string, any> = {
+  dashboard: "test-dashboard",
+  folder: "test-folder",
+  org_identifier: "test-org",
+};
+
 vi.mock("vue-router", () => ({
   useRouter: () => ({ push: mockRouterPush, replace: mockRouterReplace }),
-  useRoute: () => ({
-    query: { dashboard: "test-dashboard", folder: "test-folder", org_identifier: "test-org" },
-  }),
+  useRoute: () => ({ query: mockRouteQuery }),
 }));
 
 const mockStore = {
@@ -64,7 +96,13 @@ const i18n = createI18n({
   locale: "en",
   messages: {
     en: {
-      rum: { learnWebVitalsLabel: "Learn about Web Vitals", clickHereLabel: "Click here" },
+      rum: {
+        learnWebVitalsLabel: "Learn about Web Vitals",
+        clickHereLabel: "Click here",
+        webVitalsBrowserOnlyTitle: "Browser Web Vitals not available",
+        webVitalsBrowserOnlyDescription:
+          "This organization only has mobile RUM data. Web Vitals require data from the Browser RUM SDK.",
+      },
     },
   },
 });
@@ -72,6 +110,52 @@ const i18n = createI18n({
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+// Columns the component gates on — mirrors WEB_VITAL_FIELDS in the component.
+const WEB_VITAL_FIELDS = [
+  "view_largest_contentful_paint",
+  "view_interaction_to_next_paint",
+  "view_cumulative_layout_shift",
+  "view_first_contentful_paint",
+  "view_first_byte",
+  "view_loading_time",
+];
+
+function buildSchemaMap(fieldNames: string[]): Record<string, any> {
+  const schemaMap: Record<string, any> = {};
+  fieldNames.forEach((name) => {
+    schemaMap[name] = { name };
+  });
+  return schemaMap;
+}
+
+// A schema map containing every field the dashboard gates on (browser RUM data).
+const browserSchemaMap = buildSchemaMap(WEB_VITAL_FIELDS);
+
+// A non-empty schema map lacking every gated field (mobile-only RUM data).
+const mobileOnlySchemaMap = buildSchemaMap(["view_name", "session_id"]);
+
+// Seeds the shared performanceState with an already-known `_rumdata` schema so
+// that ensureRumSchema() short-circuits without calling getStream.
+function seedRumSchema(schemaMap: Record<string, any> | null) {
+  if (schemaMap === null) {
+    delete mockPerformanceState.data.streams["_rumdata"];
+    return;
+  }
+  mockPerformanceState.data.streams["_rumdata"] = { schema: schemaMap, name: "_rumdata" };
+}
+
+// Creates a promise together with externally-callable resolve/reject handles,
+// used to control exactly when getStream settles during a test.
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: any) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
 
 const defaultProps = {
   dateTime: {
@@ -110,6 +194,18 @@ function createWrapper(props: Record<string, any> = {}) {
 
 describe("WebVitalsDashboard", () => {
   let wrapper: ReturnType<typeof createWrapper>;
+
+  beforeEach(() => {
+    // Start every test with no known `_rumdata` schema and a clean getStream
+    // mock — individual tests/describes opt into a seeded schema as needed.
+    seedRumSchema(null);
+    mockGetStream.mockReset();
+
+    // Reset the route query to its default shape between tests.
+    mockRouteQuery.dashboard = "test-dashboard";
+    mockRouteQuery.folder = "test-folder";
+    mockRouteQuery.org_identifier = "test-org";
+  });
 
   afterEach(() => {
     wrapper?.unmount();
@@ -200,8 +296,12 @@ describe("WebVitalsDashboard", () => {
   });
 
   describe("template rendering", () => {
-    beforeEach(() => {
+    beforeEach(async () => {
+      // A known browser schema means ensureRumSchema resolves without ever
+      // calling getStream, so the dashboard branch renders after one flush.
+      seedRumSchema(browserSchemaMap);
       wrapper = createWrapper();
+      await flushPromises();
     });
 
     it("renders the performance-dashboard container", () => {
@@ -309,6 +409,22 @@ describe("WebVitalsDashboard", () => {
       // Assert
       expect(wrapper.vm.currentDashboardData.data).toBeDefined();
     });
+
+    it("keeps the converted dashboard data untouched when it already has variables", async () => {
+      // Arrange
+      const dashboardWithVariables = {
+        title: "Web Vitals Dashboard",
+        panels: [],
+        variables: { list: [{ name: "service" }] },
+      };
+      vi.mocked(mockConvertDashboardSchemaVersion).mockReturnValueOnce(dashboardWithVariables);
+
+      // Act
+      await wrapper.vm.loadDashboard();
+
+      // Assert
+      expect(wrapper.vm.currentDashboardData.data).toEqual(dashboardWithVariables);
+    });
   });
 
   describe("router navigation", () => {
@@ -345,6 +461,34 @@ describe("WebVitalsDashboard", () => {
       expect(mockRouterPush).toHaveBeenCalledWith({
         path: "/dashboards/add_panel",
         query: { dashboard: "test-dashboard", folder: "test-folder" },
+      });
+    });
+
+    it("falls back to the default folder in goBackToDashboardList when route query has no folder", () => {
+      // Arrange
+      mockRouteQuery.folder = undefined;
+
+      // Act
+      wrapper.vm.goBackToDashboardList();
+
+      // Assert
+      expect(mockRouterPush).toHaveBeenCalledWith({
+        path: "/dashboards",
+        query: { dashboard: "test-dashboard", folder: "default" },
+      });
+    });
+
+    it("falls back to the default folder in addPanelData when route query has no folder", () => {
+      // Arrange
+      mockRouteQuery.folder = undefined;
+
+      // Act
+      wrapper.vm.addPanelData();
+
+      // Assert
+      expect(mockRouterPush).toHaveBeenCalledWith({
+        path: "/dashboards/add_panel",
+        query: { dashboard: "test-dashboard", folder: "default" },
       });
     });
   });
@@ -481,17 +625,25 @@ describe("WebVitalsDashboard", () => {
   });
 
   describe("i18n label rendering", () => {
-    it("renders the learnWebVitalsLabel text from i18n", () => {
+    beforeEach(() => {
+      // Known browser schema so the dashboard (not the loading/empty gate)
+      // branch renders the i18n-driven labels under test.
+      seedRumSchema(browserSchemaMap);
+    });
+
+    it("renders the learnWebVitalsLabel text from i18n", async () => {
       // Arrange + Act
       wrapper = createWrapper();
+      await flushPromises();
 
       // Assert
       expect(wrapper.text()).toContain("Learn about Web Vitals");
     });
 
-    it("renders the clickHereLabel text from i18n", () => {
+    it("renders the clickHereLabel text from i18n", async () => {
       // Arrange + Act
       wrapper = createWrapper();
+      await flushPromises();
 
       // Assert
       expect(wrapper.text()).toContain("Click here");
@@ -525,6 +677,127 @@ describe("WebVitalsDashboard", () => {
 
       // Assert
       expect(wrapper.vm.store.state.selectedOrganization.identifier).toBe("test-org");
+    });
+  });
+
+  describe("browser-only schema gating", () => {
+    it("shows the schema-loading spinner before the schema resolves and does not render the dashboard", async () => {
+      // Arrange
+      const { promise, resolve } = deferred<{ schema: any[] }>();
+      mockGetStream.mockReturnValueOnce(promise);
+
+      // Act
+      wrapper = createWrapper();
+
+      // Assert
+      expect(wrapper.find('[data-test="web-vitals-dashboard-schema-loading"]').exists()).toBe(
+        true,
+      );
+      expect(wrapper.text()).toContain("Loading Dashboard");
+      expect(wrapper.find('[data-test="learn-web-vitals-link"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="render-dashboard-charts"]').exists()).toBe(false);
+      expect(
+        wrapper.find('[data-test="web-vitals-dashboard-browser-only-empty"]').exists(),
+      ).toBe(false);
+
+      // Cleanup — settle the pending promise so it doesn't leak into other tests
+      resolve({ schema: [] });
+      await flushPromises();
+    });
+
+    it("renders the dashboard when the resolved schema contains browser web-vital fields", async () => {
+      // Arrange
+      mockGetStream.mockResolvedValueOnce({
+        schema: WEB_VITAL_FIELDS.map((name) => ({ name })),
+      });
+
+      // Act
+      wrapper = createWrapper();
+      await flushPromises();
+
+      // Assert
+      expect(mockGetStream).toHaveBeenCalledWith("_rumdata", "logs", true);
+      expect(wrapper.find('[data-test="web-vitals-dashboard-schema-loading"]').exists()).toBe(
+        false,
+      );
+      expect(
+        wrapper.find('[data-test="web-vitals-dashboard-browser-only-empty"]').exists(),
+      ).toBe(false);
+      expect(wrapper.find('[data-test="learn-web-vitals-link"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="render-dashboard-charts"]').exists()).toBe(true);
+    });
+
+    it("renders the browser-only empty state when the resolved schema lacks every web-vital field", async () => {
+      // Arrange
+      mockGetStream.mockResolvedValueOnce({
+        schema: [{ name: "view_name" }, { name: "session_id" }],
+      });
+
+      // Act
+      wrapper = createWrapper();
+      await flushPromises();
+
+      // Assert
+      const emptyState = wrapper.find('[data-test="web-vitals-dashboard-browser-only-empty"]');
+      expect(emptyState.exists()).toBe(true);
+      expect(emptyState.text()).toContain("Browser Web Vitals not available");
+      expect(emptyState.text()).toContain(
+        "This organization only has mobile RUM data. Web Vitals require data from the Browser RUM SDK.",
+      );
+      expect(wrapper.find('[data-test="learn-web-vitals-link"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="render-dashboard-charts"]').exists()).toBe(false);
+    });
+
+    it("does not call getStream when the shared performanceState already has the _rumdata schema", async () => {
+      // Arrange
+      seedRumSchema(browserSchemaMap);
+
+      // Act
+      wrapper = createWrapper();
+      await flushPromises();
+
+      // Assert
+      expect(mockGetStream).not.toHaveBeenCalled();
+      expect(wrapper.find('[data-test="learn-web-vitals-link"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="render-dashboard-charts"]').exists()).toBe(true);
+      expect(
+        wrapper.find('[data-test="web-vitals-dashboard-browser-only-empty"]').exists(),
+      ).toBe(false);
+    });
+
+    it("does not call getStream and renders the empty state when a shared mobile-only schema is already known", async () => {
+      // Arrange
+      seedRumSchema(mobileOnlySchemaMap);
+
+      // Act
+      wrapper = createWrapper();
+      await flushPromises();
+
+      // Assert
+      expect(mockGetStream).not.toHaveBeenCalled();
+      expect(
+        wrapper.find('[data-test="web-vitals-dashboard-browser-only-empty"]').exists(),
+      ).toBe(true);
+      expect(wrapper.find('[data-test="learn-web-vitals-link"]').exists()).toBe(false);
+    });
+
+    it("falls back to rendering the dashboard when getStream rejects and the schema stays inconclusive", async () => {
+      // Arrange
+      mockGetStream.mockRejectedValueOnce(new Error("network error"));
+
+      // Act
+      wrapper = createWrapper();
+      await flushPromises();
+
+      // Assert
+      expect(wrapper.find('[data-test="web-vitals-dashboard-schema-loading"]').exists()).toBe(
+        false,
+      );
+      expect(
+        wrapper.find('[data-test="web-vitals-dashboard-browser-only-empty"]').exists(),
+      ).toBe(false);
+      expect(wrapper.find('[data-test="learn-web-vitals-link"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="render-dashboard-charts"]').exists()).toBe(true);
     });
   });
 });
