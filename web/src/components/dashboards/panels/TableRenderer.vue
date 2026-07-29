@@ -37,6 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :custom-pagination-bar="showPagination"
       :horizontal-scroll="isPivot"
       :row-height="22"
+      :virtual-scroll="!isPivot"
       :default-columns="false"
       :show-global-filter="false"
       :enable-column-filter="enableFiltering"
