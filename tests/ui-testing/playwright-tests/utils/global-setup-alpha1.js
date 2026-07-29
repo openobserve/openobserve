@@ -484,7 +484,11 @@ async function performGlobalIngestion(page) {
 
   try {
     const cloudConfig = JSON.parse(fs.readFileSync(CLOUD_CONFIG_FILE, 'utf-8'));
-    orgId = cloudConfig.orgIdentifier;
+    // Ingest into THIS shard's org (ORGNAME) rather than the org baked into
+    // cloud-config.json by the shared-auth barrier. The passcode is user-level
+    // (identity), so it authorizes any org the user is a member of — only the
+    // target org differs per shard. Enables per-shard org isolation.
+    orgId = process.env.ORGNAME || cloudConfig.orgIdentifier;
     const basicAuth = Buffer.from(`${cloudConfig.userEmail}:${cloudConfig.passcode}`).toString('base64');
     headers = {
       'Authorization': `Basic ${basicAuth}`,
@@ -628,7 +632,11 @@ async function performGlobalIngestionWithFetch() {
 
   try {
     const cloudConfig = JSON.parse(fs.readFileSync(CLOUD_CONFIG_FILE, 'utf-8'));
-    orgId = cloudConfig.orgIdentifier;
+    // Ingest into THIS shard's org (ORGNAME) rather than the org baked into
+    // cloud-config.json by the shared-auth barrier. The passcode is user-level
+    // (identity), so it authorizes any org the user is a member of — only the
+    // target org differs per shard. Enables per-shard org isolation.
+    orgId = process.env.ORGNAME || cloudConfig.orgIdentifier;
     const basicAuth = Buffer.from(`${cloudConfig.userEmail}:${cloudConfig.passcode}`).toString('base64');
     headers = {
       'Authorization': `Basic ${basicAuth}`,
