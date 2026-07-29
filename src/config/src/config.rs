@@ -1013,6 +1013,12 @@ pub struct Common {
         help = "File format for data storage: parquet or vortex"
     )]
     pub file_format: FileFormat,
+    #[env_config(
+        name = "ZO_VORTEX_USE_NATIVE_COMPRESSION",
+        default = false,
+        help = "Use Vortex's built-in compression strategy. By default, OpenObserve's custom UTF8/Zstd compressor is used"
+    )]
+    pub vortex_use_native_compression: bool,
     #[env_config(name = "ZO_PARQUET_COMPRESSION", default = "zstd")]
     pub parquet_compression: String,
     #[env_config(
