@@ -12,8 +12,9 @@
 // strictly monotonic-down and NO new raw token can land anywhere — including in a
 // file that still carries pre-existing debt. Improve → re-baseline → commit.
 //
-// Phase B: ratchet mode (this file). Phase G: delete the baseline → zero tolerance
-// (except `stylePxUnit`, which stays ratchet-only per §12.4).
+// Phase B: ratchet mode (this file). Phase G: delete the baseline → zero tolerance.
+//
+// px is not checked here — `local/no-hardcoded-px` (eslint) owns it for every file type.
 import { readFileSync, writeFileSync, readdirSync, statSync, existsSync } from "node:fs";
 import { join, extname, relative } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -146,11 +147,9 @@ const WHOLE = {
   // Arbitrary radius VALUE — but not a CSS keyword (`rounded-[inherit]` etc.),
   // which is not a hardcoded dimension and has no scale-token equivalent.
   arbRadius: /rounded(?:-[a-z]+)*-\[(?!(?:inherit|initial|unset|revert|revert-layer)\])[^\]]+\]/g,
-  arbTextSize: /text-\[[0-9.]+(?:px|rem)\]/g,
   unscopedStyle: /<style(?![^>]*\bscoped\b)[^>]*>/g,
   twPrefix: /\btw:/g,
   helperUtil: /\btext-weight-[a-z]+\b/g,
-  arbPx: /\b(?:gap|p[trblxy]?|m[trblxy]?|w|h|size|min-w|min-h|max-w|max-h|top|left|right|bottom|inset|leading)-\[[0-9.]+px\]/g,
   arbZ: /\bz-\[[0-9]+\]/g,
   // Literal font stacks. The app ships exactly two families, reached only via
   // var(--font-sans) / var(--font-mono) (FONT_AUDIT.md). Anything else resolves
@@ -180,7 +179,6 @@ const WHOLE = {
 // styleBlocks() collects every block regardless of the `scoped` attribute).
 const STYLE_ONLY = {
   styleBlockHex: /#[0-9a-fA-F]{3,8}\b|rgba?\(|hsla?\(/g,
-  stylePxUnit: /\b(?:[2-9]|[0-9]{2,})(?:\.[0-9]+)?px\b/g, // 1px hairlines exempt
   // NOTE: rawVarInComponent (F.6) is NOT a flat regex — it is context-aware and
   // computed by countRawVarInComponent() below. See that function for why.
 };
@@ -191,7 +189,10 @@ function walk(dir, files = []) {
     const full = join(dir, entry);
     const st = statSync(full);
     if (st.isDirectory()) walk(full, files);
-    else if (extname(entry) === ".vue" || extname(entry) === ".ts") files.push(full);
+    // .css joined the walk with the px categories: 11 token/feature stylesheets
+    // were never scanned at all, so any px (or future raw token) in them was
+    // invisible to this guard.
+    else if ([".vue", ".ts", ".css"].includes(extname(entry))) files.push(full);
   }
   return files;
 }
@@ -294,6 +295,9 @@ function countFile(file, rel) {
   const counts = {};
   const isVue = rel.endsWith(".vue");
   const isSpec = rel.includes(".spec.");
+  // Stylesheets have no category here — return early rather than falling into the .ts
+  // branch, whose rules would misfire on token files.
+  if (rel.endsWith(".css")) return counts;
 
   if (isVue) {
     // Per-category sanctioned exceptions (like the .ts allowlists): a file may carry
@@ -324,6 +328,7 @@ function countFile(file, rel) {
     if (rawVar) counts.rawVarInComponent = rawVar;
     const unjustified = countUnjustifiedBlocks(text);
     if (unjustified) counts.styleKeepComment = unjustified;
+
   } else {
     // .ts — only tsHex (non-spec, non-allowlisted) and darkMechanism apply.
     // Allowlist entry ending in "/" matches by directory prefix, else by suffix.

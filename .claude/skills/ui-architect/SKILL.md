@@ -8,7 +8,11 @@ description: >-
   O2 library components in web/src/lib — never bare HTML controls when an O2
   equivalent exists, (3) no hardcoded px anywhere — including inside
   Tailwind class arbitrary values ([320px]) — size with rem/%/vh/vw or Tailwind's
-  rem-based scale, and corner radius uses only the two-tier scale rounded-default
+  rem-based scale (1rem = 16px, so px/16 = rem and px/4 = the Tailwind step;
+  enforced by the local/no-hardcoded-px eslint rule, with a documented exemption
+  list for the positions where px is genuinely correct — hairlines, shadow/ring
+  widths, query conditions, canvas/email consumers) in web/scripts/px-rules.mjs;
+  and corner radius uses only the two-tier scale rounded-default
   (4px controls) / rounded-surface (12px surfaces) / rounded-full — never
   rounded-[..] or the retired rounded-sm/md/lg/xl, (4) no scoped-CSS blocks and no
   inline style="", (5) never hardcode colors/sizes and never reach a token by raw
@@ -74,8 +78,29 @@ read it once, it is the backbone of everything below.
    (`variant` / `size` / state), never by appearance overrides.
 3. **No hardcoded `px`** — size with `rem` / `%` / `vh` / `vw`, or Tailwind's
    rem-based scale. This applies **inside class arbitrary values too** (`w-[320px]`,
-   `text-[13px]`, `gap-[6px]` are all banned — convert to `rem`). The only allowed
-   `px` is a `1px` hairline border/divider.
+   `text-[13px]`, `gap-[6px]` are all banned — convert to `rem`).
+   **CI-enforced by `local/no-hardcoded-px`** (eslint), run by `lint:ci` over
+   `src/**/*.{vue,ts,css}`. It reports line:column with the rem value and the Tailwind
+   step, and surfaces in the editor as you type. Rules: `web/scripts/px-rules.mjs`.
+   - **Conversion:** `1rem = 16px` (the app sets no `html { font-size }`, so root is
+     the browser default). So `px ÷ 16` → rem, and `px ÷ 4` → the Tailwind scale
+     step: `300px` → `18.75rem` → `w-75`. Fractional steps are valid (`w-62.5`).
+   - **`px` IS correct in these positions — do NOT "fix" them.** rem there is either
+     wrong or does not resolve at all. The exemption list lives in `px-rules.mjs`.
+     | Position | Why px |
+     | --- | --- |
+     | Hairlines and sub-pixel geometry `≤1.5px` (borders, dividers, rings, half-hairline offsets, gradient dot radii) | A 1-device-pixel rule must not scale with text, or it anti-aliases into a smear — or drops out entirely — at non-integer zoom and DPR |
+     | **Exception:** `letter-spacing` / `word-spacing` / `tracking-[…]` at ANY size | Tracking is *typographic* — it must scale with the type it tracks, so it never earns the sub-pixel exemption. `tracking-[0.5px]` is a violation; use rem (or `tracking-tight`/`-normal`/`-wide` if the value matches) |
+     | Shadow offsets, ring / border / outline widths, blur radii | Optical effects, not layout. Scaling them with text makes elevation bloom |
+     | Media / container query **conditions** (`@max-[900px]/topbar`) | A threshold defining *when* layout changes, not a rendered length |
+     | `calc()` mixing `vh`/`vw` with a length | `vh` tracks the window, `rem` tracks font-size — converting one term makes the result depend on two independent variables |
+     | `calc(var(--x) * 1px)` | A unit-conversion *operator* attaching a unit to a unitless JS-computed number, not a chosen dimension |
+     | Canvas / ECharts / email consumers | No CSS cascade exists there — a detached measurement `<canvas>` has no root to resolve `rem` against, and an email resolves against the *recipient's* mail client |
+     | `<svg width>` / `<img width>` attributes | SVG's attribute length grammar doesn't reliably accept `rem`; HTML dimension attributes take a bare integer |
+     | Comments (`--text-xs: 0.75rem; /* 12px */`) | The px annotation is the *point* — nobody reads `0.75rem` and pictures a size |
+   - **A size that JS parses with `parseInt` must stay px.** `parseInt("18.75rem")`
+     is `18`, not `300` — a silent 16× shrink with no error and no failing test. If a
+     value is read back by JS arithmetic, leave it in px rather than converting it.
    - **Font size — never `text-[..px/rem]`; pick the type-scale utility by role:**
 
      | Utility | px | Use for |

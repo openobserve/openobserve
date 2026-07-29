@@ -7,6 +7,8 @@ import prettier from "eslint-plugin-prettier";
 import vuePrettierSkipFormatting from "@vue/eslint-config-prettier/skip-formatting";
 import cypress from "eslint-plugin-cypress";
 import fs from "fs";
+import css from "@eslint/css";
+import { PX_FILE_ALLOWLIST, PX_LITERAL, pxIsAllowed, maskCommentsForPx } from "./scripts/px-rules.mjs";
 
 // Bans the legacy --o2-* CSS custom-property vocabulary anywhere in a .vue/.ts
 // file's raw text — catches Tailwind arbitrary-value usages in templates
@@ -72,6 +74,52 @@ const noLegacyO2Tokens = {
   },
 };
 
+// ── no-hardcoded-px ────────────────────────────────────────────────────────
+// Sizing is authored in rem. Rules live in scripts/px-rules.mjs; this is their only
+// consumer, covering .vue, .ts and .css (the .css block below supplies the language).
+const noHardcodedPx = {
+  rules: {
+    "no-hardcoded-px": {
+      meta: {
+        type: "problem",
+        docs: { description: "Size in rem, not px" },
+      },
+      create(context) {
+        const filename = (context.filename ?? context.getFilename() ?? "").replace(/\\/g, "/");
+        if (/\.spec\.|\.test\.|\/tests?\//.test(filename)) return {};
+        if (
+          PX_FILE_ALLOWLIST.some((p) => (p.endsWith("/") ? filename.includes(p) : filename.endsWith(p)))
+        )
+          return {};
+        const scan = () => {
+          const sourceCode = context.sourceCode ?? context.getSourceCode();
+          const text = sourceCode.getText();
+          const masked = maskCommentsForPx(text);
+          let match;
+          PX_LITERAL.lastIndex = 0;
+          while ((match = PX_LITERAL.exec(masked))) {
+            if (pxIsAllowed(text, match.index, match[1])) continue;
+            const px = parseFloat(match[1]);
+            const asRem = parseFloat((px / 16).toFixed(6));
+            const scale = px / 4;
+            const hint = Number.isInteger(scale * 2) ? ` (or the Tailwind scale step ${scale})` : "";
+            context.report({
+              loc: {
+                start: sourceCode.getLocFromIndex(match.index),
+                end: sourceCode.getLocFromIndex(match.index + match[0].length),
+              },
+              message: `Hardcoded ${match[0]}. Size in rem: use ${asRem}rem${hint}. If px is genuinely required (hairline, shadow/ring width, query condition, canvas/email/SVG consumer), add it to the exemptions in scripts/px-rules.mjs.`,
+            });
+          }
+        };
+        // One visitor per language root: JS/TS/Vue give `Program`, @eslint/css gives
+        // `StyleSheet`. Registering only one makes the rule silently no-op on the other.
+        return { Program: scan, StyleSheet: scan };
+      },
+    },
+  },
+};
+
 // Read .gitignore to use as ignore patterns
 const gitignore = fs.existsSync(".gitignore")
   ? fs
@@ -95,8 +143,10 @@ export default [
       ".vscode/**",
     ],
   },
-  js.configs.recommended,
-  ...vue.configs["flat/essential"],
+  // Scoped: without `files` these apply to .css too, where JS/Vue rules crash on a
+  // CSS SourceCode.
+  { ...js.configs.recommended, files: ["**/*.{js,mjs,cjs,ts,tsx,vue}"] },
+  ...vue.configs["flat/essential"].map((c) => ({ ...c, files: ["**/*.vue"] })),
   {
     files: ["**/*.{js,mjs,cjs,ts,tsx,vue}"],
     ignores: [
@@ -122,10 +172,11 @@ export default [
       vue,
       "@typescript-eslint": typescript,
       prettier,
-      local: noLegacyO2Tokens,
+      local: { rules: { ...noLegacyO2Tokens.rules, ...noHardcodedPx.rules } },
     },
     rules: {
       "local/no-legacy-o2-tokens": ["error"],
+      "local/no-hardcoded-px": ["error"],
 
       // Catches components used in <template> but never imported/registered
       // (e.g. <date-time> instead of <DateTime>) — this class of bug is
@@ -260,6 +311,18 @@ export default [
     rules: {
       ...cypress.configs.recommended.rules,
     },
+  },
+  // ── Stylesheets ──────────────────────────────────────────────────────────
+  // Only no-hardcoded-px runs here; colour/token rules for stylesheets stay with
+  // stylelint (lint:styles).
+  {
+    files: ["**/*.css"],
+    language: "css/css",
+    // Tailwind v4 syntax (`--color-*: initial`, @custom-variant, @plugin, @source)
+    // is not standard CSS; tolerant mode skips it instead of erroring.
+    languageOptions: { tolerant: true },
+    plugins: { css, local: { rules: { ...noHardcodedPx.rules } } },
+    rules: { "local/no-hardcoded-px": ["error"] },
   },
   // Must be last: disables core/TS/Vue stylistic rules that could conflict
   // with Prettier's formatting decisions. Formatting is owned by `format:check`,

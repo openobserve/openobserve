@@ -3,9 +3,6 @@
     "rawVarInComponent": 103
   },
   "files": {
-    "components/O2AIChat.vue": {
-      "rawVarInComponent": 1
-    },
     "components/alerts/AlertInsightsContextMenu.vue": {
       "rawVarInComponent": 2
     },
@@ -16,6 +13,9 @@
       "rawVarInComponent": 4
     },
     "components/ingestion/ai/content/AIIntegrationCard.vue": {
+      "rawVarInComponent": 1
+    },
+    "components/O2AIChat.vue": {
       "rawVarInComponent": 1
     },
     "components/rum/errorTracking/view/ErrorEvents.vue": {
