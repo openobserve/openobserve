@@ -105,6 +105,9 @@ export function useSyntheticResults() {
     flakySteps: [],
     trendBuckets: [],
     failureInstances: [],
+    // Same shape `emptyStepStats()` returns; the initial value was missed when
+    // `coverage` was added, and only `tsconfig.app.json` is strict enough to say so.
+    coverage: { executions: 0, fromMs: 0, toMs: 0, truncated: false },
   });
 
   // ── Stream schema fields ─────────────────────────────────────────────────

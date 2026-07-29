@@ -211,7 +211,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :evidence-key="evidenceKey"
                 :resolve-url="screenshotUrl"
                 :step-defs="evidenceStepDefs"
-                :record-truncated="synthetics.runDetail.value?.evidenceTruncated ?? false"
+                :record-truncated="evidenceTruncated"
                 :run-passed="currentRun.status === 'pass'"
               />
             </OTabPanel>
@@ -499,7 +499,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               v-if="row.evidence"
                               :detail="row.evidence"
                               :evidence="row.appEvidence"
-                              :truncated="detail?.evidenceTruncated"
+                              :truncated="evidenceTruncated"
                               class="mt-3"
                             />
                           </div>
@@ -904,6 +904,9 @@ function screenshotUrl(key: string | null): string {
 const detailTab = ref<"steps" | "evidence">("steps");
 
 /** The SELECTED attempt's own bundle — attempt 0 bare, retries `attempt-N-`. */
+/** `evidence_truncated` from the record, for both the step rows and the panel. */
+const evidenceTruncated = computed(() => synthetics.runDetail.value?.evidenceTruncated ?? false);
+
 const evidenceKey = computed(
   () => currentAttempt.value?.evidenceKey ?? synthetics.runDetail.value?.evidenceKey ?? null,
 );
