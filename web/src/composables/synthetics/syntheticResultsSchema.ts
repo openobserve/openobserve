@@ -364,6 +364,200 @@ export interface StepEvidence {
   firstConsoleErrors: string[];
 }
 
+// ── Evidence bundle (evidence.ndjson) ──────────────────────────────────────
+//
+// The bundle is the full browser-side log for one ATTEMPT: console messages,
+// page errors, and network requests/responses, each attributed to the step whose
+// window it fell in. `evidence_by_step` on the record is only an anomaly INDEX —
+// `summarise()` emits a row solely for a step that had a console error, a page
+// error, a failed request or a non-2xx response. A run whose network was healthy
+// therefore carries an empty index while the bundle holds every event, which is
+// why the panel reads the bundle rather than the index.
+
+export type EvidenceKind =
+  | "console"
+  | "pageerror"
+  | "response"
+  | "requestfailed"
+  | "dialog"
+  | "crash"
+  | "truncation";
+
+export interface EvidenceEvent {
+  /** When the event was OBSERVED. */
+  ts: number;
+  /** Which step's window it fell in. Absent if bucketing could not attribute it. */
+  stepId: string | null;
+  kind: EvidenceKind;
+  // console
+  level: string | null;
+  text: string | null;
+  // pageerror / crash / dialog
+  message: string | null;
+  stack: string | null;
+  // network
+  method: string | null;
+  url: string | null;
+  status: number | null;
+  resourceType: string | null;
+  /**
+   * When the request STARTED, which is what the event is bucketed on.
+   *
+   * Kept alongside `ts` because work begun in step 9 routinely completes during
+   * step 10; collapsing them would hide the ambiguity rather than show it.
+   */
+  initiatedTs: number | null;
+  durationMs: number | null;
+  firstParty: boolean;
+}
+
+/** One step's events, in the order they were initiated. */
+export interface EvidenceGroup {
+  stepId: string;
+  /** Resolved from `recorded_steps`; falls back to the raw id, never blank. */
+  stepName: string;
+  events: EvidenceEvent[];
+  /** True for the step the run failed on — the panel anchors and marks it. */
+  failing: boolean;
+}
+
+export interface EvidenceBundle {
+  events: EvidenceEvent[];
+  groups: EvidenceGroup[];
+  counts: {
+    all: number;
+    consoleErrors: number;
+    pageErrors: number;
+    requestsFailed: number;
+    nonNon2xx: number;
+  };
+  /** A `truncation` event in the stream, or `evidence_truncated` on the record. */
+  truncated: boolean;
+}
+
+function evidenceNum(v: unknown): number | null {
+  return typeof v === "number" && Number.isFinite(v) ? v : null;
+}
+
+/**
+ * Parse one NDJSON bundle.
+ *
+ * NDJSON, not JSON — one object per line. `JSON.parse` on the whole payload
+ * fails, which is why the download button must not be labelled "JSON" either.
+ *
+ * Parsed per line and guarded per line: a single malformed line drops that line
+ * rather than the panel. A truncated upload ends mid-line by construction, so
+ * this is the expected case at the cap, not a corruption.
+ */
+export function parseEvidenceNdjson(text: string): EvidenceEvent[] {
+  const out: EvidenceEvent[] = [];
+  for (const line of text.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    let e: any;
+    try {
+      e = JSON.parse(trimmed);
+    } catch {
+      continue;
+    }
+    if (!e || typeof e !== "object") continue;
+    out.push({
+      ts: evidenceNum(e.ts) ?? 0,
+      stepId: e.step_id ? str(e.step_id) : null,
+      kind: (e.kind ?? "response") as EvidenceKind,
+      level: e.level ? str(e.level) : null,
+      text: e.text ? str(e.text) : null,
+      message: e.message ? str(e.message) : null,
+      stack: e.stack ? str(e.stack) : null,
+      method: e.method ? str(e.method) : null,
+      url: e.url ? str(e.url) : null,
+      status: evidenceNum(e.status),
+      resourceType: e.resource_type ? str(e.resource_type) : null,
+      initiatedTs: evidenceNum(e.initiated_ts),
+      durationMs: evidenceNum(e.duration_ms),
+      firstParty: e.first_party !== false,
+    });
+  }
+  return out;
+}
+
+/** Is this event something an engineer would call a problem? */
+export function isEvidenceAnomaly(e: EvidenceEvent): boolean {
+  if (e.kind === "console") return e.level === "error";
+  if (e.kind === "pageerror" || e.kind === "crash" || e.kind === "requestfailed") return true;
+  return e.kind === "response" && (e.status ?? 0) >= 400;
+}
+
+/**
+ * Fold a bundle into the panel's view model.
+ *
+ * Grouped by step and ordered by step order, because attribution is the whole
+ * point: "what was the page doing when step 20 timed out" is unanswerable from a
+ * flat time-ordered list of 2000 events.
+ *
+ * The failing step gets a group EVEN WITH ZERO EVENTS. "Nothing happened here"
+ * is a finding — it is what distinguishes a locator that never matched from a
+ * request that 500'd — and it is the common case, so omitting the group would
+ * leave the panel looking broken on exactly the runs people open it for.
+ */
+export function foldEvidenceBundle(
+  events: EvidenceEvent[],
+  /** step_id -> name, from `recorded_steps`. Unresolved ids render as the id. */
+  stepDefs: Map<string, { name: string }> | Map<string, { name: string; selector: string | null }>,
+  /** Step order, so groups sort the way the journey ran. */
+  stepOrder: string[],
+  failingStepId: string | null,
+  recordTruncated = false,
+): EvidenceBundle {
+  const byStep = new Map<string, EvidenceEvent[]>();
+  for (const e of events) {
+    // Unattributed events are kept under a stable bucket rather than dropped —
+    // an event nobody could attribute is still evidence.
+    const key = e.stepId ?? "";
+    const list = byStep.get(key);
+    if (list) list.push(e);
+    else byStep.set(key, [e]);
+  }
+
+  const rank = new Map(stepOrder.map((id, i) => [id, i]));
+  const ids = new Set([...byStep.keys()].filter(Boolean));
+  if (failingStepId) ids.add(failingStepId);
+
+  const groups: EvidenceGroup[] = [...ids]
+    .sort((a, b) => (rank.get(a) ?? Number.MAX_SAFE_INTEGER) - (rank.get(b) ?? Number.MAX_SAFE_INTEGER))
+    .map((stepId) => ({
+      stepId,
+      stepName: stepDefs.get(stepId)?.name || stepId,
+      failing: stepId === failingStepId,
+      events: [...(byStep.get(stepId) ?? [])].sort(
+        (x, y) => (x.initiatedTs ?? x.ts) - (y.initiatedTs ?? y.ts),
+      ),
+    }));
+
+  const unattributed = byStep.get("") ?? [];
+  if (unattributed.length) {
+    groups.push({
+      stepId: "",
+      stepName: "",
+      failing: false,
+      events: [...unattributed].sort((x, y) => (x.initiatedTs ?? x.ts) - (y.initiatedTs ?? y.ts)),
+    });
+  }
+
+  return {
+    events,
+    groups,
+    counts: {
+      all: events.length,
+      consoleErrors: events.filter((e) => e.kind === "console" && e.level === "error").length,
+      pageErrors: events.filter((e) => e.kind === "pageerror" || e.kind === "crash").length,
+      requestsFailed: events.filter((e) => e.kind === "requestfailed").length,
+      nonNon2xx: events.filter((e) => e.kind === "response" && (e.status ?? 0) >= 400).length,
+    },
+    truncated: recordTruncated || events.some((e) => e.kind === "truncation"),
+  };
+}
+
 export interface NetworkStats {
   requests: number;
   failed: number;
@@ -1212,8 +1406,12 @@ export function mapRun(rawHit: Record<string, unknown>): SyntheticRun {
  * navigation a step triggers), which on a real journey is most of the time.
  */
 function mapRetryHistory(raw: unknown): RetryAttempt[] {
-  if (!Array.isArray(raw)) return [];
-  return raw.map((a: any, i: number) => {
+  // `parseJsonArray`, not `Array.isArray`: the search API hands blob columns
+  // back as JSON STRINGS. Guarding on Array.isArray meant this returned [] for
+  // every real row, so the attempts strip could never render no matter what the
+  // query selected — `aggregateStepStats` already parsed the same column
+  // correctly, which is what hid the asymmetry.
+  return parseJsonArray(raw).map((a: any, i: number) => {
     const steps: StepExecution[] = Array.isArray(a?.steps) ? a.steps : [];
     const summed = steps.reduce((sum, st) => sum + (st.duration_ms ?? 0), 0);
     const refs: Array<{ step_id?: unknown; key?: unknown }> = Array.isArray(
@@ -1287,8 +1485,8 @@ export function buildAttemptViews(detail: SyntheticRunDetail): AttemptView[] {
 }
 
 function mapEvidence(raw: unknown): StepEvidence[] {
-  if (!Array.isArray(raw)) return [];
-  return raw.map((e: any) => ({
+  // Same string-vs-array trap as mapRetryHistory.
+  return parseJsonArray(raw).map((e: any) => ({
     stepId: str(e?.step_id),
     consoleErrors: e?.console_errors ?? 0,
     pageErrors: e?.page_errors ?? 0,
@@ -1401,7 +1599,9 @@ export function mapRunDetail(rawHit: Record<string, unknown>): SyntheticRunDetai
     // record, so the count rendered as 0 and the retry chip never appeared.
     // `retry_history` is the fallback — with every attempt recorded, its length
     // is the same number.
-    attempts: num(rawHit.attempts) || (Array.isArray(rawHit.retry_history) ? rawHit.retry_history.length : 0),
+    // `parseJsonArray` on the fallback too — `retry_history` arrives as a JSON
+    // string, so `Array.isArray` made this branch dead for every real record.
+    attempts: num(rawHit.attempts) || parseJsonArray(rawHit.retry_history).length,
     failedStep: rawHit.failed_step
       ? str(rawHit.failed_step)
       : (rawStepsArr.find((s: any) => s.status === "fail" || s.status === "failed")?.step_id ??

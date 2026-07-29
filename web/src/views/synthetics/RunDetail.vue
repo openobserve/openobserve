@@ -157,6 +157,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
 
+        <!-- Evidence, below the steps: the step timeline has to stay visible while
+             reading events, since attribution is the whole point. Collapsed by
+             default and fetched only on open — the bundle runs to 256 KB at the
+             cap and most runs are never inspected this deeply. -->
+        <OCard v-if="!loading && !isErrorRun" class="mt-2 gap-0 p-0">
+          <OCardSection role="header" class="gap-2">
+            <button
+              type="button"
+              class="text-text-body flex w-full items-center gap-2 text-left text-sm"
+              data-test="synthetics-run-detail-evidence-toggle"
+              @click="evidenceOpen = !evidenceOpen"
+            >
+              <OIcon :name="evidenceOpen ? 'expand_more' : 'chevron_right'" size="sm" />
+              {{ t("synthetics.runDetail.evidenceSection") }}
+              <span v-if="!evidenceKey" class="text-text-secondary text-xs">
+                — {{ t("synthetics.evidence.none") }}
+              </span>
+            </button>
+          </OCardSection>
+          <template v-if="evidenceOpen">
+            <OSeparator />
+            <OCardSection role="body" class="p-0">
+              <EvidencePanel
+                :evidence-key="evidenceKey"
+                :resolve-url="screenshotUrl"
+                :step-defs="evidenceStepDefs"
+                :step-order="evidenceStepOrder"
+                :failing-step-id="evidenceFailingStepId"
+                :record-truncated="synthetics.runDetail.value?.evidenceTruncated ?? false"
+                :run-passed="currentRun.status === 'pass'"
+              />
+            </OCardSection>
+          </template>
+        </OCard>
+
         <!-- Attempts strip — hidden entirely on a run that never retried. -->
         <AttemptStrip
           v-if="!loading"
@@ -532,6 +567,7 @@ import type { StepDotState } from "@/components/synthetics/journey/JourneySteps.
 import useSyntheticResults from "@/composables/useSyntheticResults";
 import ProtocolRunSummary from "@/components/synthetics/results/ProtocolRunSummary.vue";
 import AttemptStrip from "@/components/synthetics/results/AttemptStrip.vue";
+import EvidencePanel from "@/components/synthetics/results/EvidencePanel.vue";
 import { buildAttemptViews } from "@/composables/synthetics/syntheticResultsSchema";
 import type {
   AttemptView,
@@ -787,7 +823,14 @@ async function presignRunArtifacts() {
   const keys = [
     ...detail.lastAttemptSteps.map((s) => s.screenshot_key),
     detail.traceKey,
-    ...detail.retryHistory.flatMap((a) => [...a.screenshotKeys.values(), a.traceKey]),
+    detail.evidenceKey,
+    // Evidence bundles as well as screenshots and traces, so opening the
+    // Evidence tab and switching attempts inside it cost no further round-trip.
+    ...detail.retryHistory.flatMap((a) => [
+      ...a.screenshotKeys.values(),
+      a.traceKey,
+      a.evidenceKey,
+    ]),
   ].filter((k): k is string => !!k);
   if (!keys.length) return;
   const orgId = store.state.selectedOrganization.identifier;
@@ -825,6 +868,37 @@ function screenshotUrl(key: string | null): string {
   const orgId = store.state.selectedOrganization.identifier;
   return syntheticsService.artifactUrl(orgId, key, folderName.value);
 }
+
+// ── Evidence tab ──────────────────────────────────────────────────────────
+//
+// The panel reads the BUNDLE, not `evidence_by_step`: that field is an anomaly
+// index and is empty whenever the network behaved, which is the common shape of
+// a browser failure (a locator that never matched).
+const evidenceOpen = ref(false);
+
+/** The SELECTED attempt's own bundle — attempt 0 bare, retries `attempt-N-`. */
+const evidenceKey = computed(
+  () => currentAttempt.value?.evidenceKey ?? synthetics.runDetail.value?.evidenceKey ?? null,
+);
+
+/** step_id -> definition, for naming groups. Reuses the run's own snapshot so a
+ *  later edit to the check cannot relabel this run's history. */
+const evidenceStepDefs = computed(() => {
+  const m = new Map<string, { name: string; selector: string | null }>();
+  for (const rs of synthetics.runDetail.value?.recordedSteps ?? []) {
+    m.set(rs.id, { name: rs.name || rs.id, selector: rs.selector });
+  }
+  return m;
+});
+
+/** Step order as the journey ran, so evidence groups sort correctly. */
+const evidenceStepOrder = computed(() =>
+  (synthetics.runDetail.value?.recordedSteps ?? []).map((rs) => rs.id),
+);
+
+const evidenceFailingStepId = computed(
+  () => currentAttempt.value?.failedStep ?? synthetics.runDetail.value?.failedStep ?? null,
+);
 
 // ── Display model for the current run (mapped from SyntheticRunDetail) ─────
 interface DisplayRun {

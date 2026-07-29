@@ -9773,7 +9773,28 @@
       "sessionReplay": "Ghi lại phát lại phiên",
       "title": "RUM & Phát lại phiên"
     },
+    "evidence": {
+      "title": "Evidence · {count} events",
+      "filterAll": "All",
+      "filterConsole": "Console errors",
+      "filterPageErrors": "Page errors",
+      "filterNon2xx": "Non-2xx",
+      "filterFailedReq": "Failed requests",
+      "firstPartyOnly": "First-party only",
+      "failedHere": "failed here",
+      "noEventsInStep": "No events in this step's window.",
+      "noEvents": "No console, network or page events were captured.",
+      "unattributed": "Not attributed to a step",
+      "truncated": "Capture cap reached (2000 events / 256 KB). Later events are not in this bundle — download to see what was kept.",
+      "captureOff": "Evidence capture is off for this check.",
+      "failuresOnly": "Evidence is kept for failed runs only.",
+      "none": "No evidence bundle was uploaded for this attempt.",
+      "loadFailed": "Could not load the evidence bundle: {error}",
+      "retry": "Retry",
+      "stack": "stack"
+    },
     "runDetail": {
+      "evidenceSection": "Evidence",
       "attempts": "Attempts",
       "attemptsLabel": "{count} attempts",
       "attemptN": "Attempt {n}",

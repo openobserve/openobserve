@@ -114,13 +114,42 @@ export function useSyntheticResults() {
   // is absent until a run has failed, …) and the search API rejects queries
   // naming absent fields. Query builders take this set and substitute
   // literals for missing columns. getStream caches, so repeat calls are cheap.
+  /**
+   * Field names present in the stream schema.
+   *
+   * On failure this returns an EMPTY set, which makes every optional column
+   * select a typed literal instead of its name. That is the only option that
+   * cannot fail — naming a column the schema lacks is rejected outright by the
+   * search API, and the schema genuinely lacks `status_reason` until some run
+   * has been a `warning`.
+   *
+   * The cost is that a schema-fetch failure is indistinguishable from a stream
+   * that has none of these fields: `init_ms` reads 0, `attempts` reads 0 and
+   * `retry_history` reads '', so the run detail renders with no init chip, no
+   * queue delay and no attempts strip — a fetch failure presented as a run that
+   * simply had none of those things.
+   *
+   * Hence the log. It is the only signal that the degraded render is a failure
+   * rather than the data, and it cost real debugging time to work that out once.
+   */
   async function fetchSchemaFields(): Promise<Set<string>> {
     try {
       const stream: any = await getStream(SYNTHETIC_RESULTS_STREAM, "logs", true);
-      return new Set(((stream?.schema ?? []) as { name: string }[]).map((f) => f.name));
-    } catch {
-      // Schema not available — an empty set selects literals for every
-      // optional column, which cannot fail.
+      const fields = ((stream?.schema ?? []) as { name: string }[]).map((f) => f.name);
+      if (!fields.length) {
+        // eslint-disable-next-line no-console
+        console.warn(
+          "[synthetics] stream schema returned no fields; optional columns will render as empty",
+        );
+      }
+      return new Set(fields);
+    } catch (e: unknown) {
+      // eslint-disable-next-line no-console
+      console.warn(
+        "[synthetics] stream schema unavailable — optional columns (init_ms, attempts, " +
+          "retry_history, …) will render as empty, NOT as absent data:",
+        e,
+      );
       return new Set();
     }
   }
