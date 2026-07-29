@@ -38,6 +38,16 @@ pub enum TriggerModule {
     QueryRecommendations,
     Backfill,
     AnomalyDetection,
+    // APPEND ONLY. The implicit discriminant is the value stored in
+    // `scheduled_jobs.module` (this enum is persisted via `sqlx::Type` +
+    // `#[repr(i32)]`, not by name), so inserting a variant above this line
+    // silently remaps every existing row to a different module.
+    /// SLI ingest — one job per enabled SLO, cadence = its slice interval.
+    Slo,
+    /// Bulk historical fill. Its own lane, because a bulk scan sharing a
+    /// concurrency budget with latency-sensitive incremental passes would
+    /// starve them (§6b.9).
+    SloBackfill,
 }
 
 impl std::fmt::Display for TriggerModule {
@@ -49,6 +59,8 @@ impl std::fmt::Display for TriggerModule {
             Self::QueryRecommendations => write!(f, "query_recommendations"),
             Self::Backfill => write!(f, "backfill"),
             Self::AnomalyDetection => write!(f, "anomaly_detection"),
+            Self::Slo => write!(f, "slo"),
+            Self::SloBackfill => write!(f, "slo_backfill"),
         }
     }
 }
@@ -179,6 +191,23 @@ mod tests {
             TriggerModule::AnomalyDetection.to_string(),
             "anomaly_detection"
         );
+        assert_eq!(TriggerModule::Slo.to_string(), "slo");
+        assert_eq!(TriggerModule::SloBackfill.to_string(), "slo_backfill");
+    }
+
+    /// The discriminant IS the stored value. A variant inserted above an
+    /// existing one would remap every `scheduled_jobs` row to a different
+    /// module — silently, with no migration to catch it.
+    #[test]
+    fn trigger_module_discriminants_are_pinned() {
+        assert_eq!(TriggerModule::Report as i32, 0);
+        assert_eq!(TriggerModule::Alert as i32, 1);
+        assert_eq!(TriggerModule::DerivedStream as i32, 2);
+        assert_eq!(TriggerModule::QueryRecommendations as i32, 3);
+        assert_eq!(TriggerModule::Backfill as i32, 4);
+        assert_eq!(TriggerModule::AnomalyDetection as i32, 5);
+        assert_eq!(TriggerModule::Slo as i32, 6);
+        assert_eq!(TriggerModule::SloBackfill as i32, 7);
     }
 
     #[test]

@@ -238,6 +238,10 @@ pub enum TriggerDataType {
     Workflow,
     #[serde(rename = "synthetics")]
     Synthetics,
+    #[serde(rename = "slo")]
+    Slo,
+    #[serde(rename = "slo_backfill")]
+    SloBackfill,
 }
 
 impl TriggerDataType {

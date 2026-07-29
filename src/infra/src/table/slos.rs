@@ -105,6 +105,21 @@ pub async fn list(
         .collect()
 }
 
+/// When the current generation began.
+///
+/// The incremental writer starts its watermark here and backfill owns
+/// strictly before it — the rule that keeps the two writers from ever
+/// emitting the same slice (§6b.9).
+pub async fn generation_reset_time(
+    db: &DatabaseConnection,
+    id: &str,
+) -> Result<Option<i64>, Error> {
+    Ok(slos::Entity::find_by_id(id.to_string())
+        .one(db)
+        .await?
+        .and_then(|m| m.generation_reset_time))
+}
+
 pub async fn count_in_org(db: &DatabaseConnection, org: &str) -> Result<u64, Error> {
     Ok(slos::Entity::find()
         .filter(slos::Column::Org.eq(org))

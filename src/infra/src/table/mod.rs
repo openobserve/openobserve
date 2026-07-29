@@ -62,6 +62,7 @@ pub mod search_queue;
 pub mod service_streams;
 pub mod sessions;
 pub mod slo;
+pub mod slo_backfill_jobs;
 pub mod slo_budget;
 pub mod slos;
 pub mod short_urls;
