@@ -1116,9 +1116,14 @@ describe("WorkflowEditor", () => {
     // Test now dry-runs the whole in-memory graph (sent in the request), so it
     // opens the Test dialog directly whether the workflow is brand-new, has
     // unsaved edits, or is a clean saved workflow — there is no save-first prompt.
-    it("opens the Test dialog directly for a workflow that has never been saved", async () => {
+    // It still requires a runnable graph though: trigger + a connected step.
+    it("opens the Test dialog directly for a never-saved (but connected) graph", async () => {
+      // A create draft (no route id): mount runs startNewWorkflow(), then we build
+      // a valid graph on the canvas before testing.
       wrapper = mountEditor();
       await flushPromises();
+      hydrateWorkflow(savedGraph({ id: "", name: "" }));
+      await nextTick();
 
       await clickTest(wrapper);
 
@@ -1152,6 +1157,55 @@ describe("WorkflowEditor", () => {
 
       expect(workflowObj.testRun.show).toBe(true);
       expect(wrapper.find('[data-test="WorkflowTestDialog"]').exists()).toBe(true);
+    });
+
+    // A draft doesn't need a name to test, but it does need to be runnable: a
+    // trigger plus at least one connected step, no orphan nodes.
+    it("blocks Test with a warning when the graph has only a trigger (no step)", async () => {
+      wrapper = mountEditor();
+      await flushPromises();
+      placeTrigger();
+      await nextTick();
+
+      await clickTest(wrapper);
+
+      expect(workflowObj.testRun.show).toBe(false);
+      expect(wrapper.find('[data-test="WorkflowTestDialog"]').exists()).toBe(false);
+      expect(mockToast).toHaveBeenCalledWith({
+        message: t("workflow.addStepRequired"),
+        variant: "warning",
+      });
+    });
+
+    it("blocks Test with a warning when a node is left unconnected (orphan)", async () => {
+      // trigger + a destination that has NO incoming edge -> orphan.
+      wrapper = mountEditor();
+      await flushPromises();
+      hydrateWorkflow(savedGraph({ id: "", name: "", edges: [] }));
+      await nextTick();
+
+      await clickTest(wrapper);
+
+      expect(workflowObj.testRun.show).toBe(false);
+      expect(mockToast).toHaveBeenCalledWith({
+        message: t("workflow.connectAllNodes"),
+        variant: "warning",
+      });
+    });
+
+    it("does not require a name to test a connected draft", async () => {
+      wrapper = mountEditor();
+      await flushPromises();
+      hydrateWorkflow(savedGraph({ id: "", name: "" }));
+      await nextTick();
+
+      await clickTest(wrapper);
+
+      expect(workflowObj.testRun.show).toBe(true);
+      // no name warning was raised
+      expect(mockToast).not.toHaveBeenCalledWith(
+        expect.objectContaining({ message: t("workflow.nameRequired") }),
+      );
     });
 
     it("renders the per-step result drawer when a node's badge opens it", async () => {

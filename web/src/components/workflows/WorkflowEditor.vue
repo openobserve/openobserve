@@ -364,17 +364,21 @@ const goBack = () => {
 
 const saving = ref(false);
 
-// Frontend validation before hitting the API: name, a trigger, at least one
-// step, and no orphan (unconnected) nodes. Mirrors PipelineEditor's checks.
-const validate = (): boolean => {
+// Frontend validation: a trigger, at least one step (>= 2 nodes), and no orphan
+// (unconnected) nodes. Mirrors PipelineEditor's checks. Save also requires a name
+// (`requireName`); Test skips it — a draft graph is testable before it's named,
+// it just has to be a connected trigger -> step chain.
+const validate = ({ requireName = true }: { requireName?: boolean } = {}): boolean => {
   const wf = workflowObj.currentSelectedWorkflow;
-  const name = (wf.name || "").trim();
-  if (!name) {
-    workflowObj.nameError = true;
-    toast({ message: t("workflow.nameRequired"), variant: "warning" });
-    return false;
+  if (requireName) {
+    const name = (wf.name || "").trim();
+    if (!name) {
+      workflowObj.nameError = true;
+      toast({ message: t("workflow.nameRequired"), variant: "warning" });
+      return false;
+    }
+    workflowObj.nameError = false;
   }
-  workflowObj.nameError = false;
 
   const nodes = wf.nodes || [];
   const trigger = nodes.find((n: any) => n.data?.node_type === "workflow_trigger");
@@ -490,9 +494,11 @@ const onLinkAlertsDone = () => {
 };
 
 // Test dry-runs the current in-memory graph — the whole workflow is sent in the
-// request, so there's no need to save first. Open the Test dialog directly
-// whether the workflow is new, has unsaved edits, or is already saved.
+// request, so there's no need to save first. It must still be a runnable graph
+// though: a trigger plus at least one connected step, no orphan nodes (the same
+// connectivity checks as Save, minus the name requirement).
 const onTest = () => {
+  if (!validate({ requireName: false })) return;
   workflowObj.testRun.show = true;
 };
 
