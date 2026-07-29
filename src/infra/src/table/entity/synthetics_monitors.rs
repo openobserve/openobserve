@@ -33,6 +33,16 @@ pub struct Model {
     /// Denormalised status from the most recent completed check.
     /// 0=Unknown, 1=Up, 2=Warning, 3=Down
     pub last_check_status: i32,
+    /// Runs that have failed back to back; reset to 0 by a pass. Compared
+    /// against `settings.alert_if_fails` to decide whether to notify.
+    pub consecutive_failures: i32,
+    /// When a notification was last sent, in microseconds. 0 = never.
+    /// Compared against `settings.cooldown_mins`.
+    pub last_alert_at: i64,
+    /// Whether the check is currently in the alerting state. Without it,
+    /// "recovered" cannot be told from "was never alerting" — and once a
+    /// cooldown exists, silence stops meaning recovery.
+    pub alerting: bool,
     pub owner: Option<String>,
     pub created_at: i64,
     pub updated_at: i64,
@@ -69,6 +79,9 @@ mod tests {
             next_run_at: 0,
             last_triggered_at: 0,
             last_check_status: 0,
+            consecutive_failures: 0,
+            last_alert_at: 0,
+            alerting: false,
             owner: None,
             created_at: 1750000000000000,
             updated_at: 1750000000000000,

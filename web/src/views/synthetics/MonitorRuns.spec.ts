@@ -162,6 +162,24 @@ vi.mock("@/composables/synthetics/syntheticResultsSchema", () => {
   return {
     deviceIconName,
     deviceLabel,
+    // Real implementation: the tiles read its output, and a stub returning []
+    // would make "no unstable slices" untestable from here.
+    computePartitionStability: (runs: any[]) => {
+      const groups = new Map<string, any[]>();
+      for (const r of runs) {
+        const key = `${r.location}|${r.device}|${r.browserEngine}`;
+        groups.set(key, [...(groups.get(key) ?? []), r]);
+      }
+      return Array.from(groups.entries()).map(([key, group]) => ({
+        key,
+        location: key.split("|")[0],
+        device: key.split("|")[1],
+        engine: key.split("|")[2],
+        executions: group.length,
+        transitions: 0,
+        unstable: false,
+      }));
+    },
   };
 });
 

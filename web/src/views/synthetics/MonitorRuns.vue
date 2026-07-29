@@ -811,6 +811,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- ════════════ STEPS ════════════ -->
           <OTabPanel name="steps">
             <div class="mx-auto flex flex-col gap-2">
+              <!--
+                P2a — the tally takes the newest N executions, so on a busy check
+                it describes a window far shorter than the one the picker shows.
+                A 1-minute check across 2 locations x 4 browser/device combos
+                produces 11 520 executions a day: a 5000-row cap is about ten
+                hours of a "last 7 days" selection. The numbers were right; the
+                label was wrong, and silently so.
+              -->
+              <p
+                v-if="!stepsLoading && stepsCoverage.truncated"
+                class="text-text-secondary px-2 text-xs"
+                data-test="monitor-runs-steps-coverage"
+              >
+                {{
+                  t("synthetics.runs.stepsWindowTruncated", {
+                    count: stepsCoverage.executions,
+                    from: fmtTimestamp(stepsCoverage.fromMs),
+                    to: fmtTimestamp(stepsCoverage.toMs),
+                  })
+                }}
+              </p>
               <!-- Loading skeleton -->
               <template v-if="stepsLoading || !stepsHasLoadedOnce">
                 <div class="grid grid-cols-2 gap-2">
@@ -1073,7 +1094,11 @@ import MonitorStatusTimeline from "@/views/synthetics/MonitorStatusTimeline.vue"
 import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
 import useSyntheticResults from "@/composables/useSyntheticResults";
 import type { SyntheticRun } from "@/composables/synthetics/syntheticResultsSchema";
-import { deviceIconName, deviceLabel } from "@/composables/synthetics/syntheticResultsSchema";
+import {
+  computePartitionStability,
+  deviceIconName,
+  deviceLabel,
+} from "@/composables/synthetics/syntheticResultsSchema";
 import awsSvgUrl from "@/assets/images/ingestion/aws.svg";
 import gcpSvgUrl from "@/assets/images/ingestion/gcp.svg";
 import chromiumSvgUrl from "@/assets/images/synthetics/chromium.svg";
@@ -1135,12 +1160,22 @@ interface Props {
   /** Check type ("browser" | "http" | etc.) — provided by the parent after it
    * fetches the check. Controls the tabs grid layout and step analysis visibility. */
   checkType?: string;
+  /** The check's configured retry count.
+   *
+   * At 0 the probe never retries, so no run can ever be observed as flaky and
+   * `retry_step_ids` is never written. The tiles must read "—", not "0.0%":
+   * a zero is a measurement, and this is the absence of one. */
+  retries?: number;
 }
 const props = withDefaults(defineProps<Props>(), {
   monitorStatus: "healthy",
   lastTriggeredAt: 0,
   checkType: "browser",
+  retries: 0,
 });
+
+/** Whether flakiness is observable at all for this check. */
+const retriesEnabled = computed(() => props.retries > 0);
 
 // ── Synthetic results composable ──────────────────────────────────────────
 const synthetics = useSyntheticResults();
@@ -1431,6 +1466,20 @@ const totalFails = computed(() => allRuns.value.filter((r) => r.status === "fail
 
 const hasKpiData = computed(() => synthetics.kpi.value.totalRuns > 0);
 
+/**
+ * (location, device, engine) slices and how settled each one is (C3, P4).
+ *
+ * Computed over the rows the runs query already returned — no extra request.
+ * Aggregated across slices, a check solidly broken in one region and healthy in
+ * five looks identical to one intermittently broken everywhere.
+ */
+const partitionStability = computed(() =>
+  computePartitionStability(synthetics.runs.value),
+);
+const unstablePartitions = computed(() =>
+  partitionStability.value.filter((p) => p.unstable),
+);
+
 const p95Label = computed(() =>
   effectiveP95Ms.value > 0 ? fmtDur(effectiveP95Ms.value) : hasKpiData.value ? fmtDur(0) : "—",
 );
@@ -1482,14 +1531,47 @@ const kpiCards = computed<KpiCard[]>(() => {
       {
         key: "retry-rate",
         label: t("synthetics.runs.retryRate"),
-        value: k.totalRuns > 0 ? ((k.retriedRuns / k.totalRuns) * 100).toFixed(1) + "%" : "0.0%",
+        value: !retriesEnabled.value
+          ? "—"
+          : k.totalRuns > 0
+            ? ((k.retriedRuns / k.totalRuns) * 100).toFixed(1) + "%"
+            : "0.0%",
         valueClass: k.retriedRuns > 0 ? "text-text-body!" : undefined,
       },
       {
-        key: "warning-runs",
-        label: t("synthetics.runs.warningRuns"),
-        value: String(k.warningRuns),
-        valueClass: k.warningRuns > 0 ? "text-status-warning-text!" : undefined,
+        // D4 — the denominator is EXECUTIONS, the grain `totalRuns` and the
+        // runs list both use. Dividing by scheduled runs instead would be
+        // smaller by the location × browser × device fan-out and inflate this
+        // several-fold.
+        key: "flaky-rate",
+        label: t("synthetics.runs.flakyRate"),
+        // "—" at retries = 0, never "0.0%". A check that cannot retry cannot be
+        // seen to recover, so a zero here would read as "nothing is flaky" when
+        // the truth is "flakiness was never measurable".
+        value: !retriesEnabled.value
+          ? "—"
+          : k.totalRuns > 0
+            ? ((k.flakyExecutions / k.totalRuns) * 100).toFixed(1) + "%"
+            : "0.0%",
+        valueClass: k.flakyExecutions > 0 ? "text-status-warning-text!" : undefined,
+      },
+      {
+        // Split out of the warning count: degradation is a property of the
+        // TARGET (a certificate inside its warning window, a failing SFTP
+        // probe), not of the test. Folded together, a TLS check nearing expiry
+        // reported as ~100% flaky on every run until someone renewed it.
+        key: "degraded-runs",
+        label: t("synthetics.runs.degradedRuns"),
+        value: String(k.degradedExecutions),
+        valueClass: k.degradedExecutions > 0 ? "text-status-warning-text!" : undefined,
+      },
+      {
+        // "Unstable" is about oscillation, not badness — a slice that broke
+        // once and stayed broken is down, and belongs on the failure tile.
+        key: "unstable-partitions",
+        label: t("synthetics.runs.unstableSlices"),
+        value: `${unstablePartitions.value.length}/${partitionStability.value.length}`,
+        valueClass: unstablePartitions.value.length > 0 ? "text-status-warning-text!" : undefined,
       },
       {
         key: "failed-runs",
@@ -2133,6 +2215,24 @@ const runColumns = computed<OTableColumnDef[]>(() => {
 
 // ── Steps: real data from composable ────────────────────────────────────
 const stepGroupsData = computed(() => synthetics.stepStats.value.stepGroups);
+/** What the tally actually covered, so the panel can say so when the row cap
+ *  bound rather than the selected time range (P2a). */
+const stepsCoverage = computed(
+  () =>
+    synthetics.stepStats.value.coverage ?? {
+      executions: 0,
+      fromMs: 0,
+      toMs: 0,
+      // Absent coverage means "this result predates the field", which is not
+      // evidence the window was truncated. The banner stays hidden.
+      truncated: false,
+    },
+);
+
+/** Epoch ms as a local timestamp, matching the other stamps on this page. */
+function fmtTimestamp(ms: number): string {
+  return ms > 0 ? new Date(ms).toLocaleString() : "—";
+}
 
 // ── Display helpers for step analysis ────────────────────────────────────
 

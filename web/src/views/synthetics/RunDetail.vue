@@ -157,6 +157,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
 
+        <!-- Attempts strip — hidden entirely on a run that never retried. -->
+        <AttemptStrip
+          v-if="!loading"
+          class="pt-3"
+          :attempts="attemptViews"
+          :selected="selectedAttempt"
+          @select="selectedAttempt = $event"
+        />
+
         <!-- Steps skeleton -->
         <template v-if="loading">
           <OCard class="gap-0 p-0">
@@ -522,7 +531,10 @@ import JourneySteps from "@/components/synthetics/journey/JourneySteps.vue";
 import type { StepDotState } from "@/components/synthetics/journey/JourneySteps.vue";
 import useSyntheticResults from "@/composables/useSyntheticResults";
 import ProtocolRunSummary from "@/components/synthetics/results/ProtocolRunSummary.vue";
+import AttemptStrip from "@/components/synthetics/results/AttemptStrip.vue";
+import { buildAttemptViews } from "@/composables/synthetics/syntheticResultsSchema";
 import type {
+  AttemptView,
   FailureDetail,
   StepEvidence as StepEvidenceSummary,
   SyntheticRunDetail,
@@ -669,13 +681,24 @@ function fmtDur(ms: number): string {
 }
 
 /** Merge recorded_step definitions with last_attempt_step execution results. */
-function buildSteps(detail: SyntheticRunDetail | null): StepRow[] {
-  if (!detail || !detail.lastAttemptSteps.length) return [];
+/**
+ * @param attempt — the attempt being viewed. Its steps and failure detail are
+ *   used in place of the record's top-level ones, so switching attempts
+ *   re-renders the table instead of showing the deciding attempt's steps under
+ *   another attempt's label.
+ */
+function buildSteps(
+  detail: SyntheticRunDetail | null,
+  attempt: AttemptView | null = null,
+): StepRow[] {
+  const steps = attempt?.steps ?? detail?.lastAttemptSteps ?? [];
+  const failureDetail = attempt ? attempt.failureDetail : (detail?.failureDetail ?? null);
+  if (!detail || !steps.length) return [];
   const recordedMap = new Map<string, RecordedStep>();
   for (const rs of detail.recordedSteps) {
     recordedMap.set(rs.id, rs);
   }
-  return detail.lastAttemptSteps.map((ex, idx) => {
+  return steps.map((ex, idx) => {
     const recorded = recordedMap.get(ex.step_id);
     const isFail = ex.status === "fail";
     return {
@@ -692,13 +715,14 @@ function buildSteps(detail: SyntheticRunDetail | null): StepRow[] {
       durStr: fmtDur(ex.duration_ms),
       durColor: isFail ? "var(--color-status-error-text)" : "var(--color-text-secondary)",
       error: ex.error,
-      screenshotKey: ex.screenshot_key,
+      // A superseded attempt's screenshots are uploaded under an attempt-scoped
+      // key, so they are resolved from THAT attempt's refs. Falling back to the
+      // record's key would show the surviving attempt's pixels under the
+      // failing attempt's label.
+      screenshotKey: attempt?.screenshotKeys.get(ex.step_id) ?? ex.screenshot_key,
       // Scoped to the failing step: the report describes one failure, and
       // hanging it off every row would imply each step had its own.
-      evidence:
-        detail.failureDetail && detail.failureDetail.stepId === ex.step_id
-          ? detail.failureDetail
-          : null,
+      evidence: failureDetail && failureDetail.stepId === ex.step_id ? failureDetail : null,
       // Per step, not per failure: the step that CAUSED the problem is often
       // not the one that failed, so evidence hangs off whichever step owns it.
       appEvidence: detail.evidenceByStep.find((e) => e.stepId === ex.step_id) ?? null,
@@ -757,9 +781,14 @@ const artifactUrls = ref<Record<string, string>>({});
 async function presignRunArtifacts() {
   const detail = synthetics.runDetail.value;
   if (!detail) return;
-  const keys = [...detail.lastAttemptSteps.map((s) => s.screenshot_key), detail.traceKey].filter(
-    (k): k is string => !!k,
-  );
+  // Every attempt's artifacts, not only the deciding one's: switching attempts
+  // in the strip must not trigger a second presign round-trip, and a superseded
+  // attempt's screenshots live under their own keys.
+  const keys = [
+    ...detail.lastAttemptSteps.map((s) => s.screenshot_key),
+    detail.traceKey,
+    ...detail.retryHistory.flatMap((a) => [...a.screenshotKeys.values(), a.traceKey]),
+  ].filter((k): k is string => !!k);
   if (!keys.length) return;
   const orgId = store.state.selectedOrganization.identifier;
   try {
@@ -860,6 +889,25 @@ function toDisplayRun(detail: SyntheticRunDetail | null): DisplayRun {
   };
 }
 
+// ── Attempts (C2) ─────────────────────────────────────────────────────────
+//
+// One record carries every attempt the execution made. Switching between them
+// is local state — `retry_history` is already on the row, so the strip costs no
+// request.
+const attemptViews = computed<AttemptView[]>(() =>
+  synthetics.runDetail.value ? buildAttemptViews(synthetics.runDetail.value) : [],
+);
+const selectedAttempt = ref(0);
+// The deciding attempt is the default: it is the one the run's verdict and the
+// record's top-level fields describe. Reset on every new run, or the index
+// would point into the previous run's (possibly shorter) list.
+watch(attemptViews, (views) => {
+  selectedAttempt.value = Math.max(0, views.length - 1);
+});
+const currentAttempt = computed<AttemptView | null>(
+  () => attemptViews.value[selectedAttempt.value] ?? null,
+);
+
 // ── State ─────────────────────────────────────────────────────────────────
 const stackOpen = ref(true);
 
@@ -951,7 +999,7 @@ const displayMonitorName = computed(
 
 const steps = computed<StepRow[]>(() => {
   if (synthetics.runDetail.value) {
-    return buildSteps(synthetics.runDetail.value);
+    return buildSteps(synthetics.runDetail.value, currentAttempt.value);
   }
   return [];
 });
@@ -1076,7 +1124,44 @@ const infoChips = computed<InfoChip[]>(() => [
     value: locationLabel(currentRun.value.location),
     icon: locationIcon(currentRun.value.location),
   },
+  // C4 — probe start-up is INSIDE the duration above. Shown separately rather
+  // than subtracted, because a cold Lambda's 113s init is itself the finding:
+  // unlabelled it made every Lambda location look permanently slower than a
+  // private agent at every percentile.
+  ...(initMs.value > 0
+    ? [
+        {
+          label: t("synthetics.runDetail.initTime"),
+          value: fmtDur(initMs.value),
+          icon: "bolt",
+        },
+      ]
+    : []),
+  // C5 — scheduled → started. Null (not 0) when the record predates the field,
+  // so an unknown delay is never rendered as a perfect one.
+  ...(queueDelayMs.value !== null
+    ? [
+        {
+          label: t("synthetics.runDetail.queueDelay"),
+          value: fmtDur(queueDelayMs.value),
+          icon: "schedule",
+        },
+      ]
+    : []),
+  ...(attemptViews.value.length > 1
+    ? [
+        {
+          label: t("synthetics.runDetail.attempts"),
+          value: `⟳${attemptViews.value.length}`,
+          icon: "replay",
+          colorClass: "text-status-warning-text",
+        },
+      ]
+    : []),
 ]);
+
+const initMs = computed(() => synthetics.runDetail.value?.initMs ?? 0);
+const queueDelayMs = computed(() => synthetics.runDetail.value?.queueDelayMs ?? null);
 
 // ── Emit status to parent (for drawer header-right badge) ──────────────────
 watch(

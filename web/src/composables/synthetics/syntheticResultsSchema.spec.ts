@@ -26,6 +26,13 @@ import {
   buildLastRunSql,
   buildRunsSql,
   buildRunsWithStepsSql,
+  buildStepDefsSql,
+  buildRetryAttributionSql,
+  buildAttemptViews,
+  foldRetryAttribution,
+  foldStepDefs,
+  splitDelimited,
+  STATUS_REASON,
   deviceIconName,
   deviceLabel,
   mapHistogram,
@@ -233,10 +240,55 @@ describe("buildRunsWithStepsSql", () => {
     const sql = buildRunsWithStepsSql("mon-1", 500);
     expect(sql).toContain(`FROM "${SYNTHETIC_RESULTS_STREAM}"`);
     expect(sql).toContain("last_attempt_steps");
-    expect(sql).toContain("recorded_steps");
     expect(sql).toContain("retry_history");
     expect(sql).toContain("attempts");
     expect(sql).toContain("LIMIT 500");
+  });
+
+  it("should NOT select recorded_steps on the wide tally query", () => {
+    // ~4 KB per row, near-identical across rows of one config version. Selecting
+    // it on 5000 rows was roughly 60% of the panel's payload; the definitions
+    // come from buildStepDefsSql over a bounded subset instead.
+    expect(buildRunsWithStepsSql("mon-1", 5000)).not.toContain("recorded_steps");
+  });
+
+  it("should fetch step definitions from a bounded row subset", () => {
+    const sql = buildStepDefsSql("mon-1", 100);
+    expect(sql).toContain("recorded_steps");
+    expect(sql).toContain("LIMIT 100");
+    expect(sql).toContain("ORDER BY");
+    // Only the blob — nothing else is needed to build the lookup.
+    expect(sql).not.toContain("last_attempt_steps");
+  });
+});
+
+describe("foldStepDefs", () => {
+  const row = (steps: unknown[]) => ({ recorded_steps: JSON.stringify(steps) });
+
+  it("should build a step_id keyed lookup", () => {
+    const defs = foldStepDefs([
+      row([{ id: "s1", name: "Open page" }, { id: "s2", name: "Click login" }]),
+    ]);
+    expect(defs.get("s1")?.name).toBe("Open page");
+    expect(defs.get("s2")?.name).toBe("Click login");
+  });
+
+  it("should prefer the newest definition when a step was renamed", () => {
+    // Rows arrive newest-first, so the first definition seen for an id wins —
+    // a renamed step shows its current name while older rows still resolve.
+    const defs = foldStepDefs([
+      row([{ id: "s1", name: "Click sign in" }]),   // newer
+      row([{ id: "s1", name: "Click login" }]),     // older
+    ]);
+    expect(defs.get("s1")?.name).toBe("Click sign in");
+  });
+
+  it("should fall back to the id when a definition has no name", () => {
+    expect(foldStepDefs([row([{ id: "s9" }])]).get("s9")?.name).toBe("s9");
+  });
+
+  it("should tolerate rows with no recorded_steps", () => {
+    expect(foldStepDefs([{}, { recorded_steps: "" }]).size).toBe(0);
   });
 });
 
@@ -594,5 +646,253 @@ describe("mapRunDetail — evidence the probe already writes (Phase 4)", () => {
     const detail = mapRunDetail(hit({ retry_history: undefined, failure_detail: undefined }));
     expect(detail.retryHistory).toEqual([]);
     expect(detail.failureDetail).toBeNull();
+  });
+});
+
+// ── C3 · flaky and degraded are different failures ───────────────────────────
+
+describe("KPI: warning is two unrelated things", () => {
+  it("splits flaky from degraded when status_reason is in the schema", () => {
+    const sql = buildKpiSql("mon-1", true, true);
+    expect(sql).toContain("as flaky_runs");
+    expect(sql).toContain("as degraded_runs");
+    // Both clauses hang off the scan the query already performs.
+    expect(sql.match(/FROM/g)).toHaveLength(1);
+  });
+
+  it("omits both clauses when the field is absent from the schema", () => {
+    // The search API rejects a query naming a field the stream doesn't have,
+    // which would take the whole KPI panel down rather than one tile.
+    const sql = buildKpiSql("mon-1", true, false);
+    expect(sql).not.toContain("status_reason");
+  });
+
+  it("counts flaky and degraded separately, against the execution denominator", () => {
+    const kpi = mapKpi(
+      {
+        total_runs: 100,
+        passed_runs: 80,
+        warning_runs: 12,
+        failed_runs: 5,
+        error_runs: 3,
+        flaky_runs: 4,
+        degraded_runs: 8,
+      },
+      null,
+    );
+    // A TLS check inside its warning window is `warning` on every single run.
+    // Folded together, it reported as ~100% flaky forever.
+    expect(kpi.flakyExecutions).toBe(4);
+    expect(kpi.degradedExecutions).toBe(8);
+    // D4 — the denominator is executions, the grain of totalRuns.
+    expect(kpi.totalRuns).toBe(100);
+  });
+});
+
+// ── C7 · the flaky column without the 5000-row blob fetch ────────────────────
+
+describe("retry attribution", () => {
+  it("scans only the rows that actually retried", () => {
+    const sql = buildRetryAttributionSql("mon-1");
+    expect(sql).toContain("attempts > 1");
+    expect(sql).toContain("retry_step_ids");
+    // The point of the column is that no blob is read.
+    expect(sql).not.toContain("retry_history");
+    expect(sql).not.toContain("last_attempt_steps");
+  });
+
+  it("splits the delimited form back without empty members", () => {
+    // The probe wraps in leading/trailing commas so LIKE '%,s2,%' cannot also
+    // match s20. Splitting has to drop the segments that wrapping creates.
+    expect(splitDelimited(",s2,s20,")).toEqual(["s2", "s20"]);
+    expect(splitDelimited("")).toEqual([]);
+    expect(splitDelimited(undefined)).toEqual([]);
+  });
+
+  it("reads recovery from the verdict, not from the row's presence", () => {
+    // D2 — attribution is written on any retried execution. A run that retried
+    // three times and still failed is attributed too, and must not be counted
+    // as a step that recovers.
+    const summary = foldRetryAttribution([
+      {
+        execution_id: "e1",
+        status: STATUS_VALUES.warning,
+        status_reason: STATUS_REASON.flaky,
+        retry_step_ids: ",s3,",
+        retry_error_classes: ",timeout,",
+      },
+      {
+        execution_id: "e2",
+        status: STATUS_VALUES.failed,
+        status_reason: "",
+        retry_step_ids: ",s3,",
+        retry_error_classes: ",timeout,",
+        retry_consistent: true,
+      },
+    ]);
+    expect(summary.retriedExecutions).toBe(2);
+    expect(summary.byStep.get("s3")).toEqual({ retriedExecutions: 2, flakyExecutions: 1 });
+    expect(summary.byErrorClass.get("timeout")).toBe(2);
+    expect(summary.consistentFailures).toBe(1);
+    expect(summary.byExecution.get("e1")).toEqual(new Set(["s3"]));
+  });
+
+  it("treats an absent retry_consistent as unknown, never as false", () => {
+    // D1 — the column is deliberately absent below two failing attempts.
+    // Counting absent as `false` would report every recovered run as
+    // non-deterministic, which is the opposite of what happened.
+    const summary = foldRetryAttribution([
+      { execution_id: "e1", status: STATUS_VALUES.warning, status_reason: STATUS_REASON.flaky, retry_step_ids: ",s1," },
+    ]);
+    expect(summary.consistentFailures).toBe(0);
+    expect(summary.retriedExecutions).toBe(1);
+  });
+
+  it("drives the flaky tally without any retry_history being present", () => {
+    const attribution = foldRetryAttribution([
+      {
+        execution_id: "ex-1",
+        status: STATUS_VALUES.warning,
+        status_reason: STATUS_REASON.flaky,
+        retry_step_ids: ",s1,",
+      },
+    ]);
+    const stats = aggregateStepStats(
+      [
+        {
+          ts: 1_700_000_000_000_000,
+          execution_id: "ex-1",
+          run_id: "r1",
+          attempts: 2,
+          // No retry_history column at all — that is the saving.
+          last_attempt_steps: JSON.stringify([
+            { step_id: "s1", status: "ok", duration_ms: 120 },
+            { step_id: "s2", status: "ok", duration_ms: 80 },
+          ]),
+        },
+      ],
+      1_699_000_000_000_000,
+      1_701_000_000_000_000,
+      new Map([
+        ["s1", { name: "Sign in", selector: ".btn" }],
+        ["s2", { name: "Dashboard", selector: null }],
+      ]),
+      attribution,
+    );
+    const flaky = stats.flakySteps.find((f) => f.stepName === "Sign in");
+    expect(flaky, "s1 failed on attempt 0 and passed on attempt 1").toBeTruthy();
+    expect(stats.flakySteps.find((f) => f.stepName === "Dashboard")).toBeUndefined();
+  });
+});
+
+// ── C2 · one uniform attempts list ───────────────────────────────────────────
+
+describe("attempt views", () => {
+  const detail = (over: Record<string, unknown> = {}) =>
+    mapRunDetail({
+      ts: 1_700_000_000_000_000,
+      status: STATUS_VALUES.warning,
+      duration: 1200,
+      execution_id: "ex-1",
+      run_id: "r1",
+      attempts: 2,
+      last_attempt_steps: JSON.stringify([{ step_id: "s1", status: "ok", duration_ms: 120 }]),
+      trace_key: "traces/final.zip",
+      ...over,
+    })!;
+
+  it("marks the last attempt as the deciding one and gives it the full detail", () => {
+    const views = buildAttemptViews(
+      detail({
+        retry_history: [
+          {
+            attempt: 0,
+            status: "failed",
+            response_time_ms: 3400,
+            steps: [{ step_id: "s1", status: "failed", duration_ms: 3000 }],
+            artifacts: { trace_ref: "traces/attempt-1.zip" },
+          },
+          { attempt: 1, status: "passed", response_time_ms: 1200, steps: [] },
+        ],
+      }),
+    );
+    expect(views).toHaveLength(2);
+    expect(views[0]).toMatchObject({ decided: false, compact: true, status: "failed" });
+    // A passing final attempt used to be reported as failed: the mapper
+    // hard-coded the status on the reasoning that entries only exist for
+    // failures. On a flaky run that is the one attempt that passed.
+    expect(views[1]).toMatchObject({ decided: true, compact: false, status: "passed" });
+    // The deciding attempt is what the record's top-level fields describe.
+    expect(views[1].steps).toHaveLength(1);
+    expect(views[1].traceKey).toBe("traces/final.zip");
+    // A superseded attempt keeps its OWN artifacts, not the survivor's.
+    expect(views[0].traceKey).toBe("traces/attempt-1.zip");
+  });
+
+  it("uses the probe's own duration rather than summing step durations", () => {
+    // Summing steps misses everything between them — launch, settle waits, the
+    // navigation a step triggers — which on a real journey is most of the time.
+    const views = buildAttemptViews(
+      detail({
+        retry_history: [
+          {
+            attempt: 0,
+            status: "failed",
+            response_time_ms: 3400,
+            steps: [{ step_id: "s1", status: "failed", duration_ms: 120 }],
+          },
+          { attempt: 1, status: "passed", response_time_ms: 1200, steps: [] },
+        ],
+      }),
+    );
+    expect(views[0].durationMs).toBe(3400);
+  });
+
+  it("shows a single attempt for a run that never retried", () => {
+    const views = buildAttemptViews(detail({ retry_history: [], attempts: 1 }));
+    expect(views).toHaveLength(1);
+    expect(views[0].decided).toBe(true);
+  });
+
+  it("counts attempts from the field the probe actually writes", () => {
+    // The mapper read `attempt`, which no record has ever carried, so the count
+    // was 0 on every run and the retry chip never appeared.
+    expect(detail({ attempts: 3 }).attempts).toBe(3);
+  });
+});
+
+// ── C4/C5 · the two costs inside one duration ────────────────────────────────
+
+describe("run timing breakdown", () => {
+  it("separates queue delay from run duration", () => {
+    const run = mapRun({
+      ts: 1_700_000_002_200_000,
+      scheduled_ts: 1_700_000_000_000_000,
+      started_ts: 1_700_000_001_000_000,
+      duration: 1200,
+      init_ms: 900,
+      status: STATUS_VALUES.passed,
+    });
+    expect(run.queueDelayMs).toBe(1000);
+    // init is INSIDE duration — subtract it, never add it.
+    expect(run.initMs).toBe(900);
+    expect(run.durationMs).toBe(1200);
+  });
+
+  it("reports an unknown queue delay as null, not as zero", () => {
+    // Rendering an unknown as 0 ms claims the scheduler was perfect on every
+    // record written before started_ts existed.
+    const run = mapRun({ ts: 1_700_000_002_200_000, scheduled_ts: 1_700_000_000_000_000 });
+    expect(run.queueDelayMs).toBeNull();
+  });
+
+  it("never reports a negative delay", () => {
+    // A start before the schedule is a clock artefact, not early execution.
+    const run = mapRun({
+      ts: 1_700_000_002_200_000,
+      scheduled_ts: 1_700_000_001_000_000,
+      started_ts: 1_700_000_000_000_000,
+    });
+    expect(run.queueDelayMs).toBe(0);
   });
 });

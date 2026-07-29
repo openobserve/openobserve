@@ -438,6 +438,60 @@ pub async fn update_last_check_status<C: ConnectionTrait>(
     Ok(())
 }
 
+/// The alert bookkeeping a completed run needs in order to decide whether to
+/// notify. Read and written by the ack path only.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct AlertState {
+    /// Runs that failed back to back. Reset to 0 by a pass.
+    pub consecutive_failures: i32,
+    /// When a notification was last sent, in microseconds. 0 = never.
+    pub last_alert_at: i64,
+    /// Whether the check is currently in the alerting state.
+    pub alerting: bool,
+}
+
+/// Reads the alert state without pulling the whole monitor (config, secrets and
+/// step definitions are several KB, and this runs on every ack).
+pub async fn get_alert_state<C: ConnectionTrait>(
+    conn: &C,
+    id: &str,
+) -> Result<Option<AlertState>, errors::Error> {
+    let row = Entity::find_by_id(id)
+        .select_only()
+        .column(Column::ConsecutiveFailures)
+        .column(Column::LastAlertAt)
+        .column(Column::Alerting)
+        .into_tuple::<(i32, i64, bool)>()
+        .one(conn)
+        .await?;
+    Ok(row.map(
+        |(consecutive_failures, last_alert_at, alerting)| AlertState {
+            consecutive_failures,
+            last_alert_at,
+            alerting,
+        },
+    ))
+}
+
+/// Writes the alert state back after a run completes.
+pub async fn update_alert_state<C: ConnectionTrait>(
+    conn: &C,
+    id: &str,
+    state: AlertState,
+) -> Result<(), errors::Error> {
+    Entity::update_many()
+        .col_expr(
+            Column::ConsecutiveFailures,
+            Expr::value(state.consecutive_failures),
+        )
+        .col_expr(Column::LastAlertAt, Expr::value(state.last_alert_at))
+        .col_expr(Column::Alerting, Expr::value(state.alerting))
+        .filter(Column::Id.eq(id))
+        .exec(conn)
+        .await?;
+    Ok(())
+}
+
 // ── Private helpers ───────────────────────────────────────────────────────────
 
 async fn get_model<C: ConnectionTrait>(

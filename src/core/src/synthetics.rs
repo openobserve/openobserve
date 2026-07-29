@@ -35,6 +35,14 @@ pub struct CheckNotification {
     pub job_count: i64,
     pub error: Option<String>,
     pub checked_at: i64,
+    /// This message closes an incident rather than opening one.
+    ///
+    /// Mandatory once `cooldown_mins` exists: with a cooldown, silence no
+    /// longer means "recovered", it means "possibly still broken and inside
+    /// the window". A recovery message is the only thing that closes it.
+    pub recovery: bool,
+    /// How many runs in a row had failed when this fired. 0 on a recovery.
+    pub consecutive_failures: i32,
 }
 
 /// Fires once per run (when all jobs have completed) for non-passing runs.
@@ -44,7 +52,10 @@ pub struct CheckNotification {
 /// HTTP webhooks, an HTML card for email, plain text for SNS.
 #[cfg(feature = "enterprise")]
 pub async fn notify_check_result(n: CheckNotification) {
-    if n.status == "passed" || n.status == "up" {
+    // A passing run is worth sending exactly once: when it ends an incident
+    // somebody was already told about. Otherwise it is a confirmation nobody
+    // asked for.
+    if !n.recovery && (n.status == "passed" || n.status == "up") {
         return;
     }
 
@@ -66,12 +77,19 @@ pub async fn notify_check_result(n: CheckNotification) {
                     DestinationType::Http(_) => build_slack_json(&n),
                 };
 
-                let subject = format!(
-                    "[OpenObserve Synthetics] {} {} is {}",
-                    status_emoji(&n.status),
-                    n.monitor_name,
-                    n.status.to_uppercase()
-                );
+                let subject = if n.recovery {
+                    format!(
+                        "[OpenObserve Synthetics] ✅ {} has RECOVERED",
+                        n.monitor_name
+                    )
+                } else {
+                    format!(
+                        "[OpenObserve Synthetics] {} {} is {}",
+                        status_emoji(&n.status),
+                        n.monitor_name,
+                        n.status.to_uppercase()
+                    )
+                };
                 if let Err(e) =
                     crate::alerts::alert::dispatch_notification(destination_type, &subject, msg)
                         .await
@@ -92,6 +110,7 @@ pub async fn notify_check_result(n: CheckNotification) {
 #[cfg(feature = "enterprise")]
 fn status_emoji(status: &str) -> &'static str {
     match status {
+        "recovered" => "✅",
         "failed" | "down" => "🔴",
         "warning" => "🟡",
         "error" => "⚠️",
@@ -102,6 +121,9 @@ fn status_emoji(status: &str) -> &'static str {
 /// What the status means, in operator language — differs per status.
 #[cfg(feature = "enterprise")]
 fn status_headline(n: &CheckNotification) -> String {
+    if n.recovery {
+        return format!("{} has recovered", n.monitor_name);
+    }
     match n.status.as_str() {
         "warning" => format!("{} passed only after retries (flaky)", n.monitor_name),
         "error" => format!(

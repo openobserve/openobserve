@@ -21,9 +21,13 @@ import {
   bucketInterval,
   buildHistogramSql,
   buildKpiSql,
+  buildRetryAttributionSql,
+  foldRetryAttribution,
   buildLastRunSql,
   buildRunsSql,
   buildRunsWithStepsSql,
+  buildStepDefsSql,
+  foldStepDefs,
   buildRunDetailSql,
   buildProtocolRunDetailSql,
   mapHistogram,
@@ -50,6 +54,8 @@ const EMPTY_KPI: SyntheticKpi = {
   errorRuns: 0,
   totalRuns: 0,
   retriedRuns: 0,
+  flakyExecutions: 0,
+  degradedExecutions: 0,
   lastRunStatus: null,
   lastRunAt: null,
 };
@@ -153,24 +159,76 @@ export function useSyntheticResults() {
   ): Promise<StepStatsResult> {
     try {
       let hasRetryHistory = false;
+      let hasRetryAttribution = false;
+      let hasStatusReason = false;
       try {
         const stream: any = await getStream(SYNTHETIC_RESULTS_STREAM, "logs", true);
         const schema: { name: string }[] = stream?.schema ?? [];
         hasRetryHistory = schema.some((f) => f.name === "retry_history");
+        hasRetryAttribution = schema.some((f) => f.name === "retry_step_ids");
+        hasStatusReason = schema.some((f) => f.name === "status_reason");
       } catch {
         // Schema not available — omit retry_history, which is safe.
       }
+      // C7 — once the probe writes `retry_step_ids`, the flaky column is
+      // answered by three scalars on the rows that actually retried, so the
+      // ~1 KB-per-attempt `retry_history` blob stops being fetched across all
+      // 5000 rows. Until then the old path still works, unchanged.
+      const useAttribution = hasRetryAttribution;
+      const selectRetryHistory = hasRetryHistory && !useAttribution;
+      /** Set when the attribution query failed, so its results are not treated
+       *  as "nothing retried". */
+      let attributionFailed = false;
 
       const STEP_RUNS_LIMIT = 5000;
-      const hits: Record<string, unknown>[] = await executeQuery(
-        buildRunsWithStepsSql(monitorId, STEP_RUNS_LIMIT, hasRetryHistory),
-        startTime,
-        endTime,
-        "logs",
-      );
+      // Two queries rather than one (P1a): the wide tally without
+      // `recorded_steps`, and a bounded fetch of the step definitions. Selecting
+      // the definitions on all 5000 rows shipped the same ~4 KB blob 5000 times
+      // — roughly 60% of this panel's payload.
+      const STEP_DEFS_LIMIT = 100;
+      const [hits, defHits, retryHits] = await Promise.all([
+        executeQuery(
+          buildRunsWithStepsSql(monitorId, STEP_RUNS_LIMIT, selectRetryHistory),
+          startTime,
+          endTime,
+          "logs",
+        ) as Promise<Record<string, unknown>[]>,
+        executeQuery(
+          buildStepDefsSql(monitorId, STEP_DEFS_LIMIT),
+          startTime,
+          endTime,
+          "logs",
+        ) as Promise<Record<string, unknown>[]>,
+        useAttribution
+          ? (executeQuery(
+              buildRetryAttributionSql(monitorId, STEP_RUNS_LIMIT, hasStatusReason),
+              startTime,
+              endTime,
+              "logs",
+            ).catch((e: unknown) => {
+              // Isolated deliberately. These three queries share a Promise.all,
+              // so an unhandled rejection here emptied the ENTIRE Steps tab —
+              // Fail Rate, durations and all — to report one missing column.
+              // Degrade the flaky column instead, and say so rather than
+              // rendering a silent zero.
+              // eslint-disable-next-line no-console
+              console.warn("[synthetics] retry attribution query failed:", e);
+              attributionFailed = true;
+              return [] as Record<string, unknown>[];
+            }) as Promise<Record<string, unknown>[]>)
+          : Promise.resolve([] as Record<string, unknown>[]),
+      ]);
+      const stepDefs = foldStepDefs(defHits);
       if (!hits.length) return emptyStepStats();
 
-      return aggregateStepStats(hits, startTime, endTime);
+      return aggregateStepStats(
+        hits,
+        startTime,
+        endTime,
+        stepDefs,
+        useAttribution && !attributionFailed ? foldRetryAttribution(retryHits) : undefined,
+        STEP_RUNS_LIMIT,
+      );
     } catch {
       return emptyStepStats();
     }
@@ -184,6 +242,7 @@ export function useSyntheticResults() {
       flakySteps: [],
       trendBuckets: [],
       failureInstances: [],
+      coverage: { executions: 0, fromMs: 0, toMs: 0, truncated: false },
     };
   }
 
@@ -208,12 +267,18 @@ export function useSyntheticResults() {
 
       const schemaFields = await fetchSchemaFields();
       const hasAttemptsField = schemaFields.has("attempts");
+      const hasStatusReasonField = schemaFields.has("status_reason");
 
       // Group 1: KPI + last-run — both feed KPI cards. Resolves
       // independently so the KPI section renders as soon as these
       // fast queries complete, without waiting for the runs list.
       const kpiPromise = Promise.all([
-        executeQuery(buildKpiSql(monitorId, hasAttemptsField), startTime, endTime, "logs"),
+        executeQuery(
+          buildKpiSql(monitorId, hasAttemptsField, hasStatusReasonField),
+          startTime,
+          endTime,
+          "logs",
+        ),
         executeQuery(buildLastRunSql(monitorId), startTime, endTime, "logs"),
       ])
         .then(([kpiRows, lastRunRows]) => {
