@@ -4699,20 +4699,44 @@ async fn evaluate_slo_alert(
         results.level = e.classification.level();
         results.actual_value = e.actual_value;
         results.group_label = e.group_key.clone();
+        // These keys become notification template variables verbatim —
+        // `{slo_name}`, `{burn_rate}` and so on — because the template engine
+        // substitutes from the row map.
         let mut row = Map::new();
         row.insert("slo_id".to_string(), Value::String(cond.slo_id.clone()));
+        row.insert("slo_name".to_string(), Value::String(e.slo_name.clone()));
+        row.insert(
+            "slo_window".to_string(),
+            Value::String(format!("{}d", e.slo_window_secs / 86_400)),
+        );
         if let Some(g) = &e.group_key {
             row.insert("group".to_string(), Value::String(g.clone()));
         }
-        if let Some(v) = e.actual_value
-            && let Some(n) = serde_json::Number::from_f64(v)
-        {
-            row.insert("value".to_string(), Value::Number(n));
+
+        let mut put = |row: &mut Map<String, Value>, key: &str, v: f64| {
+            if let Some(n) = serde_json::Number::from_f64(v) {
+                row.insert(key.to_string(), Value::Number(n));
+            }
+        };
+        put(&mut row, "slo_target", e.slo_target);
+        if let Some(v) = e.actual_value {
+            put(&mut row, "value", v);
+            // Also named for the kind, so a template written for a burn-rate
+            // alert reads as one rather than referring to a generic `value`.
+            match cond.kind {
+                config::meta::slo::condition::SloAlertKind::BurnRate => {
+                    put(&mut row, "burn_rate", v)
+                }
+                config::meta::slo::condition::SloAlertKind::ErrorBudget => {
+                    put(&mut row, "error_budget_consumed", v)
+                }
+            }
         }
-        if let Some(s) = e.sli
-            && let Some(n) = serde_json::Number::from_f64(s)
-        {
-            row.insert("sli".to_string(), Value::Number(n));
+        if let Some(s) = e.sli {
+            put(&mut row, "sli", s);
+        }
+        if let Some(b) = e.error_budget_remaining {
+            put(&mut row, "error_budget_remaining", b);
         }
         results.data = Some(vec![row]);
     } else {
