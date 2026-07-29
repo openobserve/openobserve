@@ -270,6 +270,8 @@ async fn update_parquet_metrics() -> Result<(), anyhow::Error> {
     ingester::collect_wal_parquet_metrics()
         .await
         .map_err(|e| anyhow::anyhow!("Failed to collect parquet metrics: {}", e))?;
+    // and the wal pack backlog gauges (pack files/segments totals)
+    ingester::collect_pack_metrics().await;
     Ok(())
 }
 
