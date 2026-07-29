@@ -123,6 +123,13 @@ vi.mock("@/utils/zincutils", () => ({
   }),
   isAboveMinRefreshInterval: vi.fn(() => true),
   describeCron: vi.fn((cron: string) => `Every ${cron}`),
+  resolveBrowserTimezone: vi.fn((tz: string) => {
+    if (typeof tz === "string" && tz.toLowerCase().startsWith("browser time")) {
+      const inner = tz.match(/\(([^)]+)\)/)?.[1]?.trim();
+      return inner || Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+    }
+    return tz;
+  }),
 }));
 
 describe("QueryConfig.vue", () => {
@@ -181,6 +188,106 @@ describe("QueryConfig.vue", () => {
     if (wrapper) {
       wrapper.unmount();
     }
+  });
+
+  describe("Timezone Options", () => {
+    // Quasar calls the filter fn's `update` with a callback; run it inline.
+    const runUpdate = (fn: () => void) => fn();
+
+    const mountWithTimezone = (timezone: string) =>
+      mount(QueryConfig, {
+        global: {
+          mocks: { $store: mockStore },
+          provide: { store: mockStore },
+          plugins: [i18n],
+        },
+        props: {
+          tab: "custom",
+          multiTimeRange: [],
+          columns: [],
+          streamFieldsMap: {},
+          generatedSqlQuery: "",
+          inputData: {
+            conditions: {
+              filterType: "group",
+              logicalOperator: "AND",
+              conditions: [],
+            },
+            period: 10,
+            multi_time_range: [],
+          },
+          streamType: "logs",
+          isRealTime: "false",
+          sqlQuery: "",
+          promqlQuery: "",
+          vrlFunction: "",
+          streamName: "test-stream",
+          sqlQueryErrorMsg: "",
+          triggerCondition: {
+            frequency_type: "cron",
+            cron: "0 0 * * * *",
+            timezone,
+          },
+        },
+      });
+
+    it("lists 'Browser Time' and 'UTC' shortcuts at the top of the options", () => {
+      const options = wrapper.vm.filteredTimezones;
+      expect(options[0]).toBe(`Browser Time (${wrapper.vm.browserTimezone})`);
+      expect(options[1]).toBe("UTC");
+      expect(options.length).toBeGreaterThan(2);
+    });
+
+    it("timezoneFilterFn('') restores the full list including the shortcuts", () => {
+      wrapper.vm.filteredTimezones = [];
+      wrapper.vm.timezoneFilterFn("", runUpdate);
+      expect(wrapper.vm.filteredTimezones).toContain("UTC");
+      expect(
+        wrapper.vm.filteredTimezones.some((tz: string) =>
+          tz.startsWith("Browser Time"),
+        ),
+      ).toBe(true);
+    });
+
+    it("keeps the UTC shortcut searchable", () => {
+      wrapper.vm.timezoneFilterFn("utc", runUpdate);
+      expect(wrapper.vm.filteredTimezones).toContain("UTC");
+    });
+
+    it("keeps the Browser Time shortcut searchable", () => {
+      wrapper.vm.timezoneFilterFn("browser", runUpdate);
+      expect(
+        wrapper.vm.filteredTimezones.some((tz: string) =>
+          tz.startsWith("Browser Time"),
+        ),
+      ).toBe(true);
+    });
+
+    it("returns an empty list when the filter matches nothing", () => {
+      wrapper.vm.timezoneFilterFn("zzz-not-a-timezone", runUpdate);
+      expect(wrapper.vm.filteredTimezones).toEqual([]);
+    });
+
+    it("onCronTimezoneChange stores 'UTC' unchanged", () => {
+      wrapper.vm.onCronTimezoneChange("UTC");
+      expect(wrapper.vm.cronTimezone).toBe("UTC");
+    });
+
+    it("onCronTimezoneChange passes a raw IANA zone through unchanged", () => {
+      wrapper.vm.onCronTimezoneChange("Asia/Kolkata");
+      expect(wrapper.vm.cronTimezone).toBe("Asia/Kolkata");
+    });
+
+    it("onCronTimezoneChange resolves a 'Browser Time (<zone>)' pick to the inner IANA zone", () => {
+      wrapper.vm.onCronTimezoneChange("Browser Time (America/Los_Angeles)");
+      expect(wrapper.vm.cronTimezone).toBe("America/Los_Angeles");
+    });
+
+    it("heals a legacy 'Browser Time (<zone>)' value on mount (rc9 edit case)", () => {
+      const w = mountWithTimezone("Browser Time (Asia/Kolkata)");
+      expect(w.vm.cronTimezone).toBe("Asia/Kolkata");
+      w.unmount();
+    });
   });
 
   describe("Initialization", () => {
