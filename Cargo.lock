@@ -5585,7 +5585,6 @@ dependencies = [
  "chrono",
  "collapse",
  "config",
- "criterion",
  "datafusion",
  "futures",
  "hashbrown 0.16.1",
