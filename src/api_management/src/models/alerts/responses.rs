@@ -105,6 +105,123 @@ pub struct ListAlertsResponseBodyItem {
     /// Normalized selection tags (PT-6). Omitted when empty.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub tags: Vec<String>,
+    /// Multi-alerts only (§5.4): how many groups the last evaluation observed,
+    /// counted **before** the M-6 cap truncated them. Absent for every alert
+    /// that has not opted in.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub groups_observed: Option<i32>,
+    /// Multi-alerts only: how many of those groups were warning-or-worse,
+    /// also counted pre-cap. With `groups_observed` this is the "N of M groups
+    /// firing" chip. Counting retained state rows instead would silently
+    /// under-report whenever more than the cap's worth of groups fire, which
+    /// is the silent truncation M-6 forbids.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub groups_firing: Option<i32>,
+    /// Whether `groups_observed` is a `>=` lower bound — the bounded fetch
+    /// page came back full, so groups beyond it were never seen. Render the
+    /// count with a `≥`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub groups_observed_is_lower_bound: Option<bool>,
+    /// Whether `groups_firing` is a `>=` lower bound. Tracked separately
+    /// because the two diverge: a full page that still reached healthy groups
+    /// has seen every firing group, so this stays exact while
+    /// `groups_observed` does not.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub groups_firing_is_lower_bound: Option<bool>,
+}
+
+/// One tracked group of a multi-alert (§5.4's group table).
+#[derive(Clone, Debug, Serialize, ToSchema)]
+pub struct AlertGroupResponseItem {
+    /// Deterministic hash of the group's label set — the state identity, and
+    /// the key the per-group history filter takes.
+    pub group_key: String,
+    /// Rendered `k=v,k=v` labels, for display only. `group_key` stays the
+    /// identity because a readable rendering is ambiguous once a label value
+    /// contains the separators.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub group_labels: Option<String>,
+    /// Parsed form of `group_labels`, so the UI does not re-parse the string.
+    pub labels: Vec<AlertGroupLabel>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub level: Option<String>,
+    /// When `level` last changed — "critical for 20 minutes".
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub level_since: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_outcome: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_outcome_at: Option<i64>,
+    /// Last evaluation that actually included this group (M-7). A group whose
+    /// `last_seen` is falling behind is on its way to being resolved.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_seen: Option<i64>,
+    /// Per-group silence window (MN-2): suppress re-delivery until this
+    /// instant. Absent when the group is not silenced.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub silenced_until: Option<i64>,
+    /// Level of this group's last *successful* delivery — what escalation is
+    /// measured against. Absent when it has never paged.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_notified_level: Option<String>,
+}
+
+/// One `key=value` pair of a group's label set.
+#[derive(Clone, Debug, Serialize, ToSchema)]
+pub struct AlertGroupLabel {
+    pub name: String,
+    pub value: String,
+}
+
+/// HTTP response body for `ListAlertGroups`.
+#[derive(Clone, Debug, Serialize, ToSchema)]
+pub struct ListAlertGroupsResponseBody {
+    /// Tracked groups, most severe first.
+    pub list: Vec<AlertGroupResponseItem>,
+    /// Pre-cap totals from the rollup row, so the caller can render
+    /// "N of M groups firing" without counting the (post-cap) list above.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub groups_observed: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub groups_firing: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub groups_observed_is_lower_bound: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub groups_firing_is_lower_bound: Option<bool>,
+    /// True when the last evaluation observed more groups than the M-6 cap
+    /// tracks, so `list` is a truncated view. Drives the cap banner — M-6
+    /// forbids truncating silently.
+    pub capped: bool,
+    /// The cap in force, for the banner's wording.
+    pub group_cap: usize,
+}
+
+/// One per-group state transition (M-8's history source).
+#[derive(Clone, Debug, Serialize, ToSchema)]
+pub struct AlertGroupTransitionItem {
+    pub group_key: String,
+    /// Carried on the transition itself, so history outlives the state row the
+    /// reaper deletes.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub group_labels: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub from_level: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub to_level: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub from_outcome: Option<String>,
+    pub to_outcome: String,
+    pub at: i64,
+    /// Observed value at transition time. `None` where nothing was observed —
+    /// a group that vanished has no reading, and rendering 0 would be a lie.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub value: Option<f64>,
+}
+
+/// HTTP response body for `ListAlertGroupTransitions`.
+#[derive(Clone, Debug, Serialize, ToSchema)]
+pub struct ListAlertGroupTransitionsResponseBody {
+    pub list: Vec<AlertGroupTransitionItem>,
 }
 
 /// HTTP response body for `EnableAlert` endpoint.
@@ -179,6 +296,12 @@ impl TryFrom<(meta_folders::Folder, meta_alerts::Alert, Option<Trigger>)>
             level_since: None,
             priority: alert.priority.map(|p| p.to_i32() as u8),
             tags: alert.tags,
+            // Filled from the rollup state row by `enrich_with_run_state`,
+            // alongside the other run-state fields above.
+            groups_observed: None,
+            groups_firing: None,
+            groups_observed_is_lower_bound: None,
+            groups_firing_is_lower_bound: None,
         })
     }
 }
@@ -272,6 +395,11 @@ pub fn anomaly_config_to_list_item(v: &serde_json::Value) -> Option<ListAlertsRe
             .get("tags")
             .and_then(|t| serde_json::from_value::<Vec<String>>(t.clone()).ok())
             .unwrap_or_default(),
+        // Anomaly configs have no grouping, so there is nothing to count.
+        groups_observed: None,
+        groups_firing: None,
+        groups_observed_is_lower_bound: None,
+        groups_firing_is_lower_bound: None,
     })
 }
 
@@ -352,6 +480,10 @@ mod tests {
             level_since: None,
             priority: None,
             tags: vec![],
+            groups_observed: None,
+            groups_firing: None,
+            groups_observed_is_lower_bound: None,
+            groups_firing_is_lower_bound: None,
         };
         let json = serde_json::to_value(&item).unwrap();
         let obj = json.as_object().unwrap();
@@ -360,6 +492,13 @@ mod tests {
         assert!(!obj.contains_key("last_trained_at"));
         assert!(!obj.contains_key("status"));
         assert!(!obj.contains_key("last_error"));
+        // §5.4: a non-multi alert must not advertise a group summary at all —
+        // an absent field reads as "not a multi-alert", a zero would read as
+        // "observed no groups".
+        assert!(!obj.contains_key("groups_observed"));
+        assert!(!obj.contains_key("groups_firing"));
+        assert!(!obj.contains_key("groups_observed_is_lower_bound"));
+        assert!(!obj.contains_key("groups_firing_is_lower_bound"));
     }
 
     #[test]

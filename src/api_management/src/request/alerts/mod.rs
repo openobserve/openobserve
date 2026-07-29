@@ -59,8 +59,9 @@ use crate::{
         },
         responses::{
             AlertBulkEnableResponse, EnableAlertResponseBody, GenerateSqlMetadata,
-            GenerateSqlResponseBody, GetAlertResponseBody, ListAlertsResponseBody,
-            ListAlertsResponseBodyItem,
+            AlertGroupLabel, AlertGroupResponseItem, AlertGroupTransitionItem,
+            GenerateSqlResponseBody, GetAlertResponseBody, ListAlertGroupTransitionsResponseBody,
+            ListAlertGroupsResponseBody, ListAlertsResponseBody, ListAlertsResponseBodyItem,
         },
     },
     request::{
@@ -193,6 +194,200 @@ async fn create_anomaly_alert(
 
     match openobserve_core::anomaly_detection::create_config(org_id, req).await {
         Ok(v) => MetaHttpResponse::json(v),
+        Err(e) => MetaHttpResponse::internal_error(e.to_string()),
+    }
+}
+
+/// Split a rendered `k=v,k=v` label string back into pairs.
+///
+/// Rendering is lossy where a value contains the separators, which is exactly
+/// why `group_key` — not this — is the identity. Splitting on the first `=`
+/// keeps `path=/a=b` intact, the common case; anything genuinely ambiguous
+/// still displays, it just may split oddly.
+fn parse_group_labels(rendered: Option<&str>) -> Vec<AlertGroupLabel> {
+    rendered
+        .unwrap_or("")
+        .split(',')
+        .filter(|s| !s.is_empty())
+        .filter_map(|pair| {
+            pair.split_once('=').map(|(name, value)| AlertGroupLabel {
+                name: name.to_string(),
+                value: value.to_string(),
+            })
+        })
+        .collect()
+}
+
+/// ListAlertGroups
+#[utoipa::path(
+    get,
+    path = "/v2/{org_id}/alerts/{alert_id}/groups",
+    context_path = "/api",
+    tag = "Alerts",
+    operation_id = "ListAlertGroups",
+    summary = "List a multi-alert's tracked groups",
+    description = "Returns the per-group state rows of a multi-alert, most severe first, with the pre-cap group counts needed to render 'N of M groups firing'. Empty for alerts that have not opted in to per-group evaluation.",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("alert_id" = String, Path, description = "Alert ID"),
+      ),
+    responses(
+        (status = 200, description = "Success",  content_type = "application/json", body = inline(ListAlertGroupsResponseBody)),
+        (status = 404, description = "NotFound", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "get"})),
+        ("x-o2-mcp" = json!({"description": "List the per-group states of a multi-alert", "category": "alerts"}))
+    )
+)]
+pub async fn list_alert_groups(Path((org_id, alert_id)): Path<(String, String)>) -> Response {
+    let Ok(ksuid) = Ksuid::from_str(&alert_id) else {
+        return MetaHttpResponse::not_found(format!("invalid alert id {alert_id}"));
+    };
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    // Resolve through the alert itself so this endpoint inherits the same
+    // org scoping and not-found behaviour as every other alert read — a raw
+    // state-table query would happily serve another org's group labels, which
+    // carry host and service names.
+    if let Err(e) = alert::get_by_id(client, &org_id, ksuid).await {
+        return e.into();
+    }
+
+    let mut groups = match infra::table::alert_states::list_groups(&alert_id).await {
+        Ok(g) => g,
+        Err(e) => return MetaHttpResponse::internal_error(e.to_string()),
+    };
+    // Most severe first (§5.4), then by key so equal levels keep a stable
+    // order across polls instead of shuffling on every refresh.
+    groups.sort_by(|a, b| {
+        let rank = |s: &config::meta::alerts::state::AlertState| {
+            s.level.map(|l| l.severity_rank()).unwrap_or(0)
+        };
+        rank(b)
+            .cmp(&rank(a))
+            .then_with(|| a.group_key.cmp(&b.group_key))
+    });
+
+    let rollup = infra::table::alert_states::get_rollups(&[alert_id.clone()])
+        .await
+        .ok()
+        .and_then(|mut r| r.pop());
+    let groups_observed = rollup
+        .as_ref()
+        .and_then(|r| r.groups_observed)
+        .and_then(|n| i32::try_from(n).ok());
+    let group_cap = config::get_config().limit.alert_max_groups;
+
+    let list: Vec<AlertGroupResponseItem> = groups
+        .into_iter()
+        .map(|g| AlertGroupResponseItem {
+            labels: parse_group_labels(g.group_labels.as_deref()),
+            group_key: g.group_key,
+            group_labels: g.group_labels,
+            level: g.level.map(|l| l.to_string()),
+            level_since: g.level_since,
+            last_outcome: g.last_outcome.map(|o| o.to_string()),
+            last_outcome_at: g.last_outcome_at,
+            last_seen: g.last_seen,
+            silenced_until: g.silenced_until,
+            last_notified_level: g.last_notified_level.map(|l| l.to_string()),
+        })
+        .collect();
+
+    // Compare the PRE-cap observed total against the cap, not the length of
+    // `list`: the retained rows are post-cap, so they would report "cap of
+    // cap" and an overflowing alert would look identical to one that fit.
+    let capped = group_cap > 0
+        && groups_observed.is_some_and(|observed| observed as usize > group_cap);
+
+    MetaHttpResponse::json(ListAlertGroupsResponseBody {
+        list,
+        groups_observed,
+        groups_firing: rollup
+            .as_ref()
+            .and_then(|r| r.groups_firing)
+            .and_then(|n| i32::try_from(n).ok()),
+        groups_observed_is_lower_bound: rollup
+            .as_ref()
+            .and_then(|r| r.groups_observed_is_lower_bound),
+        groups_firing_is_lower_bound: rollup
+            .as_ref()
+            .and_then(|r| r.groups_firing_is_lower_bound),
+        capped,
+        group_cap,
+    })
+}
+
+/// ListAlertGroupTransitions
+#[utoipa::path(
+    get,
+    path = "/v2/{org_id}/alerts/{alert_id}/groups/transitions",
+    context_path = "/api",
+    tag = "Alerts",
+    operation_id = "ListAlertGroupTransitions",
+    summary = "Per-group state history for a multi-alert",
+    description = "Returns level/outcome transitions for a multi-alert, newest first, optionally scoped to one group (M-8). Reads the durable transitions table rather than the triggers stream, so history survives group reaping.",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("alert_id" = String, Path, description = "Alert ID"),
+        ("group_key" = Option<String>, Query, description = "Restrict to one group. Omit for every group."),
+        ("limit" = Option<u64>, Query, description = "Max rows (default 100, max 1000)"),
+      ),
+    responses(
+        (status = 200, description = "Success",  content_type = "application/json", body = inline(ListAlertGroupTransitionsResponseBody)),
+        (status = 404, description = "NotFound", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "get"})),
+        ("x-o2-mcp" = json!({"description": "Per-group alert state history", "category": "alerts"}))
+    )
+)]
+pub async fn list_alert_group_transitions(
+    Path((org_id, alert_id)): Path<(String, String)>,
+    Query(query): Query<HashMap<String, String>>,
+) -> Response {
+    let Ok(ksuid) = Ksuid::from_str(&alert_id) else {
+        return MetaHttpResponse::not_found(format!("invalid alert id {alert_id}"));
+    };
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    if let Err(e) = alert::get_by_id(client, &org_id, ksuid).await {
+        return e.into();
+    }
+
+    // `None` means every group, which is NOT `Some("")` — that is the rollup
+    // row's own key. An empty query value therefore has to mean "unset".
+    let group_key = query
+        .get("group_key")
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty());
+    let limit = query
+        .get("limit")
+        .and_then(|l| l.parse::<u64>().ok())
+        .unwrap_or(100)
+        .clamp(1, 1000);
+
+    match infra::table::alert_states::list_transitions_filtered(&alert_id, group_key, limit).await {
+        Ok(transitions) => MetaHttpResponse::json(ListAlertGroupTransitionsResponseBody {
+            list: transitions
+                .into_iter()
+                .map(|t| AlertGroupTransitionItem {
+                    group_key: t.group_key,
+                    group_labels: t.group_labels,
+                    from_level: t.from_level.map(|l| l.to_string()),
+                    to_level: t.to_level.map(|l| l.to_string()),
+                    from_outcome: t.from_outcome.map(|o| o.to_string()),
+                    to_outcome: t.to_outcome.to_string(),
+                    at: t.at,
+                    value: t.value,
+                })
+                .collect(),
+        }),
         Err(e) => MetaHttpResponse::internal_error(e.to_string()),
     }
 }
@@ -1070,6 +1265,16 @@ async fn enrich_with_run_state(list: &mut [ListAlertsResponseBodyItem]) {
             item.last_outcome_since = state.since;
             item.level = state.level.map(|l| l.to_string());
             item.level_since = state.level_since;
+            // §5.4: the group counts live on the rollup row and are the only
+            // source for the "N of M groups firing" chip — they are computed
+            // pre-cap, so they cannot be reconstructed by counting the
+            // retained state rows. The exactness markers ride along because
+            // exactness likewise cannot be re-derived from the counts and a
+            // mutable cap setting.
+            item.groups_observed = state.groups_observed.and_then(|n| i32::try_from(n).ok());
+            item.groups_firing = state.groups_firing.and_then(|n| i32::try_from(n).ok());
+            item.groups_observed_is_lower_bound = state.groups_observed_is_lower_bound;
+            item.groups_firing_is_lower_bound = state.groups_firing_is_lower_bound;
         }
     }
 }
