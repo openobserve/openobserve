@@ -161,6 +161,49 @@ mod tests {
         assert!(resp.status() == StatusCode::OK || resp.status() == StatusCode::NOT_FOUND);
     }
 
+    /// The `<base href>` rewrite is the only reason `ui_routes` takes an
+    /// argument, so pin it: whatever mount point the caller passes must come
+    /// back out in the served HTML.
+    ///
+    /// Driven through a synthetic HTML response rather than the embedded
+    /// `index.html`, so it still asserts something in builds where `web/dist`
+    /// is absent and the embed is empty.
+    #[tokio::test]
+    async fn base_href_is_rewritten_to_the_mount_point() {
+        for mount in ["/web/", "/abc/web/"] {
+            let app = Router::new()
+                .route(
+                    "/index.html",
+                    get(|| async {
+                        (
+                            [(header::CONTENT_TYPE, "text/html")],
+                            r#"<html><head><base href="/" /></head></html>"#,
+                        )
+                    }),
+                )
+                .layer(middleware::from_fn_with_state(
+                    mount.to_string(),
+                    base_href_middleware,
+                ));
+            let req = Request::builder()
+                .uri("/index.html")
+                .body(Body::empty())
+                .unwrap();
+
+            let resp = app.oneshot(req).await.unwrap();
+            assert_eq!(resp.status(), StatusCode::OK, "mount={mount}");
+            let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX)
+                .await
+                .unwrap();
+            let html = String::from_utf8_lossy(&bytes);
+
+            assert!(
+                html.contains(&format!(r#"<base href="{mount}" />"#)),
+                "mount={mount} produced {html}"
+            );
+        }
+    }
+
     #[tokio::test]
     async fn test_index_not_ok() {
         let app = ui_routes("/web/");
