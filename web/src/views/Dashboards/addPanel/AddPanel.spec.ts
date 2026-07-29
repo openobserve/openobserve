@@ -648,7 +648,7 @@ describe("AddPanel.vue", () => {
       const style = wrapper.vm.inputStyle;
 
       expect(style).toHaveProperty("width");
-      expect(style.width).toBe("200px");
+      expect(style.width).toBe("12.5rem");
     });
   });
 
@@ -1325,7 +1325,7 @@ describe("AddPanel.vue", () => {
       const style = wrapper.vm.inputStyle;
 
       expect(style).toHaveProperty("width");
-      expect(style.width).toBe("200px"); // Default width for empty title
+      expect(style.width).toBe("12.5rem"); // Default width for empty title
     });
   });
 
