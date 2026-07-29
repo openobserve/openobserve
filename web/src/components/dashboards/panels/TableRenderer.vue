@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :custom-pagination-bar="showPagination"
       :horizontal-scroll="isPivot"
       :row-height="22"
-      :virtual-scroll="!isPivot"
+      :virtual-scroll="virtualizeRows"
       :default-columns="false"
       :show-global-filter="false"
       :enable-column-filter="enableFiltering"
@@ -176,6 +176,21 @@ export default defineComponent({
     // Pivots carry many value/group columns and must scroll horizontally rather
     // than compress to fit; regular tables keep the fit-to-container layout.
     const isPivot = computed(() => ((props.data?.pivotHeaderLevels?.length as number) ?? 0) > 0);
+
+    // Virtualize only the case the pre-migration table virtualized — its gate was
+    // `!useVirtualScroll && !showPagination && !wrap`:
+    //  • pivot     — aggregated/small, and the fake-rowspan row merge must see
+    //                every row.
+    //  • paginated — only `pageSize` rows are in the DOM anyway, so there is
+    //                nothing to virtualize.
+    //  • wrapped   — wrapped rows vary from ~29px to ~81px, and the resulting
+    //                total-height jumps show up as flicker while scrolling.
+    //                Rendering every row is acceptable at dashboard sizes.
+    // Flat, unpaginated, unwrapped tables (e.g. Logs Visualize `SELECT *`, ~2000
+    // rows) are the case that must virtualize or the main thread stalls.
+    const virtualizeRows = computed(
+      () => !isPivot.value && !props.showPagination && !props.wrapCells,
+    );
 
     // The client pagination row model is attached once at table creation, so
     // re-key the table on the pagination mode: without it, a table first mounted
@@ -432,6 +447,7 @@ export default defineComponent({
       cellStyleFn,
       effectivePageSize,
       isPivot,
+      virtualizeRows,
       paginationMode,
       sortedRows,
       localSortBy,

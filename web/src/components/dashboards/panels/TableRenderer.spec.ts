@@ -264,6 +264,23 @@ describe("TableRenderer", () => {
       expect(table.props("virtualScroll")).toBe(false);
     });
 
+    // The remaining two cases mirror the pre-migration gate
+    // (`!useVirtualScroll && !showPagination && !wrap`).
+    it("should disable virtualScroll on OTable when cells wrap", () => {
+      // Wrapped rows vary from ~29px to ~81px; virtualizing them makes the total
+      // height jump while scrolling, which reads as flicker.
+      wrapper = createWrapper({ wrapCells: true });
+      const table = wrapper.findComponent({ name: "OTable" });
+      expect(table.props("virtualScroll")).toBe(false);
+    });
+
+    it("should disable virtualScroll on OTable when pagination is enabled", () => {
+      // Only `pageSize` rows reach the DOM, so there is nothing to virtualize.
+      wrapper = createWrapper({ showPagination: true });
+      const table = wrapper.findComponent({ name: "OTable" });
+      expect(table.props("virtualScroll")).toBe(false);
+    });
+
     it("should set enableColumnReorder=false on TenstackTable", () => {
       wrapper = createWrapper();
       const table = wrapper.findComponent({ name: "OTable" });
