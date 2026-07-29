@@ -112,6 +112,8 @@ const i18n = createI18n({
         rumPlatform: "Platform",
         rumPlatformBrowser: "Browser",
         rumPlatformReactNative: "React Native",
+        rumPlatformAndroid: "Android",
+        rumPlatformIOS: "iOS",
       },
     },
   },
@@ -509,14 +511,20 @@ describe("FrontendRumConfig", () => {
       ({ wrapper } = mountComponent());
     });
 
-    it("renders both platform options with their labels when rumToken is present", () => {
+    it("renders all four platform options with their labels when rumToken is present", () => {
       const browserTab = wrapper.find('[data-test="rum-setup-platform-browser"]');
       const reactNativeTab = wrapper.find('[data-test="rum-setup-platform-react-native"]');
+      const androidTab = wrapper.find('[data-test="rum-setup-platform-android"]');
+      const iosTab = wrapper.find('[data-test="rum-setup-platform-ios"]');
 
       expect(browserTab.exists()).toBe(true);
       expect(browserTab.text()).toBe("Browser");
       expect(reactNativeTab.exists()).toBe(true);
       expect(reactNativeTab.text()).toBe("React Native");
+      expect(androidTab.exists()).toBe(true);
+      expect(androidTab.text()).toBe("Android");
+      expect(iosTab.exists()).toBe(true);
+      expect(iosTab.text()).toBe("iOS");
     });
 
     it("does NOT render the platform switcher when rumToken is empty", () => {
@@ -571,6 +579,77 @@ describe("FrontendRumConfig", () => {
       const content = card.props("content");
       expect(content.provider.name).toBe("Real User Monitoring");
       expect(content.steps.map((s: any) => s.id)).toEqual(["install", "init", "verify"]);
+    });
+
+    it("swaps to the Android card with source = 'android' detection when Android is selected", async () => {
+      await wrapper.find('[data-test="rum-setup-platform-android"]').trigger("click");
+
+      const card = wrapper.findComponent({ name: "SetupCardRenderer" });
+      const content = card.props("content");
+      expect(content.provider.name).toBe("Real User Monitoring");
+      expect(content.provider.runtime).toBe("Android");
+      expect(content.steps.map((s: any) => s.id)).toEqual([
+        "install",
+        "init",
+        "session-replay",
+        "verify",
+      ]);
+      expect(content.detect.filter).toBe("source = 'android'");
+    });
+
+    it("swaps to the iOS card with source = 'ios' detection when iOS is selected", async () => {
+      await wrapper.find('[data-test="rum-setup-platform-ios"]').trigger("click");
+
+      const card = wrapper.findComponent({ name: "SetupCardRenderer" });
+      const content = card.props("content");
+      expect(content.provider.name).toBe("Real User Monitoring");
+      expect(content.provider.runtime).toBe("iOS");
+      expect(content.steps.map((s: any) => s.id)).toEqual([
+        "install",
+        "init",
+        "session-replay",
+        "verify",
+      ]);
+      expect(content.detect.filter).toBe("source = 'ios'");
+    });
+
+    it("points the Android RUM install at the o2-sdk-android coordinates", async () => {
+      await wrapper.find('[data-test="rum-setup-platform-android"]').trigger("click");
+
+      const card = wrapper.findComponent({ name: "SetupCardRenderer" });
+      const install = card.props("content").steps.find((s: any) => s.id === "install");
+      const kotlin = install.variants.find((v: any) => v.id === "kotlin");
+      expect(kotlin.code.raw).toContain("ai.openobserve:o2-sdk-android-rum");
+    });
+
+    it("gives each Android feature its own full intake URL", async () => {
+      await wrapper.find('[data-test="rum-setup-platform-android"]').trigger("click");
+
+      const card = wrapper.findComponent({ name: "SetupCardRenderer" });
+      const init = card.props("content").steps.find((s: any) => s.id === "init");
+      expect(init.code.raw).toContain(`${HTTPS_ENDPOINT}/rum/v1/${ORG_ID}/rum`);
+      expect(init.code.raw).toContain(`${HTTPS_ENDPOINT}/rum/v1/${ORG_ID}/logs`);
+    });
+
+    it("points the iOS install at the openobserve-sdk-ios Swift package", async () => {
+      await wrapper.find('[data-test="rum-setup-platform-ios"]').trigger("click");
+
+      const card = wrapper.findComponent({ name: "SetupCardRenderer" });
+      const install = card.props("content").steps.find((s: any) => s.id === "install");
+      const spm = install.variants.find((v: any) => v.id === "spm");
+      expect(spm.code.raw).toContain("github.com/openobserve/openobserve-sdk-ios.git");
+    });
+
+    it("carries the raw RUM token into the Android and iOS init code", async () => {
+      await wrapper.find('[data-test="rum-setup-platform-android"]').trigger("click");
+      let card = wrapper.findComponent({ name: "SetupCardRenderer" });
+      let init = card.props("content").steps.find((s: any) => s.id === "init");
+      expect(init.code.raw).toContain(RUM_TOKEN);
+
+      await wrapper.find('[data-test="rum-setup-platform-ios"]').trigger("click");
+      card = wrapper.findComponent({ name: "SetupCardRenderer" });
+      init = card.props("content").steps.find((s: any) => s.id === "init");
+      expect(init.code.raw).toContain(RUM_TOKEN);
     });
   });
 });

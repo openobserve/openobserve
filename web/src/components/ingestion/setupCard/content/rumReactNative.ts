@@ -152,7 +152,7 @@ import {
 
 const navCode = `import { useRef } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
-import { OoRumReactNavigationTracking } from '${PKG_NAV}';
+import { O2RumReactNavigationTracking } from '${PKG_NAV}';
 
 const navigationRef = useRef(null);
 
@@ -160,7 +160,7 @@ const navigationRef = useRef(null);
   ref={navigationRef}
   onReady={() => {
     // Every route change becomes a RUM view.
-    OoRumReactNavigationTracking.startTrackingViews(navigationRef.current);
+    O2RumReactNavigationTracking.startTrackingViews(navigationRef.current);
   }}
 >
   {/* your screens */}
@@ -257,7 +257,7 @@ export default function rumReactNativeCard(subs: RumReactNativeCardSubs): RichCa
           filename: "App.tsx",
           raw: navCode,
         },
-        note: "Without this you can still record views manually with `OoRum.startView()` / `OoRum.stopView()`.",
+        note: "Without this you can still record views manually with `O2Rum.startView()` / `O2Rum.stopView()`.",
       },
       {
         id: "verify",
@@ -324,7 +324,7 @@ http://192.168.1.10:5080/rum/v1/${subs.org}`,
         },
         {
           q: "Sessions appear but screens are all named the same",
-          a: "View tracking is not wired up. Either pass your navigation ref to `OoRumReactNavigationTracking.startTrackingViews()` (see the optional step above), or call `OoRum.startView()` / `OoRum.stopView()` yourself on each screen.",
+          a: "View tracking is not wired up. Either pass your navigation ref to `O2RumReactNavigationTracking.startTrackingViews()` (see the optional step above), or call `O2Rum.startView()` / `O2Rum.stopView()` yourself on each screen.",
         },
       ],
     },
