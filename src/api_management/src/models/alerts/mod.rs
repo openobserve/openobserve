@@ -348,6 +348,11 @@ pub struct QueryCondition {
     /// Historical comparison periods for anomaly detection.
     #[serde(default)]
     pub multi_time_range: Option<Vec<CompareHistoricData>>,
+
+    /// SLO condition. Required with type="slo" (Feature 5, D42).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<Object>)]
+    pub slo_condition: Option<config::meta::slo::condition::SloCondition>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema, PartialEq)]
@@ -409,6 +414,10 @@ pub enum QueryType {
     SQL,
     #[serde(rename = "promql")]
     PromQL,
+    /// Feature 5 (D28). An SLO alert reads precomputed SLO status rather than
+    /// running a query.
+    #[serde(rename = "slo")]
+    Slo,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
@@ -564,6 +573,7 @@ impl From<meta_alerts::QueryCondition> for QueryCondition {
             multi_time_range: value
                 .multi_time_range
                 .map(|cs| cs.into_iter().map(|c| c.into()).collect()),
+            slo_condition: value.slo_condition,
         }
     }
 }
@@ -604,6 +614,7 @@ impl From<meta_alerts::QueryType> for QueryType {
             meta_alerts::QueryType::Custom => Self::Custom,
             meta_alerts::QueryType::SQL => Self::SQL,
             meta_alerts::QueryType::PromQL => Self::PromQL,
+            meta_alerts::QueryType::Slo => Self::Slo,
         }
     }
 }
@@ -754,6 +765,7 @@ impl From<QueryCondition> for meta_alerts::QueryCondition {
             multi_time_range: value
                 .multi_time_range
                 .map(|cs| cs.into_iter().map(|c| c.into()).collect()),
+            slo_condition: value.slo_condition,
         }
     }
 }
@@ -794,6 +806,7 @@ impl From<QueryType> for meta_alerts::QueryType {
             QueryType::Custom => Self::Custom,
             QueryType::SQL => Self::SQL,
             QueryType::PromQL => Self::PromQL,
+            QueryType::Slo => Self::Slo,
         }
     }
 }
@@ -1364,6 +1377,7 @@ mod tests {
             vrl_function: None,
             search_event_type: None,
             multi_time_range: None,
+            slo_condition: None,
         };
         let qc = QueryCondition::from(meta);
         assert!(matches!(qc.query_type, QueryType::SQL));
@@ -1385,6 +1399,7 @@ mod tests {
             vrl_function: Some("fn".to_string()),
             search_event_type: None,
             multi_time_range: None,
+            slo_condition: None,
         };
         let meta = meta_alerts::QueryCondition::from(qc);
         assert!(matches!(meta.query_type, meta_alerts::QueryType::SQL));

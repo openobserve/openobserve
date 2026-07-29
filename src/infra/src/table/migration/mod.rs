@@ -146,6 +146,7 @@ mod m20260726_000001_add_priority_and_tags_to_alerts;
 mod m20260726_000002_add_priority_and_tags_to_anomaly_config;
 mod m20260726_000003_add_group_lifecycle_columns;
 mod m20260727_000001_create_slo_tables;
+mod m20260727_000002_add_slo_columns_to_alerts;
 
 /// Apply **only** the SLO tables, for targeted integration tests.
 ///
@@ -331,6 +332,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260726_000002_add_priority_and_tags_to_anomaly_config::Migration),
             Box::new(m20260726_000003_add_group_lifecycle_columns::Migration),
             Box::new(m20260727_000001_create_slo_tables::Migration),
+            Box::new(m20260727_000002_add_slo_columns_to_alerts::Migration),
         ]
     }
 }

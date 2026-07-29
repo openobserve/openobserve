@@ -31,6 +31,7 @@
 //! * [`job`] is the IO shell: load, search, write, commit, reschedule.
 
 pub mod backfill;
+pub mod evaluate;
 pub mod ingest;
 pub mod job;
 pub mod query;

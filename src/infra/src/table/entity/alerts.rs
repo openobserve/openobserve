@@ -43,6 +43,16 @@ pub struct Model {
     /// Feature 2 (PT-6, D18): JSON array of normalized tag strings.
     /// NULL or absent = no tags.
     pub tags: Option<Json>,
+    /// Feature 5 (D60): the SLO this alert measures. Its own INDEXED column
+    /// rather than a key inside `query_slo_condition`, because reverse lookup
+    /// — "which alerts point at this SLO" — runs on every SLO delete (S-12)
+    /// and every ingest pass (SA-19), and a JSON key is not portably
+    /// indexable. NULL = not an SLO alert.
+    pub slo_id: Option<String>,
+    /// Feature 5 (D42): the `SloCondition` payload. Follows the
+    /// `query_aggregation` precedent, NOT `trigger_thresholds`, whose scope is
+    /// threshold and level configuration only (D1).
+    pub query_slo_condition: Option<Json>,
     pub trigger_frequency_type: i16,
     pub trigger_frequency_seconds: i64,
     pub trigger_frequency_cron: Option<String>,
@@ -119,6 +129,8 @@ mod tests {
             trigger_thresholds: None,
             priority: None,
             tags: None,
+            slo_id: None,
+            query_slo_condition: None,
             trigger_frequency_type: 0,
             trigger_frequency_seconds: 300,
             trigger_frequency_cron: None,
