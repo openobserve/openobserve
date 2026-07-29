@@ -106,6 +106,31 @@ const displayValue = computed(() => {
   return formatFn(rawValue.value, props.row.original);
 });
 
+// ── Cell copy ─────────────────────────────────────────────────────
+// Empty cells get no copy affordance (matches the pre-migration table).
+const hasCopyableValue = computed(() => {
+  const value = rawValue.value;
+  if (value === null || value === undefined || value === "undefined") return false;
+  return String(value).trim() !== "";
+});
+
+const showCellCopy = computed(
+  () => !!props.enableCellCopy && !slots.default && hasCopyableValue.value,
+);
+
+// The button shares a flex row with the value instead of floating over it, so it
+// can never overlap the text. Right-aligned (numeric) columns put the button on
+// the left; left/center-aligned columns put it on the right.
+const copyRowAlignClass = computed(() => {
+  if (align.value === "center") return "justify-center";
+  if (align.value === "right") return "justify-end";
+  return "";
+});
+
+const copyValueClass = computed(() =>
+  props.wrap ? "min-w-0 wrap-anywhere whitespace-normal" : "min-w-0 truncate",
+);
+
 const horizontalScroll = inject<{ value: boolean } | null>("o2TableHorizontalScroll", null);
 
 // Keep right-pinned total cells in step with the sticky header and footer.
@@ -259,7 +284,7 @@ function onCellActionsLeave() {
             ? 'overflow-hidden whitespace-nowrap'
             : 'overflow-hidden text-ellipsis whitespace-nowrap',
       meta?.cellClass ?? '',
-      isTreeColumn || hasCellActions || enableCellCopy ? 'relative' : '',
+      isTreeColumn || hasCellActions ? 'relative' : '',
       enableCellCopy ? 'group/cell' : '',
       isTreeColumn && treeMeta?.isParent && treeMeta?.isExpanded ? 'o2-tree-parent-expanded' : '',
       isTreeColumn && treeMeta && treeMeta.parentId !== null ? 'o2-tree-child' : '',
@@ -331,6 +356,38 @@ function onCellActionsLeave() {
         <div v-if="!isAction" :class="slotContentClass"><slot /></div>
         <slot v-else />
       </div>
+      <!-- Copy-enabled cell: value and copy button share a flex row, so the
+           button sits beside the text instead of covering it. -->
+      <div
+        v-else-if="showCellCopy"
+        class="flex w-full min-w-0 items-center"
+        :class="copyRowAlignClass"
+      >
+        <FlexRender
+          v-if="cell.column.columnDef.cell"
+          :render="cell.column.columnDef.cell"
+          :props="cell.getContext()"
+        />
+        <span
+          v-else-if="highlightedHtml"
+          :class="[defaultTextClass, copyValueClass]"
+          v-html="highlightedHtml"
+        />
+        <span v-else :class="[defaultTextClass, copyValueClass]">
+          {{ displayValue }}
+        </span>
+        <button
+          type="button"
+          :data-test="`o2-table-cell-copy-${cell.column.id}`"
+          :data-copied="copied ? 'true' : undefined"
+          class="rounded-default text-text-muted hover:text-text-body hover:bg-button-ghost-hover-bg inline-flex shrink-0 cursor-pointer items-center border-0 bg-transparent p-0.5 leading-none opacity-0 transition-opacity group-hover/cell:opacity-100"
+          :class="align === 'right' ? 'order-first mr-1' : 'ml-1'"
+          :title="copied ? 'Copied!' : 'Copy'"
+          @click="handleCopy"
+        >
+          <OIcon :name="copied ? 'check' : 'content-copy'" size="xs" />
+        </button>
+      </div>
       <!-- Custom cell render via TanStack FlexRender -->
       <FlexRender
         v-else-if="cell.column.columnDef.cell"
@@ -344,19 +401,6 @@ function onCellActionsLeave() {
         {{ displayValue }}
       </span>
     </template>
-
-    <!-- Cell copy button (visible on hover) -->
-    <button
-      v-if="enableCellCopy && !$slots.default"
-      type="button"
-      :data-test="`o2-table-cell-copy-${cell.column.id}`"
-      :data-copied="copied ? 'true' : undefined"
-      class="bg-surface-base border-border-default rounded-default text-text-muted hover:text-text-body absolute top-1/2 right-1 -translate-y-1/2 cursor-pointer border p-0.5 leading-none opacity-0 transition-opacity group-hover/cell:opacity-100"
-      :title="copied ? 'Copied!' : 'Copy'"
-      @click="handleCopy"
-    >
-      <OIcon :name="copied ? 'check' : 'content-copy'" size="xs" />
-    </button>
 
     <!-- Per-cell hover-action overlay. Spans the cell's right edge full-height
          so it anchors both flow content and self-positioned content. -->

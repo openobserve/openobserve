@@ -1057,6 +1057,47 @@ describe("OTable", () => {
       });
       expect(wrapper.find('[data-test="o2-table-cell-copy-id"]').exists()).toBe(false);
     });
+
+    it("should not render a copy button when the cell value is empty", () => {
+      wrapper = mount(OTable, {
+        props: {
+          data: [{ id: 1, name: "", email: "a@b.c", status: "Active" }],
+          columns: makeColumns(),
+          enableCellCopy: true,
+        },
+      });
+      expect(wrapper.find('[data-test="o2-table-cell-copy-name"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="o2-table-cell-copy-email"]').exists()).toBe(true);
+    });
+
+    it("should place the copy button before the value when the column is right-aligned", () => {
+      const columns = makeColumns();
+      columns[0].meta = { align: "right" };
+      wrapper = mount(OTable, {
+        props: { data: makeRows(1), columns, enableCellCopy: true },
+      });
+      const copyBtn = wrapper.find('[data-test="o2-table-cell-copy-id"]');
+      expect(copyBtn.exists()).toBe(true);
+      expect(copyBtn.classes()).toContain("order-first");
+    });
+
+    it("should place the copy button after the value when the column is left-aligned", () => {
+      wrapper = mount(OTable, {
+        props: { data: makeRows(1), columns: makeColumns(), enableCellCopy: true },
+      });
+      const copyBtn = wrapper.find('[data-test="o2-table-cell-copy-id"]');
+      expect(copyBtn.exists()).toBe(true);
+      expect(copyBtn.classes()).not.toContain("order-first");
+    });
+
+    it("should keep the copy button in flow so it cannot overlap the cell text", () => {
+      wrapper = mount(OTable, {
+        props: { data: makeRows(1), columns: makeColumns(), enableCellCopy: true },
+      });
+      const copyBtn = wrapper.find('[data-test="o2-table-cell-copy-id"]');
+      expect(copyBtn.classes()).not.toContain("absolute");
+      expect(copyBtn.element.parentElement?.className).toContain("flex");
+    });
   });
 
   // ── Footer Totals ───────────────────────────────────────────
