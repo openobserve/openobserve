@@ -121,3 +121,75 @@ describe("StepEvidence — settle timing (P5.4 item 5)", () => {
     expect(w.find('[data-test="synthetics-run-detail-settle-timing"]').exists()).toBe(false);
   });
 });
+
+describe("StepEvidence — what the application did (Phase 6)", () => {
+  const appEvidence = {
+    stepId: "s2",
+    consoleErrors: 1,
+    pageErrors: 1,
+    requestsFailed: 0,
+    responsesNon2xx: 3,
+    worstResponses: [
+      { method: "POST", url: "https://x/auth/login", status: 503, count: 3 },
+    ],
+    firstConsoleErrors: ["[auth] sign-in failed: 503 Service Unavailable"],
+  };
+
+  function renderWith(over: Record<string, unknown> = {}) {
+    return mount(StepEvidence, {
+      props: { detail: detail(), evidence: appEvidence, ...over },
+      global: { plugins: [i18n] },
+    });
+  }
+
+  it("shows the failing response — the thing no field distinguishes today", () => {
+    const w = renderWith();
+    expect(w.find('[data-test="synthetics-run-detail-app-evidence"]').exists()).toBe(true);
+    expect(w.text()).toContain("503");
+    expect(w.text()).toContain("/auth/login");
+  });
+
+  it("collapses repeats into a count rather than listing them", () => {
+    expect(renderWith().text()).toContain("x3");
+  });
+
+  it("shows the application's own console error", () => {
+    expect(renderWith().text()).toContain("sign-in failed");
+  });
+
+  it("stays hidden when the step had nothing to report", () => {
+    // A healthy step contributes no rows — sparse by construction, not padded.
+    const w = renderWith({
+      evidence: {
+        ...appEvidence,
+        consoleErrors: 0,
+        pageErrors: 0,
+        requestsFailed: 0,
+        responsesNon2xx: 0,
+        worstResponses: [],
+        firstConsoleErrors: [],
+      },
+    });
+    expect(w.find('[data-test="synthetics-run-detail-app-evidence"]').exists()).toBe(false);
+  });
+
+  it("stays hidden on a record that predates evidence capture", () => {
+    const w = renderWith({ evidence: null });
+    expect(w.find('[data-test="synthetics-run-detail-app-evidence"]').exists()).toBe(false);
+  });
+
+  it("reports truncation rather than letting it pass silently", () => {
+    // X-8.2 — a capped buffer that drops events without saying so reads as
+    // "nothing else happened".
+    const w = renderWith({ truncated: true });
+    expect(w.find('[data-test="synthetics-run-detail-evidence-truncated"]').exists()).toBe(true);
+  });
+
+  it("says nothing about truncation when nothing was dropped", () => {
+    expect(
+      renderWith({ truncated: false })
+        .find('[data-test="synthetics-run-detail-evidence-truncated"]')
+        .exists(),
+    ).toBe(false);
+  });
+});

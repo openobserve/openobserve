@@ -124,6 +124,12 @@ export interface SyntheticRunDetail extends SyntheticRun {
   retryHistory: RetryAttempt[];
   /** Spec P5.4 — present exactly when the final attempt failed. */
   failureDetail: FailureDetail | null;
+  /** Browser-side evidence summary, per step that had something to report. */
+  evidenceByStep: StepEvidence[];
+  /** The bundle's object-storage key, when one was uploaded. */
+  evidenceKey: string | null;
+  /** True when the capture cap bound — X-8.2, reduced fidelity is reported. */
+  evidenceTruncated: boolean;
   network: NetworkStats | null;
   webVitals: WebVitals | null;
   traceKey: string | null;
@@ -254,6 +260,23 @@ export interface SettleSignal {
   status: "fired" | "stale";
   required: boolean;
   waitedMs: number;
+}
+
+/**
+ * Per-step counts from the evidence bundle, inlined on the record.
+ *
+ * The bundle itself lives in object storage; this fixed shape is what makes
+ * "every failure of step 9 last week that coincided with a 5xx" an ordinary
+ * query — no join, no new stream, nothing unbounded in the record.
+ */
+export interface StepEvidence {
+  stepId: string;
+  consoleErrors: number;
+  pageErrors: number;
+  requestsFailed: number;
+  responsesNon2xx: number;
+  worstResponses: Array<{ method: string; url: string; status: number; count: number }>;
+  firstConsoleErrors: string[];
 }
 
 export interface NetworkStats {
@@ -749,6 +772,19 @@ function mapRetryHistory(raw: unknown): RetryAttempt[] {
   });
 }
 
+function mapEvidence(raw: unknown): StepEvidence[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.map((e: any) => ({
+    stepId: str(e?.step_id),
+    consoleErrors: e?.console_errors ?? 0,
+    pageErrors: e?.page_errors ?? 0,
+    requestsFailed: e?.requests_failed ?? 0,
+    responsesNon2xx: e?.responses_non_2xx ?? 0,
+    worstResponses: Array.isArray(e?.worst_responses) ? e.worst_responses : [],
+    firstConsoleErrors: Array.isArray(e?.first_console_errors) ? e.first_console_errors : [],
+  }));
+}
+
 function mapFailureDetail(raw: unknown): FailureDetail | null {
   if (!raw || typeof raw !== "object") return null;
   const d = raw as any;
@@ -825,6 +861,9 @@ export function mapRunDetail(rawHit: Record<string, unknown>): SyntheticRunDetai
     // that fact survives.
     retryHistory: mapRetryHistory(rawHit.retry_history),
     failureDetail: mapFailureDetail(rawHit.failure_detail),
+    evidenceByStep: mapEvidence(rawHit.evidence_by_step),
+    evidenceKey: rawHit.evidence_key ? str(rawHit.evidence_key) : null,
+    evidenceTruncated: !!rawHit.evidence_truncated,
     network: null,
     webVitals: null,
     traceKey: rawHit.trace_key ? str(rawHit.trace_key) : null,

@@ -435,6 +435,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <StepEvidence
                         v-if="row.evidence"
                         :detail="row.evidence"
+                        :evidence="row.appEvidence"
+                        :truncated="detail?.evidenceTruncated"
                         class="mt-3"
                       />
                     </div>
@@ -522,6 +524,7 @@ import useSyntheticResults from "@/composables/useSyntheticResults";
 import ProtocolRunSummary from "@/components/synthetics/results/ProtocolRunSummary.vue";
 import type {
   FailureDetail,
+  StepEvidence as StepEvidenceSummary,
   SyntheticRunDetail,
   RecordedStep,
 } from "@/composables/synthetics/syntheticResultsSchema";
@@ -657,6 +660,8 @@ interface StepRow {
   screenshotKey: string | null;
   /** P5.4 items 3-5, present only on the step that actually failed. */
   evidence: FailureDetail | null;
+  /** Browser-side evidence for this step, when the probe captured any. */
+  appEvidence: StepEvidenceSummary | null;
 }
 
 function fmtDur(ms: number): string {
@@ -694,6 +699,9 @@ function buildSteps(detail: SyntheticRunDetail | null): StepRow[] {
         detail.failureDetail && detail.failureDetail.stepId === ex.step_id
           ? detail.failureDetail
           : null,
+      // Per step, not per failure: the step that CAUSED the problem is often
+      // not the one that failed, so evidence hangs off whichever step owns it.
+      appEvidence: detail.evidenceByStep.find((e) => e.stepId === ex.step_id) ?? null,
     };
   });
 }

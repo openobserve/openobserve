@@ -28,11 +28,17 @@
  */
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
-import type { FailureDetail } from "@/composables/synthetics/syntheticResultsSchema";
+import type { FailureDetail, StepEvidence as StepEvidenceSummary } from "@/composables/synthetics/syntheticResultsSchema";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 
-const props = defineProps<{ detail: FailureDetail }>();
+const props = defineProps<{
+  detail: FailureDetail;
+  /** Browser-side evidence for this step, when the probe captured any. */
+  evidence?: StepEvidenceSummary | null;
+  /** True when the capture cap bound during the run (X-8.2). */
+  truncated?: boolean;
+}>();
 
 const { t } = useI18n();
 
@@ -69,6 +75,15 @@ function fmtMs(ms: number | null): string {
   if (ms === null) return "—";
   return ms >= 1000 ? `${(ms / 1000).toFixed(1)}s` : `${ms}ms`;
 }
+
+/** Anything worth reading in the browser-side evidence for this step. */
+const hasEvidence = computed(() => {
+  const e = props.evidence;
+  if (!e) return false;
+  return (
+    e.consoleErrors > 0 || e.pageErrors > 0 || e.requestsFailed > 0 || e.responsesNon2xx > 0
+  );
+});
 
 function outcomeVariant(outcome: string): "success" | "error" | "default" {
   if (outcome === "matched") return "success";
@@ -159,5 +174,70 @@ function outcomeVariant(outcome: string): "success" | "error" | "default" {
         </span>
       </p>
     </section>
+
+    <!--
+      What the page SAID and what it ASKED FOR (design §5.2). Items 1-3 above
+      describe the runner's experience; these describe the application's, which
+      is the difference between "an element did not appear" and "the login call
+      returned 503".
+    -->
+    <section v-if="hasEvidence" data-test="synthetics-run-detail-app-evidence">
+      <h4 class="text-text-heading m-0 mb-1 text-xs font-semibold">
+        {{ t("synthetics.runDetail.applicationEvidence") }}
+      </h4>
+
+      <!-- Non-2xx first: ordering is the guidance, since there is no verdict. -->
+      <ul
+        v-if="evidence!.worstResponses.length"
+        class="m-0 mb-1 flex list-none flex-col gap-1 p-0"
+        data-test="synthetics-run-detail-worst-responses"
+      >
+        <li
+          v-for="(r, i) in evidence!.worstResponses"
+          :key="`${r.method}-${r.url}-${i}`"
+          class="flex items-center gap-2 text-xs"
+        >
+          <OBadge variant="error" size="sm">{{ r.status }}</OBadge>
+          <span class="text-text-secondary shrink-0">{{ r.method }}</span>
+          <span class="text-text-body min-w-0 flex-1 truncate font-mono">{{ r.url }}</span>
+          <span v-if="r.count > 1" class="text-text-secondary shrink-0">x{{ r.count }}</span>
+        </li>
+      </ul>
+
+      <ul
+        v-if="evidence!.firstConsoleErrors.length"
+        class="m-0 mb-1 flex list-none flex-col gap-1 p-0"
+        data-test="synthetics-run-detail-console-errors"
+      >
+        <li
+          v-for="(line, i) in evidence!.firstConsoleErrors"
+          :key="i"
+          class="text-text-body font-mono text-xs break-words"
+        >
+          {{ line }}
+        </li>
+      </ul>
+
+      <p class="text-text-secondary m-0 text-xs">
+        {{
+          t("synthetics.runDetail.evidenceCounts", {
+            consoleErrors: evidence!.consoleErrors,
+            pageErrors: evidence!.pageErrors,
+            failed: evidence!.requestsFailed,
+            nonOk: evidence!.responsesNon2xx,
+          })
+        }}
+      </p>
+    </section>
+
+    <!-- X-8.2: reduced fidelity is reported, never silent. -->
+    <p
+      v-if="truncated"
+      class="text-status-warning-text m-0 flex items-start gap-1 text-xs"
+      data-test="synthetics-run-detail-evidence-truncated"
+    >
+      <OIcon name="warning" size="xs" class="mt-0.5 shrink-0" aria-hidden="true" />
+      <span>{{ t("synthetics.runDetail.evidenceTruncated") }}</span>
+    </p>
   </div>
 </template>

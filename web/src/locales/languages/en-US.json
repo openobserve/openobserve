@@ -10086,7 +10086,10 @@
       "settleStaleNote": "A recorded signal never arrived. The page did not do what it did when this was recorded, which is often the real cause of a later step timing out.",
       "settleTiming": "Settle timing",
       "settleTimingValue": "Settled in {now} — {recorded} when recorded.",
-      "settleSlower": "({times}x slower than recorded)"
+      "settleSlower": "({times}x slower than recorded)",
+      "applicationEvidence": "What the application did",
+      "evidenceCounts": "{consoleErrors} console errors · {pageErrors} page errors · {failed} failed requests · {nonOk} non-2xx responses",
+      "evidenceTruncated": "Some events were dropped during this run because the capture limit was reached. The bundle names what went."
     },
     "runRowExpansion": {
       "browserHeader": "Browser",
