@@ -28,12 +28,7 @@ use {
 use crate::common::meta::user::{UserOrgRole, UserRequest};
 
 #[cfg(feature = "enterprise")]
-fn eval_scheduler_fetch_size(total: usize, max_rows: usize) -> anyhow::Result<i64> {
-    if total > max_rows {
-        return Err(anyhow::anyhow!(
-            "online eval scheduler interval has {total} rows, exceeding the safe limit of {max_rows}"
-        ));
-    }
+fn eval_scheduler_fetch_size(total: usize) -> anyhow::Result<i64> {
     let fetch_size = total
         .checked_add(1)
         .ok_or_else(|| anyhow::anyhow!("online eval scheduler result count exceeds search size"))?;
@@ -718,7 +713,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         );
 
         o2_enterprise::enterprise::llm_evaluations::eval_jobs::scheduler::register_search_executor(
-            |org_id, stream_type, sql, start_time, end_time| {
+            |org_id, stream_type, sql, start_time, end_time, truncate_over_limit| {
                 Box::pin(async move {
                     let count_req = config::meta::search::Request {
                         query: config::meta::search::Query {
@@ -742,7 +737,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
                             total: count_response.total,
                             is_partial: count_response.is_partial,
                             function_error: count_response.function_error,
-                            hits: Vec::new(),
+                            ..Default::default()
                         });
                     }
 
@@ -750,12 +745,22 @@ pub async fn init() -> Result<(), anyhow::Error> {
                     if total == 0 {
                         return Ok(Default::default());
                     }
-                    let max_rows = o2_enterprise::enterprise::common::config::get_config()
-                        .llm_eval_config
-                        .max_search_rows
-                        .saturating_mul(10)
-                        .max(10_001);
-                    let size = eval_scheduler_fetch_size(total, max_rows)?;
+                    let max_rows = o2_enterprise::enterprise::llm_evaluations::eval_jobs::scheduler::EVAL_DETECTION_MAX_ROWS;
+                    let over_limit = total > max_rows;
+                    if over_limit && !truncate_over_limit {
+                        // The scheduler splits the window in half rather than
+                        // fetching an oversized result set.
+                        return Ok(o2_enterprise::enterprise::llm_evaluations::eval_jobs::scheduler::SchedulerSearchResult {
+                            total,
+                            over_limit: true,
+                            ..Default::default()
+                        });
+                    }
+                    let size = if over_limit {
+                        max_rows as i64
+                    } else {
+                        eval_scheduler_fetch_size(total)?
+                    };
                     let data_req = config::meta::search::Request {
                         query: config::meta::search::Query {
                             sql,
@@ -776,6 +781,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
                                 total,
                                 is_partial: response.is_partial,
                                 function_error: response.function_error,
+                                over_limit,
                             }
                         })
                         .map_err(|e| anyhow::anyhow!(e))
@@ -1185,12 +1191,12 @@ mod tests {
 
     #[test]
     fn eval_scheduler_fetches_one_row_past_the_count() {
-        assert_eq!(eval_scheduler_fetch_size(10_001, 100_000).unwrap(), 10_002);
+        assert_eq!(eval_scheduler_fetch_size(10_001).unwrap(), 10_002);
     }
 
     #[test]
-    fn eval_scheduler_rejects_intervals_above_the_safe_limit() {
-        let error = eval_scheduler_fetch_size(100_001, 100_000).unwrap_err();
-        assert!(error.to_string().contains("exceeding the safe limit"));
+    fn eval_scheduler_rejects_counts_that_overflow_the_search_size() {
+        let error = eval_scheduler_fetch_size(usize::MAX).unwrap_err();
+        assert!(error.to_string().contains("exceeds search size"));
     }
 }
