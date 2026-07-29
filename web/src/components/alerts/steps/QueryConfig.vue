@@ -1035,7 +1035,7 @@ import { defineComponent, ref, computed, type PropType, defineAsyncComponent, ne
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
-import { b64EncodeUnicode, getUUID, convertMinutesToCron, getCronIntervalDifferenceInSeconds, isAboveMinRefreshInterval, describeCron, getImageURL } from "@/utils/zincutils";
+import { b64EncodeUnicode, getUUID, convertMinutesToCron, getCronIntervalDifferenceInSeconds, isAboveMinRefreshInterval, describeCron, getImageURL, resolveBrowserTimezone } from "@/utils/zincutils";
 import hljs from "highlight.js/lib/core";
 import sql from "highlight.js/lib/languages/sql";
 
@@ -1446,20 +1446,44 @@ export default defineComponent({
     const cronError = ref('');
     const cronDescription = computed(() => describeCron(cronExpression.value, cronTimezone.value));
     const filteredTimezones = ref<string[]>([]);
+    // Stable detected browser zone — used for the "Browser Time" shortcut label
+    // so it never drifts to whatever value is currently selected.
+    const browserTimezone = ref(
+      Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+    );
+
+    // Every IANA zone the runtime knows about (fallback: the detected zone).
+    const getAllTimezones = (): string[] => {
+      try {
+        // @ts-ignore - supportedValuesOf is not in all TypeScript lib versions
+        if (typeof Intl !== 'undefined' && typeof Intl.supportedValuesOf === 'function') {
+          // @ts-ignore
+          return Intl.supportedValuesOf("timeZone");
+        }
+      } catch {
+        // fall through to the fallback below
+      }
+      return [browserTimezone.value || 'UTC'];
+    };
+
+    // Options for the picker: the two convenience shortcuts first (matching the
+    // reports picker), then every IANA zone.
+    const buildTimezoneOptions = (): string[] => [
+      `Browser Time (${browserTimezone.value})`,
+      'UTC',
+      ...getAllTimezones(),
+    ];
 
     // Initialize timezone
     const initTimezones = () => {
       try {
         if (!cronTimezone.value) {
           cronTimezone.value = Intl.DateTimeFormat().resolvedOptions().timeZone;
-        }
-        // @ts-ignore
-        if (typeof Intl !== 'undefined' && typeof Intl.supportedValuesOf === 'function') {
-          // @ts-ignore
-          filteredTimezones.value = Intl.supportedValuesOf("timeZone");
         } else {
-          filteredTimezones.value = [cronTimezone.value];
+          // Heal legacy alerts that persisted a "Browser Time (…)" label.
+          cronTimezone.value = resolveBrowserTimezone(cronTimezone.value);
         }
+        filteredTimezones.value = buildTimezoneOptions();
       } catch {
         cronTimezone.value = cronTimezone.value || 'UTC';
         filteredTimezones.value = ['UTC'];
@@ -1469,19 +1493,12 @@ export default defineComponent({
 
     const timezoneFilterFn = (val: string, update: any) => {
       update(() => {
-        try {
-          // @ts-ignore
-          const all: string[] = (typeof Intl !== 'undefined' && typeof Intl.supportedValuesOf === 'function')
-            // @ts-ignore
-            ? Intl.supportedValuesOf("timeZone") : [cronTimezone.value];
-          if (val === '') {
-            filteredTimezones.value = all;
-          } else {
-            const needle = val.toLowerCase();
-            filteredTimezones.value = all.filter((tz: string) => tz.toLowerCase().includes(needle));
-          }
-        } catch {
-          // keep current list
+        const options = buildTimezoneOptions();
+        if (val === '') {
+          filteredTimezones.value = options;
+        } else {
+          const needle = val.toLowerCase();
+          filteredTimezones.value = options.filter((tz: string) => tz.toLowerCase().includes(needle));
         }
       });
     };
@@ -1570,9 +1587,13 @@ export default defineComponent({
 
     const onCronTimezoneChange = (value: any) => {
       isUserTriggerChange.value = true;
-      cronTimezone.value = value;
+      // "Browser Time (<zone>)" is a display-only shortcut; persist the resolved
+      // IANA zone so trigger_condition.timezone stays a value the backend can
+      // parse (storing the raw label produces a NaN tz_offset).
+      const resolved = resolveBrowserTimezone(value);
+      cronTimezone.value = resolved;
       if (props.triggerCondition) {
-        props.triggerCondition.timezone = value;
+        props.triggerCondition.timezone = resolved;
         validateCron();
         emit("update:triggerCondition", { ...props.triggerCondition });
       }
@@ -2402,6 +2423,7 @@ export default defineComponent({
       frequencyMode,
       cronExpression,
       cronTimezone,
+      browserTimezone,
       cronError,
       cronDescription,
       filteredTimezones,
