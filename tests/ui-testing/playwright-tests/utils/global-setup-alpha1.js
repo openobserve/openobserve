@@ -611,6 +611,14 @@ async function verifySharedAuth(baseUrl) {
         testLogger.info(`[alpha1] Auth state re-saved with target org active`);
       }
     }
+
+    // Re-fetch THIS shard's own org passcode via the session. The downloaded
+    // cloud-config.json holds the shared-auth barrier org's ingestion token,
+    // which 401s against any other org — each org has its own o2oi_ default
+    // ingestion token (see core/organization.rs get_passcode). Overwrite
+    // cloud-config.json with ORGNAME's passcode so per-shard ingestion succeeds.
+    await fetchCloudConfig(page);
+
     return true;
   } catch (e) {
     testLogger.warn(`[alpha1] Shared auth verification error: ${e.message}`);
