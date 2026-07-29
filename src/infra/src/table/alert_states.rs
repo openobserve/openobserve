@@ -1705,4 +1705,262 @@ mod tests {
             );
         }
     }
+
+    // ================= §7.6: what a FROZEN evaluation must not touch =======
+    //
+    // These need a real database, and they deliberately drive the REAL
+    // decision function rather than hand-building a noop. An earlier version
+    // constructed `StateUpdate::noop()` directly and asserted the row was
+    // untouched — which only proved that `write_update` returns early on
+    // `state: None`, i.e. tested `if None { return }`. The property that
+    // matters is that an evaluation which observed nothing DECIDES to write
+    // nothing, and that the decision survives persistence.
+
+    mod frozen {
+        use config::meta::{
+            alerts::{
+                level::AlertLevel,
+                state::{AlertState, apply_outcome},
+            },
+            self_reporting::usage::RunOutcome,
+        };
+        use sea_orm::{Database, DatabaseConnection};
+
+        use super::super::*;
+        use crate::table::migration::create_alert_state_tables_for_test;
+
+        const ALERT: &str = "alert00000000000000000000";
+
+        async fn db() -> DatabaseConnection {
+            let db = Database::connect("sqlite::memory:")
+                .await
+                .expect("in-memory sqlite");
+            create_alert_state_tables_for_test(&db)
+                .await
+                .expect("alert_states tables apply");
+            db
+        }
+
+        async fn read(db: &DatabaseConnection) -> Option<alert_states::Model> {
+            alert_states::Entity::find_by_id((ALERT.to_string(), ROLLUP_GROUP_KEY.to_string()))
+                .one(db)
+                .await
+                .unwrap()
+        }
+
+        async fn persist(db: &DatabaseConnection, update: &StateUpdate) {
+            let txn = db.begin().await.unwrap();
+            write_update(&txn, update).await.unwrap();
+            txn.commit().await.unwrap();
+        }
+
+        /// Establish a Critical alert at t=1000, through the real decision
+        /// function so the stored clocks are the ones production would write.
+        async fn seed_critical(db: &DatabaseConnection) -> AlertState {
+            let update = apply_outcome(
+                ALERT,
+                ROLLUP_GROUP_KEY,
+                None,
+                RunOutcome::Firing,
+                Some(AlertLevel::Critical),
+                1_000,
+            );
+            persist(db, &update).await;
+            update.state.expect("a firing evaluation persists state")
+        }
+
+        /// The §7.6 rule for an evaluation that observed nothing: `error` must
+        /// leave the entire level axis alone, `level_at` included, because
+        /// composite staleness reads `level_at` as "when was this last
+        /// *computed*" (§6.4). An alert erroring every minute must not look
+        /// fresh.
+        #[tokio::test]
+        async fn an_errored_evaluation_persists_no_level_change() {
+            let db = db().await;
+            let prev = seed_critical(&db).await;
+
+            let update = apply_outcome(
+                ALERT,
+                ROLLUP_GROUP_KEY,
+                Some(&prev),
+                RunOutcome::Error,
+                None, // nothing was observed
+                5_000,
+            );
+            persist(&db, &update).await;
+
+            let row = read(&db).await.expect("the row must still exist");
+            assert_eq!(row.level, Some(AlertLevel::Critical.to_i32()));
+            assert_eq!(row.level_since, Some(1_000), "level_since must not move");
+            assert_eq!(
+                row.level_at,
+                Some(1_000),
+                "level_at must NOT be refreshed by an evaluation that observed \
+                 nothing — a composite would read a long-broken child as fresh"
+            );
+        }
+
+        /// A `skipped` run writes nothing at all (the Part IV rule), so even
+        /// the outcome clock stays put.
+        #[tokio::test]
+        async fn a_skipped_evaluation_writes_nothing_at_all() {
+            let db = db().await;
+            let prev = seed_critical(&db).await;
+            let before = read(&db).await.unwrap();
+
+            let update = apply_outcome(
+                ALERT,
+                ROLLUP_GROUP_KEY,
+                Some(&prev),
+                RunOutcome::Skipped,
+                None,
+                5_000,
+            );
+            assert!(
+                update.is_noop(),
+                "a skipped run must decide to write nothing"
+            );
+            persist(&db, &update).await;
+
+            assert_eq!(read(&db).await.unwrap(), before, "the row must be byte-identical");
+        }
+
+        /// The contrast case, so the tests above cannot pass vacuously: a real
+        /// observation DOES refresh the freshness clock, while `level_since`
+        /// still holds because the level itself did not change.
+        #[tokio::test]
+        async fn a_successful_evaluation_refreshes_freshness_but_not_level_since() {
+            let db = db().await;
+            let prev = seed_critical(&db).await;
+
+            let update = apply_outcome(
+                ALERT,
+                ROLLUP_GROUP_KEY,
+                Some(&prev),
+                RunOutcome::Firing,
+                Some(AlertLevel::Critical),
+                5_000,
+            );
+            persist(&db, &update).await;
+
+            let row = read(&db).await.unwrap();
+            assert_eq!(
+                row.level_at,
+                Some(5_000),
+                "a real observation must refresh freshness"
+            );
+            assert_eq!(
+                row.level_since,
+                Some(1_000),
+                "the level did not change, so level_since must not move"
+            );
+        }
+
+        /// `notify_failed` is a delivery failure, not a measurement failure —
+        /// the level was computed, so freshness advances (§7.6).
+        #[tokio::test]
+        async fn a_delivery_failure_still_counts_as_a_measurement() {
+            let db = db().await;
+            let prev = seed_critical(&db).await;
+
+            let update = apply_outcome(
+                ALERT,
+                ROLLUP_GROUP_KEY,
+                Some(&prev),
+                RunOutcome::NotifyFailed,
+                Some(AlertLevel::Critical),
+                5_000,
+            );
+            persist(&db, &update).await;
+
+            let row = read(&db).await.unwrap();
+            assert_eq!(
+                row.level_at,
+                Some(5_000),
+                "delivery is irrelevant to whether the level was observed"
+            );
+            assert_eq!(row.level, Some(AlertLevel::Critical.to_i32()));
+        }
+
+        /// A freeze moves the **outcome** axis while leaving the **level**
+        /// axis alone, and the transition row must show exactly that.
+        ///
+        /// This test was originally written asserting no transition at all,
+        /// which was wrong and the suite caught it: `firing -> error` IS an
+        /// outcome change, and transitions carry both axes. The invariant is
+        /// not "a freeze writes nothing" — it is "a freeze writes nothing
+        /// about the level".
+        #[tokio::test]
+        async fn a_frozen_evaluation_transitions_the_outcome_but_not_the_level() {
+            let db = db().await;
+            let prev = seed_critical(&db).await;
+
+            let update = apply_outcome(
+                ALERT,
+                ROLLUP_GROUP_KEY,
+                Some(&prev),
+                RunOutcome::Error,
+                None,
+                5_000,
+            );
+            persist(&db, &update).await;
+
+            let rows = alert_state_transitions::Entity::find()
+                .order_by_asc(alert_state_transitions::Column::At)
+                .all(&db)
+                .await
+                .unwrap();
+            let last = rows.last().expect("the outcome change is recorded");
+            assert_eq!(last.to_outcome, RunOutcome::Error.to_i32());
+            assert_eq!(last.from_outcome, Some(RunOutcome::Firing.to_i32()));
+            assert_eq!(
+                last.from_level,
+                last.to_level,
+                "the level axis must be unchanged across a freeze"
+            );
+            assert_eq!(last.to_level, Some(AlertLevel::Critical.to_i32()));
+            assert_eq!(
+                last.value, None,
+                "a freeze observed nothing, so it records no value"
+            );
+        }
+
+        /// A failed transaction must leave the previous state intact — a
+        /// half-applied write would be worse than either outcome.
+        #[tokio::test]
+        async fn a_rolled_back_update_leaves_the_prior_state_intact() {
+            let db = db().await;
+            let prev = seed_critical(&db).await;
+
+            // A recovery to Ok, rolled back part-way.
+            let update = apply_outcome(
+                ALERT,
+                ROLLUP_GROUP_KEY,
+                Some(&prev),
+                RunOutcome::Normal,
+                Some(AlertLevel::Ok),
+                5_000,
+            );
+            let txn = db.begin().await.unwrap();
+            write_update(&txn, &update).await.unwrap();
+            txn.rollback().await.unwrap();
+
+            let row = read(&db).await.unwrap();
+            assert_eq!(
+                row.level,
+                Some(AlertLevel::Critical.to_i32()),
+                "a rolled-back write must not have downgraded the level"
+            );
+            assert_eq!(row.level_at, Some(1_000));
+            assert_eq!(
+                alert_state_transitions::Entity::find()
+                    .all(&db)
+                    .await
+                    .unwrap()
+                    .len(),
+                1,
+                "the rolled-back transition must not have landed either"
+            );
+        }
+    }
 }

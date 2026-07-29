@@ -59,6 +59,7 @@ pub mod short_url;
 pub mod sourcemaps;
 pub mod status;
 pub mod stream;
+pub mod slos;
 pub mod synthetics;
 #[cfg(feature = "enterprise")]
 pub mod workflows;

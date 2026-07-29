@@ -277,6 +277,10 @@ pub enum AlertTypeFilter {
     Scheduled,
     Realtime,
     AnomalyDetection,
+    /// Feature 5 (SA-16). Filters to alerts whose `slo_id` is set — the
+    /// column, not the JSON payload, which is why it can be a SQL predicate
+    /// rather than an app-side scan (D60).
+    Slo,
 }
 
 /// Parameters for listing alerts.

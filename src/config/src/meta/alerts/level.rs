@@ -55,7 +55,16 @@ pub struct ThresholdConfig {
     /// WARNING value for a PromQL alert's condition. Lives here rather than in
     /// `Condition` so the shared filter type stays free of alert-specific
     /// fields.
-    #[serde(skip_serializing_if = "Option::is_none")]
+    ///
+    /// Read back from the `trigger_thresholds` JSON column via
+    /// `serde_json::from_value`, i.e. through a buffered `Value` — where
+    /// `arbitrary_precision` represents a number as a map. Without the lenient
+    /// deserializer a fractional warning would fail to parse, and because the
+    /// caller uses `.ok()` it would be dropped SILENTLY (D61).
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::meta::slo::lenient_f64::deserialize_opt"
+    )]
     pub promql_warning: Option<f64>,
     // Reserved for Phase 4 / SLO work — declared here so the shape is known,
     // but nothing reads them yet:

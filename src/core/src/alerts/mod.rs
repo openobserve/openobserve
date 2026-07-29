@@ -147,6 +147,16 @@ impl QueryConditionExt for QueryCondition {
                     v.to_string()
                 }
             }
+            QueryType::Slo => {
+                // An SLO alert runs no query. It reads the running aggregate
+                // the ingest pass already computed, which is why five alerts
+                // on one SLO cost five cheap status reads and ZERO extra
+                // raw-data scans (§6b.9). The caller branches before reaching
+                // here (`alert.rs`); this arm exists so the dispatch stays
+                // exhaustive and a mis-routed SLO alert degrades to "nothing
+                // matched" rather than running an empty SQL string.
+                return Ok(eval_results);
+            }
             QueryType::PromQL => {
                 let Some(v) = self.promql.as_ref() else {
                     return Ok(eval_results);

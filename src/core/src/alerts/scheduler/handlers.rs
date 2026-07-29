@@ -437,6 +437,8 @@ pub async fn handle_triggers(
         db::scheduler::TriggerModule::AnomalyDetection => {
             handle_anomaly_detection_triggers(trigger).await
         }
+        db::scheduler::TriggerModule::Slo => handle_slo_triggers(trigger).await,
+        db::scheduler::TriggerModule::SloBackfill => handle_slo_backfill_triggers(trigger).await,
     }
 }
 
@@ -5133,4 +5135,169 @@ mod tests {
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].stream_name.as_str(), "output-stream");
     }
+}
+
+/// One SLI ingest pass (`alerts_2.md` §6b.4a, §6b.9).
+///
+/// The failure policy is the part worth reading: a failed pass writes no
+/// slice, so coverage falls and the SLO eventually freezes. It does NOT write
+/// zeros. Zeros would report a search outage as 100% downtime and page
+/// everyone, which is the opposite of what an absence of measurement means.
+async fn handle_slo_triggers(mut trigger: db::scheduler::Trigger) -> Result<(), anyhow::Error> {
+    use config::utils::time::{now_micros, second_micros};
+
+    let slo_id = trigger.module_key.clone();
+    let cfg = config::get_config();
+
+    // Turned off at runtime: keep the trigger alive so it resumes on restart
+    // rather than silently losing its schedule.
+    if !cfg.slo.enabled {
+        trigger.next_run_at = now_micros() + second_micros(300);
+        trigger.status = db::scheduler::TriggerStatus::Waiting;
+        db::scheduler::update_trigger(trigger, true, "").await?;
+        return Ok(());
+    }
+
+    let db = infra::db::ORM_CLIENT
+        .get()
+        .ok_or_else(|| anyhow::anyhow!("Database not initialized"))?;
+    let slo = infra::table::slos::get(db, &trigger.org, &slo_id)
+        .await
+        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+
+    // Not found locally may be a super-cluster race (the trigger row arrived
+    // before the SLO synced). Reschedule rather than delete — the trigger is
+    // cleaned up by the delete path, not here.
+    let Some(slo) = slo else {
+        log::warn!(
+            "[slo] definition not found locally for id={slo_id} org={} — rescheduling +60s",
+            trigger.org
+        );
+        trigger.next_run_at = now_micros() + second_micros(60);
+        trigger.status = db::scheduler::TriggerStatus::Waiting;
+        db::scheduler::update_trigger(trigger, true, "").await?;
+        return Ok(());
+    };
+
+    if !slo.enabled {
+        trigger.next_run_at = now_micros() + second_micros(slo.definition.slice_interval_secs);
+        trigger.status = db::scheduler::TriggerStatus::Waiting;
+        db::scheduler::update_trigger(trigger.clone(), true, "").await?;
+        publish_slo_pass(&trigger, &slo_id, RunOutcome::Skipped, None);
+        return Ok(());
+    }
+
+    let now_secs = now_micros() / 1_000_000;
+    let started = now_micros();
+    let (outcome, error) = match crate::slo::job::run_pass(&slo, now_secs).await {
+        Ok(o) => {
+            log::debug!("[slo] pass for {slo_id}: {o:?}");
+            (RunOutcome::Succeeded, None)
+        }
+        Err(e) => {
+            // Deliberately not propagated: the scheduler would retry, and a
+            // retry storm against a failing search helps nobody. Coverage
+            // falling is the designed response.
+            log::error!("[slo] pass failed for {slo_id} org={}: {e}", trigger.org);
+            (RunOutcome::NotifyFailed, Some(e.to_string()))
+        }
+    };
+
+    trigger.next_run_at = crate::slo::job::next_run_at(slo.definition.slice_interval_secs);
+    trigger.status = db::scheduler::TriggerStatus::Waiting;
+    let published = trigger.clone();
+    db::scheduler::update_trigger(trigger, true, "").await?;
+    publish_slo_pass_timed(&published, &slo_id, outcome, error, started);
+    Ok(())
+}
+
+/// One backfill chunk. Its own module so a bulk historical scan never shares a
+/// concurrency budget with latency-sensitive incremental passes (§6b.9).
+async fn handle_slo_backfill_triggers(
+    mut trigger: db::scheduler::Trigger,
+) -> Result<(), anyhow::Error> {
+    use config::utils::time::{now_micros, second_micros};
+
+    let slo_id = trigger.module_key.clone();
+    let cfg = config::get_config();
+    if !cfg.slo.enabled {
+        trigger.next_run_at = now_micros() + second_micros(300);
+        trigger.status = db::scheduler::TriggerStatus::Waiting;
+        db::scheduler::update_trigger(trigger, true, "").await?;
+        return Ok(());
+    }
+
+    let db = infra::db::ORM_CLIENT
+        .get()
+        .ok_or_else(|| anyhow::anyhow!("Database not initialized"))?;
+    let Some(slo) = infra::table::slos::get(db, &trigger.org, &slo_id)
+        .await
+        .map_err(|e| anyhow::anyhow!(e.to_string()))?
+    else {
+        // The SLO is gone, so its backfill has nothing to fill.
+        db::scheduler::delete(
+            &trigger.org,
+            db::scheduler::TriggerModule::SloBackfill,
+            &slo_id,
+        )
+        .await?;
+        return Ok(());
+    };
+
+    match crate::slo::backfill::run_chunk(&slo).await {
+        Ok(crate::slo::backfill::ChunkOutcome::Done) => {
+            log::info!("[slo] backfill complete for {slo_id}");
+            db::scheduler::delete(
+                &trigger.org,
+                db::scheduler::TriggerModule::SloBackfill,
+                &slo_id,
+            )
+            .await?;
+            return Ok(());
+        }
+        Ok(crate::slo::backfill::ChunkOutcome::More) => {}
+        Err(e) => {
+            log::error!("[slo] backfill chunk failed for {slo_id}: {e}");
+        }
+    }
+
+    // Paced: chunks are bulk scans, and running them back-to-back would use
+    // the whole lane even though the lane exists to bound exactly that.
+    trigger.next_run_at = now_micros() + second_micros(30);
+    trigger.status = db::scheduler::TriggerStatus::Waiting;
+    db::scheduler::update_trigger(trigger, true, "").await?;
+    Ok(())
+}
+
+fn publish_slo_pass(
+    trigger: &db::scheduler::Trigger,
+    slo_id: &str,
+    outcome: RunOutcome,
+    error: Option<String>,
+) {
+    publish_slo_pass_timed(trigger, slo_id, outcome, error, now_micros());
+}
+
+fn publish_slo_pass_timed(
+    trigger: &db::scheduler::Trigger,
+    slo_id: &str,
+    outcome: RunOutcome,
+    error: Option<String>,
+    started: i64,
+) {
+    usage_reporting::publish_triggers_usage(TriggerData {
+        _timestamp: now_micros(),
+        org: trigger.org.clone(),
+        module: TriggerDataType::Slo,
+        key: slo_id.to_string(),
+        next_run_at: trigger.next_run_at,
+        is_realtime: false,
+        is_silenced: false,
+        status: outcome,
+        start_time: started,
+        end_time: now_micros(),
+        retries: trigger.retries,
+        error,
+        ..Default::default()
+    });
 }

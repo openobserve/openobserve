@@ -142,6 +142,12 @@ impl TryFrom<alerts::Model> for MetaAlert {
             search_event_type: query_search_event_type.map(|t| t.into()),
             multi_time_range: query_multi_time_range
                 .map(|ds| ds.into_iter().map(|d| d.into()).collect()),
+            // Feature 5 (D42). An unparseable blob degrades to `None` rather
+            // than failing the load — one bad row must not take the alert
+            // list down, the same rule `trigger_thresholds` follows above.
+            slo_condition: value
+                .query_slo_condition
+                .and_then(|v| serde_json::from_value(v).ok()),
         };
         alert.trigger_condition = MetaTriggerCondition {
             align_time: value.align_time,
@@ -755,6 +761,20 @@ fn update_mutable_fields(
         .map(intermediate::QueryAggregation::from)
         .map(serde_json::to_value)
         .transpose()?;
+    let query_slo_condition = alert
+        .query_condition
+        .slo_condition
+        .as_ref()
+        .map(serde_json::to_value)
+        .transpose()?;
+    // D60: the id is ALSO written to its own indexed column, which is
+    // authoritative for reverse lookup. The copy inside the payload keeps the
+    // block self-describing; they are written together so they cannot drift.
+    let slo_id = alert
+        .query_condition
+        .slo_condition
+        .as_ref()
+        .map(|c| c.slo_id.clone());
     let query_vrl_function = alert.query_condition.vrl_function.filter(|s| !s.is_empty());
     let query_search_event_type: Option<i16> = alert
         .query_condition
@@ -840,6 +860,8 @@ fn update_mutable_fields(
     alert_am.query_promql = Set(query_promql);
     alert_am.query_promql_condition = Set(query_promql_condition);
     alert_am.query_aggregation = Set(query_aggregation);
+    alert_am.query_slo_condition = Set(query_slo_condition);
+    alert_am.slo_id = Set(slo_id);
     alert_am.query_vrl_function = Set(query_vrl_function);
     alert_am.query_search_event_type = Set(query_search_event_type);
     alert_am.query_multi_time_range = Set(query_multi_time_range);
@@ -933,6 +955,8 @@ mod tests {
             trigger_thresholds: None,
             priority: None,
             tags: None,
+            slo_id: None,
+            query_slo_condition: None,
             trigger_frequency_type: 1, // Seconds
             trigger_frequency_seconds: 300,
             trigger_frequency_cron: None,

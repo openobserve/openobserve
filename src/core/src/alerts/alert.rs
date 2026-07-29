@@ -1229,6 +1229,12 @@ impl AlertExt for Alert {
     ) -> Result<TriggerEvalResults, anyhow::Error> {
         if self.is_real_time {
             self.query_condition.evaluate_realtime(row).await
+        } else if self.query_condition.query_type == config::meta::alerts::QueryType::Slo {
+            // Branch BEFORE the search path: an SLO alert runs no query. It
+            // reads the aggregate the ingest pass already computed, which is
+            // what decouples the alert's cadence from the measurement's and
+            // makes five alerts on one SLO cost zero extra raw-data scans.
+            evaluate_slo_alert(self, end_time).await
         } else {
             let mut search_event_ctx = SearchEventContext::with_alert(Some(format!(
                 "/alerts/{}/{}/{}/{}",
@@ -5007,4 +5013,112 @@ mod tests {
         );
     }
 
+}
+
+/// Evaluate an SLO alert from stored status (`alerts_2.md` §6b.3).
+///
+/// A **frozen** classification returns `data: None` and `level: None`,
+/// which is what makes the caller leave `level`, `level_since` and
+/// `level_at` untouched (§7.6). That is the whole safety property: an
+/// unmeasurable window must never be reported as a recovery, or a search
+/// outage resolves every burn-rate alert in the org at once (D34).
+async fn evaluate_slo_alert(
+    alert: &Alert,
+    end_time: i64,
+) -> Result<TriggerEvalResults, anyhow::Error> {
+    let mut results = TriggerEvalResults {
+        end_time,
+        ..Default::default()
+    };
+    let Some(cond) = alert.query_condition.slo_condition.as_ref() else {
+        // query_type says slo but no condition was stored. Nothing to
+        // evaluate, and inventing a level here would be worse than
+        // reporting nothing.
+        log::warn!(
+            "[alert {}/{}] query_type is slo but no slo_condition is stored",
+            alert.org_id,
+            alert.name
+        );
+        return Ok(results);
+    };
+
+    let now_secs = end_time / 1_000_000;
+    let evals = crate::slo::evaluate::evaluate(cond, &alert.org_id, now_secs).await?;
+
+    // The most severe OBSERVED result decides the alert's level; frozen
+    // groups contribute nothing rather than dragging it to Ok.
+    let mut best: Option<&crate::slo::evaluate::SloEvalResult> = None;
+    for e in &evals {
+        let Some(level) = e.classification.level() else {
+            continue;
+        };
+        if level == config::meta::alerts::level::AlertLevel::Ok {
+            continue;
+        }
+        let better = match best.and_then(|b| b.classification.level()) {
+            Some(config::meta::alerts::level::AlertLevel::Critical) => false,
+            Some(_) => level == config::meta::alerts::level::AlertLevel::Critical,
+            None => true,
+        };
+        if better {
+            best = Some(e);
+        }
+    }
+
+    // Every group frozen means the whole evaluation is frozen: no level,
+    // no data, nothing touched.
+    if best.is_none() && evals.iter().all(|e| e.classification.is_frozen()) {
+        return Ok(results);
+    }
+
+    if let Some(e) = best {
+        results.level = e.classification.level();
+        results.actual_value = e.actual_value;
+        results.group_label = e.group_key.clone();
+        // These keys become notification template variables verbatim —
+        // `{slo_name}`, `{burn_rate}` and so on — because the template engine
+        // substitutes from the row map.
+        let mut row = Map::new();
+        row.insert("slo_id".to_string(), Value::String(cond.slo_id.clone()));
+        row.insert("slo_name".to_string(), Value::String(e.slo_name.clone()));
+        row.insert(
+            "slo_window".to_string(),
+            Value::String(format!("{}d", e.slo_window_secs / 86_400)),
+        );
+        if let Some(g) = &e.group_key {
+            row.insert("group".to_string(), Value::String(g.clone()));
+        }
+
+        let put = |row: &mut Map<String, Value>, key: &str, v: f64| {
+            if let Some(n) = serde_json::Number::from_f64(v) {
+                row.insert(key.to_string(), Value::Number(n));
+            }
+        };
+        put(&mut row, "slo_target", e.slo_target);
+        if let Some(v) = e.actual_value {
+            put(&mut row, "value", v);
+            // Also named for the kind, so a template written for a burn-rate
+            // alert reads as one rather than referring to a generic `value`.
+            match cond.kind {
+                config::meta::slo::condition::SloAlertKind::BurnRate => {
+                    put(&mut row, "burn_rate", v)
+                }
+                config::meta::slo::condition::SloAlertKind::ErrorBudget => {
+                    put(&mut row, "error_budget_consumed", v)
+                }
+            }
+        }
+        if let Some(s) = e.sli {
+            put(&mut row, "sli", s);
+        }
+        if let Some(b) = e.error_budget_remaining {
+            put(&mut row, "error_budget_remaining", b);
+        }
+        results.data = Some(vec![row]);
+    } else {
+        // Observed and healthy. A real measurement, categorically
+        // different from frozen — the level is recorded as Ok.
+        results.level = Some(config::meta::alerts::level::AlertLevel::Ok);
+    }
+    Ok(results)
 }

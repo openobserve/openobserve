@@ -211,7 +211,10 @@ pub fn evaluate_aggregation_alert(
 ///
 /// Requires an orderable operator; `=`/`!=` have no worst-first direction,
 /// which is why M-10 refuses them for multi-alerts.
-pub fn severity_order_sql(agg: &Aggregation, value_alias: &str) -> Result<String, AggThresholdError> {
+pub fn severity_order_sql(
+    agg: &Aggregation,
+    value_alias: &str,
+) -> Result<String, AggThresholdError> {
     let (critical, warning) = aggregation_thresholds(agg)?;
     let op = match agg.having.operator {
         Operator::GreaterThan => ">",

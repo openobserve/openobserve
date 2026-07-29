@@ -463,7 +463,17 @@ pub struct QueryCondition {
     /// A sibling field rather than a member of `Condition`, which is shared by
     /// every filter in the product and must not grow alert-specific knobs.
     /// Shares `promql_condition.operator` with critical. `None` = single-level.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    ///
+    /// Lenient deserialization: this arrives through
+    /// `CreateAlertRequestBody`'s `#[serde(flatten)]`, which buffers via
+    /// `Value`, where `arbitrary_precision` makes a number a map (D61).
+    /// Without it a FRACTIONAL warning is rejected while an integer one works
+    /// — found by end-to-end testing.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::meta::slo::lenient_f64::deserialize_opt"
+    )]
     pub promql_warning_value: Option<f64>,
     pub aggregation: Option<Aggregation>,
     #[serde(default)]
@@ -472,6 +482,13 @@ pub struct QueryCondition {
     pub search_event_type: Option<SearchEventType>,
     #[serde(default)]
     pub multi_time_range: Option<Vec<CompareHistoricData>>,
+    /// Feature 5 (D42): the SLO condition, when `query_type` is `Slo`.
+    ///
+    /// Persisted in its own `alerts.query_slo_condition` column following the
+    /// `query_aggregation` precedent — deliberately not `trigger_thresholds`,
+    /// whose documented scope is threshold and level configuration only (D1).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub slo_condition: Option<crate::meta::slo::condition::SloCondition>,
 }
 
 impl MemorySize for QueryCondition {
@@ -641,7 +658,14 @@ pub struct Aggregation {
     /// critical (alerts_2.md §4.4). `None` = single-level aggregation alert,
     /// i.e. exactly the legacy behaviour. Stored as f64 because aggregate
     /// values (averages, percentiles) are not integers.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Same lenient deserialization as `promql_warning_value`, for the same
+    /// reason (D61) — aggregate warnings are the field most likely to be
+    /// fractional.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::meta::slo::lenient_f64::deserialize_opt"
+    )]
     pub warning_value: Option<f64>,
     /// Opt-in to per-group evaluation — multi-alerts, `alerts_2.md` M-9/D26.
     ///
@@ -741,6 +765,12 @@ pub enum QueryType {
     SQL,
     #[serde(rename = "promql")]
     PromQL,
+    /// Feature 5 (D28). An SLO alert is an ordinary `alerts` row whose
+    /// condition reads precomputed SLO status rather than running a query —
+    /// which is what lets five alerts on one SLO cost five cheap status reads
+    /// and ZERO extra raw-data scans.
+    #[serde(rename = "slo")]
+    Slo,
 }
 
 impl std::fmt::Display for QueryType {
@@ -749,6 +779,7 @@ impl std::fmt::Display for QueryType {
             QueryType::Custom => write!(f, "custom"),
             QueryType::SQL => write!(f, "sql"),
             QueryType::PromQL => write!(f, "promql"),
+            QueryType::Slo => write!(f, "slo"),
         }
     }
 }
@@ -759,6 +790,7 @@ impl From<&str> for QueryType {
             "custom" => QueryType::Custom,
             "sql" => QueryType::SQL,
             "promql" => QueryType::PromQL,
+            "slo" => QueryType::Slo,
             _ => QueryType::Custom,
         }
     }

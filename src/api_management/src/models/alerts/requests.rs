@@ -108,7 +108,11 @@ pub struct AnomalyAlertFields {
     pub retrain_interval_days: Option<i32>,
     /// Percentile threshold (50.0–99.9). Default: 97.0
     /// Also accepts the name `threshold` (integer, e.g. 97) for API convenience.
-    #[serde(alias = "threshold")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "config::meta::slo::lenient_f64::deserialize_opt"
+    )]
     pub percentile: Option<f64>,
     pub rcf_num_trees: Option<i32>,
     pub rcf_tree_size: Option<i32>,
@@ -173,6 +177,11 @@ pub struct UpdateAnomalyAlertFields {
     pub detection_window_seconds: Option<i64>,
     pub training_window_days: Option<i32>,
     pub retrain_interval_days: Option<i32>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "config::meta::slo::lenient_f64::deserialize_opt"
+    )]
     pub percentile: Option<f64>,
     pub alert_enabled: Option<bool>,
     pub enabled: Option<bool>,

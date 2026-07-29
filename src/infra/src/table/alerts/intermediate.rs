@@ -220,12 +220,16 @@ pub enum QueryType {
     Custom,
     Sql,
     Promql,
+    Slo,
 }
 
 impl QueryType {
     const CUSTOM: i16 = 0;
     const SQL: i16 = 1;
     const PROMQL: i16 = 2;
+    /// APPEND ONLY. This is the stored value in `alerts.query_type`; reusing
+    /// or reordering one would reinterpret every existing row.
+    const SLO: i16 = 3;
 }
 
 impl From<QueryType> for i16 {
@@ -234,6 +238,7 @@ impl From<QueryType> for i16 {
             QueryType::Custom => QueryType::CUSTOM,
             QueryType::Sql => QueryType::SQL,
             QueryType::Promql => QueryType::PROMQL,
+            QueryType::Slo => QueryType::SLO,
         }
     }
 }
@@ -246,6 +251,7 @@ impl TryFrom<i16> for QueryType {
             Self::CUSTOM => Ok(QueryType::Custom),
             Self::SQL => Ok(QueryType::Sql),
             Self::PROMQL => Ok(QueryType::Promql),
+            Self::SLO => Ok(QueryType::Slo),
             _ => Err(FromI16Error {
                 value,
                 ty: "QueryType".to_string(),
@@ -260,6 +266,7 @@ impl From<MetaQueryType> for QueryType {
             MetaQueryType::Custom => QueryType::Custom,
             MetaQueryType::SQL => QueryType::Sql,
             MetaQueryType::PromQL => QueryType::Promql,
+            MetaQueryType::Slo => QueryType::Slo,
         }
     }
 }
@@ -270,6 +277,7 @@ impl From<QueryType> for MetaQueryType {
             QueryType::Custom => MetaQueryType::Custom,
             QueryType::Sql => MetaQueryType::SQL,
             QueryType::Promql => MetaQueryType::PromQL,
+            QueryType::Slo => MetaQueryType::Slo,
         }
     }
 }
@@ -919,6 +927,7 @@ mod tests {
         assert_eq!(i16::from(QueryType::Custom), 0i16);
         assert_eq!(i16::from(QueryType::Sql), 1i16);
         assert_eq!(i16::from(QueryType::Promql), 2i16);
+        assert_eq!(i16::from(QueryType::Slo), 3i16);
     }
 
     #[test]
@@ -926,6 +935,7 @@ mod tests {
         assert!(matches!(QueryType::try_from(0i16), Ok(QueryType::Custom)));
         assert!(matches!(QueryType::try_from(1i16), Ok(QueryType::Sql)));
         assert!(matches!(QueryType::try_from(2i16), Ok(QueryType::Promql)));
+        assert!(matches!(QueryType::try_from(3i16), Ok(QueryType::Slo)));
         assert!(QueryType::try_from(99i16).is_err());
     }
 
@@ -943,6 +953,10 @@ mod tests {
             QueryType::from(MetaQueryType::PromQL),
             QueryType::Promql
         ));
+        assert!(matches!(
+            QueryType::from(MetaQueryType::Slo),
+            QueryType::Slo
+        ));
     }
 
     #[test]
@@ -958,6 +972,10 @@ mod tests {
         assert!(matches!(
             MetaQueryType::from(QueryType::Promql),
             MetaQueryType::PromQL
+        ));
+        assert!(matches!(
+            MetaQueryType::from(QueryType::Slo),
+            MetaQueryType::Slo
         ));
     }
 

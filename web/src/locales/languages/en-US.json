@@ -905,7 +905,8 @@
     "language": "Language",
     "actions": "Actions",
     "keyboardShortcuts": "Keyboard Shortcuts",
-    "synthetic": "Synthetics"
+    "synthetic": "Synthetics",
+    "slos": "SLOs"
   },
   "rum": {
     "title": "Real User Monitoring",
@@ -10453,6 +10454,179 @@
       "rumErrorsRefresh": "Refresh list",
       "rumSessionsRefresh": "Refresh list",
       "sourceMapsRefresh": "Refresh list"
+    }
+  },
+  "slos": {
+    "title": "SLOs",
+    "subtitle": "Service level objectives — targets, error budgets, burn-rate alerts",
+    "new": "New SLO",
+    "newTitle": "New SLO",
+    "editTitle": "Edit SLO",
+    "edit": "Edit",
+    "delete": "Delete",
+    "pause": "Pause",
+    "resume": "Resume",
+    "paused": "Paused",
+    "pausedNotice": "SLO paused",
+    "resumed": "SLO resumed",
+    "saved": "SLO saved",
+    "deleted": "SLO deleted",
+    "rolling": "rolling",
+    "totalSlos": "Total SLOs",
+    "noGrouping": "None — a single overall series",
+    "generation": "generation {n}",
+    "newAlert": "New alert",
+    "overRolling": "over rolling {window}",
+    "searchPlaceholder": "Search SLO or tag, e.g. team:payments",
+    "loadFailed": "Could not load SLOs",
+    "saveFailed": "Could not save the SLO",
+    "updateFailed": "Could not update the SLO",
+    "deleteFailed": "Could not delete the SLO",
+    "deleteConfirmTitle": "Delete this SLO?",
+    "deleteConfirmBody": "\"{name}\" and its measurement history will be removed.",
+    "deleteBudgetNote": "The slices already written stay on disk until they age out, so this SLO's row reservation is released then rather than now.",
+    "groupedSliceNote": "Grouped SLOs use 5-minute slices.",
+    "backfillNote": "Backfill runs on save — chunked, newest history first. Alerts stay frozen until coverage clears the floor.",
+    "budgetHint": "error budget = {budget}",
+    "budgetDays": "{n} days",
+    "budgetHours": "{n} hours",
+    "budgetMinutes": "{n} minutes",
+    "reservationValue": "{groups} group(s)",
+    "reservationSummary": "{groups} group(s) · ≈{rows} slice rows",
+    "health": {
+      "budget_blown": "Budget blown",
+      "at_risk": "At risk",
+      "meeting": "Meeting target",
+      "no_data": "No data"
+    },
+    "type": {
+      "all": "All",
+      "count": "Count",
+      "countDescription": "good events / total events from one query",
+      "timeSlice": "Time slice",
+      "timeSliceDescription": "a per-slice condition, e.g. p95 < 500 ms — uptime = good slices",
+      "alert": "Alert-based",
+      "alertDescription": "uptime of an existing alert"
+    },
+    "window": {
+      "7d": "7 days",
+      "30d": "30 days",
+      "90d": "90 days"
+    },
+    "slice": {
+      "1m": "1 minute",
+      "5m": "5 minutes"
+    },
+    "column": {
+      "name": "Name",
+      "status": "Status",
+      "statusVsTarget": "Status vs target",
+      "budgetRemaining": "Budget remaining",
+      "burnRate": "Burn rate",
+      "coverage": "Coverage",
+      "window": "Window",
+      "tags": "Tags",
+      "actions": "Actions",
+      "group": "Group",
+      "sli": "SLI"
+    },
+    "stat": {
+      "status": "Status ({window})",
+      "target": "Target",
+      "budgetRemaining": "Budget remaining",
+      "burnRate": "Burn rate",
+      "timeToExhaust": "Time to exhaust",
+      "coverage": "Coverage"
+    },
+    "tab": {
+      "groups": "Groups",
+      "configuration": "Configuration"
+    },
+    "section": {
+      "identity": "Details",
+      "sli": "SLI — what \"good\" means",
+      "objective": "Objective",
+      "grouping": "Grouping",
+      "summary": "Summary"
+    },
+    "field": {
+      "name": "SLO name",
+      "namePlaceholder": "e.g. Checkout availability",
+      "description": "Description",
+      "tags": "Tags",
+      "streamType": "Stream type",
+      "stream": "Stream",
+      "scope": "Scope",
+      "scopeHint": "Optional filter applied to the denominator. Leave empty for all rows.",
+      "goodWhen": "Good when",
+      "goodWhenHint": "Boolean predicate over a row, e.g. status_code < 500",
+      "aggregate": "Aggregate",
+      "aggregateHint": "Evaluated per slice; compared against the threshold below.",
+      "comparator": "Comparator",
+      "threshold": "Threshold",
+      "target": "Target",
+      "window": "Time window",
+      "sliceInterval": "Slice interval",
+      "groupBy": "Group by",
+      "groupByPlaceholder": "Add a field, e.g. region",
+      "groupsEstimate": "Cardinality estimate",
+      "groupsEstimateHint": "Used to size the row reservation. Twice this value is reserved, to leave headroom for organic growth.",
+      "errorBudget": "Error budget",
+      "maxBurnRate": "Max burn rate",
+      "reservation": "Reservation",
+      "sliType": "SLI type",
+      "owner": "Owner"
+    },
+    "empty": {
+      "title": "No SLOs yet",
+      "description": "An SLO measures what fraction of requests, or of time, met a target — and gives alerts an error budget to burn."
+    },
+    "groups": {
+      "emptyTitle": "No groups measured yet",
+      "emptyDescription": "Groups appear once the first ingest pass has measured them."
+    },
+    "frozen": {
+      "title": "Frozen — not enough coverage",
+      "body": "Only {coverage} of this window was measured, below the {floor} floor. The SLO reads as no data and its alerts neither fire nor resolve, so unmeasured time is never reported as uptime."
+    },
+    "regenerate": {
+      "title": "This edit restarts measurement",
+      "body": "You changed what a slice means, so a new generation begins and the current window's measurements are discarded. Changing only the target would not do this — the target is applied when the SLO is read."
+    },
+    "alertSli": {
+      "unavailable": "Alert-based SLIs are not available yet: distinguishing \"the alert was OK for 3h\" from \"the alert was paused for 3h\" needs coverage data that is still being wired up."
+    },
+    "alert": {
+      "sloLabel": "Service level objective",
+      "sloSummary": "target {target} · rolling {window} · {slice} slices · max burn rate ×{max}",
+      "suggested": "Suggested configurations",
+      "suggestedFor": "Datadog's suggested rows for a {window} SLO",
+      "presetDetail": "{long} long / {short} short · fires at {budget}% budget",
+      "shortIsLongOverTwelve": "Short = long ÷ 12 (Google SRE workbook) in every suggested pair.",
+      "criticalIf": "Critical if",
+      "warningIf": "Warning if",
+      "burnRate": "burn rate",
+      "budgetConsumed": "budget consumed",
+      "inBothWindows": "in both windows —",
+      "long": "long",
+      "short": "short",
+      "none": "none",
+      "warningShares": "same windows (optional; shares the operator)",
+      "maxBurnNote": "Max burn rate for this SLO: ×{max}. Default short = long ÷ 12 → {short}.",
+      "exhaustNote": "At this rate the budget is gone in ~{time}.",
+      "multiAlert": "One alert per group",
+      "multiAlertHint": "Fans the alert out across the SLO's groups, each with its own state.",
+      "noCountGate": "No count gate.",
+      "noCountGateBody": "Unlike aggregation and PromQL alerts there is no \"for at least N groups\" row here — this family has no count axis, and a non-default value on the legacy threshold fields is rejected rather than ignored.",
+      "kind": {
+        "burnRate": "Burn rate",
+        "errorBudget": "Error budget"
+      },
+      "preset": {
+        "fast": "Fast burn — page",
+        "mid": "Mid burn — notify",
+        "slow": "Slow burn — ticket"
+      }
     }
   }
 }
