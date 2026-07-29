@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // Copyright 2026 OpenObserve Inc.
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import type {
   BrowserStep,
@@ -123,9 +123,19 @@ const valueLabel = computed(
 );
 const valueTooltip = computed(() => VALUE_TOOLTIP_MAP[props.step.action]);
 
+/**
+ * Did changing the action just discard a recorded wire step? (SE-11 / D9)
+ *
+ * Discarding is correct — the wire's payload belongs to the OLD action, so a renamed
+ * `type` step would drag its typed value into a `click`, and `click` -> `navigate`
+ * would leave a navigate with no url. What was wrong is that it happened in silence.
+ */
+const actionChangedFromRecorded = ref(false);
+
 const actionComputed = computed({
   get: () => props.step.action,
   set: (v: BrowserStep["action"]) => {
+    if (v !== props.step.action && props.step.wire) actionChangedFromRecorded.value = true;
     update({ action: v });
     emit("action-edited");
   },
@@ -383,6 +393,16 @@ const failureCaption = computed(() => {
             data-test="synthetics-journey-step-name-input"
           />
         </div>
+
+        <!-- The discard is right; doing it silently was not (D9). -->
+        <p
+          v-if="actionChangedFromRecorded"
+          class="text-text-secondary m-0 flex items-start gap-1 text-xs"
+          data-test="synthetics-journey-step-action-changed-notice"
+        >
+          <OIcon name="info-outline" size="xs" class="mt-0.5 shrink-0" aria-hidden="true" />
+          <span>{{ t("synthetics.journey.actionChangedNotice") }}</span>
+        </p>
 
         <!-- Target — the locator bundle is the only way a step names its element.
              `stepNeedsTarget` is the same rule the save-time validator uses, so the

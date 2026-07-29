@@ -15,6 +15,16 @@ export interface StructuredError {
 }
 
 /** Per-step outcome pushed by the extension via stepReplayResult. */
+/**
+ * What the player reported about one replayed step.
+ *
+ * `fidelity` carries the X-8.2 divergence notes: the preview cannot reproduce every
+ * probe behaviour (ordered candidate fallback, navigation and response settle, some
+ * assertion kinds, an author-set timeout below 60 s, uploads, retired actions), and
+ * the requirement is that it SAYS so per step rather than diverging in silence. The
+ * extension emits these; the web layer used to drop them here, so every one of those
+ * divergences was invisible and a skipped step could read as a pass.
+ */
 export interface StepReplayResult {
   stepId: string;
   stepName: string;
@@ -22,6 +32,7 @@ export interface StepReplayResult {
   durationMs: number;
   error?: string;
   structuredError?: StructuredError;
+  fidelity?: { level: string; notes: string[] };
 }
 
 export type StepAction =

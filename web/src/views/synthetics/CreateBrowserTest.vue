@@ -6,6 +6,7 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import type {
   BrowserCheck,
+  BrowserStep,
   SyntheticsLocation,
   SyntheticsDevice,
   SyntheticsFolder,
@@ -542,7 +543,24 @@ const blockedReason = computed<"incognito" | null>(() =>
 );
 
 function onReplay() {
-  const steps = journeyToWireSteps(check.value.journey);
+  runReplay(check.value.journey);
+}
+
+/**
+ * Replay only the first `upTo` steps (1-based, inclusive).
+ *
+ * A single step cannot be replayed on its own: journey state is cumulative and the
+ * extension starts every replay from the target URL, so step 5 alone would run
+ * against a fresh page with none of the preceding state. A prefix IS runnable, and
+ * `replay()` already takes an arbitrary WireStep[] — so slicing the journey is the
+ * whole implementation, with no extension change.
+ */
+function onReplayUpTo(upTo: number) {
+  runReplay(check.value.journey.slice(0, Math.max(1, upTo)));
+}
+
+function runReplay(journey: BrowserStep[]) {
+  const steps = journeyToWireSteps(journey);
   if (steps.length === 0) return;
   recorder
     .replay(
@@ -832,6 +850,7 @@ function onClearResults() {
               class="h-full!"
               @need-extension-setup="onNeedExtensionSetup"
               @replay="onReplay"
+        @replay-up-to="onReplayUpTo"
               @stop-replay="onStopReplay"
               @clear-results="onClearResults"
               @auto-record-consumed="autoRecord = false"

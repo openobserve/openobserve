@@ -226,6 +226,10 @@ const useSyntheticsRecorder = () => {
           durationMs: payload.duration_ms,
           error: payload.error,
           structuredError: payload.structuredError,
+          // X-8.2: the player reports what it could not reproduce. Dropping this
+          // made every such divergence silent — including a skipped step that
+          // would otherwise read as a pass.
+          fidelity: payload.fidelity,
         });
         activeStepId.value = null;
         break;

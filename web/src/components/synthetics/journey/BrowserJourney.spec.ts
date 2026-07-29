@@ -454,3 +454,85 @@ describe("BrowserJourney step creation is version 2", () => {
     expect(steps[0].selectorType).toBeUndefined();
   });
 });
+
+// Phase 5 / SE-4. The evidence existed and was discarded: JourneySteps declares a
+// getReplayResult prop "for error cards" and never rendered one, and BrowserJourney
+// never passed it. A failed replay showed a red dot and a one-line banner only.
+describe("BrowserJourney per-step failure evidence", () => {
+  let wrapper: VueWrapper;
+
+  afterEach(() => {
+    wrapper?.unmount();
+    vi.restoreAllMocks();
+  });
+
+  const journey = [
+    { id: "s1", action: "navigate", name: "Open app", value: "https://app.test", code: "" },
+    { id: "s2", action: "click", name: "Sign in", code: "", locator: { candidates: [{ kind: "css", value: "#go" }] } },
+  ];
+
+  function mountFailed() {
+    const stepResults = new Map([
+      [
+        "s2",
+        {
+          stepId: "s2",
+          stepName: "Sign in",
+          passed: false,
+          durationMs: 30000,
+          error: "Timeout 30000ms exceeded.",
+          fidelity: { level: "reduced", notes: ["primary locator only"] },
+        },
+      ],
+    ]);
+    return mount(BrowserJourney, {
+      props: { modelValue: journey, replayPhase: "failed", stepResults },
+      global: { stubs: { ...STUBS, JourneySteps: JourneyStepsStubWithExpansion } },
+    }) as VueWrapper;
+  }
+
+  it("should render the error card against the step that failed", () => {
+    wrapper = mountFailed();
+    const cards = wrapper.findAll('[data-test="synthetics-journey-step-error-card"]');
+    expect(cards.length).toBe(1);
+    expect(cards[0].text()).toContain("Timeout 30000ms exceeded");
+  });
+
+  it("should surface the player's fidelity notes (X-8.2)", () => {
+    wrapper = mountFailed();
+    expect(wrapper.find('[data-test="synthetics-journey-step-fidelity"]').text()).toContain(
+      "primary locator only",
+    );
+  });
+
+  it("should not render a card for a step that passed", () => {
+    const stepResults = new Map([
+      ["s1", { stepId: "s1", stepName: "Open app", passed: true, durationMs: 900 }],
+    ]);
+    wrapper = mount(BrowserJourney, {
+      props: { modelValue: journey, replayPhase: "passed", stepResults },
+      global: { stubs: { ...STUBS, JourneySteps: JourneyStepsStubWithExpansion } },
+    }) as VueWrapper;
+    expect(wrapper.find('[data-test="synthetics-journey-step-error-card"]').exists()).toBe(false);
+  });
+
+  it("should not render a card when no replay has run", () => {
+    wrapper = mount(BrowserJourney, {
+      props: { modelValue: journey },
+      global: { stubs: { ...STUBS, JourneyStepsStubWithExpansion } },
+    }) as VueWrapper;
+    expect(wrapper.find('[data-test="synthetics-journey-step-error-card"]').exists()).toBe(false);
+  });
+
+  // The old button emitted a full journey replay from inside a per-step card. A
+  // single step is not independently runnable, so the honest unit is the prefix.
+  it("should emit replay-up-to with the failed step's position", async () => {
+    wrapper = mountFailed();
+    await wrapper.find('[data-test="synthetics-journey-error-retry-btn"]').trigger("click");
+    // OButtonStub both $emits "click" and lets the native event through (it declares
+    // no `emits`), so one press registers twice. The payload is the contract here.
+    const emitted = wrapper.emitted("replay-up-to")!;
+    expect(emitted.length).toBeGreaterThan(0);
+    for (const call of emitted) expect(call).toEqual([2]);
+  });
+});

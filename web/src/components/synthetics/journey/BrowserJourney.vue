@@ -19,6 +19,7 @@ import ZeroAssertionNotice from "./ZeroAssertionNotice.vue";
 import TestIdMisconfiguredNotice from "./TestIdMisconfiguredNotice.vue";
 import { DEFAULT_TEST_ID_ATTR } from "@/constants/synthetics";
 import BrowserJourneyStepEditor from "./BrowserJourneyStepEditor.vue";
+import BrowserJourneyStepError from "./BrowserJourneyStepError.vue";
 import { stepIsMissingTarget } from "@/utils/synthetics/stepTarget";
 
 const props = defineProps<{
@@ -47,6 +48,17 @@ const emit = defineEmits<{
   "need-extension-setup": [];
   "clear-results": [];
   replay: [];
+  /**
+   * Replay only the first `upTo` steps (1-based, inclusive).
+   *
+   * A single step is not independently runnable — journey state is cumulative and
+   * the extension starts each replay from the target URL, so step 5 alone would run
+   * against a fresh page with none of the preceding state. A PREFIX is runnable, and
+   * `replay()` already accepts an arbitrary WireStep[], so this needs no extension
+   * change. The old error-card button emitted a full `replay` while sitting inside a
+   * per-step card, promising something it did not do (SE-4).
+   */
+  "replay-up-to": [upTo: number];
   "stop-replay": [];
   "auto-record-consumed": [];
   "selection-changed": [{ count: number; isRecording: boolean }];
@@ -104,6 +116,39 @@ const failedStepResult = computed<StepReplayResult | undefined>(() => {
   const step = props.modelValue[firstFailedIndex.value];
   return props.stepResults?.get(step.id);
 });
+
+/**
+ * The failed replay result for a given row, if any.
+ *
+ * Only while a replay is in a terminal/active state — a stale result from a previous
+ * run must not keep a card on screen after the journey is edited.
+ */
+function failedResultFor(row: BrowserStep): StepReplayResult | undefined {
+  if (!isReplayActive.value) return undefined;
+  const r = props.stepResults?.get(row.id);
+  return r && !r.passed ? r : undefined;
+}
+
+function stepNumberOf(row: BrowserStep): number {
+  return props.modelValue.findIndex((s) => s.id === row.id) + 1;
+}
+
+/**
+ * A failed step's evidence lives in the row's expansion, so open it automatically —
+ * the same thing validateJourneySteps does for validation errors. Without this a
+ * tester has to guess which row to expand to find out what happened.
+ */
+watch(
+  () => (props.replayPhase === "failed" ? firstFailedIndex.value : -1),
+  (idx) => {
+    if (idx < 0) return;
+    const step = props.modelValue[idx];
+    if (step && !expandedStepIds.value.includes(step.id)) {
+      expandedStepIds.value = [...expandedStepIds.value, step.id];
+    }
+  },
+  { immediate: true },
+);
 
 /** Derive the status dot state for a step based on replay results. */
 function stepDotState(stepId: string): StepDotState | undefined {
@@ -947,6 +992,15 @@ function openChromeExtensions() {
       <!-- Inline editor (expanded content) — the same component the recording
            panel renders, so an author sees the same fields either way -->
       <template #expansion="{ row }">
+        <!-- What the runner saw, when this step is the one that failed. Above the
+             editor because it is the reason the author opened the row. -->
+        <BrowserJourneyStepError
+          v-if="failedResultFor(row)"
+          class="mx-8 mt-3"
+          :result="failedResultFor(row)!"
+          :step-number="stepNumberOf(row)"
+          @retry-replay="emit('replay-up-to', stepNumberOf(row))"
+        />
         <BrowserJourneyStepEditor
           class="px-8 pt-3 pb-3"
           :step="row"
