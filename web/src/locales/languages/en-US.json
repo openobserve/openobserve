@@ -964,6 +964,7 @@
     "uploadedAt": "Uploaded At",
     "overview": "Overview",
     "webVitals": "Web Vitals",
+    "vitals": "Vitals",
     "errors": "Errors",
     "api": "API",
     "uploadSourceMapsForm": {
@@ -996,6 +997,10 @@
     "clickHereLabel": "Click here",
     "webVitalsBrowserOnlyTitle": "Web Vitals need the Browser RUM SDK",
     "webVitalsBrowserOnlyDescription": "Core Web Vitals — LCP, INP, CLS, FCP, TTFB and page load — are collected only by the Browser RUM SDK. This stream has no browser performance data yet. If you're instrumenting a mobile app, use the Sessions and Errors tabs for mobile telemetry.",
+    "performanceEmptyTitle": "No performance data for this view",
+    "performanceEmptyDescription": "The selected stream has no metrics this view can render for the current time range. Try a different time range, or check the Sessions and Errors tabs.",
+    "apiEmptyTitle": "No network data for this view",
+    "apiEmptyDescription": "The selected stream has no resource or network requests in this time range. Network metrics appear once the app instruments its HTTP calls.",
     "skipInactivity": "Skip Inactivity",
     "error": "Error",
     "sessionType": "Session Type",

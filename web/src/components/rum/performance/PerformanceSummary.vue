@@ -18,47 +18,75 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <div class="relative-position">
+    <!-- Resolving the _rumdata schema before deciding which panels can run -->
     <div
-      class="max-h-[calc(100vh-200px)] min-h-0! overflow-y-auto"
-      :class="isLoading.length ? 'invisible' : 'visible'"
-    >
-      <RenderDashboardCharts
-        ref="performanceChartsRef"
-        :viewOnly="true"
-        :frame="false"
-        :dashboardData="currentDashboardData.data"
-        :currentTimeObj="dateTime"
-        searchType="RUM"
-        @variablesManagerReady="onVariablesManagerReady"
-      >
-        <template v-slot:before_panels>
-          <div class="flex items-center pt-3 text-base font-bold font-medium">
-            <div class="w-[25%] text-center">
-              {{ t("rum.webVitalsLabel") }}
-            </div>
-            <div class="w-[25%] text-center">
-              {{ t("rum.errorLabel") }}
-            </div>
-            <div class="w-[25%] text-center">
-              {{ t("rum.sessionLabel") }}
-            </div>
-          </div>
-        </template>
-      </RenderDashboardCharts>
-    </div>
-    <div
-      v-show="isLoading.length"
-      class="absolute top-0 flex h-[calc(100vh-15.625rem)] w-full items-center justify-center pb-4 text-center"
+      v-if="!schemaResolved"
+      data-test="performance-summary-schema-loading"
+      class="flex h-[calc(100vh-15.625rem)] w-full items-center justify-center pb-4 text-center"
     >
       <div>
-        <OSpinner
-          size="md"
-          class="mx-auto block"
-          data-test="performance-summary-loading-indicator"
-        />
+        <OSpinner size="md" class="mx-auto block" />
         <div class="w-full text-center">Loading Dashboard</div>
       </div>
     </div>
+
+    <!-- Stream has no metrics this view can render (e.g. no recognised RUM fields) -->
+    <OEmptyState
+      v-else-if="showEmptyState"
+      data-test="performance-summary-empty"
+      size="block"
+      illustration="pulse"
+      :hide-action="true"
+    >
+      <template #title>{{ t("rum.performanceEmptyTitle") }}</template>
+      <template #description>{{ t("rum.performanceEmptyDescription") }}</template>
+    </OEmptyState>
+
+    <template v-else>
+      <div
+        class="max-h-[calc(100vh-200px)] min-h-0! overflow-y-auto"
+        :class="isLoading.length ? 'invisible' : 'visible'"
+      >
+        <RenderDashboardCharts
+          ref="performanceChartsRef"
+          :viewOnly="true"
+          :frame="false"
+          :dashboardData="dashboardData"
+          :currentTimeObj="dateTime"
+          searchType="RUM"
+          @variablesManagerReady="onVariablesManagerReady"
+        >
+          <!-- Fixed column labels only make sense for the full browser layout; hide them
+               once panels have been filtered out for a mobile-only stream. -->
+          <template v-if="!wasFiltered" v-slot:before_panels>
+            <div class="flex items-center pt-3 text-base font-bold font-medium">
+              <div class="w-[25%] text-center">
+                {{ t("rum.webVitalsLabel") }}
+              </div>
+              <div class="w-[25%] text-center">
+                {{ t("rum.errorLabel") }}
+              </div>
+              <div class="w-[25%] text-center">
+                {{ t("rum.sessionLabel") }}
+              </div>
+            </div>
+          </template>
+        </RenderDashboardCharts>
+      </div>
+      <div
+        v-show="isLoading.length"
+        class="absolute top-0 flex h-[calc(100vh-15.625rem)] w-full items-center justify-center pb-4 text-center"
+      >
+        <div>
+          <OSpinner
+            size="md"
+            class="mx-auto block"
+            data-test="performance-summary-loading-indicator"
+          />
+          <div class="w-full text-center">Loading Dashboard</div>
+        </div>
+      </div>
+    </template>
   </div>
 </template>
 
@@ -74,14 +102,16 @@ import { reactive } from "vue";
 import { useRoute } from "vue-router";
 import RenderDashboardCharts from "@/views/Dashboards/RenderDashboardCharts.vue";
 import overviewDashboard from "@/utils/rum/overview.json";
-import { convertDashboardSchemaVersion } from "../../../utils/dashboard/convertDashboardSchemaVersion";
+import useRumPerformanceTab from "@/composables/rum/useRumPerformanceTab";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 
 export default defineComponent({
   name: "PerformanceSummary",
   components: {
     RenderDashboardCharts,
     OSpinner,
+    OEmptyState,
   },
   props: {
     dateTime: {
@@ -98,8 +128,16 @@ export default defineComponent({
     const performanceChartsRef = ref(null);
     const isLoading: Ref<boolean[]> = ref([]);
 
-    onMounted(async () => {
-      await loadDashboard();
+    // Adaptive dashboard: drops panels whose columns the stream can't serve (browser Web
+    // Vitals for a mobile-only stream, and vice versa), reflowing the survivors. Browser
+    // data renders as before. See docs/designs/MOBILE_RUM_ADAPTIVE_UI_DESIGN.md.
+    const { dashboardData, schemaResolved, showEmptyState, wasFiltered, ensureRumSchema } =
+      useRumPerformanceTab(overviewDashboard);
+
+    onMounted(() => {
+      // Fire-and-forget: ensureRumSchema resolves the gate independently and handles its
+      // own errors.
+      ensureRumSchema();
     });
 
     onActivated(() => {
@@ -111,30 +149,10 @@ export default defineComponent({
       window.dispatchEvent(new Event("resize"));
     };
 
-    const loadDashboard = async () => {
-      // schema migration
-      currentDashboardData.value.data = convertDashboardSchemaVersion(overviewDashboard);
-
-      // if variables data is null, set it to empty list
-
-      if (
-        !(
-          currentDashboardData.value.data?.variables &&
-          currentDashboardData.value.data?.variables?.list.length
-        )
-      ) {
-        variablesData.isVariablesLoading = false;
-        variablesData.values = [];
-      }
-    };
-
     const { t } = useI18n();
     const route = useRoute();
     const router = useRouter();
     const store = useStore();
-    const currentDashboardData = ref({
-      data: {},
-    });
 
     // boolean to show/hide settings sidebar
     const showDashboardSettingsDialog = ref(false);
@@ -263,7 +281,7 @@ export default defineComponent({
 
     const onDeletePanel = async (panelId: any) => {
       await deletePanel(store, route.query.dashboard, panelId, route.query.folder ?? "default");
-      await loadDashboard();
+      await ensureRumSchema();
     };
 
     // Variables manager event handler - pass through to parent
@@ -272,7 +290,10 @@ export default defineComponent({
     };
 
     return {
-      currentDashboardData,
+      dashboardData,
+      schemaResolved,
+      showEmptyState,
+      wasFiltered,
       goBackToDashboardList,
       addPanelData,
       t,
@@ -289,7 +310,6 @@ export default defineComponent({
       onVariablesManagerReady,
       showDashboardSettingsDialog,
       openSettingsDialog,
-      loadDashboard,
       getQueryParamsForDuration,
       performanceChartsRef,
       isLoading,
