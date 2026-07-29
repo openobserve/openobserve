@@ -439,12 +439,6 @@ const expansion = useTableExpansion<TData>(
   emit,
 );
 
-// Whether the leading expand/collapse gutter COLUMN is rendered — distinct from
-// expansion being enabled. `hideExpandGutter` callers keep expansion working but
-// place the toggle in a cell slot of their own. Every gutter render and every
-// colspan sum reads this, so the two stay in step.
-const expansionGutterEnabled = computed(() => expansion.isEnabled.value && !props.hideExpandGutter);
-
 // ── Highlighting ────────────────────────────────────────────────
 const highlighting = useTableHighlight({
   highlightText: props.highlightText,
@@ -1193,7 +1187,7 @@ defineExpose({
             :selection-multiple="selection.isMultiple.value"
             :is-all-selected="selection.isAllSelected()"
             :is-indeterminate="selection.isIndeterminate()"
-            :expansion-enabled="expansionGutterEnabled"
+            :expansion-enabled="expansion.isEnabled.value"
             :enable-row-reorder="props.enableRowReorder"
             :enable-column-reorder="props.enableColumnReorder"
             :pinned-first-column="props.pinnedFirstColumn"
@@ -1232,7 +1226,7 @@ defineExpose({
             :rows="skeletonRowCount"
             :table-columns="table.getVisibleLeafColumns()"
             :selection-enabled="selection.isEnabled.value"
-            :expansion-enabled="expansionGutterEnabled"
+            :expansion-enabled="expansion.isEnabled.value"
             :enable-row-reorder="props.enableRowReorder"
             :bordered="props.bordered"
           />
@@ -1247,7 +1241,7 @@ defineExpose({
             :selection-multiple="selection.isMultiple.value"
             :is-row-selected-fn="(row: TData) => selection.isRowSelected(row)"
             :is-row-selectable="props.isRowSelectable"
-            :expansion-enabled="expansionGutterEnabled"
+            :expansion-enabled="expansion.isEnabled.value"
             :is-expanded-fn="(row: TData) => expansion.isExpanded(row)"
             :get-row-expansion-enabled="props.getRowExpansionEnabled"
             :highlight-text="props.highlightText"

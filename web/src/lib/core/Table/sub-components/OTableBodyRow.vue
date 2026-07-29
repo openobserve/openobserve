@@ -197,7 +197,7 @@ function onRowMouseleave() {
     <td
       v-if="expansionEnabled"
       :class="[
-        'w-4 min-w-4 px-0 text-center align-middle',
+        'w-6 max-w-6 min-w-6 px-0 text-center align-middle',
         bordered ? 'border-table-row-divider border-b' : '',
       ]"
       data-test="o2-table-expand-cell"

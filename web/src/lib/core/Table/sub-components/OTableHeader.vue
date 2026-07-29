@@ -403,7 +403,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
       <!-- Expand placeholder -->
       <th
         v-if="expansionEnabled"
-        class="border-table-header-border w-4 min-w-4 border-b px-0"
+        class="border-table-header-border w-6 max-w-6 min-w-6 border-b px-0"
         data-test="o2-table-th-expand"
       />
 
@@ -685,7 +685,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
            checkbox gutter had its header columns offset from its body. -->
       <th
         v-if="expansionEnabled"
-        class="border-table-header-border w-4 min-w-4 border-b px-0"
+        class="border-table-header-border w-6 max-w-6 min-w-6 border-b px-0"
         data-test="o2-table-th-expand"
       />
 

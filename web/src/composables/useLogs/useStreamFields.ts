@@ -1083,7 +1083,11 @@ export const useStreamFields = () => {
               showWrap: false,
               wrapContent: false,
             },
-            size: 260,
+            // 236 + the 24px expand gutter = the 260 the pre-migration table
+            // gave the timestamp cell, which rendered the chevron INSIDE it.
+            // The arrow is its own column here (so it stays put if timestamp
+            // ever stops being first), so its width comes out of this budget.
+            size: 236,
           });
         }
 
@@ -1139,7 +1143,11 @@ export const useStreamFields = () => {
               showWrap: false,
               wrapContent: false,
             },
-            size: 260,
+            // 236 + the 24px expand gutter = the 260 the pre-migration table
+            // gave the timestamp cell, which rendered the chevron INSIDE it.
+            // The arrow is its own column here (so it stays put if timestamp
+            // ever stops being first), so its width comes out of this budget.
+            size: 236,
           });
         }
 
