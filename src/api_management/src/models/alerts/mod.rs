@@ -330,8 +330,16 @@ pub struct QueryCondition {
     pub promql_condition: Option<Condition>,
     /// Optional WARNING value for the PromQL condition, sharing
     /// `promql_condition.operator` with critical. Omitted = single-level.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schema(example = 300.0)]
+    // Lenient: reached through CreateAlertRequestBody's `#[serde(flatten)]`,
+    // which buffers via `Value`, where `arbitrary_precision` makes a number a
+    // map (D61). Without this a FRACTIONAL warning is rejected while an
+    // integer one is accepted — found by end-to-end testing.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "config::meta::slo::lenient_f64::deserialize_opt"
+    )]
     pub promql_warning_value: Option<f64>,
 
     /// Aggregation configuration for "custom" query type.
@@ -365,8 +373,13 @@ pub struct Aggregation {
     /// `having.column` with critical. Omitted = single-level aggregation
     /// alert. Must be strictly less severe than `having.value` — direction
     /// depends on the operator.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schema(example = 50.0)]
+    // Same lenient deserialization as `promql_warning_value`, same reason.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "config::meta::slo::lenient_f64::deserialize_opt"
+    )]
     pub warning_value: Option<f64>,
     /// Opt in to per-group evaluation (multi-alerts): each group gets its own
     /// level, state row and notifications. Omitted = `false` = the alert

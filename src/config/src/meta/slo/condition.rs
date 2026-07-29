@@ -57,8 +57,19 @@ pub struct SloCondition {
     /// Orderable ascending only: `>` or `>=` (SA-5).
     pub operator: Operator,
     /// Finite and strictly positive (SA-3).
+    ///
+    /// Lenient deserialization is required, not cosmetic: this struct arrives
+    /// nested inside `CreateAlertRequestBody`'s `#[serde(flatten)]`, and a
+    /// flatten buffers through `Value`, where `arbitrary_precision` represents
+    /// every number as a map (D61). A plain `f64` fails there with
+    /// `invalid type: map, expected f64`.
+    #[serde(deserialize_with = "super::lenient_f64::deserialize")]
     pub critical: f64,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "super::lenient_f64::deserialize_opt"
+    )]
     pub warning: Option<f64>,
     /// `BurnRate` only. 1h–48h, ≤ the SLO window, an exact multiple of and
     /// ≥ 2× the slice interval (SA-8).

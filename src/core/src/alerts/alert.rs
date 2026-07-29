@@ -4713,7 +4713,7 @@ async fn evaluate_slo_alert(
             row.insert("group".to_string(), Value::String(g.clone()));
         }
 
-        let mut put = |row: &mut Map<String, Value>, key: &str, v: f64| {
+        let put = |row: &mut Map<String, Value>, key: &str, v: f64| {
             if let Some(n) = serde_json::Number::from_f64(v) {
                 row.insert(key.to_string(), Value::Number(n));
             }

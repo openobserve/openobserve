@@ -833,6 +833,23 @@ pub fn service_routes() -> Router {
         .route("/v2/{org_id}/reports/{report_id}/trigger", put(dashboards::reports::trigger_report_v2))
 
         // Folders (v2)
+        // SLOs. Deliberately NOT enterprise-gated: nothing about SLO
+        // measurement is an enterprise capability, and the handlers already
+        // return 501 when ZO_SLO_ENABLED is false. Literal segments are
+        // registered before the {slo_id} catch-all, per the router's ordering
+        // rule.
+        .route(
+            "/{org_id}/slos",
+            get(slos::list_slos).post(slos::create_slo),
+        )
+        .route("/{org_id}/slos/{slo_id}/enable", put(slos::enable_slo))
+        .route("/{org_id}/slos/{slo_id}/groups", get(slos::get_slo_groups))
+        .route(
+            "/{org_id}/slos/{slo_id}",
+            get(slos::get_slo)
+                .put(slos::update_slo)
+                .delete(slos::delete_slo),
+        )
         .route("/v2/{org_id}/folders/{folder_type}", get(folders::list_folders).post(folders::create_folder))
         .route("/v2/{org_id}/folders/{folder_type}/{folder_id}", get(folders::get_folder).put(folders::update_folder).delete(folders::delete_folder))
         .route("/v2/{org_id}/folders/{folder_type}/name/{folder_name}", get(folders::get_folder_by_name))
@@ -883,19 +900,6 @@ pub fn service_routes() -> Router {
     #[cfg(feature = "enterprise")]
     {
         router = router
-            // SLOs. Literal segments before {slo_id} catch-alls.
-            .route(
-                "/{org_id}/slos",
-                get(slos::list_slos).post(slos::create_slo),
-            )
-            .route(
-                "/{org_id}/slos/{slo_id}",
-                get(slos::get_slo)
-                    .put(slos::update_slo)
-                    .delete(slos::delete_slo),
-            )
-            .route("/{org_id}/slos/{slo_id}/enable", put(slos::enable_slo))
-            .route("/{org_id}/slos/{slo_id}/groups", get(slos::get_slo_groups))
             // Anomaly Detection
             .route("/{org_id}/anomaly_detection", get(anomaly_detection::list_configs).post(anomaly_detection::create_config))
             .route("/{org_id}/anomaly_detection/{config_id}", get(anomaly_detection::get_config).put(anomaly_detection::update_config).delete(anomaly_detection::delete_config))

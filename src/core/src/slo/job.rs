@@ -257,14 +257,7 @@ fn join_dual(
 /// the numerator or denominator depending on which scan it came from).
 fn to_row(hit: &json::Value, group_by: &[String], with_good_column: bool) -> Option<QueryRow> {
     let obj = hit.as_object()?;
-    let slice_start = num(obj.get(SLICE_ALIAS)?)? as i64;
-    // The stream stores micros; the histogram alias may come back either way
-    // depending on the engine's timestamp handling, so normalize.
-    let slice_start = if slice_start > 1_000_000_000_000 {
-        slice_start / 1_000_000
-    } else {
-        slice_start
-    };
+    let slice_start = parse_slice_start(obj.get(SLICE_ALIAS)?)?;
 
     let values: Vec<Option<String>> = group_by
         .iter()
@@ -298,6 +291,55 @@ fn to_row(hit: &json::Value, group_by: &[String], with_good_column: bool) -> Opt
         good,
         total,
     })
+}
+
+/// Read the `slice_start` column as epoch **seconds**.
+///
+/// `histogram()` does NOT come back as a number. The search layer formats a
+/// timestamp column for display, so the value arrives as
+/// `"2026-07-29T13:56:00"` — and a numeric-only parse silently drops every
+/// row, which shows up as a fully gap-filled window of `(0, 0)` slices rather
+/// than as an error. That is what this cost to find, so all three encodings
+/// are accepted explicitly:
+///
+/// * a datetime string, which is what the search layer actually returns today;
+/// * epoch micros, which is how the value is stored;
+/// * epoch seconds, in case a caller has already normalized.
+fn parse_slice_start(v: &json::Value) -> Option<i64> {
+    if let Some(s) = v.as_str()
+        && let Some(secs) = parse_datetime_secs(s)
+    {
+        return Some(secs);
+    }
+    let n = num(v)? as i64;
+    // Micros are ~1e15 for present-day timestamps and seconds ~1e9, so the
+    // threshold is unambiguous for any date this product supports.
+    Some(if n > 1_000_000_000_000 {
+        n / 1_000_000
+    } else {
+        n
+    })
+}
+
+/// Parse the search layer's timestamp rendering. Naive strings are UTC — the
+/// search layer formats in UTC unless a timezone is requested, and the ingest
+/// job never requests one.
+fn parse_datetime_secs(s: &str) -> Option<i64> {
+    use chrono::{DateTime, NaiveDateTime, Utc};
+    if let Ok(dt) = DateTime::parse_from_rfc3339(s) {
+        return Some(dt.timestamp());
+    }
+    for fmt in [
+        "%Y-%m-%dT%H:%M:%S",
+        "%Y-%m-%d %H:%M:%S",
+        "%Y-%m-%dT%H:%M:%S%.f",
+    ] {
+        if let Ok(dt) = NaiveDateTime::parse_from_str(s, fmt) {
+            return Some(dt.and_utc().timestamp());
+        }
+    }
+    let _ = Utc::now;
+    None
 }
 
 fn num(v: &json::Value) -> Option<f64> {
@@ -513,4 +555,64 @@ pub async fn run_range(
 /// Schedule the next pass for an SLO.
 pub fn next_run_at(slice_interval_secs: i64) -> i64 {
     now_micros() + slice_interval_secs * 1_000_000
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The encoding that actually comes back from `histogram()`. A
+    /// numeric-only parse drops every row silently, which surfaces as a fully
+    /// gap-filled window rather than as an error — found by end-to-end
+    /// testing, not by review.
+    #[test]
+    fn a_formatted_timestamp_parses() {
+        let v = json::Value::String("2026-07-29T13:56:00".into());
+        assert_eq!(parse_slice_start(&v), Some(1_785_333_360));
+    }
+
+    #[test]
+    fn an_rfc3339_timestamp_parses() {
+        let v = json::Value::String("2026-07-29T13:56:00Z".into());
+        assert_eq!(parse_slice_start(&v), Some(1_785_333_360));
+        let v = json::Value::String("2026-07-29T13:56:00+00:00".into());
+        assert_eq!(parse_slice_start(&v), Some(1_785_333_360));
+    }
+
+    #[test]
+    fn a_space_separated_timestamp_parses() {
+        let v = json::Value::String("2026-07-29 13:56:00".into());
+        assert_eq!(parse_slice_start(&v), Some(1_785_333_360));
+    }
+
+    #[test]
+    fn fractional_seconds_parse() {
+        let v = json::Value::String("2026-07-29T13:56:00.000".into());
+        assert_eq!(parse_slice_start(&v), Some(1_785_333_360));
+    }
+
+    #[test]
+    fn epoch_micros_are_normalized_to_seconds() {
+        let v = json::Value::Number(1_785_333_360_000_000i64.into());
+        assert_eq!(parse_slice_start(&v), Some(1_785_333_360));
+    }
+
+    #[test]
+    fn epoch_seconds_pass_through() {
+        let v = json::Value::Number(1_785_333_360i64.into());
+        assert_eq!(parse_slice_start(&v), Some(1_785_333_360));
+    }
+
+    /// A value that is neither must be None rather than 0 — 1970 would be
+    /// silently out of every window, which is the same silent-drop failure in
+    /// a different disguise.
+    #[test]
+    fn an_unparseable_value_is_none_not_zero() {
+        assert_eq!(
+            parse_slice_start(&json::Value::String("nonsense".into())),
+            None
+        );
+        assert_eq!(parse_slice_start(&json::Value::Null), None);
+        assert_eq!(parse_slice_start(&json::Value::Bool(true)), None);
+    }
 }

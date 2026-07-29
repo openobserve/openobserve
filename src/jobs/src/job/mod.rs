@@ -44,6 +44,7 @@ fn eval_scheduler_fetch_size(total: usize, max_rows: usize) -> anyhow::Result<i6
 #[cfg(feature = "enterprise")]
 pub mod alert_grouping;
 mod alert_group_reaper;
+mod slo_maintenance;
 mod alert_manager;
 #[cfg(feature = "cloud")]
 mod cloud;
@@ -1061,6 +1062,11 @@ pub async fn init() -> Result<(), anyhow::Error> {
     // can never retire on its own, because a vanished group produces no
     // observation to act on.
     alert_group_reaper::run();
+    // Reconciliation is what makes the rolling window actually roll: the
+    // ingest pass only ever ADDS, so without this a 7-day SLO's covered_slices
+    // climbs past what its window can hold. Also releases expired budget
+    // residuals (S-14c).
+    slo_maintenance::run();
 
     if LOCAL_NODE.is_compactor() {
         tokio::task::spawn(file_list_dump::run());

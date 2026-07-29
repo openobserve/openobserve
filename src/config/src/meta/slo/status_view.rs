@@ -82,9 +82,15 @@ impl SloStatusView {
         // Nothing measured yet is NOT the same as measured-and-empty. A brand
         // new SLO must not render as 0% available.
         let unmeasured = covered_slices.is_none() || covered == 0;
-        let no_data = unmeasured || coverage < coverage_floor;
+        // A covered window with ZERO events has no SLI either — the ratio is
+        // undefined, not 0% (SA-18). `coverage::observe` already treats this
+        // as `Unobserved(ZeroTotal)`; this is the read path agreeing with it.
+        // Without this the view reports `no_data: false` alongside a null SLI,
+        // an inconsistent state the UI renders as "measured" with an em dash.
+        let sli_pct_raw = sli(good, total);
+        let no_data = unmeasured || coverage < coverage_floor || sli_pct_raw.is_none();
 
-        let sli_pct = if no_data { None } else { sli(good, total) };
+        let sli_pct = if no_data { None } else { sli_pct_raw };
         let (budget, burn, ttl) = match sli_pct {
             Some(s) => {
                 let remaining = error_budget_remaining(s, target);
@@ -187,6 +193,48 @@ mod tests {
         // covered = 0 means nothing was observed, even if expected > 0.
         let v = view(Some(0.0), Some(0.0), Some(0), 100);
         assert!(v.no_data);
+    }
+
+    /// A window with plenty of COVERAGE but no events at all. The SLI is
+    /// undefined, not 0% (SA-18), so the view must say no_data rather than
+    /// report "measured" with a null SLI — an inconsistent pair the UI would
+    /// render as a measured SLO showing an em dash.
+    ///
+    /// Found by end-to-end testing: gap-filled zero-traffic slices produce
+    /// exactly this shape, and every unit test had fed it non-zero totals.
+    #[test]
+    fn a_covered_window_with_zero_events_is_no_data() {
+        let v = view(Some(0.0), Some(0.0), Some(95), 100);
+        assert!(v.coverage > 0.9, "the window IS covered");
+        assert!(
+            v.no_data,
+            "covered but empty reported as measured — sli would be null"
+        );
+        assert_eq!(v.sli, None);
+        assert_eq!(v.error_budget_remaining, None);
+        assert_eq!(v.burn_rate, None);
+    }
+
+    /// The pair must never disagree: a null SLI and `no_data: false` together
+    /// is the inconsistency this guards.
+    #[test]
+    fn no_data_and_a_null_sli_always_agree() {
+        for (good, total, covered) in [
+            (Some(0.0), Some(0.0), Some(95)),
+            (Some(99.0), Some(100.0), Some(95)),
+            (None, None, None),
+            (Some(0.0), Some(100.0), Some(95)),
+            (Some(1.0), Some(1.0), Some(5)),
+        ] {
+            let v = view(good, total, covered, 100);
+            assert_eq!(
+                v.sli.is_none(),
+                v.no_data,
+                "sli={:?} disagrees with no_data={} for {good:?}/{total:?}/{covered:?}",
+                v.sli,
+                v.no_data
+            );
+        }
     }
 
     /// D56: the target is applied at READ time, so the same stored counts

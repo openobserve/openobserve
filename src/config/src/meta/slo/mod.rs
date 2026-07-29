@@ -51,6 +51,7 @@ pub mod budget_rows;
 pub mod condition;
 pub mod coverage;
 pub mod generation;
+pub mod lenient_f64;
 pub mod group;
 pub mod math;
 pub mod slice;
@@ -206,6 +207,12 @@ impl SliConfig {
 /// editing it never invalidates a slice and never triggers a rebuild.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 pub struct SloDefinition {
+    /// Flattened, so `sli_type` and `config` sit at the SLO's top level rather
+    /// than nested under `sli_config`. `SloDefinition` is itself flattened
+    /// into [`Slo`], so this is what makes the wire shape
+    /// `{"sli_type": "count", "config": {...}, "target": ...}` — one flat
+    /// object, matching what the form actually posts.
+    #[serde(flatten)]
     pub sli_config: SliConfig,
     /// THE canonical location for grouping.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -217,8 +224,15 @@ pub struct SloDefinition {
 /// A Service Level Objective (S-1).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 pub struct Slo {
+    // The four fields below are assigned SERVER-side, so they carry
+    // `#[serde(default)]`: a create request that supplied its own id,
+    // generation or reservation would either be ignored or be a way to forge
+    // them, and requiring them just makes every client send placeholders.
+    #[serde(default)]
     pub id: String,
+    #[serde(default)]
     pub org: String,
+    #[serde(default)]
     pub folder_id: String,
     pub name: String,
     #[serde(default)]
@@ -236,12 +250,14 @@ pub struct Slo {
     pub owner: Option<String>,
     /// Bumped by every computation-affecting edit, including reverts (D59).
     /// Also the writing epoch and the CAS fence for writer commits.
+    #[serde(default)]
     pub definition_generation: i32,
     /// Preflight `COUNT(DISTINCT …)` estimate; feeds the S-10 cap and the
     /// S-14 budget.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub groups_estimate: Option<i64>,
     /// Budget reservation: 1 when ungrouped, else `clamp(2 × estimate, 64, hard cap)`.
+    #[serde(default)]
     pub groups_reserved: i64,
 }
 
@@ -1715,6 +1731,35 @@ mod tests {
     /// compares false against everything, so every slice classifies bad;
     /// `±inf` classifies every slice the same way in the other direction.
     /// Either way the SLO reports a confident, uniform, wrong answer.
+    #[test]
+    /// A create request must not have to invent server-assigned fields.
+    #[test]
+    fn an_slo_deserializes_without_server_assigned_fields() {
+        let json = serde_json::json!({
+            "name": "checkout availability",
+            "sli_type": "count",
+            "config": {
+                "source": {
+                    "mode": "single_query",
+                    "query": {
+                        "stream": "requests",
+                        "stream_type": "logs",
+                        "good_expr": "status_code < 500"
+                    }
+                }
+            },
+            "target": 99.9,
+            "window_secs": 604_800,
+            "slice_interval_secs": 60,
+            "enabled": true
+        });
+        let slo: Slo = serde_json::from_value(json).expect("must deserialize");
+        assert_eq!(slo.id, "");
+        assert_eq!(slo.definition_generation, 0);
+        assert_eq!(slo.groups_reserved, 0);
+        assert_eq!(slo.target, 99.9);
+    }
+
     #[test]
     fn sli_type_storage_ids_round_trip() {
         for t in [SliType::Count, SliType::TimeSlice, SliType::Alert] {
