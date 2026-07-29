@@ -30,4 +30,7 @@ pub use handler::{
     OAuthProtectedResourceMetadata, OAuthServerMetadata, handle_mcp_request,
     handle_mcp_request_stream,
 };
-pub use types::{MCP_PROTOCOL_VERSION, MCPRequest, MCPResponse};
+pub use types::{
+    MCP_PROTOCOL_VERSION, MCP_PROTOCOL_VERSION_MODERN, MCP_SUPPORTED_PROTOCOL_VERSIONS, MCPRequest,
+    MCPResponse, decode_mcp_header_value, is_supported_protocol_version,
+};
