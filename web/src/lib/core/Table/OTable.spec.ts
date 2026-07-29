@@ -21,7 +21,7 @@ beforeAll(() => {
   config.global.plugins.unshift([i18n as any]);
 });
 
-import { nextTick } from "vue";
+import { nextTick, reactive } from "vue";
 import OTable from "./OTable.vue";
 import OTableHeader from "./sub-components/OTableHeader.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -60,6 +60,45 @@ describe("OTable", () => {
   });
 
   // ── Basic Rendering ──────────────────────────────────────────
+
+  // ── Streaming data (in-place mutation) ──────────────────────
+  // Logs streams partitions by PUSHING onto the same `hits` array. TanStack
+  // memoises its core row model on the array's identity, so a mutated array
+  // silently leaves the table frozen at whatever count existed when the memo
+  // last ran — 0 rows if the first partition hadn't landed yet.
+  describe("data mutated in place", () => {
+    // `reactive` mirrors the real caller: logs' hits live on a reactive store,
+    // so pushes are tracked — but the array's IDENTITY never changes, which is
+    // what defeats TanStack's memo.
+    it("should render rows appended to the same array reference", async () => {
+      const rows = reactive(makeRows(3));
+      wrapper = mount(OTable, {
+        props: { data: rows, columns: makeColumns() },
+      });
+      expect(wrapper.findAll('[data-test^="o2-table-row-"]').length).toBe(3);
+
+      rows.push(...makeRows(2).map((r, i) => ({ ...r, id: 100 + i })));
+      await nextTick();
+      await flushPromises();
+
+      expect(wrapper.props("data")).toHaveLength(5);
+      expect(wrapper.findAll('[data-test^="o2-table-row-"]').length).toBe(5);
+    });
+
+    it("should render rows that arrive after mounting with an empty array", async () => {
+      const rows = reactive<TestRow[]>([]);
+      wrapper = mount(OTable, {
+        props: { data: rows, columns: makeColumns() },
+      });
+      expect(wrapper.findAll('[data-test^="o2-table-row-"]').length).toBe(0);
+
+      rows.push(...makeRows(4));
+      await nextTick();
+      await flushPromises();
+
+      expect(wrapper.findAll('[data-test^="o2-table-row-"]').length).toBe(4);
+    });
+  });
 
   describe("basic rendering", () => {
     it("renders the table with correct data-test attribute", () => {

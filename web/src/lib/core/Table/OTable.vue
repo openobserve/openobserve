@@ -282,12 +282,24 @@ provide(OTableCellActionsKey, {
   enabled: computed(() => !!slots["cell-hover-actions"]),
 });
 
+// TanStack memoises the core row model on the DATA ARRAY'S IDENTITY. Callers
+// that stream results mutate their array in place (logs pushes each partition's
+// hits onto `queryResults.hits`), so the identity never changes, the memo never
+// re-runs, and the table stays frozen at however many rows existed when it last
+// built — 0 if the first partition hadn't landed yet. Copying here gives every
+// content change a fresh identity; the `slice()` also iterates the source, so a
+// reactive array's in-place mutation invalidates this computed.
+const tableData = computed<TData[]>(() => {
+  const source = tree.enabled.value ? tree.flatRows.value : props.data;
+  return source ? source.slice() : [];
+});
+
 // ── Core table instance ─────────────────────────────────────────
 const { table, effectiveColumns, columnOrder, userReorderedColumns, columnSizing, columnSizeVars } =
   useTableCore<TData>(
     {
       get data() {
-        return tree.enabled.value ? tree.flatRows.value : props.data;
+        return tableData.value;
       },
       get columns() {
         return props.columns;
