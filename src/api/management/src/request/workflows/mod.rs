@@ -428,7 +428,7 @@ pub async fn trigger_workflow(
             MetaHttpResponse::message(StatusCode::OK, "Workflow triggered successfully")
                 .with_trace_id(trace_id),
         ),
-        Err(e) => MetaHttpResponse::internal_error(e),
+        Err(e) => MetaHttpResponse::bad_request(e),
     }
 }
 
