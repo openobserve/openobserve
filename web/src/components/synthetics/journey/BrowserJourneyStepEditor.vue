@@ -16,9 +16,7 @@ import {
   VALUE_LABELS,
   VALUE_TOOLTIP_MAP,
   VALUE_WIDTH_MAP,
-  ACTION_LABELS,
   actionOptions,
-  isRetiredAction,
 } from "@/constants/synthetics";
 import { applyValueToWire, defaultTimeoutFor } from "@/utils/synthetics/mapRecordedStep";
 import { stepNeedsTarget } from "@/utils/synthetics/stepTarget";
@@ -90,7 +88,6 @@ function update(patch: Partial<BrowserStep>) {
 }
 
 // ── Field bindings ──────────────────────────────────────────────────────────
-const actionLabel = computed(() => ACTION_LABELS[props.step.action]);
 
 /**
  * Does this step name an element?
@@ -392,16 +389,6 @@ const settleBudgetOutOfRange = computed(() => {
       <span>{{
         t("synthetics.journey.timeoutBelowDefaultWarning", { default: timeoutDefault })
       }}</span>
-    </p>
-
-    <!-- Retired action notice (spec X-9) -->
-    <p
-      v-if="isRetiredAction(step.action)"
-      class="text-status-warning-text m-0 flex items-start gap-1 text-xs"
-      data-test="synthetics-journey-step-retired-action"
-    >
-      <OIcon name="warning" size="xs" class="mt-0.5 shrink-0" aria-hidden="true" />
-      <span>{{ t("synthetics.journey.retiredActionWarning", { action: actionLabel }) }}</span>
     </p>
   </div>
 </template>

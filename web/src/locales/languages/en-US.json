@@ -9747,7 +9747,6 @@
       "steps": "Steps",
       "stop": "Stop",
       "stopAndReview": "Stop & Review",
-      "retiredActionWarning": "\"{action}\" is no longer available for new steps and cannot be previewed. Existing monitors keep running it, but it must be replaced before this monitor can be saved again.",
       "timeoutBelowDefaultWarning": "Below the {default} ms default for this step. A timeout shorter than the application's real response time is the most common cause of false failures.",
       "timeoutLabel": "Timeout (ms)",
       "timeoutPlaceholder": "30000",

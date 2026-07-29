@@ -72,3 +72,15 @@ describe("BrowserJourneyStepEditor targeting", () => {
     expect(wrapper.find(test("synthetics-journey-step-locator")).exists()).toBe(false);
   });
 });
+
+// `hover` is retired. It can no longer reach a step — actionOptions filters
+// RETIRED_ACTIONS out of the picker, the recorder has never emitted one
+// (upstream's ActionName omits them entirely), and no v1 journeys exist, which
+// was the only other way one could have entered a journey. The notice also named
+// no replacement, so it told an author to fix something without saying how.
+describe("BrowserJourneyStepEditor retired actions", () => {
+  it("renders no retired-action notice, even for a legacy action value", () => {
+    const wrapper = render({ action: "hover" });
+    expect(wrapper.find(test("synthetics-journey-step-retired-action")).exists()).toBe(false);
+  });
+});
