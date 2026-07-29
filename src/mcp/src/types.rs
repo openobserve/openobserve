@@ -20,10 +20,42 @@ use serde_json::Value;
 use utoipa::ToSchema;
 
 // MCP Protocol Constants
+/// Legacy protocol revision, negotiated through the `initialize` handshake.
 pub const MCP_PROTOCOL_VERSION: &str = "2025-11-25";
+/// Modern stateless protocol revision, declared per-request via `_meta`.
+pub const MCP_PROTOCOL_VERSION_MODERN: &str = "2026-07-28";
+/// Protocol revisions this server accepts, newest first.
+pub const MCP_SUPPORTED_PROTOCOL_VERSIONS: [&str; 2] =
+    [MCP_PROTOCOL_VERSION_MODERN, MCP_PROTOCOL_VERSION];
+/// `_meta` key carrying the protocol version on modern requests.
+pub const META_KEY_PROTOCOL_VERSION: &str = "io.modelcontextprotocol/protocolVersion";
+/// `_meta` key carrying the server identity on modern results.
+pub const META_KEY_SERVER_INFO: &str = "io.modelcontextprotocol/serverInfo";
 pub const MCP_SERVER_NAME: &str = "openobserve-mcp";
 pub const MCP_SERVER_VERSION: &str = "1.0.0";
 pub const JSONRPC_VERSION: &str = "2.0";
+
+pub fn is_supported_protocol_version(version: &str) -> bool {
+    MCP_SUPPORTED_PROTOCOL_VERSIONS.contains(&version)
+}
+
+/// Decode a header value that may use the Base64 sentinel format
+/// (`=?base64?{value}?=`) defined by the 2026-07-28 Streamable HTTP
+/// transport for `Mcp-Name` / `Mcp-Param-*`. Plain values pass through
+/// unchanged; a malformed sentinel yields `None`.
+pub fn decode_mcp_header_value(value: &str) -> Option<String> {
+    let Some(inner) = value
+        .strip_prefix("=?base64?")
+        .and_then(|v| v.strip_suffix("?="))
+    else {
+        return Some(value.to_string());
+    };
+    use base64::Engine as _;
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(inner)
+        .ok()?;
+    String::from_utf8(bytes).ok()
+}
 
 // MCP Methods
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -32,6 +64,8 @@ pub enum MCPMethod {
     Ping,
     ToolsList,
     ToolsCall,
+    /// server/discover — modern (2026-07-28) capability/version discovery
+    ServerDiscover,
     /// notifications/initialized — sent by client after initialize, no response expected
     NotificationsInitialized,
 }
@@ -43,6 +77,7 @@ impl MCPMethod {
             Self::Ping => "ping",
             Self::ToolsList => "tools/list",
             Self::ToolsCall => "tools/call",
+            Self::ServerDiscover => "server/discover",
             Self::NotificationsInitialized => "notifications/initialized",
         }
     }
@@ -62,6 +97,7 @@ impl FromStr for MCPMethod {
             "ping" => Ok(Self::Ping),
             "tools/list" => Ok(Self::ToolsList),
             "tools/call" => Ok(Self::ToolsCall),
+            "server/discover" => Ok(Self::ServerDiscover),
             "notifications/initialized" => Ok(Self::NotificationsInitialized),
             _ => Err(format!("'{s}' is not a valid MCP method")),
         }
@@ -78,6 +114,10 @@ pub enum MCPErrorCode {
     InvalidParams = -32602,
     InternalError = -32603,
     ToolExecutionFailed = -32000,
+    /// 2026-07-28: HTTP headers do not match the request body (-32020)
+    HeaderMismatch = -32020,
+    /// 2026-07-28: requested protocol version is not supported (-32022)
+    UnsupportedProtocolVersion = -32022,
     Custom(i32),
 }
 
@@ -90,6 +130,8 @@ impl MCPErrorCode {
             Self::InvalidParams => -32602,
             Self::InternalError => -32603,
             Self::ToolExecutionFailed => -32000,
+            Self::HeaderMismatch => -32020,
+            Self::UnsupportedProtocolVersion => -32022,
             Self::Custom(code) => *code,
         }
     }
@@ -104,6 +146,8 @@ impl From<i32> for MCPErrorCode {
             -32602 => Self::InvalidParams,
             -32603 => Self::InternalError,
             -32000 => Self::ToolExecutionFailed,
+            -32020 => Self::HeaderMismatch,
+            -32022 => Self::UnsupportedProtocolVersion,
             _ => Self::Custom(code),
         }
     }
@@ -117,6 +161,22 @@ pub struct MCPRequest {
     pub method: String,
     #[serde(default)]
     pub params: Value,
+}
+
+impl MCPRequest {
+    /// Protocol version declared in the request's `_meta`, present on
+    /// modern (2026-07-28) requests and absent on legacy ones.
+    pub fn meta_protocol_version(&self) -> Option<&str> {
+        self.params
+            .get("_meta")?
+            .get(META_KEY_PROTOCOL_VERSION)?
+            .as_str()
+    }
+
+    /// True when the request uses modern per-request-metadata semantics.
+    pub fn is_modern(&self) -> bool {
+        self.meta_protocol_version() == Some(MCP_PROTOCOL_VERSION_MODERN)
+    }
 }
 
 // JSON-RPC Response
@@ -389,6 +449,63 @@ mod tests {
             MCPMethod::NotificationsInitialized
         );
         assert!(MCPMethod::from_str("invalid").is_err());
+    }
+
+    #[test]
+    fn test_server_discover_method() {
+        assert_eq!(MCPMethod::ServerDiscover.as_str(), "server/discover");
+        assert_eq!(
+            MCPMethod::from_str("server/discover").unwrap(),
+            MCPMethod::ServerDiscover
+        );
+        assert!(!MCPMethod::ServerDiscover.is_notification());
+    }
+
+    #[test]
+    fn test_is_supported_protocol_version() {
+        assert!(is_supported_protocol_version("2026-07-28"));
+        assert!(is_supported_protocol_version("2025-11-25"));
+        assert!(!is_supported_protocol_version("2025-03-26"));
+        assert!(!is_supported_protocol_version("unsupported"));
+    }
+
+    #[test]
+    fn test_meta_protocol_version() {
+        let request = MCPRequest {
+            jsonrpc: JSONRPC_VERSION.to_string(),
+            id: Some(Value::from(1)),
+            method: "tools/list".to_string(),
+            params: serde_json::json!({
+                "_meta": { "io.modelcontextprotocol/protocolVersion": "2026-07-28" }
+            }),
+        };
+        assert_eq!(request.meta_protocol_version(), Some("2026-07-28"));
+        assert!(request.is_modern());
+
+        let legacy = MCPRequest {
+            jsonrpc: JSONRPC_VERSION.to_string(),
+            id: Some(Value::from(1)),
+            method: "tools/list".to_string(),
+            params: Value::Null,
+        };
+        assert_eq!(legacy.meta_protocol_version(), None);
+        assert!(!legacy.is_modern());
+    }
+
+    #[test]
+    fn test_decode_mcp_header_value() {
+        // Plain values pass through unchanged
+        assert_eq!(
+            decode_mcp_header_value("get_weather").as_deref(),
+            Some("get_weather")
+        );
+        // Base64 sentinel is decoded ("Hello, 世界")
+        assert_eq!(
+            decode_mcp_header_value("=?base64?SGVsbG8sIOS4lueVjA==?=").as_deref(),
+            Some("Hello, 世界")
+        );
+        // Malformed sentinel payload yields None
+        assert_eq!(decode_mcp_header_value("=?base64?!!!?="), None);
     }
 
     #[test]
