@@ -16,7 +16,9 @@
 use std::collections::HashSet;
 
 use o2_openfga::{authorizer, config::get_config as get_ofga_config};
-use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, PaginatorTrait, QueryFilter, QuerySelect};
+use sea_orm::{
+    ColumnTrait, ConnectionTrait, EntityTrait, PaginatorTrait, QueryFilter, QuerySelect,
+};
 
 use crate::common::utils::auth::{into_ofga_supported_format, is_ofga_unsupported};
 
@@ -78,7 +80,10 @@ pub async fn migrate_stream_names<C: ConnectionTrait>(db: &C) -> Result<(), anyh
 
             log::debug!(
                 "Migrating stream ownership tuple -> org: {}, type: {}, name: {} -> {}",
-                org_id, stream_type, stream_name, sanitized
+                org_id,
+                stream_type,
+                stream_name,
+                sanitized
             );
             authorizer::authz::get_ownership_tuple(&org_id, stream_type, &sanitized, &mut tuples);
             len += 1;
