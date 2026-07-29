@@ -474,12 +474,32 @@ pub async fn get_alert_state<C: ConnectionTrait>(
 }
 
 /// Writes the alert state back after a run completes.
-pub async fn update_alert_state<C: ConnectionTrait>(
+/// Writes the alert state back, but only if it still holds `expected`.
+///
+/// Returns `true` when the write applied, `false` when another writer got there
+/// first and the caller's decision was made against a stale read.
+///
+/// This is a compare-and-swap because the caller does a read-modify-write with no
+/// transaction around it: `get_alert_state` then decide then write. Two runs of
+/// the SAME check can complete close together — a run takes longer than the
+/// interval whenever the target is slow, which is exactly when it is failing — and
+/// both would read `consecutive_failures = 2`, both write 3, and both conclude
+/// they were outside the cooldown. The streak would undercount and the
+/// notification would double.
+///
+/// The three columns are guarded, not just the counter: a lost `alerting`
+/// transition is what produces a recovery for an incident nobody was told about.
+///
+/// Compare `synthetics_runs::increment_jobs_done`, which is a single atomic
+/// `jobs_done = jobs_done + 1`. That shape is not available here because the new
+/// value depends on a policy decision, not on arithmetic over the old one.
+pub async fn update_alert_state_if<C: ConnectionTrait>(
     conn: &C,
     id: &str,
+    expected: AlertState,
     state: AlertState,
-) -> Result<(), errors::Error> {
-    Entity::update_many()
+) -> Result<bool, errors::Error> {
+    let res = Entity::update_many()
         .col_expr(
             Column::ConsecutiveFailures,
             Expr::value(state.consecutive_failures),
@@ -487,9 +507,12 @@ pub async fn update_alert_state<C: ConnectionTrait>(
         .col_expr(Column::LastAlertAt, Expr::value(state.last_alert_at))
         .col_expr(Column::Alerting, Expr::value(state.alerting))
         .filter(Column::Id.eq(id))
+        .filter(Column::ConsecutiveFailures.eq(expected.consecutive_failures))
+        .filter(Column::LastAlertAt.eq(expected.last_alert_at))
+        .filter(Column::Alerting.eq(expected.alerting))
         .exec(conn)
         .await?;
-    Ok(())
+    Ok(res.rows_affected > 0)
 }
 
 // ── Private helpers ───────────────────────────────────────────────────────────
