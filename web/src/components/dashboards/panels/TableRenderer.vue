@@ -77,10 +77,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #bottom="scope">
         <slot name="bottom" v-bind="scope">
           <!-- This #bottom IS the pager (the built-in bar is suppressed via
-               :custom-pagination-bar), so it carries its own separator + padding. -->
+               :custom-pagination-bar), so it carries its own separator + padding.
+               With pagination off it still renders — TablePaginationControls then
+               shows the row count alone, so it drops the bar chrome. -->
           <div
-            v-if="showPagination"
-            class="border-border-default flex min-h-10 w-full items-center border-t px-3 py-1"
+            class="flex w-full items-center"
+            :class="
+              showPagination ? 'border-border-default min-h-10 border-t px-3 py-1' : 'pr-2'
+            "
             data-test="dashboard-table-pagination"
           >
             <div class="flex-1" />

@@ -620,12 +620,27 @@ describe("TableRenderer", () => {
       expect(controls.exists()).toBe(true);
     });
 
-    it("should not render the pagination bar when showPagination is false", () => {
-      // The #bottom pager owns the whole bar, so it must not render an empty
-      // bordered bar when pagination is disabled.
+    it("should still render the row count when showPagination is false", () => {
       wrapper = createWrapper({ showPagination: false });
       const paginationDiv = wrapper.find('[data-test="dashboard-table-pagination"]');
-      expect(paginationDiv.exists()).toBe(false);
+      expect(paginationDiv.exists()).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-table-row-count"]').text()).toBe("1-3 of 3");
+    });
+
+    it("should drop the pagination bar chrome when showPagination is false", () => {
+      // Count-only footer: no separator or bar height, so it reads as a caption
+      // under the table rather than an empty pager.
+      wrapper = createWrapper({ showPagination: false });
+      const classes = wrapper.find('[data-test="dashboard-table-pagination"]').classes();
+      expect(classes).not.toContain("border-t");
+      expect(classes).not.toContain("min-h-10");
+    });
+
+    it("should not render the page-size select when showPagination is false", () => {
+      wrapper = createWrapper({ showPagination: false });
+      expect(wrapper.find('[data-test="dashboard-table-rows-per-page-select"]').exists()).toBe(
+        false,
+      );
     });
 
     it("re-slices the rows when the footer page size changes", async () => {
