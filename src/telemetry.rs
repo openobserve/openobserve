@@ -286,14 +286,12 @@ impl opentelemetry_sdk::trace::SpanExporter for MetaOrgTraceExporter {
 ///
 /// Span processors are attached conditionally, and a deployment can end up with
 /// several at once:
-/// - the main OTLP exporter, when `ZO_TRACING_ENABLED` or
-///   `ZO_TRACING_SEARCH_ENABLED` is set — over gRPC if `ZO_OTEL_OTLP_GRPC_URL`
-///   is set, otherwise over HTTP to `ZO_OTEL_OTLP_URL`;
-/// - an `ai.*`-filtered exporter (enterprise), when AI tracing is on but general
-///   tracing is not, plus a second one to the eval platform if
-///   `O2_AI_EVAL_OTLP_ENDPOINT` is set;
-/// - `MetaOrgTraceExporter`, when `ZO_SEARCH_INSPECTOR_ENABLED` is set, which
-///   ingests into the `_meta` org rather than the configured OTLP endpoint.
+/// - the main OTLP exporter, when `ZO_TRACING_ENABLED` or `ZO_TRACING_SEARCH_ENABLED` is set — over
+///   gRPC if `ZO_OTEL_OTLP_GRPC_URL` is set, otherwise over HTTP to `ZO_OTEL_OTLP_URL`;
+/// - an `ai.*`-filtered exporter (enterprise), when AI tracing is on but general tracing is not,
+///   plus a second one to the eval platform if `O2_AI_EVAL_OTLP_ENDPOINT` is set;
+/// - `MetaOrgTraceExporter`, when `ZO_SEARCH_INSPECTOR_ENABLED` is set, which ingests into the
+///   `_meta` org rather than the configured OTLP endpoint.
 ///
 /// Returns the provider so the caller can hold it for the process lifetime and
 /// shut it down — dropping it early stops spans from being exported. This and
