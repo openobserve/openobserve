@@ -8872,6 +8872,10 @@
         "nameRequired": "Job name is required",
         "streamRequired": "A stream is required",
         "idleWindowMinimum": "空闲窗口必须至少为1秒",
+        "idleWindowMaximumTrace": "Trace 空闲窗口不能超过30分钟",
+        "idleWindowMaximumSession": "会话空闲窗口不能超过4小时",
+        "maxAgeMaximumTrace": "Trace 最大时长不能超过2小时",
+        "maxAgeMaximumSession": "会话最大时长不能超过24小时",
         "samplingValueRequired": "A sampling value is required"
       }
     }

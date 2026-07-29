@@ -52,6 +52,32 @@ pub const DEFAULT_TRACE_MAX_AGE_SECS: i64 = 30 * 60;
 pub const DEFAULT_SESSION_IDLE_WINDOW_SECS: i64 = 30 * 60;
 pub const DEFAULT_SESSION_MAX_AGE_SECS: i64 = 4 * 60 * 60;
 
+/// Per-scope guard rails for completion windows, applied identically to
+/// job-supplied values and env-override defaults. `max_age` bounds how long a
+/// pending target can occupy scheduler memory, how far the committed
+/// watermark may lag, and how much ingest time a restart has to rescan — so
+/// it gets a hard ceiling rather than trusting the operator.
+pub struct CompletionWindowLimits {
+    pub max_idle_window_secs: i64,
+    pub max_max_age_secs: i64,
+    idle_error: &'static str,
+    max_age_error: &'static str,
+}
+
+pub const TRACE_COMPLETION_LIMITS: CompletionWindowLimits = CompletionWindowLimits {
+    max_idle_window_secs: 30 * 60,
+    max_max_age_secs: 2 * 60 * 60,
+    idle_error: "Trace idle window cannot exceed 30 minutes",
+    max_age_error: "Trace max age cannot exceed 2 hours",
+};
+
+pub const SESSION_COMPLETION_LIMITS: CompletionWindowLimits = CompletionWindowLimits {
+    max_idle_window_secs: 4 * 60 * 60,
+    max_max_age_secs: 24 * 60 * 60,
+    idle_error: "Session idle window cannot exceed 4 hours",
+    max_age_error: "Session max age cannot exceed 24 hours",
+};
+
 /// Deployment-wide completion-window defaults, applied whenever an eval job
 /// does not set its own values (no trace/session config at all, or a config
 /// missing the field). Overridable via `O2_EVAL_TRACE_IDLE_TIMEOUT_SECS`,
@@ -75,6 +101,7 @@ fn completion_window_defaults() -> &'static CompletionWindowDefaults {
             env_secs("O2_EVAL_TRACE_MAX_AGE_SECS"),
             DEFAULT_TRACE_IDLE_WINDOW_SECS,
             DEFAULT_TRACE_MAX_AGE_SECS,
+            &TRACE_COMPLETION_LIMITS,
         );
         let (session_idle_secs, session_max_age_secs) = resolve_window_defaults(
             "session",
@@ -82,6 +109,7 @@ fn completion_window_defaults() -> &'static CompletionWindowDefaults {
             env_secs("O2_EVAL_SESSION_MAX_AGE_SECS"),
             DEFAULT_SESSION_IDLE_WINDOW_SECS,
             DEFAULT_SESSION_MAX_AGE_SECS,
+            &SESSION_COMPLETION_LIMITS,
         );
         CompletionWindowDefaults {
             trace_idle_secs,
@@ -104,10 +132,11 @@ fn resolve_window_defaults(
     max_age_override_secs: Option<i64>,
     default_idle_secs: i64,
     default_max_age_secs: i64,
+    limits: &CompletionWindowLimits,
 ) -> (i64, i64) {
     let idle_secs = idle_override_secs.unwrap_or(default_idle_secs);
     let max_age_secs = max_age_override_secs.unwrap_or(default_max_age_secs);
-    match validate_completion_window(idle_secs, max_age_secs) {
+    match validate_completion_window(idle_secs, max_age_secs, limits) {
         Ok(()) => (idle_secs, max_age_secs),
         Err(error) => {
             if idle_override_secs.is_some() || max_age_override_secs.is_some() {
@@ -365,7 +394,11 @@ impl Default for TraceEvalConfig {
 
 impl TraceEvalConfig {
     pub fn validate(&self) -> Result<(), &'static str> {
-        validate_completion_window(self.idle_window_secs, self.max_age_secs)?;
+        validate_completion_window(
+            self.idle_window_secs,
+            self.max_age_secs,
+            &TRACE_COMPLETION_LIMITS,
+        )?;
         validate_end_signal(self.end_signal.as_ref())
     }
 }
@@ -391,7 +424,11 @@ impl Default for SessionEvalConfig {
 
 impl SessionEvalConfig {
     pub fn validate(&self) -> Result<(), &'static str> {
-        validate_completion_window(self.idle_window_secs, self.max_age_secs)?;
+        validate_completion_window(
+            self.idle_window_secs,
+            self.max_age_secs,
+            &SESSION_COMPLETION_LIMITS,
+        )?;
         validate_end_signal(self.end_signal.as_ref())
     }
 }
@@ -414,6 +451,7 @@ fn validate_end_signal(end_signal: Option<&serde_json::Value>) -> Result<(), &'s
 fn validate_completion_window(
     idle_window_secs: i64,
     max_age_secs: i64,
+    limits: &CompletionWindowLimits,
 ) -> Result<(), &'static str> {
     if idle_window_secs < MIN_COMPLETION_IDLE_WINDOW_SECS {
         return Err("Completion idle window must be at least 1 second");
@@ -423,6 +461,12 @@ fn validate_completion_window(
     }
     if idle_window_secs > max_age_secs {
         return Err("Completion idle window cannot exceed max age");
+    }
+    if idle_window_secs > limits.max_idle_window_secs {
+        return Err(limits.idle_error);
+    }
+    if max_age_secs > limits.max_max_age_secs {
+        return Err(limits.max_age_error);
     }
     Ok(())
 }
@@ -970,13 +1014,68 @@ mod tests {
     #[test]
     fn completion_window_env_overrides_apply_when_valid() {
         assert_eq!(
-            resolve_window_defaults("trace", Some(300), Some(900), 180, 1800),
+            resolve_window_defaults("trace", Some(300), Some(900), 180, 1800, &TRACE_COMPLETION_LIMITS),
             (300, 900)
         );
         // A partial override combines with the built-in default for the rest.
         assert_eq!(
-            resolve_window_defaults("trace", Some(300), None, 180, 1800),
+            resolve_window_defaults("trace", Some(300), None, 180, 1800, &TRACE_COMPLETION_LIMITS),
             (300, 1800)
+        );
+    }
+
+    #[test]
+    fn completion_windows_reject_values_above_the_scope_caps() {
+        // A 1-hour trace idle window is far beyond trace scale.
+        let trace = TraceEvalConfig {
+            idle_window_secs: 60 * 60,
+            max_age_secs: 2 * 60 * 60,
+            end_signal: None,
+        };
+        assert_eq!(
+            trace.validate(),
+            Err("Trace idle window cannot exceed 30 minutes")
+        );
+
+        let trace = TraceEvalConfig {
+            idle_window_secs: 60,
+            max_age_secs: 3 * 60 * 60,
+            end_signal: None,
+        };
+        assert_eq!(trace.validate(), Err("Trace max age cannot exceed 2 hours"));
+
+        // A 10-day session would pin scheduler memory and the committed
+        // watermark for 10 days.
+        let session = SessionEvalConfig {
+            idle_window_secs: 30 * 60,
+            max_age_secs: 10 * 24 * 60 * 60,
+            end_signal: None,
+        };
+        assert_eq!(
+            session.validate(),
+            Err("Session max age cannot exceed 24 hours")
+        );
+
+        let session = SessionEvalConfig {
+            idle_window_secs: 5 * 60 * 60,
+            max_age_secs: 24 * 60 * 60,
+            end_signal: None,
+        };
+        assert_eq!(
+            session.validate(),
+            Err("Session idle window cannot exceed 4 hours")
+        );
+    }
+
+    #[test]
+    fn completion_window_env_overrides_above_the_caps_fall_back_to_defaults() {
+        assert_eq!(
+            resolve_window_defaults("trace", Some(60 * 60), Some(2 * 60 * 60), 30, 1800, &TRACE_COMPLETION_LIMITS),
+            (30, 1800)
+        );
+        assert_eq!(
+            resolve_window_defaults("session", None, Some(10 * 24 * 60 * 60), 1800, 14_400, &SESSION_COMPLETION_LIMITS),
+            (1800, 14_400)
         );
     }
 
@@ -984,12 +1083,12 @@ mod tests {
     fn invalid_completion_window_env_overrides_fall_back_to_defaults() {
         // Zero/negative idle is nonsensical.
         assert_eq!(
-            resolve_window_defaults("trace", Some(0), None, 180, 1800),
+            resolve_window_defaults("trace", Some(0), None, 180, 1800, &TRACE_COMPLETION_LIMITS),
             (180, 1800)
         );
         // Idle exceeding max age.
         assert_eq!(
-            resolve_window_defaults("session", Some(600), Some(300), 180, 14_400),
+            resolve_window_defaults("session", Some(600), Some(300), 180, 14_400, &SESSION_COMPLETION_LIMITS),
             (180, 14_400)
         );
     }

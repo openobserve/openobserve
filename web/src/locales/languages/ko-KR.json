@@ -8872,6 +8872,10 @@
         "nameRequired": "Job name is required",
         "streamRequired": "A stream is required",
         "idleWindowMinimum": "유휴 창은 최소 1초 이상이어야 합니다.",
+        "idleWindowMaximumTrace": "트레이스 유휴 창은 30분을 초과할 수 없습니다",
+        "idleWindowMaximumSession": "세션 유휴 창은 4시간을 초과할 수 없습니다",
+        "maxAgeMaximumTrace": "트레이스 최대 기간은 2시간을 초과할 수 없습니다",
+        "maxAgeMaximumSession": "세션 최대 기간은 24시간을 초과할 수 없습니다",
         "samplingValueRequired": "A sampling value is required"
       }
     }

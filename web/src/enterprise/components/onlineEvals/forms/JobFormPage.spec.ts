@@ -305,6 +305,23 @@ describe("JobFormPage", () => {
     expect(onlineEvalsService.jobs.create).not.toHaveBeenCalled();
   });
 
+  it("rejects completion windows above the per-scope hard caps", async () => {
+    wrapper = createWrapper();
+    setField(wrapper, "name", "trace-job");
+    setField(wrapper, "stream", "default");
+    setField(wrapper, "targetScope", "trace");
+    await wrapper.vm.$nextTick();
+    setField(wrapper, "scorerIds", ["s1"]);
+    setField(wrapper, "samplingMode", "all");
+    // A 1-hour trace idle window is beyond the 30-minute trace cap.
+    setField(wrapper, "idleWindowSecs", 60 * 60);
+
+    await submit(wrapper);
+
+    expect(oform(wrapper).form.state.isValid).toBe(false);
+    expect(onlineEvalsService.jobs.create).not.toHaveBeenCalled();
+  });
+
   it("saves a draft (create only) with the EXACT payload when the schema passes", async () => {
     wrapper = createWrapper();
     setField(wrapper, "name", "  my-job  "); // padded → must be trimmed at save

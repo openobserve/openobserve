@@ -34,6 +34,31 @@ export function completionWindowDefaultsForScope(
   return null;
 }
 
+export interface CompletionWindowLimits {
+  maxIdleWindowSecs: number;
+  maxAgeSecs: number;
+}
+
+// Hard per-scope ceilings, mirroring the backend guard rails: max age bounds
+// how long the scheduler holds a pending target in memory.
+export const TRACE_COMPLETION_WINDOW_LIMITS: CompletionWindowLimits = {
+  maxIdleWindowSecs: 30 * 60,
+  maxAgeSecs: 2 * 60 * 60,
+};
+
+export const SESSION_COMPLETION_WINDOW_LIMITS: CompletionWindowLimits = {
+  maxIdleWindowSecs: 4 * 60 * 60,
+  maxAgeSecs: 24 * 60 * 60,
+};
+
+export function completionWindowLimitsForScope(
+  targetScope: EvalTargetScope,
+): CompletionWindowLimits | null {
+  if (targetScope === "trace") return TRACE_COMPLETION_WINDOW_LIMITS;
+  if (targetScope === "session") return SESSION_COMPLETION_WINDOW_LIMITS;
+  return null;
+}
+
 export interface DurationParts {
   hours: number;
   minutes: number;

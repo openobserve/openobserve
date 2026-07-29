@@ -8872,6 +8872,10 @@
         "nameRequired": "Job name is required",
         "streamRequired": "A stream is required",
         "idleWindowMinimum": "Inactief venster moet ten minste 1 seconde zijn",
+        "idleWindowMaximumTrace": "Trace-inactiviteitsvenster mag niet langer zijn dan 30 minuten",
+        "idleWindowMaximumSession": "Sessie-inactiviteitsvenster mag niet langer zijn dan 4 uur",
+        "maxAgeMaximumTrace": "Maximale trace-leeftijd mag niet langer zijn dan 2 uur",
+        "maxAgeMaximumSession": "Maximale sessieleeftijd mag niet langer zijn dan 24 uur",
         "samplingValueRequired": "A sampling value is required"
       }
     }

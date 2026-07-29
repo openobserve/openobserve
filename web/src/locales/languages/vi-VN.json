@@ -8872,6 +8872,10 @@
         "nameRequired": "Tên công việc là bắt buộc",
         "streamRequired": "Một luồng là bắt buộc",
         "idleWindowMinimum": "Thời gian chờ tối thiểu phải là 1 giây",
+        "idleWindowMaximumTrace": "Cửa sổ chờ của trace không được vượt quá 30 phút",
+        "idleWindowMaximumSession": "Cửa sổ chờ của phiên không được vượt quá 4 giờ",
+        "maxAgeMaximumTrace": "Tuổi tối đa của trace không được vượt quá 2 giờ",
+        "maxAgeMaximumSession": "Tuổi tối đa của phiên không được vượt quá 24 giờ",
         "samplingValueRequired": "Một giá trị lấy mẫu là bắt buộc"
       }
     }

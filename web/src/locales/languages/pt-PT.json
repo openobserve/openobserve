@@ -8872,6 +8872,10 @@
         "nameRequired": "Job name is required",
         "streamRequired": "A stream is required",
         "idleWindowMinimum": "A janela ociosa deve ter pelo menos 1 segundo",
+        "idleWindowMaximumTrace": "A janela ociosa de trace não pode exceder 30 minutos",
+        "idleWindowMaximumSession": "A janela ociosa de sessão não pode exceder 4 horas",
+        "maxAgeMaximumTrace": "A idade máxima de trace não pode exceder 2 horas",
+        "maxAgeMaximumSession": "A idade máxima de sessão não pode exceder 24 horas",
         "samplingValueRequired": "A sampling value is required"
       }
     }
