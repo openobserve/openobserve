@@ -10528,6 +10528,38 @@
     },
     "alertSli": {
       "unavailable": "Alert-based SLIs are not available yet: distinguishing \"the alert was OK for 3h\" from \"the alert was paused for 3h\" needs coverage data that is still being wired up."
+    },
+    "alert": {
+      "sloLabel": "Service level objective",
+      "sloSummary": "target {target} · rolling {window} · {slice} slices · max burn rate ×{max}",
+      "suggested": "Suggested configurations",
+      "suggestedFor": "Datadog's suggested rows for a {window} SLO",
+      "presetDetail": "{long} long / {short} short · fires at {budget}% budget",
+      "shortIsLongOverTwelve": "Short = long ÷ 12 (Google SRE workbook) in every suggested pair.",
+      "criticalIf": "Critical if",
+      "warningIf": "Warning if",
+      "burnRate": "burn rate",
+      "budgetConsumed": "budget consumed",
+      "inBothWindows": "in both windows —",
+      "long": "long",
+      "short": "short",
+      "none": "none",
+      "warningShares": "same windows (optional; shares the operator)",
+      "maxBurnNote": "Max burn rate for this SLO: ×{max}. Default short = long ÷ 12 → {short}.",
+      "exhaustNote": "At this rate the budget is gone in ~{time}.",
+      "multiAlert": "One alert per group",
+      "multiAlertHint": "Fans the alert out across the SLO's groups, each with its own state.",
+      "noCountGate": "No count gate.",
+      "noCountGateBody": "Unlike aggregation and PromQL alerts there is no \"for at least N groups\" row here — this family has no count axis, and a non-default value on the legacy threshold fields is rejected rather than ignored.",
+      "kind": {
+        "burnRate": "Burn rate",
+        "errorBudget": "Error budget"
+      },
+      "preset": {
+        "fast": "Fast burn — page",
+        "mid": "Mid burn — notify",
+        "slow": "Slow burn — ticket"
+      }
     }
   }
 }

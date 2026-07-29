@@ -56,6 +56,13 @@ pub struct SloEvalResult {
     pub group_key: Option<String>,
     pub sli: Option<f64>,
     pub coverage: f64,
+    /// Carried so the notification template can name the SLO rather than only
+    /// its id — `{slo_name}` is what a human reads in a page at 3am.
+    pub slo_name: String,
+    pub slo_target: f64,
+    pub slo_window_secs: i64,
+    /// Percentage remaining, signed. `None` when frozen.
+    pub error_budget_remaining: Option<f64>,
 }
 
 /// Evaluate one SLO alert against the current status.
@@ -96,6 +103,10 @@ pub async fn evaluate(
             group_key: None,
             sli: None,
             coverage: 0.0,
+            slo_name: slo.name.clone(),
+            slo_target: slo.target,
+            slo_window_secs: slo.definition.window_secs,
+            error_budget_remaining: None,
         }]);
     }
 
@@ -104,7 +115,11 @@ pub async fn evaluate(
         // A status row from a superseded generation describes a definition
         // that no longer exists. Treated as unobserved, not as a measurement.
         if row.definition_generation != slo.definition_generation {
-            out.push(frozen(UnobservedReason::StaleWatermark, &row.group_key));
+            out.push(frozen(
+                UnobservedReason::StaleWatermark,
+                &row.group_key,
+                &slo,
+            ));
             continue;
         }
         out.push(evaluate_row(&slo, cond, &row, now_secs));
@@ -112,13 +127,17 @@ pub async fn evaluate(
     Ok(out)
 }
 
-fn frozen(reason: UnobservedReason, group_key: &str) -> SloEvalResult {
+fn frozen(reason: UnobservedReason, group_key: &str, slo: &Slo) -> SloEvalResult {
     SloEvalResult {
         classification: SloClassification::Frozen(reason),
         actual_value: None,
         group_key: (!group_key.is_empty()).then(|| group_key.to_string()),
         sli: None,
         coverage: 0.0,
+        slo_name: slo.name.clone(),
+        slo_target: slo.target,
+        slo_window_secs: slo.definition.window_secs,
+        error_budget_remaining: None,
     }
 }
 
@@ -169,6 +188,12 @@ fn evaluate_row(
                     read.observed_slices,
                     read.expected_slices,
                 ),
+                error_budget_remaining: obs
+                    .sli()
+                    .map(|s| config::meta::slo::math::error_budget_remaining(s, slo.target)),
+                slo_name: slo.name.clone(),
+                slo_target: slo.target,
+                slo_window_secs: slo.definition.window_secs,
                 classification,
                 group_key,
             }
@@ -188,6 +213,12 @@ fn evaluate_row(
                     .map(|s| config::meta::slo::math::burn_rate(s, slo.target)),
                 sli: long.sli(),
                 coverage: 0.0,
+                error_budget_remaining: long
+                    .sli()
+                    .map(|s| config::meta::slo::math::error_budget_remaining(s, slo.target)),
+                slo_name: slo.name.clone(),
+                slo_target: slo.target,
+                slo_window_secs: slo.definition.window_secs,
                 classification,
                 group_key,
             }
