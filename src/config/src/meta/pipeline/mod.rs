@@ -98,6 +98,12 @@ impl MemorySize for Pipeline {
 // TODO YJDoc2: in a separate PR, use this fn in the pipeline validation below, so we have
 // same logic for pipelines and workflows as intended
 pub fn validate_nodes_edges(nodes: &[Node], edges: &[Edge]) -> Result<(), anyhow::Error> {
+    if nodes.len() < 2 || edges.len() < 1 {
+        return Err(anyhow!(
+            "there must be more than 1 node and at least 1 edge"
+        ));
+    }
+
     for node in nodes {
         // ck 4
         if let NodeData::Condition(condition_params) = &node.data {
@@ -111,10 +117,10 @@ pub fn validate_nodes_edges(nodes: &[Node], edges: &[Edge]) -> Result<(), anyhow
         }
     }
 
-    if edges.len() < nodes.len() - 1 {
+    if edges.len() < nodes.len().saturating_sub(1) {
         return Err(anyhow!(
             "Insufficient number of edges to connect all nodes. Need at least {} for {} nodes, but got {}.",
-            nodes.len() - 1,
+            nodes.len().saturating_sub(1),
             nodes.len(),
             edges.len()
         ));
