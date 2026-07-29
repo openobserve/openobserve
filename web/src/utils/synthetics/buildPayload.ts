@@ -381,6 +381,10 @@ export function mapResponseToBrowserCheck(data: Record<string, unknown>): Browse
 
     browserDevices: config?.browser_devices,
 
+    // No `preserveWire`: a stored version-2 step is poorer than what
+    // buildWireFromStep rebuilds from the UI fields, so keeping it would shadow
+    // the correct reconstruction — which is how a reloaded `select` came to
+    // replay as "select nothing". See MapWireStepOptions.
     journey: mapWireSteps(config?.steps ?? []),
 
     ...(variables?.length && {

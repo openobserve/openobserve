@@ -20,7 +20,7 @@ describe("mapRecordedStep", () => {
       url: "https://app.example.com/login",
       timeout_ms: 10000,
     };
-    expect(mapWireStep(wire)).toEqual({
+    expect(mapWireStep(wire, { preserveWire: true })).toEqual({
       id: expect.any(String), // mapper assigns a fresh UUID per step
       action: "navigate",
       name: "Open login",
@@ -49,8 +49,12 @@ describe("mapRecordedStep", () => {
       startTime: 1718700003100,
       code: "await page.locator('#login-btn').click();",
     };
-    // wire is spread with the step's own UUID assigned to wire.id.
-    expect(mapWireStep(wire).wire).toEqual({ ...wire, id: expect.any(String) });
+    // wire is spread with the step's own UUID assigned to wire.id. Only the
+    // live-capture path preserves it — see MapWireStepOptions.
+    expect(mapWireStep(wire, { preserveWire: true }).wire).toEqual({
+      ...wire,
+      id: expect.any(String),
+    });
   });
 
   describe("buildWireFromStep (reverse mapper for manual steps)", () => {
@@ -113,7 +117,11 @@ describe("mapRecordedStep", () => {
   });
 
   it("should include all steps via journeyToWireSteps (including previously filtered actions)", () => {
-    const recorded = mapWireStep({ id: "s1", action: "navigate", url: "https://x.test" });
+    // Live-captured, so it carries a `wire` to be preserved verbatim below.
+    const recorded = mapWireStep(
+      { id: "s1", action: "navigate", url: "https://x.test" },
+      { preserveWire: true },
+    );
     const manual: BrowserStep = {
       id: "m1",
       action: "click",
@@ -341,5 +349,49 @@ describe("mapRecordedStep", () => {
       assertion: { kind: "element_text", expected: "Signed in" },
     });
     expect(wire?.text).toBe("Signed in");
+  });
+});
+
+// ── preserveWire ──────────────────────────────────────────────────────────
+// `wire` means two different things. Fresh from the recorder it carries fields
+// the v2 schema has no home for (options, text, modifiers, button, position,
+// framePath) and is worth keeping. Rebuilt from a SAVED monitor it is strictly
+// poorer than what buildWireFromStep reconstructs — so preserving it there
+// shadowed the correct reconstruction. That shadowing is SE-24: the extension
+// builds its select action from `options`, a stored v2 select carries only
+// `value`, so a reloaded select replayed as selectOption([]) — selecting nothing
+// while still reading as a pass, because later steps proceeded.
+describe("preserveWire", () => {
+  const storedSelect: WireStep = {
+    id: "s2",
+    action: "select",
+    name: "Pick colour",
+    value: "Blue",
+    locator: { candidates: [{ kind: "css", value: "#colour" }] },
+  };
+
+  it("should omit wire by default, so replay is rebuilt from the step", () => {
+    const [step] = mapWireSteps([storedSelect]);
+    expect(step.wire).toBeUndefined();
+  });
+
+  it("should preserve wire when the caller opts in (live capture)", () => {
+    const [step] = mapWireSteps([storedSelect], { preserveWire: true });
+    expect(step.wire).toBeDefined();
+    expect(step.wire?.action).toBe("select");
+  });
+
+  it("should replay a reloaded select with options, not an empty array (SE-24)", () => {
+    const [step] = mapWireSteps([storedSelect]);
+    const [wire] = journeyToWireSteps([step]);
+    expect(wire.options).toEqual(["Blue"]);
+  });
+
+  it("should still replay a live-captured select correctly", () => {
+    // The recorder's own step carries `options`; opting in must not regress it.
+    const recorded: WireStep = { ...storedSelect, options: ["Blue"], value: undefined };
+    const [step] = mapWireSteps([recorded], { preserveWire: true });
+    const [wire] = journeyToWireSteps([step]);
+    expect(wire.options).toEqual(["Blue"]);
   });
 });

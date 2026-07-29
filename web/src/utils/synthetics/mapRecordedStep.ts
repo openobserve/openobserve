@@ -119,8 +119,30 @@ export function applyValueToWire(wire: WireStep, action: StepAction, value: stri
   }
 }
 
+/**
+ * Options for {@link mapWireStep} and {@link mapWireSteps}.
+ *
+ * `preserveWire` keeps the extension's own step on the result for replay. It is
+ * correct for a LIVE recording, whose wire carries fields the version-2 schema
+ * has no home for — `options`, `text`, `modifiers`, `button`, `position`,
+ * `framePath`.
+ *
+ * It is wrong when reconstructing from a SAVED monitor. A stored v2 step has none
+ * of those, so preserving it shadows {@link buildWireFromStep}, which rebuilds
+ * them correctly from the UI fields. That shadowing is why a reloaded `select`
+ * replayed as `selectOption([])`: the extension reads `options`, the stored step
+ * only has `value`, and `buildWireFromStep`'s correct `options: [value]` was
+ * unreachable while `wire` won.
+ *
+ * Default is off, so the storage path is safe by omission and only live capture
+ * has to opt in.
+ */
+export interface MapWireStepOptions {
+  preserveWire?: boolean;
+}
+
 /** Convert a single extension {@link WireStep} into the UI-facing {@link BrowserStep}. */
-export function mapWireStep(wire: WireStep): BrowserStep {
+export function mapWireStep(wire: WireStep, opts: MapWireStepOptions = {}): BrowserStep {
   const action = mapAction(wire.action);
   const id = getUUIDv7(true);
   return {
@@ -144,17 +166,19 @@ export function mapWireStep(wire: WireStep): BrowserStep {
     optional: wire.optional,
     alwaysRun: wire.always_run,
     code: wire.code || "",
-    // Keep the original extension step untouched for replay (full fidelity).
-    wire: {
-      ...wire,
-      id,
-    },
+    // Keep the original extension step untouched for replay (full fidelity) —
+    // only when the caller says this wire came from a live recording. See
+    // MapWireStepOptions.
+    ...(opts.preserveWire ? { wire: { ...wire, id } } : {}),
   };
 }
 
 /** Convert a list of extension wire steps into UI steps. */
-export function mapWireSteps(wires: WireStep[]): BrowserStep[] {
-  return wires.map(mapWireStep);
+export function mapWireSteps(
+  wires: WireStep[],
+  opts: MapWireStepOptions = {},
+): BrowserStep[] {
+  return wires.map((w) => mapWireStep(w, opts));
 }
 
 /**

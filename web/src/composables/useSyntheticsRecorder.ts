@@ -198,7 +198,10 @@ const useSyntheticsRecorder = () => {
     const { payload } = msg;
     switch (payload.method) {
       case "setActions":
-        liveSteps.value = mapWireSteps(payload.browserSteps);
+        // Live capture: keep the extension's own step for replay fidelity. These
+        // wires carry fields the v2 schema cannot store (options, modifiers,
+        // button, position, framePath).
+        liveSteps.value = mapWireSteps(payload.browserSteps, { preserveWire: true });
         break;
       case "recordingStarted":
         currentUrl.value = payload.url;
