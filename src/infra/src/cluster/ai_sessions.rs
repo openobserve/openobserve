@@ -37,7 +37,8 @@
 //! correctness.
 
 use async_nats::jetstream;
-use config::get_config;
+use config::{get_config, utils::hash::Sum64};
+use futures::StreamExt;
 use serde::Deserialize;
 use tokio::sync::OnceCell;
 
@@ -47,6 +48,10 @@ use crate::db::nats::get_nats_client;
 /// so o2-ai and openobserve share one NATS namespace). Must match the bucket
 /// name in o2-ai's `src/cluster/directory.py`.
 const BUCKET: &str = "ai_session_owners";
+
+/// Bucket holding short-TTL liveness records, one per live o2-ai replica.
+/// Used to place NEW sessions; existing sessions route by their claim.
+const REPLICAS_BUCKET: &str = "ai_replicas";
 
 /// A directory record, as written by o2-ai.
 ///
@@ -95,6 +100,83 @@ async fn session_bucket() -> Option<&'static jetstream::kv::Store> {
             None
         }
     }
+}
+
+/// A live-replica record, as written by o2-ai's heartbeat.
+#[derive(Debug, Deserialize)]
+struct ReplicaEntry {
+    name: String,
+    #[serde(default)]
+    addr: String,
+}
+
+/// Pick a live o2-ai replica to host a NEW session.
+///
+/// Only for sessions with no claim yet. Existing sessions must always route to
+/// their recorded owner ([`get_session_owner_addr`]) — placing an existing
+/// session would send it to a replica that has never seen it.
+///
+/// Selection hashes the session id over the sorted live set, so it is
+/// deterministic and spreads sessions evenly without any coordination between
+/// openobserve nodes. This mirrors how queriers are dispatched
+/// (`get_node_from_consistent_hash`), but over o2-ai's own registry rather than
+/// the cluster ring — o2-ai replicas are not cluster nodes.
+///
+/// Returns `None` if no replica is heartbeating, in which case the caller falls
+/// back to the configured agent URL.
+pub async fn pick_replica_for_new_session(session_id: &str) -> Option<String> {
+    let cfg = get_config();
+    let bucket_name = format!("{}{}", cfg.nats.prefix, REPLICAS_BUCKET);
+
+    let client = get_nats_client().await.clone();
+    let jetstream = jetstream::new(client);
+    let bucket = match jetstream.get_key_value(&bucket_name).await {
+        Ok(b) => b,
+        Err(e) => {
+            log::debug!("[AI_SESSIONS] replica registry {bucket_name} unavailable: {e}");
+            return None;
+        }
+    };
+
+    // Deliberately not cached, unlike the session bucket: this is the live set,
+    // and a stale copy would keep placing new sessions on a dead replica.
+    let mut keys = match bucket.keys().await {
+        Ok(k) => k,
+        Err(e) => {
+            log::debug!("[AI_SESSIONS] cannot list replicas: {e}");
+            return None;
+        }
+    };
+
+    let mut replicas: Vec<(String, String)> = Vec::new();
+    while let Some(Ok(key)) = keys.next().await {
+        if let Ok(Some(entry)) = bucket.get(&key).await
+            && let Ok(v) = config::utils::json::from_slice::<ReplicaEntry>(&entry)
+            && !v.addr.is_empty()
+        {
+            replicas.push((v.name, v.addr.trim_end_matches('/').to_string()));
+        }
+    }
+
+    if replicas.is_empty() {
+        log::debug!("[AI_SESSIONS] no live o2-ai replicas registered");
+        return None;
+    }
+
+    // Sort so every openobserve node sees the same ordering, then index by a
+    // hash of the session id. Without the sort, KV listing order could differ
+    // between nodes and two nodes could place the same new session differently
+    // — which the o2-ai claim would catch, but only by refusing one of them.
+    replicas.sort_by(|a, b| a.0.cmp(&b.0));
+    let hash = config::utils::hash::gxhash::new().sum64(session_id);
+    let idx = (hash % replicas.len() as u64) as usize;
+
+    let (name, addr) = &replicas[idx];
+    log::debug!(
+        "[AI_SESSIONS] placing new session {session_id} on {name} ({addr}) of {} live",
+        replicas.len()
+    );
+    Some(addr.clone())
 }
 
 /// The routable address of the o2-ai replica owning `session_id`.
