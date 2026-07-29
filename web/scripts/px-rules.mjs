@@ -21,6 +21,11 @@ export const PX_FILE_ALLOWLIST = [
   "components/icons/DynamicFilterIcon.vue",
   "components/icons/SlackIcon.vue",
   "components/common/O2AIContextAddBtn.vue",
+  // Mobile session replay reproduces wireframes the SDK recorded in device pixels
+  // (dp). These are measurements of someone else's screen being replayed faithfully,
+  // not sizes we design — scaling them with the viewer's font-size would distort the
+  // recording.
+  "composables/rum/useMobileSessionReplay.ts",
 ];
 
 // `px(?![a-zA-Z0-9])`, not `px\b`: `_` is a word char, and Tailwind uses `_` for the
