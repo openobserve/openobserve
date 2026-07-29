@@ -154,13 +154,18 @@ async fn update_metadata_metrics() -> Result<(), anyhow::Error> {
     }
 
     let stream_types = [StreamType::Logs, StreamType::Metrics, StreamType::Traces];
-    let orgs = db::schema::list_organizations_from_cache().await;
+    let grouped = db::schema::list_all_streams_grouped().await;
+    // orgs are derived from the same schema cache as before, so the org count
+    // metric is unchanged
+    let orgs = grouped.keys().cloned().collect::<Vec<_>>();
     metrics::META_NUM_ORGANIZATIONS
         .with_label_values::<&str>(&[])
         .set(orgs.len() as i64);
-    for org_id in &orgs {
+    for (org_id, org_streams) in &grouped {
         for stream_type in stream_types {
-            let streams = db::schema::list_streams_from_cache(org_id, stream_type).await;
+            let Some(streams) = org_streams.get(&stream_type) else {
+                continue;
+            };
             if !streams.is_empty() {
                 metrics::META_NUM_STREAMS
                     .with_label_values::<&str>(&[org_id.as_str(), stream_type.as_str()])

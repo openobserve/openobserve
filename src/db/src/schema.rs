@@ -625,6 +625,40 @@ pub async fn get_stream_count_cached(org_id: &str, stream_type: StreamType) -> u
     count
 }
 
+/// One-pass enumeration of all cached streams grouped by org and stream type.
+///
+/// Periodic jobs that iterate every org and stream type should call this once
+/// per cycle instead of calling [`list_streams_from_cache`] per (org, type)
+/// pair, which rescans the whole schema cache on every call.
+pub async fn list_all_streams_grouped() -> HashMap<String, HashMap<StreamType, Vec<String>>> {
+    let mut grouped: HashMap<String, HashMap<StreamType, Vec<String>>> = HashMap::new();
+    let r = STREAM_SCHEMAS_LATEST.read().await;
+    for schema_key in r.keys() {
+        let mut parts = schema_key.split('/');
+        let (Some(org_id), Some(stream_type), Some(stream_name)) =
+            (parts.next(), parts.next(), parts.next())
+        else {
+            continue;
+        };
+        grouped
+            .entry(org_id.to_string())
+            .or_default()
+            .entry(StreamType::from(stream_type))
+            .or_default()
+            .push(stream_name.to_string());
+    }
+    drop(r);
+    // cache keys are unique, but names truncated at the third segment may
+    // collide; dedup to match list_streams_from_cache
+    for types in grouped.values_mut() {
+        for names in types.values_mut() {
+            names.sort_unstable();
+            names.dedup();
+        }
+    }
+    grouped
+}
+
 pub async fn list_streams_from_cache(org_id: &str, stream_type: StreamType) -> Vec<String> {
     let mut names = HashSet::new();
     let r = STREAM_SCHEMAS_LATEST.read().await;
@@ -663,6 +697,42 @@ mod tests {
 
     fn schema_without_end_dt() -> Schema {
         Schema::new_with_metadata(vec![] as Vec<arrow_schema::Field>, HashMap::new())
+    }
+
+    #[tokio::test]
+    async fn test_list_all_streams_grouped() {
+        // unique org name so the shared global cache can host parallel tests
+        let org = "grouped_enum_test_org";
+        let keys = [
+            format!("{org}/logs/app_a"),
+            format!("{org}/logs/app_b"),
+            format!("{org}/traces/svc"),
+        ];
+        {
+            let mut w = STREAM_SCHEMAS_LATEST.write().await;
+            for key in &keys {
+                w.insert(key.clone(), SchemaCache::new(Schema::empty()));
+            }
+        }
+
+        let grouped = list_all_streams_grouped().await;
+        let org_streams = grouped.get(org).unwrap();
+        let mut logs = org_streams.get(&StreamType::Logs).unwrap().clone();
+        logs.sort();
+        assert_eq!(logs, vec!["app_a".to_string(), "app_b".to_string()]);
+        assert_eq!(
+            org_streams.get(&StreamType::Traces).unwrap(),
+            &vec!["svc".to_string()]
+        );
+        // matches the per-(org, type) enumeration
+        let mut listed = list_streams_from_cache(org, StreamType::Logs).await;
+        listed.sort();
+        assert_eq!(logs, listed);
+
+        let mut w = STREAM_SCHEMAS_LATEST.write().await;
+        for key in &keys {
+            w.remove(key);
+        }
     }
 
     // ── filter_schema_version_id ──────────────────────────────────────────────
