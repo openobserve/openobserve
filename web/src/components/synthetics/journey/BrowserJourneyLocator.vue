@@ -42,6 +42,18 @@ const effective = computed<LocatorCandidate | null>(
 const fallbacks = computed(() => candidates.value.slice(1));
 
 /**
+ * A bundle with no candidates and no pin — a step added by hand rather than
+ * recorded. Every other block is `v-if`'d away, so the free-text input is the
+ * primary way to name the element, not an override of something: labelling it
+ * "use a different locator" would be wrong when there is nothing to differ from.
+ *
+ * It is also required in this state. The block only renders when the step needs a
+ * target (`stepNeedsTarget`), so its presence means "a target is mandatory here",
+ * and this input is the only way to supply one.
+ */
+const isEmpty = computed(() => !candidates.value.length && !pinned.value);
+
+/**
  * Every candidate identifies the element by counting siblings.
  *
  * Playwright appends a positional token only when nothing identified the element
@@ -186,8 +198,17 @@ function isPinnedCandidate(candidate: LocatorCandidate): boolean {
     <div class="flex items-end gap-2">
       <OInput
         v-model="overrideDraft"
-        :label="t('synthetics.journey.locatorOverrideLabel')"
-        :placeholder="t('synthetics.journey.locatorOverridePlaceholder')"
+        :label="
+          isEmpty
+            ? t('synthetics.journey.locatorEmptyLabel')
+            : t('synthetics.journey.locatorOverrideLabel')
+        "
+        :placeholder="
+          isEmpty
+            ? t('synthetics.journey.locatorEmptyPlaceholder')
+            : t('synthetics.journey.locatorOverridePlaceholder')
+        "
+        :required="isEmpty"
         class="flex-1"
         data-test="synthetics-journey-step-locator-override-input"
         @keyup.enter="applyOverride"

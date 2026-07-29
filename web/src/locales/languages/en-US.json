@@ -9648,6 +9648,8 @@
       "locatorFallbacks": "{count} fallbacks",
       "locatorOverrideLabel": "Use a different locator",
       "locatorOverridePlaceholder": "#my-button or [data-test=\"sign-in\"]",
+      "locatorEmptyLabel": "How to find this element",
+      "locatorEmptyPlaceholder": "#my-button or [data-test=\"sign-in\"]",
       "locatorKind": {
         "test_attribute": "Test attribute",
         "role": "Role",

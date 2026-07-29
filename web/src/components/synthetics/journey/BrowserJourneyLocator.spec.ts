@@ -165,3 +165,58 @@ describe("all-positional notice (Phase 2a)", () => {
     ).toBe(false);
   });
 });
+
+// ── Empty bundle ──────────────────────────────────────────────────────────
+// A hand-added step carries `{ candidates: [], user_override: null }`. Every
+// other block is v-if'd away, so the free-text input is the PRIMARY way to name
+// the element — not an override of something — and it must say so, and be marked
+// required, because the block only renders when a target is needed (D7).
+describe("BrowserJourneyLocator empty bundle", () => {
+  const EMPTY: StepLocator = { candidates: [], user_override: null };
+
+  // `data-test` sits on the OInput root, so reach the inner <input> to set a
+  // value — the pattern the pinning tests above already use.
+  function overrideInput(wrapper: ReturnType<typeof render>) {
+    return wrapper.find(`${test("synthetics-journey-step-locator-override-input")} input`);
+  }
+
+  it("labels the input as the primary control, not an override", () => {
+    const wrapper = render(EMPTY);
+    expect(overrideInput(wrapper).exists()).toBe(true);
+    expect(wrapper.text()).toContain("How to find this element");
+    expect(wrapper.text()).not.toContain("Use a different locator");
+  });
+
+  it("shows no primary card, no fallbacks and no positional warning", () => {
+    const wrapper = render(EMPTY);
+    expect(wrapper.find(test("synthetics-journey-step-locator-primary")).exists()).toBe(false);
+    expect(wrapper.find(test("synthetics-journey-step-locator-fallbacks")).exists()).toBe(false);
+    expect(
+      wrapper.find(test("synthetics-journey-step-locator-positional-warning")).exists(),
+    ).toBe(false);
+  });
+
+  it("marks the input required — the block only renders when a target is needed", () => {
+    const wrapper = render(EMPTY);
+    expect(wrapper.findComponent({ name: "OInput" }).props("required")).toBe(true);
+  });
+
+  it("still emits update:locator when a value is applied", async () => {
+    const wrapper = render(EMPTY);
+    await overrideInput(wrapper).setValue('[data-test="sign-in"]');
+    await wrapper.find(test("synthetics-journey-step-locator-override-btn")).trigger("click");
+
+    const emitted = wrapper.emitted("update:locator");
+    expect(emitted).toBeTruthy();
+    expect(emitted![0][0]).toEqual({
+      candidates: [],
+      user_override: { kind: "css", value: '[data-test="sign-in"]' },
+    });
+  });
+
+  it("keeps the override label, unmarked, when candidates exist", () => {
+    const wrapper = render();
+    expect(wrapper.text()).toContain("Use a different locator");
+    expect(wrapper.findComponent({ name: "OInput" }).props("required")).toBe(false);
+  });
+});
