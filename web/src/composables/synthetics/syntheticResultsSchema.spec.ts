@@ -15,6 +15,7 @@
 
 import { describe, expect, it } from "vitest";
 import {
+  mapRunDetail,
   SYNTHETIC_FIELDS,
   SYNTHETIC_RESULTS_STREAM,
   STATUS_VALUES,
@@ -476,5 +477,122 @@ describe("deviceLabel", () => {
 
   it("should fall back to the raw ID for an empty string", () => {
     expect(deviceLabel("")).toBe("");
+  });
+});
+
+describe("mapRunDetail — evidence the probe already writes (Phase 4)", () => {
+  function hit(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+    return {
+      ts: 1_700_000_000_500_000,
+      engine: "chromium",
+      location: "us-east-1",
+      device: "desktop",
+      run_id: "run-1",
+      execution_id: "exec-1",
+      recorded_steps: JSON.stringify([{ id: "s1", name: "Sign in" }]),
+      last_attempt_steps: JSON.stringify([
+        { step_id: "s1", status: "ok", duration_ms: 10, error: "" },
+      ]),
+      ...overrides,
+    };
+  }
+
+  it("keeps `skipped` as skipped instead of reporting it as a failure", () => {
+    // An `optional` step exists precisely because it may not be there — a
+    // cookie banner, a one-time popup. Collapsing it to `fail` reported a
+    // correctly-skipped step as broken, the opposite of what the feature is for.
+    const detail = mapRunDetail(
+      hit({
+        last_attempt_steps: JSON.stringify([
+          { step_id: "s1", status: "ok", duration_ms: 5 },
+          { step_id: "s2", status: "skipped", duration_ms: 1 },
+          { step_id: "s3", status: "failed", duration_ms: 9 },
+        ]),
+      }),
+    );
+    expect(detail.lastAttemptSteps.map((s) => s.status)).toEqual(["ok", "skipped", "fail"]);
+  });
+
+  it("maps retry history instead of discarding it", () => {
+    // The probe writes retry_history on every failed run; the mapper hardcoded
+    // an empty array, so no component could ever read it. A step that failed
+    // once and passed next attempt is transient by definition.
+    const detail = mapRunDetail(
+      hit({
+        retry_history: [
+          {
+            attempt: 0,
+            steps: [
+              { step_id: "s1", status: "passed", duration_ms: 100 },
+              { step_id: "s2", status: "failed", duration_ms: 400 },
+            ],
+          },
+        ],
+      }),
+    );
+    expect(detail.retryHistory).toHaveLength(1);
+    expect(detail.retryHistory[0].attempt).toBe(0);
+    // Derived, not invented: an entry exists only because that attempt failed.
+    expect(detail.retryHistory[0].status).toBe("failed");
+    expect(detail.retryHistory[0].durationMs).toBe(500);
+    expect(detail.retryHistory[0].failedStep).toBe("s2");
+  });
+
+  it("maps the seven items of failure_detail", () => {
+    const detail = mapRunDetail(
+      hit({
+        failure_detail: {
+          step_id: "s2",
+          step_name: "Profile visible",
+          step_index: 2,
+          error: "locator.waitFor: Timeout 60000ms exceeded",
+          candidates_tried: [
+            { kind: "test_attribute", value: '[data-test="x"]', outcome: "not_found" },
+            { kind: "role", value: "internal:role=button", outcome: "matched" },
+          ],
+          settle_signals: [
+            {
+              kind: "response",
+              signal: "response matching **/auth/login",
+              status: "stale",
+              required: false,
+              waited_ms: 30000,
+            },
+          ],
+          settle_ms: 41000,
+          observed_duration_ms: 2300,
+          screenshot_key: "k/shot.png",
+          trace_key: "k/trace.zip",
+        },
+      }),
+    );
+
+    const fd = detail.failureDetail!;
+    expect(fd.stepName).toBe("Profile visible");
+    expect(fd.stepIndex).toBe(2);
+    expect(fd.error).toContain("Timeout 60000ms");
+    // Item 3 — which candidate matched answers "locator rot?" mechanically.
+    expect(fd.candidatesTried.map((c) => c.outcome)).toEqual(["not_found", "matched"]);
+    // Item 4 — a stale signal is the strongest application-is-at-fault
+    // indicator already on the record, and it was invisible.
+    expect(fd.settleSignals[0].status).toBe("stale");
+    expect(fd.settleSignals[0].waitedMs).toBe(30000);
+    // Item 5 — settled in 2.3s when recorded, 41s today.
+    expect(fd.settleMs).toBe(41000);
+    expect(fd.observedDurationMs).toBe(2300);
+    expect(fd.screenshotKey).toBe("k/shot.png");
+    expect(fd.traceKey).toBe("k/trace.zip");
+  });
+
+  it("returns null failure detail on a passing run", () => {
+    expect(mapRunDetail(hit()).failureDetail).toBeNull();
+  });
+
+  it("degrades rather than throwing on a record written before these fields", () => {
+    // Backwards compatibility: records predating the probe change carry none of
+    // this, and must render as they did before rather than break the view.
+    const detail = mapRunDetail(hit({ retry_history: undefined, failure_detail: undefined }));
+    expect(detail.retryHistory).toEqual([]);
+    expect(detail.failureDetail).toBeNull();
   });
 });

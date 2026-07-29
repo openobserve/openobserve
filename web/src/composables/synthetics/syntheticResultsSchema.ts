@@ -122,6 +122,8 @@ export interface SyntheticRunDetail extends SyntheticRun {
   recordedSteps: RecordedStep[];
   lastAttemptSteps: StepExecution[];
   retryHistory: RetryAttempt[];
+  /** Spec P5.4 — present exactly when the final attempt failed. */
+  failureDetail: FailureDetail | null;
   network: NetworkStats | null;
   webVitals: WebVitals | null;
   traceKey: string | null;
@@ -209,6 +211,49 @@ export interface RetryAttempt {
   durationMs: number;
   failedStep: string | null;
   steps: StepExecution[];
+}
+
+/**
+ * The seven items of spec P5.4 — everything needed to understand a failed run
+ * without reproducing it.
+ *
+ * Written by the probe on every failed run since Phase 5 and read by nothing.
+ * Numbered here the way the spec numbers them, so a missing one is visible
+ * rather than merely absent.
+ */
+export interface FailureDetail {
+  /** 1 — which step. */
+  stepId: string;
+  stepName: string;
+  stepIndex: number;
+  /** 2 — the exact wait or assertion that timed out. */
+  error: string;
+  /** 3 — candidates tried, in order, with outcomes. */
+  candidatesTried: LocatorAttempt[];
+  /** 4 — which settle signals fired and which went stale. */
+  settleSignals: SettleSignal[];
+  /** 5 — observed today vs. observed while recording. */
+  settleMs: number | null;
+  observedDurationMs: number | null;
+  /** 6 and 7 — object-storage keys, filled after upload. */
+  screenshotKey: string | null;
+  traceKey: string | null;
+}
+
+/** One locator candidate the probe tried, and what happened to it. */
+export interface LocatorAttempt {
+  kind: string;
+  value: string;
+  outcome: "matched" | "not_found" | "used_as_primary" | "not_tried";
+}
+
+/** One recorded settle signal, and whether it arrived this run. */
+export interface SettleSignal {
+  kind: "navigation" | "response";
+  signal: string;
+  status: "fired" | "stale";
+  required: boolean;
+  waitedMs: number;
 }
 
 export interface NetworkStats {
@@ -682,6 +727,54 @@ export function mapRun(rawHit: Record<string, unknown>): SyntheticRun {
   };
 }
 
+/**
+ * The probe writes `{ attempt, steps }`; this view needs a per-attempt summary.
+ *
+ * `status` is derived rather than read: an entry in `retry_history` exists only
+ * because that attempt failed, so anything else would be inventing a value the
+ * probe never sent.
+ */
+function mapRetryHistory(raw: unknown): RetryAttempt[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.map((a: any, i: number) => {
+    const steps: StepExecution[] = Array.isArray(a?.steps) ? a.steps : [];
+    return {
+      attempt: typeof a?.attempt === "number" ? a.attempt : i,
+      status: "failed",
+      durationMs: steps.reduce((sum, st) => sum + (st.duration_ms ?? 0), 0),
+      failedStep:
+        steps.find((st: any) => st.status === "failed" || st.status === "fail")?.step_id ?? null,
+      steps,
+    };
+  });
+}
+
+function mapFailureDetail(raw: unknown): FailureDetail | null {
+  if (!raw || typeof raw !== "object") return null;
+  const d = raw as any;
+  return {
+    stepId: str(d.step_id),
+    stepName: str(d.step_name),
+    stepIndex: typeof d.step_index === "number" ? d.step_index : 0,
+    error: str(d.error),
+    candidatesTried: Array.isArray(d.candidates_tried) ? d.candidates_tried : [],
+    settleSignals: Array.isArray(d.settle_signals)
+      ? d.settle_signals.map((sig: any) => ({
+          kind: sig?.kind,
+          signal: str(sig?.signal),
+          status: sig?.status,
+          required: !!sig?.required,
+          waitedMs: typeof sig?.waited_ms === "number" ? sig.waited_ms : 0,
+        }))
+      : [],
+    settleMs: typeof d.settle_ms === "number" ? d.settle_ms : null,
+    observedDurationMs:
+      typeof d.observed_duration_ms === "number" ? d.observed_duration_ms : null,
+    screenshotKey: d.screenshot_key ? str(d.screenshot_key) : null,
+    traceKey: d.trace_key ? str(d.trace_key) : null,
+  };
+}
+
 export function mapRunDetail(rawHit: Record<string, unknown>): SyntheticRunDetail | null {
   if (!rawHit) return null;
   const base = mapRun({
@@ -712,11 +805,26 @@ export function mapRunDetail(rawHit: Record<string, unknown>): SyntheticRunDetai
       : (rawStepsArr.find((s: any) => s.status === "fail" || s.status === "failed")?.step_id ??
         null),
     recordedSteps: Array.isArray(rawRecordedSteps) ? (rawRecordedSteps as RecordedStep[]) : [],
+    // `skipped` is a real outcome, not a failure. An `optional` step exists
+    // precisely because it may not be there — a cookie banner, a one-time
+    // popup — and collapsing it to `fail` reported a correctly-skipped step as
+    // a broken one, which is the opposite of what the flow-control feature is
+    // for. The type has always allowed all three; only this mapper did not.
     lastAttemptSteps: rawStepsArr.map((s: any) => ({
       ...s,
-      status: s.status === "ok" || s.status === "passed" ? "ok" : ("fail" as const),
+      status:
+        s.status === "ok" || s.status === "passed"
+          ? ("ok" as const)
+          : s.status === "skipped"
+            ? ("skipped" as const)
+            : ("fail" as const),
     })),
-    retryHistory: [],
+    // The probe writes retry_history on every failed run; the mapper discarded
+    // it before any component could read it. A step that failed once and passed
+    // on the next attempt is transient by definition, and this is the only place
+    // that fact survives.
+    retryHistory: mapRetryHistory(rawHit.retry_history),
+    failureDetail: mapFailureDetail(rawHit.failure_detail),
     network: null,
     webVitals: null,
     traceKey: rawHit.trace_key ? str(rawHit.trace_key) : null,
