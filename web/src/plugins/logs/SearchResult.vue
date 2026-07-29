@@ -477,6 +477,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
           </div>
 
+          <!-- Row/cell actions live in a right-click context menu as well as the
+               hover overlay: the overlay can only be offered on columns wide
+               enough to host it, while the menu is anchored to the pointer so
+               every cell can offer actions. -->
+          <OContextMenu @update:open="onContextMenuOpenChange">
+            <template #trigger>
+              <div class="contents" @contextmenu.capture="handleTableContextMenu">
           <OTable
             ref="searchTableRef"
             :columns="getColumns || []"
@@ -512,6 +519,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @update:columnSizes="handleColumnSizesUpdate"
             @column-order-change="handleColumnOrderUpdate"
             @close-column="closeColumn"
+            @cell-contextmenu="handleCellContextMenu"
             @row-click="openLogDetailsByRow"
             @update:expandedIds="onExpandedLogIdsChange"
           >
@@ -568,6 +576,87 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </template>
           </OTable>
+              </div>
+            </template>
+
+            <!-- Actions apply to the cell that was right-clicked. `contextCell`
+                 is recorded by the table's @cell-contextmenu, which fires before
+                 reka-ui opens the menu, so the content is always in sync with
+                 the pointer. -->
+            <template v-if="contextCell">
+              <OContextMenuLabel data-test="log-context-menu-field">
+                {{ contextCell.columnId }}
+              </OContextMenuLabel>
+              <OContextMenuSeparator />
+
+              <OContextMenuItem
+                icon-left="content-copy"
+                data-test="log-context-menu-copy-value"
+                @select="copyLogToClipboard(contextCell.value)"
+              >
+                {{ t("logs.cellActions.copy") }}
+              </OContextMenuItem>
+
+              <template v-if="contextCellIsStreamField">
+                <OContextMenuItem
+                  data-test="log-context-menu-include-term"
+                  @select="
+                    addSearchTerm(
+                      contextCell.columnId,
+                      toSearchTermValue(contextCell.value),
+                      'include',
+                    )
+                  "
+                >
+                  <!-- size="sm" matches the registry icons on the other items so
+                    the labels line up; the glyph itself is inset because it
+                    fills its viewBox edge-to-edge, unlike Material Symbols. -->
+                  <template #icon-left>
+                    <OIcon name="" size="sm">
+                      <EqualIcon class="size-3" />
+                    </OIcon>
+                  </template>
+                  {{ t("logs.cellActions.includeTerm") }}
+                </OContextMenuItem>
+
+                <OContextMenuItem
+                  data-test="log-context-menu-exclude-term"
+                  @select="
+                    addSearchTerm(
+                      contextCell.columnId,
+                      toSearchTermValue(contextCell.value),
+                      'exclude',
+                    )
+                  "
+                >
+                  <template #icon-left>
+                    <OIcon name="" size="sm">
+                      <NotEqualIcon class="size-3" />
+                    </OIcon>
+                  </template>
+                  {{ t("logs.cellActions.excludeTerm") }}
+                </OContextMenuItem>
+              </template>
+
+              <template v-if="aiEnabled">
+                <OContextMenuSeparator />
+                <OContextMenuItem
+                  icon-left="auto-awesome"
+                  data-test="log-context-menu-ai-value"
+                  @select="sendToAiChat(JSON.stringify(contextCell.value))"
+                >
+                  {{ t("logs.cellActions.sendValueToAi") }}
+                </OContextMenuItem>
+                <OContextMenuItem
+                  icon-left="auto-awesome"
+                  data-test="log-context-menu-ai-row"
+                  @select="sendToAiChat(JSON.stringify(contextCell.row), true)"
+                >
+                  {{ t("logs.cellActions.sendRowToAi") }}
+                </OContextMenuItem>
+              </template>
+            </template>
+          </OContextMenu>
         </template>
 
         <!-- Patterns View -->
@@ -756,6 +845,12 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OPagination from "@/lib/navigation/Pagination/OPagination.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import OContextMenu from "@/lib/overlay/ContextMenu/OContextMenu.vue";
+import OContextMenuItem from "@/lib/overlay/ContextMenu/OContextMenuItem.vue";
+import OContextMenuLabel from "@/lib/overlay/ContextMenu/OContextMenuLabel.vue";
+import OContextMenuSeparator from "@/lib/overlay/ContextMenu/OContextMenuSeparator.vue";
+import EqualIcon from "@/components/icons/EqualIcon.vue";
+import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import LoadingProgress from "@/components/common/LoadingProgress.vue";
@@ -802,6 +897,12 @@ export default defineComponent({
     OIcon,
     ODropdown,
     ODropdownItem,
+    OContextMenu,
+    OContextMenuItem,
+    OContextMenuLabel,
+    OContextMenuSeparator,
+    EqualIcon,
+    NotEqualIcon,
     OTag,
   },
   emits: [
@@ -2011,6 +2112,72 @@ export default defineComponent({
 
     const logsTimestampCol = computed(() => store.state.zoConfig.timestamp_column || "_timestamp");
 
+    // ── Right-click cell actions ──────────────────────────────────────────────
+    // The cell the user last right-clicked, held as plain values (not the
+    // TanStack cell) so the menu keeps rendering correctly even if the
+    // virtualizer recycles the row underneath it.
+    interface ContextCell {
+      columnId: string;
+      value: unknown;
+      row: Record<string, unknown>;
+    }
+
+    const contextCell = ref<ContextCell | null>(null);
+
+    const contextCellIsStreamField = computed(() => {
+      const columnId = contextCell.value?.columnId;
+      if (!columnId) return false;
+      return (
+        searchObj.data.stream.selectedStreamFields?.find((field: any) => field.name === columnId)
+          ?.isSchemaField ?? false
+      );
+    });
+
+    // Mirrors O2AIContextAddBtn's own gate — the AI actions only exist on
+    // enterprise builds with AI turned on in the backend config.
+    const aiEnabled = computed(
+      () => config.isEnterprise === "true" && !!store.state.zoConfig.ai_enabled,
+    );
+
+    const toSearchTermValue = (value: unknown): string | number | boolean => {
+      if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+        return value;
+      }
+      if (value === null || value === undefined) return "null";
+      return JSON.stringify(value);
+    };
+
+    // Capture-phase gate on the whole table, so it runs before the cell's own
+    // handler. Only data cells offer actions — right-clicking a header or the
+    // expanded JSON row (which has its own menu) would otherwise open an empty
+    // one. reka-ui checks `defaultPrevented` before opening, so preventing here
+    // suppresses it.
+    const DATA_CELL_SELECTOR = "td[data-test^='o2-table-cell-']";
+
+    const handleTableContextMenu = (event: MouseEvent) => {
+      contextCell.value = null;
+      const target = event.target;
+      if (!(target instanceof Element) || !target.closest?.(DATA_CELL_SELECTOR)) {
+        event.preventDefault();
+      }
+    };
+
+    // Records which cell the right-click landed on. OTableBodyCell emits this
+    // from the td, so it fires before OContextMenu's own handler on the trigger.
+    const handleCellContextMenu = (params: { columnId: string; row: any; value: any }) => {
+      contextCell.value = {
+        columnId: params.columnId,
+        value: params.value,
+        row: (params.row ?? {}) as Record<string, unknown>,
+      };
+    };
+
+    // Drop the reference once the menu closes so a recycled virtual row can't be
+    // held alive by a stale row object.
+    const onContextMenuOpenChange = (open: boolean) => {
+      if (!open) contextCell.value = null;
+    };
+
     // Row object → its original index in hits; the highlight cache, detail
     // sidebar and expansion are all keyed by that index.
     const logsHitIndexMap = computed(() => {
@@ -2125,6 +2292,13 @@ export default defineComponent({
       onExpandedLogIdsChange,
       openLogDetailsByRow,
       isFunctionErrorOpen,
+      contextCell,
+      contextCellIsStreamField,
+      aiEnabled,
+      toSearchTermValue,
+      handleTableContextMenu,
+      handleCellContextMenu,
+      onContextMenuOpenChange,
       histogramChart,
       pinnedTooltip,
       closePinnedTooltip,

@@ -1272,6 +1272,7 @@ defineExpose({
             @row-mouseenter="(row: TData, evt: MouseEvent) => emit('row-mouseenter', row, evt)"
             @row-mouseleave="(row: TData) => emit('row-mouseleave', row)"
             @cell-click="(params: any) => emit('cell-click', params)"
+            @cell-contextmenu="(params: any) => emit('cell-contextmenu', params)"
           >
             <!-- Pass through named cell slots from parent (only for columns where parent provides a slot) -->
             <template

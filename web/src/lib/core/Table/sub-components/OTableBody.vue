@@ -76,6 +76,7 @@ const emit = defineEmits<{
   "row-mouseenter": [row: any, event: MouseEvent];
   "row-mouseleave": [row: any];
   "cell-click": [params: { columnId: string; row: any; value: any }];
+  "cell-contextmenu": [params: { columnId: string; row: any; value: any }];
   "row-reorder": [data: any[]];
 }>();
 
@@ -197,6 +198,7 @@ function getRowForItem(item: any): Row<any> {
       @row-mouseenter="(row: any, evt: MouseEvent) => emit('row-mouseenter', row, evt)"
       @row-mouseleave="(row: any) => emit('row-mouseleave', row)"
       @cell-click="emit('cell-click', $event)"
+      @cell-contextmenu="emit('cell-contextmenu', $event)"
     >
       <!-- Pass through named cell slots from parent -->
       <template v-for="(_, slotName) in slots" :key="slotName" #[slotName]="slotProps">
@@ -245,6 +247,7 @@ function getRowForItem(item: any): Row<any> {
       @row-mouseenter="(row: any, evt: MouseEvent) => emit('row-mouseenter', row, evt)"
       @row-mouseleave="(row: any) => emit('row-mouseleave', row)"
       @cell-click="emit('cell-click', $event)"
+      @cell-contextmenu="emit('cell-contextmenu', $event)"
     >
       <!-- Pass through named cell slots from parent -->
       <template v-for="(_, slotName) in slots" :key="slotName" #[slotName]="slotProps">
@@ -307,6 +310,7 @@ function getRowForItem(item: any): Row<any> {
       @row-mouseenter="(row: any, evt: MouseEvent) => emit('row-mouseenter', row, evt)"
       @row-mouseleave="(row: any) => emit('row-mouseleave', row)"
       @cell-click="emit('cell-click', $event)"
+      @cell-contextmenu="emit('cell-contextmenu', $event)"
     >
       <template v-for="(_, slotName) in slots" :key="slotName" #[slotName]="slotProps">
         <slot :name="slotName" v-bind="slotProps" />

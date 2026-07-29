@@ -423,6 +423,9 @@ export interface OTableEmits<TData = any> {
   "row-mouseenter": [row: TData, event: MouseEvent];
   "row-mouseleave": [row: TData];
   "cell-click": [params: { columnId: string; row: TData; value: any }];
+  /** Right-click on a body cell. Not prevented — the consumer decides whether
+   *  to open its own menu. */
+  "cell-contextmenu": [params: { columnId: string; row: TData; value: any }];
 
   // Column events
   "column-order-change": [order: string[]];

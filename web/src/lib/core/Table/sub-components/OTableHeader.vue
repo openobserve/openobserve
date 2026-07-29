@@ -3,7 +3,7 @@
 <script setup lang="ts">
 import type { HeaderGroup, Table } from "@tanstack/vue-table";
 import { FlexRender } from "@tanstack/vue-table";
-import { inject, reactive } from "vue";
+import { computed, inject, reactive } from "vue";
 import { useI18n } from "vue-i18n";
 import { VueDraggableNext as VueDraggable } from "vue-draggable-next";
 import OTableSelectCheckbox from "./OTableSelectCheckbox.vue";
@@ -135,6 +135,44 @@ function handleDragStart(event: any) {
 
 function handleDragEnd() {
   emit("drag-end");
+}
+
+// ── Column drag-reorder model ───────────────────────────────────
+// vue-draggable-next resolves drop positions straight off `$el.children`, so the
+// list it sorts must line up 1:1 with the <tr>'s cells. Two things break that
+// when `columnOrder` is passed directly:
+//   1. the leading gutter <th>s (expand / select / row-drag) are real children
+//      but not columns, so every index is shifted right by their count;
+//   2. hidden columns live in `columnOrder` but render no <th>.
+// So we hand it a list built from what is actually rendered, padded with a
+// sentinel per gutter cell, then translate the result back on update.
+const GUTTER_SENTINEL = "__o2-gutter-";
+
+const gutterIds = computed(() => {
+  const ids: string[] = [];
+  // Order must match the gutter <th>s in the template below.
+  if (props.expansionEnabled) ids.push(`${GUTTER_SENTINEL}expand`);
+  if (props.selectionMultiple) ids.push(`${GUTTER_SENTINEL}select`);
+  if (props.enableRowReorder) ids.push(`${GUTTER_SENTINEL}row-drag`);
+  return ids;
+});
+
+const renderedColumnIds = computed(() =>
+  props.headerGroups.flatMap((group) => group.headers.map((header) => header.id)),
+);
+
+const draggableOrder = computed(() => [...gutterIds.value, ...renderedColumnIds.value]);
+
+function handleDraggableUpdate(next: string[]): void {
+  const reordered = next.filter((id) => !id.startsWith(GUTTER_SENTINEL));
+  // Splice the new visible order back into the full order, leaving hidden
+  // columns parked where they are.
+  const visible = new Set(reordered);
+  let cursor = 0;
+  const fullOrder = props.columnOrder.map((id) => (visible.has(id) ? reordered[cursor++] : id));
+  // A rendered column missing from `columnOrder` (order not yet synced) would be
+  // dropped by the map above — fall back to the visible order in that case.
+  emit("update:columnOrder", cursor === reordered.length ? fullOrder : reordered);
 }
 
 function isAutoWidthColumn(header: any): boolean {
@@ -336,7 +374,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
     <!-- Drag-reorder wrapper -->
     <VueDraggable
       v-if="enableColumnReorder"
-      :model-value="columnOrder"
+      :model-value="draggableOrder"
       :element="'table'"
       :animation="200"
       :sort="!isResizing"
@@ -348,7 +386,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
       }"
       @start="handleDragStart"
       @end="handleDragEnd"
-      @update:model-value="(val: string[]) => emit('update:columnOrder', val)"
+      @update:model-value="handleDraggableUpdate"
     >
       <!-- Expand placeholder -->
       <th

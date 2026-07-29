@@ -52,6 +52,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   "cell-click": [params: { columnId: string; row: any; value: any }];
+  "cell-contextmenu": [params: { columnId: string; row: any; value: any }];
 }>();
 
 const meta = computed(() => props.cell.column.columnDef.meta as any);
@@ -238,6 +239,18 @@ function handleClick() {
   });
 }
 
+// Right-click. Emitted as plain values (not the TanStack cell) so a consumer's
+// context menu keeps rendering correctly even after the virtualizer recycles
+// the row underneath it. The event is NOT prevented — the consumer decides
+// whether to open a menu or leave the native one alone.
+function handleContextMenu() {
+  emit("cell-contextmenu", {
+    columnId: props.cell.column.id,
+    row: props.row.original,
+    value: props.cell.getValue(),
+  });
+}
+
 // ── Cell hover-actions ────────────────────────────────────────────
 // The shared single-active-cell context tracks which cell the pointer is over,
 // keyed by `cell.id` (already `${row.id}_${column.id}`).
@@ -301,6 +314,7 @@ function onCellActionsLeave() {
         : {},
     ]"
     @click="handleClick"
+    @contextmenu="handleContextMenu"
     @mouseenter="onCellActionsEnter"
     @mouseleave="onCellActionsLeave"
   >

@@ -68,6 +68,7 @@ const emit = defineEmits<{
   "row-mouseenter": [row: any, event: MouseEvent];
   "row-mouseleave": [row: any];
   "cell-click": [params: { columnId: string; row: any; value: any }];
+  "cell-contextmenu": [params: { columnId: string; row: any; value: any }];
 }>();
 
 const slots = useSlots();
@@ -270,6 +271,7 @@ function onRowMouseleave() {
       :get-cell-style="getCellStyle"
       :pivot-merge="getPivotMerge ? getPivotMerge(row.original, cell.column.id) : null"
       @cell-click="emit('cell-click', $event)"
+      @cell-contextmenu="emit('cell-contextmenu', $event)"
     >
       <template v-if="slots[`cell-${cell.column.id}`]" #default>
         <slot

@@ -307,6 +307,124 @@ describe("OTable", () => {
     });
   });
 
+  // ── Column reorder ──────────────────────────────────────────
+
+  describe("column reorder", () => {
+    // vue-draggable-next derives drop positions from the <tr>'s DOM children, so
+    // the list it sorts has to include the gutter <th>s (expand / select /
+    // row-drag) or every index is shifted right by their count.
+    function getDraggable(w: VueWrapper) {
+      return w.findComponent({ name: "VueDraggableNext" });
+    }
+
+    it("should pad the draggable model with one entry per gutter header", () => {
+      wrapper = mount(OTable, {
+        props: {
+          data: makeRows(2),
+          columns: makeColumns(),
+          enableColumnReorder: true,
+          expansion: "multiple",
+          selection: "multiple",
+        },
+      });
+      const model = getDraggable(wrapper).props("modelValue") as string[];
+      // 2 gutters (expand + select) then the four data columns, in DOM order.
+      expect(model.slice(2)).toEqual(["id", "name", "email", "status"]);
+      expect(model.slice(0, 2).every((id) => id.startsWith("__o2-gutter-"))).toBe(true);
+    });
+
+    it("should emit the reordered columns without the gutter entries", async () => {
+      wrapper = mount(OTable, {
+        props: {
+          data: makeRows(2),
+          columns: makeColumns(),
+          enableColumnReorder: true,
+          expansion: "multiple",
+        },
+      });
+      const draggable = getDraggable(wrapper);
+      const model = draggable.props("modelValue") as string[];
+      const [gutter, id, name, email, status] = model;
+
+      // Drop "email" between "id" and "name" — the gutter entry stays put.
+      draggable.vm.$emit("update:modelValue", [gutter, id, email, name, status]);
+      await nextTick();
+
+      const emitted = wrapper.emitted("column-order-change") as any[][];
+      expect(emitted).toBeTruthy();
+      expect(emitted.at(-1)![0]).toEqual(["id", "email", "name", "status"]);
+    });
+
+    it("should keep the order correct when a column is dropped before the gutter", async () => {
+      wrapper = mount(OTable, {
+        props: {
+          data: makeRows(2),
+          columns: makeColumns(),
+          enableColumnReorder: true,
+          expansion: "multiple",
+        },
+      });
+      const draggable = getDraggable(wrapper);
+      const [gutter, id, name, email, status] = draggable.props("modelValue") as string[];
+
+      draggable.vm.$emit("update:modelValue", [status, gutter, id, name, email]);
+      await nextTick();
+
+      const emitted = wrapper.emitted("column-order-change") as any[][];
+      expect(emitted.at(-1)![0]).toEqual(["status", "id", "name", "email"]);
+    });
+
+    it("should have no gutter entries when the table has no gutter headers", () => {
+      wrapper = mount(OTable, {
+        props: {
+          data: makeRows(2),
+          columns: makeColumns(),
+          enableColumnReorder: true,
+          expansion: "none",
+        },
+      });
+      expect(getDraggable(wrapper).props("modelValue")).toEqual([
+        "id",
+        "name",
+        "email",
+        "status",
+      ]);
+    });
+  });
+
+  // ── Cell context menu ───────────────────────────────────────
+
+  describe("cell-contextmenu", () => {
+    it("should emit the clicked cell's column, row and value", async () => {
+      const rows = makeRows(2);
+      wrapper = mount(OTable, {
+        props: { data: rows, columns: makeColumns() },
+      });
+
+      await wrapper.find('[data-test="o2-table-cell-email"]').trigger("contextmenu");
+
+      const emitted = wrapper.emitted("cell-contextmenu") as any[][];
+      expect(emitted).toBeTruthy();
+      expect(emitted[0][0]).toEqual({
+        columnId: "email",
+        row: rows[0],
+        value: rows[0].email,
+      });
+    });
+
+    it("should not prevent the native event, leaving the decision to the consumer", async () => {
+      wrapper = mount(OTable, {
+        props: { data: makeRows(1), columns: makeColumns() },
+      });
+      const cell = wrapper.find('[data-test="o2-table-cell-email"]');
+      const event = new MouseEvent("contextmenu", { bubbles: true, cancelable: true });
+      cell.element.dispatchEvent(event);
+      await nextTick();
+
+      expect(event.defaultPrevented).toBe(false);
+    });
+  });
+
   // ── Exposed API ─────────────────────────────────────────────
 
   describe("exposed hasResizedColumns", () => {
