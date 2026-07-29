@@ -192,11 +192,12 @@
     <!-- Duplicate check dialog -->
     <ODialog
       v-model:open="showDuplicateDialog"
+      persistent
       size="sm"
       :title="t('synthetics.dialog.duplicateTitle')"
       :primary-button-label="t('common.save')"
       :secondary-button-label="t('common.cancel')"
-      :primary-button-disabled="isDuplicating || !duplicateName.trim()"
+      :primary-button-disabled="isDuplicating || !duplicateName.trim() || !duplicateSource"
       data-test="synthetic-monitoring-duplicate-dialog"
       @click:primary="saveDuplicate"
       @click:secondary="showDuplicateDialog = false"
@@ -208,12 +209,18 @@
           :placeholder="t('synthetics.checkDetails.namePlaceholder')"
           data-test="synthetic-monitoring-duplicate-name-input"
         />
-        <OInput
-          v-model="duplicateFolder"
-          :label="t('synthetics.checkDetails.folder')"
-          :placeholder="t('synthetics.checkDetails.folderPlaceholder')"
-          data-test="synthetic-monitoring-duplicate-folder-input"
-        />
+        <!-- Wrapper carries the data-test: SelectFolderDropDown has a fragment
+             root, so attrs cannot fall through to it. Keyed on the source check
+             so the dropdown re-seeds its selection from :active-folder-id for
+             each row it is opened against. -->
+        <div data-test="synthetic-monitoring-duplicate-folder-select">
+          <SelectFolderDropDown
+            :key="String(duplicateTarget?.id ?? '')"
+            type="synthetics"
+            :active-folder-id="duplicateFolder"
+            @folder-selected="duplicateFolder = $event.value"
+          />
+        </div>
       </div>
     </ODialog>
 
@@ -321,10 +328,13 @@ import AgentSetupDrawer from "@/components/synthetic-monitoring/AgentSetupDrawer
 import CheckTypePicker from "@/components/synthetics/CheckTypePicker.vue";
 import FolderList from "@/components/common/sidebar/FolderList.vue";
 import MoveAcrossFolders from "@/components/common/sidebar/MoveAcrossFolders.vue";
+import SelectFolderDropDown from "@/components/common/sidebar/SelectFolderDropDown.vue";
 import BetaBadge from "@/components/common/BetaBadge.vue";
 import {
   mapResponseToBrowserCheck,
   buildCreateBrowserTestPayload,
+  mapResponseToProtocolCheck,
+  buildCreateProtocolCheckPayload,
 } from "@/utils/synthetics/buildPayload";
 import {
   SYNTHETIC_CHECK_TYPES,
@@ -545,6 +555,7 @@ const activeFolderName = computed(() => {
 
 watch(activeFolderId, async (newFolderId) => {
   selectedMonitorIds.value = [];
+  duplicateFolder.value = newFolderId;
   if (searchAcrossFolders.value) {
     searchAcrossFolders.value = false;
   }
@@ -578,7 +589,12 @@ const monitorsToMove = ref<string[]>([]);
 const showDuplicateDialog = ref(false);
 const duplicateTarget = ref<any>(null);
 const duplicateName = ref("");
-const duplicateFolder = ref("default");
+const duplicateFolder = ref(activeFolderId.value);
+// Full check fetched when the dialog opens — the duplicate is built from this,
+// so submitting stays instant and a failed fetch surfaces before the form is filled.
+const duplicateSource = ref<any>(null);
+// "browser" | "http" | "tcp" | "tls" | "ssh" — picks the mapper/payload builder.
+const duplicateSourceType = ref<string>("browser");
 const isDuplicating = ref(false);
 
 const openBulkDeleteConfirm = () => {
@@ -1042,40 +1058,100 @@ async function toggleEnabled(m: any) {
   }
 }
 
-function duplicateMonitor(m: any) {
+/**
+ * A duplicate is a brand-new check, so it cannot inherit the original's start
+ * timestamp: mapFrequencyToSchedule reports every saved check as "Schedule
+ * Later" with the date/time it originally started, and the API rejects a start
+ * in the past ("start must not be in the past"). Keep a start that is still in
+ * the future — duplicating a check scheduled for next week should stay
+ * scheduled — and otherwise fall back to "Schedule Now".
+ */
+function rebaseScheduleStart(schedule: any, start?: number) {
+  // `start` is microseconds on the wire.
+  if (typeof start === "number" && start / 1000 > Date.now()) return { ...schedule };
+  const { startDate: _startDate, startTime: _startTime, ...rest } = schedule ?? {};
+  return { ...rest, startType: "now" as const };
+}
+
+async function duplicateMonitor(m: any) {
   duplicateTarget.value = m;
   duplicateName.value = t("synthetics.labels.copyOf", { name: m.name });
-  duplicateFolder.value = m.folder || "default";
+  // The row's own folder, falling back to the folder being browsed. These are
+  // the same value unless "search across folders" is on, in which case the copy
+  // should land beside its original rather than jump to the active folder.
+  duplicateFolder.value = m.folderId || activeFolderId.value || "default";
+  duplicateSource.value = null;
   showDuplicateDialog.value = true;
+  try {
+    const res = await syntheticsService.get(
+      orgIdentifier.value,
+      String(m.id),
+      m.folderId ?? activeFolderId.value,
+    );
+    const data = res.data as Record<string, unknown>;
+    // Browser and protocol (http/tcp/tls/ssh) checks have separate mappers and
+    // payload builders — the browser builder hardcodes type: "browser", so
+    // running a protocol check through it would silently convert it.
+    duplicateSourceType.value = String(data.type ?? "browser").toLowerCase();
+    duplicateSource.value =
+      duplicateSourceType.value === "browser"
+        ? mapResponseToBrowserCheck(data)
+        : mapResponseToProtocolCheck(data);
+  } catch (err: any) {
+    showDuplicateDialog.value = false;
+    toast({
+      variant: "error",
+      message:
+        err?.response?.data?.message ||
+        err?.response?.data?.error ||
+        t("synthetics.toast.duplicateFailed"),
+    });
+    console.error("[synthetics] failed to load check for duplication", err);
+  }
 }
 
 async function saveDuplicate() {
-  if (!duplicateTarget.value) return;
+  if (!duplicateSource.value || !duplicateName.value.trim()) {
+    toast({ variant: "error", message: t("synthetics.toast.duplicateFailed") });
+    return;
+  }
   isDuplicating.value = true;
   const dismiss = toast({
     variant: "loading",
     message: t("synthetics.toast.duplicating"),
     timeout: 0,
   });
+  const targetFolder = duplicateFolder.value;
   try {
-    const org = orgIdentifier.value;
-    const res = await syntheticsService.get(
-      org,
-      String(duplicateTarget.value.id),
-      activeFolderId.value,
-    );
-    const check = mapResponseToBrowserCheck(res.data as Record<string, unknown>);
-    check.name = duplicateName.value;
-    check.folder = duplicateFolder.value;
+    const check = {
+      ...duplicateSource.value,
+      name: duplicateName.value,
+      folder: targetFolder,
+      schedule: rebaseScheduleStart(duplicateSource.value.schedule, duplicateSource.value.start),
+    };
     delete (check as any).id;
-    const payload = buildCreateBrowserTestPayload(check);
-    await syntheticsService.create(org, payload);
+    const payload =
+      duplicateSourceType.value === "browser"
+        ? buildCreateBrowserTestPayload(check)
+        : buildCreateProtocolCheckPayload(check);
+    await syntheticsService.create(orgIdentifier.value, payload, targetFolder);
     dismiss();
     toast({ variant: "success", message: t("synthetics.toast.duplicateSuccess") });
     showDuplicateDialog.value = false;
-    await loadMonitors();
+    // Follow the copy into its folder. Assigning activeFolderId triggers its
+    // watcher, which reloads — so only call loadMonitors on the other branch.
+    if (!searchAcrossFolders.value && targetFolder !== activeFolderId.value) {
+      activeFolderId.value = targetFolder;
+    } else {
+      await loadMonitors();
+    }
   } catch (err: any) {
     dismiss();
+    // 403s are already surfaced by the http interceptor.
+    if (err?.response?.status === 403) {
+      showDuplicateDialog.value = false;
+      return;
+    }
     toast({
       variant: "error",
       message:

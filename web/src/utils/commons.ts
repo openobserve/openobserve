@@ -18,6 +18,7 @@
 import dashboardService from "../services/dashboards";
 import { subtractRelativeTime } from "@/utils/date";
 import { convertDashboardSchemaVersion } from "./dashboard/convertDashboardSchemaVersion";
+import { normalizeReservedTimestampAlias } from "./dashboard/timestampAliasRewrite";
 import commonService from "../services/common";
 
 let moment: any;
@@ -558,9 +559,15 @@ export const getDashboard = async (store: any, dashboardId: any, folderId: any) 
   // Fix duplicate panel IDs and check if any were found
   const hasDuplicates = fixDuplicatePanelIds(dashboardJson);
 
-  // If duplicates were found, save the dashboard and retrieve it with new IDs
-  if (hasDuplicates) {
-    // Save the dashboard with fixed IDs
+  // The reserved timestamp column is not allowed as a SQL output alias —
+  // normalize it to `ts`. Returns true when anything was rewritten, so we
+  // persist it (save + re-fetch) exactly like duplicate panel IDs.
+  const timestampColumn = store.state.zoConfig?.timestamp_column ?? "_timestamp";
+  const hasReservedAlias = normalizeReservedTimestampAlias(dashboardJson, timestampColumn);
+
+  // If either fix changed the dashboard, save it and retrieve the updated version
+  if (hasDuplicates || hasReservedAlias) {
+    // Save the dashboard with the applied fixes
     await updateDashboard(
       store,
       store.state.selectedOrganization.identifier,

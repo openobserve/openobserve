@@ -7736,7 +7736,6 @@
       "scoreConfigs": "Konfigurieren Sie die Bewertungsrubriken, die für Ihre Bewertungen verwendet werden"
     },
     "agentGraph": {
-      "allAgents": "Alle Agenten",
       "stream": "Stream",
       "agent": "Agent",
       "noAgentsTitle": "Keine Agenten gefunden",
@@ -9592,6 +9591,8 @@
       "modalSubtitle": "Wählen Sie aus, was Sie überwachen möchten",
       "modalTitle": "Eine Prüfung erstellen",
       "pageTitle": "Neue {label}-Prüfung",
+      "saveAndContinue": "Speichern & fortfahren",
+      "saveAndExit": "Speichern & beenden",
       "saveCheck": "Prüfung speichern",
       "saveFailed": "Prüfung konnte nicht gespeichert werden.",
       "saved": "Prüfung erfolgreich gespeichert.",
@@ -9619,7 +9620,7 @@
         "assertionValue": "Wert",
         "assertions": "Behauptungen",
         "body": "Anfragekörper",
-        "bodyPlaceholder": "{\"key\": \"value\"}",
+        "bodyPlaceholder": "{'{'}\"key\": \"value\"{'}'}",
         "fields": {
           "body": "Antwortkörper",
           "response_time_ms": "Antwortzeit (ms)",

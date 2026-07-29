@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="synthetic-monitor-results-edit-btn"
         @click="editMonitor"
       >
-        {{ t("synthetics.results.editMonitor") }}
+        {{ t("synthetics.results.editCheck") }}
       </OButton>
       <OButton
         variant="outline"
@@ -116,6 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :override-monitor-name="monitorName"
       :override-run-id="selectedRunId"
       :override-execution-id="selectedExecutionId"
+      :override-monitor-type="resolvedCheckType"
       @update-status="onRunStatusUpdate"
     />
   </ODrawer>
@@ -151,6 +152,13 @@ const orgIdentifier = computed(() => store.state.selectedOrganization?.identifie
 // and distinguishes "never triggered" from "no runs in this window."
 const lastTriggeredAt = ref(0);
 const checkType = ref("browser");
+// True once fetchCheck() resolves — the drawer can auto-open from a run/exec
+// query param before that happens, so RunDetail must not trust checkType's
+// "browser" default until it's confirmed.
+const checkTypeReady = ref(false);
+// Empty until confirmed, so RunDetail falls back to resolving the type itself
+// instead of trusting a possibly-stale default.
+const resolvedCheckType = computed(() => (checkTypeReady.value ? checkType.value : ""));
 
 const DEFAULT_RELATIVE = "15m";
 
@@ -385,6 +393,8 @@ async function fetchCheck() {
       toast({ variant: "warning", message: t("synthetics.newCheck.notFoundInOrg") });
       return;
     }
+  } finally {
+    checkTypeReady.value = true;
   }
 }
 </script>

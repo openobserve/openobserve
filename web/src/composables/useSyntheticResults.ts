@@ -251,7 +251,7 @@ export function useSyntheticResults() {
       // Group 3: Runs list — feeds timeline, breakdown cards, table,
       // steps tab, and errors tab. Typically the slowest query.
       const runsPromise = executeQuery(
-        buildRunsSql(monitorId, 500, schemaFields),
+        buildRunsSql(monitorId, 1000, schemaFields),
         startTime,
         endTime,
         "logs",

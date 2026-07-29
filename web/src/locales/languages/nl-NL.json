@@ -7736,7 +7736,6 @@
       "scoreConfigs": "Configureer de scorerubrieken die voor uw evaluaties worden gebruikt"
     },
     "agentGraph": {
-      "allAgents": "Alle agenten",
       "stream": "Stream",
       "agent": "Agent",
       "noAgentsTitle": "Geen agents gevonden",
@@ -9592,6 +9591,8 @@
       "modalSubtitle": "Kies wat u wilt monitoren",
       "modalTitle": "Maak een Check",
       "pageTitle": "Nieuwe {label}-controle",
+      "saveAndContinue": "Opslaan en doorgaan",
+      "saveAndExit": "Opslaan en afsluiten",
       "saveCheck": "Controle opslaan",
       "saveFailed": "Kan controle niet opslaan.",
       "saved": "Controle succesvol opgeslagen.",
@@ -9619,7 +9620,7 @@
         "assertionValue": "Waarde",
         "assertions": "Asserties",
         "body": "Aanvraagtekst",
-        "bodyPlaceholder": "{\"key\": \"value\"}",
+        "bodyPlaceholder": "{'{'}\"key\": \"value\"{'}'}",
         "fields": {
           "body": "Reactietekst",
           "response_time_ms": "Reactietijd (ms)",

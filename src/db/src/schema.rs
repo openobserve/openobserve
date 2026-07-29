@@ -105,7 +105,8 @@ pub async fn set_stream_is_llm(
         // cleanly.
         ensure_gen_ai_fields_in_schema_inner(org_id, stream_name, stream_type, false).await?;
 
-        // Add to defined_schema_fields only when UDS is already enabled
+        // The schema migration above must succeed before its query fields are
+        // persisted into an already-enabled UDS.
         append_gen_ai_fields_to_defined_schema_fields(&mut settings.defined_schema_fields);
     }
 
@@ -119,8 +120,8 @@ pub async fn set_stream_is_llm(
 /// This adds the internal ingest timestamp and any missing gen_ai_* fields from
 /// [`GEN_AI_SCHEMA_FIELDS`] into the stream's Arrow schema so they are available
 /// at ingestion and query time. For streams with User-Defined Schema already
-/// enabled, only the gen_ai_* fields are appended to `defined_schema_fields`;
-/// the ingest timestamp remains an implicit internal field.
+/// enabled, the migrated gen_ai_* fields and ingest timestamp are appended to
+/// `defined_schema_fields` after the Arrow schema migration succeeds.
 ///
 /// Handles the case where a stream was already marked as an LLM stream but has
 /// only legacy `llm_*` fields — calling this ensures the newer `gen_ai_*`
@@ -181,12 +182,13 @@ fn append_gen_ai_fields_to_defined_schema_fields(defined_schema_fields: &mut Vec
     }
 
     let mut updated = false;
-    for field in GEN_AI_SCHEMA_FIELDS.iter() {
-        if !defined_schema_fields
-            .iter()
-            .any(|name| name == field.name())
-        {
-            defined_schema_fields.push(field.name().to_string());
+    let migrated_fields = GEN_AI_SCHEMA_FIELDS
+        .iter()
+        .map(|field| field.name().as_str())
+        .chain(std::iter::once(O2_INGEST_TS_COL_NAME));
+    for field_name in migrated_fields {
+        if !defined_schema_fields.iter().any(|name| name == field_name) {
+            defined_schema_fields.push(field_name.to_string());
             updated = true;
         }
     }
@@ -746,7 +748,7 @@ mod tests {
     }
 
     #[test]
-    fn test_append_gen_ai_fields_to_defined_schema_fields_adds_missing_cache_fields() {
+    fn test_append_gen_ai_fields_to_defined_schema_fields_adds_migrated_fields() {
         let mut fields = vec![
             "trace_id".to_string(),
             "gen_ai_usage_input_tokens".to_string(),
@@ -759,7 +761,7 @@ mod tests {
         assert!(fields.contains(&"gen_ai_usage_cache_read_input_tokens".to_string()));
         assert!(fields.contains(&"gen_ai_usage_cache_creation_input_tokens".to_string()));
         assert!(fields.contains(&"gen_ai_usage_cost_net_cache_impact".to_string()));
-        assert!(!fields.contains(&O2_INGEST_TS_COL_NAME.to_string()));
+        assert!(fields.contains(&O2_INGEST_TS_COL_NAME.to_string()));
     }
 
     #[test]

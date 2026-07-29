@@ -215,6 +215,15 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
     "focus-visible:ring-[3px] focus-visible:ring-button-ghost-primary-focus-ring",
     "disabled:opacity-50",
   ].join(" "),
+  // dashed: "add tile" — transparent bg, dashed muted border + muted icon/text.
+  // For the small "+" add-affordance buttons in the query builder (add join / filter / condition).
+  dashed: [
+    "bg-transparent text-button-ghost-muted-text border border-dashed border-button-outline-border",
+    "enabled:hover:bg-button-ghost-hover-bg enabled:hover:border-button-border-hover enabled:hover:text-button-ghost-text",
+    "enabled:active:bg-button-ghost-active-bg",
+    "focus-visible:ring-[3px] focus-visible:ring-button-ghost-focus-ring",
+    "disabled:opacity-50",
+  ].join(" "),
   // pricing-chip: Pill-shaped toggle chip for model pricing quick-setup template selection
   "pricing-chip": [
     "bg-transparent text-inherit border border-border-default",

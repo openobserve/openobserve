@@ -16,6 +16,8 @@
 import { ref, computed, Ref } from "vue";
 import { useStore } from "vuex";
 import searchService from "@/services/search";
+import useStreams from "@/composables/useStreams";
+import { rumFieldEqualsSql } from "@/utils/rum/fields";
 
 export interface TraceCorrelationData {
   trace_id: string;
@@ -43,6 +45,7 @@ export default function useTraceCorrelation(
   timeRange?: Ref<CorrelationTimeRange | null>,
 ) {
   const store = useStore();
+  const { getStream } = useStreams();
   const correlationData = ref<TraceCorrelationData | null>(null);
   const isLoading = ref(false);
   const error = ref<Error | null>(null);
@@ -83,10 +86,25 @@ export default function useTraceCorrelation(
     try {
       const range = effectiveRange();
 
+      // The trace-id column exists under two namespaces (`_o2_` on newer SDKs, `_oo_`
+      // on older ones and on everything already ingested). Ask the schema which are
+      // present: referencing a column the stream lacks fails the whole query, so a
+      // hardcoded name would break correlation for one SDK or the other.
+      const rumStream = await getStream("_rumdata", "logs", true);
+      const traceIdPredicate = rumFieldEqualsSql(
+        rumStream?.schema,
+        "trace_id",
+        String(traceId.value).replace(/'/g, "''"),
+      );
+      if (!traceIdPredicate) {
+        correlationData.value = null;
+        return;
+      }
+
       // Query RUM data for this trace ID
       const rumQuery = {
         query: {
-          sql: `select * from _rumdata where "_oo_trace_id" = '${traceId.value}' order by ${store.state.zoConfig.timestamp_column} desc`,
+          sql: `select * from _rumdata where ${traceIdPredicate} order by ${store.state.zoConfig.timestamp_column} desc`,
           start_time: range.startTime,
           end_time: range.endTime,
           from: 0,
