@@ -28,15 +28,6 @@ use {
 use crate::common::meta::user::{UserOrgRole, UserRequest};
 
 #[cfg(feature = "enterprise")]
-fn eval_scheduler_fetch_size(total: usize) -> anyhow::Result<i64> {
-    let fetch_size = total
-        .checked_add(1)
-        .ok_or_else(|| anyhow::anyhow!("online eval scheduler result count exceeds search size"))?;
-    i64::try_from(fetch_size)
-        .map_err(|_| anyhow::anyhow!("online eval scheduler result count exceeds search size"))
-}
-
-#[cfg(feature = "enterprise")]
 pub mod alert_grouping;
 mod alert_manager;
 #[cfg(feature = "cloud")]
@@ -756,11 +747,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
                             ..Default::default()
                         });
                     }
-                    let size = if over_limit {
-                        max_rows as i64
-                    } else {
-                        eval_scheduler_fetch_size(total)?
-                    };
+                    // total <= max_rows here; fetch one extra row so a count
+                    // that grew after the count query fails closed downstream.
+                    let size = (if over_limit { max_rows } else { total + 1 }) as i64;
                     let data_req = config::meta::search::Request {
                         query: config::meta::search::Query {
                             sql,
@@ -1185,18 +1174,3 @@ pub async fn init_deferred() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-#[cfg(all(test, feature = "enterprise"))]
-mod tests {
-    use super::eval_scheduler_fetch_size;
-
-    #[test]
-    fn eval_scheduler_fetches_one_row_past_the_count() {
-        assert_eq!(eval_scheduler_fetch_size(10_001).unwrap(), 10_002);
-    }
-
-    #[test]
-    fn eval_scheduler_rejects_counts_that_overflow_the_search_size() {
-        let error = eval_scheduler_fetch_size(usize::MAX).unwrap_err();
-        assert!(error.to_string().contains("exceeds search size"));
-    }
-}
