@@ -508,6 +508,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :get-row-status-color="getLogRowStatusColor"
                   :row-class="getLogRowClass"
                   expansion="multiple"
+                  :hide-expand-gutter="true"
                   :expanded-ids="expandedLogIds"
                   data-test="logs-search-result-logs-table"
                   class="logs-results-otable w-full"
@@ -530,8 +531,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :key="col.id"
                     #[`cell-${col.id}`]="{ row, value }"
                   >
+                    <!-- Timestamp cell owns the expand chevron, as the
+                         pre-migration table did: inside a fixed-width data cell
+                         it can't drift when column widths change, and it costs
+                         no extra gutter column. -->
                     <span
-                      v-if="logsCellHtml(col.id, row)"
+                      v-if="col.id === logsTimestampCol"
+                      class="flex min-w-0 items-center gap-1"
+                    >
+                      <button
+                        type="button"
+                        class="text-text-secondary hover:bg-button-ghost-hover-bg rounded-default inline-flex size-4.5 shrink-0 cursor-pointer items-center justify-center border-0 bg-transparent p-0"
+                        data-test="table-row-expand-menu"
+                        :aria-expanded="isLogRowExpanded(row) ? 'true' : 'false'"
+                        :aria-label="t('search.expand')"
+                        @click.stop="toggleLogRow(row)"
+                      >
+                        <OIcon
+                          :name="isLogRowExpanded(row) ? 'expand-more' : 'chevron-right'"
+                          size="sm"
+                        />
+                      </button>
+                      <span class="truncate">{{ value }}</span>
+                    </span>
+                    <span
+                      v-else-if="logsCellHtml(col.id, row)"
                       class="log-cell-html"
                       v-html="logsCellHtml(col.id, row)"
                     />
@@ -2262,6 +2286,16 @@ export default defineComponent({
       if (Number.isInteger(idx) && idx >= 0) expandLog(idx);
     };
 
+    // The expand chevron is rendered inside the timestamp cell rather than in a
+    // gutter column of its own (matching the pre-migration table), so these drive
+    // it directly instead of going through OTable's built-in toggle.
+    const isLogRowExpanded = (row: any): boolean => expandedLogIds.value.includes(logsRowKey(row));
+
+    const toggleLogRow = (row: any) => {
+      const idx = logsRowIndex(row);
+      if (Number.isInteger(idx) && idx >= 0) expandLog(idx);
+    };
+
     const openLogDetailsByRow = (row: any) => openLogDetails(row, logsRowIndex(row));
 
     return {
@@ -2287,6 +2321,8 @@ export default defineComponent({
       logsCellHtml,
       logsRowIndex,
       logsRowKey,
+      isLogRowExpanded,
+      toggleLogRow,
       getLogRowStatusColor,
       getLogRowClass,
       expandedLogIds,

@@ -1191,6 +1191,19 @@ export const useStreamFields = () => {
             });
           }
         }
+
+        // The last column absorbs whatever width the fixed ones leave over — the
+        // pre-migration table did this with `flex: 1 1 auto` on the last column,
+        // OTable's equivalent is `meta.autoWidth`. Without an absorber the table
+        // (table-layout:auto + w-full) spreads the surplus across EVERY column,
+        // so the fixed-width timestamp visibly stretches whenever the selected
+        // columns are narrower than the panel. `minSize` stops it collapsing
+        // below its own measured width.
+        const lastColumn = searchObj.data.resultGrid.columns.at(-1);
+        if (lastColumn && lastColumn.id !== store.state.zoConfig.timestamp_column) {
+          lastColumn.minSize = lastColumn.size;
+          lastColumn.meta = { ...lastColumn.meta, autoWidth: true };
+        }
       }
 
       extractFTSFields();

@@ -290,6 +290,14 @@ export interface OTableProps<TData = any> {
    * a column with id `"#"`.
    */
   showIndex?: boolean;
+  /**
+   * Drop the leading expand/collapse gutter column while keeping expansion
+   * itself working. The caller then owns the toggle — render it inside a
+   * `#cell-*` slot and drive `expandedIds` — which keeps the chevron inside a
+   * real data cell instead of a column of its own, so it can't shift as the
+   * table's column widths change.
+   */
+  hideExpandGutter?: boolean;
   enableColumnResize?: boolean;
   enableColumnReorder?: boolean;
   /**
