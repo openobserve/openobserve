@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, sync::OnceLock};
 
 use config::meta::{
     alerts::{ConditionGroup, ConditionList},
@@ -40,10 +40,78 @@ pub const VALID_STATUSES: &[&str] = &["draft", "active", "paused", "degraded", "
 
 /// Lowest configurable idle window, matching the default scheduler poll interval.
 pub const MIN_COMPLETION_IDLE_WINDOW_SECS: i64 = 45;
-pub const DEFAULT_TRACE_IDLE_WINDOW_SECS: i64 = 2 * 60;
+pub const DEFAULT_TRACE_IDLE_WINDOW_SECS: i64 = 3 * 60;
 pub const DEFAULT_TRACE_MAX_AGE_SECS: i64 = 30 * 60;
-pub const DEFAULT_SESSION_IDLE_WINDOW_SECS: i64 = 2 * 60;
+pub const DEFAULT_SESSION_IDLE_WINDOW_SECS: i64 = 3 * 60;
 pub const DEFAULT_SESSION_MAX_AGE_SECS: i64 = 4 * 60 * 60;
+
+/// Deployment-wide completion-window defaults, applied whenever an eval job
+/// does not set its own values (no trace/session config at all, or a config
+/// missing the field). Overridable via `O2_EVAL_TRACE_IDLE_TIMEOUT_SECS`,
+/// `O2_EVAL_TRACE_MAX_AGE_SECS`, `O2_EVAL_SESSION_IDLE_TIMEOUT_SECS` and
+/// `O2_EVAL_SESSION_MAX_AGE_SECS`; an override pair that fails the same
+/// validation as job-supplied windows is ignored in favor of the constants.
+struct CompletionWindowDefaults {
+    trace_idle_secs: i64,
+    trace_max_age_secs: i64,
+    session_idle_secs: i64,
+    session_max_age_secs: i64,
+}
+
+static COMPLETION_WINDOW_DEFAULTS: OnceLock<CompletionWindowDefaults> = OnceLock::new();
+
+fn completion_window_defaults() -> &'static CompletionWindowDefaults {
+    COMPLETION_WINDOW_DEFAULTS.get_or_init(|| {
+        let (trace_idle_secs, trace_max_age_secs) = resolve_window_defaults(
+            "trace",
+            env_secs("O2_EVAL_TRACE_IDLE_TIMEOUT_SECS"),
+            env_secs("O2_EVAL_TRACE_MAX_AGE_SECS"),
+            DEFAULT_TRACE_IDLE_WINDOW_SECS,
+            DEFAULT_TRACE_MAX_AGE_SECS,
+        );
+        let (session_idle_secs, session_max_age_secs) = resolve_window_defaults(
+            "session",
+            env_secs("O2_EVAL_SESSION_IDLE_TIMEOUT_SECS"),
+            env_secs("O2_EVAL_SESSION_MAX_AGE_SECS"),
+            DEFAULT_SESSION_IDLE_WINDOW_SECS,
+            DEFAULT_SESSION_MAX_AGE_SECS,
+        );
+        CompletionWindowDefaults {
+            trace_idle_secs,
+            trace_max_age_secs,
+            session_idle_secs,
+            session_max_age_secs,
+        }
+    })
+}
+
+fn env_secs(name: &str) -> Option<i64> {
+    std::env::var(name)
+        .ok()
+        .and_then(|value| value.trim().parse::<i64>().ok())
+}
+
+fn resolve_window_defaults(
+    scope: &str,
+    idle_override_secs: Option<i64>,
+    max_age_override_secs: Option<i64>,
+    default_idle_secs: i64,
+    default_max_age_secs: i64,
+) -> (i64, i64) {
+    let idle_secs = idle_override_secs.unwrap_or(default_idle_secs);
+    let max_age_secs = max_age_override_secs.unwrap_or(default_max_age_secs);
+    match validate_completion_window(idle_secs, max_age_secs) {
+        Ok(()) => (idle_secs, max_age_secs),
+        Err(error) => {
+            if idle_override_secs.is_some() || max_age_override_secs.is_some() {
+                log::warn!(
+                    "ignoring {scope} completion-window env overrides (idle={idle_secs}s, max_age={max_age_secs}s): {error}; using defaults idle={default_idle_secs}s, max_age={default_max_age_secs}s"
+                );
+            }
+            (default_idle_secs, default_max_age_secs)
+        }
+    }
+}
 
 pub type ScorerInputMapping = BTreeMap<String, String>;
 pub type JobInputMapping = BTreeMap<String, ScorerInputMapping>;
@@ -279,9 +347,10 @@ pub struct TraceEvalConfig {
 
 impl Default for TraceEvalConfig {
     fn default() -> Self {
+        let defaults = completion_window_defaults();
         Self {
-            idle_window_secs: DEFAULT_TRACE_IDLE_WINDOW_SECS,
-            max_age_secs: DEFAULT_TRACE_MAX_AGE_SECS,
+            idle_window_secs: defaults.trace_idle_secs,
+            max_age_secs: defaults.trace_max_age_secs,
             end_signal: None,
         }
     }
@@ -304,9 +373,10 @@ pub struct SessionEvalConfig {
 
 impl Default for SessionEvalConfig {
     fn default() -> Self {
+        let defaults = completion_window_defaults();
         Self {
-            idle_window_secs: DEFAULT_SESSION_IDLE_WINDOW_SECS,
-            max_age_secs: DEFAULT_SESSION_MAX_AGE_SECS,
+            idle_window_secs: defaults.session_idle_secs,
+            max_age_secs: defaults.session_max_age_secs,
             end_signal: None,
         }
     }
@@ -890,6 +960,33 @@ pub async fn update_status(
 mod tests {
     use super::*;
 
+    #[test]
+    fn completion_window_env_overrides_apply_when_valid() {
+        assert_eq!(
+            resolve_window_defaults("trace", Some(300), Some(900), 180, 1800),
+            (300, 900)
+        );
+        // A partial override combines with the built-in default for the rest.
+        assert_eq!(
+            resolve_window_defaults("trace", Some(300), None, 180, 1800),
+            (300, 1800)
+        );
+    }
+
+    #[test]
+    fn invalid_completion_window_env_overrides_fall_back_to_defaults() {
+        // Below the 45-second idle floor.
+        assert_eq!(
+            resolve_window_defaults("trace", Some(10), None, 180, 1800),
+            (180, 1800)
+        );
+        // Idle exceeding max age.
+        assert_eq!(
+            resolve_window_defaults("session", Some(600), Some(300), 180, 14_400),
+            (180, 14_400)
+        );
+    }
+
     fn end_signal() -> serde_json::Value {
         serde_json::json!({
             "version": 2,
@@ -1080,7 +1177,10 @@ mod tests {
         let job = OnlineEvalJob::from(model);
 
         assert_eq!(job.target_scope, TargetScope::Trace);
-        assert_eq!(job.trace_config.as_ref().unwrap().idle_window_secs, 120);
+        assert_eq!(
+            job.trace_config.as_ref().unwrap().idle_window_secs,
+            DEFAULT_TRACE_IDLE_WINDOW_SECS
+        );
         assert!(job.session_config.is_none());
         assert!(!job.uses_hidden_pipeline());
     }
@@ -1121,7 +1221,10 @@ mod tests {
         assert!(job.validate_target_scope().is_err());
         job.session_config = None;
         job.apply_target_scope_defaults();
-        assert_eq!(job.session_config.as_ref().unwrap().idle_window_secs, 120);
+        assert_eq!(
+            job.session_config.as_ref().unwrap().idle_window_secs,
+            DEFAULT_SESSION_IDLE_WINDOW_SECS
+        );
         assert_eq!(
             job.session_config.as_ref().unwrap().max_age_secs,
             DEFAULT_SESSION_MAX_AGE_SECS
