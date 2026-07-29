@@ -1207,7 +1207,15 @@ export const useStreamFields = () => {
         // so the fixed-width timestamp visibly stretches whenever the selected
         // columns are narrower than the panel. `minSize` stops it collapsing
         // below its own measured width.
-        const lastColumn = searchObj.data.resultGrid.columns.at(-1);
+        // `resultGrid.columns` is untyped, so `.at()` widens to `{}` — name the
+        // few fields we touch rather than reaching through `any`.
+        interface GridColumn {
+          id: string;
+          size?: number;
+          minSize?: number;
+          meta?: Record<string, unknown>;
+        }
+        const lastColumn = searchObj.data.resultGrid.columns.at(-1) as GridColumn | undefined;
         if (lastColumn && lastColumn.id !== store.state.zoConfig.timestamp_column) {
           lastColumn.minSize = lastColumn.size;
           lastColumn.meta = { ...lastColumn.meta, autoWidth: true };
