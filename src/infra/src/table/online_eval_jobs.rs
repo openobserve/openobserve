@@ -42,7 +42,9 @@ pub const VALID_STATUSES: &[&str] = &["draft", "active", "paused", "degraded", "
 pub const MIN_COMPLETION_IDLE_WINDOW_SECS: i64 = 45;
 pub const DEFAULT_TRACE_IDLE_WINDOW_SECS: i64 = 3 * 60;
 pub const DEFAULT_TRACE_MAX_AGE_SECS: i64 = 30 * 60;
-pub const DEFAULT_SESSION_IDLE_WINDOW_SECS: i64 = 3 * 60;
+/// Sessions span user think-time between traces, so their idle window is far
+/// wider than a trace's.
+pub const DEFAULT_SESSION_IDLE_WINDOW_SECS: i64 = 30 * 60;
 pub const DEFAULT_SESSION_MAX_AGE_SECS: i64 = 4 * 60 * 60;
 
 /// Deployment-wide completion-window defaults, applied whenever an eval job
