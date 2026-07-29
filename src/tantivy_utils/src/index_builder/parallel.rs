@@ -570,8 +570,9 @@ mod tests {
         use tantivy::directory::RamDirectory;
         use vortex::{
             VortexSessionDefault,
-            array::{ArrayRef, arrow::FromArrowArray},
-            dtype::{DType, arrow::FromArrowType},
+            array::ArrayRef,
+            arrow::{FromArrowArray, FromArrowType},
+            dtype::DType,
             file::{VortexWriteOptions, WriteStrategyBuilder},
             io::session::RuntimeSessionExt,
             session::VortexSession,
