@@ -394,6 +394,44 @@ pub async fn test_workflow(
     Ok(res)
 }
 
+pub async fn trigger_workflow(
+    org_id: &str,
+    id: &str,
+    inputs: Vec<serde_json::Value>,
+    user_id: &str,
+) -> Result<String, anyhow::Error> {
+    let metadata = [("event_type", "manual"), ("user_id", user_id)]
+        .into_iter()
+        .map(|(k, v)| (k.into(), v.into()))
+        .collect();
+
+    let trace_id = format!("webhook-{}", config::ider::generate_trace_id());
+    log::info!(
+        "received webhook trigger for workflow {org_id}/{id} from user {user_id}, assigning trace id {trace_id}"
+    );
+
+    if let Err(e) = send_workflow_trigger(
+        &trace_id,
+        org_id,
+        "Webhook".to_string(),
+        WorkflowTriggerType::Webhook,
+        id,
+        metadata,
+        &inputs,
+    )
+    .await
+    {
+        log::error!(
+            "error in sending webhook trigger for workflow {org_id}/{id} from user {user_id}, trace id {trace_id} error : {e}"
+        );
+        return Err(e);
+    }
+    log::info!(
+        "successfully triggered workflow {org_id}/{id} from user {user_id}, with trace id {trace_id}"
+    );
+    Ok(trace_id)
+}
+
 async fn execute_workflow(
     org_id: &str,
     id: &str,

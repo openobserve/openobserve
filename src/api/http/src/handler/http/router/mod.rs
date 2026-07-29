@@ -1084,6 +1084,10 @@ pub fn service_routes() -> Router {
                 )
                 .route("/{org_id}/workflows/test", post(workflows::test_workflow))
                 .route(
+                    "/{org_id}/workflows/{id}/trigger",
+                    post(workflows::trigger_workflow),
+                )
+                .route(
                     "/{org_id}/workflows/{id}/history",
                     get(workflows::get_workflow_history),
                 )

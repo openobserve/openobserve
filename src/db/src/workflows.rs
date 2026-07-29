@@ -52,6 +52,7 @@ pub enum WorkflowTriggerType {
     #[default]
     AlertFired,
     IncidentEvent,
+    Webhook,
 }
 
 impl From<&str> for WorkflowTriggerType {
@@ -59,6 +60,7 @@ impl From<&str> for WorkflowTriggerType {
         match value {
             "AlertFired" => Self::AlertFired,
             "IncidentEvent" => Self::IncidentEvent,
+            "Webhook" => Self::Webhook,
             _ => Self::AlertFired,
         }
     }
@@ -69,6 +71,7 @@ impl std::fmt::Display for WorkflowTriggerType {
         match self {
             Self::AlertFired => write!(f, "AlertFired"),
             Self::IncidentEvent => write!(f, "IncidentEvent"),
+            Self::Webhook => write!(f, "Webhook"),
         }
     }
 }

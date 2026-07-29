@@ -358,18 +358,17 @@ pub async fn update_workflows(
 
 #[utoipa::path(
     post,
-    path = "/{org_id}/workflows/{id}/test",
+    path = "/{org_id}/workflows/test",
     context_path = "/api",
     tag = "Workflows",
     operation_id = "testWorkflow",
-    summary = "Test an existing workflow with given input",
+    summary = "Test a workflow with given input",
     description = "",
     security(
         ("Authorization"= [])
     ),
     params(
         ("org_id" = String, Path, description = "Organization id"),
-        ("id" = String, Path, description = "Workflow id"),
     ),
     request_body(content = inline(Object), description = "Workflow inputs", content_type = "application/json"),
     responses(
@@ -388,6 +387,46 @@ pub async fn test_workflow(
     {
         Ok(v) => MetaHttpResponse::json(WorkflowTestResult { errors: v.errors }),
         Err(e) => MetaHttpResponse::bad_request(e),
+    }
+}
+
+/// TriggerWorkflow
+
+#[utoipa::path(
+    post,
+    path = "/{org_id}/workflows/{id}/trigger",
+    context_path = "/api",
+    tag = "Workflows",
+    operation_id = "triggerWorkflow",
+    summary = "Trigger an existing workflow with given input",
+    description = "",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization id"),
+        ("id" = String, Path, description = "Workflow id"),
+    ),
+    request_body(content = inline(Object), description = "Workflow inputs", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "create"})),
+    )
+)]
+pub async fn trigger_workflow(
+    Headers(user_email): Headers<UserEmail>,
+    Path((org_id, workflow_id)): Path<(String, String)>,
+    Json(inputs): Json<Vec<serde_json::Value>>,
+) -> Response {
+    match workflows::trigger_workflow(&org_id, &workflow_id, inputs, &user_email.user_id).await {
+        Ok(trace_id) => MetaHttpResponse::json(
+            MetaHttpResponse::message(StatusCode::OK, "Workflow triggered successfully")
+                .with_trace_id(trace_id),
+        ),
+        Err(e) => MetaHttpResponse::internal_error(e),
     }
 }
 
