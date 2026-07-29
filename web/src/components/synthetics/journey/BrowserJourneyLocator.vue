@@ -19,6 +19,7 @@ import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import type { LocatorCandidate, StepLocator } from "@/types/synthetics";
 import { isFullyPositional } from "@/utils/synthetics/locatorStability";
+import { deriveLocatorKind } from "@/utils/synthetics/deriveLocatorKind";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -85,8 +86,31 @@ function unpin() {
 function applyOverride() {
   const value = overrideDraft.value.trim();
   if (!value) return;
-  emit("update:locator", { ...props.locator, user_override: { kind: "css", value } });
+  // The kind is READ from the value, never chosen (D3). `kind` labels a locator; it
+  // does not parse it — both consumers hand `value` to page.locator() — so a picker
+  // that only set `kind` would store role=… semantics on a bare CSS string.
+  emit("update:locator", {
+    ...props.locator,
+    user_override: { kind: deriveLocatorKind(value), value },
+  });
   overrideDraft.value = "";
+}
+
+/**
+ * The kind the current draft would be stored as — feedback, not a control, so it
+ * can never be set to something the value contradicts.
+ *
+ * Always derived from what is in the box. A candidate's stored kind is deliberately
+ * not carried across by "start from this": the badge must describe the string the
+ * author can see and may since have edited.
+ */
+const draftKind = computed(() =>
+  overrideDraft.value.trim() ? deriveLocatorKind(overrideDraft.value.trim()) : null,
+);
+
+/** Prefill the override with a recorded candidate, as a starting point to edit. */
+function startFrom(candidate: LocatorCandidate) {
+  overrideDraft.value = candidate.value;
 }
 
 function isPinnedCandidate(candidate: LocatorCandidate): boolean {
@@ -132,7 +156,16 @@ function isPinnedCandidate(candidate: LocatorCandidate): boolean {
         {{ t("synthetics.journey.locatorUnpin") }}
       </OButton>
       <OButton
-        v-else-if="candidates.length"
+        v-if="effective"
+        variant="ghost"
+        size="xs"
+        data-test="synthetics-journey-step-locator-start-from-primary-btn"
+        @click="startFrom(effective)"
+      >
+        {{ t("synthetics.journey.locatorStartFromThis") }}
+      </OButton>
+      <OButton
+        v-if="!pinned && candidates.length"
         variant="ghost"
         size="xs"
         data-test="synthetics-journey-step-locator-pin-primary-btn"
@@ -186,6 +219,14 @@ function isPinnedCandidate(candidate: LocatorCandidate): boolean {
           <OButton
             variant="ghost"
             size="xs"
+            data-test="synthetics-journey-step-locator-start-from-btn"
+            @click="startFrom(candidate)"
+          >
+            {{ t("synthetics.journey.locatorStartFromThis") }}
+          </OButton>
+          <OButton
+            variant="ghost"
+            size="xs"
             :disabled="!!pinned && !isPinnedCandidate(candidate)"
             data-test="synthetics-journey-step-locator-pin-btn"
             @click="pin(candidate)"
@@ -215,6 +256,17 @@ function isPinnedCandidate(candidate: LocatorCandidate): boolean {
         data-test="synthetics-journey-step-locator-override-input"
         @keyup.enter="applyOverride"
       />
+      <!-- Read from the value, not chosen: `kind` labels a locator, it does not
+           parse it, so a picker that only set `kind` would store a contradiction. -->
+      <OTooltip v-if="draftKind" :content="t('synthetics.journey.locatorDerivedKindHelp')">
+        <OBadge
+          variant="default"
+          size="sm"
+          data-test="synthetics-journey-step-locator-derived-kind"
+        >
+          {{ t(`synthetics.journey.locatorKind.${draftKind}`) }}
+        </OBadge>
+      </OTooltip>
       <OButton
         variant="secondary"
         size="sm"

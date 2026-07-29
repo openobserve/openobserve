@@ -299,3 +299,37 @@ describe("BrowserJourneyStepEditor plain language", () => {
     expect(txt).not.toMatch(/\bLocator\b/);
   });
 });
+
+// Phase 4 / SE-13, D11. Both flow-control flags are fully implemented in the probe
+// with semantics the labels omit. Both-set is legitimate — run during cleanup, and
+// if it fails do not fail the run — so this explains rather than prevents.
+describe("BrowserJourneyStepEditor flow-control help", () => {
+  async function openFailure(wrapper: ReturnType<typeof render>) {
+    await wrapper.find(`${test("synthetics-journey-step-group-failure")} button`).trigger("click");
+  }
+
+  it("attaches an info tooltip to each flag", async () => {
+    const wrapper = render();
+    await openFailure(wrapper);
+    expect(wrapper.find(test("synthetics-journey-step-optional-help")).exists()).toBe(true);
+    expect(wrapper.find(test("synthetics-journey-step-always-run-help")).exists()).toBe(true);
+  });
+
+  it("explains the probe behaviour the labels omit", async () => {
+    const wrapper = render();
+    await openFailure(wrapper);
+    const tips = wrapper.findAllComponents({ name: "OTooltip" }).map((c) => c.props("content"));
+    const optional = tips.find((c) => /Skipped/i.test(String(c)));
+    const always = tips.find((c) => /cleanup/i.test(String(c)));
+    expect(optional).toMatch(/never fails the run/i);
+    expect(always).toMatch(/after the failed one/i);
+  });
+
+  it("leaves both flags independently settable — the combination is legal", async () => {
+    const wrapper = render({ optional: true, alwaysRun: true });
+    const optional = wrapper.find(test("synthetics-journey-step-optional-checkbox"));
+    const always = wrapper.find(test("synthetics-journey-step-always-run-checkbox"));
+    expect(optional.attributes("disabled")).toBeUndefined();
+    expect(always.attributes("disabled")).toBeUndefined();
+  });
+});

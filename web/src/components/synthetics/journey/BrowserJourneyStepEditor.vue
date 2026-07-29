@@ -496,16 +496,43 @@ const failureCaption = computed(() => {
       data-test="synthetics-journey-step-group-failure"
     >
       <div class="flex flex-col gap-2 pt-2">
-        <OCheckbox
-          v-model="optionalComputed"
-          :label="t('synthetics.journey.optionalLabel')"
-          data-test="synthetics-journey-step-optional-checkbox"
-        />
-        <OCheckbox
-          v-model="alwaysRunComputed"
-          :label="t('synthetics.journey.alwaysRunLabel')"
-          data-test="synthetics-journey-step-always-run-checkbox"
-        />
+        <!-- Both flags are fully implemented in the probe with semantics the labels
+             omit — the `skipped` result status, the cleanup pass, the neutral
+             verdict, and that `always_run` only reaches steps AFTER the failure.
+             Both-set is legitimate (a best-effort logout), so this explains rather
+             than prevents (D11). -->
+        <div class="flex items-center gap-1">
+          <OCheckbox
+            v-model="optionalComputed"
+            :label="t('synthetics.journey.optionalLabel')"
+            data-test="synthetics-journey-step-optional-checkbox"
+          />
+          <OTooltip :content="t('synthetics.journey.optionalHelp')">
+            <OIcon
+              name="info-outline"
+              size="xs"
+              class="text-text-secondary"
+              data-test="synthetics-journey-step-optional-help"
+              aria-hidden="true"
+            />
+          </OTooltip>
+        </div>
+        <div class="flex items-center gap-1">
+          <OCheckbox
+            v-model="alwaysRunComputed"
+            :label="t('synthetics.journey.alwaysRunLabel')"
+            data-test="synthetics-journey-step-always-run-checkbox"
+          />
+          <OTooltip :content="t('synthetics.journey.alwaysRunHelp')">
+            <OIcon
+              name="info-outline"
+              size="xs"
+              class="text-text-secondary"
+              data-test="synthetics-journey-step-always-run-help"
+              aria-hidden="true"
+            />
+          </OTooltip>
+        </div>
 
         <div class="flex gap-2">
           <OInput

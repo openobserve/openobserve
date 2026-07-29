@@ -220,3 +220,61 @@ describe("BrowserJourneyLocator empty bundle", () => {
     expect(wrapper.findComponent({ name: "OInput" }).props("required")).toBe(false);
   });
 });
+
+// Phase 4 / SE-8, D3. The kind is derived from the value, never picked — `kind`
+// labels a locator, it does not parse it, so a picker that only set `kind` would
+// store `{ kind: "role", value: "button" }` where `button` resolves as CSS.
+describe("BrowserJourneyLocator derived kind", () => {
+  const typeOverride = async (wrapper: ReturnType<typeof render>, value: string) => {
+    await wrapper
+      .find(`${test("synthetics-journey-step-locator-override-input")} input`)
+      .setValue(value);
+  };
+
+  it("stores the kind read from the value, not css", async () => {
+    const wrapper = render();
+    await typeOverride(wrapper, 'internal:role=button[name="Sign In"i]');
+    await wrapper.find(test("synthetics-journey-step-locator-override-btn")).trigger("click");
+
+    const emitted = wrapper.emitted("update:locator")!;
+    expect((emitted[0][0] as StepLocator).user_override).toEqual({
+      kind: "role",
+      value: 'internal:role=button[name="Sign In"i]',
+    });
+  });
+
+  it("still stores css for a bare attribute selector", async () => {
+    const wrapper = render();
+    await typeOverride(wrapper, '[data-qa="submit"]');
+    await wrapper.find(test("synthetics-journey-step-locator-override-btn")).trigger("click");
+    const emitted = wrapper.emitted("update:locator")!;
+    expect((emitted[0][0] as StepLocator).user_override?.kind).toBe("css");
+  });
+
+  it("shows the derived kind as a read-only badge while typing", async () => {
+    const wrapper = render();
+    expect(wrapper.find(test("synthetics-journey-step-locator-derived-kind")).exists()).toBe(
+      false,
+    );
+    await typeOverride(wrapper, "text=Sign in");
+    expect(wrapper.find(test("synthetics-journey-step-locator-derived-kind")).text()).toBe(
+      "Text",
+    );
+  });
+
+  it("prefills the override from a candidate without carrying its stored kind", async () => {
+    const wrapper = render();
+    await wrapper
+      .find(test("synthetics-journey-step-locator-start-from-primary-btn"))
+      .trigger("click");
+    const input = wrapper.find(
+      `${test("synthetics-journey-step-locator-override-input")} input`,
+    );
+    // Primary candidate is a bare [data-test=…] stored as test_attribute; the badge
+    // describes what is in the box, which is CSS. Documented and intended (D3).
+    expect((input.element as HTMLInputElement).value).toBe('[data-test="login-sign-in"]');
+    expect(wrapper.find(test("synthetics-journey-step-locator-derived-kind")).text()).toBe(
+      "CSS",
+    );
+  });
+});
