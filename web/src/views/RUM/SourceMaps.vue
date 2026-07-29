@@ -445,9 +445,9 @@ const deleteSourceMap = async () => {
     toast({
       variant: "success",
       message: t("toastMessages.RUM.sourceMapsDeletedSuccessfullyForIn", {
-        p0: sourceMap.service,
-        p1: sourceMap.version,
-        p2: sourceMap.env,
+        service: sourceMap.service,
+        version: sourceMap.version,
+        environment: sourceMap.env,
       }),
     });
 

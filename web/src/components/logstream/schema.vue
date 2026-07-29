@@ -1203,7 +1203,9 @@ export default defineComponent({
           loadingState.value = false;
           if (res.data.code == 200) {
             toast({
-              message: t("toastMessages.logstream.fieldSDeletedSuccessfully"),
+              message: t("toastMessages.logstream.fieldsDeletedSuccessfully", {
+                count: selectedFields.value.length,
+              }),
               variant: "success",
             });
             confirmQueryModeChangeDialog.value = false;
@@ -2044,9 +2046,9 @@ export default defineComponent({
           toast({
             variant: "error",
             message: t("toastMessages.logstream.cannotAddFieldsMaximumAllowedFields", {
-              p0: maxFieldsLength,
-              p1: currentDefinedSchemaLength,
-              p2: selectedFieldsSet.size,
+              max: maxFieldsLength,
+              current: currentDefinedSchemaLength,
+              adding: selectedFieldsSet.size,
             }),
           });
           selectedFields.value = [];

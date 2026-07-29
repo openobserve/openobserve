@@ -514,7 +514,9 @@ export default defineComponent({
       if (allAlertsCreated) {
         toast({
           variant: "success",
-          message: t("toastMessages.alerts.alertSImportedSuccessfully"),
+          message: t("toastMessages.alerts.alertsImportedSuccessfully", {
+            count: jsonArrayOfObj.value.length,
+          }),
         });
 
         // Delay navigation to allow Monaco editor to complete all debounced operations
@@ -598,7 +600,7 @@ export default defineComponent({
       } catch (e: any) {
         toast({
           variant: "error",
-          message: t("toastMessages.alerts.errorImportingAlertSPleaseCheck"),
+          message: t("toastMessages.alerts.errorImportingAlertPleaseCheck"),
         });
         return false;
       }

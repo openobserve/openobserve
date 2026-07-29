@@ -4490,7 +4490,7 @@ export default defineComponent({
         toast({
           variant: "error",
           message: t("toastMessages.components.imageExceeds2mbLimitMb", {
-            p0: (file.size / 1024 / 1024).toFixed(1),
+            size: (file.size / 1024 / 1024).toFixed(1),
           }),
         });
         return false;
@@ -4671,7 +4671,7 @@ export default defineComponent({
         reader.onerror = () => {
           toast({
             variant: "error",
-            message: t("toastMessages.components.failedToReadImage", { p0: file.name }),
+            message: t("toastMessages.components.failedToReadImage", { error: file.name }),
           });
           resolve(false);
         };

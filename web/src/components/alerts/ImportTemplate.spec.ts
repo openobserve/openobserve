@@ -17,8 +17,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { shallowMount } from "@vue/test-utils";
 import ImportTemplate from "./ImportTemplate.vue";
 import { createStore } from "vuex";
-import { createI18n } from "vue-i18n";
-import enLocale from "@/locales/languages/en-US.json";
 import { ref } from "vue";
 
 // ─── Service mocks ────────────────────────────────────────────────────────────
@@ -65,10 +63,10 @@ const mockStore = createStore({
   },
 });
 
-const mockI18n = createI18n({
-  locale: "en",
-  messages: { en: enLocale },
-});
+// No local createI18n here: setupTests.ts installs the real i18n instance
+// globally, so mounting needs no i18n plugin. A mount-level one is installed
+// AFTER the global and replaces it, which is how partial bags end up shadowing
+// the real messages.
 
 // ─── BaseImport stub ──────────────────────────────────────────────────────────
 const BaseImportStub = {
@@ -103,7 +101,6 @@ function createWrapper(props = defaultProps) {
   return shallowMount(ImportTemplate, {
     props,
     global: {
-      plugins: [mockI18n],
       provide: { store: mockStore },
       mocks: { $store: mockStore },
       stubs: { BaseImport: BaseImportStub },
@@ -133,7 +130,6 @@ describe("ImportTemplate", () => {
     it("accepts default empty-array props", () => {
       const w = shallowMount(ImportTemplate, {
         global: {
-          plugins: [mockI18n],
           provide: { store: mockStore },
           mocks: { $store: mockStore },
           stubs: { BaseImport: BaseImportStub },
@@ -622,7 +618,7 @@ describe("ImportTemplate", () => {
       });
 
       expect(mockToast).toHaveBeenCalledWith(
-        expect.objectContaining({ message: "Successfully imported template(s)" }),
+        expect.objectContaining({ message: "Successfully imported 1 template" }),
       );
 
       vi.runAllTimers();

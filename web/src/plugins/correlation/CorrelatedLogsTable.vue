@@ -979,14 +979,14 @@ const handleAddFieldToTable = (field: string) => {
     // Show success notification
     toast({
       variant: "success",
-      message: t("toastMessages.correlation.columnAddedToTable", { p0: field }),
+      message: t("toastMessages.correlation.columnAddedToTable", { name: field }),
       timeout: 1500,
     });
   } else {
     // Field is already visible, show info notification
     toast({
       variant: "info",
-      message: t("toastMessages.correlation.columnIsAlreadyVisible", { p0: field }),
+      message: t("toastMessages.correlation.columnIsAlreadyVisible", { name: field }),
       timeout: 1500,
     });
   }

@@ -686,7 +686,9 @@ export default defineComponent({
 
       if (allPipelinesCreated) {
         toast({
-          message: t("toastMessages.pipeline.pipelineSImportedSuccessfully"),
+          message: t("toastMessages.pipeline.pipelinesImportedSuccessfully", {
+            count: jsonArrayOfObj.value.length,
+          }),
           variant: "success",
         });
 
@@ -722,7 +724,7 @@ export default defineComponent({
         }
       } catch (e: any) {
         toast({
-          message: t("toastMessages.pipeline.errorImportingPipelineSPleaseCheck"),
+          message: t("toastMessages.pipeline.errorImportingPipelinePleaseCheck"),
           variant: "error",
         });
         return false;

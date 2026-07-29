@@ -417,7 +417,9 @@ export default defineComponent({
                   resolve(jsonArray);
                 } catch (error) {
                   toast({
-                    message: t("toastMessages.common.errorParsingJsonFromFile", { p0: file.name }),
+                    message: t("toastMessages.common.errorParsingJsonFromFile", {
+                      fileName: file.name,
+                    }),
                     variant: "error",
                   });
                   resolve([]);

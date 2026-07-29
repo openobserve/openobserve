@@ -578,8 +578,8 @@ const handleConfigureDedup = async (alertName: string) => {
       toast({
         variant: "error",
         message: t("toastMessages.alerts.alertNotFoundInAlerts", {
-          p0: alertName,
-          p1: alertsList.value.length,
+          name: alertName,
+          count: alertsList.value.length,
         }),
       });
       return;

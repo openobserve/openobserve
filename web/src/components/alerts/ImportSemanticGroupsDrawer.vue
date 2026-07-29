@@ -406,7 +406,7 @@ const loadFile = async (value: FileValue) => {
     await previewDiff(groups);
   } catch (error: any) {
     toast({
-      message: t("toastMessages.alerts.failedToParseJson", { p0: error.message }),
+      message: t("toastMessages.alerts.failedToParseJson", { error: error.message }),
       variant: "error",
     });
     clearFile();
@@ -435,7 +435,7 @@ const previewDiff = async (groups: SemanticGroup[]) => {
   } catch (error: any) {
     toast({
       message: t("toastMessages.alerts.failedToPreviewChanges", {
-        p0: error.response?.data?.error || error.message,
+        error: error.response?.data?.error || error.message,
       }),
       variant: "error",
     });
@@ -522,7 +522,7 @@ const handleApply = () => {
   handleOpenChange(false);
 
   toast({
-    message: t("toastMessages.alerts.appliedChanges", { p0: changeCount }),
+    message: t("toastMessages.alerts.appliedChanges", { count: changeCount }),
     variant: "success",
   });
 };

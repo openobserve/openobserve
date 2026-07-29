@@ -407,17 +407,17 @@ async function importJson({ jsonStr, jsonArray }: { jsonStr: string; jsonArray: 
 
   if (successCount === payloads.length) {
     toast({
-      message: t("toastMessages.onlineEvals.successfullyImportedScoreConfigS", {
-        p0: successCount,
+      message: t("toastMessages.onlineEvals.successfullyImportedScoreConfigs", {
+        count: successCount,
       }),
       variant: "success",
     });
     setTimeout(() => emit("saved"), 500);
   } else if (successCount > 0) {
     toast({
-      message: t("toastMessages.onlineEvals.importedOfScoreConfigS", {
-        p0: successCount,
-        p1: payloads.length,
+      message: t("toastMessages.onlineEvals.importedOfScoreConfigs", {
+        imported: successCount,
+        count: payloads.length,
       }),
       variant: "warning",
     });

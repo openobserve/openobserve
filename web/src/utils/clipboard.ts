@@ -1,7 +1,7 @@
 // Copyright 2026 OpenObserve Inc.
 
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { raw } from "@/types/i18n";
+import { raw, gt } from "@/types/i18n";
 
 export interface CopyToClipboardOptions {
   successMessage?: string;
@@ -61,7 +61,7 @@ export async function copyToClipboard(
     if (!silent) {
       toast({
         variant: "success",
-        message: raw(successMessage || "Copied to clipboard!"),
+        message: raw(successMessage || gt("common.copySuccess")),
         timeout,
       });
     }
@@ -70,7 +70,7 @@ export async function copyToClipboard(
     if (!silent) {
       toast({
         variant: "error",
-        message: raw(errorMessage || "Failed to copy to clipboard"),
+        message: raw(errorMessage || gt("common.copyError")),
         timeout,
       });
     }

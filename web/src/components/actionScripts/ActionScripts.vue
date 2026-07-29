@@ -661,23 +661,23 @@ export default defineComponent({
         if (successful.length > 0 && unsuccessful.length === 0) {
           toast({
             variant: "success",
-            message: t("toastMessages.actionScripts.successfullyDeletedActionScriptS", {
-              p0: successful.length,
+            message: t("toastMessages.actionScripts.successfullyDeletedActionScripts", {
+              count: successful.length,
             }),
           });
         } else if (successful.length > 0 && unsuccessful.length > 0) {
           toast({
             variant: "warning",
-            message: t("toastMessages.actionScripts.deletedActionScriptSFailedTo", {
-              p0: successful.length,
-              p1: unsuccessful.length,
+            message: t("toastMessages.actionScripts.actionScriptsDeletedWithFailures", {
+              count: successful.length,
+              failed: unsuccessful.length,
             }),
           });
         } else if (unsuccessful.length > 0) {
           toast({
             variant: "error",
-            message: t("toastMessages.actionScripts.failedToDeleteActionScriptS", {
-              p0: unsuccessful.length,
+            message: t("toastMessages.actionScripts.failedToDeleteActionScripts", {
+              count: unsuccessful.length,
             }),
           });
         }

@@ -148,7 +148,10 @@ const useLogs = () => {
     } catch (e: any) {
       searchObj.loading = false;
       showErrorNotification(
-        raw(notificationMsg.value || "Error occurred during the search operation."),
+        raw(
+          notificationMsg.value ||
+            gt("toastMessages.useLogs.errorOccurredDuringTheSearchOperation"),
+        ),
       );
       throw e;
       // notificationMsg.value = "";
@@ -204,7 +207,7 @@ const useLogs = () => {
           toast({
             variant: "info",
             message: gt("toastMessages.composables.liveModeIsEnabledOnlyTop", {
-              p0: searchObj.meta.resultGrid.rowsPerPage,
+              count: searchObj.meta.resultGrid.rowsPerPage,
             }),
           });
         }

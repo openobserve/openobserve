@@ -118,7 +118,7 @@ export default defineComponent({
 
         showPositiveNotification(
           t("toastMessages.sidebar.movedSuccessfully", {
-            p0: props?.type?.charAt?.(0)?.toUpperCase() + props?.type?.slice?.(1),
+            type: props?.type?.charAt?.(0)?.toUpperCase() + props?.type?.slice?.(1),
           }),
           {
             timeout: 5000,

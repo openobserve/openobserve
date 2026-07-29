@@ -637,9 +637,9 @@ export default defineComponent({
             // Partial success
             toast({
               variant: "warning",
-              message: t("toastMessages.functions.functionSDeletedSuccessfullyFailed", {
-                p0: successCount,
-                p1: failCount,
+              message: t("toastMessages.functions.functionsDeletedWithFailures", {
+                count: successCount,
+                failed: failCount,
               }),
               timeout: 5000,
             });
@@ -647,14 +647,14 @@ export default defineComponent({
             // All failed
             toast({
               variant: "error",
-              message: t("toastMessages.functions.failedToDeleteFunctionS", { p0: failCount }),
+              message: t("toastMessages.functions.failedToDeleteFunctions", { count: failCount }),
             });
           } else {
             // All successful
             toast({
               variant: "success",
-              message: t("toastMessages.functions.functionSDeletedSuccessfully", {
-                p0: successCount,
+              message: t("toastMessages.functions.functionsDeletedSuccessfully", {
+                count: successCount,
               }),
             });
           }
@@ -662,8 +662,8 @@ export default defineComponent({
           // Fallback success message
           toast({
             variant: "success",
-            message: t("toastMessages.functions.functionSDeletedSuccessfully", {
-              p0: selectedFunctions.value.length,
+            message: t("toastMessages.functions.functionsDeletedSuccessfully", {
+              count: selectedFunctions.value.length,
             }),
           });
         }

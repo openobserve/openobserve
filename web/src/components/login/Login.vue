@@ -441,7 +441,7 @@ export default defineComponent({
   },
   methods: {
     selected(item: any) {
-      toast({ message: gt("toastMessages.login.selectedSuggestion", { p0: item.label }) });
+      toast({ message: gt("toastMessages.login.selectedSuggestion", { suggestion: item.label }) });
     },
   },
 });

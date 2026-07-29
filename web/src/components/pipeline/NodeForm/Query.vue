@@ -589,7 +589,11 @@ const validateSqlQuery = async () => {
             : "Invalid SQL Query";
           toast({
             variant: "error",
-            message: t("toastMessages.NodeForm.message", { p0: message }),
+            message: err?.response?.data?.message
+              ? t("toastMessages.NodeForm.invalidSqlQueryDetail", {
+                  error: err.response.data.message,
+                })
+              : t("toastMessages.NodeForm.invalidSqlQuery"),
           });
 
           // Locate the offending token in the SQL and squiggle it in the editor.

@@ -418,7 +418,7 @@ const loadFile = async (value: FileValue) => {
     await previewDiff(groups);
   } catch (error: any) {
     toast({
-      message: t("toastMessages.alerts.failedToParseJson", { p0: error.message }),
+      message: t("toastMessages.alerts.failedToParseJson", { error: error.message }),
       variant: "error",
     });
     clearFile();
@@ -449,7 +449,7 @@ const previewDiff = async (groups: SemanticGroup[]) => {
   } catch (error: any) {
     toast({
       message: t("toastMessages.alerts.failedToPreviewChanges", {
-        p0: error.response?.data?.error || error.message,
+        error: error.response?.data?.error || error.message,
       }),
       variant: "error",
     });
@@ -539,7 +539,7 @@ const applyChanges = async () => {
 
     toast({
       message: t("toastMessages.alerts.successfullyAppliedChanges", {
-        p0: selectedAdditions.value.length + selectedModifications.value.length,
+        count: selectedAdditions.value.length + selectedModifications.value.length,
       }),
       variant: "success",
     });
@@ -549,7 +549,7 @@ const applyChanges = async () => {
   } catch (error: any) {
     toast({
       message: t("toastMessages.alerts.failedToSaveChanges", {
-        p0: error.response?.data?.error || error.message,
+        error: error.response?.data?.error || error.message,
       }),
       variant: "error",
     });
@@ -582,7 +582,7 @@ const handleJsonUpdate = async (jsonArray: any[]) => {
     await previewDiff(jsonArray);
   } catch (error: any) {
     toast({
-      message: t("toastMessages.alerts.invalidJson", { p0: error.message }),
+      message: t("toastMessages.alerts.invalidJson", { error: error.message }),
       variant: "error",
     });
   } finally {

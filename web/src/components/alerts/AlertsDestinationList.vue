@@ -566,7 +566,7 @@ export default defineComponent({
             toast({
               variant: "success",
               message: t("toastMessages.alerts.destinationDeletedSuccessfully", {
-                p0: confirmDelete.value.data.name,
+                name: confirmDelete.value.data.name,
               }),
             });
             getDestinations();
@@ -735,30 +735,30 @@ export default defineComponent({
           if (failCount > 0 && successCount > 0) {
             toast({
               variant: "warning",
-              message: t("toastMessages.alerts.destinationSDeletedSuccessfullyFailed", {
-                p0: successCount,
-                p1: failCount,
+              message: t("toastMessages.alerts.destinationsDeletedWithFailures", {
+                count: successCount,
+                failed: failCount,
               }),
               timeout: 5000,
             });
           } else if (failCount > 0) {
             toast({
               variant: "error",
-              message: t("toastMessages.alerts.failedToDeleteDestinationS", { p0: failCount }),
+              message: t("toastMessages.alerts.failedToDeleteDestinations", { count: failCount }),
             });
           } else {
             toast({
               variant: "success",
-              message: t("toastMessages.alerts.destinationSDeletedSuccessfully", {
-                p0: successCount,
+              message: t("toastMessages.alerts.destinationsDeletedSuccessfully", {
+                count: successCount,
               }),
             });
           }
         } else {
           toast({
             variant: "success",
-            message: t("toastMessages.alerts.destinationSDeletedSuccessfully", {
-              p0: selectedDestinations.value.length,
+            message: t("toastMessages.alerts.destinationsDeletedSuccessfully", {
+              count: selectedDestinations.value.length,
             }),
           });
         }

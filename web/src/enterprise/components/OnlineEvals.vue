@@ -1096,8 +1096,7 @@ function exportScorerBulk(ids: string[]) {
     toast({
       variant: "success",
       message: t("toastMessages.components.exportedScorer", {
-        p0: selected.length,
-        p1: selected.length > 1 ? "s" : "",
+        count: selected.length,
       }),
     });
   } else {
@@ -1123,8 +1122,7 @@ function exportScoreConfigBulk(ids: string[]) {
     toast({
       variant: "success",
       message: t("toastMessages.components.exportedScoreConfig", {
-        p0: selected.length,
-        p1: selected.length > 1 ? "s" : "",
+        count: selected.length,
       }),
     });
   } else {

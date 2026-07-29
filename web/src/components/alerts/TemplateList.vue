@@ -476,7 +476,7 @@ const deleteTemplate = () => {
         toast({
           variant: "success",
           message: t("toastMessages.alerts.templateDeletedSuccessfully", {
-            p0: confirmDelete.value.data.name,
+            name: confirmDelete.value.data.name,
           }),
         });
 
@@ -588,22 +588,24 @@ const bulkDeleteTemplates = () => {
       if (successful.length > 0 && unsuccessful.length === 0) {
         toast({
           variant: "success",
-          message: t("toastMessages.alerts.successfullyDeletedTemplateS", {
-            p0: successful.length,
+          message: t("toastMessages.alerts.successfullyDeletedTemplates", {
+            count: successful.length,
           }),
         });
       } else if (successful.length > 0 && unsuccessful.length > 0) {
         toast({
           variant: "warning",
-          message: t("toastMessages.alerts.deletedTemplateSButFailed", {
-            p0: successful.length,
-            p1: unsuccessful.length,
+          message: t("toastMessages.alerts.templatesDeletedWithFailures", {
+            count: successful.length,
+            failed: unsuccessful.length,
           }),
         });
       } else if (unsuccessful.length > 0) {
         toast({
           variant: "error",
-          message: t("toastMessages.alerts.failedToDeleteTemplateS", { p0: unsuccessful.length }),
+          message: t("toastMessages.alerts.failedToDeleteTemplates", {
+            count: unsuccessful.length,
+          }),
         });
       }
 

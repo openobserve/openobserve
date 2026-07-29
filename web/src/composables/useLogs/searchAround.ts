@@ -225,7 +225,7 @@ export const useSearchAround = () => {
       searchObj.loading = false;
       const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
       showErrorNotification(
-        gt("toastMessages.useLogs.errorWhileFetchingData", { p0: errorMessage }),
+        gt("toastMessages.useLogs.errorWhileFetchingData", { error: errorMessage }),
       );
     }
   };

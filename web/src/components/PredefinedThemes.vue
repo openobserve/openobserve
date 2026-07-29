@@ -409,8 +409,8 @@ const applyTheme = (theme: PredefinedTheme, themeMode: "light" | "dark") => {
   toast({
     variant: "success",
     message: t("toastMessages.components.appliedToModeSuccessfully", {
-      p0: themeDisplayName(theme.name),
-      p1: themeMode,
+      theme: themeDisplayName(theme.name),
+      mode: themeMode,
     }),
   });
 };
@@ -473,7 +473,9 @@ const applyCustomTheme = (themeMode: "light" | "dark") => {
 
   toast({
     variant: "success",
-    message: t("toastMessages.components.customColorAppliedToModeSuccessfully", { p0: themeMode }),
+    message: t("toastMessages.components.customColorAppliedToModeSuccessfully", {
+      mode: themeMode,
+    }),
   });
 };
 

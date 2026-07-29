@@ -2708,7 +2708,9 @@ export default defineComponent({
 
         toast({
           variant: "success",
-          message: t("toastMessages.alerts.incidentStatusUpdatedTo", { p0: response.data.status }),
+          message: t("toastMessages.alerts.incidentStatusUpdatedTo", {
+            status: response.data.status,
+          }),
         });
         // Mark data as stale so incident list will refresh
         store.dispatch("incidents/setShouldRefresh", true);
@@ -2758,7 +2760,7 @@ export default defineComponent({
 
         toast({
           variant: "success",
-          message: t("toastMessages.alerts.incidentSeverityUpdatedTo", { p0: data.severity }),
+          message: t("toastMessages.alerts.incidentSeverityUpdatedTo", { severity: data.severity }),
         });
         // Mark data as stale so incident list will refresh
         store.dispatch("incidents/setShouldRefresh", true);

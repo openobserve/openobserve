@@ -214,8 +214,8 @@ const saveStream = async (value: AddStreamForm) => {
     .then(() => {
       toast({
         message: t("toastMessages.logstream.streamOfTypeIsAlreadyPresent", {
-          p0: value.name,
-          p1: value.stream_type,
+          name: value.name,
+          streamType: value.stream_type,
         }),
         variant: "warning",
       });

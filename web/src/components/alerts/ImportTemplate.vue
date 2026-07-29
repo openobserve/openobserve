@@ -327,7 +327,9 @@ export default defineComponent({
       // Only redirect and show success message if ALL templates were imported successfully
       if (successCount === totalCount) {
         toast({
-          message: t("toastMessages.alerts.successfullyImportedTemplateS"),
+          message: t("toastMessages.alerts.successfullyImportedTemplates", {
+            count: successCount,
+          }),
           variant: "success",
         });
 

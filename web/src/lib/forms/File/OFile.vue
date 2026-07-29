@@ -66,7 +66,10 @@ function emitFiles(fileList: FileList | File[] | null) {
         .map((t) => t.trim())
         .join(", ");
       toast({
-        message: t("toastMessages.File.isNotASupportedFileType", { p0: names, p1: allowed }),
+        message: t("toastMessages.File.isNotASupportedFileType", {
+          fileName: names,
+          allowed: allowed,
+        }),
         variant: "error",
       });
       emit("type-error", rejected);

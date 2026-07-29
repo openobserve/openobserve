@@ -276,7 +276,11 @@ export default defineComponent({
         } catch (err) {
           const e = err as { response?: { data?: { message?: string } }; message?: string };
           showErrorNotification(
-            raw(e?.response?.data?.message || e?.message || "Folder deletion failed"),
+            raw(
+              e?.response?.data?.message ||
+                e?.message ||
+                t("toastMessages.sidebar.folderDeletionFailed"),
+            ),
             {
               timeout: 2000,
             },

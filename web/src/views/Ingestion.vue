@@ -213,7 +213,7 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 // @ts-ignore
 import { defineComponent, ref, onBeforeMount, onMounted, onUpdated, watch, computed } from "vue";
-import { useI18nTyped, raw } from "@/types/i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter, useRoute } from "vue-router";
 import { copyToClipboard } from "@/utils/clipboard";
@@ -416,7 +416,7 @@ export default defineComponent({
           if (e.response.status != 403) {
             toast({
               variant: "error",
-              message: raw("Error while updating Token." + e.error),
+              message: t("toastMessages.views.errorWhileUpdatingToken", { error: e.error }),
               timeout: 5000,
             });
           }

@@ -835,9 +835,9 @@ const saveActionScript = async (value: EditScriptForm) => {
     .then(() => {
       toast({
         variant: "success",
-        message: t("toastMessages.actionScripts.actionSuccessfully", {
-          p0: isEditingActionScript.value ? "updated" : "saved",
-        }),
+        message: isEditingActionScript.value
+          ? t("toastMessages.actionScripts.actionUpdatedSuccessfully")
+          : t("toastMessages.actionScripts.actionSavedSuccessfully"),
       });
       goToActionScripts();
       emit("getActionScripts");

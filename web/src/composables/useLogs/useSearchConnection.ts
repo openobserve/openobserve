@@ -27,7 +27,7 @@ import {
   WebSocketErrorResponse,
 } from "@/ts/interfaces/query";
 import { generateTraceContext } from "@/utils/zincutils";
-import { raw } from "@/types/i18n";
+import { raw, gt } from "@/types/i18n";
 
 export const useSearchConnection = () => {
   const { showErrorNotification } = useNotifications();
@@ -136,7 +136,10 @@ export const useSearchConnection = () => {
     } catch (e: any) {
       searchObj.loading = false;
       showErrorNotification(
-        raw(notificationMsg.value || "Error occurred while sending socket message."),
+        raw(
+          notificationMsg.value ||
+            gt("toastMessages.useLogs.errorOccurredWhileSendingSocketMessage"),
+        ),
       );
       notificationMsg.value = "";
     }
@@ -223,7 +226,10 @@ export const useSearchConnection = () => {
       console.error(`Error while getting data through ${searchObj.communicationMethod}`, e);
       searchObj.loading = false;
       showErrorNotification(
-        raw(notificationMsg.value || "Error occurred during the search operation."),
+        raw(
+          notificationMsg.value ||
+            gt("toastMessages.useLogs.errorOccurredDuringTheSearchOperation"),
+        ),
       );
       notificationMsg.value = "";
     }

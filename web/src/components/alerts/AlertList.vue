@@ -709,7 +709,7 @@ import { useRouter } from "vue-router";
 import useStreams from "@/composables/useStreams";
 
 import { convertUnixToDateFormat as convertUnixToFormat } from "@/utils/date";
-import { useI18nTyped, raw } from "@/types/i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { debounce } from "lodash-es";
 import alertsService from "@/services/alerts";
 import destinationService from "@/services/alert_destination";
@@ -2133,7 +2133,9 @@ export default defineComponent({
           });
           toast({
             variant: "success",
-            message: raw(isEnabled ? "Alert Resumed Successfully" : "Alert Paused Successfully"),
+            message: isEnabled
+              ? t("toastMessages.alerts.alertResumedSuccessfully")
+              : t("toastMessages.alerts.alertPausedSuccessfully"),
           });
         })
         .finally(() => {
@@ -2522,8 +2524,7 @@ export default defineComponent({
         toast({
           variant: "success",
           message: t("toastMessages.alerts.successfullyExportedAlert", {
-            p0: selectedAlertsToExport.length,
-            p1: selectedAlertsToExport.length > 1 ? "s" : "",
+            count: selectedAlertsToExport.length,
           }),
         });
         selectedAlerts.value = [];
@@ -2615,9 +2616,10 @@ export default defineComponent({
     const bulkToggleAlerts = async (action: "pause" | "resume") => {
       const dismiss = toast({
         variant: "loading",
-        message: t("toastMessages.alerts.alerts", {
-          p0: action === "resume" ? "Resuming" : "Pausing",
-        }),
+        message:
+          action === "resume"
+            ? t("toastMessages.alerts.resumingAlerts")
+            : t("toastMessages.alerts.pausingAlerts"),
         timeout: 0,
       });
       try {
@@ -2631,7 +2633,10 @@ export default defineComponent({
         if (alertsToToggle.length === 0) {
           toast({
             variant: "error",
-            message: t("toastMessages.alerts.noAlertsTo", { p0: action }),
+            message:
+              action === "resume"
+                ? t("toastMessages.alerts.noAlertsToResume")
+                : t("toastMessages.alerts.noAlertsToPause"),
           });
           dismiss();
           return;
@@ -2654,7 +2659,10 @@ export default defineComponent({
           dismiss();
           toast({
             variant: "success",
-            message: t("toastMessages.alerts.alertsDSuccessfully", { p0: action }),
+            message:
+              action === "resume"
+                ? t("toastMessages.alerts.alertsResumedSuccessfully")
+                : t("toastMessages.alerts.alertsPausedSuccessfully"),
           });
         }
         // Refresh alerts
@@ -2668,7 +2676,10 @@ export default defineComponent({
         console.error(`Error ${action}ing alerts:`, error);
         toast({
           variant: "error",
-          message: t("toastMessages.alerts.errorIngAlertsPleaseTryAgain", { p0: action }),
+          message:
+            action === "resume"
+              ? t("toastMessages.alerts.errorResumingAlerts")
+              : t("toastMessages.alerts.errorPausingAlerts"),
         });
       }
     };
@@ -2721,9 +2732,9 @@ export default defineComponent({
             // Partial success
             toast({
               variant: "warning",
-              message: t("toastMessages.alerts.alertSDeletedSuccessfullyFailed", {
-                p0: successCount,
-                p1: failCount,
+              message: t("toastMessages.alerts.alertsDeletedWithFailures", {
+                count: successCount,
+                failed: failCount,
               }),
               timeout: 5000,
             });
@@ -2731,21 +2742,21 @@ export default defineComponent({
             // All failed
             toast({
               variant: "error",
-              message: t("toastMessages.alerts.failedToDeleteAlertS", { p0: failCount }),
+              message: t("toastMessages.alerts.failedToDeleteAlerts", { count: failCount }),
             });
           } else {
             // All successful
             toast({
               variant: "success",
-              message: t("toastMessages.alerts.alertSDeletedSuccessfully", { p0: successCount }),
+              message: t("toastMessages.alerts.alertsDeletedSuccessfully", { count: successCount }),
             });
           }
         } else {
           // Fallback success message
           toast({
             variant: "success",
-            message: t("toastMessages.alerts.alertSDeletedSuccessfully", {
-              p0: selectedAlerts.value.length,
+            message: t("toastMessages.alerts.alertsDeletedSuccessfully", {
+              count: selectedAlerts.value.length,
             }),
           });
         }

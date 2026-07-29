@@ -1326,9 +1326,9 @@ const saveReport = async (value: CreateReportForm) => {
 
       toast({
         variant: "success",
-        message: t("toastMessages.reports.reportSuccessfully", {
-          p0: isEditingReport.value ? "updated" : "saved",
-        }),
+        message: isEditingReport.value
+          ? t("toastMessages.reports.reportUpdatedSuccessfully")
+          : t("toastMessages.reports.reportSavedSuccessfully"),
       });
       goToReports();
     })

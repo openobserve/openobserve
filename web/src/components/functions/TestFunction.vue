@@ -596,7 +596,9 @@ const getResults = async () => {
       // This case happens when user enters invalid query and then switches to real time alert
       toast({
         variant: "error",
-        message: raw("Invalid SQL Query : " + err.response?.data?.message),
+        message: t("toastMessages.functions.invalidSqlQueryDetail", {
+          error: err.response?.data?.message,
+        }),
       });
     })
     .finally(() => {

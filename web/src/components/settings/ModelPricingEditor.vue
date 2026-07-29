@@ -829,7 +829,7 @@ function notifyError(prefix: string, e: any) {
   const msg = e?.response?.data?.message || e?.message || t("modelPricing.errUnknown");
   toast({
     variant: "error",
-    message: t("toastMessages.settings.message", { p0: prefix, p1: msg }),
+    message: t("toastMessages.settings.message", { prefix: prefix, message: msg }),
     timeout: 5000,
   });
 }

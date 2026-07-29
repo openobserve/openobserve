@@ -812,7 +812,7 @@ export default defineComponent({
           if (res.data.code == 200) {
             toast({
               message: t("toastMessages.functions.deletedSuccessfully", {
-                p0: selectedDelete.value.name,
+                name: selectedDelete.value.name,
               }),
               variant: "success",
             });
@@ -883,23 +883,23 @@ export default defineComponent({
 
           if (successfulDeletions > 0 && failedDeletions === 0) {
             toast({
-              message: t("toastMessages.functions.successfullyDeletedEnrichmentTableS", {
-                p0: successfulDeletions,
+              message: t("toastMessages.functions.successfullyDeletedEnrichmentTables", {
+                count: successfulDeletions,
               }),
               variant: "success",
             });
           } else if (successfulDeletions > 0 && failedDeletions > 0) {
             toast({
-              message: t("toastMessages.functions.deletedEnrichmentTableSFailedTo", {
-                p0: successfulDeletions,
-                p1: failedDeletions,
+              message: t("toastMessages.functions.enrichmentTablesDeletedWithFailures", {
+                count: successfulDeletions,
+                failed: failedDeletions,
               }),
               variant: "warning",
             });
           } else if (failedDeletions > 0) {
             toast({
-              message: t("toastMessages.functions.failedToDeleteEnrichmentTableS", {
-                p0: failedDeletions,
+              message: t("toastMessages.functions.failedToDeleteEnrichmentTables", {
+                count: failedDeletions,
               }),
               variant: "error",
             });

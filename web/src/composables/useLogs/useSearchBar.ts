@@ -849,7 +849,10 @@ export const useSearchBar = () => {
       // );
       searchObj.loading = false;
       showErrorNotification(
-        raw(notificationMsg.value || "Error occurred during the search operation."),
+        raw(
+          notificationMsg.value ||
+            gt("toastMessages.useLogs.errorOccurredDuringTheSearchOperation"),
+        ),
       );
       notificationMsg.value = "";
     }

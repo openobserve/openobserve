@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import MoveAcrossFolders from "./MoveAcrossFolders.vue";
-import { createI18n } from "vue-i18n";
 import { createStore } from "vuex";
 import { nextTick } from "vue";
 
@@ -109,31 +108,16 @@ const mockStore = createStore({
   },
 });
 
-const mockI18n = createI18n({
-  locale: "en",
-  messages: {
-    en: {
-      dashboard: {
-        currentFolderLabel: "Current Folder",
-        cancel: "Cancel",
-        moveToAnotherFolder: "Move {type} To Another Folder",
-      },
-      common: {
-        move: "Move",
-      },
-      toastMessages: {
-        sidebar: { movedSuccessfully: "{p0} moved successfully" },
-      },
-    },
-  },
-});
+// No local createI18n here on purpose: a mount-level i18n plugin is installed
+// AFTER the global one from setupTests.ts and therefore replaces the real
+// en-US bag, so every key outside the local copy renders empty and the copy
+// silently goes stale. The global install serves the real messages.
 
 // Factory — single source of truth for mount config
 const createWrapper = (props: Record<string, any> = {}) => {
   return mount(MoveAcrossFolders, {
     props: { open: true, ...props },
     global: {
-      plugins: [mockI18n],
       provide: { store: mockStore },
       mocks: { $store: mockStore },
       stubs: { ODialog: ODialogStub },
@@ -426,7 +410,6 @@ describe("MoveAcrossFolders.vue", () => {
   it("should use default props when not provided", () => {
     wrapper = mount(MoveAcrossFolders, {
       global: {
-        plugins: [mockI18n],
         provide: { store: mockStore },
         mocks: { $store: mockStore },
         stubs: { ODialog: ODialogStub },

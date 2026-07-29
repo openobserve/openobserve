@@ -344,7 +344,7 @@ export default defineComponent({
         toast({
           variant: "info",
           message: t("toastMessages.recommended.openingAwsConsoleToSetUp", {
-            p0: props.integration.displayName,
+            name: props.integration.displayName,
           }),
         });
       } catch (error) {
@@ -352,7 +352,7 @@ export default defineComponent({
         toast({
           variant: "error",
           message: t("toastMessages.recommended.errorOpeningAwsConsole", {
-            p0: error instanceof Error ? error.message : "Unknown error",
+            error: error instanceof Error ? error.message : "Unknown error",
           }),
           timeout: 5000,
         });
@@ -473,7 +473,7 @@ export default defineComponent({
             toast({
               variant: "success",
               message: t("toastMessages.recommended.dashboardForReplacedSuccessfully", {
-                p0: props.integration.displayName,
+                name: props.integration.displayName,
               }),
               timeout: 5000,
               action: {
@@ -493,7 +493,7 @@ export default defineComponent({
             toast({
               variant: "error",
               message: t("toastMessages.recommended.failedToReplaceDashboard", {
-                p0: error instanceof Error ? error.message : "Unknown error",
+                error: error instanceof Error ? error.message : "Unknown error",
               }),
               timeout: 5000,
             });
@@ -514,7 +514,7 @@ export default defineComponent({
         toast({
           variant: "success",
           message: t("toastMessages.recommended.dashboardForImportedSuccessfully", {
-            p0: props.integration.displayName,
+            name: props.integration.displayName,
           }),
           timeout: 5000,
           action: {
@@ -533,7 +533,7 @@ export default defineComponent({
         toast({
           variant: "error",
           message: t("toastMessages.recommended.failedToImportDashboard", {
-            p0: error instanceof Error ? error.message : "Unknown error",
+            error: error instanceof Error ? error.message : "Unknown error",
           }),
           timeout: 5000,
         });

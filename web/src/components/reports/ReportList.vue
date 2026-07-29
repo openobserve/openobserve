@@ -698,10 +698,11 @@ const editReport = (report: any) => {
 
 // Toggle enable/disable — uses report_id (v2)
 const toggleReportState = (report: any) => {
-  const state = report.enabled ? "Stopping" : "Starting";
   const dismiss = toast({
     variant: "loading",
-    message: t("toastMessages.reports.report", { p0: state, p1: report.name }),
+    message: report.enabled
+      ? t("toastMessages.reports.stoppingReport", { name: report.name })
+      : t("toastMessages.reports.startingReport", { name: report.name }),
     timeout: 0,
   });
   reportsStateLoadingMap.value[report.report_id] = true;
@@ -720,9 +721,9 @@ const toggleReportState = (report: any) => {
       filterReports();
       toast({
         variant: "success",
-        message: t("toastMessages.reports.reportSuccessfully2", {
-          p0: !report.enabled ? "Started" : "Stopped",
-        }),
+        message: !report.enabled
+          ? t("toastMessages.reports.reportStartedSuccessfully")
+          : t("toastMessages.reports.reportStoppedSuccessfully"),
       });
     })
     .catch((err) => {
@@ -750,7 +751,7 @@ const deleteReport = () => {
   const { report_id, name } = deleteDialog.value.data;
   const dismiss = toast({
     variant: "loading",
-    message: t("toastMessages.reports.deletingReport", { p0: name }),
+    message: t("toastMessages.reports.deletingReport", { name: name }),
     timeout: 0,
   });
 
@@ -806,20 +807,22 @@ const bulkDeleteReports = async () => {
       toast({
         variant: "warning",
         message: t("toastMessages.reports.deletedFailed", {
-          p0: successful.length,
-          p1: unsuccessful.length,
+          count: successful.length,
+          failed: unsuccessful.length,
         }),
         timeout: 5000,
       });
     } else if (unsuccessful.length) {
       toast({
         variant: "error",
-        message: t("toastMessages.reports.failedToDeleteReportS", { p0: unsuccessful.length }),
+        message: t("toastMessages.reports.failedToDeleteReports", { count: unsuccessful.length }),
       });
     } else {
       toast({
         variant: "success",
-        message: t("toastMessages.reports.reportSDeletedSuccessfully", { p0: successful.length }),
+        message: t("toastMessages.reports.reportsDeletedSuccessfully", {
+          count: successful.length,
+        }),
       });
     }
 

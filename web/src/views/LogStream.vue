@@ -733,7 +733,7 @@ export default defineComponent({
           if (successfulDeletions.length > 0) {
             toast({
               message: t("toastMessages.views.deletedStreamsSuccessfully", {
-                p0: successfulDeletions.length,
+                count: successfulDeletions.length,
               }),
               variant: "success",
             });
@@ -742,7 +742,7 @@ export default defineComponent({
           if (failedDeletions.length > 0) {
             toast({
               message: t("toastMessages.views.failedToDeleteStreams", {
-                p0: failedDeletions.length,
+                count: failedDeletions.length,
               }),
               variant: "error",
             });
