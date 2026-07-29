@@ -333,3 +333,46 @@ describe("BrowserJourneyStepEditor flow-control help", () => {
     expect(always.attributes("disabled")).toBeUndefined();
   });
 });
+
+// Phase 5c / SE-11, D9. Discarding the wire on an action change is correct — its
+// payload belongs to the old action — but it used to happen in silence.
+//
+// Scope note: after the storage path stopped preserving `wire` (SE-24), a step
+// loaded from a saved monitor carries none, so there is nothing to discard and the
+// notice correctly stays silent. It applies to a live recording session, which is
+// the only place a wire is still present.
+describe("BrowserJourneyStepEditor action-change notice", () => {
+  const selectAction = async (wrapper: ReturnType<typeof render>, action: string) => {
+    await wrapper
+      .findComponent({ name: "OSelect" })
+      .vm.$emit("update:modelValue", action);
+  };
+
+  it("says the step is rebuilt when a recorded wire is discarded", async () => {
+    const wrapper = render({ wire: { id: "w1", action: "click" } as never });
+    expect(
+      wrapper.find(test("synthetics-journey-step-action-changed-notice")).exists(),
+    ).toBe(false);
+
+    await selectAction(wrapper, "navigate");
+    expect(wrapper.find(test("synthetics-journey-step-action-changed-notice")).text()).toMatch(
+      /rebuilds this step/i,
+    );
+  });
+
+  it("stays silent for a stored step, which carries no wire to lose", async () => {
+    const wrapper = render(); // no `wire` — the shape mapWireSteps now produces
+    await selectAction(wrapper, "navigate");
+    expect(
+      wrapper.find(test("synthetics-journey-step-action-changed-notice")).exists(),
+    ).toBe(false);
+  });
+
+  it("stays silent when the action is re-selected unchanged", async () => {
+    const wrapper = render({ wire: { id: "w1", action: "click" } as never });
+    await selectAction(wrapper, "click");
+    expect(
+      wrapper.find(test("synthetics-journey-step-action-changed-notice")).exists(),
+    ).toBe(false);
+  });
+});
