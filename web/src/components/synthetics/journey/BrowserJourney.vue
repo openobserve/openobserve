@@ -404,7 +404,6 @@ function handleInsertBelow(row: BrowserStep) {
     id: getUUIDv7(true),
     action: "click",
     name: "",
-    timeout: 30000,
     code: "",
   });
   emit("update:modelValue", next);
@@ -421,7 +420,7 @@ function handleUpdateExpanded(ids: string[]) {
 function addStep() {
   emit("update:modelValue", [
     ...props.modelValue,
-    { id: getUUIDv7(true), action: "click", name: "", timeout: 30000, code: "" },
+    { id: getUUIDv7(true), action: "click", name: "", code: "" },
   ]);
 }
 function duplicateCapturedStep(index: number, step: BrowserStep) {

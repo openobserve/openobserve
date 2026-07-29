@@ -400,3 +400,53 @@ describe("BrowserJourney step validation", () => {
     expect(validate([{ id: "1", action: "click", selector: "#login" }])).toBe(false);
   });
 });
+
+// ── Step creation ─────────────────────────────────────────────────────────
+// A created step must carry no timeout. Absence means "use the runner's
+// per-category default" (spec P1.1.1-P1.1.3); a stamped value freezes at 30000
+// while recorded steps follow the default, and fires the below-default warning
+// as soon as the author picks navigate or assert (default 60000) without ever
+// having touched the field.
+describe("BrowserJourney step creation", () => {
+  let wrapper: VueWrapper;
+
+  afterEach(() => {
+    wrapper?.unmount();
+    vi.restoreAllMocks();
+  });
+
+  function lastEmittedSteps(w: VueWrapper): any[] {
+    const emitted = w.emitted("update:modelValue");
+    expect(emitted).toBeTruthy();
+    return emitted![emitted!.length - 1][0] as any[];
+  }
+
+  it("should create a step with no timeout via Add Step", async () => {
+    wrapper = mountJourney({ modelValue: [] });
+    await wrapper.find('[data-test="synthetics-journey-add-step-btn"]').trigger("click");
+
+    const steps = lastEmittedSteps(wrapper);
+    expect(steps).toHaveLength(1);
+    expect(steps[0].timeout).toBeUndefined();
+  });
+
+  it("should create a step with no timeout via insert below", async () => {
+    const existing = {
+      id: "s1",
+      action: "navigate",
+      name: "Open app",
+      value: "https://app.test",
+      code: "",
+    };
+    wrapper = mountJourney({ modelValue: [existing] });
+
+    // Drive the row action through the event contract JourneySteps emits,
+    // rather than reaching into the component's internals.
+    wrapper.findComponent(JourneyStepsStub).vm.$emit("insert-below", existing);
+    await flushPromises();
+
+    const steps = lastEmittedSteps(wrapper);
+    expect(steps).toHaveLength(2);
+    expect(steps[1].timeout).toBeUndefined();
+  });
+});
