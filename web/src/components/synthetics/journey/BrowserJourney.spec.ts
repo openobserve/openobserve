@@ -323,3 +323,80 @@ describe("BrowserJourney recording", () => {
     expect(wrapper.emitted("clear-results")).toBeTruthy();
   });
 });
+
+describe("BrowserJourney step validation", () => {
+  let wrapper: VueWrapper;
+
+  afterEach(() => {
+    wrapper?.unmount();
+    vi.restoreAllMocks();
+  });
+
+  function validate(modelValue: unknown[]): boolean {
+    wrapper = mountJourney({ modelValue });
+    return (wrapper.vm as any).validateStepSelectors();
+  }
+
+  it("should pass a v1 journey whose steps carry selectors", () => {
+    expect(
+      validate([
+        { id: "1", action: "navigate", value: "https://app.test" },
+        { id: "2", action: "click", selector: "#login" },
+      ]),
+    ).toBe(true);
+  });
+
+  // Regression: a v2 step identifies its element with a locator bundle and has
+  // no `selector` at all. Requiring `selector` blocked Save & Continue on every
+  // recorded journey the moment it was reopened for editing.
+  it("should pass a v2 step that identifies its element by locator", () => {
+    expect(
+      validate([
+        { id: "1", action: "navigate", value: "https://app.test" },
+        {
+          id: "2",
+          action: "click",
+          locator: {
+            candidates: [{ kind: "test_attribute", value: 'internal:testid=[data-test="login"]' }],
+            user_override: null,
+          },
+        },
+      ]),
+    ).toBe(true);
+  });
+
+  it("should pass a v2 step whose only target is a pinned override", () => {
+    expect(
+      validate([
+        { id: "1", action: "navigate", value: "https://app.test" },
+        {
+          id: "2",
+          action: "click",
+          locator: { candidates: [], user_override: { kind: "css", value: "#login" } },
+        },
+      ]),
+    ).toBe(true);
+  });
+
+  it("should pass a page-level assertion, which targets no element", () => {
+    expect(
+      validate([
+        { id: "1", action: "navigate", value: "https://app.test" },
+        { id: "2", action: "assert", assertion: { kind: "url_matches", expected: "/home" } },
+      ]),
+    ).toBe(true);
+  });
+
+  it("should fail a step that identifies no element at all", () => {
+    expect(
+      validate([
+        { id: "1", action: "navigate", value: "https://app.test" },
+        { id: "2", action: "click" },
+      ]),
+    ).toBe(false);
+  });
+
+  it("should fail when the first step does not navigate", () => {
+    expect(validate([{ id: "1", action: "click", selector: "#login" }])).toBe(false);
+  });
+});

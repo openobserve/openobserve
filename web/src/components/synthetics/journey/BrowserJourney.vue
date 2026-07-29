@@ -19,7 +19,7 @@ import ZeroAssertionNotice from "./ZeroAssertionNotice.vue";
 import TestIdMisconfiguredNotice from "./TestIdMisconfiguredNotice.vue";
 import { DEFAULT_TEST_ID_ATTR } from "@/constants/synthetics";
 import BrowserJourneyStepEditor from "./BrowserJourneyStepEditor.vue";
-import { SELECTOR_ACTIONS as SELECTOR_ACTIONS_CONST } from "@/constants/synthetics";
+import { stepIsMissingTarget } from "@/utils/synthetics/stepTarget";
 
 const props = defineProps<{
   modelValue: BrowserStep[];
@@ -208,15 +208,11 @@ function validateJourneySteps(): boolean {
   const first = props.modelValue[0];
   firstStepError.value = first ? first.action !== "navigate" : false;
 
-  // 2. Selector-requiring steps must have a selector
+  // 2. Element-acting steps must name their element — by a v1 `selector` or a
+  //    v2 locator bundle. See stepIsMissingTarget.
   const selErrs = new Set<string>();
   for (const step of props.modelValue) {
-    if (
-      SELECTOR_ACTIONS_CONST.includes(step.action as any) &&
-      (!step.selector || step.selector.trim() === "")
-    ) {
-      selErrs.add(step.id);
-    }
+    if (stepIsMissingTarget(step)) selErrs.add(step.id);
   }
   selectorErrors.value = selErrs;
 

@@ -8,6 +8,14 @@
 //   • url    — required + valid HTTP(S) URL.
 
 import { z } from "zod";
+import { stepIsMissingTarget } from "@/utils/synthetics/stepTarget";
+
+/** The version-2 locator bundle, as it sits on an editor step. */
+const locatorCandidateSchema = z.object({ kind: z.string(), value: z.string() });
+const locatorSchema = z.object({
+  candidates: z.array(locatorCandidateSchema).nullish(),
+  user_override: locatorCandidateSchema.nullish(),
+});
 
 export const makeBrowserCheckGateSchema = (t: (_key: string) => string) =>
   z.object({
@@ -65,6 +73,12 @@ export const makeBrowserCheckSaveSchema = (t: (_key: string) => string) =>
             value: z.string().optional(),
             timeout: z.number().optional(),
             code: z.string().optional(),
+            // A version-2 step names its element here and carries no `selector`.
+            // Declared explicitly because z.object strips what it does not
+            // declare — leaving it out made every v2 step look target-less to
+            // the refinement below.
+            locator: locatorSchema.optional(),
+            assertion: z.object({ kind: z.string().optional() }).loose().optional(),
           }),
         )
         .optional()
@@ -81,14 +95,9 @@ export const makeBrowserCheckSaveSchema = (t: (_key: string) => string) =>
         });
       }
 
-      // Validate selectors on steps that require them
-      const SELECTOR_ACTIONS = ["click", "type", "select", "hover", "assert"] as const;
+      // Every element-acting step must name its element, by either channel.
       for (let i = 0; i < val.journey.length; i++) {
-        const step = val.journey[i];
-        if (
-          SELECTOR_ACTIONS.includes(step.action as any) &&
-          (!step.selector || step.selector.trim() === "")
-        ) {
+        if (stepIsMissingTarget(val.journey[i])) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             path: ["journey", i, "selector"],
