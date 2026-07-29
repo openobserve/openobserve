@@ -383,7 +383,10 @@ pub async fn test_workflow(
     Path(org_id): Path<String>,
     Json(inputs): Json<WorkflowTestInput>,
 ) -> Response {
-    match workflows::test_workflow(&org_id, inputs.workflow, inputs.inputs, inputs.from_node).await
+    let mut workflow = inputs.workflow;
+    workflow.org_id = org_id.clone();
+    workflow.id = format!("test-{}",config::ider::uuid());
+    match workflows::test_workflow(&org_id, workflow, inputs.inputs, inputs.from_node).await
     {
         Ok(v) => MetaHttpResponse::json(WorkflowTestResult { errors: v.errors }),
         Err(e) => MetaHttpResponse::bad_request(e),
