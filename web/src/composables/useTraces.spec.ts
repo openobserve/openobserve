@@ -14,6 +14,13 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import i18nInstance from "@/locales";
+import type { TranslateFn } from "@/types/i18n";
+
+// copyTracesUrl takes an injected translator. These tests run outside a
+// component, so they supply the shared instance's t — the real messages, so
+// assertions below check the text a user actually sees.
+const t = (i18nInstance.global as any).t as TranslateFn;
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -572,10 +579,11 @@ describe("useTraces", () => {
         endTime: 0,
       };
 
-      copyTracesUrl();
+      copyTracesUrl(t);
 
       expect(vi.mocked(copyToClipboard)).toHaveBeenCalledWith(
         expect.stringContaining("http"),
+        expect.any(Function),
         expect.objectContaining({ successMessage: expect.any(String) }),
       );
     });
@@ -591,10 +599,11 @@ describe("useTraces", () => {
         endTime: 0,
       };
 
-      copyTracesUrl();
+      copyTracesUrl(t);
 
       expect(vi.mocked(copyToClipboard)).toHaveBeenCalledWith(
         expect.any(String),
+        expect.any(Function),
         expect.objectContaining({
           successMessage: "Link Copied Successfully!",
           timeout: 5000,
@@ -613,12 +622,13 @@ describe("useTraces", () => {
         endTime: 0,
       };
 
-      copyTracesUrl();
+      copyTracesUrl(t);
 
       expect(vi.mocked(copyToClipboard)).toHaveBeenCalledWith(
         expect.any(String),
+        expect.any(Function),
         expect.objectContaining({
-          errorMessage: "Error while copy link.",
+          errorMessage: "Error while copying link.",
         }),
       );
     });
@@ -634,7 +644,7 @@ describe("useTraces", () => {
         endTime: 0,
       };
 
-      copyTracesUrl({ from: "1000", to: "9999" });
+      copyTracesUrl(t, { from: "1000", to: "9999" });
 
       const clipboardArg = vi.mocked(copyToClipboard).mock.calls[0][0];
       expect(clipboardArg).toContain("from=1000");

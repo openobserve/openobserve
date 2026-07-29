@@ -463,7 +463,7 @@ const { t } = useI18nTyped();
 const { columnVisibility, setColumnVisibility } = useExternalColumnToggle("services-catalog");
 const catalogContainerRef = ref<HTMLElement | null>(null);
 const { searchObj } = useTraces();
-const { getStreams } = useStreams();
+const { getStreams } = useStreams(t);
 const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } = useHttpStreaming();
 
 const emit = defineEmits<{

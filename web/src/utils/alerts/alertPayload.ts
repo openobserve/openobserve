@@ -7,7 +7,7 @@ import { b64EncodeUnicode } from "@/utils/zincutils";
 import alertsService from "@/services/alerts";
 import { transformFEToBE } from "./alertDataTransforms";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { gt } from "@/types/i18n";
+import type { TranslateFn } from "@/types/i18n";
 
 export interface PayloadFormData {
   name: string;
@@ -51,6 +51,8 @@ export interface PayloadContext {
 
 export interface SaveAlertContext {
   store: any;
+  /** Injected translator — this module has no Vue context of its own. */
+  t: TranslateFn;
   props: any;
   emit: any;
   router: any;
@@ -191,7 +193,7 @@ export const getAlertPayload = (formData: PayloadFormData, context: PayloadConte
 };
 
 export const prepareAndSaveAlert = async (data: any, context: SaveAlertContext): Promise<void> => {
-  const { store, props, emit, router, isAggregationEnabled, activeFolderId, handleAlertError } =
+  const { store, t, props, emit, router, isAggregationEnabled, activeFolderId, handleAlertError } =
     context;
 
   const payload = cloneDeep(data);
@@ -237,7 +239,7 @@ export const prepareAndSaveAlert = async (data: any, context: SaveAlertContext):
   try {
     const dismiss = toast({
       variant: "loading",
-      message: gt("toastMessages.alerts.pleaseWait"),
+      message: t("toastMessages.alerts.pleaseWait"),
       timeout: 0,
     });
 
@@ -250,7 +252,7 @@ export const prepareAndSaveAlert = async (data: any, context: SaveAlertContext):
       emit("update:list", activeFolderId.value);
       toast({
         variant: "success",
-        message: gt("toastMessages.alerts.alertUpdatedSuccessfully"),
+        message: t("toastMessages.alerts.alertUpdatedSuccessfully"),
       });
     } else {
       await alertsService.create_by_alert_id(
@@ -261,7 +263,7 @@ export const prepareAndSaveAlert = async (data: any, context: SaveAlertContext):
       emit("update:list", activeFolderId.value);
       toast({
         variant: "success",
-        message: gt("toastMessages.alerts.alertSavedSuccessfully"),
+        message: t("toastMessages.alerts.alertSavedSuccessfully"),
       });
     }
     dismiss();

@@ -96,8 +96,9 @@ const props = defineProps({
 });
 
 defineEmits(["delete:node"]);
+const { t } = useI18nTyped();
 const { pipelineObj, deletePipelineNode, checkIfDefaultDestinationNode, openStepPicker } =
-  useDragAndDrop();
+  useDragAndDrop(t);
 const showButtons = ref(false);
 let hideButtonsTimeout: number | null = null;
 
@@ -264,8 +265,6 @@ const navigateToFunction = (functionName: string | undefined) => {
 // feature that no longer exists, and were the only writers of the now-deleted
 // userClickedNode/userSelectedNode. Adding a downstream node is done via the
 // hover-`+` step picker (useDnD.addNodeAfter).)
-
-const { t } = useI18nTyped();
 const router = useRouter();
 const store = useStore();
 

@@ -87,7 +87,7 @@ export default defineComponent({
 
     const copyToClipboardFn = () => {
       const content = replaceValues(props.content, false);
-      copyToClipboard(content, {
+      copyToClipboard(content, t, {
         successMessage: "Content Copied Successfully!",
         errorMessage: "Error while copy content.",
         timeout: 5000,

@@ -48,8 +48,8 @@ export default defineComponent({
 
     const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
 
-    const { getStream } = useStreams();
-    const { dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey);
+    const { getStream } = useStreams(t);
+    const { dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey, t);
 
     // Raw loaded groups: { label, streamRef, children: [{name, ...}] }
     const groups = ref<{ label: string; streamRef: any; children: any[] }[]>([]);

@@ -143,7 +143,7 @@ const props = defineProps<{
 }>();
 
 const { t } = useI18nTyped();
-const { editNode, requestDeleteNode, openStepPicker } = useWorkflowCanvas();
+const { editNode, requestDeleteNode, openStepPicker } = useWorkflowCanvas(t);
 
 // Test result badge state — read from the last Test run. Null (no run, or this
 // node wasn't part of a `from_node` run) → no badge. A node passes (✓) only when

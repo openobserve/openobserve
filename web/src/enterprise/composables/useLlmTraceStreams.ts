@@ -20,10 +20,11 @@
 // handling here.
 
 import { ref, type Ref } from "vue";
+import type { TranslateFn } from "@/types/i18n";
 import useStreams from "@/composables/useStreams";
 
-export function useLlmTraceStreams(activeStream: Ref<string>) {
-  const { getStreams } = useStreams();
+export function useLlmTraceStreams(activeStream: Ref<string>, t: TranslateFn) {
+  const { getStreams } = useStreams(t);
 
   const availableStreams = ref<string[]>([]);
   const streamsLoaded = ref(false);

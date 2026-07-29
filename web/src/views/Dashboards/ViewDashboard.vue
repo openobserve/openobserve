@@ -789,7 +789,7 @@ export default defineComponent({
       arePanelsLoading.value = !allPanelsLoaded;
     };
 
-    const { traceIdRef, searchRequestTraceIds, cancelQuery } = useCancelQuery();
+    const { traceIdRef, searchRequestTraceIds, cancelQuery } = useCancelQuery(t);
 
     // [END] cancel running queries
 
@@ -1511,6 +1511,7 @@ export default defineComponent({
             error?.response?.data?.message ??
               error?.message ??
               t("dashboard.viewDashboard.panelDeletionFailed"),
+            t,
           );
         } else {
           showErrorNotification(
@@ -1545,6 +1546,7 @@ export default defineComponent({
             error?.response?.data?.message ??
               error?.message ??
               t("dashboard.viewDashboard.panelMoveFailed"),
+            t,
           );
         } else {
           showErrorNotification(error?.message ?? t("dashboard.viewDashboard.panelMoveFailed"), {

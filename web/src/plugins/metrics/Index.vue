@@ -189,8 +189,8 @@ export default defineComponent({
     const router = useRouter();
     const { showErrorNotification } = useNotifications();
     const { dashboardPanelData, resetDashboardPanelData, resetAggregationFunction, validatePanel } =
-      useDashboardPanelData("metrics");
-    const { applyDefaultPanelFields } = useDefaultPanelFields("metrics");
+      useDashboardPanelData("metrics", t);
+    const { applyDefaultPanelFields } = useDefaultPanelFields("metrics", t);
     const editMode = ref(false);
     const selectedDate: any = ref({
       valueType: "relative",
@@ -527,7 +527,7 @@ export default defineComponent({
 
       return searchIds.flat() as string[];
     });
-    const { traceIdRef, cancelQuery } = useCancelQuery();
+    const { traceIdRef, cancelQuery } = useCancelQuery(t);
 
     const cancelAddPanelQuery = () => {
       traceIdRef.value = searchRequestTraceIds.value;

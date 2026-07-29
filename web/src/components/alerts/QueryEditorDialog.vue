@@ -910,10 +910,13 @@ const buildMultiWindowQuery = (sql: string, periodInMicroseconds: number) => {
 // Query execution
 const triggerQuery = async (fn = false) => {
   try {
-    const queryReq = buildQueryPayload({
-      sqlMode: true,
-      streamName: props.streamName,
-    });
+    const queryReq = buildQueryPayload(
+      {
+        sqlMode: true,
+        streamName: props.streamName,
+      },
+      t,
+    );
     queryReq.query.sql = localSqlQuery.value;
     queryReq.query.size = 10;
 
@@ -1018,10 +1021,13 @@ const runTestFunction = async () => {
 };
 
 const triggerPromqlQuery = async () => {
-  const queryReq = buildQueryPayload({
-    sqlMode: true,
-    streamName: props.streamName,
-  });
+  const queryReq = buildQueryPayload(
+    {
+      sqlMode: true,
+      streamName: props.streamName,
+    },
+    t,
+  );
 
   const periodInMicroseconds = props.period * 60 * 1000000;
   const endTime = new Date().getTime() * 1000;

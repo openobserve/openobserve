@@ -60,6 +60,7 @@ import {
   watch,
   type PropType,
 } from "vue";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import useNotifications from "@/composables/useNotifications";
@@ -103,8 +104,11 @@ export default defineComponent({
 
     const store = useStore();
     const { showErrorNotification } = useNotifications();
-    const { dashboardPanelData, resetDashboardPanelData, validatePanel } =
-      useDashboardPanelData("metrics");
+    const { t } = useI18nTyped();
+    const { dashboardPanelData, resetDashboardPanelData, validatePanel } = useDashboardPanelData(
+      "metrics",
+      t,
+    );
 
     const panelEditorRef = ref<any>(null);
     const showAddToDashboardDialog = ref(false);

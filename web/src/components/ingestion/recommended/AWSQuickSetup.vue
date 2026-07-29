@@ -438,7 +438,7 @@ export default defineComponent({
     });
 
     const copyParam = (value: string) => {
-      copyToClipboard(value, {
+      copyToClipboard(value, t, {
         successMessage: "Copied to clipboard",
         timeout: 1500,
       });

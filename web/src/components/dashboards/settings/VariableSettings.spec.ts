@@ -401,6 +401,7 @@ describe("VariableSettings", () => {
 
       expect(mockNotifications.showConfictErrorNotificationWithRefreshBtn).toHaveBeenCalledWith(
         "Conflict error",
+        expect.any(Function),
       );
       // No positive notification should be called when error occurs
       expect(mockNotifications.showPositiveNotification).not.toHaveBeenCalled();
@@ -477,6 +478,7 @@ describe("VariableSettings", () => {
 
       expect(mockNotifications.showConfictErrorNotificationWithRefreshBtn).toHaveBeenCalledWith(
         "Reorder conflict",
+        expect.any(Function),
       );
     });
 

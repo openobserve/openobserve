@@ -677,11 +677,16 @@ export default defineComponent({
       // the Favorites pseudo-folder as a real folder id.
       const folderId =
         row.folder_id || (showFavoritesOnly.value ? "default" : activeFolderId.value) || "default";
-      toggleFavoriteSetting(org, userId, {
-        dashboardId: row.id,
-        folderId,
-        label: row.name,
-      });
+      toggleFavoriteSetting(
+        org,
+        userId,
+        {
+          dashboardId: row.id,
+          folderId,
+          label: row.name,
+        },
+        t,
+      );
     };
     const openHomeDashboard = async () => {
       if (!homeDashboard.value) return;

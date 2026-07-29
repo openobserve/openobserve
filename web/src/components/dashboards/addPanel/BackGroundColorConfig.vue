@@ -36,8 +36,8 @@ export default defineComponent({
   setup() {
     // Destructure props and emit if needed
     const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
-    const { dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey);
     const { t } = useI18nTyped();
+    const { dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey, t);
 
     const colorModeOptions = [
       { label: t("dashboard.none"), value: "" },

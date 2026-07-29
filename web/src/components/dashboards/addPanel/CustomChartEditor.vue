@@ -38,6 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref, watch } from "vue";
 import { defineAsyncComponent } from "vue";
 const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 
@@ -58,7 +59,8 @@ export default defineComponent({
     const splitterModel = ref(50);
     const dataToBeRendered = ref({});
     const store = useStore();
-    const { dashboardPanelData } = useDashboardPanelData("dashboard");
+    const { t } = useI18nTyped();
+    const { dashboardPanelData } = useDashboardPanelData("dashboard", t);
 
     // Watch for prop changes and update the editor content
     watch(

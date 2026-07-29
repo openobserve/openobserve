@@ -190,7 +190,7 @@ function toggleStackTrace() {
 
 function copyStackTrace() {
   const stack = se.value?.stack;
-  if (stack) copyToClipboard(stack);
+  if (stack) copyToClipboard(stack, t);
 }
 
 function toggleExpanded() {

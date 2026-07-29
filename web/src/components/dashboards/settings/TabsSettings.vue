@@ -300,6 +300,7 @@ export default defineComponent({
             error?.response?.data?.message ??
               error?.message ??
               t("dashboard.tabsSettings.tabReorderFailed"),
+            t,
           );
         } else {
           showErrorNotification(error?.message ?? t("dashboard.tabsSettings.tabReorderFailed"));
@@ -342,6 +343,7 @@ export default defineComponent({
             error?.response?.data?.message ??
               error?.message ??
               t("dashboard.tabsSettings.tabUpdationFailed"),
+            t,
           );
         } else {
           showErrorNotification(error?.message ?? t("dashboard.tabsSettings.tabUpdationFailed"));
@@ -392,6 +394,7 @@ export default defineComponent({
             error?.response?.data?.message ??
               error?.message ??
               t("dashboard.tabsSettings.tabDeletionFailed"),
+            t,
           );
         } else {
           showErrorNotification(error?.message ?? t("dashboard.tabsSettings.tabDeletionFailed"), {

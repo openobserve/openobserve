@@ -21,7 +21,7 @@ import searchService from "@/services/search";
 import useNotifications from "@/composables/useNotifications";
 import useHistogram from "@/composables/useLogs/useHistogram";
 import useStreamFields from "@/composables/useLogs/useStreamFields";
-import { gt } from "@/types/i18n";
+import { useI18nTyped } from "@/types/i18n";
 import {
   SearchAroundParams,
   StreamField,
@@ -31,6 +31,9 @@ import {
 } from "@/ts/interfaces";
 
 export const useSearchAround = () => {
+  // Safe to obtain here: useSearchAround() is only ever called from a component
+  // setup (SearchResult.vue), never from a spec or a plain function.
+  const { t } = useI18nTyped();
   const { searchObj, notificationMsg } = searchState();
   const { showErrorNotification } = useNotifications();
 
@@ -225,7 +228,7 @@ export const useSearchAround = () => {
       searchObj.loading = false;
       const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
       showErrorNotification(
-        gt("toastMessages.useLogs.errorWhileFetchingData", { error: errorMessage }),
+        t("toastMessages.useLogs.errorWhileFetchingData", { error: errorMessage }),
       );
     }
   };

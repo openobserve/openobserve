@@ -17,6 +17,10 @@ import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import useStreams from "@/composables/useStreams";
 import StreamService from "@/services/stream";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import i18nInstance from "@/locales";
+// Converted composables take an injected translator; this spec runs outside a
+// component, so it supplies the shared instance's t.
+const t = (i18nInstance.global as any).t;
 
 // Mock Stream Service
 vi.mock("@/services/stream", () => ({
@@ -103,7 +107,7 @@ describe("useStreams Composable", () => {
       },
     });
 
-    streamsInstance = useStreams();
+    streamsInstance = useStreams(t);
   });
 
   afterEach(() => {

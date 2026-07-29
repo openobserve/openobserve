@@ -564,7 +564,7 @@ export default defineComponent({
     };
 
     const perPageOptionsList = [20, 50, 100, 250, 500];
-    const { getStreams, resetStreamType, getStream } = useStreams();
+    const { getStreams, resetStreamType, getStream } = useStreams(t);
 
     onBeforeMount(() => {
       getLookupTables();

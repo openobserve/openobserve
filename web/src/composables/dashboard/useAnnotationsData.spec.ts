@@ -1,4 +1,8 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
+import i18nInstance from "@/locales";
+
+// Injected translator — this spec runs outside a component.
+const t = (i18nInstance.global as any).t;
 import { nextTick } from "vue";
 import { useAnnotationsData } from "./useAnnotationsData";
 import { getDashboard } from "@/utils/commons";
@@ -53,6 +57,7 @@ describe("useAnnotationsData", () => {
       "test-dashboard",
       "test-panel",
       "test-folder",
+      t,
     );
 
     expect(composable).toBeDefined();
@@ -82,6 +87,7 @@ describe("useAnnotationsData", () => {
         "test-dashboard",
         "test-panel",
         "test-folder",
+        t,
       );
 
       composable.enableAddAnnotationMode();
@@ -95,6 +101,7 @@ describe("useAnnotationsData", () => {
         "test-dashboard",
         "test-panel",
         "test-folder",
+        t,
       );
 
       composable.enableAddAnnotationMode();
@@ -110,6 +117,7 @@ describe("useAnnotationsData", () => {
         "test-dashboard",
         "test-panel",
         "test-folder",
+        t,
       );
 
       expect(composable.isAddAnnotationMode.value).toBe(false);
@@ -129,6 +137,7 @@ describe("useAnnotationsData", () => {
         "test-dashboard",
         "test-panel",
         "test-folder",
+        t,
       );
 
       composable.showAddAnnotationDialog();
@@ -142,6 +151,7 @@ describe("useAnnotationsData", () => {
         "test-dashboard",
         "test-panel",
         "test-folder",
+        t,
       );
 
       // Set some initial state
@@ -164,6 +174,7 @@ describe("useAnnotationsData", () => {
         "test-dashboard",
         "test-panel",
         "test-folder",
+        t,
       );
 
       composable.enableAddAnnotationMode();
@@ -186,6 +197,7 @@ describe("useAnnotationsData", () => {
         "test-dashboard",
         "test-panel",
         "test-folder",
+        t,
       );
 
       // Input is in milliseconds (chart timestamp format)
@@ -208,6 +220,7 @@ describe("useAnnotationsData", () => {
         "test-dashboard",
         "test-panel",
         "test-folder",
+        t,
       );
 
       composable.handleAddAnnotation(1500, null);
@@ -228,6 +241,7 @@ describe("useAnnotationsData", () => {
         "test-dashboard",
         "test-panel",
         "test-folder",
+        t,
       );
 
       composable.handleAddAnnotation(null, 2500);
@@ -248,6 +262,7 @@ describe("useAnnotationsData", () => {
         "test-dashboard",
         "test-panel",
         "test-folder",
+        t,
       );
 
       composable.handleAddAnnotation(null, null);
@@ -268,6 +283,7 @@ describe("useAnnotationsData", () => {
         "test-dashboard",
         "test-panel",
         "test-folder",
+        t,
       );
 
       composable.handleAddAnnotation(0, 0);
@@ -288,6 +304,7 @@ describe("useAnnotationsData", () => {
         "test-dashboard",
         "test-panel",
         "test-folder",
+        t,
       );
 
       composable.handleAddAnnotation(-1500, -500);
@@ -308,6 +325,7 @@ describe("useAnnotationsData", () => {
         "test-dashboard",
         "different-panel",
         "test-folder",
+        t,
       );
 
       composable.handleAddAnnotation(1000, 2000);
@@ -323,6 +341,7 @@ describe("useAnnotationsData", () => {
         "test-dashboard",
         "test-panel",
         "test-folder",
+        t,
       );
 
       const annotationData = {
@@ -345,6 +364,7 @@ describe("useAnnotationsData", () => {
         "test-dashboard",
         "test-panel",
         "test-folder",
+        t,
       );
 
       // Set initial state
@@ -369,6 +389,7 @@ describe("useAnnotationsData", () => {
         "test-dashboard",
         "test-panel",
         "test-folder",
+        t,
       );
 
       composable.enableAddAnnotationMode();
@@ -386,6 +407,7 @@ describe("useAnnotationsData", () => {
         "test-dashboard",
         "test-panel",
         "test-folder",
+        t,
       );
 
       composable.enableAddAnnotationMode();
@@ -407,6 +429,7 @@ describe("useAnnotationsData", () => {
         "test-dashboard",
         "test-panel",
         "test-folder",
+        t,
       );
 
       const mockDashboardData = {
@@ -491,6 +514,7 @@ describe("useAnnotationsData", () => {
         "test-dashboard",
         "test-panel",
         "test-folder",
+        t,
       );
 
       const mockDashboardData = {};
@@ -507,6 +531,7 @@ describe("useAnnotationsData", () => {
         "test-dashboard",
         "test-panel",
         "test-folder",
+        t,
       );
 
       const mockDashboardData = {
@@ -530,6 +555,7 @@ describe("useAnnotationsData", () => {
         "test-dashboard",
         "test-panel",
         "test-folder",
+        t,
       );
 
       const mockDashboardData = {
@@ -554,6 +580,7 @@ describe("useAnnotationsData", () => {
         "test-dashboard",
         "test-panel",
         "test-folder",
+        t,
       );
 
       const mockDashboardData = {
@@ -583,6 +610,7 @@ describe("useAnnotationsData", () => {
         "test-dashboard",
         "test-panel",
         "test-folder",
+        t,
       );
 
       const mockDashboardData = {
@@ -613,6 +641,7 @@ describe("useAnnotationsData", () => {
         "test-dashboard",
         "test-panel",
         "test-folder",
+        t,
       );
 
       const mockDashboardData = {
@@ -643,6 +672,7 @@ describe("useAnnotationsData", () => {
         "test-dashboard",
         "test-panel",
         "test-folder",
+        t,
       );
 
       const supportedTypes = [
@@ -682,6 +712,7 @@ describe("useAnnotationsData", () => {
         "test-dashboard",
         "test-panel",
         "test-folder",
+        t,
       );
 
       const mockError = new Error("Failed to fetch dashboard");
@@ -699,6 +730,7 @@ describe("useAnnotationsData", () => {
         "test-dashboard",
         "test-panel",
         "test-folder",
+        t,
       );
 
       mockGetDashboard.mockResolvedValue({ tabs: [] });
@@ -710,8 +742,8 @@ describe("useAnnotationsData", () => {
   });
 
   it("should create independent instances", () => {
-    const composable1 = useAnnotationsData("org1", "dash1", "panel1", "folder1");
-    const composable2 = useAnnotationsData("org2", "dash2", "panel2", "folder2");
+    const composable1 = useAnnotationsData("org1", "dash1", "panel1", "folder1", t);
+    const composable2 = useAnnotationsData("org2", "dash2", "panel2", "folder2", t);
 
     composable1.enableAddAnnotationMode();
 
@@ -725,6 +757,7 @@ describe("useAnnotationsData", () => {
       "test-dashboard",
       "test-panel",
       "test-folder",
+      t,
     );
 
     // Add annotation (input in milliseconds, output in microseconds)

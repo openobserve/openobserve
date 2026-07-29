@@ -45,6 +45,7 @@
 
 <script lang="ts">
 import { getImageURL } from "@/utils/zincutils";
+import { useI18nTyped } from "@/types/i18n";
 import DropzoneBackground from "@/plugins/pipelines/DropzoneBackground.vue";
 import { defineComponent, computed, watch, type PropType } from "vue";
 import { VueFlow, type Node, type Edge } from "@vue-flow/core";
@@ -83,7 +84,8 @@ export default defineComponent({
   },
   components: { VueFlow, CustomNode, DropzoneBackground, FlowEdge },
   setup(props) {
-    const { pipelineObj } = useDragAndDrop();
+    const { t } = useI18nTyped();
+    const { pipelineObj } = useDragAndDrop(t);
     const vueFlowRef = ref<InstanceType<typeof VueFlow> | null>(null);
     // Computed properties for nodes and edges
     const lockedNodes = computed(() => {

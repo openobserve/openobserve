@@ -227,7 +227,7 @@ const builtInVars: { name: string; desc: string }[] = [
 const showBuiltIns = ref(false);
 
 function copyVar(name: string) {
-  copyToClipboard(`{${name}}`, { successMessage: `Copied {${name}}` });
+  copyToClipboard(`{${name}}`, t, { successMessage: `Copied {${name}}` });
 }
 
 defineExpose({ applyTemplate, previewTemplate });

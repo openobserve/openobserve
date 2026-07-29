@@ -250,7 +250,7 @@ const {
   closeStepPicker,
   onDragStart,
   addNodeToEnd,
-} = useWorkflowCanvas();
+} = useWorkflowCanvas(t);
 
 // Docked palette items, grouped into sections (Transform / Destination) to
 // mirror the pipeline sidebar. The trigger is pre-placed and not addable, so

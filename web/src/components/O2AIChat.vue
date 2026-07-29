@@ -500,7 +500,7 @@
                             size="icon-xs-circle"
                             class="copy-btn opacity-60 hover:opacity-100"
                             @click.stop="
-                              copyToClipboard(getToolCallDisplayData(block.context)?.query)
+                              copyToClipboard(getToolCallDisplayData(block.context)?.query, t)
                             "
                           >
                             <OIcon name="content-copy" size="sm" />
@@ -613,7 +613,7 @@
                             size="icon-xs-circle"
                             class="copy-btn opacity-60 hover:opacity-100"
                             @click.stop="
-                              copyToClipboard(getToolCallDisplayData(block.context)?.vrl)
+                              copyToClipboard(getToolCallDisplayData(block.context)?.vrl, t)
                             "
                           >
                             <OIcon name="content-copy" size="sm" />
@@ -638,7 +638,7 @@
                             size="icon-xs-circle"
                             class="copy-btn opacity-60 hover:opacity-100"
                             @click.stop="
-                              copyToClipboard(getToolCallDisplayData(block.context)?.command)
+                              copyToClipboard(getToolCallDisplayData(block.context)?.command, t)
                             "
                           >
                             <OIcon name="content-copy" size="sm" />
@@ -663,7 +663,7 @@
                               size="icon-xs-circle"
                               class="copy-btn opacity-60 hover:opacity-100"
                               @click.stop="
-                                copyToClipboard(JSON.stringify(block.response.hits, null, 2))
+                                copyToClipboard(JSON.stringify(block.response.hits, null, 2), t)
                               "
                             >
                               <OIcon name="content-copy" size="sm" />
@@ -797,7 +797,7 @@
                               size="icon-xs-circle"
                               class="copy-btn opacity-60 hover:opacity-100"
                               @click.stop="
-                                copyToClipboard(JSON.stringify(block.response.items, null, 2))
+                                copyToClipboard(JSON.stringify(block.response.items, null, 2), t)
                               "
                             >
                               <OIcon name="content-copy" size="sm" />
@@ -839,6 +839,7 @@
                                 typeof block.response === 'string'
                                   ? block.response
                                   : JSON.stringify(block.response, null, 2),
+                                t,
                               )
                             "
                           >
@@ -891,7 +892,7 @@
                           variant="ghost"
                           size="icon-xs-circle"
                           class="copy-btn rounded-default absolute top-2 right-2 z-1 px-2 py-1 opacity-60 [background:color-mix(in_srgb,var(--color-text-heading)_10%,transparent)] hover:opacity-100 hover:[background:color-mix(in_srgb,var(--color-text-heading)_8%,transparent)] dark:hover:[background:color-mix(in_srgb,var(--color-text-heading)_15%,transparent)]"
-                          @click.stop="copyToClipboard(block.content)"
+                          @click.stop="copyToClipboard(block.content, t)"
                         >
                           <OIcon name="content-copy" size="sm" />
                           <OTooltip :content="t('aiAssistant.copyContent')" />
@@ -965,7 +966,7 @@
                             variant="ghost"
                             size="xs"
                             class="copy-button"
-                            @click="copyToClipboard(textBlock.content)"
+                            @click="copyToClipboard(textBlock.content, t)"
                           >
                             <OIcon size="sm" name="content-copy" />
                             <span class="ml-1">{{ t("common.copy") }}</span>
@@ -1038,7 +1039,7 @@
                           variant="ghost"
                           size="xs"
                           class="copy-button"
-                          @click="copyToClipboard(block.content)"
+                          @click="copyToClipboard(block.content, t)"
                         >
                           <OIcon size="sm" name="content-copy" />
                           <span class="ml-1">{{ t("common.copy") }}</span>

@@ -164,7 +164,7 @@ const {
   onDrop,
   onDragOver,
   openTriggerPicker,
-} = useWorkflowCanvas();
+} = useWorkflowCanvas(t);
 
 const { onNodesInitialized, setViewport, viewport, dimensions, findNode } = useVueFlow();
 

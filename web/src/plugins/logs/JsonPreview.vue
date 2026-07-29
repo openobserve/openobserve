@@ -351,7 +351,7 @@ export default {
 
     const streamSearchValue = ref<string>("");
 
-    const { getStreams } = useStreams();
+    const { getStreams } = useStreams(t);
 
     const filteredTracesStreamOptions = ref([]);
 
@@ -801,7 +801,7 @@ export default {
 
     const copySelectedText = () => {
       if (selectedText.value) {
-        copyToClipboard(selectedText.value, {
+        copyToClipboard(selectedText.value, t, {
           successMessage: t("logs.jsonPreview.textCopiedToClipboard"),
           errorMessage: t("logs.jsonPreview.failedToCopyText"),
           timeout: 1500,

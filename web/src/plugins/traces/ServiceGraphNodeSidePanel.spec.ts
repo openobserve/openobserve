@@ -47,7 +47,7 @@ vi.mock("@/services/service_streams", () => ({
   buildChipDimensionsFromFilters: vi.fn().mockReturnValue({}),
 }));
 
-// resolveStreamSchema calls useStreams().getStream() to fetch and cache the
+// resolveStreamSchema calls useStreams(t).getStream() to fetch and cache the
 // stream schema. Mock it so those calls complete instantly instead of making
 // real HTTP requests that hang in tests.
 const { getStreamMock } = vi.hoisted(() => ({

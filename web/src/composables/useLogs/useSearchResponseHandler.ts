@@ -163,7 +163,7 @@ export const useSearchResponseHandler = () => {
       searchObj.loadingHistogramProgressPercentage = 0;
       searchObj.data.isOperationCancelled = false;
 
-      showCancelSearchNotification();
+      showCancelSearchNotification(t);
       setCancelSearchError();
     }
   };
@@ -533,7 +533,7 @@ export const useSearchResponseHandler = () => {
     const { message, trace_id, code, error_detail, error } = err.content;
 
     if (code === 20009) {
-      showCancelSearchNotification();
+      showCancelSearchNotification(t);
       setCancelSearchError();
     }
 

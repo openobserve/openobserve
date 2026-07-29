@@ -39,7 +39,7 @@ import { makeEdge } from "@/composables/flow/makeEdge";
 import { getTruncatedConditions } from "@/utils/conditionPreview";
 import workflowService from "@/services/workflows";
 import type { I18nKey } from "@/types/i18n";
-import { gt } from "@/types/i18n";
+import type { TranslateFn } from "@/types/i18n";
 
 export type WorkflowNodeCategory = "trigger" | "logic" | "action";
 
@@ -485,7 +485,9 @@ export const hydrateWorkflow = (wf: any) => {
   workflowObj.isEditWorkflow = true;
 };
 
-export default function useWorkflowCanvas() {
+// `t` injected: this composable is invoked directly by specs outside any
+// component, so it cannot obtain a translator itself.
+export default function useWorkflowCanvas(t: TranslateFn) {
   const { screenToFlowCoordinate, onNodesInitialized, updateNode } = useVueFlow();
 
   // --- edge helpers ----------------------------------------------------------
@@ -520,7 +522,7 @@ export default function useWorkflowCanvas() {
     // one incoming edge per node
     if (edges.some((e: any) => e.target === connection.target)) {
       toast({
-        message: gt("toastMessages.workflows.onlyOneIncomingConnectionToA"),
+        message: t("toastMessages.workflows.onlyOneIncomingConnectionToA"),
         variant: "warning",
       });
       return;
@@ -528,7 +530,7 @@ export default function useWorkflowCanvas() {
 
     if (detectCycle(edges, connection)) {
       toast({
-        message: gt("toastMessages.workflows.thisConnectionWouldCreateALoop"),
+        message: t("toastMessages.workflows.thisConnectionWouldCreateALoop"),
         variant: "warning",
       });
       return;
@@ -560,7 +562,7 @@ export default function useWorkflowCanvas() {
     const node = wf.nodes.find((n: any) => n.id === nodeId);
     if (node?.data?.node_type === "workflow_trigger") {
       toast({
-        message: gt("toastMessages.workflows.theTriggerStartsTheWorkflowAnd"),
+        message: t("toastMessages.workflows.theTriggerStartsTheWorkflowAnd"),
         variant: "warning",
       });
       return;
@@ -577,7 +579,7 @@ export default function useWorkflowCanvas() {
     // The trigger anchors the workflow and can't be removed.
     if (node?.data?.node_type === "workflow_trigger") {
       toast({
-        message: gt("toastMessages.workflows.theTriggerStartsTheWorkflowAnd"),
+        message: t("toastMessages.workflows.theTriggerStartsTheWorkflowAnd"),
         variant: "warning",
       });
       return;
@@ -664,7 +666,7 @@ export default function useWorkflowCanvas() {
   }
   function warnTriggerFirst() {
     toast({
-      message: gt("toastMessages.workflows.chooseATriggerNodeToStart"),
+      message: t("toastMessages.workflows.chooseATriggerNodeToStart"),
       variant: "warning",
     });
   }
@@ -680,7 +682,7 @@ export default function useWorkflowCanvas() {
     if (!src) return;
     if (isTerminal(src)) {
       toast({
-        message: gt("toastMessages.workflows.thisBranchAlreadyEndsInA"),
+        message: t("toastMessages.workflows.thisBranchAlreadyEndsInA"),
         variant: "warning",
       });
       return;

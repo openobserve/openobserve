@@ -72,7 +72,7 @@ export default defineComponent({
     const { t } = useI18nTyped();
     const store = useStore();
     const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
-    const { dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey);
+    const { dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey, t);
 
     const showColorBySeriesPopUp = ref(false);
 

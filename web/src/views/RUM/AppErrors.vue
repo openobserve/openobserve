@@ -358,7 +358,7 @@ const {
   cancelAll,
   fetchTrend,
   lastQueryError,
-} = useErrorIssuesData();
+} = useErrorIssuesData(t);
 
 // Turn the last issues-search server error into editor squiggles (filter mode).
 watch(lastQueryError, async (err) => {
@@ -378,7 +378,7 @@ watch(lastQueryError, async (err) => {
 const store = useStore();
 const isLoading: Ref<true[]> = ref([]);
 const isMounted = ref(false);
-const { getStream } = useStreams();
+const { getStream } = useStreams(t);
 const schemaMapping: Ref<{ [key: string]: boolean }> = ref({});
 
 const tableErrors = computed(() =>

@@ -439,7 +439,7 @@ async function saveTemplate(value: AddTemplateForm) {
 }
 
 const copyTemplateBody = (text: any) => {
-  copyToClipboard(JSON.parse(JSON.stringify(text)), {
+  copyToClipboard(JSON.parse(JSON.stringify(text)), t, {
     successMessage: t("alert_templates.contentCopied"),
     timeout: 1000,
   });

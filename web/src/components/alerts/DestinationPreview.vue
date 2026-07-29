@@ -446,7 +446,7 @@ const getDestinationTypeName = (type: string): string => {
 
 // Copy template to clipboard
 const copyTemplate = () => {
-  copyToClipboard(props.templateContent, {
+  copyToClipboard(props.templateContent, t, {
     successMessage: "Template copied to clipboard",
     errorMessage: "Failed to copy template",
     timeout: 2000,

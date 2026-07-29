@@ -562,7 +562,7 @@ export default defineComponent({
     } = searchState();
     const { getStreamList, updateGridColumns, extractFields } = useStreamFields();
     const { getFunctions, getQueryData, cancelQuery, getRegionInfo, setCommunicationMethod } =
-      useSearchBar();
+      useSearchBar(t);
     let {
       getJobData,
       refreshData,
@@ -575,7 +575,7 @@ export default defineComponent({
       processHttpHistogramResults,
       loadVisualizeData,
       loadPatternsData,
-    } = useLogs();
+    } = useLogs(t);
 
     const {
       getHistogramQueryData,
@@ -584,7 +584,7 @@ export default defineComponent({
       generateHistogramSkeleton,
     } = useHistogram();
 
-    const { getStream } = useStreams();
+    const { getStream } = useStreams(t);
 
     const {
       fnParsedSQL,
@@ -596,7 +596,7 @@ export default defineComponent({
       addTraceId,
     } = logsUtils();
     const { getHistogramData, buildWebSocketPayload, buildSearch, initializeSearchConnection } =
-      useSearchStream();
+      useSearchStream(t);
 
     // Initialize patterns composable (completely separate from logs)
     const { extractPatterns, patternsState } = usePatterns();
@@ -625,14 +625,14 @@ export default defineComponent({
       resetDashboardPanelData,
       setCustomQueryFields,
       getResultSchema,
-    } = useDashboardPanelData("logs");
+    } = useDashboardPanelData("logs", t);
 
     // Get build page's dashboardPanelData for watching chart type/config changes
     const {
       dashboardPanelData: buildDashboardPanelData,
       removeXYFilters: buildRemoveXYFilters,
       updateXYFieldsForCustomQueryMode: buildUpdateXYFieldsForCustomQueryMode,
-    } = useDashboardPanelData("build");
+    } = useDashboardPanelData("build", t);
 
     const visualizeErrorData: any = reactive({
       errors: [],

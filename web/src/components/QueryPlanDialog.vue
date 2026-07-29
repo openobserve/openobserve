@@ -230,7 +230,7 @@ export default defineComponent({
   setup(props, { emit }) {
     const { t } = useI18nTyped();
     const store = useStore();
-    const { getSearchQueryPayload } = useSearchStream();
+    const { getSearchQueryPayload } = useSearchStream(t);
 
     const loading = ref(false);
     const error = ref("");

@@ -101,8 +101,8 @@ export default defineComponent({
     const store = useStore();
     const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
     const { dashboardPanelData, removeXYFilters, updateXYFieldsForCustomQueryMode } =
-      useDashboardPanelData(dashboardPanelDataPageKey);
-    const { applyDefaultPanelFields } = useDefaultPanelFields(dashboardPanelDataPageKey);
+      useDashboardPanelData(dashboardPanelDataPageKey, t);
+    const { applyDefaultPanelFields } = useDefaultPanelFields(dashboardPanelDataPageKey, t);
     // Pages that re-seed default builder fields on the in-page Builder toggle.
     // (Entering a builder surface parses on mount, not via this handler.)
     const SEED_ON_TOGGLE_PAGES = ["dashboard", "metrics", "build", "logs"];

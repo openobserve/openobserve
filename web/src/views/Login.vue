@@ -57,7 +57,7 @@ import {
 } from "@/utils/zincutils";
 import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { gt } from "@/types/i18n";
+import { useI18nTyped } from "@/types/i18n";
 
 export default defineComponent({
   name: "LoginPage",
@@ -67,6 +67,7 @@ export default defineComponent({
   },
   setup() {
     const store = useStore();
+    const { t } = useI18nTyped();
     const { isDark } = useTheme();
     let orgOptions = ref([{ label: Number, value: String }]);
     const selectedOrg = ref({});
@@ -257,6 +258,7 @@ export default defineComponent({
 
     return {
       store,
+      t,
       isDark,
       config,
       router,
@@ -346,7 +348,7 @@ export default defineComponent({
           if (res.data.data.id == 0) {
             const dismiss = toast({
               variant: "loading",
-              message: gt("toastMessages.views.pleaseWaitWhileCreatingNewUser"),
+              message: this.t("toastMessages.views.pleaseWaitWhileCreatingNewUser"),
               timeout: 0,
             });
 
@@ -373,7 +375,7 @@ export default defineComponent({
         .catch((error) => {
           toast({
             variant: "loading",
-            message: gt("toastMessages.views.errorWhileVerifyingUser"),
+            message: this.t("toastMessages.views.errorWhileVerifyingUser"),
             timeout: 0,
           });
           if (error.status === 403) this.signout();

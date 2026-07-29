@@ -195,10 +195,10 @@ const { t } = useI18nTyped();
 const store = useStore();
 
 const { addNode, pipelineObj, deletePipelineNode, checkIfDefaultDestinationNode } =
-  useDragAndDrop();
+  useDragAndDrop(t);
 const { getUsedStreamsList } = usePipelines();
 
-const { getStreams } = useStreams();
+const { getStreams } = useStreams(t);
 
 const createNewStream = ref(false);
 const isUpdating = ref(false);

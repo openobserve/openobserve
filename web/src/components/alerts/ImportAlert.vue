@@ -359,7 +359,7 @@ export default defineComponent({
     const store = useStore();
     const router = useRouter();
 
-    const { getStreams } = useStreams();
+    const { getStreams } = useStreams(t);
 
     const baseImportRef = ref<any>(null);
     const alertErrorsToDisplay = ref<AlertErrors>([]);

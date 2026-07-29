@@ -1143,7 +1143,7 @@ const props = withDefaults(defineProps<Props>(), {
 });
 
 // ── Synthetic results composable ──────────────────────────────────────────
-const synthetics = useSyntheticResults();
+const synthetics = useSyntheticResults(t);
 const kpiLoading = computed(() => synthetics.kpiLoading.value);
 const histogramLoading = computed(() => synthetics.histogramLoading.value);
 const runsLoading = computed(() => synthetics.runsLoading.value);

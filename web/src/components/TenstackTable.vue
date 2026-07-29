@@ -1635,7 +1635,7 @@ const shouldShowCopyButton = (value: any) => {
 
 const copyCellContent = (value: any, rowIndex: number, colName: string) => {
   if (value === null || value === undefined) return;
-  copyToClipboard(String(value), { silent: true }).then(() => {
+  copyToClipboard(String(value), t, { silent: true }).then(() => {
     const key = `${rowIndex}_${colName}`;
     copiedCells.value.set(key, true);
     setTimeout(() => copiedCells.value.delete(key), 3000);

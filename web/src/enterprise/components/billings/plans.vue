@@ -169,7 +169,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref, computed } from "vue";
-import { useI18nTyped, gt } from "@/types/i18n";
+import { useI18nTyped } from "@/types/i18n";
 import EnterprisePlan from "./enterprisePlan.vue";
 import ProPlan from "./proPlan.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -350,7 +350,7 @@ export default defineComponent({
           // Only show subscribe prompt for Stripe orgs without subscription
           toast({
             variant: "warning",
-            message: gt("toastMessages.billings.pleaseSubscribeToOneOfThe"),
+            message: this.t("toastMessages.billings.pleaseSubscribeToOneOfThe"),
             timeout: 5000,
           });
 

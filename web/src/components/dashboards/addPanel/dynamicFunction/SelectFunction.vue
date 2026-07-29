@@ -196,7 +196,7 @@ export default {
 
     const { t } = useI18nTyped();
     const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
-    const { getAllSelectedStreams } = useDashboardPanelData(dashboardPanelDataPageKey);
+    const { getAllSelectedStreams } = useDashboardPanelData(dashboardPanelDataPageKey, t);
 
     const fields = ref(addMissingArgs(props.modelValue));
 

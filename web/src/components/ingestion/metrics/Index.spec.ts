@@ -311,11 +311,15 @@ describe("IngestMetrics Component", () => {
       const mockContent = { innerText: "prometheus config snippet" };
       wrapper.vm.copyToClipboardFn(mockContent);
 
-      expect(copyToClipboard).toHaveBeenCalledWith("prometheus config snippet", {
-        successMessage: "Content Copied Successfully!",
-        errorMessage: "Error while copy content.",
-        timeout: 5000,
-      });
+      expect(copyToClipboard).toHaveBeenCalledWith(
+        "prometheus config snippet",
+        expect.any(Function),
+        {
+          successMessage: "Content Copied Successfully!",
+          errorMessage: "Error while copy content.",
+          timeout: 5000,
+        },
+      );
     });
 
     it("should pass correct success options when copying", async () => {
@@ -323,7 +327,7 @@ describe("IngestMetrics Component", () => {
 
       wrapper.vm.copyToClipboardFn({ innerText: "some text" });
 
-      expect(copyToClipboard).toHaveBeenCalledWith("some text", {
+      expect(copyToClipboard).toHaveBeenCalledWith("some text", expect.any(Function), {
         successMessage: "Content Copied Successfully!",
         errorMessage: "Error while copy content.",
         timeout: 5000,
@@ -335,7 +339,7 @@ describe("IngestMetrics Component", () => {
 
       wrapper.vm.copyToClipboardFn({ innerText: "fail text" });
 
-      expect(copyToClipboard).toHaveBeenCalledWith("fail text", {
+      expect(copyToClipboard).toHaveBeenCalledWith("fail text", expect.any(Function), {
         successMessage: expect.any(String),
         errorMessage: "Error while copy content.",
         timeout: 5000,
@@ -389,7 +393,7 @@ describe("IngestMetrics Component", () => {
 
       wrapper.vm.copyToClipboardFn({ innerText: "" });
 
-      expect(copyToClipboard).toHaveBeenCalledWith("", {
+      expect(copyToClipboard).toHaveBeenCalledWith("", expect.any(Function), {
         successMessage: "Content Copied Successfully!",
         errorMessage: "Error while copy content.",
         timeout: 5000,
@@ -401,7 +405,7 @@ describe("IngestMetrics Component", () => {
 
       wrapper.vm.copyToClipboardFn({});
 
-      expect(copyToClipboard).toHaveBeenCalledWith(undefined, {
+      expect(copyToClipboard).toHaveBeenCalledWith(undefined, expect.any(Function), {
         successMessage: "Content Copied Successfully!",
         errorMessage: "Error while copy content.",
         timeout: 5000,

@@ -121,7 +121,7 @@
                       size="icon-chip"
                       class="ml-2"
                       @click.stop="
-                        copyToClipboard(row.sql, {
+                        copyToClipboard(row.sql, t, {
                           successMessage: t('logs.searchHistory.sqlQueryCopied'),
                           timeout: 5000,
                         })
@@ -194,7 +194,7 @@
                       size="icon-chip"
                       class="ml-2"
                       @click.stop="
-                        copyToClipboard(row.function, {
+                        copyToClipboard(row.function, t, {
                           successMessage: t('logs.searchHistory.functionDefinitionCopied'),
                           timeout: 5000,
                         })

@@ -116,8 +116,7 @@ export default {
     const dropdownOpenMap = reactive<Record<string, boolean>>({});
 
     const copyToClipboard = () => {
-      copyTextToClipboard(JSON.stringify(props.value, null, 2), {
-        successMessage: t("common.copyToClipboard") + "!",
+      copyTextToClipboard(JSON.stringify(props.value, null, 2), t, {
         timeout: 1500,
       });
       emit("copy", props.value);

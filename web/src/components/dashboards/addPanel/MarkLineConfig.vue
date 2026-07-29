@@ -86,7 +86,7 @@ export default defineComponent({
     ];
 
     const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
-    const { dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey);
+    const { dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey, t);
 
     onBeforeMount(() => {
       // Ensure that the mark_line object is initialized in config

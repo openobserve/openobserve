@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { computed, onScopeDispose, ref, shallowRef, watch } from "vue";
+import type { TranslateFn } from "@/types/i18n";
 import { useStore } from "vuex";
 import useStreams from "@/composables/useStreams";
 import useHttpStreamingSearch from "@/composables/useStreamingSearch";
@@ -253,9 +254,9 @@ function writeJson(key: string, value: unknown) {
   }
 }
 
-export function useMetricsExplorerGrid() {
+export function useMetricsExplorerGrid(t: TranslateFn) {
   const store = useStore();
-  const { getStreams } = useStreams();
+  const { getStreams } = useStreams(t);
   const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } =
     useHttpStreamingSearch();
 

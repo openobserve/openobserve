@@ -535,7 +535,7 @@ const showExamples = ref(false);
 const copiedPattern = ref<string | null>(null);
 
 function copyPattern(pattern: string) {
-  copyToClipboard(pattern, { silent: true }).then((success) => {
+  copyToClipboard(pattern, t, { silent: true }).then((success) => {
     if (success) {
       copiedPattern.value = pattern;
       setTimeout(() => {

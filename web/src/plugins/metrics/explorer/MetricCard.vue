@@ -655,7 +655,7 @@ export default defineComponent({
     });
 
     const copyErrorReport = () =>
-      copyToClipboard(errorReport.value, {
+      copyToClipboard(errorReport.value, t, {
         successMessage: t("metrics.explorer.card.errorCopied"),
       });
 

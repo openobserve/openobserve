@@ -568,7 +568,7 @@ const onQueryEditorBlur = async () => {
 };
 
 const schemaMapping: Ref<{ [key: string]: boolean }> = ref({});
-const { getStream } = useStreams();
+const { getStream } = useStreams(t);
 
 // Autosuggestions — field names, operators, filter values
 const {
@@ -878,7 +878,7 @@ const getSessions = () => {
     streamName: "_rumdata",
   };
 
-  const req = buildQueryPayload(queryPayload);
+  const req = buildQueryPayload(queryPayload, t);
 
   // Build optional fields based on schema
   let geoFields = "";

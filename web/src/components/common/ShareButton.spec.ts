@@ -164,11 +164,15 @@ describe("ShareButton", () => {
     await flushPromises();
 
     expect(mockCreate).toHaveBeenCalledWith("test-org", "https://example.com/logs?query=test");
-    expect(mockCopyToClipboard).toHaveBeenCalledWith("https://short.url/abc123", {
-      successMessage: "Link copied successfully",
-      errorMessage: "Error copying link",
-      timeout: 5000,
-    });
+    expect(mockCopyToClipboard).toHaveBeenCalledWith(
+      "https://short.url/abc123",
+      expect.any(Function),
+      {
+        successMessage: "Link copied successfully",
+        errorMessage: "Error copying link",
+        timeout: 5000,
+      },
+    );
   });
 
   it("should emit copy:success event when copy succeeds (Chrome)", async () => {

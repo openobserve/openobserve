@@ -421,7 +421,7 @@ export default defineComponent({
     const toBasicAuth = (name: string, token: string) => getBasicAuth(name, token);
 
     const copyToken = (token: string) => {
-      copyToClipboard(token);
+      copyToClipboard(token, t);
     };
 
     onBeforeMount(() => {

@@ -3,13 +3,15 @@ import useNotifications from "../useNotifications";
 import { getDashboard } from "@/utils/commons";
 import { useStore } from "vuex";
 import { getUTCTimestampFromZonedTimestamp } from "@/utils/dashboard/dateTimeUtils";
-import { gt } from "@/types/i18n";
+import type { TranslateFn } from "@/types/i18n";
 
+// `t` injected: invoked directly by specs outside any component.
 export const useAnnotationsData = (
   organization: string,
   dashboardId: string,
   panelId: string,
   folderId: string,
+  t: TranslateFn,
 ) => {
   // show annotation button
   const isAddAnnotationMode = ref(false);
@@ -89,7 +91,7 @@ export const useAnnotationsData = (
   // Watch for annotation mode to show notification
   watch(isAddAnnotationMode, () => {
     if (isAddAnnotationMode.value) {
-      showInfoNotification(gt("toastMessages.dashboard.clickOnTheChartDataOr"), {});
+      showInfoNotification(t("toastMessages.dashboard.clickOnTheChartDataOr"), {});
     }
   });
 

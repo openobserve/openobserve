@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { reactive, onBeforeMount, nextTick } from "vue";
+import type { TranslateFn } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { cloneDeep } from "lodash-es";
@@ -38,9 +39,10 @@ import useSearchBar from "@/composables/useLogs/useSearchBar";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
 import useStreamingSearch from "@/composables/useStreamingSearch";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { raw, gt } from "@/types/i18n";
+import { raw } from "@/types/i18n";
 
-const useLogs = () => {
+// `t` injected: invoked directly by specs outside any component.
+const useLogs = (t: TranslateFn) => {
   const store = useStore();
 
   let { searchObj, initialQueryPayload, resetFunctions, notificationMsg } = searchState();
@@ -49,9 +51,9 @@ const useLogs = () => {
 
   const { getPaginatedData } = usePagination();
 
-  const { buildSearch } = useSearchStream();
+  const { buildSearch } = useSearchStream(t);
 
-  const { getFunctions, getActions, getQueryData } = useSearchBar();
+  const { getFunctions, getActions, getQueryData } = useSearchBar(t);
 
   const { fnParsedSQL, fnUnparsedSQL, addTransformToQuery, isActionsEnabled } = logsUtils();
 
@@ -59,7 +61,7 @@ const useLogs = () => {
     useStreamFields();
 
   const { showErrorNotification } = useNotifications();
-  const { getStreams } = useStreams();
+  const { getStreams } = useStreams(t);
   const { cancelStreamQueryBasedOnRequestId } = useStreamingSearch();
 
   const router = useRouter();
@@ -132,9 +134,9 @@ const useLogs = () => {
           .then(() => {
             toast({
               variant: "success",
-              message: gt("toastMessages.composables.jobAddedSuccessfully"),
+              message: t("toastMessages.composables.jobAddedSuccessfully"),
               action: {
-                label: gt("toastMessages.composables.goToJobScheduler"),
+                label: t("toastMessages.composables.goToJobScheduler"),
                 handler: () => routeToSearchSchedule(),
               },
             });
@@ -149,8 +151,7 @@ const useLogs = () => {
       searchObj.loading = false;
       showErrorNotification(
         raw(
-          notificationMsg.value ||
-            gt("toastMessages.useLogs.errorOccurredDuringTheSearchOperation"),
+          notificationMsg.value || t("toastMessages.useLogs.errorOccurredDuringTheSearchOperation"),
         ),
       );
       throw e;
@@ -206,7 +207,7 @@ const useLogs = () => {
         if (searchObj.meta.logsVisualizeToggle == "logs") {
           toast({
             variant: "info",
-            message: gt("toastMessages.composables.liveModeIsEnabledOnlyTop", {
+            message: t("toastMessages.composables.liveModeIsEnabledOnlyTop", {
               count: searchObj.meta.resultGrid.rowsPerPage,
             }),
           });

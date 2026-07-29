@@ -88,7 +88,7 @@ function handleDrawerClose(v: boolean) {
 
 const store = useStore();
 const { t } = useI18nTyped();
-const { addNode, pipelineObj, deletePipelineNode } = useDragAndDrop();
+const { addNode, pipelineObj, deletePipelineNode } = useDragAndDrop(t);
 
 const picker = ref<any>(null);
 // True while the picker's inline create form is open — the drawer hides its

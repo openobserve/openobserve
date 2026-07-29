@@ -749,7 +749,7 @@ export default defineComponent({
     };
 
     const copyTraceId = () => {
-      copyToClipboard(traceId.value, {
+      copyToClipboard(traceId.value, t, {
         errorMessage: t("logs.searchJobInspector.failedToCopyTraceId"),
       }).then((success) => {
         if (success) {
@@ -763,7 +763,7 @@ export default defineComponent({
 
     const copiedSql = ref(false);
     const copySql = () => {
-      copyToClipboard(profileData.value?.sql || "", {
+      copyToClipboard(profileData.value?.sql || "", t, {
         errorMessage: t("logs.searchJobInspector.failedToCopySql"),
       }).then((success) => {
         if (success) {

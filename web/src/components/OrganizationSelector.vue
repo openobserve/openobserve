@@ -115,7 +115,7 @@ const copiedId = ref<string | null>(null);
 let copyTimer: ReturnType<typeof setTimeout> | null = null;
 
 const copyId = async (org: OrgOption) => {
-  const ok = await copyToClipboard(org.identifier, { silent: true });
+  const ok = await copyToClipboard(org.identifier, t, { silent: true });
   if (!ok) return;
   copiedId.value = org.identifier;
   if (copyTimer) clearTimeout(copyTimer);

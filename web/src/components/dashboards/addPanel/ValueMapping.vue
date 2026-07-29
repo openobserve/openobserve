@@ -52,7 +52,7 @@ export default defineComponent({
   setup() {
     const { t } = useI18nTyped();
     const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
-    const { dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey);
+    const { dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey, t);
 
     const showValueMappingPopUp = ref(false);
 

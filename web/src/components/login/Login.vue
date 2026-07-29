@@ -166,7 +166,7 @@ import { defineComponent, ref, onBeforeMount } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 
-import { useI18nTyped, gt } from "@/types/i18n";
+import { useI18nTyped } from "@/types/i18n";
 import authService from "@/services/auth";
 import organizationsService from "@/services/organizations";
 import {
@@ -441,7 +441,11 @@ export default defineComponent({
   },
   methods: {
     selected(item: any) {
-      toast({ message: gt("toastMessages.login.selectedSuggestion", { suggestion: item.label }) });
+      // `this.t` — methods are a sibling of setup(), so setup's local `t` is not
+      // in scope here; it is exposed via setup's return.
+      toast({
+        message: this.t("toastMessages.login.selectedSuggestion", { suggestion: item.label }),
+      });
     },
   },
 });

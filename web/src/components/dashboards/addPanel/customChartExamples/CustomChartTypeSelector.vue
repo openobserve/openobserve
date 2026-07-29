@@ -191,7 +191,7 @@ export default defineComponent({
   setup(props, { emit }) {
     const { t } = useI18nTyped();
     const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
-    const { dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey);
+    const { dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey, t);
 
     const chartCategories = ref<ChartCategory[]>(chartTypesData.data);
     const selectedCategory = ref<string>(chartCategories.value[0]?.chartLabel || "");

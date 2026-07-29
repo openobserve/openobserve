@@ -2,7 +2,7 @@ import { useStore } from "vuex";
 import useNotifications from "@/composables/useNotifications";
 import { b64EncodeUnicode, addSpacesToOperators } from "@/utils/zincutils";
 import { onBeforeMount, onBeforeUnmount } from "vue";
-import { gt } from "@/types/i18n";
+import type { TranslateFn } from "@/types/i18n";
 
 interface BuildQueryPayload {
   from?: number;
@@ -141,7 +141,8 @@ const useQuery = () => {
     }
   };
 
-  const buildQueryPayload = (data: BuildQueryPayload) => {
+  // `t` injected: useQuery() is called directly by specs outside any component.
+  const buildQueryPayload = (data: BuildQueryPayload, t: TranslateFn) => {
     try {
       const req: any = {
         query: {
@@ -187,7 +188,7 @@ const useQuery = () => {
 
       return req;
     } catch (e: any) {
-      showErrorNotification(gt("toastMessages.composables.invalidSqlSyntax"));
+      showErrorNotification(t("toastMessages.composables.invalidSqlSyntax"));
     }
   };
 

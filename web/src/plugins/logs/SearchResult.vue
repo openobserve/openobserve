@@ -994,13 +994,13 @@ export default defineComponent({
     const disableMoreErrorDetails = ref(false);
     const router = useRouter();
     const { searchAroundData } = useSearchAround();
-    const { refreshPagination } = useSearchStream();
+    const { refreshPagination } = useSearchStream(t);
     const { refreshPartitionPagination, refreshJobPagination } = usePagination();
     const { updatedLocalLogFilterField } = logsUtils();
     const { extractFTSFields, filterHitsColumns } = useStreamFields();
 
     const { reorderSelectedFields, getFilterExpressionByFieldType, resolveDefaultColumns } =
-      useLogs();
+      useLogs(t);
 
     const { searchObj } = searchState();
 
@@ -1619,7 +1619,7 @@ export default defineComponent({
 
     const copyLogToClipboard = (log: any, copyAsJson: boolean = true) => {
       const copyData = copyAsJson ? JSON.stringify(log) : log;
-      copyToClipboard(copyData, {
+      copyToClipboard(copyData, t, {
         successMessage: t("logs.searchResult.contentCopied"),
         timeout: 1000,
       });

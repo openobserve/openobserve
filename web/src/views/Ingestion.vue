@@ -459,7 +459,7 @@ export default defineComponent({
     };
 
     const copyToClipboardFn = (content: any) => {
-      copyToClipboard(content.innerText, {
+      copyToClipboard(content.innerText, t, {
         successMessage: "Content Copied Successfully!",
         errorMessage: "Error while copy content.",
         timeout: 5000,

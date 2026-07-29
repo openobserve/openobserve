@@ -752,7 +752,7 @@ export default defineComponent({
     });
     const route = useRoute();
     const title = ref(t("dashboard.newVariable"));
-    const { getStreams, getStream } = useStreams();
+    const { getStreams, getStream } = useStreams(t);
     const { showErrorNotification, showConfictErrorNotificationWithRefreshBtn } =
       useNotifications();
     // const model = ref(null)
@@ -1150,6 +1150,7 @@ export default defineComponent({
               error?.response?.data?.message ??
                 error?.message ??
                 t("dashboard.addSettingVariable.variableUpdateFailed"),
+              t,
             );
           } else {
             showErrorNotification(
@@ -1170,6 +1171,7 @@ export default defineComponent({
               error?.response?.data?.message ??
                 error?.message ??
                 t("dashboard.addSettingVariable.variableCreationFailed"),
+              t,
             );
           } else {
             showErrorNotification(

@@ -535,7 +535,7 @@ function formatExceptionMessage(message: any) {
 
 function copyStackTrace(stacktrace: string) {
   if (!stacktrace) return;
-  copyToClipboard(stacktrace, {
+  copyToClipboard(stacktrace, t, {
     successMessage: t("traces.stacktraceCopied"),
     errorMessage: t("traces.stacktraceCopyFailed"),
     timeout: 2000,

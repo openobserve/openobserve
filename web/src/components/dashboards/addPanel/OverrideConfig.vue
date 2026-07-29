@@ -51,8 +51,10 @@ export default defineComponent({
   setup(props) {
     const { t } = useI18nTyped();
     const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
-    const { dashboardPanelData, promqlMode, fetchPromQLLabels } =
-      useDashboardPanelData(dashboardPanelDataPageKey);
+    const { dashboardPanelData, promqlMode, fetchPromQLLabels } = useDashboardPanelData(
+      dashboardPanelDataPageKey,
+      t,
+    );
 
     const showOverrideConfigPopup = ref(false);
     const columns: any = ref<Column[]>([]);

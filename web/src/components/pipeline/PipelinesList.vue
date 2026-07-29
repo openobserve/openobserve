@@ -501,7 +501,7 @@ const resumePipelineDialogMeta: any = ref({
   onCancel: () => handleCancelResumePipeline(),
 });
 
-const { pipelineObj } = useDragAndDrop();
+const { pipelineObj } = useDragAndDrop(t);
 
 watch(
   () => router.currentRoute.value.name,

@@ -509,7 +509,7 @@ const { formatTimestamp, formatId, getStatusIcon, getStatusColorClass, getEventT
   useEventFormatters();
 
 const copyAttributesToClipboard = () => {
-  copyToClipboard(JSON.stringify(props.rawEvent, null, 2), {
+  copyToClipboard(JSON.stringify(props.rawEvent, null, 2), t, {
     successMessage: t("common.copyToClipboard") + " - " + t("common.success"),
     errorMessage: "Error while copying content.",
     timeout: 1500,

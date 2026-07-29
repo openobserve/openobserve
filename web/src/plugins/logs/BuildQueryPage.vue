@@ -162,7 +162,7 @@ const {
   updateGroupedFields,
   makeAutoSQLQuery,
   validatePanel,
-} = useDashboardPanelData("build");
+} = useDashboardPanelData("build", t);
 
 const { showErrorNotification } = useNotifications();
 

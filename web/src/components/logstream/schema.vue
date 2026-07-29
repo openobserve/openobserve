@@ -1143,7 +1143,7 @@ export default defineComponent({
       { label: "Hash partition (64 Buckets)", value: "hashPartition_64" },
       { label: "Hash partition (128 Buckets)", value: "hashPartition_128" },
     ];
-    const { getStream, getUpdatedSettings } = useStreams();
+    const { getStream, getUpdatedSettings } = useStreams(t);
 
     onBeforeMount(() => {
       dataRetentionDays.value = store.state.zoConfig.data_retention_days || 0;

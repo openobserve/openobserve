@@ -1351,7 +1351,7 @@ describe("TenstackTable", () => {
       await wrapper.find('[data-test="dashboard-table-cell-copy-btn"] button').trigger("click");
       await flushPromises();
 
-      expect(mockCopyToClipboard).toHaveBeenCalledWith(FORMATTED, {
+      expect(mockCopyToClipboard).toHaveBeenCalledWith(FORMATTED, expect.any(Function), {
         silent: true,
       });
     });
@@ -1406,7 +1406,7 @@ describe("TenstackTable", () => {
       await wrapper.find('[data-test="dashboard-table-cell-copy-btn"] button').trigger("click");
       await flushPromises();
 
-      expect(mockCopyToClipboard).toHaveBeenCalledWith(FORMATTED, {
+      expect(mockCopyToClipboard).toHaveBeenCalledWith(FORMATTED, expect.any(Function), {
         silent: true,
       });
     });
@@ -1424,7 +1424,7 @@ describe("TenstackTable", () => {
       await wrapper.find('[data-test="dashboard-table-cell-copy-btn"] button').trigger("click");
       await flushPromises();
 
-      expect(mockCopyToClipboard).toHaveBeenCalledWith("plain-text", {
+      expect(mockCopyToClipboard).toHaveBeenCalledWith("plain-text", expect.any(Function), {
         silent: true,
       });
     });
@@ -1450,7 +1450,7 @@ describe("TenstackTable", () => {
       await wrapper.find('[data-test="dashboard-table-cell-copy-btn"] button').trigger("click");
       await flushPromises();
 
-      expect(mockCopyToClipboard).toHaveBeenCalledWith(FORMATTED, {
+      expect(mockCopyToClipboard).toHaveBeenCalledWith(FORMATTED, expect.any(Function), {
         silent: true,
       });
     });
@@ -1510,7 +1510,7 @@ describe("TenstackTable", () => {
         .trigger("click");
       await flushPromises();
 
-      expect(mockCopyToClipboard).toHaveBeenCalledWith(FORMATTED, {
+      expect(mockCopyToClipboard).toHaveBeenCalledWith(FORMATTED, expect.any(Function), {
         silent: true,
       });
     });
@@ -1592,7 +1592,7 @@ describe("TenstackTable", () => {
         .trigger("click");
       await flushPromises();
 
-      expect(mockCopyToClipboard).toHaveBeenCalledWith(FORMATTED, {
+      expect(mockCopyToClipboard).toHaveBeenCalledWith(FORMATTED, expect.any(Function), {
         silent: true,
       });
     });

@@ -829,7 +829,7 @@ export default defineComponent({
     };
 
     const copyContentToClipboard = (log: any) => {
-      copyToClipboard(JSON.stringify(log), {
+      copyToClipboard(JSON.stringify(log), t, {
         successMessage: t("logs.detailTable.contentCopiedSuccessfully"),
         timeout: 1000,
       });

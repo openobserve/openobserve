@@ -979,7 +979,7 @@ export default defineComponent({
       // reinterpret using the pasting tab's own timezone).
       const { startTime, endTime } = getConsumableDateTime();
       const payload = JSON.stringify({ start_date: startTime, end_date: endTime });
-      copyToClipboard(payload, { successMessage: t("common.dateRangeCopied") });
+      copyToClipboard(payload, t, { successMessage: t("common.dateRangeCopied") });
     };
 
     // Converts a parsed absolute date[+time] string, interpreted as wall-clock

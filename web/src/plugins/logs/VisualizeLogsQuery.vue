@@ -102,14 +102,16 @@ export default defineComponent({
     const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "logs");
     const { t } = useI18nTyped();
     const store = useStore();
-    const { dashboardPanelData, resetAggregationFunction, validatePanel } =
-      useDashboardPanelData(dashboardPanelDataPageKey);
+    const { dashboardPanelData, resetAggregationFunction, validatePanel } = useDashboardPanelData(
+      dashboardPanelDataPageKey,
+      t,
+    );
     const resultMetaData = ref(null);
 
     const { showErrorNotification } = useNotifications();
 
     const { searchObj } = searchState();
-    const { buildSearch } = useSearchStream();
+    const { buildSearch } = useSearchStream(t);
 
     // Logs visualization has no dashboard variables; keep the runtime `{}` value.
     const emptyVariablesData = {} as PanelEditorVariablesData;

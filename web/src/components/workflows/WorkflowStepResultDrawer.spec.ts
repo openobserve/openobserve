@@ -433,7 +433,7 @@ describe("WorkflowStepResultDrawer", () => {
         `[title="${i18n.global.t("workflow.test.stepResult.copyInput")}"]`,
       );
       await btns[0].trigger("click");
-      expect(mockCopy).toHaveBeenCalledWith(VALID_INPUT, {
+      expect(mockCopy).toHaveBeenCalledWith(VALID_INPUT, expect.any(Function), {
         successMessage: i18n.global.t("workflow.test.stepResult.copiedInput"),
       });
     });
@@ -444,7 +444,7 @@ describe("WorkflowStepResultDrawer", () => {
         `[title="${i18n.global.t("workflow.test.stepResult.copyOutput")}"]`,
       );
       await btns[0].trigger("click");
-      expect(mockCopy).toHaveBeenCalledWith("boom\nbad record", {
+      expect(mockCopy).toHaveBeenCalledWith("boom\nbad record", expect.any(Function), {
         successMessage: i18n.global.t("workflow.test.stepResult.copiedOutput"),
       });
     });

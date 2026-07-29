@@ -333,7 +333,7 @@ function copyMapping(scorerId: string, variable: string) {
   const value =
     props.inputMappings[scorerId]?.[variable] ||
     defaultJobMappingValue(variable, props.targetScope);
-  void copyToClipboard(value, {
+  void copyToClipboard(value, t, {
     successMessage: t("common.copySuccess"),
   });
 }

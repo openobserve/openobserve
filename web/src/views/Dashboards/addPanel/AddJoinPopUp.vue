@@ -310,11 +310,11 @@ export default defineComponent({
   setup(props) {
     const { t } = useI18nTyped();
     const store = useStore();
-    const { getStreams } = useStreams();
+    const { getStreams } = useStreams(t);
 
     const dashboardPanelDataPageKey = inject<string>("dashboardPanelDataPageKey", "dashboard");
 
-    const { dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey);
+    const { dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey, t);
 
     // Same reference as props.modelValue; mutation targets its nested fields only.
     const modelValueModel = computed(() => props.modelValue);

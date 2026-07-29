@@ -951,7 +951,7 @@ const handleRowClick = () => {};
 
 const handleCopy = (log: any, copyAsJson: boolean = true) => {
   const copyData = copyAsJson ? JSON.stringify(log) : log;
-  copyToClipboard(copyData, {
+  copyToClipboard(copyData, t, {
     successMessage: "Content Copied Successfully!",
     timeout: 1000,
   });

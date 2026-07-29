@@ -226,7 +226,7 @@ const { t } = useI18nTyped();
 
 const store = useStore();
 
-const { getStream } = useStreams();
+const { getStream } = useStreams(t);
 
 const { buildQueryPayload } = useQuery();
 
@@ -279,7 +279,7 @@ const originalStreamFields: Ref<any[]> = ref([]);
 // `isAggregationEnabled` is a reactive view of the form-owned flag. The
 // aggregation toggle in ScheduledPipeline writes it via the form, so this read
 // stays in sync (single source of truth — no mirror).
-const { addNode, pipelineObj, deletePipelineNode } = useDragAndDrop();
+const { addNode, pipelineObj, deletePipelineNode } = useDragAndDrop(t);
 
 const dialog = ref({
   show: false,
@@ -543,10 +543,13 @@ const validateSqlQuery = async () => {
     validatingSqlQuery.value = false;
     return;
   }
-  const query = buildQueryPayload({
-    sqlMode: true,
-    streamName: streamRoute.value.name as string,
-  });
+  const query = buildQueryPayload(
+    {
+      sqlMode: true,
+      streamName: streamRoute.value.name as string,
+    },
+    t,
+  );
 
   delete query.aggs;
 

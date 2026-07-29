@@ -139,11 +139,10 @@ const emit = defineEmits(["save"]);
 
 const store = useStore();
 
-const { getStreams } = useStreams();
+const { t } = useI18nTyped();
+const { getStreams } = useStreams(t);
 
 const isFetchingStreams = ref(false);
-
-const { t } = useI18nTyped();
 
 // Co-located schema (factory keeps the required message i18n-driven).
 const addPipelineSchema = makeAddPipelineSchema(t);

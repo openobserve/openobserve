@@ -271,8 +271,10 @@ export default defineComponent({
 
     let parser: any;
     const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
-    const { dashboardPanelData, promqlMode, resetDashboardPanelData } =
-      useDashboardPanelData(dashboardPanelDataPageKey);
+    const { dashboardPanelData, promqlMode, resetDashboardPanelData } = useDashboardPanelData(
+      dashboardPanelDataPageKey,
+      t,
+    );
     // default selected date will be absolute time
     const selectedDate: any = ref(props.selectedDateForViewPanel);
     const dateTimePickerRef: any = ref(null);
@@ -728,7 +730,7 @@ export default defineComponent({
       return searchIds.flat() as string[];
     });
 
-    const { traceIdRef, cancelQuery } = useCancelQuery();
+    const { traceIdRef, cancelQuery } = useCancelQuery(t);
 
     const cancelViewPanelQuery = () => {
       traceIdRef.value = searchRequestTraceIds.value;

@@ -162,7 +162,11 @@ describe("IngestLogs Index Component", () => {
 
       await wrapper.vm.copyToClipboardFn(mockContent);
 
-      expect(copyToClipboard).toHaveBeenCalledWith("test content", mockCopyToClipboardOptions);
+      expect(copyToClipboard).toHaveBeenCalledWith(
+        "test content",
+        expect.any(Function),
+        mockCopyToClipboardOptions,
+      );
     });
 
     it("should handle clipboard copy failure", () => {
@@ -198,7 +202,11 @@ describe("IngestLogs Index Component", () => {
 
       await wrapper.vm.copyToClipboardFn(mockContent);
 
-      expect(copyToClipboard).toHaveBeenCalledWith("", mockCopyToClipboardOptions);
+      expect(copyToClipboard).toHaveBeenCalledWith(
+        "",
+        expect.any(Function),
+        mockCopyToClipboardOptions,
+      );
     });
 
     it("should handle content with whitespace", async () => {
@@ -206,7 +214,11 @@ describe("IngestLogs Index Component", () => {
 
       await wrapper.vm.copyToClipboardFn(mockContent);
 
-      expect(copyToClipboard).toHaveBeenCalledWith("  test content  ", mockCopyToClipboardOptions);
+      expect(copyToClipboard).toHaveBeenCalledWith(
+        "  test content  ",
+        expect.any(Function),
+        mockCopyToClipboardOptions,
+      );
     });
 
     it("should handle content with special characters", async () => {
@@ -216,6 +228,7 @@ describe("IngestLogs Index Component", () => {
 
       expect(copyToClipboard).toHaveBeenCalledWith(
         "test@#$%^&*()content",
+        expect.any(Function),
         mockCopyToClipboardOptions,
       );
     });
@@ -227,6 +240,7 @@ describe("IngestLogs Index Component", () => {
 
       expect(copyToClipboard).toHaveBeenCalledWith(
         "line1\nline2\nline3",
+        expect.any(Function),
         mockCopyToClipboardOptions,
       );
     });
@@ -238,6 +252,7 @@ describe("IngestLogs Index Component", () => {
 
       expect(copyToClipboard).toHaveBeenCalledWith(
         "test &amp; content &lt; &gt;",
+        expect.any(Function),
         mockCopyToClipboardOptions,
       );
     });
@@ -419,7 +434,11 @@ describe("IngestLogs Index Component", () => {
 
       await wrapper.vm.copyToClipboardFn(mockContent);
 
-      expect(copyToClipboard).toHaveBeenCalledWith(null, mockCopyToClipboardOptions);
+      expect(copyToClipboard).toHaveBeenCalledWith(
+        null,
+        expect.any(Function),
+        mockCopyToClipboardOptions,
+      );
     });
 
     it("should handle undefined content in copyToClipboardFn", async () => {
@@ -427,7 +446,11 @@ describe("IngestLogs Index Component", () => {
 
       await wrapper.vm.copyToClipboardFn(mockContent);
 
-      expect(copyToClipboard).toHaveBeenCalledWith(undefined, mockCopyToClipboardOptions);
+      expect(copyToClipboard).toHaveBeenCalledWith(
+        undefined,
+        expect.any(Function),
+        mockCopyToClipboardOptions,
+      );
     });
 
     it("should handle missing innerText property", async () => {
@@ -435,7 +458,11 @@ describe("IngestLogs Index Component", () => {
 
       await wrapper.vm.copyToClipboardFn(mockContent);
 
-      expect(copyToClipboard).toHaveBeenCalledWith(undefined, mockCopyToClipboardOptions);
+      expect(copyToClipboard).toHaveBeenCalledWith(
+        undefined,
+        expect.any(Function),
+        mockCopyToClipboardOptions,
+      );
     });
 
     it("should handle very long content", async () => {
@@ -444,7 +471,11 @@ describe("IngestLogs Index Component", () => {
 
       await wrapper.vm.copyToClipboardFn(mockContent);
 
-      expect(copyToClipboard).toHaveBeenCalledWith(longContent, mockCopyToClipboardOptions);
+      expect(copyToClipboard).toHaveBeenCalledWith(
+        longContent,
+        expect.any(Function),
+        mockCopyToClipboardOptions,
+      );
     });
 
     it("should handle rapid successive calls to showUpdateDialogFn", () => {
@@ -463,7 +494,11 @@ describe("IngestLogs Index Component", () => {
 
       await wrapper.vm.copyToClipboardFn(mockContent);
 
-      expect(copyToClipboard).toHaveBeenCalledWith("test", mockCopyToClipboardOptions);
+      expect(copyToClipboard).toHaveBeenCalledWith(
+        "test",
+        expect.any(Function),
+        mockCopyToClipboardOptions,
+      );
     });
 
     it("should handle component updates", async () => {

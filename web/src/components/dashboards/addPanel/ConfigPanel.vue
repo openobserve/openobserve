@@ -1812,8 +1812,11 @@ export default defineComponent({
   props: ["dashboardPanelData", "variablesData", "panelData"],
   setup(props) {
     const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
-    const { dashboardPanelData, promqlMode, isPivotMode } =
-      useDashboardPanelData(dashboardPanelDataPageKey);
+    const { t } = useI18nTyped();
+    const { dashboardPanelData, promqlMode, isPivotMode } = useDashboardPanelData(
+      dashboardPanelDataPageKey,
+      t,
+    );
 
     // Alias for template v-model mutation sites; same reference, no behavior change.
     const dashboardPanelDataModel = computed(() => dashboardPanelData);
@@ -1837,7 +1840,6 @@ export default defineComponent({
     const toggleItemValue = (value: unknown) =>
       value === null || value === undefined ? TOGGLE_AUTO : value;
 
-    const { t } = useI18nTyped();
     const store = useStore();
 
     const basemapTypeOptions = [

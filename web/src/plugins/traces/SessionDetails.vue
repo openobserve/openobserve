@@ -1712,7 +1712,7 @@ function copySessionId() {
 
 function copyText(text: string | null | undefined) {
   if (!text) return;
-  copyToClipboard(text, { successMessage: t("traces.sessionDetails.copied"), timeout: 1000 });
+  copyToClipboard(text, t, { successMessage: t("traces.sessionDetails.copied"), timeout: 1000 });
 }
 
 function usd4(v: number): string {

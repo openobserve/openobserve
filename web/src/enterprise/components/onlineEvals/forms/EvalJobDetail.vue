@@ -173,7 +173,7 @@
                   size="icon-xs-sq"
                   data-test="eval-job-detail-filter-copy-btn"
                   @click="
-                    copyToClipboard(filterText, {
+                    copyToClipboard(filterText, t, {
                       successMessage: t('common.copySuccess'),
                     })
                   "

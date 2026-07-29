@@ -103,9 +103,10 @@ import useWorkflowCanvas, {
 } from "@/plugins/workflows/useWorkflowCanvas";
 import workflowService from "@/services/workflows";
 
-const { resetWorkflowData } = useWorkflowCanvas();
-
 const { t } = useI18nTyped();
+
+const { resetWorkflowData } = useWorkflowCanvas(t);
+
 const router = useRouter();
 const store = useStore();
 

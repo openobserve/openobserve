@@ -213,7 +213,7 @@ export default {
       validateConnection,
       openSourcePicker,
       pipelineObj,
-    } = useDragAndDrop();
+    } = useDragAndDrop(t);
     const store = useStore();
 
     // Mirror the hook's drag-over state (pipelineObj.isDragOver) into a local

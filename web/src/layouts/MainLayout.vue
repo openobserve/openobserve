@@ -315,7 +315,7 @@ export default defineComponent({
     const zoBackendUrl = store.state.API_ENDPOINT;
     const isLoading = ref(false);
 
-    const { getStreams, resetStreams } = useStreams();
+    const { getStreams, resetStreams } = useStreams(t);
     const { closeSocket } = useSearchWebSocket();
     const { isOpen: isPredefinedThemesOpen, toggleThemes } = usePredefinedThemes();
     const { prefetchRoute } = useRoutePrefetch();

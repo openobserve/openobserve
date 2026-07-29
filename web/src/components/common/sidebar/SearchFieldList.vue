@@ -654,7 +654,7 @@ const addSearchTerm = (term: string) => {
 };
 
 const copyContentValue = (value: string) => {
-  copyToClipboard(value, { successMessage: "Value copied to clipboard" });
+  copyToClipboard(value, t, { successMessage: "Value copied to clipboard" });
 };
 </script>
 

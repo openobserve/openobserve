@@ -249,7 +249,7 @@ export default defineComponent({
     };
 
     const copyLegend = (text: string, index: number) => {
-      copyToClipboard(text, { silent: true, timeout: 3000 }).then(() => {
+      copyToClipboard(text, t, { silent: true, timeout: 3000 }).then(() => {
         copiedLegendIndices.value.add(index);
         setTimeout(() => {
           copiedLegendIndices.value.delete(index);
@@ -259,7 +259,7 @@ export default defineComponent({
 
     const copyAllLegends = () => {
       const allLegendsText = legends.value.map((l: any) => l.name).join("\n");
-      copyToClipboard(allLegendsText, { silent: true, timeout: 3000 }).then(() => {
+      copyToClipboard(allLegendsText, t, { silent: true, timeout: 3000 }).then(() => {
         isAllCopied.value = true;
         setTimeout(() => {
           isAllCopied.value = false;

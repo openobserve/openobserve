@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import i18nInstance from "@/locales";
 import { ref, reactive, nextTick } from "vue";
 import { usePanelEditor } from "./usePanelEditor";
 
@@ -94,6 +95,7 @@ describe("usePanelEditor", () => {
 
     options = {
       pageType: "dashboard" as const,
+      t: (i18nInstance.global as any).t,
       config: {
         showQueryEditor: true,
         showQueryBuilder: true,

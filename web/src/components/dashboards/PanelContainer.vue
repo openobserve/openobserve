@@ -712,6 +712,7 @@ export default defineComponent({
         if (error?.response?.status === 409) {
           showConfictErrorNotificationWithRefreshBtn(
             error?.response?.data?.message ?? error?.message ?? t("panel.panelDuplicationFailed"),
+            t,
           );
         } else {
           showErrorNotification(error?.message ?? t("panel.panelDuplicationFailed"));

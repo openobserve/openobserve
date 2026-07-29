@@ -704,7 +704,7 @@ const resolvedConfig = computed<PanelEditorConfig>(() => resolveConfig(props));
 // Get dashboard panel data composable
 const pageKey = computed(() => props.pageType);
 const { dashboardPanelData, resetAggregationFunction, makeAutoSQLQuery, validatePanel } =
-  useDashboardPanelData(pageKey.value);
+  useDashboardPanelData(pageKey.value, t);
 
 // Provide page key for child components
 provide("dashboardPanelDataPageKey", pageKey.value);
@@ -770,6 +770,7 @@ const {
   updateDateTime,
 } = usePanelEditor({
   pageType: props.pageType,
+  t,
   config: resolvedConfig.value,
   dashboardPanelData,
   editMode: editModeRef,

@@ -317,8 +317,8 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import VersionCompareView from "@/enterprise/components/AIObservability/VersionCompareView.vue";
 import { useVersionCompare } from "./composables/useVersionCompare";
 
-const { getStreams } = useStreams();
 const { t } = useI18nTyped();
+const { getStreams } = useStreams(t);
 const router = useRouter();
 const route = useRoute();
 const store = useStore();

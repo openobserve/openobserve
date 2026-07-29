@@ -32,15 +32,16 @@ import useSearchConnection from "@/composables/useLogs/useSearchConnection";
 import useSearchResponseHandler from "@/composables/useLogs/useSearchResponseHandler";
 import useSearchHistogramManager from "@/composables/useLogs/useSearchHistogramManager";
 import useSearchPagination from "@/composables/useLogs/useSearchPagination";
-import { gt } from "@/types/i18n";
+import type { TranslateFn } from "@/types/i18n";
 
-export const useSearchStream = () => {
+// `t` injected: reached from other composables, never a setup context.
+export const useSearchStream = (t: TranslateFn) => {
   const { showErrorNotification } = useNotifications();
   const { addTraceId } = logsUtils();
 
   // Initialize all the split composables
   const queryBuilder = useSearchQuery();
-  const connectionManager = useSearchConnection();
+  const connectionManager = useSearchConnection(t);
   const responseProcessor = useSearchResponseHandler();
   const histogramHandler = useSearchHistogramManager();
   const paginationManager = useSearchPagination();
@@ -72,7 +73,7 @@ export const useSearchStream = () => {
     } catch (error: any) {
       console.error("Search operation failed:", error);
       searchObj.loading = false;
-      showErrorNotification(gt("toastMessages.useLogs.errorOccurredDuringTheSearchOperation"));
+      showErrorNotification(t("toastMessages.useLogs.errorOccurredDuringTheSearchOperation"));
     }
   };
 

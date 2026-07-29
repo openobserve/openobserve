@@ -272,7 +272,10 @@ const activeStream = ref<string>(
 // Trace-stream loading is shared with the other AI pages via
 // useLlmTraceStreams. availableStreams/streamsLoaded/ensureStreamsLoaded are
 // byte-identical to the previous inline versions.
-const { availableStreams, streamsLoaded, ensureStreamsLoaded } = useLlmTraceStreams(activeStream);
+const { availableStreams, streamsLoaded, ensureStreamsLoaded } = useLlmTraceStreams(
+  activeStream,
+  t,
+);
 const MODE_LS_KEY = "sessionsList_filterMode";
 // Persists the RESOLVED agent NAME of the cascade selection (was the old single
 // `activeAgent` key). On reload we re-seed the cascade from it (see

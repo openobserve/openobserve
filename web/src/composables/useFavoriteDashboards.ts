@@ -16,7 +16,7 @@
 import { ref, type Ref } from "vue";
 import settings from "@/services/settings";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { gt } from "@/types/i18n";
+import type { TranslateFn } from "@/types/i18n";
 
 export interface FavoriteDashboard {
   dashboardId: string;
@@ -56,7 +56,14 @@ export function useFavoriteDashboards() {
     }
   };
 
-  const toggleFavorite = async (org: string, userId: string, d: FavoriteDashboard) => {
+  // `t` injected: useFavoriteDashboards() is called directly by its own spec
+  // outside any component, so it cannot obtain a translator itself.
+  const toggleFavorite = async (
+    org: string,
+    userId: string,
+    d: FavoriteDashboard,
+    t: TranslateFn,
+  ) => {
     if (!org || !userId) return; // never hit the API with an undefined segment
     const prev = favorites.value;
     favorites.value = isFavorite(d.dashboardId)
@@ -70,8 +77,8 @@ export function useFavoriteDashboards() {
         variant: "error",
         message:
           e?.response?.status === 403
-            ? gt("toastMessages.composables.noPermissionToChangeFavorites")
-            : gt("toastMessages.composables.couldNotUpdateFavoriteDashboards"),
+            ? t("toastMessages.composables.noPermissionToChangeFavorites")
+            : t("toastMessages.composables.couldNotUpdateFavoriteDashboards"),
       });
     }
   };

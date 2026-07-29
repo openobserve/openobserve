@@ -250,7 +250,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @update:datetime="setHistogramDate"
                         @update:scroll="getMoreData"
                         @update:sort="runQueryOnSort"
-                        @shareLink="copyTracesUrl"
+                        @shareLink="(range: any) => copyTracesUrl(t, range)"
                         @metrics:filters-updated="onMetricsFiltersUpdated"
                         @run-query="searchData"
                         @remove-filter="onRemoveTracesFilter"
@@ -417,7 +417,7 @@ const toggleErrorDetails = () => {
   disableMoreErrorDetails.value = !disableMoreErrorDetails.value;
 };
 const indexListRef = ref(null);
-const { getStreams, getStream } = useStreams();
+const { getStreams, getStream } = useStreams(t);
 const { loadSemanticGroups, loadKeyFields, loadFieldGrouping } = useServiceCorrelation();
 const chartRedrawTimeout = ref(null);
 const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } = useHttpStreaming();
@@ -2251,7 +2251,7 @@ useShortcuts([
   },
   {
     id: "tracesCopyUrl",
-    handler: () => copyTracesUrl(),
+    handler: () => copyTracesUrl(t),
   },
 ]);
 </script>

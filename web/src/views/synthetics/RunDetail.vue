@@ -590,7 +590,7 @@ const executionIdParam = computed(() =>
 const folderName = computed(() => String(route.query.folder ?? ""));
 
 // ── Composable ─────────────────────────────────────────────────────────────
-const synthetics = useSyntheticResults();
+const synthetics = useSyntheticResults(t);
 
 // ── Monitor type — protocol runs render ProtocolRunSummary instead ──────────
 // null until resolved; browser view only fetches once known (avoids running

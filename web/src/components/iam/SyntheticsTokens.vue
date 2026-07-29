@@ -505,11 +505,11 @@ export default defineComponent({
       if (!token) return;
       // Single toast: let the clipboard util own the notification with the
       // token-specific message, instead of firing a second generic one.
-      copyToClipboard(token, { successMessage: t("synthetics.tokens.copiedToast") });
+      copyToClipboard(token, t, { successMessage: t("synthetics.tokens.copiedToast") });
     };
 
     const copyCommand = () => {
-      if (installCommand.value) copyToClipboard(installCommand.value);
+      if (installCommand.value) copyToClipboard(installCommand.value, t);
     };
 
     const fetchAgentSetup = async () => {

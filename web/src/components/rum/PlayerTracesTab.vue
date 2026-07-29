@@ -243,7 +243,7 @@ import TraceDetails from "@/plugins/traces/TraceDetails.vue";
 
 const { t } = useI18nTyped();
 const store = useStore();
-const { getStream } = useStreams();
+const { getStream } = useStreams(t);
 
 const props = defineProps({
   sessionId: {

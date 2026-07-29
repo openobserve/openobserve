@@ -281,7 +281,7 @@ const copyableOutput = computed(() => errorMessages.value.join("\n"));
 
 const copy = (text: string, type: "input" | "output") => {
   if (!text) return;
-  copyToClipboard(text, {
+  copyToClipboard(text, t, {
     successMessage: t(
       type === "input"
         ? "workflow.test.stepResult.copiedInput"

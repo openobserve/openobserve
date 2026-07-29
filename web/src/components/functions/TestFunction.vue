@@ -355,7 +355,8 @@ const selectedStream = ref<{
   type: "logs" | "metrics" | "traces";
 }>({ name: "", type: "logs" });
 
-const { getStreams, getStream } = useStreams();
+const { t } = useI18nTyped();
+const { getStreams, getStream } = useStreams(t);
 
 const { buildQueryPayload } = useQuery();
 
@@ -370,8 +371,6 @@ const isFetchingStreams = ref(false);
 const store = useStore();
 
 let parser: any = null;
-
-const { t } = useI18nTyped();
 
 const expandState = ref({
   stream: true,
@@ -547,11 +546,14 @@ const getResults = async () => {
       ? getConsumableRelativeTime(dateTime.value.relativeTimePeriod)
       : dateTime.value;
 
-  const query = buildQueryPayload({
-    sqlMode: true,
-    streamName: selectedStream.value.name,
-    timestamps,
-  });
+  const query = buildQueryPayload(
+    {
+      sqlMode: true,
+      streamName: selectedStream.value.name,
+      timestamps,
+    },
+    t,
+  );
 
   delete query.aggs;
 

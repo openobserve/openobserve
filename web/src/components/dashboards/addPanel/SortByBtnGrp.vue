@@ -54,7 +54,7 @@ export default defineComponent({
   setup(props) {
     const { t } = useI18nTyped();
     const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
-    const { dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey);
+    const { dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey, t);
 
     // same object reference as props.fieldObj; nested mutation is unchanged
     const fieldObjModel = computed(() => props.fieldObj);

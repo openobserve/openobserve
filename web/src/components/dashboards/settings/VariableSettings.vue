@@ -396,6 +396,7 @@ export default defineComponent({
             error?.response?.data?.message ??
               error?.message ??
               t("dashboard.variableSettingsPage.variableReorderFailed"),
+            t,
           );
         } else {
           showErrorNotification(
@@ -504,6 +505,7 @@ export default defineComponent({
             error?.response?.data?.message ??
               error?.message ??
               t("dashboard.variableSettingsPage.variableDeletionFailed"),
+            t,
           );
         } else {
           showErrorNotification(

@@ -20,7 +20,7 @@ import { watch, reactive } from "vue";
 import { detectCycle } from "@/composables/flow/detectCycle";
 import { makeEdge } from "@/composables/flow/makeEdge";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { gt } from "@/types/i18n";
+import type { TranslateFn } from "@/types/i18n";
 
 const dialogObj = {
   show: false,
@@ -108,7 +108,9 @@ const defaultObject = {
 const pipelineObj = reactive(Object.assign({}, defaultObject));
 
 export { pipelineObj };
-export default function useDragAndDrop() {
+// `t` injected: this composable is invoked directly by its own spec outside any
+// component, so it cannot obtain a translator itself.
+export default function useDragAndDrop(t: TranslateFn) {
   const { screenToFlowCoordinate, onNodesInitialized, updateNode } = useVueFlow();
 
   watch(
@@ -172,7 +174,7 @@ export default function useDragAndDrop() {
   function onDrop(event: any, offSet: any = { x: 0, y: 0 }) {
     if (pipelineObj.hasInputNode && pipelineObj.draggedNode.io_type == "input") {
       toast({
-        message: gt("toastMessages.pipelines.only1SourceNodeIsAllowed"),
+        message: t("toastMessages.pipelines.only1SourceNodeIsAllowed"),
         variant: "warning",
       });
       return;
@@ -238,7 +240,7 @@ export default function useDragAndDrop() {
       (connection.sourceHandle === "output" && connection.targetHandle === "output")
     ) {
       toast({
-        message: gt("toastMessages.pipelines.sameTypeOfEdgesNodesCannot"),
+        message: t("toastMessages.pipelines.sameTypeOfEdgesNodesCannot"),
         variant: "warning",
       });
       return;
@@ -248,7 +250,7 @@ export default function useDragAndDrop() {
     );
     if (isConnectionAlreadyAvailable) {
       toast({
-        message: gt("toastMessages.pipelines.onlyOneIncomingEdgeToThe"),
+        message: t("toastMessages.pipelines.onlyOneIncomingEdgeToThe"),
         variant: "warning",
       });
       return;
@@ -257,7 +259,7 @@ export default function useDragAndDrop() {
     const isCycle = detectCycle(pipelineObj.currentSelectedPipeline.edges, connection);
     if (isCycle) {
       toast({
-        message: gt("toastMessages.pipelines.addingThisEdgeWillCreateA"),
+        message: t("toastMessages.pipelines.addingThisEdgeWillCreateA"),
         variant: "warning",
       });
       return;
@@ -330,7 +332,7 @@ export default function useDragAndDrop() {
           if (detectCycle(pipelineObj.currentSelectedPipeline.edges, edge)) {
             toast({
               variant: "warning",
-              message: gt("toastMessages.pipelines.addingThisEdgeWillCreateA"),
+              message: t("toastMessages.pipelines.addingThisEdgeWillCreateA"),
             });
           } else {
             pipelineObj.currentSelectedPipeline.edges = [

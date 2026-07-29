@@ -18,7 +18,7 @@ let copyTimer: ReturnType<typeof setTimeout> | null = null;
 async function handleCopy(event: MouseEvent) {
   event.stopPropagation();
   const value = String(props.cell.getValue() ?? "");
-  const success = await copyToClipboard(value, { silent: true });
+  const success = await copyToClipboard(value, t, { silent: true });
   if (success) {
     copied.value = true;
     if (copyTimer) clearTimeout(copyTimer);

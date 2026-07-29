@@ -114,11 +114,15 @@ describe("CopyContent.vue Branch Coverage", () => {
       await nextTick();
       await nextTick();
 
-      expect(mockCopyToClipboard).toHaveBeenCalledWith("Test content test@example.com", {
-        successMessage: "Content Copied Successfully!",
-        errorMessage: "Error while copy content.",
-        timeout: 5000,
-      });
+      expect(mockCopyToClipboard).toHaveBeenCalledWith(
+        "Test content test@example.com",
+        expect.any(Function),
+        {
+          successMessage: "Content Copied Successfully!",
+          errorMessage: "Error while copy content.",
+          timeout: 5000,
+        },
+      );
     });
   });
 
@@ -144,11 +148,15 @@ describe("CopyContent.vue Branch Coverage", () => {
       await nextTick();
       await nextTick();
 
-      expect(mockCopyToClipboard).toHaveBeenCalledWith("Test content test@example.com", {
-        successMessage: "Content Copied Successfully!",
-        errorMessage: "Error while copy content.",
-        timeout: 5000,
-      });
+      expect(mockCopyToClipboard).toHaveBeenCalledWith(
+        "Test content test@example.com",
+        expect.any(Function),
+        {
+          successMessage: "Content Copied Successfully!",
+          errorMessage: "Error while copy content.",
+          timeout: 5000,
+        },
+      );
     });
   });
 
@@ -310,11 +318,15 @@ describe("CopyContent.vue Branch Coverage", () => {
       const copyButton = wrapper.find('[data-test="rum-copy-btn"]');
       await copyButton.trigger("click");
 
-      expect(mockCopyToClipboard).toHaveBeenCalledWith("Simple content without any patterns", {
-        successMessage: "Content Copied Successfully!",
-        errorMessage: "Error while copy content.",
-        timeout: 5000,
-      });
+      expect(mockCopyToClipboard).toHaveBeenCalledWith(
+        "Simple content without any patterns",
+        expect.any(Function),
+        {
+          successMessage: "Content Copied Successfully!",
+          errorMessage: "Error while copy content.",
+          timeout: 5000,
+        },
+      );
     });
   });
 });

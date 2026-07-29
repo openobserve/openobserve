@@ -691,7 +691,7 @@ export default defineComponent({
       isAddBreakdownNotAllowed,
       cleanupDraggingFields,
       isPivotMode,
-    } = useDashboardPanelData(dashboardPanelDataPageKey);
+    } = useDashboardPanelData(dashboardPanelDataPageKey, t);
 
     const { parsePromQlQuery } = usePromqlSuggestions();
 

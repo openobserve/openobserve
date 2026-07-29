@@ -68,9 +68,9 @@ const emit = defineEmits<{
 
 const store = useStore();
 const router = useRouter();
-const { getStreams } = useStreams();
-const { isDark } = useTheme();
 const { t } = useI18nTyped();
+const { getStreams } = useStreams(t);
+const { isDark } = useTheme();
 
 // The detected stream type drives the status copy + the "View …" destination.
 // traces / logs land in their explorers; metrics (which fan out into many

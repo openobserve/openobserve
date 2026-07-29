@@ -185,6 +185,7 @@ export default defineComponent({
               (props.editMode
                 ? t("dashboard.addTab.failedToUpdateTab")
                 : t("dashboard.addTab.failedToAddTab")),
+            t,
           );
         } else {
           showErrorNotification(

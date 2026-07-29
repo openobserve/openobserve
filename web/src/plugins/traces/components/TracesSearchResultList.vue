@@ -144,6 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, onMounted } from "vue";
+import { useI18nTyped } from "@/types/i18n";
 import { copyToClipboard as qCopyToClipboard } from "@/utils/clipboard";
 import TenstackTable from "@/components/TenstackTable.vue";
 import CellActions from "@/plugins/logs/data-table/CellActions.vue";
@@ -235,6 +236,7 @@ const emit = defineEmits<{
 const copyToClipboard = (field: string, value: any) =>
   qCopyToClipboard(
     field === "span_kind" ? (SPAN_KIND_MAP[String(value)] ?? String(value)) : String(value),
+    t,
   );
 
 const addSearchTerm = (
@@ -268,6 +270,7 @@ const addSearchTerm = (
 
 const sendToAiChat = (value: string) => emit("send-to-ai-chat", value);
 
+const { t } = useI18nTyped();
 const { searchObj, updatedLocalLogFilterField } = useTraces();
 const { buildColumns } = useTracesTableColumns();
 

@@ -1436,10 +1436,9 @@ export default defineComponent({
     const copyToClipboard = (text: string | undefined, fieldName: string) => {
       if (!text) return;
 
-      copyToClipboardUtil(text, {
-        successMessage: "Copied to clipboard",
-        errorMessage: "Failed to copy to clipboard",
-      }).then((success) => {
+      // No message overrides — the util's defaults are common.copySuccess /
+      // common.copyError, which is exactly this copy, translated.
+      copyToClipboardUtil(text, t).then((success) => {
         if (success) {
           copiedField.value = fieldName;
           // Reset the icon after 2 seconds

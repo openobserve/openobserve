@@ -106,7 +106,7 @@ const createWorkflow = workflowService.createWorkflow as any;
 const updateWorkflow = workflowService.updateWorkflow as any;
 const getWorkflowRun = workflowService.getWorkflowRun as any;
 
-const { resetWorkflowData } = useWorkflowCanvas();
+const { resetWorkflowData } = useWorkflowCanvas(t);
 
 // ── stubs ────────────────────────────────────────────────────────────────────
 

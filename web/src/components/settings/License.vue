@@ -643,7 +643,7 @@ export default defineComponent({
 
     const copyLicenseKey = async () => {
       if (!licenseData.value.key) return;
-      const success = await copyToClipboard(licenseData.value.key, {
+      const success = await copyToClipboard(licenseData.value.key, t, {
         successMessage: t("about.license_key_copied"),
         errorMessage: t("about.failed_to_copy_license"),
       });

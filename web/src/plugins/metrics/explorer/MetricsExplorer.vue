@@ -650,7 +650,7 @@ export default defineComponent({
     const store = useStore();
     const router = useRouter();
     const route = useRoute();
-    const grid = useMetricsExplorerGrid();
+    const grid = useMetricsExplorerGrid(t);
 
     const scrollRef = ref<HTMLElement | null>(null);
     const dateTimePickerRef = ref<any>(null);

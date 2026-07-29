@@ -2219,7 +2219,7 @@ export default defineComponent({
     const regionFilter = ref();
     const regionFilterRef = ref(null);
     const { resetStreamData, searchObj } = searchState();
-    const { buildSearch } = useSearchStream();
+    const { buildSearch } = useSearchStream(t);
 
     const {
       fnParsedSQL,
@@ -2231,14 +2231,14 @@ export default defineComponent({
       checkTimestampAlias,
     } = logsUtils();
     const { getSavedViews, setSelectedStreams, onStreamChange, getQueryData, cancelQuery } =
-      useSearchBar();
+      useSearchBar(t);
     const { loadStreamLists, extractFields } = useStreamFields();
     const { cancelPatterns } = usePatterns();
 
     const { refreshData, handleRunQuery, getJobData, routeToSearchSchedule, getHistogramTitle } =
-      useLogs();
+      useLogs(t);
 
-    const { isStreamExists, isStreamFetched, getStreams, getStream } = useStreams();
+    const { isStreamExists, isStreamFetched, getStreams, getStream } = useStreams(t);
     const queryEditorRef = ref(null);
     const syntaxGuideRef = ref(null);
 
@@ -4626,7 +4626,7 @@ export default defineComponent({
     };
 
     const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "logs");
-    const { dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey);
+    const { dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey, t);
 
     // [START] cancel running queries
 
@@ -4660,7 +4660,7 @@ export default defineComponent({
         };
       }
     });
-    const { traceIdRef, cancelQuery: cancelVisualizeQuery } = useCancelQuery();
+    const { traceIdRef, cancelQuery: cancelVisualizeQuery } = useCancelQuery(t);
 
     const cancelVisualizeQueries = () => {
       // Filter out the dummy id before sending to backend cancel API

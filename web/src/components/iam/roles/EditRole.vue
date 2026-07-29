@@ -357,7 +357,7 @@ const roleUsers: Ref<string[]> = ref([]);
 
 const permissionsUiType = ref("table");
 
-const { getStreams } = useStreams();
+const { getStreams } = useStreams(t);
 
 // Per-tab unsaved-changes flags. Each tab tracks only its own pending changes.
 const isPermissionsDirty = computed(

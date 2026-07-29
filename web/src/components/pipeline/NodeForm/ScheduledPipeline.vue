@@ -1020,15 +1020,16 @@ const emits = defineEmits([
   "update:stream_type",
   "update:delay",
 ]);
-const { pipelineObj } = useDragAndDrop();
+const { t } = useI18nTyped();
+const { pipelineObj } = useDragAndDrop(t);
 // `searchObj` is provided by the logs search state, not the job-focused
 // useLogs return; type it as optional so the guarded write stays type-safe.
 const {
   searchObj,
 }: ReturnType<typeof useLogs> & {
   searchObj?: { data?: { stream?: { pipelineQueryStream?: string[] } } };
-} = useLogs();
-const { getStream, getStreams } = useStreams();
+} = useLogs(t);
+const { getStream, getStreams } = useStreams(t);
 const { loadSemanticGroups, loadKeyFields, loadFieldGrouping } = useServiceCorrelation();
 const { registerAiChatHandler, removeAiChatHandler } = useAiChat();
 let parser: any;
@@ -1082,8 +1083,6 @@ const getColumns = computed(() => {
     },
   ];
 });
-
-const { t } = useI18nTyped();
 
 // ── Form descendant ───────────────────────────────────────────────────────────
 // ScheduledPipeline is rendered INSIDE Query's <OForm>; it injects that form and
@@ -2386,7 +2385,7 @@ const expandLog = (index: any) => {
 };
 const copyLogToClipboard = (log: any, copyAsJson: boolean = true) => {
   const copyData = copyAsJson ? JSON.stringify(log) : log;
-  copyToClipboard(copyData, {
+  copyToClipboard(copyData, t, {
     successMessage: "Content Copied Successfully!",
     timeout: 1000,
   });

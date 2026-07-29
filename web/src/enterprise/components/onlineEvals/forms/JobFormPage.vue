@@ -507,7 +507,7 @@ const selectedScorers = computed(() =>
     .filter((scorer): scorer is Scorer => Boolean(scorer)),
 );
 
-const { getStreams, getStream } = useStreams();
+const { getStreams, getStream } = useStreams(t);
 const traceStreams = ref<string[]>([]);
 const RESERVED_EVAL_SOURCE_STREAMS = new Set([
   "_evaluator",

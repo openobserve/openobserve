@@ -157,9 +157,9 @@ export default defineComponent({
   ],
   setup(props, { emit }) {
     const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
-    const { getAllSelectedStreams, getStreamNameFromStreamAlias, dashboardPanelData } =
-      useDashboardPanelData(dashboardPanelDataPageKey);
     const { t } = useI18nTyped();
+    const { getAllSelectedStreams, getStreamNameFromStreamAlias, dashboardPanelData } =
+      useDashboardPanelData(dashboardPanelDataPageKey, t);
     const searchTerm = ref("");
 
     // Same reference as props.condition; mutation targets its nested fields only.

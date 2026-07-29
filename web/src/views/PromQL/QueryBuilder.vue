@@ -130,7 +130,7 @@ const generatedQuery = computed(() => {
 // Methods
 const copyQuery = () => {
   if (generatedQuery.value) {
-    copyToClipboard(generatedQuery.value, {
+    copyToClipboard(generatedQuery.value, t, {
       successMessage: t("metrics.queryBuilder.queryCopied"),
     });
   }

@@ -18,6 +18,8 @@ import { ref } from "vue";
 import useRumSpanBuilder from "@/composables/rum/useRumSpanBuilder";
 import searchService from "@/services/search";
 import { SPAN_KIND_CLIENT, SPAN_KIND_UNSPECIFIED } from "@/utils/traces/constants";
+import i18nInstance from "@/locales";
+const t = (i18nInstance.global as any).t;
 
 // ---------------------------------------------------------------------------
 // Module mocks — hoisted before any import is executed
@@ -207,7 +209,7 @@ function makeSearchObj(serviceNames: { service_name: string; count: number }[] =
 function buildComposable(logStreamNames: string[] = ["_rumdata"], searchObjOverride?: any) {
   const logStreams = ref(logStreamNames);
   const searchObj = searchObjOverride ?? makeSearchObj();
-  return useRumSpanBuilder(logStreams, searchObj);
+  return useRumSpanBuilder(logStreams, searchObj, t);
 }
 
 // ---------------------------------------------------------------------------

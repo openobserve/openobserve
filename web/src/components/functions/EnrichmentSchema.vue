@@ -148,7 +148,7 @@ export default defineComponent({
   setup(props) {
     const { t } = useI18nTyped();
     const store = useStore();
-    const { getStream } = useStreams();
+    const { getStream } = useStreams(t);
     const columns = [
       {
         id: "name",

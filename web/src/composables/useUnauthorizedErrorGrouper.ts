@@ -16,32 +16,37 @@
 import { toast, toastRecords, updateToast } from "@/lib/feedback/Toast/useToast";
 import type { ToastDetail } from "@/lib/feedback/Toast/OToast.types";
 import { copyToClipboard } from "@/utils/clipboard";
-import { raw, gt } from "@/types/i18n";
+import { gt, type I18nKey } from "@/types/i18n";
 
 // ── Friendly name overrides ──────────────────────────────────────────────────
+//
+// Keys, not resolved text: this map lives at module scope, so resolving here
+// would freeze the labels to whatever locale was active at import time. They are
+// translated at display time in extractResourceInfo(). `I18nKey` makes a typo or
+// a deleted key a compile error.
 
-const FRIENDLY_NAMES: Record<string, string> = {
-  dashboards: "Dashboards",
-  alerts: "Alerts",
-  streams: "Streams",
-  functions: "Functions",
-  savedviews: "Saved Views",
-  users: "Users",
-  roles: "Roles",
-  organizations: "Organizations",
-  pipelines: "Pipelines",
-  destinations: "Destinations",
-  templates: "Templates",
-  reports: "Reports",
-  "llm/models": "LLM Model Pricing",
-  "llm/models/built-in": "LLM Model Pricing",
-  "llm/models/refresh-built-in": "LLM Model Pricing",
+const FRIENDLY_NAME_KEYS: Record<string, I18nKey> = {
+  dashboards: "toastMessages.composables.resources.dashboards",
+  alerts: "toastMessages.composables.resources.alerts",
+  streams: "toastMessages.composables.resources.streams",
+  functions: "toastMessages.composables.resources.functions",
+  savedviews: "toastMessages.composables.resources.savedviews",
+  users: "toastMessages.composables.resources.users",
+  roles: "toastMessages.composables.resources.roles",
+  organizations: "toastMessages.composables.resources.organizations",
+  pipelines: "toastMessages.composables.resources.pipelines",
+  destinations: "toastMessages.composables.resources.destinations",
+  templates: "toastMessages.composables.resources.templates",
+  reports: "toastMessages.composables.resources.reports",
+  "llm/models": "toastMessages.composables.resources.llmModelPricing",
+  "llm/models/built-in": "toastMessages.composables.resources.llmModelPricing",
+  "llm/models/refresh-built-in": "toastMessages.composables.resources.llmModelPricing",
 };
 
 // ── URL → {label, urlPath} extraction ───────────────────────────────────────
 
 function extractResourceInfo(rawUrl: string): ToastDetail {
-  let label = "Resource";
+  let label: string = gt("toastMessages.composables.resourceFallback");
   let urlPath = rawUrl;
 
   try {
@@ -73,9 +78,11 @@ function extractResourceInfo(rawUrl: string): ToastDetail {
 
       if (resourceNames.length > 0) {
         const joined = resourceNames.join("/");
-        const friendly =
-          FRIENDLY_NAMES[joined] ?? FRIENDLY_NAMES[resourceNames[resourceNames.length - 1]];
-        label = friendly ?? capitalize(resourceNames[resourceNames.length - 1]);
+        const friendlyKey =
+          FRIENDLY_NAME_KEYS[joined] ?? FRIENDLY_NAME_KEYS[resourceNames[resourceNames.length - 1]];
+        // Unknown resources fall back to the capitalised URL segment — a path
+        // token, not prose, so it is deliberately left untranslated.
+        label = friendlyKey ? gt(friendlyKey) : capitalize(resourceNames[resourceNames.length - 1]);
       }
     }
   } catch {
@@ -90,12 +97,13 @@ function capitalize(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-function buildTitle(): string {
-  return "Access Required";
+// Resolved per call, not at module scope, so a locale change is reflected.
+function buildTitle() {
+  return gt("toastMessages.composables.accessRequiredTitle");
 }
 
-function buildMessage(): string {
-  return "Some sections couldn't load because you don't have the required permissions. Contact your administrator if you believe you should have access.";
+function buildMessage() {
+  return gt("toastMessages.composables.accessRequiredMessage");
 }
 
 // ── Module-level singleton state ─────────────────────────────────────────────
@@ -113,7 +121,7 @@ function copyDetails(): void {
   const text = accumulatedErrors.map((e) => `${e.label}: ${e.url}`).join("\n");
   // silent: true — feedback is shown on the button itself via successLabel,
   // not as a separate toast notification.
-  copyToClipboard(text, { silent: true });
+  copyToClipboard(text, gt, { silent: true });
 }
 
 function flushGroupedToast(): void {
@@ -126,8 +134,8 @@ function flushGroupedToast(): void {
     const record = toastRecords.find((r) => r.id === activeToastId && r.open);
     if (record) {
       updateToast(activeToastId, {
-        title: raw(title),
-        message: raw(message),
+        title,
+        message,
         details,
         titleCount: details.length,
       });
@@ -141,8 +149,8 @@ function flushGroupedToast(): void {
   // No explicit timeout — the default error timeout (30 s) applies.
   toast({
     variant: "error",
-    title: raw(title),
-    message: raw(message),
+    title,
+    message,
     titleCount: details.length,
     details,
     action: {

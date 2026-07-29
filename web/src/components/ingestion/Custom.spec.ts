@@ -230,7 +230,7 @@ describe("Custom Component", () => {
 
       await wrapper.vm.copyToClipboardFn(mockContent);
 
-      expect(copyToClipboard).toHaveBeenCalledWith("test content to copy", {
+      expect(copyToClipboard).toHaveBeenCalledWith("test content to copy", expect.any(Function), {
         successMessage: "Content Copied Successfully!",
         errorMessage: "Error while copy content.",
         timeout: 5000,
@@ -251,7 +251,7 @@ describe("Custom Component", () => {
         // Expected error
       }
 
-      expect(copyToClipboard).toHaveBeenCalledWith("test content to copy", {
+      expect(copyToClipboard).toHaveBeenCalledWith("test content to copy", expect.any(Function), {
         successMessage: "Content Copied Successfully!",
         errorMessage: "Error while copy content.",
         timeout: 5000,
@@ -849,7 +849,7 @@ describe("Custom Component", () => {
 
       await wrapper.vm.copyToClipboardFn(mockContent);
 
-      expect(copyToClipboard).toHaveBeenCalledWith("", {
+      expect(copyToClipboard).toHaveBeenCalledWith("", expect.any(Function), {
         successMessage: "Content Copied Successfully!",
         errorMessage: "Error while copy content.",
         timeout: 5000,
@@ -866,7 +866,7 @@ describe("Custom Component", () => {
 
       await wrapper.vm.copyToClipboardFn(mockContent);
 
-      expect(copyToClipboard).toHaveBeenCalledWith(null, {
+      expect(copyToClipboard).toHaveBeenCalledWith(null, expect.any(Function), {
         successMessage: "Content Copied Successfully!",
         errorMessage: "Error while copy content.",
         timeout: 5000,
@@ -881,7 +881,7 @@ describe("Custom Component", () => {
 
       await wrapper.vm.copyToClipboardFn(mockContent);
 
-      expect(copyToClipboard).toHaveBeenCalledWith(undefined, {
+      expect(copyToClipboard).toHaveBeenCalledWith(undefined, expect.any(Function), {
         successMessage: "Content Copied Successfully!",
         errorMessage: "Error while copy content.",
         timeout: 5000,

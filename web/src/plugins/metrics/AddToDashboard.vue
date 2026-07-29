@@ -199,6 +199,7 @@ export default defineComponent({
             error?.response?.data?.message ??
               error?.message ??
               t("metrics.addToDashboardPage.errorAddingPanel"),
+            t,
           );
         } else {
           showErrorNotification(error?.message ?? t("metrics.addToDashboardPage.errorAddingPanel"));

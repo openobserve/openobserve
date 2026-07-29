@@ -1115,7 +1115,8 @@ export default defineComponent({
     const splitterModel = ref(25);
     const timeRange: any = ref({ start: 0, end: 0 });
     const store = useStore();
-    const { getStreams } = useStreams();
+    const { t } = useI18nTyped();
+    const { getStreams } = useStreams(t);
 
     // Chart renderer ref for tooltip integration
     const chartRendererRef = ref<any>(null);
@@ -1231,8 +1232,6 @@ export default defineComponent({
     const filteredStreamOptions = ref<string[]>([]);
 
     const streamSearchValue = ref<string>("");
-
-    const { t } = useI18nTyped();
 
     const router = useRouter();
 
@@ -2079,6 +2078,7 @@ export default defineComponent({
     const { fetchRumEventsForTrace, formatRumEventsAsSpans } = useRumSpanBuilder(
       logStreams,
       searchObj,
+      t,
     );
 
     const getTraceDetails = async (data: any) => {
@@ -2618,7 +2618,7 @@ export default defineComponent({
     };
 
     const copyTraceId = () => {
-      copyToClipboard(spanList.value[0]["trace_id"], {
+      copyToClipboard(spanList.value[0]["trace_id"], t, {
         successMessage: t("traces.traceDetails.traceIdCopied"),
       });
     };
@@ -2627,7 +2627,7 @@ export default defineComponent({
 
     const copySessionId = () => {
       if (!sessionId.value) return;
-      copyToClipboard(sessionId.value, {
+      copyToClipboard(sessionId.value, t, {
         successMessage: t("traces.traceDetails.sessionIdCopied"),
       });
     };

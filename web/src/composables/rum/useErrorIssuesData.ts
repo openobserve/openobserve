@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { computed, ref, type Ref } from "vue";
+import type { TranslateFn } from "@/types/i18n";
 import { useStore } from "vuex";
 import searchService from "@/services/search";
 import useQuery from "@/composables/useQuery";
@@ -70,7 +71,9 @@ export interface FetchIssuesParams {
   service: string;
 }
 
-const useErrorIssuesData = () => {
+// `t` injected: this composable is invoked directly by its own spec outside any
+// component, so it cannot obtain a translator itself.
+const useErrorIssuesData = (t: TranslateFn) => {
   const store = useStore();
   const { getTimeInterval, buildQueryPayload } = useQuery();
 
@@ -142,13 +145,16 @@ const useErrorIssuesData = () => {
     signal?: AbortSignal,
   ): Promise<any[]> => {
     const range = rangeOverride ?? params;
-    const req = buildQueryPayload({
-      sqlMode: false,
-      streamName: "_rumdata",
-      timestamp_column: store.state.zoConfig.timestamp_column,
-      timestamps: { startTime: range.startTime, endTime: range.endTime },
-      size,
-    } as any);
+    const req = buildQueryPayload(
+      {
+        sqlMode: false,
+        streamName: "_rumdata",
+        timestamp_column: store.state.zoConfig.timestamp_column,
+        timestamps: { startTime: range.startTime, endTime: range.endTime },
+        size,
+      } as any,
+      t,
+    );
     // buildQueryPayload encodes its template SQL before we override it, so
     // the replacement must be re-encoded when base64 mode is active.
     req.query.sql = req.encoding === "base64" ? b64EncodeUnicode(sql) : sql;

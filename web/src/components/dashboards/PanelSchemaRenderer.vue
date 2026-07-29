@@ -491,7 +491,7 @@ export default defineComponent({
     // wrong panel data in contexts that don't need the hiding feature
     let dashboardPanelDataForHiding: any = null;
     if (dashboardPanelDataPageKey) {
-      const result = useDashboardPanelData(dashboardPanelDataPageKey);
+      const result = useDashboardPanelData(dashboardPanelDataPageKey, t);
       dashboardPanelDataForHiding = result.dashboardPanelData;
     }
 
@@ -603,7 +603,7 @@ export default defineComponent({
     const metricCopiedIdx = ref<number | null>(null);
     const copyMetricItem = (m: any) => {
       if (m?.text == null) return;
-      copyToClipboard(String(m.text), { silent: true }).then(() => {
+      copyToClipboard(String(m.text), t, { silent: true }).then(() => {
         metricCopiedIdx.value = m?.idx;
         setTimeout(() => {
           if (metricCopiedIdx.value === m.idx) metricCopiedIdx.value = null;
@@ -687,6 +687,7 @@ export default defineComponent({
       dashboardId.value,
       panelSchema.value.id,
       folderId.value,
+      t,
     );
 
     // Filter data based on hiddenQueries for PromQL panels

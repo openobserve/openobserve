@@ -169,7 +169,7 @@ export default defineComponent({
     const { t } = useI18nTyped();
 
     const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
-    const { dashboardPanelData, promqlMode } = useDashboardPanelData(dashboardPanelDataPageKey);
+    const { dashboardPanelData, promqlMode } = useDashboardPanelData(dashboardPanelDataPageKey, t);
     onBeforeMount(() => {
       // on before mount need to check whether color object is there or not else use palette-classic-by-series as a default
       if (!dashboardPanelData?.data?.config?.color) {

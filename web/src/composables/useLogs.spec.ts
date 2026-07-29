@@ -32,6 +32,10 @@ import { searchState } from "../composables/useLogs/searchState";
 import useNotifications from "../composables/useNotifications";
 
 import store from "../test/unit/helpers/store";
+import i18nInstance from "@/locales";
+// Converted composables take an injected translator; this spec runs outside a
+// component, so it supplies the shared instance's t.
+const t = (i18nInstance.global as any).t;
 
 // Mock toast
 vi.mock("@/lib/feedback/Toast/useToast", () => ({
@@ -111,9 +115,9 @@ vi.mock("vue-router", () => ({
 const TestComponent = defineComponent({
   template: "<div></div>",
   setup() {
-    const logsComposable = useLogs();
-    const { setDateTime } = useSearchBar();
-    const { buildSearch } = useSearchStream();
+    const logsComposable = useLogs(t);
+    const { setDateTime } = useSearchBar(t);
+    const { buildSearch } = useSearchStream(t);
     const { searchObj, notificationMsg, fieldValues } = searchState();
     const { showErrorNotification } = useNotifications();
     const { updateGridColumns, updateFieldValues } = useStreamFields();

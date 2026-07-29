@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { useStore } from "vuex";
+import type { TranslateFn } from "@/types/i18n";
 
 import { searchState } from "@/composables/useLogs/searchState";
 import useStreams from "@/composables/useStreams";
@@ -35,10 +36,11 @@ import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
 import { isCrossLinkingEnabledForStream } from "@/utils/crossLinking";
 import config from "@/aws-exports";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { raw, gt } from "@/types/i18n";
+import { raw } from "@/types/i18n";
 
-export const useSearchBar = () => {
-  const { getStream, isStreamExists, isStreamFetched } = useStreams();
+// `t` injected: invoked directly by specs outside any component.
+export const useSearchBar = (t: TranslateFn) => {
+  const { getStream, isStreamExists, isStreamFetched } = useStreams(t);
 
   let { searchObj, searchObjDebug, notificationMsg } = searchState();
 
@@ -46,7 +48,7 @@ export const useSearchBar = () => {
 
   const { fnParsedSQL, extractTimestamps } = logsUtils();
 
-  const { getDataThroughStream, buildSearch } = useSearchStream();
+  const { getDataThroughStream, buildSearch } = useSearchStream(t);
 
   const { getAllFunctions } = useFunctions();
   const { getAllActions } = useActions();
@@ -85,7 +87,7 @@ export const useSearchBar = () => {
       });
       return;
     } catch (e) {
-      showErrorNotification(gt("toastMessages.useLogs.errorWhileFetchingFunctions"));
+      showErrorNotification(t("toastMessages.useLogs.errorWhileFetchingFunctions"));
     }
   };
 
@@ -107,7 +109,7 @@ export const useSearchBar = () => {
       });
       return;
     } catch (e) {
-      showErrorNotification(gt("toastMessages.useLogs.errorWhileFetchingActions"));
+      showErrorNotification(t("toastMessages.useLogs.errorWhileFetchingActions"));
     }
   };
 
@@ -850,8 +852,7 @@ export const useSearchBar = () => {
       searchObj.loading = false;
       showErrorNotification(
         raw(
-          notificationMsg.value ||
-            gt("toastMessages.useLogs.errorOccurredDuringTheSearchOperation"),
+          notificationMsg.value || t("toastMessages.useLogs.errorOccurredDuringTheSearchOperation"),
         ),
       );
       notificationMsg.value = "";
@@ -889,7 +890,7 @@ export const useSearchBar = () => {
               searchObj.data.isOperationCancelled = false;
               toast({
                 variant: "info",
-                message: gt("toastMessages.useLogs.runningQueryCancelledSuccessfully"),
+                message: t("toastMessages.useLogs.runningQueryCancelledSuccessfully"),
               });
             }
           })
@@ -908,7 +909,7 @@ export const useSearchBar = () => {
       } catch (error) {
         toast({
           variant: "error",
-          message: gt("toastMessages.useLogs.failedToCancelRunningQuery"),
+          message: t("toastMessages.useLogs.failedToCancelRunningQuery"),
         });
         resolve(true);
       }
@@ -933,7 +934,7 @@ export const useSearchBar = () => {
       });
     } catch (error: any) {
       console.error("Failed to cancel WebSocket searches:", error);
-      showErrorNotification(gt("toastMessages.useLogs.failedToCancelSearchOperations"));
+      showErrorNotification(t("toastMessages.useLogs.failedToCancelSearchOperations"));
     }
   };
 

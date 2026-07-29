@@ -14,6 +14,11 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, vi, beforeEach } from "vitest";
+import i18nInstance from "@/locales";
+
+// buildQueryPayload takes an injected translator; this spec runs outside a
+// component, so it supplies the shared instance's t.
+const t = (i18nInstance.global as any).t;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // vi.hoisted() runs before any vi.mock() factory so the values are available
@@ -165,87 +170,108 @@ describe("useQuery", () => {
     });
 
     it("returns an object with query and aggs keys", () => {
-      const result = buildQueryPayload({
-        streamName: "my-stream",
-        sqlMode: false,
-        timeInterval: "10 second",
-      });
+      const result = buildQueryPayload(
+        {
+          streamName: "my-stream",
+          sqlMode: false,
+          timeInterval: "10 second",
+        },
+        t,
+      );
       expect(result).toHaveProperty("query");
       expect(result).toHaveProperty("aggs");
     });
 
     it("replaces [INDEX_NAME] with the streamName", () => {
-      const result = buildQueryPayload({
-        streamName: "test-stream",
-        sqlMode: false,
-        timeInterval: "10 second",
-      });
+      const result = buildQueryPayload(
+        {
+          streamName: "test-stream",
+          sqlMode: false,
+          timeInterval: "10 second",
+        },
+        t,
+      );
       expect(result?.query.sql).toContain('"test-stream"');
       expect(result?.query.sql).not.toContain("[INDEX_NAME]");
     });
 
     it("replaces [INTERVAL] in the histogram aggregation", () => {
-      const result = buildQueryPayload({
-        streamName: "s",
-        sqlMode: false,
-        timeInterval: "30 second",
-      });
+      const result = buildQueryPayload(
+        {
+          streamName: "s",
+          sqlMode: false,
+          timeInterval: "30 second",
+        },
+        t,
+      );
       expect(result?.aggs.histogram).toContain("'30 second'");
       expect(result?.aggs.histogram).not.toContain("[INTERVAL]");
     });
 
     it("replaces [WHERE_CLAUSE] with parsedQuery.whereClause", () => {
-      const result = buildQueryPayload({
-        streamName: "s",
-        sqlMode: false,
-        timeInterval: "10 second",
-        parsedQuery: {
-          queryFunctions: "",
-          whereClause: "status = 'active'",
-          limit: 0,
-          query: "",
-          offset: 0,
+      const result = buildQueryPayload(
+        {
+          streamName: "s",
+          sqlMode: false,
+          timeInterval: "10 second",
+          parsedQuery: {
+            queryFunctions: "",
+            whereClause: "status = 'active'",
+            limit: 0,
+            query: "",
+            offset: 0,
+          },
         },
-      });
+        t,
+      );
       expect(result?.query.sql).toContain("status = 'active'");
       expect(result?.query.sql).not.toContain("[WHERE_CLAUSE]");
     });
 
     it("replaces [QUERY_FUNCTIONS] with parsedQuery.queryFunctions", () => {
-      const result = buildQueryPayload({
-        streamName: "s",
-        sqlMode: false,
-        timeInterval: "10 second",
-        parsedQuery: {
-          queryFunctions: ", count(*) AS total",
-          whereClause: "",
-          limit: 0,
-          query: "",
-          offset: 0,
+      const result = buildQueryPayload(
+        {
+          streamName: "s",
+          sqlMode: false,
+          timeInterval: "10 second",
+          parsedQuery: {
+            queryFunctions: ", count(*) AS total",
+            whereClause: "",
+            limit: 0,
+            query: "",
+            offset: 0,
+          },
         },
-      });
+        t,
+      );
       expect(result?.query.sql).toContain(", count(*) AS total");
       expect(result?.query.sql).not.toContain("[QUERY_FUNCTIONS]");
     });
 
     it("uses default from=0 and size=100 when not provided", () => {
-      const result = buildQueryPayload({
-        streamName: "s",
-        sqlMode: false,
-        timeInterval: "10 second",
-      });
+      const result = buildQueryPayload(
+        {
+          streamName: "s",
+          sqlMode: false,
+          timeInterval: "10 second",
+        },
+        t,
+      );
       expect(result?.query.from).toBe(0);
       expect(result?.query.size).toBe(100);
     });
 
     it("uses provided from and size values", () => {
-      const result = buildQueryPayload({
-        streamName: "s",
-        sqlMode: false,
-        timeInterval: "10 second",
-        from: 50,
-        size: 25,
-      });
+      const result = buildQueryPayload(
+        {
+          streamName: "s",
+          sqlMode: false,
+          timeInterval: "10 second",
+          from: 50,
+          size: 25,
+        },
+        t,
+      );
       expect(result?.query.from).toBe(50);
       expect(result?.query.size).toBe(25);
     });
@@ -253,70 +279,88 @@ describe("useQuery", () => {
     it("overrides start_time and end_time when timestamps are provided", () => {
       const startTime = 1_000_000;
       const endTime = 2_000_000;
-      const result = buildQueryPayload({
-        streamName: "s",
-        sqlMode: false,
-        timeInterval: "10 second",
-        timestamps: { startTime, endTime },
-      });
+      const result = buildQueryPayload(
+        {
+          streamName: "s",
+          sqlMode: false,
+          timeInterval: "10 second",
+          timestamps: { startTime, endTime },
+        },
+        t,
+      );
       expect(result?.query.start_time).toBe(startTime);
       expect(result?.query.end_time).toBe(endTime);
     });
 
     it("keeps default start/end_time (numbers) when timestamps are not provided", () => {
-      const result = buildQueryPayload({
-        streamName: "s",
-        sqlMode: false,
-        timeInterval: "10 second",
-      });
+      const result = buildQueryPayload(
+        {
+          streamName: "s",
+          sqlMode: false,
+          timeInterval: "10 second",
+        },
+        t,
+      );
       expect(typeof result?.query.start_time).toBe("number");
       expect(typeof result?.query.end_time).toBe("number");
     });
 
     it("encodes sql and histogram with base64 when sql_base64_enabled is true", () => {
       mockStore.state.zoConfig.sql_base64_enabled = true;
-      const result = buildQueryPayload({
-        streamName: "s",
-        sqlMode: false,
-        timeInterval: "10 second",
-        currentPage: 0,
-      });
+      const result = buildQueryPayload(
+        {
+          streamName: "s",
+          sqlMode: false,
+          timeInterval: "10 second",
+          currentPage: 0,
+        },
+        t,
+      );
       expect(result?.encoding).toBe("base64");
       expect(mockB64EncodeUnicode).toHaveBeenCalled();
     });
 
     it("does not add encoding key when sql_base64_enabled is false", () => {
       mockStore.state.zoConfig.sql_base64_enabled = false;
-      const result = buildQueryPayload({
-        streamName: "s",
-        sqlMode: false,
-        timeInterval: "10 second",
-      });
+      const result = buildQueryPayload(
+        {
+          streamName: "s",
+          sqlMode: false,
+          timeInterval: "10 second",
+        },
+        t,
+      );
       expect(result).not.toHaveProperty("encoding");
       expect(mockB64EncodeUnicode).not.toHaveBeenCalled();
     });
 
     it("uses store's timestamp_column in the histogram SQL", () => {
       mockStore.state.zoConfig.timestamp_column = "custom_ts";
-      const result = buildQueryPayload({
-        streamName: "s",
-        sqlMode: false,
-        timeInterval: "10 second",
-      });
+      const result = buildQueryPayload(
+        {
+          streamName: "s",
+          sqlMode: false,
+          timeInterval: "10 second",
+        },
+        t,
+      );
       expect(result?.aggs.histogram).toContain("custom_ts");
     });
 
     it("uses _timestamp from store when timestamp_column is '_timestamp'", () => {
-      const result = buildQueryPayload({
-        streamName: "s",
-        sqlMode: false,
-        timeInterval: "10 second",
-      });
+      const result = buildQueryPayload(
+        {
+          streamName: "s",
+          sqlMode: false,
+          timeInterval: "10 second",
+        },
+        t,
+      );
       expect(result?.aggs.histogram).toContain("_timestamp");
     });
 
     it("calls showErrorNotification and returns undefined on internal error", () => {
-      const result = buildQueryPayload(null as any);
+      const result = buildQueryPayload(null as any, t);
       expect(mockShowErrorNotification).toHaveBeenCalledWith("Invalid SQL Syntax");
       expect(result).toBeUndefined();
     });

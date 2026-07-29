@@ -129,7 +129,7 @@
                         class="ml-2"
                         data-test="search-scheduler-copy-sql-btn"
                         @click.stop="
-                          copyToClipboard(row.sql, {
+                          copyToClipboard(row.sql, t, {
                             successMessage: `${t('logs.searchSchedulersList.sqlQuery')} ${t('search_scheduler_job.copy_success')}`,
                             timeout: 5000,
                           })
@@ -182,7 +182,7 @@
                         size="icon-chip"
                         class="ml-2"
                         @click.stop="
-                          copyToClipboard(row.function, {
+                          copyToClipboard(row.function, t, {
                             successMessage: `${t('logs.searchSchedulersList.functionDefinationCopy')} ${t('search_scheduler_job.copy_success')}`,
                             timeout: 5000,
                           })

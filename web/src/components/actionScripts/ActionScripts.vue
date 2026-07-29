@@ -342,7 +342,7 @@ export default defineComponent({
     const { getAllActions } = useActions();
     const { track } = useReo();
 
-    const { getStreams } = useStreams();
+    const { getStreams } = useStreams(t);
 
     // Clone-dialog bindings referenced by the template; nothing opens the dialog yet.
     const showForm = ref(false);

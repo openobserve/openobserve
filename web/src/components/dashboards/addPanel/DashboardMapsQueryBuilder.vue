@@ -312,7 +312,7 @@ export default defineComponent({
       removeMapValue,
       promqlMode,
       cleanupDraggingFields,
-    } = useDashboardPanelData(dashboardPanelDataPageKey);
+    } = useDashboardPanelData(dashboardPanelDataPageKey, t);
 
     const triggerOperators = [
       { label: t("dashboard.count"), value: "count" },

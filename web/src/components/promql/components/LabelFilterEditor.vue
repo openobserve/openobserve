@@ -136,7 +136,7 @@ const { t } = useI18nTyped();
 
 // Get fetchPromQLLabels from composable
 const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
-const { fetchPromQLLabels } = useDashboardPanelData(dashboardPanelDataPageKey);
+const { fetchPromQLLabels } = useDashboardPanelData(dashboardPanelDataPageKey, t);
 
 const availableLabels = computed<string[]>(
   () => props.dashboardPanelData?.meta?.promql?.availableLabels || [],

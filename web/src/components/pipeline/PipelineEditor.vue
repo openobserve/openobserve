@@ -369,6 +369,7 @@ const nodeTypes: any = [
 ];
 const functions = ref<{ [key: string]: Function }>({});
 
+const { t } = useI18nTyped();
 const {
   pipelineObj,
   resetPipelineData,
@@ -376,7 +377,7 @@ const {
   addSourceNode,
   closeStepPicker,
   onDragStart,
-} = useDragAndDrop();
+} = useDragAndDrop(t);
 
 // Items for the shared step picker: the downstream-addable node types
 // (Transform + Destination; sources aren't "added after" a node).
@@ -445,7 +446,7 @@ const chartContainerRef = ref(null);
 
 const isPipelineSaving = ref(false);
 
-const { getStreams } = useStreams();
+const { getStreams } = useStreams(t);
 
 const confirmDialogBasicPipeline = ref(false);
 const showJsonEditorDialog = ref(false);
@@ -463,8 +464,6 @@ const jsonEditorAiBtnLogo = computed(() => {
 const toggleJsonEditorAIChat = () => {
   store.dispatch("setIsAiChatEnabled", !store.state.isAiChatEnabled);
 };
-
-const { t } = useI18nTyped();
 
 const validationErrors = ref<string[]>([]);
 

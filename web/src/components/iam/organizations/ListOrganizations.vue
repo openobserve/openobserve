@@ -655,7 +655,7 @@ export default defineComponent({
       this.showJoinOrganizationDialog = false;
     },
     copyAPIKey() {
-      copyToClipboard(this.organizationAPIKey, {
+      copyToClipboard(this.organizationAPIKey, this.t, {
         successMessage: this.t("iam.listOrganizations.apiKeyCopied"),
         errorMessage: this.t("iam.listOrganizations.apiKeyCopyError"),
         timeout: 5000,

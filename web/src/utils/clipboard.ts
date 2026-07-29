@@ -1,7 +1,7 @@
 // Copyright 2026 OpenObserve Inc.
 
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { raw, gt } from "@/types/i18n";
+import { raw, type TranslateFn } from "@/types/i18n";
 
 export interface CopyToClipboardOptions {
   successMessage?: string;
@@ -52,6 +52,7 @@ async function writeClipboard(text: string): Promise<void> {
 
 export async function copyToClipboard(
   text: string,
+  t: TranslateFn,
   options: CopyToClipboardOptions = {},
 ): Promise<boolean> {
   const { successMessage, errorMessage, timeout = 2000, silent = false } = options;
@@ -61,7 +62,7 @@ export async function copyToClipboard(
     if (!silent) {
       toast({
         variant: "success",
-        message: raw(successMessage || gt("common.copySuccess")),
+        message: raw(successMessage || t("common.copySuccess")),
         timeout,
       });
     }
@@ -70,7 +71,7 @@ export async function copyToClipboard(
     if (!silent) {
       toast({
         variant: "error",
-        message: raw(errorMessage || gt("common.copyError")),
+        message: raw(errorMessage || t("common.copyError")),
         timeout,
       });
     }

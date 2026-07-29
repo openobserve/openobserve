@@ -497,7 +497,7 @@ export default defineComponent({
     const { isDark } = useTheme();
     const router = useRouter();
     const { t } = useI18nTyped();
-    const { getStreams } = useStreams();
+    const { getStreams } = useStreams(t);
     const { searchObj } = useTraces();
 
     // Resolved visualization + layout type. A parent that owns its own type

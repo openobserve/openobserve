@@ -233,7 +233,7 @@ describe("SearchHistory Component", () => {
       });
 
       const testSQL = "SELECT * FROM logs";
-      await wrapper.vm.copyToClipboard(testSQL, "SQL Query");
+      await wrapper.vm.copyToClipboard(testSQL, wrapper.vm.t);
       await flushPromises();
 
       expect(mockWriteText).toHaveBeenCalledWith(testSQL);

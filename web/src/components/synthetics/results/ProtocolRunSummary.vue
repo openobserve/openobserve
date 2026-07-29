@@ -41,7 +41,7 @@ const store = useStore();
 const route = useRoute();
 // The check's folder (name), carried on the results-page route as ?folder=.
 const folderName = computed(() => String(route.query.folder ?? ""));
-const synthetics = useSyntheticResults();
+const synthetics = useSyntheticResults(t);
 
 const run = computed(() => synthetics.protocolRunDetail.value);
 const loading = computed(() => synthetics.loading.value);

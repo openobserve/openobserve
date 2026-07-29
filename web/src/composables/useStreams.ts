@@ -19,11 +19,13 @@ import { computed, ComputedRef } from "vue";
 import { ref } from "vue";
 import { deepCopy } from "@/utils/zincutils";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { gt } from "@/types/i18n";
+import type { TranslateFn } from "@/types/i18n";
 
 const getStreamsPromise: any = ref(null);
 
-const useStreams = () => {
+// `t` injected: this composable is invoked directly by specs outside any
+// component, so it cannot obtain a translator itself.
+const useStreams = (t: TranslateFn) => {
   const store = useStore();
 
   const updateStreamsInStore = (streamType: string, streams: any) => {
@@ -69,7 +71,7 @@ const useStreams = () => {
             const dismiss = notify
               ? toast({
                   variant: "loading",
-                  message: gt("toastMessages.composables.pleaseWaitWhileLoadingStreams"),
+                  message: t("toastMessages.composables.pleaseWaitWhileLoadingStreams"),
                   timeout: 0,
                 })
               : () => {};
@@ -189,7 +191,7 @@ const useStreams = () => {
           const dismiss = notify
             ? toast({
                 variant: "loading",
-                message: gt("toastMessages.composables.pleaseWaitWhileLoadingStreams"),
+                message: t("toastMessages.composables.pleaseWaitWhileLoadingStreams"),
                 timeout: 5000,
               })
             : () => {};

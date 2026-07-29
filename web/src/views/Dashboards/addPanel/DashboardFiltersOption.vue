@@ -60,14 +60,14 @@ export default defineComponent({
     const route = useRoute();
     const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
 
+    const { t } = useI18nTyped();
     const {
       dashboardPanelData,
       removeFilterItem,
       loadFilterItem,
       selectedStreamFieldsBasedOnUserDefinedSchema,
-    } = useDashboardPanelData(dashboardPanelDataPageKey);
+    } = useDashboardPanelData(dashboardPanelDataPageKey, t);
 
-    const { t } = useI18nTyped();
     const showAddMenu = ref(false);
 
     const topLevelGroup = computed(() => {

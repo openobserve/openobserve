@@ -282,7 +282,7 @@ export default defineComponent({
       resetAggregationFunction,
       validatePanel,
       makeAutoSQLQuery,
-    } = useDashboardPanelData("dashboard");
+    } = useDashboardPanelData("dashboard", t);
     const editMode = ref(!!route.query.panelId);
     const selectedDate: any = ref(null);
     const dateTimePickerRef: any = ref(null);
@@ -334,7 +334,7 @@ export default defineComponent({
 
     let variablesData: any = reactive({});
     const { registerAiChatHandler, removeAiChatHandler } = useAiChat();
-    const { getStream } = useStreams();
+    const { getStream } = useStreams(t);
     const seriesData = ref([]);
     const shouldRefreshWithoutCache = ref(false);
 
@@ -1337,6 +1337,7 @@ export default defineComponent({
               (editMode.value
                 ? t("dashboard.addPanel.errorUpdatingPanel")
                 : t("dashboard.addPanel.errorCreatingPanel")),
+            t,
           );
         } else {
           showErrorNotification(
@@ -1425,7 +1426,7 @@ export default defineComponent({
 
       return searchIds.flat() as string[];
     });
-    const { traceIdRef, cancelQuery } = useCancelQuery();
+    const { traceIdRef, cancelQuery } = useCancelQuery(t);
 
     const cancelAddPanelQuery = () => {
       traceIdRef.value = searchRequestTraceIds.value;

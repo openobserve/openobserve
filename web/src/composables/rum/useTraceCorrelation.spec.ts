@@ -17,6 +17,10 @@ import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { ref } from "vue";
 import useTraceCorrelation from "@/composables/rum/useTraceCorrelation";
 import searchService from "@/services/search";
+import i18nInstance from "@/locales";
+// Converted composables take an injected translator; this spec runs outside a
+// component, so it supplies the shared instance's t.
+const t = (i18nInstance.global as any).t;
 
 // The composable now asks the stream schema which trace-id namespaces exist (`_o2_` vs
 // `_oo_`) before building SQL, so getStream must be mocked or every call hangs.
@@ -134,7 +138,7 @@ describe("useTraceCorrelation", () => {
         hasBackendTrace,
         backendSpanCount,
         performanceData,
-      } = useTraceCorrelation(traceId);
+      } = useTraceCorrelation(traceId, t);
 
       expect(correlationData.value).toBeNull();
       expect(isLoading.value).toBe(false);
@@ -146,7 +150,7 @@ describe("useTraceCorrelation", () => {
 
     it("should expose all public API surface members", () => {
       const traceId = ref("test-trace-123");
-      const result = useTraceCorrelation(traceId);
+      const result = useTraceCorrelation(traceId, t);
 
       expect(typeof result.fetchCorrelation).toBe("function");
       expect(typeof result.reset).toBe("function");
@@ -162,7 +166,7 @@ describe("useTraceCorrelation", () => {
   describe("fetchCorrelation", () => {
     it("should not fetch when traceId is empty", async () => {
       const traceId = ref("");
-      const { fetchCorrelation } = useTraceCorrelation(traceId);
+      const { fetchCorrelation } = useTraceCorrelation(traceId, t);
 
       await fetchCorrelation();
 
@@ -178,7 +182,7 @@ describe("useTraceCorrelation", () => {
         .mockImplementation(() => new Promise((resolve) => setTimeout(resolve, 100)));
       vi.mocked(searchService.search).mockImplementation(mockSearchFn);
 
-      const { isLoading, fetchCorrelation } = useTraceCorrelation(traceId);
+      const { isLoading, fetchCorrelation } = useTraceCorrelation(traceId, t);
 
       const fetchPromise = fetchCorrelation();
 
@@ -196,7 +200,7 @@ describe("useTraceCorrelation", () => {
 
       mockSuccessfulSearch([], []);
 
-      const { fetchCorrelation } = useTraceCorrelation(traceId);
+      const { fetchCorrelation } = useTraceCorrelation(traceId, t);
       await fetchCorrelation();
 
       expect(searchService.search).toHaveBeenCalledWith(
@@ -217,7 +221,7 @@ describe("useTraceCorrelation", () => {
 
       mockSuccessfulSearch([], []);
 
-      const { fetchCorrelation } = useTraceCorrelation(traceId);
+      const { fetchCorrelation } = useTraceCorrelation(traceId, t);
       await fetchCorrelation();
 
       const firstCall = vi.mocked(searchService.search).mock.calls[0];
@@ -236,7 +240,7 @@ describe("useTraceCorrelation", () => {
       const backendSpan = createMockBackendSpan();
       mockSuccessfulSearch([rumEvent], [backendSpan]);
 
-      const { fetchCorrelation } = useTraceCorrelation(traceId);
+      const { fetchCorrelation } = useTraceCorrelation(traceId, t);
       await fetchCorrelation();
 
       expect(searchService.search).toHaveBeenCalledTimes(2);
@@ -260,7 +264,7 @@ describe("useTraceCorrelation", () => {
 
       mockSuccessfulSearch(mockRumEvents, mockBackendSpans);
 
-      const { correlationData, fetchCorrelation } = useTraceCorrelation(traceId);
+      const { correlationData, fetchCorrelation } = useTraceCorrelation(traceId, t);
       await fetchCorrelation();
 
       expect(correlationData.value).not.toBeNull();
@@ -279,7 +283,10 @@ describe("useTraceCorrelation", () => {
         .mockResolvedValueOnce(createMockSearchResponse([rumEvent]))
         .mockRejectedValueOnce(new Error("Trace not found"));
 
-      const { correlationData, hasBackendTrace, fetchCorrelation } = useTraceCorrelation(traceId);
+      const { correlationData, hasBackendTrace, fetchCorrelation } = useTraceCorrelation(
+        traceId,
+        t,
+      );
       await fetchCorrelation();
 
       expect(correlationData.value).not.toBeNull();
@@ -293,7 +300,7 @@ describe("useTraceCorrelation", () => {
 
       mockFailedSearch("Network error");
 
-      const { correlationData, error, fetchCorrelation } = useTraceCorrelation(traceId);
+      const { correlationData, error, fetchCorrelation } = useTraceCorrelation(traceId, t);
       await fetchCorrelation();
 
       expect(correlationData.value).toBeNull();
@@ -309,7 +316,7 @@ describe("useTraceCorrelation", () => {
 
       mockFailedSearch("Network error");
 
-      const { isLoading, fetchCorrelation } = useTraceCorrelation(traceId);
+      const { isLoading, fetchCorrelation } = useTraceCorrelation(traceId, t);
 
       await fetchCorrelation();
 
@@ -329,7 +336,7 @@ describe("useTraceCorrelation", () => {
 
       mockSuccessfulSearch(mockRumEvents, mockBackendSpans);
 
-      const { performanceData, fetchCorrelation } = useTraceCorrelation(traceId);
+      const { performanceData, fetchCorrelation } = useTraceCorrelation(traceId, t);
       await fetchCorrelation();
 
       expect(performanceData.value).not.toBeNull();
@@ -350,7 +357,7 @@ describe("useTraceCorrelation", () => {
           data: { hits: [], total: 0 },
         } as any);
 
-      const { performanceData, fetchCorrelation } = useTraceCorrelation(traceId);
+      const { performanceData, fetchCorrelation } = useTraceCorrelation(traceId, t);
       await fetchCorrelation();
 
       expect(performanceData.value).toBeNull();
@@ -375,7 +382,7 @@ describe("useTraceCorrelation", () => {
           data: { hits: [], total: 0 },
         } as any);
 
-      const { performanceData, fetchCorrelation } = useTraceCorrelation(traceId);
+      const { performanceData, fetchCorrelation } = useTraceCorrelation(traceId, t);
       await fetchCorrelation();
 
       expect(performanceData.value?.total_duration_ms).toBe(0);
@@ -395,7 +402,7 @@ describe("useTraceCorrelation", () => {
           data: { hits: [{ span_id: "span-1" }], total: 1 },
         } as any);
 
-      const { hasBackendTrace, fetchCorrelation } = useTraceCorrelation(traceId);
+      const { hasBackendTrace, fetchCorrelation } = useTraceCorrelation(traceId, t);
 
       expect(hasBackendTrace.value).toBe(false);
 
@@ -421,7 +428,7 @@ describe("useTraceCorrelation", () => {
           data: { hits: mockBackendSpans, total: 3 },
         } as any);
 
-      const { backendSpanCount, fetchCorrelation } = useTraceCorrelation(traceId);
+      const { backendSpanCount, fetchCorrelation } = useTraceCorrelation(traceId, t);
 
       expect(backendSpanCount.value).toBe(0);
 
@@ -449,7 +456,10 @@ describe("useTraceCorrelation", () => {
           data: { hits: [{ span_id: "span-1" }], total: 1 },
         } as any);
 
-      const { hasBackendTrace, backendSpanCount, fetchCorrelation } = useTraceCorrelation(traceId);
+      const { hasBackendTrace, backendSpanCount, fetchCorrelation } = useTraceCorrelation(
+        traceId,
+        t,
+      );
 
       await fetchCorrelation();
 
@@ -476,8 +486,10 @@ describe("useTraceCorrelation", () => {
           data: { hits: [], total: 0 },
         } as any);
 
-      const { correlationData, isLoading, error, fetchCorrelation, reset } =
-        useTraceCorrelation(traceId);
+      const { correlationData, isLoading, error, fetchCorrelation, reset } = useTraceCorrelation(
+        traceId,
+        t,
+      );
 
       await fetchCorrelation();
 
@@ -504,7 +516,7 @@ describe("useTraceCorrelation", () => {
         .mockResolvedValueOnce({ data: { hits: [], total: 0 } } as any)
         .mockResolvedValueOnce({ data: { hits: [], total: 0 } } as any);
 
-      const { fetchCorrelation } = useTraceCorrelation(traceId);
+      const { fetchCorrelation } = useTraceCorrelation(traceId, t);
 
       await fetchCorrelation();
       await fetchCorrelation();
@@ -533,7 +545,7 @@ describe("useTraceCorrelation", () => {
           data: { hits: [{ span_id: "span-1" }], total: 1 },
         } as any);
 
-      const { hasBackendTrace, fetchCorrelation } = useTraceCorrelation(traceId);
+      const { hasBackendTrace, fetchCorrelation } = useTraceCorrelation(traceId, t);
 
       await fetchCorrelation();
       expect(hasBackendTrace.value).toBe(false);
@@ -551,7 +563,7 @@ describe("useTraceCorrelation", () => {
         data: { hits: [], total: 0 },
       } as any);
 
-      const { correlationData, fetchCorrelation } = useTraceCorrelation(traceId);
+      const { correlationData, fetchCorrelation } = useTraceCorrelation(traceId, t);
       await fetchCorrelation();
 
       expect(correlationData.value).not.toBeNull();
@@ -566,7 +578,7 @@ describe("useTraceCorrelation", () => {
         data: {},
       } as any);
 
-      const { correlationData, fetchCorrelation } = useTraceCorrelation(traceId);
+      const { correlationData, fetchCorrelation } = useTraceCorrelation(traceId, t);
       await fetchCorrelation();
 
       expect(correlationData.value).not.toBeNull();
@@ -594,7 +606,7 @@ describe("useTraceCorrelation", () => {
           data: { hits: mockBackendSpans, total: 2 },
         } as any);
 
-      const { performanceData, fetchCorrelation } = useTraceCorrelation(traceId);
+      const { performanceData, fetchCorrelation } = useTraceCorrelation(traceId, t);
       await fetchCorrelation();
 
       // Should handle null duration_ms gracefully (reduce treats null as 0)
@@ -616,7 +628,7 @@ describe("useTraceCorrelation", () => {
           data: { hits: [], total: 0 },
         } as any);
 
-      const { fetchCorrelation } = useTraceCorrelation(traceId);
+      const { fetchCorrelation } = useTraceCorrelation(traceId, t);
       await fetchCorrelation();
 
       expect(searchService.search).toHaveBeenCalledWith(
@@ -658,7 +670,7 @@ describe("useTraceCorrelation", () => {
           .mockResolvedValueOnce({ data: { hits: [], total: 0 } } as any)
           .mockResolvedValueOnce({ data: { hits: [], total: 0 } } as any);
 
-        const { fetchCorrelation } = useTraceCorrelation(traceId, timeRange);
+        const { fetchCorrelation } = useTraceCorrelation(traceId, t, timeRange);
 
         // Act
         await fetchCorrelation();
@@ -680,7 +692,7 @@ describe("useTraceCorrelation", () => {
           .mockResolvedValueOnce({ data: { hits: [], total: 0 } } as any)
           .mockResolvedValueOnce({ data: { hits: [], total: 0 } } as any);
 
-        const { fetchCorrelation } = useTraceCorrelation(traceId, timeRange);
+        const { fetchCorrelation } = useTraceCorrelation(traceId, t, timeRange);
 
         // Act
         await fetchCorrelation();
@@ -702,7 +714,7 @@ describe("useTraceCorrelation", () => {
           .mockResolvedValueOnce({ data: { hits: [], total: 0 } } as any)
           .mockResolvedValueOnce({ data: { hits: [], total: 0 } } as any);
 
-        const { fetchCorrelation } = useTraceCorrelation(traceId, timeRange);
+        const { fetchCorrelation } = useTraceCorrelation(traceId, t, timeRange);
 
         // Act
         await fetchCorrelation();
@@ -723,7 +735,7 @@ describe("useTraceCorrelation", () => {
 
         vi.mocked(searchService.search).mockResolvedValue({ data: { hits: [], total: 0 } } as any);
 
-        const { fetchCorrelation } = useTraceCorrelation(traceId, timeRange);
+        const { fetchCorrelation } = useTraceCorrelation(traceId, t, timeRange);
         await fetchCorrelation();
 
         // Update the reactive ref
@@ -753,7 +765,7 @@ describe("useTraceCorrelation", () => {
           .mockResolvedValueOnce({ data: { hits: [], total: 0 } } as any)
           .mockResolvedValueOnce({ data: { hits: [], total: 0 } } as any);
 
-        const { fetchCorrelation } = useTraceCorrelation(traceId);
+        const { fetchCorrelation } = useTraceCorrelation(traceId, t);
 
         // Act
         await fetchCorrelation();
@@ -772,7 +784,7 @@ describe("useTraceCorrelation", () => {
           .mockResolvedValueOnce({ data: { hits: [], total: 0 } } as any)
           .mockResolvedValueOnce({ data: { hits: [], total: 0 } } as any);
 
-        const { fetchCorrelation } = useTraceCorrelation(traceId);
+        const { fetchCorrelation } = useTraceCorrelation(traceId, t);
 
         const beforeCall = Date.now() * 1000;
         // Act
@@ -803,7 +815,7 @@ describe("useTraceCorrelation", () => {
           .mockResolvedValueOnce({ data: { hits: [], total: 0 } } as any)
           .mockResolvedValueOnce({ data: { hits: [], total: 0 } } as any);
 
-        const { fetchCorrelation } = useTraceCorrelation(traceId, timeRange);
+        const { fetchCorrelation } = useTraceCorrelation(traceId, t, timeRange);
 
         // Act
         await fetchCorrelation();

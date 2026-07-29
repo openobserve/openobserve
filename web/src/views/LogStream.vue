@@ -417,7 +417,7 @@ export default defineComponent({
     );
 
     const streamTabs: never[] = [];
-    const { removeStream, getStream, getPaginatedStreams, addNewStreams } = useStreams();
+    const { removeStream, getStream, getPaginatedStreams, addNewStreams } = useStreams(t);
     const columns = ref<OTableColumnDef[]>([
       {
         id: "name",

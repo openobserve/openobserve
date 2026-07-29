@@ -218,7 +218,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   const router = useRouter();
   const { track } = useReo();
   const { getAllFunctions } = useFunctions();
-  const { getStreams, getStream } = useStreams();
+  const { getStreams, getStream } = useStreams(t);
   const { buildQueryPayload } = useQuery();
 
   // ── Core State ──────────────────────────────────────────────────────────
@@ -1454,6 +1454,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   const saveAlertJson = async (json: any) => {
     const saveContext: SaveAlertContext = {
       store,
+      t,
       props,
       emit,
       router,
@@ -1472,7 +1473,9 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       streams,
       getStreams,
       getParser,
-      buildQueryPayload,
+      // Bind the injected translator here so the validation module keeps its
+      // 1-arg callback contract.
+      buildQueryPayload: (options: any) => buildQueryPayload(options, t),
       prepareAndSaveAlert: prepareAndSaveAlertFunction,
     };
 

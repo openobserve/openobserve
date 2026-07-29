@@ -304,7 +304,7 @@ export default defineComponent({
     const store = useStore();
     const route = useRoute();
     const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
-    const { dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey);
+    const { dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey, t);
 
     // Inject variablesManager to access all dashboard variables
     const variablesManager = inject<any>("variablesManager", null);

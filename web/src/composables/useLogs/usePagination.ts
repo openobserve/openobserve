@@ -55,7 +55,7 @@ export const usePagination = () => {
     updateUrlQueryParams,
   } = logsUtils();
 
-  const { chunkedAppend } = useSearchStream();
+  const { chunkedAppend } = useSearchStream(t);
 
   // Sorting function
   interface OrderByField {
@@ -80,7 +80,7 @@ export const usePagination = () => {
 
         searchObj.loading = false;
         searchObj.data.isOperationCancelled = false;
-        showCancelSearchNotification();
+        showCancelSearchNotification(t);
         return;
       }
       // if (searchObj.meta.jobId != "") {

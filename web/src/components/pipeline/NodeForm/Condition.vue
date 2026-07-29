@@ -216,7 +216,7 @@ const { t } = useI18nTyped();
 
 const store = useStore();
 
-const { getStream } = useStreams();
+const { getStream } = useStreams(t);
 
 const emit = defineEmits(["update:node", "cancel:hideform", "delete:node"]);
 
@@ -242,7 +242,7 @@ const filteredColumns: any = ref([]);
 
 const originalStreamFields: Ref<any[]> = ref([]);
 
-const { addNode, pipelineObj, deletePipelineNode } = useDragAndDrop();
+const { addNode, pipelineObj, deletePipelineNode } = useDragAndDrop(t);
 
 const selected = ref(null);
 watch(selected, (newValue: any) => {

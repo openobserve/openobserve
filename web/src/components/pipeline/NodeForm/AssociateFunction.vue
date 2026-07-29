@@ -99,7 +99,7 @@ const props = withDefaults(
 const emit = defineEmits(["update:node", "cancel:hideform", "delete:node", "add:function"]);
 
 const { t } = useI18nTyped();
-const { addNode, pipelineObj, deletePipelineNode } = useDragAndDrop();
+const { addNode, pipelineObj, deletePipelineNode } = useDragAndDrop(t);
 
 const internalOpen = ref(!!props.open);
 watch(

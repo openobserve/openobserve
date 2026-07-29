@@ -148,7 +148,7 @@ const props = defineProps<{
   open?: boolean;
 }>();
 
-const { addStream, getStream } = useStreams();
+const { addStream, getStream } = useStreams(t);
 
 const store = useStore();
 

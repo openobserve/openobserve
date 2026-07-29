@@ -1,8 +1,7 @@
 // Copyright 2026 OpenObserve Inc.
 import { toast } from "@/lib/feedback/Toast/useToast";
 import type { ToastOptions } from "@/lib/feedback/Toast/OToast.types";
-import type { I18nText } from "@/types/i18n";
-import { gt } from "@/types/i18n";
+import type { I18nText, TranslateFn } from "@/types/i18n";
 
 type NotificationOptions = Pick<ToastOptions, "timeout" | "position">;
 
@@ -11,8 +10,11 @@ const useNotifications = () => {
     return toast({ variant: "error", message, ...options });
   };
 
+  // `t` injected: useNotifications() is called directly by specs outside any
+  // component, so it cannot obtain a translator itself.
   const showConfictErrorNotificationWithRefreshBtn = (
     message: I18nText,
+    t: TranslateFn,
     options?: NotificationOptions,
   ) => {
     return toast({
@@ -20,7 +22,7 @@ const useNotifications = () => {
       message,
       timeout: 0,
       action: {
-        label: gt("toastMessages.composables.refresh"),
+        label: t("toastMessages.composables.refresh"),
         handler: () => window.location.reload(),
       },
       ...options,

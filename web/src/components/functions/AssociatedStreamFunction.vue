@@ -257,7 +257,7 @@ export default defineComponent({
     ];
     const addFunctionInProgress = ref(false);
     const addFunctionInProgressLoading = ref(false);
-    const { getStreams } = useStreams();
+    const { getStreams } = useStreams(t);
 
     let deleteStreamName = "";
     let deleteStreamType = "";

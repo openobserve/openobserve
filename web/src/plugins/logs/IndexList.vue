@@ -355,14 +355,14 @@ export default defineComponent({
     const store = useStore();
     const router = useRouter();
     const { t } = useI18nTyped();
-    const { reorderSelectedFields, getFilterExpressionByFieldType, extractValueQuery } = useLogs();
+    const { reorderSelectedFields, getFilterExpressionByFieldType, extractValueQuery } = useLogs(t);
 
     const { filterHitsColumns, extractFields, getStreamList } = useStreamFields();
 
     const { searchObj, streamSchemaFieldsIndexMapping } = searchState();
 
-    const { onStreamChange, handleQueryData } = useSearchBar();
-    const { validateFilterForMultiStream } = useSearchStream();
+    const { onStreamChange, handleQueryData } = useSearchBar(t);
+    const { validateFilterForMultiStream } = useSearchStream(t);
 
     const { fnParsedSQL, fnUnparsedSQL, updatedLocalLogFilterField } = logsUtils();
 

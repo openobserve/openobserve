@@ -172,7 +172,7 @@ const isLoading = ref<boolean[]>([]);
 const { sessionState } = useSession();
 const { errorTrackingState } = useErrorTracking();
 const { performanceState } = usePerformance();
-const { getStream } = useStreams();
+const { getStream } = useStreams(t);
 
 const activeTab = ref<string>("performance");
 const tabs = [

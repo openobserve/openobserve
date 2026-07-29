@@ -924,7 +924,7 @@ export default defineComponent({
     const store = useStore();
     const { t } = useI18nTyped();
     const router = useRouter();
-    const { getStream } = useStreams();
+    const { getStream } = useStreams(t);
 
     // RED Charts State
     const dashboardData = ref<any>({});
@@ -1478,7 +1478,7 @@ export default defineComponent({
 
     /** Fetch the trace stream schema and populate streamFieldSet.
      *  Idempotent — skips if already resolved for the current stream.
-     *  Uses useStreams().getStream() which caches the schema in the Vuex store
+     *  Uses useStreams(t).getStream() which caches the schema in the Vuex store
      *  so other components benefit from the cached data. */
     const resolveStreamSchema = async () => {
       if (

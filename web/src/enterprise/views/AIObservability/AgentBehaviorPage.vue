@@ -92,7 +92,7 @@ import { useChildRefresh } from "@/enterprise/composables/useChildRefresh";
 defineOptions({ name: "AgentBehaviorPage" });
 
 const { t } = useI18nTyped();
-const { getStreams } = useStreams();
+const { getStreams } = useStreams(t);
 const store = useStore();
 
 // Shared with LLM Insights / Sessions / Quality — see useAiDateRange.ts.

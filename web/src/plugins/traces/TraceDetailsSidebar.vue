@@ -1483,7 +1483,7 @@ export default defineComponent({
     });
 
     const copySpanId = () => {
-      copyToClipboard(props.span?.span_id || "", {
+      copyToClipboard(props.span?.span_id || "", t, {
         successMessage: t("traces.traceDetailsSidebar.spanIdCopied"),
       });
     };
@@ -1492,7 +1492,7 @@ export default defineComponent({
       const attributes = props.span?.attributes || {};
       const attributesText = JSON.stringify(attributes, null, 2);
 
-      copyToClipboard(attributesText, {
+      copyToClipboard(attributesText, t, {
         successMessage: t("traces.traceDetailsSidebar.attributesCopied"),
       });
     };
@@ -1833,7 +1833,7 @@ export default defineComponent({
         }
 
         // Copy to clipboard
-        copyToClipboard(textToCopy, {
+        copyToClipboard(textToCopy, t, {
           successMessage: t("traces.traceDetailsSidebar.copiedToClipboard", {
             type: type.charAt(0).toUpperCase() + type.slice(1),
           }),
@@ -1956,7 +1956,7 @@ export default defineComponent({
     );
 
     const copyContentToClipboard = (log: any) => {
-      copyToClipboard(JSON.stringify(log), {
+      copyToClipboard(JSON.stringify(log), t, {
         successMessage: t("traces.traceDetailsSidebar.contentCopied"),
         timeout: 1000,
       });

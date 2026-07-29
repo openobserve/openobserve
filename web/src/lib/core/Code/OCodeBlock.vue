@@ -76,7 +76,7 @@ const highlightOne = (code: string, lang?: string): string => {
 const highlighted = computed(() => highlightOne(displayCode.value, props.lang));
 
 const onCopy = () => {
-  copyToClipboard(props.code, {
+  copyToClipboard(props.code, t, {
     successMessage: props.copyMessage,
     errorMessage: "Error while copying content.",
   });

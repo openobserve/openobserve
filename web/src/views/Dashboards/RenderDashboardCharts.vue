@@ -696,6 +696,7 @@ export default defineComponent({
             error?.response?.data?.message ??
               error?.message ??
               t("dashboard.renderDashboardCharts.dashboardUpdateFailed"),
+            t,
           );
         } else {
           showErrorNotification(

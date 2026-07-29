@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { reactive, computed, watch, onBeforeMount } from "vue";
+import type { TranslateFn } from "@/types/i18n";
 import { useStore } from "vuex";
 import useNotifications from "../useNotifications";
 import { b64EncodeUnicode, isStreamingEnabled } from "@/utils/zincutils";
@@ -46,10 +47,10 @@ let parser: any;
 
 const dashboardPanelDataObj: any = {};
 
-const useDashboardPanelData = (pageKey: string = "dashboard") => {
+const useDashboardPanelData = (pageKey: string = "dashboard", t: TranslateFn) => {
   const store = useStore();
   const { showErrorNotification } = useNotifications();
-  const { getStream } = useStreams();
+  const { getStream } = useStreams(t);
   const valuesWebSocket = useValuesWebSocket();
 
   // Initialize the state for this page key if it doesn't already exist

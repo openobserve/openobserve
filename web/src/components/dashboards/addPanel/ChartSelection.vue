@@ -172,7 +172,7 @@ export default defineComponent({
     ]);
 
     const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
-    const { promqlMode, dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey);
+    const { promqlMode, dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey, t);
 
     const promqlAllowedCharts = new Set([
       "line",

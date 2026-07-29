@@ -833,7 +833,7 @@ export default defineComponent({
     const selectedHistoryAlertId = ref("");
     const selectedHistoryAlertName = ref("");
 
-    const { getStreams } = useStreams();
+    const { getStreams } = useStreams(t);
 
     const toBeCloneAlertName = ref("");
     const toBeClonedID = ref("");

@@ -48,13 +48,13 @@ import type { KeyFieldsConfig, FieldGroupingConfig } from "@/composables/useServ
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 
 export const useStreamFields = () => {
-  const { getStreams, getStream } = useStreams();
+  const { t } = useI18nTyped();
+  const { getStreams, getStream } = useStreams(t);
   const { updateFieldKeywords } = useSqlSuggestions();
   const { loadSemanticGroups, loadKeyFields, loadFieldGrouping } = useServiceCorrelation();
 
   const store = useStore();
   const router = useRouter();
-  const { t } = useI18nTyped();
 
   let {
     searchObj,

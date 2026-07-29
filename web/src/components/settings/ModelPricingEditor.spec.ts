@@ -572,7 +572,9 @@ describe("ModelPricingEditor.vue", () => {
       await flushPromises();
       (wrapper.vm as any).copyPattern("gpt-4o");
       await flushPromises();
-      expect(mockCopyToClipboard).toHaveBeenCalledWith("gpt-4o", { silent: true });
+      expect(mockCopyToClipboard).toHaveBeenCalledWith("gpt-4o", expect.any(Function), {
+        silent: true,
+      });
       expect((wrapper.vm as any).copiedPattern).toBe("gpt-4o");
     });
   });

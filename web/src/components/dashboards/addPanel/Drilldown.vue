@@ -81,7 +81,7 @@ export default defineComponent({
     const drilldownPopUpKey = ref(0);
 
     const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
-    const { dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey);
+    const { dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey, t);
 
     onBeforeMount(() => {
       // Ensure that the drilldown object is initialized in config

@@ -292,7 +292,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="icon-md"
               :title="t('serviceAccounts.copyToken')"
               @click.stop="
-                copyToClipboard(serviceToken, {
+                copyToClipboard(serviceToken, t, {
                   successMessage: t('serviceAccounts.toast.tokenCopied'),
                   timeout: 5000,
                 })

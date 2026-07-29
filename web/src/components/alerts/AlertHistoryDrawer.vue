@@ -248,7 +248,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OButton
                     v-if="anomalySql"
                     @click="
-                      copyToClipboard(anomalySql, {
+                      copyToClipboard(anomalySql, t, {
                         successMessage: 'SQL Copied Successfully!',
                         timeout: 3000,
                       })
@@ -297,7 +297,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       alertDetails.conditions !== '--'
                     "
                     @click="
-                      copyToClipboard(alertDetails.conditions, {
+                      copyToClipboard(alertDetails.conditions, t, {
                         successMessage:
                           (alertDetails.type === 'sql'
                             ? t('alerts.alertDetails.sqlQuery')

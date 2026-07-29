@@ -237,6 +237,7 @@ const correlationRange = computed(() =>
 const { isLoading, hasBackendTrace, fetchCorrelation, backendSpanCount, performanceData } =
   useTraceCorrelation(
     computed(() => props.traceId),
+    t,
     correlationRange,
   );
 
@@ -271,7 +272,7 @@ const calculatePercentage = (value: number, total: number) => {
 };
 
 const copyTraceId = () => {
-  copyToClipboard(props.traceId, {
+  copyToClipboard(props.traceId, t, {
     successMessage: "Trace ID copied to clipboard",
     timeout: 1500,
   });

@@ -168,7 +168,7 @@ export default defineComponent({
           isPolling = false;
 
           // Short URL is ready! Copy it to clipboard
-          copyToClipboard(shortURL, {
+          copyToClipboard(shortURL, t, {
             successMessage: t("search.linkCopiedSuccessfully"),
             errorMessage: t("search.errorCopyingLink"),
             timeout: 5000,
@@ -241,7 +241,7 @@ export default defineComponent({
               store.commit("setPendingShortURL", shortUrl);
             } else {
               // Chrome/Firefox: Copy directly here
-              copyToClipboard(shortUrl, {
+              copyToClipboard(shortUrl, t, {
                 successMessage: t("search.linkCopiedSuccessfully"),
                 errorMessage: t("search.errorCopyingLink"),
                 timeout: 5000,

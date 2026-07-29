@@ -77,7 +77,7 @@ import WorkflowDestination from "@/plugins/workflows/nodes/WorkflowDestination.v
 import useWorkflowCanvas, { workflowObj, nodeMeta } from "@/plugins/workflows/useWorkflowCanvas";
 
 const { t } = useI18nTyped();
-const { commitNode, cancelNodeDrawer, requestDeleteNode } = useWorkflowCanvas();
+const { commitNode, cancelNodeDrawer, requestDeleteNode } = useWorkflowCanvas(t);
 
 const meta = computed(() => nodeMeta(workflowObj.dialog.name));
 const title = computed(() => (meta.value ? t(meta.value.titleKey) : workflowObj.dialog.name));

@@ -181,7 +181,10 @@ describe("JsonPreview", () => {
       expect(clipboardUtils.copyToClipboard).toHaveBeenCalledOnce();
       expect(clipboardUtils.copyToClipboard).toHaveBeenCalledWith(
         JSON.stringify(value, null, 2),
-        expect.objectContaining({ successMessage: expect.any(String), timeout: 1500 }),
+        expect.any(Function),
+        // No successMessage override any more — the util's default
+        // (common.copySuccess) is the correct "Copied to clipboard" wording.
+        expect.objectContaining({ timeout: 1500 }),
       );
     });
   });

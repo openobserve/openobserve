@@ -205,6 +205,7 @@ export default defineComponent({
             error?.response?.data?.message ??
               error?.message ??
               t("dashboard.generalSettingsPage.updationFailed"),
+            t,
           );
         } else {
           showErrorNotification(

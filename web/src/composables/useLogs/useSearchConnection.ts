@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { searchState } from "@/composables/useLogs/searchState";
+import type { TranslateFn } from "@/types/i18n";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { useHistogram } from "@/composables/useLogs/useHistogram";
 import useNotifications from "@/composables/useNotifications";
@@ -27,9 +28,10 @@ import {
   WebSocketErrorResponse,
 } from "@/ts/interfaces/query";
 import { generateTraceContext } from "@/utils/zincutils";
-import { raw, gt } from "@/types/i18n";
+import { raw } from "@/types/i18n";
 
-export const useSearchConnection = () => {
+// `t` injected: reached from other composables, never a setup context.
+export const useSearchConnection = (t: TranslateFn) => {
   const { showErrorNotification } = useNotifications();
   const { addTraceId, removeTraceId, fnParsedSQL, isLimitQuery, isDistinctQuery, isWithQuery } =
     logsUtils();
@@ -138,7 +140,7 @@ export const useSearchConnection = () => {
       showErrorNotification(
         raw(
           notificationMsg.value ||
-            gt("toastMessages.useLogs.errorOccurredWhileSendingSocketMessage"),
+            t("toastMessages.useLogs.errorOccurredWhileSendingSocketMessage"),
         ),
       );
       notificationMsg.value = "";
@@ -227,8 +229,7 @@ export const useSearchConnection = () => {
       searchObj.loading = false;
       showErrorNotification(
         raw(
-          notificationMsg.value ||
-            gt("toastMessages.useLogs.errorOccurredDuringTheSearchOperation"),
+          notificationMsg.value || t("toastMessages.useLogs.errorOccurredDuringTheSearchOperation"),
         ),
       );
       notificationMsg.value = "";

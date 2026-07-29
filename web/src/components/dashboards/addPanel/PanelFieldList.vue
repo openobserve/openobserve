@@ -426,7 +426,7 @@ const dashboardPanelDataPageKey: string = inject("dashboardPanelDataPageKey", "d
 
 const store = useStore();
 const { t } = useI18nTyped();
-const { getStreams } = useStreams();
+const { getStreams } = useStreams(t);
 const { showErrorNotification } = useNotifications();
 const { parsePromQlQuery } = usePromqlSuggestions();
 const emit = defineEmits<{ collapse: [] }>();
@@ -454,7 +454,7 @@ const {
   cleanupDraggingFields,
   updateGroupedFields,
   fetchPromQLLabels,
-} = useDashboardPanelData(dashboardPanelDataPageKey);
+} = useDashboardPanelData(dashboardPanelDataPageKey, t);
 
 const fieldListRef = ref<InstanceType<typeof OFieldList> | null>(null);
 const currentPage = ref(1);

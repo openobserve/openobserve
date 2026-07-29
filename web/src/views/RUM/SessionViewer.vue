@@ -366,7 +366,7 @@ const getSessionSegments = () => {
     parsedQuery: null,
   };
 
-  const req = buildQueryPayload(queryPayload);
+  const req = buildQueryPayload(queryPayload, t);
   req.query.sql = `select * from "_sessionreplay" where session_id='${sessionId.value}' order by start asc`;
   delete req.aggs;
   isLoading.value.push(true);
@@ -421,7 +421,7 @@ const getSessionEvents = () => {
     parsedQuery: null,
   };
 
-  const req = buildQueryPayload(queryPayload);
+  const req = buildQueryPayload(queryPayload, t);
   req.query.sql = `select * from "_rumdata" where session_id='${sessionId.value}' and (type='error' or type='action' or type='view') order by date asc`;
   delete req.aggs;
   isLoading.value.push(true);
@@ -476,7 +476,7 @@ const getSessionErrorLogs = () => {
     parsedQuery: null,
   };
 
-  const req = buildQueryPayload(queryPayload);
+  const req = buildQueryPayload(queryPayload, t);
   req.query.sql = `select * from "_rumlog" where session_id='${sessionId.value}' and status='error' order by date asc`;
   delete req.aggs;
   isLoading.value.push(true);

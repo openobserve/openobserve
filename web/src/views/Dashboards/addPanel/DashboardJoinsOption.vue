@@ -153,9 +153,8 @@ export default defineComponent({
   setup() {
     const dashboardPanelDataPageKey = inject<string>("dashboardPanelDataPageKey", "dashboard");
 
-    const { dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey);
-
     const { t } = useI18nTyped();
+    const { dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey, t);
 
     /**
      * Determines if joins section should be displayed
