@@ -40,7 +40,10 @@ pub const VALID_STATUSES: &[&str] = &["draft", "active", "paused", "degraded", "
 
 /// Lowest configurable idle window, matching the default scheduler poll interval.
 pub const MIN_COMPLETION_IDLE_WINDOW_SECS: i64 = 45;
-pub const DEFAULT_TRACE_IDLE_WINDOW_SECS: i64 = 3 * 60;
+/// The design spec calls for a 30s trace idle timeout; readiness is resolved
+/// at scheduler scan granularity (one poll interval), so anything below the
+/// 45s floor behaves identically to it — the floor is the effective spec value.
+pub const DEFAULT_TRACE_IDLE_WINDOW_SECS: i64 = MIN_COMPLETION_IDLE_WINDOW_SECS;
 pub const DEFAULT_TRACE_MAX_AGE_SECS: i64 = 30 * 60;
 /// Sessions span user think-time between traces, so their idle window is far
 /// wider than a trace's.
