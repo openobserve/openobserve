@@ -45,11 +45,15 @@ use config::{
     },
 };
 use cron::Schedule;
+#[cfg(feature = "enterprise")]
+use db::workflows::{AssociationDeleteEvent, WorkflowTriggerType};
 use db::{
     self,
     authz::{remove_ownership, set_ownership},
     folders,
 };
+#[cfg(feature = "enterprise")]
+use infra::table::workflows::WorkflowTriggerEntity;
 use infra::{
     db::{ORM_CLIENT, connect_to_orm},
     schema::unwrap_stream_settings,
@@ -72,8 +76,6 @@ use tracing::{Level, span};
 
 #[cfg(feature = "enterprise")]
 use crate::auth::check_permissions;
-#[cfg(feature = "enterprise")]
-use crate::workflows::WorkflowTriggerType;
 use crate::{
     alerts::{QueryConditionExt, build_sql, destinations},
     auth::is_ofga_unsupported,
@@ -804,6 +806,60 @@ pub async fn update<C: ConnectionTrait + TransactionTrait>(
 
     prepare_alert(org_id, &stream_name, &alert_name, &mut alert, false, false).await?;
 
+    #[cfg(feature = "enterprise")]
+    if let Some(ref id) = alert.id {
+        let (_, old_alert) = get_by_id(conn, org_id, id.to_owned()).await?;
+        let old_workflows = old_alert.workflows;
+
+        if old_workflows != alert.workflows {
+            let mut removed = Vec::new();
+            let mut added = Vec::new();
+            for w in &old_workflows {
+                if !alert.workflows.contains(w) {
+                    removed.push(w.clone());
+                }
+            }
+            for w in &alert.workflows {
+                if !old_workflows.contains(w) {
+                    added.push(w.clone());
+                }
+            }
+
+            for r in removed {
+                if let Err(e) =
+                    db::workflows::delete_workflow_association(AssociationDeleteEvent::Specific {
+                        org_id: org_id.to_string(),
+                        entity_id: id.to_string(),
+                        workflow_id: r.clone(),
+                    })
+                    .await
+                {
+                    log::error!(
+                        "error updating workflow association for alert update : error removing old workflow association of {org_id}/{r} for alert {} : {e}",
+                        id
+                    );
+                }
+            }
+
+            for a in added {
+                if let Err(e) = db::workflows::associate_workflow(
+                    org_id,
+                    &a,
+                    &id.to_string(),
+                    WorkflowTriggerEntity::Alert.to_string(),
+                    WorkflowTriggerType::AlertFired.to_string(),
+                )
+                .await
+                {
+                    log::error!(
+                        "error updating workflow association for alert update : error adding new workflow association of {org_id}/{a} for alert {} : {e}",
+                        id
+                    );
+                }
+            }
+        }
+    }
+
     let alert = db::alerts::alert::update(conn, org_id, dst_folder_id_info, alert).await?;
     clean_up_opted_out_groups(&alert).await;
     #[cfg(feature = "enterprise")]
@@ -1376,11 +1432,11 @@ impl AlertExt for Alert {
                 .as_ref()
                 .map_or(format!("{}/{}", self.org_id, self.name), |v| v.to_string());
 
-            let metadata: HashMap<String, String> = vec![
-                ("org_id", self.org_id.clone()),
-                ("stream_type", self.stream_type.to_string()),
-                ("stream_name", self.stream_name.clone()),
-                ("alert_name", self.name.clone()),
+            let metadata: HashMap<String, Value> = vec![
+                ("org_id", self.org_id.clone().into()),
+                ("stream_type", self.stream_type.to_string().into()),
+                ("stream_name", self.stream_name.clone().into()),
+                ("alert_name", self.name.clone().into()),
                 (
                     "alert_type",
                     if self.is_real_time {
@@ -1388,18 +1444,15 @@ impl AlertExt for Alert {
                     } else {
                         "scheduled"
                     }
-                    .to_string(),
+                    .into(),
                 ),
-                ("alert_period", self.trigger_condition.period.to_string()),
+                ("alert_period", self.trigger_condition.period.into()),
                 (
                     "alert_operator",
-                    self.trigger_condition.operator.to_string(),
+                    self.trigger_condition.operator.to_string().into(),
                 ),
-                (
-                    "alert_threshold",
-                    self.trigger_condition.threshold.to_string(),
-                ),
-                ("alert_count", rows.len().to_string()),
+                ("alert_threshold", self.trigger_condition.threshold.into()),
+                ("alert_count", rows.len().into()),
                 (
                     "alert_start_time",
                     start_time
@@ -1410,9 +1463,9 @@ impl AlertExt for Alert {
                                     .num_microseconds()
                                     .unwrap(),
                         )
-                        .to_string(),
+                        .into(),
                 ),
-                ("alert_end_time", rows_end_time.to_string()),
+                ("alert_end_time", rows_end_time.into()),
             ]
             .into_iter()
             .map(|(k, v)| (k.to_string(), v))

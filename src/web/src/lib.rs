@@ -18,6 +18,12 @@
 //! This lives in its own leaf crate so the expensive embed + compression
 //! macro expansion only re-runs when `web/dist` changes, not on every
 //! rebuild of the API crate.
+//!
+//! For that to hold, the dependency list here must stay small and stable:
+//! anything this crate depends on drags the ~50MB embed through LLVM again
+//! whenever it changes. `config` in particular used to be a dependency, which
+//! meant every `config` edit paid the embed cost. Config values the UI routes
+//! need are passed in as arguments instead — see [`ui_routes`].
 
 use rust_embed_for_web::RustEmbed;
 

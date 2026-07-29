@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::atomic::Ordering;
+use std::sync::{Arc, atomic::Ordering};
 
 use arrow_schema::{DataType, Field, Schema};
 use bytes::Bytes;
@@ -24,8 +24,8 @@ use config::{
 };
 use hashbrown::{HashMap, HashSet};
 use infra::schema::{
-    STREAM_RECORD_ID_GENERATOR, STREAM_SCHEMAS, STREAM_SCHEMAS_LATEST, STREAM_SETTINGS,
-    SchemaCache, unwrap_stream_settings,
+    STREAM_RECORD_ID_GENERATOR, STREAM_SCHEMAS, STREAM_SCHEMAS_LATEST, SchemaCache,
+    unwrap_stream_settings,
 };
 #[cfg(feature = "enterprise")]
 use {
@@ -94,6 +94,7 @@ pub async fn set_stream_is_llm(
 ) -> Result<(), anyhow::Error> {
     let mut settings = infra::schema::get_settings(org_id, stream_name, stream_type)
         .await
+        .map(|s| (*s).clone())
         .unwrap_or_default();
     settings.is_llm_stream = is_llm_stream;
 
@@ -105,7 +106,8 @@ pub async fn set_stream_is_llm(
         // cleanly.
         ensure_gen_ai_fields_in_schema_inner(org_id, stream_name, stream_type, false).await?;
 
-        // Add to defined_schema_fields only when UDS is already enabled
+        // The schema migration above must succeed before its query fields are
+        // persisted into an already-enabled UDS.
         append_gen_ai_fields_to_defined_schema_fields(&mut settings.defined_schema_fields);
     }
 
@@ -119,8 +121,8 @@ pub async fn set_stream_is_llm(
 /// This adds the internal ingest timestamp and any missing gen_ai_* fields from
 /// [`GEN_AI_SCHEMA_FIELDS`] into the stream's Arrow schema so they are available
 /// at ingestion and query time. For streams with User-Defined Schema already
-/// enabled, only the gen_ai_* fields are appended to `defined_schema_fields`;
-/// the ingest timestamp remains an implicit internal field.
+/// enabled, the migrated gen_ai_* fields and ingest timestamp are appended to
+/// `defined_schema_fields` after the Arrow schema migration succeeds.
 ///
 /// Handles the case where a stream was already marked as an LLM stream but has
 /// only legacy `llm_*` fields — calling this ensures the newer `gen_ai_*`
@@ -166,6 +168,7 @@ async fn ensure_gen_ai_fields_in_defined_schema_fields(
 ) -> Result<(), anyhow::Error> {
     let mut settings = infra::schema::get_settings(org_id, stream_name, stream_type)
         .await
+        .map(|s| (*s).clone())
         .unwrap_or_default();
     if append_gen_ai_fields_to_defined_schema_fields(&mut settings.defined_schema_fields) {
         let mut metadata = std::collections::HashMap::with_capacity(1);
@@ -181,12 +184,13 @@ fn append_gen_ai_fields_to_defined_schema_fields(defined_schema_fields: &mut Vec
     }
 
     let mut updated = false;
-    for field in GEN_AI_SCHEMA_FIELDS.iter() {
-        if !defined_schema_fields
-            .iter()
-            .any(|name| name == field.name())
-        {
-            defined_schema_fields.push(field.name().to_string());
+    let migrated_fields = GEN_AI_SCHEMA_FIELDS
+        .iter()
+        .map(|field| field.name().as_str())
+        .chain(std::iter::once(O2_INGEST_TS_COL_NAME));
+    for field_name in migrated_fields {
+        if !defined_schema_fields.iter().any(|name| name == field_name) {
+            defined_schema_fields.push(field_name.to_string());
             updated = true;
         }
     }
@@ -483,6 +487,7 @@ pub async fn cache() -> Result<(), anyhow::Error> {
     log::info!("Stream schemas Cached {items_num} schemas");
     let keys_num = schemas.keys().len();
     let keys = schemas.keys().map(|k| k.to_string()).collect::<Vec<_>>();
+    let mut settings_batch = Vec::with_capacity(keys_num);
     for (i, item_key) in keys.iter().enumerate() {
         let Some(mut schema_versions) = schemas.remove(item_key) else {
             continue;
@@ -515,9 +520,7 @@ pub async fn cache() -> Result<(), anyhow::Error> {
                 LOCAL_NODE_ID.load(Ordering::Relaxed),
             ));
         }
-        let mut w = STREAM_SETTINGS.write().await;
-        w.insert(item_key.to_string(), settings);
-        drop(w);
+        settings_batch.push((item_key.to_string(), Arc::new(settings)));
         let mut w = STREAM_SCHEMAS_LATEST.write().await;
         w.insert(
             item_key.to_string(),
@@ -546,11 +549,9 @@ pub async fn cache() -> Result<(), anyhow::Error> {
             log::info!("Stream schemas Cached progress: {}/{}", i, keys.len());
         }
     }
-    // sync the atomic cache once after the loop; cloning the settings map per
-    // stream inside the loop is O(n^2) and stalls startup with many streams
-    let w = STREAM_SETTINGS.read().await;
-    infra::schema::set_stream_settings_atomic(w.clone());
-    drop(w);
+    // insert all settings and publish the read snapshot once; publishing per
+    // stream inside the loop would be O(n^2) and stall startup with many streams
+    infra::schema::put_stream_settings_batch(settings_batch).await;
     log::info!("Stream schemas Cached {keys_num} streams");
     Ok(())
 }
@@ -623,6 +624,40 @@ pub async fn get_stream_count_cached(org_id: &str, stream_type: StreamType) -> u
     count
 }
 
+/// One-pass enumeration of all cached streams grouped by org and stream type.
+///
+/// Periodic jobs that iterate every org and stream type should call this once
+/// per cycle instead of calling [`list_streams_from_cache`] per (org, type)
+/// pair, which rescans the whole schema cache on every call.
+pub async fn list_all_streams_grouped() -> HashMap<String, HashMap<StreamType, Vec<String>>> {
+    let mut grouped: HashMap<String, HashMap<StreamType, Vec<String>>> = HashMap::new();
+    let r = STREAM_SCHEMAS_LATEST.read().await;
+    for schema_key in r.keys() {
+        let mut parts = schema_key.split('/');
+        let (Some(org_id), Some(stream_type), Some(stream_name)) =
+            (parts.next(), parts.next(), parts.next())
+        else {
+            continue;
+        };
+        grouped
+            .entry(org_id.to_string())
+            .or_default()
+            .entry(StreamType::from(stream_type))
+            .or_default()
+            .push(stream_name.to_string());
+    }
+    drop(r);
+    // cache keys are unique, but names truncated at the third segment may
+    // collide; dedup to match list_streams_from_cache
+    for types in grouped.values_mut() {
+        for names in types.values_mut() {
+            names.sort_unstable();
+            names.dedup();
+        }
+    }
+    grouped
+}
+
 pub async fn list_streams_from_cache(org_id: &str, stream_type: StreamType) -> Vec<String> {
     let mut names = HashSet::new();
     let r = STREAM_SCHEMAS_LATEST.read().await;
@@ -661,6 +696,42 @@ mod tests {
 
     fn schema_without_end_dt() -> Schema {
         Schema::new_with_metadata(vec![] as Vec<arrow_schema::Field>, HashMap::new())
+    }
+
+    #[tokio::test]
+    async fn test_list_all_streams_grouped() {
+        // unique org name so the shared global cache can host parallel tests
+        let org = "grouped_enum_test_org";
+        let keys = [
+            format!("{org}/logs/app_a"),
+            format!("{org}/logs/app_b"),
+            format!("{org}/traces/svc"),
+        ];
+        {
+            let mut w = STREAM_SCHEMAS_LATEST.write().await;
+            for key in &keys {
+                w.insert(key.clone(), SchemaCache::new(Schema::empty()));
+            }
+        }
+
+        let grouped = list_all_streams_grouped().await;
+        let org_streams = grouped.get(org).unwrap();
+        let mut logs = org_streams.get(&StreamType::Logs).unwrap().clone();
+        logs.sort();
+        assert_eq!(logs, vec!["app_a".to_string(), "app_b".to_string()]);
+        assert_eq!(
+            org_streams.get(&StreamType::Traces).unwrap(),
+            &vec!["svc".to_string()]
+        );
+        // matches the per-(org, type) enumeration
+        let mut listed = list_streams_from_cache(org, StreamType::Logs).await;
+        listed.sort();
+        assert_eq!(logs, listed);
+
+        let mut w = STREAM_SCHEMAS_LATEST.write().await;
+        for key in &keys {
+            w.remove(key);
+        }
     }
 
     // ── filter_schema_version_id ──────────────────────────────────────────────
@@ -746,7 +817,7 @@ mod tests {
     }
 
     #[test]
-    fn test_append_gen_ai_fields_to_defined_schema_fields_adds_missing_cache_fields() {
+    fn test_append_gen_ai_fields_to_defined_schema_fields_adds_migrated_fields() {
         let mut fields = vec![
             "trace_id".to_string(),
             "gen_ai_usage_input_tokens".to_string(),
@@ -759,7 +830,7 @@ mod tests {
         assert!(fields.contains(&"gen_ai_usage_cache_read_input_tokens".to_string()));
         assert!(fields.contains(&"gen_ai_usage_cache_creation_input_tokens".to_string()));
         assert!(fields.contains(&"gen_ai_usage_cost_net_cache_impact".to_string()));
-        assert!(!fields.contains(&O2_INGEST_TS_COL_NAME.to_string()));
+        assert!(fields.contains(&O2_INGEST_TS_COL_NAME.to_string()));
     }
 
     #[test]

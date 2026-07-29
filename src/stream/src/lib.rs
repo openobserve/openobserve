@@ -49,7 +49,7 @@ use hashbrown::HashMap;
 use infra::{
     cache::stats,
     schema::{
-        STREAM_RECORD_ID_GENERATOR, STREAM_SCHEMAS, STREAM_SCHEMAS_LATEST, STREAM_SETTINGS,
+        STREAM_RECORD_ID_GENERATOR, STREAM_SCHEMAS, STREAM_SCHEMAS_LATEST,
         get_partition_time_level, unwrap_stream_created_at, unwrap_stream_is_derived,
         unwrap_stream_settings,
     },
@@ -459,10 +459,11 @@ pub async fn update_stream_settings(
     stream_type: StreamType,
     mut new_settings: UpdateStreamSettings,
 ) -> Result<HttpResponse, Error> {
-    let Some(mut settings) = infra::schema::get_settings(org_id, stream_name, stream_type).await
-    else {
+    let Some(settings) = infra::schema::get_settings(org_id, stream_name, stream_type).await else {
         return Ok(MetaHttpResponse::not_found("stream not found"));
     };
+    // local editable copy; persisted via save_stream_settings below
+    let mut settings = (*settings).clone();
 
     // process new fields first
     let new_fields = std::mem::take(&mut new_settings.fields);
@@ -914,10 +915,7 @@ pub async fn stream_delete_inner(
     drop(w);
 
     // delete stream settings cache
-    let mut w = STREAM_SETTINGS.write().await;
-    w.remove(&key);
-    infra::schema::set_stream_settings_atomic(w.clone());
-    drop(w);
+    infra::schema::remove_stream_settings(&key).await;
 
     // delete stream record id generator cache
     {
@@ -1114,11 +1112,9 @@ pub async fn get_stream_retention(
     stream_type: StreamType,
     stream: &str,
 ) -> Option<i64> {
-    if let Some(s) = infra::schema::get_settings(org_id, stream, stream_type).await {
-        Some(s.data_retention)
-    } else {
-        None
-    }
+    infra::schema::get_settings(org_id, stream, stream_type)
+        .await
+        .map(|s| s.data_retention)
 }
 
 #[cfg(test)]

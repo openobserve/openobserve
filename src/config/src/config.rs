@@ -56,7 +56,16 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 55: m20260725_000002_add_threshold_and_level_columns (multi-level thresholds)
 // 56: m20260726_000001_add_priority_and_tags_to_alerts (priority & tags)
 // 57: m20260726_000002_add_priority_and_tags_to_anomaly_config (same, anomalies)
-pub const DB_SCHEMA_VERSION: u64 = 58;
+// 58: m20260726_000003 / m20260727_00000x (group lifecycle, SLO tables)
+// 59: m20260723_000001_add_env_version_to_gen_ai_agents (from main)
+// 60: m20260728_000001_create_workflows_associations_table (from main)
+//
+// main reached 55 independently while this branch reached 58, so the numbers
+// overlap: both sides spent 54 and 55 on different migrations. The merged
+// chain therefore has to sit above BOTH, or the migrator would treat an
+// already-recorded version as current and silently skip whichever migrations
+// it thinks have run.
+pub const DB_SCHEMA_VERSION: u64 = 60;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -117,8 +126,9 @@ pub const ID_COL_NAME: &str = "_o2_id";
 pub const ORIGINAL_DATA_COL_NAME: &str = "_original";
 pub const ALL_VALUES_COL_NAME: &str = "_all_values";
 
-/// Internal columns are implicitly part of every user-defined schema:
-/// never persisted in `defined_schema_fields` and exempt from the UDS limit.
+/// Internal columns are part of the effective UDS and exempt from its field
+/// limit. Most remain implicit; the LLM schema migration also persists
+/// `_o2_ingest_ts` for streams that already have UDS enabled.
 pub fn is_uds_internal_column(name: &str) -> bool {
     name == TIMESTAMP_COL_NAME
         || name == O2_INGEST_TS_COL_NAME
@@ -1082,6 +1092,12 @@ pub struct Common {
         help = "File format for data storage: parquet or vortex"
     )]
     pub file_format: FileFormat,
+    #[env_config(
+        name = "ZO_VORTEX_USE_NATIVE_COMPRESSION",
+        default = false,
+        help = "Use Vortex's built-in compression strategy. By default, OpenObserve's custom UTF8/Zstd compressor is used"
+    )]
+    pub vortex_use_native_compression: bool,
     #[env_config(name = "ZO_PARQUET_COMPRESSION", default = "zstd")]
     pub parquet_compression: String,
     #[env_config(
@@ -1200,6 +1216,12 @@ pub struct Common {
         help = "Enable shared memtable across multiple organizations"
     )]
     pub feature_shared_memtable_enabled: bool,
+    #[env_config(
+        name = "ZO_FEATURE_WAL_PACK_ENABLED",
+        default = false,
+        help = "Persist memtables into packed wal files (one file per rotation instead of one file per stream)"
+    )]
+    pub feature_wal_pack_enabled: bool,
     #[env_config(name = "ZO_UI_ENABLED", default = true)]
     pub ui_enabled: bool,
     #[env_config(name = "ZO_UI_SQL_BASE64_ENABLED", default = false)]

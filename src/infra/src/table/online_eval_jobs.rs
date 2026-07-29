@@ -447,11 +447,28 @@ impl OnlineEvalJob {
             return Ok(());
         }
         for scorer in &self.scorers {
-            if !self.span_selector_bindings.contains_key(&scorer.id) {
-                return Err("Every trace scorer must have a Span Selector binding");
+            if self.scorer_uses_spans(&scorer.id)
+                && !self.span_selector_bindings.contains_key(&scorer.id)
+            {
+                return Err("Every trace scorer that uses spans must have a Span Selector binding");
             }
         }
         Ok(())
+    }
+
+    fn scorer_uses_spans(&self, scorer_id: &str) -> bool {
+        self.input_mapping
+            .as_ref()
+            .and_then(|mappings| mappings.get(scorer_id))
+            .is_some_and(|mapping| {
+                mapping.keys().any(|variable| variable.trim() == "spans")
+                    || mapping.values().any(|source| {
+                        source
+                            .strip_prefix("{{")
+                            .and_then(|value| value.strip_suffix("}}"))
+                            .is_some_and(|value| value.trim() == "spans")
+                    })
+            })
     }
 
     pub fn selector_for_scorer(&self, scorer_id: &str) -> Option<&SpanSelector> {
@@ -1326,8 +1343,18 @@ mod tests {
     }
 
     #[test]
-    fn test_trace_activation_requires_a_valid_binding_for_every_scorer() {
+    fn test_trace_activation_requires_a_binding_only_for_scorers_using_spans() {
         let mut job = trace_job_with_selector();
+        job.input_mapping = Some(BTreeMap::from([
+            (
+                "s1".to_string(),
+                BTreeMap::from([("evidence".to_string(), "{{ spans }}".to_string())]),
+            ),
+            (
+                "s2".to_string(),
+                BTreeMap::from([("question".to_string(), "{{ input }}".to_string())]),
+            ),
+        ]));
         assert!(job.validate_for_activation().is_ok());
         assert_eq!(
             job.selector_for_scorer("s1")
@@ -1336,9 +1363,12 @@ mod tests {
         );
 
         job.span_selector_bindings.remove("s2");
+        assert!(job.validate_for_activation().is_ok());
+
+        job.span_selector_bindings.remove("s1");
         assert_eq!(
             job.validate_for_activation(),
-            Err("Every trace scorer must have a Span Selector binding")
+            Err("Every trace scorer that uses spans must have a Span Selector binding")
         );
 
         job.span_selector_bindings

@@ -7736,7 +7736,6 @@
       "scoreConfigs": "Configura le rubriche di punteggio utilizzate nelle tue valutazioni"
     },
     "agentGraph": {
-      "allAgents": "Tutti gli agenti",
       "stream": "Stream",
       "agent": "Agente",
       "noAgentsTitle": "Nessun agente trovato",
@@ -9592,6 +9591,8 @@
       "modalSubtitle": "Scegli cosa monitorare",
       "modalTitle": "Crea un check",
       "pageTitle": "Nuovo controllo {label}",
+      "saveAndContinue": "Salva e continua",
+      "saveAndExit": "Salva ed esci",
       "saveCheck": "Salva controllo",
       "saveFailed": "Salvataggio del controllo fallito.",
       "saved": "Controllo salvato con successo.",
@@ -9619,7 +9620,7 @@
         "assertionValue": "Valore",
         "assertions": "Asserzioni",
         "body": "Corpo della richiesta",
-        "bodyPlaceholder": "{\"key\": \"value\"}",
+        "bodyPlaceholder": "{'{'}\"key\": \"value\"{'}'}",
         "fields": {
           "body": "Corpo della risposta",
           "response_time_ms": "Tempo di risposta (ms)",

@@ -37,6 +37,7 @@ import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import { detectCycle } from "@/composables/flow/detectCycle";
 import { makeEdge } from "@/composables/flow/makeEdge";
 import { getTruncatedConditions } from "@/utils/conditionPreview";
+import { DEFAULT_TRIGGER_KIND } from "./triggers";
 import workflowService from "@/services/workflows";
 
 export type WorkflowNodeCategory = "trigger" | "logic" | "action";
@@ -75,7 +76,7 @@ export const WORKFLOW_NODE_TYPES: Record<string, WorkflowNodeMeta> = {
   workflow_trigger: {
     category: "trigger",
     kindKey: "workflow.node.kindTrigger",
-    titleKey: "workflow.node.alertTrigger",
+    titleKey: "workflow.triggerKind.alertFired.node",
     descKey: "workflow.node.triggerBody",
     icon: "notifications-active",
     image: getImageURL("images/pipeline/input_stream.png"),
@@ -135,40 +136,17 @@ export const nodeConfigDetail = (data: any, maxLen = 28): string => {
   return "";
 };
 
-// Trigger kinds the user chooses from when creating a workflow. `key` maps to
-// the future backend WorkflowTriggerKind (B1). Only Alert Fired is enabled in
-// v1; the rest are shown as "coming soon" so the picker is clearly extensible.
-export interface WorkflowTriggerType {
-  key: string;
-  labelKey: string;
-  descKey: string;
-  icon: IconName;
-  enabled: boolean;
-}
-
-export const WORKFLOW_TRIGGER_TYPES: WorkflowTriggerType[] = [
-  {
-    key: "alert_fired",
-    labelKey: "workflow.triggerType.alertFired",
-    descKey: "workflow.triggerType.alertFiredDesc",
-    icon: "notifications-active",
-    enabled: true,
-  },
-  {
-    key: "schedule",
-    labelKey: "workflow.triggerType.schedule",
-    descKey: "workflow.triggerType.scheduleDesc",
-    icon: "schedule",
-    enabled: false,
-  },
-  {
-    key: "webhook",
-    labelKey: "workflow.triggerType.webhook",
-    descKey: "workflow.triggerType.webhookDesc",
-    icon: "webhook",
-    enabled: false,
-  },
-];
+// Trigger kinds live in the registry (./triggers) — the single place a kind is
+// described. Re-exported here so canvas consumers keep one import surface.
+export {
+  WORKFLOW_TRIGGERS,
+  DEFAULT_TRIGGER_KIND,
+  triggerDef,
+  triggerTypeForKind,
+  enabledTriggers,
+  buildTriggerSampleText,
+} from "./triggers";
+export type { WorkflowTriggerDef } from "./triggers";
 
 const defaultDialog = {
   show: false,
@@ -255,6 +233,19 @@ const workflowObj = reactive(Object.assign({}, defaultObject));
 
 export { workflowObj };
 
+// The kind of the current graph's trigger node — the single lookup other pieces
+// (payload reference, condition fields, function sample) use to stay in sync
+// with whatever trigger the workflow starts from. Returns undefined when there
+// is NO trigger node (e.g. it was deleted): callers then show nothing rather
+// than defaulting to a kind that isn't there. The kind lives in
+// `data.trigger_kind` (fresh) or `meta.trigger_kind` (rehydrated from the API).
+export const currentTriggerKind = (): string | undefined => {
+  const trigger = (workflowObj.currentSelectedWorkflow?.nodes || []).find(
+    (n: any) => n.data?.node_type === "workflow_trigger",
+  );
+  return trigger?.data?.trigger_kind || trigger?.meta?.trigger_kind;
+};
+
 // ── Shared graph helpers ─────────────────────────────────────────────────────
 // Workflows enforce one incoming edge per node (see onConnect), so the graph is
 // a TREE rooted at the trigger (or from_node) — a plain BFS from the root visits
@@ -336,11 +327,66 @@ const downstreamOfErrorNodes = (errorIds: string[]): string[] => {
   return [...set];
 };
 
+// Serialize one in-memory VueFlow node down to the fields the backend `Node`
+// struct persists: id, io_type, position, data, and (when present) meta / style.
+// Everything else on the node is VueFlow runtime state (`type`, `dimensions`,
+// `handleBounds`, `computedPosition`, `selected`, `dragging`, …) and is dropped.
+//
+// `io_type` is derived from `node_type` (via `node.type`, the VueFlow render
+// template) — the backend `Node` struct requires it (matches the pipeline
+// payload); it isn't a source of truth.
+const serializeNode = (node: any) => {
+  const nodeType = node?.data?.node_type;
+  const data = { ...(node.data || {}) };
+  const meta: Record<string, string> = { ...(node.meta || {}) };
+
+  // Trigger: NodeData::WorkflowTrigger is a unit variant, so its kind can't live
+  // in `data`; carry it in `meta` (strings survive serialization).
+  if (nodeType === "workflow_trigger") {
+    meta.trigger_kind = data.trigger_kind || DEFAULT_TRIGGER_KIND;
+  }
+
+  const out: any = {
+    id: node.id,
+    io_type: node.type || "default",
+    position: {
+      x: node.position?.x ?? 0,
+      y: node.position?.y ?? 0,
+    },
+    data,
+  };
+  if (Object.keys(meta).length) out.meta = meta;
+  if (node.style) out.style = node.style;
+  return out;
+};
+
+// Build the backend `Workflow` object from the current in-memory graph. Shared by
+// the editor's create/update payload AND the Test run (which now sends the whole
+// graph so it can run WITHOUT saving). The `Workflow` struct has no serde
+// defaults, so every field must be present; org_id/id/created_by are
+// overridden/generated by the backend (the test endpoint assigns a throwaway id).
+export const serializeWorkflow = () => {
+  const wf = workflowObj.currentSelectedWorkflow;
+  return {
+    id: wf.id || "",
+    org_id: "",
+    name: (wf.name || "").trim(),
+    description: wf.description || "",
+    enabled: wf.enabled ?? true,
+    created_at: wf.created_at || 0,
+    updated_at: wf.updated_at || 0,
+    created_by: "",
+    nodes: (wf.nodes || []).map(serializeNode),
+    edges: wf.edges || [],
+  };
+};
+
 // Run the workflow Test (from the Test dialog or a node's Replay button) and
 // store the result so each WorkflowNode paints its ✓ / ✗ / ⊘ badge. Shared so
-// both entry points behave identically. The backend returns errors only — the
-// step drawer (error nodes only) derives its input/output from `errors`, so
-// there's no per-node node_io to carry.
+// both entry points behave identically. The whole in-memory graph is sent, so a
+// workflow can be tested whether or not it's been saved. The backend returns
+// errors only — the step drawer (error nodes only) derives its input/output from
+// `errors`, so there's no per-node node_io to carry.
 export const executeTestRun = async (opts: {
   orgId: string;
   inputs: any[];
@@ -350,7 +396,7 @@ export const executeTestRun = async (opts: {
   try {
     const res = await workflowService.testWorkflow({
       org_identifier: opts.orgId,
-      id: wf.id,
+      workflow: serializeWorkflow(),
       inputs: opts.inputs,
       from_node: opts.fromNode || undefined,
     });
@@ -461,7 +507,7 @@ export const hydrateWorkflow = (wf: any) => {
     if (node.data?.node_type === "workflow_trigger" && node.meta) {
       node.data = {
         ...node.data,
-        trigger_kind: node.meta.trigger_kind || node.data.trigger_kind || "alert_fired",
+        trigger_kind: node.meta.trigger_kind || node.data.trigger_kind || DEFAULT_TRIGGER_KIND,
       };
     }
     return node;
@@ -551,18 +597,12 @@ export default function useWorkflowCanvas() {
   }
 
   // Ask before removing a node — opens the ConfirmDialog (rendered in
-  // WorkflowEditor) rather than deleting outright. The trigger anchors the
-  // workflow, so it's rejected here without a prompt.
+  // WorkflowEditor) rather than deleting outright. The trigger is deletable too:
+  // removing it brings back the "Choose a Trigger" start node so the user can
+  // pick a different kind. Any steps that followed it stay on the canvas (the
+  // user reconnects them to the new trigger), the same as deleting a source in
+  // the pipeline editor.
   function requestDeleteNode(nodeId: string) {
-    const wf = workflowObj.currentSelectedWorkflow;
-    const node = wf.nodes.find((n: any) => n.id === nodeId);
-    if (node?.data?.node_type === "workflow_trigger") {
-      toast({
-        message: "The trigger starts the workflow and can't be deleted",
-        variant: "warning",
-      });
-      return;
-    }
     workflowObj.deleteConfirm = { show: true, nodeId };
   }
   function cancelDeleteNode() {
@@ -571,15 +611,6 @@ export default function useWorkflowCanvas() {
 
   function deleteNode(nodeId: string) {
     const wf = workflowObj.currentSelectedWorkflow;
-    const node = wf.nodes.find((n: any) => n.id === nodeId);
-    // The trigger anchors the workflow and can't be removed.
-    if (node?.data?.node_type === "workflow_trigger") {
-      toast({
-        message: "The trigger starts the workflow and can't be deleted",
-        variant: "warning",
-      });
-      return;
-    }
     wf.nodes = wf.nodes.filter((n: any) => n.id !== nodeId);
     wf.edges = wf.edges.filter((e: any) => e.source !== nodeId && e.target !== nodeId);
     // The graph changed — prior Test badges are stale.

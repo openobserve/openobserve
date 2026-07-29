@@ -420,7 +420,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div v-if="pinnedTooltip.visible" class="oo-pin-backdrop" @click="closePinnedTooltip" />
           <div
             v-if="pinnedTooltip.visible"
-            class="oo-pin-tooltip"
+            class="oo-pin-tooltip bg-surface-base border-border-default text-text-heading border"
             :style="{
               top: pinnedTooltip.y + 'px',
               left: pinnedTooltip.x + 'px',
@@ -437,13 +437,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span class="oo-pin-tooltip__count">{{ formatCount(row.count) }}</span>
               <span class="oo-pin-tooltip__row-actions">
                 <span
-                  class="oo-pin-tooltip__action oo-pin-tooltip__action--include"
+                  class="oo-pin-tooltip__action oo-pin-tooltip__action--include text-status-info-text"
                   :title="t('logs.searchResult.include')"
                   @click.stop="applyPinnedFilter(row.rawValue, 'include')"
                   >=</span
                 >
                 <span
-                  class="oo-pin-tooltip__action oo-pin-tooltip__action--exclude"
+                  class="oo-pin-tooltip__action oo-pin-tooltip__action--exclude text-status-error-text"
                   :title="t('logs.searchResult.exclude')"
                   @click.stop="applyPinnedFilter(row.rawValue, 'exclude')"
                   >≠</span
@@ -1021,14 +1021,19 @@ export default defineComponent({
     // Context the pattern details drawer needs to look up a pattern's
     // window-wide volume, so its Occurrences figure matches the list's `~N`
     // instead of falling back to the much smaller extraction-sample count.
-    const patternVolumeContext = computed<PatternVolumeContext | null>(() =>
-      buildPatternVolumeContext({
+    const patternVolumeContext = computed<PatternVolumeContext | null>(() => {
+      // Pattern volume feeds only the patterns view's "N events" figures. Don't
+      // build a context (and so don't fire the window-total count query) while the
+      // user is on the logs/visualize view — otherwise every logs visit runs a
+      // `SELECT count(*)` for a feature that isn't on screen.
+      if (searchObj.meta.logsVisualizeToggle !== "patterns") return null;
+      return buildPatternVolumeContext({
         orgId: store.state.selectedOrganization?.identifier ?? "",
         streamName: searchObj.data.stream.selectedStream[0],
         window: props.queryWindowUs as { start: number; end: number } | undefined,
         lastQuery: patternsState.value?.lastQuery,
-      }),
-    );
+      });
+    });
 
     // Exact event count for the query window, from one aggregate query. Feeds
     // both the "N events" chip and the severity-chip scaling in PatternList, so
@@ -2060,13 +2065,10 @@ export default defineComponent({
   max-height: 20vh;
   overflow-y: auto;
   overflow-x: hidden;
-  background: var(--color-surface-base);
-  border: 1px solid var(--color-border-default);
   border-radius: var(--radius-surface);
   box-shadow: var(--shadow-lg);
   padding: 0.5rem 0;
   font-size: var(--text-xs);
-  color: var(--color-text-heading);
   outline: none;
 
   &__time {
@@ -2130,7 +2132,6 @@ export default defineComponent({
 
     &--include {
       background: color-mix(in srgb, var(--color-status-info-text) 12%, transparent);
-      color: var(--color-status-info-text);
 
       &:hover {
         background: color-mix(in srgb, var(--color-status-info-text) 25%, transparent);
@@ -2139,7 +2140,6 @@ export default defineComponent({
 
     &--exclude {
       background: color-mix(in srgb, var(--color-status-error-text) 8%, transparent);
-      color: var(--color-status-error-text);
 
       &:hover {
         background: color-mix(in srgb, var(--color-status-error-text) 20%, transparent);

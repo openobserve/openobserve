@@ -7736,7 +7736,6 @@
       "scoreConfigs": "評価に使用するスコアリングルーブリックを設定します"
     },
     "agentGraph": {
-      "allAgents": "全エージェント",
       "stream": "ストリーム",
       "agent": "エージェント",
       "noAgentsTitle": "エージェントが見つかりません",
@@ -9592,6 +9591,8 @@
       "modalSubtitle": "監視するものを選択",
       "modalTitle": "チェックを作成",
       "pageTitle": "新規 {label} チェック",
+      "saveAndContinue": "保存して続行",
+      "saveAndExit": "保存して終了",
       "saveCheck": "チェックを保存",
       "saveFailed": "チェックの保存に失敗しました。",
       "saved": "チェックが正常に保存されました。",
@@ -9619,7 +9620,7 @@
         "assertionValue": "値",
         "assertions": "アサーション",
         "body": "リクエストボディ",
-        "bodyPlaceholder": "{\"key\": \"value\"}",
+        "bodyPlaceholder": "{'{'}\"key\": \"value\"{'}'}",
         "fields": {
           "body": "レスポンスボディ",
           "response_time_ms": "応答時間（ms）",

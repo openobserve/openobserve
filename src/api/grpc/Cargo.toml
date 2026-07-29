@@ -1,0 +1,64 @@
+[package]
+name = "openobserve-api-grpc"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[lib]
+path = "src/lib.rs"
+
+[features]
+default = []
+enterprise = [
+    "dep:o2_enterprise",
+    "enrichment-data/enterprise",
+    "openobserve-core/enterprise",
+    "promql-service/enterprise",
+    "search_service/enterprise",
+]
+cloud = ["enterprise", "o2_enterprise/cloud", "openobserve-core/cloud"]
+vectorscan = [
+    "openobserve-core/vectorscan",
+    "promql-service/vectorscan",
+    "search_service/vectorscan",
+]
+
+[dependencies]
+anyhow.workspace = true
+arrow.workspace = true
+arrow-flight.workspace = true
+async-stream.workspace = true
+bytes.workspace = true
+common.workspace = true
+config.workspace = true
+datafusion.workspace = true
+db.workspace = true
+enrichment-data.workspace = true
+flight.workspace = true
+futures.workspace = true
+futures-util.workspace = true
+http.workspace = true
+http-auth-basic.workspace = true
+infra.workspace = true
+ingestion-common.workspace = true
+log.workspace = true
+o2_enterprise = { workspace = true, optional = true, default-features = false }
+openobserve-core.workspace = true
+openobserve-node.workspace = true
+opentelemetry.workspace = true
+opentelemetry-proto.workspace = true
+parking_lot.workspace = true
+promql-service.workspace = true
+prost.workspace = true
+proto.workspace = true
+search.workspace = true
+search_service.workspace = true
+tokio.workspace = true
+tokio-stream.workspace = true
+tonic.workspace = true
+tracing.workspace = true
+tracing-opentelemetry.workspace = true
+
+[dev-dependencies]
+arrow-schema.workspace = true
