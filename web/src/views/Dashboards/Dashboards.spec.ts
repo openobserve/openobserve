@@ -298,7 +298,7 @@ const buildGlobalConfig = (
       template: '<div data-test-stub="move-dashboard"></div>',
     },
     ConfirmDialog: true,
-    QTablePagination: true,
+    Pagination: true,
     NoData: true,
   },
 });

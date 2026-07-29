@@ -116,7 +116,7 @@ import { useRouter } from "vue-router";
 import { getImageURL } from "../../../utils/zincutils";
 
 export default defineComponent({
-  name: "QTablePagination",
+  name: "Pagination",
   components: { OSeparator, OButtonGroup, OButton, OInput, OSelect },
 
   props: [

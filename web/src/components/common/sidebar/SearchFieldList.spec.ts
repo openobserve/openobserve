@@ -738,7 +738,6 @@ describe("FieldList.vue Comprehensive Coverage", () => {
       const fields = [{ name: "normal_field", ftsKey: false, showValues: true }];
       wrapper = createWrapper({ fields });
 
-      // The component uses OFieldList with expansion slots, not QExpansionItem
       const fieldList = wrapper.findComponent({ name: "OFieldList" });
       expect(fieldList.exists()).toBe(true);
     });

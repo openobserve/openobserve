@@ -47,7 +47,7 @@ describe("NoOrganizationSelected", () => {
   });
 
   it("should have correct component name", () => {
-    expect(wrapper.vm.$options.name).toBe("QTableNoData");
+    expect(wrapper.vm.$options.name).toBe("NoOrganizationSelected");
   });
 
   it("should expose t function and getImageURL from setup", () => {

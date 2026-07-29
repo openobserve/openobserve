@@ -178,16 +178,6 @@ describe("Header Component", () => {
       plugins: [i18n],
       stubs: {
         ThemeSwitcher: true,
-        QBtn: true,
-        QIcon: true,
-        QToolbarTitle: true,
-        QMenu: true,
-        QList: true,
-        QItem: true,
-        QItemSection: true,
-        QSeparator: true,
-        QTooltip: true,
-        QMarkupTable: true,
       },
     };
 
@@ -199,7 +189,6 @@ describe("Header Component", () => {
       const logoWrapper = createWrapper({
         mountType: "mount",
         stubsOverrides: {
-          QToolbar: false,
         },
       });
 
@@ -226,8 +215,6 @@ describe("Header Component", () => {
           isEnterprise: "true",
         },
         stubsOverrides: {
-          // Don't stub QToolbar so content renders
-          QToolbar: false,
         },
       });
 
@@ -259,7 +246,6 @@ describe("Header Component", () => {
           },
         },
         stubsOverrides: {
-          QToolbar: false,
         },
       });
 
@@ -291,7 +277,6 @@ describe("Header Component", () => {
           isEnterprise: "true",
         },
         stubsOverrides: {
-          QToolbar: false,
         },
       });
 
@@ -323,7 +308,6 @@ describe("Header Component", () => {
           isEnterprise: "true",
         },
         stubsOverrides: {
-          QToolbar: false,
         },
       });
 
@@ -353,7 +337,6 @@ describe("Header Component", () => {
           },
         },
         stubsOverrides: {
-          QToolbar: false,
         },
       });
 
@@ -386,7 +369,6 @@ describe("Header Component", () => {
           isEnterprise: "true",
         },
         stubsOverrides: {
-          QToolbar: false,
         },
       });
 
@@ -441,7 +423,6 @@ describe("Header Component", () => {
           isEnterprise: "true",
         },
         stubsOverrides: {
-          QToolbar: false,
         },
       });
 
@@ -470,7 +451,6 @@ describe("Header Component", () => {
           isEnterprise: "true",
         },
         stubsOverrides: {
-          QToolbar: false,
         },
       });
 
@@ -497,7 +477,6 @@ describe("Header Component", () => {
           isEnterprise: "false",
         },
         stubsOverrides: {
-          QToolbar: false,
         },
       });
 
@@ -524,7 +503,6 @@ describe("Header Component", () => {
           isEnterprise: "true",
         },
         stubsOverrides: {
-          QToolbar: false,
         },
       });
 
@@ -552,7 +530,6 @@ describe("Header Component", () => {
           isEnterprise: "true",
         },
         stubsOverrides: {
-          QToolbar: false,
         },
       });
 
@@ -581,7 +558,6 @@ describe("Header Component", () => {
           isEnterprise: "true",
         },
         stubsOverrides: {
-          QToolbar: false,
         },
       });
 
@@ -609,7 +585,6 @@ describe("Header Component", () => {
           isEnterprise: "true",
         },
         stubsOverrides: {
-          QToolbar: false,
         },
       });
 
@@ -642,7 +617,6 @@ describe("Header Component", () => {
           isEnterprise: "true",
         },
         stubsOverrides: {
-          QToolbar: false,
         },
       });
 
@@ -675,7 +649,6 @@ describe("Header Component", () => {
           isEnterprise: "true",
         },
         stubsOverrides: {
-          QToolbar: false,
         },
       });
 
@@ -895,14 +868,11 @@ describe("Header Component", () => {
     });
 
     it("should attach an OTooltip to the profile button", () => {
-      // The QTooltip with class="header-user-tooltip" was replaced by OTooltip
       // (no class needed — OTooltip styles itself via Tailwind tokens).
       // The test now verifies the OTooltip is co-located with the profile btn.
       const tooltipWrapper = createWrapper({
         mountType: "mount",
         stubsOverrides: {
-          QToolbar: false,
-          QBtn: false,
         },
       });
 
@@ -1032,7 +1002,6 @@ describe("Header Component", () => {
       const lightWrapper = createWrapper({
         mountType: "mount",
         stubsOverrides: {
-          QToolbar: false,
         },
       });
 
@@ -1057,7 +1026,6 @@ describe("Header Component", () => {
           },
         },
         stubsOverrides: {
-          QToolbar: false,
         },
       });
 
@@ -1134,7 +1102,6 @@ describe("Header Component", () => {
           organizations: [],
         },
         stubsOverrides: {
-          // QSelect was replaced by OSelect during the OSelect migration; keep
           // the OSelect stub off so we can probe its options.
           OSelect: false,
         },
@@ -1160,8 +1127,6 @@ describe("Header Component", () => {
           },
         },
         stubsOverrides: {
-          QToolbar: false,
-          QToolbarTitle: false,
         },
       });
 
@@ -1228,7 +1193,6 @@ describe("Header Component", () => {
           isEnterprise: "true",
         },
         stubsOverrides: {
-          QToolbar: false,
         },
       });
 

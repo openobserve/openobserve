@@ -190,8 +190,7 @@ async function mountAlertList() {
         },
         ImportAlert: true,
         AddAlert: true,
-        QTablePagination: true,
-        QDrawer: true,
+        Pagination: true,
         ODialog: ODialogStub,
         ODrawer: ODrawerStub,
         ConfirmDialog: {

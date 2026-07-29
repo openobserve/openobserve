@@ -177,10 +177,6 @@ describe("QueryInspector", () => {
         stubs: {
           ODialog: ODialogStub,
           OButton: OButtonStub,
-          QIcon: {
-            template: '<span data-test="OIcon" :class="name"><slot /></span>',
-            props: ["name", "size"],
-          },
         },
         directives: {
           "close-popup": () => {},

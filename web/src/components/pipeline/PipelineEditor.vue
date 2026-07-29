@@ -84,8 +84,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              The rail toggle lives up in the page actions, so nothing sits
              between the header and the canvas.
 
-             `relative` (was `relative-position`, a Quasar class that no longer
-             resolves — Quasar is not installed and nothing defines that rule)
+             `relative` (was `relative-position`, a legacy CSS-framework
+             class that nothing in this repo defines, so it never resolved)
              makes this the offset parent for the canvas overlays: the start
              node and the edge-help toast. Without it they anchored to some
              ancestor further up, so the start node sat at a different height
