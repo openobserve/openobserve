@@ -96,7 +96,9 @@ function isPinnedCandidate(candidate: LocatorCandidate): boolean {
 
 <template>
   <div class="flex flex-col gap-2" data-test="synthetics-journey-step-locator">
-    <div class="flex items-center gap-2">
+    <!-- In the empty state the block IS a single input, and that input already
+         carries this heading as its label — showing both would say it twice. -->
+    <div v-if="!isEmpty" class="flex items-center gap-2">
       <span class="text-text-secondary text-xs">{{ t("synthetics.journey.locatorLabel") }}</span>
       <OTooltip :content="t('synthetics.journey.locatorHelp')">
         <OIcon name="info-outline" size="xs" class="text-text-secondary" aria-hidden="true" />
@@ -220,7 +222,7 @@ function isPinnedCandidate(candidate: LocatorCandidate): boolean {
         data-test="synthetics-journey-step-locator-override-btn"
         @click="applyOverride"
       >
-        {{ t("synthetics.journey.locatorPin") }}
+        {{ t("synthetics.journey.locatorOverrideApply") }}
       </OButton>
     </div>
   </div>

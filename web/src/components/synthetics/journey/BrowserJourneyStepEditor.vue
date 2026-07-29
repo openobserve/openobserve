@@ -9,8 +9,10 @@ import type {
   StepLocator,
 } from "@/types/synthetics";
 import {
+  ACTION_LABELS,
   DEFAULT_SETTLE_BUDGET_MS,
   MAX_SETTLE_BUDGET_MS,
+  MAX_STEP_TIMEOUT_MS,
   MIN_SETTLE_BUDGET_MS,
   VALUE_ACTIONS,
   VALUE_LABELS,
@@ -278,6 +280,49 @@ const settleBudgetOutOfRange = computed(() => {
 
 const seconds = (ms: number) => Number((ms / 1000).toFixed(1));
 
+// ── Plain-language summary (spec SE-6) ──────────────────────────────────────
+// Every comparable tool leads a step editor with a sentence describing the step in
+// the author's words rather than the tool's. Composed entirely from values already
+// on screen, so it can never disagree with the fields below it.
+
+/** What the run will actually target: the pin if there is one, else the primary. */
+const effectiveTarget = computed(() => {
+  const locator = props.step.locator;
+  return locator?.user_override?.value ?? locator?.candidates?.[0]?.value ?? "";
+});
+
+const summary = computed(() => {
+  const action = ACTION_LABELS[props.step.action] ?? props.step.action;
+  const target = showTarget.value ? effectiveTarget.value : props.step.value ?? "";
+  const sentence = target
+    ? t("synthetics.journey.summaryWithTarget", { action, target })
+    : action;
+  const effectiveTimeout = props.step.timeout ?? timeoutDefault.value;
+  return t("synthetics.journey.summaryWaitingUpTo", {
+    sentence,
+    seconds: seconds(effectiveTimeout),
+  });
+});
+
+// ── Timeout helper (spec SE-9 / D8, SE-20) ──────────────────────────────────
+// The placeholder stays — P1.1.5 mandates it, and T1-13 asserts it — but a
+// placeholder alone reads as "empty" to the audience it was meant to inform. This
+// line is additive: it says what blank means and what the bounds are.
+//
+// On navigate and assert the category default (60 s) EQUALS the server maximum, so
+// the field can only ever shorten the timeout. Saying so up front is what stops the
+// below-default warning reading as a malfunction (SE-20).
+const timeoutIsCeiling = computed(() => timeoutDefault.value >= MAX_STEP_TIMEOUT_MS);
+
+const timeoutHelp = computed(() =>
+  timeoutIsCeiling.value
+    ? t("synthetics.journey.timeoutHelpNavAssert", { seconds: seconds(timeoutDefault.value) })
+    : t("synthetics.journey.timeoutHelpInteraction", {
+        seconds: seconds(timeoutDefault.value),
+        max: seconds(MAX_STEP_TIMEOUT_MS),
+      }),
+);
+
 const waitsCaption = computed(() => {
   const parts: string[] = [];
   if (hasRecordedSettle.value) parts.push(t("synthetics.journey.captionRecorded"));
@@ -299,6 +344,16 @@ const failureCaption = computed(() => {
 
 <template>
   <div class="flex flex-col gap-2" data-test="synthetics-journey-step-editor">
+    <!-- What this step will do, in the author's words rather than the tool's.
+         Composed from the same values the fields below show, so the two cannot
+         disagree. -->
+    <p
+      class="text-text-body m-0 text-sm"
+      data-test="synthetics-journey-step-summary"
+    >
+      {{ summary }}
+    </p>
+
     <!-- 1. What this step does — always open. Every field that can carry a
             validation error lives here, so an error is never collapsed away. -->
     <OCollapsible
@@ -462,6 +517,14 @@ const failureCaption = computed(() => {
             data-test="synthetics-journey-step-timeout-input"
           />
         </div>
+        <!-- Additive to the placeholder, which P1.1.5 mandates: says what blank
+             means, and on navigate/assert that the default is also the ceiling. -->
+        <p
+          class="text-text-secondary m-0 text-xs"
+          data-test="synthetics-journey-step-timeout-help"
+        >
+          {{ timeoutHelp }}
+        </p>
         <p
           v-if="timeoutBelowDefault"
           class="text-status-warning-text m-0 flex items-start gap-1 text-xs"

@@ -240,3 +240,62 @@ describe("BrowserJourneyStepEditor layout", () => {
     expect(offenders).toEqual([]);
   });
 });
+
+// Phase 3 / SE-6, SE-9, SE-20.
+describe("BrowserJourneyStepEditor plain language", () => {
+  it("leads with a sentence describing the step", () => {
+    const wrapper = render({
+      action: "click",
+      locator: { candidates: [{ kind: "test_attribute", value: '[data-test="sign-in"]' }] },
+    });
+    const summary = wrapper.find(test("synthetics-journey-step-summary")).text();
+    expect(summary).toContain("Click");
+    expect(summary).toContain('[data-test="sign-in"]');
+    // the effective timeout, not a raw ms number
+    expect(summary).toContain("30");
+  });
+
+  it("uses the pinned locator in the summary, since that is what runs", () => {
+    const wrapper = render({
+      locator: {
+        candidates: [{ kind: "css", value: ".ignored" }],
+        user_override: { kind: "css", value: "#pinned" },
+      },
+    });
+    expect(wrapper.find(test("synthetics-journey-step-summary")).text()).toContain("#pinned");
+  });
+
+  it("reflects an explicit timeout in the summary", () => {
+    const wrapper = render({ timeout: 5000 });
+    expect(wrapper.find(test("synthetics-journey-step-summary")).text()).toContain("5");
+  });
+
+  it("names the runner default in the timeout helper for an interaction", async () => {
+    const wrapper = render();
+    await wrapper.find(`${test("synthetics-journey-step-group-failure")} button`).trigger("click");
+    const help = wrapper.find(test("synthetics-journey-step-timeout-help")).text();
+    expect(help).toContain("30");
+    expect(help).toContain("Maximum 60");
+  });
+
+  // SE-20: on navigate/assert the category default IS the server maximum, so the
+  // field can only shorten — saying so stops the below-default warning reading as
+  // a malfunction.
+  it("says the field can only shorten on navigate, where default equals the maximum", async () => {
+    const wrapper = render({ action: "navigate", value: "https://example.com" });
+    await wrapper.find(`${test("synthetics-journey-step-group-failure")} button`).trigger("click");
+    const help = wrapper.find(test("synthetics-journey-step-timeout-help")).text();
+    expect(help).toContain("60");
+    expect(help).toMatch(/only shorten/i);
+  });
+
+  it("renames the Playwright terms out of the visible copy", () => {
+    const wrapper = render({
+      locator: { candidates: [{ kind: "css", value: "#a" }, { kind: "css", value: "#b" }] },
+    });
+    const txt = wrapper.text();
+    expect(txt).toContain("How to find this element");
+    expect(txt).toContain("Always use this one");
+    expect(txt).not.toMatch(/\bLocator\b/);
+  });
+});

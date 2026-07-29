@@ -149,6 +149,19 @@ export const VALUE_LABELS: Record<string, string> = {
   wait: "Duration (ms)",
 };
 
+// ── Per-step timeout bounds ──────────────────────────────────────────────
+/**
+ * Mirrors the server's range check on a step's `timeout_ms` (spec P1.1.3:
+ * *"it validates into `100..=60_000`"*).
+ *
+ * Note the maximum EQUALS the navigate/assert category default
+ * (`NAV_ASSERT_TIMEOUT_MS`), so on those two actions an explicit timeout can only
+ * ever shorten the step — which is why the editor says so rather than leaving the
+ * below-default warning looking like a malfunction (SE-20).
+ */
+export const MIN_STEP_TIMEOUT_MS = 100;
+export const MAX_STEP_TIMEOUT_MS = 60000;
+
 // ── Settle budget (spec P3.3, P3.4.3) ────────────────────────────────────
 /** What the probe sleeps for when a legacy `wait` carries no duration. */
 export const DEFAULT_SETTLE_BUDGET_MS = 30000;
