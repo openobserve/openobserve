@@ -13,9 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::collections::HashSet;
+
 use config::{
     cluster::LOCAL_NODE,
-    meta::stream::{ALL_STREAM_TYPES, StreamType},
+    meta::stream::StreamType,
     metrics,
     utils::time::{HourFormat, day_micros, get_ymdh_from_micros, now_micros},
 };
@@ -62,10 +64,14 @@ pub async fn update_stats_from_file_list() -> Result<(), anyhow::Error> {
     );
 
     // get updated streams if we don't need to update old stats
-    let updated_streams = if no_need_update_old_stats {
-        infra_file_list::get_updated_streams((last_updated_at, latest_updated_at)).await?
+    // empty set means update all streams
+    let updated_streams: HashSet<String> = if no_need_update_old_stats {
+        infra_file_list::get_updated_streams((last_updated_at, latest_updated_at))
+            .await?
+            .into_iter()
+            .collect()
     } else {
-        vec![]
+        HashSet::new()
     };
 
     let yesterday_boundary = get_yesterday_boundary();
@@ -74,14 +80,13 @@ pub async fn update_stats_from_file_list() -> Result<(), anyhow::Error> {
 
     let iter = [(new_data_range, true), (old_data_range, false)];
 
-    let orgs = db::schema::list_organizations_from_cache().await;
+    let grouped = db::schema::list_all_streams_grouped().await;
     let mut total_streams = 0;
-    for org_id in orgs {
-        for stream_type in ALL_STREAM_TYPES {
+    for (org_id, stream_types) in grouped {
+        for (stream_type, streams) in stream_types {
             if stream_type == StreamType::Index || stream_type == StreamType::Filelist {
                 continue;
             }
-            let streams = db::schema::list_streams_from_cache(&org_id, stream_type).await;
             total_streams += streams.len();
             let stream_type_str = stream_type.to_string();
             for stream_name in streams {

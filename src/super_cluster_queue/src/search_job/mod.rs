@@ -244,19 +244,18 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
             let event: AssociationDeleteEvent = json::from_slice(&msg.value.unwrap())?;
             match &event {
                 AssociationDeleteEvent::Entity { org_id, entity_id } => {
-                    infra::table::workflows::delete_association_by_entity(&org_id, &entity_id)
+                    infra::table::workflows::delete_association_by_entity(org_id, entity_id)
                         .await?;
                 }
                 AssociationDeleteEvent::Workflow {
                     org_id,
                     workflow_id,
                 } => {
-                    infra::table::workflows::delete_association_by_workflow(&org_id, &workflow_id)
+                    infra::table::workflows::delete_association_by_workflow(org_id, workflow_id)
                         .await?;
                 }
                 AssociationDeleteEvent::Trigger { org_id, trigger } => {
-                    infra::table::workflows::delete_association_by_trigger(&org_id, &trigger)
-                        .await?;
+                    infra::table::workflows::delete_association_by_trigger(org_id, trigger).await?;
                 }
                 AssociationDeleteEvent::Specific {
                     org_id,

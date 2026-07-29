@@ -47,16 +47,16 @@ static PROCESSING_FILES: Lazy<RwLock<HashSet<String>>> = Lazy::new(|| RwLock::ne
 
 pub async fn run_generate(worker_tx: mpsc::Sender<FileKey>) -> Result<(), anyhow::Error> {
     let semaphore = std::sync::Arc::new(Semaphore::new(get_config().limit.file_merge_thread_num));
-    let orgs = db::schema::list_organizations_from_cache().await;
+    let grouped = db::schema::list_all_streams_grouped().await;
     let stream_types = [StreamType::Logs];
-    for org_id in orgs {
+    for (org_id, mut org_streams) in grouped {
         // check backlist
         if !db::file_list::BLOCKED_ORGS.is_empty() && db::file_list::BLOCKED_ORGS.contains(&org_id)
         {
             continue;
         }
         for stream_type in stream_types {
-            let streams = db::schema::list_streams_from_cache(&org_id, stream_type).await;
+            let streams = org_streams.remove(&stream_type).unwrap_or_default();
             let mut tasks = Vec::with_capacity(streams.len());
             for stream_name in streams {
                 // check if this stream need flatten
@@ -64,8 +64,7 @@ pub async fn run_generate(worker_tx: mpsc::Sender<FileKey>) -> Result<(), anyhow
                     infra::schema::get_settings(&org_id, &stream_name, stream_type)
                         .await
                         .unwrap_or_default();
-                let defined_schema_fields = stream_setting.defined_schema_fields;
-                if defined_schema_fields.is_empty() {
+                if stream_setting.defined_schema_fields.is_empty() {
                     continue;
                 }
 

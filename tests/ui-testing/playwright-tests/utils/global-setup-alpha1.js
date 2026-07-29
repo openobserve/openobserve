@@ -484,7 +484,11 @@ async function performGlobalIngestion(page) {
 
   try {
     const cloudConfig = JSON.parse(fs.readFileSync(CLOUD_CONFIG_FILE, 'utf-8'));
-    orgId = cloudConfig.orgIdentifier;
+    // Ingest into THIS shard's org (ORGNAME) rather than the org baked into
+    // cloud-config.json by the shared-auth barrier. The passcode is user-level
+    // (identity), so it authorizes any org the user is a member of — only the
+    // target org differs per shard. Enables per-shard org isolation.
+    orgId = process.env.ORGNAME || cloudConfig.orgIdentifier;
     const basicAuth = Buffer.from(`${cloudConfig.userEmail}:${cloudConfig.passcode}`).toString('base64');
     headers = {
       'Authorization': `Basic ${basicAuth}`,
@@ -597,16 +601,19 @@ async function verifySharedAuth(baseUrl) {
     await menuItem.waitFor({ state: 'visible', timeout: 15000 });
     testLogger.info('[alpha1] Shared auth verified — menu visible');
 
-    // Re-apply org switch + persist if active org doesn't match target
-    if (targetOrg && targetOrg !== 'default') {
-      const activeOrg = new URL(page.url()).searchParams.get('org_identifier');
-      if (activeOrg !== targetOrg) {
-        testLogger.info(`[alpha1] Active org (${activeOrg}) != target (${targetOrg}); re-switching`);
-        await switchOrgViaDropdown(page, targetOrg);
-        await context.storageState({ path: AUTH_FILE });
-        testLogger.info(`[alpha1] Auth state re-saved with target org active`);
-      }
-    }
+    // Note: no dropdown org-switch needed here. Each test pins its own org by
+    // navigating to /web/?org_identifier=<ORGNAME> (see navigateToBase), which the
+    // app honours on a fresh page load. Forcing a dropdown switch here is both
+    // redundant and flaky (the virtualized selector under load), so we rely on the
+    // per-test URL instead. The passcode below is still fetched per shard org.
+
+    // Re-fetch THIS shard's own org passcode via the session. The downloaded
+    // cloud-config.json holds the shared-auth barrier org's ingestion token,
+    // which 401s against any other org — each org has its own o2oi_ default
+    // ingestion token (see core/organization.rs get_passcode). Overwrite
+    // cloud-config.json with ORGNAME's passcode so per-shard ingestion succeeds.
+    await fetchCloudConfig(page);
+
     return true;
   } catch (e) {
     testLogger.warn(`[alpha1] Shared auth verification error: ${e.message}`);
@@ -628,7 +635,11 @@ async function performGlobalIngestionWithFetch() {
 
   try {
     const cloudConfig = JSON.parse(fs.readFileSync(CLOUD_CONFIG_FILE, 'utf-8'));
-    orgId = cloudConfig.orgIdentifier;
+    // Ingest into THIS shard's org (ORGNAME) rather than the org baked into
+    // cloud-config.json by the shared-auth barrier. The passcode is user-level
+    // (identity), so it authorizes any org the user is a member of — only the
+    // target org differs per shard. Enables per-shard org isolation.
+    orgId = process.env.ORGNAME || cloudConfig.orgIdentifier;
     const basicAuth = Buffer.from(`${cloudConfig.userEmail}:${cloudConfig.passcode}`).toString('base64');
     headers = {
       'Authorization': `Basic ${basicAuth}`,

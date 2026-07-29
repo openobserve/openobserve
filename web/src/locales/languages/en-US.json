@@ -2203,9 +2203,6 @@
       "skipped": "Skipped",
       "errorsN": "{count} error(s)",
       "runError": "Unable to run the test.",
-      "saveToTestTitle": "Save & Test",
-      "saveToTestBody": "Testing runs the saved version of this workflow. Save your changes first?",
-      "saveAndTest": "Save & Test",
       "stepResult": {
         "viewHint": "Click To View Input / Output",
         "input": "Input",

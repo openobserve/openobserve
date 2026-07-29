@@ -153,7 +153,7 @@ async fn get_event_metadata(
         }
         IncidentEventType::Unknown(value) => {
             metadata.push(("event_type", "unknown".into()));
-            metadata.push(("value", value.into()));
+            metadata.push(("value", value));
         }
     }
 
