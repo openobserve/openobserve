@@ -89,7 +89,10 @@ pub async fn check_stream_permissions(
             AuthExtractor {
                 auth: "".to_string(),
                 method: "GET".to_string(),
-                o2_type: format!("{o2_model_type}:{stream_name}"),
+                o2_type: format!(
+                    "{o2_model_type}:{}",
+                    crate::common::utils::auth::into_ofga_supported_format(stream_name)
+                ),
                 org_id: org_id.to_string(),
                 bypass_check: false,
                 parent_id: "".to_string(),
