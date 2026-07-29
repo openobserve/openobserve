@@ -343,9 +343,19 @@ function handleResetColumnSizes(): void {
 const pagination = useTablePagination(
   table,
   {
-    pagination: props.pagination,
-    pageSize: props.pageSize,
-    pageSizeOptions: props.pageSizeOptions,
+    // All of these must be getters: a plain `props.x` here snapshots the value
+    // at setup, so in server mode the footer would keep rendering the initial
+    // page size after the parent changed it (and `goToPage` would emit the stale
+    // size back, resetting the parent).
+    get pagination() {
+      return props.pagination;
+    },
+    get pageSize() {
+      return props.pageSize;
+    },
+    get pageSizeOptions() {
+      return props.pageSizeOptions;
+    },
     get currentPage() {
       return props.currentPage;
     },
@@ -957,6 +967,9 @@ defineExpose({
   table,
   toggleAllRows: selection.toggleAllRows,
   clearSelection: selection.clearSelection,
+  // Callers that render their own OTableColumnToggle (outside the built-in
+  // toolbar / global-filter bar) need this to show "Reset column widths".
+  hasResizedColumns: computed(() => props.enableColumnResize && hasResizedColumns.value),
   resetColumnSizes: () => {
     table.resetColumnSizing?.();
     frozen.value = false;

@@ -523,6 +523,9 @@ export interface OTableExposed<TData = any> {
   toggleAllRows: () => void;
   /** Clear selection */
   clearSelection: () => void;
+  /** True when column resizing is enabled and the user has resized at least one
+   *  column. Read this when rendering your own `OTableColumnToggle`. */
+  hasResizedColumns: boolean;
   /** Reset column sizes to default */
   resetColumnSizes: () => void;
   /** Reset column order to default */

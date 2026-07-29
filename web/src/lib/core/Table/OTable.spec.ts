@@ -246,6 +246,118 @@ describe("OTable", () => {
       const info = wrapper.find('[data-test="o2-table-pagination-info"]');
       expect(info.text()).toContain("200");
     });
+
+    it("should reflect a pageSize prop change in the footer", async () => {
+      wrapper = mount(OTable, {
+        props: {
+          data: makeRows(10),
+          columns: makeColumns(),
+          pagination: "server",
+          totalCount: 45,
+          pageSize: 20,
+          currentPage: 1,
+        },
+      });
+      expect(wrapper.find('[data-test="o2-table-pagination-info"]').text()).toContain("1 - 20");
+
+      await wrapper.setProps({ pageSize: 10 });
+
+      expect(wrapper.find('[data-test="o2-table-pagination-info"]').text()).toContain("1 - 10");
+      expect(wrapper.findComponent(OSelect).props("modelValue")).toBe(10);
+    });
+
+    it("should emit the updated pageSize when paging after a pageSize change", async () => {
+      wrapper = mount(OTable, {
+        props: {
+          data: makeRows(10),
+          columns: makeColumns(),
+          pagination: "server",
+          totalCount: 45,
+          pageSize: 20,
+          currentPage: 1,
+        },
+      });
+
+      // Server mode: the parent owns page size, so it echoes the change back as a prop.
+      await wrapper.setProps({ pageSize: 10 });
+      await wrapper.find('[data-test="o2-table-next-page-btn"]').trigger("click");
+
+      const events = wrapper.emitted("pagination-change") as any[][];
+      expect(events.at(-1)![0]).toEqual({ page: 2, size: 10 });
+    });
+
+    it("should reflect a pageSizeOptions prop change in the footer select", async () => {
+      wrapper = mount(OTable, {
+        props: {
+          data: makeRows(10),
+          columns: makeColumns(),
+          pagination: "server",
+          totalCount: 45,
+          pageSize: 20,
+          pageSizeOptions: [20, 50],
+        },
+      });
+
+      await wrapper.setProps({ pageSizeOptions: [10, 20] });
+
+      expect(wrapper.findComponent(OSelect).props("options")).toEqual([
+        { label: "10", value: 10 },
+        { label: "20", value: 20 },
+      ]);
+    });
+  });
+
+  // ── Exposed API ─────────────────────────────────────────────
+
+  describe("exposed hasResizedColumns", () => {
+    it("should expose false until a column is resized, then true", async () => {
+      wrapper = mount(OTable, {
+        props: {
+          data: makeRows(3),
+          columns: makeColumns(),
+          enableColumnResize: true,
+        },
+      });
+      expect(wrapper.vm.hasResizedColumns).toBe(false);
+
+      // No public API for a drag in jsdom — drive TanStack's sizing state directly.
+      (wrapper.vm as any).table.setColumnSizing({ name: 300 });
+      await nextTick();
+
+      expect(wrapper.vm.hasResizedColumns).toBe(true);
+    });
+
+    it("should expose false when column resizing is disabled", async () => {
+      wrapper = mount(OTable, {
+        props: {
+          data: makeRows(3),
+          columns: makeColumns(),
+          enableColumnResize: false,
+        },
+      });
+      (wrapper.vm as any).table.setColumnSizing({ name: 300 });
+      await nextTick();
+
+      expect(wrapper.vm.hasResizedColumns).toBe(false);
+    });
+
+    it("should go back to false after resetColumnSizes", async () => {
+      wrapper = mount(OTable, {
+        props: {
+          data: makeRows(3),
+          columns: makeColumns(),
+          enableColumnResize: true,
+        },
+      });
+      (wrapper.vm as any).table.setColumnSizing({ name: 300 });
+      await nextTick();
+      expect(wrapper.vm.hasResizedColumns).toBe(true);
+
+      (wrapper.vm as any).resetColumnSizes();
+      await nextTick();
+
+      expect(wrapper.vm.hasResizedColumns).toBe(false);
+    });
   });
 
   // ── Client-Side Sorting ────────────────────────────────────
