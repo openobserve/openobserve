@@ -26,9 +26,7 @@ use tokio::runtime::Runtime;
 use vortex::{
     array::{ArrayRef, Canonical, ExecutionCtx, IntoArray},
     buffer::Buffer,
-    compressor::{
-        BtrBlocksCompressor, BtrBlocksCompressorBuilder, SchemeExt, schemes::integer::IntDictScheme,
-    },
+    compressor::{BtrBlocksCompressor, BtrBlocksCompressorBuilder},
     dtype::DType,
     encodings::zstd::Zstd,
     error::VortexResult,
@@ -36,6 +34,7 @@ use vortex::{
     layout::{LayoutStrategy, layouts::compressed::CompressorPlugin},
     scan::selection::Selection,
 };
+use vortex_btrblocks::{SchemeExt, schemes::integer::IntDictScheme};
 use vortex_datafusion::VortexAccessPlan;
 
 pub static VORTEX_RUNTIME: LazyLock<Arc<Runtime>> = LazyLock::new(|| {

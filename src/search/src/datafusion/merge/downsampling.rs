@@ -33,8 +33,9 @@ use datafusion::{
 use futures::TryStreamExt;
 use vortex::{
     VortexSessionDefault,
-    array::{ArrayRef, arrow::FromArrowArray},
-    dtype::{DType, arrow::FromArrowType},
+    array::ArrayRef,
+    arrow::{FromArrowArray, FromArrowType},
+    dtype::DType,
     file::VortexWriteOptions,
     io::session::RuntimeSessionExt,
     session::VortexSession,
