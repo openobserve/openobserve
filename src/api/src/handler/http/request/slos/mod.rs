@@ -356,6 +356,8 @@ fn save_error(e: openobserve_core::slo::service::SloError) -> Response {
         SloError::Validation(_) => StatusCode::BAD_REQUEST,
         SloError::Budget(_) => StatusCode::PAYLOAD_TOO_LARGE,
         SloError::NotFound => StatusCode::NOT_FOUND,
+        // A name clash is the user's to fix, not a server fault.
+        SloError::DuplicateName(_) => StatusCode::CONFLICT,
         SloError::Db(_) => StatusCode::INTERNAL_SERVER_ERROR,
     };
     if status == StatusCode::INTERNAL_SERVER_ERROR {

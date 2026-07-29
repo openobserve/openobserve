@@ -159,7 +159,7 @@
 
       <template #cell-window="{ row }">
         <span class="tabular-nums">{{ formatWindow(row.window_secs) }}</span>
-        <span class="text-text-secondary text-compact"> {{ t("slos.rolling") }}</span>
+        <span class="text-text-secondary text-compact ml-1">{{ t("slos.rolling") }}</span>
       </template>
 
       <template #cell-tags="{ row }">
@@ -215,8 +215,11 @@
       </template>
     </OTable>
 
+    <!-- `v-model:open`, not `v-model` — ODialog's controlled prop is `open`,
+         and a plain v-model binds `modelValue`, which it ignores. The dialog
+         then simply never appears, with no error anywhere. -->
     <ODialog
-      v-model="deleteDialog"
+      v-model:open="deleteDialog"
       :title="t('slos.deleteConfirmTitle')"
       data-test="slos-slolist-delete-dialog"
     >
@@ -226,7 +229,7 @@
       <OBanner variant="info" class="mt-3">
         {{ t("slos.deleteBudgetNote") }}
       </OBanner>
-      <template #actions>
+      <template #footer>
         <OButton variant="outline" size="sm-action" @click="deleteDialog = false">
           {{ t("common.cancel") }}
         </OButton>

@@ -243,9 +243,13 @@ const org = computed(() => store.state.selectedOrganization?.identifier);
 const health = computed(() => sloHealth(status.value));
 const isGrouped = computed(() => !!slo.value?.group_by && slo.value.group_by.length > 0);
 
+/// Reads as "below the 80% floor" when the server exposes the value, and
+/// "below the configured floor" when it does not — the sentence has to work
+/// either way, which the literal "the configured floor" broke by producing
+/// "below the the configured floor floor".
 const coverageFloorLabel = computed(() => {
   const floor = store.state.zoConfig?.slo_min_coverage;
-  return floor ? `${Math.round(Number(floor) * 100)}%` : "the configured floor";
+  return floor ? `${Math.round(Number(floor) * 100)}%` : "configured";
 });
 
 const backTarget = computed(() => ({

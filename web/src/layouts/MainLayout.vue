@@ -447,6 +447,14 @@ export default defineComponent({
         name: "alertList",
       },
       {
+        // Directly after Alerts: an SLO is what an SLO alert burns against,
+        // and the two are navigated together.
+        title: t("menu.slos"),
+        icon: "target",
+        link: "/slos",
+        name: "sloList",
+      },
+      {
         title: t("menu.ingestion"),
         icon: "data-plus-line",
         link: "/ingestion",

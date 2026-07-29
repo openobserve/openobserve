@@ -390,7 +390,7 @@ const definitionChanged = computed(() => {
 function definitionKey(): string {
   return JSON.stringify({
     sli_type: form.sli_type,
-    config: form.config,
+    config: wireConfig(),
     group_by: groupByList.value.length ? groupByList.value : null,
     window_secs: form.window_secs,
     slice_interval_secs: form.slice_interval_secs,
@@ -406,12 +406,16 @@ async function load() {
   if (!isEdit.value || !org.value) return;
   const res = await sloService.get(org.value, sloId.value);
   const body = res.data ?? {};
+  // Unwrap the adjacent tagging back into the flat model the form edits.
+  const cfg = body.config ?? {};
+  const flat =
+    body.sli_type === "count" ? (cfg.source?.query ?? cfg.source ?? {}) : cfg;
   Object.assign(form, {
     name: body.name,
     description: body.description ?? "",
     tags: body.tags ?? [],
     sli_type: body.sli_type,
-    config: body.config ?? {},
+    config: { stream_type: "logs", ...flat },
     target: body.target,
     window_secs: body.window_secs,
     slice_interval_secs: body.slice_interval_secs,
@@ -422,15 +426,37 @@ async function load() {
   original.value = definitionKey();
 }
 
+/// Drop empty strings rather than sending them.
+///
+/// An empty `scope` is not "no scope" to the validator — it is an empty
+/// predicate, and it is rejected. Absent is what "all rows" looks like.
+function pruned(o: Record<string, any>): Record<string, any> {
+  return Object.fromEntries(
+    Object.entries(o).filter(([, v]) => v !== "" && v !== null && v !== undefined),
+  );
+}
+
+/// Map the flat form model onto the wire shape.
+///
+/// `CountSource` is adjacently tagged (`mode`/`query`), so a count SLI's
+/// config is `{source: {mode, query: {...}}}` — NOT the flat object the form
+/// edits. `SliConfig::TimeSlice` is a struct variant, so its fields do sit
+/// directly under `config`. Getting this wrong is a 422 with no useful
+/// message, which is exactly how it was found.
+function wireConfig(): Record<string, any> {
+  if (form.sli_type === "count") {
+    return { source: { mode: "single_query", query: pruned(form.config) } };
+  }
+  return pruned(form.config);
+}
+
 function payload() {
+  const { config: _flat, groups_estimate, ...rest } = form as any;
   return {
-    ...form,
+    ...rest,
+    groups_estimate: isGrouped.value ? groups_estimate : null,
     group_by: groupByList.value.length ? groupByList.value : null,
-    // Empty strings are not "no scope" to the validator — they are an empty
-    // predicate. Sent as absent instead.
-    config: Object.fromEntries(
-      Object.entries(form.config).filter(([, v]) => v !== "" && v !== null && v !== undefined),
-    ),
+    config: wireConfig(),
   };
 }
 

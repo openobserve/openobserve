@@ -47,6 +47,11 @@ pub enum SloError {
     Validation(String),
     Budget(String),
     NotFound,
+    /// A name already taken in this folder. Its own variant so the handler can
+    /// answer 409 with a sentence, instead of leaking
+    /// `UNIQUE constraint failed: slos.org, slos.folder_id, slos.name` from a
+    /// 500 — which is what it did before end-to-end testing.
+    DuplicateName(String),
     Db(String),
 }
 
@@ -55,6 +60,9 @@ impl std::fmt::Display for SloError {
         match self {
             Self::Validation(m) | Self::Budget(m) | Self::Db(m) => write!(f, "{m}"),
             Self::NotFound => write!(f, "SLO not found"),
+            Self::DuplicateName(n) => {
+                write!(f, "an SLO named \"{n}\" already exists in this folder")
+            }
         }
     }
 }
@@ -71,6 +79,17 @@ impl From<infra::errors::Error> for SloError {
     fn from(e: infra::errors::Error) -> Self {
         Self::Db(e.to_string())
     }
+}
+
+/// Recognize the unique-index violation across backends.
+///
+/// Matched on the message because the three supported stores word it
+/// differently and none surfaces a portable error code through sea-orm:
+/// SQLite says `UNIQUE constraint failed`, Postgres `duplicate key value
+/// violates unique constraint`, MySQL `Duplicate entry`.
+fn is_duplicate_name(e: &infra::errors::Error) -> bool {
+    let m = e.to_string().to_lowercase();
+    (m.contains("unique") || m.contains("duplicate")) && m.contains("slos")
 }
 
 /// Validate a definition without saving it — shared by create and update so
@@ -133,6 +152,9 @@ pub async fn create(slo: &mut Slo) -> Result<(), SloError> {
         // Release what we just reserved, or a failed save would leak budget
         // that nothing will ever retire.
         let _ = slo_budget::retire(db, &slo.org, &slo.id, slo.definition_generation, now).await;
+        if is_duplicate_name(&e) {
+            return Err(SloError::DuplicateName(slo.name.clone()));
+        }
         return Err(e.into());
     }
 
@@ -158,7 +180,13 @@ pub async fn update(slo: &mut Slo) -> Result<(), SloError> {
     slo.groups_reserved = groups;
 
     let now = now_micros() / 1_000_000;
-    let effect = slos_table::update(db, slo, now, slo.owner.as_deref()).await?;
+    let effect = match slos_table::update(db, slo, now, slo.owner.as_deref()).await {
+        Ok(e) => e,
+        Err(e) if is_duplicate_name(&e) => {
+            return Err(SloError::DuplicateName(slo.name.clone()));
+        }
+        Err(e) => return Err(e.into()),
+    };
 
     match effect {
         GenerationEffect::Bumped { from, to } => {

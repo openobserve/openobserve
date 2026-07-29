@@ -905,7 +905,8 @@
     "language": "Language",
     "actions": "Actions",
     "keyboardShortcuts": "Keyboard Shortcuts",
-    "synthetic": "Synthetics"
+    "synthetic": "Synthetics",
+    "slos": "SLOs"
   },
   "rum": {
     "title": "Real User Monitoring",
