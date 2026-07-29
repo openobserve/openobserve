@@ -49,6 +49,32 @@ pub fn is_reserved_self_reporting_stream(stream_name: &str) -> bool {
     RESERVED_SELF_REPORTING_STREAMS.contains(&stream_name)
 }
 
+/// Every reserved internal stream, self-reporting or otherwise.
+///
+/// `slo_slices` is not self-reporting — it is measurement data for Feature 5 —
+/// but it needs the identical protection, and for the identical reason: a user
+/// write into it would corrupt the numbers an SLO reports. It is listed
+/// separately rather than folded into [`RESERVED_SELF_REPORTING_STREAMS`] so
+/// that array keeps meaning what its name says.
+pub const RESERVED_INTERNAL_STREAMS: [&str; 6] = [
+    USAGE_STREAM,
+    STATS_STREAM,
+    TRIGGERS_STREAM,
+    ERROR_STREAM,
+    DATA_RETENTION_USAGE_STREAM,
+    crate::meta::slo::stream::SLO_SLICES_STREAM,
+];
+
+/// Returns true if `stream_name` is reserved for internal writes of any kind.
+///
+/// This is the predicate the create/delete/ingest guards should use. Internal
+/// writers bypass it the same way self-reporting does — via the
+/// `IngestionRequest::Usage` channel, for which `should_report_usage()` is
+/// false.
+pub fn is_reserved_internal_stream(stream_name: &str) -> bool {
+    RESERVED_INTERNAL_STREAMS.contains(&stream_name)
+}
+
 /// Outcome of a single scheduled evaluation — "did it fire?".
 ///
 /// Part III of `alerts.md`. Replaces the former `TriggerDataStatus`, whose
@@ -1365,6 +1391,37 @@ mod run_outcome_tests {
         let td: TriggerData = serde_json::from_str(legacy).unwrap();
         assert_eq!(td.actual_value, None);
         assert_eq!(td.level, None);
+    }
+}
+
+#[cfg(test)]
+mod reserved_stream_tests {
+    use super::*;
+
+    #[test]
+    fn slo_slices_is_reserved() {
+        // Not self-reporting, but it needs the identical protection: a user
+        // write into it would corrupt the numbers an SLO reports.
+        assert!(is_reserved_internal_stream(
+            crate::meta::slo::stream::SLO_SLICES_STREAM
+        ));
+        assert!(!is_reserved_self_reporting_stream(
+            crate::meta::slo::stream::SLO_SLICES_STREAM
+        ));
+    }
+
+    #[test]
+    fn every_self_reporting_stream_is_also_an_internal_stream() {
+        for s in RESERVED_SELF_REPORTING_STREAMS {
+            assert!(is_reserved_internal_stream(s), "{s} lost its protection");
+        }
+    }
+
+    #[test]
+    fn an_ordinary_stream_name_is_not_reserved() {
+        for s in ["logs", "default", "slo", "slices", "slo_slice"] {
+            assert!(!is_reserved_internal_stream(s), "{s} wrongly reserved");
+        }
     }
 }
 

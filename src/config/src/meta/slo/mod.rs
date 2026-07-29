@@ -53,6 +53,7 @@ pub mod generation;
 pub mod group;
 pub mod math;
 pub mod slice;
+pub mod stream;
 pub mod window;
 
 /// Which of the three SLI shapes an SLO measures (S-5).
