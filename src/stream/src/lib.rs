@@ -1112,11 +1112,9 @@ pub async fn get_stream_retention(
     stream_type: StreamType,
     stream: &str,
 ) -> Option<i64> {
-    if let Some(s) = infra::schema::get_settings(org_id, stream, stream_type).await {
-        Some(s.data_retention)
-    } else {
-        None
-    }
+    infra::schema::get_settings(org_id, stream, stream_type)
+        .await
+        .map(|s| s.data_retention)
 }
 
 #[cfg(test)]

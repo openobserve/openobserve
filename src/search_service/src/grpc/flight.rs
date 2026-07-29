@@ -700,7 +700,7 @@ async fn get_file_list_by_ids(
             stream_name,
             time_range,
             &file,
-            &partition_keys,
+            partition_keys,
             equal_items,
         )
         .await
