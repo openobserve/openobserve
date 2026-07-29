@@ -22,7 +22,11 @@ import {
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 
-const props = defineProps<{ assertion?: StepAssertion }>();
+const props = defineProps<{
+  assertion?: StepAssertion;
+  /** Validation from the host view; absent in contexts that do not validate. */
+  expectedErrorMessage?: string;
+}>();
 const emit = defineEmits<{ "update:assertion": [value: StepAssertion] }>();
 
 const { t } = useI18n();
@@ -92,6 +96,8 @@ const expectedPlaceholder = computed(() =>
       v-model="expectedComputed"
       :label="t('synthetics.journey.assertionExpectedLabel')"
       :placeholder="expectedPlaceholder"
+      :error="!!expectedErrorMessage"
+      :error-message="expectedErrorMessage ?? ''"
       data-test="synthetics-journey-step-assertion-expected-input"
     />
   </div>

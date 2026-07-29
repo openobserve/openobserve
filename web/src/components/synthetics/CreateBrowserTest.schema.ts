@@ -9,6 +9,8 @@
 
 import { z } from "zod";
 import { stepIsMissingTarget } from "@/utils/synthetics/stepTarget";
+import { assertionNeedsExpected } from "@/constants/synthetics";
+import type { AssertionKind } from "@/types/synthetics";
 
 /** The version-2 locator bundle, as it sits on an editor step. */
 const locatorCandidateSchema = z.object({ kind: z.string(), value: z.string() });
@@ -81,7 +83,12 @@ export const makeBrowserCheckSaveSchema = (t: (_key: string) => string) =>
             // declare — leaving it out made every v2 step look target-less to
             // the refinement below.
             locator: locatorSchema.optional(),
-            assertion: z.object({ kind: z.string().optional() }).loose().optional(),
+            // `expected` is declared, not just tolerated by `.loose()`, so the
+            // refinement below can read it in a typed way.
+            assertion: z
+              .object({ kind: z.string().optional(), expected: z.string().optional() })
+              .loose()
+              .optional(),
           }),
         )
         .optional()
@@ -105,6 +112,43 @@ export const makeBrowserCheckSaveSchema = (t: (_key: string) => string) =>
             code: z.ZodIssueCode.custom,
             path: ["journey", i, "selector"],
             message: t("synthetics.validation.selectorRequired"),
+          });
+        }
+      }
+
+      // Field-level step rules. These live here rather than in
+      // validateJourneySteps so there is one enforcement path, and so every
+      // failure carries a field path the editor can bind an inline error to.
+      for (let i = 0; i < val.journey.length; i++) {
+        const step = val.journey[i];
+
+        if (step.action === "navigate" && !/^https?:\/\/\S+$/i.test(step.value ?? "")) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["journey", i, "value"],
+            message: t("synthetics.validation.urlInvalid"),
+          });
+        }
+
+        // A `type` step with no text types nothing and the run still passes.
+        if (step.action === "type" && !(step.value ?? "").trim()) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["journey", i, "value"],
+            message: t("synthetics.validation.typeTextRequired"),
+          });
+        }
+
+        if (
+          step.action === "assert" &&
+          step.assertion?.kind &&
+          assertionNeedsExpected(step.assertion.kind as AssertionKind) &&
+          !(step.assertion.expected ?? "").trim()
+        ) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["journey", i, "assertion", "expected"],
+            message: t("synthetics.validation.expectedRequired"),
           });
         }
       }

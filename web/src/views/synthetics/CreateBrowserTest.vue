@@ -439,10 +439,15 @@ async function persist(): Promise<boolean> {
     if (errors["name"] || errors["url"] || errors["locations"]) {
       currentStep.value = 2;
     } else if (Object.keys(errors).some((k) => k.startsWith("journey."))) {
-      // Step selector errors — switch to Journey tab and auto-expand
+      // Step errors — switch to Journey tab and auto-expand
       currentStep.value = 1;
       journeyRef.value?.validateStepSelectors?.();
     }
+    // Hand every step-scoped issue to the journey so it renders against the
+    // field it names, rather than only as the toast below. Done unconditionally:
+    // a journey issue can coexist with a Details-tab one, and the author should
+    // find both waiting when they switch tabs.
+    journeyRef.value?.setStepFieldErrors?.(result.error.issues);
     toast({
       variant: "error",
       message: t("synthetics.validation.fixHighlightedFields"),

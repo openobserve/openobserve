@@ -203,6 +203,43 @@ watch([selectedCount, isRecording], ([count, recording]) => {
 const selectorErrors = ref<Set<string>>(new Set());
 const firstStepError = ref(false);
 
+/**
+ * Field errors for the expanded editor, keyed by step id then field name.
+ *
+ * Populated from the zod issue paths so one enforcement path produces both the
+ * save block and the inline messages. Keying by step **id** rather than index
+ * means a reorder or a delete cannot leave an error pointing at the wrong row.
+ */
+const stepFieldErrors = ref<Map<string, Record<string, string>>>(new Map());
+
+/** Record zod issues whose path points at a journey step field. */
+function setStepFieldErrors(issues: { path: PropertyKey[]; message: string }[]) {
+  const next = new Map<string, Record<string, string>>();
+  for (const issue of issues) {
+    if (issue.path[0] !== "journey" || typeof issue.path[1] !== "number") continue;
+    const step = props.modelValue[issue.path[1]];
+    if (!step) continue;
+    // `journey.3.assertion.expected` → "assertion.expected"; a bare
+    // `journey.3` (a whole-step issue) is attributed to the action field.
+    const field = issue.path.slice(2).join(".") || "action";
+    next.set(step.id, { ...(next.get(step.id) ?? {}), [field]: issue.message });
+  }
+  stepFieldErrors.value = next;
+}
+
+function fieldError(stepId: string, field: string): string {
+  return stepFieldErrors.value.get(stepId)?.[field] ?? "";
+}
+
+function clearFieldError(stepId: string, field: string) {
+  const current = stepFieldErrors.value.get(stepId);
+  if (!current?.[field]) return;
+  const { [field]: _dropped, ...rest } = current;
+  const next = new Map(stepFieldErrors.value);
+  next.set(stepId, rest);
+  stepFieldErrors.value = next;
+}
+
 function validateJourneySteps(): boolean {
   // 1. First step must be "navigate"
   const first = props.modelValue[0];
@@ -263,6 +300,10 @@ defineExpose({
   stopActiveRecording,
   stopActiveReplay,
   validateStepSelectors: validateJourneySteps,
+  // The parent view owns the zod parse, so it pushes the resulting issues back
+  // down here to be rendered against the fields they name. `fieldError` stays
+  // internal — the template is its only caller.
+  setStepFieldErrors,
 });
 
 function startRecording() {
@@ -910,12 +951,13 @@ function openChromeExtensions() {
           class="px-8 pt-3 pb-3"
           :step="row"
           :action-error-message="
-            firstStepError && props.modelValue[0]?.id === row.id
+            (firstStepError && props.modelValue[0]?.id === row.id
               ? t('synthetics.validation.firstStepMustNavigate')
-              : ''
+              : '') || fieldError(row.id, 'action')
           "
+          :name-error-message="fieldError(row.id, 'name')"
           :selector-error-message="
-            selectorErrors.has(row.id)
+            (selectorErrors.has(row.id)
               ? t('synthetics.validation.selectorRequired', {
                   step:
                     row.name ||
@@ -923,11 +965,19 @@ function openChromeExtensions() {
                       step: props.modelValue.indexOf(row) + 1,
                     }),
                 })
-              : ''
+              : '') || fieldError(row.id, 'selector')
           "
+          :value-error-message="fieldError(row.id, 'value')"
+          :expected-error-message="fieldError(row.id, 'assertion.expected')"
           @update:step="(next: BrowserStep) => handleStepReplace(row, next)"
-          @action-edited="clearFirstStepError"
-          @selector-edited="clearSelectorError(row.id)"
+          @action-edited="
+            clearFirstStepError();
+            clearFieldError(row.id, 'action');
+          "
+          @selector-edited="
+            clearSelectorError(row.id);
+            clearFieldError(row.id, 'selector');
+          "
         />
       </template>
     </JourneySteps>

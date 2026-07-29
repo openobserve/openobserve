@@ -10360,6 +10360,8 @@
       "nameRequired": "Name is required",
       "selectorRequired": "Selector is required for \"{step}\"",
       "stepNameRequired": "Give this step a name — it is what run results show",
+      "typeTextRequired": "Enter the text this step should type",
+      "expectedRequired": "Enter the value this assertion should expect",
       "urlInvalid": "Enter a valid URL starting with http:// or https://",
       "urlRequired": "Starting URL is required",
       "fixHighlightedFields": "Fix the highlighted fields before saving"

@@ -48,6 +48,8 @@ const props = defineProps<{
   actionErrorMessage?: string;
   nameErrorMessage?: string;
   selectorErrorMessage?: string;
+  valueErrorMessage?: string;
+  expectedErrorMessage?: string;
 }>();
 
 const emit = defineEmits<{
@@ -294,6 +296,8 @@ const settleBudgetOutOfRange = computed(() => {
       :label="valueLabel"
       :placeholder="valueLabel"
       :class="valueWidthClass"
+      :error="!!valueErrorMessage"
+      :error-message="valueErrorMessage ?? ''"
       data-test="synthetics-journey-step-value-input"
     >
       <template v-if="valueTooltip" #tooltip>
@@ -305,6 +309,7 @@ const settleBudgetOutOfRange = computed(() => {
     <BrowserJourneyAssertion
       v-if="step.action === 'assert'"
       :assertion="step.assertion"
+      :expected-error-message="expectedErrorMessage"
       @update:assertion="updateAssertion"
     />
 

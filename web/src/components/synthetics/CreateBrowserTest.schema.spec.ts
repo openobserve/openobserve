@@ -182,3 +182,71 @@ describe("makeBrowserCheckSaveSchema step name", () => {
     expect(result.success).toBe(true);
   });
 });
+
+// Field-level step rules live in the schema, not in validateJourneySteps, so
+// there is one enforcement path and every failure carries a field path the editor
+// can bind an inline error to. Before this, validation was save-time and
+// toast-only and covered two rules (SE-3).
+describe("makeBrowserCheckSaveSchema field-level step rules", () => {
+  const schema = makeBrowserCheckSaveSchema(t);
+  const pin = { candidates: [], user_override: { kind: "css", value: "#go" } };
+  const opened = { id: "1", action: "navigate", value: "https://app.test" };
+
+  it("should reject a navigate step whose URL is not http(s)", () => {
+    const result = schema.safeParse(form([{ id: "1", action: "navigate", value: "app.test" }]));
+
+    expect(result.success).toBe(false);
+    expect(issuePaths(result)).toContain("journey.0.value");
+  });
+
+  it("should reject a navigate step with no URL at all", () => {
+    const result = schema.safeParse(form([{ id: "1", action: "navigate" }]));
+
+    expect(result.success).toBe(false);
+    expect(issuePaths(result)).toContain("journey.0.value");
+  });
+
+  it("should accept a navigate step with a valid URL", () => {
+    const result = schema.safeParse(form([opened]));
+
+    expect(result.success).toBe(true);
+  });
+
+  // A `type` step with no text types nothing and the run still passes.
+  it("should reject a type step with no text", () => {
+    const result = schema.safeParse(
+      form([opened, { id: "2", action: "type", value: "", locator: pin }]),
+    );
+
+    expect(result.success).toBe(false);
+    expect(issuePaths(result)).toContain("journey.1.value");
+  });
+
+  it("should accept a type step that has text", () => {
+    const result = schema.safeParse(
+      form([opened, { id: "2", action: "type", value: "hunter2", locator: pin }]),
+    );
+
+    expect(result.success).toBe(true);
+  });
+
+  it("should reject an assertion kind that needs an expected value but has none", () => {
+    const result = schema.safeParse(
+      form([
+        opened,
+        { id: "2", action: "assert", locator: pin, assertion: { kind: "element_text", expected: "" } },
+      ]),
+    );
+
+    expect(result.success).toBe(false);
+    expect(issuePaths(result)).toContain("journey.1.assertion.expected");
+  });
+
+  it("should accept a visibility assertion, which needs no expected value", () => {
+    const result = schema.safeParse(
+      form([opened, { id: "2", action: "assert", locator: pin, assertion: { kind: "element_visible" } }]),
+    );
+
+    expect(result.success).toBe(true);
+  });
+});

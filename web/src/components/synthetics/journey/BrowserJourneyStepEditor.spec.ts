@@ -84,3 +84,57 @@ describe("BrowserJourneyStepEditor retired actions", () => {
     expect(wrapper.find(test("synthetics-journey-step-retired-action")).exists()).toBe(false);
   });
 });
+
+// The host parses with zod and pushes the resulting issues back down as per-field
+// messages. Before this, validation was save-time and toast-only, so a failure
+// named no field (SE-3).
+describe("BrowserJourneyStepEditor inline field errors", () => {
+  function renderWithErrors(step: Partial<BrowserStep>, errors: Record<string, string>) {
+    const full: BrowserStep = {
+      id: "s1",
+      action: "click",
+      name: "Sign in",
+      code: "",
+      locator: { candidates: [], user_override: null },
+      ...step,
+    };
+    return mount(BrowserJourneyStepEditor, {
+      props: { step: full, ...errors },
+      global: { plugins: [i18n] },
+    });
+  }
+
+  it("renders a name error on the name field", () => {
+    const wrapper = renderWithErrors({}, { nameErrorMessage: "Give this step a name" });
+    expect(wrapper.find(test("synthetics-journey-step-name-input")).text()).toContain(
+      "Give this step a name",
+    );
+  });
+
+  it("renders a value error on the value field", () => {
+    const wrapper = renderWithErrors(
+      { action: "type", value: "" },
+      { valueErrorMessage: "Enter the text this step should type" },
+    );
+    expect(wrapper.find(test("synthetics-journey-step-value-input")).text()).toContain(
+      "Enter the text this step should type",
+    );
+  });
+
+  it("renders an expected error on the assertion's expected field", () => {
+    const wrapper = renderWithErrors(
+      { action: "assert", assertion: { kind: "element_text", expected: "" } },
+      { expectedErrorMessage: "Enter the value this assertion should expect" },
+    );
+    expect(
+      wrapper.find(test("synthetics-journey-step-assertion-expected-input")).text(),
+    ).toContain("Enter the value this assertion should expect");
+  });
+
+  it("renders no error text when the host passes none", () => {
+    const wrapper = renderWithErrors({}, {});
+    expect(wrapper.find(test("synthetics-journey-step-name-input")).text()).not.toContain(
+      "Give this step a name",
+    );
+  });
+});
