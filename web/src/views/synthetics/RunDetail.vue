@@ -429,6 +429,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           </div>
                         </div>
                       </div>
+                      <!-- P5.4 items 3-5: what the runner saw. Written by the
+                           probe on every failed run and rendered by nothing
+                           until now, which is why every failure looked alike. -->
+                      <StepEvidence
+                        v-if="row.evidence"
+                        :detail="row.evidence"
+                        class="mt-3"
+                      />
                     </div>
                   </div>
                 </template>
@@ -500,6 +508,7 @@ import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import StepEvidence from "@/components/synthetics/StepEvidence.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import BetaBadge from "@/components/common/BetaBadge.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
@@ -512,6 +521,7 @@ import type { StepDotState } from "@/components/synthetics/journey/JourneySteps.
 import useSyntheticResults from "@/composables/useSyntheticResults";
 import ProtocolRunSummary from "@/components/synthetics/results/ProtocolRunSummary.vue";
 import type {
+  FailureDetail,
   SyntheticRunDetail,
   RecordedStep,
 } from "@/composables/synthetics/syntheticResultsSchema";
@@ -645,6 +655,8 @@ interface StepRow {
   durColor: string;
   error: string | null;
   screenshotKey: string | null;
+  /** P5.4 items 3-5, present only on the step that actually failed. */
+  evidence: FailureDetail | null;
 }
 
 function fmtDur(ms: number): string {
@@ -676,6 +688,12 @@ function buildSteps(detail: SyntheticRunDetail | null): StepRow[] {
       durColor: isFail ? "var(--color-status-error-text)" : "var(--color-text-secondary)",
       error: ex.error,
       screenshotKey: ex.screenshot_key,
+      // Scoped to the failing step: the report describes one failure, and
+      // hanging it off every row would imply each step had its own.
+      evidence:
+        detail.failureDetail && detail.failureDetail.stepId === ex.step_id
+          ? detail.failureDetail
+          : null,
     };
   });
 }

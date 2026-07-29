@@ -10078,7 +10078,15 @@
       "title": "Run Detail",
       "viewFullError": "View full error & stack trace",
       "viewFullErrorBtn": "View full error",
-      "detailUrl": "URL"
+      "detailUrl": "URL",
+      "locatorResolution": "Locator resolution",
+      "locatorNoneMatched": "No candidate matched — the element was not on the page.",
+      "locatorHealed": "The primary locator did not match; a fallback did. The markup has changed under this step.",
+      "settleSignals": "What the page did",
+      "settleStaleNote": "A recorded signal never arrived. The page did not do what it did when this was recorded, which is often the real cause of a later step timing out.",
+      "settleTiming": "Settle timing",
+      "settleTimingValue": "Settled in {now} — {recorded} when recorded.",
+      "settleSlower": "({times}x slower than recorded)"
     },
     "runRowExpansion": {
       "browserHeader": "Browser",
