@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<bom xmlns="http://cyclonedx.org/schema/bom/1.3" serialNumber="urn:uuid:dd3e1b35-843c-47b8-bc19-d56543107f23" version="1">
+<bom xmlns="http://cyclonedx.org/schema/bom/1.3" serialNumber="urn:uuid:95cd0509-73ff-4af7-8f43-b2fd440a397a" version="1">
   <metadata>
-    <timestamp>2026-07-29T08:37:07.863747000Z</timestamp>
+    <timestamp>2026-07-29T08:37:07.144915000Z</timestamp>
     <tools>
       <tool>
         <vendor>CycloneDX</vendor>
@@ -9,33 +9,19 @@
         <version>0.5.9</version>
       </tool>
     </tools>
-    <component type="application" bom-ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d#openobserve@0.93.0">
-      <name>openobserve</name>
-      <version>0.93.0</version>
-      <description>OpenObserve is an observability platform that allows you to capture, search, and analyze your logs, metrics, and traces.</description>
+    <component type="library" bom-ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/api/http#openobserve-api-http@0.1.0">
+      <name>openobserve-api-http</name>
+      <version>0.1.0</version>
       <scope>required</scope>
       <licenses>
         <expression>AGPL-3.0</expression>
       </licenses>
-      <purl>pkg:cargo/openobserve@0.93.0?download_url=file://.</purl>
-      <externalReferences>
-        <reference type="website">
-          <url>https://openobserve.ai/</url>
-        </reference>
-        <reference type="vcs">
-          <url>https://github.com/openobserve/openobserve/</url>
-        </reference>
-      </externalReferences>
+      <purl>pkg:cargo/openobserve-api-http@0.1.0?download_url=file://.</purl>
       <components>
-        <component type="library" bom-ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d#openobserve@0.93.0 bin-target-0">
-          <name>openobserve</name>
-          <version>0.93.0</version>
-          <purl>pkg:cargo/openobserve@0.93.0?download_url=file://.#src/lib.rs</purl>
-        </component>
-        <component type="application" bom-ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d#openobserve@0.93.0 bin-target-1">
-          <name>openobserve</name>
-          <version>0.93.0</version>
-          <purl>pkg:cargo/openobserve@0.93.0?download_url=file://.#src/main.rs</purl>
+        <component type="library" bom-ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/api/http#openobserve-api-http@0.1.0 bin-target-0">
+          <name>openobserve_api_http</name>
+          <version>0.1.0</version>
+          <purl>pkg:cargo/openobserve-api-http@0.1.0?download_url=file://.#src/lib.rs</purl>
         </component>
       </components>
     </component>
@@ -1654,25 +1640,7 @@
       <licenses>
         <expression>AGPL-3.0</expression>
       </licenses>
-      <purl>pkg:cargo/openobserve-api-common@0.1.0?download_url=file://src/api/common</purl>
-    </component>
-    <component type="library" bom-ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/api/grpc#openobserve-api-grpc@0.1.0">
-      <name>openobserve-api-grpc</name>
-      <version>0.1.0</version>
-      <scope>required</scope>
-      <licenses>
-        <expression>AGPL-3.0</expression>
-      </licenses>
-      <purl>pkg:cargo/openobserve-api-grpc@0.1.0?download_url=file://src/api/grpc</purl>
-    </component>
-    <component type="library" bom-ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/api/http#openobserve-api-http@0.1.0">
-      <name>openobserve-api-http</name>
-      <version>0.1.0</version>
-      <scope>required</scope>
-      <licenses>
-        <expression>AGPL-3.0</expression>
-      </licenses>
-      <purl>pkg:cargo/openobserve-api-http@0.1.0?download_url=file://src/api/http</purl>
+      <purl>pkg:cargo/openobserve-api-common@0.1.0?download_url=file://../common</purl>
     </component>
     <component type="library" bom-ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/api/ingest#openobserve-api-ingest@0.1.0">
       <name>openobserve-api-ingest</name>
@@ -1681,7 +1649,7 @@
       <licenses>
         <expression>AGPL-3.0</expression>
       </licenses>
-      <purl>pkg:cargo/openobserve-api-ingest@0.1.0?download_url=file://src/api/ingest</purl>
+      <purl>pkg:cargo/openobserve-api-ingest@0.1.0?download_url=file://../ingest</purl>
     </component>
     <component type="library" bom-ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/api/management#openobserve-api-management@0.1.0">
       <name>openobserve-api-management</name>
@@ -1690,7 +1658,7 @@
       <licenses>
         <expression>AGPL-3.0</expression>
       </licenses>
-      <purl>pkg:cargo/openobserve-api-management@0.1.0?download_url=file://src/api/management</purl>
+      <purl>pkg:cargo/openobserve-api-management@0.1.0?download_url=file://../management</purl>
     </component>
     <component type="library" bom-ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/api/pipelines#openobserve-api-pipelines@0.1.0">
       <name>openobserve-api-pipelines</name>
@@ -1699,7 +1667,7 @@
       <licenses>
         <expression>AGPL-3.0</expression>
       </licenses>
-      <purl>pkg:cargo/openobserve-api-pipelines@0.1.0?download_url=file://src/api/pipelines</purl>
+      <purl>pkg:cargo/openobserve-api-pipelines@0.1.0?download_url=file://../pipelines</purl>
     </component>
     <component type="library" bom-ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/api/search#openobserve-api-search@0.1.0">
       <name>openobserve-api-search</name>
@@ -1708,7 +1676,7 @@
       <licenses>
         <expression>AGPL-3.0</expression>
       </licenses>
-      <purl>pkg:cargo/openobserve-api-search@0.1.0?download_url=file://src/api/search</purl>
+      <purl>pkg:cargo/openobserve-api-search@0.1.0?download_url=file://../search</purl>
     </component>
     <component type="library" bom-ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/audit#0.1.0">
       <name>audit</name>
@@ -1717,7 +1685,7 @@
       <licenses>
         <expression>AGPL-3.0</expression>
       </licenses>
-      <purl>pkg:cargo/audit@0.1.0?download_url=file://src/audit</purl>
+      <purl>pkg:cargo/audit@0.1.0?download_url=file://../../audit</purl>
     </component>
     <component type="library" bom-ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/builtins#openobserve-builtins@0.1.0">
       <name>openobserve-builtins</name>
@@ -1726,7 +1694,7 @@
       <licenses>
         <expression>AGPL-3.0</expression>
       </licenses>
-      <purl>pkg:cargo/openobserve-builtins@0.1.0?download_url=file://src/builtins</purl>
+      <purl>pkg:cargo/openobserve-builtins@0.1.0?download_url=file://../../builtins</purl>
     </component>
     <component type="library" bom-ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/common#0.1.0">
       <name>common</name>
@@ -1735,7 +1703,7 @@
       <licenses>
         <expression>AGPL-3.0</expression>
       </licenses>
-      <purl>pkg:cargo/common@0.1.0?download_url=file://src/common</purl>
+      <purl>pkg:cargo/common@0.1.0?download_url=file://../../common</purl>
     </component>
     <component type="library" bom-ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/compaction#0.1.0">
       <name>compaction</name>
@@ -1744,7 +1712,7 @@
       <licenses>
         <expression>AGPL-3.0</expression>
       </licenses>
-      <purl>pkg:cargo/compaction@0.1.0?download_url=file://src/compaction</purl>
+      <purl>pkg:cargo/compaction@0.1.0?download_url=file://../../compaction</purl>
     </component>
     <component type="library" bom-ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/config#0.1.0">
       <name>config</name>
@@ -1753,7 +1721,7 @@
       <licenses>
         <expression>AGPL-3.0</expression>
       </licenses>
-      <purl>pkg:cargo/config@0.1.0?download_url=file://src/config</purl>
+      <purl>pkg:cargo/config@0.1.0?download_url=file://../../config</purl>
     </component>
     <component type="library" bom-ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/core#openobserve-core@0.1.0">
       <name>openobserve-core</name>
@@ -1762,7 +1730,7 @@
       <licenses>
         <expression>AGPL-3.0</expression>
       </licenses>
-      <purl>pkg:cargo/openobserve-core@0.1.0?download_url=file://src/core</purl>
+      <purl>pkg:cargo/openobserve-core@0.1.0?download_url=file://../../core</purl>
     </component>
     <component type="library" bom-ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/db#0.1.0">
       <name>db</name>
@@ -1771,7 +1739,7 @@
       <licenses>
         <expression>AGPL-3.0</expression>
       </licenses>
-      <purl>pkg:cargo/db@0.1.0?download_url=file://src/db</purl>
+      <purl>pkg:cargo/db@0.1.0?download_url=file://../../db</purl>
     </component>
     <component type="library" bom-ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/enrichment_data#enrichment-data@0.1.0">
       <name>enrichment-data</name>
@@ -1780,7 +1748,7 @@
       <licenses>
         <expression>AGPL-3.0</expression>
       </licenses>
-      <purl>pkg:cargo/enrichment-data@0.1.0?download_url=file://src/enrichment_data</purl>
+      <purl>pkg:cargo/enrichment-data@0.1.0?download_url=file://../../enrichment_data</purl>
     </component>
     <component type="library" bom-ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/flight#0.1.0">
       <name>flight</name>
@@ -1789,7 +1757,7 @@
       <licenses>
         <expression>AGPL-3.0</expression>
       </licenses>
-      <purl>pkg:cargo/flight@0.1.0?download_url=file://src/flight</purl>
+      <purl>pkg:cargo/flight@0.1.0?download_url=file://../../flight</purl>
     </component>
     <component type="library" bom-ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/infra#0.1.0">
       <name>infra</name>
@@ -1798,7 +1766,7 @@
       <licenses>
         <expression>AGPL-3.0</expression>
       </licenses>
-      <purl>pkg:cargo/infra@0.1.0?download_url=file://src/infra</purl>
+      <purl>pkg:cargo/infra@0.1.0?download_url=file://../../infra</purl>
     </component>
     <component type="library" bom-ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/ingester#0.1.0">
       <name>ingester</name>
@@ -1807,7 +1775,7 @@
       <licenses>
         <expression>AGPL-3.0</expression>
       </licenses>
-      <purl>pkg:cargo/ingester@0.1.0?download_url=file://src/ingester</purl>
+      <purl>pkg:cargo/ingester@0.1.0?download_url=file://../../ingester</purl>
     </component>
     <component type="library" bom-ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/ingestion_common#ingestion-common@0.1.0">
       <name>ingestion-common</name>
@@ -1816,16 +1784,7 @@
       <licenses>
         <expression>AGPL-3.0</expression>
       </licenses>
-      <purl>pkg:cargo/ingestion-common@0.1.0?download_url=file://src/ingestion_common</purl>
-    </component>
-    <component type="library" bom-ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/jobs#openobserve-jobs@0.1.0">
-      <name>openobserve-jobs</name>
-      <version>0.1.0</version>
-      <scope>required</scope>
-      <licenses>
-        <expression>AGPL-3.0</expression>
-      </licenses>
-      <purl>pkg:cargo/openobserve-jobs@0.1.0?download_url=file://src/jobs</purl>
+      <purl>pkg:cargo/ingestion-common@0.1.0?download_url=file://../../ingestion_common</purl>
     </component>
     <component type="library" bom-ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/mcp#openobserve-mcp@0.1.0">
       <name>openobserve-mcp</name>
@@ -1834,7 +1793,7 @@
       <licenses>
         <expression>AGPL-3.0</expression>
       </licenses>
-      <purl>pkg:cargo/openobserve-mcp@0.1.0?download_url=file://src/mcp</purl>
+      <purl>pkg:cargo/openobserve-mcp@0.1.0?download_url=file://../../mcp</purl>
     </component>
     <component type="library" bom-ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/node#openobserve-node@0.1.0">
       <name>openobserve-node</name>
@@ -1843,7 +1802,7 @@
       <licenses>
         <expression>AGPL-3.0</expression>
       </licenses>
-      <purl>pkg:cargo/openobserve-node@0.1.0?download_url=file://src/node</purl>
+      <purl>pkg:cargo/openobserve-node@0.1.0?download_url=file://../../node</purl>
     </component>
     <component type="library" bom-ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/org_storage#openobserve-org-storage@0.1.0">
       <name>openobserve-org-storage</name>
@@ -1852,7 +1811,7 @@
       <licenses>
         <expression>AGPL-3.0</expression>
       </licenses>
-      <purl>pkg:cargo/openobserve-org-storage@0.1.0?download_url=file://src/org_storage</purl>
+      <purl>pkg:cargo/openobserve-org-storage@0.1.0?download_url=file://../../org_storage</purl>
     </component>
     <component type="library" bom-ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/promql#0.1.0">
       <name>promql</name>
@@ -1861,7 +1820,7 @@
       <licenses>
         <expression>AGPL-3.0</expression>
       </licenses>
-      <purl>pkg:cargo/promql@0.1.0?download_url=file://src/promql</purl>
+      <purl>pkg:cargo/promql@0.1.0?download_url=file://../../promql</purl>
     </component>
     <component type="library" bom-ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/promql_service#promql-service@0.1.0">
       <name>promql-service</name>
@@ -1870,7 +1829,7 @@
       <licenses>
         <expression>AGPL-3.0</expression>
       </licenses>
-      <purl>pkg:cargo/promql-service@0.1.0?download_url=file://src/promql_service</purl>
+      <purl>pkg:cargo/promql-service@0.1.0?download_url=file://../../promql_service</purl>
     </component>
     <component type="library" bom-ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/proto#0.1.0">
       <name>proto</name>
@@ -1879,16 +1838,7 @@
       <licenses>
         <expression>AGPL-3.0</expression>
       </licenses>
-      <purl>pkg:cargo/proto@0.1.0?download_url=file://src/proto</purl>
-    </component>
-    <component type="library" bom-ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/report_server#0.1.0">
-      <name>report_server</name>
-      <version>0.1.0</version>
-      <scope>required</scope>
-      <licenses>
-        <expression>AGPL-3.0</expression>
-      </licenses>
-      <purl>pkg:cargo/report_server@0.1.0?download_url=file://src/report_server</purl>
+      <purl>pkg:cargo/proto@0.1.0?download_url=file://../../proto</purl>
     </component>
     <component type="library" bom-ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/schema#0.1.0">
       <name>schema</name>
@@ -1897,7 +1847,7 @@
       <licenses>
         <expression>AGPL-3.0</expression>
       </licenses>
-      <purl>pkg:cargo/schema@0.1.0?download_url=file://src/schema</purl>
+      <purl>pkg:cargo/schema@0.1.0?download_url=file://../../schema</purl>
     </component>
     <component type="library" bom-ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/search#0.1.0">
       <name>search</name>
@@ -1906,7 +1856,7 @@
       <licenses>
         <expression>AGPL-3.0</expression>
       </licenses>
-      <purl>pkg:cargo/search@0.1.0?download_url=file://src/search</purl>
+      <purl>pkg:cargo/search@0.1.0?download_url=file://../../search</purl>
     </component>
     <component type="library" bom-ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/search_service#0.1.0">
       <name>search_service</name>
@@ -1915,7 +1865,7 @@
       <licenses>
         <expression>AGPL-3.0</expression>
       </licenses>
-      <purl>pkg:cargo/search_service@0.1.0?download_url=file://src/search_service</purl>
+      <purl>pkg:cargo/search_service@0.1.0?download_url=file://../../search_service</purl>
     </component>
     <component type="library" bom-ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/sourcemaps#openobserve-sourcemaps@0.1.0">
       <name>openobserve-sourcemaps</name>
@@ -1924,7 +1874,7 @@
       <licenses>
         <expression>AGPL-3.0</expression>
       </licenses>
-      <purl>pkg:cargo/openobserve-sourcemaps@0.1.0?download_url=file://src/sourcemaps</purl>
+      <purl>pkg:cargo/openobserve-sourcemaps@0.1.0?download_url=file://../../sourcemaps</purl>
     </component>
     <component type="library" bom-ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/stream#0.1.0">
       <name>stream</name>
@@ -1933,16 +1883,7 @@
       <licenses>
         <expression>AGPL-3.0</expression>
       </licenses>
-      <purl>pkg:cargo/stream@0.1.0?download_url=file://src/stream</purl>
-    </component>
-    <component type="library" bom-ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/super_cluster_queue#0.1.0">
-      <name>super_cluster_queue</name>
-      <version>0.1.0</version>
-      <scope>required</scope>
-      <licenses>
-        <expression>AGPL-3.0</expression>
-      </licenses>
-      <purl>pkg:cargo/super_cluster_queue@0.1.0?download_url=file://src/super_cluster_queue</purl>
+      <purl>pkg:cargo/stream@0.1.0?download_url=file://../../stream</purl>
     </component>
     <component type="library" bom-ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/tantivy_utils#0.1.0">
       <name>tantivy_utils</name>
@@ -1951,7 +1892,7 @@
       <licenses>
         <expression>AGPL-3.0</expression>
       </licenses>
-      <purl>pkg:cargo/tantivy_utils@0.1.0?download_url=file://src/tantivy_utils</purl>
+      <purl>pkg:cargo/tantivy_utils@0.1.0?download_url=file://../../tantivy_utils</purl>
     </component>
     <component type="library" bom-ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/tls#openobserve-tls@0.1.0">
       <name>openobserve-tls</name>
@@ -1960,7 +1901,7 @@
       <licenses>
         <expression>AGPL-3.0</expression>
       </licenses>
-      <purl>pkg:cargo/openobserve-tls@0.1.0?download_url=file://src/tls</purl>
+      <purl>pkg:cargo/openobserve-tls@0.1.0?download_url=file://../../tls</purl>
     </component>
     <component type="library" bom-ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/transform#0.1.0">
       <name>transform</name>
@@ -1969,7 +1910,7 @@
       <licenses>
         <expression>AGPL-3.0</expression>
       </licenses>
-      <purl>pkg:cargo/transform@0.1.0?download_url=file://src/transform</purl>
+      <purl>pkg:cargo/transform@0.1.0?download_url=file://../../transform</purl>
     </component>
     <component type="library" bom-ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/usage_reporting#0.1.0">
       <name>usage_reporting</name>
@@ -1978,7 +1919,7 @@
       <licenses>
         <expression>AGPL-3.0</expression>
       </licenses>
-      <purl>pkg:cargo/usage_reporting@0.1.0?download_url=file://src/usage_reporting</purl>
+      <purl>pkg:cargo/usage_reporting@0.1.0?download_url=file://../../usage_reporting</purl>
     </component>
     <component type="library" bom-ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/wal#0.1.0">
       <name>wal</name>
@@ -1987,16 +1928,7 @@
       <licenses>
         <expression>AGPL-3.0</expression>
       </licenses>
-      <purl>pkg:cargo/wal@0.1.0?download_url=file://src/wal</purl>
-    </component>
-    <component type="library" bom-ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/web#0.1.0">
-      <name>web</name>
-      <version>0.1.0</version>
-      <scope>required</scope>
-      <licenses>
-        <expression>AGPL-3.0</expression>
-      </licenses>
-      <purl>pkg:cargo/web@0.1.0?download_url=file://src/web</purl>
+      <purl>pkg:cargo/wal@0.1.0?download_url=file://../../wal</purl>
     </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#actix-codec@0.5.2">
       <author>Nikolay Kim &lt;fafhrd91@gmail.com>, Rob Ede &lt;robjtede@icloud.com></author>
@@ -4247,28 +4179,6 @@
         </reference>
         <reference type="vcs">
           <url>https://github.com/RustCrypto/formats</url>
-        </reference>
-      </externalReferences>
-    </component>
-    <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#base85rs@0.1.3">
-      <author>YetiBarBar</author>
-      <name>base85rs</name>
-      <version>0.1.3</version>
-      <description>A base85 (RFC1924 variant) encoder / decoder</description>
-      <scope>required</scope>
-      <hashes>
-        <hash alg="SHA-256">87678d33a2af71f019ed11f52db246ca6c5557edee2cccbe689676d1ad9c6b5a</hash>
-      </hashes>
-      <licenses>
-        <expression>MIT OR Apache-2.0</expression>
-      </licenses>
-      <purl>pkg:cargo/base85rs@0.1.3</purl>
-      <externalReferences>
-        <reference type="documentation">
-          <url>https://docs.rs/base85rs/</url>
-        </reference>
-        <reference type="vcs">
-          <url>https://github.com/YetiBarBar/base85rs</url>
         </reference>
       </externalReferences>
     </component>
@@ -7266,44 +7176,6 @@
         </reference>
       </externalReferences>
     </component>
-    <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#dirs-sys@0.5.0">
-      <author>Simon Ochsenreither &lt;simon@ochsenreither.de></author>
-      <name>dirs-sys</name>
-      <version>0.5.0</version>
-      <description>System-level helper functions for the dirs and directories crates.</description>
-      <scope>required</scope>
-      <hashes>
-        <hash alg="SHA-256">e01a3366d27ee9890022452ee61b2b63a67e6f13f58900b651ff5665f0bb1fab</hash>
-      </hashes>
-      <licenses>
-        <expression>MIT OR Apache-2.0</expression>
-      </licenses>
-      <purl>pkg:cargo/dirs-sys@0.5.0</purl>
-      <externalReferences>
-        <reference type="vcs">
-          <url>https://github.com/dirs-dev/dirs-sys-rs</url>
-        </reference>
-      </externalReferences>
-    </component>
-    <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#dirs@6.0.0">
-      <author>Simon Ochsenreither &lt;simon@ochsenreither.de></author>
-      <name>dirs</name>
-      <version>6.0.0</version>
-      <description>A tiny low-level library that provides platform-specific standard locations of directories for config, cache and other data on Linux, Windows, macOS and Redox by leveraging the mechanisms defined by the XDG base/user directory specifications on Linux, the Known Folder API on Windows, and the Standard Directory guidelines on macOS.</description>
-      <scope>required</scope>
-      <hashes>
-        <hash alg="SHA-256">c3e8aa94d75141228480295a7d0e7feb620b1a5ad9f12bc40be62411e38cce4e</hash>
-      </hashes>
-      <licenses>
-        <expression>MIT OR Apache-2.0</expression>
-      </licenses>
-      <purl>pkg:cargo/dirs@6.0.0</purl>
-      <externalReferences>
-        <reference type="vcs">
-          <url>https://github.com/soc/dirs-rs</url>
-        </reference>
-      </externalReferences>
-    </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#displaydoc@0.2.5">
       <author>Jane Lusby &lt;jlusby@yaah.dev></author>
       <name>displaydoc</name>
@@ -8898,31 +8770,6 @@
         </reference>
       </externalReferences>
     </component>
-    <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#globset@0.4.18">
-      <author>Andrew Gallant &lt;jamslam@gmail.com></author>
-      <name>globset</name>
-      <version>0.4.18</version>
-      <description>Cross platform single glob and glob set matching. Glob set matching is the process of matching one or more glob patterns against a single candidate path simultaneously, and returning all of the globs that matched. </description>
-      <scope>required</scope>
-      <hashes>
-        <hash alg="SHA-256">52dfc19153a48bde0cbd630453615c8151bce3a5adfac7a0aebfbf0a1e1f57e3</hash>
-      </hashes>
-      <licenses>
-        <expression>Unlicense OR MIT</expression>
-      </licenses>
-      <purl>pkg:cargo/globset@0.4.18</purl>
-      <externalReferences>
-        <reference type="documentation">
-          <url>https://docs.rs/globset</url>
-        </reference>
-        <reference type="website">
-          <url>https://github.com/BurntSushi/ripgrep/tree/master/crates/globset</url>
-        </reference>
-        <reference type="vcs">
-          <url>https://github.com/BurntSushi/ripgrep/tree/master/crates/globset</url>
-        </reference>
-      </externalReferences>
-    </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#grok@2.4.0">
       <author>Matt Mastracci &lt;matthew@mastracci.com>, Michael Nitschinger &lt;michael@nitschinger.at></author>
       <name>grok</name>
@@ -9385,25 +9232,6 @@
       <externalReferences>
         <reference type="vcs">
           <url>https://github.com/veddan/rust-htmlescape</url>
-        </reference>
-      </externalReferences>
-    </component>
-    <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#http-auth-basic@0.3.7">
-      <author>Esteban Borai &lt;estebanborai@gmail.com></author>
-      <name>http-auth-basic</name>
-      <version>0.3.7</version>
-      <description>HTTP Basic Authentication Scheme (RFC 7617 and RFC 2617 compliant, base64-encoded credentials) for Rust applications</description>
-      <scope>required</scope>
-      <hashes>
-        <hash alg="SHA-256">8e92637d714ad90b81c91bce86e8c1f98fb32ca79bddf8d69e9d83fee3966946</hash>
-      </hashes>
-      <licenses>
-        <expression>MIT OR Apache-2.0</expression>
-      </licenses>
-      <purl>pkg:cargo/http-auth-basic@0.3.7</purl>
-      <externalReferences>
-        <reference type="vcs">
-          <url>https://github.com/EstebanBorai/http-auth-basic</url>
         </reference>
       </externalReferences>
     </component>
@@ -11891,28 +11719,6 @@
         </reference>
       </externalReferences>
     </component>
-    <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#new_mime_guess@4.0.4">
-      <author>Austin Bonander &lt;austin.bonander@gmail.com>, Lynnesbian &lt;lynne@bune.city></author>
-      <name>new_mime_guess</name>
-      <version>4.0.4</version>
-      <description>A simple crate for associating MIME types to file extensions.</description>
-      <scope>required</scope>
-      <hashes>
-        <hash alg="SHA-256">02a2dfb3559d53e90b709376af1c379462f7fb3085a0177deb73e6ea0d99eff4</hash>
-      </hashes>
-      <licenses>
-        <expression>MIT</expression>
-      </licenses>
-      <purl>pkg:cargo/new_mime_guess@4.0.4</purl>
-      <externalReferences>
-        <reference type="documentation">
-          <url>https://docs.rs/new_mime_guess/</url>
-        </reference>
-        <reference type="vcs">
-          <url>https://github.com/Lynnesbian/mime_guess</url>
-        </reference>
-      </externalReferences>
-    </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#nix@0.29.0">
       <author>The nix-rust Project Developers</author>
       <name>nix</name>
@@ -12712,48 +12518,6 @@
         </reference>
         <reference type="vcs">
           <url>https://github.com/RustCrypto/utils</url>
-        </reference>
-      </externalReferences>
-    </component>
-    <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#opentelemetry-http@0.32.0">
-      <name>opentelemetry-http</name>
-      <version>0.32.0</version>
-      <description>Helper implementations for sending HTTP requests. Uses include propagating and extracting context over http, exporting telemetry, requesting sampling strategies.</description>
-      <scope>required</scope>
-      <hashes>
-        <hash alg="SHA-256">5683015d09e2df236ef005b17f6f196f0d5f6313c4fa43a7b6a53b52776e4331</hash>
-      </hashes>
-      <licenses>
-        <expression>Apache-2.0</expression>
-      </licenses>
-      <purl>pkg:cargo/opentelemetry-http@0.32.0</purl>
-      <externalReferences>
-        <reference type="website">
-          <url>https://github.com/open-telemetry/opentelemetry-rust/tree/main/opentelemetry-http</url>
-        </reference>
-        <reference type="vcs">
-          <url>https://github.com/open-telemetry/opentelemetry-rust/tree/main/opentelemetry-http</url>
-        </reference>
-      </externalReferences>
-    </component>
-    <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#opentelemetry-otlp@0.32.0">
-      <name>opentelemetry-otlp</name>
-      <version>0.32.0</version>
-      <description>Exporter for the OpenTelemetry Collector</description>
-      <scope>required</scope>
-      <hashes>
-        <hash alg="SHA-256">9966929966d17620d7c316c643ba62631826e10021409357772d5eea84f62c35</hash>
-      </hashes>
-      <licenses>
-        <expression>Apache-2.0</expression>
-      </licenses>
-      <purl>pkg:cargo/opentelemetry-otlp@0.32.0</purl>
-      <externalReferences>
-        <reference type="website">
-          <url>https://github.com/open-telemetry/opentelemetry-rust/tree/main/opentelemetry-otlp</url>
-        </reference>
-        <reference type="vcs">
-          <url>https://github.com/open-telemetry/opentelemetry-rust/tree/main/opentelemetry-otlp</url>
         </reference>
       </externalReferences>
     </component>
@@ -15941,63 +15705,6 @@
         </reference>
       </externalReferences>
     </component>
-    <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#rust-embed-for-web-impl@11.4.1">
-      <name>rust-embed-for-web-impl</name>
-      <version>11.4.1</version>
-      <description>The proc-macro implementation of rust-embed-for-web.</description>
-      <scope>required</scope>
-      <hashes>
-        <hash alg="SHA-256">8527f04d3f734ff9ebab526fcc3e03d61d66386975b2cf898d6b2a221f7dee29</hash>
-      </hashes>
-      <licenses>
-        <expression>MIT</expression>
-      </licenses>
-      <purl>pkg:cargo/rust-embed-for-web-impl@11.4.1</purl>
-      <externalReferences>
-        <reference type="vcs">
-          <url>https://github.com/SeriousBug/rust-embed-for-web</url>
-        </reference>
-      </externalReferences>
-    </component>
-    <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#rust-embed-for-web-utils@11.4.1">
-      <name>rust-embed-for-web-utils</name>
-      <version>11.4.1</version>
-      <description>Utilities for rust-embed-for-web</description>
-      <scope>required</scope>
-      <hashes>
-        <hash alg="SHA-256">d05939009fc97b73cd5ccee07f5af565b2e3f676a60de30fe8c29419dd33b2c2</hash>
-      </hashes>
-      <licenses>
-        <expression>MIT</expression>
-      </licenses>
-      <purl>pkg:cargo/rust-embed-for-web-utils@11.4.1</purl>
-      <externalReferences>
-        <reference type="vcs">
-          <url>https://github.com/SeriousBug/rust-embed-for-web</url>
-        </reference>
-      </externalReferences>
-    </component>
-    <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#rust-embed-for-web@11.4.1">
-      <name>rust-embed-for-web</name>
-      <version>11.4.1</version>
-      <description>Rust Macro which embeds files into your executable. A fork of `rust-embed` with a focus on usage on web servers.</description>
-      <scope>required</scope>
-      <hashes>
-        <hash alg="SHA-256">cc9de9fc1c7cb74c76c770e9ae5454c050aead66420ad59cdad7544e1a5d85fc</hash>
-      </hashes>
-      <licenses>
-        <expression>MIT</expression>
-      </licenses>
-      <purl>pkg:cargo/rust-embed-for-web@11.4.1</purl>
-      <externalReferences>
-        <reference type="documentation">
-          <url>https://docs.rs/rust-embed-for-web</url>
-        </reference>
-        <reference type="vcs">
-          <url>https://github.com/SeriousBug/rust-embed-for-web</url>
-        </reference>
-      </externalReferences>
-    </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#rust-embed-impl@8.11.0">
       <author>pyrossh</author>
       <name>rust-embed-impl</name>
@@ -17298,28 +17005,6 @@
         </reference>
         <reference type="vcs">
           <url>https://github.com/hawkw/sharded-slab</url>
-        </reference>
-      </externalReferences>
-    </component>
-    <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#shellexpand@3.1.2">
-      <author>Vladimir Matveev &lt;vmatveev@citrine.cc>, Ian Jackson &lt;iwj@torproject.org></author>
-      <name>shellexpand</name>
-      <version>3.1.2</version>
-      <description>Shell-like expansions in strings</description>
-      <scope>required</scope>
-      <hashes>
-        <hash alg="SHA-256">32824fab5e16e6c4d86dc1ba84489390419a39f97699852b66480bb87d297ed8</hash>
-      </hashes>
-      <licenses>
-        <expression>MIT OR Apache-2.0</expression>
-      </licenses>
-      <purl>pkg:cargo/shellexpand@3.1.2</purl>
-      <externalReferences>
-        <reference type="documentation">
-          <url>http://docs.rs/shellexpand/</url>
-        </reference>
-        <reference type="vcs">
-          <url>https://gitlab.com/ijackson/rust-shellexpand</url>
         </reference>
       </externalReferences>
     </component>
@@ -19366,28 +19051,6 @@
         </reference>
       </externalReferences>
     </component>
-    <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#tonic-types@0.14.5">
-      <author>Lucio Franco &lt;luciofranco14@gmail.com>, Rafael Lemos &lt;flemos.rafael.dev@gmail.com></author>
-      <name>tonic-types</name>
-      <version>0.14.5</version>
-      <description>A collection of useful protobuf types that can be used with `tonic`. </description>
-      <scope>required</scope>
-      <hashes>
-        <hash alg="SHA-256">2a875a902255423d34c1f20838ab374126db8eb41625b7947a1d54113b0b7399</hash>
-      </hashes>
-      <licenses>
-        <expression>MIT</expression>
-      </licenses>
-      <purl>pkg:cargo/tonic-types@0.14.5</purl>
-      <externalReferences>
-        <reference type="website">
-          <url>https://github.com/hyperium/tonic</url>
-        </reference>
-        <reference type="vcs">
-          <url>https://github.com/hyperium/tonic</url>
-        </reference>
-      </externalReferences>
-    </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#tonic@0.14.5">
       <author>Lucio Franco &lt;luciofranco14@gmail.com></author>
       <name>tonic</name>
@@ -19501,28 +19164,6 @@
         </reference>
         <reference type="vcs">
           <url>https://github.com/tower-rs/tower</url>
-        </reference>
-      </externalReferences>
-    </component>
-    <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#tracing-appender@0.2.4">
-      <author>Zeki Sherif &lt;zekshi@amazon.com>, Tokio Contributors &lt;team@tokio.rs></author>
-      <name>tracing-appender</name>
-      <version>0.2.4</version>
-      <description>Provides utilities for file appenders and making non-blocking writers. </description>
-      <scope>required</scope>
-      <hashes>
-        <hash alg="SHA-256">786d480bce6247ab75f005b14ae1624ad978d3029d9113f0a22fa1ac773faeaf</hash>
-      </hashes>
-      <licenses>
-        <expression>MIT</expression>
-      </licenses>
-      <purl>pkg:cargo/tracing-appender@0.2.4</purl>
-      <externalReferences>
-        <reference type="website">
-          <url>https://tokio.rs</url>
-        </reference>
-        <reference type="vcs">
-          <url>https://github.com/tokio-rs/tracing</url>
         </reference>
       </externalReferences>
     </component>
@@ -22718,138 +22359,6 @@
       <dependency ref="git+https://github.com/openobserve/vortex?rev=57ffbf2b2dde0d63df03ff1f4788cd85206388a0#vortex-session@0.1.0" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#zstd@0.13.3" />
     </dependency>
-    <dependency ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d#openobserve@0.93.0">
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#ahash@0.8.12" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#anyhow@1.0.103" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#argon2@0.5.3" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#arrow@58.3.0" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#arrow-flight@58.3.0" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#arrow-json@58.3.0" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#arrow-schema@58.3.0" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#async-recursion@1.1.1" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#async-stream@0.3.6" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#async-trait@0.1.89" />
-      <dependency ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/audit#0.1.0" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#aws-sdk-sns@1.98.0" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#axum@0.8.8" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#axum-client-ip@1.3.1" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#axum-extra@0.12.5" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#axum-server@0.8.0" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#base64@0.22.1" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#bitflags@2.11.0" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#byteorder@1.5.0" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#bytes@1.11.1" />
-      <dependency ref="git+https://github.com/mattsse/chromiumoxide?rev=6f2392f78ae851e2acf33df8e9764cc299d837db#0.7.0" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#chrono@0.4.44" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#clap@4.5.60" />
-      <dependency ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/common#0.1.0" />
-      <dependency ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/compaction#0.1.0" />
-      <dependency ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/config#0.1.0" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#cron@0.15.0" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#csv@1.4.0" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#dashmap@6.1.0" />
-      <dependency ref="git+https://github.com/openobserve/datafusion?rev=869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b#54.0.0" />
-      <dependency ref="git+https://github.com/openobserve/datafusion-functions-json?rev=0df53d710425cc91cf109e77a050bbe1e374e4fe#0.54.2" />
-      <dependency ref="git+https://github.com/openobserve/datafusion?rev=869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b#datafusion-proto@54.0.0" />
-      <dependency ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/db#0.1.0" />
-      <dependency ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/enrichment_data#enrichment-data@0.1.0" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#env_logger@0.11.9" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#faststr@0.2.34" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#flate2@1.1.9" />
-      <dependency ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/flight#0.1.0" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#futures@0.3.32" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#futures-util@0.3.32" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#hashbrown@0.16.1" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#hashlink@0.11.0" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#hex@0.4.3" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#http@1.4.0" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#http-auth-basic@0.3.7" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#http-body-util@0.1.3" />
-      <dependency ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/infra#0.1.0" />
-      <dependency ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/ingester#0.1.0" />
-      <dependency ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/ingestion_common#ingestion-common@0.1.0" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#itertools@0.14.0" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#jsonwebtoken@10.3.0" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#lettre@0.11.22" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#log@0.4.29" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#maxminddb@0.27.3" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#md5@0.8.0" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#memchr@2.8.0" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#mime@0.3.17" />
-      <dependency ref="git+https://github.com/openobserve/arrow-rs-object-store?branch=openobserve-v0.13.2#object_store@0.13.2" />
-      <dependency ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/api/common#openobserve-api-common@0.1.0" />
-      <dependency ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/api/grpc#openobserve-api-grpc@0.1.0" />
-      <dependency ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/api/http#openobserve-api-http@0.1.0" />
-      <dependency ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/core#openobserve-core@0.1.0" />
-      <dependency ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/jobs#openobserve-jobs@0.1.0" />
-      <dependency ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/mcp#openobserve-mcp@0.1.0" />
-      <dependency ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/node#openobserve-node@0.1.0" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#opentelemetry@0.32.0" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#opentelemetry-otlp@0.32.0" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#opentelemetry-proto@0.32.0" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#opentelemetry_sdk@0.32.1" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#parking_lot@0.12.5" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#parquet@58.3.0" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#pin-project-lite@0.2.17" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#prettytable-rs@0.10.0" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#prometheus@0.14.0" />
-      <dependency ref="git+https://github.com/openobserve/promql-parser?branch=openobserve#0.6.0" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#prost@0.14.3" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#prost-wkt-types@0.7.1" />
-      <dependency ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/proto#0.1.0" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#rand@0.10.1" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#rayon@1.11.0" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#regex@1.12.3" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#regex-syntax@0.8.10" />
-      <dependency ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/report_server#0.1.0" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#reqwest@0.13.2" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#rustls@0.23.37" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#rustls-native-certs@0.8.3" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#sea-orm@1.1.20" />
-      <dependency ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/search#0.1.0" />
-      <dependency ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/search_service#0.1.0" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#segment@0.2.6" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#serde@1.0.228" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#serde_json@1.0.149" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#sha256@1.6.0" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#snafu@0.9.0" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#snap@1.1.1" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#sourcemap@9.3.2" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#sqlparser@0.62.0" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#sqlx@0.8.6" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#strum@0.28.0" />
-      <dependency ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/super_cluster_queue#0.1.0" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#svix-ksuid@0.8.0" />
-      <dependency ref="git+https://github.com/openobserve/tantivy?branch=perf%2Fopenobserve#0.26.1" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#tantivy-fst@0.5.0" />
-      <dependency ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/tantivy_utils#0.1.0" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#tempfile@3.26.0" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#thiserror@2.0.18" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#tiktoken-rs@0.9.1" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#time@0.3.47" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#tokio@1.52.3" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#tokio-stream@0.1.18" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#tonic@0.14.5" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#tonic-prost@0.14.5" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#tower@0.5.3" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#tower-http@0.6.8" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#tracing@0.1.44" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#tracing-appender@0.2.4" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#tracing-opentelemetry@0.33.0" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#tracing-subscriber@0.3.22" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#uaparser@0.6.4" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#url@2.5.8" />
-      <dependency ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/usage_reporting#0.1.0" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#utoipa@5.4.0" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#utoipa-swagger-ui@9.0.2" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#version-compare@0.2.1" />
-      <dependency ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/wal#0.1.0" />
-      <dependency ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/web#0.1.0" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#webpki-roots@1.0.6" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#x509-parser@0.18.1" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#zip@8.2.0" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#zstd@0.13.3" />
-    </dependency>
     <dependency ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/api/common#openobserve-api-common@0.1.0">
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#anyhow@1.0.103" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#axum@0.8.8" />
@@ -22868,41 +22377,6 @@
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#tokio@1.52.3" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#url@2.5.8" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#utoipa@5.4.0" />
-    </dependency>
-    <dependency ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/api/grpc#openobserve-api-grpc@0.1.0">
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#anyhow@1.0.103" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#arrow@58.3.0" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#arrow-flight@58.3.0" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#async-stream@0.3.6" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#bytes@1.11.1" />
-      <dependency ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/common#0.1.0" />
-      <dependency ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/config#0.1.0" />
-      <dependency ref="git+https://github.com/openobserve/datafusion?rev=869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b#54.0.0" />
-      <dependency ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/db#0.1.0" />
-      <dependency ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/enrichment_data#enrichment-data@0.1.0" />
-      <dependency ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/flight#0.1.0" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#futures@0.3.32" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#futures-util@0.3.32" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#http@1.4.0" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#http-auth-basic@0.3.7" />
-      <dependency ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/infra#0.1.0" />
-      <dependency ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/ingestion_common#ingestion-common@0.1.0" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#log@0.4.29" />
-      <dependency ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/core#openobserve-core@0.1.0" />
-      <dependency ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/node#openobserve-node@0.1.0" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#opentelemetry@0.32.0" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#opentelemetry-proto@0.32.0" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#parking_lot@0.12.5" />
-      <dependency ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/promql_service#promql-service@0.1.0" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#prost@0.14.3" />
-      <dependency ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/proto#0.1.0" />
-      <dependency ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/search#0.1.0" />
-      <dependency ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/search_service#0.1.0" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#tokio@1.52.3" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#tokio-stream@0.1.18" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#tonic@0.14.5" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#tracing@0.1.44" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#tracing-opentelemetry@0.33.0" />
     </dependency>
     <dependency ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/api/http#openobserve-api-http@0.1.0">
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#anyhow@1.0.103" />
@@ -23445,48 +22919,6 @@
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#serde@1.0.228" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#utoipa@5.4.0" />
     </dependency>
-    <dependency ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/jobs#openobserve-jobs@0.1.0">
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#anyhow@1.0.103" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#arrow@58.3.0" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#arrow-schema@58.3.0" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#async-trait@0.1.89" />
-      <dependency ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/audit#0.1.0" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#bytes@1.11.1" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#chrono@0.4.44" />
-      <dependency ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/common#0.1.0" />
-      <dependency ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/compaction#0.1.0" />
-      <dependency ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/config#0.1.0" />
-      <dependency ref="git+https://github.com/openobserve/datafusion?rev=869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b#54.0.0" />
-      <dependency ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/db#0.1.0" />
-      <dependency ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/enrichment_data#enrichment-data@0.1.0" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#futures@0.3.32" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#hashbrown@0.16.1" />
-      <dependency ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/infra#0.1.0" />
-      <dependency ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/ingester#0.1.0" />
-      <dependency ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/ingestion_common#ingestion-common@0.1.0" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#log@0.4.29" />
-      <dependency ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/builtins#openobserve-builtins@0.1.0" />
-      <dependency ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/core#openobserve-core@0.1.0" />
-      <dependency ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/node#openobserve-node@0.1.0" />
-      <dependency ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/org_storage#openobserve-org-storage@0.1.0" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#prometheus@0.14.0" />
-      <dependency ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/promql_service#promql-service@0.1.0" />
-      <dependency ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/proto#0.1.0" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#regex@1.12.3" />
-      <dependency ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/report_server#0.1.0" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#reqwest@0.13.2" />
-      <dependency ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/schema#0.1.0" />
-      <dependency ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/search#0.1.0" />
-      <dependency ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/search_service#0.1.0" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#serde_json@1.0.149" />
-      <dependency ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/stream#0.1.0" />
-      <dependency ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/tantivy_utils#0.1.0" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#tokio@1.52.3" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#tonic@0.14.5" />
-      <dependency ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/transform#0.1.0" />
-      <dependency ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/usage_reporting#0.1.0" />
-      <dependency ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/wal#0.1.0" />
-    </dependency>
     <dependency ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/mcp#openobserve-mcp@0.1.0">
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#anyhow@1.0.103" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#base64@0.22.1" />
@@ -23583,19 +23015,6 @@
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#tonic@0.14.5" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#tonic-prost@0.14.5" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#tonic-prost-build@0.14.5" />
-    </dependency>
-    <dependency ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/report_server#0.1.0">
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#anyhow@1.0.103" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#axum@0.8.8" />
-      <dependency ref="git+https://github.com/mattsse/chromiumoxide?rev=6f2392f78ae851e2acf33df8e9764cc299d837db#0.7.0" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#chrono@0.4.44" />
-      <dependency ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/config#0.1.0" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#futures@0.3.32" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#lettre@0.11.22" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#log@0.4.29" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#serde@1.0.228" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#tempfile@3.26.0" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#tokio@1.52.3" />
     </dependency>
     <dependency ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/schema#0.1.0">
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#anyhow@1.0.103" />
@@ -23733,25 +23152,6 @@
       <dependency ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/schema#0.1.0" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#tracing@0.1.44" />
     </dependency>
-    <dependency ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/super_cluster_queue#0.1.0">
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#anyhow@1.0.103" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#arrow@58.3.0" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#async-recursion@1.1.1" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#bytes@1.11.1" />
-      <dependency ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/common#0.1.0" />
-      <dependency ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/compaction#0.1.0" />
-      <dependency ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/config#0.1.0" />
-      <dependency ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/db#0.1.0" />
-      <dependency ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/enrichment_data#enrichment-data@0.1.0" />
-      <dependency ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/infra#0.1.0" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#log@0.4.29" />
-      <dependency ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/core#openobserve-core@0.1.0" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#serde@1.0.228" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#serde_json@1.0.149" />
-      <dependency ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/stream#0.1.0" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#svix-ksuid@0.8.0" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#tokio@1.52.3" />
-    </dependency>
     <dependency ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/tantivy_utils#0.1.0">
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#anyhow@1.0.103" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#arrow@58.3.0" />
@@ -23811,11 +23211,6 @@
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#snafu@0.9.0" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#snap@1.1.1" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#tempfile@3.26.0" />
-    </dependency>
-    <dependency ref="path+file:///private/tmp/openobserve-cyclonedx-fix.jfwk4d/src/web#0.1.0">
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#axum@0.8.8" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#mime_guess@2.0.5" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#rust-embed-for-web@11.4.1" />
     </dependency>
     <dependency ref="registry+https://github.com/rust-lang/crates.io-index#actix-codec@0.5.2">
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#bitflags@2.11.0" />
@@ -24686,7 +24081,6 @@
     </dependency>
     <dependency ref="registry+https://github.com/rust-lang/crates.io-index#base64@0.22.1" />
     <dependency ref="registry+https://github.com/rust-lang/crates.io-index#base64ct@1.8.3" />
-    <dependency ref="registry+https://github.com/rust-lang/crates.io-index#base85rs@0.1.3" />
     <dependency ref="registry+https://github.com/rust-lang/crates.io-index#basic-toml@0.1.10">
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#serde@1.0.228" />
     </dependency>
@@ -25211,13 +24605,6 @@
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#libc@0.2.186" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#option-ext@0.2.0" />
     </dependency>
-    <dependency ref="registry+https://github.com/rust-lang/crates.io-index#dirs-sys@0.5.0">
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#libc@0.2.186" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#option-ext@0.2.0" />
-    </dependency>
-    <dependency ref="registry+https://github.com/rust-lang/crates.io-index#dirs@6.0.0">
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#dirs-sys@0.5.0" />
-    </dependency>
     <dependency ref="registry+https://github.com/rust-lang/crates.io-index#displaydoc@0.2.5">
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#proc-macro2@1.0.106" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#quote@1.0.45" />
@@ -25481,13 +24868,6 @@
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#rand_core@0.10.0" />
     </dependency>
     <dependency ref="registry+https://github.com/rust-lang/crates.io-index#glob@0.3.3" />
-    <dependency ref="registry+https://github.com/rust-lang/crates.io-index#globset@0.4.18">
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#aho-corasick@1.1.4" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#bstr@1.12.1" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#log@0.4.29" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#regex-automata@0.4.14" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#regex-syntax@0.8.10" />
-    </dependency>
     <dependency ref="registry+https://github.com/rust-lang/crates.io-index#grok@2.4.0">
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#glob@0.3.3" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#onig@6.5.1" />
@@ -25573,9 +24953,6 @@
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#libc@0.2.186" />
     </dependency>
     <dependency ref="registry+https://github.com/rust-lang/crates.io-index#htmlescape@0.3.1" />
-    <dependency ref="registry+https://github.com/rust-lang/crates.io-index#http-auth-basic@0.3.7">
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#base64@0.22.1" />
-    </dependency>
     <dependency ref="registry+https://github.com/rust-lang/crates.io-index#http-body-util@0.1.3">
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#bytes@1.11.1" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#futures-core@0.3.32" />
@@ -26086,10 +25463,6 @@
     <dependency ref="registry+https://github.com/rust-lang/crates.io-index#murmurhash32@0.4.0" />
     <dependency ref="registry+https://github.com/rust-lang/crates.io-index#never-say-never@6.6.666" />
     <dependency ref="registry+https://github.com/rust-lang/crates.io-index#new_debug_unreachable@1.0.6" />
-    <dependency ref="registry+https://github.com/rust-lang/crates.io-index#new_mime_guess@4.0.4">
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#mime@0.3.17" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#unicase@2.9.0" />
-    </dependency>
     <dependency ref="registry+https://github.com/rust-lang/crates.io-index#nix@0.29.0">
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#bitflags@2.11.0" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#cfg-if@1.0.4" />
@@ -26238,28 +25611,6 @@
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#pkg-config@0.3.32" />
     </dependency>
     <dependency ref="registry+https://github.com/rust-lang/crates.io-index#opaque-debug@0.3.1" />
-    <dependency ref="registry+https://github.com/rust-lang/crates.io-index#opentelemetry-http@0.32.0">
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#async-trait@0.1.89" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#bytes@1.11.1" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#http@1.4.0" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#opentelemetry@0.32.0" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#reqwest@0.13.2" />
-    </dependency>
-    <dependency ref="registry+https://github.com/rust-lang/crates.io-index#opentelemetry-otlp@0.32.0">
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#http@1.4.0" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#opentelemetry@0.32.0" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#opentelemetry-http@0.32.0" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#opentelemetry-proto@0.32.0" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#opentelemetry_sdk@0.32.1" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#prost@0.14.3" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#reqwest@0.13.2" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#serde@1.0.228" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#serde_json@1.0.149" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#thiserror@2.0.18" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#tokio@1.52.3" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#tonic@0.14.5" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#tonic-types@0.14.5" />
-    </dependency>
     <dependency ref="registry+https://github.com/rust-lang/crates.io-index#opentelemetry-proto@0.32.0">
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#base64@0.22.1" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#const-hex@1.18.1" />
@@ -27067,30 +26418,6 @@
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#subtle@2.6.1" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#zeroize@1.8.2" />
     </dependency>
-    <dependency ref="registry+https://github.com/rust-lang/crates.io-index#rust-embed-for-web-impl@11.4.1">
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#brotli@8.0.2" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#flate2@1.1.9" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#globset@0.4.18" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#proc-macro2@1.0.106" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#quote@1.0.45" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#rust-embed-for-web-utils@11.4.1" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#shellexpand@3.1.2" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#syn@2.0.117" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#walkdir@2.5.0" />
-    </dependency>
-    <dependency ref="registry+https://github.com/rust-lang/crates.io-index#rust-embed-for-web-utils@11.4.1">
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#base85rs@0.1.3" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#chrono@0.4.44" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#globset@0.4.18" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#new_mime_guess@4.0.4" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#sha2@0.11.0" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#walkdir@2.5.0" />
-    </dependency>
-    <dependency ref="registry+https://github.com/rust-lang/crates.io-index#rust-embed-for-web@11.4.1">
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#rust-embed-for-web-impl@11.4.1" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#rust-embed-for-web-utils@11.4.1" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#walkdir@2.5.0" />
-    </dependency>
     <dependency ref="registry+https://github.com/rust-lang/crates.io-index#rust-embed-impl@8.11.0">
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#proc-macro2@1.0.106" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#quote@1.0.45" />
@@ -27425,9 +26752,6 @@
     </dependency>
     <dependency ref="registry+https://github.com/rust-lang/crates.io-index#sharded-slab@0.1.7">
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#lazy_static@1.5.0" />
-    </dependency>
-    <dependency ref="registry+https://github.com/rust-lang/crates.io-index#shellexpand@3.1.2">
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#dirs@6.0.0" />
     </dependency>
     <dependency ref="registry+https://github.com/rust-lang/crates.io-index#shlex@1.3.0" />
     <dependency ref="registry+https://github.com/rust-lang/crates.io-index#signal-hook-registry@1.4.8">
@@ -27971,11 +27295,6 @@
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#prost@0.14.3" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#tonic@0.14.5" />
     </dependency>
-    <dependency ref="registry+https://github.com/rust-lang/crates.io-index#tonic-types@0.14.5">
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#prost@0.14.3" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#prost-types@0.14.3" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#tonic@0.14.5" />
-    </dependency>
     <dependency ref="registry+https://github.com/rust-lang/crates.io-index#tonic@0.14.5">
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#async-trait@0.1.89" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#axum@0.8.8" />
@@ -28037,12 +27356,6 @@
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#tower-layer@0.3.3" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#tower-service@0.3.3" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#tracing@0.1.44" />
-    </dependency>
-    <dependency ref="registry+https://github.com/rust-lang/crates.io-index#tracing-appender@0.2.4">
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#crossbeam-channel@0.5.15" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#thiserror@2.0.18" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#time@0.3.47" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#tracing-subscriber@0.3.22" />
     </dependency>
     <dependency ref="registry+https://github.com/rust-lang/crates.io-index#tracing-attributes@0.1.31">
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#proc-macro2@1.0.106" />
