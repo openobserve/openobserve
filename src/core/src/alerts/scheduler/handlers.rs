@@ -229,6 +229,21 @@ async fn dispatch_per_group(
         }
     };
 
+    // M-6 is explicit that silent truncation is unacceptable. The pre-cap
+    // counts persisted on the rollup row are what the UI banner renders, but
+    // an operator reading logs gets nothing from them — so say it here too,
+    // once per evaluation that actually overflowed.
+    if let config::meta::alerts::grouping::GroupCapOutcome::Exceeded { observed, cap } =
+        classification.cap
+    {
+        log::warn!(
+            "[SCHEDULER trace_id {trace_id}] alert {alert_id}: {observed} groups observed exceeds \
+             the tracked-group cap of {cap} (ZO_ALERT_MAX_GROUPS); {} group(s) were not persisted \
+             and cannot page. Raise the cap or narrow the group_by.",
+            observed.saturating_sub(cap)
+        );
+    }
+
     let rows = rows_by_group_key(records, &group_by);
     let cfg = get_config();
 
@@ -1321,7 +1336,20 @@ async fn handle_alert_triggers(
     // ── §7.1 delivery decision ──────────────────────────────────────────────
     // Computed for multi-level alerts only; single-level alerts short-circuit
     // to `Deliver` so their behaviour is bit-for-bit unchanged (G5).
-    let delivery = if multi_level {
+    // MN-1/MN-2: a multi-alert's suppression is per group, decided inside
+    // `dispatch_per_group` from each row's own `silenced_until`. The
+    // alert-level decision must not run in front of it — one window for the
+    // whole alert would mute every group at once, and a group that starts
+    // firing mid-window would never page at all.
+    let alert_level_delivery = config::meta::alerts::dispatch::alert_level_delivery_applies(
+        alert
+            .query_condition
+            .aggregation
+            .as_ref()
+            .is_some_and(|a| a.multi_alert),
+        multi_level,
+    );
+    let delivery = if alert_level_delivery {
         config::meta::alerts::level::delivery_decision(
             eval_level.unwrap_or(config::meta::alerts::level::AlertLevel::Ok),
             trigger_data
@@ -1334,7 +1362,7 @@ async fn handle_alert_triggers(
     } else {
         config::meta::alerts::level::DeliveryDecision::Deliver
     };
-    if !delivery.should_deliver() && multi_level {
+    if !delivery.should_deliver() && alert_level_delivery {
         log::info!(
             "[SCHEDULER trace_id {scheduler_trace_id}] delivery suppressed ({delivery:?}) for {}/{}",
             new_trigger.org,
@@ -1351,8 +1379,12 @@ async fn handle_alert_triggers(
     // correlation). `last_notified_level`'s contract is the last DELIVERED
     // level — stamping it before a send that then FAILS would make the retry
     // look like a repeat inside an active silence window and suppress it.
+    // MN-2: multi-alerts keep their delivery state on the per-group rows, so
+    // they never write these alert-level fields. Leaving them stale would be
+    // harmless now that nothing reads them for this path, but writing them
+    // would resurrect the alert-level window the moment anything did.
     let record_delivery = |trigger_data: &mut ScheduledTriggerData| {
-        if multi_level && delivery.resets_silence() {
+        if alert_level_delivery && delivery.resets_silence() {
             trigger_data.last_notified_level = eval_level.map(|l| l.to_i32());
             trigger_data.delivery_silenced_until = if alert.trigger_condition.silence > 0 {
                 Some(

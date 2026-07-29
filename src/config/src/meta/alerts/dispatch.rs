@@ -365,6 +365,22 @@ pub fn evaluates_through_silence(multi_alert: bool, has_warning: bool) -> bool {
     multi_alert || has_warning
 }
 
+/// Whether the **alert-level** §7.1 delivery decision governs this evaluation.
+///
+/// For a multi-alert it must not: MN-1 makes per-group dispatch the *only*
+/// delivery path, and MN-2 puts the silence window and the last-delivered
+/// level on each group's own `alert_states` row. An alert-level decision in
+/// front of dispatch collapses every group into one window — the group that
+/// starts firing mid-window never pages at all, which is precisely the
+/// cross-group blindness the feature exists to remove.
+///
+/// The bug this guards against was invisible to unit tests and only bit
+/// multi-alerts that *also* carry a warning threshold, because `multi_level`
+/// is what turns the alert-level decision on in the first place.
+pub fn alert_level_delivery_applies(multi_alert: bool, multi_level: bool) -> bool {
+    multi_level && !multi_alert
+}
+
 /// `group_key -> original result row`, verbatim (MN-3).
 ///
 /// The dispatch item's notification payload must be the group's real row —
@@ -1584,6 +1600,29 @@ mod tests {
         // §7.1 unchanged for everything that did not opt in.
         assert!(evaluates_through_silence(false, true));
         assert!(!evaluates_through_silence(false, false));
+    }
+
+    // ═════════════════════════════════════════════════════════════════════
+    // alert_level_delivery_applies — MN-1/MN-2
+    // ═════════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn test_multi_alerts_are_never_gated_at_the_alert_level() {
+        // The regression this exists for: a multi-alert WITH a warning
+        // threshold used to take the alert-level decision, whose single
+        // silence window suppressed every group's dispatch — including the
+        // first-ever page of a group that started firing mid-window.
+        assert!(!alert_level_delivery_applies(true, true));
+        assert!(!alert_level_delivery_applies(true, false));
+    }
+
+    #[test]
+    fn test_non_multi_alerts_keep_the_alert_level_decision() {
+        // G5: everything that did not opt in is untouched — a warning-
+        // configured alert still gets §7.1 at the alert level, and a
+        // single-level alert still short-circuits to Deliver.
+        assert!(alert_level_delivery_applies(false, true));
+        assert!(!alert_level_delivery_applies(false, false));
     }
 
     // ═════════════════════════════════════════════════════════════════════

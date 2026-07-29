@@ -27,6 +27,33 @@ use serde_json::Value as JsonValue;
 use svix_ksuid::Ksuid;
 use utoipa::ToSchema;
 
+/// Deserialize an optional float that has to survive a `#[serde(flatten)]`.
+///
+/// `serde_json` is built workspace-wide with `arbitrary_precision` (root
+/// `Cargo.toml`), which represents a non-integer number as a magic one-key
+/// map rather than visiting `f64`. `CreateAlertRequestBody`/`UpdateAlert...`
+/// flatten the whole `Alert`, and `flatten` makes serde buffer the body
+/// through its `Content` type first — at which point that map can no longer
+/// be visited as an `f64`. A plain `Option<f64>` field therefore rejects
+/// `99.5` with "invalid type: map, expected f64" while quietly accepting
+/// `99`, so a fractional warning threshold is unreachable over the API.
+///
+/// Routing through `serde_json::Number` reads both the buffered map and a
+/// direct number, and still rejects strings and non-numeric values.
+fn de_opt_f64<'de, D>(deserializer: D) -> Result<Option<f64>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let parsed = Option::<serde_json::Number>::deserialize(deserializer)?;
+    parsed
+        .map(|n| {
+            n.as_f64().ok_or_else(|| {
+                serde::de::Error::custom(format!("`{n}` is not representable as a number"))
+            })
+        })
+        .transpose()
+}
+
 /// Alert configuration for monitoring streams and triggering notifications.
 ///
 /// An alert watches a stream (logs, metrics, or traces) using SQL or PromQL queries,
@@ -330,7 +357,7 @@ pub struct QueryCondition {
     pub promql_condition: Option<Condition>,
     /// Optional WARNING value for the PromQL condition, sharing
     /// `promql_condition.operator` with critical. Omitted = single-level.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", deserialize_with = "de_opt_f64")]
     #[schema(example = 300.0)]
     pub promql_warning_value: Option<f64>,
 
@@ -360,7 +387,7 @@ pub struct Aggregation {
     /// `having.column` with critical. Omitted = single-level aggregation
     /// alert. Must be strictly less severe than `having.value` — direction
     /// depends on the operator.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", deserialize_with = "de_opt_f64")]
     #[schema(example = 50.0)]
     pub warning_value: Option<f64>,
     /// Opt in to per-group evaluation (multi-alerts): each group gets its own

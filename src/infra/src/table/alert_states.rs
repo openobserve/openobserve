@@ -33,7 +33,7 @@ use sea_orm::{
     TransactionTrait,
 };
 
-use super::entity::{alert_state_transitions, alert_states};
+use super::entity::{alert_state_transitions, alert_states, alerts};
 use crate::{
     db::{ORM_CLIENT, connect_to_orm},
     errors,
@@ -179,6 +179,21 @@ pub async fn persist_group_plan_with<C: sea_orm::ConnectionTrait + TransactionTr
     alert_id: &str,
 ) -> Result<(), errors::Error> {
     let txn = conn.begin().await?;
+
+    // §5.3 opt-out race: this evaluation may have read the alert BEFORE a save
+    // turned `multi_alert` off, in which case its group rows would be written
+    // after the save-time cleanup already ran — resurrecting exactly the rows
+    // the toggle promised to remove. Re-reading the flag inside the plan's own
+    // transaction is what makes "the group table empties on save" hold: past
+    // this point, no in-flight evaluation can put rows back.
+    if !multi_alert_still_enabled(&txn, alert_id).await? {
+        txn.commit().await?;
+        log::debug!(
+            "alert {alert_id}: per-group alerting was turned off mid-evaluation; dropping this \
+             evaluation's group writes"
+        );
+        return Ok(());
+    }
 
     for update in &plan.updates {
         write_update(&txn, update).await?;
@@ -416,6 +431,63 @@ pub async fn delete_groups_with<C: sea_orm::ConnectionTrait>(
         .exec(conn)
         .await?;
     Ok(())
+}
+
+/// Whether the alert still has `multi_alert` set, read inside a caller's
+/// transaction (§5.3).
+///
+/// Reads the one JSON column rather than rebuilding the whole `Alert`: the
+/// question is a single boolean, and the intermediate-layer conversion would
+/// pull in folder and destination lookups that have no business inside the
+/// state transaction.
+///
+/// A missing alert row answers `false` — the alert was deleted mid-evaluation,
+/// and writing group rows for it would strand them.
+async fn multi_alert_still_enabled<C: sea_orm::ConnectionTrait>(
+    conn: &C,
+    alert_id: &str,
+) -> Result<bool, errors::Error> {
+    let Some(agg) = alerts::Entity::find_by_id(alert_id)
+        .select_only()
+        .column(alerts::Column::QueryAggregation)
+        .into_tuple::<Option<sea_orm::JsonValue>>()
+        .one(conn)
+        .await?
+    else {
+        return Ok(false);
+    };
+    Ok(agg
+        .as_ref()
+        .and_then(|v| v.get("multi_alert"))
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false))
+}
+
+/// Delete every non-rollup row of an alert, for the opt-out cleanup (§5.3).
+///
+/// Turning `multi_alert` off is **configuration, not disappearance**: the
+/// groups did not recover, they merely stopped being evaluated. So the rows go
+/// transition-free — the same bookkeeping semantics as M-6 eviction — and the
+/// rollup row (`group_key = ''`) is left exactly as it was. Draining them
+/// through M-7 instead would fabricate a wave of `Ok` "recoveries" and leave
+/// stale firing rows visible for K x interval plus the grace period, which is
+/// the opposite of the immediate rollback the toggle promises.
+pub async fn delete_all_groups(alert_id: &str) -> Result<u64, errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    delete_all_groups_with(client, alert_id).await
+}
+
+/// [`delete_all_groups`] against a caller-supplied connection.
+pub async fn delete_all_groups_with<C: sea_orm::ConnectionTrait>(
+    conn: &C,
+    alert_id: &str,
+) -> Result<u64, errors::Error> {
+    let res = alert_states::Entity::delete_many()
+        .filter(alert_states::Column::AlertId.eq(alert_id))
+        .filter(alert_states::Column::GroupKey.ne(ROLLUP_GROUP_KEY))
+        .exec(conn)
+        .await?;
+    Ok(res.rows_affected)
 }
 
 /// One state upsert plus its optional transition, inside a caller-owned
@@ -767,7 +839,7 @@ mod tests {
 
     use config::meta::alerts::state::StateUpdate;
 
-    use crate::table::test_harness::{test_db, unique_alert_id};
+    use crate::table::test_harness::{seed_alert, test_db, unique_alert_id};
 
     /// The silence window a `Delivered { silence_minutes: 10, at: 1_100 }`
     /// callback produces — computed by `dispatch::delivery_success_update`,
@@ -967,6 +1039,7 @@ mod tests {
         // by construction in `persist_group_plan_with`, not by this test.
         let db = test_db().await;
         let alert_id = unique_alert_id("group-plan");
+        seed_alert(db, &alert_id, true).await;
 
         // An incumbent that this evaluation will evict.
         persist_with(
@@ -1001,6 +1074,103 @@ mod tests {
         let groups = list_groups_with(db, &alert_id).await.unwrap();
         assert_eq!(groups.len(), 1, "list_groups excludes the rollup row");
         assert_eq!(groups[0].group_key, "new");
+    }
+
+    #[tokio::test]
+    async fn test_group_plan_is_dropped_when_multi_alert_was_turned_off_mid_evaluation() {
+        // §5.3 opt-out race: an evaluation that read the alert while it was
+        // still a multi-alert must not commit group rows after the save-time
+        // cleanup has run — otherwise the toggle-off leaves rows behind and
+        // "rollback is immediate" is false. The re-check lives inside the
+        // plan's own transaction precisely so this cannot interleave.
+        let db = test_db().await;
+        let alert_id = unique_alert_id("opt-out-race");
+        seed_alert(db, &alert_id, false).await;
+
+        let plan = GroupPlan {
+            updates: vec![
+                update_of(group_row(&alert_id, "g1", AlertLevel::Critical, 2_000)),
+                update_of(group_row(&alert_id, ROLLUP_GROUP_KEY, AlertLevel::Critical, 2_000)),
+            ],
+            evicted: vec![],
+        };
+        persist_group_plan_with(db, &plan, &alert_id).await.unwrap();
+
+        assert!(
+            list_groups_with(db, &alert_id).await.unwrap().is_empty(),
+            "an evaluation past the opt-out must not resurrect group rows"
+        );
+        assert!(
+            get_with(db, &alert_id, ROLLUP_GROUP_KEY)
+                .await
+                .unwrap()
+                .is_none(),
+            "and it writes no rollup either — the whole plan is dropped"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_group_plan_is_dropped_when_the_alert_no_longer_exists() {
+        // A deleted alert reads as opted-out: writing group rows for it would
+        // strand them with nothing to reap them against.
+        let db = test_db().await;
+        let alert_id = unique_alert_id("deleted-alert");
+
+        let plan = GroupPlan {
+            updates: vec![update_of(group_row(&alert_id, "g1", AlertLevel::Critical, 2_000))],
+            evicted: vec![],
+        };
+        persist_group_plan_with(db, &plan, &alert_id).await.unwrap();
+
+        assert!(list_groups_with(db, &alert_id).await.unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_opt_out_delete_drops_groups_but_keeps_the_rollup_and_history() {
+        // §5.3: turning the flag off is configuration, not disappearance. The
+        // group rows go transition-free (they did not recover, they stopped
+        // being evaluated), the rollup row is untouched, and per-group history
+        // stays readable — which is why transitions carry their own labels.
+        let db = test_db().await;
+        let alert_id = unique_alert_id("opt-out-delete");
+        seed_alert(db, &alert_id, true).await;
+
+        for key in ["g1", "g2", ROLLUP_GROUP_KEY] {
+            persist_with(
+                db,
+                &update_of(group_row(&alert_id, key, AlertLevel::Critical, 1_000)),
+            )
+            .await
+            .unwrap();
+        }
+        let transitions_before = count_transitions(db, &alert_id).await;
+
+        let deleted = delete_all_groups_with(db, &alert_id).await.unwrap();
+
+        assert_eq!(deleted, 2, "both group rows, and only them");
+        assert!(list_groups_with(db, &alert_id).await.unwrap().is_empty());
+        assert!(
+            get_with(db, &alert_id, ROLLUP_GROUP_KEY)
+                .await
+                .unwrap()
+                .is_some(),
+            "the rollup row survives the opt-out"
+        );
+        assert_eq!(
+            count_transitions(db, &alert_id).await,
+            transitions_before,
+            "eviction is bookkeeping: it writes no transitions"
+        );
+    }
+
+    async fn count_transitions(db: &sea_orm::DatabaseConnection, alert_id: &str) -> u64 {
+        use sea_orm::PaginatorTrait;
+
+        alert_state_transitions::Entity::find()
+            .filter(alert_state_transitions::Column::AlertId.eq(alert_id))
+            .count(db)
+            .await
+            .unwrap()
     }
 
     #[tokio::test]

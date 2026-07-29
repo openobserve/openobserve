@@ -309,6 +309,44 @@ fn validate_multi_alert_config(alert: &Alert) -> Result<(), AlertError> {
     .map_err(AlertError::InvalidMultiAlert)
 }
 
+/// Drop the per-group rows of an alert that is no longer a multi-alert (§5.3).
+///
+/// Runs **after** the row is committed, so the flag is durably off before the
+/// rows go: an evaluation racing this cleanup is caught either by
+/// `persist_group_plan`'s in-transaction re-check or, failing that, by the
+/// reaper — which keys off the *existence* of non-rollup rows rather than the
+/// current flag, precisely so rows orphaned by a crash between save and
+/// cleanup are still collected.
+///
+/// Best-effort by design: the reaper is the backstop, so a failure here must
+/// not fail the user's save. It is not, however, a substitute for this call —
+/// the sweep can be turned off entirely (`ZO_ALERT_GROUP_SWEEP_INTERVAL=0`),
+/// and rollback is supposed to be immediate.
+async fn clean_up_opted_out_groups(alert: &Alert) {
+    let opted_in = alert
+        .query_condition
+        .aggregation
+        .as_ref()
+        .is_some_and(|a| a.multi_alert);
+    if opted_in {
+        return;
+    }
+    let Some(alert_id) = alert.id.as_ref().map(|id| id.to_string()) else {
+        return;
+    };
+    match infra::table::alert_states::delete_all_groups(&alert_id).await {
+        Ok(0) => {}
+        Ok(n) => log::info!(
+            "alert {alert_id}: per-group alerting turned off, dropped {n} group state row(s) \
+             without transitions"
+        ),
+        Err(e) => log::error!(
+            "alert {alert_id}: could not drop group state rows after opt-out, leaving them to the \
+             reaper: {e}"
+        ),
+    }
+}
+
 /// Validates the alert and prepares it before it is written to the database.
 async fn prepare_alert(
     org_id: &str,
@@ -767,6 +805,7 @@ pub async fn update<C: ConnectionTrait + TransactionTrait>(
     prepare_alert(org_id, &stream_name, &alert_name, &mut alert, false, false).await?;
 
     let alert = db::alerts::alert::update(conn, org_id, dst_folder_id_info, alert).await?;
+    clean_up_opted_out_groups(&alert).await;
     #[cfg(feature = "enterprise")]
     if let Some((curr_folder_id, dst_folder_id)) = _folder_info
         && get_openfga_config().enabled

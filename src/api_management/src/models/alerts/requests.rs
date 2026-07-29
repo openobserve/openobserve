@@ -396,6 +396,101 @@ pub fn combine_detection_function(
 mod tests {
     use super::*;
 
+    /// Minimal create body carrying an aggregation warning threshold.
+    fn body_with_warning_value(warning: &str) -> String {
+        format!(
+            r#"{{
+                "name": "agg",
+                "stream_type": "logs",
+                "stream_name": "s",
+                "is_real_time": false,
+                "destinations": ["d"],
+                "query_condition": {{
+                    "type": "custom",
+                    "conditions": [],
+                    "aggregation": {{
+                        "group_by": ["host"],
+                        "function": "avg",
+                        "having": {{"column": "latency", "operator": ">=", "value": 500}},
+                        "warning_value": {warning}
+                    }}
+                }},
+                "trigger_condition": {{
+                    "period": 1, "operator": ">=", "threshold": 1,
+                    "frequency": 1, "frequency_type": "minutes", "silence": 0
+                }}
+            }}"#
+        )
+    }
+
+    fn parse_warning_value(warning: &str) -> Result<Option<f64>, serde_json::Error> {
+        let body: CreateAlertRequestBody = serde_json::from_str(&body_with_warning_value(warning))?;
+        Ok(body
+            .alert
+            .query_condition
+            .aggregation
+            .and_then(|a| a.warning_value))
+    }
+
+    /// The regression: `serde_json`'s `arbitrary_precision` renders a float as
+    /// a magic map, and `CreateAlertRequestBody`'s `#[serde(flatten)]` buffers
+    /// the body before the field is read — so a plain `Option<f64>` used to
+    /// reject every fractional threshold with "invalid type: map, expected
+    /// f64" while accepting the integer next to it. An average-latency
+    /// warning band is fractional by nature, so this made the field
+    /// unreachable over the API.
+    #[test]
+    fn test_fractional_warning_value_survives_the_flatten_buffer() {
+        assert_eq!(parse_warning_value("199.5").unwrap(), Some(199.5));
+        assert_eq!(parse_warning_value("0.25").unwrap(), Some(0.25));
+        assert_eq!(parse_warning_value("-2.5").unwrap(), Some(-2.5));
+    }
+
+    #[test]
+    fn test_integer_and_absent_warning_values_are_unchanged() {
+        assert_eq!(parse_warning_value("200").unwrap(), Some(200.0));
+        assert_eq!(parse_warning_value("null").unwrap(), None);
+    }
+
+    #[test]
+    fn test_non_numeric_warning_value_is_still_rejected() {
+        // Leniency is only about representation, not about accepting junk.
+        assert!(parse_warning_value("\"200\"").is_err());
+        assert!(parse_warning_value("true").is_err());
+    }
+
+    /// Pins the defect the `de_opt_f64` workaround exists for, so the two
+    /// tests above cannot silently become tautologies.
+    ///
+    /// A plain `Option<f64>` behind a `#[serde(flatten)]` still cannot read a
+    /// fractional number while `arbitrary_precision` is on. **If this test
+    /// ever fails, the bug is fixed upstream (or the feature was dropped) and
+    /// `de_opt_f64` can be deleted** — it is not a test of our code so much as
+    /// of the constraint our code works around.
+    #[test]
+    fn test_plain_option_f64_behind_flatten_still_cannot_read_a_float() {
+        #[derive(serde::Deserialize, Debug)]
+        struct Inner {
+            plain: Option<f64>,
+        }
+        #[derive(serde::Deserialize, Debug)]
+        struct Outer {
+            #[serde(flatten)]
+            inner: Inner,
+        }
+
+        // The integer form works, which is exactly why the bug hid so well.
+        let ok: Outer = serde_json::from_str(r#"{"plain": 200}"#).unwrap();
+        assert_eq!(ok.inner.plain, Some(200.0));
+
+        let err = serde_json::from_str::<Outer>(r#"{"plain": 199.5}"#)
+            .expect_err("arbitrary_precision + flatten should still reject a bare f64 float");
+        assert!(
+            err.to_string().contains("invalid type: map"),
+            "unexpected failure mode, workaround may need revisiting: {err}"
+        );
+    }
+
     #[test]
     fn test_combine_none_function_returns_none() {
         assert_eq!(combine_detection_function(None, None), None);

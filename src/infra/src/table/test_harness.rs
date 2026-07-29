@@ -254,3 +254,77 @@ pub fn unique_alert_id(prefix: &str) -> String {
     static COUNTER: AtomicU64 = AtomicU64::new(0);
     format!("{prefix}-{}", COUNTER.fetch_add(1, Ordering::Relaxed))
 }
+
+/// Insert the `alerts` row that a per-group state test implies exists.
+///
+/// `persist_group_plan` re-reads `multi_alert` from this row inside its own
+/// transaction (§5.3 opt-out race), so a test that writes group rows for an
+/// alert with no row at all is asserting against a shape production never
+/// produces — and, since a missing alert reads as opted-out, would silently
+/// assert nothing. Pass `multi_alert: false` to exercise the opted-out path.
+pub async fn seed_alert(conn: &DatabaseConnection, alert_id: &str, multi_alert: bool) {
+    use sea_orm::{EntityTrait, Set, sea_query::OnConflict};
+
+    use crate::table::entity::{alerts, folders};
+
+    // `alerts.folder_id` is a real foreign key, so the folder has to exist
+    // first. One shared folder for every seeded alert is enough.
+    let folder = folders::ActiveModel {
+        id: Set("default".to_string()),
+        org: Set("default".to_string()),
+        folder_id: Set("default".to_string()),
+        name: Set("default".to_string()),
+        description: Set(None),
+        r#type: Set(0),
+    };
+    folders::Entity::insert(folder)
+        .on_conflict(OnConflict::column(folders::Column::Id).do_nothing().to_owned())
+        .do_nothing()
+        .exec(conn)
+        .await
+        .expect("seed folder row");
+
+    let model = alerts::ActiveModel {
+        id: Set(alert_id.to_string()),
+        org: Set("default".to_string()),
+        folder_id: Set("default".to_string()),
+        name: Set(alert_id.to_string()),
+        stream_type: Set("logs".to_string()),
+        stream_name: Set("s".to_string()),
+        is_real_time: Set(false),
+        destinations: Set(serde_json::json!([])),
+        workflows: Set(serde_json::json!([])),
+        trigger_threshold_operator: Set(">=".to_string()),
+        // Every remaining NOT NULL column: `..Default::default()` leaves an
+        // ActiveModel field `NotSet`, which SQLite rejects rather than
+        // defaulting.
+        row_template_type: Set(0),
+        enabled: Set(true),
+        tz_offset: Set(0),
+        query_type: Set(0),
+        trigger_period_seconds: Set(60),
+        trigger_threshold_count: Set(1),
+        trigger_frequency_type: Set(0),
+        trigger_frequency_seconds: Set(60),
+        trigger_silence_seconds: Set(0),
+        align_time: Set(false),
+        dedup_enabled: Set(false),
+        creates_incident: Set(false),
+        query_aggregation: Set(Some(serde_json::json!({
+            "group_by": ["host"],
+            "function": "avg",
+            "having": {"column": "v", "operator": ">=", "value": 1},
+            "multi_alert": multi_alert,
+        }))),
+        ..Default::default()
+    };
+    alerts::Entity::insert(model)
+        .on_conflict(
+            OnConflict::column(alerts::Column::Id)
+                .update_column(alerts::Column::QueryAggregation)
+                .to_owned(),
+        )
+        .exec(conn)
+        .await
+        .expect("seed alert row");
+}
