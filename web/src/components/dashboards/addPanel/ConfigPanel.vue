@@ -1123,7 +1123,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #label>
             {{ t("dashboard.pivotStickyColTotals") }}
             <OButton variant="ghost" size="icon" @click.stop icon-left="info-outline">
-              <OTooltip :content="t('dashboard.pivotStickyColTotalsTooltip')" max-width="15.625rem" />
+              <OTooltip
+                :content="t('dashboard.pivotStickyColTotalsTooltip')"
+                max-width="15.625rem"
+              />
             </OButton>
           </template>
         </OSwitch>
@@ -1155,7 +1158,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #label>
             {{ t("dashboard.pivotStickyRowTotals") }}
             <OButton variant="ghost" size="icon" @click.stop icon-left="info-outline">
-              <OTooltip :content="t('dashboard.pivotStickyRowTotalsTooltip')" max-width="15.625rem" />
+              <OTooltip
+                :content="t('dashboard.pivotStickyRowTotalsTooltip')"
+                max-width="15.625rem"
+              />
             </OButton>
           </template>
         </OSwitch>
@@ -1212,7 +1218,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >{{ t("dashboard.configSectionFieldOverrides") }}</span
         >
         <OIcon name="info-outline" size="sm" />
-        <OTooltip :content="t('dashboard.configSectionFieldOverridesTooltip')" max-width="15.625rem" />
+        <OTooltip
+          :content="t('dashboard.configSectionFieldOverridesTooltip')"
+          max-width="15.625rem"
+        />
       </template>
       <div class="box-border flex flex-col gap-2.5 overflow-x-hidden px-3 py-2.5">
         <OverrideConfig :dashboardPanelData="dashboardPanelData" :panelData="panelData" />

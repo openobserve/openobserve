@@ -431,7 +431,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data-test="`metrics-explorer-card-nan-guard-${card.name}`"
       >
         <span class="inline-flex cursor-help">
-          <OTooltip :content="t('metrics.explorer.card.nanGuard')" max-width="22.5rem" :delay="200" />
+          <OTooltip
+            :content="t('metrics.explorer.card.nanGuard')"
+            max-width="22.5rem"
+            :delay="200"
+          />
           <OIcon name="info-outline" size="xs" />
         </span>
       </div>

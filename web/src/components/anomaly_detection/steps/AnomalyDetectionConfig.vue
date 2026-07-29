@@ -36,7 +36,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Filters mode -->
         <div v-if="queryMode === 'filters'" class="mb-4! flex items-start pb-0!">
-          <div class="flex items-center font-semibold" style="width: 11.125rem; min-height: 2.25rem">
+          <div
+            class="flex items-center font-semibold"
+            style="width: 11.125rem; min-height: 2.25rem"
+          >
             {{ t("alerts.anomaly.filters") }}
           </div>
           <div style="width: calc(100% - 11.875rem)">

@@ -129,7 +129,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OSplitter
           v-model="splitterModel"
           :limits="splitterLimits"
-          :style="{ width: showDimensionSelector ? '100%' : 'calc(100% - 3.125rem)', height: '100%' }"
+          :style="{
+            width: showDimensionSelector ? '100%' : 'calc(100% - 3.125rem)',
+            height: '100%',
+          }"
           class="analysis-splitter-smooth [transition:all_0.3s_ease]"
           @update:model-value="onSplitterUpdate"
         >

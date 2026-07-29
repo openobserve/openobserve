@@ -427,7 +427,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 <OFormSelect
                                   name="trigger_condition.operator"
                                   :options="triggerOperators"
-                                  style="width: 5.5rem; border: 1px solid var(--color-border-subtle)"
+                                  style="
+                                    width: 5.5rem;
+                                    border: 1px solid var(--color-border-subtle);
+                                  "
                                 />
                               </div>
                               <div
@@ -450,7 +453,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 </div>
                                 <div
                                   data-test="scheduled-pipeline-threshold-unit"
-                                  style="min-width: 5.625rem; margin-left: 0 !important; height: 2.5rem"
+                                  style="
+                                    min-width: 5.625rem;
+                                    margin-left: 0 !important;
+                                    height: 2.5rem;
+                                  "
                                   class="bg-surface-subtle flex items-center justify-center font-normal"
                                 >
                                   {{ t("alerts.times") }}

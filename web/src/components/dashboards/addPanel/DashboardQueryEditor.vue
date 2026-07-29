@@ -255,7 +255,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="dashboard-addpanel-config-drilldown-info"
                     >
                       <template #icon-left><OIcon name="info-outline" size="sm" /></template>
-                      <OTooltip :content="t('dashboard.vrlExtractionTooltip')" max-width="15.625rem" />
+                      <OTooltip
+                        :content="t('dashboard.vrlExtractionTooltip')"
+                        max-width="15.625rem"
+                      />
                     </OButton>
                   </div>
                 </div>

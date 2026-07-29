@@ -33,7 +33,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :horizontal="true"
         unit="px"
         :limits="[85, 400]"
-        :separatorStyle="{ height: '0.625rem', marginTop: '-0.3125rem', marginBottom: '-0.3125rem', zIndex: '10' }"
+        :separatorStyle="{
+          height: '0.625rem',
+          marginTop: '-0.3125rem',
+          marginBottom: '-0.3125rem',
+          zIndex: '10',
+        }"
         @update:model-value="onSplitterUpdate"
       >
         <template v-slot:before>

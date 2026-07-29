@@ -49,7 +49,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <img
           v-if="store.state.zoConfig.custom_hide_self_logo == false"
           class="appLogo h-auto"
-          :style="store.state.zoConfig.custom_logo_text != '' ? 'width: 9.375rem;' : 'width: 15.625rem;'"
+          :style="
+            store.state.zoConfig.custom_logo_text != '' ? 'width: 9.375rem;' : 'width: 15.625rem;'
+          "
           :src="
             isDark
               ? getImageURL('images/common/openobserve_latest_dark_2.svg')
@@ -60,7 +62,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="mb-4 flex justify-center" v-else>
         <img
           class="appLogo h-auto"
-          :style="store.state.zoConfig.custom_logo_text != '' ? 'width: 9.375rem;' : 'width: 15.625rem;'"
+          :style="
+            store.state.zoConfig.custom_logo_text != '' ? 'width: 9.375rem;' : 'width: 15.625rem;'
+          "
           :src="
             isDark
               ? getImageURL('images/common/openobserve_latest_dark_2.svg')

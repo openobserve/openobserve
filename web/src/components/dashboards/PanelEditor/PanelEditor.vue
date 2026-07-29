@@ -61,7 +61,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :style="splitterStyle"
           :disable="!dashboardPanelData.layout.showFieldList"
           separatorClass="field-list-separator"
-          :separatorStyle="{ width: '0.625rem', marginLeft: '-0.3125rem', marginRight: '-0.3125rem', zIndex: '10' }"
+          :separatorStyle="{
+            width: '0.625rem',
+            marginLeft: '-0.3125rem',
+            marginRight: '-0.3125rem',
+            zIndex: '10',
+          }"
         >
           <!-- Field List (before slot) -->
           <template #before>
@@ -407,7 +412,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             height: '100%',
           }"
           separatorClass="field-list-separator"
-          :separatorStyle="{ width: '0.625rem', marginLeft: '-0.3125rem', marginRight: '-0.3125rem', zIndex: '10' }"
+          :separatorStyle="{
+            width: '0.625rem',
+            marginLeft: '-0.3125rem',
+            marginRight: '-0.3125rem',
+            zIndex: '10',
+          }"
         >
           <!-- Field List for custom chart -->
           <!-- Mirror the normal field-list block above: a fixed-height wrapper

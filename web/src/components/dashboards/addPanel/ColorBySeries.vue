@@ -25,7 +25,11 @@
         icon-left="info-outline"
       >
         <template #icon-left><OIcon name="info-outline" size="sm" /></template>
-        <OTooltip :content="t('dashboard.colorBySeriesTooltip')" side="bottom" max-width="15.625rem" />
+        <OTooltip
+          :content="t('dashboard.colorBySeriesTooltip')"
+          side="bottom"
+          max-width="15.625rem"
+        />
       </OButton>
     </div>
     <OButton

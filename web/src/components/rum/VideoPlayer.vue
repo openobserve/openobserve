@@ -70,7 +70,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="absolute cursor-pointer"
           :class="getEventMarkerClass(event)"
           :style="{
-            width: event.frustration_types && event.frustration_types.length > 0 ? '0.1875rem' : '0.125rem',
+            width:
+              event.frustration_types && event.frustration_types.length > 0
+                ? '0.1875rem'
+                : '0.125rem',
             left: (event.relativeTime / playerState.totalTime) * playerState.width + 'px',
             bottom: '-0.3125rem',
             height:
