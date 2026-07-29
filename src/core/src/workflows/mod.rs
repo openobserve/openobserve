@@ -360,7 +360,7 @@ fn is_permitted(workflow_id: &str, org_id: &str, permitted: Option<&Vec<String>>
 }
 
 pub async fn delete_workflow(org_id: &str, id: &str) -> Result<(), anyhow::Error> {
-    let associations = db::workflows::get_workflow_associations(&org_id, &id).await?;
+    let associations = db::workflows::get_workflow_associations(org_id, id).await?;
     if associations
         .iter()
         .any(|a| a.trigger_type != WorkflowTriggerType::IncidentEvent.to_string())
@@ -382,19 +382,58 @@ pub async fn delete_workflow(org_id: &str, id: &str) -> Result<(), anyhow::Error
 
 pub async fn test_workflow(
     org_id: &str,
-    id: &str,
+    workflow: Workflow,
     inputs: Vec<serde_json::Value>,
     from_node: Option<String>,
 ) -> Result<WorkflowResult, anyhow::Error> {
-    let workflow = get_workflow_by_id(org_id, id)
-        .await?
-        .ok_or(anyhow::anyhow!("workflow with given id not found"))?;
+    validate_workflow(&workflow).await?;
     let executable = ExecutablePipeline::new_from_workflow(&workflow).await?;
-
     let res = executable
         .process_workflow(org_id, inputs, from_node)
         .await?;
     Ok(res)
+}
+
+pub async fn trigger_workflow(
+    org_id: &str,
+    id: &str,
+    inputs: Vec<serde_json::Value>,
+    user_id: &str,
+) -> Result<String, anyhow::Error> {
+    if db::workflows::get_workflow(org_id, id).await?.is_none() {
+        return Err(anyhow::anyhow!("workflow with id {id} not found"));
+    }
+
+    let metadata = [("event_type", "manual"), ("user_id", user_id)]
+        .into_iter()
+        .map(|(k, v)| (k.into(), v.into()))
+        .collect();
+
+    let trace_id = format!("webhook-{}", config::ider::generate_trace_id());
+    log::info!(
+        "received webhook trigger for workflow {org_id}/{id} from user {user_id}, assigning trace id {trace_id}"
+    );
+
+    if let Err(e) = send_workflow_trigger(
+        &trace_id,
+        org_id,
+        "Webhook".to_string(),
+        WorkflowTriggerType::Webhook,
+        id,
+        metadata,
+        &inputs,
+    )
+    .await
+    {
+        log::error!(
+            "error in sending webhook trigger for workflow {org_id}/{id} from user {user_id}, trace id {trace_id} error : {e}"
+        );
+        return Err(e);
+    }
+    log::info!(
+        "successfully triggered workflow {org_id}/{id} from user {user_id}, with trace id {trace_id}"
+    );
+    Ok(trace_id)
 }
 
 async fn execute_workflow(

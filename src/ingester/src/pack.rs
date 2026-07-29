@@ -38,6 +38,7 @@ use arrow_schema::Schema;
 use config::{
     FileFormat, RwAHashMap,
     meta::{search::ScanStats, stream::FileMeta},
+    metrics,
     utils::hash::{Sum64, gxhash},
 };
 use hashbrown::{HashMap, HashSet};
@@ -557,6 +558,19 @@ pub async fn get_segment_index_stats() -> (usize, usize) {
     let streams = r.len();
     let segments = r.values().map(|v| v.segments.len()).sum();
     (streams, segments)
+}
+
+/// Refresh the pack backlog gauges: total pack files on disk and total
+/// segments pending upload. Unlabeled totals, set every cycle.
+pub async fn collect_pack_metrics() {
+    let (_, segments) = get_segment_index_stats().await;
+    let files = PACK_REGISTRY.read().await.len();
+    metrics::INGEST_PACK_FILES
+        .with_label_values::<&str>(&[])
+        .set(files as i64);
+    metrics::INGEST_PACK_SEGMENTS
+        .with_label_values::<&str>(&[])
+        .set(segments as i64);
 }
 
 /// Acquire read guards so the mover will not delete these packs mid-read.
@@ -1505,5 +1519,38 @@ mod tests {
                 .map(|v| v.segments.iter().all(|s| s.memtable_id != 77))
                 .unwrap_or(true)
         );
+    }
+
+    #[tokio::test]
+    async fn test_collect_pack_metrics() {
+        let dir = tempfile::tempdir().unwrap();
+        let finished = write_test_pack(dir.path(), 79).await;
+        let pack = &finished[0];
+        fs::rename(&pack.tmp_path, &pack.path).await.unwrap();
+        register_pack(
+            pack.path.clone(),
+            &pack.footer,
+            config::utils::time::now_micros(),
+            &Default::default(),
+        )
+        .await;
+
+        collect_pack_metrics().await;
+        // the totals are global and other tests register their own packs
+        // concurrently, so only assert this pack's contribution is included
+        assert!(
+            metrics::INGEST_PACK_SEGMENTS
+                .with_label_values::<&str>(&[])
+                .get()
+                >= 2
+        );
+        assert!(
+            metrics::INGEST_PACK_FILES
+                .with_label_values::<&str>(&[])
+                .get()
+                >= 1
+        );
+
+        unregister_pack(&pack.path).await;
     }
 }

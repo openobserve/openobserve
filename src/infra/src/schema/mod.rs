@@ -47,7 +47,7 @@ pub static STREAM_SCHEMAS: Lazy<RwAHashMap<String, Vec<(i64, Schema)>>> =
     Lazy::new(Default::default);
 pub static STREAM_SCHEMAS_LATEST: Lazy<RwAHashMap<String, SchemaCache>> =
     Lazy::new(Default::default);
-pub static STREAM_SETTINGS: Lazy<RwAHashMap<String, StreamSettings>> = Lazy::new(Default::default);
+static STREAM_SETTINGS: Lazy<RwAHashMap<String, Arc<StreamSettings>>> = Lazy::new(Default::default);
 /// Used for filtering records when a stream is configured to store original unflattened records
 /// use a RwHashMap instead of RwAHashMap because of high write ratio as
 /// SnowflakeIdGenerator::generate() requires a &mut
@@ -56,8 +56,9 @@ pub static STREAM_RECORD_ID_GENERATOR: Lazy<RwHashMap<String, SnowflakeIdGenerat
 /// Cache if the stream stats exist, used for calculating stats
 pub static STREAM_STATS_EXISTS: Lazy<RwHashSet<String>> = Lazy::new(Default::default);
 
-// atomic version of cache
-type StreamSettingsCache = hashbrown::HashMap<String, StreamSettings>;
+// atomic version of cache, values shared with STREAM_SETTINGS via Arc so the
+// snapshot republish below is a shallow clone
+type StreamSettingsCache = hashbrown::HashMap<String, Arc<StreamSettings>>;
 static STREAM_SETTINGS_ATOMIC: Lazy<ArcSwap<StreamSettingsCache>> =
     Lazy::new(|| ArcSwap::from(Arc::new(hashbrown::HashMap::new())));
 
@@ -68,12 +69,55 @@ pub async fn init() -> Result<()> {
     Ok(())
 }
 
-pub fn get_stream_settings_atomic(key: &str) -> Option<StreamSettings> {
+/// Lock-free point read of the settings cache snapshot. Unlike
+/// [`get_settings`] this never falls back to the DB, so it also serves as an
+/// exact "is this stream cached" check.
+pub fn get_stream_settings_atomic(key: &str) -> Option<Arc<StreamSettings>> {
     STREAM_SETTINGS_ATOMIC.load().get(key).cloned()
 }
 
-pub fn set_stream_settings_atomic(settings: StreamSettingsCache) {
-    STREAM_SETTINGS_ATOMIC.store(Arc::new(settings));
+/// Republish the atomic snapshot from the locked map. Called with the write
+/// lock held so concurrent mutations cannot publish snapshots out of order;
+/// the clone is shallow (String keys + Arc refcount bumps).
+fn publish_stream_settings(settings: &StreamSettingsCache) {
+    STREAM_SETTINGS_ATOMIC.store(Arc::new(settings.clone()));
+}
+
+/// Insert or replace one stream's settings and republish the read snapshot.
+///
+/// All mutations of the settings cache must go through this function,
+/// [`put_stream_settings_batch`] or [`remove_stream_settings`]; callers must
+/// never rebuild the snapshot themselves.
+pub async fn put_stream_settings(key: String, settings: Arc<StreamSettings>) {
+    let mut w = STREAM_SETTINGS.write().await;
+    w.insert(key, settings);
+    publish_stream_settings(&w);
+}
+
+/// Insert many streams' settings and republish the read snapshot once.
+pub async fn put_stream_settings_batch(items: Vec<(String, Arc<StreamSettings>)>) {
+    if items.is_empty() {
+        return;
+    }
+    let mut w = STREAM_SETTINGS.write().await;
+    for (key, settings) in items {
+        w.insert(key, settings);
+    }
+    publish_stream_settings(&w);
+}
+
+/// Remove one stream's settings; republishes only if the key existed.
+pub async fn remove_stream_settings(key: &str) {
+    let mut w = STREAM_SETTINGS.write().await;
+    if w.remove(key).is_some() {
+        publish_stream_settings(&w);
+    }
+}
+
+/// (len, capacity, memory size) of the settings cache, for the status API.
+pub async fn get_stream_settings_stats() -> (usize, usize, usize) {
+    use config::stats::CacheStatsAsync;
+    STREAM_SETTINGS.stats().await
 }
 
 pub async fn get_stream_schema_from_cache(
@@ -255,10 +299,10 @@ pub async fn get_settings(
     org_id: &str,
     stream_name: &str,
     stream_type: StreamType,
-) -> Option<StreamSettings> {
+) -> Option<Arc<StreamSettings>> {
     let key = format!("{org_id}/{stream_type}/{stream_name}");
 
-    // Try to get from read lock first
+    // Try to get from the lock-free snapshot first
     if let Some(settings) = get_stream_settings_atomic(&key) {
         return Some(settings);
     }
@@ -268,7 +312,8 @@ pub async fn get_settings(
         .await
         .ok()
         .as_ref()
-        .and_then(unwrap_stream_settings);
+        .and_then(unwrap_stream_settings)
+        .map(Arc::new);
 
     // Only acquire write lock if we have settings to update
     if let Some(ref s) = settings {
@@ -276,8 +321,8 @@ pub async fn get_settings(
         let mut w = STREAM_SETTINGS.write().await;
         if !w.contains_key(&key) {
             w.insert(key, s.clone());
+            publish_stream_settings(&w);
         }
-        set_stream_settings_atomic(w.clone());
         drop(w);
     }
 
@@ -342,17 +387,25 @@ pub fn get_partition_time_level(stream_type: StreamType) -> PartitionTimeLevel {
     }
 }
 
-pub fn get_stream_setting_defined_schema_fields(settings: &Option<StreamSettings>) -> Vec<String> {
+pub fn get_stream_setting_defined_schema_fields<T: std::borrow::Borrow<StreamSettings>>(
+    settings: &Option<T>,
+) -> Vec<String> {
     settings
         .as_ref()
-        .map(|settings| settings.defined_schema_fields.clone())
+        .map(|settings| settings.borrow().defined_schema_fields.clone())
         .unwrap_or_default()
 }
 
-pub fn get_stream_setting_fts_fields(settings: &Option<StreamSettings>) -> Vec<String> {
+// The setting helpers here are generic over `Borrow<StreamSettings>` so
+// callers can pass either `&Option<StreamSettings>` or the
+// `Option<Arc<StreamSettings>>` returned by [`get_settings`].
+pub fn get_stream_setting_fts_fields<T: std::borrow::Borrow<StreamSettings>>(
+    settings: &Option<T>,
+) -> Vec<String> {
     let default_fields = SQL_FULL_TEXT_SEARCH_FIELDS.clone();
     match settings {
         Some(settings) => {
+            let settings = settings.borrow();
             let mut fields = settings.full_text_search_keys.clone();
             fields.extend(default_fields);
             if settings.index_original_data {
@@ -369,7 +422,9 @@ pub fn get_stream_setting_fts_fields(settings: &Option<StreamSettings>) -> Vec<S
     }
 }
 
-pub fn get_stream_setting_index_fields(settings: &Option<StreamSettings>) -> Vec<String> {
+pub fn get_stream_setting_index_fields<T: std::borrow::Borrow<StreamSettings>>(
+    settings: &Option<T>,
+) -> Vec<String> {
     // Bloom filter is built on top of the secondary index, so every bloom
     // field must also be a secondary-index field. Fold the default bloom
     // fields into the index defaults here; the per-stream configured bloom
@@ -379,6 +434,7 @@ pub fn get_stream_setting_index_fields(settings: &Option<StreamSettings>) -> Vec
     default_fields.extend(BLOOM_FILTER_DEFAULT_FIELDS.clone());
     let mut fields = match settings {
         Some(settings) => {
+            let settings = settings.borrow();
             let mut fields = settings.index_fields.clone();
             fields.extend(default_fields);
             fields.extend(settings.bloom_filter_fields.clone());
@@ -391,10 +447,13 @@ pub fn get_stream_setting_index_fields(settings: &Option<StreamSettings>) -> Vec
     fields
 }
 
-pub fn get_stream_setting_bloom_filter_fields(settings: &Option<StreamSettings>) -> Vec<String> {
+pub fn get_stream_setting_bloom_filter_fields<T: std::borrow::Borrow<StreamSettings>>(
+    settings: &Option<T>,
+) -> Vec<String> {
     let default_fields = BLOOM_FILTER_DEFAULT_FIELDS.clone();
     match settings {
         Some(settings) => {
+            let settings = settings.borrow();
             let mut fields = settings.bloom_filter_fields.clone();
             fields.extend(default_fields);
             fields.sort();
@@ -405,8 +464,8 @@ pub fn get_stream_setting_bloom_filter_fields(settings: &Option<StreamSettings>)
     }
 }
 
-pub fn get_stream_setting_index_updated_at_for_fields(
-    settings: &Option<StreamSettings>,
+pub fn get_stream_setting_index_updated_at_for_fields<T: std::borrow::Borrow<StreamSettings>>(
+    settings: &Option<T>,
     created_at: Option<i64>,
     fields: &[String],
 ) -> i64 {
@@ -421,7 +480,9 @@ pub fn get_stream_setting_index_updated_at_for_fields(
         }
     };
     let default_updated_at = match settings {
-        Some(settings) if settings.index_updated_at > 0 => settings.index_updated_at,
+        Some(settings) if settings.borrow().index_updated_at > 0 => {
+            settings.borrow().index_updated_at
+        }
         _ => created_at,
     };
     fields
@@ -432,7 +493,7 @@ pub fn get_stream_setting_index_updated_at_for_fields(
             } else {
                 settings
                     .as_ref()
-                    .and_then(|s| s.index_fields_updated_at.get(f))
+                    .and_then(|s| s.borrow().index_fields_updated_at.get(f))
                     .copied()
                     .unwrap_or(default_updated_at)
             }
@@ -765,7 +826,9 @@ pub fn get_merge_schema_changes(
 #[derive(Clone, Debug, Serialize)]
 pub struct SchemaCache {
     schema: SchemaRef,
-    fields_map: HashMap<String, usize>,
+    // Arc so cloning a cached entry does not deep-copy the field index,
+    // which can hold thousands of entries for wide streams
+    fields_map: Arc<HashMap<String, usize>>,
     hash_key: String,
     is_derived: bool,
 }
@@ -777,12 +840,14 @@ impl SchemaCache {
 
     pub fn new_from_arc(schema: Arc<Schema>) -> Self {
         let hash_key = schema.hash_key();
-        let fields_map = schema
-            .fields()
-            .iter()
-            .enumerate()
-            .map(|(i, f)| (f.name().to_owned(), i))
-            .collect();
+        let fields_map = Arc::new(
+            schema
+                .fields()
+                .iter()
+                .enumerate()
+                .map(|(i, f)| (f.name().to_owned(), i))
+                .collect(),
+        );
         Self {
             schema,
             fields_map,
@@ -924,6 +989,47 @@ mod tests {
         assert!(is_widening_conversion(&DataType::Int8, &DataType::Int32));
     }
 
+    #[tokio::test]
+    async fn test_stream_settings_mutation_api() {
+        // unique org prefix so the shared global caches can host parallel tests
+        let key1 = "settings_api_test_org/logs/s1".to_string();
+        let key2 = "settings_api_test_org/logs/s2".to_string();
+
+        let s1 = Arc::new(StreamSettings {
+            data_retention: 7,
+            ..Default::default()
+        });
+        put_stream_settings(key1.clone(), s1.clone()).await;
+        let got = get_stream_settings_atomic(&key1).unwrap();
+        assert_eq!(got.data_retention, 7);
+        // the snapshot shares the value, it does not deep-copy it
+        assert!(Arc::ptr_eq(&got, &s1));
+
+        put_stream_settings_batch(vec![
+            (
+                key1.clone(),
+                Arc::new(StreamSettings {
+                    data_retention: 30,
+                    ..Default::default()
+                }),
+            ),
+            (key2.clone(), Arc::new(StreamSettings::default())),
+        ])
+        .await;
+        assert_eq!(
+            get_stream_settings_atomic(&key1).unwrap().data_retention,
+            30
+        );
+        assert!(get_stream_settings_atomic(&key2).is_some());
+
+        remove_stream_settings(&key1).await;
+        assert!(get_stream_settings_atomic(&key1).is_none());
+        // removing one key republishes without dropping the others
+        assert!(get_stream_settings_atomic(&key2).is_some());
+        remove_stream_settings(&key2).await;
+        assert!(get_stream_settings_atomic(&key2).is_none());
+    }
+
     #[test]
     fn test_get_stream_setting_fts_fields() {
         let schema = Schema::new(vec![Field::new("f.c", DataType::Int32, false)]);
@@ -1050,7 +1156,7 @@ mod tests {
     #[test]
     fn test_get_stream_setting_defined_schema_fields() {
         // Test with None
-        let fields = get_stream_setting_defined_schema_fields(&None);
+        let fields = get_stream_setting_defined_schema_fields(&None::<StreamSettings>);
         assert!(fields.is_empty());
 
         // Test with Some settings
@@ -1083,7 +1189,7 @@ mod tests {
     #[test]
     fn test_get_stream_setting_index_fields() {
         // Test with None
-        let fields = get_stream_setting_index_fields(&None);
+        let fields = get_stream_setting_index_fields(&None::<StreamSettings>);
         assert!(!fields.is_empty()); // Should have default fields
 
         // Test with custom index fields
@@ -1102,7 +1208,7 @@ mod tests {
     fn test_get_stream_setting_bloom_filter_fields() {
         // Test with None: returns the configured default fields (empty unless
         // ZO_BLOOM_FILTER_DEFAULT_FIELDS is set)
-        let fields = get_stream_setting_bloom_filter_fields(&None);
+        let fields = get_stream_setting_bloom_filter_fields(&None::<StreamSettings>);
         assert_eq!(fields, BLOOM_FILTER_DEFAULT_FIELDS.clone());
 
         // Test with custom bloom filter fields
@@ -1153,8 +1259,11 @@ mod tests {
 
         // None settings falls back to created_at
         let fields = vec!["user_id".to_string()];
-        let result =
-            get_stream_setting_index_updated_at_for_fields(&None, Some(created_at), &fields);
+        let result = get_stream_setting_index_updated_at_for_fields(
+            &None::<StreamSettings>,
+            Some(created_at),
+            &fields,
+        );
         assert_eq!(result, created_at);
 
         // default-enabled index fields always resolve to BASE_TIME, even with an entry
@@ -1168,8 +1277,11 @@ mod tests {
             get_stream_setting_index_updated_at_for_fields(&settings, Some(created_at), &fields);
         assert_eq!(result, base_time);
         let fields = vec!["service_name".to_string()];
-        let result =
-            get_stream_setting_index_updated_at_for_fields(&None, Some(created_at), &fields);
+        let result = get_stream_setting_index_updated_at_for_fields(
+            &None::<StreamSettings>,
+            Some(created_at),
+            &fields,
+        );
         assert_eq!(result, base_time);
 
         // a default field combined with a configured field still uses the max

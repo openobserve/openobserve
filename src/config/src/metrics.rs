@@ -163,6 +163,32 @@ pub static INGEST_PARQUET_FILES: Lazy<IntGaugeVec> = Lazy::new(|| {
     )
     .expect("Metric created")
 });
+pub static INGEST_PACK_FILES: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "ingest_pack_files",
+            "Number of wal pack files in the ingester.".to_owned() + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &[],
+    )
+    .expect("Metric created")
+});
+pub static INGEST_PACK_SEGMENTS: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "ingest_pack_segments",
+            "Number of wal pack segments in the ingester pending upload to object store."
+                .to_owned()
+                + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &[],
+    )
+    .expect("Metric created")
+});
 pub static INGEST_WAL_WRITE_BYTES: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
         Opts::new(
@@ -1960,6 +1986,12 @@ fn register_metrics(registry: &Registry) {
         .register(Box::new(INGEST_PARQUET_FILES.clone()))
         .expect("Metric registered");
     registry
+        .register(Box::new(INGEST_PACK_FILES.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(INGEST_PACK_SEGMENTS.clone()))
+        .expect("Metric registered");
+    registry
         .register(Box::new(INGEST_WAL_WRITE_BYTES.clone()))
         .expect("Metric registered");
     registry
@@ -2537,6 +2569,8 @@ mod tests {
         let _ = INGEST_ERRORS.clone();
         let _ = INGEST_WAL_USED_BYTES.clone();
         let _ = INGEST_PARQUET_FILES.clone();
+        let _ = INGEST_PACK_FILES.clone();
+        let _ = INGEST_PACK_SEGMENTS.clone();
         let _ = INGEST_WAL_WRITE_BYTES.clone();
         let _ = INGEST_WAL_READ_BYTES.clone();
         let _ = INGEST_MEMTABLE_BYTES.clone();
