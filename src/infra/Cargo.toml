@@ -47,5 +47,10 @@ proto.workspace = true
 
 [dev-dependencies]
 collapse.workspace = true
+criterion = { version = "0.5", default-features = false, features = ["rayon"] }
 sea-orm = { workspace = true, features = ["mock"] }
 tempfile.workspace = true
+
+[[bench]]
+name = "stream_settings"
+harness = false
