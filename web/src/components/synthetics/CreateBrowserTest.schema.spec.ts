@@ -58,7 +58,10 @@ describe("makeBrowserCheckSaveSchema journey validation", () => {
           name: 'Click on internal:testid=[data-test="login-as-internal-user"]',
           locator: {
             candidates: [
-              { kind: "test_attribute", value: 'internal:testid=[data-test="login-as-internal-user"]' },
+              {
+                kind: "test_attribute",
+                value: 'internal:testid=[data-test="login-as-internal-user"]',
+              },
             ],
             user_override: null,
           },

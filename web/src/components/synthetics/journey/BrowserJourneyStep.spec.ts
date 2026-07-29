@@ -267,16 +267,16 @@ describe("BrowserJourneyStep", () => {
         step: makeStep({ action: "wait", timeout: 30000 }),
         expanded: true,
       });
-      expect(
-        wrapper.find('[data-test="synthetics-journey-step-retired-action"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="synthetics-journey-step-retired-action"]').exists()).toBe(
+        true,
+      );
     });
 
     it("does not flag a supported action", () => {
       wrapper = mountStep({ step: makeStep({ action: "click" }), expanded: true });
-      expect(
-        wrapper.find('[data-test="synthetics-journey-step-retired-action"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="synthetics-journey-step-retired-action"]').exists()).toBe(
+        false,
+      );
     });
 
     it("should show timeout input when expanded", () => {
@@ -606,9 +606,7 @@ describe("BrowserJourneyStep", () => {
     it("should drop the budget when the field is cleared", async () => {
       wrapper = mountStep({ step: settleStep(), expanded: true });
 
-      await wrapper
-        .find('[data-test="synthetics-journey-step-settle-budget-input"]')
-        .setValue("");
+      await wrapper.find('[data-test="synthetics-journey-step-settle-budget-input"]').setValue("");
 
       const emitted = wrapper.emitted("update:step") as BrowserStep[][];
       const next = emitted[0][0];

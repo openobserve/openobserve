@@ -28,7 +28,10 @@
  */
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
-import type { FailureDetail, StepEvidence as StepEvidenceSummary } from "@/composables/synthetics/syntheticResultsSchema";
+import type {
+  FailureDetail,
+  StepEvidence as StepEvidenceSummary,
+} from "@/composables/synthetics/syntheticResultsSchema";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 
@@ -80,9 +83,7 @@ function fmtMs(ms: number | null): string {
 const hasEvidence = computed(() => {
   const e = props.evidence;
   if (!e) return false;
-  return (
-    e.consoleErrors > 0 || e.pageErrors > 0 || e.requestsFailed > 0 || e.responsesNon2xx > 0
-  );
+  return e.consoleErrors > 0 || e.pageErrors > 0 || e.requestsFailed > 0 || e.responsesNon2xx > 0;
 });
 
 function outcomeVariant(outcome: string): "success" | "error" | "default" {
@@ -140,7 +141,11 @@ function outcomeVariant(outcome: string): "success" | "error" | "default" {
         <span>{{ t("synthetics.runDetail.settleStaleNote") }}</span>
       </p>
       <ul class="m-0 flex list-none flex-col gap-1 p-0">
-        <li v-for="(s, i) in signals" :key="`${s.signal}-${i}`" class="flex items-center gap-2 text-xs">
+        <li
+          v-for="(s, i) in signals"
+          :key="`${s.signal}-${i}`"
+          class="flex items-center gap-2 text-xs"
+        >
           <OBadge :variant="s.status === 'fired' ? 'success' : 'error'" size="sm">
             {{ s.status }}
           </OBadge>

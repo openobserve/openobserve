@@ -64,7 +64,9 @@ describe("BrowserJourneyLocator", () => {
     const wrapper = render();
     // The fallbacks are collapsed by default — the effective locator is the
     // thing an author usually needs, and the rest is evidence behind a click.
-    await wrapper.find(`${test("synthetics-journey-step-locator-fallbacks")} button`).trigger("click");
+    await wrapper
+      .find(`${test("synthetics-journey-step-locator-fallbacks")} button`)
+      .trigger("click");
 
     const pinButtons = wrapper.findAll(test("synthetics-journey-step-locator-pin-btn"));
     expect(pinButtons.length).toBe(2);
@@ -80,7 +82,9 @@ describe("BrowserJourneyLocator", () => {
       ...BUNDLE,
       user_override: { kind: "css", value: "#pinned" },
     });
-    expect(wrapper.find(test("synthetics-journey-step-locator-primary")).text()).toContain("#pinned");
+    expect(wrapper.find(test("synthetics-journey-step-locator-primary")).text()).toContain(
+      "#pinned",
+    );
     expect(wrapper.find(test("synthetics-journey-step-locator-pinned-note")).exists()).toBe(true);
   });
 

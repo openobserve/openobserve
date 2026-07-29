@@ -37,9 +37,15 @@ describe("BrowserJourneyAssertion", () => {
   });
 
   it("asks for an expected value on every kind except the visibility ones", () => {
-    expect(render({ kind: "element_text", expected: "Welcome" }).find(EXPECTED).exists()).toBe(true);
-    expect(render({ kind: "url_matches", expected: "**/web/**" }).find(EXPECTED).exists()).toBe(true);
-    expect(render({ kind: "page_title", expected: "Dashboard" }).find(EXPECTED).exists()).toBe(true);
+    expect(render({ kind: "element_text", expected: "Welcome" }).find(EXPECTED).exists()).toBe(
+      true,
+    );
+    expect(render({ kind: "url_matches", expected: "**/web/**" }).find(EXPECTED).exists()).toBe(
+      true,
+    );
+    expect(render({ kind: "page_title", expected: "Dashboard" }).find(EXPECTED).exists()).toBe(
+      true,
+    );
     expect(render({ kind: "element_not_visible" }).find(EXPECTED).exists()).toBe(false);
   });
 

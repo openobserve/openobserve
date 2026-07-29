@@ -31,7 +31,11 @@ describe("ZeroAssertionNotice", () => {
   });
 
   it("stays quiet once the journey asserts something", () => {
-    expect(render([step(), step({ id: "s2", action: "assert" })]).find(NOTICE).exists()).toBe(false);
+    expect(
+      render([step(), step({ id: "s2", action: "assert" })])
+        .find(NOTICE)
+        .exists(),
+    ).toBe(false);
   });
 
   it("stays quiet for an empty journey — there is nothing to assert about yet", () => {

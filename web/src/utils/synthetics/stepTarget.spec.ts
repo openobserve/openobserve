@@ -55,9 +55,9 @@ describe("stepIsMissingTarget", () => {
   });
 
   it("should reject a v2 step whose bundle is empty", () => {
-    expect(
-      stepIsMissingTarget(step({ locator: { candidates: [], user_override: null } })),
-    ).toBe(true);
+    expect(stepIsMissingTarget(step({ locator: { candidates: [], user_override: null } }))).toBe(
+      true,
+    );
   });
 
   it("should not require a target for actions that carry no element", () => {
@@ -73,9 +73,9 @@ describe("stepIsMissingTarget", () => {
         step({ action: "assert", assertion: { kind: "url_matches", expected: "/home" } }),
       ),
     ).toBe(false);
-    expect(
-      stepIsMissingTarget(step({ action: "assert", assertion: { kind: "page_title" } })),
-    ).toBe(false);
+    expect(stepIsMissingTarget(step({ action: "assert", assertion: { kind: "page_title" } }))).toBe(
+      false,
+    );
   });
 
   it("should still require a target for an element-level assertion", () => {

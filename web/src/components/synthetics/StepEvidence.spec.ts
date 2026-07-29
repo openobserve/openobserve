@@ -90,7 +90,13 @@ describe("StepEvidence — settle signals (P5.4 item 4)", () => {
     const w = render(
       detail({
         settleSignals: [
-          { kind: "navigation", signal: "navigation to **/web/**", status: "fired", required: false, waitedMs: 800 },
+          {
+            kind: "navigation",
+            signal: "navigation to **/web/**",
+            status: "fired",
+            required: false,
+            waitedMs: 800,
+          },
         ],
       }),
     );
@@ -129,9 +135,7 @@ describe("StepEvidence — what the application did (Phase 6)", () => {
     pageErrors: 1,
     requestsFailed: 0,
     responsesNon2xx: 3,
-    worstResponses: [
-      { method: "POST", url: "https://x/auth/login", status: 503, count: 3 },
-    ],
+    worstResponses: [{ method: "POST", url: "https://x/auth/login", status: 503, count: 3 }],
     firstConsoleErrors: ["[auth] sign-in failed: 503 Service Unavailable"],
   };
 

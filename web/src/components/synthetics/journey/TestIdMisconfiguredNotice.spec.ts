@@ -32,7 +32,11 @@ describe("TestIdMisconfiguredNotice", () => {
     // The silent failure: upstream's generator emits nothing at test-id rank
     // when the configured attribute is not the one the app uses, and every step
     // degrades to role/text/css without an error anywhere.
-    expect(render([step("role"), step("css")]).find(NOTICE).exists()).toBe(true);
+    expect(
+      render([step("role"), step("css")])
+        .find(NOTICE)
+        .exists(),
+    ).toBe(true);
   });
 
   it("names the attribute that was actually used, so the fix is obvious", () => {
@@ -40,13 +44,21 @@ describe("TestIdMisconfiguredNotice", () => {
   });
 
   it("stays silent when any step found a test attribute", () => {
-    expect(render([step("css"), step("test_attribute")]).find(NOTICE).exists()).toBe(false);
+    expect(
+      render([step("css"), step("test_attribute")])
+        .find(NOTICE)
+        .exists(),
+    ).toBe(false);
   });
 
   it("stays silent for a journey with no element steps at all", () => {
     // A navigate-only journey has nothing to find; zero test attributes there
     // is not evidence of anything.
-    expect(render([step(null)]).find(NOTICE).exists()).toBe(false);
+    expect(
+      render([step(null)])
+        .find(NOTICE)
+        .exists(),
+    ).toBe(false);
     expect(render([]).find(NOTICE).exists()).toBe(false);
   });
 

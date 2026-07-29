@@ -18,8 +18,7 @@ import { buildAttemptViews, mapRunDetail } from "./syntheticResultsSchema";
 
 /** One execution of `intro test (expect fail)`, retries=1, as ingested. */
 function ingestedRow(over: Record<string, unknown> = {}) {
-  const base =
-    "synthetics/default/3HAzRCdLOfBKPUm6Rg4Pvr9Ocig/2026/07/29/RUN/EXEC/";
+  const base = "synthetics/default/3HAzRCdLOfBKPUm6Rg4Pvr9Ocig/2026/07/29/RUN/EXEC/";
   return {
     ts: 1785356358235000,
     status: "failed",
@@ -61,10 +60,25 @@ function ingestedRow(over: Record<string, unknown> = {}) {
         response_time_ms: 57795,
         init_ms: 188,
         steps: [
-          { step_id: "s1", status: "passed", duration_ms: 5046, screenshot_key: `${base}screenshot-s1.png` },
-          { step_id: "fa1", status: "failed", duration_ms: 5003, screenshot_key: `${base}screenshot-fa1.png` },
+          {
+            step_id: "s1",
+            status: "passed",
+            duration_ms: 5046,
+            screenshot_key: `${base}screenshot-s1.png`,
+          },
+          {
+            step_id: "fa1",
+            status: "failed",
+            duration_ms: 5003,
+            screenshot_key: `${base}screenshot-fa1.png`,
+          },
         ],
-        failure_detail: { step_id: "fa1", step_name: "Assert visible", step_index: 20, error: "Timeout" },
+        failure_detail: {
+          step_id: "fa1",
+          step_name: "Assert visible",
+          step_index: 20,
+          error: "Timeout",
+        },
         artifacts: {
           screenshot_refs: [{ step_id: "fa1", key: `${base}screenshot-fa1.png` }],
           trace_ref: `${base}trace.zip`,
@@ -77,10 +91,25 @@ function ingestedRow(over: Record<string, unknown> = {}) {
         response_time_ms: 58341,
         init_ms: 118,
         steps: [
-          { step_id: "s1", status: "passed", duration_ms: 5065, screenshot_key: `${base}attempt-1-screenshot-s1.png` },
-          { step_id: "fa1", status: "failed", duration_ms: 5005, screenshot_key: `${base}attempt-1-screenshot-fa1.png` },
+          {
+            step_id: "s1",
+            status: "passed",
+            duration_ms: 5065,
+            screenshot_key: `${base}attempt-1-screenshot-s1.png`,
+          },
+          {
+            step_id: "fa1",
+            status: "failed",
+            duration_ms: 5005,
+            screenshot_key: `${base}attempt-1-screenshot-fa1.png`,
+          },
         ],
-        failure_detail: { step_id: "fa1", step_name: "Assert visible", step_index: 20, error: "Timeout" },
+        failure_detail: {
+          step_id: "fa1",
+          step_name: "Assert visible",
+          step_index: 20,
+          error: "Timeout",
+        },
         artifacts: {
           screenshot_refs: [{ step_id: "fa1", key: `${base}attempt-1-screenshot-fa1.png` }],
           trace_ref: `${base}attempt-1-trace.zip`,
@@ -158,7 +187,11 @@ describe("per-attempt artifacts", () => {
     // `fail` reports a correctly-skipped step as a broken one.
     const rows = viewsFor({
       retry_history: JSON.stringify([
-        { attempt: 0, status: "failed", steps: [{ step_id: "opt", status: "skipped", duration_ms: 1 }] },
+        {
+          attempt: 0,
+          status: "failed",
+          steps: [{ step_id: "opt", status: "skipped", duration_ms: 1 }],
+        },
         { attempt: 1, status: "failed", steps: [] },
       ]),
     });
@@ -184,7 +217,12 @@ describe("per-attempt artifacts", () => {
 
   it("gives every attempt its own evidence bundle and trace", () => {
     const [a0, a1] = viewsFor();
-    expect(a0.evidenceKey).toBe("…/evidence.ndjson".replace("…/", a0.evidenceKey!.slice(0, a0.evidenceKey!.lastIndexOf("/") + 1)));
+    expect(a0.evidenceKey).toBe(
+      "…/evidence.ndjson".replace(
+        "…/",
+        a0.evidenceKey!.slice(0, a0.evidenceKey!.lastIndexOf("/") + 1),
+      ),
+    );
     expect(a0.evidenceKey).not.toContain("attempt-1-");
     expect(a1.evidenceKey).toContain("attempt-1-evidence.ndjson");
     expect(a0.traceKey).not.toContain("attempt-1-");

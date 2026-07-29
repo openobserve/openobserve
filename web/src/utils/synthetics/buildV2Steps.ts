@@ -67,7 +67,8 @@ export function isV2Journey(steps: BrowserStep[]): boolean {
     if ((RETIRED_ACTIONS as readonly string[]).includes(step.action)) return false;
     if (!ACTION_TO_V2[step.action]) return false;
     if (step.action === "navigate") return true;
-    if (step.action === "assert" && PAGE_LEVEL_ASSERTIONS.has(step.assertion?.kind ?? "")) return true;
+    if (step.action === "assert" && PAGE_LEVEL_ASSERTIONS.has(step.assertion?.kind ?? ""))
+      return true;
     return !!(step.locator?.candidates?.length || step.locator?.user_override);
   });
 }
@@ -126,7 +127,8 @@ export function buildV2Step(step: BrowserStep): V2WireStep {
 
   if (step.settle) {
     const settle: NonNullable<V2WireStep["settle"]> = {};
-    if (step.settle.navigation) settle.navigation = { url_pattern: step.settle.navigation.url_pattern };
+    if (step.settle.navigation)
+      settle.navigation = { url_pattern: step.settle.navigation.url_pattern };
     if (step.settle.responses?.length) {
       settle.responses = step.settle.responses.map((r) => ({
         url_pattern: r.url_pattern,

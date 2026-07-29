@@ -228,11 +228,15 @@ describe("EvidencePanel", () => {
 
     const passed = mountPanel({ evidenceKey: null, runPassed: true });
     await flushPromises();
-    expect(passed.find('[data-test="synthetics-evidence-empty"]').text()).toContain("failed runs only");
+    expect(passed.find('[data-test="synthetics-evidence-empty"]').text()).toContain(
+      "failed runs only",
+    );
 
     const none = mountPanel({ evidenceKey: null });
     await flushPromises();
-    expect(none.find('[data-test="synthetics-evidence-empty"]').text()).toContain("No evidence bundle");
+    expect(none.find('[data-test="synthetics-evidence-empty"]').text()).toContain(
+      "No evidence bundle",
+    );
     // Never fetch when there is no key.
     expect(globalThis.fetch).not.toHaveBeenCalled();
   });

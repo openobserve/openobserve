@@ -145,10 +145,26 @@ const chips = computed(() => {
   const c = bundle.value.counts;
   return [
     { key: "all" as Filter, label: t("synthetics.evidence.filterAll"), count: c.all },
-    { key: "consoleErrors" as Filter, label: t("synthetics.evidence.filterConsole"), count: c.consoleErrors },
-    { key: "pageErrors" as Filter, label: t("synthetics.evidence.filterPageErrors"), count: c.pageErrors },
-    { key: "nonNon2xx" as Filter, label: t("synthetics.evidence.filterNon2xx"), count: c.nonNon2xx },
-    { key: "requestsFailed" as Filter, label: t("synthetics.evidence.filterFailedReq"), count: c.requestsFailed },
+    {
+      key: "consoleErrors" as Filter,
+      label: t("synthetics.evidence.filterConsole"),
+      count: c.consoleErrors,
+    },
+    {
+      key: "pageErrors" as Filter,
+      label: t("synthetics.evidence.filterPageErrors"),
+      count: c.pageErrors,
+    },
+    {
+      key: "nonNon2xx" as Filter,
+      label: t("synthetics.evidence.filterNon2xx"),
+      count: c.nonNon2xx,
+    },
+    {
+      key: "requestsFailed" as Filter,
+      label: t("synthetics.evidence.filterFailedReq"),
+      count: c.requestsFailed,
+    },
   ];
 });
 
@@ -166,7 +182,8 @@ function shortUrl(url: string | null): string {
 function statusClass(e: EvidenceEvent): string {
   if (e.kind === "requestfailed" || e.kind === "crash" || e.kind === "pageerror")
     return "text-status-error-text";
-  if (e.kind === "console") return e.level === "error" ? "text-status-error-text" : "text-text-secondary";
+  if (e.kind === "console")
+    return e.level === "error" ? "text-status-error-text" : "text-text-secondary";
   const s = e.status ?? 0;
   if (s >= 500) return "text-status-error-text";
   if (s >= 400) return "text-status-warning-text";
@@ -181,9 +198,7 @@ function toggle(i: number) {
   expanded.value = next;
 }
 
-const downloadUrl = computed(() =>
-  props.evidenceKey ? props.resolveUrl(props.evidenceKey) : "",
-);
+const downloadUrl = computed(() => (props.evidenceKey ? props.resolveUrl(props.evidenceKey) : ""));
 </script>
 
 <template>
@@ -267,7 +282,11 @@ const downloadUrl = computed(() =>
             {{ c.label }} {{ c.count }}
           </button>
           <label class="text-text-secondary ml-2 flex items-center gap-1 text-xs">
-            <input v-model="firstPartyOnly" type="checkbox" data-test="synthetics-evidence-first-party" />
+            <input
+              v-model="firstPartyOnly"
+              type="checkbox"
+              data-test="synthetics-evidence-first-party"
+            />
             {{ t("synthetics.evidence.firstPartyOnly") }}
           </label>
         </div>
@@ -293,11 +312,13 @@ const downloadUrl = computed(() =>
           <div
             v-for="(e, i) in g.events"
             :key="`${g.kind}-${i}`"
-            class="hover:bg-surface-raised flex items-start gap-2 rounded px-1 py-0.5 font-mono text-xs"
+            class="hover:bg-surface-raised rounded-default flex items-start gap-2 px-1 py-0.5 font-mono text-xs"
             :class="e.firstParty ? '' : 'opacity-60'"
           >
             <span class="w-10 shrink-0 text-right" :class="statusClass(e)">
-              {{ e.kind === "response" ? (e.status ?? "—") : e.kind === "requestfailed" ? "—" : "" }}
+              {{
+                e.kind === "response" ? (e.status ?? "—") : e.kind === "requestfailed" ? "—" : ""
+              }}
             </span>
             <span class="text-text-secondary w-12 shrink-0">{{ e.method ?? e.level ?? "" }}</span>
             <span class="min-w-0 flex-1 truncate" :title="e.url ?? e.text ?? e.message ?? ''">
@@ -325,7 +346,6 @@ const downloadUrl = computed(() =>
             </button>
           </div>
         </div>
-
       </template>
     </template>
   </div>

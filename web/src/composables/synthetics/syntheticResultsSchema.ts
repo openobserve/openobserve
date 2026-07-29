@@ -527,7 +527,7 @@ export function foldEvidenceBundle(
 ): EvidenceBundle {
   const named = events.map((e) => ({
     ...e,
-    stepName: e.stepId ? (stepDefs.get(e.stepId)?.name || e.stepId) : null,
+    stepName: e.stepId ? stepDefs.get(e.stepId)?.name || e.stepId : null,
   }));
 
   const byKind = new Map<EvidenceGroup["kind"], EvidenceEvent[]>();
@@ -1061,9 +1061,7 @@ export function splitDelimited(raw: unknown): string[] {
   return v.split(",").filter(Boolean);
 }
 
-export function foldRetryAttribution(
-  hits: Record<string, unknown>[],
-): RetryAttributionSummary {
+export function foldRetryAttribution(hits: Record<string, unknown>[]): RetryAttributionSummary {
   const byExecution = new Map<string, Set<string>>();
   const byStep = new Map<string, StepRetryProfile>();
   const byErrorClass = new Map<string, number>();
@@ -1350,9 +1348,7 @@ export function mapKpi(
     // uptime by exactly our own dispatch-failure rate. `errorRuns` is reported
     // separately so the omission is visible rather than silent.
     uptimePct:
-      totalRuns - errorRuns > 0
-        ? ((passedRuns + warningRuns) / (totalRuns - errorRuns)) * 100
-        : 0,
+      totalRuns - errorRuns > 0 ? ((passedRuns + warningRuns) / (totalRuns - errorRuns)) * 100 : 0,
     p95Ms: num(rawKpiRow?.p95_duration),
     passedRuns,
     warningRuns,
@@ -1473,7 +1469,8 @@ export function buildAttemptViews(detail: SyntheticRunDetail): AttemptView[] {
     return [
       {
         attempt: 0,
-        status: detail.status === STATUS_VALUES.passed ? STATUS_VALUES.passed : STATUS_VALUES.failed,
+        status:
+          detail.status === STATUS_VALUES.passed ? STATUS_VALUES.passed : STATUS_VALUES.failed,
         durationMs: detail.durationMs,
         failedStep: detail.failedStep,
         steps: detail.lastAttemptSteps,
@@ -1541,8 +1538,7 @@ function mapFailureDetail(raw: unknown, recordTraceKey?: unknown): FailureDetail
         }))
       : [],
     settleMs: typeof d.settle_ms === "number" ? d.settle_ms : null,
-    observedDurationMs:
-      typeof d.observed_duration_ms === "number" ? d.observed_duration_ms : null,
+    observedDurationMs: typeof d.observed_duration_ms === "number" ? d.observed_duration_ms : null,
     screenshotKey: d.screenshot_key ? str(d.screenshot_key) : null,
     traceKey: d.trace_key ? str(d.trace_key) : recordTraceKey ? str(recordTraceKey) : null,
   };
@@ -1570,12 +1566,12 @@ function flattenedFailureDetail(rawHit: Record<string, unknown>): unknown {
     error: str(rawHit.failure_detail_error),
     candidates_tried: parseJsonArray(rawHit.failure_detail_candidates_tried),
     settle_signals: parseJsonArray(rawHit.failure_detail_settle_signals),
-    settle_ms: rawHit.failure_detail_settle_ms == null
-      ? undefined
-      : num(rawHit.failure_detail_settle_ms),
-    observed_duration_ms: rawHit.failure_detail_observed_duration_ms == null
-      ? undefined
-      : num(rawHit.failure_detail_observed_duration_ms),
+    settle_ms:
+      rawHit.failure_detail_settle_ms == null ? undefined : num(rawHit.failure_detail_settle_ms),
+    observed_duration_ms:
+      rawHit.failure_detail_observed_duration_ms == null
+        ? undefined
+        : num(rawHit.failure_detail_observed_duration_ms),
     screenshot_key: rawHit.failure_detail_screenshot_key
       ? str(rawHit.failure_detail_screenshot_key)
       : undefined,
@@ -1851,9 +1847,7 @@ export function aggregateStepStats(
     const runTsMs = runTimestamp / 1000;
     const bucketKey = timeBucketKey(runTsMs, bucketMs);
 
-    const recordedSteps = stepDefsFromQuery
-      ? []
-      : (parseJsonArray(hit.recorded_steps) as any[]);
+    const recordedSteps = stepDefsFromQuery ? [] : (parseJsonArray(hit.recorded_steps) as any[]);
     const lastAttemptSteps = parseJsonArray(hit.last_attempt_steps) as any[];
     const retryHistory = parseJsonArray(hit.retry_history) as any[];
 

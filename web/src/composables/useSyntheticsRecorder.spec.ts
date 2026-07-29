@@ -199,31 +199,31 @@ describe("useSyntheticsRecorder", () => {
     });
   });
 
-    it("sends the configured test-id attribute when one is given", async () => {
-      const r = useSyntheticsRecorder();
-      const promise = r.startRecording("https://app.test", "data-qa");
+  it("sends the configured test-id attribute when one is given", async () => {
+    const r = useSyntheticsRecorder();
+    const promise = r.startRecording("https://app.test", "data-qa");
 
-      await settleProbeDelay();
-      respondToLastCommand({ success: true });
-      await promise;
+    await settleProbeDelay();
+    respondToLastCommand({ success: true });
+    await promise;
 
-      // An application on data-qa/data-cy/data-pw produced NO test-attribute
-      // candidates before this — upstream's hardcoded fallback list covers only
-      // data-testid, data-test-id and data-test, so their strongest attribute
-      // was stored as plain css, rank 3, behind text.
-      expect(getLastCommand().testIdAttr).toBe("data-qa");
-    });
+    // An application on data-qa/data-cy/data-pw produced NO test-attribute
+    // candidates before this — upstream's hardcoded fallback list covers only
+    // data-testid, data-test-id and data-test, so their strongest attribute
+    // was stored as plain css, rank 3, behind text.
+    expect(getLastCommand().testIdAttr).toBe("data-qa");
+  });
 
-    it("falls back to the O2 default when no attribute is given", async () => {
-      const r = useSyntheticsRecorder();
-      const promise = r.startRecording("https://app.test", "");
+  it("falls back to the O2 default when no attribute is given", async () => {
+    const r = useSyntheticsRecorder();
+    const promise = r.startRecording("https://app.test", "");
 
-      await settleProbeDelay();
-      respondToLastCommand({ success: true });
-      await promise;
+    await settleProbeDelay();
+    respondToLastCommand({ success: true });
+    await promise;
 
-      expect(getLastCommand().testIdAttr).toBe("data-test");
-    });
+    expect(getLastCommand().testIdAttr).toBe("data-test");
+  });
 
   // ── stopRecording ──────────────────────────────────────────────────────
 

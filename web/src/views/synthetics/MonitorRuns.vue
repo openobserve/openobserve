@@ -1473,12 +1473,8 @@ const hasKpiData = computed(() => synthetics.kpi.value.totalRuns > 0);
  * Aggregated across slices, a check solidly broken in one region and healthy in
  * five looks identical to one intermittently broken everywhere.
  */
-const partitionStability = computed(() =>
-  computePartitionStability(synthetics.runs.value),
-);
-const unstablePartitions = computed(() =>
-  partitionStability.value.filter((p) => p.unstable),
-);
+const partitionStability = computed(() => computePartitionStability(synthetics.runs.value));
+const unstablePartitions = computed(() => partitionStability.value.filter((p) => p.unstable));
 
 const p95Label = computed(() =>
   effectiveP95Ms.value > 0 ? fmtDur(effectiveP95Ms.value) : hasKpiData.value ? fmtDur(0) : "—",

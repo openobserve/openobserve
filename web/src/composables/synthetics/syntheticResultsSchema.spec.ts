@@ -267,7 +267,10 @@ describe("foldStepDefs", () => {
 
   it("should build a step_id keyed lookup", () => {
     const defs = foldStepDefs([
-      row([{ id: "s1", name: "Open page" }, { id: "s2", name: "Click login" }]),
+      row([
+        { id: "s1", name: "Open page" },
+        { id: "s2", name: "Click login" },
+      ]),
     ]);
     expect(defs.get("s1")?.name).toBe("Open page");
     expect(defs.get("s2")?.name).toBe("Click login");
@@ -277,8 +280,8 @@ describe("foldStepDefs", () => {
     // Rows arrive newest-first, so the first definition seen for an id wins —
     // a renamed step shows its current name while older rows still resolve.
     const defs = foldStepDefs([
-      row([{ id: "s1", name: "Click sign in" }]),   // newer
-      row([{ id: "s1", name: "Click login" }]),     // older
+      row([{ id: "s1", name: "Click sign in" }]), // newer
+      row([{ id: "s1", name: "Click login" }]), // older
     ]);
     expect(defs.get("s1")?.name).toBe("Click sign in");
   });
@@ -742,7 +745,12 @@ describe("retry attribution", () => {
     // Counting absent as `false` would report every recovered run as
     // non-deterministic, which is the opposite of what happened.
     const summary = foldRetryAttribution([
-      { execution_id: "e1", status: STATUS_VALUES.warning, status_reason: STATUS_REASON.flaky, retry_step_ids: ",s1," },
+      {
+        execution_id: "e1",
+        status: STATUS_VALUES.warning,
+        status_reason: STATUS_REASON.flaky,
+        retry_step_ids: ",s1,",
+      },
     ]);
     expect(summary.consistentFailures).toBe(0);
     expect(summary.retriedExecutions).toBe(1);

@@ -42,9 +42,7 @@ const locatorSteps = computed(() =>
 );
 
 const hasTestAttribute = computed(() =>
-  locatorSteps.value.some((s) =>
-    s.locator!.candidates.some((c) => c.kind === "test_attribute"),
-  ),
+  locatorSteps.value.some((s) => s.locator!.candidates.some((c) => c.kind === "test_attribute")),
 );
 
 const show = computed(

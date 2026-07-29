@@ -361,6 +361,5 @@ function toggleExpanded() {
       :step="step"
       @update:step="emit('update:step', $event)"
     />
-
   </div>
 </template>

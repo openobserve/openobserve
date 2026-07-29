@@ -83,8 +83,7 @@ const DROP_REASONS: Record<string, string> = {
   wait: "Hard sleeps are removed: the runner now waits for the page itself, with a 30s/60s budget per step instead of a fixed delay.",
   scroll:
     "Scrolling carries no information — an element is scrolled into view automatically before it is acted on. This step did nothing at run time.",
-  screenshot:
-    "Screenshots are controlled per run by the capture setting, not per step.",
+  screenshot: "Screenshots are controlled per run by the capture setting, not per step.",
   hover:
     "Hover cannot be expressed as a v2 step. If this journey depends on a hover-revealed menu, re-record it instead of lifting.",
 };
@@ -111,9 +110,7 @@ function liftStep(step: BrowserStep, changes: LiftChange[]): BrowserStep | null 
   // recorded selector type; an unset type means the selector was authored by
   // hand, and CSS is the only safe assumption.
   if (step.selector && !step.locator) {
-    const kind: LocatorKind = step.selectorType
-      ? SELECTOR_TYPE_TO_KIND[step.selectorType]
-      : "css";
+    const kind: LocatorKind = step.selectorType ? SELECTOR_TYPE_TO_KIND[step.selectorType] : "css";
     const candidate: LocatorCandidate = { kind, value: step.selector };
     lifted.locator = { candidates: [candidate], user_override: null };
     changes.push({
@@ -232,7 +229,6 @@ function sleepBudgetMs(step: BrowserStep): number | null {
   if (!Number.isFinite(budget) || budget <= 0) return null;
   return Math.min(Math.max(Math.round(budget), MIN_SETTLE_BUDGET_MS), MAX_SETTLE_BUDGET_MS);
 }
-
 
 /**
  * Whether a journey needs lifting at all — used to decide if the upgrade
