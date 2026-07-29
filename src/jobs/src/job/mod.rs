@@ -685,6 +685,15 @@ pub async fn init() -> Result<(), anyhow::Error> {
             },
         );
 
+        let llm_eval_config =
+            &o2_enterprise::enterprise::common::config::get_config().llm_eval_config;
+        infra::table::online_eval_jobs::init_completion_window_defaults(
+            llm_eval_config.trace_idle_timeout_secs,
+            llm_eval_config.trace_max_age_secs,
+            llm_eval_config.session_idle_timeout_secs,
+            llm_eval_config.session_max_age_secs,
+        );
+
         o2_enterprise::enterprise::llm_evaluations::eval_jobs::async_executor::register_evaluator_trace_exporter(
             |org_id, traces, node_idx| {
                 Box::pin(async move {
@@ -1173,4 +1182,3 @@ pub async fn init_deferred() -> Result<(), anyhow::Error> {
 
     Ok(())
 }
-
