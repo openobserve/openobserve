@@ -138,3 +138,105 @@ describe("BrowserJourneyStepEditor inline field errors", () => {
     );
   });
 });
+
+// Phase 2 / SE-5. Grouped on the runner's own sequence — act, then settle, then
+// handle failure. Group 1 is always open; 2 and 3 open only when they hold
+// something other than defaults, and advertise that content in their caption so
+// collapsing hides nothing.
+describe("BrowserJourneyStepEditor field grouping", () => {
+  const groups = (wrapper: ReturnType<typeof render>) =>
+    wrapper.findAll('[data-test^="synthetics-journey-step-group-"]').map((g) =>
+      g.attributes("data-test"),
+    );
+
+  it("renders exactly the three groups", () => {
+    const wrapper = render();
+    expect(groups(wrapper)).toEqual([
+      "synthetics-journey-step-group-does",
+      "synthetics-journey-step-group-waits",
+      "synthetics-journey-step-group-failure",
+    ]);
+  });
+
+  // SE-16: the settle group used to be gated on hasSettle, so a hand-added step
+  // could never be given a budget — the field that creates one was hidden until
+  // one existed.
+  // OCollapsible unmounts collapsed content, so the group must be opened before
+  // its fields are in the DOM — the group being closed by default is the point.
+  async function openGroup(wrapper: ReturnType<typeof render>, name: string) {
+    await wrapper.find(`${test(name)} button`).trigger("click");
+  }
+
+  it("renders the waits group for a hand-added step with no settle data", async () => {
+    const wrapper = render();
+    expect(wrapper.find(test("synthetics-journey-step-group-waits")).exists()).toBe(true);
+    // Closed by default, because a hand-added step has nothing recorded yet...
+    expect(wrapper.find(test("synthetics-journey-step-settle-budget-input")).exists()).toBe(
+      false,
+    );
+    // ...but reachable, which is what SE-16 was about: the budget input is the only
+    // way to create a budget, and gating the group on "has a budget" hid it forever.
+    await openGroup(wrapper, "synthetics-journey-step-group-waits");
+    expect(wrapper.find(test("synthetics-journey-step-settle-budget-input")).exists()).toBe(true);
+  });
+
+  it("keeps action, name, target and value in the first group", () => {
+    const wrapper = render({ action: "type", value: "hunter2" });
+    const g1 = wrapper.find(test("synthetics-journey-step-group-does"));
+    expect(g1.find(test("synthetics-journey-step-action-select")).exists()).toBe(true);
+    expect(g1.find(test("synthetics-journey-step-name-input")).exists()).toBe(true);
+    expect(g1.find(test("synthetics-journey-step-locator")).exists()).toBe(true);
+    expect(g1.find(test("synthetics-journey-step-value-input")).exists()).toBe(true);
+  });
+
+  it("puts the flow-control fields and timeout in the failure group", async () => {
+    const wrapper = render();
+    await openGroup(wrapper, "synthetics-journey-step-group-failure");
+    const g3 = wrapper.find(test("synthetics-journey-step-group-failure"));
+    expect(g3.find(test("synthetics-journey-step-optional-checkbox")).exists()).toBe(true);
+    expect(g3.find(test("synthetics-journey-step-always-run-checkbox")).exists()).toBe(true);
+    expect(g3.find(test("synthetics-journey-step-timeout-input")).exists()).toBe(true);
+  });
+
+  it("opens the failure group already when it holds a non-default value", () => {
+    const wrapper = render({ optional: true });
+    expect(wrapper.find(test("synthetics-journey-step-timeout-input")).exists()).toBe(true);
+  });
+
+  it("shows no caption when a group holds only defaults", () => {
+    const wrapper = render();
+    expect(wrapper.find(test("synthetics-journey-step-group-failure")).text()).not.toMatch(
+      /Optional|Always run|Timeout \d/,
+    );
+  });
+
+  it("captions the failure group with each non-default value", () => {
+    const wrapper = render({ optional: true, alwaysRun: true, timeout: 10000 });
+    const caption = wrapper.find(test("synthetics-journey-step-group-failure")).text();
+    expect(caption).toContain("Optional");
+    expect(caption).toContain("Always run");
+    expect(caption).toContain("10");
+  });
+
+  it("captions the waits group when settle evidence was recorded", () => {
+    const wrapper = render({
+      settle: { navigation: { url_pattern: "**/home" }, observed_duration_ms: 1200 },
+    });
+    expect(wrapper.find(test("synthetics-journey-step-group-waits")).text()).toContain(
+      "recorded",
+    );
+  });
+});
+
+// Phase 2 / SE-15. The configure forms size fields with flex, not fixed widths;
+// the step editor was the outlier with `!important` overrides that defeated reflow.
+describe("BrowserJourneyStepEditor layout", () => {
+  it("uses no !important width overrides", () => {
+    const wrapper = render({ action: "type", value: "x" });
+    const offenders = wrapper
+      .findAll("*")
+      .map((n) => n.attributes("class") ?? "")
+      .filter((c) => /\bw-\d+!/.test(c));
+    expect(offenders).toEqual([]);
+  });
+});
