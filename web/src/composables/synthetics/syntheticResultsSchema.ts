@@ -1413,7 +1413,24 @@ function mapRetryHistory(raw: unknown): RetryAttempt[] {
   // query selected — `aggregateStepStats` already parsed the same column
   // correctly, which is what hid the asymmetry.
   return parseJsonArray(raw).map((a: any, i: number) => {
-    const steps: StepExecution[] = Array.isArray(a?.steps) ? a.steps : [];
+    // Normalised to the same vocabulary `lastAttemptSteps` uses. The probe
+    // writes `passed`/`failed`/`skipped` on the compact timeline while
+    // `StepExecution` declares `ok`/`fail`/`skipped`, and every consumer tests
+    // for `fail` — so passing these through raw rendered a superseded attempt's
+    // FAILING step as a pass: a green tick on the step that actually broke.
+    //
+    // `skipped` survives: an `optional` step exists precisely because it may not
+    // be there, and collapsing it to `fail` reports a correctly-skipped step as
+    // a broken one.
+    const steps: StepExecution[] = parseJsonArray(a?.steps).map((st: any) => ({
+      ...st,
+      status:
+        st?.status === "ok" || st?.status === "passed"
+          ? ("ok" as const)
+          : st?.status === "skipped"
+            ? ("skipped" as const)
+            : ("fail" as const),
+    }));
     const summed = steps.reduce((sum, st) => sum + (st.duration_ms ?? 0), 0);
     const refs: Array<{ step_id?: unknown; key?: unknown }> = Array.isArray(
       a?.artifacts?.screenshot_refs,

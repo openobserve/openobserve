@@ -34,9 +34,23 @@ function ingestedRow(over: Record<string, unknown> = {}) {
     synthetics_name: "intro test (expect fail)",
     trace_key: `${base}attempt-1-trace.zip`,
     evidence_key: `${base}attempt-1-evidence.ndjson`,
+    // The deciding attempt's steps, which is what `buildAttemptViews` substitutes
+    // for its compact timeline. The probe stamps `screenshot_key` here too, under
+    // the deciding attempt's own prefix.
     last_attempt_steps: JSON.stringify([
-      { step_id: "s1", status: "passed", duration_ms: 5065 },
-      { step_id: "fa1", status: "failed", duration_ms: 5005, error: "Timeout 5000ms exceeded" },
+      {
+        step_id: "s1",
+        status: "passed",
+        duration_ms: 5065,
+        screenshot_key: `${base}attempt-1-screenshot-s1.png`,
+      },
+      {
+        step_id: "fa1",
+        status: "failed",
+        duration_ms: 5005,
+        error: "Timeout 5000ms exceeded",
+        screenshot_key: `${base}attempt-1-screenshot-fa1.png`,
+      },
     ]),
     // The API returns this as a string, not an array. Passing an array here
     // would test a shape production never produces.
@@ -46,7 +60,10 @@ function ingestedRow(over: Record<string, unknown> = {}) {
         status: "failed",
         response_time_ms: 57795,
         init_ms: 188,
-        steps: [{ step_id: "fa1", status: "failed", duration_ms: 5003 }],
+        steps: [
+          { step_id: "s1", status: "passed", duration_ms: 5046, screenshot_key: `${base}screenshot-s1.png` },
+          { step_id: "fa1", status: "failed", duration_ms: 5003, screenshot_key: `${base}screenshot-fa1.png` },
+        ],
         failure_detail: { step_id: "fa1", step_name: "Assert visible", step_index: 20, error: "Timeout" },
         artifacts: {
           screenshot_refs: [{ step_id: "fa1", key: `${base}screenshot-fa1.png` }],
@@ -59,7 +76,10 @@ function ingestedRow(over: Record<string, unknown> = {}) {
         status: "failed",
         response_time_ms: 58341,
         init_ms: 118,
-        steps: [{ step_id: "fa1", status: "failed", duration_ms: 5005 }],
+        steps: [
+          { step_id: "s1", status: "passed", duration_ms: 5065, screenshot_key: `${base}attempt-1-screenshot-s1.png` },
+          { step_id: "fa1", status: "failed", duration_ms: 5005, screenshot_key: `${base}attempt-1-screenshot-fa1.png` },
+        ],
         failure_detail: { step_id: "fa1", step_name: "Assert visible", step_index: 20, error: "Timeout" },
         artifacts: {
           screenshot_refs: [{ step_id: "fa1", key: `${base}attempt-1-screenshot-fa1.png` }],
@@ -118,5 +138,56 @@ describe("attempt views", () => {
     expect(mapRunDetail(ingestedRow())!.attempts).toBe(2);
     // And falls back to the history length when `attempts` is absent.
     expect(mapRunDetail(ingestedRow({ attempts: 0 }))!.attempts).toBe(2);
+  });
+});
+
+// ── Each attempt keeps its own screenshots and its own evidence bundle ───────
+
+describe("per-attempt artifacts", () => {
+  it("normalises the compact timeline's step statuses", () => {
+    // The probe writes `passed`/`failed` on the compact timeline while
+    // `StepExecution` declares `ok`/`fail`, and every consumer tests for `fail`.
+    // Passed through raw, a superseded attempt's FAILING step rendered as a
+    // pass — a green tick on the step that actually broke.
+    const [superseded] = viewsFor();
+    expect(superseded.steps.map((s) => s.status)).toEqual(["ok", "fail"]);
+  });
+
+  it("keeps `skipped` distinct from `fail`", () => {
+    // An `optional` step exists because it may not be there; collapsing it to
+    // `fail` reports a correctly-skipped step as a broken one.
+    const rows = viewsFor({
+      retry_history: JSON.stringify([
+        { attempt: 0, status: "failed", steps: [{ step_id: "opt", status: "skipped", duration_ms: 1 }] },
+        { attempt: 1, status: "failed", steps: [] },
+      ]),
+    });
+    expect(rows[0].steps[0].status).toBe("skipped");
+  });
+
+  it("resolves screenshots per attempt, from that attempt's own keys", () => {
+    const [a0, a1] = viewsFor();
+    // Attempt 0 keeps the bare key; retries are `attempt-N-` prefixed. Falling
+    // back to the record's key would show the deciding attempt's pixels under
+    // the failing attempt's label.
+    expect(a0.steps.find((s) => s.step_id === "fa1")!.screenshot_key).toContain(
+      "/screenshot-fa1.png",
+    );
+    expect(a0.steps.find((s) => s.step_id === "fa1")!.screenshot_key).not.toContain("attempt-1-");
+    expect(a1.steps.find((s) => s.step_id === "fa1")!.screenshot_key).toContain(
+      "attempt-1-screenshot-fa1.png",
+    );
+    // And the same via the refs map the step table reads.
+    expect(a0.screenshotKeys.get("fa1")).not.toContain("attempt-1-");
+    expect(a1.screenshotKeys.get("fa1")).toContain("attempt-1-");
+  });
+
+  it("gives every attempt its own evidence bundle and trace", () => {
+    const [a0, a1] = viewsFor();
+    expect(a0.evidenceKey).toBe("…/evidence.ndjson".replace("…/", a0.evidenceKey!.slice(0, a0.evidenceKey!.lastIndexOf("/") + 1)));
+    expect(a0.evidenceKey).not.toContain("attempt-1-");
+    expect(a1.evidenceKey).toContain("attempt-1-evidence.ndjson");
+    expect(a0.traceKey).not.toContain("attempt-1-");
+    expect(a1.traceKey).toContain("attempt-1-trace.zip");
   });
 });
