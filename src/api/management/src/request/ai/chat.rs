@@ -64,6 +64,14 @@ fn get_agent_type(context: &serde_json::Value) -> &'static str {
     }
 }
 
+/// Marker o2-ai returns when a session's owning replica cannot serve it.
+///
+/// Must match the code in o2-ai's `src/server/app.py`. The UI keys its
+/// conversation-restore flow on this exact string, so it is matched rather than
+/// re-derived, and must not be reused for unrelated failures.
+#[cfg(feature = "enterprise")]
+const SESSION_OWNER_UNAVAILABLE: &str = "session_owner_unavailable";
+
 /// Whether `val` is a well-formed o2 assistant session id (UUID 8-4-4-4-12).
 ///
 /// The id is client-supplied and ends up in outbound URLs and — under HA — as
@@ -828,10 +836,22 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
                         "[trace_id:{trace_id}] [user_id:{user_id}] [org_id:{org_id_str}] \
                          Agent query failed: {e}"
                     );
-                    let error_event = serde_json::json!({
+                    // Carry a machine-readable code when the agent reported one.
+                    // The stream has already returned 200 by the time this
+                    // fires, so the client sees a successful response with an
+                    // error event inside it — the HTTP status is no longer
+                    // available to key on. Without the code here, a recoverable
+                    // "this conversation moved" is indistinguishable from a
+                    // hard failure, and the UI cannot offer to restore it.
+                    let msg = e.to_string();
+                    let mut error_event = serde_json::json!({
                         "type": "error",
-                        "error": format!("Agent query failed: {}", e)
+                        "error": format!("Agent query failed: {}", msg)
                     });
+                    if msg.contains(SESSION_OWNER_UNAVAILABLE) {
+                        error_event["code"] = serde_json::json!(SESSION_OWNER_UNAVAILABLE);
+                        error_event["recoverable"] = serde_json::json!(true);
+                    }
                     yield Ok(bytes::Bytes::from(format!("data: {}\n\n", error_event)));
                     // End span on error path too
                     if let Some(span_cx) = otel_chat_span {

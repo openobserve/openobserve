@@ -110,21 +110,11 @@ struct ReplicaEntry {
     addr: String,
 }
 
-/// Pick a live o2-ai replica to host a NEW session.
+/// The o2-ai replicas currently heartbeating, as `(name, addr)` pairs.
 ///
-/// Only for sessions with no claim yet. Existing sessions must always route to
-/// their recorded owner ([`get_session_owner_addr`]) — placing an existing
-/// session would send it to a replica that has never seen it.
-///
-/// Selection hashes the session id over the sorted live set, so it is
-/// deterministic and spreads sessions evenly without any coordination between
-/// openobserve nodes. This mirrors how queriers are dispatched
-/// (`get_node_from_consistent_hash`), but over o2-ai's own registry rather than
-/// the cluster ring — o2-ai replicas are not cluster nodes.
-///
-/// Returns `None` if no replica is heartbeating, in which case the caller falls
-/// back to the configured agent URL.
-pub async fn pick_replica_for_new_session(session_id: &str) -> Option<String> {
+/// Deliberately not cached, unlike the session bucket: this is the *live* set,
+/// and a stale copy would keep routing to a replica that is gone.
+async fn live_replicas() -> Vec<(String, String)> {
     let cfg = get_config();
     let bucket_name = format!("{}{}", cfg.nats.prefix, REPLICAS_BUCKET);
 
@@ -134,17 +124,15 @@ pub async fn pick_replica_for_new_session(session_id: &str) -> Option<String> {
         Ok(b) => b,
         Err(e) => {
             log::debug!("[AI_SESSIONS] replica registry {bucket_name} unavailable: {e}");
-            return None;
+            return Vec::new();
         }
     };
 
-    // Deliberately not cached, unlike the session bucket: this is the live set,
-    // and a stale copy would keep placing new sessions on a dead replica.
     let mut keys = match bucket.keys().await {
         Ok(k) => k,
         Err(e) => {
             log::debug!("[AI_SESSIONS] cannot list replicas: {e}");
-            return None;
+            return Vec::new();
         }
     };
 
@@ -157,6 +145,25 @@ pub async fn pick_replica_for_new_session(session_id: &str) -> Option<String> {
             replicas.push((v.name, v.addr.trim_end_matches('/').to_string()));
         }
     }
+    replicas
+}
+
+/// Pick a live o2-ai replica to host a NEW session.
+///
+/// Only for sessions with no claim yet. Existing sessions must always route to
+/// their recorded owner ([`get_session_route`]) — placing an existing
+/// session would send it to a replica that has never seen it.
+///
+/// Selection hashes the session id over the sorted live set, so it is
+/// deterministic and spreads sessions evenly without any coordination between
+/// openobserve nodes. This mirrors how queriers are dispatched
+/// (`get_node_from_consistent_hash`), but over o2-ai's own registry rather than
+/// the cluster ring — o2-ai replicas are not cluster nodes.
+///
+/// Returns `None` if no replica is heartbeating, in which case the caller falls
+/// back to the configured agent URL.
+pub async fn pick_replica_for_new_session(session_id: &str) -> Option<String> {
+    let mut replicas = live_replicas().await;
 
     if replicas.is_empty() {
         log::debug!("[AI_SESSIONS] no live o2-ai replicas registered");
@@ -179,12 +186,29 @@ pub async fn pick_replica_for_new_session(session_id: &str) -> Option<String> {
     Some(addr.clone())
 }
 
-/// The routable address of the o2-ai replica owning `session_id`.
+/// Where a session should be routed.
+#[derive(Debug, Clone, PartialEq)]
+pub enum SessionRoute {
+    /// The owning replica is alive: dial this address.
+    Owner(String),
+    /// The session is claimed by a replica that is no longer heartbeating.
+    ///
+    /// Its conversation is gone — no other replica can serve it. Dialling the
+    /// dead address would surface as a connect error ("failed to send request"),
+    /// which the client cannot distinguish from a network blip and the UI cannot
+    /// act on. Callers must instead report this as an owner-unavailable
+    /// condition so the UI can restore the conversation into a fresh session.
+    OwnerUnavailable { owner: String },
+    /// No claim recorded — a new conversation, free to be placed anywhere.
+    Unclaimed,
+}
+
+/// Where to route `session_id`.
 ///
-/// Returns `None` for every non-answer: no claim recorded yet (a new
-/// conversation), no advertised address, NATS unreachable, or a malformed
-/// record. Callers treat them identically — fall back to the configured agent
-/// URL and let o2-ai's own ownership check catch a genuine misroute.
+/// Cross-checks the recorded owner against the live-replica registry, because a
+/// claim deliberately outlives its replica (so a session stays pinned across a
+/// restart). Without that check a session owned by a dead replica resolves to an
+/// unreachable address and the request fails at the transport layer.
 ///
 /// # Consumers
 ///
@@ -192,30 +216,55 @@ pub async fn pick_replica_for_new_session(session_id: &str) -> Option<String> {
 /// `AiAgentClient` (`o2_enterprise::enterprise::ai::client`) to route a session
 /// to its owning replica. Signature changes here must be made in lockstep with
 /// that crate.
-pub async fn get_session_owner_addr(session_id: &str) -> Option<String> {
+pub async fn get_session_route(session_id: &str) -> SessionRoute {
     if session_id.is_empty() {
-        return None;
+        return SessionRoute::Unclaimed;
     }
 
-    let bucket = session_bucket().await?;
+    let Some(bucket) = session_bucket().await else {
+        return SessionRoute::Unclaimed;
+    };
 
     let entry = match bucket.get(session_id).await {
         Ok(Some(v)) => v,
-        Ok(None) => return None,
+        Ok(None) => return SessionRoute::Unclaimed,
         Err(e) => {
             log::debug!("[AI_SESSIONS] lookup of session {session_id} failed: {e}");
-            return None;
+            return SessionRoute::Unclaimed;
         }
     };
 
     match config::utils::json::from_slice::<SessionOwner>(&entry) {
         Ok(v) if !v.addr.is_empty() => {
-            log::debug!(
-                "[AI_SESSIONS] session {session_id} owned by {} at {}",
-                v.owner,
-                v.addr
-            );
-            Some(v.addr.trim_end_matches('/').to_string())
+            // A claim outlives its replica by design. Confirm the owner is still
+            // heartbeating before sending anything to it.
+            let live = live_replicas().await;
+            if live.is_empty() {
+                // Registry unavailable — don't declare a healthy replica dead on
+                // the strength of a failed lookup. Route to the claim and let the
+                // request succeed or fail on its own merits.
+                log::debug!(
+                    "[AI_SESSIONS] replica registry empty; routing session {session_id} to \
+                     recorded owner {} without a liveness check",
+                    v.owner
+                );
+                return SessionRoute::Owner(v.addr.trim_end_matches('/').to_string());
+            }
+            if live.iter().any(|(name, _)| name == &v.owner) {
+                log::debug!(
+                    "[AI_SESSIONS] session {session_id} owned by {} at {}",
+                    v.owner,
+                    v.addr
+                );
+                SessionRoute::Owner(v.addr.trim_end_matches('/').to_string())
+            } else {
+                log::warn!(
+                    "[AI_SESSIONS] session {session_id} is owned by {}, which is no longer \
+                     registered; the conversation is unavailable",
+                    v.owner
+                );
+                SessionRoute::OwnerUnavailable { owner: v.owner }
+            }
         }
         Ok(v) => {
             // Claimed, but the owner published no address — it is running
@@ -225,11 +274,11 @@ pub async fn get_session_owner_addr(session_id: &str) -> Option<String> {
                  address; falling back to the configured agent URL",
                 v.owner
             );
-            None
+            SessionRoute::Unclaimed
         }
         Err(e) => {
             log::warn!("[AI_SESSIONS] malformed record for session {session_id}: {e}");
-            None
+            SessionRoute::Unclaimed
         }
     }
 }

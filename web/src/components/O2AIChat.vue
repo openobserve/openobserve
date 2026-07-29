@@ -2484,6 +2484,13 @@ export default defineComponent({
 
                   // Handle error events - display error message to user
                   if (data && data.type === "error") {
+                    // Owning replica is gone — flag and stop; sendMessage
+                    // restores the conversation once the stream ends. See the
+                    // matching check in the other error branches.
+                    if (data.code === "session_owner_unavailable") {
+                      streamOwnerUnavailable.value = true;
+                      continue;
+                    }
                     // Complete any active tool call first
                     let lastMessage = msgs[msgs.length - 1];
                     if (activeToolCall.value) {
@@ -2783,6 +2790,15 @@ export default defineComponent({
 
                   // Handle error events - stream-level errors
                   if (data && data.type === "error") {
+                    // The session's owning replica is gone. Flag it and stop:
+                    // sendMessage restores the conversation into a new session
+                    // once the stream ends. Showing the raw error here as well
+                    // would leave a dead-end message above the restored
+                    // conversation.
+                    if (data.code === "session_owner_unavailable") {
+                      streamOwnerUnavailable.value = true;
+                      continue;
+                    }
                     // Complete any active tool call as failed
                     if (activeToolCall.value) {
                       const failedToolBlock: ContentBlock = {
@@ -3008,6 +3024,13 @@ export default defineComponent({
 
                 // Handle error events
                 if (data && data.type === "error") {
+                  // Owning replica is gone — flag and stop; sendMessage restores
+                  // the conversation once the stream ends. See the matching
+                  // check in the other error branches.
+                  if (data.code === "session_owner_unavailable") {
+                    streamOwnerUnavailable.value = true;
+                    continue;
+                  }
                   let lastMessage = msgs[msgs.length - 1];
                   if (activeToolCall.value) {
                     const completedToolBlock: ContentBlock = {
@@ -3165,6 +3188,13 @@ export default defineComponent({
 
                 // Handle error events - stream-level errors
                 if (data && data.type === "error") {
+                  // Owning replica is gone — flag and stop; sendMessage restores
+                  // the conversation once the stream ends. See the matching
+                  // check in the other error branches.
+                  if (data.code === "session_owner_unavailable") {
+                    streamOwnerUnavailable.value = true;
+                    continue;
+                  }
                   if (activeToolCall.value) {
                     const failedToolBlock: ContentBlock = {
                       type: "tool_call",
@@ -3602,6 +3632,12 @@ export default defineComponent({
      * server has actually said the session is unreachable — never as a guess
      * from a generic failure.
      */
+    // Set by processStream when the agent reports that a session's owning
+    // replica is gone. The stream has already returned HTTP 200 by then, so the
+    // status code is no longer available to branch on — sendMessage reads this
+    // after the stream ends and restores the conversation.
+    const streamOwnerUnavailable = ref(false);
+
     const isSessionOwnerUnavailable = (errorBody: unknown): boolean => {
       // `unknown`, not `any`: this comes straight from response.json(), so the
       // shape is whatever the server sent. Narrow before reading, or a
@@ -4341,6 +4377,42 @@ export default defineComponent({
         const streamMsgs = chatMessages.value;
 
         await processStream(reader);
+
+        // The agent reported mid-stream that this session's owning replica is
+        // gone. The transcript is still here in the browser, so start a fresh
+        // session and resend — the server seeds the new session from the
+        // messages we post, and the conversation continues.
+        //
+        // This is the streaming counterpart of the pre-stream 409 handled
+        // above: once the stream has opened, the failure arrives as an SSE
+        // event inside a 200, so response.ok can no longer be branched on.
+        if (streamOwnerUnavailable.value && !hasReseeded) {
+          streamOwnerUnavailable.value = false;
+          hasReseeded = true;
+
+          if (streamController) backgroundStreams.delete(streamController);
+          if (streamSessionId) backgroundStreamMap.delete(streamSessionId);
+
+          currentSessionId.value = getUUIDv7();
+          appendErrorBlock(
+            "This conversation was interrupted and has been restored. Earlier messages are preserved, but any files, queries or other actions from before the interruption were not carried over.",
+            true,
+          );
+
+          const retry = await fetchAiChat(
+            chatMessages.value,
+            "",
+            store.state.selectedOrganization.identifier,
+            currentAbortController.value?.signal,
+            undefined,
+            currentSessionId.value,
+            hasImages ? messagesToSend : undefined,
+          );
+          if (retry && !retry.cancelled && retry.ok && retry.body) {
+            await processStream(retry.body.getReader());
+          }
+        }
+        streamOwnerUnavailable.value = false;
 
         // Remove controller from background set and clean up re-attachment map
         if (streamController) backgroundStreams.delete(streamController);
