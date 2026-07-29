@@ -71,6 +71,28 @@ pub enum SliType {
     Alert,
 }
 
+impl SliType {
+    /// The stable integer written to `slos.sli_type`. Explicit rather than
+    /// derived from declaration order, so reordering the enum cannot silently
+    /// reinterpret every stored row.
+    pub fn storage_id(self) -> i32 {
+        match self {
+            Self::Count => 1,
+            Self::TimeSlice => 2,
+            Self::Alert => 3,
+        }
+    }
+
+    pub fn from_storage_id(id: i32) -> Option<Self> {
+        match id {
+            1 => Some(Self::Count),
+            2 => Some(Self::TimeSlice),
+            3 => Some(Self::Alert),
+            _ => None,
+        }
+    }
+}
+
 /// Query language for a time-slice aggregate. Carried explicitly rather than
 /// inferred from the stream type, so the evaluator never guesses.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
@@ -1688,6 +1710,24 @@ mod tests {
     /// compares false against everything, so every slice classifies bad;
     /// `±inf` classifies every slice the same way in the other direction.
     /// Either way the SLO reports a confident, uniform, wrong answer.
+    #[test]
+    fn sli_type_storage_ids_round_trip() {
+        for t in [SliType::Count, SliType::TimeSlice, SliType::Alert] {
+            assert_eq!(SliType::from_storage_id(t.storage_id()), Some(t));
+        }
+    }
+
+    /// Pinned, not derived. A reordering of the enum that silently shifted
+    /// these would reinterpret every stored row as a different SLI type.
+    #[test]
+    fn sli_type_storage_ids_are_pinned() {
+        assert_eq!(SliType::Count.storage_id(), 1);
+        assert_eq!(SliType::TimeSlice.storage_id(), 2);
+        assert_eq!(SliType::Alert.storage_id(), 3);
+        assert_eq!(SliType::from_storage_id(0), None);
+        assert_eq!(SliType::from_storage_id(4), None);
+    }
+
     #[test]
     fn a_non_finite_time_slice_threshold_is_rejected() {
         for bad in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {

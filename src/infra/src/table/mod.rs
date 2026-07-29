@@ -62,6 +62,7 @@ pub mod search_queue;
 pub mod service_streams;
 pub mod sessions;
 pub mod slo;
+pub mod slos;
 pub mod short_urls;
 pub mod source_maps;
 pub mod synthetics_agents;
