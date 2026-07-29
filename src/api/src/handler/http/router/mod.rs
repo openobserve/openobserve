@@ -883,6 +883,19 @@ pub fn service_routes() -> Router {
     #[cfg(feature = "enterprise")]
     {
         router = router
+            // SLOs. Literal segments before {slo_id} catch-alls.
+            .route(
+                "/{org_id}/slos",
+                get(slos::list_slos).post(slos::create_slo),
+            )
+            .route(
+                "/{org_id}/slos/{slo_id}",
+                get(slos::get_slo)
+                    .put(slos::update_slo)
+                    .delete(slos::delete_slo),
+            )
+            .route("/{org_id}/slos/{slo_id}/enable", put(slos::enable_slo))
+            .route("/{org_id}/slos/{slo_id}/groups", get(slos::get_slo_groups))
             // Anomaly Detection
             .route("/{org_id}/anomaly_detection", get(anomaly_detection::list_configs).post(anomaly_detection::create_config))
             .route("/{org_id}/anomaly_detection/{config_id}", get(anomaly_detection::get_config).put(anomaly_detection::update_config).delete(anomaly_detection::delete_config))

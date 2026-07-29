@@ -253,6 +253,19 @@ pub async fn load_status(
     )
 }
 
+/// Every status row for one SLO — the rollup plus each group.
+pub async fn load_all_groups(
+    db: &DatabaseConnection,
+    slo_id: &str,
+) -> Result<Vec<slo_status::Model>, errors::Error> {
+    use sea_orm::{ColumnTrait, QueryFilter, QueryOrder};
+    Ok(slo_status::Entity::find()
+        .filter(slo_status::Column::SloId.eq(slo_id))
+        .order_by_asc(slo_status::Column::GroupKey)
+        .all(db)
+        .await?)
+}
+
 /// Create the rollup row for a new generation.
 ///
 /// The running aggregates are left **NULL, not zero**. `Some(0.0)` is "we

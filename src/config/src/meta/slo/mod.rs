@@ -54,8 +54,11 @@ pub mod generation;
 pub mod group;
 pub mod math;
 pub mod slice;
+pub mod status_view;
 pub mod stream;
 pub mod window;
+
+pub use status_view::SloStatusView;
 
 /// Which of the three SLI shapes an SLO measures (S-5).
 ///

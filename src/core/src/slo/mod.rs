@@ -35,4 +35,5 @@ pub mod ingest;
 pub mod job;
 pub mod query;
 pub mod reconcile;
+pub mod service;
 pub mod writer;
