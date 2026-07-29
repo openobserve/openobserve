@@ -48,6 +48,7 @@ use crate::{
 #[derive(Deserialize)]
 pub struct WorkflowTestInput {
     inputs: Vec<serde_json::Value>,
+    workflow: Workflow,
     #[serde(default)]
     from_node: Option<String>,
 }
@@ -380,10 +381,11 @@ pub async fn update_workflows(
     )
 )]
 pub async fn test_workflow(
-    Path((org_id, workflow_id)): Path<(String, String)>,
+    Path(org_id): Path<String>,
     Json(inputs): Json<WorkflowTestInput>,
 ) -> Response {
-    match workflows::test_workflow(&org_id, &workflow_id, inputs.inputs, inputs.from_node).await {
+    match workflows::test_workflow(&org_id, inputs.workflow, inputs.inputs, inputs.from_node).await
+    {
         Ok(v) => MetaHttpResponse::json(WorkflowTestResult { errors: v.errors }),
         Err(e) => MetaHttpResponse::bad_request(e),
     }

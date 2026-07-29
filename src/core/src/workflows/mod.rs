@@ -382,15 +382,12 @@ pub async fn delete_workflow(org_id: &str, id: &str) -> Result<(), anyhow::Error
 
 pub async fn test_workflow(
     org_id: &str,
-    id: &str,
+    workflow: Workflow,
     inputs: Vec<serde_json::Value>,
     from_node: Option<String>,
 ) -> Result<WorkflowResult, anyhow::Error> {
-    let workflow = get_workflow_by_id(org_id, id)
-        .await?
-        .ok_or(anyhow::anyhow!("workflow with given id not found"))?;
+    validate_workflow(&workflow).await?;
     let executable = ExecutablePipeline::new_from_workflow(&workflow).await?;
-
     let res = executable
         .process_workflow(org_id, inputs, from_node)
         .await?;
