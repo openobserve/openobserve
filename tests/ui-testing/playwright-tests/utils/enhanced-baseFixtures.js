@@ -128,7 +128,13 @@ async function verifyAuthentication(page) {
  * @param {import('@playwright/test').Page} page 
  */
 async function navigateToBase(page) {
-  const baseUrlWithOrg = `${process.env["ZO_BASE_URL"]}?org_identifier=${process.env["ORGNAME"]}`;
+  // Must include the /web/ SPA path. Navigating to the bare domain
+  // (`${ZO_BASE_URL}?org_identifier=X`) redirects to /web/ and DROPS the query
+  // string, so the app falls back to the user's DEFAULT org instead of ORGNAME.
+  // On cloud that default org can be a different, trial-expired org, which then
+  // redirects to /web/billings/plans where the home menu never renders and auth
+  // verification fails. Every other navigation in the suite already uses /web/.
+  const baseUrlWithOrg = `${process.env["ZO_BASE_URL"]}/web/?org_identifier=${process.env["ORGNAME"]}`;
   testLogger.info('Navigating to base URL with org identifier', { url: baseUrlWithOrg });
 
   // Use 60s navigation timeout for all environments (dev/staging can be slow to load)
