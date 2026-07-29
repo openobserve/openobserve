@@ -57,15 +57,47 @@ pub fn overall_time_slice(
     observed: &[(String, SliceVerdict)],
     expected: &[String],
 ) -> SliceVerdict {
-    let _ = (observed, expected);
-    todo!("group::overall_time_slice")
+    use std::collections::HashMap;
+
+    // Duplicates of one key collapse to their WORST verdict — a disagreeing
+    // duplicate must not be resolved optimistically.
+    let mut by_key: HashMap<&str, SliceVerdict> = HashMap::new();
+    for (key, verdict) in observed {
+        by_key
+            .entry(key.as_str())
+            .and_modify(|v| *v = (*v).min(*verdict))
+            .or_insert(*verdict);
+    }
+
+    if expected.is_empty() {
+        // Nothing was expected, so "every group was good" is unprovable rather
+        // than vacuously true.
+        return SliceVerdict::Unknown;
+    }
+
+    // Three-valued MIN over the EXPECTED set. A key observed but not expected
+    // neither votes nor fabricates an absence: the active set can lag a
+    // newly-appeared group by one pass.
+    expected
+        .iter()
+        .map(|key| {
+            by_key
+                .get(key.as_str())
+                .copied()
+                .unwrap_or(SliceVerdict::Unknown)
+        })
+        .min()
+        .unwrap_or(SliceVerdict::Unknown)
 }
 
 /// The overall good/total for a **count** SLO: a straight sum across every
 /// group, which is exactly the ungrouped query (S-9).
 pub fn overall_count(groups: &[(f64, f64)]) -> (f64, f64) {
-    let _ = groups;
-    todo!("group::overall_count")
+    // Sum, not a mean of ratios: the overall must be traffic-weighted, or a
+    // tiny perfect group would drag a huge broken one up.
+    groups
+        .iter()
+        .fold((0.0, 0.0), |(g, t), (good, total)| (g + good, t + total))
 }
 
 /// A candidate for the per-group status roster.
@@ -83,16 +115,26 @@ pub struct RosterCandidate {
 /// This is possible only because tier 1 persists slices for *every* observed
 /// group: ranking a group needs its window SLI, which needs slices that a
 /// naive "cap the slices" design would already have discarded (D55).
-pub fn elect_roster(candidates: Vec<RosterCandidate>, cap: usize) -> Vec<String> {
-    let _ = (candidates, cap);
-    todo!("group::elect_roster")
+pub fn elect_roster(mut candidates: Vec<RosterCandidate>, cap: usize) -> Vec<String> {
+    // Worst SLI first; ties broken on the group key so the roster is stable
+    // between elections and cannot churn which groups may page.
+    candidates.sort_by(|a, b| {
+        a.sli
+            .partial_cmp(&b.sli)
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then_with(|| a.group_key.cmp(&b.group_key))
+    });
+    candidates
+        .into_iter()
+        .take(cap)
+        .map(|c| c.group_key)
+        .collect()
 }
 
 /// Whether the observed group count has crossed the hard cap, which freezes
 /// per-group tracking while leaving the overall exact (S-10).
 pub fn is_group_overflow(observed_groups: i64, hard_cap: i64) -> bool {
-    let _ = (observed_groups, hard_cap);
-    todo!("group::is_group_overflow")
+    observed_groups > hard_cap
 }
 
 #[cfg(test)]

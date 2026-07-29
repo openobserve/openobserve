@@ -204,14 +204,20 @@ impl std::error::Error for SloConditionError {}
 
 /// SA-8: the smallest legal window for a slice interval — two slices.
 pub fn min_window_secs(slice_interval_secs: i64) -> i64 {
-    let _ = slice_interval_secs;
-    todo!("condition::min_window_secs")
+    2 * slice_interval_secs
 }
 
 /// The default short window: long ÷ 12, raised to the smallest legal value.
 pub fn default_short_window_secs(long_window_secs: i64, slice_interval_secs: i64) -> i64 {
-    let _ = (long_window_secs, slice_interval_secs);
-    todo!("condition::default_short_window_secs")
+    if slice_interval_secs <= 0 {
+        return long_window_secs;
+    }
+    // Google's ratio, then rounded ONTO the slice grid and raised to the legal
+    // minimum. `long / 12` alone lands off-grid whenever 12 does not divide the
+    // long window in slices — 3660s / 12 = 305s, which is not a multiple of 60.
+    let raw = long_window_secs / 12;
+    let on_grid = (raw / slice_interval_secs) * slice_interval_secs;
+    on_grid.max(min_window_secs(slice_interval_secs))
 }
 
 /// Validate a condition against the SLO it references (SA-3 … SA-13).
@@ -238,8 +244,117 @@ pub fn validate(
     slo: &SloFacts,
     count_gate_is_default: bool,
 ) -> Result<(), SloConditionError> {
-    let _ = (cond, slo, count_gate_is_default);
-    todo!("condition::validate")
+    // 1. Window presence must match the kind.
+    let windows = (cond.long_window_secs, cond.short_window_secs);
+    match cond.kind {
+        SloAlertKind::BurnRate => {
+            if windows.0.is_none() || windows.1.is_none() {
+                return Err(SloConditionError::WindowsMismatchedForKind(cond.kind));
+            }
+        }
+        SloAlertKind::ErrorBudget => {
+            if windows.0.is_some() || windows.1.is_some() {
+                return Err(SloConditionError::WindowsMismatchedForKind(cond.kind));
+            }
+        }
+    }
+
+    // 2. Operator: "bad when high" has no meaning for the others.
+    if !matches!(
+        cond.operator,
+        Operator::GreaterThan | Operator::GreaterThanEquals
+    ) {
+        return Err(SloConditionError::OperatorNotAscending(cond.operator));
+    }
+
+    // 3. Thresholds finite and strictly positive. `!(v > 0.0)` also rejects NaN, which a `v <= 0.0`
+    //    test would let through.
+    for (field, value) in [("critical", Some(cond.critical)), ("warning", cond.warning)] {
+        let Some(value) = value else { continue };
+        if !value.is_finite() || !(value > 0.0) {
+            return Err(SloConditionError::ThresholdNotFinitePositive { field, value });
+        }
+    }
+
+    // 4. Kind-specific range.
+    match cond.kind {
+        SloAlertKind::BurnRate => {
+            let max = super::math::max_burn_rate(slo.target);
+            if cond.critical > max {
+                return Err(SloConditionError::BurnRateAboveMax {
+                    critical: cond.critical,
+                    max,
+                });
+            }
+        }
+        SloAlertKind::ErrorBudget => {
+            if cond.critical > 100.0 {
+                return Err(SloConditionError::ErrorBudgetOutOfRange(cond.critical));
+            }
+        }
+    }
+
+    // 5. Warning strictly less severe. Checked after (3), so a NaN warning cannot reach this
+    //    comparison and fall through both branches.
+    if let Some(warning) = cond.warning
+        && warning >= cond.critical
+    {
+        return Err(SloConditionError::WarningNotLessSevere {
+            critical: cond.critical,
+            warning,
+        });
+    }
+
+    // 6. Windows.
+    if let (Some(long), Some(short)) = windows {
+        const HOUR: i64 = 3600;
+        if !(HOUR..=48 * HOUR).contains(&long) {
+            return Err(SloConditionError::LongWindowOutOfRange(long));
+        }
+        let slice = slo.slice_interval_secs;
+        for window in [long, short] {
+            if slice <= 0 || window % slice != 0 {
+                return Err(SloConditionError::WindowNotSliceMultiple {
+                    window_secs: window,
+                    slice_secs: slice,
+                });
+            }
+        }
+        let min = min_window_secs(slice);
+        for (field, window) in [("long window", long), ("short window", short)] {
+            if window < min {
+                return Err(SloConditionError::WindowTooFewSlices {
+                    window_secs: window,
+                    min_secs: min,
+                    field,
+                });
+            }
+        }
+        if short > long {
+            return Err(SloConditionError::ShortWindowExceedsLong { short, long });
+        }
+        for window in [long, short] {
+            if window > slo.window_secs {
+                return Err(SloConditionError::WindowExceedsSloWindow {
+                    window_secs: window,
+                    slo_window: slo.window_secs,
+                });
+            }
+        }
+    }
+
+    // 7. This family has no count gate — a stray value is rejected, not ignored (SA-4; ignored
+    //    config is invisible config).
+    if !count_gate_is_default {
+        return Err(SloConditionError::CountGateNotSupported);
+    }
+
+    // 8. Per-group fan-out needs something to fan out over.
+    if cond.multi_alert && !slo.is_grouped {
+        return Err(SloConditionError::MultiAlertRequiresGroupedSlo);
+    }
+
+    Ok(())
 }
 
 /// SA-19: reject a new alert that would push the SLO past the burn-window pair
@@ -250,8 +365,25 @@ pub fn validate_pair_budget(
     existing: &[(i64, i64)],
     max_pairs: usize,
 ) -> Result<(), SloConditionError> {
-    let _ = (cond, existing, max_pairs);
-    todo!("condition::validate_pair_budget")
+    let (Some(long), Some(short)) = (cond.long_window_secs, cond.short_window_secs) else {
+        // Error-budget alerts read the SLO window, not a burn pair.
+        return Ok(());
+    };
+
+    // DISTINCT pairs — ten alerts sharing two pairs cost two aggregates per
+    // pass, not ten.
+    let mut distinct: std::collections::BTreeSet<(i64, i64)> = existing.iter().copied().collect();
+    if distinct.contains(&(long, short)) {
+        return Ok(());
+    }
+    distinct.insert((long, short));
+    if distinct.len() > max_pairs {
+        return Err(SloConditionError::TooManyBurnWindowPairs {
+            pairs: distinct.len(),
+            max: max_pairs,
+        });
+    }
+    Ok(())
 }
 
 /// Classify one observed value against the condition's thresholds.
@@ -259,8 +391,14 @@ pub fn validate_pair_budget(
 /// `None` means "matched nothing" = `Ok`, exactly as `evaluate_level_values`
 /// does — trap 4 in §8b.
 pub fn classify_value(value: f64, cond: &SloCondition) -> Option<AlertLevel> {
-    let _ = (value, cond);
-    todo!("condition::classify_value")
+    // Feature 1's comparator, unmodified — this family must not grow a
+    // parallel one that could drift from the other three (§8b trap 5).
+    super::super::alerts::level::evaluate_level_values(
+        value,
+        cond.operator,
+        cond.critical,
+        cond.warning,
+    )
 }
 
 /// The outcome of classifying an SLO alert.
@@ -311,8 +449,39 @@ pub fn classify_burn_rate(
     target: f64,
     cond: &SloCondition,
 ) -> SloClassification {
-    let _ = (long, short, target, cond);
-    todo!("condition::classify_burn_rate")
+    // Either window unobserved => freeze. The long window's reason wins when
+    // both are, so the rendered copy does not flicker between passes.
+    let (Observation::Observed { sli: long_sli }, Observation::Observed { sli: short_sli }) =
+        (long, short)
+    else {
+        let reason = match (long, short) {
+            (Observation::Unobserved(r), _) => r,
+            (_, Observation::Unobserved(r)) => r,
+            _ => unreachable!("at least one window is unobserved in this branch"),
+        };
+        return SloClassification::Frozen(reason);
+    };
+
+    let long_level = classify_value(super::math::burn_rate(long_sli, target), cond);
+    let short_level = classify_value(super::math::burn_rate(short_sli, target), cond);
+
+    // The LESS severe of the two — Datadog's "must exceed in both windows",
+    // generalized from a boolean to a level.
+    SloClassification::Observed(less_severe(long_level, short_level))
+}
+
+/// The less severe of two classifications, treating "matched nothing" as `Ok`.
+fn less_severe(a: Option<AlertLevel>, b: Option<AlertLevel>) -> AlertLevel {
+    let rank = |l: Option<AlertLevel>| match l {
+        Some(AlertLevel::Critical) => 2,
+        Some(AlertLevel::Warning) => 1,
+        _ => 0,
+    };
+    let (a, b) = (
+        super::super::alerts::level::level_for_successful_evaluation(a),
+        super::super::alerts::level::level_for_successful_evaluation(b),
+    );
+    if rank(Some(a)) <= rank(Some(b)) { a } else { b }
 }
 
 /// Classify an error-budget alert from the window observation.
@@ -321,15 +490,25 @@ pub fn classify_error_budget(
     target: f64,
     cond: &SloCondition,
 ) -> SloClassification {
-    let _ = (window, target, cond);
-    todo!("condition::classify_error_budget")
+    match window {
+        Observation::Unobserved(reason) => SloClassification::Frozen(reason),
+        Observation::Observed { sli } => {
+            let consumed = super::math::error_budget_consumed(sli, target);
+            SloClassification::Observed(
+                super::super::alerts::level::level_for_successful_evaluation(classify_value(
+                    consumed, cond,
+                )),
+            )
+        }
+    }
 }
 
 /// Which of the two burn-rate windows governs — the **less severe**, and
 /// therefore the value recorded as `actual_value` (SA-11).
 pub fn governing_burn_rate(long: f64, short: f64) -> f64 {
-    let _ = (long, short);
-    todo!("condition::governing_burn_rate")
+    // The value that actually gated the alert, so history cannot contradict
+    // the paging decision (SA-11).
+    long.min(short)
 }
 
 #[cfg(test)]

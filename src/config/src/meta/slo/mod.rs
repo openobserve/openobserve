@@ -341,12 +341,6 @@ pub enum QuerySafetyError {
     /// The query must project `slice_start`, every `group_by` column, and
     /// exactly one numeric `zo_slo_value` — nothing else.
     ProjectionMismatch { field: &'static str, detail: String },
-    /// The numerator and denominator must agree on their key schema, or the
-    /// join that pairs them is undefined.
-    KeySchemaMismatch {
-        good: Vec<String>,
-        total: Vec<String>,
-    },
     /// The query language must suit the stream type.
     LanguageNotValidForStream {
         stream_type: String,
@@ -372,10 +366,6 @@ impl std::fmt::Display for QuerySafetyError {
             Self::ProjectionMismatch { field, detail } => {
                 write!(f, "{field} has an invalid projection: {detail}")
             }
-            Self::KeySchemaMismatch { good, total } => write!(
-                f,
-                "numerator keys {good:?} do not match denominator keys {total:?}"
-            ),
             Self::LanguageNotValidForStream {
                 stream_type,
                 query_language,
@@ -421,12 +411,128 @@ impl ValidatedPredicate {
 ///
 /// A fragment that round-trips through a parser cannot smuggle a statement
 /// separator, a second statement, or a subquery past it.
+/// Functions a predicate fragment may call. Everything else is rejected —
+/// an allowlist rather than a denylist, so a new engine builtin cannot become
+/// reachable by default.
+const PREDICATE_FUNCTION_ALLOWLIST: &[&str] = &[
+    "lower",
+    "upper",
+    "trim",
+    "length",
+    "abs",
+    "round",
+    "floor",
+    "ceil",
+    "coalesce",
+    "concat",
+    "substr",
+    "starts_with",
+    "ends_with",
+    "cast",
+];
+
 pub fn parse_predicate(
     field: &'static str,
     fragment: &str,
 ) -> Result<ValidatedPredicate, QuerySafetyError> {
-    let _ = (field, fragment);
-    todo!("parse_predicate")
+    use sqlparser::{ast::Expr, dialect::GenericDialect, parser::Parser};
+
+    if fragment.trim().is_empty() {
+        // An empty scope means "all rows" to the caller; it must not be
+        // forced through here and become an empty predicate.
+        return Err(QuerySafetyError::NotASingleExpression { field });
+    }
+    if fragment.contains(';') {
+        return Err(QuerySafetyError::ContainsStatementSeparator { field });
+    }
+
+    let dialect = GenericDialect {};
+    let mut parser = Parser::new(&dialect)
+        .try_with_sql(fragment)
+        .map_err(|_| QuerySafetyError::Unparseable { field })?;
+    let expr = parser
+        .parse_expr()
+        .map_err(|_| QuerySafetyError::Unparseable { field })?;
+
+    // Exactly ONE expression: anything left over means the fragment was a
+    // list, a statement, or trailing garbage.
+    if parser.peek_token().token != sqlparser::tokenizer::Token::EOF {
+        return Err(QuerySafetyError::NotASingleExpression { field });
+    }
+
+    check_expr(field, &expr)?;
+    if !is_boolean_shaped(&expr) {
+        return Err(QuerySafetyError::NotASingleExpression { field });
+    }
+
+    Ok(ValidatedPredicate {
+        rendered: expr.to_string(),
+    })
+}
+
+/// Reject subqueries and non-allowlisted functions anywhere in the tree.
+fn check_expr(field: &'static str, expr: &sqlparser::ast::Expr) -> Result<(), QuerySafetyError> {
+    use sqlparser::ast::Expr;
+    match expr {
+        Expr::Subquery(_) | Expr::InSubquery { .. } | Expr::Exists { .. } => {
+            Err(QuerySafetyError::ContainsSubquery { field })
+        }
+        Expr::Function(f) => {
+            let name = f.name.to_string().to_lowercase();
+            if !PREDICATE_FUNCTION_ALLOWLIST.contains(&name.as_str()) {
+                return Err(QuerySafetyError::FunctionNotAllowed { field, name });
+            }
+            Ok(())
+        }
+        Expr::BinaryOp { left, right, .. } => {
+            check_expr(field, left)?;
+            check_expr(field, right)
+        }
+        Expr::UnaryOp { expr, .. }
+        | Expr::Nested(expr)
+        | Expr::IsNull(expr)
+        | Expr::IsNotNull(expr) => check_expr(field, expr),
+        Expr::InList { expr, list, .. } => {
+            check_expr(field, expr)?;
+            list.iter().try_for_each(|e| check_expr(field, e))
+        }
+        Expr::Between {
+            expr, low, high, ..
+        } => {
+            check_expr(field, expr)?;
+            check_expr(field, low)?;
+            check_expr(field, high)
+        }
+        Expr::Like { expr, pattern, .. } | Expr::ILike { expr, pattern, .. } => {
+            check_expr(field, expr)?;
+            check_expr(field, pattern)
+        }
+        _ => Ok(()),
+    }
+}
+
+/// Whether the expression could plausibly evaluate to a boolean. A bare
+/// column is not a predicate — accepting one would silently filter on
+/// truthiness.
+fn is_boolean_shaped(expr: &sqlparser::ast::Expr) -> bool {
+    use sqlparser::ast::{BinaryOperator as Op, Expr};
+    match expr {
+        Expr::BinaryOp { op, left, right } => {
+            matches!(
+                op,
+                Op::Eq | Op::NotEq | Op::Gt | Op::GtEq | Op::Lt | Op::LtEq
+            ) || (matches!(op, Op::And | Op::Or)
+                && is_boolean_shaped(left)
+                && is_boolean_shaped(right))
+        }
+        Expr::UnaryOp { op, expr } => {
+            matches!(op, sqlparser::ast::UnaryOperator::Not) && is_boolean_shaped(expr)
+        }
+        Expr::Nested(inner) => is_boolean_shaped(inner),
+        Expr::IsNull(_) | Expr::IsNotNull(_) | Expr::InList { .. } | Expr::Between { .. } => true,
+        Expr::Like { .. } | Expr::ILike { .. } => true,
+        _ => false,
+    }
 }
 
 /// Combine a slice-range bound with an optional user predicate **structurally**
@@ -438,8 +544,15 @@ pub fn conjoin_time_bound(
     end_secs: i64,
     predicate: Option<&ValidatedPredicate>,
 ) -> String {
-    let _ = (start_secs, end_secs, predicate);
-    todo!("conjoin_time_bound")
+    // Half-open, matching the ingest range: `>= start` and `< end`.
+    let bound = format!("_timestamp >= {start_secs} AND _timestamp < {end_secs}");
+    match predicate {
+        // The parentheses are the point. Without them a user predicate of
+        // `a = 1 OR b = 2` binds as `(bound AND a = 1) OR b = 2`, and rows
+        // outside the slice range enter the batch.
+        Some(p) => format!("{bound} AND ({})", p.as_display()),
+        None => bound,
+    }
 }
 
 /// Validate a dual-query member: SELECT-only, and projecting exactly
@@ -458,8 +571,178 @@ pub fn validate_count_query(
     group_by: &[String],
     slice_interval_secs: i64,
 ) -> Result<Vec<String>, QuerySafetyError> {
-    let _ = (field, query, group_by, slice_interval_secs);
-    todo!("validate_count_query")
+    use sqlparser::{
+        ast::{Expr, GroupByExpr, SelectItem, SetExpr, Statement},
+        dialect::GenericDialect,
+        parser::Parser,
+    };
+
+    let statements = Parser::parse_sql(&GenericDialect {}, &query.sql)
+        .map_err(|_| QuerySafetyError::Unparseable { field })?;
+    let [Statement::Query(q)] = statements.as_slice() else {
+        return Err(QuerySafetyError::NotSelectOnly { field });
+    };
+    let SetExpr::Select(select) = q.body.as_ref() else {
+        return Err(QuerySafetyError::NotSelectOnly { field });
+    };
+
+    // Collect the projection's output names.
+    let mut names = Vec::new();
+    let mut saw_value = false;
+    let mut value_is_numeric = false;
+    for item in &select.projection {
+        match item {
+            SelectItem::ExprWithAlias { expr, alias } => {
+                let alias = alias.value.to_lowercase();
+                if alias == "zo_slo_value" {
+                    saw_value = true;
+                    value_is_numeric = expr_is_numeric(expr);
+                } else {
+                    if alias == "slice_start" {
+                        check_histogram_interval(field, expr, slice_interval_secs)?;
+                    }
+                    names.push(alias);
+                }
+            }
+            SelectItem::UnnamedExpr(Expr::Identifier(ident)) => {
+                names.push(ident.value.to_lowercase());
+            }
+            _ => {
+                return Err(QuerySafetyError::ProjectionMismatch {
+                    field,
+                    detail: "every projected column must be a plain column or an alias".to_string(),
+                });
+            }
+        }
+    }
+
+    if !saw_value {
+        return Err(QuerySafetyError::ProjectionMismatch {
+            field,
+            detail: "missing a numeric `zo_slo_value` column".to_string(),
+        });
+    }
+    if !value_is_numeric {
+        return Err(QuerySafetyError::ProjectionMismatch {
+            field,
+            detail: "`zo_slo_value` must be a numeric aggregate".to_string(),
+        });
+    }
+
+    // Exactly `slice_start` + the configured group_by columns, nothing else:
+    // the ingest job writes a fixed row shape, so a surprise column is
+    // silently dropped.
+    let mut expected: Vec<String> = vec!["slice_start".to_string()];
+    expected.extend(group_by.iter().map(|g| g.to_lowercase()));
+    let mut want = expected.clone();
+    want.sort();
+
+    let mut got = names.clone();
+    got.sort();
+    if got != want {
+        return Err(QuerySafetyError::ProjectionMismatch {
+            field,
+            detail: format!("projects {names:?}, expected {expected:?}"),
+        });
+    }
+
+    // The GROUP BY must match too. A query that projects `region` but groups
+    // only by `slice_start` still returns one row per slice, so the ingest job
+    // would write an arbitrary region's label against every region's data.
+    let mut grouped: Vec<String> = match &select.group_by {
+        GroupByExpr::Expressions(exprs, _) => exprs
+            .iter()
+            .map(|e| match e {
+                Expr::Identifier(i) => i.value.to_lowercase(),
+                other => other.to_string().to_lowercase(),
+            })
+            .collect(),
+        // `GROUP BY ALL` groups by every non-aggregate projection, which is
+        // exactly the key set — accept it.
+        GroupByExpr::All(_) => want.clone(),
+    };
+    grouped.sort();
+    if grouped != want {
+        return Err(QuerySafetyError::ProjectionMismatch {
+            field,
+            detail: format!("groups by {grouped:?}, expected {expected:?}"),
+        });
+    }
+
+    Ok(expected)
+}
+
+/// Whether an expression looks like a numeric aggregate rather than a column.
+fn expr_is_numeric(expr: &sqlparser::ast::Expr) -> bool {
+    use sqlparser::ast::Expr;
+    match expr {
+        Expr::Function(_) => true,
+        Expr::Cast { .. } => true,
+        Expr::Value(_) => true,
+        Expr::BinaryOp { .. } => true,
+        Expr::Nested(inner) => expr_is_numeric(inner),
+        _ => false,
+    }
+}
+
+/// The `histogram()` bucket width must equal the SLO's slice interval, or the
+/// rows do not line up with the grid every coverage denominator is computed
+/// from (§6b.4a-bis).
+fn check_histogram_interval(
+    field: &'static str,
+    expr: &sqlparser::ast::Expr,
+    slice_interval_secs: i64,
+) -> Result<(), QuerySafetyError> {
+    use sqlparser::ast::{Expr, FunctionArg, FunctionArgExpr, FunctionArguments, Value};
+
+    let Expr::Function(f) = expr else {
+        return Err(QuerySafetyError::ProjectionMismatch {
+            field,
+            detail: "`slice_start` must be histogram(_timestamp, '<interval>')".to_string(),
+        });
+    };
+    if f.name.to_string().to_lowercase() != "histogram" {
+        return Err(QuerySafetyError::ProjectionMismatch {
+            field,
+            detail: "`slice_start` must be produced by histogram()".to_string(),
+        });
+    }
+    let FunctionArguments::List(list) = &f.args else {
+        return Err(QuerySafetyError::ProjectionMismatch {
+            field,
+            detail: "histogram() needs an explicit interval".to_string(),
+        });
+    };
+    let literal = list.args.iter().find_map(|a| match a {
+        FunctionArg::Unnamed(FunctionArgExpr::Expr(Expr::Value(v))) => match &v.value {
+            Value::SingleQuotedString(s) => Some(s.clone()),
+            _ => None,
+        },
+        _ => None,
+    });
+    let Some(literal) = literal else {
+        return Err(QuerySafetyError::ProjectionMismatch {
+            field,
+            detail: "histogram() needs a quoted interval literal".to_string(),
+        });
+    };
+    let want = interval_literal(slice_interval_secs);
+    if literal.trim().to_lowercase() != want {
+        return Err(QuerySafetyError::ProjectionMismatch {
+            field,
+            detail: format!("histogram interval '{literal}' must be '{want}'"),
+        });
+    }
+    Ok(())
+}
+
+/// The interval literal for a slice width, in the form `histogram()` accepts.
+pub fn interval_literal(slice_interval_secs: i64) -> String {
+    match slice_interval_secs {
+        60 => "1 minute".to_string(),
+        300 => "5 minute".to_string(),
+        s => format!("{s} second"),
+    }
 }
 
 /// Whether a query language can address a stream type.
@@ -467,8 +750,19 @@ pub fn language_suits_stream(
     stream_type: &str,
     query_language: QueryLanguage,
 ) -> Result<(), QuerySafetyError> {
-    let _ = (stream_type, query_language);
-    todo!("language_suits_stream")
+    let ok = match query_language {
+        // SQL addresses any stream; PromQL only makes sense over metrics.
+        QueryLanguage::Sql => stream_type != "metrics",
+        QueryLanguage::PromQl => stream_type == "metrics",
+    };
+    if ok {
+        Ok(())
+    } else {
+        Err(QuerySafetyError::LanguageNotValidForStream {
+            stream_type: stream_type.to_string(),
+            query_language,
+        })
+    }
 }
 
 /// Full query-safety validation for an SLI config (§6b.7), run at save.
@@ -477,8 +771,46 @@ pub fn validate_query_safety(
     group_by: &[String],
     slice_interval_secs: i64,
 ) -> Result<(), QuerySafetyError> {
-    let _ = (sli_config, group_by, slice_interval_secs);
-    todo!("validate_query_safety")
+    match sli_config {
+        SliConfig::Count { source } => match source {
+            CountSource::SingleQuery {
+                stream_type,
+                scope,
+                good_expr,
+                ..
+            } => {
+                language_suits_stream(stream_type, QueryLanguage::Sql)?;
+                if let Some(scope) = scope {
+                    parse_predicate("scope", scope)?;
+                }
+                parse_predicate("good_expr", good_expr)?;
+                Ok(())
+            }
+            CountSource::DualQuery { good, total } => {
+                // Both are checked against the SLO's own `group_by`, which is
+                // what makes their key schemas agree: there is no separate
+                // cross-check, because two projections that each equal
+                // `slice_start + group_by` cannot differ from each other.
+                validate_count_query("good_query", good, group_by, slice_interval_secs)?;
+                validate_count_query("total_query", total, group_by, slice_interval_secs)?;
+                Ok(())
+            }
+        },
+        SliConfig::TimeSlice {
+            stream_type,
+            query_language,
+            scope,
+            ..
+        } => {
+            language_suits_stream(stream_type, *query_language)?;
+            if let Some(scope) = scope {
+                parse_predicate("scope", scope)?;
+            }
+            Ok(())
+        }
+        // Reads existing alert state, not user SQL.
+        SliConfig::Alert { .. } => Ok(()),
+    }
 }
 
 /// What an `alert` SLI needs to know about its source, gathered by the caller.
@@ -514,8 +846,83 @@ pub fn validate_slo(
     target: f64,
     source_alert: Option<SourceAlertFacts>,
 ) -> Result<(), SloValidationError> {
-    let _ = (definition, target, source_alert);
-    todo!("validate_slo")
+    // 1. Target range, then precision.
+    if !target.is_finite() || target <= 0.0 || target >= 100.0 {
+        return Err(SloValidationError::TargetOutOfRange(target));
+    }
+    // Three decimals: compare against the value rounded to 3 places rather
+    // than inspecting the literal, so 99.9 and 99.900 behave the same.
+    if (target * 1000.0).round() / 1000.0 != target {
+        return Err(SloValidationError::TargetTooPrecise(target));
+    }
+
+    // 2. Rolling windows only (D31).
+    if !matches!(
+        definition.window_secs,
+        WINDOW_7D_SECS | WINDOW_30D_SECS | WINDOW_90D_SECS
+    ) {
+        return Err(SloValidationError::UnsupportedWindow(
+            definition.window_secs,
+        ));
+    }
+
+    // 3. Slice interval.
+    if !matches!(
+        definition.slice_interval_secs,
+        SLICE_60_SECS | SLICE_300_SECS
+    ) {
+        return Err(SloValidationError::UnsupportedSliceInterval(
+            definition.slice_interval_secs,
+        ));
+    }
+
+    // 4. Grouped SLOs are pinned to 5-minute slices (D30). An EMPTY group_by is not grouped and
+    //    must not trip this.
+    let is_grouped = definition.group_by.as_ref().is_some_and(|g| !g.is_empty());
+    if is_grouped && definition.slice_interval_secs != SLICE_300_SECS {
+        return Err(SloValidationError::GroupedRequiresCoarseSlice {
+            slice_interval_secs: definition.slice_interval_secs,
+        });
+    }
+
+    // 5. SLI-type specifics.
+    match &definition.sli_config {
+        SliConfig::TimeSlice {
+            comparator,
+            threshold,
+            ..
+        } => {
+            if !matches!(
+                comparator,
+                Operator::GreaterThan
+                    | Operator::GreaterThanEquals
+                    | Operator::LessThan
+                    | Operator::LessThanEquals
+            ) {
+                return Err(SloValidationError::ComparatorNotOrderable(*comparator));
+            }
+            if !threshold.is_finite() {
+                return Err(SloValidationError::ThresholdNotFinite(*threshold));
+            }
+        }
+        SliConfig::Alert { .. } => {
+            let Some(facts) = source_alert else {
+                return Err(SloValidationError::AlertSliSourceUnknown);
+            };
+            if facts.is_slo_alert || facts.is_composite {
+                return Err(SloValidationError::AlertSliSourceIneligible);
+            }
+            if !facts.is_scheduled {
+                return Err(SloValidationError::AlertSliSourceNotScheduled);
+            }
+            if facts.is_grouped {
+                return Err(SloValidationError::AlertSliSourceIsGrouped);
+            }
+        }
+        SliConfig::Count { .. } => {}
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -1130,6 +1537,9 @@ mod tests {
     /// different groups.
     #[test]
     fn dual_queries_with_different_key_schemas_are_rejected() {
+        // The denominator omits `region`, so it cannot be joined per-group.
+        // This surfaces as a projection mismatch NAMING the offending query,
+        // which is strictly more useful than a symmetric "they disagree".
         let cfg = SliConfig::Count {
             source: CountSource::DualQuery {
                 good: cq(
@@ -1142,7 +1552,10 @@ mod tests {
         };
         assert!(matches!(
             validate_query_safety(&cfg, &["region".to_string()], 300),
-            Err(QuerySafetyError::KeySchemaMismatch { .. })
+            Err(QuerySafetyError::ProjectionMismatch {
+                field: "total_query",
+                ..
+            })
         ));
     }
 
@@ -1288,9 +1701,13 @@ mod tests {
                 threshold: bad,
             };
             let d = def(cfg, None, SLICE_60_SECS);
-            assert_eq!(
-                validate_slo(&d, 99.9, None),
-                Err(SloValidationError::ThresholdNotFinite(bad)),
+            // NOT assert_eq: NaN != NaN, so comparing the payload can never
+            // succeed for the NaN case.
+            assert!(
+                matches!(
+                    validate_slo(&d, 99.9, None),
+                    Err(SloValidationError::ThresholdNotFinite(_))
+                ),
                 "threshold {bad} accepted"
             );
         }

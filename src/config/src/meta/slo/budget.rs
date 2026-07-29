@@ -38,15 +38,25 @@ pub const RETENTION_HORIZON_SECS: i64 = 97 * 86_400;
 /// series, and an unconditional floor would charge it ~1.79M rows, letting 200
 /// ungrouped SLOs exceed the whole default budget.
 pub fn groups_reserved(is_grouped: bool, groups_estimate: i64, hard_cap: i64) -> i64 {
-    let _ = (is_grouped, groups_estimate, hard_cap);
-    todo!("budget::groups_reserved")
+    if !is_grouped {
+        // An ungrouped SLO can never grow a second series. An unconditional
+        // floor here charged it ~1.79M rows, which let 200 ungrouped SLOs
+        // exceed the whole default budget.
+        return 1;
+    }
+    (2 * groups_estimate).clamp(64, hard_cap)
 }
 
 /// Logical slice rows a reservation costs at the retention horizon, including
 /// the revision headroom multiplier.
 pub fn rows_charged(groups_reserved: i64, slice_interval_secs: i64, revision_headroom: f64) -> i64 {
-    let _ = (groups_reserved, slice_interval_secs, revision_headroom);
-    todo!("budget::rows_charged")
+    if slice_interval_secs <= 0 {
+        return 0;
+    }
+    // Priced at the retention HORIZON, not the SLO's own window: retention is
+    // a stream property, so a 7-day SLO's slices still live 97 days (D57).
+    let slices = RETENTION_HORIZON_SECS / slice_interval_secs;
+    ((groups_reserved * slices) as f64 * revision_headroom) as i64
 }
 
 /// A charge's lifecycle state (S-14c).
@@ -69,15 +79,27 @@ pub struct BudgetCharge {
 
 /// Convert a charge to a residual expiring one horizon after its last write.
 pub fn to_residual(charge: BudgetCharge, last_write_secs: i64) -> BudgetCharge {
-    let _ = (charge, last_write_secs);
-    todo!("budget::to_residual")
+    // Releasing at delete time would let create/backfill/delete cycles exceed
+    // the budget arbitrarily: the rows persist to the horizon regardless.
+    BudgetCharge {
+        state: ChargeState::Residual {
+            expires_at: last_write_secs + RETENTION_HORIZON_SECS,
+        },
+        ..charge
+    }
 }
 
 /// Total rows an org currently owes: active reservations plus unexpired
 /// residuals.
 pub fn org_usage(charges: &[BudgetCharge], now_secs: i64) -> i64 {
-    let _ = (charges, now_secs);
-    todo!("budget::org_usage")
+    charges
+        .iter()
+        .filter(|c| match c.state {
+            ChargeState::Active => true,
+            ChargeState::Residual { expires_at } => now_secs < expires_at,
+        })
+        .map(|c| c.rows_charged)
+        .sum()
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -100,8 +122,15 @@ pub fn can_admit(
     limit: i64,
     now_secs: i64,
 ) -> Result<(), BudgetError> {
-    let _ = (charges, requested_rows, limit, now_secs);
-    todo!("budget::can_admit")
+    let in_use = org_usage(charges, now_secs);
+    if in_use + requested_rows > limit {
+        return Err(BudgetError::OrgBudgetExceeded {
+            requested: requested_rows,
+            in_use,
+            limit,
+        });
+    }
+    Ok(())
 }
 
 /// Whether the ingest job may raise a reservation in place, or must trip
@@ -114,8 +143,14 @@ pub fn can_raise_reservation(
     limit: i64,
     now_secs: i64,
 ) -> bool {
-    let _ = (charges, slo_id, generation, new_rows, limit, now_secs);
-    todo!("budget::can_raise_reservation")
+    // The raise REPLACES this charge rather than adding to it — summing would
+    // double-count the SLO's own reservation and trip overflow early.
+    let others: Vec<BudgetCharge> = charges
+        .iter()
+        .filter(|c| !(c.slo_id == slo_id && c.generation == generation))
+        .cloned()
+        .collect();
+    can_admit(&others, new_rows, limit, now_secs).is_ok()
 }
 
 #[cfg(test)]

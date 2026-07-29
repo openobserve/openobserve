@@ -41,14 +41,42 @@ use super::SloDefinition;
 /// Canonical form — sorted keys, expressions re-rendered from their AST — so
 /// cosmetic re-edits (whitespace in a predicate) hash equal.
 pub fn definition_hash(definition: &SloDefinition) -> String {
-    let _ = definition;
-    todo!("generation::definition_hash")
+    use std::hash::{Hash, Hasher};
+
+    // Canonical form first: serialize, then re-parse into a BTreeMap-backed
+    // value so key order cannot affect the hash, and normalize the free-text
+    // expressions so a whitespace-only edit does not read as a semantic one.
+    let mut value = crate::utils::json::to_value(definition).unwrap_or(serde_json::Value::Null);
+    canonicalize(&mut value);
+    let canonical = serde_json::to_string(&value).unwrap_or_default();
+
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    canonical.hash(&mut hasher);
+    format!("{:016x}", hasher.finish())
+}
+
+/// Collapse insignificant whitespace inside every string, recursively.
+///
+/// A full AST re-render belongs at the query-safety boundary
+/// (`parse_predicate`), which is where a fragment is validated. This is the
+/// cheap half of the same idea: it stops reformatting from triggering a
+/// 90-day rebuild without pretending to understand SQL.
+fn canonicalize(value: &mut serde_json::Value) {
+    match value {
+        serde_json::Value::String(s) => {
+            *s = s.split_whitespace().collect::<Vec<_>>().join(" ");
+        }
+        serde_json::Value::Array(items) => items.iter_mut().for_each(canonicalize),
+        serde_json::Value::Object(map) => map.iter_mut().for_each(|(_, v)| canonicalize(v)),
+        _ => {}
+    }
 }
 
 /// Whether an edit requires a fresh generation and a rebuild.
 pub fn requires_new_generation(old: &SloDefinition, new: &SloDefinition) -> bool {
-    let _ = (old, new);
-    todo!("generation::requires_new_generation")
+    // Every field of SloDefinition is computation-affecting by construction —
+    // `target` is deliberately not a member (D56). So the hash IS the test.
+    definition_hash(old) != definition_hash(new)
 }
 
 /// Whether a writer whose pass began at `writer_generation` may still commit
@@ -58,8 +86,9 @@ pub fn requires_new_generation(old: &SloDefinition, new: &SloDefinition) -> bool
 /// late commit must fail rather than advance the new generation's marks with
 /// the old generation's arithmetic.
 pub fn writer_may_commit(writer_generation: i32, current_generation: i32) -> bool {
-    let _ = (writer_generation, current_generation);
-    todo!("generation::writer_may_commit")
+    // Equality, not `>=`: a mismatch in either direction means the writer's
+    // arithmetic does not describe the current definition.
+    writer_generation == current_generation
 }
 
 #[cfg(test)]
