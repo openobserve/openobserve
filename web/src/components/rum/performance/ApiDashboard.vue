@@ -22,31 +22,58 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="relative-position h-full"
     :key="store.state.selectedOrganization.identifier"
   >
+    <!-- Resolving the _rumdata schema before deciding which panels can run -->
     <div
-      class="h-full max-h-[calc(100vh-196px)] min-h-0! overflow-y-auto"
-      :class="isLoading.length ? 'invisible' : 'visible'"
-    >
-      <div class="performance-dashboard">
-        <RenderDashboardCharts
-          ref="apiDashboardChartsRef"
-          :viewOnly="true"
-          :frame="false"
-          :dashboardData="currentDashboardData.data"
-          :currentTimeObj="dateTime"
-          searchType="RUM"
-          @variablesManagerReady="onVariablesManagerReady"
-        />
-      </div>
-    </div>
-    <div
-      v-show="isLoading.length"
-      class="absolute top-0 flex h-[calc(100vh-15.625rem)] w-full items-center justify-center pb-4 text-center"
+      v-if="!schemaResolved"
+      data-test="api-dashboard-schema-loading"
+      class="flex h-[calc(100vh-15.625rem)] w-full items-center justify-center pb-4 text-center"
     >
       <div>
         <OSpinner size="md" class="mx-auto block" />
         <div class="w-full text-center">Loading Dashboard</div>
       </div>
     </div>
+
+    <!-- Stream has no network/resource data this view can render (e.g. a mobile app with
+         no network instrumentation) -->
+    <OEmptyState
+      v-else-if="showEmptyState"
+      data-test="api-dashboard-empty"
+      size="block"
+      illustration="pulse"
+      :hide-action="true"
+    >
+      <template #title>{{ t("rum.apiEmptyTitle") }}</template>
+      <template #description>{{ t("rum.apiEmptyDescription") }}</template>
+    </OEmptyState>
+
+    <template v-else>
+      <div
+        class="h-full max-h-[calc(100vh-196px)] min-h-0! overflow-y-auto"
+        :class="isLoading.length ? 'invisible' : 'visible'"
+      >
+        <div class="performance-dashboard">
+          <RenderDashboardCharts
+            ref="apiDashboardChartsRef"
+            :viewOnly="true"
+            :frame="false"
+            :dashboardData="dashboardData"
+            :currentTimeObj="dateTime"
+            searchType="RUM"
+            @variablesManagerReady="onVariablesManagerReady"
+          />
+        </div>
+      </div>
+      <div
+        v-show="isLoading.length"
+        class="absolute top-0 flex h-[calc(100vh-15.625rem)] w-full items-center justify-center pb-4 text-center"
+      >
+        <div>
+          <OSpinner size="md" class="mx-auto block" />
+          <div class="w-full text-center">Loading Dashboard</div>
+        </div>
+      </div>
+    </template>
   </div>
 </template>
 
@@ -55,18 +82,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref, watch, onMounted, onActivated, nextTick, type Ref } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
-import { reactive } from "vue";
 import searchService from "@/services/search";
 import apiDashboard from "@/utils/rum/api.json";
 import RenderDashboardCharts from "@/views/Dashboards/RenderDashboardCharts.vue";
-import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboardSchemaVersion";
+import useRumPerformanceTab from "@/composables/rum/useRumPerformanceTab";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 
 export default defineComponent({
   name: "ApiDashboard",
   components: {
     RenderDashboardCharts,
     OSpinner,
+    OEmptyState,
   },
   props: {
     dateTime: {
@@ -82,9 +110,12 @@ export default defineComponent({
   setup(props, { emit }) {
     const { t } = useI18n();
     const store = useStore();
-    const currentDashboardData = reactive({
-      data: {},
-    });
+
+    // Adaptive dashboard: drops resource/network panels the stream can't serve, reflowing
+    // the survivors. See docs/designs/MOBILE_RUM_ADAPTIVE_UI_DESIGN.md.
+    const { dashboardData, schemaResolved, showEmptyState, ensureRumSchema } =
+      useRumPerformanceTab(apiDashboard);
+
     const showDashboardSettingsDialog = ref(false);
     const apiDashboardChartsRef: Ref<any> = ref(null);
     const viewOnly = ref(true);
@@ -104,8 +135,8 @@ export default defineComponent({
       emit("variablesManagerReady", manager);
     };
 
-    onMounted(async () => {
-      await loadDashboard();
+    onMounted(() => {
+      ensureRumSchema();
       updateLayout();
     });
 
@@ -248,20 +279,6 @@ export default defineComponent({
       return variablesString;
     };
 
-    const loadDashboard = async () => {
-      currentDashboardData.data = convertDashboardSchemaVersion(apiDashboard);
-
-      // if variables data is null, set it to empty list
-      if (
-        !(currentDashboardData.data?.variables && currentDashboardData.data?.variables?.list.length)
-      ) {
-        if (variablesData.value) {
-          variablesData.value.isVariablesLoading = false;
-          variablesData.value.values = [];
-        }
-      }
-    };
-
     const addSettingsData = () => {
       showDashboardSettingsDialog.value = true;
     };
@@ -277,7 +294,9 @@ export default defineComponent({
     );
 
     return {
-      currentDashboardData,
+      dashboardData,
+      schemaResolved,
+      showEmptyState,
       t,
       store,
       refDateTime,
@@ -288,7 +307,6 @@ export default defineComponent({
       onVariablesManagerReady,
       addSettingsData,
       showDashboardSettingsDialog,
-      loadDashboard,
       apiDashboard,
       isLoading,
       apiDashboardChartsRef,
