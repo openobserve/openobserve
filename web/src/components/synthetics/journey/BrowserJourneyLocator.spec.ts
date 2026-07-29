@@ -111,3 +111,53 @@ describe("BrowserJourneyLocator", () => {
     expect(wrapper.find(test("synthetics-journey-step-locator-fallbacks")).exists()).toBe(false);
   });
 });
+
+describe("all-positional notice (Phase 2a)", () => {
+  const positional = {
+    candidates: [
+      { kind: "test_attribute" as const, value: '[data-test="org-item"] >> nth=1' },
+      { kind: "css" as const, value: "div >> internal:has-text=/^Acme$/ >> nth=0" },
+    ],
+    user_override: null,
+  };
+
+  it("warns when every candidate identifies the element by position", () => {
+    const wrapper = mount(BrowserJourneyLocator, {
+      props: { locator: positional },
+      global: { plugins: [i18n] },
+    });
+    expect(
+      wrapper.find('[data-test="synthetics-journey-step-locator-positional-warning"]').exists(),
+    ).toBe(true);
+  });
+
+  it("stays silent when any candidate is unambiguous", () => {
+    const wrapper = mount(BrowserJourneyLocator, {
+      props: {
+        locator: {
+          candidates: [
+            { kind: "role" as const, value: 'internal:role=button[name="Save"i]' },
+            { kind: "test_attribute" as const, value: '[data-test="org-item"] >> nth=1' },
+          ],
+          user_override: null,
+        },
+      },
+      global: { plugins: [i18n] },
+    });
+    expect(
+      wrapper.find('[data-test="synthetics-journey-step-locator-positional-warning"]').exists(),
+    ).toBe(false);
+  });
+
+  it("stays silent once the author has pinned — the question is answered", () => {
+    const wrapper = mount(BrowserJourneyLocator, {
+      props: {
+        locator: { ...positional, user_override: { kind: "css" as const, value: "#chosen" } },
+      },
+      global: { plugins: [i18n] },
+    });
+    expect(
+      wrapper.find('[data-test="synthetics-journey-step-locator-positional-warning"]').exists(),
+    ).toBe(false);
+  });
+});

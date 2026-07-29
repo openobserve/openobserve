@@ -18,6 +18,7 @@
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import type { LocatorCandidate, StepLocator } from "@/types/synthetics";
+import { isFullyPositional } from "@/utils/synthetics/locatorStability";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -39,6 +40,17 @@ const effective = computed<LocatorCandidate | null>(
 );
 
 const fallbacks = computed(() => candidates.value.slice(1));
+
+/**
+ * Every candidate identifies the element by counting siblings.
+ *
+ * Playwright appends a positional token only when nothing identified the element
+ * uniquely, so when all of them carry one the recorder is saying it could not
+ * tell these elements apart. Re-ranking cannot help — there is nothing better to
+ * promote — which is exactly why this has to be said rather than sorted away.
+ * A pinned step is excluded: the author has already answered the question.
+ */
+const allPositional = computed(() => !pinned.value && isFullyPositional(candidates.value));
 
 const overrideDraft = ref("");
 
@@ -115,6 +127,19 @@ function isPinnedCandidate(candidate: LocatorCandidate): boolean {
         {{ t("synthetics.journey.locatorPin") }}
       </OButton>
     </div>
+
+    <!--
+      Phase 2a: the recorder could not identify this element at all. Ranking is
+      a no-op here, so the author is the only thing that can resolve it.
+    -->
+    <p
+      v-if="allPositional"
+      class="text-status-warning-text m-0 flex items-start gap-1 text-xs"
+      data-test="synthetics-journey-step-locator-positional-warning"
+    >
+      <OIcon name="warning" size="xs" class="mt-0.5 shrink-0" aria-hidden="true" />
+      <span>{{ t("synthetics.journey.locatorAllPositionalWarning") }}</span>
+    </p>
 
     <!-- A pinned step never falls back, so the list is shown inert. -->
     <p
