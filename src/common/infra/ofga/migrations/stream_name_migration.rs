@@ -16,7 +16,7 @@
 use std::collections::HashSet;
 
 use o2_openfga::{authorizer, config::get_config as get_ofga_config};
-use sea_orm::{ColumnTrait, ConnectionTrait, PaginatorTrait, QueryFilter, QuerySelect};
+use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, PaginatorTrait, QueryFilter, QuerySelect};
 
 use crate::common::utils::auth::{into_ofga_supported_format, is_ofga_unsupported};
 
@@ -62,7 +62,7 @@ pub async fn migrate_stream_names<C: ConnectionTrait>(db: &C) -> Result<(), anyh
             // key2 is `{stream_type}/{stream_name}`; the stream name is
             // everything after the first `/` (names may themselves contain `/`).
             let Some((stream_type, stream_name)) = key2.split_once('/') else {
-                log::warn!("Unexpected schema key format (no '/'): {org_id}/{key2}");
+                log::warn!("Unexpected schema key format (no '/'): {}/{}", org_id, key2);
                 continue;
             };
 
@@ -71,13 +71,14 @@ pub async fn migrate_stream_names<C: ConnectionTrait>(db: &C) -> Result<(), anyh
             }
 
             let sanitized = into_ofga_supported_format(stream_name);
-            let dedupe_key = format!("{org_id}/{stream_type}/{sanitized}");
+            let dedupe_key = format!("{}/{}/{}", org_id, stream_type, sanitized);
             if !seen.insert(dedupe_key) {
                 continue;
             }
 
             log::debug!(
-                "Migrating stream ownership tuple -> org: {org_id}, type: {stream_type}, name: {stream_name} -> {sanitized}"
+                "Migrating stream ownership tuple -> org: {}, type: {}, name: {} -> {}",
+                org_id, stream_type, stream_name, sanitized
             );
             authorizer::authz::get_ownership_tuple(&org_id, stream_type, &sanitized, &mut tuples);
             len += 1;
