@@ -228,6 +228,8 @@ describe("Ingestion", () => {
       expect(wrapper.vm.metricRoutes).toEqual([
         "prometheus",
         "vmagent",
+        "nightingale",
+        "categraf",
         "otelCollector",
         "telegraf",
         "cloudwatchMetrics",

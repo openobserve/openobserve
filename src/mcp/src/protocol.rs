@@ -36,6 +36,25 @@ pub async fn route_request(request: MCPRequest, auth_token: Option<String>) -> R
         ));
     }
 
+    // Modern (2026-07-28) clients declare their protocol version on every
+    // request. An unsupported version must be answered with
+    // UnsupportedProtocolVersionError listing the versions we do support so
+    // the client can retry with one of them.
+    if let Some(version) = request.meta_protocol_version().map(str::to_owned)
+        && !is_supported_protocol_version(&version)
+    {
+        return Ok(MCPResponse::error(
+            request.id,
+            MCPErrorCode::UnsupportedProtocolVersion,
+            "Unsupported protocol version".to_string(),
+            Some(json!({
+                "supported": MCP_SUPPORTED_PROTOCOL_VERSIONS,
+                "requested": version,
+            })),
+        ));
+    }
+    let modern = request.is_modern();
+
     // Parse method
     let method = match MCPMethod::from_str(&request.method) {
         Ok(m) => m,
@@ -55,12 +74,18 @@ pub async fn route_request(request: MCPRequest, auth_token: Option<String>) -> R
         MCPMethod::Ping => handle_ping(),
         MCPMethod::ToolsList => handle_tools_list(),
         MCPMethod::ToolsCall => handle_tools_call(request.params, auth_token).await,
+        MCPMethod::ServerDiscover => handle_server_discover(),
         // Notifications are one-way; no response body required (HTTP layer returns 202)
         MCPMethod::NotificationsInitialized => Ok(Value::Null),
     };
 
     match result {
-        Ok(value) => Ok(MCPResponse::success(request.id, value)),
+        Ok(mut value) => {
+            if modern {
+                decorate_modern_result(&mut value, &method);
+            }
+            Ok(MCPResponse::success(request.id, value))
+        }
         Err(e) => Ok(MCPResponse::error(
             request.id,
             MCPErrorCode::InternalError,
@@ -68,6 +93,66 @@ pub async fn route_request(request: MCPRequest, auth_token: Option<String>) -> R
             None,
         )),
     }
+}
+
+/// Cache lifetime advertised on `server/discover` results (1 hour); the
+/// version/capability surface only changes across deployments.
+const DISCOVER_TTL_MS: u64 = 3_600_000;
+/// Cache lifetime advertised on modern `tools/list` results (5 minutes);
+/// the tool set is fixed per process but kept shorter to bound staleness
+/// across rolling upgrades.
+const TOOLS_LIST_TTL_MS: u64 = 300_000;
+
+/// Server identity for `_meta` (`io.modelcontextprotocol/serverInfo`).
+fn server_info_meta() -> Value {
+    json!({
+        "name": MCP_SERVER_NAME,
+        "version": MCP_SERVER_VERSION,
+        "title": "OpenObserve MCP Server",
+    })
+}
+
+/// Add the fields a 2026-07-28 result must or should carry: `resultType`,
+/// `_meta` server identity, and cache-control fields on list results.
+/// Legacy (initialize-negotiated) responses are left untouched so
+/// 2025-11-25 clients never see fields their revision doesn't define.
+fn decorate_modern_result(value: &mut Value, method: &MCPMethod) {
+    let Some(obj) = value.as_object_mut() else {
+        return;
+    };
+    obj.entry("resultType").or_insert_with(|| json!("complete"));
+    if matches!(method, MCPMethod::ToolsList) {
+        obj.entry("ttlMs")
+            .or_insert_with(|| json!(TOOLS_LIST_TTL_MS));
+        obj.entry("cacheScope").or_insert_with(|| json!("public"));
+    }
+    let meta = obj
+        .entry("_meta")
+        .or_insert_with(|| Value::Object(serde_json::Map::new()));
+    if let Some(meta) = meta.as_object_mut() {
+        meta.entry(META_KEY_SERVER_INFO)
+            .or_insert_with(server_info_meta);
+    }
+}
+
+/// Handle server/discover (2026-07-28)
+///
+/// Required entry point for modern clients (and the stdio
+/// backward-compatibility probe): advertises supported protocol versions,
+/// capabilities, and identity in a single cacheable result.
+fn handle_server_discover() -> Result<Value> {
+    Ok(json!({
+        "resultType": "complete",
+        "supportedVersions": MCP_SUPPORTED_PROTOCOL_VERSIONS,
+        "capabilities": {
+            "tools": {},
+            "completions": {},
+        },
+        "instructions": "OpenObserve observability tools. Call tool_search to discover tools for streams, logs, metrics, traces, alerts, dashboards, etc., then execute them via tools_call.",
+        "ttlMs": DISCOVER_TTL_MS,
+        "cacheScope": "public",
+        "_meta": { (META_KEY_SERVER_INFO): server_info_meta() },
+    }))
 }
 
 /// Handle initialize request
@@ -528,6 +613,99 @@ mod tests {
         let response = route_request(request, None).await.unwrap();
         assert!(response.result.is_some());
         assert!(response.error.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_server_discover() {
+        let request = MCPRequest {
+            jsonrpc: JSONRPC_VERSION.to_string(),
+            id: Some(Value::from(1)),
+            method: "server/discover".to_string(),
+            params: json!({
+                "_meta": { "io.modelcontextprotocol/protocolVersion": "2026-07-28" }
+            }),
+        };
+
+        let response = route_request(request, None).await.unwrap();
+        assert!(response.error.is_none());
+        let result = response.result.unwrap();
+        assert_eq!(result["resultType"], json!("complete"));
+        let versions = result["supportedVersions"].as_array().unwrap();
+        assert!(versions.contains(&json!("2026-07-28")));
+        assert!(versions.contains(&json!("2025-11-25")));
+        assert!(result["capabilities"]["tools"].is_object());
+        assert!(result["ttlMs"].is_u64());
+        assert_eq!(result["cacheScope"], json!("public"));
+        assert_eq!(
+            result["_meta"]["io.modelcontextprotocol/serverInfo"]["name"],
+            json!(MCP_SERVER_NAME)
+        );
+    }
+
+    #[tokio::test]
+    async fn test_unsupported_meta_protocol_version() {
+        let request = MCPRequest {
+            jsonrpc: JSONRPC_VERSION.to_string(),
+            id: Some(Value::from(1)),
+            method: "tools/list".to_string(),
+            params: json!({
+                "_meta": { "io.modelcontextprotocol/protocolVersion": "1900-01-01" }
+            }),
+        };
+
+        let response = route_request(request, None).await.unwrap();
+        let error = response.error.unwrap();
+        assert_eq!(error.code, -32022);
+        let data = error.data.unwrap();
+        assert_eq!(data["requested"], json!("1900-01-01"));
+        assert!(
+            data["supported"]
+                .as_array()
+                .unwrap()
+                .contains(&json!("2026-07-28"))
+        );
+    }
+
+    #[tokio::test]
+    async fn test_modern_tools_list_is_decorated() {
+        tools::init_test_tools().await;
+
+        let request = MCPRequest {
+            jsonrpc: JSONRPC_VERSION.to_string(),
+            id: Some(Value::from(1)),
+            method: "tools/list".to_string(),
+            params: json!({
+                "_meta": { "io.modelcontextprotocol/protocolVersion": "2026-07-28" }
+            }),
+        };
+
+        let response = route_request(request, None).await.unwrap();
+        let result = response.result.unwrap();
+        assert_eq!(result["resultType"], json!("complete"));
+        assert!(result["ttlMs"].is_u64());
+        assert_eq!(result["cacheScope"], json!("public"));
+        assert!(result["_meta"]["io.modelcontextprotocol/serverInfo"].is_object());
+        assert!(result["tools"].is_array());
+    }
+
+    #[tokio::test]
+    async fn test_legacy_tools_list_is_not_decorated() {
+        tools::init_test_tools().await;
+
+        let request = MCPRequest {
+            jsonrpc: JSONRPC_VERSION.to_string(),
+            id: Some(Value::from(1)),
+            method: "tools/list".to_string(),
+            params: Value::Null,
+        };
+
+        let response = route_request(request, None).await.unwrap();
+        let result = response.result.unwrap();
+        let obj = result.as_object().unwrap();
+        assert!(!obj.contains_key("resultType"));
+        assert!(!obj.contains_key("ttlMs"));
+        assert!(!obj.contains_key("cacheScope"));
+        assert!(!obj.contains_key("_meta"));
     }
 
     #[tokio::test]

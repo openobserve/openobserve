@@ -81,6 +81,9 @@ module.exports = defineConfig({
   reporter: process.env.CI
     ? [
         ['blob', { outputDir: 'blob-report' }],
+        // Prints a LOUD banner to stdout whenever a test is retried (blob writes nothing to
+        // the log, so retries are otherwise invisible in the CI output). Log-only, never fails.
+        ['./playwright-tests/utils/retry-banner-reporter.js'],
       ]
     : [
         ['html', { outputFolder: 'playwright-results/html-report', open: 'never' }],

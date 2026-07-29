@@ -85,7 +85,7 @@ pub async fn get_stream_partition_keys(
     let stream_settings = infra::schema::get_settings(org_id, stream_name, *stream_type)
         .await
         .unwrap_or_default();
-    stream_settings.partition_keys
+    stream_settings.partition_keys.clone()
 }
 
 #[inline(always)]
@@ -478,7 +478,8 @@ pub async fn get_uds_and_original_data_streams(
         );
 
         if !stream_settings.defined_schema_fields.is_empty() {
-            let mut fields = HashSet::<_>::from_iter(stream_settings.defined_schema_fields);
+            let mut fields =
+                HashSet::<_>::from_iter(stream_settings.defined_schema_fields.iter().cloned());
             if !fields.contains(TIMESTAMP_COL_NAME) {
                 fields.insert(TIMESTAMP_COL_NAME.to_string());
             }
@@ -550,7 +551,7 @@ pub fn refactor_map(
 
 #[cfg(test)]
 mod tests {
-    use infra::schema::{STREAM_SETTINGS, unwrap_stream_settings};
+    use infra::schema::unwrap_stream_settings;
     use transform::compile_vrl_function;
 
     use super::*;
@@ -620,10 +621,11 @@ mod tests {
         );
         let schema = arrow_schema::Schema::empty().with_metadata(meta);
         let settings = unwrap_stream_settings(&schema).unwrap();
-        let mut w = STREAM_SETTINGS.write().await;
-        w.insert("default/logs/olympics".to_string(), settings);
-        infra::schema::set_stream_settings_atomic(w.clone());
-        drop(w);
+        infra::schema::put_stream_settings(
+            "default/logs/olympics".to_string(),
+            std::sync::Arc::new(settings),
+        )
+        .await;
         let keys = get_stream_partition_keys("default", &StreamType::Logs, "olympics").await;
         assert_eq!(
             keys,
