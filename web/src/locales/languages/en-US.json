@@ -8483,7 +8483,7 @@
           "inputOutput": {
             "span": "Map these to the span fields holding the input and output.",
             "trace": "Input and output from the trace's root span.",
-            "session": "Not available \u2014 a session has no single input or output."
+            "session": "Not available — a session has no single input or output."
           },
           "statistics": {
             "span": "Map this name like any other scorer variable when evaluating a single span.",
@@ -8501,7 +8501,7 @@
             "session": "Traces in time order, represented as conversation turns."
           }
         },
-        "indexDescription": "{spansVar} and {stepsVar} arrive as JSON arrays. Reference the whole variable \u2014 indexed access like {indexedVar} is not supported."
+        "indexDescription": "{spansVar} and {stepsVar} arrive as JSON arrays. Reference the whole variable — indexed access like {indexedVar} is not supported."
       },
       "identitySection": "Identity",
       "judgeSection": "Judge configuration",
@@ -8522,7 +8522,7 @@
       "includeReasoningLabel": "Include Reasoning",
       "includeReasoningHint": "The judge explains why it gave that score, saved with each result.",
       "extraFieldsLabel": "Extra Metadata Fields (Optional)",
-      "extraFieldsHint": "Ask the judge to return extra values with each score \u2014 a category or a confidence, for example.",
+      "extraFieldsHint": "Ask the judge to return extra values with each score — a category or a confidence, for example.",
       "extraFields": {
         "colName": "Field Name",
         "colType": "Type",
@@ -8833,7 +8833,7 @@
         "variableCount": "{count} variables",
         "systemProvided": {
           "title": "{scope} Variables",
-          "description": "OpenObserve supplies these values from the {scope} itself. A scorer prompt can use them directly \u2014 no mapping needed.",
+          "description": "OpenObserve supplies these values from the {scope} itself. A scorer prompt can use them directly — no mapping needed.",
           "badge": "System provided",
           "selectorRequired": "Span Selector required",
           "columns": {
@@ -8874,7 +8874,7 @@
         "customSchema": "Custom Fields",
         "defaultSchemaHelp": "These eight fields are read from every matching span. Anything missing comes through empty.",
         "fields": "Fields",
-        "fieldsHelp": "Only these fields are read \u2014 nothing else is sent to the scorer.",
+        "fieldsHelp": "Only these fields are read — nothing else is sent to the scorer.",
         "maximumSpans": "Maximum Spans",
         "budget": "Limits how many spans are selected from the trace.",
         "validation": {
@@ -10387,6 +10387,147 @@
       "rumErrorsRefresh": "Refresh list",
       "rumSessionsRefresh": "Refresh list",
       "sourceMapsRefresh": "Refresh list"
+    }
+  },
+  "slos": {
+    "title": "SLOs",
+    "subtitle": "Service level objectives — targets, error budgets, burn-rate alerts",
+    "new": "New SLO",
+    "newTitle": "New SLO",
+    "editTitle": "Edit SLO",
+    "edit": "Edit",
+    "delete": "Delete",
+    "pause": "Pause",
+    "resume": "Resume",
+    "paused": "Paused",
+    "pausedNotice": "SLO paused",
+    "resumed": "SLO resumed",
+    "saved": "SLO saved",
+    "deleted": "SLO deleted",
+    "rolling": "rolling",
+    "totalSlos": "Total SLOs",
+    "noGrouping": "None — a single overall series",
+    "generation": "generation {n}",
+    "newAlert": "New alert",
+    "overRolling": "over rolling {window}",
+    "searchPlaceholder": "Search SLO or tag, e.g. team:payments",
+    "loadFailed": "Could not load SLOs",
+    "saveFailed": "Could not save the SLO",
+    "updateFailed": "Could not update the SLO",
+    "deleteFailed": "Could not delete the SLO",
+    "deleteConfirmTitle": "Delete this SLO?",
+    "deleteConfirmBody": "\"{name}\" and its measurement history will be removed.",
+    "deleteBudgetNote": "The slices already written stay on disk until they age out, so this SLO's row reservation is released then rather than now.",
+    "groupedSliceNote": "Grouped SLOs use 5-minute slices.",
+    "backfillNote": "Backfill runs on save — chunked, newest history first. Alerts stay frozen until coverage clears the floor.",
+    "budgetHint": "error budget = {budget}",
+    "budgetDays": "{n} days",
+    "budgetHours": "{n} hours",
+    "budgetMinutes": "{n} minutes",
+    "reservationValue": "{groups} group(s)",
+    "reservationSummary": "{groups} group(s) · ≈{rows} slice rows",
+    "health": {
+      "budget_blown": "Budget blown",
+      "at_risk": "At risk",
+      "meeting": "Meeting target",
+      "no_data": "No data"
+    },
+    "type": {
+      "all": "All",
+      "count": "Count",
+      "countDescription": "good events / total events from one query",
+      "timeSlice": "Time slice",
+      "timeSliceDescription": "a per-slice condition, e.g. p95 < 500 ms — uptime = good slices",
+      "alert": "Alert-based",
+      "alertDescription": "uptime of an existing alert"
+    },
+    "window": {
+      "7d": "7 days",
+      "30d": "30 days",
+      "90d": "90 days"
+    },
+    "slice": {
+      "1m": "1 minute",
+      "5m": "5 minutes"
+    },
+    "column": {
+      "name": "Name",
+      "status": "Status",
+      "statusVsTarget": "Status vs target",
+      "budgetRemaining": "Budget remaining",
+      "burnRate": "Burn rate",
+      "coverage": "Coverage",
+      "window": "Window",
+      "tags": "Tags",
+      "actions": "Actions",
+      "group": "Group",
+      "sli": "SLI"
+    },
+    "stat": {
+      "status": "Status ({window})",
+      "target": "Target",
+      "budgetRemaining": "Budget remaining",
+      "burnRate": "Burn rate",
+      "timeToExhaust": "Time to exhaust",
+      "coverage": "Coverage"
+    },
+    "tab": {
+      "groups": "Groups",
+      "configuration": "Configuration"
+    },
+    "section": {
+      "identity": "Details",
+      "sli": "SLI — what \"good\" means",
+      "objective": "Objective",
+      "grouping": "Grouping",
+      "summary": "Summary"
+    },
+    "field": {
+      "name": "SLO name",
+      "namePlaceholder": "e.g. Checkout availability",
+      "description": "Description",
+      "tags": "Tags",
+      "streamType": "Stream type",
+      "stream": "Stream",
+      "scope": "Scope",
+      "scopeHint": "Optional filter applied to the denominator. Leave empty for all rows.",
+      "goodWhen": "Good when",
+      "goodWhenHint": "Boolean predicate over a row, e.g. status_code < 500",
+      "aggregate": "Aggregate",
+      "aggregateHint": "Evaluated per slice; compared against the threshold below.",
+      "comparator": "Comparator",
+      "threshold": "Threshold",
+      "target": "Target",
+      "window": "Time window",
+      "sliceInterval": "Slice interval",
+      "groupBy": "Group by",
+      "groupByPlaceholder": "Add a field, e.g. region",
+      "groupsEstimate": "Cardinality estimate",
+      "groupsEstimateHint": "Used to size the row reservation. Twice this value is reserved, to leave headroom for organic growth.",
+      "errorBudget": "Error budget",
+      "maxBurnRate": "Max burn rate",
+      "reservation": "Reservation",
+      "sliType": "SLI type",
+      "owner": "Owner"
+    },
+    "empty": {
+      "title": "No SLOs yet",
+      "description": "An SLO measures what fraction of requests, or of time, met a target — and gives alerts an error budget to burn."
+    },
+    "groups": {
+      "emptyTitle": "No groups measured yet",
+      "emptyDescription": "Groups appear once the first ingest pass has measured them."
+    },
+    "frozen": {
+      "title": "Frozen — not enough coverage",
+      "body": "Only {coverage} of this window was measured, below the {floor} floor. The SLO reads as no data and its alerts neither fire nor resolve, so unmeasured time is never reported as uptime."
+    },
+    "regenerate": {
+      "title": "This edit restarts measurement",
+      "body": "You changed what a slice means, so a new generation begins and the current window's measurements are discarded. Changing only the target would not do this — the target is applied when the SLO is read."
+    },
+    "alertSli": {
+      "unavailable": "Alert-based SLIs are not available yet: distinguishing \"the alert was OK for 3h\" from \"the alert was paused for 3h\" needs coverage data that is still being wired up."
     }
   }
 }
