@@ -245,10 +245,23 @@ describe("TableRenderer", () => {
       expect(table.props("pageSize")).toBe(10);
     });
 
-    it("should set useVirtualScroll=false on TenstackTable", () => {
+    it("should enable virtualScroll on OTable for non-pivot tables", () => {
+      // Flat tables can return thousands of rows (e.g. Logs Visualize SELECT *);
+      // virtualization keeps only the visible rows in the DOM so the main thread
+      // does not stall rendering them all at once.
       wrapper = createWrapper();
       const table = wrapper.findComponent({ name: "OTable" });
-      expect(table.props("virtualScroll")).toBeFalsy();
+      expect(table.props("virtualScroll")).toBe(true);
+    });
+
+    it("should disable virtualScroll on OTable for pivot tables", () => {
+      // Pivots are aggregated (small) and their fake-rowspan row-merge needs all
+      // rows present, so they stay non-virtualized.
+      wrapper = createWrapper({
+        data: { ...mockTableData, pivotHeaderLevels: [{ level: 0 }] },
+      });
+      const table = wrapper.findComponent({ name: "OTable" });
+      expect(table.props("virtualScroll")).toBe(false);
     });
 
     it("should set enableColumnReorder=false on TenstackTable", () => {

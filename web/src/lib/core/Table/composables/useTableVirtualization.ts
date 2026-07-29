@@ -106,7 +106,12 @@ export function useTableVirtualization(options: VirtualizationOptions) {
   }
 
   function measure() {
-    rowVirtualizer.value.measure();
+    // The virtualizer only exposes `measure` once it has bound to a live scroll
+    // element; under jsdom (and any pre-mount call) it can be absent, so guard
+    // it the same way `measureRowElement` guards its DOM access below.
+    if (typeof rowVirtualizer.value?.measure === "function") {
+      rowVirtualizer.value.measure();
+    }
   }
 
   /**
