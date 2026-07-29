@@ -775,6 +775,21 @@ pub struct BrowserConfig {
     /// retry sequence cannot outlive it — see `validate_browser_config`.
     pub journey_budget_ms: Option<u32>,
     pub capture: Option<BrowserCapture>,
+    /// The DOM attribute the recorder selects on for this monitor.
+    ///
+    /// Absent means [`DEFAULT_TEST_ID_ATTR`]. It exists because the attribute is
+    /// a property of the application under test, not of OpenObserve: Playwright
+    /// defaults to `data-testid`, O2's own frontend uses `data-test`, and a
+    /// customer may use `data-qa`, `data-cy` or `data-automation-id`.
+    ///
+    /// Getting it wrong is silent. Upstream's generator carries a hardcoded
+    /// fallback list (`data-testid`, `data-test-id`, `data-test`), so an
+    /// application outside that list produces NO `test_attribute` candidates at
+    /// all and every step degrades to role/text/css without any error.
+    ///
+    /// Recorded per monitor rather than per org so a journey that was recorded
+    /// against one application keeps working when another is added.
+    pub test_id_attr: Option<String>,
 }
 
 /// A recorder-captured secret form value (e.g. a password typed during a login
@@ -989,6 +1004,17 @@ const MAX_STEPS_JSON_BYTES: usize = 100_000;
 /// payload, so neither storage nor transport needs changing.
 const MAX_STEPS_JSON_BYTES_V2: usize = 262_144;
 const MAX_LOCATOR_CANDIDATES: usize = 5;
+
+/// The recorder's test-id attribute when a monitor does not set one.
+///
+/// `data-test` rather than Playwright's `data-testid`: OpenObserve's own
+/// frontend marks interactive elements with it, and self-monitoring is this
+/// feature's acceptance test (X-1's o2.introspect monitors).
+pub const DEFAULT_TEST_ID_ATTR: &str = "data-test";
+
+/// Longest attribute name accepted. A DOM attribute name this long is not a
+/// configuration, it is a paste accident.
+const MAX_TEST_ID_ATTR_LEN: usize = 64;
 const MAX_SETTLE_RESPONSES: usize = 5;
 const MAX_TAGS: usize = 20;
 const MAX_VARIABLES: usize = 50;
@@ -1638,6 +1664,35 @@ fn validate_browser_config(
         ));
     }
 
+    // ── recorder test-id attribute ─────────────────────────────────────────
+    // Validated rather than trusted because it is interpolated into a selector
+    // (`[<attr>="value"]`). A name with a quote or bracket in it would produce a
+    // selector that silently matches nothing, which is the failure mode this
+    // whole area exists to remove.
+    if let Some(attr) = &cfg.test_id_attr {
+        let trimmed = attr.trim();
+        if trimmed.is_empty() {
+            return Err(
+                "config.test_id_attr: must not be blank — omit it to use the default".to_string(),
+            );
+        }
+        if trimmed.len() > MAX_TEST_ID_ATTR_LEN {
+            return Err(format!(
+                "config.test_id_attr: too long ({} > {MAX_TEST_ID_ATTR_LEN})",
+                trimmed.len()
+            ));
+        }
+        if !trimmed
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+        {
+            return Err(format!(
+                "config.test_id_attr: '{trimmed}' is not a valid attribute name \
+                 (letters, digits, '-' and '_' only)"
+            ));
+        }
+    }
+
     // ── steps ──────────────────────────────────────────────────────────────
     if cfg.steps.is_empty() {
         return Err("config.steps: at least one step is required".to_string());
@@ -2148,6 +2203,75 @@ mod tests {
         let (locs, brs, devs) = allowed();
         let s = v2_synthetic(serde_json::json!([v2_nav_step(), v2_click_step()]));
         assert!(s.validate(&locs, &brs, &devs, true).is_ok());
+    }
+
+    // ── Recorder test-id attribute ───────────────────────────────────────────
+    // The attribute is a property of the application under test, not of O2, and
+    // getting it wrong is SILENT: upstream's generator falls back to a hardcoded
+    // list, so an app outside it produces no test_attribute candidates at all.
+
+    #[test]
+    fn test_test_id_attr_absent_is_valid() {
+        let (locs, brs, devs) = allowed();
+        let s = valid_browser_synthetic();
+        assert!(s.config.get("test_id_attr").is_none());
+        assert!(s.validate(&locs, &brs, &devs, true).is_ok());
+    }
+
+    #[test]
+    fn test_test_id_attr_accepts_real_attribute_names() {
+        let (locs, brs, devs) = allowed();
+        for attr in [
+            "data-test",
+            "data-testid",
+            "data-qa",
+            "data-cy",
+            "data_e2e",
+            "id",
+        ] {
+            let mut s = valid_browser_synthetic();
+            s.config["test_id_attr"] = serde_json::json!(attr);
+            assert!(
+                s.validate(&locs, &brs, &devs, true).is_ok(),
+                "{attr} should be accepted: {:?}",
+                s.validate(&locs, &brs, &devs, true)
+            );
+        }
+    }
+
+    #[test]
+    fn test_test_id_attr_rejects_blank() {
+        // Blank would silently mean "everything" once interpolated into
+        // `[<attr>="value"]`. Omitting the field is how you ask for the default.
+        let (locs, brs, devs) = allowed();
+        let mut s = valid_browser_synthetic();
+        s.config["test_id_attr"] = serde_json::json!("   ");
+        let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
+        assert!(err.contains("test_id_attr"), "{err}");
+    }
+
+    #[test]
+    fn test_test_id_attr_rejects_selector_injection() {
+        // The value is interpolated into a selector, so a quote or bracket would
+        // produce one that silently matches nothing.
+        let (locs, brs, devs) = allowed();
+        for bad in ["data-test=\"x\"", "data test", "data]test", "a*b"] {
+            let mut s = valid_browser_synthetic();
+            s.config["test_id_attr"] = serde_json::json!(bad);
+            assert!(
+                s.validate(&locs, &brs, &devs, true).is_err(),
+                "{bad} should be rejected"
+            );
+        }
+    }
+
+    #[test]
+    fn test_test_id_attr_rejects_absurd_length() {
+        let (locs, brs, devs) = allowed();
+        let mut s = valid_browser_synthetic();
+        s.config["test_id_attr"] = serde_json::json!("d".repeat(MAX_TEST_ID_ATTR_LEN + 1));
+        let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
+        assert!(err.contains("too long"), "{err}");
     }
 
     #[test]
