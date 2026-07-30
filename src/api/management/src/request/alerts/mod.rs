@@ -271,7 +271,7 @@ pub async fn list_alert_groups(Path((org_id, alert_id)): Path<(String, String)>)
             .then_with(|| a.group_key.cmp(&b.group_key))
     });
 
-    let rollup = infra::table::alert_states::get_rollups(&[alert_id.clone()])
+    let rollup = infra::table::alert_states::get_rollups(std::slice::from_ref(&alert_id))
         .await
         .ok()
         .and_then(|mut r| r.pop());

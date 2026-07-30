@@ -304,6 +304,9 @@ pub(crate) async fn create_default_alerts_folder(org_id: &str) -> Result<Folder,
 /// function**. Duplicating the call in a test helper would still compile after
 /// the production call changed, leaving the tests quietly verifying something
 /// else.
+// Sync (unlike its async AlertError-returning neighbours, whose futures hide
+// the size from this lint); boxing the error is not worth the churn here.
+#[allow(clippy::result_large_err)]
 fn validate_multi_alert_config(alert: &Alert) -> Result<(), AlertError> {
     config::meta::alerts::grouping::validate_multi_alert(
         &alert.query_condition,
@@ -1530,7 +1533,6 @@ pub(crate) async fn dispatch_notification(
 }
 
 #[allow(clippy::too_many_arguments)]
-#[allow(clippy::too_many_arguments)]
 async fn send_notification(
     alert: &Alert,
     dest_type: &DestinationType,
@@ -1928,6 +1930,7 @@ fn fmt_observed(v: f64) -> String {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn process_dest_template(
     org_name: &str,
     tpl: &str,

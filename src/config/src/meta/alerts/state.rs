@@ -285,7 +285,7 @@ pub fn apply_outcome(
 
     // A change on EITHER axis is a transition — an escalation while still
     // `firing` must be recorded, as must a delivery failure at a steady level.
-    let transition = (outcome_changed || level_changed).then(|| StateTransition {
+    let transition = (outcome_changed || level_changed).then_some(StateTransition {
         alert_id,
         group_key,
         from_outcome: previous_outcome,

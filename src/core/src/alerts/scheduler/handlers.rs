@@ -1234,8 +1234,9 @@ async fn handle_alert_triggers(
     // cannot disagree; passing the raw `matched_level` to state persistence is
     // what previously wrote NULL level on healthy runs.
     let matched_level = trigger_results.level;
-    let eval_level =
-        Some(config::meta::alerts::level::level_for_successful_evaluation(matched_level));
+    let recorded_level =
+        config::meta::alerts::level::level_for_successful_evaluation(matched_level);
+    let eval_level = Some(recorded_level);
 
     // T-9 value context: what was observed, against what, with which operator.
     //
@@ -1365,7 +1366,7 @@ async fn handle_alert_triggers(
     );
     let delivery = if alert_level_delivery {
         config::meta::alerts::level::delivery_decision(
-            eval_level.unwrap_or(config::meta::alerts::level::AlertLevel::Ok),
+            recorded_level,
             trigger_data
                 .last_notified_level
                 .and_then(config::meta::alerts::level::AlertLevel::from_i32),

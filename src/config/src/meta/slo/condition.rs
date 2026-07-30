@@ -278,11 +278,11 @@ pub fn validate(
         return Err(SloConditionError::OperatorNotAscending(cond.operator));
     }
 
-    // 3. Thresholds finite and strictly positive. `!(v > 0.0)` also rejects NaN, which a `v <= 0.0`
-    //    test would let through.
+    // 3. Thresholds finite and strictly positive. The finiteness test runs first, so NaN never
+    //    reaches the sign test.
     for (field, value) in [("critical", Some(cond.critical)), ("warning", cond.warning)] {
         let Some(value) = value else { continue };
-        if !value.is_finite() || !(value > 0.0) {
+        if !value.is_finite() || value <= 0.0 {
             return Err(SloConditionError::ThresholdNotFinitePositive { field, value });
         }
     }

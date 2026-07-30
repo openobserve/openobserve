@@ -59,6 +59,7 @@ pub struct SloStatusView {
 
 impl SloStatusView {
     /// Derive the view from raw counts and the current target.
+    #[allow(clippy::too_many_arguments)]
     pub fn derive(
         group_key: String,
         good: Option<f64>,

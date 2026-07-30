@@ -39,7 +39,8 @@
 /// SA-18 turns that into "unobserved" rather than a recovery.
 pub fn sli(good: f64, total: f64) -> Option<f64> {
     // `<= 0` rather than `== 0`: a negative total is corruption, not a 0% SLI.
-    if !(total > 0.0) {
+    // NaN is checked explicitly — it must not reach the division either.
+    if total.is_nan() || total <= 0.0 {
         return None;
     }
     Some(100.0 * good / total)
@@ -83,9 +84,8 @@ pub fn error_budget_remaining(sli_window: f64, target: f64) -> f64 {
 /// `window / burn`. `None` when the burn rate is zero or negative — the budget
 /// is not being consumed at all.
 pub fn time_to_exhaust_secs(window_secs: i64, burn: f64) -> Option<i64> {
-    // `!(burn > 0.0)` also rejects NaN, which a `burn <= 0.0` test would let
-    // through into a division.
-    if !(burn > 0.0) {
+    // NaN is checked explicitly — it must not reach the division.
+    if burn.is_nan() || burn <= 0.0 {
         return None;
     }
     Some((window_secs as f64 / burn) as i64)
