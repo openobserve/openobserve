@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { test as base } from '@playwright/test';
 import fs from 'fs';
+import { waitForNavRailReady } from '../commonActions.js';
 import { AlertDestinationsPage } from './alertDestinationsPage.js';
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
 
@@ -81,13 +82,20 @@ export class AlertTemplatesPage {
                 await this.page.waitForLoadState('domcontentloaded', { timeout: 10000 }).catch(() => {});
                 await this.page.waitForTimeout(2000);
 
-                // Check if templates page loaded (look for templates tab content or add button)
+                // Check if templates page loaded (look for templates tab content or add button).
+                // 30s, not 3s: the settings route mounts after the SPA has fetched config +
+                // org context, which on alpha1 with every shard booting at once is well past
+                // 3s. Falling through early sent this into the menu fallback, whose nav-rail
+                // item may not exist yet either — so both paths "failed" while the page was
+                // merely still loading. Race the two signals so whichever lands first wins.
                 const addBtn = this.page.locator(this.addTemplateButton);
                 const templatesContent = this.page.locator('[data-test="alert-templates-tab"], [class*="template"]').first();
-                const addBtnVisible = await addBtn.isVisible({ timeout: 3000 }).catch(() => false);
-                const contentVisible = await templatesContent.isVisible({ timeout: 3000 }).catch(() => false);
+                const loaded = await Promise.any([
+                    addBtn.waitFor({ state: 'visible', timeout: 30000 }),
+                    templatesContent.waitFor({ state: 'visible', timeout: 30000 }),
+                ]).then(() => true).catch(() => false);
 
-                if (addBtnVisible || contentVisible) {
+                if (loaded) {
                     testLogger.info('Navigated to templates via URL');
                     return;
                 }
@@ -95,7 +103,9 @@ export class AlertTemplatesPage {
                 testLogger.warn('URL navigation to templates failed, trying menu path', { error: navError.message });
             }
 
-            // Fallback: Navigate via Settings menu
+            // Fallback: Navigate via Settings menu. The rail must be populated first —
+            // menu-link items are absent from the DOM until MainLayout's menuReady flips.
+            await waitForNavRailReady(this.page);
             await this.page.locator(this.settingsMenuItem).waitFor({ state: 'visible', timeout: 15000 });
             await this.page.locator(this.settingsMenuItem).click();
             await this.page.waitForTimeout(2000);

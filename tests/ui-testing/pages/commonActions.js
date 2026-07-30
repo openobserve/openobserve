@@ -39,6 +39,12 @@ export async function openNavFlyoutChild(page, child) {
     const entry = NAV_FLYOUT_CHILD[child];
     if (!entry) throw new Error(`Unknown nav flyout child: ${child}`);
     const tile = page.locator(NAV_GROUP_TILE[entry.group]);
+    // The group tile is itself a nav-rail MenuLink, so it does not exist until
+    // MainLayout's menuReady flips on GET /config. Waiting 30s on a tile that
+    // cannot appear is how enrichment tests died en masse in run 30552638159
+    // ("waiting for [data-test=\"enrichment-tables-list-page\"]" after the flyout
+    // never opened). Reissue a hung /config first, then wait for the tile.
+    await waitForNavRailReady(page);
     await tile.waitFor({ state: 'visible', timeout: 30000 });
     const item = page.locator(`[data-test="nav-group-item-${entry.name}"]`);
     // Opening is hover-driven with a short open delay, and the flyout self-closes
@@ -73,6 +79,36 @@ export async function openNavFlyoutChild(page, child) {
  * editor is what these tests are actually about, and one navigation is one thing
  * that can fail. Sidebar navigation itself is covered by landingPage.spec.
  */
+/**
+ * Wait for the left nav rail to be populated, reloading to reissue a hung GET
+ * /config.
+ *
+ * MainLayout.vue holds `navLinks` at [] until `menuReady` flips, which happens
+ * only once /config resolves — so every `menu-link-*` item is ABSENT from the DOM
+ * until then, not merely hidden. Any page object that falls back to clicking a
+ * nav item needs this first, or its fallback is waiting on an element that cannot
+ * appear. It fails open on a /config error, so a rail still empty after the first
+ * window means the request is hung and a reload is the only thing that recovers it.
+ *
+ * @param {import('@playwright/test').Page} page
+ * @param {number[]} attempts per-attempt timeouts; a reload happens between them
+ * @returns {Promise<boolean>} whether the rail became available
+ */
+export async function waitForNavRailReady(page, attempts = [20000, 30000]) {
+    const rail = page.locator('[data-test="menu-link-\\/-item"]');
+    for (let i = 0; i < attempts.length; i++) {
+        const ok = await rail.waitFor({ state: 'visible', timeout: attempts[i] })
+            .then(() => true)
+            .catch(() => false);
+        if (ok) return true;
+        if (i < attempts.length - 1) {
+            testLogger.warn(`Nav rail empty after ${attempts[i]}ms — reloading to reissue GET /config`);
+            await page.reload({ waitUntil: 'domcontentloaded' }).catch(() => {});
+        }
+    }
+    return false;
+}
+
 export async function gotoMetricsEditor(page) {
     // Carry the org the page is CURRENTLY on, rather than pinning the default.
     // The sidebar click this replaced preserved the selected org, and the

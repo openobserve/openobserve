@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { CommonActions } from '../commonActions';
+import { waitForNavRailReady } from '../commonActions.js';
 import { AlertsPage } from './alertsPage.js';
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
 const { getOrgIdentifier } = require('../../playwright-tests/utils/cloud-auth.js');
@@ -157,9 +158,14 @@ export class AlertDestinationsPage {
                 await this.page.waitForLoadState('domcontentloaded', { timeout: 10000 }).catch(() => {});
                 await this.page.waitForTimeout(2000);
 
-                // Check if destinations page loaded
+                // 30s, not 5s: the settings route mounts only after the SPA has config +
+                // org context, which on a loaded alpha1 takes well past 5s. Falling through
+                // early sent this into the menu fallback, whose nav-rail item may not exist
+                // yet either — so both paths "failed" while the page was still loading, and
+                // every Alerts spec died on "Failed to navigate to destinations".
                 const title = this.page.locator(this.destinationsListTitle);
-                const titleVisible = await title.isVisible({ timeout: 5000 }).catch(() => false);
+                const titleVisible = await title.waitFor({ state: 'visible', timeout: 30000 })
+                    .then(() => true).catch(() => false);
 
                 if (titleVisible) {
                     testLogger.info('Navigated to destinations via URL');
@@ -169,7 +175,9 @@ export class AlertDestinationsPage {
                 testLogger.warn('URL navigation to destinations failed, trying menu path', { error: navError.message });
             }
 
-            // Fallback: Navigate via Settings menu
+            // Fallback: Navigate via Settings menu. The rail must be populated first —
+            // menu-link items are absent from the DOM until MainLayout's menuReady flips.
+            await waitForNavRailReady(this.page);
             await this.page.locator(this.settingsMenuItem).waitFor({ state: 'visible', timeout: 15000 });
             await this.page.locator(this.settingsMenuItem).click();
             await this.page.waitForTimeout(2000);

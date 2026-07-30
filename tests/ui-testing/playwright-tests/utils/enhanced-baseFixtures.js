@@ -155,11 +155,42 @@ function enforceOrgOnNavigation(page) {
         original: String(url),
         navigated: resolved.toString(),
       });
-      return await originalGoto(resolved.toString(), options);
+      const res = await originalGoto(resolved.toString(), options);
+      await settleNavRail(page, resolved.pathname);
+      return res;
     }
 
-    return await originalGoto(url, options);
+    const res = await originalGoto(url, options);
+    if (sameApp && isAppRoute) await settleNavRail(page, resolved.pathname);
+    return res;
   };
+}
+
+/**
+ * Best-effort: give the nav rail a chance to populate after an in-app navigation.
+ *
+ * Page objects all over the suite click `menu-link-*` items directly, and those
+ * items do not exist until MainLayout's menuReady flips on GET /config. In run
+ * 30552638159 that produced 45s click timeouts on menu-link-/streams-item and
+ * menu-link-/metrics-item, and killed every enrichment test when the nav-group
+ * tile behind the flyout never appeared. Settling here means a navigation hands
+ * back a page whose rail is usable, without ~10 page objects each having to know.
+ *
+ * Deliberately non-fatal and reload-free: this is a synchronization aid, not an
+ * assertion. If the rail genuinely never arrives, the caller's own assertion still
+ * fails with its own message, and the explicit entry points (navigateToBase,
+ * openNavFlyoutChild, the Alerts settings navigation) do the reload recovery.
+ */
+async function settleNavRail(page, pathname) {
+  // /web/login and the OIDC callback have no rail by design.
+  if (/\/(login|cb)$/.test(pathname || '')) return;
+  const appeared = await page.locator(NAV_RAIL_SELECTOR)
+    .waitFor({ state: 'visible', timeout: 20000 })
+    .then(() => true)
+    .catch(() => false);
+  if (!appeared) {
+    testLogger.warn('Nav rail not populated 20s after navigation — menu-link clicks may fail', { pathname });
+  }
 }
 
 /**
