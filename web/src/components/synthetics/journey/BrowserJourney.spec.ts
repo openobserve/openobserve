@@ -240,20 +240,20 @@ describe("BrowserJourney recording", () => {
       global: { stubs: { ...STUBS, JourneySteps: JourneyStepsStubWithExpansion } },
     });
 
-    // The editor now groups its fields (SE-5), and OCollapsible unmounts collapsed
-    // content — so open every group before asserting. The point of this test is that
-    // no field is MISSING, not that all of them are visible at once.
-    for (const g of ["does", "waits", "failure"]) {
-      const trigger = wrapper.find(`[data-test="synthetics-journey-step-group-${g}"] button`);
-      expect(trigger.exists(), `group ${g}`).toBe(true);
-      if (trigger.attributes("data-state") !== "open") await trigger.trigger("click");
-    }
+    // The editor keeps its tuning fields behind one `Advanced` collapsible (SE-5),
+    // and OCollapsible unmounts collapsed content — so open it before asserting. The
+    // point of this test is that no field is MISSING, not that all of them are
+    // visible at once.
+    const advanced = wrapper.find(
+      '[data-test="synthetics-journey-step-group-advanced"] button',
+    );
+    expect(advanced.exists()).toBe(true);
+    if (advanced.attributes("data-state") !== "open") await advanced.trigger("click");
 
     for (const dt of [
       "synthetics-journey-step-editor",
       "synthetics-journey-step-group-does",
-      "synthetics-journey-step-group-waits",
-      "synthetics-journey-step-group-failure",
+      "synthetics-journey-step-group-advanced",
       "synthetics-journey-step-locator",
       "synthetics-journey-step-settle",
       "synthetics-journey-step-settle-required-0",

@@ -139,90 +139,107 @@ describe("BrowserJourneyStepEditor inline field errors", () => {
   });
 });
 
-// Phase 2 / SE-5. Grouped on the runner's own sequence — act, then settle, then
-// handle failure. Group 1 is always open; 2 and 3 open only when they hold
-// something other than defaults, and advertise that content in their caption so
-// collapsing hides nothing.
-describe("BrowserJourneyStepEditor field grouping", () => {
+// Phase 2 / SE-5, revised. Two tiers, not three peer collapsibles: what the step
+// DOES is plain always-visible markup, and everything a recording or a runner
+// default already answers sits behind one `Advanced` collapsible.
+//
+// The three-group shape charged the same price for the step's identity as for its
+// tuning — and wrapped always-visible content in a `default-open` collapsible,
+// which is a control whose only effect is to let an author close what they need.
+describe("BrowserJourneyStepEditor field layout", () => {
   const groups = (wrapper: ReturnType<typeof render>) =>
     wrapper.findAll('[data-test^="synthetics-journey-step-group-"]').map((g) =>
       g.attributes("data-test"),
     );
 
-  it("renders exactly the three groups", () => {
+  it("renders the always-visible block and exactly one collapsible", () => {
     const wrapper = render();
     expect(groups(wrapper)).toEqual([
       "synthetics-journey-step-group-does",
-      "synthetics-journey-step-group-waits",
-      "synthetics-journey-step-group-failure",
+      "synthetics-journey-step-group-advanced",
     ]);
   });
 
-  // SE-16: the settle group used to be gated on hasSettle, so a hand-added step
-  // could never be given a budget — the field that creates one was hidden until
-  // one existed.
-  // OCollapsible unmounts collapsed content, so the group must be opened before
-  // its fields are in the DOM — the group being closed by default is the point.
-  async function openGroup(wrapper: ReturnType<typeof render>, name: string) {
-    await wrapper.find(`${test(name)} button`).trigger("click");
+  // OCollapsible unmounts collapsed content, so `Advanced` must be opened before
+  // its fields are in the DOM — it being closed by default is the point.
+  async function openAdvanced(wrapper: ReturnType<typeof render>) {
+    await wrapper
+      .find(`${test("synthetics-journey-step-group-advanced")} button`)
+      .trigger("click");
   }
 
-  it("renders the waits group for a hand-added step with no settle data", async () => {
+  it("needs no click to reach action, name, target and value", () => {
+    const wrapper = render({ action: "type", value: "hunter2" });
+    const visible = wrapper.find(test("synthetics-journey-step-group-does"));
+    expect(visible.find(test("synthetics-journey-step-action-select")).exists()).toBe(true);
+    expect(visible.find(test("synthetics-journey-step-name-input")).exists()).toBe(true);
+    expect(visible.find(test("synthetics-journey-step-locator")).exists()).toBe(true);
+    expect(visible.find(test("synthetics-journey-step-value-input")).exists()).toBe(true);
+  });
+
+  // One disclosure in the whole editor. The locator block used to add a second
+  // (its "N fallbacks" collapse), which nested two levels of hiding over one short
+  // read-only list.
+  it("renders one disclosure region in the whole editor", () => {
+    const wrapper = render({
+      locator: {
+        candidates: [
+          { kind: "test_attribute", value: '[data-test="a"]' },
+          { kind: "role", value: "role=button" },
+        ],
+      },
+    });
+    expect(wrapper.findAll('[data-test="o-collapsible-content"]').length).toBe(1);
+  });
+
+  // SE-16: the settle fields used to be gated on hasSettle, so a hand-added step
+  // could never be given a budget — the field that creates one was hidden until
+  // one existed.
+  it("reaches the settle budget on a hand-added step with no settle data", async () => {
     const wrapper = render();
-    expect(wrapper.find(test("synthetics-journey-step-group-waits")).exists()).toBe(true);
-    // Closed by default, because a hand-added step has nothing recorded yet...
     expect(wrapper.find(test("synthetics-journey-step-settle-budget-input")).exists()).toBe(
       false,
     );
-    // ...but reachable, which is what SE-16 was about: the budget input is the only
-    // way to create a budget, and gating the group on "has a budget" hid it forever.
-    await openGroup(wrapper, "synthetics-journey-step-group-waits");
+    await openAdvanced(wrapper);
     expect(wrapper.find(test("synthetics-journey-step-settle-budget-input")).exists()).toBe(true);
   });
 
-  it("keeps action, name, target and value in the first group", () => {
-    const wrapper = render({ action: "type", value: "hunter2" });
-    const g1 = wrapper.find(test("synthetics-journey-step-group-does"));
-    expect(g1.find(test("synthetics-journey-step-action-select")).exists()).toBe(true);
-    expect(g1.find(test("synthetics-journey-step-name-input")).exists()).toBe(true);
-    expect(g1.find(test("synthetics-journey-step-locator")).exists()).toBe(true);
-    expect(g1.find(test("synthetics-journey-step-value-input")).exists()).toBe(true);
-  });
-
-  it("puts the flow-control fields and timeout in the failure group", async () => {
+  it("puts settling, timeout and flow control in Advanced", async () => {
     const wrapper = render();
-    await openGroup(wrapper, "synthetics-journey-step-group-failure");
-    const g3 = wrapper.find(test("synthetics-journey-step-group-failure"));
-    expect(g3.find(test("synthetics-journey-step-optional-checkbox")).exists()).toBe(true);
-    expect(g3.find(test("synthetics-journey-step-always-run-checkbox")).exists()).toBe(true);
-    expect(g3.find(test("synthetics-journey-step-timeout-input")).exists()).toBe(true);
+    await openAdvanced(wrapper);
+    const advanced = wrapper.find(test("synthetics-journey-step-group-advanced"));
+    expect(advanced.find(test("synthetics-journey-step-settle-budget-input")).exists()).toBe(true);
+    expect(advanced.find(test("synthetics-journey-step-timeout-input")).exists()).toBe(true);
+    expect(advanced.find(test("synthetics-journey-step-optional-checkbox")).exists()).toBe(true);
+    expect(advanced.find(test("synthetics-journey-step-always-run-checkbox")).exists()).toBe(true);
   });
 
-  it("opens the failure group already when it holds a non-default value", () => {
+  it("opens Advanced already when the step holds a non-default value", () => {
     const wrapper = render({ optional: true });
     expect(wrapper.find(test("synthetics-journey-step-timeout-input")).exists()).toBe(true);
   });
 
-  it("shows no caption when a group holds only defaults", () => {
+  it("captions Advanced with what it is for when the step holds only defaults", () => {
     const wrapper = render();
-    expect(wrapper.find(test("synthetics-journey-step-group-failure")).text()).not.toMatch(
-      /Optional|Always run|Timeout \d/,
-    );
+    const caption = wrapper.find(test("synthetics-journey-step-group-advanced")).text();
+    expect(caption).toContain("Page settling");
+    expect(caption).not.toMatch(/Optional|Always run|Timeout \d/);
   });
 
-  it("captions the failure group with each non-default value", () => {
+  it("captions Advanced with each non-default value instead", () => {
     const wrapper = render({ optional: true, alwaysRun: true, timeout: 10000 });
-    const caption = wrapper.find(test("synthetics-journey-step-group-failure")).text();
+    const caption = wrapper.find(test("synthetics-journey-step-group-advanced")).text();
     expect(caption).toContain("Optional");
     expect(caption).toContain("Always run");
     expect(caption).toContain("10");
+    expect(caption).not.toContain("Page settling");
   });
 
-  it("captions the waits group when settle evidence was recorded", () => {
+  it("captions Advanced when settle evidence was recorded", () => {
     const wrapper = render({
       settle: { navigation: { url_pattern: "**/home" }, observed_duration_ms: 1200 },
     });
-    expect(wrapper.find(test("synthetics-journey-step-group-waits")).text()).toContain(
+    expect(wrapper.find(test("synthetics-journey-step-group-advanced")).text()).toContain(
       "recorded",
     );
   });
@@ -272,7 +289,7 @@ describe("BrowserJourneyStepEditor plain language", () => {
 
   it("names the runner default in the timeout helper for an interaction", async () => {
     const wrapper = render();
-    await wrapper.find(`${test("synthetics-journey-step-group-failure")} button`).trigger("click");
+    await wrapper.find(`${test("synthetics-journey-step-group-advanced")} button`).trigger("click");
     const help = wrapper.find(test("synthetics-journey-step-timeout-help")).text();
     expect(help).toContain("30");
     expect(help).toContain("Maximum 60");
@@ -283,7 +300,7 @@ describe("BrowserJourneyStepEditor plain language", () => {
   // a malfunction.
   it("says the field can only shorten on navigate, where default equals the maximum", async () => {
     const wrapper = render({ action: "navigate", value: "https://example.com" });
-    await wrapper.find(`${test("synthetics-journey-step-group-failure")} button`).trigger("click");
+    await wrapper.find(`${test("synthetics-journey-step-group-advanced")} button`).trigger("click");
     const help = wrapper.find(test("synthetics-journey-step-timeout-help")).text();
     expect(help).toContain("60");
     expect(help).toMatch(/only shorten/i);
@@ -304,20 +321,20 @@ describe("BrowserJourneyStepEditor plain language", () => {
 // with semantics the labels omit. Both-set is legitimate — run during cleanup, and
 // if it fails do not fail the run — so this explains rather than prevents.
 describe("BrowserJourneyStepEditor flow-control help", () => {
-  async function openFailure(wrapper: ReturnType<typeof render>) {
-    await wrapper.find(`${test("synthetics-journey-step-group-failure")} button`).trigger("click");
+  async function openAdvanced(wrapper: ReturnType<typeof render>) {
+    await wrapper.find(`${test("synthetics-journey-step-group-advanced")} button`).trigger("click");
   }
 
   it("attaches an info tooltip to each flag", async () => {
     const wrapper = render();
-    await openFailure(wrapper);
+    await openAdvanced(wrapper);
     expect(wrapper.find(test("synthetics-journey-step-optional-help")).exists()).toBe(true);
     expect(wrapper.find(test("synthetics-journey-step-always-run-help")).exists()).toBe(true);
   });
 
   it("explains the probe behaviour the labels omit", async () => {
     const wrapper = render();
-    await openFailure(wrapper);
+    await openAdvanced(wrapper);
     const tips = wrapper.findAllComponents({ name: "OTooltip" }).map((c) => c.props("content"));
     const optional = tips.find((c) => /Skipped/i.test(String(c)));
     const always = tips.find((c) => /cleanup/i.test(String(c)));

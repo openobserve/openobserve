@@ -272,21 +272,27 @@ const settleBudgetOutOfRange = computed(() => {
   return budget < MIN_SETTLE_BUDGET_MS || budget > MAX_SETTLE_BUDGET_MS;
 });
 
-// ── Field groups (spec SE-5) ────────────────────────────────────────────────
-// Grouped on the runner's own sequence — act, then settle, then handle failure.
-// That is the order the step executes in and the order a tester asks questions in.
+// ── Field layout (spec SE-5) ────────────────────────────────────────────────
+// Two tiers, not three groups. What the step does is the step — action, name,
+// target, value, assertion — so it is plain always-visible markup with no
+// disclosure of its own. Everything a recording or a runner default already
+// answers correctly — page settling, the timeout, failure behaviour — sits behind
+// one `Advanced` collapsible.
 //
-// A collapsed group must advertise what it holds, or collapsing hides state. The
-// caption names every non-default value; a group holding only defaults captions
-// nothing and stays shut. `OCollapsible` has no trailing-content slot, so this
-// uses its native `caption` prop rather than a header badge — which carries more
-// than a count would anyway ("Optional · Timeout 10 s" beats "2 changed").
+// The earlier shape had three peer collapsibles. That charged the same price for
+// the step's identity as for its tuning: an author editing a step had to open a
+// group to reach the fields the step cannot function without, while a `default-open`
+// collapsible around always-visible content is a control that does nothing but
+// take a click away.
+//
+// One collapsible is also the only separation device here. No cards, no rules, no
+// sub-sections: each field carries its own label, so a second grouping vocabulary
+// on top of them would say the same thing twice.
 //
 // Every field that can currently carry a validation error — action, name, target,
-// value, assertion expected — lives in group 1, which is always open, so an error
-// can never be collapsed out of view. When SE-2/SE-19 introduce settle-budget or
-// timeout errors, groups 2 and 3 must become controlled so an error force-opens
-// them.
+// value, assertion expected — is outside the collapsible, so an error can never be
+// collapsed out of view. When SE-2/SE-19 introduce settle-budget or timeout errors,
+// `Advanced` must become controlled so an error force-opens it.
 
 const seconds = (ms: number) => Number((ms / 1000).toFixed(1));
 
@@ -333,27 +339,39 @@ const timeoutHelp = computed(() =>
       }),
 );
 
-const waitsCaption = computed(() => {
+/**
+ * Everything inside `Advanced` that is not a default, named.
+ *
+ * A collapsed section must advertise what it holds or collapsing hides state. Empty
+ * when the step carries nothing but defaults, which is also the signal for whether
+ * the section opens itself — see `advancedCaption`.
+ */
+const advancedChanges = computed(() => {
   const parts: string[] = [];
   if (hasRecordedSettle.value) parts.push(t("synthetics.journey.captionRecorded"));
   const budget = props.step.settle?.budget_ms;
   if (budget !== undefined)
     parts.push(t("synthetics.journey.captionBudget", { seconds: seconds(budget) }));
+  if (props.step.timeout !== undefined)
+    parts.push(t("synthetics.journey.captionTimeout", { seconds: seconds(props.step.timeout) }));
+  if (props.step.optional) parts.push(t("synthetics.journey.captionOptional"));
+  if (props.step.alwaysRun) parts.push(t("synthetics.journey.captionAlwaysRun"));
   return parts.join(" · ");
 });
 
-const failureCaption = computed(() => {
-  const parts: string[] = [];
-  if (props.step.optional) parts.push(t("synthetics.journey.captionOptional"));
-  if (props.step.alwaysRun) parts.push(t("synthetics.journey.captionAlwaysRun"));
-  if (props.step.timeout !== undefined)
-    parts.push(t("synthetics.journey.captionTimeout", { seconds: seconds(props.step.timeout) }));
-  return parts.join(" · ");
-});
+/**
+ * Names the non-default values when there are any, and what the section is for
+ * when there are not — matching how the alert form captions its own Advanced step
+ * ("Context variables, description, and row template"). A bare label would leave
+ * an author guessing whether anything in here applies to their step.
+ */
+const advancedCaption = computed(
+  () => advancedChanges.value || t("synthetics.journey.groupAdvancedCaption"),
+);
 </script>
 
 <template>
-  <div class="flex flex-col gap-2" data-test="synthetics-journey-step-editor">
+  <div class="flex w-full flex-col gap-2" data-test="synthetics-journey-step-editor">
     <!-- What this step will do, in the author's words rather than the tool's.
          Composed from the same values the fields below show, so the two cannot
          disagree. -->
@@ -364,158 +382,175 @@ const failureCaption = computed(() => {
       {{ summary }}
     </p>
 
-    <!-- 1. What this step does — always open. Every field that can carry a
-            validation error lives here, so an error is never collapsed away. -->
-    <OCollapsible
-      :label="t('synthetics.journey.groupDoesLabel')"
-      :default-open="true"
-      data-test="synthetics-journey-step-group-does"
-    >
-      <div class="flex flex-col gap-3 pt-2">
-        <div class="flex gap-2">
-          <OSelect
-            v-model="actionComputed"
-            :label="t('synthetics.journey.actionLabel')"
-            :options="actionOptions"
-            class="basis-1/3"
-            :error="!!actionErrorMessage"
-            :error-message="actionErrorMessage ?? ''"
-            data-test="synthetics-journey-step-action-select"
-          />
-          <OInput
-            v-model="nameComputed"
-            :label="t('synthetics.journey.stepNameLabel')"
-            :placeholder="t('synthetics.journey.stepNamePurposePlaceholder')"
-            :required="true"
-            :error="!!nameErrorMessage"
-            :error-message="nameErrorMessage ?? ''"
-            class="basis-2/3"
-            data-test="synthetics-journey-step-name-input"
-          />
-        </div>
-
-        <!-- The discard is right; doing it silently was not (D9). -->
-        <p
-          v-if="actionChangedFromRecorded"
-          class="text-text-secondary m-0 flex items-start gap-1 text-xs"
-          data-test="synthetics-journey-step-action-changed-notice"
-        >
-          <OIcon name="info-outline" size="xs" class="mt-0.5 shrink-0" aria-hidden="true" />
-          <span>{{ t("synthetics.journey.actionChangedNotice") }}</span>
-        </p>
-
-        <!-- Target — the locator bundle is the only way a step names its element.
-             `stepNeedsTarget` is the same rule the save-time validator uses, so the
-             block appears exactly when a target is required. -->
-        <BrowserJourneyLocator
-          v-if="showTarget"
-          :locator="effectiveLocator"
-          @update:locator="updateLocator"
+    <!-- What this step does — no disclosure of its own. These are the fields the
+         step cannot function without, and every field that can carry a validation
+         error is here, so an error can never be collapsed out of view. -->
+    <div class="flex w-full flex-col gap-3" data-test="synthetics-journey-step-group-does">
+      <div class="flex w-full gap-2">
+        <OSelect
+          v-model="actionComputed"
+          :label="t('synthetics.journey.actionLabel')"
+          :options="actionOptions"
+          class="basis-1/3"
+          :error="!!actionErrorMessage"
+          :error-message="actionErrorMessage ?? ''"
+          data-test="synthetics-journey-step-action-select"
         />
-
-        <!-- Value (action-specific label) -->
         <OInput
-          v-if="showValue"
-          v-model="valueComputed"
-          :label="valueLabel"
-          :placeholder="valueLabel"
-          :error="!!valueErrorMessage"
-          :error-message="valueErrorMessage ?? ''"
-          data-test="synthetics-journey-step-value-input"
-        >
-          <template v-if="valueTooltip" #tooltip>
-            <OTooltip :content="valueTooltip" />
-          </template>
-        </OInput>
-
-        <!-- Typed assertion — what this step actually verifies -->
-        <BrowserJourneyAssertion
-          v-if="step.action === 'assert'"
-          :assertion="step.assertion"
-          :expected-error-message="expectedErrorMessage"
-          @update:assertion="updateAssertion"
+          v-model="nameComputed"
+          :label="t('synthetics.journey.stepNameLabel')"
+          :placeholder="t('synthetics.journey.stepNamePurposePlaceholder')"
+          :required="true"
+          :error="!!nameErrorMessage"
+          :error-message="nameErrorMessage ?? ''"
+          class="basis-2/3"
+          data-test="synthetics-journey-step-name-input"
         />
       </div>
-    </OCollapsible>
 
-    <!-- 2. What it waits for — rendered unconditionally. The budget input is the
-            only way to create a budget, so gating the group on "has settle data"
-            made it unreachable on a hand-added step (SE-16). Only the recorded
-            evidence lines are conditional. -->
-    <OCollapsible
-      :label="t('synthetics.journey.groupWaitsLabel')"
-      :caption="waitsCaption"
-      :default-open="!!waitsCaption"
-      data-test="synthetics-journey-step-group-waits"
-    >
-      <div class="flex flex-col gap-2 pt-2" data-test="synthetics-journey-step-settle">
-        <template v-if="hasRecordedSettle">
-          <span class="text-text-secondary text-xs">{{
-            t("synthetics.journey.settleLabel")
-          }}</span>
+      <!-- The discard is right; doing it silently was not (D9). -->
+      <p
+        v-if="actionChangedFromRecorded"
+        class="text-text-secondary m-0 flex items-start gap-1 text-xs"
+        data-test="synthetics-journey-step-action-changed-notice"
+      >
+        <OIcon name="info-outline" size="xs" class="mt-0.5 shrink-0" aria-hidden="true" />
+        <span>{{ t("synthetics.journey.actionChangedNotice") }}</span>
+      </p>
 
-          <p v-if="settleNavigationLine" class="text-text-secondary m-0 font-mono text-xs">
-            {{ settleNavigationLine }}
-          </p>
+      <!-- Target — the locator bundle is the only way a step names its element.
+           `stepNeedsTarget` is the same rule the save-time validator uses, so the
+           block appears exactly when a target is required. -->
+      <BrowserJourneyLocator
+        v-if="showTarget"
+        :locator="effectiveLocator"
+        @update:locator="updateLocator"
+      />
 
-          <div
-            v-for="(response, i) in settleResponses"
-            :key="`${response.url_pattern}-${i}`"
-            class="flex items-center gap-2"
-          >
-            <OCheckbox
-              :model-value="!!response.required"
-              size="xs"
-              :label="t('synthetics.journey.settleRequiredLabel')"
-              :data-test="`synthetics-journey-step-settle-required-${i}`"
-              @update:model-value="setResponseRequired(i, $event)"
-            />
-            <span class="text-text-secondary min-w-0 truncate font-mono text-xs">
-              {{ settleResponseLabel(response) }}
-            </span>
-          </div>
-
-          <p v-if="settleObservedLine" class="text-text-secondary m-0 font-mono text-xs">
-            {{ settleObservedLine }}
-          </p>
+      <!-- Value (action-specific label) -->
+      <OInput
+        v-if="showValue"
+        v-model="valueComputed"
+        :label="valueLabel"
+        :placeholder="valueLabel"
+        class="w-full"
+        :error="!!valueErrorMessage"
+        :error-message="valueErrorMessage ?? ''"
+        data-test="synthetics-journey-step-value-input"
+      >
+        <template v-if="valueTooltip" #tooltip>
+          <OTooltip :content="valueTooltip" />
         </template>
+      </OInput>
 
-        <div class="flex gap-2">
+      <!-- Typed assertion — what this step actually verifies -->
+      <BrowserJourneyAssertion
+        v-if="step.action === 'assert'"
+        :assertion="step.assertion"
+        :expected-error-message="expectedErrorMessage"
+        @update:assertion="updateAssertion"
+      />
+    </div>
+
+    <!-- Advanced — settling, timeout and failure behaviour, all of which a
+         recording or a runner default already answers. Rendered unconditionally:
+         the budget input is the only way to create a budget, so gating on "has
+         settle data" made it unreachable on a hand-added step (SE-16). Only the
+         recorded evidence lines are conditional.
+
+         Opens itself when the step carries a non-default, so nothing an author set
+         is hidden from them. -->
+    <OCollapsible
+      :label="t('synthetics.journey.groupAdvancedLabel')"
+      :caption="advancedCaption"
+      :default-open="!!advancedChanges"
+      data-test="synthetics-journey-step-group-advanced"
+    >
+      <div class="flex w-full flex-col gap-3 pt-2">
+        <!-- Waiting: what the recording observed, then the two numbers that bound
+             the wait. Adjacent because they answer one question. -->
+        <div class="flex w-full flex-col gap-2" data-test="synthetics-journey-step-settle">
+          <template v-if="hasRecordedSettle">
+            <span class="text-text-secondary text-xs">{{
+              t("synthetics.journey.settleLabel")
+            }}</span>
+
+            <p v-if="settleNavigationLine" class="text-text-secondary m-0 font-mono text-xs">
+              {{ settleNavigationLine }}
+            </p>
+
+            <div
+              v-for="(response, i) in settleResponses"
+              :key="`${response.url_pattern}-${i}`"
+              class="flex w-full items-center gap-2"
+            >
+              <OCheckbox
+                :model-value="!!response.required"
+                size="xs"
+                :label="t('synthetics.journey.settleRequiredLabel')"
+                :data-test="`synthetics-journey-step-settle-required-${i}`"
+                @update:model-value="setResponseRequired(i, $event)"
+              />
+              <span class="text-text-secondary min-w-0 truncate font-mono text-xs">
+                {{ settleResponseLabel(response) }}
+              </span>
+            </div>
+
+            <p v-if="settleObservedLine" class="text-text-secondary m-0 font-mono text-xs">
+              {{ settleObservedLine }}
+            </p>
+          </template>
+
           <OInput
             v-model="settleBudgetComputed"
             :label="t('synthetics.journey.settleBudgetLabel')"
             :placeholder="String(DEFAULT_SETTLE_BUDGET_MS)"
             type="number"
-            class="basis-1/3"
+            class="w-full"
             data-test="synthetics-journey-step-settle-budget-input"
           />
+          <p
+            v-if="settleBudgetOutOfRange"
+            class="text-status-warning-text m-0 flex items-start gap-1 text-xs"
+            data-test="synthetics-journey-step-settle-budget-warning"
+          >
+            <OIcon name="warning" size="xs" class="mt-0.5 shrink-0" aria-hidden="true" />
+            <span>{{
+              t("synthetics.journey.settleBudgetRangeWarning", {
+                min: MIN_SETTLE_BUDGET_MS,
+                max: MAX_SETTLE_BUDGET_MS,
+              })
+            }}</span>
+          </p>
         </div>
+
+        <OInput
+          v-model="timeoutComputed"
+          :label="t('synthetics.journey.timeoutLabel')"
+          :placeholder="String(timeoutDefault)"
+          type="number"
+          class="w-full"
+          data-test="synthetics-journey-step-timeout-input"
+        />
+        <!-- Additive to the placeholder, which P1.1.5 mandates: says what blank
+             means, and on navigate/assert that the default is also the ceiling. -->
         <p
-          v-if="settleBudgetOutOfRange"
+          class="text-text-secondary m-0 text-xs"
+          data-test="synthetics-journey-step-timeout-help"
+        >
+          {{ timeoutHelp }}
+        </p>
+        <p
+          v-if="timeoutBelowDefault"
           class="text-status-warning-text m-0 flex items-start gap-1 text-xs"
-          data-test="synthetics-journey-step-settle-budget-warning"
+          data-test="synthetics-journey-step-timeout-warning"
         >
           <OIcon name="warning" size="xs" class="mt-0.5 shrink-0" aria-hidden="true" />
           <span>{{
-            t("synthetics.journey.settleBudgetRangeWarning", {
-              min: MIN_SETTLE_BUDGET_MS,
-              max: MAX_SETTLE_BUDGET_MS,
-            })
+            t("synthetics.journey.timeoutBelowDefaultWarning", { default: timeoutDefault })
           }}</span>
         </p>
-      </div>
-    </OCollapsible>
 
-    <!-- 3. How it behaves on failure — flow control plus the timeout, with the
-            below-default warning beside the field it describes rather than in a
-            trailing block. -->
-    <OCollapsible
-      :label="t('synthetics.journey.groupFailureLabel')"
-      :caption="failureCaption"
-      :default-open="!!failureCaption"
-      data-test="synthetics-journey-step-group-failure"
-    >
-      <div class="flex flex-col gap-2 pt-2">
         <!-- Both flags are fully implemented in the probe with semantics the labels
              omit — the `skipped` result status, the cleanup pass, the neutral
              verdict, and that `always_run` only reaches steps AFTER the failure.
@@ -553,35 +588,6 @@ const failureCaption = computed(() => {
             />
           </OTooltip>
         </div>
-
-        <div class="flex gap-2">
-          <OInput
-            v-model="timeoutComputed"
-            :label="t('synthetics.journey.timeoutLabel')"
-            :placeholder="String(timeoutDefault)"
-            type="number"
-            class="basis-1/3"
-            data-test="synthetics-journey-step-timeout-input"
-          />
-        </div>
-        <!-- Additive to the placeholder, which P1.1.5 mandates: says what blank
-             means, and on navigate/assert that the default is also the ceiling. -->
-        <p
-          class="text-text-secondary m-0 text-xs"
-          data-test="synthetics-journey-step-timeout-help"
-        >
-          {{ timeoutHelp }}
-        </p>
-        <p
-          v-if="timeoutBelowDefault"
-          class="text-status-warning-text m-0 flex items-start gap-1 text-xs"
-          data-test="synthetics-journey-step-timeout-warning"
-        >
-          <OIcon name="warning" size="xs" class="mt-0.5 shrink-0" aria-hidden="true" />
-          <span>{{
-            t("synthetics.journey.timeoutBelowDefaultWarning", { default: timeoutDefault })
-          }}</span>
-        </p>
       </div>
     </OCollapsible>
   </div>

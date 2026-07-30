@@ -632,10 +632,21 @@ describe("BrowserJourneyStep", () => {
       ).toBe(false);
     });
 
-    it("should render nothing when the step has no settle evidence", () => {
+    // Only the recorded lines are conditional. The block itself holds the budget
+    // input, which is the ONLY way to create a budget — gating it on "has settle
+    // data" made it unreachable on a hand-added step (SE-16). This asserted the
+    // wrapper's absence, which happened to hold while the settle fields sat in
+    // their own collapsed group; merging that group into `Advanced` means a step
+    // carrying any non-default (this fixture sets `timeout`) opens it.
+    it("should render no recorded evidence when the step has none", () => {
       wrapper = mountStep({ step: makeStep({ action: "click" }), expanded: true });
 
-      expect(wrapper.find('[data-test="synthetics-journey-step-settle"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="synthetics-journey-step-settle"]').text()).not.toContain(
+        "Waits for (recorded)",
+      );
+      expect(
+        wrapper.find('[data-test="synthetics-journey-step-settle-budget-input"]').exists(),
+      ).toBe(true);
     });
   });
 });

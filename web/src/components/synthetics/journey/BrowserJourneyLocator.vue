@@ -24,7 +24,6 @@ import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
-import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 const props = defineProps<{ locator: StepLocator }>();
@@ -40,6 +39,16 @@ const effective = computed<LocatorCandidate | null>(
   () => pinned.value ?? candidates.value[0] ?? null,
 );
 
+/**
+ * Everything after the primary — shown in full, never behind a disclosure.
+ *
+ * P2.5/T5 put these behind an `OCollapsible "N fallbacks"`. That was written when
+ * the editor was a flat column of eight controls and hiding the list was one of the
+ * few ways to keep the block short. Field grouping replaced that constraint, and a
+ * bare count advertised nothing, so the click bought the author no information: the
+ * list is what the runner will actually try if the primary stops matching, and the
+ * ordering only carries meaning when it can be seen.
+ */
 const fallbacks = computed(() => candidates.value.slice(1));
 
 /**
@@ -119,7 +128,7 @@ function isPinnedCandidate(candidate: LocatorCandidate): boolean {
 </script>
 
 <template>
-  <div class="flex flex-col gap-2" data-test="synthetics-journey-step-locator">
+  <div class="flex w-full flex-col gap-2" data-test="synthetics-journey-step-locator">
     <!-- In the empty state the block IS a single input, and that input already
          carries this heading as its label — showing both would say it twice. -->
     <div v-if="!isEmpty" class="flex items-center gap-2">
@@ -129,50 +138,53 @@ function isPinnedCandidate(candidate: LocatorCandidate): boolean {
       </OTooltip>
     </div>
 
-    <!-- The effective locator: what this step will actually use. -->
+    <!-- The effective locator: what this step will actually use. Both badges sit on
+         the left so the row's action group lines up with every fallback row below
+         it, whatever combination of buttons a row happens to carry. -->
     <div
       v-if="effective"
-      class="border-border-default rounded-default flex items-center gap-2 border p-2"
+      class="border-border-default rounded-default flex w-full items-center gap-2 border px-2 py-2"
       data-test="synthetics-journey-step-locator-primary"
     >
       <OBadge variant="default" size="sm">{{
         t(`synthetics.journey.locatorKind.${effective.kind}`)
+      }}</OBadge>
+      <OBadge v-if="pinned" variant="default" size="sm">{{
+        t("synthetics.journey.locatorPinned")
       }}</OBadge>
       <OTooltip :content="effective.value" interactive>
         <span class="text-text-body min-w-0 flex-1 truncate font-mono text-xs">
           {{ effective.value }}
         </span>
       </OTooltip>
-      <OBadge v-if="pinned" variant="default" size="sm">{{
-        t("synthetics.journey.locatorPinned")
-      }}</OBadge>
-      <OButton
-        v-if="pinned"
-        variant="ghost"
-        size="xs"
-        data-test="synthetics-journey-step-locator-unpin-btn"
-        @click="unpin"
-      >
-        {{ t("synthetics.journey.locatorUnpin") }}
-      </OButton>
-      <OButton
-        v-if="effective"
-        variant="ghost"
-        size="xs"
-        data-test="synthetics-journey-step-locator-start-from-primary-btn"
-        @click="startFrom(effective)"
-      >
-        {{ t("synthetics.journey.locatorStartFromThis") }}
-      </OButton>
-      <OButton
-        v-if="!pinned && candidates.length"
-        variant="ghost"
-        size="xs"
-        data-test="synthetics-journey-step-locator-pin-primary-btn"
-        @click="pin(candidates[0])"
-      >
-        {{ t("synthetics.journey.locatorPin") }}
-      </OButton>
+      <div class="ml-auto flex shrink-0 items-center gap-1">
+        <OButton
+          variant="ghost"
+          size="xs"
+          data-test="synthetics-journey-step-locator-start-from-primary-btn"
+          @click="startFrom(effective)"
+        >
+          {{ t("synthetics.journey.locatorStartFromThis") }}
+        </OButton>
+        <OButton
+          v-if="pinned"
+          variant="ghost"
+          size="xs"
+          data-test="synthetics-journey-step-locator-unpin-btn"
+          @click="unpin"
+        >
+          {{ t("synthetics.journey.locatorUnpin") }}
+        </OButton>
+        <OButton
+          v-else-if="candidates.length"
+          variant="ghost"
+          size="xs"
+          data-test="synthetics-journey-step-locator-pin-primary-btn"
+          @click="pin(candidates[0])"
+        >
+          {{ t("synthetics.journey.locatorPin") }}
+        </OButton>
+      </div>
     </div>
 
     <!--
@@ -197,16 +209,27 @@ function isPinnedCandidate(candidate: LocatorCandidate): boolean {
       {{ t("synthetics.journey.locatorPinnedNote") }}
     </p>
 
-    <OCollapsible
-      v-if="fallbacks.length"
-      :label="t('synthetics.journey.locatorFallbacks', { count: fallbacks.length })"
-      data-test="synthetics-journey-step-locator-fallbacks"
-    >
-      <div class="flex flex-col gap-1 pt-1" :class="{ 'opacity-50': !!pinned }">
+    <!-- Every remaining candidate, in full. Says what the list is FOR rather than
+         how many entries it has: the ordering is the runner's own fallback order,
+         and a count communicated none of that. A pinned step never falls back, so
+         the note above stands in for the lead-in and the rows render inert. -->
+    <template v-if="fallbacks.length">
+      <p
+        v-if="!pinned"
+        class="text-text-secondary m-0 text-xs"
+        data-test="synthetics-journey-step-locator-fallbacks-lead"
+      >
+        {{ t("synthetics.journey.locatorFallbacksLead") }}
+      </p>
+      <div
+        class="flex w-full flex-col"
+        :class="{ 'opacity-50': !!pinned }"
+        data-test="synthetics-journey-step-locator-fallbacks"
+      >
         <div
           v-for="candidate in fallbacks"
           :key="`${candidate.kind}:${candidate.value}`"
-          class="flex items-center gap-2 py-1"
+          class="flex w-full items-center gap-2 px-2 py-1"
         >
           <OBadge variant="default" size="sm">{{
             t(`synthetics.journey.locatorKind.${candidate.kind}`)
@@ -216,29 +239,32 @@ function isPinnedCandidate(candidate: LocatorCandidate): boolean {
               {{ candidate.value }}
             </span>
           </OTooltip>
-          <OButton
-            variant="ghost"
-            size="xs"
-            data-test="synthetics-journey-step-locator-start-from-btn"
-            @click="startFrom(candidate)"
-          >
-            {{ t("synthetics.journey.locatorStartFromThis") }}
-          </OButton>
-          <OButton
-            variant="ghost"
-            size="xs"
-            :disabled="!!pinned && !isPinnedCandidate(candidate)"
-            data-test="synthetics-journey-step-locator-pin-btn"
-            @click="pin(candidate)"
-          >
-            {{ t("synthetics.journey.locatorPin") }}
-          </OButton>
+          <div class="ml-auto flex shrink-0 items-center gap-1">
+            <OButton
+              variant="ghost"
+              size="xs"
+              data-test="synthetics-journey-step-locator-start-from-btn"
+              @click="startFrom(candidate)"
+            >
+              {{ t("synthetics.journey.locatorStartFromThis") }}
+            </OButton>
+            <OButton
+              variant="ghost"
+              size="xs"
+              :disabled="!!pinned && !isPinnedCandidate(candidate)"
+              data-test="synthetics-journey-step-locator-pin-btn"
+              @click="pin(candidate)"
+            >
+              {{ t("synthetics.journey.locatorPin") }}
+            </OButton>
+          </div>
         </div>
       </div>
-    </OCollapsible>
+    </template>
 
-    <!-- Free text is intent, so it sets the pin rather than editing evidence. -->
-    <div class="flex items-end gap-2">
+    <!-- Free text is intent, so it sets the pin rather than editing evidence. Last
+         in the block: it is the author's own entry, after every recorded one. -->
+    <div class="flex w-full items-end gap-2">
       <OInput
         v-model="overrideDraft"
         :label="

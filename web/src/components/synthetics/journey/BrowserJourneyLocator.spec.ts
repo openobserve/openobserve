@@ -39,10 +39,33 @@ describe("BrowserJourneyLocator", () => {
     expect(primary.text()).toContain("Test attribute");
   });
 
-  it("collapses the remaining candidates behind a fallback count", () => {
+  // The fallbacks used to sit behind an `OCollapsible "N fallbacks"` (P2.5/T5).
+  // A count advertised nothing, and the list is what the runner will actually try
+  // if the primary stops matching, so the click bought the author no information.
+  it("shows every remaining candidate without a disclosure", () => {
     const wrapper = render();
     expect(wrapper.find(test("synthetics-journey-step-locator-fallbacks")).exists()).toBe(true);
-    expect(wrapper.text()).toContain("2 fallbacks");
+    const list = wrapper.find(test("synthetics-journey-step-locator-fallbacks")).text();
+    expect(list).toContain('role=button[name="Sign In"]');
+    expect(list).toContain(".btn-primary");
+    expect(wrapper.text()).not.toContain("2 fallbacks");
+  });
+
+  it("says what the fallback list is for rather than how long it is", () => {
+    const wrapper = render();
+    expect(
+      wrapper.find(test("synthetics-journey-step-locator-fallbacks-lead")).text(),
+    ).toMatch(/tried in order/i);
+  });
+
+  // A pinned step never falls back, so the lead-in would be a lie; the pinned note
+  // stands in for it and the rows render inert.
+  it("drops the fallback lead-in when the step is pinned", () => {
+    const wrapper = render({ ...BUNDLE, user_override: { kind: "css", value: "#pinned" } });
+    expect(
+      wrapper.find(test("synthetics-journey-step-locator-fallbacks-lead")).exists(),
+    ).toBe(false);
+    expect(wrapper.find(test("synthetics-journey-step-locator-pinned-note")).exists()).toBe(true);
   });
 
   // P2.5.0 — the list is machine-derived evidence. Pinning is the only way for
@@ -62,12 +85,6 @@ describe("BrowserJourneyLocator", () => {
 
   it("pins a fallback candidate without reordering the list", async () => {
     const wrapper = render();
-    // The fallbacks are collapsed by default — the effective locator is the
-    // thing an author usually needs, and the rest is evidence behind a click.
-    await wrapper
-      .find(`${test("synthetics-journey-step-locator-fallbacks")} button`)
-      .trigger("click");
-
     const pinButtons = wrapper.findAll(test("synthetics-journey-step-locator-pin-btn"));
     expect(pinButtons.length).toBe(2);
     await pinButtons[0].trigger("click");
