@@ -1956,11 +1956,11 @@ pub static EVAL_SCHEDULER_PENDING_TARGETS: Lazy<IntGaugeVec> = Lazy::new(|| {
     IntGaugeVec::new(
         Opts::new(
             "eval_scheduler_pending_targets",
-            "Current in-flight (pending) evaluation targets tracked by the eval scheduler",
+            "Current in-flight (pending) evaluation targets tracked by the eval scheduler, summed across the organization's streams",
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
-        &["organization", "stream"],
+        &["organization"],
     )
     .expect("Metric created")
 });
@@ -1986,7 +1986,20 @@ pub static EVAL_SCHEDULER_FORCED_READY_TOTAL: Lazy<IntCounterVec> = Lazy::new(||
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
-        &["organization", "stream"],
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+
+pub static EVAL_SCHEDULER_EVICTED_EVIDENCE_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "eval_scheduler_evicted_evidence_total",
+            "Evaluation evidence dropped by pending-memory budget enforcement (kind=orphan: unbound session evidence whose session evaluation may be lost until a restart replays it; kind=binding: trace-to-session bindings). Sustained increases mean the budget does not match the workload",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "kind"],
     )
     .expect("Metric created")
 });
@@ -1995,11 +2008,11 @@ pub static EVAL_SCHEDULER_WATERMARK_LAG_SECONDS: Lazy<IntGaugeVec> = Lazy::new(|
     IntGaugeVec::new(
         Opts::new(
             "eval_scheduler_watermark_lag_seconds",
-            "Lag in seconds between the eval scheduler scan cursor and the committed (persisted) watermark",
+            "Lag in seconds between the eval scheduler scan cursor and the committed (persisted) watermark, worst case across the organization's streams",
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
-        &["organization", "stream"],
+        &["organization"],
     )
     .expect("Metric created")
 });
@@ -2513,6 +2526,9 @@ fn register_metrics(registry: &Registry) {
         .expect("Metric registered");
     registry
         .register(Box::new(EVAL_SCHEDULER_FORCED_READY_TOTAL.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(EVAL_SCHEDULER_EVICTED_EVIDENCE_TOTAL.clone()))
         .expect("Metric registered");
     registry
         .register(Box::new(EVAL_SCHEDULER_WATERMARK_LAG_SECONDS.clone()))
