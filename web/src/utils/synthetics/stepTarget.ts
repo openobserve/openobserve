@@ -30,10 +30,7 @@ import { SELECTOR_ACTIONS, isPageLevelAssertion } from "@/constants/synthetics";
  */
 export interface TargetableStep {
   action: string;
-  locator?: {
-    candidates?: readonly { kind: string; value: string }[] | null;
-    user_override?: { kind: string; value: string } | null;
-  } | null;
+  locator?: { candidates?: readonly { kind: string; value: string }[] | null } | null;
   assertion?: { kind?: string } | null;
 }
 
@@ -50,8 +47,7 @@ export function stepNeedsTarget(step: TargetableStep): boolean {
 
 /** Whether this step names an element. */
 export function stepHasTarget(step: TargetableStep): boolean {
-  if (step.locator?.candidates?.length) return true;
-  return !!step.locator?.user_override?.value?.trim();
+  return !!step.locator?.candidates?.length;
 }
 
 /** The save-blocking condition: this step must name an element and does not. */

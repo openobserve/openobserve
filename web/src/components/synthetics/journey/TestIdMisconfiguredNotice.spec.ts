@@ -16,7 +16,7 @@ function step(kind: string | null): BrowserStep {
     id: "s1",
     action: "click",
     name: "Click",
-    locator: kind ? { candidates: [{ kind, value: "x" }], user_override: null } : undefined,
+    locator: kind ? { candidates: [{ kind, value: "x" }] } : undefined,
   } as unknown as BrowserStep;
 }
 

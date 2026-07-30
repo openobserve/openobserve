@@ -21,10 +21,19 @@ import type { AssertionKind } from "@/types/synthetics";
 type Translate = (_key: string, _params?: Record<string, unknown>) => string;
 
 /** The locator bundle, as it sits on an editor step. */
-const locatorCandidateSchema = z.object({ kind: z.string(), value: z.string() });
+const compositePartSchema = z.object({ value: z.string(), relation: z.string().optional() });
+const locatorCandidateSchema = z.object({
+  kind: z.string(),
+  value: z.string(),
+  origin: z.string().optional(),
+  from: z.array(compositePartSchema).optional(),
+});
+// Declared, not tolerated: z.object strips what it does not declare, so an
+// undeclared `origin` would be dropped here and the payload built from the
+// parsed value would carry none.
 const locatorSchema = z.object({
   candidates: z.array(locatorCandidateSchema).nullish(),
-  user_override: locatorCandidateSchema.nullish(),
+  author_ordered: z.boolean().optional(),
 });
 
 export const makeBrowserCheckGateSchema = (t: Translate) =>

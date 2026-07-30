@@ -19,8 +19,13 @@ export interface V2WireStep {
   name?: string;
   url?: string;
   locator?: {
-    candidates: Array<{ kind: string; value: string }>;
-    user_override?: { kind: string; value: string } | null;
+    candidates: Array<{
+      kind: string;
+      value: string;
+      origin?: string;
+      from?: Array<{ value: string; relation?: string }>;
+    }>;
+    author_ordered?: boolean;
   };
   value?: string;
   key?: string;
@@ -117,15 +122,23 @@ export function buildV2Step(step: BrowserStep): V2WireStep {
   if (step.name) wire.name = step.name;
   Object.assign(wire, v2Value(step));
 
-  if (step.locator?.candidates?.length || step.locator?.user_override) {
+  if (step.locator?.candidates?.length) {
     wire.locator = {
-      candidates: (step.locator.candidates ?? []).map((c) => ({ kind: c.kind, value: c.value })),
-      ...(step.locator.user_override && {
-        user_override: {
-          kind: step.locator.user_override.kind,
-          value: step.locator.user_override.value,
-        },
-      }),
+      // Provenance travels. Without it the editor's work never reaches storage:
+      // the save looks fine, and healing later overwrites an authored entry
+      // because nothing recorded that a human wrote it.
+      candidates: step.locator.candidates.map((c) => ({
+        kind: c.kind,
+        value: c.value,
+        ...(c.origin && { origin: c.origin }),
+        ...(c.from?.length && {
+          from: c.from.map((p) => ({
+            value: p.value,
+            ...(p.relation && { relation: p.relation }),
+          })),
+        }),
+      })),
+      ...(step.locator.author_ordered && { author_ordered: true }),
     };
   }
 

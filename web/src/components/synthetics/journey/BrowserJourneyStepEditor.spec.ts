@@ -19,7 +19,7 @@ function render(step: Partial<BrowserStep> = {}) {
     id: "s1",
     action: "click",
     name: "Sign in",
-    locator: { candidates: [], user_override: null },
+    locator: { candidates: [] },
     ...step,
   };
   return mount(BrowserJourneyStepEditor, {
@@ -91,7 +91,7 @@ describe("BrowserJourneyStepEditor inline field errors", () => {
       id: "s1",
       action: "click",
       name: "Sign in",
-      locator: { candidates: [], user_override: null },
+      locator: { candidates: [] },
       ...step,
     };
     return mount(BrowserJourneyStepEditor, {
@@ -264,14 +264,17 @@ describe("BrowserJourneyStepEditor plain language", () => {
     expect(summary).toContain("30");
   });
 
-  it("uses the pinned locator in the summary, since that is what runs", () => {
+  it("uses the author's first locator in the summary, since that is what runs", () => {
     const wrapper = render({
       locator: {
-        candidates: [{ kind: "css", value: ".ignored" }],
-        user_override: { kind: "css", value: "#pinned" },
+        candidates: [
+          { kind: "css", value: "#authored", origin: "authored" },
+          { kind: "css", value: ".fallback" },
+        ],
+        author_ordered: true,
       },
     });
-    expect(wrapper.find(test("synthetics-journey-step-summary")).text()).toContain("#pinned");
+    expect(wrapper.find(test("synthetics-journey-step-summary")).text()).toContain("#authored");
   });
 
   it("reflects an explicit timeout in the summary", () => {
@@ -309,7 +312,8 @@ describe("BrowserJourneyStepEditor plain language", () => {
     });
     const txt = wrapper.text();
     expect(txt).toContain("How to find this element");
-    expect(txt).toContain("Always use this one");
+    // Ordering is the feature, so it is stated rather than discovered.
+    expect(txt).toContain("Tried in order, top first");
     expect(txt).not.toMatch(/\bLocator\b/);
   });
 });

@@ -110,8 +110,15 @@ describe("BrowserJourneyStep", () => {
       expect(wrapper.text()).toContain("Click login");
     });
 
-    it("should render selector preview text", () => {
-      wrapper = mountStep({ step: makeStep({ action: "click", selector: "#login-btn" }) });
+    // The row shows what the run tries FIRST, which is position 0. A bare
+    // `selector` is the retired version-1 channel and never reaches the wire.
+    it("should render the first locator as the preview", () => {
+      wrapper = mountStep({
+        step: makeStep({
+          action: "click",
+          locator: { candidates: [{ kind: "css", value: "#login-btn" }] },
+        }),
+      });
 
       expect(wrapper.text()).toContain("#login-btn");
     });

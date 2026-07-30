@@ -1851,20 +1851,20 @@ function timeBucketKey(tsMs: number, bucketMs: number): number {
 }
 
 /**
- * The selector to show for a recorded step, whichever schema version it uses.
+ * The selector to show for a recorded step.
  *
- * A v1 step has one `selector`. A v2 step has a locator bundle instead, so
- * reading `selector` alone leaves every v2 run showing empty selectors in
- * results — a regression that would look like missing data rather than a schema
- * mismatch (spec P2.5.6).
+ * A step's identity is its locator bundle, so reading a bare `selector` alone
+ * left every run showing empty selectors in results — a regression that looked
+ * like missing data rather than a schema mismatch (spec P2.5.6).
  *
- * A pinned `user_override` wins, because that is the locator the run actually
- * used; otherwise it is the primary candidate, which is what the run would have
- * started from.
+ * Position 0: the author's first choice, and what the run started from. This
+ * used to check a pin first. That branch is gone, and with it the third copy of
+ * "pin, else primary" — the other two were in `crx` and in the step editor.
+ * A stored pin, if one somehow exists, is ignored rather than honoured: the
+ * server refuses to store one, so acting on it would mean showing a locator the
+ * run could not have used.
  */
 export function effectiveSelector(step: Record<string, any>): string | null {
-  const pinned = step?.locator?.user_override;
-  if (pinned?.value) return str(pinned.value);
   const primary = step?.locator?.candidates?.[0];
   if (primary?.value) return str(primary.value);
   return step?.selector ? str(step.selector) : null;

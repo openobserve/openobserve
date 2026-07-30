@@ -493,7 +493,7 @@ function handleInsertBelow(row: BrowserStep) {
     // bare `selector`. Seeding it empty is what makes the editor render the
     // Locator block from the start, and what lets isV2Journey stay true once the
     // author supplies a locator instead of flipping the journey to v1 (SE-18).
-    locator: { candidates: [], user_override: null },
+    locator: { candidates: [] },
   });
   emit("update:modelValue", next);
 }
@@ -514,7 +514,7 @@ function addStep() {
       action: "click",
       name: "",
       // See handleInsertBelow — a new step is version 2.
-      locator: { candidates: [], user_override: null },
+      locator: { candidates: [] },
     },
   ]);
 }

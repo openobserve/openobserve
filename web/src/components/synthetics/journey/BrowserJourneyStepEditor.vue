@@ -108,9 +108,7 @@ const showTarget = computed(() => stepNeedsTarget(props.step));
  * a new identity on every render defeats its prop watchers. A step that somehow
  * carries no bundle falls back to an empty one, computed once.
  */
-const effectiveLocator = computed<StepLocator>(
-  () => props.step.locator ?? { candidates: [], user_override: null },
-);
+const effectiveLocator = computed<StepLocator>(() => props.step.locator ?? { candidates: [] });
 
 const showValue = computed(() => VALUE_ACTIONS.includes(props.step.action));
 const valueLabel = computed(
@@ -294,11 +292,8 @@ const seconds = (ms: number) => Number((ms / 1000).toFixed(1));
 // the author's words rather than the tool's. Composed entirely from values already
 // on screen, so it can never disagree with the fields below it.
 
-/** What the run will actually target: the pin if there is one, else the primary. */
-const effectiveTarget = computed(() => {
-  const locator = props.step.locator;
-  return locator?.user_override?.value ?? locator?.candidates?.[0]?.value ?? "";
-});
+/** What the run will actually target: the author's first choice. */
+const effectiveTarget = computed(() => props.step.locator?.candidates?.[0]?.value ?? "");
 
 const summary = computed(() => {
   const action = ACTION_LABELS[props.step.action] ?? props.step.action;

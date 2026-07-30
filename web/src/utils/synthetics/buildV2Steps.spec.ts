@@ -77,16 +77,46 @@ describe("buildV2Step", () => {
     expect(buildV2Step(step({ action: "type", value: "omkar" })).value).toBe("omkar");
   });
 
-  it("carries a pin, which the runner uses exclusively", () => {
+  // Miss this and the editor's work never reaches storage: the save looks fine,
+  // and healing later overwrites an authored entry because nothing recorded
+  // that a human wrote it.
+  it("carries provenance to the wire, and no pin field", () => {
     const wire = buildV2Step(
       step({
         locator: {
-          candidates: [{ kind: "test_attribute", value: "#a" }],
-          user_override: { kind: "css", value: "#pinned" },
+          candidates: [
+            { kind: "css", value: "#authored", origin: "authored" },
+            {
+              kind: "test_attribute",
+              value: '[data-test="row"] >> internal:and="#b"',
+              origin: "composite",
+              from: [{ value: '[data-test="row"]' }, { relation: "and", value: "#b" }],
+            },
+            { kind: "test_attribute", value: "#a" },
+          ],
+          author_ordered: true,
         },
       }),
     );
-    expect(wire.locator?.user_override).toEqual({ kind: "css", value: "#pinned" });
+
+    expect(wire.locator?.candidates[0]).toEqual({
+      kind: "css",
+      value: "#authored",
+      origin: "authored",
+    });
+    expect(wire.locator?.candidates[1].from).toEqual([
+      { value: '[data-test="row"]' },
+      { relation: "and", value: "#b" },
+    ]);
+    // Absent, not "recorded": a bundle that predates provenance has to keep
+    // round-tripping unchanged while the deploy catches up.
+    expect(wire.locator?.candidates[2]).toEqual({ kind: "test_attribute", value: "#a" });
+    expect(wire.locator?.author_ordered).toBe(true);
+    expect(wire.locator).not.toHaveProperty("user_override");
+  });
+
+  it("omits author_ordered when nobody has touched the list", () => {
+    expect(buildV2Step(step()).locator).not.toHaveProperty("author_ordered");
   });
 
   it("carries the settle block and defaults a signal to advisory", () => {
@@ -164,7 +194,10 @@ describe("SE-18: a completed manual step does not block the save", () => {
         id: "s2",
         action: "click",
         name: "Sign in",
-        locator: { candidates: [], user_override: { kind: "css", value: "#sign-in" } },
+        locator: {
+          candidates: [{ kind: "css", value: "#sign-in", origin: "authored" }],
+          author_ordered: true,
+        },
       },
     ];
     expect(isSaveableJourney(journey)).toBe(true);

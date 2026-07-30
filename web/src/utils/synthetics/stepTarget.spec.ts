@@ -38,27 +38,27 @@ describe("stepIsMissingTarget", () => {
         step({
           locator: {
             candidates: [{ kind: "test_attribute", value: 'internal:testid=[data-test="login"]' }],
-            user_override: null,
           },
         }),
       ),
     ).toBe(false);
   });
 
-  it("should accept a step whose only target is a pinned override", () => {
+  it("should accept a step whose only target is a locator the author wrote", () => {
     expect(
       stepIsMissingTarget(
         step({
-          locator: { candidates: [], user_override: { kind: "css", value: "#login" } },
+          locator: {
+            candidates: [{ kind: "css", value: "#login", origin: "authored" }],
+            author_ordered: true,
+          },
         }),
       ),
     ).toBe(false);
   });
 
   it("should reject a step whose bundle is empty", () => {
-    expect(stepIsMissingTarget(step({ locator: { candidates: [], user_override: null } }))).toBe(
-      true,
-    );
+    expect(stepIsMissingTarget(step({ locator: { candidates: [] } }))).toBe(true);
   });
 
   it("should not require a target for actions that carry no element", () => {

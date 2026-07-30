@@ -336,21 +336,23 @@ describe("BrowserJourney step validation", () => {
           action: "click",
           locator: {
             candidates: [{ kind: "test_attribute", value: 'internal:testid=[data-test="login"]' }],
-            user_override: null,
           },
         },
       ]),
     ).toBe(true);
   });
 
-  it("should pass a v2 step whose only target is a pinned override", () => {
+  it("should pass a step whose only target is a locator the author wrote", () => {
     expect(
       validate([
         { id: "1", action: "navigate", value: "https://app.test" },
         {
           id: "2",
           action: "click",
-          locator: { candidates: [], user_override: { kind: "css", value: "#login" } },
+          locator: {
+            candidates: [{ kind: "css", value: "#login", origin: "authored" }],
+            author_ordered: true,
+          },
         },
       ]),
     ).toBe(true);
@@ -446,7 +448,7 @@ describe("BrowserJourney step creation is version 2", () => {
 
     const emitted = wrapper.emitted("update:modelValue")!;
     const steps = emitted[emitted.length - 1][0] as any[];
-    expect(steps[0].locator).toEqual({ candidates: [], user_override: null });
+    expect(steps[0].locator).toEqual({ candidates: [] });
     expect(steps[0].selector).toBeUndefined();
     expect(steps[0].selectorType).toBeUndefined();
   });
