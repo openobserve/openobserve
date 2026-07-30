@@ -233,7 +233,6 @@ import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
 import type { SelectOptionInput } from "@/lib/forms/Select/OSelect.types";
-import { useStore } from "vuex";
 
 const props = defineProps({
   fields: {
@@ -278,8 +277,6 @@ const fieldErrors = reactive<Record<string, string>>({});
 
 var triggerOperators: any = ref(["=", "!=", ">=", "<=", ">", "<", "Contains", "NotContains"]);
 const emits = defineEmits(["add", "remove", "input:update"]);
-
-const store = useStore();
 
 const { t } = useI18n();
 
