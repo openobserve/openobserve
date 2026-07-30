@@ -31,8 +31,8 @@
 use config::meta::{
     alerts::Operator,
     slo::{
-        SliConfig, SliType,
-        slice::{GapFill, ObservationError, SliceRow, gap_fill_policy, validate_observation},
+        SliConfig,
+        slice::{GapFill, ObservationError, SliceRow, gap_fill_policy_for, validate_observation},
         window::align_down,
     },
 };
@@ -193,19 +193,27 @@ pub fn build_slices(sli: &SliConfig, rows: Vec<QueryRow>, params: &PassParams) -
 
 /// Fill buckets the query returned nothing for.
 ///
-/// The policy is type-specific (D48) and this is where it bites:
+/// The policy is definition-specific (D48 + `absent_is_bad`) and this is
+/// where it bites:
 ///
 /// * a **count** SLI's empty bucket is `(0, 0)` — zero traffic, which is neither uptime nor
 ///   downtime and contributes nothing to either;
 /// * a **time-slice** SLI's empty bucket is *not measured at all*, so it produces no slice and
-///   shows up as reduced coverage.
+///   shows up as reduced coverage;
+/// * a time-slice SLI with **`absent_is_bad`** treats the proven-empty bucket as `(0, interval)` —
+///   fully bad seconds, covered, because for a freshness SLO the silence IS the failure.
 ///
-/// Writing `(0, interval)` for the time-slice case would be the tempting
-/// shortcut and it invents downtime out of a search outage.
-pub fn fill_missing(sli_type: SliType, present: &[SliceRow], params: &PassParams) -> Vec<SliceRow> {
-    if gap_fill_policy(sli_type) != GapFill::CoveredZero {
-        return Vec::new();
-    }
+/// Writing `(0, interval)` in the *default* time-slice case would be the
+/// tempting shortcut and it invents downtime out of a search outage. The
+/// `absent_is_bad` case does not have that hazard: this function runs only
+/// after a SUCCESSFUL query, so the emptiness was proven, not assumed — a
+/// failed search still writes nothing for every type.
+pub fn fill_missing(sli: &SliConfig, present: &[SliceRow], params: &PassParams) -> Vec<SliceRow> {
+    let fill_total = match gap_fill_policy_for(sli) {
+        GapFill::CoveredZero => 0.0,
+        GapFill::CoveredBad => params.slice_interval_secs as f64,
+        GapFill::Nothing => return Vec::new(),
+    };
     let mut by_group: std::collections::BTreeMap<&str, std::collections::BTreeSet<i64>> =
         Default::default();
     for s in present {
@@ -231,7 +239,7 @@ pub fn fill_missing(sli_type: SliType, present: &[SliceRow], params: &PassParams
                     group_key: group.to_string(),
                     slice_start: t,
                     good: 0.0,
-                    total: 0.0,
+                    total: fill_total,
                     rev: params.rev,
                 });
             }
@@ -311,6 +319,7 @@ mod tests {
             scope: None,
             comparator,
             threshold,
+            absent_is_bad: false,
         }
     }
 
@@ -436,7 +445,7 @@ mod tests {
             total: 5.0,
             rev: 7,
         }];
-        let filled = fill_missing(SliType::Count, &present, &params());
+        let filled = fill_missing(&count_sli(), &present, &params());
         assert_eq!(filled.len(), 2, "buckets 300 and 600");
         for f in &filled {
             assert_eq!((f.good, f.total), (0.0, 0.0));
@@ -449,14 +458,14 @@ mod tests {
     #[test]
     fn a_time_slice_slis_empty_bucket_produces_no_slice() {
         assert!(
-            fill_missing(SliType::TimeSlice, &[], &params()).is_empty(),
+            fill_missing(&time_slice_sli(Operator::LessThan, 300.0), &[], &params()).is_empty(),
             "gap-filling a time-slice SLI invented measurements"
         );
     }
 
     #[test]
     fn an_ungrouped_count_slo_with_no_rows_still_fills_its_series() {
-        let filled = fill_missing(SliType::Count, &[], &params());
+        let filled = fill_missing(&count_sli(), &[], &params());
         assert_eq!(filled.len(), 3);
         assert!(filled.iter().all(|f| f.group_key.is_empty()));
     }
@@ -483,7 +492,7 @@ mod tests {
                 rev: 7,
             },
         ];
-        let filled = fill_missing(SliType::Count, &present, &params());
+        let filled = fill_missing(&count_sli(), &present, &params());
         assert_eq!(filled.len(), 4, "2 groups x 3 buckets - 2 present");
     }
 
@@ -582,5 +591,107 @@ mod tests {
         let r = build_slices(&count_sli(), rows, &p);
         assert!(!r.group_overflow);
         assert_eq!(r.slices.len(), 2, "the cap is on groups, not on slices");
+    }
+}
+
+/// Gap-fill under `absent_is_bad` — the core of the freshness semantics.
+/// Written before `fill_missing` takes a config.
+#[cfg(test)]
+mod absent_is_bad_fill_tests {
+    use config::meta::slo::{CountSource, QueryLanguage, SliConfig};
+
+    use super::*;
+
+    fn p() -> PassParams {
+        PassParams {
+            slo_id: "slo1".to_string(),
+            definition_generation: 1,
+            range_start: 0,
+            range_end: 900,
+            slice_interval_secs: 300,
+            rev: 7,
+            max_groups: 500,
+        }
+    }
+
+    fn ts(absent_is_bad: bool) -> SliConfig {
+        SliConfig::TimeSlice {
+            stream: "etl_output".into(),
+            stream_type: "logs".into(),
+            query_language: QueryLanguage::Sql,
+            query: "count(*)".into(),
+            scope: None,
+            comparator: config::meta::alerts::Operator::GreaterThanEquals,
+            threshold: 1.0,
+            absent_is_bad,
+        }
+    }
+
+    fn present(slice_start: i64) -> SliceRow {
+        SliceRow {
+            slo_id: "slo1".into(),
+            definition_generation: 1,
+            group_key: String::new(),
+            slice_start,
+            good: 300.0,
+            total: 300.0,
+            rev: 7,
+        }
+    }
+
+    /// A slice the query PROVED empty is downtime for a freshness SLO: the
+    /// whole interval is bad seconds, and — because total > 0 — the slice
+    /// counts as COVERED, so the SLO reads bad rather than freezing.
+    #[test]
+    fn an_absent_is_bad_time_slice_fills_missing_buckets_as_fully_bad() {
+        let filled = fill_missing(&ts(true), &[], &p());
+        assert_eq!(filled.len(), 3, "every bucket in the range");
+        for f in &filled {
+            assert_eq!(
+                (f.good, f.total),
+                (0.0, 300.0),
+                "bad SECONDS with a full total — not (0, 0), which would be \
+                 zero-traffic no-op, and not a gap, which would freeze"
+            );
+        }
+    }
+
+    /// The flag off keeps S-8 byte-for-byte: no slice, coverage falls.
+    #[test]
+    fn a_plain_time_slice_still_fills_nothing() {
+        assert!(fill_missing(&ts(false), &[], &p()).is_empty());
+    }
+
+    #[test]
+    fn absent_is_bad_fills_only_the_missing_buckets() {
+        let filled = fill_missing(&ts(true), &[present(0)], &p());
+        assert_eq!(filled.len(), 2, "buckets 300 and 600");
+        assert!(filled.iter().all(|f| f.slice_start != 0));
+    }
+
+    /// The count SLI is untouched by the flag machinery: an empty bucket
+    /// stays an observation of zero traffic.
+    #[test]
+    fn a_count_slis_fill_is_still_zero_traffic_not_bad() {
+        let count = SliConfig::Count {
+            source: CountSource::SingleQuery {
+                stream: "s".into(),
+                stream_type: "logs".into(),
+                scope: None,
+                good_expr: "ok".into(),
+            },
+        };
+        let filled = fill_missing(&count, &[], &p());
+        assert_eq!(filled.len(), 3);
+        assert!(filled.iter().all(|f| (f.good, f.total) == (0.0, 0.0)));
+    }
+
+    /// An alert SLI reads existing state; it must never fabricate slices.
+    #[test]
+    fn an_alert_slis_fill_is_still_nothing() {
+        let alert = SliConfig::Alert {
+            alert_id: "a1".into(),
+        };
+        assert!(fill_missing(&alert, &[], &p()).is_empty());
     }
 }

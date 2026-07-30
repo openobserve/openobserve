@@ -125,6 +125,7 @@ mod tests {
                 scope: None,
                 comparator: Operator::LessThan,
                 threshold: 500.0,
+                absent_is_bad: false,
             },
             group_by: Some(vec!["region".into()]),
             window_secs: 7 * 86_400,
@@ -244,6 +245,7 @@ mod tests {
             scope: None,
             comparator: Operator::LessThanEquals,
             threshold: 500.0,
+            absent_is_bad: false,
         };
         assert!(requires_new_generation(&base, &cmp_changed));
 
@@ -256,6 +258,7 @@ mod tests {
             scope: None,
             comparator: Operator::LessThan,
             threshold: 250.0,
+            absent_is_bad: false,
         };
         assert!(requires_new_generation(&base, &threshold_changed));
     }

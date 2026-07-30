@@ -43,6 +43,16 @@ pub struct SliQuery {
     pub end_micros: i64,
 }
 
+/// A PromQL range evaluation: `expr` sampled every `step_micros` from
+/// `start_micros` through `end_micros` inclusive.
+#[derive(Debug, Clone, PartialEq)]
+pub struct PromQuery {
+    pub expr: String,
+    pub start_micros: i64,
+    pub end_micros: i64,
+    pub step_micros: i64,
+}
+
 /// What a pass needs to query, which depends on the SLI shape.
 #[derive(Debug, Clone, PartialEq)]
 pub enum SliQueryPlan {
@@ -51,6 +61,8 @@ pub enum SliQueryPlan {
     /// Two scans that must be joined on the key schema. Used only by the
     /// importer fallback for an unfoldable Datadog pair.
     Dual { good: SliQuery, total: SliQuery },
+    /// Two PromQL range evaluations, joined at the group grain.
+    PromQl { good: PromQuery, total: PromQuery },
     /// Nothing to query — the SLI reads existing state rather than raw data.
     NoQuery,
 }
@@ -89,6 +101,24 @@ pub fn plan(sli: &SliConfig, group_by: &[String], range: PlanRange) -> SliQueryP
                     end_micros: range.end_secs * 1_000_000,
                 },
             },
+            CountSource::PromQl { good, total } => {
+                // PromQL evaluates AT instants, and a sample at T with a
+                // slice-wide range selector covers (T-interval, T]. So the
+                // instants are the slice ENDS: first = start + interval,
+                // last = end. Evaluating at slice STARTS would attribute
+                // every value to the wrong slice.
+                let step_micros = range.slice_interval_secs * 1_000_000;
+                let prom = |expr: &str| PromQuery {
+                    expr: expr.to_string(),
+                    start_micros: (range.start_secs + range.slice_interval_secs) * 1_000_000,
+                    end_micros: range.end_secs * 1_000_000,
+                    step_micros,
+                };
+                SliQueryPlan::PromQl {
+                    good: prom(good),
+                    total: prom(total),
+                }
+            }
         },
         SliConfig::TimeSlice {
             stream,
@@ -368,6 +398,7 @@ mod tests {
             scope: None,
             comparator: Operator::LessThan,
             threshold: 300.0,
+            absent_is_bad: false,
         };
         let sql = sql_of(plan(&sli, &[], range()));
         assert!(
@@ -486,5 +517,58 @@ mod tests {
             &[Some("x".into()), Some("y,z".into())],
         );
         assert_ne!(a, b, "two distinct groups collided on one key");
+    }
+}
+
+/// Plan tests for the PromQL count source. Written before the variant exists.
+#[cfg(test)]
+mod promql_plan_tests {
+    use config::meta::slo::{CountSource, SliConfig};
+
+    use super::*;
+
+    fn promql_sli() -> SliConfig {
+        SliConfig::Count {
+            source: CountSource::PromQl {
+                good: "increase(hits[5m]) - increase(errs[5m])".into(),
+                total: "increase(hits[5m])".into(),
+            },
+        }
+    }
+
+    fn aligned_range() -> PlanRange {
+        PlanRange {
+            start_secs: 1_200,
+            end_secs: 2_100,
+            slice_interval_secs: 300,
+        }
+    }
+
+    #[test]
+    fn a_promql_source_plans_two_range_queries() {
+        let SliQueryPlan::PromQl { good, total } = plan(&promql_sli(), &[], aligned_range()) else {
+            panic!("expected a promql plan");
+        };
+        assert_eq!(good.expr, "increase(hits[5m]) - increase(errs[5m])");
+        assert_eq!(total.expr, "increase(hits[5m])");
+        assert_eq!(good.step_micros, 300 * 1_000_000);
+        assert_eq!(
+            (good.start_micros, good.end_micros),
+            (total.start_micros, total.end_micros),
+            "the two scans must cover identical instants or the join drops rows"
+        );
+    }
+
+    /// PromQL evaluates AT instants, and a sample at T with a slice-wide
+    /// range selector covers (T-interval, T]. So the instants are the slice
+    /// ENDS: first = range.start + interval, last = range.end. Evaluating at
+    /// slice STARTS instead would attribute every value to the wrong slice.
+    #[test]
+    fn evaluation_instants_are_slice_ends() {
+        let SliQueryPlan::PromQl { good, .. } = plan(&promql_sli(), &[], aligned_range()) else {
+            panic!("expected a promql plan");
+        };
+        assert_eq!(good.start_micros, 1_500 * 1_000_000);
+        assert_eq!(good.end_micros, 2_100 * 1_000_000);
     }
 }

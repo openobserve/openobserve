@@ -119,11 +119,7 @@ pub async fn run_pass(slo: &Slo, now_secs: i64) -> Result<PassOutcome, anyhow::E
 
     // Gap fill BEFORE the rollup, or a grouped SLO's zero-traffic buckets
     // would be missing from the exact overall row.
-    let filled = fill_missing(
-        slo.definition.sli_config.sli_type(),
-        &result.slices,
-        &params,
-    );
+    let filled = fill_missing(&slo.definition.sli_config, &result.slices, &params);
     result.slices.extend(filled);
 
     if !group_by.is_empty() {
@@ -185,6 +181,16 @@ async fn fetch_rows(
                 .filter_map(|h| to_row(h, group_by, true))
                 .collect())
         }
+        SliQueryPlan::PromQl { good, total } => {
+            let good_series = prom_search(&slo.org, &good).await?;
+            let total_series = prom_search(&slo.org, &total).await?;
+            Ok(promql_rows(
+                good_series,
+                total_series,
+                group_by,
+                params.slice_interval_secs,
+            ))
+        }
         SliQueryPlan::Dual { good, total } => {
             let good_hits = search(
                 &slo.org,
@@ -213,11 +219,143 @@ fn sli_stream_type(sli: &SliConfig) -> StreamType {
             config::meta::slo::CountSource::SingleQuery { stream_type, .. } => stream_type.as_str(),
             // The importer fallback carries its stream inside the SQL.
             config::meta::slo::CountSource::DualQuery { .. } => "logs",
+            // PromQL only addresses metrics.
+            config::meta::slo::CountSource::PromQl { .. } => "metrics",
         },
         SliConfig::TimeSlice { stream_type, .. } => stream_type.as_str(),
         SliConfig::Alert { .. } => "logs",
     };
     StreamType::from(raw)
+}
+
+/// One PromQL series in a neutral shape — labels plus `(micros, value)`
+/// samples — so [`promql_rows`] stays decoupled from the promql engine's
+/// types and testable without one.
+#[derive(Debug, Clone, PartialEq)]
+pub struct PromSeries {
+    pub labels: std::collections::BTreeMap<String, String>,
+    pub samples: Vec<(i64, f64)>,
+}
+
+/// Turn two PromQL range evaluations into joined [`QueryRow`]s.
+///
+/// Semantics, in order:
+///
+/// 1. A sample at instant T covers the slice **ending** at T — the plan
+///    evaluates at slice ends, so `slice_start = T - interval`.
+/// 2. Each side is summed to the **group grain first** (the SLO's `group_by`
+///    read from the series' labels; a missing label is an empty value), then
+///    the sides are joined — exactly as the SQL dual's per-side GROUP BY
+///    aggregates each scan before its join. A series-grain join would drop a
+///    numerator series whose label set the denominator lacks even though its
+///    group is present on both sides.
+/// 3. Join rules follow [`join_dual`]: good with no total is dropped (an
+///    infinite SLI), total with no good is a real fully-bad bucket.
+/// 4. `good` is clamped to `total`: `increase()` over two different counters
+///    carries float error, and a counter reset can transiently put good
+///    above total. Unclamped, the row is rejected downstream
+///    (`GoodExceedsTotal`) and the slice becomes a coverage hole — routine
+///    pod restarts would freeze the SLO. Written as a `>` comparison, NOT
+///    `f64::min`: `min(NaN, x)` returns `x`, which would launder an
+///    unmeasurable numerator into a fully GOOD slice. NaN survives to the
+///    ingest boundary, which rejects it.
+pub fn promql_rows(
+    good: Vec<PromSeries>,
+    total: Vec<PromSeries>,
+    group_by: &[String],
+    slice_interval_secs: i64,
+) -> Vec<QueryRow> {
+    type Acc = std::collections::BTreeMap<(i64, String), (f64, String)>;
+    let accumulate = |series: Vec<PromSeries>| -> Acc {
+        let mut acc: Acc = Default::default();
+        for s in series {
+            let values: Vec<Option<String>> =
+                group_by.iter().map(|g| s.labels.get(g).cloned()).collect();
+            let key = group_key(group_by, &values);
+            let labels = group_by
+                .iter()
+                .zip(&values)
+                .map(|(k, v)| format!("{k}: {}", v.as_deref().unwrap_or("")))
+                .collect::<Vec<_>>()
+                .join(", ");
+            for (t_micros, value) in s.samples {
+                let slice_start = t_micros / 1_000_000 - slice_interval_secs;
+                let e = acc
+                    .entry((slice_start, key.clone()))
+                    .or_insert((0.0, labels.clone()));
+                e.0 += value;
+            }
+        }
+        acc
+    };
+
+    let goods = accumulate(good);
+    let totals = accumulate(total);
+
+    totals
+        .into_iter()
+        .map(|((slice_start, group_key), (total, labels))| {
+            let mut good = goods
+                .get(&(slice_start, group_key.clone()))
+                .map(|(v, _)| *v)
+                .unwrap_or(0.0);
+            if good > total {
+                good = total;
+            }
+            QueryRow {
+                slice_start,
+                group_key,
+                group_labels: labels,
+                good,
+                total,
+            }
+        })
+        .collect()
+}
+
+/// Run one PromQL range evaluation and normalize its matrix.
+async fn prom_search(
+    org: &str,
+    q: &super::query::PromQuery,
+) -> Result<Vec<PromSeries>, anyhow::Error> {
+    let req = promql_service::MetricsQueryRequest {
+        query: q.expr.clone(),
+        start: q.start_micros,
+        end: q.end_micros,
+        step: q.step_micros,
+        query_exemplars: false,
+        use_cache: None,
+        search_type: Some(config::meta::search::SearchEventType::DerivedStream),
+        regions: vec![],
+        clusters: vec![],
+    };
+    #[cfg(not(feature = "enterprise"))]
+    let is_super_cluster = false;
+    #[cfg(feature = "enterprise")]
+    let is_super_cluster = o2_enterprise::enterprise::common::config::get_config()
+        .super_cluster
+        .enabled;
+
+    let trace_id = config::ider::generate_trace_id();
+    let resp =
+        promql_service::search::search(&trace_id, org, &req, "", 0, is_super_cluster).await?;
+    let config::meta::promql::value::Value::Matrix(matrix) = resp else {
+        // The same rule as a partial SQL response: an unusable result is an
+        // ERROR that fails the pass, so coverage falls — never an empty
+        // window that reads as data.
+        anyhow::bail!("SLO PromQL query returned a non-matrix response");
+    };
+    Ok(matrix
+        .into_iter()
+        .map(|rv| PromSeries {
+            labels: rv
+                .labels
+                .iter()
+                .map(|l| (l.name.to_string(), l.value.to_string()))
+                .collect(),
+            samples: rv.samples.iter().map(|s| (s.timestamp, s.value)).collect(),
+        })
+        .collect())
 }
 
 /// Pair the numerator and denominator scans on `(slice_start, group_key)`.
@@ -497,11 +635,7 @@ pub async fn run_range(
 
     let rows = fetch_rows(slo, &group_by, &range, &params).await?;
     let mut result = build_slices(&slo.definition.sli_config, rows, &params);
-    let filled = fill_missing(
-        slo.definition.sli_config.sli_type(),
-        &result.slices,
-        &params,
-    );
+    let filled = fill_missing(&slo.definition.sli_config, &result.slices, &params);
     result.slices.extend(filled);
     if !group_by.is_empty() {
         let rollup = exact_rollup(&result.slices, &params);
@@ -614,5 +748,215 @@ mod tests {
         );
         assert_eq!(parse_slice_start(&json::Value::Null), None);
         assert_eq!(parse_slice_start(&json::Value::Bool(true)), None);
+    }
+}
+
+/// Tests for turning PromQL matrices into [`QueryRow`]s. Written before the
+/// conversion exists; `PromSeries`/`promql_rows` below are the specification.
+#[cfg(test)]
+mod promql_rows_tests {
+    use config::meta::slo::{CountSource, SliConfig};
+
+    use super::*;
+
+    fn series(labels: &[(&str, &str)], samples: &[(i64, f64)]) -> PromSeries {
+        PromSeries {
+            labels: labels
+                .iter()
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .collect(),
+            samples: samples.to_vec(),
+        }
+    }
+
+    /// Micros, matching promql sample timestamps.
+    const T1500: i64 = 1_500 * 1_000_000;
+    const T1800: i64 = 1_800 * 1_000_000;
+
+    #[test]
+    fn a_sample_is_attributed_to_the_slice_it_closes() {
+        let rows = promql_rows(
+            vec![series(&[], &[(T1500, 7.0)])],
+            vec![series(&[], &[(T1500, 10.0)])],
+            &[],
+            300,
+        );
+        assert_eq!(rows.len(), 1);
+        assert_eq!(
+            rows[0].slice_start, 1_200,
+            "a sample at T covers (T-interval, T], i.e. the slice STARTING at T-interval"
+        );
+        assert_eq!((rows[0].good, rows[0].total), (7.0, 10.0));
+    }
+
+    /// The key must agree byte-for-byte with what the SQL path would produce,
+    /// because stored group keys survive a source change within a generation.
+    #[test]
+    fn series_labels_become_the_group_key_in_definition_order() {
+        let gb = vec!["region".to_string(), "tier".to_string()];
+        let rows = promql_rows(
+            vec![series(&[("tier", "gold"), ("region", "eu")], &[(T1500, 1.0)])],
+            vec![series(&[("region", "eu"), ("tier", "gold")], &[(T1500, 2.0)])],
+            &gb,
+            300,
+        );
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].group_key, "region=eu,tier=gold");
+    }
+
+    #[test]
+    fn a_missing_group_label_reads_as_empty_not_dropped() {
+        let gb = vec!["region".to_string()];
+        let rows = promql_rows(
+            vec![series(&[], &[(T1500, 1.0)])],
+            vec![series(&[], &[(T1500, 1.0)])],
+            &gb,
+            300,
+        );
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].group_key, "region=");
+    }
+
+    /// Users routinely return finer series than the SLO's grouping (per-pod
+    /// series, per-region SLO). They sum — exactly what the SQL path's
+    /// GROUP BY would have done.
+    #[test]
+    fn series_finer_than_the_group_by_are_summed() {
+        let gb = vec!["region".to_string()];
+        let rows = promql_rows(
+            vec![
+                series(&[("region", "eu"), ("pod", "a")], &[(T1500, 3.0)]),
+                series(&[("region", "eu"), ("pod", "b")], &[(T1500, 4.0)]),
+            ],
+            vec![
+                series(&[("region", "eu"), ("pod", "a")], &[(T1500, 5.0)]),
+                series(&[("region", "eu"), ("pod", "b")], &[(T1500, 5.0)]),
+            ],
+            &gb,
+            300,
+        );
+        assert_eq!(rows.len(), 1);
+        assert_eq!((rows[0].good, rows[0].total), (7.0, 10.0));
+    }
+
+    #[test]
+    fn an_ungrouped_slo_sums_every_series_into_the_empty_key() {
+        let rows = promql_rows(
+            vec![
+                series(&[("pod", "a")], &[(T1500, 1.0)]),
+                series(&[("pod", "b")], &[(T1500, 2.0)]),
+            ],
+            vec![
+                series(&[("pod", "a")], &[(T1500, 2.0)]),
+                series(&[("pod", "b")], &[(T1500, 2.0)]),
+            ],
+            &[],
+            300,
+        );
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].group_key, "");
+        assert_eq!((rows[0].good, rows[0].total), (3.0, 4.0));
+    }
+
+    /// Same rules as the SQL dual join: a numerator with no denominator would
+    /// make the SLI infinite and is dropped; a denominator with no numerator
+    /// is a real, fully-bad bucket.
+    #[test]
+    fn the_join_follows_the_dual_query_rules() {
+        let dropped = promql_rows(vec![series(&[], &[(T1500, 5.0)])], vec![], &[], 300);
+        assert!(
+            dropped.is_empty(),
+            "a good series with no total must be dropped"
+        );
+
+        let bad = promql_rows(vec![], vec![series(&[], &[(T1500, 5.0)])], &[], 300);
+        assert_eq!(bad.len(), 1);
+        assert_eq!((bad[0].good, bad[0].total), (0.0, 5.0));
+    }
+
+    /// The join happens at the GROUP grain, not the series grain — each side
+    /// is summed to the group first, exactly as the SQL dual's GROUP BY
+    /// aggregates each scan before the join. A series-grain join would
+    /// silently drop a numerator series whose labels the denominator lacks,
+    /// even though its GROUP is present on both sides.
+    #[test]
+    fn each_side_is_summed_to_the_group_before_the_join() {
+        let gb = vec!["region".to_string()];
+        let rows = promql_rows(
+            vec![
+                series(&[("region", "eu"), ("pod", "a")], &[(T1500, 3.0)]),
+                // No pod=c in the denominator — but region=eu is on both sides.
+                series(&[("region", "eu"), ("pod", "c")], &[(T1500, 7.0)]),
+            ],
+            vec![series(&[("region", "eu"), ("pod", "a")], &[(T1500, 10.0)])],
+            &gb,
+            300,
+        );
+        assert_eq!(rows.len(), 1);
+        assert_eq!(
+            (rows[0].good, rows[0].total),
+            (10.0, 10.0),
+            "a series-grain join would have dropped pod=c and answered (3, 10)"
+        );
+    }
+
+    /// `increase()` over two DIFFERENT counters carries float error, and a
+    /// counter reset can transiently put good above total. Unclamped, the row
+    /// is rejected downstream (GoodExceedsTotal) and the slice becomes a
+    /// coverage hole — routine pod restarts would freeze the SLO.
+    #[test]
+    fn good_is_clamped_to_total_against_counter_jitter() {
+        let rows = promql_rows(
+            vec![series(&[], &[(T1500, 100.001)])],
+            vec![series(&[], &[(T1500, 100.0)])],
+            &[],
+            300,
+        );
+        assert_eq!(rows[0].good, 100.0);
+    }
+
+    /// `f64::min(NaN, x)` returns x — a clamp written with `.min()` would
+    /// launder an unmeasurable numerator into a fully GOOD slice. NaN must
+    /// survive to the ingest boundary, which rejects the row and lets
+    /// coverage fall instead.
+    #[test]
+    fn a_nan_numerator_is_not_laundered_into_good_by_the_clamp() {
+        let rows = promql_rows(
+            vec![series(&[], &[(T1500, f64::NAN)])],
+            vec![series(&[], &[(T1500, 5.0)])],
+            &[],
+            300,
+        );
+        assert_eq!(rows.len(), 1);
+        assert!(
+            rows[0].good.is_nan(),
+            "NaN was replaced by {}",
+            rows[0].good
+        );
+    }
+
+    #[test]
+    fn each_sample_becomes_its_own_slice_in_time_order() {
+        let rows = promql_rows(
+            vec![series(&[], &[(T1500, 1.0), (T1800, 2.0)])],
+            vec![series(&[], &[(T1500, 2.0), (T1800, 2.0)])],
+            &[],
+            300,
+        );
+        assert_eq!(rows.len(), 2);
+        let starts: Vec<i64> = rows.iter().map(|r| r.slice_start).collect();
+        assert_eq!(starts, vec![1_200, 1_500]);
+    }
+
+    /// The promql search must be issued against the metrics stream.
+    #[test]
+    fn a_promql_source_reads_the_metrics_stream_type() {
+        let sli = SliConfig::Count {
+            source: CountSource::PromQl {
+                good: "g".into(),
+                total: "t".into(),
+            },
+        };
+        assert_eq!(sli_stream_type(&sli), StreamType::Metrics);
     }
 }

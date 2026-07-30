@@ -121,8 +121,29 @@ pub enum GapFill {
     /// Emit `good = 0, total = 0` — a real observation of zero traffic, which
     /// counts as covered.
     CoveredZero,
+    /// Emit `good = 0, total = interval` — the slice was PROVEN empty and
+    /// absence is the failure (`absent_is_bad`). Covered, and fully bad.
+    CoveredBad,
     /// Emit nothing — the slice is a gap and reduces coverage.
     Nothing,
+}
+
+/// How a missing bucket is interpreted for a specific SLO definition.
+///
+/// Refines [`gap_fill_policy`]: the per-TYPE answer (D48) holds except where
+/// the definition itself says otherwise — a time-slice SLO with
+/// `absent_is_bad` treats a proven-empty bucket as downtime rather than as a
+/// gap. Callers holding a config should ask here; the type-level function
+/// remains for callers that have only the discriminant.
+pub fn gap_fill_policy_for(sli: &crate::meta::slo::SliConfig) -> GapFill {
+    if let crate::meta::slo::SliConfig::TimeSlice {
+        absent_is_bad: true,
+        ..
+    } = sli
+    {
+        return GapFill::CoveredBad;
+    }
+    gap_fill_policy(sli.sli_type())
 }
 
 /// How a missing bucket is interpreted, per SLI type (D48).
@@ -586,5 +607,66 @@ mod tests {
                 total: 10.0
             })
         );
+    }
+}
+
+/// Tests for the config-aware gap-fill policy — the seam `absent_is_bad`
+/// turns on. Written before the function exists.
+#[cfg(test)]
+mod gap_fill_policy_for_tests {
+    use super::*;
+    use crate::meta::{
+        alerts::Operator,
+        slo::{CountSource, QueryLanguage, SliConfig},
+    };
+
+    fn ts(absent_is_bad: bool) -> SliConfig {
+        SliConfig::TimeSlice {
+            stream: "s".into(),
+            stream_type: "logs".into(),
+            query_language: QueryLanguage::Sql,
+            query: "count(*)".into(),
+            scope: None,
+            comparator: Operator::GreaterThanEquals,
+            threshold: 1.0,
+            absent_is_bad,
+        }
+    }
+
+    /// The freshness semantics: a slice the search proved empty is BAD, not a
+    /// gap. Only the POLICY changes — a failed search still writes nothing
+    /// for every type, because gap fill runs only after a successful query.
+    #[test]
+    fn an_absent_is_bad_time_slice_fills_covered_bad() {
+        assert_eq!(gap_fill_policy_for(&ts(true)), GapFill::CoveredBad);
+    }
+
+    /// Off keeps S-8 exactly: absence is a gap, coverage falls, the SLO
+    /// freezes rather than inventing downtime.
+    #[test]
+    fn a_plain_time_slice_still_fills_nothing() {
+        assert_eq!(gap_fill_policy_for(&ts(false)), GapFill::Nothing);
+    }
+
+    #[test]
+    fn count_and_alert_policies_are_unchanged() {
+        let count = SliConfig::Count {
+            source: CountSource::SingleQuery {
+                stream: "s".into(),
+                stream_type: "logs".into(),
+                scope: None,
+                good_expr: "ok".into(),
+            },
+        };
+        assert_eq!(gap_fill_policy_for(&count), GapFill::CoveredZero);
+        assert_eq!(
+            gap_fill_policy_for(&SliConfig::Alert {
+                alert_id: "a".into()
+            }),
+            GapFill::Nothing
+        );
+        // The type-level answer stays for callers that have no config.
+        assert_eq!(gap_fill_policy(SliType::Count), GapFill::CoveredZero);
+        assert_eq!(gap_fill_policy(SliType::TimeSlice), GapFill::Nothing);
     }
 }

@@ -152,6 +152,22 @@ pub enum CountSource {
     /// atomicity: two scans that cannot be proven to have seen the same
     /// instant.
     DualQuery { good: CountQuery, total: CountQuery },
+    /// Metrics-native counting: two PromQL expressions, each evaluated per
+    /// slice (wire tag `prom_ql`, following [`QueryLanguage::PromQl`]).
+    ///
+    /// Exists because pre-aggregated counters have no rows for a `good_expr`
+    /// to classify — "good" only exists as arithmetic between series, and
+    /// correct counter arithmetic is `increase()` (monotonic-reset-aware),
+    /// which SQL over raw samples cannot express. The expressions should use
+    /// a range selector equal to the slice interval
+    /// (`increase(http_requests_total[5m])` for a 5-minute slice); the
+    /// evaluator samples them at slice ends, so each sample covers exactly
+    /// its slice.
+    ///
+    /// Same atomicity caveat as [`Self::DualQuery`]: two evaluations that
+    /// cannot be proven to have seen the same instant. Grouping needs no
+    /// column list — the returned series' labels supply the group values.
+    PromQl { good: String, total: String },
 }
 
 /// What "good" means, tagged on [`SliType`] (§6b.7).
@@ -181,6 +197,23 @@ pub enum SliConfig {
         /// a failure, so `=`/`!=` have no meaning here.
         comparator: Operator,
         threshold: f64,
+        /// Freshness semantics: a slice the query PROVED empty is **bad**
+        /// rather than a gap. For a pipeline-freshness SLO, absence is the
+        /// failure signal — a silent pipeline is a broken pipeline, and under
+        /// S-8's default it could never read as bad.
+        ///
+        /// Only flips the meaning of a *successful* query's empty bucket; a
+        /// FAILED query still writes nothing and coverage falls, so a search
+        /// outage freezes the SLO exactly as before. That distinction is
+        /// structural — gap fill runs only after a successful query.
+        ///
+        /// `#[serde(default)]` is the upgrade guarantee: every stored
+        /// time-slice SLO predates the field and keeps S-8 byte-for-byte.
+        /// Ungrouped SLOs only (validated) — gap fill cannot see a group that
+        /// is absent from the whole pass, so a grouped freshness SLO would
+        /// freeze instead of firing for precisely the failure it watches for.
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        absent_is_bad: bool,
     },
     Alert {
         alert_id: String,
@@ -300,6 +333,11 @@ pub enum SloValidationError {
     /// SLO alerts and composites are excluded as sources — which is what
     /// prevents `SLO → alert → SLO` cycles without a cycle checker.
     AlertSliSourceIneligible,
+    /// `absent_is_bad` on a grouped SLO: gap fill only fills groups present
+    /// in the pass, so a fully absent group would freeze rather than read
+    /// bad — the opposite of what the flag promises. Rejected until
+    /// per-group fill exists (D27: ignored config is invisible config).
+    AbsentIsBadRequiresUngrouped,
 }
 
 impl std::fmt::Display for SloValidationError {
@@ -345,6 +383,11 @@ impl std::fmt::Display for SloValidationError {
             Self::AlertSliSourceIneligible => f.write_str(
                 "SLO alerts and composite alerts cannot be SLI sources — that is what prevents                  SLO -> alert -> SLO cycles",
             ),
+            Self::AbsentIsBadRequiresUngrouped => f.write_str(
+                "absent_is_bad is not yet supported on a grouped SLO: a group absent from the \
+                 whole pass cannot be gap-filled, so it would freeze instead of reading bad; \
+                 remove the grouping or turn the flag off",
+            ),
         }
     }
 }
@@ -389,6 +432,9 @@ pub enum QuerySafetyError {
         stream_type: String,
         query_language: QueryLanguage,
     },
+    /// A PromQL source expression is empty. It would save cleanly and then
+    /// measure nothing — permanent no-data discovered much later.
+    EmptyExpression { field: &'static str },
 }
 
 impl std::fmt::Display for QuerySafetyError {
@@ -416,6 +462,9 @@ impl std::fmt::Display for QuerySafetyError {
                 f,
                 "{query_language:?} cannot be used against a `{stream_type}` stream"
             ),
+            Self::EmptyExpression { field } => {
+                write!(f, "{field} must be a non-empty PromQL expression")
+            }
         }
     }
 }
@@ -838,6 +887,18 @@ pub fn validate_query_safety(
                 validate_count_query("total_query", total, group_by, slice_interval_secs)?;
                 Ok(())
             }
+            CountSource::PromQl { good, total } => {
+                // Non-empty is all that can be checked here: this crate has no
+                // PromQL parser, and the grouping needs no column list — the
+                // returned series' labels supply the group values at
+                // evaluation time.
+                for (field, expr) in [("good", good), ("total", total)] {
+                    if expr.trim().is_empty() {
+                        return Err(QuerySafetyError::EmptyExpression { field });
+                    }
+                }
+                Ok(())
+            }
         },
         SliConfig::TimeSlice {
             stream_type,
@@ -933,6 +994,7 @@ pub fn validate_slo(
         SliConfig::TimeSlice {
             comparator,
             threshold,
+            absent_is_bad,
             ..
         } => {
             if !matches!(
@@ -946,6 +1008,12 @@ pub fn validate_slo(
             }
             if !threshold.is_finite() {
                 return Err(SloValidationError::ThresholdNotFinite(*threshold));
+            }
+            // Gap fill cannot see a group absent from the whole pass, so a
+            // grouped freshness SLO would freeze rather than fire for the
+            // exact failure it exists to watch (see the field's doc).
+            if *absent_is_bad && is_grouped {
+                return Err(SloValidationError::AbsentIsBadRequiresUngrouped);
             }
         }
         SliConfig::Alert { .. } => {
@@ -992,6 +1060,7 @@ mod tests {
             scope: None,
             comparator,
             threshold: 500.0,
+            absent_is_bad: false,
         }
     }
 
@@ -1342,6 +1411,7 @@ mod tests {
             scope: None,
             comparator: Operator::LessThanEquals,
             threshold: 0.001_25,
+            absent_is_bad: false,
         };
         let json = serde_json::to_string(&cfg).unwrap();
         assert_eq!(serde_json::from_str::<SliConfig>(&json).unwrap(), cfg);
@@ -1718,6 +1788,7 @@ mod tests {
             scope: None,
             comparator: Operator::LessThan,
             threshold: 500.0,
+            absent_is_bad: false,
         };
         assert!(matches!(
             validate_query_safety(&cfg, &[], 300),
@@ -1789,6 +1860,7 @@ mod tests {
                 scope: None,
                 comparator: Operator::LessThan,
                 threshold: bad,
+                absent_is_bad: false,
             };
             let d = def(cfg, None, SLICE_60_SECS);
             // NOT assert_eq: NaN != NaN, so comparing the payload can never
@@ -1814,6 +1886,7 @@ mod tests {
                 scope: None,
                 comparator: Operator::LessThan,
                 threshold: ok,
+                absent_is_bad: false,
             };
             let d = def(cfg, None, SLICE_60_SECS);
             assert_eq!(
@@ -1864,5 +1937,192 @@ mod tests {
         let mut grouped = base;
         grouped.definition.group_by = Some(vec!["region".into()]);
         assert!(grouped.is_grouped());
+    }
+}
+
+/// Tests for the PromQL count source (metrics-native counting).
+///
+/// Written FIRST, against an API that does not exist yet — the variant, the
+/// error, and the validation arm below are the specification.
+#[cfg(test)]
+mod promql_count_source_tests {
+    use super::*;
+
+    fn promql_cfg(good: &str, total: &str) -> SliConfig {
+        SliConfig::Count {
+            source: CountSource::PromQl {
+                good: good.into(),
+                total: total.into(),
+            },
+        }
+    }
+
+    #[test]
+    fn a_promql_count_source_round_trips() {
+        let cfg = promql_cfg(
+            "increase(http_requests_total[5m]) - increase(http_errors_total[5m])",
+            "increase(http_requests_total[5m])",
+        );
+        let json = serde_json::to_string(&cfg).unwrap();
+        assert_eq!(serde_json::from_str::<SliConfig>(&json).unwrap(), cfg);
+    }
+
+    /// The wire shape is part of the API contract: mode-tagged like its two
+    /// siblings, so a client dispatches every count source on the same field.
+    #[test]
+    fn the_wire_shape_is_mode_tagged() {
+        let json = r#"{"sli_type":"count","config":{"source":{"mode":"prom_ql","query":{"good":"g","total":"t"}}}}"#;
+        let parsed: SliConfig = serde_json::from_str(json).unwrap();
+        assert_eq!(parsed, promql_cfg("g", "t"));
+    }
+
+    /// The denormalized `slos.sli_type` column and every list filter key on
+    /// the TYPE — a new source must not become a new type.
+    #[test]
+    fn a_promql_source_is_still_a_count_sli() {
+        assert_eq!(promql_cfg("g", "t").sli_type(), SliType::Count);
+    }
+
+    /// Adding the variant must not disturb what is already stored.
+    #[test]
+    fn stored_single_query_json_still_parses_unchanged() {
+        let json = r#"{"sli_type":"count","config":{"source":{"mode":"single_query","query":{"stream":"s","stream_type":"logs","good_expr":"ok"}}}}"#;
+        let parsed: SliConfig = serde_json::from_str(json).unwrap();
+        let SliConfig::Count {
+            source: CountSource::SingleQuery { good_expr, .. },
+        } = parsed
+        else {
+            panic!("single_query no longer parses to SingleQuery");
+        };
+        assert_eq!(good_expr, "ok");
+    }
+
+    // ── save-time validation ────────────────────────────────────────────────
+
+    #[test]
+    fn a_promql_pair_is_accepted() {
+        assert!(
+            validate_query_safety(
+                &promql_cfg("increase(a[5m]) - increase(b[5m])", "increase(a[5m])"),
+                &[],
+                300
+            )
+            .is_ok()
+        );
+    }
+
+    /// An empty expression would save cleanly and then measure nothing — the
+    /// same silent-permanent-no-data failure the stream picker closed.
+    #[test]
+    fn an_empty_promql_expression_is_rejected() {
+        for (good, total, which) in [
+            ("", "t", "good"),
+            ("g", "", "total"),
+            ("   ", "t", "good"),
+            ("g", "\n", "total"),
+        ] {
+            let err = validate_query_safety(&promql_cfg(good, total), &[], 300).unwrap_err();
+            assert!(
+                matches!(err, QuerySafetyError::EmptyExpression { field } if field == which),
+                "({good:?}, {total:?}): expected EmptyExpression for {which}, got {err:?}"
+            );
+        }
+    }
+
+    /// Grouping a PromQL source is legal: the series' labels supply the group
+    /// values at evaluation time, so there is no column list to check
+    /// statically — unlike the dual-query SQL members.
+    #[test]
+    fn a_grouped_promql_source_passes_query_safety() {
+        assert!(validate_query_safety(&promql_cfg("g", "t"), &["region".into()], 300).is_ok());
+    }
+}
+
+/// Tests for `absent_is_bad` (freshness semantics).
+///
+/// S-8 says an empty slice is a gap, because a search outage must freeze the
+/// SLO rather than page as downtime. For a freshness SLO, absence IS the
+/// failure — a silent pipeline is a broken pipeline. The flag flips the
+/// meaning of a slice the search PROVED empty; a failed search still writes
+/// nothing, for every type (that distinction is structural: gap fill only
+/// runs after a successful query).
+#[cfg(test)]
+mod absent_is_bad_tests {
+    use super::*;
+
+    fn ts(absent_is_bad: bool) -> SliConfig {
+        SliConfig::TimeSlice {
+            stream: "etl_output".into(),
+            stream_type: "logs".into(),
+            query_language: QueryLanguage::Sql,
+            query: "count(*)".into(),
+            scope: None,
+            comparator: Operator::GreaterThanEquals,
+            threshold: 1.0,
+            absent_is_bad,
+        }
+    }
+
+    fn def(sli: SliConfig, group_by: Option<Vec<String>>) -> SloDefinition {
+        SloDefinition {
+            sli_config: sli,
+            group_by,
+            window_secs: WINDOW_30D_SECS,
+            slice_interval_secs: SLICE_300_SECS,
+        }
+    }
+
+    /// THE upgrade guarantee: every time-slice SLO already stored was
+    /// serialized without this field and must keep S-8 gap semantics.
+    #[test]
+    fn stored_time_slice_json_parses_with_the_flag_off() {
+        let json = r#"{"sli_type":"time_slice","config":{"stream":"s","stream_type":"logs","query_language":"sql","query":"count(*)","comparator":">=","threshold":1.0}}"#;
+        let parsed: SliConfig = serde_json::from_str(json).unwrap();
+        let SliConfig::TimeSlice { absent_is_bad, .. } = parsed else {
+            panic!("wrong variant");
+        };
+        assert!(!absent_is_bad);
+    }
+
+    #[test]
+    fn the_flag_round_trips_when_on() {
+        let json = serde_json::to_string(&ts(true)).unwrap();
+        assert!(json.contains("absent_is_bad"), "{json}");
+        assert_eq!(serde_json::from_str::<SliConfig>(&json).unwrap(), ts(true));
+    }
+
+    /// Off is omitted, so re-saving an old SLO writes the JSON it already has.
+    #[test]
+    fn the_flag_is_omitted_from_json_when_off() {
+        let json = serde_json::to_string(&ts(false)).unwrap();
+        assert!(!json.contains("absent_is_bad"), "{json}");
+    }
+
+    /// Gap fill only fills groups PRESENT in the pass, so a fully absent
+    /// group would silently decay to frozen rather than reading bad — a lie
+    /// for the exact use case this flag serves. Rejected until per-group fill
+    /// exists, rather than half-working (D27: ignored config is invisible
+    /// config).
+    #[test]
+    fn a_grouped_slo_cannot_set_absent_is_bad() {
+        let err = validate_slo(&def(ts(true), Some(vec!["region".into()])), 99.9, None).unwrap_err();
+        assert!(
+            matches!(err, SloValidationError::AbsentIsBadRequiresUngrouped),
+            "got {err:?}"
+        );
+    }
+
+    #[test]
+    fn an_ungrouped_absent_is_bad_slo_is_accepted() {
+        assert!(validate_slo(&def(ts(true), None), 99.9, None).is_ok());
+        assert!(
+            validate_slo(&def(ts(true), Some(vec![])), 99.9, None).is_ok(),
+            "an EMPTY group_by is ungrouped and must not trip the rule"
+        );
+    }
+
+    #[test]
+    fn a_grouped_time_slice_without_the_flag_is_still_accepted() {
+        assert!(validate_slo(&def(ts(false), Some(vec!["region".into()])), 99.9, None).is_ok());
     }
 }

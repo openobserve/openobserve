@@ -850,3 +850,51 @@ mod tests {
         assert_eq!(count_in_org(&db, ORG).await.unwrap(), 2);
     }
 }
+
+/// Generation semantics for `absent_is_bad` — the property that makes the
+/// flag safe to add at all.
+#[cfg(test)]
+mod absent_is_bad_generation_tests {
+    use config::meta::{
+        alerts::Operator,
+        slo::{QueryLanguage, SliConfig, SloDefinition},
+    };
+
+    use super::definition_changed;
+
+    fn ts_def(absent_is_bad: bool) -> SloDefinition {
+        SloDefinition {
+            sli_config: SliConfig::TimeSlice {
+                stream: "s".into(),
+                stream_type: "logs".into(),
+                query_language: QueryLanguage::Sql,
+                query: "count(*)".into(),
+                scope: None,
+                comparator: Operator::GreaterThanEquals,
+                threshold: 1.0,
+                absent_is_bad,
+            },
+            group_by: None,
+            window_secs: 30 * 86_400,
+            slice_interval_secs: 300,
+        }
+    }
+
+    /// Toggling the flag changes what every empty slice MEANS — gap versus
+    /// downtime — so slices computed under the two rules must never be
+    /// averaged into one number (the D59 corruption). A toggle is a
+    /// redefinition and starts a new epoch.
+    #[test]
+    fn toggling_absent_is_bad_is_a_redefinition() {
+        assert!(definition_changed(&ts_def(false), &ts_def(true)));
+        assert!(definition_changed(&ts_def(true), &ts_def(false)));
+    }
+
+    /// The mirror guarantee: a UI round-tripping an old SLO sends an explicit
+    /// `false`, the stored row deserializes to `false` — equal, no bump, and
+    /// no 90 days of measurement discarded by merely opening the edit form.
+    #[test]
+    fn an_explicit_false_is_not_a_redefinition() {
+        assert!(!definition_changed(&ts_def(false), &ts_def(false)));
+    }
+}
