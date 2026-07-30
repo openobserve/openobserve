@@ -48,9 +48,38 @@ async searchSchedulerSubmit() {
   await this.page.locator(submitBtn).click();
 
   const jobResponse = await jobResponsePromise;
-  const body = await jobResponse.json();
-  const match = body.message?.match(/\[Job_Id: (.+?)\]/);
-  return match ? match[1] : null;
+  const status = jobResponse.status();
+  const raw = await jobResponse.text();
+
+  let body = null;
+  try {
+    body = JSON.parse(raw);
+  } catch { /* handled below */ }
+
+  if (status < 200 || status >= 300) {
+    throw new Error(`Search-job creation failed: POST /search_jobs returned ${status} — ${raw.slice(0, 300)}`);
+  }
+
+  // Prefer an explicit id field; fall back to scraping the human-readable message.
+  // Returning null on a miss (the old behaviour) pushed the failure downstream to
+  // `Job with id "null" not found in scheduler list`, which reads like the scheduler
+  // list is broken when in fact creation never yielded an id. Fail here, with the body.
+  const jobId =
+    body?.job_id ??
+    body?.id ??
+    body?.data?.job_id ??
+    body?.data?.id ??
+    body?.message?.match(/\[Job_Id:\s*(.+?)\]/)?.[1] ??
+    null;
+
+  if (!jobId) {
+    throw new Error(
+      `Search-job creation returned ${status} but no job id could be extracted. ` +
+      `Response: ${raw.slice(0, 300)}`
+    );
+  }
+
+  return jobId;
 }
 
 async validateAddJob(jobId) {
@@ -77,16 +106,39 @@ async validateAddJob(jobId) {
   // Get-Jobs button in the DOM but display:none. If that happened, re-open the scheduler
   // list from the toolbar to restore the view before clicking (graceful workaround for
   // origin/fix/search-scheduler-job-issue).
+  // Same recovery as JobSchedulerPage._ensureSchedulerListOpen: alternate the toolbar
+  // toggle with a scheduler-list URL load. Retrying only the toolbar (the old code
+  // here) leaves no way out when the component has already lost the flag, and
+  // retrying only the URL leaves no way out when a reload re-strips the param.
   const getJobsBtn = this.page.locator('[data-test="search-scheduler-get-jobs-btn"]');
-  let jobsBtnVisible = await getJobsBtn.waitFor({ state: 'visible', timeout: 10000 })
-    .then(() => true).catch(() => false);
-  for (let attempt = 0; attempt < 2 && !jobsBtnVisible; attempt++) {
-    await this.page.locator('[data-test="logs-search-bar-more-options-btn"]').click().catch(() => {});
-    await this.page.locator('[data-test="search-scheduler-list-btn"]').click().catch(() => {});
-    jobsBtnVisible = await getJobsBtn.waitFor({ state: 'visible', timeout: 10000 })
-      .then(() => true).catch(() => false);
+  const jobsBtnVisible = async (timeout) => await getJobsBtn
+    .waitFor({ state: 'visible', timeout }).then(() => true).catch(() => false);
+
+  if (!(await jobsBtnVisible(10000))) {
+    const base = process.env["ZO_BASE_URL_SC_UI"] || process.env["ZO_BASE_URL"];
+    const schedulerUrl = `${base}/web/logs?action=search_scheduler&org_identifier=${orgId}&type=search_scheduler_list`;
+    const routes = [
+      async () => {
+        await this.page.locator('[data-test="logs-search-bar-more-options-btn"]').click({ timeout: 10000 }).catch(() => {});
+        await this.page.locator('[data-test="search-scheduler-list-btn"]').click({ timeout: 10000 }).catch(() => {});
+      },
+      async () => {
+        await this.page.goto(schedulerUrl);
+        await this.page.waitForLoadState('domcontentloaded');
+      },
+    ];
+    let opened = false;
+    for (let attempt = 0; attempt < 4 && !opened; attempt++) {
+      await routes[attempt % routes.length]();
+      opened = await jobsBtnVisible(10000);
+    }
+    if (!opened) {
+      throw new Error(
+        'Scheduler list never became visible: [data-test="search-scheduler-get-jobs-btn"] stayed hidden ' +
+        'after toolbar and URL recovery.'
+      );
+    }
   }
-  await getJobsBtn.waitFor({ state: 'visible', timeout: 10000 });
   const responsePromise = this.page.waitForResponse(
     resp => resp.url().includes('/search_jobs') && resp.request().method() === 'GET',
     { timeout: 15000 }

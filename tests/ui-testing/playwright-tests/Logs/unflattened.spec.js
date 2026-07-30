@@ -280,8 +280,12 @@ test.describe("Unflattened testcases", () => {
     await page.waitForTimeout(500);
 
     testLogger.info('Closing log detail dialog');
-    await pageManager.unflattenedPage.closeDialog.waitFor();
-    await pageManager.unflattenedPage.closeDialog.click();
+    // closeLogDetailDrawerIfOpen (not a bare waitFor+click): after the unflattened
+    // sub-tab click the drawer re-renders, and if that click landed while the drawer
+    // was closing there is no close button to wait for — the old bare waitFor then
+    // burned the full 45s action timeout. The helper no-ops when the drawer is
+    // already shut and falls back to Escape when the button is intercepted.
+    await pageManager.unflattenedPage.closeLogDetailDrawerIfOpen();
 
     // Cleanup: Toggle Store Original Data back OFF
     testLogger.info('Cleanup: Toggling Store Original Data back OFF');
@@ -423,8 +427,12 @@ test.describe("Unflattened testcases", () => {
     await page.waitForTimeout(500);
 
     testLogger.info('Closing log detail dialog');
-    await pageManager.unflattenedPage.closeDialog.waitFor();
-    await pageManager.unflattenedPage.closeDialog.click();
+    // closeLogDetailDrawerIfOpen (not a bare waitFor+click): after the unflattened
+    // sub-tab click the drawer re-renders, and if that click landed while the drawer
+    // was closing there is no close button to wait for — the old bare waitFor then
+    // burned the full 45s action timeout. The helper no-ops when the drawer is
+    // already shut and falls back to Escape when the button is intercepted.
+    await pageManager.unflattenedPage.closeLogDetailDrawerIfOpen();
 
     testLogger.info('Toggling Store Original Data back OFF to clean up');
     await page.goto(`${process.env.ZO_BASE_URL}/web/streams?org_identifier=${getOrgIdentifier()}`);

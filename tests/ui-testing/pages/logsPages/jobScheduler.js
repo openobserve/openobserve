@@ -99,6 +99,57 @@ export class JobSchedulerPage {
         await this.page.waitForLoadState('domcontentloaded');
       }
 
+      /**
+       * Re-open the scheduler list from the logs toolbar.
+       *
+       * The URL route above only works if the app still honours
+       * `action=search_scheduler` when it boots; on a fresh load Index.vue's
+       * updateUrlQueryParams can strip the param again before the list is shown, so a
+       * reload can land on a page where the Get-Jobs button is present but
+       * display:none and never recovers. The toolbar toggles `showSearchScheduler`
+       * on the live component instead, with no reload for that race to happen in.
+       *
+       * Neither route is reliable alone — run 30552638159 burned all three URL-based
+       * retries with the button still hidden ("25 x locator resolved to hidden"), so
+       * _ensureSchedulerListOpen alternates between them.
+       */
+      async _openSchedulerListFromToolbar() {
+        await this.page.locator('[data-test="logs-search-bar-more-options-btn"]')
+            .click({ timeout: 10000 }).catch(() => {});
+        await this.page.locator('[data-test="search-scheduler-list-btn"]')
+            .click({ timeout: 10000 }).catch(() => {});
+      }
+
+      /**
+       * Make the scheduler list actually visible, alternating recovery routes.
+       * @returns {Promise<boolean>} whether the Get-Jobs button became visible
+       */
+      async _ensureSchedulerListOpen(perTryTimeout = 15000) {
+        const getJobsBtn = this.page.locator('[data-test="search-scheduler-get-jobs-btn"]');
+        const isVisible = async (timeout) => await getJobsBtn
+            .waitFor({ state: 'visible', timeout })
+            .then(() => true)
+            .catch(() => false);
+
+        if (await isVisible(perTryTimeout)) return true;
+
+        // Toolbar first (cheap, no reload), then the URL route, then repeat.
+        const routes = [
+            () => this._openSchedulerListFromToolbar(),
+            () => this._navigateToSchedulerList(),
+            () => this._openSchedulerListFromToolbar(),
+            () => this._navigateToSchedulerList(),
+        ];
+        for (let i = 0; i < routes.length; i++) {
+            testLogger.warn(
+                `_ensureSchedulerListOpen: Get-Jobs button hidden (scheduler view reset) — recovery ${i + 1}/${routes.length}`,
+            );
+            await routes[i]();
+            if (await isVisible(perTryTimeout)) return true;
+        }
+        return false;
+      }
+
       async _getJobRowIndex(trace_id, timeout = 15000) {
         // GRACEFUL WORKAROUND for an app-side flake (origin/fix/search-scheduler-job-issue):
         // the scheduler list lives under `v-show="showSearchScheduler"`, and Index.vue
@@ -109,22 +160,13 @@ export class JobSchedulerPage {
         // to the scheduler-list URL (which restores the param → re-shows the list) and
         // retrying. Remove once the app preserves the scheduler view across URL updates.
         const getJobsBtn = this.page.locator('[data-test="search-scheduler-get-jobs-btn"]');
-        let visible = await getJobsBtn
-            .waitFor({ state: 'visible', timeout: 15000 })
-            .then(() => true)
-            .catch(() => false);
-        for (let attempt = 0; attempt < 3 && !visible; attempt++) {
-            testLogger.warn(
-                `_getJobRowIndex: Get-Jobs button hidden (scheduler view reset) — re-opening scheduler list (attempt ${attempt + 1}/3)`,
+        if (!(await this._ensureSchedulerListOpen())) {
+            throw new Error(
+                'Scheduler list never became visible: [data-test="search-scheduler-get-jobs-btn"] stayed ' +
+                'hidden after toolbar and URL recovery. The logs page dropped action=search_scheduler ' +
+                'and did not restore showSearchScheduler.'
             );
-            await this._navigateToSchedulerList();
-            visible = await getJobsBtn
-                .waitFor({ state: 'visible', timeout: 15000 })
-                .then(() => true)
-                .catch(() => false);
         }
-        // Final gate — if it is still hidden, surface a clear failure.
-        await getJobsBtn.waitFor({ state: 'visible', timeout: 10000 });
         const responsePromise = this.page.waitForResponse(
             resp => resp.url().includes('/search_jobs') && resp.request().method() === 'GET',
             { timeout }
@@ -187,27 +229,51 @@ async deleteJobSearch(trace_id) {
  */
 async _awaitEnabledRowButton(trace_id, buttonTestId, label, timeoutMs = 180000) {
     let button = null;
+    // Track the last observed state so the failure says WHICH condition never held —
+    // "the job never appeared in the list" and "the job appeared but its button stayed
+    // disabled" have completely different causes, and a single generic message sends
+    // the reader looking in the wrong place.
+    let lastState = 'job not found in scheduler list';
 
-    await expect.poll(async () => {
+    // Hand-rolled poll rather than expect.poll: its `message` option does not reach
+    // the thrown error in this Playwright version (verified — neither the string nor
+    // the function form appears in error.message), so the whole point of tracking
+    // lastState would be lost and the failure would read as a bare
+    // "expect(received).toBe(expected)".
+    const deadline = Date.now() + timeoutMs;
+    const intervals = [2000, 3000, 5000, 5000, 10000, 10000, 15000];
+    let tick = 0;
+
+    while (Date.now() < deadline) {
         const rowIndex = await this._getJobRowIndex(trace_id, 15000);
-        if (rowIndex === -1) return false;
+        if (rowIndex === -1) {
+            lastState = 'job not found in scheduler list';
+        } else {
+            const row = this.page.locator(`[data-test="o2-table-row-${rowIndex}"]`);
+            if (!(await row.isVisible({ timeout: 10000 }).catch(() => false))) {
+                lastState = `job row ${rowIndex} never rendered`;
+            } else {
+                const candidate = row.locator(`[data-test="${buttonTestId}"]`);
+                if (!(await candidate.isVisible({ timeout: 5000 }).catch(() => false))) {
+                    lastState = `${label} button not present on the job row`;
+                } else if (!(await candidate.isEnabled().catch(() => false))) {
+                    lastState = `${label} button present but disabled — the job has not reached an actionable status`;
+                } else {
+                    button = candidate;
+                    return button;
+                }
+            }
+        }
 
-        const row = this.page.locator(`[data-test="o2-table-row-${rowIndex}"]`);
-        if (!(await row.isVisible({ timeout: 10000 }).catch(() => false))) return false;
+        const wait = intervals[Math.min(tick++, intervals.length - 1)];
+        if (Date.now() + wait >= deadline) break;
+        await this.page.waitForTimeout(wait);
+    }
 
-        const candidate = row.locator(`[data-test="${buttonTestId}"]`);
-        if (!(await candidate.isVisible({ timeout: 5000 }).catch(() => false))) return false;
-        if (!(await candidate.isEnabled().catch(() => false))) return false;
-
-        button = candidate;
-        return true;
-    }, {
-        message: `${label} button for trace ID ${trace_id} never became enabled — the search job did not reach an actionable state`,
-        intervals: [2000, 3000, 5000, 5000, 10000, 10000, 15000],
-        timeout: timeoutMs,
-    }).toBe(true);
-
-    return button;
+    throw new Error(
+        `${label} button for trace ID ${trace_id} never became actionable within ${timeoutMs}ms. ` +
+        `Last observed: ${lastState}.`
+    );
 }
 
 async cancelJobSearch(trace_id) {
