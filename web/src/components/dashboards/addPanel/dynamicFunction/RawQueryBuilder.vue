@@ -1,16 +1,14 @@
+<!-- Copyright 2026 OpenObserve Inc. -->
+
 <template>
   <div class="w-full" data-test="dashboard-raw-query-builder">
-    <div class="query-section" data-test="dashboard-raw-query-section">
-      <div class="query-label" data-test="dashboard-raw-query-title">{{ t("common.query") }}</div>
-      <div class="query-label text-xs" data-test="dashboard-raw-query-instruction">
-        {{ t("dashboard.rawQueryBuilder.instruction") }}
-      </div>
-
+    <div class="flex flex-col" data-test="dashboard-raw-query-section">
       <OTextarea
         v-model="fields.rawQuery"
-        :rows="6"
+        :rows="10"
+        :placeholder="t('dashboard.rawQueryBuilder.instruction')"
         data-test="dashboard-raw-query-textarea"
-        class="mt-0.5"
+        class="w-full"
       />
     </div>
   </div>

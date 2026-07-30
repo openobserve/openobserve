@@ -159,6 +159,27 @@ describe("WorkflowTestDialog", () => {
       expect(editorVm(wrapper).props("query")).toBe(buildTestSampleText());
     });
 
+    it("seeds the INCIDENT sample when the trigger is an incident event", () => {
+      // The Test drawer must prefill the payload of the CURRENT trigger kind —
+      // an incident workflow should not seed an alert sample.
+      setWorkflow(
+        [
+          {
+            id: "t1",
+            data: { node_type: "workflow_trigger", trigger_kind: "incident_event" },
+          },
+          destNode,
+        ],
+        [{ source: "t1", target: "d1" }],
+      );
+      workflowObj.testRun.input = "";
+      mountDialog();
+      const [{ meta }] = JSON.parse(workflowObj.testRun.input);
+      expect(meta).toHaveProperty("incident_id");
+      expect(meta).toHaveProperty("event_type");
+      expect(meta).not.toHaveProperty("alert_name"); // not the alert sample
+    });
+
     it("keeps an existing input (persisted across opens) instead of reseeding", () => {
       workflowObj.testRun.input = VALID_INPUT;
       mountDialog();
@@ -307,12 +328,19 @@ describe("WorkflowTestDialog", () => {
       await primary(wrapper).trigger("click");
       await flushPromises();
 
-      expect(mockTestWorkflow).toHaveBeenCalledWith({
-        org_identifier: "default",
-        id: "wf1",
-        inputs: JSON.parse(VALID_INPUT),
-        from_node: undefined,
-      });
+      // The whole in-memory graph is sent (test-without-saving), not just an id.
+      expect(mockTestWorkflow).toHaveBeenCalledWith(
+        expect.objectContaining({
+          org_identifier: "default",
+          inputs: JSON.parse(VALID_INPUT),
+          from_node: undefined,
+          workflow: expect.objectContaining({
+            id: "wf1",
+            name: "wf",
+            nodes: expect.arrayContaining([expect.objectContaining({ id: "t1" })]),
+          }),
+        }),
+      );
       // success -> the popup closes and the result is stored for the canvas badges
       expect(workflowObj.testRun.show).toBe(false);
       expect(workflowObj.testRun.result).toMatchObject({ errors: {} });

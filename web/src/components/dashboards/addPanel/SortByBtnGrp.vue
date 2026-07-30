@@ -1,5 +1,4 @@
 <template>
-  {{ t("dashboard.sortBy") }}
   <OButtonGroup data-test="dashboard-sort-by-btn-group">
     <OButton
       :active="!fieldObj.sortBy"

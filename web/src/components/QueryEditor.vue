@@ -84,6 +84,7 @@
     <div class="relative min-h-0 flex-1 overflow-hidden">
       <CodeQueryEditor
         :ref="(el) => (editorRef = el)"
+        :key="currentLanguage"
         :editor-id="`${dataTestPrefix}-editor-${currentLanguage}`"
         :language="currentLanguage"
         :query="query"

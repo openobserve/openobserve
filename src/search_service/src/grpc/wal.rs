@@ -39,6 +39,7 @@ use config::{
 };
 use datafusion::{
     arrow::{datatypes::Schema, record_batch::RecordBatch},
+    datasource::TableProvider,
     execution::cache::cache_manager::FileStatisticsCache,
 };
 use futures::StreamExt;
@@ -70,6 +71,48 @@ pub async fn search_parquet(
     index_condition: Option<IndexCondition>,
     fst_fields: Vec<String>,
     memtable_ids: HashSet<u64>,
+) -> super::SearchTable {
+    let (mut tables, mut scan_stats, ids) = search_parquet_files(
+        query.clone(),
+        schema.clone(),
+        search_partition_keys,
+        sorted_by_time,
+        file_stat_cache,
+        index_condition.clone(),
+        fst_fields.clone(),
+        &memtable_ids,
+    )
+    .await?;
+
+    // not gated by the pack flag: packs on disk must stay searchable after
+    // the flag is turned off
+    let (pack_tables, pack_stats) = search_pack_segments(
+        query,
+        schema,
+        search_partition_keys,
+        sorted_by_time,
+        index_condition,
+        fst_fields,
+        &memtable_ids,
+    )
+    .await?;
+    tables.extend(pack_tables);
+    scan_stats.add(&pack_stats);
+
+    Ok((tables, scan_stats, ids))
+}
+
+/// search in the legacy per-stream wal parquet files
+#[allow(clippy::too_many_arguments)]
+async fn search_parquet_files(
+    query: Arc<super::QueryParams>,
+    schema: Arc<Schema>,
+    search_partition_keys: &[(String, String)],
+    sorted_by_time: bool,
+    file_stat_cache: Option<Arc<dyn FileStatisticsCache>>,
+    index_condition: Option<IndexCondition>,
+    fst_fields: Vec<String>,
+    memtable_ids: &HashSet<u64>,
 ) -> super::SearchTable {
     let load_start = std::time::Instant::now();
     let trace_id = &query.trace_id;
@@ -353,6 +396,139 @@ pub async fn search_memtable(
     // check memory circuit breaker
     ingester::check_memory_circuit_breaker().map_err(|e| Error::ResourceError(e.to_string()))?;
 
+    let start = std::time::Instant::now();
+    let tables = create_tables_from_batch_groups(
+        &query,
+        schema,
+        batch_groups,
+        sorted_by_time,
+        index_condition,
+        fst_fields,
+        "mem",
+    )
+    .await?;
+
+    log::info!(
+        "{}",
+        search_inspector_fields(
+            format!(
+                "[trace_id {}] wal->mem->search: create tables took {} ms",
+                query.trace_id,
+                start.elapsed().as_millis()
+            ),
+            SearchInspectorFieldsBuilder::new()
+                .trace_id(query.trace_id.to_string())
+                .node_name(LOCAL_NODE.name.clone())
+                .component("wal:memtable create tables".to_string())
+                .search_role("follower".to_string())
+                .duration(start.elapsed().as_millis() as usize)
+                .build()
+        )
+    );
+    Ok((tables, scan_stats, memtable_ids))
+}
+
+/// search in the wal pack segments, fully materialized so no file lock needed
+async fn search_pack_segments(
+    query: Arc<super::QueryParams>,
+    schema: Arc<Schema>,
+    search_partition_keys: &[(String, String)],
+    sorted_by_time: bool,
+    index_condition: Option<IndexCondition>,
+    fst_fields: Vec<String>,
+    memtable_ids: &HashSet<u64>,
+) -> Result<(Vec<Arc<dyn TableProvider>>, ScanStats), Error> {
+    let load_start = std::time::Instant::now();
+
+    // format partition keys
+    let stream_settings =
+        infra::schema::get_settings(&query.org_id, &query.stream_name, query.stream_type)
+            .await
+            .unwrap_or_default();
+    let partition_keys = &stream_settings.partition_keys;
+    let mut filters = generate_filter_from_equal_items(search_partition_keys);
+    let partition_keys: HashMap<&String, &StreamPartition> =
+        partition_keys.iter().map(|v| (&v.field, v)).collect();
+    for (key, value) in filters.iter_mut() {
+        if let Some(partition_key) = partition_keys.get(key) {
+            for val in value.iter_mut() {
+                *val = partition_key.get_partition_value(val);
+            }
+        }
+    }
+
+    let (segment_batches, scan_stats) = ingester::read_from_pack(
+        &query.org_id,
+        query.stream_type.as_str(),
+        &query.stream_name,
+        Some(query.time_range),
+        &filters,
+        memtable_ids,
+    )
+    .await
+    .map_err(|e| Error::Message(e.to_string()))?;
+    if segment_batches.is_empty() {
+        return Ok((vec![], ScanStats::new()));
+    }
+
+    // check memory circuit breaker
+    ingester::check_memory_circuit_breaker().map_err(|e| Error::ResourceError(e.to_string()))?;
+
+    let mut batch_groups: HashMap<Arc<Schema>, Vec<RecordBatch>> = HashMap::with_capacity(2);
+    for (seg_schema, batches) in segment_batches {
+        batch_groups.entry(seg_schema).or_default().extend(batches);
+    }
+
+    let tables = create_tables_from_batch_groups(
+        &query,
+        schema,
+        batch_groups,
+        sorted_by_time,
+        index_condition,
+        fst_fields,
+        "pack",
+    )
+    .await?;
+
+    log::info!(
+        "{}",
+        search_inspector_fields(
+            format!(
+                "[trace_id {}] wal->pack->search: load segments {}, scan_size {}, compressed_size {}",
+                query.trace_id,
+                scan_stats.files,
+                scan_stats.original_size,
+                scan_stats.compressed_size,
+            ),
+            SearchInspectorFieldsBuilder::new()
+                .trace_id(query.trace_id.to_string())
+                .node_name(LOCAL_NODE.name.clone())
+                .component("wal:pack load".to_string())
+                .search_role("follower".to_string())
+                .duration(load_start.elapsed().as_millis() as usize)
+                .desc(format!(
+                    "wal pack search load segments {}, scan_size {}, compressed_size {}",
+                    scan_stats.files,
+                    bytes_to_human_readable(scan_stats.original_size as f64),
+                    bytes_to_human_readable(scan_stats.compressed_size as f64)
+                ))
+                .build()
+        )
+    );
+
+    Ok((tables, scan_stats))
+}
+
+/// Build one `NewMemTable` per batch group, shared by memtable and pack search.
+async fn create_tables_from_batch_groups(
+    query: &Arc<super::QueryParams>,
+    schema: Arc<Schema>,
+    batch_groups: HashMap<Arc<Schema>, Vec<RecordBatch>>,
+    sorted_by_time: bool,
+    index_condition: Option<IndexCondition>,
+    fst_fields: Vec<String>,
+    source: &str,
+) -> Result<Vec<Arc<dyn TableProvider>>, Error> {
     // construct latest schema map
     let latest_schema = Arc::new(schema.as_ref().clone().with_metadata(Default::default()));
     let mut latest_schema_map = HashMap::with_capacity(latest_schema.fields().len());
@@ -360,8 +536,7 @@ pub async fn search_memtable(
         latest_schema_map.insert(field.name(), field);
     }
 
-    let mut tables = Vec::new();
-    let start = std::time::Instant::now();
+    let mut tables: Vec<Arc<dyn TableProvider>> = Vec::new();
     let latest_schema_fields = latest_schema.fields().len();
     for (i, (schema, record_batches)) in batch_groups.into_iter().enumerate() {
         if record_batches.is_empty() {
@@ -388,7 +563,7 @@ pub async fn search_memtable(
         }
 
         log::info!(
-            "[trace_id {}] wal->mem->search: adapt batches for group {i}, schema fields {latest_schema_fields}, batch fields: {batch_fields}, diff_fields {}, batches {batch_num}, took {} ms",
+            "[trace_id {}] wal->{source}->search: adapt batches for group {i}, schema fields {latest_schema_fields}, batch fields: {batch_fields}, diff_fields {}, batches {batch_num}, took {} ms",
             query.trace_id,
             diff_fields.len(),
             adapt_start.elapsed().as_millis()
@@ -427,7 +602,7 @@ pub async fn search_memtable(
             .collect::<Vec<_>>();
 
         log::info!(
-            "[trace_id {}] wal->mem->search: merge batches for group {i}, batches {batch_num}, took {} ms",
+            "[trace_id {}] wal->{source}->search: merge batches for group {i}, batches {batch_num}, took {} ms",
             query.trace_id,
             merge_start.elapsed().as_millis()
         );
@@ -446,7 +621,7 @@ pub async fn search_memtable(
             Ok(table) => Arc::new(table),
             Err(e) => {
                 log::error!(
-                    "[trace_id {}] wal->mem->search: create memtable error: {e}",
+                    "[trace_id {}] wal->{source}->search: create memtable error: {e}",
                     query.trace_id,
                 );
                 return Err(e.into());
@@ -454,25 +629,7 @@ pub async fn search_memtable(
         };
         tables.push(table as _);
     }
-
-    log::info!(
-        "{}",
-        search_inspector_fields(
-            format!(
-                "[trace_id {}] wal->mem->search: create tables took {} ms",
-                query.trace_id,
-                start.elapsed().as_millis()
-            ),
-            SearchInspectorFieldsBuilder::new()
-                .trace_id(query.trace_id.to_string())
-                .node_name(LOCAL_NODE.name.clone())
-                .component("wal:memtable create tables".to_string())
-                .search_role("follower".to_string())
-                .duration(start.elapsed().as_millis() as usize)
-                .build()
-        )
-    );
-    Ok((tables, scan_stats, memtable_ids))
+    Ok(tables)
 }
 
 #[tracing::instrument(name = "service:search:grpc:wal:get_file_list", skip_all, fields(org_id = query.org_id, stream_name = query.stream_name))]
@@ -482,7 +639,7 @@ async fn get_file_list(
     time_range: Option<(i64, i64)>,
     search_partition_keys: &[(String, String)],
     partition_time_level: PartitionTimeLevel,
-    memtable_ids: HashSet<u64>,
+    memtable_ids: &HashSet<u64>,
 ) -> Result<Vec<FileKey>, Error> {
     let wal_dir = match Path::new(&get_config().common.data_wal_dir).canonicalize() {
         Ok(path) => {

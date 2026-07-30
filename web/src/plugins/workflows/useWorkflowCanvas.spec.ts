@@ -52,6 +52,8 @@ import useWorkflowCanvas, {
   workflowObj,
   loadWorkflowRun,
   executeTestRun,
+  serializeWorkflow,
+  currentTriggerKind,
 } from "@/plugins/workflows/useWorkflowCanvas";
 
 const triggerNode = () => ({
@@ -265,6 +267,19 @@ describe("executeTestRun — ran-node scope + badge state", () => {
     expect(res.blockedNodeIds).toEqual([]);
   });
 
+  it("sends the whole in-memory graph (test-without-saving), not just an id", async () => {
+    mockTest.mockResolvedValue({ data: { errors: {} } });
+    await executeTestRun({ orgId: "o", inputs: [{ a: 1 }], fromNode: "f" });
+    const arg = mockTest.mock.calls[0][0];
+    expect(arg.org_identifier).toBe("o");
+    expect(arg.from_node).toBe("f");
+    // no top-level workflow id — the graph rides in `workflow`
+    expect(arg.id).toBeUndefined();
+    expect(arg.workflow.id).toBe("wf1");
+    expect(arg.workflow.nodes.map((n: any) => n.id).sort()).toEqual(["d", "f", "t", "x"]);
+    expect(arg.workflow.edges).toHaveLength(2);
+  });
+
   it("replay from a mid-graph node marks that node + everything downstream", async () => {
     mockTest.mockResolvedValue({ data: { errors: {} } });
     await executeTestRun({ orgId: "o", inputs: [{ a: 1 }], fromNode: "f" });
@@ -304,6 +319,72 @@ describe("executeTestRun — ran-node scope + badge state", () => {
     expect(r.ok).toBe(false);
     expect(r.error).toBe("down");
     expect(workflowObj.testRun.result).toBeNull();
+  });
+});
+
+// serializeWorkflow builds the backend `Workflow` object shared by both the
+// create/update payload and the Test run — so testing without saving sends the
+// exact same graph the editor would persist.
+describe("serializeWorkflow — backend Workflow shape", () => {
+  it("emits every required field and only the persisted node fields", () => {
+    workflowObj.currentSelectedWorkflow = {
+      id: "wf9",
+      name: "  padded name  ",
+      description: "desc",
+      enabled: false,
+      created_at: 10,
+      updated_at: 20,
+      nodes: [
+        {
+          id: "t",
+          type: "input",
+          position: { x: 5, y: 6 },
+          data: { node_type: "workflow_trigger", trigger_kind: "alert_fired" },
+          // VueFlow runtime state that must be dropped:
+          dimensions: { width: 1, height: 1 },
+          selected: true,
+          dragging: false,
+        },
+      ],
+      edges: [{ source: "t", target: "f" }],
+    } as any;
+
+    const wf = serializeWorkflow();
+    expect(Object.keys(wf).sort()).toEqual([
+      "created_at",
+      "created_by",
+      "description",
+      "edges",
+      "enabled",
+      "id",
+      "name",
+      "nodes",
+      "org_id",
+      "updated_at",
+    ]);
+    expect(wf.name).toBe("padded name"); // trimmed
+    expect(wf.enabled).toBe(false);
+    expect(wf.org_id).toBe(""); // backend overrides
+    expect(wf.created_by).toBe("");
+
+    const node = wf.nodes[0];
+    // persisted fields only — runtime state stripped
+    expect(Object.keys(node).sort()).toEqual(["data", "id", "io_type", "meta", "position"]);
+    expect(node.io_type).toBe("input");
+    // trigger kind carried in meta (NodeData::WorkflowTrigger is a unit variant)
+    expect(node.meta.trigger_kind).toBe("alert_fired");
+    expect(node.dimensions).toBeUndefined();
+    expect(node.selected).toBeUndefined();
+  });
+
+  it("defaults enabled to true and id/name to empty for a fresh graph", () => {
+    workflowObj.currentSelectedWorkflow = { nodes: [], edges: [] } as any;
+    const wf = serializeWorkflow();
+    expect(wf.enabled).toBe(true);
+    expect(wf.id).toBe("");
+    expect(wf.name).toBe("");
+    expect(wf.nodes).toEqual([]);
+    expect(wf.edges).toEqual([]);
   });
 });
 
@@ -348,5 +429,45 @@ describe("trigger-first guard — palette adds are blocked until a trigger exist
     expect(mockToast).not.toHaveBeenCalled();
     expect(workflowObj.dialog.show).toBe(true);
     expect(workflowObj.currentSelectedNodeData?.data.node_type).toBe("function");
+  });
+});
+
+describe("currentTriggerKind", () => {
+  const setNodes = (nodes: any[]) => {
+    workflowObj.currentSelectedWorkflow = { nodes } as any;
+  };
+
+  it("returns undefined when there is no trigger node", () => {
+    setNodes([{ id: "c1", data: { node_type: "condition" } }]);
+    expect(currentTriggerKind()).toBeUndefined();
+  });
+
+  it("reads the kind from a fresh trigger node (data.trigger_kind)", () => {
+    setNodes([
+      { id: "t1", data: { node_type: "workflow_trigger", trigger_kind: "incident_event" } },
+    ]);
+    expect(currentTriggerKind()).toBe("incident_event");
+  });
+
+  it("falls back to meta.trigger_kind (rehydrated from the API)", () => {
+    setNodes([
+      {
+        id: "t1",
+        data: { node_type: "workflow_trigger" },
+        meta: { trigger_kind: "alert_fired" },
+      },
+    ]);
+    expect(currentTriggerKind()).toBe("alert_fired");
+  });
+
+  it("prefers data.trigger_kind over meta.trigger_kind", () => {
+    setNodes([
+      {
+        id: "t1",
+        data: { node_type: "workflow_trigger", trigger_kind: "incident_event" },
+        meta: { trigger_kind: "alert_fired" },
+      },
+    ]);
+    expect(currentTriggerKind()).toBe("incident_event");
   });
 });

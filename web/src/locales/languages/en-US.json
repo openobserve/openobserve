@@ -709,7 +709,9 @@
     "dropFilesHint": "Drop files here or click to choose",
     "chooseFiles": "Choose files",
     "chooseAFile": "Choose a file",
-    "loadingEllipsis": "Loading..."
+    "loadingEllipsis": "Loading...",
+    "field": "Field",
+    "enterValueOrVariable": "Enter value or $variable"
   },
   "flow": {
     "stepPicker": {
@@ -2411,7 +2413,6 @@
     "search": "Search Workflows",
     "refresh": "Refresh Workflows",
     "trigger": "Trigger",
-    "triggerAlertFired": "Alert Fired",
     "steps": "Steps",
     "status": "Status",
     "updated": "Updated",
@@ -2463,13 +2464,21 @@
       "cta": "Create Workflow",
       "soonCta": "Available In A Future Release",
       "comingSoon": "Coming Soon",
-      "soon": "Soon",
-      "alertFired": "Alert Fired",
-      "alertFiredDesc": "Run When An Alert Fires",
-      "schedule": "Schedule",
-      "scheduleDesc": "Run On A Schedule",
-      "webhook": "Webhook",
-      "webhookDesc": "Run On An Incoming Webhook"
+      "soon": "Soon"
+    },
+    "triggerKind": {
+      "alertFired": {
+        "label": "Alert Fired",
+        "node": "Alert Trigger",
+        "desc": "Run when an alert fires",
+        "intro": "When a linked alert fires, every downstream step receives this payload."
+      },
+      "incidentEvent": {
+        "label": "Incident Event",
+        "node": "Incident Trigger",
+        "desc": "Run on an incident lifecycle event",
+        "intro": "When an incident event occurs, every downstream step receives this payload."
+      }
     },
     "triggerMeta": {
       "orgId": "Organization ID the alert belongs to.",
@@ -2508,9 +2517,6 @@
       "skipped": "Skipped",
       "errorsN": "{count} error(s)",
       "runError": "Unable to run the test.",
-      "saveToTestTitle": "Save & Test",
-      "saveToTestBody": "Testing runs the saved version of this workflow. Save your changes first?",
-      "saveAndTest": "Save & Test",
       "stepResult": {
         "viewHint": "Click To View Input / Output",
         "input": "Input",
@@ -2557,7 +2563,6 @@
       "kindTrigger": "Trigger",
       "kindLogic": "Logic",
       "kindAction": "Action",
-      "alertTrigger": "Alert Trigger",
       "condition": "Condition",
       "function": "Function",
       "sendToDestination": "Destination",
@@ -2582,7 +2587,6 @@
       "triggerAlertsNone": "No Alerts Found In This Organization.",
       "triggerAlertsError": "Unable To Load Alerts",
       "triggerNote": "This Workflow Runs When Any Of The Selected Alerts Fires.",
-      "triggerPayloadIntro": "When a linked alert fires, every downstream step receives this payload.",
       "triggerStructureTitle": "Payload Structure",
       "triggerStructureHint": "Hover A Field For Details",
       "triggerDetailHint": "Hover Or Focus A Field Above To See Its Type And Meaning.",
@@ -2591,6 +2595,10 @@
       "triggerDataBlock": "data[] · Your Alert's Rows",
       "triggerDataColumns": "Result Columns",
       "triggerDataExampleNote": "Example only — the actual columns come from your alert's query.",
+      "incidentEventTypeLabel": "Event Type",
+      "incidentCommonTitle": "Common Fields (Every Event)",
+      "incidentSpecificTitle": "Event-Specific Fields",
+      "incidentNoExtraFields": "This event adds no fields beyond the common ones.",
       "triggerDataBlockNote": "An array with one object per matched record. Its columns come from the alert's own query, so they differ by alert — reference them as data[].<column>.",
       "conditionBody": "Set A Rule To Branch On",
       "conditionBodySet": "Branches On A Rule",
@@ -3137,12 +3145,14 @@
       "prometheus": "Prometheus",
       "vmagent": "vmagent",
       "nightingale": "Nightingale",
+      "categraf": "Categraf",
       "otelCollector": "OTEL Collector",
       "telegraf": "Telegraf",
       "awsCloudwatchMetrics": "AWS CloudWatch Metrics"
     },
     "otlpHttp": "OTLP HTTP",
     "otlpGrpc": "OTLP gRPC",
+    "categrafDocLinkText": "to learn how to ingest metrics using Categraf",
     "fluentBitDocLinkText": "to explore the process of sending logs from Kubernetes to OpenObserve using FluentBit.",
     "loongCollectorDocLinkText": "to learn more about LoongCollector configuration.",
     "nightingaleDocLinkText": "to learn how to ingest metrics using Nightingale",
@@ -3457,9 +3467,6 @@
     "alertContextMenu": {
       "thresholdAbove": "Create Alert with threshold above {value}",
       "thresholdBelow": "Create Alert with threshold below {value}"
-    },
-    "rawQueryBuilder": {
-      "instruction": "Write a SQL query for complex actions."
     },
     "dashboardErrors": {
       "errorsCount": "Errors ({count})"
@@ -4336,7 +4343,8 @@
       "clause": "Clause {number}",
       "selectOperation": "Select Operation",
       "addAnotherClause": "Add another clause",
-      "removeClause": "Remove clause"
+      "removeClause": "Remove clause",
+      "addClause": "Add clause"
     },
     "viewDashboard": {
       "refreshToApplyVariables": "Refresh to apply latest variable changes",
@@ -4363,7 +4371,9 @@
       "add": "Add",
       "value": "Value",
       "markAsNonTimestamp": "Mark this field as non-timestamp",
-      "renderDataAsJson": "Render Data as JSON / Array"
+      "renderDataAsJson": "Render Data as JSON / Array",
+      "sortBy": "Sort By",
+      "havingHint": "Filter on the aggregate"
     },
     "customChartTypeSelector": {
       "exampleOfCustomCharts": "Example of custom charts",
@@ -4579,7 +4589,11 @@
     "exitAnnotationsMode": "Exit Annotations Mode",
     "addAnnotations": "Add Annotations",
     "refreshToApplyVariables": "Refresh to apply latest variable changes",
-    "moveToAnotherFolder": "Move {type} To Another Folder"
+    "moveToAnotherFolder": "Move {type} To Another Folder",
+    "rawQueryBuilder": {
+      "query": "Query",
+      "instruction": "Write a SQL query for complex actions."
+    }
   },
   "panel": {
     "addPivotShort": "+P",

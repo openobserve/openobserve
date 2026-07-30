@@ -229,6 +229,10 @@ describe("resolveTab", () => {
       expect(resolveTab("ingestMetrics", "nightingale", "prometheus")).toBe("nightingale");
     });
 
+    it("ingestMetrics – categraf", () => {
+      expect(resolveTab("ingestMetrics", "categraf", "prometheus")).toBe("categraf");
+    });
+
     it("ingestMetrics – otelCollector", () => {
       expect(resolveTab("ingestMetrics", "otelCollector", "prometheus")).toBe("otelCollector");
     });
@@ -461,8 +465,8 @@ describe("ROUTE_TAB_MAPS", () => {
       expect(Object.keys(ROUTE_TAB_MAPS.servers)).toHaveLength(2);
     });
 
-    it("ingestMetrics has 6 entries", () => {
-      expect(Object.keys(ROUTE_TAB_MAPS.ingestMetrics)).toHaveLength(6);
+    it("ingestMetrics has 7 entries", () => {
+      expect(Object.keys(ROUTE_TAB_MAPS.ingestMetrics)).toHaveLength(7);
     });
 
     it("ingestLogs has 9 entries", () => {

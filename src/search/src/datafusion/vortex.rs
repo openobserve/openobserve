@@ -16,30 +16,25 @@
 //! Vortex file format support.
 //!
 //! This module provides:
-//! - `Utf8Compressor`: A smart compressor for UTF8 fields using Zstd compression
-//! - Vortex file reading utilities for reading record batches and schemas
+//! - A custom compressor for UTF8 fields using Zstd compression
+//! - Shared Vortex write strategy and access plan utilities
 
 use std::sync::{Arc, LazyLock};
 
-use arrow::{buffer::BooleanBuffer, record_batch::RecordBatch};
-use datafusion::error::{DataFusionError, Result as DataFusionResult};
+use arrow::buffer::BooleanBuffer;
 use tokio::runtime::Runtime;
 use vortex::{
-    VortexSessionDefault,
-    array::{ArrayRef, Canonical, ExecutionCtx, IntoArray, arrow::FromArrowArray},
+    array::{ArrayRef, Canonical, ExecutionCtx, IntoArray},
     buffer::Buffer,
-    compressor::{
-        BtrBlocksCompressor, BtrBlocksCompressorBuilder, SchemeExt, schemes::integer::IntDictScheme,
-    },
-    dtype::{DType, arrow::FromArrowType},
+    compressor::{BtrBlocksCompressor, BtrBlocksCompressorBuilder},
+    dtype::DType,
     encodings::zstd::Zstd,
     error::VortexResult,
-    file::{VortexWriteOptions, WriteStrategyBuilder},
-    io::session::RuntimeSessionExt,
-    layout::layouts::compressed::CompressorPlugin,
+    file::WriteStrategyBuilder,
+    layout::{LayoutStrategy, layouts::compressed::CompressorPlugin},
     scan::selection::Selection,
-    session::VortexSession,
 };
+use vortex_btrblocks::{SchemeExt, schemes::integer::IntDictScheme};
 use vortex_datafusion::VortexAccessPlan;
 
 pub static VORTEX_RUNTIME: LazyLock<Arc<Runtime>> = LazyLock::new(|| {
@@ -64,7 +59,7 @@ pub static VORTEX_RUNTIME: LazyLock<Arc<Runtime>> = LazyLock::new(|| {
 /// For all other data types:
 /// - Delegates to BtrBlocksCompressor for optimal encoding
 #[derive(Clone)]
-pub struct Utf8Compressor {
+struct Utf8Compressor {
     /// The underlying BtrBlocks compressor for general compression
     btr_compressor: BtrBlocksCompressor,
     /// Zstd compression level (default: 3)
@@ -75,7 +70,7 @@ pub struct Utf8Compressor {
 
 impl Utf8Compressor {
     /// Create a new smart compressor with default settings.
-    pub fn new() -> Self {
+    fn new() -> Self {
         Self {
             btr_compressor: BtrBlocksCompressorBuilder::default()
                 .exclude_schemes([IntDictScheme.id()])
@@ -86,13 +81,15 @@ impl Utf8Compressor {
     }
 
     /// Set the Zstd compression level (1-22, default: 3).
-    pub fn with_zstd_level(mut self, level: i32) -> Self {
+    #[cfg(test)]
+    fn with_zstd_level(mut self, level: i32) -> Self {
         self.zstd_level = level;
         self
     }
 
     /// Set the number of values per Zstd compression frame (default: 8192).
-    pub fn with_values_per_page(mut self, values: usize) -> Self {
+    #[cfg(test)]
+    fn with_values_per_page(mut self, values: usize) -> Self {
         self.values_per_page = values;
         self
     }
@@ -141,6 +138,24 @@ impl CompressorPlugin for Utf8Compressor {
     }
 }
 
+/// Build the configured Vortex file write strategy.
+///
+/// OpenObserve's custom UTF8/Zstd compressor is used by default. Vortex's
+/// native compression strategy can be enabled with
+/// `ZO_VORTEX_USE_NATIVE_COMPRESSION=true`.
+pub(super) fn vortex_write_strategy() -> Arc<dyn LayoutStrategy> {
+    build_vortex_write_strategy(config::get_config().common.vortex_use_native_compression)
+}
+
+fn build_vortex_write_strategy(use_native_compression: bool) -> Arc<dyn LayoutStrategy> {
+    let builder = WriteStrategyBuilder::default();
+    if use_native_compression {
+        builder.build()
+    } else {
+        builder.with_compressor(Utf8Compressor::default()).build()
+    }
+}
+
 /// Generate a vortex access plan from a per-row match bitmap.
 pub fn generate_vortex_access_plan(row_ids: &BooleanBuffer) -> Option<VortexAccessPlan> {
     let indices: Vec<u64> = row_ids.set_indices().map(|i| i as u64).collect();
@@ -150,55 +165,15 @@ pub fn generate_vortex_access_plan(row_ids: &BooleanBuffer) -> Option<VortexAcce
     Some(selection)
 }
 
-/// Write record batches to a vortex file.
-pub async fn write_vortex(
-    schema: Arc<arrow::datatypes::Schema>,
-    mut rx: tokio::sync::mpsc::Receiver<RecordBatch>,
-    read_task: tokio::task::JoinHandle<DataFusionResult<()>>,
-) -> DataFusionResult<Vec<u8>> {
-    let writer_task = VORTEX_RUNTIME.spawn_blocking(move || {
-        VORTEX_RUNTIME.block_on(async move {
-            let mut buf = Vec::new();
-            let session = VortexSession::default().with_tokio();
-            let dtype = DType::from_arrow(schema.as_ref());
-            let write_options = VortexWriteOptions::new(session.clone()).with_strategy(
-                WriteStrategyBuilder::default()
-                    .with_compressor(Utf8Compressor::default())
-                    .build(),
-            );
-            let mut writer = write_options.writer(&mut buf, dtype);
-
-            while let Some(batch) = rx.recv().await {
-                let array: ArrayRef = ArrayRef::from_arrow(batch, false).map_err(|e| {
-                    DataFusionError::Execution(format!(
-                        "Failed to convert arrow array to vortex array: {e}"
-                    ))
-                })?;
-                writer.push(array).await?;
-            }
-
-            writer.finish().await?;
-
-            Ok::<Vec<u8>, anyhow::Error>(buf)
-        })
-    });
-
-    // Wait for both tasks to complete
-    read_task
-        .await
-        .map_err(|e| DataFusionError::External(Box::new(e)))??;
-
-    writer_task
-        .await
-        .map_err(|e| DataFusionError::Execution(format!("Vortex runtime task failed: {e}")))?
-        .map_err(|e| DataFusionError::Execution(format!("Failed to write vortex file: {e}")))
-}
-
 #[cfg(test)]
 mod tests {
     use vortex::{
+        VortexSessionDefault,
         array::{IntoArray, arrays::VarBinViewArray},
         dtype::{DType, Nullability},
+        file::VortexWriteOptions,
+        io::session::RuntimeSessionExt,
+        session::VortexSession,
     };
 
     use super::*;
@@ -285,5 +260,25 @@ mod tests {
         let compressed = compressor.compress(&array, &mut ctx).unwrap();
         assert_eq!(compressed.len(), 3);
         assert!(compressed.nbytes() > 0);
+    }
+
+    #[tokio::test]
+    async fn test_native_and_custom_write_strategies_create_files() {
+        for use_native_compression in [true, false] {
+            let strings = vec![Some("test"), Some("data"), Some("test")];
+            let array = VarBinViewArray::from_iter(strings, DType::Utf8(Nullability::NonNullable))
+                .into_array();
+            let dtype = array.dtype().clone();
+            let session = VortexSession::default().with_tokio();
+            let write_options = VortexWriteOptions::new(session)
+                .with_strategy(build_vortex_write_strategy(use_native_compression));
+            let mut buf = Vec::new();
+            let mut writer = write_options.writer(&mut buf, dtype);
+
+            writer.push(array).await.unwrap();
+            writer.finish().await.unwrap();
+
+            assert!(!buf.is_empty());
+        }
     }
 }

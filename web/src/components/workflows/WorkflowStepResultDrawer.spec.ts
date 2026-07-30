@@ -352,12 +352,15 @@ describe("WorkflowStepResultDrawer", () => {
       await replayBtn(wrapper).trigger("click");
       await flushPromises();
 
-      expect(mockTestWorkflow).toHaveBeenCalledWith({
-        org_identifier: "default",
-        id: "wf1",
-        inputs: JSON.parse(VALID_INPUT),
-        from_node: "f1",
-      });
+      // The whole in-memory graph is sent (test-without-saving), not just an id.
+      expect(mockTestWorkflow).toHaveBeenCalledWith(
+        expect.objectContaining({
+          org_identifier: "default",
+          inputs: JSON.parse(VALID_INPUT),
+          from_node: "f1",
+          workflow: expect.objectContaining({ id: "wf1" }),
+        }),
+      );
       expect(workflowObj.testRun.resultDrawer).toEqual({
         show: false,
         nodeId: "",

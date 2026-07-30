@@ -1021,14 +1021,19 @@ export default defineComponent({
     // Context the pattern details drawer needs to look up a pattern's
     // window-wide volume, so its Occurrences figure matches the list's `~N`
     // instead of falling back to the much smaller extraction-sample count.
-    const patternVolumeContext = computed<PatternVolumeContext | null>(() =>
-      buildPatternVolumeContext({
+    const patternVolumeContext = computed<PatternVolumeContext | null>(() => {
+      // Pattern volume feeds only the patterns view's "N events" figures. Don't
+      // build a context (and so don't fire the window-total count query) while the
+      // user is on the logs/visualize view — otherwise every logs visit runs a
+      // `SELECT count(*)` for a feature that isn't on screen.
+      if (searchObj.meta.logsVisualizeToggle !== "patterns") return null;
+      return buildPatternVolumeContext({
         orgId: store.state.selectedOrganization?.identifier ?? "",
         streamName: searchObj.data.stream.selectedStream[0],
         window: props.queryWindowUs as { start: number; end: number } | undefined,
         lastQuery: patternsState.value?.lastQuery,
-      }),
-    );
+      });
+    });
 
     // Exact event count for the query window, from one aggregate query. Feeds
     // both the "N events" chip and the severity-chip scaling in PatternList, so

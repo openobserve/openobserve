@@ -57,7 +57,7 @@ mod tests {
         },
     };
     use enrichment_data::enrichment::storage::{Values, local};
-    use infra::schema::{STREAM_SCHEMAS, STREAM_SCHEMAS_LATEST, STREAM_SETTINGS};
+    use infra::schema::{STREAM_SCHEMAS, STREAM_SCHEMAS_LATEST};
     use ingestion_common::IngestionResponse;
     use openobserve::migration;
     use openobserve_api_grpc::handler::grpc::{auth::check_auth, flight::FlightServiceImpl};
@@ -3166,9 +3166,7 @@ mod tests {
         drop(stream_schemas_latest);
 
         // Verify stream settings cache was updated
-        let stream_settings = STREAM_SETTINGS.read().await;
-        assert!(stream_settings.contains_key(&schema_key));
-        drop(stream_settings);
+        assert!(infra::schema::get_stream_settings_atomic(&schema_key).is_some());
 
         // Get the meta table stats for enrichment table
         let meta_table_stats = db::enrichment_table::get_meta_table_stats(org_id, table_name).await;
@@ -3247,9 +3245,7 @@ mod tests {
         assert!(!stream_schemas_latest.contains_key(&schema_key));
         drop(stream_schemas_latest);
 
-        let stream_settings = STREAM_SETTINGS.read().await;
-        assert!(!stream_settings.contains_key(&schema_key));
-        drop(stream_settings);
+        assert!(infra::schema::get_stream_settings_atomic(&schema_key).is_none());
 
         // wait for 2 seconds
         tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;

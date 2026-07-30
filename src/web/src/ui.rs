@@ -16,13 +16,12 @@
 use axum::{
     Router,
     body::Body,
-    extract::Path,
+    extract::{Path, State},
     http::{StatusCode, header},
     middleware::{self, Next},
     response::{IntoResponse, Response},
     routing::get,
 };
-use config::get_config;
 use rust_embed_for_web::EmbedableFile;
 
 use crate::WebAssets;
@@ -73,9 +72,15 @@ pub async fn serve(Path(path): Path<String>) -> impl IntoResponse {
 }
 
 /// Middleware to rewrite base href in HTML responses
-async fn base_href_middleware(request: axum::http::Request<Body>, next: Next) -> Response {
-    let cfg = get_config();
-    let prefix = format!("{}/web/", cfg.common.base_uri);
+///
+/// `base_href` is resolved once by the caller. Keeping it as middleware state is
+/// what lets this crate stay free of a `config` dependency — see the module docs
+/// on [`crate`].
+async fn base_href_middleware(
+    State(base_href): State<String>,
+    request: axum::http::Request<Body>,
+    next: Next,
+) -> Response {
     let path = request
         .uri()
         .path()
@@ -112,7 +117,7 @@ async fn base_href_middleware(request: axum::http::Request<Body>, next: Next) ->
             let body_str = String::from_utf8_lossy(&bytes);
             let modified_body = body_str.replace(
                 r#"<base href="/" />"#,
-                &format!(r#"<base href="{prefix}" />"#),
+                &format!(r#"<base href="{base_href}" />"#),
             );
             Response::from_parts(parts, Body::from(modified_body))
         }
@@ -121,11 +126,18 @@ async fn base_href_middleware(request: axum::http::Request<Body>, next: Next) ->
 }
 
 /// Create UI routes
-pub fn ui_routes() -> Router {
+///
+/// `base_href` is the `<base href>` rewritten into the served HTML — the mount
+/// point of these routes, `"{ZO_BASE_URI}/web/"`. The caller resolves it so this
+/// crate does not have to depend on `config`.
+pub fn ui_routes(base_href: &str) -> Router {
     Router::new()
         .route("/", get(|| async { serve(Path("".to_string())).await }))
         .route("/{*path}", get(serve))
-        .layer(middleware::from_fn(base_href_middleware))
+        .layer(middleware::from_fn_with_state(
+            base_href.to_string(),
+            base_href_middleware,
+        ))
 }
 
 #[cfg(test)]
@@ -137,7 +149,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_index_ok() {
-        let app = ui_routes();
+        let app = ui_routes("/web/");
         let req = Request::builder()
             .uri("/index.html")
             .body(Body::empty())
@@ -149,9 +161,52 @@ mod tests {
         assert!(resp.status() == StatusCode::OK || resp.status() == StatusCode::NOT_FOUND);
     }
 
+    /// The `<base href>` rewrite is the only reason `ui_routes` takes an
+    /// argument, so pin it: whatever mount point the caller passes must come
+    /// back out in the served HTML.
+    ///
+    /// Driven through a synthetic HTML response rather than the embedded
+    /// `index.html`, so it still asserts something in builds where `web/dist`
+    /// is absent and the embed is empty.
+    #[tokio::test]
+    async fn base_href_is_rewritten_to_the_mount_point() {
+        for mount in ["/web/", "/abc/web/"] {
+            let app = Router::new()
+                .route(
+                    "/index.html",
+                    get(|| async {
+                        (
+                            [(header::CONTENT_TYPE, "text/html")],
+                            r#"<html><head><base href="/" /></head></html>"#,
+                        )
+                    }),
+                )
+                .layer(middleware::from_fn_with_state(
+                    mount.to_string(),
+                    base_href_middleware,
+                ));
+            let req = Request::builder()
+                .uri("/index.html")
+                .body(Body::empty())
+                .unwrap();
+
+            let resp = app.oneshot(req).await.unwrap();
+            assert_eq!(resp.status(), StatusCode::OK, "mount={mount}");
+            let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX)
+                .await
+                .unwrap();
+            let html = String::from_utf8_lossy(&bytes);
+
+            assert!(
+                html.contains(&format!(r#"<base href="{mount}" />"#)),
+                "mount={mount} produced {html}"
+            );
+        }
+    }
+
     #[tokio::test]
     async fn test_index_not_ok() {
-        let app = ui_routes();
+        let app = ui_routes("/web/");
         let req = Request::builder()
             .uri("/abc.html")
             .body(Body::empty())

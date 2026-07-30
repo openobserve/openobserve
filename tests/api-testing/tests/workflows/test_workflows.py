@@ -48,33 +48,36 @@ def _suffix():
 def _workflow_payload(name, dest_name, description="automation workflow"):
     """Minimal valid workflow graph: Alert Trigger -> Destination (bound to a pipeline dest)."""
     return {
-        "id": "",
-        "org_id": "",
-        "created_at": 0,
-        "updated_at": 0,
-        "created_by": "",
-        "name": name,
-        "description": description,
-        "enabled": True,
-        "nodes": [
-            {
-                "id": "trigger-1",
-                "data": {"node_type": "workflow_trigger"},
-                "position": {"x": 100, "y": 100},
-                "io_type": "input",
-            },
-            {
-                "id": "dest-1",
-                "data": {
-                    "node_type": "destination",
-                    "destination_id": dest_name,
-                    "template_override": None,
+        "workflow":{
+            "id": "",
+            "org_id": "",
+            "created_at": 0,
+            "updated_at": 0,
+            "created_by": "",
+            "name": name,
+            "description": description,
+            "enabled": True,
+            "nodes": [
+                {
+                    "id": "trigger-1",
+                    "data": {"node_type": "workflow_trigger"},
+                    "position": {"x": 100, "y": 100},
+                    "io_type": "input",
                 },
-                "position": {"x": 400, "y": 100},
-                "io_type": "output",
-            },
-        ],
-        "edges": [{"id": "etrigger-1-dest-1", "source": "trigger-1", "target": "dest-1"}],
+                {
+                    "id": "dest-1",
+                    "data": {
+                        "node_type": "destination",
+                        "destination_id": dest_name,
+                        "template_override": None,
+                    },
+                    "position": {"x": 400, "y": 100},
+                    "io_type": "output",
+                },
+            ],
+            "edges": [{"id": "etrigger-1-dest-1", "source": "trigger-1", "target": "dest-1"}],
+        },
+        "trigger_type":"AlertFired"
     }
 
 
@@ -136,8 +139,9 @@ def test_create_workflow_malformed_body(create_session, base_url):
 def test_create_workflow_trigger_only_rejected(create_session, base_url):
     """CT-15c — a trigger-only graph (non-leaf leaf) is rejected by graph validation."""
     payload = _workflow_payload(f"wf_auto_api_{_suffix()}", "unused")
-    payload["nodes"] = payload["nodes"][:1]  # drop the destination node
-    payload["edges"] = []
+    # nodes/edges live under the "workflow" envelope now (create body is {workflow, trigger_type}).
+    payload["workflow"]["nodes"] = payload["workflow"]["nodes"][:1]  # drop the destination node
+    payload["workflow"]["edges"] = []
     resp = create_session.post(f"{base_url}api/{ORG_ID}/workflows", json=payload)
     assert resp.status_code in (400, 422), f"expected 4xx, got {resp.status_code}: {resp.text[:300]}"
 
@@ -159,7 +163,9 @@ def test_update_workflow_round_trip(create_session, base_url, workflow):
     """CT-13c — update persists; re-reading via list shows the edited fields (no get-by-id endpoint)."""
     new_desc = "automation workflow edited"
     payload = _workflow_payload(workflow["name"], workflow["dest"], description=new_desc)
-    payload["id"] = workflow["id"]
+    # id must be set inside the "workflow" envelope; the handler reads payload.workflow.id
+    # and 400s ("id mismatch in payload and path") if it doesn't match the path id.
+    payload["workflow"]["id"] = workflow["id"]
     resp = create_session.put(f"{base_url}api/{ORG_ID}/workflows/{workflow['id']}", json=payload)
     assert resp.status_code == 200, f"update failed: {resp.status_code} {resp.text[:300]}"
     found = _find_in_list(create_session, base_url, workflow["id"])
@@ -193,8 +199,9 @@ def test_delete_workflow(create_session, base_url, pipeline_destination):
 
 def test_test_workflow(create_session, base_url, workflow):
     """CT-14a — the test endpoint runs the graph and returns a per-node result object."""
-    body = {"inputs": [{"meta": {}, "data": []}], "from_node": "trigger-1"}
-    resp = create_session.post(f"{base_url}api/{ORG_ID}/workflows/{workflow['id']}/test", json=body)
+    workflow_body = _workflow_payload(workflow["name"], workflow["dest"])["workflow"]
+    body = {"inputs": [{"meta": {}, "data": []}], "from_node": "trigger-1", "workflow": workflow_body }
+    resp = create_session.post(f"{base_url}api/{ORG_ID}/workflows/test", json=body)
     assert resp.status_code == 200, f"test failed: {resp.status_code} {resp.text[:300]}"
 
 

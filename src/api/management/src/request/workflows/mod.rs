@@ -31,7 +31,10 @@ use config::{
     },
     utils::time::now_micros,
 };
-use infra::table::workflows::{Workflow, WorkflowRunErrors};
+use db::workflows::WorkflowTriggerType;
+use infra::table::workflows::{
+    Workflow, WorkflowAssociation, WorkflowRunErrors, WorkflowTriggerEntity,
+};
 use openobserve_api_common::extractors::Headers;
 use openobserve_core::auth::UserEmail;
 use search_service::{self as SearchService, query_range::get_settings_max_query_range};
@@ -39,12 +42,13 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     common::{meta::http::HttpResponse as MetaHttpResponse, utils::http::get_or_create_trace_id},
-    service::workflows::{self, InputMap, WorkflowTriggerType},
+    service::workflows::{self, InputMap},
 };
 
 #[derive(Deserialize)]
 pub struct WorkflowTestInput {
     inputs: Vec<serde_json::Value>,
+    workflow: Workflow,
     #[serde(default)]
     from_node: Option<String>,
 }
@@ -98,6 +102,19 @@ pub struct WorkflowErrorResponse {
     data: Option<InputMap>,
 }
 
+#[derive(Serialize)]
+pub struct WorkflowListItem {
+    associations: Vec<WorkflowAssociation>,
+    #[serde(flatten)]
+    workflow: Workflow,
+}
+
+#[derive(Deserialize)]
+pub struct WorkflowCreatePayload {
+    trigger_type: WorkflowTriggerType,
+    workflow: Workflow,
+}
+
 /// CreateWorkflow
 
 #[utoipa::path(
@@ -126,21 +143,42 @@ pub struct WorkflowErrorResponse {
 pub async fn save_workflow(
     Path(org_id): Path<String>,
     Headers(user_email): Headers<UserEmail>,
-    Json(mut workflow): Json<Workflow>,
+    Json(payload): Json<WorkflowCreatePayload>,
 ) -> Response {
+    let mut workflow = payload.workflow;
     workflow.name = workflow.name.trim().to_lowercase();
-    workflow.org_id = org_id;
+    workflow.org_id = org_id.clone();
     workflow.id = ider::generate();
     workflow.created_by = user_email.user_id;
 
     let id = workflow.id.to_string();
     let name = workflow.name.clone();
     match workflows::save_workflow(workflow).await {
-        Ok(()) => MetaHttpResponse::json(
-            MetaHttpResponse::message(StatusCode::OK, "Workflow created successfully")
-                .with_id(id)
-                .with_name(name),
-        ),
+        Ok(()) => {
+            if payload.trigger_type == WorkflowTriggerType::IncidentEvent
+                && let Err(e) = db::workflows::associate_workflow(
+                    &org_id,
+                    &id,
+                    "system",
+                    WorkflowTriggerEntity::Incident.to_string(),
+                    WorkflowTriggerType::IncidentEvent.to_string(),
+                )
+                .await
+            {
+                log::error!(
+                    "error in associating workflow to incident after successful creation of workflow : {org_id}/{id} : {e}"
+                );
+                MetaHttpResponse::internal_error(format!(
+                    "workflow created successfully , but failed to save the association : {e}"
+                ))
+            } else {
+                MetaHttpResponse::json(
+                    MetaHttpResponse::message(StatusCode::OK, "Workflow created successfully")
+                        .with_id(id)
+                        .with_name(name),
+                )
+            }
+        }
         Err(e) => MetaHttpResponse::bad_request(e),
     }
 }
@@ -202,7 +240,24 @@ pub async fn list_workflows(
         Ok(workflows) => workflows,
         Err(e) => return MetaHttpResponse::internal_error(e),
     };
-    MetaHttpResponse::json(workflows)
+    let mut ret = Vec::with_capacity(workflows.len());
+    for w in workflows {
+        let associations = match workflows::get_workflow_associations(&org_id, &w.id).await {
+            Ok(v) => v,
+            Err(e) => {
+                log::error!(
+                    "error getting workflow associations for {org_id}/{} : {e}",
+                    w.id
+                );
+                continue;
+            }
+        };
+        ret.push(WorkflowListItem {
+            workflow: w,
+            associations,
+        });
+    }
+    MetaHttpResponse::json(ret)
 }
 
 /// DeleteWorkflows
@@ -230,7 +285,6 @@ pub async fn list_workflows(
     )
 )]
 pub async fn delete_workflows(Path((org_id, id)): Path<(String, String)>) -> Response {
-    // TODO YJDoc2: check for workflow associations
     match workflows::delete_workflow(&org_id, &id).await {
         Ok(_) => MetaHttpResponse::ok("deleted successfully"),
         Err(e) => {
@@ -267,8 +321,9 @@ pub async fn delete_workflows(Path((org_id, id)): Path<(String, String)>) -> Res
 )]
 pub async fn update_workflows(
     Path((org_id, id)): Path<(String, String)>,
-    Json(mut workflow): Json<Workflow>,
+    Json(payload): Json<WorkflowCreatePayload>,
 ) -> Response {
+    let mut workflow = payload.workflow;
     workflow.name = workflow.name.trim().to_lowercase();
     workflow.org_id = org_id.clone();
 
@@ -303,11 +358,49 @@ pub async fn update_workflows(
 
 #[utoipa::path(
     post,
-    path = "/{org_id}/workflows/{id}/test",
+    path = "/{org_id}/workflows/test",
     context_path = "/api",
     tag = "Workflows",
     operation_id = "testWorkflow",
-    summary = "Test an existing workflow with given input",
+    summary = "Test a workflow with given input",
+    description = "",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization id"),
+    ),
+    request_body(content = inline(Object), description = "Workflow inputs", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "create"})),
+    )
+)]
+pub async fn test_workflow(
+    Path(org_id): Path<String>,
+    Json(inputs): Json<WorkflowTestInput>,
+) -> Response {
+    let mut workflow = inputs.workflow;
+    workflow.org_id = org_id.clone();
+    workflow.id = format!("test-{}", config::ider::uuid());
+    match workflows::test_workflow(&org_id, workflow, inputs.inputs, inputs.from_node).await {
+        Ok(v) => MetaHttpResponse::json(WorkflowTestResult { errors: v.errors }),
+        Err(e) => MetaHttpResponse::bad_request(e),
+    }
+}
+
+/// TriggerWorkflow
+
+#[utoipa::path(
+    post,
+    path = "/{org_id}/workflows/{id}/trigger",
+    context_path = "/api",
+    tag = "Workflows",
+    operation_id = "triggerWorkflow",
+    summary = "Trigger an existing workflow with given input",
     description = "",
     security(
         ("Authorization"= [])
@@ -325,12 +418,16 @@ pub async fn update_workflows(
         ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "create"})),
     )
 )]
-pub async fn test_workflow(
+pub async fn trigger_workflow(
+    Headers(user_email): Headers<UserEmail>,
     Path((org_id, workflow_id)): Path<(String, String)>,
-    Json(inputs): Json<WorkflowTestInput>,
+    Json(inputs): Json<Vec<serde_json::Value>>,
 ) -> Response {
-    match workflows::test_workflow(&org_id, &workflow_id, inputs.inputs, inputs.from_node).await {
-        Ok(v) => MetaHttpResponse::json(WorkflowTestResult { errors: v.errors }),
+    match workflows::trigger_workflow(&org_id, &workflow_id, inputs, &user_email.user_id).await {
+        Ok(trace_id) => MetaHttpResponse::json(
+            MetaHttpResponse::message(StatusCode::OK, "Workflow triggered successfully")
+                .with_trace_id(trace_id),
+        ),
         Err(e) => MetaHttpResponse::bad_request(e),
     }
 }

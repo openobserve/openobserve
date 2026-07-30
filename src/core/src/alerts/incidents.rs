@@ -24,7 +24,7 @@ use config::{
         alert::Alert,
         incidents::{
             AlertEdge, AlertNode, CorrelationReason, EdgeType, Incident, IncidentAlert,
-            IncidentCorrelationOutcome, IncidentTopology, IncidentWithAlerts,
+            IncidentCorrelationOutcome, IncidentEvent, IncidentTopology, IncidentWithAlerts,
         },
     },
     utils::json::{Map, Value},
@@ -808,6 +808,20 @@ async fn create_new_incident(
         );
     }
 
+    // error in sending workflow trigger should not block the incident flow
+    if let Err(e) = crate::incidents::send_incident_event_trigger(
+        org_id,
+        &incident.id,
+        IncidentEvent::created(),
+    )
+    .await
+    {
+        log::error!(
+            "error triggering workflow for incident created for {org_id} incident id {} : {e}",
+            incident.id
+        );
+    }
+
     // Add the first alert to the incident
     infra::table::alert_incidents::add_alert_to_incident(
         &incident.id,
@@ -895,7 +909,7 @@ async fn create_new_incident(
             && o2_cfg.incidents.rca_enabled
             && !o2_cfg.ai.agent_url.is_empty()
         {
-            if let Err(e) = infra::table::incident_events::append(
+            if let Err(e) = crate::incidents::append_event(
                 org_id,
                 &incident.id,
                 config::meta::alerts::incidents::IncidentEvent::ai_analysis_begin(),
@@ -993,6 +1007,19 @@ async fn find_or_create_incident(
                 );
             }
 
+            if let Err(e) = crate::incidents::send_incident_event_trigger(
+                org_id,
+                &incident.id,
+                IncidentEvent::alert(&alert_id, &alert.name, triggered_at),
+            )
+            .await
+            {
+                log::error!(
+                    "error triggering workflow for alert added for {org_id} incident id {} : {e}",
+                    incident.id
+                );
+            }
+
             spawn_topology_enrichment(
                 org_id,
                 &incident.id,
@@ -1064,6 +1091,20 @@ async fn find_or_create_incident(
                 );
             }
 
+            if !is_new_alert_type
+                && let Err(e) = crate::incidents::send_incident_event_trigger(
+                    org_id,
+                    &existing.id,
+                    IncidentEvent::alert(alert.get_unique_key(), &alert.name, triggered_at),
+                )
+                .await
+            {
+                log::error!(
+                    "error triggering workflow for incident created for {org_id} incident id {} : {e}",
+                    existing.id
+                );
+            }
+
             let updated = infra::table::alert_incidents::get(org_id, &existing.id)
                 .await?
                 .ok_or_else(|| anyhow::anyhow!("Incident not found"))?;
@@ -1084,7 +1125,7 @@ async fn find_or_create_incident(
                 )
                 .await?;
 
-                if let Err(e) = infra::table::incident_events::append(
+                if let Err(e) = crate::incidents::append_event(
                     org_id,
                     &existing.id,
                     config::meta::alerts::incidents::IncidentEvent::dimensions_upgraded(
@@ -1148,7 +1189,7 @@ async fn find_or_create_incident(
                         .await
                         .unwrap_or_default();
                     if !is_analysis_in_flight(&events, cooldown * 2) {
-                        let _ = infra::table::incident_events::append(
+                        let _ = crate::incidents::append_event(
                             &org_id_rca,
                             &incident_id_rca,
                             config::meta::alerts::incidents::IncidentEvent::ai_analysis_begin(),
@@ -1659,7 +1700,7 @@ async fn emit_analysis_failure(
 
     let error_details = error.map(|e| format!("{:#}", e).chars().take(500).collect::<String>());
 
-    if let Err(e) = infra::table::incident_events::append(
+    if let Err(e) = crate::incidents::append_event(
         org_id,
         incident_id,
         IncidentEvent::ai_analysis_failed(reason, trigger_type, error_details),
@@ -1747,7 +1788,7 @@ pub async fn trigger_rca_for_incident(
 
     // Emit AIAnalysisBegin only when the caller hasn't already done so
     if !begin_already_emitted
-        && let Err(e) = infra::table::incident_events::append(
+        && let Err(e) = crate::incidents::append_event(
             &org_id,
             &incident_id,
             config::meta::alerts::incidents::IncidentEvent::ai_analysis_begin(),
@@ -1839,7 +1880,7 @@ pub async fn trigger_rca_for_incident(
             }
 
             // Emit AIAnalysisComplete on success
-            if let Err(e) = infra::table::incident_events::append(
+            if let Err(e) = crate::incidents::append_event(
                 &org_id,
                 &incident_id,
                 config::meta::alerts::incidents::IncidentEvent::ai_analysis_complete(),
@@ -1939,7 +1980,7 @@ pub async fn update_status(
         _ => None,
     };
     if let Some(evt) = event
-        && let Err(e) = infra::table::incident_events::append(org_id, incident_id, evt).await
+        && let Err(e) = crate::incidents::append_event(org_id, incident_id, evt).await
     {
         log::error!("[Incidents] Failed to record status event: {e}");
     }
@@ -1958,7 +1999,7 @@ pub async fn update_status(
             .unwrap_or_default();
         if !is_analysis_in_flight(&events, cooldown * 2) {
             // Emit Begin synchronously so the frontend sees it on the next poll
-            let _ = infra::table::incident_events::append(
+            let _ = crate::incidents::append_event(
                 &org_id_rca,
                 &incident_id_rca,
                 config::meta::alerts::incidents::IncidentEvent::ai_analysis_begin(),
@@ -2033,7 +2074,7 @@ pub async fn update_title(
     let updated = infra::table::alert_incidents::update_title(org_id, incident_id, title).await?;
 
     if from_title != title
-        && let Err(e) = infra::table::incident_events::append(
+        && let Err(e) = crate::incidents::append_event(
             org_id,
             incident_id,
             config::meta::alerts::incidents::IncidentEvent::title_changed(
@@ -2068,7 +2109,7 @@ pub async fn update_severity(
 
     // Emit severity override event and notify only when the severity actually changed
     if from_severity != to_severity {
-        if let Err(e) = infra::table::incident_events::append(
+        if let Err(e) = crate::incidents::append_event(
             org_id,
             incident_id,
             config::meta::alerts::incidents::IncidentEvent::severity_override(

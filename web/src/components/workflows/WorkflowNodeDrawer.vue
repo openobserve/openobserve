@@ -70,21 +70,31 @@ import { computed, ref } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import WorkflowAlertTrigger from "@/plugins/workflows/nodes/WorkflowAlertTrigger.vue";
+import WorkflowTrigger from "@/plugins/workflows/nodes/WorkflowTrigger.vue";
 import WorkflowCondition from "@/plugins/workflows/nodes/WorkflowCondition.vue";
 import WorkflowFunction from "@/plugins/workflows/nodes/WorkflowFunction.vue";
 import WorkflowDestination from "@/plugins/workflows/nodes/WorkflowDestination.vue";
-import useWorkflowCanvas, { workflowObj, nodeMeta } from "@/plugins/workflows/useWorkflowCanvas";
+import useWorkflowCanvas, {
+  workflowObj,
+  nodeMeta,
+  triggerDef,
+} from "@/plugins/workflows/useWorkflowCanvas";
 
 const { t } = useI18nTyped();
 const { commitNode, cancelNodeDrawer, requestDeleteNode } = useWorkflowCanvas(t);
 
 const meta = computed(() => nodeMeta(workflowObj.dialog.name));
-const title = computed(() => (meta.value ? t(meta.value.titleKey) : workflowObj.dialog.name));
+const title = computed(() => {
+  // Trigger drawers title by KIND (registry), matching the canvas card; other
+  // nodes use their node-type title.
+  if (meta.value?.category === "trigger")
+    return t(triggerDef(workflowObj.currentSelectedNodeData?.data?.trigger_kind).nodeTitleKey);
+  return meta.value ? t(meta.value.titleKey) : workflowObj.dialog.name;
+});
 
 // Node types that have a real config form. The rest still show the placeholder.
 const BODY_COMPONENTS: Record<string, any> = {
-  workflow_trigger: WorkflowAlertTrigger,
+  workflow_trigger: WorkflowTrigger,
   condition: WorkflowCondition,
   function: WorkflowFunction,
   destination: WorkflowDestination,

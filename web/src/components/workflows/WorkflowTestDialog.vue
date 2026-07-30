@@ -100,8 +100,9 @@ import {
   executeTestRun,
   flowOrderedNodeIds,
   nodeConfigDetail,
+  currentTriggerKind,
+  buildTriggerSampleText,
 } from "@/plugins/workflows/useWorkflowCanvas";
-import { buildTestSampleText } from "@/plugins/workflows/testSample";
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -119,7 +120,7 @@ const edges = computed<any[]>(() => workflowObj.currentSelectedWorkflow?.edges |
 // Seed the sample payload the first time the dialog opens (persisted after).
 onMounted(() => {
   if (!workflowObj.testRun.input) {
-    workflowObj.testRun.input = buildTestSampleText();
+    workflowObj.testRun.input = buildTriggerSampleText(currentTriggerKind());
   }
 });
 
@@ -204,7 +205,7 @@ const run = async () => {
 };
 
 const resetSample = () => {
-  workflowObj.testRun.input = buildTestSampleText();
+  workflowObj.testRun.input = buildTriggerSampleText(currentTriggerKind());
 };
 const close = () => {
   workflowObj.testRun.show = false;
