@@ -337,7 +337,7 @@ async fn apply_deduplication_impl(
     org_config: Option<&GlobalDeduplicationConfig>,
     semantic_groups: &[config::meta::correlation::FieldAlias],
     level: Option<config::meta::alerts::level::AlertLevel>,
-) -> Result<(Vec<Map<String, Value>>, Vec<String>), sea_orm::DbErr> {
+) -> Result<(Vec<Map<String, Value>>, Vec<ReservedFingerprint>), sea_orm::DbErr> {
     let now = o2_enterprise::enterprise::alerts::dedup::current_timestamp_micros();
     let alert_id = alert.get_unique_key();
     let org_id = &alert.org_id;

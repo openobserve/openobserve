@@ -189,6 +189,11 @@ struct GroupDispatchOutcome {
     /// Group keys whose send succeeded. A dedup reservation is confirmed by
     /// its OWN group's delivery, never a sibling's (§5.5 MN-6).
     delivered_groups: std::collections::HashSet<String>,
+    /// The state layer failed, so nothing was even attempted. Distinct from
+    /// "delivered nothing": a zero/zero result otherwise reads as a clean run
+    /// and the caller would advance the trigger as if the alert had been
+    /// handled — no notification, no error recorded, no retry.
+    state_failed: bool,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -244,6 +249,7 @@ async fn dispatch_per_group(
             failed: 0,
             errors: vec!["group state did not commit".to_string()],
             delivered_groups: Default::default(),
+            state_failed: true,
         });
     }
 
@@ -256,6 +262,7 @@ async fn dispatch_per_group(
                 failed: 0,
                 errors: vec![format!("group state read failed: {e}")],
                 delivered_groups: Default::default(),
+                state_failed: true,
             });
         }
     };
@@ -414,6 +421,7 @@ async fn dispatch_per_group(
         failed,
         errors,
         delivered_groups,
+        state_failed: false,
     })
 }
 
@@ -1825,6 +1833,35 @@ async fn handle_alert_triggers(
             // sent, so the later `persist_alert_run_state` call is skipped for
             // this path.
             multi_alert_dispatched = true;
+            if dispatch.state_failed {
+                // Nothing was sent and nothing can be: the group plan is the
+                // input to every delivery decision. Treated as an evaluation
+                // failure rather than a completed run — record `error`, leave
+                // the silence window and last-notified level alone, and take
+                // the retry path so the next attempt comes soon instead of a
+                // full interval later with the firing silently unpaged.
+                trigger_data_stream.status = RunOutcome::Error;
+                trigger_data_stream.error = Some(dispatch.errors.join("; "));
+                log::error!(
+                    "[SCHEDULER trace_id {scheduler_trace_id}] alert {}/{}: per-group state \
+                     unavailable, nothing dispatched; retrying",
+                    new_trigger.org,
+                    new_trigger.module_key
+                );
+                db::scheduler::update_status(
+                    &new_trigger.org,
+                    new_trigger.module,
+                    &new_trigger.module_key,
+                    db::scheduler::TriggerStatus::Waiting,
+                    trigger.retries + 1,
+                    None,
+                    true,
+                    &query_trace_id,
+                )
+                .await?;
+                publish_triggers_usage(trigger_data_stream);
+                return Ok(());
+            }
             if dispatch.failed > 0 {
                 // MN-7: the evaluation's single trigger record (D8) reports a
                 // delivery failure if ANY group's send failed; the per-group
