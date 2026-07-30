@@ -43,6 +43,23 @@ struct FilteredSemanticResult {
     key_type: config::meta::alerts::incidents::KeyType,
 }
 
+/// Identity being correlated into an incident.
+///
+/// Decouples correlation/incident-creation from the concrete `Alert` type so that
+/// non-alert identities (e.g. external alert sources) can be correlated using the
+/// same machinery. For the internal alert path this is built from an `Alert`.
+#[derive(Debug, Clone)]
+pub struct CorrelationSubject {
+    /// internal: `alert.get_unique_key()`; external: `external_alerts.id`
+    pub id: String,
+    pub name: String,
+    pub org_id: String,
+    pub kind: config::meta::alerts::incidents::AlertKind,
+    pub base_destinations: Vec<String>,
+    /// Pre-mapped severity for external events; `None` → enterprise default (internal path)
+    pub severity: Option<config::meta::alerts::incidents::IncidentSeverity>,
+}
+
 /// Combined correlation result from both Service Discovery and semantic extraction
 struct ParallelCorrelationResult {
     service_discovery: Option<ServiceDiscoveryResult>,
@@ -300,11 +317,45 @@ async fn send_incident_notifications(
     triggered_at: i64,
     dest_names: &[String],
 ) {
+    // Preserve the alert/stream sub-object emitted for the internal alert path.
+    let alert_block = config::utils::json::json!({
+        "name": alert.name,
+        "stream": {
+            "name": alert.stream_name,
+            "type": alert.stream_type.to_string(),
+        }
+    });
+    send_incident_notifications_inner(
+        &alert.org_id,
+        &alert.name,
+        incident_id,
+        event,
+        triggered_at,
+        dest_names,
+        Some(alert_block),
+    )
+    .await;
+}
+
+/// Build an incident-specific notification payload and send to all given destinations.
+///
+/// Identity-agnostic core of [`send_incident_notifications`]. `alert_block`, when
+/// present, is emitted verbatim as the payload's `incident.alert` sub-object (used
+/// by the internal alert path to carry alert/stream metadata).
+#[cfg(feature = "enterprise")]
+#[allow(clippy::too_many_arguments)]
+async fn send_incident_notifications_inner(
+    org_id: &str,
+    subject_name: &str,
+    incident_id: &str,
+    event: &str,
+    triggered_at: i64,
+    dest_names: &[String],
+    alert_block: Option<Value>,
+) {
     if dest_names.is_empty() {
         return;
     }
-
-    let org_id = alert.org_id.as_str();
 
     // Load incident to get severity, title and service_name.
     let (severity, title, service_name) =
@@ -332,6 +383,11 @@ async fn send_incident_notifications(
         .map(|dt: chrono::DateTime<chrono::Utc>| dt.format("%Y-%m-%dT%H:%M:%S%.3fZ").to_string())
         .unwrap_or_default();
 
+    // Internal path supplies a full alert/stream block; other subjects fall back to
+    // a name-only block derived from `subject_name`.
+    let alert_block =
+        alert_block.unwrap_or_else(|| config::utils::json::json!({ "name": subject_name }));
+
     let payload = config::utils::json::json!({
         "incident": {
             "id": incident_id,
@@ -339,13 +395,7 @@ async fn send_incident_notifications(
             "event": event,
             "service": service_name,
             "severity": severity,
-            "alert": {
-                "name": alert.name,
-                "stream": {
-                    "name": alert.stream_name,
-                    "type": alert.stream_type.to_string(),
-                }
-            },
+            "alert": alert_block,
             "time": time_str,
             "url": incident_url,
         }
@@ -574,12 +624,22 @@ pub async fn correlate_alert_to_incident(
             sem_result.group_values
         );
     }
+    // Build the correlation subject for the internal alert path.
+    let subject = CorrelationSubject {
+        id: alert.get_unique_key(),
+        name: alert.name.clone(),
+        org_id: alert.org_id.to_string(),
+        kind: AlertKind::Internal,
+        base_destinations: alert.destinations.clone(),
+        severity: None,
+    };
+
     // Find or create incident
     let outcome = find_or_create_incident(
         &alert.org_id,
         &group_values,
         key_type,
-        alert,
+        &subject,
         triggered_at,
         &correlation_reason,
         &service_name,
@@ -787,23 +847,27 @@ async fn create_new_incident(
     org_id: &str,
     group_values: &HashMap<String, String>,
     key_type: config::meta::alerts::incidents::KeyType,
-    alert: &Alert,
+    subject: &CorrelationSubject,
     triggered_at: i64,
     correlation_reason: &str,
     service_name: &str,
     eval_level: Option<config::meta::alerts::level::AlertLevel>,
 ) -> Result<IncidentCorrelationOutcome, anyhow::Error> {
-    // T-8: the evaluated level maps to incident severity — Critical opens a
-    // P2, Warning a P3. Without a level (manual trigger, single-level alert)
-    // the enterprise default stands.
-    let severity = match eval_level {
-        Some(config::meta::alerts::level::AlertLevel::Critical) => "P2".to_string(),
-        Some(config::meta::alerts::level::AlertLevel::Warning) => "P3".to_string(),
-        _ => o2_enterprise::enterprise::alerts::incidents::determine_severity(None).to_string(),
+    // Pre-mapped severity from the subject (external events) wins; otherwise
+    // T-8's evaluated level maps to incident severity — Critical opens a P2,
+    // Warning a P3. Without either (manual trigger, single-level alert) the
+    // enterprise default stands.
+    let severity = match (subject.severity, eval_level) {
+        (Some(s), _) => s.to_string(),
+        (None, Some(config::meta::alerts::level::AlertLevel::Critical)) => "P2".to_string(),
+        (None, Some(config::meta::alerts::level::AlertLevel::Warning)) => "P3".to_string(),
+        (None, _) => {
+            o2_enterprise::enterprise::alerts::incidents::determine_severity(None).to_string()
+        }
     };
 
     let title =
-        o2_enterprise::enterprise::alerts::incidents::generate_title(&alert.name, group_values);
+        o2_enterprise::enterprise::alerts::incidents::generate_title(&subject.name, group_values);
 
     let incident = infra::table::alert_incidents::create(
         org_id,
@@ -840,9 +904,9 @@ async fn create_new_incident(
     // Add the first alert to the incident
     infra::table::alert_incidents::add_alert_to_incident(
         &incident.id,
-        &alert.get_unique_key(),
-        &alert.name,
-        "internal",
+        &subject.id,
+        &subject.name,
+        subject.kind.as_str(),
         triggered_at,
         correlation_reason,
     )
@@ -852,8 +916,8 @@ async fn create_new_incident(
     if let Err(e) = infra::table::incident_events::record_alert(
         org_id,
         &incident.id,
-        &alert.get_unique_key(),
-        &alert.name,
+        &subject.id,
+        &subject.name,
         triggered_at,
     )
     .await
@@ -867,7 +931,7 @@ async fn create_new_incident(
     log::info!(
         "[incidents] Created new incident {} for alert '{}' (key_type: {:?}, severity: {})",
         incident.id,
-        alert.name,
+        subject.name,
         key_type,
         severity
     );
@@ -910,8 +974,8 @@ async fn create_new_incident(
         org_id,
         &incident.id,
         service_name,
-        &alert.get_unique_key(),
-        &alert.name,
+        &subject.id,
+        &subject.name,
         triggered_at,
     );
 
@@ -983,7 +1047,7 @@ async fn find_or_create_incident(
     org_id: &str,
     group_values: &HashMap<String, String>,
     key_type: config::meta::alerts::incidents::KeyType,
-    alert: &Alert,
+    subject: &CorrelationSubject,
     triggered_at: i64,
     correlation_reason: &str,
     service_name: &str,
@@ -993,7 +1057,7 @@ async fn find_or_create_incident(
 
     // STEP 1: AlertId exact match - check for existing incident with same alert_id
     if key_type == KeyType::AlertId {
-        let alert_id = alert.get_unique_key();
+        let alert_id = subject.id.clone();
 
         // Use the dedicated DB query: junction table lookup + incident fetch
         if let Some(incident) =
@@ -1003,8 +1067,8 @@ async fn find_or_create_incident(
             let _ = infra::table::alert_incidents::add_alert_to_incident(
                 &incident.id,
                 &alert_id,
-                &alert.name,
-                "internal",
+                &subject.name,
+                subject.kind.as_str(),
                 triggered_at,
                 correlation_reason,
             )
@@ -1014,7 +1078,7 @@ async fn find_or_create_incident(
                 org_id,
                 &incident.id,
                 &alert_id,
-                &alert.name,
+                &subject.name,
                 triggered_at,
             )
             .await
@@ -1043,7 +1107,7 @@ async fn find_or_create_incident(
                 &incident.id,
                 service_name,
                 &alert_id,
-                &alert.name,
+                &subject.name,
                 triggered_at,
             );
 
@@ -1143,9 +1207,9 @@ async fn find_or_create_incident(
 
             let is_new_alert_type = infra::table::alert_incidents::add_alert_to_incident(
                 &existing.id,
-                &alert.get_unique_key(),
-                &alert.name,
-                "internal",
+                &subject.id,
+                &subject.name,
+                subject.kind.as_str(),
                 triggered_at,
                 correlation_reason,
             )
@@ -1154,8 +1218,8 @@ async fn find_or_create_incident(
             if let Err(e) = infra::table::incident_events::record_alert(
                 org_id,
                 &existing.id,
-                &alert.get_unique_key(),
-                &alert.name,
+                &subject.id,
+                &subject.name,
                 triggered_at,
             )
             .await
@@ -1233,8 +1297,8 @@ async fn find_or_create_incident(
                     o2_enterprise::enterprise::super_cluster::queue::incidents_add_alert(
                         org_id,
                         &existing.id,
-                        &alert.get_unique_key(),
-                        &alert.name,
+                        &subject.id,
+                        &subject.name,
                         triggered_at,
                         correlation_reason,
                     )
@@ -1247,8 +1311,8 @@ async fn find_or_create_incident(
                 org_id,
                 &existing.id,
                 service_name,
-                &alert.get_unique_key(),
-                &alert.name,
+                &subject.id,
+                &subject.name,
                 triggered_at,
             );
 
@@ -1321,7 +1385,7 @@ async fn find_or_create_incident(
         org_id,
         group_values,
         key_type,
-        alert,
+        subject,
         triggered_at,
         correlation_reason,
         service_name,
