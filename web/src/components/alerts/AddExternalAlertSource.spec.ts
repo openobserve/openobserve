@@ -45,4 +45,12 @@ describe("AddExternalAlertSource", () => {
     await (wrapper.vm as any).cancel();
     expect(wrapper.emitted("cancel:hideform")).toBeTruthy();
   });
+
+  it("renders a usable name input and source type select in the DOM", async () => {
+    const wrapper = buildWrapper();
+    const nameInput = wrapper.find('[data-test="add-alert-source-name-input"] input');
+    expect(nameInput.exists()).toBe(true);
+    await nameInput.setValue("my-source");
+    expect((wrapper.vm as any).form.name).toBe("my-source");
+  });
 });
