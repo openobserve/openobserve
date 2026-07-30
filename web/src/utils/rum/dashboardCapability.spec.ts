@@ -333,6 +333,69 @@ describe("dashboardCapability", () => {
     });
   });
 
+  describe("filterDashboardBySchema — v8 tabs[] shape", () => {
+    // convertDashboardSchemaVersion upgrades the RUM dashboards to v8, which nests panels
+    // under tabs[].panels rather than a flat top-level panels[]. The gate must read that
+    // container; otherwise it sees zero panels, reports keptCount 0, and every tab shows
+    // its empty state the moment the schema resolves — for browser AND mobile users.
+    function makeTabbedDashboard(panels: DashboardPanel[]): RumDashboard {
+      return { tabs: [{ tabId: "t1", name: "Default", panels }] };
+    }
+
+    it("keeps all panels when their gated fields are present (no false empty state)", () => {
+      const dashboard = makeTabbedDashboard([
+        makePanel(1, 0, 0, 6, 4, "SELECT view_largest_contentful_paint FROM _rumdata"),
+        makePanel(2, 6, 0, 6, 4, "SELECT COUNT(*) FROM _rumdata WHERE type='error'"),
+      ]);
+      const presentFields = new Set(["view_largest_contentful_paint", "session_id"]);
+
+      const result = filterDashboardBySchema(dashboard, presentFields);
+
+      expect(result.keptCount).toBe(2);
+      expect(result.droppedCount).toBe(0);
+      expect(result.dashboard).toBe(dashboard);
+    });
+
+    it("counts panels inside tabs on the unknown-schema no-op path", () => {
+      const dashboard = makeTabbedDashboard([
+        makePanel(1, 0, 0, 6, 4, "SELECT view_largest_contentful_paint FROM _rumdata"),
+        makePanel(2, 6, 0, 6, 4, "SELECT session_id FROM _rumdata"),
+      ]);
+
+      const result = filterDashboardBySchema(dashboard, null);
+
+      expect(result.dashboard).toBe(dashboard);
+      expect(result.keptCount).toBe(2);
+    });
+
+    it("drops only the unrenderable panels and keeps the survivors in the tab", () => {
+      const dashboard = makeTabbedDashboard([
+        makePanel(1, 0, 0, 6, 4, "SELECT view_largest_contentful_paint FROM _rumdata"),
+        makePanel(2, 6, 0, 6, 4, "SELECT session_id FROM _rumdata"),
+      ]);
+      const presentFields = new Set(["session_id"]);
+
+      const result = filterDashboardBySchema(dashboard, presentFields);
+
+      expect(result.keptCount).toBe(1);
+      expect(result.droppedCount).toBe(1);
+      expect(result.dashboard.tabs?.[0].panels).toHaveLength(1);
+    });
+
+    it("reports keptCount 0 only when every panel in the tab is unrenderable", () => {
+      const dashboard = makeTabbedDashboard([
+        makePanel(1, 0, 0, 6, 4, "SELECT view_largest_contentful_paint FROM _rumdata"),
+        makePanel(2, 6, 0, 6, 4, "SELECT view_first_byte FROM _rumdata"),
+      ]);
+      const presentFields = new Set(["session_id"]);
+
+      const result = filterDashboardBySchema(dashboard, presentFields);
+
+      expect(result.keptCount).toBe(0);
+      expect(result.droppedCount).toBe(2);
+    });
+  });
+
   describe("CAPABILITY_GATED_FIELDS", () => {
     it("is a non-empty array of unique field names", () => {
       // Arrange / Act
