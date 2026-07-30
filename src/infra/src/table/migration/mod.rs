@@ -153,6 +153,7 @@ mod m20260729_000001_add_promql_multi_alert_to_alerts;
 mod m20260730_000001_add_alert_state_to_synthetics_monitors;
 mod m20260730_000002_create_incident_integrations;
 mod m20260730_000003_create_external_alerts;
+mod m20260730_000004_add_alert_kind_to_incident_alerts;
 
 /// Apply **only** the SLO tables, for targeted integration tests.
 ///
@@ -345,6 +346,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260730_000001_add_alert_state_to_synthetics_monitors::Migration),
             Box::new(m20260730_000002_create_incident_integrations::Migration),
             Box::new(m20260730_000003_create_external_alerts::Migration),
+            Box::new(m20260730_000004_add_alert_kind_to_incident_alerts::Migration),
         ]
     }
 }

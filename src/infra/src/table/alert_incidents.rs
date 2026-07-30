@@ -87,6 +87,7 @@ pub async fn add_alert_to_incident(
     incident_id: &str,
     alert_id: &str,
     alert_name: &str,
+    alert_kind: &str,
     alert_fired_at: i64,
     correlation_reason: &str,
 ) -> Result<bool, errors::Error> {
@@ -129,6 +130,7 @@ pub async fn add_alert_to_incident(
         alert_id: Set(alert_id.to_string()),
         alert_fired_at: Set(alert_fired_at),
         alert_name: Set(alert_name.to_string()),
+        alert_kind: Set(alert_kind.to_string()),
         correlation_reason: Set(Some(correlation_reason.to_string())),
         created_at: Set(now),
     };

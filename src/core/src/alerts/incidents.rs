@@ -23,7 +23,7 @@ use config::{
     meta::alerts::{
         alert::Alert,
         incidents::{
-            AlertEdge, AlertNode, CorrelationReason, EdgeType, Incident, IncidentAlert,
+            AlertEdge, AlertKind, AlertNode, CorrelationReason, EdgeType, Incident, IncidentAlert,
             IncidentCorrelationOutcome, IncidentEvent, IncidentTopology, IncidentWithAlerts,
         },
     },
@@ -842,6 +842,7 @@ async fn create_new_incident(
         &incident.id,
         &alert.get_unique_key(),
         &alert.name,
+        "internal",
         triggered_at,
         correlation_reason,
     )
@@ -1003,6 +1004,7 @@ async fn find_or_create_incident(
                 &incident.id,
                 &alert_id,
                 &alert.name,
+                "internal",
                 triggered_at,
                 correlation_reason,
             )
@@ -1143,6 +1145,7 @@ async fn find_or_create_incident(
                 &existing.id,
                 &alert.get_unique_key(),
                 &alert.name,
+                "internal",
                 triggered_at,
                 correlation_reason,
             )
@@ -1365,6 +1368,7 @@ pub async fn get_incident_with_alerts(
             incident_id: a.incident_id.clone(),
             alert_id: a.alert_id.clone(),
             alert_name: a.alert_name.clone(),
+            alert_kind: AlertKind::from_stored(&a.alert_kind),
             alert_fired_at: a.alert_fired_at,
             correlation_reason: a
                 .correlation_reason

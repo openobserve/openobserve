@@ -388,6 +388,8 @@ pub struct IncidentAlert {
     pub incident_id: String,
     pub alert_id: String,
     pub alert_name: String,
+    #[serde(default)]
+    pub alert_kind: AlertKind,
     pub alert_fired_at: i64,
     pub correlation_reason: CorrelationReason,
     pub created_at: i64,
