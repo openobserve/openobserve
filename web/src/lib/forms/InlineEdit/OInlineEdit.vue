@@ -11,7 +11,9 @@
 //     user-originated — a consumer can treat one as "the user took over" without
 //     having to distinguish typing from a programmatic write.
 //   • `commit` fires once the user is done (Enter or blur) with the trimmed
-//     value — that's the signal to re-derive or persist.
+//     value — that's the signal to re-derive or persist. Enter additionally
+//     submits the owning <form>, if there is one, so a title inside an <OForm>
+//     still saves on Enter the way the boxed field it replaced did.
 //   • Escape restores the pre-edit value (emitted back) and emits `cancel`.
 //
 // The input auto-sizes with a grid sizer (an invisible span sharing the input's
@@ -44,6 +46,7 @@ const isEditing = ref(false);
 const draft = ref("");
 const valueAtEditStart = ref("");
 const inputRef = ref<HTMLInputElement | null>(null);
+const triggerRef = ref<HTMLButtonElement | null>(null);
 
 const displayValue = computed(() => (props.modelValue ?? "").trim());
 const isEmpty = computed(() => displayValue.value === "");
@@ -101,6 +104,37 @@ const onInput = (event: Event) => {
   emit("update:modelValue", draft.value);
 };
 
+// Closing the editor unmounts the input, which would drop focus to <body> and
+// strand a keyboard user before every action in the header (Save included). Hand
+// focus back to the display trigger instead, so Tab carries on from the title.
+// Only the keyboard paths call this: a blur-commit means focus has already,
+// legitimately, gone somewhere else (often the very button that was clicked).
+const restoreTriggerFocus = async () => {
+  await nextTick();
+  // A failed submit can re-open the editor (focus-the-first-error walkers) —
+  // don't yank focus back out of an input that was just deliberately opened.
+  if (!isEditing.value) triggerRef.value?.focus();
+};
+
+// Enter commits AND submits the owning form — Enter in the boxed name field
+// this replaced is how a panel or a function got saved from the keyboard, and
+// that has to survive the field becoming a title. The browser's own implicit
+// submission can't carry it: closing the editor unmounts the input before the
+// keypress that would have triggered it, so ask the form directly. A title with
+// no form owner (a workflow name, an incident title) submits nothing.
+const onEnter = () => {
+  const owner = inputRef.value?.form ?? null;
+  commit();
+  restoreTriggerFocus();
+  // After commit, so the form validates and saves the trimmed value.
+  owner?.requestSubmit();
+};
+
+const onEscape = () => {
+  cancel();
+  restoreTriggerFocus();
+};
+
 // F2 is the platform convention for "rename the focused thing"; Enter matches
 // the button's own activation. Both land on the display trigger only.
 const onDisplayKeydown = (event: KeyboardEvent) => {
@@ -151,13 +185,18 @@ defineExpose({ focus: startEdit });
        text still lines up with whatever sits above/below it. -->
   <div
     v-bind="$attrs"
-    class="group/inline-edit relative -mx-1.5 -my-0.5 flex min-w-0 items-center gap-1.5"
+    class="group/inline-edit -mx-1.5 -my-0.5 flex min-w-0 items-center gap-1.5"
   >
     <!-- EDIT MODE — the input shares a grid cell with an invisible sizer span,
          so the track (and therefore the input) is exactly as wide as the text.
          The sizer mirrors the input's box exactly and only widens its trailing
          padding, leaving room for the caret without moving the text origin. -->
-    <div v-if="isEditing" class="grid max-w-full items-center">
+    <!-- minmax(0,max-content): the sizer's `whitespace-pre` makes the track's
+         automatic minimum the FULL text width, so a long name grew the track
+         past the header and painted the input over the action buttons. A 0
+         minimum lets the track stop at whatever width the header can spare,
+         while the max-content ceiling keeps the grow-with-the-text behaviour. -->
+    <div v-if="isEditing" class="grid max-w-full grid-cols-[minmax(0,max-content)] items-center">
       <span
         aria-hidden="true"
         :class="[
@@ -187,8 +226,8 @@ defineExpose({ focus: startEdit });
         ]"
         @input="onInput"
         @blur="commit"
-        @keydown.enter.prevent="commit"
-        @keydown.esc.stop.prevent="cancel"
+        @keydown.enter="onEnter"
+        @keydown.esc.stop.prevent="onEscape"
       />
     </div>
 
@@ -209,6 +248,7 @@ defineExpose({ focus: startEdit });
       >
       <button
         v-else
+        ref="triggerRef"
         type="button"
         :disabled="disabled"
         :aria-label="ariaLabel"
@@ -255,12 +295,16 @@ defineExpose({ focus: startEdit });
       <slot name="trail" />
     </template>
 
-    <!-- The message is absolutely placed so an invalid name never changes the
-         header's height. -->
+    <!-- The message sits BESIDE the value, not below it. Below is where the
+         header's subtitle band already is — a floated message landed on top of
+         it ("Name is required" printed over "Edit Panel"). Inline it costs no
+         height either: it is smaller than the title's own line box, so the
+         header still doesn't reflow when a name turns invalid. It keeps its
+         width (`shrink-0`) and the name truncates around it. -->
     <span
       v-if="error && errorMessage"
       role="alert"
-      class="text-input-error-text text-2xs absolute start-0 top-full max-w-full truncate leading-tight"
+      class="text-input-error-text text-2xs shrink-0 leading-tight whitespace-nowrap"
       :data-test="dataTest ? `${dataTest}-error` : undefined"
       >{{ errorMessage }}</span
     >

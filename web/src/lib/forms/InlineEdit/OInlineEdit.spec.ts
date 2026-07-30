@@ -1,7 +1,7 @@
 // Copyright 2026 OpenObserve Inc.
 
-import { describe, it, expect } from "vitest";
-import { mount } from "@vue/test-utils";
+import { describe, it, expect, afterEach, vi } from "vitest";
+import { flushPromises, mount, VueWrapper } from "@vue/test-utils";
 import OInlineEdit from "./OInlineEdit.vue";
 
 const mountInlineEdit = (props: Record<string, unknown> = {}) =>
@@ -114,6 +114,105 @@ describe("OInlineEdit", () => {
     const wrapper = mountInlineEdit();
 
     expect(wrapper.find("[data-inline-edit-trigger]").exists()).toBe(true);
+  });
+
+  // The title replaced a boxed input that sat inside the page's <form>: Enter
+  // saved, and Tab walked on to the header's action buttons. Both have to keep
+  // working now that the field unmounts itself when it closes.
+  describe("keyboard", () => {
+    let wrapper: VueWrapper;
+
+    afterEach(() => {
+      wrapper?.unmount();
+    });
+
+    const mountAttached = () =>
+      mount(OInlineEdit, {
+        attachTo: document.body,
+        props: { modelValue: "Panel one", "data-test": "name" },
+        global: { stubs: { OIcon: true } },
+      });
+
+    it("should not swallow Enter, so nothing else listening for it is blocked", async () => {
+      wrapper = mountAttached();
+      await wrapper.find('[data-test="name-trigger"]').trigger("click");
+
+      const enter = new KeyboardEvent("keydown", {
+        key: "Enter",
+        bubbles: true,
+        cancelable: true,
+      });
+      wrapper.find('[data-test="name-input"]').element.dispatchEvent(enter);
+      await flushPromises();
+
+      expect(enter.defaultPrevented).toBe(false);
+      expect(wrapper.emitted("commit")).toEqual([["Panel one"]]);
+    });
+
+    it("should submit the owning form on Enter, so the header's Save is still reachable", async () => {
+      const onSubmit = vi.fn((event: Event) => event.preventDefault());
+      const Host = {
+        components: { OInlineEdit },
+        setup: () => ({ onSubmit }),
+        template: `
+          <form @submit="onSubmit">
+            <OInlineEdit model-value="Panel one" data-test="name" />
+            <button type="submit">Save</button>
+          </form>`,
+      };
+      wrapper = mount(Host, { attachTo: document.body, global: { stubs: { OIcon: true } } });
+      await wrapper.find('[data-test="name-trigger"]').trigger("click");
+
+      await wrapper.find('[data-test="name-input"]').trigger("keydown.enter");
+      await flushPromises();
+
+      expect(onSubmit).toHaveBeenCalledTimes(1);
+    });
+
+    it("should submit nothing on Enter when the title has no form around it", async () => {
+      wrapper = mountAttached();
+      await wrapper.find('[data-test="name-trigger"]').trigger("click");
+
+      // Would throw if the component reached for a form that isn't there.
+      await wrapper.find('[data-test="name-input"]').trigger("keydown.enter");
+      await flushPromises();
+
+      expect(wrapper.emitted("commit")).toEqual([["Panel one"]]);
+    });
+
+    it("should return focus to the trigger on Enter, so Tab continues to the header actions", async () => {
+      wrapper = mountAttached();
+      await wrapper.find('[data-test="name-trigger"]').trigger("click");
+
+      await wrapper.find('[data-test="name-input"]').trigger("keydown.enter");
+      await flushPromises();
+
+      expect(document.activeElement).toBe(wrapper.find('[data-test="name-trigger"]').element);
+    });
+
+    it("should return focus to the trigger on Escape", async () => {
+      wrapper = mountAttached();
+      await wrapper.find('[data-test="name-trigger"]').trigger("click");
+
+      await wrapper.find('[data-test="name-input"]').trigger("keydown.esc");
+      await flushPromises();
+
+      expect(document.activeElement).toBe(wrapper.find('[data-test="name-trigger"]').element);
+    });
+
+    it("should leave focus alone when the editor closes because focus went elsewhere", async () => {
+      wrapper = mountAttached();
+      const outside = document.createElement("button");
+      document.body.appendChild(outside);
+      await wrapper.find('[data-test="name-trigger"]').trigger("click");
+
+      outside.focus();
+      await wrapper.find('[data-test="name-input"]').trigger("blur");
+      await flushPromises();
+
+      expect(document.activeElement).toBe(outside);
+      outside.remove();
+    });
   });
 
   it("shows the trail slot in display mode only", async () => {

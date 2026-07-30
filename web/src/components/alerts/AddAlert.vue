@@ -748,8 +748,9 @@ export default defineComponent({
    pointer-events:none so the floating text can't swallow clicks on the tab bar
    it overlaps. `:deep` because [role="alert"] renders inside the child
    component. All widths and container-query steps are template utilities.
-   The alert-name field is NOT listed here: OInlineEdit floats its own message
-   out of flow, so it needs no wrapper override. */
+   The alert-name field is NOT listed here: OInlineEdit renders its message
+   BESIDE the name (below is the subtitle band), so it adds no height either and
+   needs no wrapper override. */
 .stream-type-select,
 .stream-name-select {
   position: relative;
