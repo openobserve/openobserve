@@ -543,13 +543,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                  add-search-term on closable field cells. -->
                   <template #cell-hover-actions="{ row, column, active }">
                     <O2AIContextAddBtn
-                      v-if="active && column.id === logsTimestampCol"
+                      v-if="active && !contextMenuOpen && column.id === logsTimestampCol"
                       class="ai-btn"
                       data-test="logs-search-result-ai-btn"
                       @send-to-ai-chat="sendToAiChat(JSON.stringify(row), true)"
                     />
                     <CellActions
-                      v-else-if="active && column.meta?.closable && row[column.id] != null"
+                      v-else-if="
+                        active &&
+                        !contextMenuOpen &&
+                        column.meta?.closable &&
+                        row[column.id] != null
+                      "
                       :column="column"
                       :row="row"
                       :selected-stream-fields="searchObj.data.stream.selectedStreamFields"
@@ -2198,7 +2203,12 @@ export default defineComponent({
 
     // Drop the reference once the menu closes so a recycled virtual row can't be
     // held alive by a stale row object.
+    // While the context menu is open the hover overlay offers the same actions, so
+    // the two would sit on screen at once. Track open state and hide the overlay.
+    const contextMenuOpen = ref(false);
+
     const onContextMenuOpenChange = (open: boolean) => {
+      contextMenuOpen.value = open;
       if (!open) contextCell.value = null;
     };
 
@@ -2323,6 +2333,7 @@ export default defineComponent({
       handleTableContextMenu,
       handleCellContextMenu,
       onContextMenuOpenChange,
+      contextMenuOpen,
       histogramChart,
       histogramChartWrap,
       pinnedTooltip,
