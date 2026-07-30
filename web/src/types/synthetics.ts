@@ -309,11 +309,16 @@ export type RecorderPushPayload =
       duration_ms: number;
       error?: string;
       structuredError?: StructuredError;
-      /** X-8.2 divergence notes, as the extension emits them. Declared here as
-       *  well as on `StepReplayResult` because this is the INBOUND shape the
-       *  composable reads from; without it, reading `payload.fidelity` does not
-       *  type-check, and dropping the read instead would make every divergence
-       *  silent again — a skipped step reading as a pass. */
+      /**
+       * What the preview could not evaluate for this step (X-8.2).
+       *
+       * Declared because the extension really sends it — `background.ts` sets it
+       * from `replayFidelity`, and `useSyntheticsRecorder` reads it straight
+       * into {@link StepReplayResult}. Omitting it here made that read a type
+       * error while the value flowed anyway: a green result WITH notes is a
+       * weaker claim than one without, and this is the field carrying the
+       * difference.
+       */
       fidelity?: { level: string; notes: string[] };
     }
   | { method: "stepReplayStarted"; stepId: string; stepName?: string };
