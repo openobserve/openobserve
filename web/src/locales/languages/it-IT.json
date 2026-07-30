@@ -8871,7 +8871,11 @@
       "validation": {
         "nameRequired": "Job name is required",
         "streamRequired": "A stream is required",
-        "idleWindowMinimum": "La finestra di inattività deve essere di almeno 45 secondi",
+        "idleWindowMinimum": "La finestra di inattività deve essere di almeno 1 secondo",
+        "idleWindowMaximumTrace": "La finestra di inattività della trace non può superare i 30 minuti",
+        "idleWindowMaximumSession": "La finestra di inattività della sessione non può superare le 4 ore",
+        "maxAgeMaximumTrace": "L'età massima della trace non può superare le 2 ore",
+        "maxAgeMaximumSession": "L'età massima della sessione non può superare le 24 ore",
         "samplingValueRequired": "A sampling value is required"
       }
     }

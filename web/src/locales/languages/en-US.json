@@ -9043,7 +9043,11 @@
       "validation": {
         "nameRequired": "Job name is required",
         "streamRequired": "A stream is required",
-        "idleWindowMinimum": "Idle window must be at least 45 seconds",
+        "idleWindowMinimum": "Idle window must be at least 1 second",
+        "idleWindowMaximumTrace": "Trace idle window cannot exceed 30 minutes",
+        "idleWindowMaximumSession": "Session idle window cannot exceed 4 hours",
+        "maxAgeMaximumTrace": "Trace max age cannot exceed 2 hours",
+        "maxAgeMaximumSession": "Session max age cannot exceed 24 hours",
         "samplingValueRequired": "A sampling value is required"
       }
     }

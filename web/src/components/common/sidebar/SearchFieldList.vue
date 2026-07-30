@@ -249,6 +249,14 @@ const props = defineProps({
     type: String,
     default: "",
   },
+  // Page-level WHERE fragment (e.g. `type='error'`) always ANDed into the
+  // field-values SQL so the counts match the rows the page itself queries.
+  // Deliberately separate from `query`: it is not user-editable, so it must
+  // not feed the include/exclude checkbox round-trip below.
+  baseFilter: {
+    type: String,
+    default: "",
+  },
   showCount: {
     type: Boolean,
     default: false,
@@ -465,6 +473,43 @@ const buildSql = (streamName: string, whereClause?: string) =>
   b64EncodeUnicode(`SELECT * FROM "${streamName}"${whereClause ? ` WHERE ${whereClause}` : ""}`) ||
   "";
 
+// Base filter first, user query parenthesised after it — the editor value may
+// contain a top-level OR, which would otherwise swallow the base filter.
+const valuesWhereClause = computed(() => {
+  const base = props.baseFilter.trim();
+  const userQuery = props.query.trim();
+  if (base && userQuery) return `${base} AND (${userQuery})`;
+  return base || userQuery;
+});
+
+// Single entry point for every value request (expand, search, load-more,
+// base-filter refresh) so all four stay on the same SQL and time range.
+// `streamOverride` carries the row's own stream when the caller already has the
+// row in hand — expansion can be driven with a row that is not in `fields`.
+function requestFieldValues(
+  fieldName: string,
+  size: number,
+  keyword?: string,
+  streamOverride?: string,
+) {
+  const row: any = (props.fields as any[]).find((f: any) => f.name === fieldName);
+  const resolvedStream = streamOverride || row?.stream_name || props.streamName;
+  const pinnedTime = fieldValuesTimeRange.value[fieldName];
+  fetchFieldValues({
+    fields: [fieldName],
+    size,
+    no_count: false,
+    start_time: pinnedTime?.start_time ?? (props.timeStamp as any).startTime,
+    end_time: pinnedTime?.end_time ?? (props.timeStamp as any).endTime,
+    stream_name: resolvedStream,
+    stream_type: props.streamType,
+    sql: buildSql(resolvedStream, valuesWhereClause.value || undefined),
+    keyword: keyword || undefined,
+    timeout: 30000,
+    use_cache: (globalThis as any).use_cache ?? true,
+  });
+}
+
 // ─── Expansion handling ──────────────────────────────────────────────
 
 function isExpandable(row: any) {
@@ -518,25 +563,13 @@ function openFilterCreator({ name, ftsKey, stream_name }: any) {
   };
   resetFieldValues(name, true);
 
-  const resolvedStream = stream_name || props.streamName;
   fieldValuesCurrentSize.value[name] = defaultValuesCount.value;
   expandedRows.value[name] = true;
   if (!expandedIds.value.includes(name)) {
     expandedIds.value = [...expandedIds.value, name];
   }
 
-  fetchFieldValues({
-    fields: [name],
-    size: defaultValuesCount.value,
-    no_count: false,
-    start_time: (props.timeStamp as any).startTime,
-    end_time: (props.timeStamp as any).endTime,
-    stream_name: resolvedStream,
-    stream_type: props.streamType,
-    sql: buildSql(resolvedStream, (props as any).query || undefined),
-    timeout: 30000,
-    use_cache: (globalThis as any).use_cache ?? true,
-  });
+  requestFieldValues(name, defaultValuesCount.value, undefined, stream_name);
 }
 
 function closeField(fieldName: string) {
@@ -573,8 +606,6 @@ function setPage(page: number) {
 // ─── FieldValuesPanel event handlers ─────────────────────────────────
 
 const handleSearchFieldValues = (fieldName: string, term: string) => {
-  const row: any = (props.fields as any[]).find((f: any) => f.name === fieldName);
-  const resolvedStream = row?.stream_name || props.streamName;
   currentKeyword.value[fieldName] = term;
   currentSizePerField.value[fieldName] = defaultValuesCount.value;
   fieldValuesCurrentSize.value[fieldName] = defaultValuesCount.value;
@@ -582,46 +613,37 @@ const handleSearchFieldValues = (fieldName: string, term: string) => {
   cancelFieldStream(fieldName);
   resetFieldValues(fieldName, true);
 
-  const pinnedTime = fieldValuesTimeRange.value[fieldName];
-  fetchFieldValues({
-    fields: [fieldName],
-    size: defaultValuesCount.value,
-    no_count: false,
-    start_time: pinnedTime?.start_time ?? (props.timeStamp as any).startTime,
-    end_time: pinnedTime?.end_time ?? (props.timeStamp as any).endTime,
-    stream_name: resolvedStream,
-    stream_type: props.streamType,
-    sql: buildSql(resolvedStream, (props as any).query || undefined),
-    keyword: term || undefined,
-    timeout: 30000,
-    use_cache: (globalThis as any).use_cache ?? true,
-  });
+  requestFieldValues(fieldName, defaultValuesCount.value, term);
 };
 
 const handleLoadMoreValues = (fieldName: string) => {
-  const row: any = (props.fields as any[]).find((f: any) => f.name === fieldName);
-  const resolvedStream = row?.stream_name || props.streamName;
   const newSize =
     (currentSizePerField.value[fieldName] ?? defaultValuesCount.value) + defaultValuesCount.value;
   currentSizePerField.value[fieldName] = newSize;
   fieldValuesCurrentSize.value[fieldName] = newSize;
   fieldValuesFinalizedValues.value[fieldName] = [...(fieldValues.value[fieldName]?.values || [])];
 
-  const pinnedTime = fieldValuesTimeRange.value[fieldName];
-  fetchFieldValues({
-    fields: [fieldName],
-    size: newSize,
-    no_count: false,
-    start_time: pinnedTime?.start_time ?? (props.timeStamp as any).startTime,
-    end_time: pinnedTime?.end_time ?? (props.timeStamp as any).endTime,
-    stream_name: resolvedStream,
-    stream_type: props.streamType,
-    sql: buildSql(resolvedStream, (props as any).query || undefined),
-    keyword: currentKeyword.value[fieldName] || undefined,
-    timeout: 30000,
-    use_cache: (globalThis as any).use_cache ?? true,
-  });
+  requestFieldValues(fieldName, newSize, currentKeyword.value[fieldName]);
 };
+
+// The base filter is page-owned (e.g. the service chip on error tracking), so a
+// change to it silently invalidates every open value list. Refetch them in
+// place, keeping each field's current size and search keyword.
+watch(
+  () => props.baseFilter,
+  () => {
+    for (const fieldName of expandedIds.value) {
+      cancelFieldStream(fieldName);
+      delete fieldValuesFinalizedValues.value[fieldName];
+      resetFieldValues(fieldName, true);
+      requestFieldValues(
+        fieldName,
+        currentSizePerField.value[fieldName] ?? defaultValuesCount.value,
+        currentKeyword.value[fieldName],
+      );
+    }
+  },
+);
 
 const isNullValue = (v: string) =>
   v === null || v === undefined || v === "" || v.toLowerCase() === "null";

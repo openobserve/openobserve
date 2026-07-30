@@ -470,6 +470,64 @@ describe("FieldList.vue Comprehensive Coverage", () => {
       );
     });
 
+    it("should include baseFilter in sql when query prop is empty", async () => {
+      wrapper = createWrapper({ baseFilter: "type='error'" });
+      const vm = wrapper.vm as any;
+
+      await vm.openFilterCreator({
+        name: "test_field",
+        ftsKey: false,
+      });
+
+      expect(fieldValuesMocks.fetchFieldValues).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sql: b64EncodeUnicode(`SELECT * FROM "test-stream" WHERE type='error'`),
+        }),
+      );
+    });
+
+    it("should AND baseFilter with a parenthesised query", async () => {
+      wrapper = createWrapper({
+        baseFilter: "type='error'",
+        query: "country='US' or country='IN'",
+      });
+      const vm = wrapper.vm as any;
+
+      await vm.openFilterCreator({
+        name: "test_field",
+        ftsKey: false,
+      });
+
+      expect(fieldValuesMocks.fetchFieldValues).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sql: b64EncodeUnicode(
+            `SELECT * FROM "test-stream" WHERE type='error' AND (country='US' or country='IN')`,
+          ),
+        }),
+      );
+    });
+
+    it("should refetch expanded fields when baseFilter changes", async () => {
+      wrapper = createWrapper({
+        baseFilter: "type='error'",
+        fields: [{ name: "test_field", showValues: true }],
+      });
+      const vm = wrapper.vm as any;
+
+      await vm.openFilterCreator({ name: "test_field", ftsKey: false });
+      fieldValuesMocks.fetchFieldValues.mockClear();
+
+      await wrapper.setProps({ baseFilter: "type='error' AND service='web'" });
+      await nextTick();
+
+      expect(fieldValuesMocks.fetchFieldValues).toHaveBeenCalledWith(
+        expect.objectContaining({
+          fields: ["test_field"],
+          sql: b64EncodeUnicode(`SELECT * FROM "test-stream" WHERE type='error' AND service='web'`),
+        }),
+      );
+    });
+
     it("should pass query WHERE clause through handleSearchFieldValues", async () => {
       const query = "country = 'US'";
       wrapper = createWrapper({
