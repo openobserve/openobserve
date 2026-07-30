@@ -108,6 +108,7 @@ async fn handle_events(
             let _ = infra::table::incident_integrations::touch_sender(
                 &integration.id,
                 detected.as_str(),
+                None,
                 now,
                 0,
                 1,
@@ -171,9 +172,11 @@ async fn handle_events(
             }
         }
     }
+    let sender_label = openobserve_core::alerts::external_alerts::derive_sender_label(&events);
     let _ = infra::table::incident_integrations::touch_sender(
         &integration.id,
         detected.as_str(),
+        sender_label.as_deref(),
         now,
         accepted,
         rejected,

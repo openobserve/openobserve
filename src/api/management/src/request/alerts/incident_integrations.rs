@@ -388,6 +388,7 @@ mod tests {
             accepted_count: 5,
             rejected_count: 0,
             resolved_seen: false,
+            sender_label: None,
         };
         let resp: SenderResponse = r.into();
         assert!(resp.resolve_wiring_hint);
@@ -403,6 +404,7 @@ mod tests {
             accepted_count: 5,
             rejected_count: 0,
             resolved_seen: true,
+            sender_label: None,
         };
         let resp: SenderResponse = r.into();
         assert!(!resp.resolve_wiring_hint);
@@ -418,6 +420,7 @@ mod tests {
             accepted_count: 0,
             rejected_count: 3,
             resolved_seen: false,
+            sender_label: None,
         };
         let resp: SenderResponse = r.into();
         assert!(!resp.resolve_wiring_hint);
