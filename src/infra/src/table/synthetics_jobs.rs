@@ -232,6 +232,14 @@ pub async fn drain_monitor<C: ConnectionTrait>(
     Ok(res.rows_affected())
 }
 
+/// Hard ceiling on one lease call, whatever the caller asks for.
+///
+/// Well above every real caller — the dispatcher takes 10, a Go agent
+/// `min(4 x NumCPU, 16)`, a browser agent 1 — so it never binds in normal
+/// operation. It exists so that no single probe can drain the queue, by
+/// misconfiguration or otherwise.
+const MAX_LEASE_BATCH: i64 = 100;
+
 // ── Dispatcher: lease ─────────────────────────────────────────────────────────
 
 /// Leases up to `limit` pending checks from a pool.
@@ -258,6 +266,13 @@ pub async fn lease_batch<C: ConnectionTrait>(
 ) -> Result<Vec<LeasedRow>, errors::Error> {
     let lease_secs = lease_secs.max(config::meta::synthetics::JOB_LEASE_SECS);
     let lease_expires_at = now_us + lease_secs * 1_000_000;
+
+    // `limit` arrives from a client and is cast to u64 below, where a negative
+    // wraps to ~1.8e19 and the query becomes unbounded — one agent would lease the
+    // entire pending queue for its pool and then hold a lease on every row of it.
+    // Reachable from a single mistyped env var, so it is clamped here rather than
+    // trusted: a probe does not get to decide how much of the queue it may take.
+    let limit = limit.clamp(1, MAX_LEASE_BATCH);
 
     // Step 1: pick candidate IDs.
     //
@@ -835,6 +850,23 @@ mod tests {
     }
 
     const MAX: i32 = 3;
+
+    #[test]
+    fn a_lease_limit_is_clamped_before_it_reaches_the_query() {
+        // `limit` is cast to u64 in the query. A negative wraps to ~1.8e19, making
+        // the LIMIT unbounded — one agent leases the entire pending queue for its
+        // pool and holds a 900s lease on every row. Reachable from one mistyped
+        // env var, so the server clamps rather than trusting the client.
+        assert_eq!((-4i64).clamp(1, MAX_LEASE_BATCH), 1);
+        assert_eq!(0i64.clamp(1, MAX_LEASE_BATCH), 1);
+        // Real callers are far below the ceiling and pass through untouched:
+        // dispatcher 10, Go agent min(4 x NumCPU, 16), browser agent 1.
+        for asked in [1i64, 10, 16, 25] {
+            assert_eq!(asked.clamp(1, MAX_LEASE_BATCH), asked);
+        }
+        // And nobody drains the queue by asking louder.
+        assert_eq!(i64::MAX.clamp(1, MAX_LEASE_BATCH), MAX_LEASE_BATCH);
+    }
 
     #[test]
     fn pending_backlog_row_carries_location_pool_and_the_oldest_entry() {
