@@ -44,15 +44,17 @@
            with a primary thumb, so the only thing distinguishing off from on
            was the label beside it. For a control that changes how many alerts
            this monitor becomes, both options have to be visible at once. -->
-      <OFormOptionGroup
-        :name="name"
-        type="radio"
-        orientation="horizontal"
-        size="sm"
-        :options="options"
-        data-test="alerts-alertmultitoggle-choice"
-        @update:model-value="emit('change', $event)"
-      />
+      <div class="flex h-8.5 items-center">
+        <OFormOptionGroup
+          :name="name"
+          type="radio"
+          orientation="horizontal"
+          size="sm"
+          :options="options"
+          data-test="alerts-alertmultitoggle-choice"
+          @update:model-value="emit('change', $event)"
+        />
+      </div>
       <p class="text-xs text-text-secondary">
         {{ enabled ? t(onDescriptionKey) : t("alerts.multiAlert.simpleDescription") }}
       </p>
