@@ -292,14 +292,10 @@ const search = {
   }: {
     org_identifier: string;
     labels: string;
-    start_time?: number;
-    end_time?: number;
+    start_time: number;
+    end_time: number;
   }) => {
-    // start/end are optional on the backend (defaults to the last 24h); omit
-    // them when unset instead of sending "start=undefined"
-    let url = `/api/${org_identifier}/prometheus/api/v1/series?match[]=${labels}`;
-    if (start_time) url += `&start=${start_time}`;
-    if (end_time) url += `&end=${end_time}`;
+    const url = `/api/${org_identifier}/prometheus/api/v1/series?match[]=${labels}&start=${start_time}&end=${end_time}`;
     return http().get(url);
   },
 
