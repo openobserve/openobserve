@@ -37,6 +37,7 @@ pub mod enrichment_table_urls;
 pub mod enrichment_tables;
 pub mod entity;
 pub mod evaluation_watermarks;
+pub mod external_alerts;
 pub mod folders;
 pub mod gen_ai_agents;
 pub mod incident_events;
