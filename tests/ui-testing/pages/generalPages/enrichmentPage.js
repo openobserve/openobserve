@@ -60,10 +60,13 @@ class EnrichmentPage {
         // ────────────────────────────────────────────────────────────────────
         // Logs page locators (used by explore-from-table flow)
         // ────────────────────────────────────────────────────────────────────
-        this.timestampColumn = page.locator('[data-test="log-table-column-0-_timestamp"]');
+        this.timestampColumn = page.locator('[data-test="o2-table-row-0"] [data-test="o2-table-cell-_timestamp"]');
         this.logDetailDrawer = page.locator('[data-test="logs-search-result-detail-dialog"]');
         this.logDetailDrawerClose = page.locator('[data-test="logs-search-result-detail-dialog"] [data-test="o-drawer-close-btn"]');
-        this.expandMenu = '[data-test="table-row-expand-menu"]';
+        // OTable renders the expand toggle in its own leading <td>
+        // ([data-test="o2-table-expand-cell"]) — a SIBLING of the data cells,
+        // not a child of the timestamp cell. Scope it to the row index instead.
+        this.firstLogRowExpandMenu = page.locator('[data-test="o2-table-expand-0"]');
         this.protocolKeywordText = '[data-test="log-expand-detail-key-protocol_keyword"]';
         this.dateTimeBtn = page.locator('[data-test="date-time-btn"]');
 
@@ -586,10 +589,9 @@ abc, err = get_enrichment_table_record("${fileName}", {
 
         // Wait for timestamp column to be visible and stable
         await this.timestampColumn.first().waitFor({ state: 'visible', timeout: 30000 });
-        const expandButton = this.timestampColumn.first().locator(this.expandMenu);
-        await expandButton.waitFor({ state: 'visible' });
+        await this.firstLogRowExpandMenu.waitFor({ state: 'visible' });
 
-        await expandButton.click();
+        await this.firstLogRowExpandMenu.click();
         await this.page.waitForLoadState('domcontentloaded');
 
         // Wait for expand panel to load and stabilize
@@ -1625,7 +1627,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
     async clickFirstLogRow() {
         testLogger.debug('Clicking first log row');
 
-        const firstLogRow = this.page.locator('[data-test="log-table-column-0-_timestamp"]').first();
+        const firstLogRow = this.page.locator('[data-test="o2-table-row-0"] [data-test="o2-table-cell-_timestamp"]').first();
         await firstLogRow.waitFor({ state: 'visible', timeout: 30000 });
         await firstLogRow.click();
 

@@ -110,7 +110,7 @@ test.describe("Logs Table Field Management - Complete Test Suite", () => {
       await pageManager.logsPage.expectLogsTableVisible().catch(() => {});
       await pageManager.logsPage.waitForFieldListReady().catch(() => {});
       restored = await page
-        .locator(`[data-test="log-search-result-table-th-${fieldName}"]`)
+        .locator(`[data-test="o2-table-th-${fieldName}"]`)
         .first()
         .waitFor({ state: 'visible', timeout: 20000 })
         .then(() => true)

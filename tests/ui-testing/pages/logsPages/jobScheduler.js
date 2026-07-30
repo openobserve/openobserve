@@ -140,7 +140,7 @@ async deleteJobSearch(trace_id) {
       const rowIndex = await this._getJobRowIndex(trace_id);
       if (rowIndex === -1) throw new Error(`Job with trace ID ${trace_id} not found in scheduler list`);
 
-      const row = this.page.locator(`[data-test="o2-table-row-${rowIndex}"]`);
+      const row = this.page.locator(`[data-test="search-scheduler-table"] [data-test="o2-table-row-${rowIndex}"]`);
       await row.waitFor({ state: 'visible', timeout: 15000 });
 
       // Click delete, cancel (tests the cancel flow), click delete again and confirm
@@ -164,7 +164,7 @@ async deleteJobSearch(trace_id) {
         const rowIndex = await this._getJobRowIndex(trace_id, 15000);
         if (rowIndex === -1) throw new Error(`Job with trace ID ${trace_id} not found in scheduler list`);
 
-        const row = this.page.locator(`[data-test="o2-table-row-${rowIndex}"]`);
+        const row = this.page.locator(`[data-test="search-scheduler-table"] [data-test="o2-table-row-${rowIndex}"]`);
         await row.waitFor({ state: 'visible', timeout: 10000 });
 
         const restartBtn = row.locator('[data-test="search-scheduler-restart-btn"]');
@@ -193,7 +193,7 @@ async cancelJobSearch(trace_id) {
     const rowIndex = await this._getJobRowIndex(trace_id);
     if (rowIndex === -1) throw new Error(`Job with trace ID ${trace_id} not found in scheduler list`);
 
-    const row = this.page.locator(`[data-test="o2-table-row-${rowIndex}"]`);
+    const row = this.page.locator(`[data-test="search-scheduler-table"] [data-test="o2-table-row-${rowIndex}"]`);
     await row.waitFor({ state: 'visible', timeout: 15000 });
     await row.locator('[data-test="search-scheduler-cancel-btn"]').click();
     await this.page.locator('[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]').click();
@@ -213,7 +213,7 @@ async exploreJob(trace_id) {
         const rowIndex = await this._getJobRowIndex(trace_id, 15000);
         if (rowIndex === -1) throw new Error(`Job with trace ID ${trace_id} not found in scheduler list`);
 
-        const row = this.page.locator(`[data-test="o2-table-row-${rowIndex}"]`);
+        const row = this.page.locator(`[data-test="search-scheduler-table"] [data-test="o2-table-row-${rowIndex}"]`);
         await row.waitFor({ state: 'visible', timeout: 10000 });
 
         const exploreButton = row.locator('[data-test="search-scheduler-explore-btn"]');
@@ -244,7 +244,7 @@ async viewJobDetails(trace_id) {
     const rowIndex = await this._getJobRowIndex(trace_id, 15000);
     if (rowIndex === -1) throw new Error(`Job with trace ID ${trace_id} not found in scheduler list`);
 
-    const row = this.page.locator(`[data-test="o2-table-row-${rowIndex}"]`);
+    const row = this.page.locator(`[data-test="search-scheduler-table"] [data-test="o2-table-row-${rowIndex}"]`);
     await row.waitFor({ state: 'visible', timeout: 10000 });
 
     const expandBtn = this.page.locator(`[data-test="o2-table-expand-${rowIndex}"]`);

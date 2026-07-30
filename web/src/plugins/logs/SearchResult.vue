@@ -265,24 +265,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
-      <!-- The histogram is pinned: in the logs view this strip does not scroll,
-        the table below owns both scrollbars, so scrolling the log lines
-        sideways can never drag the chart out from under the toolbar. The
-        patterns view has no such table of its own, so it keeps the older
-        combined scroll where the histogram scrolls away with the list. -->
-      <div
-        ref="scrollContainerRef"
-        :class="[
-          'min-h-0 flex-1',
-          searchObj.meta.logsVisualizeToggle === 'patterns'
-            ? 'overflow-auto'
-            : 'flex flex-col overflow-hidden',
-        ]"
-      >
+      <!-- Combined scroll: histogram + logs/patterns scroll together vertically.
+        The histogram is pinned along the X axis only (see histogramPinStyle), so
+        scrolling the wide results table sideways can't drag the chart with it. -->
+      <div class="min-h-0 flex-1 overflow-auto" ref="scrollContainerRef">
         <div
           ref="histogramRef"
+          :style="histogramPinStyle"
           :class="[
-            'histogram-container shrink-0',
+            'histogram-container histogram-container--pinned-x',
             searchObj.meta.showHistogram
               ? 'histogram-container--visible'
               : 'histogram-container--hidden',
@@ -305,6 +296,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               (searchObj.data?.queryResults?.aggs?.length > 0 ||
                 (plotChart && Object.keys(plotChart)?.length > 0))
             "
+            ref="histogramChartWrap"
             class="histogram-chart"
             @click="onHistogramAreaClick"
           >
@@ -372,8 +364,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
         <div
+          :style="histogramPinStyle"
           :class="[
-            'histogram-container shrink-0',
+            'histogram-container histogram-container--pinned-x',
             searchObj.meta.showHistogram
               ? 'histogram-container--visible'
               : 'histogram-container--hidden',
@@ -455,34 +448,222 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Logs View -->
         <template v-if="searchObj.meta.logsVisualizeToggle === 'logs'">
-          <TenstackTable
-            ref="searchTableRef"
-            :columns="getColumns || []"
-            :rows="searchObj.data.queryResults?.hits || []"
-            :wrap="searchObj.meta.toggleSourceWrap"
-            :err-msg="searchObj.data.missingStreamMessage"
-            :loading="searchObj.loading"
-            :loadingProgressPercentage="searchObj.loadingProgressPercentage || 0"
-            :functionErrorMsg="searchObj?.data?.functionError"
-            :expandedRows="expandedLogs"
-            :highlight-timestamp="searchObj.data?.searchAround?.indexTimestamp"
-            :selected-stream-fts-keys="selectedStreamFullTextSearchKeys"
-            :highlight-query="searchObj.data.highlightQuery"
-            :default-columns="!searchObj.data.stream.selectedFields.length"
-            :selectedStreamFields="searchObj.data.stream.selectedStreamFields"
-            class="min-h-0 w-full flex-1"
-            @update:columnSizes="handleColumnSizesUpdate"
-            @update:columnOrder="handleColumnOrderUpdate"
-            @copy="copyLogToClipboard"
-            @add-field-to-table="addFieldToTable"
-            @add-search-term="addSearchTerm"
-            @close-column="closeColumn"
-            @click:data-row="openLogDetails"
-            @expand-row="expandLog"
-            @send-to-ai-chat="sendToAiChat"
-            @view-trace="redirectToTraces"
-            @show-correlation="openLogDetailsWithCorrelation"
-          />
+          <!-- Missing-stream warning banner -->
+          <div
+            v-if="!searchObj.loading && searchObj.data.missingStreamMessage"
+            class="px-page-edge text-status-warning-text bg-status-warning-bg flex items-center gap-2 py-2 text-xs"
+          >
+            <OIcon name="warning" size="sm" />
+            <span>{{ searchObj.data.missingStreamMessage }}</span>
+          </div>
+          <!-- VRL function-error banner (collapsible) -->
+          <div
+            v-if="!searchObj.loading && searchObj?.data?.functionError"
+            data-test="log-search-result-function-error"
+            class="px-page-edge bg-status-warning-bg py-2 text-xs"
+          >
+            <button
+              type="button"
+              class="text-status-warning-text flex cursor-pointer items-center gap-1 border-0 bg-transparent"
+              data-test="table-row-expand-menu"
+              @click="isFunctionErrorOpen = !isFunctionErrorOpen"
+            >
+              <OIcon :name="isFunctionErrorOpen ? 'expand-more' : 'chevron-right'" size="sm" />
+              {{ t("search.functionErrorLabel") }}
+            </button>
+            <pre
+              v-if="isFunctionErrorOpen"
+              class="text-status-warning-text mt-1 break-words whitespace-pre-wrap"
+              >{{ searchObj?.data?.functionError }}</pre
+            >
+          </div>
+
+          <!-- Row/cell actions live in a right-click context menu as well as the
+               hover overlay: the overlay can only be offered on columns wide
+               enough to host it, while the menu is anchored to the pointer so
+               every cell can offer actions. -->
+          <OContextMenu @update:open="onContextMenuOpenChange">
+            <template #trigger>
+              <div class="contents" @contextmenu.capture="handleTableContextMenu">
+                <OTable
+                  ref="searchTableRef"
+                  :columns="getColumns || []"
+                  :data="searchObj.data.queryResults?.hits || []"
+                  :wrap="searchObj.meta.toggleSourceWrap"
+                  :loading="searchObj.loading"
+                  :row-key="logsRowKey"
+                  :row-height="20"
+                  virtual-scroll
+                  :fill-height="false"
+                  :scroll-el="scrollContainerRef"
+                  :horizontal-scroll="true"
+                  :scroll-margin="0"
+                  :default-columns="false"
+                  :show-global-filter="false"
+                  :frame="false"
+                  pagination="none"
+                  sorting="none"
+                  :enable-column-reorder="true"
+                  :pinned-first-column="logsTimestampCol"
+                  :enable-column-resize="true"
+                  :get-row-status-color="getLogRowStatusColor"
+                  :row-class="getLogRowClass"
+                  expansion="multiple"
+                  :expanded-ids="expandedLogIds"
+                  data-test="logs-search-result-logs-table"
+                  class="logs-results-otable w-full"
+                  :class="[
+                    !searchObj.meta.showHistogram ||
+                    (searchObj.meta.showHistogram && searchObj.data.histogram.errorCode == -1)
+                      ? 'min-h-full!'
+                      : 'min-h-[calc(100%-6.25rem)]!',
+                  ]"
+                  @update:columnSizes="handleColumnSizesUpdate"
+                  @column-order-change="handleColumnOrderUpdate"
+                  @close-column="closeColumn"
+                  @cell-contextmenu="handleCellContextMenu"
+                  @row-click="openLogDetailsByRow"
+                  @update:expandedIds="onExpandedLogIdsChange"
+                >
+                  <!-- FTS-highlighted cell content; falls back to the plain value. -->
+                  <template
+                    v-for="col in getColumns || []"
+                    :key="col.id"
+                    #[`cell-${col.id}`]="{ row, value }"
+                  >
+                    <span
+                      v-if="logsCellHtml(col.id, row)"
+                      class="log-cell-html"
+                      v-html="logsCellHtml(col.id, row)"
+                    />
+                    <span v-else>{{ value }}</span>
+                  </template>
+
+                  <!-- Per-cell hover actions: AI button on the timestamp cell; copy /
+                 add-search-term on closable field cells. -->
+                  <template #cell-hover-actions="{ row, column, active }">
+                    <O2AIContextAddBtn
+                      v-if="active && !contextMenuOpen && column.id === logsTimestampCol"
+                      class="ai-btn"
+                      data-test="logs-search-result-ai-btn"
+                      @send-to-ai-chat="sendToAiChat(JSON.stringify(row), true)"
+                    />
+                    <CellActions
+                      v-else-if="
+                        active &&
+                        !contextMenuOpen &&
+                        column.meta?.closable &&
+                        row[column.id] != null
+                      "
+                      :column="column"
+                      :row="row"
+                      :selected-stream-fields="searchObj.data.stream.selectedStreamFields"
+                      :hide-search-term-actions="false"
+                      @copy="copyLogToClipboard"
+                      @add-search-term="addSearchTerm"
+                      @send-to-ai-chat="sendToAiChat"
+                    />
+                  </template>
+
+                  <!-- Expanded row → JSON preview -->
+                  <template #expansion="{ row }">
+                    <JsonPreview
+                      :value="row"
+                      :index="logsRowIndex(row)"
+                      class="px-2 py-1.5"
+                      mode="expanded"
+                      :highlight-query="searchObj.data.highlightQuery"
+                      :hide-search-term-actions="false"
+                      @copy="copyLogToClipboard"
+                      @add-field-to-table="addFieldToTable"
+                      @add-search-term="addSearchTerm"
+                      @view-trace="redirectToTraces"
+                      @show-correlation="openLogDetailsWithCorrelation"
+                      @send-to-ai-chat="sendToAiChat"
+                    />
+                  </template>
+                </OTable>
+              </div>
+            </template>
+
+            <!-- Actions apply to the cell that was right-clicked. `contextCell`
+                 is recorded by the table's @cell-contextmenu, which fires before
+                 reka-ui opens the menu, so the content is always in sync with
+                 the pointer. -->
+            <template v-if="contextCell">
+              <OContextMenuLabel data-test="log-context-menu-field">
+                {{ contextCell.columnId }}
+              </OContextMenuLabel>
+              <OContextMenuSeparator />
+
+              <OContextMenuItem
+                icon-left="content-copy"
+                data-test="log-context-menu-copy-value"
+                @select="copyLogToClipboard(contextCell.value)"
+              >
+                {{ t("logs.cellActions.copy") }}
+              </OContextMenuItem>
+
+              <template v-if="contextCellIsStreamField">
+                <OContextMenuItem
+                  data-test="log-context-menu-include-term"
+                  @select="
+                    addSearchTerm(
+                      contextCell.columnId,
+                      toSearchTermValue(contextCell.value),
+                      'include',
+                    )
+                  "
+                >
+                  <!-- size="sm" matches the registry icons on the other items so
+                    the labels line up; the glyph itself is inset because it
+                    fills its viewBox edge-to-edge, unlike Material Symbols. -->
+                  <template #icon-left>
+                    <OIcon name="" size="sm">
+                      <EqualIcon class="size-3" />
+                    </OIcon>
+                  </template>
+                  {{ t("logs.cellActions.includeTerm") }}
+                </OContextMenuItem>
+
+                <OContextMenuItem
+                  data-test="log-context-menu-exclude-term"
+                  @select="
+                    addSearchTerm(
+                      contextCell.columnId,
+                      toSearchTermValue(contextCell.value),
+                      'exclude',
+                    )
+                  "
+                >
+                  <template #icon-left>
+                    <OIcon name="" size="sm">
+                      <NotEqualIcon class="size-3" />
+                    </OIcon>
+                  </template>
+                  {{ t("logs.cellActions.excludeTerm") }}
+                </OContextMenuItem>
+              </template>
+
+              <template v-if="aiEnabled">
+                <OContextMenuSeparator />
+                <OContextMenuItem
+                  icon-left="auto-awesome"
+                  data-test="log-context-menu-ai-value"
+                  @select="sendToAiChat(JSON.stringify(contextCell.value))"
+                >
+                  {{ t("logs.cellActions.sendValueToAi") }}
+                </OContextMenuItem>
+                <OContextMenuItem
+                  icon-left="auto-awesome"
+                  data-test="log-context-menu-ai-row"
+                  @select="sendToAiChat(JSON.stringify(contextCell.row), true)"
+                >
+                  {{ t("logs.cellActions.sendRowToAi") }}
+                </OContextMenuItem>
+              </template>
+            </template>
+          </OContextMenu>
         </template>
 
         <!-- Patterns View -->
@@ -627,6 +808,7 @@ import {
   provide,
 } from "vue";
 import { copyToClipboard } from "@/utils/clipboard";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
 import { useI18n } from "vue-i18n";
@@ -670,10 +852,20 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OPagination from "@/lib/navigation/Pagination/OPagination.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import OContextMenu from "@/lib/overlay/ContextMenu/OContextMenu.vue";
+import OContextMenuItem from "@/lib/overlay/ContextMenu/OContextMenuItem.vue";
+import OContextMenuLabel from "@/lib/overlay/ContextMenu/OContextMenuLabel.vue";
+import OContextMenuSeparator from "@/lib/overlay/ContextMenu/OContextMenuSeparator.vue";
+import EqualIcon from "@/components/icons/EqualIcon.vue";
+import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import LoadingProgress from "@/components/common/LoadingProgress.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import CellActions from "@/plugins/logs/data-table/CellActions.vue";
+import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
+import { useLogsHighlighter } from "@/composables/useLogsHighlighter";
+import { extractStatusFromLog } from "@/utils/logs/statusParser";
 import {
   buildPatternVolumeContext,
   fetchWindowTotal,
@@ -699,7 +891,10 @@ export default defineComponent({
       () => import("@/components/dashboards/panels/ChartRenderer.vue"),
     ),
     SanitizedHtmlRenderer,
-    TenstackTable: defineAsyncComponent(() => import("./TenstackTable.vue")),
+    OTable: defineAsyncComponent(() => import("@/lib/core/Table/OTable.vue")),
+    CellActions,
+    O2AIContextAddBtn,
+    JsonPreview: defineAsyncComponent(() => import("./JsonPreview.vue")),
     TelemetryCorrelationDashboard,
     PatternList: defineAsyncComponent(() => import("./patterns/PatternList.vue")),
     PatternDetailsDialog: defineAsyncComponent(() => import("./patterns/PatternDetailsDialog.vue")),
@@ -709,6 +904,12 @@ export default defineComponent({
     OIcon,
     ODropdown,
     ODropdownItem,
+    OContextMenu,
+    OContextMenuItem,
+    OContextMenuLabel,
+    OContextMenuSeparator,
+    EqualIcon,
+    NotEqualIcon,
     OTag,
   },
   emits: [
@@ -739,6 +940,13 @@ export default defineComponent({
   },
   methods: {
     handleColumnSizesUpdate(newColSizes: any) {
+      // Sizes arrive keyed by column id, but persistence stores them as
+      // `--col-{id}-size` / `--header-{id}-size` so saved views load back correctly.
+      const cssVarSizes: Record<string, number> = {};
+      for (const [id, size] of Object.entries(newColSizes || {})) {
+        cssVarSizes[`--col-${id}-size`] = size as number;
+        cssVarSizes[`--header-${id}-size`] = size as number;
+      }
       // colSizes entries are arrays of size-maps keyed by joined stream name.
       const colSizes = this.searchObj.data.resultGrid?.colSizes as Record<
         string,
@@ -750,7 +958,7 @@ export default defineComponent({
         [
           {
             ...prevColSizes,
-            ...newColSizes,
+            ...cssVarSizes,
           },
         ];
     },
@@ -853,12 +1061,16 @@ export default defineComponent({
       this.searchObj.meta.isFtsDefaultColumn = false;
       let selectedFields = this.reorderSelectedFields();
 
-      const RGIndex = this.searchObj.data.resultGrid.columns.indexOf(col.id);
-      this.searchObj.data.resultGrid.columns.splice(RGIndex, 1);
+      // `col` is the OTable columnDef, which carries `id` but not the original
+      // `name`. resultGrid.columns holds column objects, so match on id there and
+      // fall back to id for the selectedFields (string) lookup.
+      const field = col.name ?? col.id;
+      const RGIndex = this.searchObj.data.resultGrid.columns.findIndex((c: any) => c.id === col.id);
+      if (RGIndex !== -1) this.searchObj.data.resultGrid.columns.splice(RGIndex, 1);
 
-      const SFIndex = selectedFields.indexOf(col.name);
+      const SFIndex = selectedFields.indexOf(field);
 
-      selectedFields.splice(SFIndex, 1);
+      if (SFIndex !== -1) selectedFields.splice(SFIndex, 1);
 
       this.searchObj.data.stream.selectedFields = selectedFields.filter(
         (_field) => _field !== (this.store?.state?.zoConfig?.timestamp_column || "_timestamp"),
@@ -925,6 +1137,18 @@ export default defineComponent({
     let containerResizeObserver: ResizeObserver | null = null;
     // match shouldMoveActionsToMenu threshold: 3 pages when narrow, 5 when wide
     const paginationMaxPages = computed(() => (containerWidth.value < 700 ? 3 : 5));
+
+    // The histogram is sticky-left inside the shared scroll container. Sticky
+    // alone would stretch it to the full scroll width and mis-size the ECharts
+    // canvas, so lock it to the container's visible (client) width instead.
+    const histogramPinWidth = ref(0);
+    let histogramResizeObserver: ResizeObserver | null = null;
+    const histogramPinStyle = computed(() =>
+      histogramPinWidth.value ? { width: `${histogramPinWidth.value}px` } : {},
+    );
+    const syncHistogramPinWidth = () => {
+      histogramPinWidth.value = scrollContainerRef.value?.clientWidth ?? 0;
+    };
 
     const noOfRecordsTitle = computed<string>(
       () => (searchObj.data.histogram.chartParams.title as string) || "",
@@ -1215,6 +1439,27 @@ export default defineComponent({
 
     const histogramChart: any = ref(null);
 
+    // ECharts sizes its canvas from the element it was mounted into, and only
+    // re-measures when told to. The histogram wrapper is locked to an explicit
+    // pixel width (histogramPinStyle), so a viewport change — docking or
+    // undocking devtools, for instance — moves the box underneath a canvas that
+    // never hears about it, and the chart is left at the old size. ECharts' own
+    // window-resize handler is no help: it fires before the new width has been
+    // applied, so it re-measures the stale box.
+    //
+    // Watching the chart's own element removes the ordering problem entirely —
+    // the observer fires once the new box is real, whatever caused it.
+    const histogramChartWrap = ref<HTMLElement | null>(null);
+    let chartResizeObserver: ResizeObserver | null = null;
+
+    watch(histogramChartWrap, (el) => {
+      chartResizeObserver?.disconnect();
+      chartResizeObserver = null;
+      if (!el) return;
+      chartResizeObserver = new ResizeObserver(() => histogramChart.value?.chart?.resize());
+      chartResizeObserver.observe(el);
+    });
+
     const closePinnedTooltip = () => {
       pinnedTooltip.value.visible = false;
       // Restore tooltip mouse tracking
@@ -1314,11 +1559,19 @@ export default defineComponent({
         });
         containerResizeObserver.observe(searchListContainer.value);
       }
+
+      if (scrollContainerRef.value) {
+        syncHistogramPinWidth();
+        histogramResizeObserver = new ResizeObserver(syncHistogramPinWidth);
+        histogramResizeObserver.observe(scrollContainerRef.value);
+      }
     });
 
     onBeforeUnmount(() => {
       window.removeEventListener("themeColorChanged", handleThemeColorChange);
       containerResizeObserver?.disconnect();
+      histogramResizeObserver?.disconnect();
+      chartResizeObserver?.disconnect();
       // Clear any pending debounce timer
       if (debounceTimer) {
         clearTimeout(debounceTimer);
@@ -1661,16 +1914,12 @@ export default defineComponent({
       return window.innerWidth - (leftSidebarMenu + fieldList) - 5;
     });
 
-    // In the logs view the table scrolls itself (the histogram above it is
-    // pinned), so a page change has to reset that element rather than the
-    // pane. The patterns view still scrolls as a whole.
     const scrollTableToTop = (value: number) => {
-      const logsTableScrollEl = searchTableRef.value?.parentRef;
-      (logsTableScrollEl ?? scrollContainerRef.value)?.scrollTo({ top: value });
+      scrollContainerRef.value?.scrollTo({ top: value });
     };
 
-    const getColumns = computed(() => {
-      return searchObj.data?.resultGrid?.columns?.filter((col: any) => !!col.id);
+    const getColumns = computed<OTableColumnDef<any>[]>(() => {
+      return ((searchObj.data?.resultGrid?.columns as any[]) ?? []).filter((col: any) => !!col.id);
     });
 
     const getPartitionPaginations = computed(() => {
@@ -1883,6 +2132,171 @@ export default defineComponent({
       return [...new Set([...defaultFTSKeys, ...selectedStreamFTSKeys])];
     });
 
+    // ── Logs-grid rendering ───────────────────────────────────────────────────
+    // `processHitsInChunks` builds a per-(column, rowIndex) map of colorized HTML
+    // that the cell slots render via v-html.
+    const { processedResults, processHitsInChunks } = useLogsHighlighter();
+
+    const isFunctionErrorOpen = ref(false);
+
+    const logsTimestampCol = computed(() => store.state.zoConfig.timestamp_column || "_timestamp");
+
+    // ── Right-click cell actions ──────────────────────────────────────────────
+    // The cell the user last right-clicked, held as plain values (not the
+    // TanStack cell) so the menu keeps rendering correctly even if the
+    // virtualizer recycles the row underneath it.
+    interface ContextCell {
+      columnId: string;
+      value: unknown;
+      row: Record<string, unknown>;
+    }
+
+    const contextCell = ref<ContextCell | null>(null);
+
+    const contextCellIsStreamField = computed(() => {
+      const columnId = contextCell.value?.columnId;
+      if (!columnId) return false;
+      return (
+        searchObj.data.stream.selectedStreamFields?.find((field: any) => field.name === columnId)
+          ?.isSchemaField ?? false
+      );
+    });
+
+    // Mirrors O2AIContextAddBtn's own gate — the AI actions only exist on
+    // enterprise builds with AI turned on in the backend config.
+    const aiEnabled = computed(
+      () => config.isEnterprise === "true" && !!store.state.zoConfig.ai_enabled,
+    );
+
+    const toSearchTermValue = (value: unknown): string | number | boolean => {
+      if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+        return value;
+      }
+      if (value === null || value === undefined) return "null";
+      return JSON.stringify(value);
+    };
+
+    // Capture-phase gate on the whole table, so it runs before the cell's own
+    // handler. Only data cells offer actions — right-clicking a header or the
+    // expanded JSON row (which has its own menu) would otherwise open an empty
+    // one. reka-ui checks `defaultPrevented` before opening, so preventing here
+    // suppresses it.
+    const DATA_CELL_SELECTOR = "td[data-test^='o2-table-cell-']";
+
+    const handleTableContextMenu = (event: MouseEvent) => {
+      contextCell.value = null;
+      const target = event.target;
+      if (!(target instanceof Element) || !target.closest?.(DATA_CELL_SELECTOR)) {
+        event.preventDefault();
+      }
+    };
+
+    // Records which cell the right-click landed on. OTableBodyCell emits this
+    // from the td, so it fires before OContextMenu's own handler on the trigger.
+    const handleCellContextMenu = (params: { columnId: string; row: any; value: any }) => {
+      contextCell.value = {
+        columnId: params.columnId,
+        value: params.value,
+        row: (params.row ?? {}) as Record<string, unknown>,
+      };
+    };
+
+    // Drop the reference once the menu closes so a recycled virtual row can't be
+    // held alive by a stale row object.
+    // While the context menu is open the hover overlay offers the same actions, so
+    // the two would sit on screen at once. Track open state and hide the overlay.
+    const contextMenuOpen = ref(false);
+
+    const onContextMenuOpenChange = (open: boolean) => {
+      contextMenuOpen.value = open;
+      if (!open) contextCell.value = null;
+    };
+
+    // Row object → its original index in hits; the highlight cache, detail
+    // sidebar and expansion are all keyed by that index.
+    const logsHitIndexMap = computed(() => {
+      const m = new Map<any, number>();
+      (searchObj.data.queryResults?.hits || []).forEach((h: any, i: number) => m.set(h, i));
+      return m;
+    });
+    const logsRowIndex = (row: any): number => logsHitIndexMap.value.get(row) ?? -1;
+    const logsCellHtml = (columnId: string, row: any): string | null => {
+      const idx = logsRowIndex(row);
+      if (idx < 0) return null;
+      return (processedResults.value as any)[`${columnId}_${idx}`] ?? null;
+    };
+
+    const reprocessLogsHighlight = (clearCache: boolean) => {
+      processHitsInChunks(
+        searchObj.data.queryResults?.hits || [],
+        (getColumns.value as any[]) || [],
+        clearCache,
+        searchObj.data.highlightQuery || "",
+        100,
+        selectedStreamFullTextSearchKeys.value,
+      );
+    };
+    // `immediate` so a mount with results already present still highlights them.
+    watch(
+      () => getColumns.value,
+      () => reprocessLogsHighlight(true),
+      {
+        immediate: true,
+      },
+    );
+    watch(
+      () => searchObj.data.queryResults?.hits,
+      () => reprocessLogsHighlight(false),
+    );
+
+    const getLogRowStatusColor = (row: any): string | undefined => extractStatusFromLog(row)?.color;
+
+    // "Search around" highlight, applied as a class (not an inline style) so the
+    // row-hover utility still wins on hover.
+    const getLogRowClass = (row: any): string => {
+      const classes: string[] = [];
+      const ts = searchObj.data?.searchAround?.indexTimestamp;
+      if (ts != null && ts !== -1 && row[logsTimestampCol.value] === ts) {
+        classes.push("bg-table-row-selected-bg");
+      }
+      // Carries the detected severity for the status spine, which is otherwise
+      // only readable as a colour.
+      const level = extractStatusFromLog(row)?.level;
+      if (level) classes.push(`o2-log-level-${level}`);
+      return classes.join(" ");
+    };
+
+    // Row identity is the hit's position, NOT its `_timestamp`: a timestamp
+    // repeats across hits ingested in the same batch (an enrichment table gives
+    // every row the upload time), and keying on it expanded every row sharing
+    // the value off a single click. The parent already tracks `expandedLogs` as
+    // hit indices, so use those directly.
+    const logsRowKey = (row: any): string => String(logsRowIndex(row));
+    const expandedLogIds = computed<string[]>(() =>
+      ((props.expandedLogs as number[]) || []).map(String),
+    );
+    const onExpandedLogIdsChange = (newIds: string[]) => {
+      const prev = new Set(expandedLogIds.value);
+      const next = new Set(newIds);
+      let toggled: string | null = null;
+      for (const k of next)
+        if (!prev.has(k)) {
+          toggled = k;
+          break;
+        }
+      if (toggled == null)
+        for (const k of prev)
+          if (!next.has(k)) {
+            toggled = k;
+            break;
+          }
+      if (toggled == null) return;
+      const idx = Number(toggled);
+      if (Number.isInteger(idx) && idx >= 0) expandLog(idx);
+    };
+
+    const openLogDetailsByRow = (row: any) => openLogDetails(row, logsRowIndex(row));
+
     return {
       isDark,
       t,
@@ -1898,10 +2312,30 @@ export default defineComponent({
       searchTableRef,
       scrollContainerRef,
       histogramRef,
+      histogramPinStyle,
       searchAroundData,
       addSearchTerm,
       removeSearchTerm,
+      logsTimestampCol,
+      logsCellHtml,
+      logsRowIndex,
+      logsRowKey,
+      getLogRowStatusColor,
+      getLogRowClass,
+      expandedLogIds,
+      onExpandedLogIdsChange,
+      openLogDetailsByRow,
+      isFunctionErrorOpen,
+      contextCell,
+      contextCellIsStreamField,
+      aiEnabled,
+      toSearchTermValue,
+      handleTableContextMenu,
+      handleCellContextMenu,
+      onContextMenuOpenChange,
+      contextMenuOpen,
       histogramChart,
+      histogramChartWrap,
       pinnedTooltip,
       closePinnedTooltip,
       onHistogramAreaClick,
@@ -2046,6 +2480,39 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped>
+/* keep(lib-override:logs-cell-font): the monospace log-cell font. Body cells are
+   rendered by OTableBodyCell, so the rule must reach them through :deep(), and it
+   is scoped to the DATA cells so the expanded row keeps its own typography. */
+.logs-results-otable :deep(td[data-test^="o2-table-cell-"]) {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  /* Cap the line box so a single log line can't grow the row height. */
+  line-height: 1.125rem;
+}
+
+/* The default expand button sets a floor under every log row height
+   regardless of :row-height, which costs a line per screen. Sized to fill its
+   cell rather than shrunk to the glyph, so the whole cell is clickable — a
+   glyph-sized target is easy to miss near its edges. */
+.logs-results-otable :deep([data-test^="o2-table-expand-"]) {
+  height: 1.25rem !important;
+  /* Definite width matching the w-4 expand cell — NOT 100%: a percent-width
+     child inside the auto-layout table is circular, and Chromium resolves it
+     by inflating the table to its 500000-pixel cap, pushing all data off-screen. */
+  width: 1rem !important;
+  min-height: 0 !important;
+}
+.logs-results-otable :deep([data-test^="o2-table-expand-"] svg) {
+  width: 0.875rem !important;
+  height: 0.875rem !important;
+}
+
+/* The shared expanded-row fill reads as a grey slab against the dense log rows,
+   which is not how the logs grid looked before. Keep the normal cell surface. */
+.logs-results-otable :deep([data-test^="o2-table-expanded-row-"]) {
+  background-color: var(--color-table-cell-bg);
+}
+
 /* keep(generated-content): pin-breakdown tooltip. The rows are built from data
    via v-for with per-row inline colours, and the whole tooltip is
    <Teleport to="body">; Vue still stamps the scope id onto teleported nodes, so
@@ -2195,6 +2662,14 @@ export default defineComponent({
 .histogram-container {
   border-radius: 0.5rem;
   position: relative;
+
+  /* Pinned along X only: still scrolls away with the log lines, but stays put
+     when the wide results table scrolls sideways. */
+  &--pinned-x {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+  }
 
   &--visible {
     height: 6.25rem;
