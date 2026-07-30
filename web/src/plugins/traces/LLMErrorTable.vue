@@ -240,7 +240,7 @@ onMounted(() => {
     (entries) => {
       isVisible.value = entries[0].isIntersecting;
     },
-    { root: null, rootMargin: "12.5rem", threshold: 0 },
+    { root: null, rootMargin: "200px", threshold: 0 },
   );
   setTimeout(() => {
     if (rootEl.value) observer?.observe(rootEl.value);

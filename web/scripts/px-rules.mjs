@@ -100,6 +100,12 @@ export const pxIsAllowed = (text, index, raw) => {
   if (/@media|@container/.test(before.slice(before.lastIndexOf("\n") + 1))) return true;
   if (/@?(?:max|min)(?:-[a-z]+)?-\[[^\]]*$/.test(before)) return true;
 
+  // IntersectionObserver rootMargin. The API parses px and % ONLY — a rem value
+  // throws SyntaxError from the constructor, killing the observer and whatever it
+  // gates (lazy-load, prefetch-ahead-of-fold). Like a query condition, it is a
+  // scroll threshold rather than a rendered length.
+  if (/rootMargin["']?\s*:\s*[^,}]*$/.test(before)) return true;
+
   // `calc(var(--x) * 1px)` — a unit-conversion operator on a unitless JS value.
   if (/\*\s*$/.test(before)) return true;
 

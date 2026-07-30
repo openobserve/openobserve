@@ -154,7 +154,7 @@ onMounted(() => {
         observer = null;
       }
     },
-    { rootMargin: "12.5rem 0px" },
+    { rootMargin: "200px 0px" },
   );
   observer.observe(rootEl.value);
 });

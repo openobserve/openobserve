@@ -31,8 +31,9 @@
 >   for `parseInt` on authored sizes (§6 R7).
 >
 > **Deliberately still px** (§5 / §6 R1): hairlines, shadow/ring/blur widths, query
-> conditions, `calc()` mixing vh/vw, `* 1px` unit-multiplication, SVG/img dimension
-> attributes, canvas/ECharts/email consumers, and comment annotations.
+> conditions, `IntersectionObserver` `rootMargin` (§6 R5 — rem *throws*), `calc()` mixing
+> vh/vw, `* 1px` unit-multiplication, SVG/img dimension attributes, canvas/ECharts/email
+> consumers, and comment annotations.
 >
 > **Reviewer note — the one behaviour change.** Everything else is pixel-identical by
 > construction. `useStickyColumns` previously did `parseInt("100.5px") → 100`, truncating
@@ -136,6 +137,7 @@ every nested component.
 | K8 | Consumer requires px (email, fonts) | KEEP | 24 | 2 |
 | R4 | ECharts option objects | KEEP | 17 | 6 |
 | K3 | Shadow offsets in style blocks | KEEP | 2 | 2 |
+| R5 | `IntersectionObserver` `rootMargin` | KEEP | 4 | 4 |
 | R6 | JS scroll thresholds | KEEP | 2 | 1 |
 | K6 | `9999px` pill sentinel | KEEP | 1 | 1 |
 | K9 | Unit-multiplication `calc(var(--x) * 1px)` | KEEP | 7 | 2 |
@@ -466,6 +468,37 @@ or the literal `0.75`.
 This is the same constraint that already forces `utils/dashboard/` onto the `TS_HEX_ALLOWLIST` in
 your design-consistency script — colours can't be tokens there for exactly the same reason sizes
 can't be rem.
+
+---
+
+### R5 · `IntersectionObserver` `rootMargin` — 4 · *cannot*
+
+The `rootMargin` string is parsed by the **API**, not by the style system, and its grammar
+accepts **px and % only**. A rem value does not degrade — it throws from the constructor:
+
+```
+SyntaxError: Failed to construct 'IntersectionObserver':
+rootMargin must be specified in pixels or percent.
+```
+
+All four sites build the observer inside `onMounted`, so the throw aborts the mount hook and
+whatever the observer gates never happens — and because the work is lazy ("load when scrolled
+near"), the failure is **silent**: an empty cell, not an error the user can see.
+
+```js
+// components/rum/errorTracking/list/ErrorTrendCell.vue
+// components/rum/sessionReplay/SessionActivitySparkline.vue
+// plugins/logs/patterns/PatternVolumeCell.vue
+// plugins/traces/LLMErrorTable.vue
+{ rootMargin: "200px 0px" }   // KEEP — "12.5rem 0px" throws
+```
+
+Like K1 (query conditions) this is a **threshold that decides when** something loads, not a
+rendered length, so it has no reason to track font-size. `%` is accepted if a viewport-relative
+prefetch distance is ever wanted (`MetricCard.vue` already uses `"100% 0px"`).
+
+Enforced by a `rootMargin` exemption in `scripts/px-rules.mjs` — without it the eslint rule
+reports the correct px as an error and pushes the next author straight back into the crash.
 
 ---
 

@@ -11,7 +11,8 @@ description: >-
   rem-based scale (1rem = 16px, so px/16 = rem and px/4 = the Tailwind step;
   enforced by the local/no-hardcoded-px eslint rule, with a documented exemption
   list for the positions where px is genuinely correct — hairlines, shadow/ring
-  widths, query conditions, canvas/email consumers) in web/scripts/px-rules.mjs;
+  widths, query conditions, IntersectionObserver rootMargin, canvas/email
+  consumers) in web/scripts/px-rules.mjs;
   and corner radius uses only the two-tier scale rounded-default
   (4px controls) / rounded-surface (12px surfaces) / rounded-full — never
   rounded-[..] or the retired rounded-sm/md/lg/xl, (4) no scoped-CSS blocks and no
@@ -93,6 +94,7 @@ read it once, it is the backbone of everything below.
      | **Exception:** `letter-spacing` / `word-spacing` / `tracking-[…]` at ANY size | Tracking is *typographic* — it must scale with the type it tracks, so it never earns the sub-pixel exemption. `tracking-[0.5px]` is a violation; use rem (or `tracking-tight`/`-normal`/`-wide` if the value matches) |
      | Shadow offsets, ring / border / outline widths, blur radii | Optical effects, not layout. Scaling them with text makes elevation bloom |
      | Media / container query **conditions** (`@max-[900px]/topbar`) | A threshold defining *when* layout changes, not a rendered length |
+     | `IntersectionObserver` `rootMargin` | The API parses **px and % only** — a rem value throws `SyntaxError` from the constructor, silently killing the observer and whatever it gates (lazy-load, prefetch-ahead-of-fold). Like a query condition, it is a scroll threshold, not a rendered length |
      | `calc()` mixing `vh`/`vw` with a length | `vh` tracks the window, `rem` tracks font-size — converting one term makes the result depend on two independent variables |
      | `calc(var(--x) * 1px)` | A unit-conversion *operator* attaching a unit to a unitless JS-computed number, not a chosen dimension |
      | Canvas / ECharts / email consumers | No CSS cascade exists there — a detached measurement `<canvas>` has no root to resolve `rem` against, and an email resolves against the *recipient's* mail client |
