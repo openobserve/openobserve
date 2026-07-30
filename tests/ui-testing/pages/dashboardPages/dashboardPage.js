@@ -503,9 +503,22 @@ export class DashboardPage {
     }
   }
 
-  async addCustomChart() {
+  async addCustomChart(dashboardName = "Customcharts") {
     await this.dashboardsMenuItem.waitFor({ state: 'visible', timeout: 10000 });
     await this.dashboardsMenuItem.click();
+
+    // The sidebar click can silently fail to navigate on cloud (page stays on
+    // its current route) — verify the URL actually changed and fall back to a
+    // direct goto (with the org explicitly forced) if not, instead of hanging
+    // on addDashboardButton until timeout.
+    try {
+      await this.page.waitForURL('**/dashboards**', { timeout: 10000 });
+    } catch (e) {
+      const orgId = process.env['ORGNAME'];
+      await this.page.goto(
+        `${process.env['ZO_BASE_URL']}/web/dashboards?org_identifier=${orgId}&folder=default`
+      );
+    }
 
     await this.addDashboardButton.waitFor({ state: 'visible', timeout: 10000 });
     await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
@@ -513,7 +526,7 @@ export class DashboardPage {
 
     // Wait for dialog and fill name
     await this.dashboardNameInput.waitFor({ state: 'visible', timeout: 10000 });
-    await this.dashboardNameInput.fill("Customcharts");
+    await this.dashboardNameInput.fill(dashboardName);
 
     // Wait for submit button to be enabled
     await expect(this.dashboardSubmitButton).toBeEnabled({ timeout: 15000 });
