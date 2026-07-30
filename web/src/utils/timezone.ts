@@ -97,10 +97,7 @@ export const getLocalTime = (datetime: string) => {
  * value (a real IANA zone, "UTC", empty) is returned unchanged.
  */
 export const resolveBrowserTimezone = (timezone: string): string => {
-  if (
-    typeof timezone === "string" &&
-    timezone.toLowerCase().startsWith("browser time")
-  ) {
+  if (typeof timezone === "string" && timezone.toLowerCase().startsWith("browser time")) {
     const inner = timezone.match(/\(([^)]+)\)/)?.[1]?.trim();
     return inner || Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
   }

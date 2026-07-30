@@ -2320,9 +2320,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
         // Heal legacy alerts (e.g. created on older releases) that persisted a
         // "Browser Time (<zone>)" label — resolve it to a plain IANA zone so the
         // picker shows a valid value and the save path computes a real offset.
-        data.trigger_condition.timezone = resolveBrowserTimezone(
-          data.trigger_condition.timezone,
-        );
+        data.trigger_condition.timezone = resolveBrowserTimezone(data.trigger_condition.timezone);
       }
 
       if (data.query_condition.vrl_function) {

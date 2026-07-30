@@ -1881,10 +1881,11 @@ export default defineComponent({
       try {
         const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
         // @ts-ignore
-        const zones: string[] = (typeof Intl !== "undefined" && typeof Intl.supportedValuesOf === "function")
-          // @ts-ignore
-          ? Intl.supportedValuesOf("timeZone")
-          : [cronTimezone.value || "UTC"];
+        const zones: string[] =
+          typeof Intl !== "undefined" && typeof Intl.supportedValuesOf === "function"
+            ? // @ts-ignore
+              Intl.supportedValuesOf("timeZone")
+            : [cronTimezone.value || "UTC"];
         // Convenience shortcuts first (matching the reports picker), then every
         // IANA zone. This only populates OPTIONS — it must not seed cronTimezone.
         filteredTimezones.value = [`Browser Time (${browserTz})`, "UTC", ...zones];

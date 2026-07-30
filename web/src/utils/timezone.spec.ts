@@ -193,9 +193,7 @@ describe("convertDateToTimestamp", () => {
 
 describe("resolveBrowserTimezone", () => {
   it("returns a raw IANA zone unchanged", () => {
-    expect(resolveBrowserTimezone("America/Los_Angeles")).toBe(
-      "America/Los_Angeles",
-    );
+    expect(resolveBrowserTimezone("America/Los_Angeles")).toBe("America/Los_Angeles");
   });
 
   it("returns 'UTC' unchanged", () => {
@@ -209,24 +207,16 @@ describe("resolveBrowserTimezone", () => {
   });
 
   it("resolves a legacy label saved on another machine (rc9 update case)", () => {
-    expect(resolveBrowserTimezone("Browser Time (Asia/Kolkata)")).toBe(
-      "Asia/Kolkata",
-    );
+    expect(resolveBrowserTimezone("Browser Time (Asia/Kolkata)")).toBe("Asia/Kolkata");
   });
 
   it("matches the label prefix regardless of case", () => {
-    expect(resolveBrowserTimezone("browser time (Asia/Kolkata)")).toBe(
-      "Asia/Kolkata",
-    );
-    expect(resolveBrowserTimezone("BROWSER TIME (Asia/Kolkata)")).toBe(
-      "Asia/Kolkata",
-    );
+    expect(resolveBrowserTimezone("browser time (Asia/Kolkata)")).toBe("Asia/Kolkata");
+    expect(resolveBrowserTimezone("BROWSER TIME (Asia/Kolkata)")).toBe("Asia/Kolkata");
   });
 
   it("trims whitespace inside the label parentheses", () => {
-    expect(resolveBrowserTimezone("Browser Time ( Asia/Kolkata )")).toBe(
-      "Asia/Kolkata",
-    );
+    expect(resolveBrowserTimezone("Browser Time ( Asia/Kolkata )")).toBe("Asia/Kolkata");
   });
 
   it("leaves a value that only contains (not starts with) the label untouched", () => {
