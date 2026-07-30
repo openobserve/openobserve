@@ -62,7 +62,14 @@ watch(
   { immediate: true },
 );
 
+// Set while Enter commits and hands focus back to the trigger. A `<button>` is
+// keyboard-activatable, so the SAME Enter keypress that just committed would
+// land on the freshly-focused trigger and re-open the editor — leaving the field
+// stuck in edit mode. Ignore exactly that one re-activation.
+let ignoreNextActivation = false;
+
 const startEdit = async () => {
+  if (ignoreNextActivation) return;
   if (!canEdit.value || isEditing.value) return;
   valueAtEditStart.value = props.modelValue ?? "";
   draft.value = props.modelValue ?? "";
@@ -124,10 +131,16 @@ const restoreTriggerFocus = async () => {
 // no form owner (a workflow name, an incident title) submits nothing.
 const onEnter = () => {
   const owner = inputRef.value?.form ?? null;
+  // Swallow the re-activation this same Enter would fire on the trigger once
+  // focus returns to it (see startEdit); cleared after the key event settles.
+  ignoreNextActivation = true;
   commit();
   restoreTriggerFocus();
   // After commit, so the form validates and saves the trimmed value.
   owner?.requestSubmit();
+  requestAnimationFrame(() => {
+    ignoreNextActivation = false;
+  });
 };
 
 const onEscape = () => {
