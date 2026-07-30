@@ -1549,7 +1549,7 @@ pub async fn get_incident_with_alerts(
     }
 
     // Convert incident_alerts to triggers
-    let triggers: Vec<IncidentAlert> = incident_alerts
+    let mut triggers: Vec<IncidentAlert> = incident_alerts
         .iter()
         .map(|a| IncidentAlert {
             incident_id: a.incident_id.clone(),
@@ -1563,8 +1563,47 @@ pub async fn get_incident_with_alerts(
                 .and_then(|r| CorrelationReason::try_from(r.as_str()).ok())
                 .unwrap_or(CorrelationReason::AlertId),
             created_at: a.created_at,
+            source_url: None,
+            labels: None,
+            detected_source: None,
         })
         .collect();
+
+    // Enrich external-kind triggers with data from the external_alerts table.
+    // Internal alerts are left untouched (their details are hydrated below via
+    // the live-fetch path).
+    let external_ids: Vec<String> = triggers
+        .iter()
+        .filter(|t| t.alert_kind == AlertKind::External)
+        .map(|t| t.alert_id.clone())
+        .collect();
+
+    if !external_ids.is_empty() {
+        match infra::table::external_alerts::get_by_ids(&incident_org_id, &external_ids).await {
+            Ok(records) => {
+                let records_by_id: std::collections::HashMap<_, _> =
+                    records.into_iter().map(|r| (r.id.clone(), r)).collect();
+
+                for trigger in triggers
+                    .iter_mut()
+                    .filter(|t| t.alert_kind == AlertKind::External)
+                {
+                    if let Some(record) = records_by_id.get(&trigger.alert_id) {
+                        trigger.source_url = record.source_url.clone();
+                        trigger.labels = serde_json::from_value(record.labels.clone()).ok();
+                        trigger.detected_source = Some(record.detected_source.clone());
+                    }
+                }
+            }
+            Err(e) => {
+                log::warn!(
+                    "[incidents] Failed to fetch external alert details for incident {}: {}",
+                    incident_id,
+                    e
+                );
+            }
+        }
+    }
 
     // Get unique alert names from triggers
     let unique_alert_names: std::collections::HashSet<String> = incident_alerts

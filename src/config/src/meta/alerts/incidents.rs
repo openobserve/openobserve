@@ -393,6 +393,12 @@ pub struct IncidentAlert {
     pub alert_fired_at: i64,
     pub correlation_reason: CorrelationReason,
     pub created_at: i64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_url: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub labels: Option<std::collections::HashMap<String, String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub detected_source: Option<String>,
 }
 
 /// Incident with its alerts (for detail view)
@@ -2211,6 +2217,56 @@ mod tests {
         assert_eq!(AlertKind::from_stored("internal"), AlertKind::Internal);
         assert_eq!(AlertKind::from_stored("garbage"), AlertKind::Internal); // safe default
         assert_eq!(AlertKind::External.as_str(), "external");
+    }
+
+    #[test]
+    fn test_incident_alert_external_fields_serde() {
+        let alert = IncidentAlert {
+            incident_id: "inc1".to_string(),
+            alert_id: "ext1".to_string(),
+            alert_name: "External Alert".to_string(),
+            alert_kind: AlertKind::External,
+            alert_fired_at: 1000,
+            correlation_reason: CorrelationReason::AlertId,
+            created_at: 1000,
+            source_url: Some("https://example.com/alert/1".to_string()),
+            labels: Some(std::collections::HashMap::from([(
+                "service".to_string(),
+                "checkout".to_string(),
+            )])),
+            detected_source: Some("pagerduty".to_string()),
+        };
+
+        let json = serde_json::to_value(&alert).unwrap();
+        assert_eq!(json["alert_kind"], "external");
+        assert_eq!(json["source_url"], "https://example.com/alert/1");
+        assert_eq!(json["detected_source"], "pagerduty");
+
+        let round_tripped: IncidentAlert = serde_json::from_value(json).unwrap();
+        assert_eq!(round_tripped.alert_kind, AlertKind::External);
+        assert_eq!(
+            round_tripped.source_url,
+            Some("https://example.com/alert/1".to_string())
+        );
+    }
+
+    #[test]
+    fn test_incident_alert_legacy_json_defaults_to_internal() {
+        // Legacy stored/older payloads have no alert_kind or external fields at all.
+        let legacy_json = serde_json::json!({
+            "incident_id": "inc1",
+            "alert_id": "alert1",
+            "alert_name": "My Alert",
+            "alert_fired_at": 1000,
+            "correlation_reason": "alert_id",
+            "created_at": 1000,
+        });
+
+        let alert: IncidentAlert = serde_json::from_value(legacy_json).unwrap();
+        assert_eq!(alert.alert_kind, AlertKind::Internal);
+        assert_eq!(alert.source_url, None);
+        assert_eq!(alert.labels, None);
+        assert_eq!(alert.detected_source, None);
     }
 
     #[test]
