@@ -40,6 +40,7 @@ pub mod evaluation_watermarks;
 pub mod folders;
 pub mod gen_ai_agents;
 pub mod incident_events;
+pub mod incident_integrations;
 pub mod kv_store;
 mod migration;
 pub mod model_pricing;
