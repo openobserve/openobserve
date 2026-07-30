@@ -1082,9 +1082,10 @@ pub fn service_routes() -> Router {
                     "/{org_id}/workflows/{id}",
                     delete(workflows::delete_workflows).put(workflows::update_workflows),
                 )
+                .route("/{org_id}/workflows/test", post(workflows::test_workflow))
                 .route(
-                    "/{org_id}/workflows/{id}/test",
-                    post(workflows::test_workflow),
+                    "/{org_id}/workflows/{id}/trigger",
+                    post(workflows::trigger_workflow),
                 )
                 .route(
                     "/{org_id}/workflows/{id}/history",
@@ -1329,7 +1330,7 @@ pub fn other_service_routes() -> Router {
 }
 
 /// Create the full application router
-pub fn create_app_router(ui_routes: fn() -> Router) -> Router {
+pub fn create_app_router(ui_routes: fn(&str) -> Router) -> Router {
     let cfg = get_config();
 
     let mut app = if config::cluster::LOCAL_NODE.is_router() {
@@ -1368,13 +1369,16 @@ pub fn create_app_router(ui_routes: fn() -> Router) -> Router {
     let web_path = format!("{}/web/", cfg.common.base_uri);
     // Add UI routes at app level (outside basic_routes to avoid any middleware conflicts)
     if cfg.common.ui_enabled {
+        // `web_path` is also the `<base href>` the UI needs; resolve it here so the
+        // web crate does not have to depend on `config`.
+        let ui = ui_routes(&web_path);
         let web_path = web_path.clone();
         app = app
             .route(
                 "/",
                 get(move || core::future::ready(axum::response::Redirect::permanent(&web_path))),
             )
-            .nest_service("/web", ui_routes());
+            .nest_service("/web", ui);
     }
 
     // Set request body size limit (equivalent to actix-web's PayloadConfig)

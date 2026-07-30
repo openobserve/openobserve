@@ -2347,6 +2347,10 @@ async fn process_destination_node(
         data.push(std::sync::Arc::new(pipeline_item.record));
     }
 
+    if data.is_empty() {
+        return Ok(0);
+    }
+
     let data_count = data.len();
 
     match dest.module {

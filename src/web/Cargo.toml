@@ -6,7 +6,6 @@ license.workspace = true
 
 [dependencies]
 axum.workspace = true
-config.workspace = true
 mime_guess.workspace = true
 rust-embed-for-web.workspace = true
 

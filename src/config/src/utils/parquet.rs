@@ -36,7 +36,8 @@ use parquet::{
 };
 use vortex::{
     VortexSessionDefault,
-    array::{ArrayRef, VortexSessionExecute, arrow::ArrowSessionExt},
+    array::{ArrayRef, VortexSessionExecute},
+    arrow::{ArrowSessionExt, ToArrowType},
     buffer::Buffer,
     file::OpenOptionsSessionExt,
     io::session::RuntimeSessionExt,
