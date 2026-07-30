@@ -364,7 +364,7 @@ pub async fn zo_config() -> impl IntoResponse {
     // Anomaly detection is on when the enterprise feature is compiled in, unless turned off at
     // runtime via O2_ANOMALY_DETECTION_DISABLED. When disabled the UI hides the anomaly tab.
     let anomaly_detection_enabled = enterprise_value!(false, !o2cfg.anomaly_detection.disabled);
-    let online_evals_enabled = enterprise_value!(false, o2cfg.common.online_evals_enabled);
+    let online_evals_enabled = enterprise_value!(false, o2cfg.llm_eval_config.enabled);
     let synthetics_enabled = enterprise_value!(false, o2cfg.synthetics.enabled);
 
     #[cfg(all(feature = "cloud", not(feature = "enterprise")))]
