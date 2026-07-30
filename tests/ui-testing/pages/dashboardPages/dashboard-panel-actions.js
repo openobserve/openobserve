@@ -7,8 +7,10 @@ export default class DashboardactionPage {
 
     // The panel name is now an inline-edited title (OFormInlineEdit): a display
     // trigger swaps to an input on click. Click the trigger, then fill the input.
+    // The display trigger holds a `-value` span with the (auto-generated) name.
     this.panelNameTrigger = page.locator('[data-test="dashboard-panel-name-trigger"]');
     this.panelNameInput = page.locator('[data-test="dashboard-panel-name-input"]');
+    this.panelNameValue = page.locator('[data-test="dashboard-panel-name-value"]');
     this.panelSaveBtn = page.locator('[data-test="dashboard-panel-save"]');
     this.applyDashboard = page.locator('[data-test="dashboard-apply"]');
     this.addPanelBtn = page.locator('[data-test="dashboard-panel-add"]');
@@ -36,6 +38,12 @@ export default class DashboardactionPage {
   // Returns the inline panel-name validation error locator for assertions
   getPanelNameError() {
     return this.panelNameError;
+  }
+
+  // Returns the auto-generated panel-name display locator (the read-only value
+  // span shown in display mode) for asserting a name is always present.
+  getPanelNameValue() {
+    return this.panelNameValue;
   }
 
   // Returns all dashboard panel table data rows
