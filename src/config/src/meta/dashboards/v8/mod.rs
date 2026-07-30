@@ -503,12 +503,10 @@ pub struct Mapping {
     pattern: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", rename = "match")]
     matchh: Option<String>,
-    // Background color of a mapped value (existing field — unchanged for back-compat).
     #[serde(skip_serializing_if = "Option::is_none")]
     color: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     text: Option<String>,
-    // Optional text color for a mapped value; the background stays `color`.
     #[serde(skip_serializing_if = "Option::is_none")]
     text_color: Option<String>,
 }
