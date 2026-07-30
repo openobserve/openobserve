@@ -2560,6 +2560,153 @@ mod tests {
         }
     }
 
+    // ── The cross-repo contract (Phases 2b + 2c) ─────────────────────────
+    //
+    // Every other test in this module builds its own fixture, so all of them
+    // could pass while the payload the WEB app actually sends is refused. These
+    // are the bytes `buildCreateBrowserTestPayload` produces for a journey that
+    // exercises the whole surface at once: a recorded bundle, a locator the
+    // author wrote, a combined one with its parts, an author-owned order, a
+    // settle block and a typed assertion.
+    //
+    // Its twin is `web/src/utils/synthetics/payloadContract.spec.ts`, which
+    // asserts the web side emits exactly this. Neither repo can import from the
+    // other, so two copies of the same bytes is the only mechanism there is —
+    // if they drift, one of them fails.
+    const WEB_PAYLOAD_STEPS: &str = r##"[
+            {
+                "id": "s1",
+                "action": "navigate",
+                "name": "Open app",
+                "url": "https://app.test/login"
+            },
+            {
+                "id": "s2",
+                "action": "fill",
+                "name": "Username",
+                "value": "omkar",
+                "locator": {
+                    "candidates": [
+                        {
+                            "kind": "test_attribute",
+                            "value": "[data-test=\"login-user-id-field\"]",
+                            "origin": "recorded"
+                        }
+                    ]
+                }
+            },
+            {
+                "id": "s3",
+                "action": "click",
+                "name": "Switch org",
+                "locator": {
+                    "candidates": [
+                        {
+                            "kind": "test_attribute",
+                            "value": "[data-test=\"org-row\"] >> internal:and=\"div >> internal:has-text=/^acme_prod$/\"",
+                            "origin": "composite",
+                            "from": [
+                                {
+                                    "value": "[data-test=\"org-row\"]"
+                                },
+                                {
+                                    "value": "div >> internal:has-text=/^acme_prod$/",
+                                    "relation": "and"
+                                }
+                            ]
+                        },
+                        {
+                            "kind": "css",
+                            "value": "#my-own",
+                            "origin": "authored"
+                        },
+                        {
+                            "kind": "test_attribute",
+                            "value": "[data-test=\"org-row\"] >> nth=1",
+                            "origin": "recorded"
+                        }
+                    ],
+                    "author_ordered": true
+                },
+                "settle": {
+                    "navigation": {
+                        "url_pattern": "**/web/**"
+                    },
+                    "responses": [
+                        {
+                            "url_pattern": "**/auth/login",
+                            "method": "POST",
+                            "required": false
+                        }
+                    ]
+                }
+            },
+            {
+                "id": "s4",
+                "action": "assert",
+                "name": "Profile visible",
+                "locator": {
+                    "candidates": [
+                        {
+                            "kind": "test_attribute",
+                            "value": "[data-test=\"header-my-account-profile-icon\"]"
+                        }
+                    ]
+                },
+                "assertion": {
+                    "kind": "element_visible"
+                }
+            }
+        ]"##;
+
+    #[test]
+    fn test_the_payload_the_web_app_sends_validates() {
+        let (locs, brs, devs) = allowed();
+        let steps: serde_json::Value =
+            serde_json::from_str(WEB_PAYLOAD_STEPS).expect("the web payload must be valid JSON");
+        let s = v2_synthetic(steps);
+
+        let result = s.validate(&locs, &brs, &devs, true);
+        assert!(result.is_ok(), "{}", result.unwrap_err());
+    }
+
+    #[test]
+    fn test_every_field_the_web_sends_is_one_the_step_struct_knows() {
+        // `validate` alone would pass on a payload whose `from` was silently
+        // dropped. Deserializing is what proves deny_unknown_fields accepts the
+        // shape AND that the fields survive — which is the whole point of
+        // building the payload key by key rather than by spreading a model.
+        let steps: Vec<serde_json::Value> = serde_json::from_str(WEB_PAYLOAD_STEPS).unwrap();
+        let combined: BrowserStepV2 = serde_json::from_value(steps[2].clone())
+            .expect("the org-switcher step must deserialize");
+        let locator = combined.locator.expect("it carries a bundle");
+
+        assert!(locator.author_ordered);
+        assert_eq!(locator.candidates.len(), 3);
+
+        let composite = &locator.candidates[0];
+        assert_eq!(composite.origin.as_deref(), Some("composite"));
+        let from = composite
+            .from
+            .as_ref()
+            .expect("a composite says what built it");
+        assert_eq!(from.len(), 2);
+        assert!(
+            from[0].relation.is_none(),
+            "the base part carries no relation"
+        );
+        assert_eq!(from[1].relation.as_deref(), Some("and"));
+
+        assert_eq!(locator.candidates[1].origin.as_deref(), Some("authored"));
+
+        // The last step's bundle carries NO origin at all — the shape every
+        // bundle recorded before Phase 2b has. It has to keep validating while
+        // the deploy catches up, which is why `origin` is optional rather than
+        // defaulted at the serde layer.
+        let legacy: BrowserStepV2 = serde_json::from_value(steps[3].clone()).unwrap();
+        assert!(legacy.locator.unwrap().candidates[0].origin.is_none());
+    }
+
     fn v2_assert_step(assertion: serde_json::Value) -> serde_json::Value {
         serde_json::json!({
             "id": "s3",

@@ -1,0 +1,21 @@
+{
+  // The workspace root is the Rust crate; all JS/TS tooling lives in web/.
+  // Pin the Prettier extension to the repo's own prettier (3.7.4) rather than
+  // the version bundled with the extension, and point it at web/.prettierignore
+  // since the default lookup (<workspace>/.prettierignore) does not exist.
+  "prettier.prettierPath": "web/node_modules/prettier",
+  "prettier.ignorePath": "web/.prettierignore",
+
+  "editor.formatOnSave": true,
+
+  // Bind Prettier per-language only. A global editor.defaultFormatter would
+  // also claim .rs files and break rustfmt/rust-analyzer formatting on save.
+  "[vue]": { "editor.defaultFormatter": "esbenp.prettier-vscode" },
+  "[typescript]": { "editor.defaultFormatter": "esbenp.prettier-vscode" },
+  "[javascript]": { "editor.defaultFormatter": "esbenp.prettier-vscode" },
+  "[json]": { "editor.defaultFormatter": "esbenp.prettier-vscode" },
+  "[jsonc]": { "editor.defaultFormatter": "esbenp.prettier-vscode" },
+  "[css]": { "editor.defaultFormatter": "esbenp.prettier-vscode" },
+  "[scss]": { "editor.defaultFormatter": "esbenp.prettier-vscode" },
+  "[markdown]": { "editor.defaultFormatter": "esbenp.prettier-vscode" }
+}
