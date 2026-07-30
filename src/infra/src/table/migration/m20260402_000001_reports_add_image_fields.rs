@@ -26,7 +26,7 @@ impl MigrationTrait for Migration {
             .alter_table(
                 Table::alter()
                     .table(Reports::Table)
-                    .add_column(
+                    .add_column_if_not_exists(
                         ColumnDef::new(Reports::ImagePreview)
                             .boolean()
                             .not_null()
@@ -42,7 +42,7 @@ impl MigrationTrait for Migration {
             .alter_table(
                 Table::alter()
                     .table(ReportDashboards::Table)
-                    .add_column(
+                    .add_column_if_not_exists(
                         ColumnDef::new(ReportDashboards::ReportType)
                             .small_integer()
                             .not_null()
@@ -58,7 +58,7 @@ impl MigrationTrait for Migration {
             .alter_table(
                 Table::alter()
                     .table(ReportDashboards::Table)
-                    .add_column(
+                    .add_column_if_not_exists(
                         ColumnDef::new(ReportDashboards::EmailAttachmentType)
                             .small_integer()
                             .not_null()
@@ -74,7 +74,7 @@ impl MigrationTrait for Migration {
             .alter_table(
                 Table::alter()
                     .table(ReportDashboards::Table)
-                    .add_column(
+                    .add_column_if_not_exists(
                         ColumnDef::new(ReportDashboards::AttachmentDimensions)
                             .json()
                             .null(),
