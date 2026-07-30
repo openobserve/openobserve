@@ -39,6 +39,7 @@ use tokio::sync::OnceCell;
 use super::migration::Migrator;
 
 static TEST_DB: OnceCell<DatabaseConnection> = OnceCell::const_new();
+static TEST_DB_URL: OnceCell<String> = OnceCell::const_new();
 
 /// A migrated SQLite connection, shared by every test in the process.
 ///
@@ -47,14 +48,33 @@ static TEST_DB: OnceCell<DatabaseConnection> = OnceCell::const_new();
 pub async fn test_db() -> &'static DatabaseConnection {
     TEST_DB
         .get_or_init(|| async {
-            // `into_path` keeps the directory alive for the process; a dropped
-            // `TempDir` would delete the file out from under open connections.
-            let dir = tempfile::tempdir()
-                .expect("create temp dir for the test database")
-                .keep();
-            let url = format!("sqlite://{}/test.sqlite?mode=rwc", dir.display());
+            let url = TEST_DB_URL
+                .get_or_init(|| async {
+                    // `keep` holds the directory for the process; a dropped
+                    // `TempDir` would delete the file out from under open
+                    // connections.
+                    let dir = tempfile::tempdir()
+                        .expect("create temp dir for the test database")
+                        .keep();
+                    format!("sqlite://{}/test.sqlite?mode=rwc", dir.display())
+                })
+                .await;
 
-            let conn = Database::connect(&url)
+            // One migration (m20260107, distinct-retention sync) reaches
+            // around the ORM connection to the process-global key/value
+            // store. Its sqlite backend lives under `data_db_dir`, relative
+            // to the test process's CWD, and its read pool opens the file
+            // read-only — so in a crate directory that has never run a
+            // server, the file does not exist and every read fails with
+            // CANTOPEN. Create the directory and the store's tables the same
+            // way production startup does.
+            std::fs::create_dir_all(&config::get_config().common.data_db_dir)
+                .expect("create the meta-db directory");
+            crate::db::create_table()
+                .await
+                .expect("create the key/value store tables");
+
+            let conn = Database::connect(url)
                 .await
                 .expect("connect to the test sqlite database");
 
@@ -229,6 +249,40 @@ CREATE TABLE IF NOT EXISTS pipeline
         .await
 }
 
+/// Point the process-global `ORM_CLIENT` at the harness database.
+///
+/// For wiring-layer tests in OTHER crates (the group reaper, the scheduler
+/// tail, the management API): those paths reach the database through
+/// `ORM_CLIENT.get_or_init(connect_to_orm)` internally, so the only way to
+/// hand them the migrated test schema is to win that initialization first.
+/// It has to be a second pool onto the same SQLite file, because this crate
+/// enables sea-orm's `mock` feature, which strips `Clone` from
+/// `DatabaseConnection`.
+///
+/// Idempotent — every caller points at the same database, so whoever gets
+/// there first is fine. Useless inside this crate's own tests (they pass the
+/// harness connection explicitly to the `_with` variants); only global-client
+/// callers need it.
+pub async fn init_global_orm() {
+    // Migrate first: a global client handed out before the schema exists
+    // would race the migration set.
+    let _ = test_db().await;
+    let url = TEST_DB_URL.get().expect("test_db() initialized the url");
+    crate::db::ORM_CLIENT
+        .get_or_init(|| async {
+            let conn = Database::connect(url)
+                .await
+                .expect("connect the global ORM client to the test database");
+            // Same busy timeout as the harness pool — the two pools' writers
+            // must serialise, not fail with SQLITE_BUSY.
+            conn.execute_unprepared("PRAGMA busy_timeout=15000;")
+                .await
+                .expect("configure the global test connection");
+            conn
+        })
+        .await;
+}
+
 /// Create one table from its entity definition, ignoring "already exists".
 async fn create_from_entity<E>(conn: &DatabaseConnection, entity: E)
 where
@@ -313,10 +367,14 @@ pub async fn seed_alert(conn: &DatabaseConnection, alert_id: &str, multi_alert: 
         align_time: Set(false),
         dedup_enabled: Set(false),
         creates_incident: Set(false),
+        // The full storage shape, `ignore_case` included: the production
+        // write path always serializes it, and the read path requires it, so
+        // an abbreviated fixture would 500 any test that reads the alert
+        // back through `get_by_id`.
         query_aggregation: Set(Some(serde_json::json!({
             "group_by": ["host"],
             "function": "avg",
-            "having": {"column": "v", "operator": ">=", "value": 1},
+            "having": {"column": "v", "operator": ">=", "value": 1, "ignore_case": false},
             "multi_alert": multi_alert,
         }))),
         ..Default::default()

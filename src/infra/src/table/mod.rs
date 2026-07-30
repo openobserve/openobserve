@@ -76,7 +76,7 @@ pub mod synthetics_runs;
 pub mod system_prompts;
 pub mod system_settings;
 pub mod templates;
-#[cfg(test)]
+#[cfg(any(test, feature = "test-utils"))]
 pub mod test_harness;
 pub mod timed_annotation_panels;
 pub mod timed_annotations;

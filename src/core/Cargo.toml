@@ -117,4 +117,5 @@ lettre.workspace = true
 futures-util.workspace = true
 
 [dev-dependencies]
+infra = { workspace = true, features = ["test-utils"] }
 multer.workspace = true

@@ -2080,4 +2080,160 @@ mod tests {
             StatusCode::INTERNAL_SERVER_ERROR
         );
     }
+
+    // ── the groups endpoints against the real schema ────────────────────────
+    // Everything below them (the planner, the table layer) is tested in its
+    // own crate; these pin the endpoint contract — org scoping, severity
+    // ordering, the rollup counts, and the transitions filter.
+
+    use std::collections::BTreeMap;
+
+    use config::meta::alerts::{
+        grouping::{
+            ClassifiedGroup, FetchPage, GroupCapOutcome, GroupClassification, group_key,
+            plan_group_updates,
+        },
+        level::AlertLevel,
+    };
+    use hashbrown::HashMap;
+    use infra::table::test_harness::{init_global_orm, seed_alert, test_db};
+    use svix_ksuid::KsuidLike;
+
+    use super::{Path, Query, list_alert_group_transitions, list_alert_groups};
+
+    async fn body_json(resp: Response) -> serde_json::Value {
+        let bytes = axum::body::to_bytes(resp.into_body(), 1 << 20)
+            .await
+            .expect("read the response body");
+        serde_json::from_slice(&bytes).expect("parse the response body")
+    }
+
+    fn host_labels(host: &str) -> BTreeMap<String, String> {
+        [("host".to_string(), host.to_string())]
+            .into_iter()
+            .collect()
+    }
+
+    /// Seed a multi-alert with one critical group (host=a) and one healthy
+    /// group (host=b), written through the production plan path. Returns the
+    /// alert's ksuid.
+    async fn seed_multi_alert_with_groups() -> String {
+        init_global_orm().await;
+        let db = test_db().await;
+        let id = svix_ksuid::Ksuid::new(None, None).to_string();
+        seed_alert(db, &id, true).await;
+
+        let classification = GroupClassification {
+            // Healthy first, so the endpoint's severity sort is what orders
+            // the response — not insertion order.
+            groups: vec![
+                ClassifiedGroup {
+                    labels: host_labels("b"),
+                    actual_value: 1.0,
+                    level: None,
+                },
+                ClassifiedGroup {
+                    labels: host_labels("a"),
+                    actual_value: 99.0,
+                    level: Some(AlertLevel::Critical),
+                },
+            ],
+            rollup: Some(AlertLevel::Critical),
+            cap: GroupCapOutcome::WithinCap,
+            firing_observed: 1,
+            page: FetchPage::default(),
+            dropped: vec![],
+        };
+        let plan = plan_group_updates(
+            &id,
+            &classification,
+            &std::collections::HashMap::new(),
+            config::utils::time::now_micros(),
+        );
+        infra::table::alert_states::persist_group_plan(&plan, &id)
+            .await
+            .expect("persist the group plan");
+        id
+    }
+
+    #[tokio::test]
+    async fn an_invalid_alert_id_is_not_found() {
+        let resp =
+            list_alert_groups(Path(("default".to_string(), "not-a-ksuid".to_string()))).await;
+        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+    }
+
+    #[tokio::test]
+    async fn an_unknown_alert_is_not_found() {
+        init_global_orm().await;
+        let id = svix_ksuid::Ksuid::new(None, None).to_string();
+        let resp = list_alert_groups(Path(("default".to_string(), id))).await;
+        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+    }
+
+    /// The endpoint resolves through the alert, so another org must get 404 —
+    /// group labels carry host and service names.
+    #[tokio::test]
+    async fn another_org_cannot_read_group_labels() {
+        let id = seed_multi_alert_with_groups().await;
+        let resp = list_alert_groups(Path(("someone-else".to_string(), id))).await;
+        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+    }
+
+    #[tokio::test]
+    async fn groups_come_back_most_severe_first_with_rollup_counts() {
+        let id = seed_multi_alert_with_groups().await;
+        let resp = list_alert_groups(Path(("default".to_string(), id))).await;
+        let status = resp.status();
+        let body = body_json(resp).await;
+        assert_eq!(status, StatusCode::OK, "body: {body}");
+        let list = body["list"].as_array().expect("list");
+        assert_eq!(list.len(), 2);
+        assert_eq!(list[0]["level"], "critical");
+        assert_eq!(list[0]["labels"][0]["name"], "host");
+        assert_eq!(list[0]["labels"][0]["value"], "a");
+        assert_eq!(list[1]["level"], "ok");
+        assert_eq!(list[1]["labels"][0]["value"], "b");
+
+        assert_eq!(body["groups_observed"], 2);
+        assert_eq!(body["groups_firing"], 1);
+        assert_eq!(body["capped"], false);
+    }
+
+    #[tokio::test]
+    async fn transitions_filter_by_group_and_respect_limit() {
+        let id = seed_multi_alert_with_groups().await;
+
+        // Unfiltered: both groups' transitions (and the rollup's) come back.
+        let resp = list_alert_group_transitions(
+            Path(("default".to_string(), id.clone())),
+            Query(HashMap::new()),
+        )
+        .await;
+        assert_eq!(resp.status(), StatusCode::OK);
+        let all = body_json(resp).await;
+        let total = all["list"].as_array().expect("list").len();
+        assert!(total >= 2, "expected the initial transitions, got {total}");
+
+        // Scoped to the critical group: everything returned is that group's.
+        let key = group_key(&host_labels("a"));
+        let mut query = HashMap::new();
+        query.insert("group_key".to_string(), key.clone());
+        let resp =
+            list_alert_group_transitions(Path(("default".to_string(), id.clone())), Query(query))
+                .await;
+        let scoped = body_json(resp).await;
+        let scoped = scoped["list"].as_array().expect("list");
+        assert!(!scoped.is_empty());
+        assert!(scoped.iter().all(|t| t["group_key"] == key.as_str()));
+        assert!(scoped.len() < total);
+
+        // The limit clamps the page.
+        let mut query = HashMap::new();
+        query.insert("limit".to_string(), "1".to_string());
+        let resp =
+            list_alert_group_transitions(Path(("default".to_string(), id)), Query(query)).await;
+        let limited = body_json(resp).await;
+        assert_eq!(limited["list"].as_array().expect("list").len(), 1);
+    }
 }

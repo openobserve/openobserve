@@ -249,4 +249,216 @@ mod tests {
         assert!(!still_multi(None));
         assert!(!still_multi(Some(&Alert::default())));
     }
+
+    // ── sweep_alert against the real schema ─────────────────────────────────
+    // The sweep's decision helpers (group_fate, may_age_groups,
+    // opt_out_evictions) are pinned in the config crate; what these cover is
+    // the orchestration this file owns — which rows each verdict actually
+    // touches in the database.
+
+    use std::collections::BTreeMap;
+
+    use config::meta::alerts::{
+        AggFunction, Aggregation, Condition, Operator,
+        grouping::{
+            ClassifiedGroup, FetchPage, GroupCapOutcome, GroupClassification, plan_group_updates,
+        },
+        level::AlertLevel,
+        state::ROLLUP_GROUP_KEY,
+    };
+    use infra::table::test_harness::{
+        init_global_orm, seed_alert, seed_promql_alert, test_db, unique_alert_id,
+    };
+
+    const MINUTE: i64 = 60 * 1_000_000;
+
+    /// Write one critical group (host=a) plus the rollup row through the
+    /// production write path, stamped `at`.
+    async fn write_one_critical_group(alert_id: &str, at: i64, page: FetchPage) {
+        let labels: BTreeMap<String, String> = [("host".to_string(), "a".to_string())]
+            .into_iter()
+            .collect();
+        let classification = GroupClassification {
+            groups: vec![ClassifiedGroup {
+                labels,
+                actual_value: 42.0,
+                level: Some(AlertLevel::Critical),
+            }],
+            rollup: Some(AlertLevel::Critical),
+            cap: GroupCapOutcome::WithinCap,
+            firing_observed: 1,
+            page,
+            dropped: vec![],
+        };
+        let plan = plan_group_updates(alert_id, &classification, &HashMap::new(), at);
+        infra::table::alert_states::persist_group_plan(&plan, alert_id)
+            .await
+            .expect("persist the group plan");
+    }
+
+    /// An alert whose aggregation opted in to per-group evaluation.
+    fn aggregation_multi_alert() -> Alert {
+        let mut alert = Alert::default();
+        alert.query_condition.aggregation = Some(Aggregation {
+            group_by: Some(vec!["host".to_string()]),
+            function: AggFunction::Avg,
+            having: Condition {
+                column: "v".to_string(),
+                operator: Operator::GreaterThanEquals,
+                value: serde_json::json!(1),
+                ignore_case: false,
+            },
+            warning_value: None,
+            multi_alert: true,
+        });
+        alert
+    }
+
+    #[tokio::test]
+    async fn an_alert_missing_from_the_cache_gets_evicted_but_keeps_its_rollup() {
+        init_global_orm().await;
+        let db = test_db().await;
+        let id = unique_alert_id("reaper-optout");
+        seed_alert(db, &id, true).await;
+        write_one_critical_group(&id, now_micros(), FetchPage::default()).await;
+        assert_eq!(
+            infra::table::alert_states::list_groups(&id)
+                .await
+                .unwrap()
+                .len(),
+            1
+        );
+
+        // `None` = the alert is gone from the cache; grace must be irrelevant.
+        let (resolved, reaped, evicted) = sweep_alert(&id, None, 3, i64::MAX).await.unwrap();
+
+        assert_eq!((resolved, reaped, evicted), (0, 0, 1));
+        assert!(
+            infra::table::alert_states::list_groups(&id)
+                .await
+                .unwrap()
+                .is_empty()
+        );
+        // The rollup row is the alert's own state, not a group's — an opt-out
+        // eviction must leave it alone.
+        assert!(
+            infra::table::alert_states::get(&id, ROLLUP_GROUP_KEY)
+                .await
+                .unwrap()
+                .is_some(),
+            "eviction deleted the rollup row"
+        );
+    }
+
+    /// Regression for the launch bug: the sweep read only
+    /// `aggregation.multi_alert`, so a PromQL per-series alert looked opted
+    /// out and had all its state rows deleted on every pass.
+    #[tokio::test]
+    async fn a_promql_per_series_alert_keeps_its_rows_across_a_sweep() {
+        init_global_orm().await;
+        let db = test_db().await;
+        let id = unique_alert_id("reaper-promql");
+        seed_promql_alert(db, &id, true).await;
+        write_one_critical_group(&id, now_micros(), FetchPage::default()).await;
+
+        let mut alert = Alert::default();
+        alert.query_condition.query_type = config::meta::alerts::QueryType::PromQL;
+        alert.query_condition.promql_multi_alert = true;
+
+        let (resolved, reaped, evicted) =
+            sweep_alert(&id, Some(&alert), 3, i64::MAX).await.unwrap();
+
+        assert_eq!((resolved, reaped, evicted), (0, 0, 0));
+        assert_eq!(
+            infra::table::alert_states::list_groups(&id)
+                .await
+                .unwrap()
+                .len(),
+            1,
+            "the sweep treated a per-series alert as opted out"
+        );
+    }
+
+    /// A truncated fetch page must freeze the sweep: absence from a page that
+    /// never reached a healthy group proves nothing, however old the row is.
+    #[tokio::test]
+    async fn a_truncated_page_freezes_aging() {
+        init_global_orm().await;
+        let db = test_db().await;
+        let id = unique_alert_id("reaper-truncated");
+        seed_alert(db, &id, true).await;
+        // Old enough to resolve (default frequency floors resolve_after at
+        // 60s), but written from a page that filled while still firing.
+        write_one_critical_group(
+            &id,
+            now_micros() - 10 * MINUTE,
+            FetchPage {
+                filled: true,
+                reached_healthy: false,
+            },
+        )
+        .await;
+
+        let alert = aggregation_multi_alert();
+        let (resolved, reaped, evicted) =
+            sweep_alert(&id, Some(&alert), 3, i64::MAX).await.unwrap();
+
+        assert_eq!((resolved, reaped, evicted), (0, 0, 0));
+        let groups = infra::table::alert_states::list_groups(&id).await.unwrap();
+        assert_eq!(groups.len(), 1);
+        assert_eq!(
+            groups[0].level,
+            Some(AlertLevel::Critical),
+            "a frozen row must keep its level, not be resolved"
+        );
+    }
+
+    /// The full lifecycle: a vanished group resolves first (final Ok
+    /// transition), and only an already-resolved row is reaped once the grace
+    /// period passes.
+    #[tokio::test]
+    async fn a_vanished_group_resolves_then_reaps() {
+        init_global_orm().await;
+        let db = test_db().await;
+        let id = unique_alert_id("reaper-lifecycle");
+        seed_alert(db, &id, true).await;
+        write_one_critical_group(&id, now_micros() - 10 * MINUTE, FetchPage::default()).await;
+
+        let alert = aggregation_multi_alert();
+
+        // Pass 1, generous grace: resolve, never reap.
+        let (resolved, reaped, evicted) =
+            sweep_alert(&id, Some(&alert), 3, i64::MAX).await.unwrap();
+        assert_eq!((resolved, reaped, evicted), (1, 0, 0));
+        let groups = infra::table::alert_states::list_groups(&id).await.unwrap();
+        assert_eq!(groups.len(), 1, "resolution keeps the row for the UI");
+        let row = &groups[0];
+        assert_eq!(row.level, Some(AlertLevel::Ok));
+        assert!(
+            row.last_outcome_at > row.last_seen,
+            "resolution must advance last_outcome_at past last_seen — that gap \
+             is what marks the row resolved"
+        );
+
+        // Pass 2, zero grace: the resolved row reaps; nothing double-resolves.
+        let (resolved, reaped, evicted) = sweep_alert(&id, Some(&alert), 3, 0).await.unwrap();
+        assert_eq!((resolved, reaped, evicted), (0, 1, 0));
+        assert!(
+            infra::table::alert_states::list_groups(&id)
+                .await
+                .unwrap()
+                .is_empty()
+        );
+
+        // The durable history survives the reap: the firing and the recovery
+        // are both still on record (M-8).
+        let transitions = infra::table::alert_states::list_transitions(&id, 100)
+            .await
+            .expect("list transitions");
+        assert!(
+            transitions.len() >= 2,
+            "expected the firing and the resolution to both be recorded, got {}",
+            transitions.len()
+        );
+    }
 }

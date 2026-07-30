@@ -5143,6 +5143,185 @@ mod tests {
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].stream_name.as_str(), "output-stream");
     }
+
+    // ── persist_alert_run_state against the real schema ─────────────────────
+    // The planner (plan_group_updates) and the table layer are each tested in
+    // their own crates; these cover the wiring this file owns — which path an
+    // outcome takes (per-group fan-out vs single row vs dropped), reading and
+    // writing through the same global client production uses.
+
+    use std::collections::BTreeMap;
+
+    use config::meta::alerts::{
+        grouping::{ClassifiedGroup, FetchPage, GroupCapOutcome, GroupClassification},
+        level::AlertLevel,
+        state::ROLLUP_GROUP_KEY,
+    };
+    use infra::table::test_harness::{init_global_orm, seed_alert, test_db, unique_alert_id};
+
+    /// One critical group (host=a) and one healthy group (host=b).
+    fn two_group_classification() -> GroupClassification {
+        let group = |host: &str, level: Option<AlertLevel>, value: f64| ClassifiedGroup {
+            labels: [("host".to_string(), host.to_string())]
+                .into_iter()
+                .collect::<BTreeMap<String, String>>(),
+            actual_value: value,
+            level,
+        };
+        GroupClassification {
+            groups: vec![
+                group("a", Some(AlertLevel::Critical), 99.0),
+                group("b", None, 1.0),
+            ],
+            rollup: Some(AlertLevel::Critical),
+            cap: GroupCapOutcome::WithinCap,
+            firing_observed: 1,
+            page: FetchPage::default(),
+            dropped: vec![],
+        }
+    }
+
+    #[tokio::test]
+    async fn a_grouped_evaluation_fans_out_to_group_rows_and_the_rollup() {
+        init_global_orm().await;
+        let db = test_db().await;
+        let id = unique_alert_id("sched-fanout");
+        seed_alert(db, &id, true).await;
+
+        let classification = two_group_classification();
+        assert!(
+            persist_alert_run_state(
+                &id,
+                &RunOutcome::Firing,
+                Some(AlertLevel::Critical),
+                Some(&classification),
+            )
+            .await
+        );
+
+        let mut groups = infra::table::alert_states::list_groups(&id).await.unwrap();
+        groups.sort_by(|a, b| a.group_labels.cmp(&b.group_labels));
+        assert_eq!(groups.len(), 2);
+        assert_eq!(groups[0].level, Some(AlertLevel::Critical));
+        assert_eq!(
+            groups[1].level,
+            Some(AlertLevel::Ok),
+            "a healthy group is Ok, not absent"
+        );
+
+        let rollup = infra::table::alert_states::get(&id, ROLLUP_GROUP_KEY)
+            .await
+            .unwrap()
+            .expect("the fan-out must write the rollup row too");
+        assert_eq!(rollup.level, Some(AlertLevel::Critical));
+        assert_eq!(rollup.groups_observed, Some(2));
+        assert_eq!(rollup.groups_firing, Some(1));
+    }
+
+    #[tokio::test]
+    async fn a_skipped_run_does_not_touch_group_state() {
+        init_global_orm().await;
+        let db = test_db().await;
+        let id = unique_alert_id("sched-skip");
+        seed_alert(db, &id, true).await;
+
+        let classification = two_group_classification();
+        assert!(
+            persist_alert_run_state(
+                &id,
+                &RunOutcome::Firing,
+                Some(AlertLevel::Critical),
+                Some(&classification),
+            )
+            .await
+        );
+
+        // A silenced run must not launder the firing state into healthy —
+        // even when it carries a classification claiming everything is fine.
+        let all_ok = GroupClassification {
+            groups: classification
+                .groups
+                .iter()
+                .cloned()
+                .map(|mut g| {
+                    g.level = None;
+                    g
+                })
+                .collect(),
+            rollup: None,
+            firing_observed: 0,
+            ..classification.clone()
+        };
+        assert!(persist_alert_run_state(&id, &RunOutcome::Skipped, None, Some(&all_ok)).await);
+
+        let groups = infra::table::alert_states::list_groups(&id).await.unwrap();
+        let critical = groups
+            .iter()
+            .filter(|g| g.level == Some(AlertLevel::Critical))
+            .count();
+        assert_eq!(critical, 1, "the skipped run erased a firing group's state");
+    }
+
+    #[tokio::test]
+    async fn an_ungrouped_evaluation_writes_only_the_rollup_row() {
+        init_global_orm().await;
+        let id = unique_alert_id("sched-single");
+        // No alerts row needed: the single-row path does not re-read the
+        // opt-in flag.
+
+        assert!(
+            persist_alert_run_state(&id, &RunOutcome::Firing, Some(AlertLevel::Critical), None)
+                .await
+        );
+        let rollup = infra::table::alert_states::get(&id, ROLLUP_GROUP_KEY)
+            .await
+            .unwrap()
+            .expect("rollup row");
+        assert_eq!(rollup.last_outcome, Some(RunOutcome::Firing));
+        assert_eq!(rollup.level, Some(AlertLevel::Critical));
+        assert!(
+            infra::table::alert_states::list_groups(&id)
+                .await
+                .unwrap()
+                .is_empty()
+        );
+
+        // Recovery overwrites in place.
+        assert!(
+            persist_alert_run_state(&id, &RunOutcome::Normal, Some(AlertLevel::Ok), None).await
+        );
+        let rollup = infra::table::alert_states::get(&id, ROLLUP_GROUP_KEY)
+            .await
+            .unwrap()
+            .expect("rollup row");
+        assert_eq!(rollup.last_outcome, Some(RunOutcome::Normal));
+        assert_eq!(rollup.level, Some(AlertLevel::Ok));
+    }
+
+    #[tokio::test]
+    async fn load_tracked_group_states_returns_groups_and_rollup() {
+        init_global_orm().await;
+        let db = test_db().await;
+        let id = unique_alert_id("sched-load");
+        seed_alert(db, &id, true).await;
+
+        let classification = two_group_classification();
+        assert!(
+            persist_alert_run_state(
+                &id,
+                &RunOutcome::Firing,
+                Some(AlertLevel::Critical),
+                Some(&classification),
+            )
+            .await
+        );
+
+        let tracked = load_tracked_group_states(&id).await.unwrap();
+        // Two groups plus the rollup: the planner diffs against the rollup
+        // row too, so omitting it would break `since` continuity.
+        assert_eq!(tracked.len(), 3);
+        assert!(tracked.contains_key(ROLLUP_GROUP_KEY));
+    }
 }
 
 /// One SLI ingest pass (`alerts_2.md` §6b.4a, §6b.9).
