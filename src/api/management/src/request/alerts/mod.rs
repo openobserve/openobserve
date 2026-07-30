@@ -75,6 +75,7 @@ pub mod deduplication;
 pub mod destinations;
 pub mod external_events;
 pub mod history;
+pub mod incident_integrations;
 pub mod incidents;
 pub mod templates;
 
