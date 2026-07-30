@@ -27,7 +27,7 @@
 <template>
   <OPageLayout
     :title="isEdit ? t('slos.editTitle') : t('slos.newTitle')"
-    icon="track_changes"
+    icon="track-changes"
     :back="{ to: backTarget, label: t('slos.title') }"
     scroll
     title-data-test="slos-addslo-title"

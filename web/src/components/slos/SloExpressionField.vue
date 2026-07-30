@@ -49,7 +49,7 @@
         :query="modelValue ?? ''"
         language="sql"
         :keywords="keywords"
-        :suggestions="suggestions"
+        :suggestions="suggestions ?? undefined"
         :show-line-numbers="false"
         :sticky-scroll="false"
         :data-test="`${dataTest}-editor`"

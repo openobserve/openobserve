@@ -27,7 +27,7 @@
 <template>
   <OPageLayout
     :title="t('slos.title')"
-    icon="track_changes"
+    icon="track-changes"
     :subtitle="t('slos.subtitle')"
     title-data-test="slos-slolist-title"
     bleed
@@ -84,7 +84,7 @@
             v-if="selectedIds.length"
             variant="outline"
             size="sm-action"
-            icon-left="drive_file_move"
+            icon-left="drive-file-move"
             data-test="slos-slolist-move-selected"
             @click="openMove(selectedRows)"
           >
@@ -127,7 +127,7 @@
           />
           <OTag
             v-if="!row.enabled"
-            variant="neutral-soft"
+            variant="default-soft"
             icon="pause"
             size="xs"
             :label="t('slos.paused')"
@@ -156,7 +156,7 @@
         <div v-if="hasBudget(row)" class="flex items-center gap-2">
           <OProgressBar :value="budgetBarValue(row)" :tone="budgetTone(row)" class="w-20" />
           <span class="font-semibold tabular-nums" :class="budgetTextClass(row)">
-            {{ formatBudget(row.status.error_budget_remaining) }}
+            {{ formatBudget(row.status?.error_budget_remaining) }}
           </span>
         </div>
         <span v-else class="text-text-secondary">{{ ABSENT }}</span>
@@ -189,7 +189,7 @@
           <OTag
             v-for="tag in (row.tags || []).slice(0, 2)"
             :key="tag"
-            variant="neutral-soft"
+            variant="default-soft"
             size="xs"
             :label="tag"
           />
@@ -214,7 +214,7 @@
           <OButton
             variant="ghost"
             size="xs"
-            icon-left="drive_file_move"
+            icon-left="drive-file-move"
             :title="t('slos.move')"
             :data-test="`slos-slolist-move-${row.name}`"
             @click="openMove([row])"
@@ -222,7 +222,7 @@
           <OButton
             variant="ghost"
             size="xs"
-            :icon-left="row.enabled ? 'pause' : 'play_arrow'"
+            :icon-left="row.enabled ? 'pause' : 'play-arrow'"
             :title="row.enabled ? t('slos.pause') : t('slos.resume')"
             @click="toggleEnabled(row)"
           />
@@ -238,7 +238,7 @@
 
       <template #empty>
         <OEmptyState
-          icon="track_changes"
+          icon="track-changes"
           :title="t('slos.empty.title')"
           :description="t('slos.empty.description')"
         >
@@ -267,7 +267,7 @@
         <OButton variant="outline" size="sm-action" @click="deleteDialog = false">
           {{ t("common.cancel") }}
         </OButton>
-        <OButton variant="danger" size="sm-action" @click="doDelete">
+        <OButton variant="destructive" size="sm-action" @click="doDelete">
           {{ t("slos.delete") }}
         </OButton>
       </template>
@@ -320,6 +320,7 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -382,12 +383,18 @@ const typeOptions = computed(() => [
 ]);
 
 const columns = computed<OTableColumnDef<SloListItem>[]>(() => [
-  { id: "name", header: t("slos.column.name"), accessor: (r) => r.name, sortable: true, size: 260 },
-  { id: "health", header: t("slos.column.status"), accessor: (r) => health(r), size: 130 },
+  {
+    id: "name",
+    header: t("slos.column.name"),
+    accessor: (r: any) => r.name,
+    sortable: true,
+    size: 260,
+  },
+  { id: "health", header: t("slos.column.status"), accessor: (r: any) => health(r), size: 130 },
   {
     id: "sli",
     header: t("slos.column.statusVsTarget"),
-    accessor: (r) => r.status?.sli ?? -1,
+    accessor: (r: any) => r.status?.sli ?? -1,
     sortable: true,
     size: 170,
   },
@@ -395,35 +402,35 @@ const columns = computed<OTableColumnDef<SloListItem>[]>(() => [
     id: "budget",
     header: t("slos.column.budgetRemaining"),
     // Frozen SLOs sort to the end via the null branch in compareByUrgency.
-    accessor: (r) => r.status?.error_budget_remaining ?? null,
+    accessor: (r: any) => r.status?.error_budget_remaining ?? null,
     sortable: true,
     size: 190,
   },
   {
     id: "burn",
     header: t("slos.column.burnRate"),
-    accessor: (r) => r.status?.burn_rate ?? -1,
+    accessor: (r: any) => r.status?.burn_rate ?? -1,
     sortable: true,
     size: 110,
   },
   {
     id: "coverage",
     header: t("slos.column.coverage"),
-    accessor: (r) => r.status?.coverage ?? 0,
+    accessor: (r: any) => r.status?.coverage ?? 0,
     sortable: true,
     size: 100,
   },
-  { id: "window", header: t("slos.column.window"), accessor: (r) => r.window_secs, size: 100 },
+  { id: "window", header: t("slos.column.window"), accessor: (r: any) => r.window_secs, size: 100 },
   {
     id: "tags",
     header: t("slos.column.tags"),
-    accessor: (r) => (r.tags || []).join(","),
+    accessor: (r: any) => (r.tags || []).join(","),
     size: 180,
   },
   {
     id: "folder",
     header: t("slos.column.folder"),
-    accessor: (r) => r.folder_id,
+    accessor: (r: any) => r.folder_id,
     sortable: true,
     hideable: true,
     size: 140,
@@ -440,7 +447,7 @@ function health(row: SloListItem): SloHealth {
   return sloHealth(row.status);
 }
 
-function healthVariant(row: SloListItem): string {
+function healthVariant(row: SloListItem): BadgeVariant {
   switch (health(row)) {
     case "budget_blown":
       return "error-soft";
@@ -449,7 +456,7 @@ function healthVariant(row: SloListItem): string {
     case "meeting":
       return "success-soft";
     default:
-      return "neutral-soft";
+      return "default-soft";
   }
 }
 
@@ -505,7 +512,7 @@ const stats = computed<StatItem[]>(() => {
       key: "budget_blown",
       label: t("slos.health.budget_blown"),
       value: counts.budget_blown,
-      icon: "local_fire_department",
+      icon: "local-fire-department",
       tone: "error",
       max: total,
     },
@@ -513,7 +520,7 @@ const stats = computed<StatItem[]>(() => {
       key: "at_risk",
       label: t("slos.health.at_risk"),
       value: counts.at_risk,
-      icon: "trending_down",
+      icon: "trending-down",
       tone: "warning",
       max: total,
     },
@@ -521,7 +528,7 @@ const stats = computed<StatItem[]>(() => {
       key: "meeting",
       label: t("slos.health.meeting"),
       value: counts.meeting,
-      icon: "check_circle",
+      icon: "check-circle",
       tone: "success",
       max: total,
     },

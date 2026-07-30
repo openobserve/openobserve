@@ -157,6 +157,8 @@ import PlayCircle from "~icons/material-symbols/play-circle-outline";
 import SmartToy from "~icons/material-symbols/smart-toy-outline";
 import Speed from "~icons/material-symbols/speed-outline";
 import Target from "~icons/material-symbols/target";
+import TrackChanges from "~icons/material-symbols/track-changes";
+import LocalFireDepartment from "~icons/material-symbols/local-fire-department";
 import StopCircle from "~icons/material-symbols/stop-circle-outline";
 import Storage from "~icons/material-symbols/storage";
 import TableChart from "~icons/material-symbols/table-chart-outline";
@@ -519,6 +521,8 @@ export const iconRegistry = {
   "smart-toy": SmartToy,
   speed: Speed,
   target: Target,
+  "track-changes": TrackChanges,
+  "local-fire-department": LocalFireDepartment,
   "stop-circle": StopCircle,
   storage: Storage,
   "table-chart": TableChart,

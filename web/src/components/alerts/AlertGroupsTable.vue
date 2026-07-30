@@ -194,7 +194,7 @@ const rows = computed<AlertGroup[]>(() => {
   return props.groups.filter((g) => (g.group_labels || "").toLowerCase().includes(term));
 });
 
-const onEmptyAction = (id: string) => {
+const onEmptyAction = (id?: string) => {
   if (id === "clear-filters") search.value = "";
 };
 

@@ -214,7 +214,7 @@ const sloOptions = computed(() => slos.value.map((s) => ({ value: s.id, label: s
 const selectedSlo = computed(() => slos.value.find((s) => s.id === model.value.slo_id) || null);
 
 const kindOptions = computed(() => [
-  { value: "burn_rate", label: t("slos.alert.kind.burnRate"), icon: "local_fire_department" },
+  { value: "burn_rate", label: t("slos.alert.kind.burnRate"), icon: "local-fire-department" },
   { value: "error_budget", label: t("slos.alert.kind.errorBudget"), icon: "data_usage" },
 ]);
 

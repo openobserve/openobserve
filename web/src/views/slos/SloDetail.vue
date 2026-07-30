@@ -28,7 +28,7 @@
 <template>
   <OPageLayout
     :title="slo?.name || sloId"
-    icon="track_changes"
+    icon="track-changes"
     :subtitle="subtitle"
     :back="{ to: backTarget, label: t('slos.title') }"
     title-data-test="slos-slodetail-title"
@@ -47,7 +47,7 @@
         <OTag
           v-for="tag in slo?.tags || []"
           :key="tag"
-          variant="neutral-soft"
+          variant="default-soft"
           size="xs"
           :label="tag"
         />
@@ -276,7 +276,7 @@ const healthVariant = computed(() => {
     case "meeting":
       return "success-soft";
     default:
-      return "neutral-soft";
+      return "default-soft";
   }
 });
 
@@ -331,35 +331,35 @@ const groupColumns = computed<OTableColumnDef<SloStatus>[]>(() => [
   {
     id: "group_key",
     header: t("slos.column.group"),
-    accessor: (r) => r.group_key,
+    accessor: (r: any) => r.group_key,
     sortable: true,
     size: 280,
   },
   {
     id: "sli",
     header: t("slos.column.sli"),
-    accessor: (r) => r.sli ?? -1,
+    accessor: (r: any) => r.sli ?? -1,
     sortable: true,
     size: 130,
   },
   {
     id: "budget",
     header: t("slos.column.budgetRemaining"),
-    accessor: (r) => r.error_budget_remaining ?? null,
+    accessor: (r: any) => r.error_budget_remaining ?? null,
     sortable: true,
     size: 160,
   },
   {
     id: "burn",
     header: t("slos.column.burnRate"),
-    accessor: (r) => r.burn_rate ?? -1,
+    accessor: (r: any) => r.burn_rate ?? -1,
     sortable: true,
     size: 120,
   },
   {
     id: "coverage",
     header: t("slos.column.coverage"),
-    accessor: (r) => r.coverage,
+    accessor: (r: any) => r.coverage,
     sortable: true,
     size: 120,
   },
