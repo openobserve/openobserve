@@ -3,6 +3,15 @@ use sea_orm_migration::prelude::*;
 #[derive(DeriveMigrationName)]
 pub struct Migration;
 
+// Raw SQL rather than SeaORM's alter builder: `drop_column()` has no `IF EXISTS` variant, so the
+// builder version fails with `column "..." does not exist` when replayed against a database whose
+// v0.40.x schema was restored by hand (downgrade → re-upgrade). Every clause here is idempotent.
+const POSTGRES_ALTER_UP: &str = "ALTER TABLE alert_incidents \
+     DROP COLUMN IF EXISTS correlation_key, \
+     DROP COLUMN IF EXISTS stable_dimensions, \
+     ADD COLUMN IF NOT EXISTS group_values jsonb NOT NULL DEFAULT '{}', \
+     ADD COLUMN IF NOT EXISTS key_type varchar(20) NOT NULL DEFAULT 'AlertId'";
+
 // GIN indexes are Postgres-specific and not expressible via SeaORM's index builder.
 const POSTGRES_GIN_UP: &str = "CREATE INDEX IF NOT EXISTS alert_incidents_group_idx ON alert_incidents USING GIN (group_values)";
 const POSTGRES_GIN_DOWN: &str = "DROP INDEX IF EXISTS alert_incidents_group_idx";
@@ -26,25 +35,11 @@ impl MigrationTrait for Migration {
         match backend {
             sea_orm::DbBackend::Postgres => {
                 manager
-                    .alter_table(
-                        Table::alter()
-                            .table(AlertIncidents::Table)
-                            .drop_column(Alias::new("correlation_key"))
-                            .drop_column(Alias::new("stable_dimensions"))
-                            .add_column_if_not_exists(
-                                ColumnDef::new(AlertIncidents::GroupValues)
-                                    .json_binary()
-                                    .not_null()
-                                    .default("{}"),
-                            )
-                            .add_column_if_not_exists(
-                                ColumnDef::new(AlertIncidents::KeyType)
-                                    .string_len(20)
-                                    .not_null()
-                                    .default("AlertId"),
-                            )
-                            .to_owned(),
-                    )
+                    .get_connection()
+                    .execute(sea_orm::Statement::from_string(
+                        backend,
+                        POSTGRES_ALTER_UP.to_string(),
+                    ))
                     .await?;
                 manager
                     .get_connection()
