@@ -258,7 +258,7 @@
         </OTabPanel>
 
         <OTabPanel name="configuration" stretch>
-          <OContent class="py-4">
+          <OContent class="h-full overflow-y-auto py-4">
             <AlertConfigSummary v-if="alert" :alert="alert" />
           </OContent>
         </OTabPanel>
@@ -268,7 +268,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
@@ -432,7 +432,7 @@ const groupStats = computed<StatItem[]>(() => {
       key: "ok",
       label: t("alerts.groups.ok"),
       value: countOf("ok"),
-      icon: "check_circle",
+      icon: "check-circle",
       tone: "success",
       dataTest: "alerts-alertdetail-stat-ok",
     },
@@ -440,7 +440,7 @@ const groupStats = computed<StatItem[]>(() => {
       key: "firing",
       label: t("alerts.groups.firingTotal"),
       value: withBound(d?.groups_firing, d?.groups_firing_is_lower_bound),
-      icon: "notifications_active",
+      icon: "notifications-active",
       tone: "orange",
       dataTest: "alerts-alertdetail-stat-firing",
     },
@@ -533,17 +533,12 @@ const editAlert = () => {
   });
 };
 
-// Multi-alerts land on Groups (the reason the page exists for them); everything
-// else has no groups tab, so History is the only sensible default.
-watch(isMultiAlert, (multi) => {
-  if (multi) {
-    activeTab.value = "groups";
-    fetchGroups();
-  }
-});
-
 onMounted(async () => {
   await fetchAlert();
+  // Multi-alerts land on Groups (the reason the page exists for them); everything
+  // else has no groups tab, so History is the only sensible default. The alert is
+  // fetched exactly once and never re-fetched, so handling the initial load here
+  // is enough — a separate watch on isMultiAlert would just re-fire fetchGroups().
   if (isMultiAlert.value) {
     activeTab.value = "groups";
     await fetchGroups();

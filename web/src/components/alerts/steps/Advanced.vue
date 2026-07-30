@@ -147,13 +147,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Priority & tags (Feature 2, PT-10) -->
-          <div class="flex flex-wrap items-start gap-4">
-            <div class="min-w-40">
+          <div class="flex flex-col gap-4">
+            <div>
               <div
                 class="subsection-label text-text-secondary mb-2 flex items-center text-xs font-semibold"
               >
                 <span>{{ t("alerts.priority") }}</span>
-                <OTooltip :content="t('alerts.priorityTooltip')" :delay="300" />
+                <OIcon name="info" size="sm" class="ml-1 cursor-pointer" />
+                <OTooltip :content="t('alerts.priorityTooltip')" side="right" />
               </div>
               <OFormSelect
                 name="priority"
@@ -165,12 +166,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="alert-priority-select"
               />
             </div>
-            <div class="min-w-60 flex-1">
+            <div>
               <div
                 class="subsection-label text-text-secondary mb-2 flex items-center text-xs font-semibold"
               >
                 <span>{{ t("alerts.tags") }}</span>
-                <OTooltip :content="t('alerts.tagsTooltip')" :delay="300" />
+                <OIcon name="info" size="sm" class="ml-1 cursor-pointer" />
+                <OTooltip :content="t('alerts.tagsTooltip')" side="right" />
               </div>
               <OFormTagInput
                 name="tags"
