@@ -227,7 +227,7 @@ async deleteJobSearch(trace_id) {
  * @param {string} label         human name used in the failure message
  * @param {number} [timeoutMs=180000]
  */
-async _awaitEnabledRowButton(trace_id, buttonTestId, label, timeoutMs = 180000) {
+async _awaitEnabledRowButton(trace_id, buttonTestId, label, timeoutMs = 120000) {
     let button = null;
     // Track the last observed state so the failure says WHICH condition never held —
     // "the job never appeared in the list" and "the job appeared but its button stayed
