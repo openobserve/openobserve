@@ -94,7 +94,7 @@ export async function openNavFlyoutChild(page, child) {
  * @param {number[]} attempts per-attempt timeouts; a reload happens between them
  * @returns {Promise<boolean>} whether the rail became available
  */
-export async function waitForNavRailReady(page, attempts = [20000, 30000]) {
+export async function waitForNavRailReady(page, attempts = [15000, 20000, 25000]) {
     // Any rail MenuLink — see NAV_RAIL_SELECTOR in enhanced-baseFixtures.js for why
     // this must not pin on the home item.
     const rail = page.locator('[data-test="navbar-main-nav"] [data-test^="menu-link-"]').first();

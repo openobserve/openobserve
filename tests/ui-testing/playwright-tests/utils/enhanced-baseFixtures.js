@@ -211,7 +211,15 @@ async function settleNavRail(page, pathname) {
  * First attempt is short because the common case is instant; the reloads exist
  * only for the hung-/config case.
  */
-const NAV_RAIL_ATTEMPTS = [30000, 45000, 45000];
+// Five attempts with SHORT windows, not three long ones.
+//
+// Measured in run 30576576717 (Logs-Core): the rail recovered after a reload 8
+// times and was never populated 4 times, i.e. reloading works ~2 times in 3. Since
+// a healthy rail lands in ~1s, a long window buys nothing — what raises the
+// recovery rate is more reload attempts. 20s is already 20x the healthy case.
+//
+// Worst case 110s, still inside the 300s test budget with room for the test itself.
+const NAV_RAIL_ATTEMPTS = [20000, 20000, 20000, 25000, 25000];
 // ANY menu link inside the rail, not the home item specifically.
 // MainLayout.filterMenus() drops entries listed in the server's custom_hide_menus
 // config, so pinning the readiness check on one particular item risks waiting
