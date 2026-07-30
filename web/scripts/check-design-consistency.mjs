@@ -189,10 +189,7 @@ function walk(dir, files = []) {
     const full = join(dir, entry);
     const st = statSync(full);
     if (st.isDirectory()) walk(full, files);
-    // .css joined the walk with the px categories: 11 token/feature stylesheets
-    // were never scanned at all, so any px (or future raw token) in them was
-    // invisible to this guard.
-    else if ([".vue", ".ts", ".css"].includes(extname(entry))) files.push(full);
+    else if (extname(entry) === ".vue" || extname(entry) === ".ts") files.push(full);
   }
   return files;
 }
@@ -295,9 +292,6 @@ function countFile(file, rel) {
   const counts = {};
   const isVue = rel.endsWith(".vue");
   const isSpec = rel.includes(".spec.");
-  // Stylesheets have no category here — return early rather than falling into the .ts
-  // branch, whose rules would misfire on token files.
-  if (rel.endsWith(".css")) return counts;
 
   if (isVue) {
     // Per-category sanctioned exceptions (like the .ts allowlists): a file may carry
@@ -328,7 +322,6 @@ function countFile(file, rel) {
     if (rawVar) counts.rawVarInComponent = rawVar;
     const unjustified = countUnjustifiedBlocks(text);
     if (unjustified) counts.styleKeepComment = unjustified;
-
   } else {
     // .ts — only tsHex (non-spec, non-allowlisted) and darkMechanism apply.
     // Allowlist entry ending in "/" matches by directory prefix, else by suffix.
