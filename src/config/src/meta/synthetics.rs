@@ -1744,7 +1744,6 @@ fn validate_browser_config(
             "config.journey_budget_ms: must be {MIN_JOURNEY_BUDGET_MS}..={MAX_JOURNEY_BUDGET_MS}, got {budget_ms}"
         ));
     }
-    let attempts = i64::from(retries) + 1;
     // Multiplied by the device count, because the probe runs `browser_devices`
     // SEQUENTIALLY INSIDE the leased job (`browser-probe/src/index.ts:124`) — the
     // lease covers the whole job, not one device.

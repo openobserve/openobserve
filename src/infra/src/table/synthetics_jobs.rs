@@ -352,14 +352,23 @@ pub async fn lease_batch<C: ConnectionTrait>(
 /// Status values: 3=Passed, 4=Failed, 5=Warning, 6=Error (dispatch error).
 ///
 /// Returns `Some(run_id)` when the ack applied, and **`None` when it did not** —
-/// either the job does not exist or it was no longer Claimed, i.e. a duplicate or
-/// stale ack. The caller must treat `None` as "do not touch run accounting".
+/// the job does not exist, it was no longer Claimed, or it is now held by someone
+/// else. The caller must treat `None` as "do not touch run accounting".
+///
+/// `claimed_by` is the acking probe's agent id. `None` means the probe did not
+/// send one, which is the **compatibility window**: a probe built before this
+/// change acks without it, and rejecting those would drop every result until both
+/// probes are redeployed. Such an ack falls back to the status guard alone, i.e.
+/// exactly the behaviour before this change — so an old probe is no worse off,
+/// and a new one gets the ownership guard immediately. The window closes by
+/// making this argument non-optional once both probes have shipped.
 pub async fn ack_complete<C: ConnectionTrait>(
     conn: &C,
     job_id: &str,
     status: i32,
     result_json: Option<&str>,
     now_us: i64,
+    claimed_by: Option<&str>,
 ) -> Result<Option<String>, errors::Error> {
     // `AND status = 1` makes the ack idempotent: only a job still in the Claimed
     // state can be completed. Without it a duplicate ack succeeded, the caller
@@ -372,20 +381,31 @@ pub async fn ack_complete<C: ConnectionTrait>(
     // aws-sdk-lambda client retries a timed-out `RequestResponse` invoke, which
     // re-executes a check that is already running.
     //
-    // This does NOT cover the reaper-reassignment case — the row goes back to
-    // status 1 for the new holder, so the evicted holder's late ack still
-    // matches. That needs `claimed_by` on the ack, which spans both probes and a
-    // compatibility window, and is tracked separately.
-    let sql = r#"
-        UPDATE synthetics_jobs
-        SET status = $1, result = $2, completed_at = $3
-        WHERE id = $4 AND status = 1
-    "#;
-    let applied = conn
-        .execute(Statement::from_sql_and_values(
-            conn.get_database_backend(),
-            sql,
-            [
+    // The status guard alone does NOT cover reaper reassignment: the reaper puts
+    // the row back to Pending, another agent leases it, and the row is at status 1
+    // again — so the EVICTED holder's late ack still matches and overwrites the
+    // new holder's result, or lands before it and gets overwritten. Either way one
+    // job produced two results and `increment_jobs_done` ran twice for it.
+    //
+    // `claimed_by` closes that: only the agent the row is currently leased to can
+    // complete it. The lease already stamps `claimed_by`, so this compares against
+    // what the server itself recorded rather than anything the probe asserts.
+    let (owner_clause, values) = match claimed_by {
+        Some(agent) => (
+            " AND claimed_by = $5",
+            vec![
+                Value::from(status),
+                result_json
+                    .map(Value::from)
+                    .unwrap_or(Value::from(None::<String>)),
+                Value::from(now_us),
+                Value::from(job_id.to_owned()),
+                Value::from(agent.to_owned()),
+            ],
+        ),
+        None => (
+            "",
+            vec![
                 Value::from(status),
                 result_json
                     .map(Value::from)
@@ -393,6 +413,17 @@ pub async fn ack_complete<C: ConnectionTrait>(
                 Value::from(now_us),
                 Value::from(job_id.to_owned()),
             ],
+        ),
+    };
+    let sql = format!(
+        "UPDATE synthetics_jobs SET status = $1, result = $2, completed_at = $3 \
+         WHERE id = $4 AND status = 1{owner_clause}"
+    );
+    let applied = conn
+        .execute(Statement::from_sql_and_values(
+            conn.get_database_backend(),
+            &sql,
+            values,
         ))
         .await?;
 
@@ -554,6 +585,20 @@ pub enum DispatchFailureOutcome {
     /// via the dispatcher's existing `mark_failure`), so writing an
     /// intermediate status here would just be overwritten and wastes a query.
     DeadLettered,
+    /// The job is no longer Claimed — it has already been completed by a probe
+    /// ack, or reassigned to another holder. **The caller must do nothing:** no
+    /// requeue, no failure record, no run accounting.
+    ///
+    /// Reachable whenever a dispatch is judged failed *after* the probe already
+    /// reported: a Lambda that acks and then panics returns `FunctionError`, and
+    /// the SDK can also fail reading a response for an invocation that ran fine.
+    /// Without this the requeue reset a finished job to Pending, it was leased
+    /// again, and the check ran a second time — producing a duplicate result and a
+    /// second `increment_jobs_done` for one job.
+    ///
+    /// Enforced by the compiler rather than a test: the dispatcher matches all three
+    /// variants with no wildcard arm, so adding this one made "handle it" mandatory.
+    AlreadySettled,
 }
 
 /// Called when dispatching a leased job failed *before* the probe could run
@@ -571,19 +616,43 @@ pub async fn fail_dispatch<C: ConnectionTrait>(
     max_attempts: i32,
 ) -> Result<DispatchFailureOutcome, errors::Error> {
     if current_attempts < max_attempts {
+        // `AND status = 1` is what keeps this from resurrecting finished work. A
+        // dispatch can be judged failed after the probe has already acked — a
+        // Lambda that reports and then panics is exactly that — and without the
+        // guard the requeue reset a COMPLETED job to Pending, so it was leased and
+        // run again: duplicate result, and `increment_jobs_done` twice for one job.
         let sql = r#"
             UPDATE synthetics_jobs
             SET status = 0, claimed_by = NULL, claimed_at = NULL, lease_expires_at = NULL
-            WHERE id = $1
+            WHERE id = $1 AND status = 1
         "#;
-        conn.execute(Statement::from_sql_and_values(
-            conn.get_database_backend(),
-            sql,
-            [Value::from(job_id.to_owned())],
-        ))
-        .await?;
+        let applied = conn
+            .execute(Statement::from_sql_and_values(
+                conn.get_database_backend(),
+                sql,
+                [Value::from(job_id.to_owned())],
+            ))
+            .await?;
+        if applied.rows_affected() == 0 {
+            return Ok(DispatchFailureOutcome::AlreadySettled);
+        }
         Ok(DispatchFailureOutcome::Requeued)
     } else {
+        // Same check on the terminal branch, for the same reason: the caller's
+        // `mark_failure` would otherwise write a dispatch error over a real result.
+        // `ack_complete` would refuse it, but the caller also writes to the results
+        // stream and increments the run, and neither of those can be taken back.
+        let still_claimed = Entity::find()
+            .select_only()
+            .column(Column::Id)
+            .filter(Column::Id.eq(job_id))
+            .filter(Column::Status.eq(1i32))
+            .into_tuple::<String>()
+            .one(conn)
+            .await?;
+        if still_claimed.is_none() {
+            return Ok(DispatchFailureOutcome::AlreadySettled);
+        }
         Ok(DispatchFailureOutcome::DeadLettered)
     }
 }
@@ -628,6 +697,69 @@ pub async fn failing_locations<C: ConnectionTrait>(
         }
     }
     Ok(out)
+}
+
+/// One location+pool's share of the pending queue.
+#[derive(Debug, PartialEq, Eq)]
+pub struct PendingBacklogRow {
+    pub location: String,
+    pub pool: String,
+    /// Checks still waiting to be leased.
+    pub pending: i64,
+    /// `scheduled_ts` of the oldest one, in microseconds. The caller turns this
+    /// into an age; doing it here would bake in a clock reading the caller may
+    /// already have.
+    pub oldest_scheduled_ts: i64,
+}
+
+/// Per-location, per-pool count of checks waiting to be leased, with the oldest
+/// one's scheduled time.
+///
+/// Counts only rows that are still leasable — Pending and inside `valid_until`.
+/// Rows past their window are excluded on purpose: they are the reaper's to
+/// terminate and counting them would report a backlog that no amount of probe
+/// capacity can drain, which is a different problem wearing the same number.
+pub async fn pending_backlog<C: ConnectionTrait>(
+    conn: &C,
+    now_us: i64,
+) -> Result<Vec<PendingBacklogRow>, errors::Error> {
+    let sql = r#"
+        SELECT location, pool, COUNT(*) AS pending, MIN(scheduled_ts) AS oldest_scheduled_ts
+        FROM synthetics_jobs
+        WHERE status = 0 AND valid_until > $1
+        GROUP BY location, pool
+    "#;
+    let rows = conn
+        .query_all(Statement::from_sql_and_values(
+            conn.get_database_backend(),
+            sql,
+            [Value::from(now_us)],
+        ))
+        .await?;
+
+    Ok(rows
+        .into_iter()
+        .filter_map(|row| {
+            Some(PendingBacklogRow {
+                location: row.try_get("", "location").ok()?,
+                pool: row.try_get("", "pool").ok()?,
+                // SQLite hands COUNT back as i32 on some builds and i64 on others,
+                // so try the wider type first and fall back rather than dropping
+                // the row and reporting an empty backlog.
+                pending: row
+                    .try_get::<i64>("", "pending")
+                    .or_else(|_| row.try_get::<i32>("", "pending").map(i64::from))
+                    .unwrap_or(0),
+                // Falls back to `now_us`, i.e. age 0 — NOT to 0, which is the
+                // epoch and would publish a ~55-year-old backlog and page whoever
+                // is on call for a column we simply failed to decode.
+                oldest_scheduled_ts: row
+                    .try_get::<i64>("", "oldest_scheduled_ts")
+                    .or_else(|_| row.try_get::<i32>("", "oldest_scheduled_ts").map(i64::from))
+                    .unwrap_or(now_us),
+            })
+        })
+        .collect())
 }
 
 /// Backstop for pending rows past `valid_until`.
@@ -703,6 +835,20 @@ mod tests {
     }
 
     const MAX: i32 = 3;
+
+    #[test]
+    fn pending_backlog_row_carries_location_pool_and_the_oldest_entry() {
+        // The oldest entry is the half that distinguishes a deep queue that drains
+        // every tick from a location nothing is serving at all.
+        let row = PendingBacklogRow {
+            location: "private-dc1".to_string(),
+            pool: "private-dc1-pool".to_string(),
+            pending: 42,
+            oldest_scheduled_ts: 1_750_000_000_000_000,
+        };
+        assert_eq!(row.pending, 42);
+        assert_eq!(row.oldest_scheduled_ts, 1_750_000_000_000_000);
+    }
 
     #[test]
     fn pending_row_is_never_dispatched_whatever_its_attempt_count() {
