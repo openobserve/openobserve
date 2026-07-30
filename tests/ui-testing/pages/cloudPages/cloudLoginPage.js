@@ -30,7 +30,26 @@ class CloudLoginPage {
      */
     async expectHomePageMenuVisible(timeout = 90000) {
         await expect(this.appShell).toBeVisible({ timeout: 30000 });
-        await expect(this.homePageMenu).toBeVisible({ timeout });
+
+        // Reload between attempts rather than sitting on one long wait. A rail still
+        // empty after the first window means /config hung, and only a fresh request
+        // recovers that — a flat 90s here is exactly what failed in run 30568851982
+        // ("Timed out 90000ms ... menu-link-\\/-item ... element(s) not found") while
+        // the app shell was up, i.e. the session was fine.
+        const windows = [Math.min(timeout, 30000), 30000, 30000];
+        for (let i = 0; i < windows.length; i++) {
+            const ok = await this.homePageMenu.first()
+                .waitFor({ state: 'visible', timeout: windows[i] })
+                .then(() => true)
+                .catch(() => false);
+            if (ok) return;
+            if (i < windows.length - 1) {
+                await this.page.reload({ waitUntil: 'domcontentloaded' }).catch(() => {});
+            }
+        }
+
+        // Let expect produce the familiar diagnostic on the final failure.
+        await expect(this.homePageMenu).toBeVisible({ timeout: 15000 });
     }
 
     async expectOnWebPage(timeout = 15000) {

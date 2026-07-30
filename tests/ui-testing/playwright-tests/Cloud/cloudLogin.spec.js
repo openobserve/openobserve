@@ -8,7 +8,12 @@
  * @tags @cloudLogin @smoke @cloud @all
  */
 
-const { test } = require("@playwright/test");
+// enhanced-baseFixtures, not bare @playwright/test: this was the ONLY spec still on
+// the plain fixture, so it received none of the harness protections — no
+// org_identifier enforcement on navigation, no GET /config retry, no nav-rail reload
+// recovery. It duly failed in run 30568851982 on a 90s wait for menu-link-\/-item
+// while every other shard's equivalent wait was being recovered.
+const { test } = require("../utils/enhanced-baseFixtures.js");
 const testLogger = require("../utils/test-logger.js");
 const { CloudLoginPage } = require("../../pages/cloudPages/cloudLoginPage.js");
 
