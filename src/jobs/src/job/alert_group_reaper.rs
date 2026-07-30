@@ -139,13 +139,7 @@ async fn sweep_alert(
     // where aging them through M-7 would fabricate recoveries for groups that
     // simply stopped being evaluated (D26). This is the backstop for the
     // cleanup that the save path performs directly.
-    let still_multi = alert.is_some_and(|a| {
-        a.query_condition
-            .aggregation
-            .as_ref()
-            .is_some_and(|agg| agg.multi_alert)
-    });
-    if !still_multi {
+    if !still_multi(alert) {
         let tracked: HashMap<String, AlertState> = groups
             .into_iter()
             .map(|s| (s.group_key.clone(), s))
@@ -210,6 +204,14 @@ async fn sweep_alert(
     Ok((resolved, reaped, 0))
 }
 
+/// Whether the alert still evaluates per group. Must agree with every other
+/// layer — `multi_alert_enabled()` covers both the aggregation opt-in and the
+/// PromQL per-series opt-in; checking only `aggregation.multi_alert` here
+/// would make this sweep wipe a per-series alert's state rows every pass.
+fn still_multi(alert: Option<&Alert>) -> bool {
+    alert.is_some_and(|a| a.query_condition.multi_alert_enabled())
+}
+
 /// `alert_id -> Alert` from the in-memory cache.
 ///
 /// Built once per pass. `alert_states` rows are keyed by alert id alone while
@@ -222,4 +224,29 @@ async fn cached_alerts_by_id() -> HashMap<String, Alert> {
         .values()
         .filter_map(|(_, alert)| alert.id.map(|id| (id.to_string(), alert.clone())))
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use config::meta::alerts::QueryType;
+
+    use super::*;
+
+    // The aggregation arm of `multi_alert_enabled()` is pinned in the config
+    // crate; what this file must never regress on is the PromQL arm — the
+    // original bug read only `aggregation.multi_alert` and wiped a per-series
+    // alert's state rows every sweep.
+    #[test]
+    fn a_promql_per_series_alert_is_still_multi() {
+        let mut alert = Alert::default();
+        alert.query_condition.query_type = QueryType::PromQL;
+        alert.query_condition.promql_multi_alert = true;
+        assert!(still_multi(Some(&alert)));
+    }
+
+    #[test]
+    fn a_simple_or_missing_alert_is_not_multi() {
+        assert!(!still_multi(None));
+        assert!(!still_multi(Some(&Alert::default())));
+    }
 }

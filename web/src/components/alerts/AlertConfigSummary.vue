@@ -124,9 +124,13 @@ const sections = computed(() => [
       {
         key: "evaluation-mode",
         label: t("alerts.multiAlert.evaluationMode"),
-        value: aggregation.value?.multi_alert
-          ? t("alerts.multiAlert.perGroup")
-          : t("alerts.multiAlert.simple"),
+        // Three shapes: per-series (PromQL opt-in), per-group (aggregation
+        // opt-in), or simple.
+        value: queryCondition.value?.promql_multi_alert
+          ? t("alerts.multiAlert.perSeries")
+          : aggregation.value?.multi_alert
+            ? t("alerts.multiAlert.perGroup")
+            : t("alerts.multiAlert.simple"),
       },
     ],
   },

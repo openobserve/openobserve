@@ -1535,11 +1535,15 @@ export default defineComponent({
             // Severity axis (alerts_2.md Feature 1) — independent of outcome.
             level: data.level ?? null,
             level_since: data.level_since ?? null,
-            // Whether the alert CURRENTLY evaluates per group. The counts
+            // Whether the alert CURRENTLY evaluates per group — either the
+            // aggregation opt-in or the PromQL per-series one. The counts
             // below survive an opt-out (§5.3 leaves the rollup row alone), so
             // without this flag a simple alert would keep advertising the
             // group summary from back when it was a multi-alert.
-            multi_alert: !!data.condition?.aggregation?.multi_alert,
+            multi_alert: !!(
+              data.condition?.aggregation?.multi_alert ||
+              data.condition?.promql_multi_alert
+            ),
             // Multi-alert fan-out counts (§5.4). `undefined` — not 0 — for an
             // alert that never opted in, so the cell can render "—" rather
             // than claiming it observed zero groups.
