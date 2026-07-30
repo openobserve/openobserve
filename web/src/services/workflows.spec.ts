@@ -232,17 +232,23 @@ describe("workflows service", () => {
   });
 
   describe("testWorkflow", () => {
-    it("POSTs inputs to the test endpoint", async () => {
+    // The test endpoint dry-runs the whole graph WITHOUT persisting it, so the
+    // full `workflow` object is sent in the body and no id goes in the URL (the
+    // backend assigns a throwaway id for the run).
+    const wf = { id: "", org_id: "", name: "wf", nodes: [], edges: [] };
+
+    it("POSTs the workflow + inputs to the test endpoint", async () => {
       const inputs = [{ meta: { alert_name: "High Error Rate" }, data: [] }];
       mockHttpInstance.post.mockResolvedValue({ data: { errors: [] } });
 
       await workflows.testWorkflow({
         org_identifier: "org123",
-        id: "w1",
+        workflow: wf,
         inputs,
       });
 
-      expect(mockHttpInstance.post).toHaveBeenCalledWith("/api/org123/workflows/w1/test", {
+      expect(mockHttpInstance.post).toHaveBeenCalledWith("/api/org123/workflows/test", {
+        workflow: wf,
         inputs,
         from_node: undefined,
       });
@@ -254,12 +260,13 @@ describe("workflows service", () => {
 
       await workflows.testWorkflow({
         org_identifier: "o",
-        id: "w1",
+        workflow: wf,
         inputs,
         from_node: "node-3",
       });
 
-      expect(mockHttpInstance.post).toHaveBeenCalledWith("/api/o/workflows/w1/test", {
+      expect(mockHttpInstance.post).toHaveBeenCalledWith("/api/o/workflows/test", {
+        workflow: wf,
         inputs,
         from_node: "node-3",
       });
@@ -268,9 +275,10 @@ describe("workflows service", () => {
     it("sends an empty inputs array through untouched", async () => {
       mockHttpInstance.post.mockResolvedValue({ data: {} });
 
-      await workflows.testWorkflow({ org_identifier: "o", id: "w1", inputs: [] });
+      await workflows.testWorkflow({ org_identifier: "o", workflow: wf, inputs: [] });
 
-      expect(mockHttpInstance.post).toHaveBeenCalledWith("/api/o/workflows/w1/test", {
+      expect(mockHttpInstance.post).toHaveBeenCalledWith("/api/o/workflows/test", {
+        workflow: wf,
         inputs: [],
         from_node: undefined,
       });
@@ -279,17 +287,17 @@ describe("workflows service", () => {
     it("always sends the from_node key (undefined when omitted)", async () => {
       mockHttpInstance.post.mockResolvedValue({ data: {} });
 
-      await workflows.testWorkflow({ org_identifier: "o", id: "w1", inputs: [] });
+      await workflows.testWorkflow({ org_identifier: "o", workflow: wf, inputs: [] });
 
       const body = mockHttpInstance.post.mock.calls[0][1];
-      expect(Object.keys(body).sort()).toEqual(["from_node", "inputs"]);
+      expect(Object.keys(body).sort()).toEqual(["from_node", "inputs", "workflow"]);
     });
 
     it("propagates a test failure", async () => {
       mockHttpInstance.post.mockRejectedValue(new Error("test failed"));
 
       await expect(
-        workflows.testWorkflow({ org_identifier: "o", id: "w1", inputs: [] }),
+        workflows.testWorkflow({ org_identifier: "o", workflow: wf, inputs: [] }),
       ).rejects.toThrow("test failed");
     });
   });

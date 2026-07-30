@@ -24,11 +24,9 @@ use std::sync::{Arc, LazyLock};
 use arrow::buffer::BooleanBuffer;
 use tokio::runtime::Runtime;
 use vortex::{
-    array::{ArrayRef, Canonical, ExecutionCtx, IntoArray},
+    array::{ArrayRef, Canonical, ExecutionCtx, IntoArray, arrays::VarBinViewArray},
     buffer::Buffer,
-    compressor::{
-        BtrBlocksCompressor, BtrBlocksCompressorBuilder, SchemeExt, schemes::integer::IntDictScheme,
-    },
+    compressor::{BtrBlocksCompressor, BtrBlocksCompressorBuilder},
     dtype::DType,
     encodings::zstd::Zstd,
     error::VortexResult,
@@ -36,6 +34,7 @@ use vortex::{
     layout::{LayoutStrategy, layouts::compressed::CompressorPlugin},
     scan::selection::Selection,
 };
+use vortex_btrblocks::{SchemeExt, schemes::integer::IntDictScheme};
 use vortex_datafusion::VortexAccessPlan;
 
 pub static VORTEX_RUNTIME: LazyLock<Arc<Runtime>> = LazyLock::new(|| {
@@ -50,90 +49,126 @@ pub static VORTEX_RUNTIME: LazyLock<Arc<Runtime>> = LazyLock::new(|| {
     )
 });
 
-/// A compressor optimized for UTF8 fields using Zstd compression.
-///
-/// For UTF8/Binary fields:
-/// - Applies Zstd compression directly to VarBinView arrays
-/// - Uses configurable compression level (default: 3) and page size (default: 8192)
-/// - Falls back to uncompressed if compression doesn't reduce size
-///
-/// For all other data types:
-/// - Delegates to BtrBlocksCompressor for optimal encoding
+/// Configuration for compressing long UTF8 chunks with Zstd.
 #[derive(Clone)]
-struct Utf8Compressor {
-    /// The underlying BtrBlocks compressor for general compression
-    btr_compressor: BtrBlocksCompressor,
-    /// Zstd compression level (default: 3)
+struct LongTextCompressionOptions {
+    /// Zstd compression level.
     zstd_level: i32,
-    /// Number of values per Zstd compression frame (default: 8192)
+    /// Number of values per Zstd compression frame.
     values_per_page: usize,
+    /// Minimum average UTF8 value length that identifies long text.
+    min_average_length: usize,
+    /// Individual UTF8 value length considered long.
+    long_value_length: usize,
+    /// Percentage of valid values that must be long when the average is short.
+    min_long_value_ratio_percent: usize,
+    /// Avoid Zstd for small chunks where its framing overhead is not worthwhile.
+    min_total_bytes: usize,
 }
 
-impl Utf8Compressor {
-    /// Create a new smart compressor with default settings.
+impl Default for LongTextCompressionOptions {
+    fn default() -> Self {
+        Self {
+            zstd_level: 1,
+            values_per_page: 8192,
+            min_average_length: 64,
+            long_value_length: 64,
+            min_long_value_ratio_percent: 80,
+            min_total_bytes: 64 * 1024,
+        }
+    }
+}
+
+/// A compressor optimized for long UTF8 fields using Zstd compression.
+///
+/// For long UTF8 fields:
+/// - Applies Zstd compression directly to VarBinView arrays
+/// - Uses configurable compression level (default: 1) and page size (default: 8192)
+///
+/// For short UTF8, Binary, and all other data types:
+/// - Delegates to BtrBlocksCompressor for optimal encoding
+#[derive(Clone)]
+struct LongTextCompressor {
+    /// The underlying BtrBlocks compressor for general compression
+    btr_compressor: BtrBlocksCompressor,
+    /// Zstd compression and long-text detection options.
+    options: LongTextCompressionOptions,
+}
+
+impl LongTextCompressor {
     fn new() -> Self {
         Self {
             btr_compressor: BtrBlocksCompressorBuilder::default()
                 .exclude_schemes([IntDictScheme.id()])
                 .build(),
-            zstd_level: 3,
-            values_per_page: 8192,
+            options: LongTextCompressionOptions::default(),
         }
-    }
-
-    /// Set the Zstd compression level (1-22, default: 3).
-    #[cfg(test)]
-    fn with_zstd_level(mut self, level: i32) -> Self {
-        self.zstd_level = level;
-        self
-    }
-
-    /// Set the number of values per Zstd compression frame (default: 8192).
-    #[cfg(test)]
-    fn with_values_per_page(mut self, values: usize) -> Self {
-        self.values_per_page = values;
-        self
     }
 
     fn compress(&self, chunk: &ArrayRef, ctx: &mut ExecutionCtx) -> VortexResult<ArrayRef> {
-        // Check if this is a UTF8 or Binary field
-        if matches!(chunk.dtype(), DType::Utf8(_) | DType::Binary(_)) {
-            self.compress_utf8_or_binary(chunk, ctx)
-        } else {
-            // For non-UTF8 types, use BtrBlocks directly
-            self.btr_compressor.compress(chunk, ctx)
+        if !matches!(chunk.dtype(), DType::Utf8(_)) {
+            return self.btr_compressor.compress(chunk, ctx);
         }
-    }
 
-    fn compress_utf8_or_binary(
-        &self,
-        chunk: &ArrayRef,
-        ctx: &mut ExecutionCtx,
-    ) -> VortexResult<ArrayRef> {
         let canonical = chunk.clone().execute::<Canonical>(ctx)?;
-        let compressed = match &canonical {
-            Canonical::VarBinView(vbv) => {
-                let zstd_array =
-                    Zstd::from_var_bin_view(vbv, self.zstd_level, self.values_per_page, ctx)?;
-                zstd_array.into_array()
-            }
-            _ => {
-                // Unexpected canonical form, return BtrBlocks result
-                self.btr_compressor.compress(chunk, ctx)?
-            }
+        let Canonical::VarBinView(vbv) = &canonical else {
+            return self.btr_compressor.compress(chunk, ctx);
         };
 
-        Ok(compressed)
+        if !self.should_use_zstd(vbv, ctx)? {
+            return self.btr_compressor.compress(chunk, ctx);
+        }
+
+        Ok(Zstd::from_var_bin_view(
+            vbv,
+            self.options.zstd_level,
+            self.options.values_per_page,
+            ctx,
+        )?
+        .into_array())
+    }
+
+    fn should_use_zstd(
+        &self,
+        array: &VarBinViewArray,
+        ctx: &mut ExecutionCtx,
+    ) -> VortexResult<bool> {
+        let mut valid_count = 0usize;
+        let mut total_bytes = 0usize;
+        let mut long_value_count = 0usize;
+
+        for (index, view) in array.views().iter().enumerate() {
+            if !array.as_ref().is_valid(index, ctx)? {
+                continue;
+            }
+
+            let length = view.len() as usize;
+            valid_count += 1;
+            total_bytes = total_bytes.saturating_add(length);
+            if length >= self.options.long_value_length {
+                long_value_count += 1;
+            }
+        }
+
+        if valid_count == 0 || total_bytes < self.options.min_total_bytes {
+            return Ok(false);
+        }
+
+        let average_is_long = total_bytes / valid_count >= self.options.min_average_length;
+        let long_values_dominate = long_value_count.saturating_mul(100)
+            >= valid_count.saturating_mul(self.options.min_long_value_ratio_percent);
+
+        Ok(average_is_long || long_values_dominate)
     }
 }
 
-impl Default for Utf8Compressor {
+impl Default for LongTextCompressor {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl CompressorPlugin for Utf8Compressor {
+impl CompressorPlugin for LongTextCompressor {
     fn compress_chunk(&self, chunk: &ArrayRef, ctx: &mut ExecutionCtx) -> VortexResult<ArrayRef> {
         self.compress(chunk, ctx)
     }
@@ -153,7 +188,11 @@ fn build_vortex_write_strategy(use_native_compression: bool) -> Arc<dyn LayoutSt
     if use_native_compression {
         builder.build()
     } else {
-        builder.with_compressor(Utf8Compressor::default()).build()
+        let compressor = LongTextCompressor::default();
+        builder
+            .with_compressor(compressor.clone())
+            .with_probe_compressor(compressor)
+            .build()
     }
 }
 
@@ -170,9 +209,14 @@ pub fn generate_vortex_access_plan(row_ids: &BooleanBuffer) -> Option<VortexAcce
 mod tests {
     use vortex::{
         VortexSessionDefault,
-        array::{IntoArray, arrays::VarBinViewArray},
-        dtype::{DType, Nullability},
-        file::VortexWriteOptions,
+        array::{
+            IntoArray,
+            arrays::{StructArray, VarBinViewArray},
+            expr::{root, select},
+            stream::ArrayStreamExt,
+        },
+        dtype::{DType, FieldNames, Nullability},
+        file::{OpenOptionsSessionExt, VortexWriteOptions},
         io::session::RuntimeSessionExt,
         session::VortexSession,
     };
@@ -180,53 +224,47 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_compresses_utf8_strings() {
-        let compressor = Utf8Compressor::new();
+    fn test_long_text_compression_defaults() {
+        let options = LongTextCompressionOptions::default();
 
-        let strings = vec![
-            Some("apple"),
-            Some("banana"),
-            Some("apple"),
-            Some("cherry"),
-            Some("banana"),
-            Some("apple"),
-            Some("cherry"),
-            Some("banana"),
-            Some("apple"),
-            Some("apple"),
-            Some("banana"),
-            Some("cherry"),
-        ];
+        assert_eq!(options.zstd_level, 1);
+        assert_eq!(options.values_per_page, 8192);
+    }
+
+    #[test]
+    fn test_long_utf8_uses_zstd() {
+        let compressor = LongTextCompressor::new();
+        let strings = (0..1024)
+            .map(|i| Some(format!("long log message {i}: {}", "x".repeat(192))))
+            .collect::<Vec<_>>();
         let array =
             VarBinViewArray::from_iter(strings, DType::Utf8(Nullability::NonNullable)).into_array();
 
         let mut ctx = ExecutionCtx::new(VortexSession::default());
         let compressed = compressor.compress(&array, &mut ctx).unwrap();
         assert_eq!(compressed.len(), array.len());
-        assert!(compressed.nbytes() > 0);
+        assert_eq!(compressed.encoding_id().as_ref(), "vortex.zstd");
     }
 
     #[test]
-    fn test_high_cardinality_strings() {
-        let compressor = Utf8Compressor::new();
-
-        let strings: Vec<Option<String>> = (0..100)
-            .map(|i| Some(format!("unique_string_{:06}", i)))
+    fn test_short_utf8_delegates_to_btrblocks() {
+        let compressor = LongTextCompressor::new();
+        let strings: Vec<_> = (0..8192)
+            .map(|i| Some(format!("node-{}", i % 32)))
             .collect();
         let array =
             VarBinViewArray::from_iter(strings, DType::Utf8(Nullability::NonNullable)).into_array();
 
         let mut ctx = ExecutionCtx::new(VortexSession::default());
         let compressed = compressor.compress(&array, &mut ctx).unwrap();
-        assert_eq!(compressed.len(), 100);
-        assert!(compressed.nbytes() > 0);
+        assert_ne!(compressed.encoding_id().as_ref(), "vortex.zstd");
     }
 
     #[test]
     fn test_non_utf8_uses_btrblocks() {
         use vortex::array::arrays::PrimitiveArray;
 
-        let compressor = Utf8Compressor::new();
+        let compressor = LongTextCompressor::new();
         let array: PrimitiveArray = vec![1i32, 2, 3, 4, 5].into_iter().collect();
 
         let mut ctx = ExecutionCtx::new(VortexSession::default());
@@ -236,7 +274,7 @@ mod tests {
 
     #[test]
     fn test_empty_string_array() {
-        let compressor = Utf8Compressor::new();
+        let compressor = LongTextCompressor::new();
 
         let strings: Vec<Option<&str>> = vec![];
         let array =
@@ -245,22 +283,6 @@ mod tests {
         let mut ctx = ExecutionCtx::new(VortexSession::default());
         let compressed = compressor.compress(&array, &mut ctx).unwrap();
         assert_eq!(compressed.len(), 0);
-    }
-
-    #[test]
-    fn test_compression_settings() {
-        let compressor = Utf8Compressor::new()
-            .with_zstd_level(5)
-            .with_values_per_page(4096);
-
-        let strings = vec![Some("test"), Some("data"), Some("test")];
-        let array =
-            VarBinViewArray::from_iter(strings, DType::Utf8(Nullability::NonNullable)).into_array();
-
-        let mut ctx = ExecutionCtx::new(VortexSession::default());
-        let compressed = compressor.compress(&array, &mut ctx).unwrap();
-        assert_eq!(compressed.len(), 3);
-        assert!(compressed.nbytes() > 0);
     }
 
     #[tokio::test]
@@ -281,5 +303,54 @@ mod tests {
 
             assert!(!buf.is_empty());
         }
+    }
+
+    #[tokio::test]
+    async fn test_long_text_probe_skips_dict_layout() {
+        let body = VarBinViewArray::from_iter(
+            (0..8192).map(|i| Some(format!("long log message {i}: {}", "x".repeat(192)))),
+            DType::Utf8(Nullability::NonNullable),
+        )
+        .into_array();
+        let tag = VarBinViewArray::from_iter(
+            (0..8192).map(|i| Some(format!("node-{}", i % 32))),
+            DType::Utf8(Nullability::NonNullable),
+        )
+        .into_array();
+        let array = StructArray::try_new(
+            FieldNames::from(["body", "tag"]),
+            vec![body, tag],
+            8192,
+            vortex::array::validity::Validity::NonNullable,
+        )
+        .unwrap()
+        .into_array();
+        let dtype = array.dtype().clone();
+        let session = VortexSession::default().with_tokio();
+        let write_options = VortexWriteOptions::new(session.clone())
+            .with_strategy(build_vortex_write_strategy(false));
+        let mut buf = Vec::new();
+        let mut writer = write_options.writer(&mut buf, dtype);
+
+        writer.push(array).await.unwrap();
+        writer.finish().await.unwrap();
+
+        let projected = session
+            .open_options()
+            .open_buffer(buf)
+            .unwrap()
+            .scan()
+            .unwrap()
+            .with_projection(select(["body", "tag"], root()))
+            .into_array_stream()
+            .unwrap()
+            .read_all()
+            .await
+            .unwrap();
+        let encoding_tree = projected.display_tree_encodings_only().to_string();
+
+        assert!(encoding_tree.contains("body: vortex.zstd"));
+        assert!(!encoding_tree.contains("body: vortex.dict"));
+        assert!(encoding_tree.contains("tag: vortex.dict"));
     }
 }

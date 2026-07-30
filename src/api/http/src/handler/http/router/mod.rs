@@ -1082,9 +1082,10 @@ pub fn service_routes() -> Router {
                     "/{org_id}/workflows/{id}",
                     delete(workflows::delete_workflows).put(workflows::update_workflows),
                 )
+                .route("/{org_id}/workflows/test", post(workflows::test_workflow))
                 .route(
-                    "/{org_id}/workflows/{id}/test",
-                    post(workflows::test_workflow),
+                    "/{org_id}/workflows/{id}/trigger",
+                    post(workflows::trigger_workflow),
                 )
                 .route(
                     "/{org_id}/workflows/{id}/history",
