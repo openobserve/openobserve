@@ -67,8 +67,8 @@
                   :data-test="`dashboard-addpanel-config-value-mapping-type-select-${index}`"
                 />
               </div>
-              <template v-if="mapping.type === 'range'">
-                <div class="w-24 shrink-0">
+              <div v-if="mapping.type === 'range'" class="flex w-52 shrink-0 gap-2">
+                <div class="min-w-0 flex-1">
                   <OInput
                     v-model="mapping.from"
                     :placeholder="t('dashboard.valueMappingFrom')"
@@ -76,7 +76,7 @@
                     :data-test="`dashboard-addpanel-config-value-mapping-from-input-${index}`"
                   />
                 </div>
-                <div class="w-24 shrink-0">
+                <div class="min-w-0 flex-1">
                   <OInput
                     v-model="mapping.to"
                     :placeholder="t('dashboard.valueMappingTo')"
@@ -84,8 +84,8 @@
                     :data-test="`dashboard-addpanel-config-value-mapping-to-input-${index}`"
                   />
                 </div>
-              </template>
-              <div v-else-if="mapping.type === 'regex'" class="w-44 shrink-0">
+              </div>
+              <div v-else-if="mapping.type === 'regex'" class="w-52 shrink-0">
                 <OInput
                   v-model="mapping.pattern"
                   :placeholder="t('dashboard.valueMappingRegex')"
@@ -93,7 +93,7 @@
                   :data-test="`dashboard-addpanel-config-value-mapping-pattern-input-${index}`"
                 />
               </div>
-              <div v-else class="w-28 shrink-0">
+              <div v-else class="w-52 shrink-0">
                 <OInput
                   v-model="mapping.value"
                   :placeholder="t('dashboard.valueMappingValue')"
@@ -117,7 +117,7 @@
                 class="o-input-label text-compact text-input-label-text w-24 shrink-0 leading-tight font-medium"
                 >{{ t("dashboard.valueMappingDisplayValue") }}</span
               >
-              <div class="min-w-0 flex-1">
+              <div class="w-98 shrink-0">
                 <OInput
                   v-model="mapping.text"
                   :placeholder="t('dashboard.valueMappingDisplayPlaceholder')"
