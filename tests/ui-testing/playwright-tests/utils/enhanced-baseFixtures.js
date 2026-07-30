@@ -163,8 +163,44 @@ function enforceOrgOnNavigation(page) {
 }
 
 /**
+ * Escalating waits for the nav rail, with a page reload between attempts.
+ * First attempt is short because the common case is instant; the reloads exist
+ * only for the hung-/config case.
+ */
+const NAV_RAIL_ATTEMPTS = [30000, 45000, 45000];
+const NAV_RAIL_SELECTOR = '[data-test="menu-link-\\/-item"]';
+
+/**
+ * Wait for MainLayout to populate the nav rail, reloading to retry a hung GET
+ * /config. Returns whether the rail appeared.
+ *
+ * @param {import('@playwright/test').Page} page
+ */
+async function waitForNavRail(page) {
+  for (let i = 0; i < NAV_RAIL_ATTEMPTS.length; i++) {
+    const appeared = await page.locator(NAV_RAIL_SELECTOR)
+      .waitFor({ state: 'visible', timeout: NAV_RAIL_ATTEMPTS[i] })
+      .then(() => true)
+      .catch(() => false);
+    if (appeared) {
+      if (i > 0) testLogger.info(`Nav rail populated after ${i} reload(s)`);
+      return true;
+    }
+    if (i < NAV_RAIL_ATTEMPTS.length - 1) {
+      testLogger.warn(
+        `Nav rail still empty after ${NAV_RAIL_ATTEMPTS[i]}ms — reloading to reissue GET /config ` +
+        `(attempt ${i + 1}/${NAV_RAIL_ATTEMPTS.length - 1})`
+      );
+      // Reload keeps the current URL, so this shard's org_identifier is preserved.
+      await page.reload({ waitUntil: 'domcontentloaded' }).catch(() => {});
+    }
+  }
+  return false;
+}
+
+/**
  * Utility function to check if user is authenticated
- * @param {import('@playwright/test').Page} page 
+ * @param {import('@playwright/test').Page} page
  */
 async function verifyAuthentication(page) {
   try {
@@ -187,15 +223,20 @@ async function verifyAuthentication(page) {
     // MainLayout.vue gates the rail on `menuReady`, which only flips once GET
     // /config has resolved (`zoConfig.version` non-empty); until then `navLinks`
     // is [] and ONavbar renders NO MenuLink items at all — the element is absent
-    // from the DOM, not merely hidden. On alpha1 with 13 shards booting at once
-    // that single request routinely takes longer than the old 15s budget, which
-    // failed tests across nearly every shard in run 30552638159. 90s covers a
-    // loaded backend; MainLayout also fails open on a /config error, so a real
-    // failure still reveals the menu rather than burning the whole budget.
-    await page.waitHelpers.waitForElementVisible('[data-test="menu-link-\\/-item"]', {
-      timeout: 90000,
-      description: 'home menu link (nav rail populated after GET /config)'
-    });
+    // from the DOM, not merely hidden.
+    //
+    // A flat 90s wait was NOT enough on its own: run 30552638159 attempt 2 still
+    // produced "Timeout 90000ms exceeded" waiting on this element. MainLayout fails
+    // open when /config *errors*, so a rail that is still empty after a minute+
+    // means the request is hung, not slow — and no amount of extra waiting recovers
+    // a hung request. Reloading issues a fresh /config, which does.
+    if (!(await waitForNavRail(page))) {
+      throw new Error(
+        'Nav rail never populated: [data-test="menu-link-\\/-item"] absent after ' +
+        `${NAV_RAIL_ATTEMPTS.length} attempts with reloads. The app shell rendered, so the session is ` +
+        'valid — GET /config never resolved and MainLayout never set menuReady.'
+      );
+    }
     return true;
   } catch (error) {
     testLogger.warn('Authentication verification failed', { error: error.message });
