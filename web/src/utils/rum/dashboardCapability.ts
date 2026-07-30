@@ -99,8 +99,15 @@ export interface DashboardPanel {
   [key: string]: unknown;
 }
 
+export interface RumDashboardTab {
+  panels?: DashboardPanel[];
+  [key: string]: unknown;
+}
+
 export interface RumDashboard {
   panels?: DashboardPanel[];
+  /** v8+ dashboards nest panels under tabs rather than a flat top-level `panels[]`. */
+  tabs?: RumDashboardTab[];
   [key: string]: unknown;
 }
 
@@ -157,11 +164,28 @@ const reflowPanels = (panels: DashboardPanel[]): DashboardPanel[] => {
   });
 };
 
+/** Total panel count across whichever container the dashboard uses. */
+const totalPanelCount = (dashboard: RumDashboard): number => {
+  if (Array.isArray(dashboard?.panels) && dashboard.panels.length) {
+    return dashboard.panels.length;
+  }
+  if (Array.isArray(dashboard?.tabs)) {
+    return dashboard.tabs.reduce((sum, tab) => sum + (tab?.panels?.length ?? 0), 0);
+  }
+  return dashboard?.panels?.length ?? 0;
+};
+
 /**
  * Remove panels whose queries reference columns absent from the stream schema, then
- * reflow the survivors.
+ * reflow the survivors. Handles both dashboard shapes:
  *
- * @param dashboard      A version-2 RUM dashboard (flat `panels[]` with per-panel layout).
+ *   - flat `panels[]` (v2 / legacy / unit fixtures);
+ *   - `tabs[].panels` (v8+, which `convertDashboardSchemaVersion` always produces — the
+ *     shape the Performance tabs actually feed in). Reading only the flat `panels[]` here
+ *     silently saw ZERO panels for a converted dashboard, so `keptCount` was always 0 and
+ *     the tab showed its empty state for every persona once the schema resolved.
+ *
+ * @param dashboard      A RUM dashboard in either shape.
  * @param presentFields  The set of column names in the `_rumdata` schema. When null or
  *                       empty (schema not yet known) the dashboard is returned UNCHANGED,
  *                       so a browser user is never degraded by an unresolved schema.
@@ -172,14 +196,34 @@ export const filterDashboardBySchema = (
   dashboard: RumDashboard,
   presentFields: Set<string> | null | undefined,
 ): FilterResult => {
-  const panels = dashboard?.panels ?? [];
-
   // Unknown schema → don't touch anything (non-regression for the common browser path).
   if (!presentFields || presentFields.size === 0) {
-    return { dashboard, droppedCount: 0, keptCount: panels.length };
+    return { dashboard, droppedCount: 0, keptCount: totalPanelCount(dashboard) };
   }
 
-  const kept = panels.filter((panel) => !panelReferencesAbsentField(panel, presentFields));
+  const keep = (panel: DashboardPanel) => !panelReferencesAbsentField(panel, presentFields);
+
+  // v8+ shape: filter each tab's panels in place, aggregate counts across tabs.
+  const usesTabs = Array.isArray(dashboard?.tabs) && !(dashboard.panels?.length);
+  if (usesTabs) {
+    let droppedCount = 0;
+    let keptCount = 0;
+    const tabs = (dashboard.tabs ?? []).map((tab) => {
+      const panels = tab?.panels ?? [];
+      const kept = panels.filter(keep);
+      droppedCount += panels.length - kept.length;
+      keptCount += kept.length;
+      // Only rebuild a tab whose panels actually changed, so untouched tabs keep identity.
+      return kept.length === panels.length ? tab : { ...tab, panels: reflowPanels(kept) };
+    });
+
+    if (droppedCount === 0) return { dashboard, droppedCount: 0, keptCount };
+    return { dashboard: { ...dashboard, tabs }, droppedCount, keptCount };
+  }
+
+  // Flat shape.
+  const panels = dashboard?.panels ?? [];
+  const kept = panels.filter(keep);
   const droppedCount = panels.length - kept.length;
 
   if (droppedCount === 0) {
