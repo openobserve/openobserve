@@ -481,6 +481,7 @@ mod tests {
             30,
             10,
             None,
+            None,
         );
         assert_eq!(batch.alerts.len(), 1);
         assert!(!batch.is_full());
@@ -495,6 +496,7 @@ mod tests {
             vec![],
             30,
             2,
+            None,
             None,
         );
         assert!(!batch.is_full());
@@ -513,6 +515,7 @@ mod tests {
             30,
             1,
             None,
+            None,
         );
         assert!(batch.is_full());
         let added = batch.add_alert(make_alert(), vec![]);
@@ -530,6 +533,7 @@ mod tests {
             3600, // 1 hour wait
             10,
             None,
+            None,
         );
         assert!(!batch.is_expired());
     }
@@ -546,6 +550,7 @@ mod tests {
             vec![],
             3600,
             10,
+            None,
             None,
         );
         assert!(!ready);
@@ -567,6 +572,7 @@ mod tests {
             3600,
             2,
             None,
+            None,
         );
         assert!(!ready1); // new batch, 1 alert, not full
 
@@ -577,6 +583,7 @@ mod tests {
             vec![],
             3600,
             2,
+            None,
             None,
         );
         assert!(ready2); // 2nd alert fills batch, ready=true
@@ -596,6 +603,7 @@ mod tests {
             vec![],
             3600,
             10,
+            None,
             None,
         );
 
@@ -621,6 +629,7 @@ mod tests {
             3600,
             10,
             None,
+            None,
         );
         add_to_batch(
             fp2.clone(),
@@ -629,6 +638,7 @@ mod tests {
             vec![],
             3600,
             10,
+            None,
             None,
         );
 
