@@ -69,7 +69,7 @@ struct LongTextCompressionOptions {
 impl Default for LongTextCompressionOptions {
     fn default() -> Self {
         Self {
-            zstd_level: 3,
+            zstd_level: 1,
             values_per_page: 8192,
             min_average_length: 64,
             long_value_length: 64,
@@ -83,7 +83,7 @@ impl Default for LongTextCompressionOptions {
 ///
 /// For long UTF8 fields:
 /// - Applies Zstd compression directly to VarBinView arrays
-/// - Uses configurable compression level (default: 3) and page size (default: 8192)
+/// - Uses configurable compression level (default: 1) and page size (default: 8192)
 ///
 /// For short UTF8, Binary, and all other data types:
 /// - Delegates to BtrBlocksCompressor for optimal encoding
@@ -222,6 +222,14 @@ mod tests {
     };
 
     use super::*;
+
+    #[test]
+    fn test_long_text_compression_defaults() {
+        let options = LongTextCompressionOptions::default();
+
+        assert_eq!(options.zstd_level, 1);
+        assert_eq!(options.values_per_page, 8192);
+    }
 
     #[test]
     fn test_long_utf8_uses_zstd() {
