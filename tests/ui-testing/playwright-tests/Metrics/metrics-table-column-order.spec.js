@@ -300,12 +300,10 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
 
     await setupTableChart(pm, page, 'expanded_timeseries');
 
-    // Get the current table header order before reordering. Wait for the table
-    // to actually render headers first — capturing a 0 baseline makes the
-    // post-save "settles back to baseline" poll below impossible to satisfy.
-    await expect
-      .poll(async () => await pm.metricsPage.getPromqlTableHeaderCount(), { timeout: 10000 })
-      .toBeGreaterThan(0);
+    // Get the current table header order before reordering. Gate on the trailing
+    // Value column, not just the first header: the count captured here is the
+    // baseline the post-save comparison below polls against.
+    await pm.metricsPage.waitForPromqlTableLayoutReady();
     const initialHeaderCount = await pm.metricsPage.getPromqlTableHeaderCount();
     testLogger.info(`Initial table has ${initialHeaderCount} columns`);
 
@@ -338,8 +336,9 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
     testLogger.info('Column Order popup closed after save');
 
     // Verify the table reflects the new column order — wait for header count to settle
+    await pm.metricsPage.waitForPromqlTableLayoutReady();
     await expect
-      .poll(async () => await pm.metricsPage.getPromqlTableHeaderCount(), { timeout: 5000 })
+      .poll(async () => await pm.metricsPage.getPromqlTableHeaderCount(), { timeout: 10000 })
       .toBe(initialHeaderCount);
     const newHeaderCount = await pm.metricsPage.getPromqlTableHeaderCount();
     testLogger.info(`Table now has ${newHeaderCount} columns`);
@@ -443,10 +442,10 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
 
     // STEP 1: Get the initial table column order from the actual table headers
     testLogger.info('Reading initial table column order');
-    // Wait for table to fully render — count must stabilize
-    await expect
-      .poll(async () => await pm.metricsPage.getPromqlTableHeaderCount(), { timeout: 5000 })
-      .toBeGreaterThan(0);
+    // Wait for the trailing Value column before counting: a count taken while
+    // the label columns are still painting is lower than the settled one, and
+    // STEP 5 below compares the two counts for equality.
+    await pm.metricsPage.waitForPromqlTableLayoutReady();
 
     const initialHeaderCount = await pm.metricsPage.getPromqlTableHeaderCount();
     testLogger.info(`Table has ${initialHeaderCount} columns`);
@@ -490,13 +489,20 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
 
     // STEP 5: Verify table shows the new column order — poll until second column updates
     testLogger.info('Reading new table column order after save');
+    // The save repaints the table; gate before any positional read so the poll
+    // isn't swallowed by getPromqlTableHeaderText's own 5s waitFor.
+    await pm.metricsPage.waitForPromqlTableLayoutReady();
     await expect
-      .poll(async () => await pm.metricsPage.getPromqlTableHeaderText(1), { timeout: 5000 })
+      .poll(async () => await pm.metricsPage.getPromqlTableHeaderText(1), { timeout: 10000 })
       .toBe(expectedSecondTableColumn);
 
-    const newHeaderCount = await pm.metricsPage.getPromqlTableHeaderCount();
-    testLogger.info(`Table still has ${newHeaderCount} columns`);
-    expect(newHeaderCount).toBe(initialHeaderCount);
+    // Reordering must not add or drop columns. Poll rather than asserting a
+    // single instantaneous read: the save re-renders the table, so a lone read
+    // can land mid-repaint and see a partial header row.
+    await expect
+      .poll(async () => await pm.metricsPage.getPromqlTableHeaderCount(), { timeout: 10000 })
+      .toBe(initialHeaderCount);
+    testLogger.info(`Table still has ${initialHeaderCount} columns`);
 
     // Get the new column names
     const newTimestamp = await pm.metricsPage.getPromqlTableHeaderText(0);
@@ -525,16 +531,12 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
     testLogger.info('Testing column order persists after re-running the query');
 
     await setupTableChart(pm, page, 'expanded_timeseries');
+    // Value is the layout's trailing column, so its presence means every label
+    // column ahead of it has rendered.
+    await pm.metricsPage.waitForPromqlTableLayoutReady();
     await expect
       .poll(async () => await pm.metricsPage.getPromqlTableHeaderCount(), { timeout: 20000 })
       .toBeGreaterThan(2);
-    await expect
-      .poll(async () => {
-        const count = await pm.metricsPage.getPromqlTableHeaderCount();
-        if (count < 3) return '';
-        return await pm.metricsPage.getPromqlTableHeaderText(count - 1);
-      }, { timeout: 10000 })
-      .toBe('Value');
     const headerCountReady = await pm.metricsPage.getPromqlTableHeaderCount();
     testLogger.info(`Table layout ready: ${headerCountReady} headers (expanded_timeseries layout)`);
 
@@ -586,8 +588,10 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
     // STEP 5: Verify column order is still maintained after query re-run
     // The reordered column should still be in position 1 (second column after Timestamp)
     testLogger.info('Verifying column order persists after re-running query');
+    // Re-running the query repaints the table, so gate before the positional read.
+    await pm.metricsPage.waitForPromqlTableLayoutReady();
     await expect
-      .poll(async () => await pm.metricsPage.getPromqlTableHeaderText(1), { timeout: 5000 })
+      .poll(async () => await pm.metricsPage.getPromqlTableHeaderText(1), { timeout: 10000 })
       .toBe(expectedColumnName);
 
     const timestampAfterRerun = await pm.metricsPage.getPromqlTableHeaderText(0);
@@ -640,8 +644,13 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
     // STEP 4: Verify column order is still maintained
     // NOTE: Timestamp is always in position 0, reordered column should be in position 1
     testLogger.info('Verifying column order persists after switching chart types');
+    // Switching away to line and back rebuilds the table from scratch. Without
+    // this gate the poll below calls nth(1) on an empty header row, and
+    // getPromqlTableHeaderText's own 5s waitFor then consumes the whole poll
+    // budget in a single iteration.
+    await pm.metricsPage.waitForPromqlTableLayoutReady();
     await expect
-      .poll(async () => await pm.metricsPage.getPromqlTableHeaderText(1), { timeout: 5000 })
+      .poll(async () => await pm.metricsPage.getPromqlTableHeaderText(1), { timeout: 10000 })
       .toBe(expectedColumnName);
 
     const timestampColumn = await pm.metricsPage.getPromqlTableHeaderText(0);

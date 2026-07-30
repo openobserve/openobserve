@@ -228,7 +228,7 @@ test.describe("Dashboard Table — Column Formatting (PR #12531)", () => {
     let sawRed = false;
     for (let i = 0; i < rowCount; i++) {
       const cell = rows.nth(i).locator("td").last();
-      const text = await cell.locator('[data-test="dashboard-table-cell-value"]').textContent();
+      const text = await cell.textContent();
       const value = parseFloat(text || "");
       if (Number.isNaN(value)) continue;
       const bg = await cell.evaluate((el) => getComputedStyle(el).backgroundColor);

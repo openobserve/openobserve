@@ -23,9 +23,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </span>
       <OSelect
         :model-value="pagination.rowsPerPage"
-        @update:model-value="(val: SelectModelValue) => $emit('update:rowsPerPage', val)"
+        @update:model-value="(val: SelectModelValue) => $emit('update:rowsPerPage', Number(val))"
         :options="formattedPaginationOptions"
         size="sm"
+        :searchable="false"
         class="w-fit!"
         data-test="dashboard-table-rows-per-page-select"
       />
@@ -138,12 +139,21 @@ export default defineComponent({
       return `${start}-${end} of ${totalRows}`;
     });
 
-    const formattedPaginationOptions = computed(() =>
-      props.paginationOptions.map((opt) => ({
+    const formattedPaginationOptions = computed(() => {
+      const opts = [...props.paginationOptions];
+      // Include a custom "Records per page" that isn't one of the presets, so the
+      // dropdown reflects it instead of rendering blank.
+      const current = props.pagination?.rowsPerPage;
+      if (current != null && current > 0 && !opts.includes(current)) {
+        const idx = opts.findIndex((o) => o !== 0 && o > current);
+        if (idx === -1) opts.push(current);
+        else opts.splice(idx, 0, current);
+      }
+      return opts.map((opt) => ({
         label: opt === 0 ? "All" : String(opt),
         value: opt,
-      })),
-    );
+      }));
+    });
 
     return {
       countDisplay,
