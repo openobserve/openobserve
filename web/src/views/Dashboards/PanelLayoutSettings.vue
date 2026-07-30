@@ -45,7 +45,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >Approximately <strong>{{ getRowCount }}</strong> table rows will be displayed</span
             >
             <OIcon name="info-outline" class="shrink-0 cursor-pointer" size="xs" />
-            <OTooltip content="1 unit = 1.875rem" />
+            <!-- Prose, not a style: the grid unit is a fixed unitless 30 below, so it never
+                 scales with font-size — px is the truthful unit here. -->
+            <OTooltip content="1 unit = 30 pixels" />
           </div>
         </div>
       </div>

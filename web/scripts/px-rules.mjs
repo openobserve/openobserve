@@ -100,6 +100,17 @@ export const pxIsAllowed = (text, index, raw) => {
   if (/@media|@container/.test(before.slice(before.lastIndexOf("\n") + 1))) return true;
   if (/@?(?:max|min)(?:-[a-z]+)?-\[[^\]]*$/.test(before)) return true;
 
+  // Prose *about* a size, not a size being applied — converting it rewrites the sentence,
+  // usually into a falsehood. Narrow by design: px inside an unclosed `<tag …` still reports.
+  if (
+    /(?:content|placeholder|label|title|aria-label|description|hint|message|caption|subtitle)\s*=\s*["'][^"']*$/i.test(
+      before,
+    )
+  )
+    return true;
+  // …a template text node: on this line the last tag closed and no new one opened.
+  if (/>[^<>]*$/.test(before.slice(before.lastIndexOf("\n") + 1))) return true;
+
   // IntersectionObserver rootMargin. The API parses px and % ONLY — a rem value
   // throws SyntaxError from the constructor, killing the observer and whatever it
   // gates (lazy-load, prefetch-ahead-of-fold). Like a query condition, it is a

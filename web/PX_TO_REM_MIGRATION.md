@@ -130,6 +130,7 @@ every nested component.
 | C3 | Bound `:style` objects | CONVERT | 15 | 8 |
 | C7 | Direct DOM `.style` writes | CONVERT | 2 | 1 |
 | Z1 | Comments & documentation | KEEP | 281 | 78 |
+| K4 | User-facing copy (tooltip/placeholder/label text) | KEEP | 1 | 1 |
 | K2 | Hairline borders — `1px`, `1.5px` | KEEP | 77 | 32 |
 | K7 | Arbitrary shadow / ring / blur widths | KEEP | 49 | 16 |
 | R2 | Canvas font & text measurement | KEEP | 36 | 9 |
@@ -468,6 +469,34 @@ or the literal `0.75`.
 This is the same constraint that already forces `utils/dashboard/` onto the `TS_HEX_ALLOWLIST` in
 your design-consistency script — colours can't be tokens there for exactly the same reason sizes
 can't be rem.
+
+---
+
+### K4 · User-facing copy — 1 · *should not*
+
+Text the reader sees is prose *about* a size, not a size being applied. Converting it edits the
+sentence rather than the styling — and usually makes it untrue, because the quantity being
+described is a fixed layout constant that does not scale with font-size:
+
+```html
+<!-- views/Dashboards/PanelLayoutSettings.vue -->
+<OTooltip content="1 unit = 30px" />        <!-- KEEP -->
+<OTooltip content="1 unit = 1.875rem" />    <!-- WRONG: the grid unit is a unitless 30 in the
+                                                  row-count maths and a fixed gridstack
+                                                  cellHeight; it never scales with type -->
+```
+
+Two independent reasons to keep px here: the statement stays **true**, and readers do not think
+in rem — "30px" communicates a size, "1.875rem" does not.
+
+This is the rendered-string sibling of Z1 (comments). Z1 is handled by `maskCommentsForPx()`;
+this category is handled by a `px-rules.mjs` exemption covering text-bearing attributes
+(`content`, `placeholder`, `label`, `title`, `aria-label`, …) and template text nodes. The
+exemption is deliberately narrow — px inside an unclosed `<tag …` still reports, so
+`<div style="width: 300px">` is unaffected.
+
+> Prefer spelling the unit out (`"1 unit = 30 pixels"`) in new copy: it reads better and needs
+> no exemption at all.
 
 ---
 
