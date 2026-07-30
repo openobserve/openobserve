@@ -231,12 +231,25 @@ function enforceOrgOnNavigation(page) {
 async function settleNavRail(page, pathname) {
   // /web/login and the OIDC callback have no rail by design.
   if (/\/(login|cb)$/.test(pathname || '')) return;
+
+  // 5s, deliberately short. This runs on EVERY in-app navigation, and
+  // languageTranslation.spec.js crawls many pages across 10 parallel workers with
+  // its OOM safety resting on keeping each heavy page's live-at-peak-memory dwell
+  // near ~3s (see the comment in that spec). An earlier 20s budget here extended
+  // that dwell by up to 20s per navigation and GeneralTests — which had produced a
+  // report the run before — was killed mid-step with no artifact in the first run
+  // that included it.
+  //
+  // Short is enough: this is only an optimisation for page objects that click a
+  // menu-link straight after navigating. The paths that genuinely depend on the
+  // rail (navigateToBase, openNavFlyoutChild, the Alerts settings navigation) each
+  // do their own longer wait with reload recovery.
   const appeared = await page.locator(NAV_RAIL_SELECTOR).first()
-    .waitFor({ state: 'visible', timeout: 20000 })
+    .waitFor({ state: 'visible', timeout: 5000 })
     .then(() => true)
     .catch(() => false);
   if (!appeared) {
-    testLogger.warn('Nav rail not populated 20s after navigation — menu-link clicks may fail', { pathname });
+    testLogger.debug('Nav rail not populated 5s after navigation', { pathname });
   }
 }
 
