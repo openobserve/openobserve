@@ -23,6 +23,8 @@ const props = defineProps<{
   isIndeterminate?: boolean;
   expansionEnabled?: boolean;
   enableRowReorder?: boolean;
+  /** Cells are wrapping — the fill column must then be allowed to shrink. */
+  wrap?: boolean;
   enableColumnReorder?: boolean;
   /** Column id locked to slot 0 — not draggable, and normalised back if a drop
    *  would displace it. */
@@ -456,7 +458,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
         ]"
         :style="{
           ...(isAutoWidthColumn(header)
-            ? header.column.columnDef.minSize
+            ? header.column.columnDef.minSize && !wrap
               ? { minWidth: `${header.column.columnDef.minSize}px` }
               : {}
             : (header.column.columnDef.meta as any)?.fixedWidth
@@ -466,7 +468,9 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
                   maxWidth: headerSizeVar(header),
                 }
               : horizontalScroll?.value
-                ? { width: headerSizeVar(header) }
+                ? wrap
+                  ? { width: headerSizeVar(header), minWidth: headerSizeVar(header) }
+                  : { width: headerSizeVar(header) }
                 : { width: headerSizeVar(header), maxWidth: headerSizeVar(header) }),
           ...(header.column.getIsPinned?.() === 'left'
             ? {
@@ -728,7 +732,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
         ]"
         :style="{
           ...(isAutoWidthColumn(header)
-            ? header.column.columnDef.minSize
+            ? header.column.columnDef.minSize && !wrap
               ? { minWidth: `${header.column.columnDef.minSize}px` }
               : {}
             : (header.column.columnDef.meta as any)?.fixedWidth
@@ -738,7 +742,9 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
                   maxWidth: headerSizeVar(header),
                 }
               : horizontalScroll?.value
-                ? { width: headerSizeVar(header) }
+                ? wrap
+                  ? { width: headerSizeVar(header), minWidth: headerSizeVar(header) }
+                  : { width: headerSizeVar(header) }
                 : { width: headerSizeVar(header), maxWidth: headerSizeVar(header) }),
           ...(header.column.getIsPinned?.() === 'left'
             ? {

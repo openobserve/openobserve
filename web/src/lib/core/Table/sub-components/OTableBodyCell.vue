@@ -84,7 +84,7 @@ const slotAlignClass = computed(() => {
 // Slotted content truncates to one line unless `wrap` is on, mirroring the
 // default (non-slot) behaviour.
 const slotContentClass = computed(() =>
-  props.wrap ? "min-w-0 flex-1 break-words whitespace-normal" : "truncate min-w-0 flex-1",
+  props.wrap ? "min-w-0 flex-1 wrap-anywhere whitespace-normal" : "truncate min-w-0 flex-1",
 );
 
 const isPinned = computed(() => props.cell.column.getIsPinned?.() ?? false);
@@ -128,7 +128,7 @@ const copyRowAlignClass = computed(() => {
 });
 
 const copyValueClass = computed(() =>
-  props.wrap ? "min-w-0 break-words whitespace-normal" : "min-w-0 truncate",
+  props.wrap ? "min-w-0 wrap-anywhere whitespace-normal" : "min-w-0 truncate",
 );
 
 const horizontalScroll = inject<{ value: boolean } | null>("o2TableHorizontalScroll", null);
@@ -160,8 +160,11 @@ const cellStyle = computed(() => {
   if (isAutoWidth.value) {
     // Elastic column: no width (absorbs the table's leftover space), but honour
     // minSize so it can't collapse — it pushes the table to scroll instead.
+    // While WRAPPING the floor has to go: the pre-migration table gave the fill
+    // column `flex: 1 1 0; min-width: 0` so it shrank to the row and the text
+    // wrapped. Keeping minSize here pins the column open and nothing ever wraps.
     const min = props.cell.column.columnDef.minSize;
-    if (min) base.minWidth = `${min}px`;
+    if (min && !props.wrap) base.minWidth = `${min}px`;
   } else {
     const sizeVar = `var(--header-${props.cell.column.id.replace(/[^a-zA-Z0-9]/g, "-")}-size)`;
     base.width = sizeVar;
@@ -172,6 +175,12 @@ const cellStyle = computed(() => {
       base.maxWidth = sizeVar;
     } else if (!horizontalScroll?.value) {
       base.maxWidth = sizeVar;
+    } else if (props.wrap) {
+      // Wrapping drops the table's `min-w-max`, so auto layout would otherwise
+      // squeeze these sized columns to fit the container. The pre-migration
+      // table pinned them with `flex-shrink: 0` and let the ROW scroll instead;
+      // only the fill column was allowed to shrink.
+      base.minWidth = sizeVar;
     }
   }
   if (isPinned.value === "left") {
@@ -289,7 +298,7 @@ function onCellActionsLeave() {
           : 'bg-table-cell-bg group-hover/row:bg-table-row-hover-bg transition-colors duration-150'
         : '',
       wrap
-        ? 'break-words whitespace-normal'
+        ? 'wrap-anywhere whitespace-normal'
         : horizontalScroll?.value
           ? 'whitespace-nowrap'
           : isAction
