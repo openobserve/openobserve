@@ -40,9 +40,32 @@ pub fn normalize(
     }
 }
 
+/// Derives a display label for the sender of a batch of normalized events,
+/// from the first event's `source` label (spec §1: single request = single
+/// label). Returns `None` when absent, empty, or whitespace-only — callers
+/// fall back to the already-detected system name (spec §2).
+pub fn derive_sender_label(events: &[ExternalAlertEvent]) -> Option<String> {
+    events
+        .first()
+        .and_then(|e| e.labels.get("source"))
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+}
+
+/// Resolves the display name shown in the status panel: the sender-provided
+/// label when present, otherwise the detected system name (grafana /
+/// alertmanager / generic) — exactly today's behavior.
+pub fn resolve_display_name(detected_source: &str, sender_label: Option<&str>) -> String {
+    sender_label
+        .filter(|s| !s.is_empty())
+        .unwrap_or(detected_source)
+        .to_string()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashMap;
 
     fn grafana_payload() -> serde_json::Value {
         serde_json::json!({
@@ -174,5 +197,87 @@ mod tests {
     #[test]
     fn test_unknown_format_errors() {
         assert!(normalize(DetectedSource::Unknown, &serde_json::json!({"x": 1}), NOW).is_err());
+    }
+
+    fn event_with_label(source_label: Option<&str>) -> ExternalAlertEvent {
+        let mut labels = HashMap::new();
+        if let Some(s) = source_label {
+            labels.insert("source".to_string(), s.to_string());
+        }
+        labels.insert("alertname".to_string(), "test".to_string());
+        ExternalAlertEvent {
+            status: config::meta::alerts::incidents::ExternalAlertStatus::Firing,
+            dedup_key: "k".to_string(),
+            title: "t".to_string(),
+            severity: config::meta::alerts::incidents::IncidentSeverity::P3,
+            labels,
+            event_ts: 0,
+            source_url: None,
+            raw: serde_json::json!({}),
+        }
+    }
+
+    #[test]
+    fn test_derive_sender_label_present() {
+        let events = vec![event_with_label(Some("solarwinds"))];
+        assert_eq!(derive_sender_label(&events), Some("solarwinds".to_string()));
+    }
+
+    #[test]
+    fn test_derive_sender_label_absent() {
+        let events = vec![event_with_label(None)];
+        assert_eq!(derive_sender_label(&events), None);
+    }
+
+    #[test]
+    fn test_derive_sender_label_empty_string_treated_as_absent() {
+        let events = vec![event_with_label(Some(""))];
+        assert_eq!(derive_sender_label(&events), None);
+    }
+
+    #[test]
+    fn test_derive_sender_label_whitespace_only_treated_as_absent() {
+        let events = vec![event_with_label(Some("   "))];
+        assert_eq!(derive_sender_label(&events), None);
+    }
+
+    #[test]
+    fn test_derive_sender_label_trims_whitespace() {
+        let events = vec![event_with_label(Some("  solarwinds  "))];
+        assert_eq!(derive_sender_label(&events), Some("solarwinds".to_string()));
+    }
+
+    #[test]
+    fn test_derive_sender_label_empty_events_list() {
+        let events: Vec<ExternalAlertEvent> = vec![];
+        assert_eq!(derive_sender_label(&events), None);
+    }
+
+    #[test]
+    fn test_derive_sender_label_uses_first_event_only() {
+        let first = event_with_label(Some("first-sender"));
+        let mut second_labels = HashMap::new();
+        second_labels.insert("source".to_string(), "second-sender".to_string());
+        let second = ExternalAlertEvent {
+            labels: second_labels,
+            ..event_with_label(None)
+        };
+        let events = vec![first, second];
+        assert_eq!(derive_sender_label(&events), Some("first-sender".to_string()));
+    }
+
+    #[test]
+    fn test_resolve_display_name_with_label() {
+        assert_eq!(resolve_display_name("generic", Some("solarwinds")), "solarwinds");
+    }
+
+    #[test]
+    fn test_resolve_display_name_without_label() {
+        assert_eq!(resolve_display_name("generic", None), "generic");
+    }
+
+    #[test]
+    fn test_resolve_display_name_empty_label_falls_back() {
+        assert_eq!(resolve_display_name("grafana", Some("")), "grafana");
     }
 }
