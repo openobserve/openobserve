@@ -54,11 +54,11 @@ pub mod providers;
 #[cfg(feature = "enterprise")]
 pub mod ratelimit;
 use search_service as search;
-pub mod slo;
 pub mod self_reporting;
 pub mod service;
 pub mod session;
 pub mod short_url;
+pub mod slo;
 pub mod stream;
 pub mod stream_utils;
 pub mod synthetics;

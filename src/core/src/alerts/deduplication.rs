@@ -84,7 +84,10 @@ pub fn calculate_fingerprint(
     // and for the rollup key, so existing fingerprints stay byte-identical and
     // no live silence window is invalidated by the upgrade.
     let with_level = with_level_component(base, alert, level);
-    config::meta::alerts::grouping::with_group_component(with_level, row_group_key(alert, result_row).as_deref())
+    config::meta::alerts::grouping::with_group_component(
+        with_level,
+        row_group_key(alert, result_row).as_deref(),
+    )
 }
 
 /// This row's group identity, for the M-5 fingerprint component.
@@ -456,15 +459,17 @@ async fn apply_deduplication_impl(
 #[cfg(test)]
 mod tests {
     use config::meta::alerts::{
-        Aggregation, AggFunction, Condition, Operator, QueryType,
-        alert::Alert,
+        AggFunction, Aggregation, Condition, Operator, QueryType, alert::Alert,
     };
     use serde_json::{Map, Value, json};
 
     use super::row_group_key;
 
     fn row(pairs: &[(&str, Value)]) -> Map<String, Value> {
-        pairs.iter().map(|(k, v)| (k.to_string(), v.clone())).collect()
+        pairs
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.clone()))
+            .collect()
     }
 
     fn promql_alert(multi: bool) -> Alert {
@@ -500,10 +505,19 @@ mod tests {
     #[test]
     fn a_promql_multi_alert_gets_a_distinct_group_key_per_series() {
         let alert = promql_alert(true);
-        let a = row_group_key(&alert, &row(&[("pod", json!("web-1")), ("value", json!(5.0))]));
-        let b = row_group_key(&alert, &row(&[("pod", json!("web-2")), ("value", json!(9.0))]));
+        let a = row_group_key(
+            &alert,
+            &row(&[("pod", json!("web-1")), ("value", json!(5.0))]),
+        );
+        let b = row_group_key(
+            &alert,
+            &row(&[("pod", json!("web-2")), ("value", json!(9.0))]),
+        );
 
-        assert!(a.is_some(), "a per-series alert must carry a group component");
+        assert!(
+            a.is_some(),
+            "a per-series alert must carry a group component"
+        );
         assert_ne!(a, b, "two series must not share one fingerprint");
     }
 
@@ -511,11 +525,20 @@ mod tests {
     #[test]
     fn a_promql_series_keeps_its_key_as_its_value_changes() {
         let alert = promql_alert(true);
-        let a = row_group_key(&alert, &row(&[("pod", json!("web-1")), ("value", json!(5.0))]));
-        let b = row_group_key(&alert, &row(&[("pod", json!("web-1")), ("value", json!(500.0))]));
+        let a = row_group_key(
+            &alert,
+            &row(&[("pod", json!("web-1")), ("value", json!(5.0))]),
+        );
+        let b = row_group_key(
+            &alert,
+            &row(&[("pod", json!("web-1")), ("value", json!(500.0))]),
+        );
         // `is_some` first: without it this passes trivially when BOTH are None,
         // which is exactly the broken state — `None == None`.
-        assert!(a.is_some(), "a per-series alert must carry a group component");
+        assert!(
+            a.is_some(),
+            "a per-series alert must carry a group component"
+        );
         assert_eq!(a, b);
     }
 
@@ -525,7 +548,10 @@ mod tests {
     fn a_promql_alert_that_did_not_opt_in_has_no_group_component() {
         let alert = promql_alert(false);
         assert_eq!(
-            row_group_key(&alert, &row(&[("pod", json!("web-1")), ("value", json!(5.0))])),
+            row_group_key(
+                &alert,
+                &row(&[("pod", json!("web-1")), ("value", json!(5.0))])
+            ),
             None
         );
     }
@@ -533,16 +559,19 @@ mod tests {
     #[test]
     fn the_aggregation_family_is_unchanged() {
         let alert = agg_alert(true);
-        let a = row_group_key(&alert, &row(&[("host", json!("a")), ("alert_agg_value", json!(1))]));
-        let b = row_group_key(&alert, &row(&[("host", json!("b")), ("alert_agg_value", json!(1))]));
+        let a = row_group_key(
+            &alert,
+            &row(&[("host", json!("a")), ("alert_agg_value", json!(1))]),
+        );
+        let b = row_group_key(
+            &alert,
+            &row(&[("host", json!("b")), ("alert_agg_value", json!(1))]),
+        );
         assert!(a.is_some());
         assert_ne!(a, b);
 
         let simple = agg_alert(false);
-        assert_eq!(
-            row_group_key(&simple, &row(&[("host", json!("a"))])),
-            None
-        );
+        assert_eq!(row_group_key(&simple, &row(&[("host", json!("a"))])), None);
     }
 
     /// An SLO alert has no per-group dispatch (see `multi_alert_enabled`), so

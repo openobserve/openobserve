@@ -181,7 +181,11 @@ pub fn validate_multi_alert(
     // once per range: one state row cannot represent "this group, this week"
     // and "this group, last week" at once, and dispatch would page it per
     // window while consuming one MN-8 slot each.
-    if query.multi_time_range.as_ref().is_some_and(|r| !r.is_empty()) {
+    if query
+        .multi_time_range
+        .as_ref()
+        .is_some_and(|r| !r.is_empty())
+    {
         return Err(MultiAlertError::MultiTimeRangeUnsupported);
     }
 
@@ -231,7 +235,11 @@ fn validate_promql_multi_alert(
     if creates_incident {
         return Err(MultiAlertError::IncidentsUnsupported);
     }
-    if query.multi_time_range.as_ref().is_some_and(|r| !r.is_empty()) {
+    if query
+        .multi_time_range
+        .as_ref()
+        .is_some_and(|r| !r.is_empty())
+    {
         return Err(MultiAlertError::MultiTimeRangeUnsupported);
     }
 
@@ -2907,21 +2915,13 @@ mod tests {
             MultiAlertError::CountGateNotAnyGroup,
         );
         assert_eq!(
-            validate_multi_alert(
-                &q,
-                &tc(Operator::GreaterThanEquals, 1, Some(3)),
-                false
-            )
-            .unwrap_err(),
+            validate_multi_alert(&q, &tc(Operator::GreaterThanEquals, 1, Some(3)), false)
+                .unwrap_err(),
             MultiAlertError::WarningCountGateNotAnyGroup,
         );
         assert_eq!(
-            validate_multi_alert(
-                &promql_qc(Operator::EqualTo, true),
-                &any_group,
-                false
-            )
-            .unwrap_err(),
+            validate_multi_alert(&promql_qc(Operator::EqualTo, true), &any_group, false)
+                .unwrap_err(),
             MultiAlertError::OperatorNotOrderable,
         );
     }
@@ -3071,7 +3071,10 @@ mod tests {
         let rows = vec![series(&[("pod", "ok")], 50.0), bad];
         let c = super::classify_promql_series(&rows, Operator::GreaterThan, 10.0, None, 500);
         assert_eq!(c.groups.len(), 1);
-        assert_eq!(c.groups[0].labels.get("pod").map(String::as_str), Some("ok"));
+        assert_eq!(
+            c.groups[0].labels.get("pod").map(String::as_str),
+            Some("ok")
+        );
     }
 
     #[test]
@@ -3105,7 +3108,10 @@ mod tests {
         ];
         let c = super::classify_promql_series(&rows, Operator::GreaterThan, 100.0, Some(10.0), 1);
         assert_eq!(c.groups.len(), 1);
-        assert_eq!(c.groups[0].labels.get("pod").map(String::as_str), Some("loud"));
+        assert_eq!(
+            c.groups[0].labels.get("pod").map(String::as_str),
+            Some("loud")
+        );
         assert_eq!(c.rollup, Some(AlertLevel::Critical));
     }
 
@@ -3378,7 +3384,11 @@ mod tests {
         // Incidents without multi stay untouched — this guard is multi-only.
         let simple = agg_cfg(Some(&["host"]), Operator::GreaterThan, false);
         assert_eq!(
-            validate_multi_alert(&qc(&simple), &tc(Operator::GreaterThanEquals, 3, None), true),
+            validate_multi_alert(
+                &qc(&simple),
+                &tc(Operator::GreaterThanEquals, 3, None),
+                true
+            ),
             Ok(())
         );
         assert!(
@@ -3443,7 +3453,11 @@ mod tests {
 
         let ungrouped = agg_cfg(None, Operator::EqualTo, false);
         assert_eq!(
-            validate_multi_alert(&qc(&ungrouped), &tc(Operator::GreaterThanEquals, 7, None), false),
+            validate_multi_alert(
+                &qc(&ungrouped),
+                &tc(Operator::GreaterThanEquals, 7, None),
+                false
+            ),
             Ok(())
         );
     }

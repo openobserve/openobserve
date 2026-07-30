@@ -935,15 +935,22 @@ mod tests {
             db,
             &alert_id,
             "g1",
-            DeliveryEpisode { level: AlertLevel::Critical, level_since: 1_000, notified_at_enqueue: (None, None) },
-            DeliveryOutcome::Delivered { silence_minutes: 10, at: 1_100 },
+            DeliveryEpisode {
+                level: AlertLevel::Critical,
+                level_since: 1_000,
+                notified_at_enqueue: (None, None),
+            },
+            DeliveryOutcome::Delivered {
+                silence_minutes: 10,
+                at: 1_100,
+            },
         )
         .await
         .unwrap();
         assert!(applied, "the episode matched, so the callback must apply");
 
-        // 3. The NEXT evaluation writes observation state. It still carries
-        //    the pre-delivery copy (None/None) — exactly the stale write.
+        // 3. The NEXT evaluation writes observation state. It still carries the pre-delivery copy
+        //    (None/None) — exactly the stale write.
         let mut second = group_row(&alert_id, "g1", AlertLevel::Critical, 2_000);
         second.silenced_until = None;
         second.last_notified_level = None;
@@ -987,8 +994,15 @@ mod tests {
             db,
             &alert_id,
             "g1",
-            DeliveryEpisode { level: AlertLevel::Warning, level_since: 1_000, notified_at_enqueue: (None, None) },
-            DeliveryOutcome::Delivered { silence_minutes: 10, at: 1_100 },
+            DeliveryEpisode {
+                level: AlertLevel::Warning,
+                level_since: 1_000,
+                notified_at_enqueue: (None, None),
+            },
+            DeliveryOutcome::Delivered {
+                silence_minutes: 10,
+                at: 1_100,
+            },
         )
         .await
         .unwrap();
@@ -1021,7 +1035,11 @@ mod tests {
             db,
             &alert_id,
             "g1",
-            DeliveryEpisode { level: AlertLevel::Critical, level_since: 1_000, notified_at_enqueue: (None, None) },
+            DeliveryEpisode {
+                level: AlertLevel::Critical,
+                level_since: 1_000,
+                notified_at_enqueue: (None, None),
+            },
             DeliveryOutcome::Failed { at: 1_500 },
         )
         .await
@@ -1032,7 +1050,10 @@ mod tests {
         assert_eq!(read.last_outcome, Some(RunOutcome::NotifyFailed));
         assert_eq!(read.last_outcome_at, Some(1_500));
         assert!(read.is_firing(), "a delivery failure is still firing");
-        assert_eq!(read.silenced_until, None, "nothing advanced, so it re-qualifies");
+        assert_eq!(
+            read.silenced_until, None,
+            "nothing advanced, so it re-qualifies"
+        );
         assert_eq!(read.last_notified_level, None);
         assert_eq!(read.last_seen, Some(1_000), "M-7's clock must not move");
     }
@@ -1062,7 +1083,12 @@ mod tests {
         let plan = GroupPlan {
             updates: vec![
                 update_of(group_row(&alert_id, "new", AlertLevel::Critical, 2_000)),
-                update_of(group_row(&alert_id, ROLLUP_GROUP_KEY, AlertLevel::Critical, 2_000)),
+                update_of(group_row(
+                    &alert_id,
+                    ROLLUP_GROUP_KEY,
+                    AlertLevel::Critical,
+                    2_000,
+                )),
             ],
             evicted: vec!["old".to_string()],
         };
@@ -1100,7 +1126,12 @@ mod tests {
         let plan = GroupPlan {
             updates: vec![
                 update_of(group_row(&alert_id, "g1", AlertLevel::Critical, 2_000)),
-                update_of(group_row(&alert_id, ROLLUP_GROUP_KEY, AlertLevel::Critical, 2_000)),
+                update_of(group_row(
+                    &alert_id,
+                    ROLLUP_GROUP_KEY,
+                    AlertLevel::Critical,
+                    2_000,
+                )),
             ],
             evicted: vec![],
         };
@@ -1132,9 +1163,24 @@ mod tests {
 
         let plan = GroupPlan {
             updates: vec![
-                update_of(group_row(&alert_id, "pod=web-1", AlertLevel::Critical, 2_000)),
-                update_of(group_row(&alert_id, "pod=web-2", AlertLevel::Warning, 2_000)),
-                update_of(group_row(&alert_id, ROLLUP_GROUP_KEY, AlertLevel::Critical, 2_000)),
+                update_of(group_row(
+                    &alert_id,
+                    "pod=web-1",
+                    AlertLevel::Critical,
+                    2_000,
+                )),
+                update_of(group_row(
+                    &alert_id,
+                    "pod=web-2",
+                    AlertLevel::Warning,
+                    2_000,
+                )),
+                update_of(group_row(
+                    &alert_id,
+                    ROLLUP_GROUP_KEY,
+                    AlertLevel::Critical,
+                    2_000,
+                )),
             ],
             evicted: vec![],
         };
@@ -1201,7 +1247,12 @@ mod tests {
         let alert_id = unique_alert_id("deleted-alert");
 
         let plan = GroupPlan {
-            updates: vec![update_of(group_row(&alert_id, "g1", AlertLevel::Critical, 2_000))],
+            updates: vec![update_of(group_row(
+                &alert_id,
+                "g1",
+                AlertLevel::Critical,
+                2_000,
+            ))],
             evicted: vec![],
         };
         persist_group_plan_with(db, &plan, &alert_id).await.unwrap();
@@ -1278,18 +1329,33 @@ mod tests {
             db,
             &alert_id,
             "g1",
-            DeliveryEpisode { level: AlertLevel::Critical, level_since: 1_000, notified_at_enqueue: (None, None) },
-            DeliveryOutcome::Delivered { silence_minutes: 10, at: 1_100 },
+            DeliveryEpisode {
+                level: AlertLevel::Critical,
+                level_since: 1_000,
+                notified_at_enqueue: (None, None),
+            },
+            DeliveryOutcome::Delivered {
+                silence_minutes: 10,
+                at: 1_100,
+            },
         )
         .await
         .unwrap();
 
         assert_eq!(
-            get_with(db, &alert_id, "g1").await.unwrap().unwrap().silenced_until,
+            get_with(db, &alert_id, "g1")
+                .await
+                .unwrap()
+                .unwrap()
+                .silenced_until,
             Some(DELIVERED_WINDOW)
         );
         assert_eq!(
-            get_with(db, &alert_id, "g2").await.unwrap().unwrap().silenced_until,
+            get_with(db, &alert_id, "g2")
+                .await
+                .unwrap()
+                .unwrap()
+                .silenced_until,
             None,
             "host-a's delivery must not silence host-b"
         );
@@ -1328,7 +1394,10 @@ mod tests {
                 &alert_id,
                 "g1",
                 never_delivered,
-                DeliveryOutcome::Delivered { silence_minutes: 10, at: 1_100 },
+                DeliveryOutcome::Delivered {
+                    silence_minutes: 10,
+                    at: 1_100
+                },
             )
             .await
             .unwrap()
@@ -1355,7 +1424,11 @@ mod tests {
             Some(RunOutcome::Firing),
             "the group delivered; it must not read as NotifyFailed"
         );
-        assert_eq!(read.silenced_until, Some(DELIVERED_WINDOW), "and stays silenced");
+        assert_eq!(
+            read.silenced_until,
+            Some(DELIVERED_WINDOW),
+            "and stays silenced"
+        );
     }
 
     #[tokio::test]
@@ -1446,7 +1519,11 @@ mod tests {
         .unwrap();
 
         assert_eq!(
-            get_with(db, &alert_id, "g1").await.unwrap().unwrap().silenced_until,
+            get_with(db, &alert_id, "g1")
+                .await
+                .unwrap()
+                .unwrap()
+                .silenced_until,
             Some(long_window),
             "the later window must survive, whatever order the callbacks commit in"
         );
@@ -1500,7 +1577,11 @@ mod tests {
         .unwrap();
 
         assert_eq!(
-            get_with(db, &alert_id, "g1").await.unwrap().unwrap().silenced_until,
+            get_with(db, &alert_id, "g1")
+                .await
+                .unwrap()
+                .unwrap()
+                .silenced_until,
             Some(window),
             "a zero-silence callback must not clear a live window"
         );
@@ -1518,15 +1599,14 @@ mod tests {
     //
     // What these can and cannot establish, measured rather than assumed:
     //
-    // * They CAN catch a write that is not confined to its own columns, which
-    //   is the one-writer rule (MN-2) and holds on every backend.
-    // * They CANNOT prove the `level`/`level_since` predicates on the delivery
-    //   UPDATE are load-bearing. Deleting those predicates leaves this suite
-    //   green, because the callback's transaction reads and writes under one
-    //   SQLite write lock. Under Postgres READ COMMITTED the same read-then-
-    //   write does not conflict — the UPDATE simply observes the newer row —
-    //   so the guard is required for a backend this harness never runs
-    //   against. Treat it as covered by review, not by test.
+    // * They CAN catch a write that is not confined to its own columns, which is the one-writer
+    //   rule (MN-2) and holds on every backend.
+    // * They CANNOT prove the `level`/`level_since` predicates on the delivery UPDATE are
+    //   load-bearing. Deleting those predicates leaves this suite green, because the callback's
+    //   transaction reads and writes under one SQLite write lock. Under Postgres READ COMMITTED the
+    //   same read-then- write does not conflict — the UPDATE simply observes the newer row — so the
+    //   guard is required for a backend this harness never runs against. Treat it as covered by
+    //   review, not by test.
     //
     // A third test lived here and was deleted rather than fixed: it asserted
     // that a row at a new level-episode can never carry delivery state. Real
@@ -1670,7 +1750,8 @@ mod tests {
             refreshed.last_outcome_at = Some(7_777);
             refreshed.last_seen = Some(7_777);
 
-            let evaluation = tokio::spawn(async move { persist_with(db, &update_of(refreshed)).await });
+            let evaluation =
+                tokio::spawn(async move { persist_with(db, &update_of(refreshed)).await });
             let cb_id = alert_id.clone();
             let callback = tokio::spawn(async move {
                 advance_delivery_state_with(
@@ -1906,7 +1987,11 @@ mod tests {
             );
             persist(&db, &update).await;
 
-            assert_eq!(read(&db).await.unwrap(), before, "the row must be byte-identical");
+            assert_eq!(
+                read(&db).await.unwrap(),
+                before,
+                "the row must be byte-identical"
+            );
         }
 
         /// The contrast case, so the tests above cannot pass vacuously: a real
@@ -1998,8 +2083,7 @@ mod tests {
             assert_eq!(last.to_outcome, RunOutcome::Error.to_i32());
             assert_eq!(last.from_outcome, Some(RunOutcome::Firing.to_i32()));
             assert_eq!(
-                last.from_level,
-                last.to_level,
+                last.from_level, last.to_level,
                 "the level axis must be unchanged across a freeze"
             );
             assert_eq!(last.to_level, Some(AlertLevel::Critical.to_i32()));

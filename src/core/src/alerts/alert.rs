@@ -2965,12 +2965,7 @@ mod threshold_validation_tests {
         // The UPDATE path specifically: `prepare_alert` runs on both, so an
         // edit that empties group_by while the flag stays on is rejected.
         let mut alert = multi_alert_fixture();
-        alert
-            .query_condition
-            .aggregation
-            .as_mut()
-            .unwrap()
-            .group_by = Some(vec![]);
+        alert.query_condition.aggregation.as_mut().unwrap().group_by = Some(vec![]);
 
         assert!(matches!(
             validate_rules(&alert),
@@ -3932,7 +3927,7 @@ mod tests {
             options,
             &hashbrown::HashMap::new(),
             None,
-)
+        )
         .await;
 
         // The result should be valid JSON with rows as a JSON array of objects
@@ -3981,7 +3976,7 @@ mod tests {
             options,
             &hashbrown::HashMap::new(),
             None,
-)
+        )
         .await;
 
         let parsed: Value = serde_json::from_str(&result).unwrap();
@@ -4024,7 +4019,7 @@ mod tests {
             options,
             &hashbrown::HashMap::new(),
             None,
-)
+        )
         .await;
 
         let parsed: Value = serde_json::from_str(&result).unwrap();
@@ -4073,7 +4068,7 @@ mod tests {
             options,
             &hashbrown::HashMap::new(),
             None,
-)
+        )
         .await;
 
         // String values should be joined with \n (non-email), not injected as JSON array
@@ -4162,7 +4157,7 @@ mod tests {
             options,
             &hashbrown::HashMap::new(),
             None,
-)
+        )
         .await;
 
         let parsed: Value = serde_json::from_str(&result).unwrap();
@@ -4220,7 +4215,7 @@ mod tests {
             options,
             &hashbrown::HashMap::new(),
             None,
-)
+        )
         .await;
 
         let parsed: Value = serde_json::from_str(&result).unwrap();
@@ -4265,7 +4260,7 @@ mod tests {
             options,
             &hashbrown::HashMap::new(),
             None,
-)
+        )
         .await;
 
         let parsed: Value = serde_json::from_str(&result).unwrap();
@@ -4797,7 +4792,7 @@ mod tests {
             options,
             &hashbrown::HashMap::new(),
             None,
-)
+        )
         .await;
 
         let parsed: Value = serde_json::from_str(&result).unwrap();
@@ -4833,7 +4828,7 @@ mod tests {
             options,
             &hashbrown::HashMap::new(),
             None,
-)
+        )
         .await;
 
         let parsed: Value = serde_json::from_str(&result).unwrap();
@@ -5010,7 +5005,9 @@ mod tests {
         let mut alert = Alert::default();
         alert.name = "disk".into();
         let labels: std::collections::BTreeMap<String, String> =
-            [("host".to_string(), "web-1".to_string())].into_iter().collect();
+            [("host".to_string(), "web-1".to_string())]
+                .into_iter()
+                .collect();
 
         let result = process_dest_template(
             "test_org",
@@ -5045,7 +5042,9 @@ mod tests {
         let mut alert = Alert::default();
         alert.name = "disk-usage".into();
         let labels: std::collections::BTreeMap<String, String> =
-            [("pod".to_string(), "{alert_name}".to_string())].into_iter().collect();
+            [("pod".to_string(), "{alert_name}".to_string())]
+                .into_iter()
+                .collect();
 
         let result = process_dest_template(
             "test_org",
@@ -5083,7 +5082,9 @@ mod tests {
         let mut alert = Alert::default();
         alert.name = "real-alert".into();
         let labels: std::collections::BTreeMap<String, String> =
-            [("alert_name".to_string(), "spoofed".to_string())].into_iter().collect();
+            [("alert_name".to_string(), "spoofed".to_string())]
+                .into_iter()
+                .collect();
 
         let result = process_dest_template(
             "test_org",
@@ -5139,7 +5140,6 @@ mod tests {
             "with no group context the placeholder is left untouched, as it is today"
         );
     }
-
 }
 
 /// Evaluate an SLO alert from stored status (`alerts_2.md` §6b.3).

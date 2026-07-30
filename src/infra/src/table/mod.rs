@@ -42,8 +42,6 @@ pub mod gen_ai_agents;
 pub mod incident_events;
 pub mod kv_store;
 mod migration;
-#[cfg(test)]
-pub mod test_harness;
 pub mod model_pricing;
 pub mod online_eval_jobs;
 pub mod org_ai_toolsets;
@@ -63,11 +61,11 @@ pub mod search_job;
 pub mod search_queue;
 pub mod service_streams;
 pub mod sessions;
+pub mod short_urls;
 pub mod slo;
 pub mod slo_backfill_jobs;
 pub mod slo_budget;
 pub mod slos;
-pub mod short_urls;
 pub mod source_maps;
 pub mod synthetics_agents;
 pub mod synthetics_jobs;
@@ -78,6 +76,8 @@ pub mod synthetics_runs;
 pub mod system_prompts;
 pub mod system_settings;
 pub mod templates;
+#[cfg(test)]
+pub mod test_harness;
 pub mod timed_annotation_panels;
 pub mod timed_annotations;
 #[cfg(feature = "cloud")]

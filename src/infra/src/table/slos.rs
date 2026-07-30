@@ -733,12 +733,22 @@ mod tests {
         let db = db().await;
         create(&db, &slo(), 1_000, None).await.unwrap();
 
-        let moved = move_to_folder(&db, "someone-else", &[ID.to_string()], "payments", 2_000, None)
-            .await
-            .unwrap();
+        let moved = move_to_folder(
+            &db,
+            "someone-else",
+            &[ID.to_string()],
+            "payments",
+            2_000,
+            None,
+        )
+        .await
+        .unwrap();
 
         assert_eq!(moved, 0);
-        assert_eq!(get(&db, ORG, ID).await.unwrap().unwrap().folder_id, "default");
+        assert_eq!(
+            get(&db, ORG, ID).await.unwrap().unwrap().folder_id,
+            "default"
+        );
     }
 
     /// `(org, folder_id, name)` is unique, so a colliding move fails whole —
@@ -761,7 +771,10 @@ mod tests {
                 || format!("{err}").to_lowercase().contains("duplicate"),
             "expected a unique-violation, got: {err}"
         );
-        assert_eq!(get(&db, ORG, ID).await.unwrap().unwrap().folder_id, "default");
+        assert_eq!(
+            get(&db, ORG, ID).await.unwrap().unwrap().folder_id,
+            "default"
+        );
     }
 
     #[tokio::test]

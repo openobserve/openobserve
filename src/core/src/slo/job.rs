@@ -241,23 +241,20 @@ pub struct PromSeries {
 ///
 /// Semantics, in order:
 ///
-/// 1. A sample at instant T covers the slice **ending** at T — the plan
-///    evaluates at slice ends, so `slice_start = T - interval`.
-/// 2. Each side is summed to the **group grain first** (the SLO's `group_by`
-///    read from the series' labels; a missing label is an empty value), then
-///    the sides are joined — exactly as the SQL dual's per-side GROUP BY
-///    aggregates each scan before its join. A series-grain join would drop a
-///    numerator series whose label set the denominator lacks even though its
-///    group is present on both sides.
-/// 3. Join rules follow [`join_dual`]: good with no total is dropped (an
-///    infinite SLI), total with no good is a real fully-bad bucket.
-/// 4. `good` is clamped to `total`: `increase()` over two different counters
-///    carries float error, and a counter reset can transiently put good
-///    above total. Unclamped, the row is rejected downstream
-///    (`GoodExceedsTotal`) and the slice becomes a coverage hole — routine
-///    pod restarts would freeze the SLO. Written as a `>` comparison, NOT
-///    `f64::min`: `min(NaN, x)` returns `x`, which would launder an
-///    unmeasurable numerator into a fully GOOD slice. NaN survives to the
+/// 1. A sample at instant T covers the slice **ending** at T — the plan evaluates at slice ends, so
+///    `slice_start = T - interval`.
+/// 2. Each side is summed to the **group grain first** (the SLO's `group_by` read from the series'
+///    labels; a missing label is an empty value), then the sides are joined — exactly as the SQL
+///    dual's per-side GROUP BY aggregates each scan before its join. A series-grain join would drop
+///    a numerator series whose label set the denominator lacks even though its group is present on
+///    both sides.
+/// 3. Join rules follow [`join_dual`]: good with no total is dropped (an infinite SLI), total with
+///    no good is a real fully-bad bucket.
+/// 4. `good` is clamped to `total`: `increase()` over two different counters carries float error,
+///    and a counter reset can transiently put good above total. Unclamped, the row is rejected
+///    downstream (`GoodExceedsTotal`) and the slice becomes a coverage hole — routine pod restarts
+///    would freeze the SLO. Written as a `>` comparison, NOT `f64::min`: `min(NaN, x)` returns `x`,
+///    which would launder an unmeasurable numerator into a fully GOOD slice. NaN survives to the
 ///    ingest boundary, which rejects it.
 pub fn promql_rows(
     good: Vec<PromSeries>,
@@ -795,8 +792,14 @@ mod promql_rows_tests {
     fn series_labels_become_the_group_key_in_definition_order() {
         let gb = vec!["region".to_string(), "tier".to_string()];
         let rows = promql_rows(
-            vec![series(&[("tier", "gold"), ("region", "eu")], &[(T1500, 1.0)])],
-            vec![series(&[("region", "eu"), ("tier", "gold")], &[(T1500, 2.0)])],
+            vec![series(
+                &[("tier", "gold"), ("region", "eu")],
+                &[(T1500, 1.0)],
+            )],
+            vec![series(
+                &[("region", "eu"), ("tier", "gold")],
+                &[(T1500, 2.0)],
+            )],
             &gb,
             300,
         );

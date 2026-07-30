@@ -154,13 +154,12 @@ async fn load_tracked_group_states(
 > {
     use config::meta::alerts::state::ROLLUP_GROUP_KEY;
 
-    let mut prev: std::collections::HashMap<_, _> = infra::table::alert_states::list_groups(
-        alert_id,
-    )
-    .await?
-    .into_iter()
-    .map(|s| (s.group_key.clone(), s))
-    .collect();
+    let mut prev: std::collections::HashMap<_, _> =
+        infra::table::alert_states::list_groups(alert_id)
+            .await?
+            .into_iter()
+            .map(|s| (s.group_key.clone(), s))
+            .collect();
 
     if let Some(rollup) = infra::table::alert_states::get(alert_id, ROLLUP_GROUP_KEY).await? {
         prev.insert(ROLLUP_GROUP_KEY.to_string(), rollup);
@@ -213,7 +212,13 @@ async fn dispatch_per_group(
     // The rollup outcome follows the classification, not an assumption: an
     // evaluation can reach dispatch with every group healthy.
     let rollup_outcome = config::meta::alerts::grouping::group_outcome(classification.rollup);
-    if !persist_alert_run_state(&alert_id, &rollup_outcome, rollup_level, Some(classification)).await
+    if !persist_alert_run_state(
+        &alert_id,
+        &rollup_outcome,
+        rollup_level,
+        Some(classification),
+    )
+    .await
     {
         // MN-1: dispatch only AFTER the plan commits. Sending against stale
         // state would page a group under the previous episode and its delivery
@@ -1202,7 +1207,13 @@ async fn handle_alert_triggers(
             // forward untouched (including its freshness clock).
             // Best-effort: a state write must not fail an evaluation that has
             // already run. Only the per-group caller checks the result.
-            let _ = persist_alert_run_state(&alert_id.to_string(), &trigger_data_stream.status, None, None).await;
+            let _ = persist_alert_run_state(
+                &alert_id.to_string(),
+                &trigger_data_stream.status,
+                None,
+                None,
+            )
+            .await;
         }
         publish_triggers_usage(trigger_data_stream);
 

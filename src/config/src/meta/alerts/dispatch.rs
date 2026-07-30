@@ -35,8 +35,10 @@ use super::{
     level::{AlertLevel, DeliveryDecision, delivery_decision},
     state::{AlertState, StateTransition, StateUpdate},
 };
-use crate::meta::self_reporting::usage::RunOutcome;
-use crate::utils::json::{Map, Value};
+use crate::{
+    meta::self_reporting::usage::RunOutcome,
+    utils::json::{Map, Value},
+};
 
 /// The version a delayed delivery carries — the group's **level-episode** at
 /// enqueue time (§5.5 round-6): `level_since` advances only when the level
@@ -106,27 +108,24 @@ pub struct DispatchPlan {
 
 /// Decide which groups this evaluation notifies (MN-1, MN-8).
 ///
-/// * Candidates are **only** `classification.groups` — the post-cap retained
-///   set. `dropped` keys have no state rows to hold delivery state, and the
-///   pre-cap observation set would bypass the M-6 bound entirely.
-/// * Per group, §7.1's `delivery_decision` runs against the group's own
-///   delivery state (`last_notified_level`, `silenced_until`) from `states` —
-///   which the caller reads back *after* `persist_group_plan`, so the level
-///   axis is this evaluation's. One rule covers first-fire, escalation,
-///   re-notify after silence expiry, and re-delivery after a failed send
-///   (whose state never advanced, MN-6).
-/// * A retained group with **no state row** is a consistency failure, not a
-///   routine case: `persist_group_plan` committed a row for every retained
-///   group before dispatch runs. It is reported in `inconsistent` and **not
-///   dispatched**. Paging anyway would be unbounded rather than merely
-///   duplicated — with no row, a successful delivery has nothing to record
-///   itself on, so the group would re-page every evaluation forever.
-///   Skipping costs at most one cycle, and the next evaluation has the row.
-/// * **Duplicate group keys** are likewise refused (`inconsistent`): a
-///   classification carrying one key twice would otherwise notify the group
-///   twice and consume two slots of the MN-8 budget.
-/// * `max_sends` is the MN-8 knob: `0` = unlimited; otherwise it counts
-///   **qualifying** sends (applied after `delivery_decision`), worst-first.
+/// * Candidates are **only** `classification.groups` — the post-cap retained set. `dropped` keys
+///   have no state rows to hold delivery state, and the pre-cap observation set would bypass the
+///   M-6 bound entirely.
+/// * Per group, §7.1's `delivery_decision` runs against the group's own delivery state
+///   (`last_notified_level`, `silenced_until`) from `states` — which the caller reads back *after*
+///   `persist_group_plan`, so the level axis is this evaluation's. One rule covers first-fire,
+///   escalation, re-notify after silence expiry, and re-delivery after a failed send (whose state
+///   never advanced, MN-6).
+/// * A retained group with **no state row** is a consistency failure, not a routine case:
+///   `persist_group_plan` committed a row for every retained group before dispatch runs. It is
+///   reported in `inconsistent` and **not dispatched**. Paging anyway would be unbounded rather
+///   than merely duplicated — with no row, a successful delivery has nothing to record itself on,
+///   so the group would re-page every evaluation forever. Skipping costs at most one cycle, and the
+///   next evaluation has the row.
+/// * **Duplicate group keys** are likewise refused (`inconsistent`): a classification carrying one
+///   key twice would otherwise notify the group twice and consume two slots of the MN-8 budget.
+/// * `max_sends` is the MN-8 knob: `0` = unlimited; otherwise it counts **qualifying** sends
+///   (applied after `delivery_decision`), worst-first.
 pub fn plan_dispatch(
     classification: &GroupClassification,
     states: &HashMap<String, AlertState>,
@@ -207,8 +206,9 @@ pub fn plan_dispatch(
                     row: row.clone(),
                 });
             }
-            DeliveryDecision::SuppressedBySilence
-            | DeliveryDecision::SuppressedByWarningPolicy => suppressed += 1,
+            DeliveryDecision::SuppressedBySilence | DeliveryDecision::SuppressedByWarningPolicy => {
+                suppressed += 1
+            }
             DeliveryDecision::NotFiring => {}
         }
     }
@@ -228,12 +228,10 @@ pub fn plan_dispatch(
 ///
 /// **Checks the episode pair only — deliberately NOT `notified_at_enqueue`.**
 /// The guards are asymmetric, and the asymmetry is the whole design:
-/// * a *success* is a fact about the world (the page went out), so recording
-///   it is always correct — at worst it refreshes a window that a sibling
-///   attempt already set;
-/// * a *failure* is an assertion that nothing was delivered, which a newer
-///   success in the same episode falsifies — so [`delivery_failure_update`]
-///   checks the anchor as well.
+/// * a *success* is a fact about the world (the page went out), so recording it is always correct —
+///   at worst it refreshes a window that a sibling attempt already set;
+/// * a *failure* is an assertion that nothing was delivered, which a newer success in the same
+///   episode falsifies — so [`delivery_failure_update`] checks the anchor as well.
 ///
 /// Checking the anchor here too would break the legitimate case in
 /// `test_no_monotonicity_a_new_warning_episode_resets_the_baseline`: a new
@@ -299,15 +297,14 @@ pub fn delivery_success_update(
 /// Returns a full [`StateUpdate`], not a bare row, because a delivery failure
 /// moves the **outcome axis** and that axis has invariants the rest of the
 /// state model already enforces (`state::apply_outcome`):
-/// * `since` records when `last_outcome` last *changed*, so a first
-///   `Firing → NotifyFailed` must move it — leaving it at the Firing start
-///   would make "notify-failed for 20 minutes" read as the firing duration;
+/// * `since` records when `last_outcome` last *changed*, so a first `Firing → NotifyFailed` must
+///   move it — leaving it at the Firing start would make "notify-failed for 20 minutes" read as the
+///   firing duration;
 /// * an outcome change is a **transition**, and per-group history lives in
-///   `alert_state_transitions` (MN-9/M-8), so the recovery pairing and the
-///   history drawer both depend on it being written;
-/// * a *repeated* failure changes nothing on either axis, so it must preserve
-///   `since` and emit no duplicate transition — the same
-///   transition-bounded-writes rule the evaluation path follows.
+///   `alert_state_transitions` (MN-9/M-8), so the recovery pairing and the history drawer both
+///   depend on it being written;
+/// * a *repeated* failure changes nothing on either axis, so it must preserve `since` and emit no
+///   duplicate transition — the same transition-bounded-writes rule the evaluation path follows.
 pub fn delivery_failure_update(
     current: &AlertState,
     episode: DeliveryEpisode,
@@ -446,10 +443,7 @@ pub fn rows_by_series_key(records: &[Map<String, Value>]) -> HashMap<String, Map
 
 /// Extract a row's group labels the same way the evaluation does — shared so
 /// [`rows_by_group_key`] and the fan-out cannot drift apart on rendering.
-pub fn row_group_labels(
-    row: &Map<String, Value>,
-    group_by: &[String],
-) -> BTreeMap<String, String> {
+pub fn row_group_labels(row: &Map<String, Value>, group_by: &[String]) -> BTreeMap<String, String> {
     group_by
         .iter()
         .filter_map(|col| {
@@ -706,7 +700,11 @@ mod tests {
 
         let plan = plan_dispatch(&c, &states, &rows_for(&c), &tc(None), 1_000 * SEC, 0);
 
-        assert_eq!(plan.items.len(), 2, "critical + warning fire; healthy does not");
+        assert_eq!(
+            plan.items.len(),
+            2,
+            "critical + warning fire; healthy does not"
+        );
         assert!(plan.items.iter().any(|i| i.group_key == key_of("a")));
         assert!(plan.items.iter().any(|i| i.group_key == key_of("b")));
         assert!(!plan.items.iter().any(|i| i.group_key == key_of("c")));
@@ -815,7 +813,10 @@ mod tests {
         let plan = plan_dispatch(&c, &states, &rows_for(&c), &tc(None), now, 0);
 
         assert_eq!(plan.items.len(), 1);
-        assert!(!plan.items[0].escalation, "same level again is not an escalation");
+        assert!(
+            !plan.items[0].escalation,
+            "same level again is not an escalation"
+        );
     }
 
     #[test]
@@ -879,7 +880,10 @@ mod tests {
 
         assert_eq!(plan.items.len(), 1);
         assert_eq!(plan.items[0].group_key, key_of("crit"));
-        assert_eq!(plan.suppressed, 1, "the warning group was suppressed, not dropped");
+        assert_eq!(
+            plan.suppressed, 1,
+            "the warning group was suppressed, not dropped"
+        );
     }
 
     #[test]
@@ -1085,7 +1089,10 @@ mod tests {
         // A refused group is not a send, so it must not spend a slot of the
         // MN-8 budget and starve a group that could have paged.
         let now = 1_000 * SEC;
-        let c = classified(&[("a", 150.0), ("a", 150.0), ("b", 120.0), ("c", 110.0)], 500);
+        let c = classified(
+            &[("a", 150.0), ("a", 150.0), ("b", 120.0), ("c", 110.0)],
+            500,
+        );
         let states = states_for(&c, now, None, None);
 
         let plan = plan_dispatch(&c, &states, &rows_for(&c), &tc(None), now, 2);
@@ -1160,7 +1167,11 @@ mod tests {
         let plan = plan_dispatch(&c, &states, &rows_for(&c), &tc(None), 1_000 * SEC, 2);
 
         assert_eq!(plan.items.len(), 2);
-        assert_eq!(plan.items[0].group_key, key_of("crit"), "critical survives any cap");
+        assert_eq!(
+            plan.items[0].group_key,
+            key_of("crit"),
+            "critical survives any cap"
+        );
 
         // Exact, not "either one". Accepting whichever group happened to be
         // dropped would let a non-deterministic implementation pass, and then
@@ -1168,8 +1179,7 @@ mod tests {
         // evaluation — worse than a consistent cap, because on-call cannot
         // tell which hosts are actually silent.
         let (w1, w2) = (key_of("warn1"), key_of("warn2"));
-        let (kept_warn, dropped_warn) =
-            if w1 < w2 { (w1, w2) } else { (w2, w1) };
+        let (kept_warn, dropped_warn) = if w1 < w2 { (w1, w2) } else { (w2, w1) };
         assert_eq!(
             plan.items[1].group_key, kept_warn,
             "within a severity band the lower group_key is admitted first"
@@ -1214,7 +1224,10 @@ mod tests {
                     Some(now + 10 * MIN),
                 ),
             ),
-            (key_b.clone(), state(&key_b, AlertLevel::Critical, now, None, None)),
+            (
+                key_b.clone(),
+                state(&key_b, AlertLevel::Critical, now, None, None),
+            ),
         ]);
 
         let plan = plan_dispatch(&c, &states, &rows_for(&c), &tc(None), now, 1);
@@ -1337,8 +1350,12 @@ mod tests {
         let mut row = state(&key_of("a"), AlertLevel::Critical, since, None, None);
         row.level_at = Some(since + 5 * MIN); // a later same-level evaluation
 
-        let updated =
-            delivery_success_update(&row, episode(AlertLevel::Critical, since), 10, since + 6 * MIN);
+        let updated = delivery_success_update(
+            &row,
+            episode(AlertLevel::Critical, since),
+            10,
+            since + 6 * MIN,
+        );
         assert!(
             updated.is_some(),
             "a same-level evaluation must not orphan an in-flight delivery"
@@ -1492,7 +1509,11 @@ mod tests {
         let since = 1_000 * SEC;
         let failed_at = since + 30 * SEC;
         let row = state(&key_of("a"), AlertLevel::Critical, since, None, None);
-        assert_eq!(row.last_outcome, Some(RunOutcome::Firing), "fixture: firing");
+        assert_eq!(
+            row.last_outcome,
+            Some(RunOutcome::Firing),
+            "fixture: firing"
+        );
 
         let update = failed_state(&row, episode(AlertLevel::Critical, since), failed_at);
         let st = update.state.as_ref().unwrap();
@@ -1577,7 +1598,10 @@ mod tests {
         let st = update.state.as_ref().unwrap();
 
         assert_eq!(st.last_seen, row.last_seen);
-        assert_eq!(st.level, row.level, "the level axis is not delivery's to touch");
+        assert_eq!(
+            st.level, row.level,
+            "the level axis is not delivery's to touch"
+        );
         assert_eq!(st.level_since, row.level_since);
         assert_eq!(st.level_at, row.level_at);
     }
@@ -1755,7 +1779,10 @@ mod tests {
         // The evaluation renders non-string group values (numeric pod
         // ordinals, bools) via to_string. The row map must render them the
         // SAME way, or the dispatch item can never find its row.
-        let rows = vec![row(&[("replica", json!(3)), ("alert_agg_value", json!(150.0))])];
+        let rows = vec![row(&[
+            ("replica", json!(3)),
+            ("alert_agg_value", json!(150.0)),
+        ])];
 
         let map = rows_by_group_key(&rows, &["replica".to_string()]);
 
@@ -1846,13 +1873,17 @@ mod tests {
             &key_of("a"),
             AlertLevel::Critical,
             since,
-            Some(AlertLevel::Warning),          // last delivered at Warning...
-            Some(since + 60 * MIN),             // ...under the old, longer silence
+            Some(AlertLevel::Warning), // last delivered at Warning...
+            Some(since + 60 * MIN),    // ...under the old, longer silence
         );
 
-        let updated =
-            delivery_success_update(&row, episode(AlertLevel::Critical, since), 10, since + 5 * MIN)
-                .expect("current episode");
+        let updated = delivery_success_update(
+            &row,
+            episode(AlertLevel::Critical, since),
+            10,
+            since + 5 * MIN,
+        )
+        .expect("current episode");
 
         assert_eq!(
             updated.silenced_until,

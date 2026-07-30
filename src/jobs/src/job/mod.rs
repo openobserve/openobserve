@@ -41,10 +41,9 @@ fn eval_scheduler_fetch_size(total: usize, max_rows: usize) -> anyhow::Result<i6
         .map_err(|_| anyhow::anyhow!("online eval scheduler result count exceeds search size"))
 }
 
+mod alert_group_reaper;
 #[cfg(feature = "enterprise")]
 pub mod alert_grouping;
-mod alert_group_reaper;
-mod slo_maintenance;
 mod alert_manager;
 #[cfg(feature = "cloud")]
 mod cloud;
@@ -67,6 +66,7 @@ mod promql_self_consume;
 #[cfg(feature = "enterprise")]
 mod service_graph;
 mod session_cleanup;
+mod slo_maintenance;
 mod stats;
 
 use enrichment_data::enrichment_table::geoip::wait_for_initialization;

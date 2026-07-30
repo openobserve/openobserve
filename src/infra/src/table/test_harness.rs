@@ -18,15 +18,14 @@
 //! Most of this crate's logic is pure and tested without a database, but three
 //! classes of defect are invisible to a pure test and have all appeared here:
 //!
-//! 1. **Migration/entity drift** — a column added to the entity but not to a
-//!    migration compiles, passes every unit test, and fails on the first real
-//!    write. Running the actual migrations gives the tests the same schema
-//!    production gets.
-//! 2. **Conflict-clause mistakes** — which columns an upsert does and does not
-//!    overwrite is invisible until two writers touch one row. The multi-alert
-//!    one-writer rule (`alerts_2.md` §5.5 MN-2) is exactly this shape.
-//! 3. **Conditional-update semantics** — `UPDATE … WHERE <guard>` either
-//!    matched or it did not, and only the database can say.
+//! 1. **Migration/entity drift** — a column added to the entity but not to a migration compiles,
+//!    passes every unit test, and fails on the first real write. Running the actual migrations
+//!    gives the tests the same schema production gets.
+//! 2. **Conflict-clause mistakes** — which columns an upsert does and does not overwrite is
+//!    invisible until two writers touch one row. The multi-alert one-writer rule (`alerts_2.md`
+//!    §5.5 MN-2) is exactly this shape.
+//! 3. **Conditional-update semantics** — `UPDATE … WHERE <guard>` either matched or it did not, and
+//!    only the database can say.
 //!
 //! The database is a temp file (not `sqlite::memory:`, where every pooled
 //! connection would get its own empty database) built once per test process,
@@ -34,10 +33,10 @@
 //! use a unique `alert_id`** — [`unique_alert_id`] does that.
 
 use sea_orm::{ConnectionTrait, Database, DatabaseConnection};
+use sea_orm_migration::MigratorTrait;
 use tokio::sync::OnceCell;
 
 use super::migration::Migrator;
-use sea_orm_migration::MigratorTrait;
 
 static TEST_DB: OnceCell<DatabaseConnection> = OnceCell::const_new();
 
@@ -278,7 +277,11 @@ pub async fn seed_alert(conn: &DatabaseConnection, alert_id: &str, multi_alert: 
         r#type: Set(0),
     };
     folders::Entity::insert(folder)
-        .on_conflict(OnConflict::column(folders::Column::Id).do_nothing().to_owned())
+        .on_conflict(
+            OnConflict::column(folders::Column::Id)
+                .do_nothing()
+                .to_owned(),
+        )
         .do_nothing()
         .exec(conn)
         .await
@@ -354,7 +357,11 @@ pub async fn seed_promql_alert(
         r#type: Set(0),
     };
     folders::Entity::insert(folder)
-        .on_conflict(OnConflict::column(folders::Column::Id).do_nothing().to_owned())
+        .on_conflict(
+            OnConflict::column(folders::Column::Id)
+                .do_nothing()
+                .to_owned(),
+        )
         .do_nothing()
         .exec(conn)
         .await

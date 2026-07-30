@@ -27,11 +27,10 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use config::meta::slo::{Slo, SloStatusView};
+use openobserve_api_common::extractors::Headers;
 use openobserve_core::{auth::UserEmail, slo::service as slo_service};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
-
-use openobserve_api_common::extractors::Headers;
 
 use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 
@@ -253,10 +252,9 @@ pub async fn delete_slo(Path((org_id, slo_id)): Path<(String, String)>) -> Respo
         return r;
     }
     match slo_service::delete(&org_id, &slo_id).await {
-        Ok(true) => MetaHttpResponse::json(MetaHttpResponse::message(
-            StatusCode::OK,
-            "SLO deleted",
-        )),
+        Ok(true) => {
+            MetaHttpResponse::json(MetaHttpResponse::message(StatusCode::OK, "SLO deleted"))
+        }
         Ok(false) => not_found(),
         Err(e) => internal(anyhow::anyhow!(e.to_string())),
     }

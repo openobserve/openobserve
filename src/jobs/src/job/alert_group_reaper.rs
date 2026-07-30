@@ -117,9 +117,7 @@ async fn sweep() -> Result<(), anyhow::Error> {
     }
 
     if resolved > 0 || reaped > 0 || evicted > 0 {
-        log::info!(
-            "[ALERT_GROUP_REAPER] resolved={resolved} reaped={reaped} evicted={evicted}"
-        );
+        log::info!("[ALERT_GROUP_REAPER] resolved={resolved} reaped={reaped} evicted={evicted}");
     }
     Ok(())
 }

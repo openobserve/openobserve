@@ -58,8 +58,8 @@ use crate::{
             UpdateAlertRequestBody,
         },
         responses::{
-            AlertBulkEnableResponse, EnableAlertResponseBody, GenerateSqlMetadata,
-            AlertGroupLabel, AlertGroupResponseItem, AlertGroupTransitionItem,
+            AlertBulkEnableResponse, AlertGroupLabel, AlertGroupResponseItem,
+            AlertGroupTransitionItem, EnableAlertResponseBody, GenerateSqlMetadata,
             GenerateSqlResponseBody, GetAlertResponseBody, ListAlertGroupTransitionsResponseBody,
             ListAlertGroupsResponseBody, ListAlertsResponseBody, ListAlertsResponseBodyItem,
         },
@@ -300,8 +300,8 @@ pub async fn list_alert_groups(Path((org_id, alert_id)): Path<(String, String)>)
     // Compare the PRE-cap observed total against the cap, not the length of
     // `list`: the retained rows are post-cap, so they would report "cap of
     // cap" and an overflowing alert would look identical to one that fit.
-    let capped = group_cap > 0
-        && groups_observed.is_some_and(|observed| observed as usize > group_cap);
+    let capped =
+        group_cap > 0 && groups_observed.is_some_and(|observed| observed as usize > group_cap);
 
     MetaHttpResponse::json(ListAlertGroupsResponseBody {
         list,
@@ -313,9 +313,7 @@ pub async fn list_alert_groups(Path((org_id, alert_id)): Path<(String, String)>)
         groups_observed_is_lower_bound: rollup
             .as_ref()
             .and_then(|r| r.groups_observed_is_lower_bound),
-        groups_firing_is_lower_bound: rollup
-            .as_ref()
-            .and_then(|r| r.groups_firing_is_lower_bound),
+        groups_firing_is_lower_bound: rollup.as_ref().and_then(|r| r.groups_firing_is_lower_bound),
         capped,
         group_cap,
     })

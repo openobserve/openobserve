@@ -363,7 +363,11 @@ pub struct QueryCondition {
     // is accepted. Both branches found this independently; `de_opt_f64` is the
     // local helper and `config::meta::slo::lenient_f64` the shared one used
     // where this helper is not reachable.
-    #[serde(default, skip_serializing_if = "Option::is_none", deserialize_with = "de_opt_f64")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "de_opt_f64"
+    )]
     #[schema(example = 300.0)]
     pub promql_warning_value: Option<f64>,
 
@@ -406,7 +410,11 @@ pub struct Aggregation {
     /// alert. Must be strictly less severe than `having.value` — direction
     /// depends on the operator.
     // Same lenient deserialization as `promql_warning_value`, same reason.
-    #[serde(default, skip_serializing_if = "Option::is_none", deserialize_with = "de_opt_f64")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "de_opt_f64"
+    )]
     #[schema(example = 50.0)]
     pub warning_value: Option<f64>,
     /// Opt in to per-group evaluation (multi-alerts): each group gets its own

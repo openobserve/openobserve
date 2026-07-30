@@ -211,9 +211,9 @@ export default defineComponent({
     // a possibly-undefined field throws on mount. Default on read, write back
     // to the config so edits still propagate.
     const tagsModel = computed({
-      get: () => props.config.tags ?? [],
+      get: () => configModel.value.tags ?? [],
       set: (v: string[]) => {
-        props.config.tags = v;
+        configModel.value.tags = v;
       },
     });
 

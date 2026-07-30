@@ -51,8 +51,8 @@ pub mod budget_rows;
 pub mod condition;
 pub mod coverage;
 pub mod generation;
-pub mod lenient_f64;
 pub mod group;
+pub mod lenient_f64;
 pub mod math;
 pub mod slice;
 pub mod status_view;
@@ -2105,7 +2105,8 @@ mod absent_is_bad_tests {
     /// config).
     #[test]
     fn a_grouped_slo_cannot_set_absent_is_bad() {
-        let err = validate_slo(&def(ts(true), Some(vec!["region".into()])), 99.9, None).unwrap_err();
+        let err =
+            validate_slo(&def(ts(true), Some(vec!["region".into()])), 99.9, None).unwrap_err();
         assert!(
             matches!(err, SloValidationError::AbsentIsBadRequiresUngrouped),
             "got {err:?}"

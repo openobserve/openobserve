@@ -790,15 +790,13 @@ impl QueryConditionExt for QueryCondition {
                         // reached healthy groups if not every observed group
                         // was firing. Together they decide whether the counts
                         // are exact and whether absence proves disappearance.
-                        let observed =
-                            classification.groups.len() + classification.dropped.len();
+                        let observed = classification.groups.len() + classification.dropped.len();
                         let page = config::meta::alerts::grouping::FetchPage {
                             filled: size > 0 && records.len() as i64 >= size,
                             reached_healthy: classification.firing_observed < observed,
                         };
 
-                        eval_results.group_classification =
-                            Some(classification.with_page(page));
+                        eval_results.group_classification = Some(classification.with_page(page));
                     }
 
                     level.map(|_| records)
