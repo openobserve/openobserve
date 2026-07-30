@@ -140,6 +140,40 @@ const build = async () => {
     return;
   }
 
+  // ── PromQL alerts chart their own expression ────────────────────────────
+  // Not SQL at all, so everything below (generate_sql, the count/aggregation
+  // rewrites) is the wrong machinery: it produced a `count(*)` of rows over
+  // time — a 0-6 "Events" axis for an alert whose value is ~1000 — and drew
+  // the mark line at `trigger_condition.threshold`, which for PromQL is the
+  // SERIES-COUNT gate ("having series >= 1"), not the value being compared.
+  // Both axes were wrong at once, which is why the chart looked unrelated to
+  // the alert. Same panel shape the edit-page preview uses.
+  if (queryCondition.value?.type === "promql" || queryCondition.value?.promql) {
+    setTimeRange();
+    const panel: any = cloneDeep(getDefaultDashboardPanelData());
+    panel.data.type = "line";
+    panel.data.queryType = "promql";
+    panel.data.queries[0].customQuery = false;
+    panel.data.queries[0].query = queryCondition.value.promql || "";
+    panel.data.queries[0].vrlFunctionQuery = null;
+    panel.data.config.table_dynamic_columns = false;
+    panel.data.queries[0].config.promql_mode = true;
+    panel.data.queries[0].fields.stream = props.alert.stream_name;
+    panel.data.queries[0].fields.stream_type = props.alert.stream_type;
+    // PromQL names its own series from the returned labels.
+    panel.data.queries[0].fields.x = [];
+    panel.data.queries[0].fields.y = [];
+    panel.data.queries[0].fields.z = [];
+    panel.data.queries[0].fields.breakdown = [];
+    // The VALUE thresholds, which is what a PromQL alert compares.
+    panel.data.config.mark_line = buildThresholdMarkLines(
+      queryCondition.value?.promql_condition?.value,
+      queryCondition.value?.promql_warning_value,
+    );
+    chartData.value = panel.data;
+    return;
+  }
+
   let sql = "";
   try {
     // Ask the backend for the alert's own SQL rather than rebuilding it here:
@@ -258,18 +292,22 @@ const build = async () => {
         props.alert?.trigger_condition?.warning_threshold,
       );
 
-  // MICROSECONDS into `new Date(...)`, deliberately: that is the convention
-  // `PanelSchemaRenderer` is fed everywhere else in the alert UI (see
-  // PreviewAlert's `endTime = Date.now() * 1000`). Passing honest
-  // milliseconds here silently produced an empty chart.
+  setTimeRange();
+  chartData.value = panel.data;
+};
+
+/// MICROSECONDS into `new Date(...)`, deliberately: that is the convention
+/// `PanelSchemaRenderer` is fed everywhere else in the alert UI (see
+/// PreviewAlert's `endTime = Date.now() * 1000`). Passing honest milliseconds
+/// here silently produced an empty chart.
+function setTimeRange() {
   const endUs = Date.now() * 1000;
   const startUs = endUs - (RANGE_MS[range.value] ?? RANGE_MS["1h"]) * 1000;
   selectedTimeObj.value = {
     start_time: new Date(startUs),
     end_time: new Date(endUs),
   };
-  chartData.value = panel.data;
-};
+}
 
 watch(() => props.alert, build);
 onMounted(build);
