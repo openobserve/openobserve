@@ -23,7 +23,7 @@
       }
     "
     :title="t('dashboard.valueMappingsTitle')"
-    :width="70"
+    size="lg"
     :neutral-button-label="t('dashboard.valueMappingAddNew')"
     neutral-button-variant="outline"
     :primary-button-label="t('dashboard.valueMappingApply')"
