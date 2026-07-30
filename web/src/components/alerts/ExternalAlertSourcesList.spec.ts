@@ -103,6 +103,7 @@ describe("ExternalAlertSourcesList", () => {
           {
             integration_id: "int-1",
             detected_source: "grafana",
+            display_name: "grafana",
             first_received_at: 1,
             last_received_at: Date.now() * 1000,
             accepted_count: 5,
@@ -116,8 +117,32 @@ describe("ExternalAlertSourcesList", () => {
     const wrapper = buildWrapper();
     await flushPromises();
     expect((wrapper.vm as any).sourceStatuses.length).toBe(1);
-    expect((wrapper.vm as any).sourceStatuses[0].detectedSource).toBe("grafana");
+    expect((wrapper.vm as any).sourceStatuses[0].displayName).toBe("grafana");
     expect((wrapper.vm as any).sourceStatuses[0].resolveWiringHint).toBe(true);
+  });
+
+  it("shows the sender's display_name instead of detected_source when present", async () => {
+    (alertSources.listSenders as any).mockResolvedValue({
+      data: {
+        senders: [
+          {
+            integration_id: "int-1",
+            detected_source: "generic",
+            display_name: "solarwinds",
+            first_received_at: 1,
+            last_received_at: Date.now() * 1000,
+            accepted_count: 5,
+            rejected_count: 0,
+            resolved_seen: false,
+            resolve_wiring_hint: false,
+          },
+        ],
+      },
+    });
+    const wrapper = buildWrapper();
+    await flushPromises();
+    expect((wrapper.vm as any).sourceStatuses[0].displayName).toBe("solarwinds");
+    expect(wrapper.text()).toContain("solarwinds");
   });
 
   it("calls setEnabled with the inverse of current enabled state", async () => {

@@ -15,6 +15,7 @@ export interface AlertSourceIntegration {
 export interface AlertSourceSender {
   integration_id: string;
   detected_source: string;
+  display_name: string;
   first_received_at: number;
   last_received_at: number;
   accepted_count: number;

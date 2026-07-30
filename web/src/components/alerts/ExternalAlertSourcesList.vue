@@ -113,9 +113,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTag variant="default-outline">{{ t("alert_sources.statusNotConnected") }}</OTag>
           <p class="text-text-secondary">{{ t("alert_sources.statusNotConnectedHelp") }}</p>
         </div>
-        <div v-for="status in sourceStatuses" :key="status.detectedSource" class="flex flex-col gap-1">
+        <div v-for="status in sourceStatuses" :key="status.displayName" class="flex flex-col gap-1">
           <div class="flex items-center gap-2">
-            <span>{{ status.detectedSource }}</span>
+            <span>{{ status.displayName }}</span>
             <OTag v-if="status.status === 'receiving'" variant="success-soft" dot>
               {{ t("alert_sources.statusReceiving") }}
             </OTag>
@@ -222,7 +222,7 @@ import { getEndPoint, getIngestionURL } from "@/utils/zincutils";
 import type { AlertSourceIntegration } from "@/ts/interfaces/alertSources";
 
 interface SourceStatusRow {
-  detectedSource: string;
+  displayName: string;
   status: "receiving" | "stale" | "not_connected";
   acceptedCount: number;
   rejectedCount: number;
@@ -330,7 +330,7 @@ export default defineComponent({
         const res = await alertSources.listSenders(this.orgIdentifier, integrationId);
         const now = Date.now() * 1000;
         this.sourceStatuses = res.data.senders.map((s: any) => ({
-          detectedSource: s.detected_source,
+          displayName: s.display_name,
           status: getAlertSourceStatus(s.last_received_at, now),
           acceptedCount: s.accepted_count,
           rejectedCount: s.rejected_count,
