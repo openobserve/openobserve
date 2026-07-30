@@ -10731,7 +10731,8 @@
       "reservation": "Reservation",
       "sliType": "SLI type",
       "owner": "Owner",
-      "folder": "Folder"
+      "folder": "Folder",
+      "streamPlaceholder": "Select a stream"
     },
     "empty": {
       "title": "No SLOs yet",

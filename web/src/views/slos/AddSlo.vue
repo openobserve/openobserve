@@ -28,7 +28,8 @@
   <OPageLayout
     :title="isEdit ? t('slos.editTitle') : t('slos.newTitle')"
     icon="track_changes"
-    :back="backTarget"
+    :back="{ to: backTarget, label: t('slos.title') }"
+    scroll
     title-data-test="slos-addslo-title"
   >
     <template #actions>
@@ -118,11 +119,17 @@
                   v-model="form.config.stream_type"
                   :label="t('slos.field.streamType')"
                   :options="streamTypeOptions"
+                  :searchable="false"
                   data-test="slos-addslo-stream-type"
+                  @update:model-value="onStreamTypeChange"
                 />
-                <OInput
+                <OSelect
                   v-model="form.config.stream"
                   :label="t('slos.field.stream')"
+                  :options="streamOptions"
+                  :loading="isFetchingStreams"
+                  :disabled="!form.config.stream_type"
+                  :placeholder="t('slos.field.streamPlaceholder')"
                   required
                   data-test="slos-addslo-stream"
                 />
@@ -152,8 +159,20 @@
                   v-model="form.config.stream_type"
                   :label="t('slos.field.streamType')"
                   :options="streamTypeOptions"
+                  :searchable="false"
+                  data-test="slos-addslo-timeslice-stream-type"
+                  @update:model-value="onStreamTypeChange"
                 />
-                <OInput v-model="form.config.stream" :label="t('slos.field.stream')" required />
+                <OSelect
+                  v-model="form.config.stream"
+                  :label="t('slos.field.stream')"
+                  :options="streamOptions"
+                  :loading="isFetchingStreams"
+                  :disabled="!form.config.stream_type"
+                  :placeholder="t('slos.field.streamPlaceholder')"
+                  required
+                  data-test="slos-addslo-timeslice-stream"
+                />
               </div>
               <OInput
                 v-model="form.config.query"
@@ -310,6 +329,7 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import ORadioCards from "@/lib/forms/OptionGroup/OOptionGroup.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import useStreams from "@/composables/useStreams";
 import OTagInput from "@/lib/forms/TagInput/OTagInput.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -362,6 +382,42 @@ const streamTypeOptions = [
   { value: "metrics", label: "metrics" },
   { value: "traces", label: "traces" },
 ];
+
+// ── Stream picker ─────────────────────────────────────────────────────────
+// Same shape as the alert form: pick a stream TYPE, then pick a stream NAME
+// from what that type actually has. A free-text box let a typo through to the
+// backend, where the SLO saves and then measures nothing — the failure only
+// shows up later as permanent no-data.
+const { getStreams } = useStreams();
+const streamOptions = ref<string[]>([]);
+const isFetchingStreams = ref(false);
+
+async function loadStreams(streamType: string) {
+  if (!streamType) {
+    streamOptions.value = [];
+    return;
+  }
+  isFetchingStreams.value = true;
+  try {
+    // `useStreams` caches per type, so switching back and forth is free.
+    const res: any = await getStreams(streamType, false);
+    streamOptions.value = (res?.list ?? []).map((s: any) => s.name);
+  } catch {
+    // A failed list must not block the form: leave the picker empty rather
+    // than trapping the user on a page that cannot be completed.
+    streamOptions.value = [];
+  } finally {
+    isFetchingStreams.value = false;
+  }
+}
+
+/// Changing the type invalidates the chosen stream — a `logs` stream name is
+/// not a `metrics` one, and silently keeping it would submit a stream that
+/// does not exist under the new type.
+function onStreamTypeChange(value: unknown) {
+  form.config.stream = "";
+  loadStreams(String(value ?? ""));
+}
 
 const comparatorOptions = [
   { value: "<", label: "<" },
@@ -538,5 +594,11 @@ function cancel() {
   router.push(backTarget.value);
 }
 
-onMounted(load);
+onMounted(async () => {
+  // Hydrate the SLO first so an edit reports its stored stream_type, then load
+  // that type's streams — otherwise the picker opens empty and the stream the
+  // SLO already uses looks unset.
+  await load();
+  await loadStreams(form.config.stream_type);
+});
 </script>

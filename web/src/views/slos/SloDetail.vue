@@ -30,7 +30,7 @@
     :title="slo?.name || sloId"
     icon="track_changes"
     :subtitle="subtitle"
-    :back="backTarget"
+    :back="{ to: backTarget, label: t('slos.title') }"
     title-data-test="slos-slodetail-title"
     bleed
   >
