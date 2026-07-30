@@ -509,6 +509,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               :truncated="evidenceTruncated"
                               class="mt-3"
                             />
+                            <!-- What the PAGE was doing during this step, as
+                                 opposed to what the runner experienced.
+                                 Rendered on any step that owns events, not only
+                                 the failed one: a 503 during a step that passed
+                                 is routinely the cause of the timeout two steps
+                                 later. -->
+                            <StepPageActivity
+                              v-if="evidenceKey"
+                              :step-id="row.stepId"
+                              :events="row.bundleEvents"
+                              :status="evidence.status.value"
+                              :error="evidence.error.value"
+                              :truncated="evidence.truncated.value"
+                              :unattributed-count="evidence.unattributedCount.value"
+                              class="mt-3"
+                              @view-all="openEvidenceForStep"
+                              @retry="evidence.load(true)"
+                            />
                           </div>
                         </div>
                       </template>
@@ -584,6 +602,7 @@ import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import StepEvidence from "@/components/synthetics/StepEvidence.vue";
+import StepPageActivity from "@/components/synthetics/results/StepPageActivity.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import BetaBadge from "@/components/common/BetaBadge.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
@@ -605,6 +624,7 @@ import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import { buildAttemptViews } from "@/composables/synthetics/syntheticResultsSchema";
 import type {
   AttemptView,
+  EvidenceEvent,
   FailureDetail,
   StepEvidence as StepEvidenceSummary,
   SyntheticRunDetail,
@@ -744,6 +764,8 @@ interface StepRow {
   evidence: FailureDetail | null;
   /** Browser-side evidence for this step, when the probe captured any. */
   appEvidence: StepEvidenceSummary | null;
+  /** Bundle events attributed to this step, ranked worst-first. Empty until loaded. */
+  bundleEvents: EvidenceEvent[];
 }
 
 function fmtDur(ms: number): string {
@@ -760,6 +782,8 @@ function fmtDur(ms: number): string {
 function buildSteps(
   detail: SyntheticRunDetail | null,
   attempt: AttemptView | null = null,
+  /** step_id -> that step's bundle events, ranked. Empty before the bundle loads. */
+  eventsByStep: Map<string, EvidenceEvent[]> = new Map(),
 ): StepRow[] {
   const steps = attempt?.steps ?? detail?.lastAttemptSteps ?? [];
   const failureDetail = attempt ? attempt.failureDetail : (detail?.failureDetail ?? null);
@@ -796,6 +820,9 @@ function buildSteps(
       // Per step, not per failure: the step that CAUSED the problem is often
       // not the one that failed, so evidence hangs off whichever step owns it.
       appEvidence: detail.evidenceByStep.find((e) => e.stepId === ex.step_id) ?? null,
+      // Per step, from the shared bundle. Empty (not absent) before the fetch
+      // resolves, so the block can distinguish "loading" from "nothing here".
+      bundleEvents: eventsByStep.get(ex.step_id) ?? [],
     };
   });
 }
@@ -1068,6 +1095,15 @@ const evidenceStepFilterName = computed(() =>
     : "",
 );
 
+/**
+ * The step is a filter over the run log, not a second copy of it — so "view all"
+ * scopes the existing panel rather than opening a second list.
+ */
+function openEvidenceForStep(stepId: string) {
+  evidenceStepFilter.value = stepId;
+  detailTab.value = "evidence";
+}
+
 // Two independent triggers, either of which may come first: a step expanding
 // (failed steps auto-expand, so this is load-time on a failed run) and the tab
 // opening. load() is idempotent, which is what makes that safe. An attempt
@@ -1160,7 +1196,7 @@ const displayMonitorName = computed(
 
 const steps = computed<StepRow[]>(() => {
   if (synthetics.runDetail.value) {
-    return buildSteps(synthetics.runDetail.value, currentAttempt.value);
+    return buildSteps(synthetics.runDetail.value, currentAttempt.value, evidence.eventsByStep.value);
   }
   return [];
 });
