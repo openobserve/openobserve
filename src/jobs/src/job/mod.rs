@@ -27,20 +27,6 @@ use {
 
 use crate::common::meta::user::{UserOrgRole, UserRequest};
 
-#[cfg(feature = "enterprise")]
-fn eval_scheduler_fetch_size(total: usize, max_rows: usize) -> anyhow::Result<i64> {
-    if total > max_rows {
-        return Err(anyhow::anyhow!(
-            "online eval scheduler interval has {total} rows, exceeding the safe limit of {max_rows}"
-        ));
-    }
-    let fetch_size = total
-        .checked_add(1)
-        .ok_or_else(|| anyhow::anyhow!("online eval scheduler result count exceeds search size"))?;
-    i64::try_from(fetch_size)
-        .map_err(|_| anyhow::anyhow!("online eval scheduler result count exceeds search size"))
-}
-
 mod alert_group_reaper;
 #[cfg(feature = "enterprise")]
 pub mod alert_grouping;
@@ -701,6 +687,15 @@ pub async fn init() -> Result<(), anyhow::Error> {
             },
         );
 
+        let llm_eval_config =
+            &o2_enterprise::enterprise::common::config::get_config().llm_eval_config;
+        infra::table::online_eval_jobs::init_completion_window_defaults(
+            llm_eval_config.trace_idle_timeout_secs,
+            llm_eval_config.trace_max_age_secs,
+            llm_eval_config.session_idle_timeout_secs,
+            llm_eval_config.session_max_age_secs,
+        );
+
         o2_enterprise::enterprise::llm_evaluations::eval_jobs::async_executor::register_evaluator_trace_exporter(
             |org_id, traces, node_idx| {
                 Box::pin(async move {
@@ -720,7 +715,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         );
 
         o2_enterprise::enterprise::llm_evaluations::eval_jobs::scheduler::register_search_executor(
-            |org_id, stream_type, sql, start_time, end_time| {
+            |org_id, stream_type, sql, start_time, end_time, truncate_over_limit| {
                 Box::pin(async move {
                     let count_req = config::meta::search::Request {
                         query: config::meta::search::Query {
@@ -744,7 +739,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
                             total: count_response.total,
                             is_partial: count_response.is_partial,
                             function_error: count_response.function_error,
-                            hits: Vec::new(),
+                            ..Default::default()
                         });
                     }
 
@@ -752,12 +747,20 @@ pub async fn init() -> Result<(), anyhow::Error> {
                     if total == 0 {
                         return Ok(Default::default());
                     }
-                    let max_rows = o2_enterprise::enterprise::common::config::get_config()
-                        .llm_eval_config
-                        .max_buffer_size
-                        .saturating_mul(10)
-                        .max(10_001);
-                    let size = eval_scheduler_fetch_size(total, max_rows)?;
+                    let max_rows = o2_enterprise::enterprise::llm_evaluations::eval_jobs::scheduler::EVAL_DETECTION_MAX_ROWS;
+                    let over_limit = total > max_rows;
+                    if over_limit && !truncate_over_limit {
+                        // The scheduler splits the window in half rather than
+                        // fetching an oversized result set.
+                        return Ok(o2_enterprise::enterprise::llm_evaluations::eval_jobs::scheduler::SchedulerSearchResult {
+                            total,
+                            over_limit: true,
+                            ..Default::default()
+                        });
+                    }
+                    // total <= max_rows here; fetch one extra row so a count
+                    // that grew after the count query fails closed downstream.
+                    let size = (if over_limit { max_rows } else { total + 1 }) as i64;
                     let data_req = config::meta::search::Request {
                         query: config::meta::search::Query {
                             sql,
@@ -778,6 +781,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
                                 total,
                                 is_partial: response.is_partial,
                                 function_error: response.function_error,
+                                over_limit,
                             }
                         })
                         .map_err(|e| anyhow::anyhow!(e))
@@ -1188,20 +1192,4 @@ pub async fn init_deferred() -> Result<(), anyhow::Error> {
         .expect("Dashboard id->org cache failed");
 
     Ok(())
-}
-
-#[cfg(all(test, feature = "enterprise"))]
-mod tests {
-    use super::eval_scheduler_fetch_size;
-
-    #[test]
-    fn eval_scheduler_fetches_one_row_past_the_count() {
-        assert_eq!(eval_scheduler_fetch_size(10_001, 100_000).unwrap(), 10_002);
-    }
-
-    #[test]
-    fn eval_scheduler_rejects_intervals_above_the_safe_limit() {
-        let error = eval_scheduler_fetch_size(100_001, 100_000).unwrap_err();
-        assert!(error.to_string().contains("exceeding the safe limit"));
-    }
 }

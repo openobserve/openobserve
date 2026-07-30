@@ -365,7 +365,7 @@ export default defineComponent({
     );
 
     // Backend `/config` flag `online_evals_enabled` — controlled by
-    // enterprise `O2_ONLINE_EVALS_ENABLED`. Reactive so the menu picks it up regardless
+    // enterprise `O2_EVAL_ENABLED`. Reactive so the menu picks it up regardless
     // of whether the config response arrived before or after this component
     // mounted.
     const isOnlineEvalsEnabled = computed(() => {

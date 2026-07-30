@@ -74,7 +74,12 @@ pub mod session {
             .collect()
     }
 
-    pub fn trace_ids_sql(stream: &str, session_columns: &[String], session_id: &str) -> String {
+    pub fn trace_ids_sql(
+        stream: &str,
+        session_columns: &[String],
+        session_id: &str,
+        ingest_cutoff_us: Option<i64>,
+    ) -> String {
         let escaped_session_id = escape_sql_string(session_id);
         let predicate = session_columns
             .iter()
@@ -84,12 +89,25 @@ pub mod session {
         format!(
             "SELECT trace_id, min({}) as zo_sql_timestamp \
              FROM {} \
-             WHERE ({predicate}) \
+             WHERE ({predicate}){} \
              GROUP BY trace_id \
              ORDER BY zo_sql_timestamp DESC, trace_id ASC",
             quote_identifier(TIMESTAMP_COL_NAME),
             quote_identifier(stream),
+            ingest_cutoff_predicate(ingest_cutoff_us),
         )
+    }
+
+    /// An ingest-time upper bound appended to evidence queries: rows ingested
+    /// at or after the cutoff are excluded, so hydration cannot mix evidence
+    /// that arrived after an evaluation run's frozen boundary into that run.
+    fn ingest_cutoff_predicate(ingest_cutoff_us: Option<i64>) -> String {
+        ingest_cutoff_us.map_or_else(String::new, |cutoff_us| {
+            format!(
+                " AND {} < {cutoff_us}",
+                quote_identifier(crate::O2_INGEST_TS_COL_NAME)
+            )
+        })
     }
 
     pub fn trace_ids_from_hits(hits: &[Value]) -> Vec<String> {
@@ -116,11 +134,16 @@ pub mod session {
         format!("{} IN ({values})", quote_identifier("trace_id"))
     }
 
-    pub fn span_rows_sql(stream: &str, trace_ids: &[String]) -> String {
+    pub fn span_rows_sql(
+        stream: &str,
+        trace_ids: &[String],
+        ingest_cutoff_us: Option<i64>,
+    ) -> String {
         format!(
-            "SELECT * FROM {} WHERE {} ORDER BY {} ASC, _o2_ingest_ts ASC, trace_id ASC, span_id ASC",
+            "SELECT * FROM {} WHERE {}{} ORDER BY {} ASC, _o2_ingest_ts ASC, trace_id ASC, span_id ASC",
             quote_identifier(stream),
             trace_id_predicate(trace_ids),
+            ingest_cutoff_predicate(ingest_cutoff_us),
             quote_identifier(TIMESTAMP_COL_NAME),
         )
     }
@@ -165,17 +188,37 @@ pub mod session {
                     "llm_session_id".to_string(),
                 ],
                 "session-'1",
+                None,
             );
 
             assert!(sql.contains("\"gen_ai_conversation_id\" = 'session-''1'"));
+            assert!(!sql.contains("_o2_ingest_ts"));
             assert!(sql.contains("OR \"llm_session_id\" = 'session-''1'"));
             assert!(sql.contains("GROUP BY trace_id"));
             assert!(sql.contains("ORDER BY zo_sql_timestamp DESC, trace_id ASC"));
         }
 
         #[test]
+        fn evidence_queries_apply_the_frozen_ingest_cutoff() {
+            let sql = trace_ids_sql(
+                "traces",
+                &["llm_session_id".to_string()],
+                "session-1",
+                Some(1_000_000),
+            );
+            assert!(sql.contains("AND \"_o2_ingest_ts\" < 1000000 GROUP BY"));
+
+            let sql = span_rows_sql("traces", &["abc-123".to_string()], Some(1_000_000));
+            assert!(sql.contains("AND \"_o2_ingest_ts\" < 1000000 ORDER BY"));
+        }
+
+        #[test]
         fn phase_two_selects_all_rows_for_discovered_traces() {
-            let sql = span_rows_sql("traces", &["abc-123".to_string(), "def-456".to_string()]);
+            let sql = span_rows_sql(
+                "traces",
+                &["abc-123".to_string(), "def-456".to_string()],
+                None,
+            );
 
             assert!(sql.contains("SELECT *"));
             assert!(sql.contains("\"trace_id\" IN ('abc-123', 'def-456')"));
