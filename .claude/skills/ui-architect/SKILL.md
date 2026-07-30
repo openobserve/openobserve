@@ -275,9 +275,9 @@ considering the UI done:
       manual `useLoading`/`:loading` and Save is not disabled on invalid.
 - [ ] Payload built with explicit keys (not `{ ...value }`); numeric inputs
       coerced. Field arrays use `:key="index"` + a non-last-row delete test.
-- [ ] Zero `px` values (except a `1px` hairline) — including inside class
-      arbitrary values (`w-[320px]`, `text-[13px]`). Sizes use rem / % / vh / vw
-      or Tailwind's rem scale.
+- [ ] Zero `px` values outside the sanctioned positions (§3 exemption table) —
+      including inside class arbitrary values (`w-[320px]`, `text-[13px]`). Sizes
+      use rem / % / vh / vw or Tailwind's rem scale.
 - [ ] **Spacing copies a sibling, never invented per page** — padding/margins/
       gaps and card surface classes are taken verbatim from the sibling panel
       family the screen joins (`card-container` alone styles nothing — cards

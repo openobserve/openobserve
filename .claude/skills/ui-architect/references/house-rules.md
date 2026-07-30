@@ -123,8 +123,12 @@ utilities usually removes the temptation entirely.
   too — a `px` unit in a Tailwind arbitrary value (`w-[320px]`, `text-[13px]`,
   `gap-[6px]`) is just as banned as a `px` in a `style=""`. Convert to rem
   (divide by 16: `320px → 20rem`, `22px → 1.375rem`, `6px → 0.375rem`).
-- **The only accepted `px` is a `1px` hairline border/divider.** Every other `px`
-  — inline, in a `<style>` block, or in a class arbitrary value — is a smell.
+- **`px` is banned outside a sanctioned position** — hairlines, shadow/ring/border
+  widths, query conditions, canvas/email consumers and a handful more. The list is
+  the exemption table in `SKILL.md` §3, enforced per-occurrence by
+  `local/no-hardcoded-px` (`web/scripts/px-rules.mjs`); it is deliberately kept in
+  one place, so consult it rather than assuming. Any other `px` — inline, in a
+  `<style>` block, or in a class arbitrary value — is a smell.
 - **Corner radius is a token, not a guess — exactly two tiers + circle:**
   `rounded-default` (**4px** — controls: buttons, inputs, chips, small icon
   buttons), `rounded-surface` (**12px** — surfaces: dialogs, drawers, cards,
