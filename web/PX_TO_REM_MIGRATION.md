@@ -22,6 +22,17 @@
 > parses). Run by `lint:ci` over `src/**/*.{vue,ts,css}`. Rules live in
 > `scripts/px-rules.mjs`, imported by the rule so there is a single definition.
 >
+> - **Exemptions are per-occurrence, not per-file.** `pxIsAllowed()` judges each px from
+>   its surrounding context (hairline, shadow/ring width, query condition, `rootMargin`,
+>   user-facing copy, SVG dimension attribute, canvas measurement helper, ECharts
+>   `extraCssText` / `*_STYLE` constant, `calc()` mixing vh/vw). `PX_FILE_ALLOWLIST` is a
+>   deliberate last resort — **4 files** where *every* px is unresolvable and no context
+>   rule can express why: the HTML email document, the canvas-rendered trace tree,
+>   gridstack's numeric `cellHeight`, and mobile session-replay device pixels. A file
+>   listed there gets NO px checking, so **prefer adding a context rule over an entry**.
+>   An earlier directory-scoped form (`utils/dashboard/`, `composables/dashboard/`) blanked
+>   104 files and hid a real miss — `FIELD_FUNCTION_MENU_WIDTH` was still `771px` while the
+>   sibling components had already moved to `48.1875rem`.
 > - The design-consistency ratchet carries **no px category at all**. It briefly did,
 >   and that was a mistake: a counter cannot catch a swap (remove one px, add another —
 >   count unchanged, CI passes), it reports a per-file number instead of a location, and
@@ -306,8 +317,9 @@ offsets themselves are K3-class values; only the spread/geometry converts.
 
 ## 5. KEEP — where px is the correct answer (529)
 
-These are **not backlog**. Converting them introduces a bug or changes behaviour for no benefit, and
-a future lint rule should allowlist them explicitly.
+These are **not backlog**. Converting them introduces a bug or changes behaviour for no benefit.
+`local/no-hardcoded-px` now exempts them explicitly — per-occurrence from the surrounding context
+wherever that is expressible, and only otherwise by a whole-file entry (see the banner above).
 
 There are two distinct reasons a value lands here, and it matters which:
 
@@ -451,8 +463,10 @@ it resolves to — the whole email would resize unpredictably per recipient.
 This file already carries an exemption in `scripts/check-design-consistency.mjs` under
 `FONT_ALLOWLIST` for exactly this reason. The px exemption belongs in the same place.
 
-`utils/fonts.ts` is here for a different reason: it *defines* the font stacks and the `canvasFont`
-helper, so it is upstream of the tokens rather than a consumer of them.
+`utils/fonts.ts` *defines* the font stacks and the `canvasFont` helper, so it is upstream of the
+tokens rather than a consumer of them. It needs **no px entry**: its only px is a JSDoc example
+(`@param size … e.g. "12px"`), which `maskCommentsForPx()` blanks before the scan. Its callers are
+covered per-occurrence by the canvas-measurement-helper rule instead.
 
 ---
 
@@ -615,8 +629,9 @@ the wrong unit.
 
 `width`/`height` on an SVG element are parsed with SVG's own attribute length grammar,
 which predates `rem` and does not accept it reliably across browsers. The idiomatic
-alternative is unitless SVG **user units** (`width="24"`), not rem — so these stay px and
-both files are on the eslint rule's file allowlist.
+alternative is unitless SVG **user units** (`width="24"`), not rem — so these stay px.
+Enforced per-occurrence: the rule permits a dimension attribute only inside an *unclosed*
+SVG/`<img>` tag, so ordinary CSS in the same icon file still reports.
 
 `stroke-width` px: genuinely zero, confirmed by the same scan.
 

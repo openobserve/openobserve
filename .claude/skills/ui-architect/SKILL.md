@@ -87,7 +87,11 @@ read it once, it is the backbone of everything below.
      the browser default). So `px ÷ 16` → rem, and `px ÷ 4` → the Tailwind scale
      step: `300px` → `18.75rem` → `w-75`. Fractional steps are valid (`w-62.5`).
    - **`px` IS correct in these positions — do NOT "fix" them.** rem there is either
-     wrong or does not resolve at all. The exemption list lives in `px-rules.mjs`.
+     wrong or does not resolve at all. Exemptions live in `px-rules.mjs` and are judged
+     **per-occurrence** from the surrounding context, so the rest of the file stays
+     checked. `PX_FILE_ALLOWLIST` disables the rule for a whole file and is a last resort
+     (4 files) — if you need a new exemption, add a context rule to `pxIsAllowed()`, not
+     a file entry.
      | Position | Why px |
      | --- | --- |
      | Hairlines and sub-pixel geometry `≤1.5px` (borders, dividers, rings, half-hairline offsets, gradient dot radii) | A 1-device-pixel rule must not scale with text, or it anti-aliases into a smear — or drops out entirely — at non-integer zoom and DPR |

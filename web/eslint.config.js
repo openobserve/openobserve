@@ -108,7 +108,7 @@ const noHardcodedPx = {
                 start: sourceCode.getLocFromIndex(match.index),
                 end: sourceCode.getLocFromIndex(match.index + match[0].length),
               },
-              message: `Hardcoded ${match[0]}. Size in rem: use ${asRem}rem${hint}. If px is genuinely required (hairline, shadow/ring width, query condition, IntersectionObserver rootMargin, user-facing copy, canvas/email/SVG consumer), add it to the exemptions in scripts/px-rules.mjs.`,
+              message: `Hardcoded ${match[0]}. Size in rem: use ${asRem}rem${hint}. If px is genuinely required (hairline, shadow/ring width, query condition, IntersectionObserver rootMargin, user-facing copy, SVG dimension attribute, canvas/ECharts/email consumer), add a context rule to pxIsAllowed() in scripts/px-rules.mjs — prefer that over a whole-file PX_FILE_ALLOWLIST entry.`,
             });
           }
         };

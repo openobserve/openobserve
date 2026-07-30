@@ -6,21 +6,18 @@
 // Kept in its own module, not inlined into eslint.config.js, so there is exactly one
 // definition of "is this px allowed?" — an earlier second copy drifted out of sync.
 
-// Whole files where the CONSUMER cannot resolve a relative unit, so px is the only
-// option: a detached measurement <canvas>, ECharts options (serialised, no cascade),
-// a standalone HTML email (rem resolves against the recipient's mail client), numeric
-// JS layout-lib APIs, SVG geometry attributes, and <img width>/<img height>.
+// Whole-file exemptions, kept to the few files where EVERY px is unresolvable and a
+// per-occurrence rule below cannot express why. A file listed here gets NO px checking
+// at all, so prefer adding a context rule to `pxIsAllowed` over adding an entry.
 // Entries ending in "/" match by directory prefix; others by suffix.
 export const PX_FILE_ALLOWLIST = [
+  // A standalone HTML email document: rem resolves against the recipient's mail
+  // client, and every length in the file belongs to that document.
   "utils/prebuilt-templates/email.ts",
-  "utils/fonts.ts",
-  "utils/dashboard/",
-  "composables/dashboard/",
+  // Tooltip/label geometry composed for a <canvas>-rendered tree — no CSS cascade.
   "utils/traces/treeVisualizationEngine.ts",
+  // Gridstack cellHeight: a numeric layout-lib API, not a CSS length.
   "views/Dashboards/RenderDashboardCharts.vue",
-  "components/icons/DynamicFilterIcon.vue",
-  "components/icons/SlackIcon.vue",
-  "components/common/O2AIContextAddBtn.vue",
   // Mobile session replay reproduces wireframes the SDK recorded in device pixels
   // (dp). These are measurements of someone else's screen being replayed faithfully,
   // not sizes we design — scaling them with the viewer's font-size would distort the
@@ -95,6 +92,47 @@ export const pxIsAllowed = (text, index, raw) => {
   // Forwarded to <img width>/<img height> — HTML dimension attributes take a bare
   // integer, so a CSS unit is invalid markup there.
   if (/\bimage(?:Width|Height)["']?\s*=?\s*["'{]?[^;{}]*$/.test(before)) return true;
+  // …including its Vue prop-definition form, where `default:` sits inside the prop object.
+  if (/\bimage(?:Width|Height)\s*:\s*\{[^}]*$/.test(before)) return true;
+
+  // A dimension attribute on an SVG/<img> element. SVG's attribute length grammar does
+  // not reliably accept rem, so px (or a bare number) is the only portable unit. Scoped
+  // to an UNCLOSED tag of that kind, so CSS elsewhere in the same file still reports.
+  {
+    const open = before.lastIndexOf("<");
+    if (open !== -1 && !before.slice(open).includes(">")) {
+      const tag = /^<\s*([a-zA-Z][\w:-]*)/.exec(before.slice(open))?.[1] ?? "";
+      if (
+        /^(?:svg|img|image|rect|circle|ellipse|line|polyline|polygon|path|use|symbol|pattern|mask|filter)$/i.test(
+          tag,
+        ) &&
+        /\b(?:width|height|x|y|cx|cy|r|rx|ry|x1|y1|x2|y2|stroke-width)\s*=\s*["'][^"']*$/.test(
+          before,
+        )
+      )
+        return true;
+    }
+  }
+
+  // Text handed to a <canvas> measurement helper. These write ctx.font on a DETACHED
+  // canvas, which resolves rem against the 16px default rather than the document root —
+  // so a rem here silently measures the wrong width. See §6 R2.
+  if (/\b(?:calculateWidthText|canvasFont|measureText)\s*\([^)]*$/.test(before)) return true;
+  if (/\bfontSize\s*:\s*string\s*=\s*["'][^"']*$/.test(before)) return true;
+
+  // ECharts tooltip CSS — an `extraCssText:` value, or a *_STYLE constant holding one.
+  // ECharts serialises this into its own container; under renderMode "richText" zrender
+  // parses it, not the CSS engine. Needs a wider window than `before`: these declaration
+  // strings run well past 160 chars, so the trailing values would miss the match.
+  {
+    const wide = text.slice(Math.max(0, index - 700), index);
+    if (
+      // UPPER_SNAKE only: a module constant holding the tooltip CSS. A camelCase
+      // `someStyle` is usually a local bound to an inline style, where rem resolves.
+      /(?:extraCssText\s*:|\b[A-Z][A-Z0-9_]*_STYLE\s*=)\s*(?:\r?\n\s*)?["'][^"']*$/.test(wide)
+    )
+      return true;
+  }
 
   // Query conditions are thresholds, not rendered lengths.
   if (/@media|@container/.test(before.slice(before.lastIndexOf("\n") + 1))) return true;
