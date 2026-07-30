@@ -108,19 +108,21 @@ describe("FunctionsToolbar", () => {
     const wrapper = mountToolbar({
       transformTypeOptions: [{ label: "VRL", value: "0" }],
     });
-    const input = wrapper.find('[data-test="add-function-name-input-field"]');
-    await input.setValue("newName");
+    // The name is an inline-edited title: click to open the editor, then type.
+    await wrapper.find('[data-test="add-function-name-input-trigger"]').trigger("click");
+    await wrapper.find('[data-test="add-function-name-input-input"]').setValue("newName");
 
     expect(getForm(wrapper).state.values.name).toBe("newName");
   });
 
-  it("should disable name input when disableName is true", () => {
+  it("should not offer an editable name input when disableName is true", () => {
     const wrapper = mountToolbar({
       disableName: true,
       transformTypeOptions: [{ label: "VRL", value: "0" }],
     });
-    const input = wrapper.find('[data-test="add-function-name-input-field"]');
-    expect(input.attributes("disabled")).toBeDefined();
+    // readonly drops the trigger entirely — the saved name shows as plain text.
+    expect(wrapper.find('[data-test="add-function-name-input-trigger"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="add-function-name-input-value"]').exists()).toBe(true);
   });
 
   it("should render VRL radio button", () => {
