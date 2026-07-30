@@ -1554,7 +1554,6 @@ export default defineComponent({
       return true;
     };
 
-
     const searchResponseForVisualization = ref({});
 
     const shouldUseHistogramQuery = ref(false);

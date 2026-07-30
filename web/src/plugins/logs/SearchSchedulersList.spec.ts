@@ -181,7 +181,6 @@ describe("SearchSchedulersList Component", () => {
         ]),
       );
     });
-
   });
 
   describe("Navigation", () => {
