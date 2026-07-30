@@ -278,13 +278,20 @@ export function useSyntheticResults() {
     };
   }
 
+  /**
+   * Loads everything the Overview tab needs.
+   *
+   * Steps are deliberately NOT part of this: the step aggregation reads the
+   * REST /runs endpoint row by row and is the most expensive query on the page,
+   * while the Steps tab is the one the fewest visits ever open. Callers drive it
+   * separately through `fetchSteps` when the tab is actually in view.
+   */
   async function fetchAll(monitorId: string, startTime: number, endTime: number): Promise<void> {
     if (!monitorId || !startTime || !endTime) return;
     loading.value = true;
     kpiLoading.value = true;
     histogramLoading.value = true;
     runsLoading.value = true;
-    stepsLoading.value = true;
     error.value = null;
 
     // Clear per-group errors on each fresh fetch so a successful retry
@@ -292,7 +299,6 @@ export function useSyntheticResults() {
     kpiError.value = null;
     histogramError.value = null;
     runsError.value = null;
-    stepsError.value = null;
 
     try {
       const interval = bucketInterval(endTime - startTime);
@@ -365,23 +371,9 @@ export function useSyntheticResults() {
           runsHasLoadedOnce.value = true;
         });
 
-      // Group 4: Steps — fetched via REST /runs API because the log
-      // stream doesn't carry the step-level JSON fields.
-      const stepsPromise = fetchAndAggregateSteps(monitorId, startTime, endTime)
-        .then((stats) => {
-          stepStats.value = stats;
-        })
-        .catch((e: unknown) => {
-          stepsError.value = e instanceof Error ? e.message : String(e ?? "Steps query failed");
-        })
-        .finally(() => {
-          stepsLoading.value = false;
-          stepsHasLoadedOnce.value = true;
-        });
-
       // Wait for all to settle so callers that await fetchAll still
       // get a meaningful completion signal.
-      await Promise.all([kpiPromise, histogramPromise, runsPromise, stepsPromise]);
+      await Promise.all([kpiPromise, histogramPromise, runsPromise]);
     } catch (e: unknown) {
       error.value = e instanceof Error ? e.message : "Failed to load results";
       kpi.value = { ...EMPTY_KPI };
@@ -453,13 +445,22 @@ export function useSyntheticResults() {
     }
   }
 
+  /**
+   * Step aggregation for the Steps tab — fetched via the REST /runs API because
+   * the log stream doesn't carry the step-level JSON fields.
+   *
+   * Called on its own rather than from `fetchAll`, so the Steps tab pays for
+   * this only when it is opened or its window changes underneath it.
+   */
   async function fetchSteps(monitorId: string, startTime: number, endTime: number): Promise<void> {
     if (!monitorId || !startTime || !endTime) return;
     stepsLoading.value = true;
+    stepsError.value = null;
     try {
       stepStats.value = await fetchAndAggregateSteps(monitorId, startTime, endTime);
-    } catch {
+    } catch (e: unknown) {
       stepStats.value = emptyStepStats();
+      stepsError.value = e instanceof Error ? e.message : String(e ?? "Steps query failed");
     } finally {
       stepsLoading.value = false;
       stepsHasLoadedOnce.value = true;

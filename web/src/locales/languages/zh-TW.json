@@ -9870,8 +9870,6 @@
       "passRateByDevice": "按裝置的通過率",
       "passRateByLocation": "按位置的通過率",
       "durationByLocation": "按位置的平均持續時間",
-      "degradedRuns": "Degraded",
-      "unstableSlices": "Unstable Slices",
       "flakyRate": "Flaky Rate",
       "stepsWindowTruncated": "Showing the newest {count} executions ({from} \u2013 {to}); the selected range holds more.",
       "retryRate": "重試率",

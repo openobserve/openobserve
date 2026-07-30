@@ -9876,8 +9876,6 @@
       "passRateByLocation": "Tỷ lệ đạt theo vị trí",
       "durationByLocation": "Thời lượng theo vị trí (Trung bình)",
       "flakyRate": "Flaky Rate",
-      "degradedRuns": "Degraded",
-      "unstableSlices": "Unstable Slices",
       "stepsWindowTruncated": "Showing the newest {count} executions ({from} \u2013 {to}); the selected range holds more.",
       "retryRate": "Tỷ lệ thử lại",
       "statusTimeline": "Dòng thời gian trạng thái",

@@ -10180,8 +10180,6 @@
       "passRateByLocation": "Pass Rate by Location",
       "durationByLocation": "Duration by Location (Avg)",
       "flakyRate": "Flaky Rate",
-      "degradedRuns": "Degraded",
-      "unstableSlices": "Unstable Slices",
       "stepsWindowTruncated": "Showing the newest {count} executions ({from} \u2013 {to}); the selected range holds more.",
       "retryRate": "Retry Rate",
       "statusTimeline": "Status Timeline",

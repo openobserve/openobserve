@@ -23,11 +23,14 @@ import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 
 const $t = (key: string) => key;
 
-const { mockFetchAll, mockRun, mockSyntheticsServiceGetLocations } = vi.hoisted(() => ({
-  mockFetchAll: vi.fn().mockResolvedValue(undefined),
-  mockRun: vi.fn().mockResolvedValue({}),
-  mockSyntheticsServiceGetLocations: vi.fn().mockResolvedValue({ data: { locations: [] } }),
-}));
+const { mockFetchAll, mockFetchSteps, mockRun, mockSyntheticsServiceGetLocations } = vi.hoisted(
+  () => ({
+    mockFetchAll: vi.fn().mockResolvedValue(undefined),
+    mockFetchSteps: vi.fn().mockResolvedValue(undefined),
+    mockRun: vi.fn().mockResolvedValue({}),
+    mockSyntheticsServiceGetLocations: vi.fn().mockResolvedValue({ data: { locations: [] } }),
+  }),
+);
 
 // ── Mock useSyntheticResults composable with full shape ─────────────────
 vi.mock("@/composables/useSyntheticResults", () => {
@@ -126,6 +129,7 @@ vi.mock("@/composables/useSyntheticResults", () => {
       }),
 
       fetchAll: mockFetchAll,
+      fetchSteps: mockFetchSteps,
       cancelAll: vi.fn(),
     }),
   };
@@ -206,6 +210,7 @@ import MonitorRuns from "./MonitorRuns.vue";
 // ── Stubs for every child component ─────────────────────────────────────
 const baseStubs = {
   OTabs: {
+    name: "OTabs",
     template: '<div data-test="monitor-runs-tabs"><slot /></div>',
     props: ["modelValue", "class"],
   },
@@ -416,6 +421,121 @@ describe("MonitorRuns", () => {
       await flushPromises();
 
       expect(mockFetchAll).not.toHaveBeenCalled();
+    });
+  });
+
+  // The step aggregation is the most expensive request this page can issue and
+  // the Steps tab is the least-visited one, so it is not part of the Overview
+  // load. Exactly two things may trigger it: opening the tab, and a new time
+  // window while the tab is open.
+  describe("steps query is lazy", () => {
+    /** Switch tabs the way OTabs does — through its v-model. */
+    async function switchTab(w: VueWrapper, tab: string) {
+      await w.findComponent({ name: "OTabs" }).vm.$emit("update:modelValue", tab);
+      await flushPromises();
+    }
+
+    it("should not query steps while the Overview tab is the open one", async () => {
+      wrapper = mountRuns();
+      await flushPromises();
+
+      const vm = wrapper.vm as any;
+      await vm.refresh(1_700_000_000_000_000, 1_700_003_600_000_000);
+      await flushPromises();
+
+      expect(mockFetchAll).toHaveBeenCalledTimes(1);
+      expect(mockFetchSteps).not.toHaveBeenCalled();
+    });
+
+    it("should query steps when the user moves to the Steps tab", async () => {
+      wrapper = mountRuns();
+      await flushPromises();
+
+      const vm = wrapper.vm as any;
+      await vm.refresh(1_700_000_000_000_000, 1_700_003_600_000_000);
+      await flushPromises();
+      await switchTab(wrapper, "steps");
+
+      expect(mockFetchSteps).toHaveBeenCalledWith(
+        "mon-1",
+        1_700_000_000_000_000,
+        1_700_003_600_000_000,
+      );
+    });
+
+    it("should not re-query steps when the tab is left and re-opened in the same window", async () => {
+      wrapper = mountRuns();
+      await flushPromises();
+
+      const vm = wrapper.vm as any;
+      await vm.refresh(1_700_000_000_000_000, 1_700_003_600_000_000);
+      await flushPromises();
+
+      await switchTab(wrapper, "steps");
+      await switchTab(wrapper, "overview");
+      await switchTab(wrapper, "steps");
+
+      expect(mockFetchSteps).toHaveBeenCalledTimes(1);
+    });
+
+    it("should re-query steps immediately when the window changes while the tab is open", async () => {
+      wrapper = mountRuns();
+      await flushPromises();
+
+      const vm = wrapper.vm as any;
+      await vm.refresh(1_700_000_000_000_000, 1_700_003_600_000_000);
+      await flushPromises();
+      await switchTab(wrapper, "steps");
+      expect(mockFetchSteps).toHaveBeenCalledTimes(1);
+
+      await vm.refresh(1_700_010_000_000_000, 1_700_013_600_000_000);
+      await flushPromises();
+
+      expect(mockFetchSteps).toHaveBeenCalledTimes(2);
+      expect(mockFetchSteps).toHaveBeenLastCalledWith(
+        "mon-1",
+        1_700_010_000_000_000,
+        1_700_013_600_000_000,
+      );
+    });
+
+    it("should defer the re-query to the next visit when the window changes with the tab closed", async () => {
+      wrapper = mountRuns();
+      await flushPromises();
+
+      const vm = wrapper.vm as any;
+      await vm.refresh(1_700_000_000_000_000, 1_700_003_600_000_000);
+      await flushPromises();
+      await switchTab(wrapper, "steps");
+      await switchTab(wrapper, "overview");
+
+      // New window, Steps tab closed — nothing fires yet.
+      await vm.refresh(1_700_010_000_000_000, 1_700_013_600_000_000);
+      await flushPromises();
+      expect(mockFetchSteps).toHaveBeenCalledTimes(1);
+
+      // …and the stale aggregation is replaced on the next visit, not reused.
+      await switchTab(wrapper, "steps");
+      expect(mockFetchSteps).toHaveBeenCalledTimes(2);
+      expect(mockFetchSteps).toHaveBeenLastCalledWith(
+        "mon-1",
+        1_700_010_000_000_000,
+        1_700_013_600_000_000,
+      );
+    });
+  });
+
+  describe("KPI tiles", () => {
+    it("should render six tiles and neither Degraded nor Unstable Slices", () => {
+      wrapper = mountRuns();
+
+      expect(wrapper.findAll('[data-test^="monitor-runs-kpi-"]')).toHaveLength(6);
+      expect(wrapper.find('[data-test="monitor-runs-kpi-degraded-runs"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="monitor-runs-kpi-unstable-partitions"]').exists()).toBe(
+        false,
+      );
+      expect(wrapper.text()).not.toContain("synthetics.runs.degradedRuns");
+      expect(wrapper.text()).not.toContain("synthetics.runs.unstableSlices");
     });
   });
 

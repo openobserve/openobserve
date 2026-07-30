@@ -9876,8 +9876,6 @@
       "passRateByLocation": "Konuma Göre Geçme Oranı",
       "durationByLocation": "Konuma Göre Süre (Ort)",
       "flakyRate": "Flaky Rate",
-      "degradedRuns": "Degraded",
-      "unstableSlices": "Unstable Slices",
       "stepsWindowTruncated": "Showing the newest {count} executions ({from} \u2013 {to}); the selected range holds more.",
       "retryRate": "Tekrar Deneme Oranı",
       "statusTimeline": "Durum Zaman Çizelgesi",

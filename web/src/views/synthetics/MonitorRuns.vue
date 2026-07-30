@@ -1064,7 +1064,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRoute } from "vue-router";
 import { useStore } from "vuex";
@@ -1094,11 +1094,7 @@ import MonitorStatusTimeline from "@/views/synthetics/MonitorStatusTimeline.vue"
 import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
 import useSyntheticResults from "@/composables/useSyntheticResults";
 import type { SyntheticRun } from "@/composables/synthetics/syntheticResultsSchema";
-import {
-  computePartitionStability,
-  deviceIconName,
-  deviceLabel,
-} from "@/composables/synthetics/syntheticResultsSchema";
+import { deviceIconName, deviceLabel } from "@/composables/synthetics/syntheticResultsSchema";
 import awsSvgUrl from "@/assets/images/ingestion/aws.svg";
 import gcpSvgUrl from "@/assets/images/ingestion/gcp.svg";
 import chromiumSvgUrl from "@/assets/images/synthetics/chromium.svg";
@@ -1466,16 +1462,6 @@ const totalFails = computed(() => allRuns.value.filter((r) => r.status === "fail
 
 const hasKpiData = computed(() => synthetics.kpi.value.totalRuns > 0);
 
-/**
- * (location, device, engine) slices and how settled each one is (C3, P4).
- *
- * Computed over the rows the runs query already returned — no extra request.
- * Aggregated across slices, a check solidly broken in one region and healthy in
- * five looks identical to one intermittently broken everywhere.
- */
-const partitionStability = computed(() => computePartitionStability(synthetics.runs.value));
-const unstablePartitions = computed(() => partitionStability.value.filter((p) => p.unstable));
-
 const p95Label = computed(() =>
   effectiveP95Ms.value > 0 ? fmtDur(effectiveP95Ms.value) : hasKpiData.value ? fmtDur(0) : "—",
 );
@@ -1550,24 +1536,6 @@ const kpiCards = computed<KpiCard[]>(() => {
             ? ((k.flakyExecutions / k.totalRuns) * 100).toFixed(1) + "%"
             : "0.0%",
         valueClass: k.flakyExecutions > 0 ? "text-status-warning-text!" : undefined,
-      },
-      {
-        // Split out of the warning count: degradation is a property of the
-        // TARGET (a certificate inside its warning window, a failing SFTP
-        // probe), not of the test. Folded together, a TLS check nearing expiry
-        // reported as ~100% flaky on every run until someone renewed it.
-        key: "degraded-runs",
-        label: t("synthetics.runs.degradedRuns"),
-        value: String(k.degradedExecutions),
-        valueClass: k.degradedExecutions > 0 ? "text-status-warning-text!" : undefined,
-      },
-      {
-        // "Unstable" is about oscillation, not badness — a slice that broke
-        // once and stayed broken is down, and belongs on the failure tile.
-        key: "unstable-partitions",
-        label: t("synthetics.runs.unstableSlices"),
-        value: `${unstablePartitions.value.length}/${partitionStability.value.length}`,
-        valueClass: unstablePartitions.value.length > 0 ? "text-status-warning-text!" : undefined,
       },
       {
         key: "failed-runs",
@@ -2532,11 +2500,40 @@ function openRun(row: { id: number }) {
   emit("open-run", String(row.id), "");
 }
 
+// ── Steps tab — loaded lazily ────────────────────────────────────────────
+//
+// The step aggregation walks the REST /runs payload and is the heaviest query
+// the page issues, so it runs only when the Steps tab is actually in view. Two
+// triggers, and nothing else: opening the tab, and a new time window while the
+// tab is open. A window change with the tab closed just marks the aggregation
+// stale so the next visit refetches.
+
+/** Whether `stepStats` was computed over the window in `timeRangeMicros`. */
+const stepsMatchWindow = ref(false);
+
+async function loadSteps() {
+  const tr = timeRangeMicros.value;
+  if (!tr) return;
+  stepsMatchWindow.value = true;
+  await synthetics.fetchSteps(props.monitorId, tr.startTime, tr.endTime);
+}
+
+watch(activeTab, (tab) => {
+  if (tab === "steps" && !stepsMatchWindow.value) void loadSteps();
+});
+
 // ── Public API — parent drives all (re)loads ─────────────────────────────
 async function refresh(startTime?: number, endTime?: number) {
   if (!startTime || !endTime) return;
   timeRangeMicros.value = { startTime, endTime };
-  await synthetics.fetchAll(props.monitorId, startTime, endTime);
+  // The new window invalidates whatever the Steps tab is holding. Refetch right
+  // away if it is the open tab — this is also the path the steps error-state
+  // retry button takes — otherwise defer to the next time it is opened.
+  stepsMatchWindow.value = false;
+  await Promise.all([
+    synthetics.fetchAll(props.monitorId, startTime, endTime),
+    activeTab.value === "steps" ? loadSteps() : Promise.resolve(),
+  ]);
 }
 
 defineExpose({ refresh });
