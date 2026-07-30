@@ -1518,8 +1518,7 @@ describe("AddPanel.vue", () => {
     it("should leave a user-typed title alone regardless of its length", async () => {
       // The header control sizes itself from its own content, so a long title is
       // no longer a width calculation — it just has to survive untouched.
-      const longTitle =
-        "This is a very long dashboard panel title that a user typed themselves";
+      const longTitle = "This is a very long dashboard panel title that a user typed themselves";
       wrapper.vm.panelAutoName.markManual();
       wrapper.vm.dashboardPanelData.data.title = longTitle;
       await nextTick();

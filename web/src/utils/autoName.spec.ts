@@ -192,7 +192,10 @@ describe("buildAlertAutoName", () => {
           conditions: {
             filterType: "group",
             conditions: [
-              { filterType: "group", conditions: [{ column: "level", operator: "=", value: "error" }] },
+              {
+                filterType: "group",
+                conditions: [{ column: "level", operator: "=", value: "error" }],
+              },
             ],
           },
         },

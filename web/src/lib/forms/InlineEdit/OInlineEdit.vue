@@ -183,10 +183,7 @@ defineExpose({ focus: startEdit });
   <!-- The -mx-1.5 lives on the ROOT, not on either mode's box, so the shared
        inline padding cancels out identically whichever one is showing and the
        text still lines up with whatever sits above/below it. -->
-  <div
-    v-bind="$attrs"
-    class="group/inline-edit -mx-1.5 -my-0.5 flex min-w-0 items-center gap-1.5"
-  >
+  <div v-bind="$attrs" class="group/inline-edit -mx-1.5 -my-0.5 flex min-w-0 items-center gap-1.5">
     <!-- EDIT MODE — the input shares a grid cell with an invisible sizer span,
          so the track (and therefore the input) is exactly as wide as the text.
          The sizer mirrors the input's box exactly and only widens its trailing
