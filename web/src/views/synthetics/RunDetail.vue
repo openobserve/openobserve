@@ -211,8 +211,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :evidence-key="evidenceKey"
                 :resolve-url="screenshotUrl"
                 :step-defs="evidenceStepDefs"
-                :record-truncated="evidenceTruncated"
+                :events="evidence.events.value"
+                :status="evidence.status.value"
+                :error="evidence.error.value"
+                :truncated="evidence.truncated.value"
+                :step-filter="evidenceStepFilter"
+                :step-filter-name="evidenceStepFilterName"
                 :run-passed="currentRun.status === 'pass'"
+                @clear-step-filter="evidenceStepFilter = null"
+                @retry="evidence.load(true)"
               />
             </OTabPanel>
 
@@ -587,6 +594,7 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import JourneySteps from "@/components/synthetics/journey/JourneySteps.vue";
 import type { StepDotState } from "@/components/synthetics/journey/JourneySteps.vue";
 import useSyntheticResults from "@/composables/useSyntheticResults";
+import { useSyntheticEvidence } from "@/composables/useSyntheticEvidence";
 import ProtocolRunSummary from "@/components/synthetics/results/ProtocolRunSummary.vue";
 import EvidencePanel from "@/components/synthetics/results/EvidencePanel.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -1039,6 +1047,38 @@ const expandedStepIdsArr = computed(() => Array.from(expandedStepIds.value));
 function handleUpdateExpanded(ids: string[]) {
   expandedStepIds.value = new Set(ids);
 }
+
+// Declared here, not beside `evidenceKey`: `watch` evaluates its source once at
+// setup to seed the old value, and `evidenceKey` reads `currentAttempt`, which
+// is declared further up this file. Instantiating earlier is a TDZ crash.
+/** The attempt's bundle, fetched once and shared by the tab and the step rows. */
+const evidence = useSyntheticEvidence(
+  evidenceKey,
+  screenshotUrl,
+  evidenceStepDefs,
+  evidenceTruncated,
+);
+
+/** Which step the Evidence tab is scoped to. Null shows the whole run. */
+const evidenceStepFilter = ref<string | null>(null);
+
+const evidenceStepFilterName = computed(() =>
+  evidenceStepFilter.value
+    ? (evidenceStepDefs.value.get(evidenceStepFilter.value)?.name ?? evidenceStepFilter.value)
+    : "",
+);
+
+// Two independent triggers, either of which may come first: a step expanding
+// (failed steps auto-expand, so this is load-time on a failed run) and the tab
+// opening. load() is idempotent, which is what makes that safe. An attempt
+// switch resets the composable to idle, and this watcher re-fires on the key.
+watch(
+  [expandedStepIds, detailTab, evidenceKey],
+  () => {
+    if (expandedStepIds.value.size || detailTab.value === "evidence") evidence.load();
+  },
+  { immediate: true },
+);
 
 function stepDotState(row: any): StepDotState | undefined {
   return row.status === "fail" ? "fail" : "pass";

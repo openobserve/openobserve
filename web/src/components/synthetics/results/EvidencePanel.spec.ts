@@ -1,7 +1,7 @@
 // Copyright 2026 OpenObserve Inc.
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { mount, flushPromises } from "@vue/test-utils";
+import { describe, it, expect } from "vitest";
+import { mount } from "@vue/test-utils";
 
 import i18n from "@/locales";
 import EvidencePanel from "./EvidencePanel.vue";
@@ -151,29 +151,39 @@ describe("evidence grouping", () => {
 });
 
 describe("EvidencePanel", () => {
+  // The panel no longer fetches; the composable does. It receives events.
+  //
+  // NDJSON's four lines all sit on s19, so a fifth on another step is added
+  // here — without it, "filtered to s19" and "the whole run" are the same set
+  // and the narrowing assertion below would pass on a broken filter.
+  const OTHER_STEP =
+    '{"ts":1785356287000,"kind":"response","method":"GET","url":"https://o2.example.dev/api/late","status":404,"initiated_ts":1785356286900,"first_party":true,"step_id":"fa1"}';
+
+  const named = () =>
+    parseEvidenceNdjson(`${NDJSON}\n${OTHER_STEP}`).map((e) => ({
+      ...e,
+      stepName: e.stepId ? STEP_DEFS.get(e.stepId)?.name || e.stepId : null,
+    }));
+
   const mountPanel = (props: Record<string, unknown> = {}) =>
     mount(EvidencePanel, {
       props: {
-        evidenceKey: "synthetics/org/mon/2026/07/29/RUN/EXEC/attempt-1-evidence.ndjson",
+        evidenceKey: "synthetics/org/mon/RUN/EXEC/attempt-1-evidence.ndjson",
         resolveUrl: (k: string) => `/artifact?key=${k}`,
         stepDefs: STEP_DEFS,
+        events: named(),
+        status: "ready",
+        error: null,
+        truncated: false,
+        stepFilter: null,
+        stepFilterName: "",
         ...props,
       },
       global: { plugins: [i18n] },
     });
 
-  beforeEach(() => {
-    globalThis.fetch = vi.fn(async () => ({
-      ok: true,
-      status: 200,
-      statusText: "OK",
-      text: async () => NDJSON,
-    })) as any;
-  });
-
-  it("fetches the bundle and renders a section per kind", async () => {
+  it("renders a section per kind", () => {
     const w = mountPanel();
-    await flushPromises();
     expect(w.find('[data-test="synthetics-evidence-panel"]').exists()).toBe(true);
     expect(w.find('[data-test="synthetics-evidence-group-network"]').exists()).toBe(true);
     expect(w.find('[data-test="synthetics-evidence-group-console"]').exists()).toBe(true);
@@ -181,75 +191,76 @@ describe("EvidencePanel", () => {
     expect(w.find('[data-test="synthetics-evidence-group-pageErrors"]').exists()).toBe(false);
   });
 
-  it("shows which step each row belongs to", async () => {
+  it("shows which step each row belongs to", () => {
     const w = mountPanel();
-    await flushPromises();
-    expect(w.find('[data-test="synthetics-evidence-row-step"]').text()).toContain(
+    expect(w.find('[data-test="synthetics-evidence-events-step"]').text()).toContain(
       "Navigate to /web/login",
     );
   });
 
-  it("refetches when the attempt changes, so bundles never cross labels", async () => {
+  it("keeps zero-count chips visible rather than hiding them", () => {
     const w = mountPanel();
-    await flushPromises();
-    expect(globalThis.fetch).toHaveBeenCalledTimes(1);
-    await w.setProps({ evidenceKey: "…/evidence.ndjson" });
-    await flushPromises();
-    expect(globalThis.fetch).toHaveBeenCalledTimes(2);
-    expect((globalThis.fetch as any).mock.calls[1][0]).toContain("/evidence.ndjson");
-  });
-
-  it("keeps zero-count chips visible rather than hiding them", async () => {
-    const w = mountPanel();
-    await flushPromises();
     // A hidden zero is indistinguishable from a chip that does not exist, and
     // "no page errors" is information.
     expect(w.find('[data-test="synthetics-evidence-chip-pageErrors"]').exists()).toBe(true);
     expect(w.find('[data-test="synthetics-evidence-chip-pageErrors"]').text()).toContain("0");
   });
 
-  it("reports a failed fetch instead of rendering a quiet run", async () => {
-    globalThis.fetch = vi.fn(async () => ({
-      ok: false,
-      status: 403,
-      statusText: "Forbidden",
-      text: async () => "",
-    })) as any;
-    const w = mountPanel();
-    await flushPromises();
-    expect(w.find('[data-test="synthetics-evidence-error"]').exists()).toBe(true);
-    expect(w.find('[data-test="synthetics-evidence-panel"]').text()).toContain("403");
+  it("narrows both the rows and the chip counts to the filtered step", () => {
+    // A chip that counts the whole run while the list shows one step is a lie.
+    const all = mountPanel();
+    const scoped = mountPanel({ stepFilter: "s19", stepFilterName: "Navigate to /web/login" });
+    expect(scoped.find('[data-test="synthetics-evidence-chip-all"]').text()).not.toBe(
+      all.find('[data-test="synthetics-evidence-chip-all"]').text(),
+    );
+    expect(scoped.find('[data-test="synthetics-evidence-step-filter"]').text()).toContain(
+      "Navigate to /web/login",
+    );
   });
 
-  it("distinguishes capture-off from not-kept from absent", async () => {
+  it("clears the step filter on request", async () => {
+    const w = mountPanel({ stepFilter: "s19", stepFilterName: "Navigate to /web/login" });
+    await w.find('[data-test="synthetics-evidence-clear-step-filter-btn"]').trigger("click");
+    expect(w.emitted("clear-step-filter")).toBeTruthy();
+  });
+
+  it("shows no step-filter banner when unfiltered", () => {
+    expect(mountPanel().find('[data-test="synthetics-evidence-step-filter"]').exists()).toBe(false);
+  });
+
+  it("reports a failed load instead of rendering a quiet run", () => {
+    const w = mountPanel({ status: "error", error: "403 Forbidden", events: [] });
+    expect(w.find('[data-test="synthetics-evidence-error"]').text()).toContain("403");
+  });
+
+  it("asks the owner to retry rather than refetching itself", async () => {
+    const w = mountPanel({ status: "error", error: "403 Forbidden", events: [] });
+    await w.find('[data-test="synthetics-evidence-retry-btn"]').trigger("click");
+    expect(w.emitted("retry")).toBeTruthy();
+  });
+
+  it("distinguishes capture-off from not-kept from absent", () => {
     const off = mountPanel({ evidenceKey: null, captureOff: true });
-    await flushPromises();
     expect(off.find('[data-test="synthetics-evidence-empty"]').text()).toContain("capture is off");
 
     const passed = mountPanel({ evidenceKey: null, runPassed: true });
-    await flushPromises();
     expect(passed.find('[data-test="synthetics-evidence-empty"]').text()).toContain(
       "failed runs only",
     );
 
     const none = mountPanel({ evidenceKey: null });
-    await flushPromises();
     expect(none.find('[data-test="synthetics-evidence-empty"]').text()).toContain(
       "No evidence bundle",
     );
-    // Never fetch when there is no key.
-    expect(globalThis.fetch).not.toHaveBeenCalled();
   });
 
-  it("states truncation rather than showing a quietly short list", async () => {
-    const w = mountPanel({ recordTruncated: true });
-    await flushPromises();
+  it("states truncation rather than showing a quietly short list", () => {
+    const w = mountPanel({ truncated: true });
     expect(w.find('[data-test="synthetics-evidence-truncated"]').exists()).toBe(true);
   });
 
-  it("labels the download as NDJSON", async () => {
+  it("labels the download as NDJSON", () => {
     const w = mountPanel();
-    await flushPromises();
     expect(w.find('[data-test="synthetics-evidence-download"]').text()).toContain(".ndjson");
   });
 });

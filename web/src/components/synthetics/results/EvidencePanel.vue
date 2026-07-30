@@ -28,81 +28,76 @@
  * and retries at `attempt-N-`. Showing one under another's label is a real
  * error, not a cosmetic one.
  */
-import { computed, ref, watch } from "vue";
+import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
 import {
   foldEvidenceBundle,
-  parseEvidenceNdjson,
   type EvidenceEvent,
 } from "@/composables/synthetics/syntheticResultsSchema";
+import EvidenceEvents from "./EvidenceEvents.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import type { EvidenceStatus } from "@/composables/useSyntheticEvidence";
 
-const props = defineProps<{
-  /** Object-storage key of the selected attempt's bundle. Null when none exists. */
-  evidenceKey: string | null;
-  /** Resolves a key to a fetchable URL. Already presigned for every attempt. */
-  resolveUrl: (key: string) => string;
-  /** step_id -> definition, for naming the step on each row. */
-  stepDefs: Map<string, { name: string; selector: string | null }>;
-  /** `evidence_truncated` from the record. */
-  recordTruncated?: boolean;
-  /** Whether capture is switched off for this check, vs merely not kept. */
-  captureOff?: boolean;
-  /** Whether the run passed — evidence is retained for failures by default. */
-  runPassed?: boolean;
-}>();
+const props = withDefaults(
+  defineProps<{
+    /** Object-storage key of the selected attempt's bundle. Null when none exists. */
+    evidenceKey: string | null;
+    /** Resolves a key to a fetchable URL — used for the download link only. */
+    resolveUrl: (key: string) => string;
+    /** step_id -> definition, for naming the step on each row. */
+    stepDefs: Map<string, { name: string; selector: string | null }>;
+    /** The attempt's events, already fetched and named by useSyntheticEvidence. */
+    events: EvidenceEvent[];
+    status: EvidenceStatus;
+    error: string | null;
+    /** `evidence_truncated` from the record, or a truncation event in the stream. */
+    truncated?: boolean;
+    /** Scope every row and every count to one step. Null shows the whole run. */
+    stepFilter?: string | null;
+    /** Display name for the filtered step, for the banner. */
+    stepFilterName?: string;
+    /** Whether capture is switched off for this check, vs merely not kept. */
+    captureOff?: boolean;
+    /** Whether the run passed — evidence is retained for failures by default. */
+    runPassed?: boolean;
+  }>(),
+  {
+    truncated: false,
+    stepFilter: null,
+    stepFilterName: "",
+    captureOff: false,
+    runPassed: false,
+  },
+);
+
+const emit = defineEmits<{ (e: "clear-step-filter"): void; (e: "retry"): void }>();
 
 const { t } = useI18n();
 
 type Filter = "all" | "consoleErrors" | "pageErrors" | "requestsFailed" | "nonNon2xx";
 
-const loading = ref(false);
-const loadError = ref<string | null>(null);
-const events = ref<EvidenceEvent[]>([]);
-const fetched = ref(false);
 const filter = ref<Filter>("all");
 const firstPartyOnly = ref(false);
-const expanded = ref(new Set<number>());
+
+const loading = computed(() => props.status === "loading" || props.status === "idle");
+const loadError = computed(() => (props.status === "error" ? props.error : null));
 
 /**
- * Fetched on demand, not with the record: the bundle runs to 256 KB at the cap
- * and most users never open this tab.
+ * Events after the STEP filter, before the kind filter.
+ *
+ * The chips are folded from this, not from the whole run: a chip that counts
+ * the run while the list shows one step is a lie, not a shortcut.
  */
-async function load() {
-  if (!props.evidenceKey) return;
-  loading.value = true;
-  loadError.value = null;
-  try {
-    const res = await fetch(props.resolveUrl(props.evidenceKey));
-    if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
-    events.value = parseEvidenceNdjson(await res.text());
-    fetched.value = true;
-  } catch (e: any) {
-    // Never an empty list on failure — "the fetch broke" and "the run was quiet"
-    // are different findings and must not render the same.
-    loadError.value = e?.message ?? String(e);
-    events.value = [];
-  } finally {
-    loading.value = false;
-  }
-}
-
-// Switching attempts changes the key; refetch that attempt's own bundle.
-watch(
-  () => props.evidenceKey,
-  () => {
-    fetched.value = false;
-    events.value = [];
-    loadError.value = null;
-    if (props.evidenceKey) load();
-  },
-  { immediate: true },
+const scopedEvents = computed(() =>
+  props.stepFilter ? props.events.filter((e) => e.stepId === props.stepFilter) : props.events,
 );
 
 const bundle = computed(() =>
-  foldEvidenceBundle(events.value, props.stepDefs, props.recordTruncated ?? false),
+  foldEvidenceBundle(scopedEvents.value, props.stepDefs, props.truncated),
 );
 
 /**
@@ -168,36 +163,6 @@ const chips = computed(() => {
   ];
 });
 
-/** Truncate from the LEFT: the host repeats on every row, the path is what differs. */
-function shortUrl(url: string | null): string {
-  if (!url) return "";
-  try {
-    const u = new URL(url);
-    return u.pathname + (u.search ? u.search : "");
-  } catch {
-    return url.length > 70 ? `…${url.slice(-70)}` : url;
-  }
-}
-
-function statusClass(e: EvidenceEvent): string {
-  if (e.kind === "requestfailed" || e.kind === "crash" || e.kind === "pageerror")
-    return "text-status-error-text";
-  if (e.kind === "console")
-    return e.level === "error" ? "text-status-error-text" : "text-text-secondary";
-  const s = e.status ?? 0;
-  if (s >= 500) return "text-status-error-text";
-  if (s >= 400) return "text-status-warning-text";
-  if (s >= 300) return "text-text-secondary";
-  return "text-text-body";
-}
-
-function toggle(i: number) {
-  const next = new Set(expanded.value);
-  if (next.has(i)) next.delete(i);
-  else next.add(i);
-  expanded.value = next;
-}
-
 const downloadUrl = computed(() => (props.evidenceKey ? props.resolveUrl(props.evidenceKey) : ""));
 </script>
 
@@ -236,22 +201,46 @@ const downloadUrl = computed(() => (props.evidenceKey ? props.resolveUrl(props.e
         <OSkeleton v-for="i in 4" :key="i" type="text" class="h-4 w-full" />
       </div>
 
-      <!-- A failed fetch is reported, never rendered as an empty run. -->
-      <div
+      <!-- A failed fetch is reported, never rendered as an empty run. The owner
+           holds the bundle, so retrying is its call, not this panel's. -->
+      <OBanner
         v-else-if="loadError"
-        class="rounded-default border-status-error-text/30 flex items-center justify-between gap-2 border p-2 text-xs"
-        role="alert"
+        variant="error"
+        dense
+        inline-actions
+        :content="t('synthetics.evidence.loadFailed', { error: loadError })"
         data-test="synthetics-evidence-error"
       >
-        <span class="text-status-error-text">
-          {{ t("synthetics.evidence.loadFailed", { error: loadError }) }}
-        </span>
-        <button type="button" class="text-text-body underline" @click="load()">
-          {{ t("synthetics.evidence.retry") }}
-        </button>
-      </div>
+        <template #actions>
+          <OButton variant="ghost" size="xs" data-test="synthetics-evidence-retry-btn" @click="emit('retry')">
+            {{ t("synthetics.evidence.retry") }}
+          </OButton>
+        </template>
+      </OBanner>
 
       <template v-else>
+        <!-- Scoped to one step, arrived at from a step expansion. Dismissible,
+             because the run-level view is the other half of the question. -->
+        <OBanner
+          v-if="stepFilter"
+          variant="info"
+          dense
+          inline-actions
+          :content="t('synthetics.evidence.stepFilterBanner', { step: stepFilterName })"
+          data-test="synthetics-evidence-step-filter"
+        >
+          <template #actions>
+            <OButton
+              variant="ghost"
+              size="xs"
+              data-test="synthetics-evidence-clear-step-filter-btn"
+              @click="emit('clear-step-filter')"
+            >
+              {{ t("synthetics.evidence.clearStepFilter") }}
+            </OButton>
+          </template>
+        </OBanner>
+
         <!-- X-8.2: reduced fidelity is reported. A silently short list reads as a
              quiet run. -->
         <div
@@ -309,42 +298,15 @@ const downloadUrl = computed(() => (props.evidenceKey ? props.resolveUrl(props.e
             <span class="text-text-secondary">{{ g.events.length }}</span>
           </div>
 
-          <div
-            v-for="(e, i) in g.events"
-            :key="`${g.kind}-${i}`"
-            class="hover:bg-surface-raised rounded-default flex items-start gap-2 px-1 py-0.5 font-mono text-xs"
-            :class="e.firstParty ? '' : 'opacity-60'"
-          >
-            <span class="w-10 shrink-0 text-right" :class="statusClass(e)">
-              {{
-                e.kind === "response" ? (e.status ?? "—") : e.kind === "requestfailed" ? "—" : ""
-              }}
-            </span>
-            <span class="text-text-secondary w-12 shrink-0">{{ e.method ?? e.level ?? "" }}</span>
-            <span class="min-w-0 flex-1 truncate" :title="e.url ?? e.text ?? e.message ?? ''">
-              {{ shortUrl(e.url) || e.text || e.message || e.kind }}
-            </span>
-            <!-- Which step this belongs to. Attribution kept, just not as the
-                 grouping axis. -->
-            <span
-              class="text-text-secondary w-40 shrink-0 truncate"
-              :title="e.stepName ?? ''"
-              data-test="synthetics-evidence-row-step"
-            >
-              {{ e.stepName ?? t("synthetics.evidence.unattributed") }}
-            </span>
-            <span class="text-text-secondary w-14 shrink-0 text-right">
-              {{ e.durationMs != null ? `${e.durationMs}ms` : "" }}
-            </span>
-            <button
-              v-if="e.stack"
-              type="button"
-              class="text-text-secondary shrink-0 underline"
-              @click="toggle(i)"
-            >
-              {{ t("synthetics.evidence.stack") }}
-            </button>
-          </div>
+          <!-- Rows come from the shared table, so the step expansion and this
+               panel cannot drift apart. Attribution is kept on the row, just
+               not as the grouping axis. -->
+          <EvidenceEvents
+            :events="g.events"
+            mode="panel"
+            :filtered="!!stepFilter"
+            @clear-filters="emit('clear-step-filter')"
+          />
         </div>
       </template>
     </template>
