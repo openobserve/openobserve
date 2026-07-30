@@ -136,6 +136,18 @@ export default class DashboardCreate {
   async backToDashboardList() {
     await this.backBtn.waitFor({ state: "visible", timeout: 50000 });
     await this.backBtn.click();
+
+    // Verify the click actually navigated to the list. Both the panel-editor
+    // and the dashboard-view page render an element with the same
+    // data-test="dashboard-back-btn", so a click that lands on a stale
+    // instance mid page-transition can silently no-op instead of throwing —
+    // retry once with a fresh locator lookup before giving up.
+    try {
+      await this.page.waitForURL(/\/dashboards(?:\?|$)/, { timeout: 8000 });
+    } catch (e) {
+      await this.page.locator('[data-test="dashboard-back-btn"]').click();
+      await this.page.waitForURL(/\/dashboards(?:\?|$)/, { timeout: 15000 });
+    }
   }
 
   //wait for back button to be visible (no click)

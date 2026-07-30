@@ -9,7 +9,10 @@ import { ingestion } from "./utils/dashIngestion.js";
 import PageManager from "../../pages/page-manager";
 import { waitForDashboardPage, deleteDashboard } from "./utils/dashCreation.js";
 import { waitForValuesStreamComplete } from "../utils/streaming-helpers.js";
-const randomDashboardName =
+// Each test runs in parallel (mode: "parallel" below), so the name must be
+// generated fresh per test — a single shared name caused cross-test races
+// where one test's create/delete collided with another's mid-flight.
+const generateDashboardName = () =>
   "Dashboard_" + Math.random().toString(36).substr(2, 9);
 
 // Basic HTML snippet for the first test
@@ -67,6 +70,7 @@ test.describe("HTML chart dashboard", () => {
   }) => {
     // Instantiate PageManager with the current page
     const pm = new PageManager(page);
+    const randomDashboardName = generateDashboardName();
     const panelName =
       pm.dashboardPanelActions.generateUniquePanelName("panel-test");
 
@@ -104,6 +108,7 @@ test.describe("HTML chart dashboard", () => {
   }) => {
     // Instantiate PageManager with the current page
     const pm = new PageManager(page);
+    const randomDashboardName = generateDashboardName();
     const panelName =
       pm.dashboardPanelActions.generateUniquePanelName("panel-test");
 

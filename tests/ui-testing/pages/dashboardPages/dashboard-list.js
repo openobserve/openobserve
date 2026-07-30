@@ -72,9 +72,26 @@ export default class DashboardListPage {
   // Menu Items — menu-link data-test contains a literal "/" (route prefix);
   // CSS attribute selectors accept "/" verbatim, no escape needed.
   async menuItem(item) {
+    const targetPath = item.replace('-item', '');
     const menuItem = this.page.locator(`[data-test="menu-link-/${item}"]`);
     await menuItem.click();
-    await this.page.waitForURL(`**/${item.replace('-item', '')}**`, { timeout: 15000 }).catch(() => {});
+
+    // The sidebar click can silently fail to navigate (page stays on its
+    // current route instead of moving to the target) — seen previously on
+    // traces/metrics on cloud. Verify the URL actually changed and fall back
+    // to a direct goto if not, instead of swallowing the failure. Prefer the
+    // intended env org over whatever org is in the current URL — the current
+    // page may itself be stuck on the wrong (e.g. personal/default) org, and
+    // extracting from it would just perpetuate that mistake.
+    try {
+      await this.page.waitForURL(`**/${targetPath}**`, { timeout: 15000 });
+    } catch (e) {
+      const orgId = process.env['ORGNAME'] ?? this.page.url().match(/org_identifier=([^&]+)/)?.[1];
+      // Dashboards.vue expects a `folder` query param (goBackToDashboardList
+      // in ViewDashboard.vue always sends one) — without it the list can
+      // fail to render. Harmless extra param for other sidebar sections.
+      await this.page.goto(`${process.env['ZO_BASE_URL']}/web/${targetPath}?org_identifier=${orgId}&folder=default`);
+    }
     await this.page.waitForLoadState('domcontentloaded');
   }
 
