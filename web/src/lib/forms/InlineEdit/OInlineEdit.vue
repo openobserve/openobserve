@@ -217,6 +217,9 @@ defineExpose({ focus: startEdit });
           'bg-input-bg text-input-text placeholder:text-input-placeholder col-start-1 row-start-1 w-full min-w-0 outline-none',
           BOX_CLASSES,
           textClasses,
+          // The error state shows through the red ring alone — the placeholder
+          // keeps its normal muted colour (no separate message either; see the
+          // visually-hidden alert below, kept only for screen readers).
           error
             ? 'ring-input-border-error focus:ring-2'
             : 'ring-input-border focus:ring-input-border-focus focus:ring-2',
@@ -252,20 +255,30 @@ defineExpose({ focus: startEdit });
         :data-test="dataTest ? `${dataTest}-trigger` : undefined"
         data-inline-edit-trigger
         :class="[
-          'focus-visible:outline-accent/40 flex max-w-full min-w-0 items-center gap-1.5 text-start ring-transparent outline-none focus-visible:outline-2',
+          'focus-visible:outline-accent/40 flex max-w-full min-w-0 items-center gap-1.5 text-start outline-none focus-visible:outline-2',
           BOX_CLASSES,
+          // An invalid name draws the same red box in display mode that the input
+          // shows while editing, so the field reads as an error even before it is
+          // clicked into — the required-name state must be visible at rest, not
+          // only mid-edit (matches the pipeline/panel headers).
+          error ? 'ring-input-border-error' : 'ring-transparent',
           disabled
             ? 'cursor-not-allowed opacity-60'
-            : 'hover:bg-surface-subtle hover:ring-border-default cursor-text',
+            : error
+              ? 'cursor-text'
+              : 'hover:bg-surface-subtle hover:ring-border-default cursor-text',
         ]"
         @click="startEdit"
         @keydown="onDisplayKeydown"
       >
+        <!-- An empty field shows the placeholder in its normal muted colour even
+             in the error state — the red ring alone signals the error. A non-empty
+             value that is invalid still reads red. -->
         <span
           :class="[
             'min-w-0 truncate',
             textClasses,
-            error ? 'text-input-error-text' : isEmpty ? 'text-text-placeholder' : valueToneClass,
+            isEmpty ? 'text-text-placeholder' : error ? 'text-input-error-text' : valueToneClass,
           ]"
           :data-test="dataTest ? `${dataTest}-value` : undefined"
           >{{ displayValue || placeholder }}</span
@@ -292,12 +305,11 @@ defineExpose({ focus: startEdit });
       <slot name="trail" />
     </template>
 
-    <!-- The message sits BESIDE the value, not below it. Below is where the
-         header's subtitle band already is — a floated message landed on top of
-         it ("Name is required" printed over "Edit Panel"). Inline it costs no
-         height either: it is smaller than the title's own line box, so the
-         header still doesn't reflow when a name turns invalid. It keeps its
-         width (`shrink-0`) and the name truncates around it. -->
+    <!-- The message sits BESIDE the value, not below it — below is the header's
+         subtitle band, where a floated message would land on top of it. Inline it
+         costs no height (smaller than the title's own line box), so the header
+         doesn't reflow when a name turns invalid; it keeps its width (`shrink-0`)
+         and the name truncates around it. -->
     <span
       v-if="error && errorMessage"
       role="alert"
