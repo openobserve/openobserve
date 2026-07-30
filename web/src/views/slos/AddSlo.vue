@@ -64,16 +64,56 @@
       {{ t("slos.regenerate.body") }}
     </OBanner>
 
-    <div class="grid grid-cols-1 lg:grid-cols-[1fr_22rem] gap-4">
-      <div class="flex flex-col gap-4">
+    <!-- The right column is 33rem (was 22rem, +50%): it now hosts the two
+         preview charts as well as the summary, and bars need the width to
+         stay readable.
+         `minmax(0, 1fr)` for the left, NOT `1fr`: a bare `1fr` carries an
+         implicit `min-width: auto`, so the column refuses to shrink below its
+         content's intrinsic width and the grid overflows the viewport — which
+         is the horizontal page scroll. `minmax(0, …)` lets it actually take
+         only the remaining space. -->
+    <div class="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_33rem] gap-4">
+      <!-- `min-w-0` for the same reason as the track above: a flex item's
+           default `min-width: auto` would let a wide child (the query
+           editors) push the column past its share. -->
+      <div class="flex min-w-0 flex-col gap-4">
         <SloSection :title="t('slos.section.identity')">
-          <OInput
-            v-model="form.name"
-            :label="t('slos.field.name')"
-            :placeholder="t('slos.field.namePlaceholder')"
-            required
-            data-test="slos-addslo-name"
-          />
+          <!-- One row: folder, name, tags — in that order. The folder column
+               is fixed-width so the name (the field people actually type in)
+               takes the slack; tags get their own share. Wraps to a column on
+               narrow screens rather than crushing three controls. -->
+          <div class="grid grid-cols-1 items-end gap-3 md:grid-cols-[14rem_1fr_1fr]">
+            <div>
+              <label class="text-text-secondary mb-1 block text-xs">
+                {{ t("slos.field.folder") }}
+              </label>
+              <!-- type="alerts": SLOs live in alert folders (there is no SLO
+                   folder type), so this offers the same folders the Alerts
+                   page does. -->
+              <SelectFolderDropDown
+                type="alerts"
+                :active-folder-id="form.folder_id"
+                @folder-selected="onFolderSelected"
+              />
+            </div>
+            <OInput
+              v-model="form.name"
+              :label="t('slos.field.name')"
+              :placeholder="t('slos.field.namePlaceholder')"
+              required
+              data-test="slos-addslo-name"
+            />
+            <!-- OTagInput's root is `h-full`; without a constraining wrapper
+                 it stretches and swallows what follows. -->
+            <div>
+              <OTagInput
+                v-model="form.tags"
+                :label="t('slos.field.tags')"
+                placeholder=""
+                data-test="slos-addslo-tags"
+              />
+            </div>
+          </div>
           <OInput
             v-model="form.description"
             :label="t('slos.field.description')"
@@ -81,37 +121,34 @@
             class="mt-3"
             data-test="slos-addslo-description"
           />
-          <!-- OTagInput's root is `h-full`; without a constraining wrapper it
-               stretches to fill the section and swallows what follows. -->
-          <div class="mt-3">
-            <OTagInput
-              v-model="form.tags"
-              :label="t('slos.field.tags')"
-              placeholder=""
-              data-test="slos-addslo-tags"
-            />
-          </div>
-          <div class="mt-3">
-            <label class="text-text-secondary mb-1 block text-xs">
-              {{ t("slos.field.folder") }}
-            </label>
-            <!-- type="alerts": SLOs live in alert folders (there is no SLO
-                 folder type), so this offers the same folders the Alerts page
-                 does. -->
-            <SelectFolderDropDown
-              type="alerts"
-              :active-folder-id="form.folder_id"
-              @folder-selected="onFolderSelected"
-            />
-          </div>
         </SloSection>
   
           <SloSection :title="t('slos.section.sli')">
-            <ORadioCards
+            <OToggleGroup
               v-model="form.sli_type"
-              :options="sliTypeOptions"
               data-test="slos-addslo-sli-type"
-            />
+            >
+              <OToggleGroupItem
+                v-for="opt in sliTypeOptions"
+                :key="opt.value"
+                :value="opt.value"
+                :disabled="opt.disable"
+                :tooltip="opt.disable ? t('slos.type.alertUnavailable') : undefined"
+                size="sm"
+                :data-test="`slos-addslo-sli-type-${opt.value}`"
+              >
+                <template #icon-left>
+                  <OIcon :name="opt.icon" size="sm" />
+                </template>
+                {{ opt.label }}
+              </OToggleGroupItem>
+            </OToggleGroup>
+            <p
+              class="text-xs text-text-secondary mt-1"
+              data-test="slos-addslo-sli-type-description"
+            >
+              {{ sliTypeDescription }}
+            </p>
   
             <template v-if="form.sli_type === 'count'">
               <div class="grid grid-cols-2 gap-3 mt-3">
@@ -134,21 +171,25 @@
                   data-test="slos-addslo-stream"
                 />
               </div>
-              <OInput
+              <SloExpressionField
                 v-model="form.config.scope"
+                editor-id="slo-scope-editor"
                 :label="t('slos.field.scope')"
                 :hint="t('slos.field.scopeHint')"
+                :keywords="autoCompleteKeywords"
+                :suggestions="autoCompleteSuggestions"
                 class="mt-3"
-                placeholder="service = 'checkout'"
                 data-test="slos-addslo-scope"
               />
-              <OInput
+              <SloExpressionField
                 v-model="form.config.good_expr"
+                editor-id="slo-good-expr-editor"
                 :label="t('slos.field.goodWhen')"
                 :hint="t('slos.field.goodWhenHint')"
-                class="mt-3"
+                :keywords="autoCompleteKeywords"
+                :suggestions="autoCompleteSuggestions"
                 required
-                placeholder="status_code < 500"
+                class="mt-3"
                 data-test="slos-addslo-good-expr"
               />
             </template>
@@ -194,7 +235,15 @@
                   type="number"
                 />
               </div>
-              <OInput v-model="form.config.scope" :label="t('slos.field.scope')" class="mt-3" />
+              <SloExpressionField
+                v-model="form.config.scope"
+                editor-id="slo-timeslice-scope-editor"
+                :label="t('slos.field.scope')"
+                :keywords="autoCompleteKeywords"
+                :suggestions="autoCompleteSuggestions"
+                class="mt-3"
+                data-test="slos-addslo-timeslice-scope"
+              />
             </template>
   
             <OBanner v-else variant="info" class="mt-3">
@@ -261,14 +310,14 @@
   
           <SloSection :title="t('slos.section.grouping')">
             <!-- Constraining wrapper: OTagInput's root is `h-full`. -->
-            <div>
-              <OTagInput
-                v-model="groupByList"
-                :label="t('slos.field.groupBy')"
-                placeholder=""
-                data-test="slos-addslo-group-by"
-              />
-            </div>
+            <OSelect
+              v-model="groupByList"
+              :label="t('slos.field.groupBy')"
+              :options="streamFieldNames"
+              multiple
+              :placeholder="t('slos.field.groupByPlaceholder')"
+              data-test="slos-addslo-group-by"
+            />
           <OInput
             v-if="isGrouped"
             v-model.number="form.groups_estimate"
@@ -281,9 +330,23 @@
         </SloSection>
       </div>
 
+      <div class="flex flex-col gap-4">
+        <!-- Preview sits above the summary: it answers "is my predicate
+             right?", which is the question asked while the left column is
+             still being filled in. Count SLI only — the other SLI types do
+             not have a good/bad event count to draw. -->
+        <SloPreviewChart
+          v-if="form.sli_type === 'count' && form.config.stream && form.config.good_expr"
+          data-test="slos-addslo-preview-section"
+          :stream-type="form.config.stream_type"
+          :stream="form.config.stream"
+          :scope="form.config.scope"
+          :good-expr="form.config.good_expr"
+        />
+
       <!-- Summary. Mirrors the backend's own arithmetic so a budget rejection
            at save time is never the first time a user sees the numbers. -->
-      <SloSection :title="t('slos.section.summary')" class="h-fit sticky top-4">
+      <SloSection :title="t('slos.section.summary')" class="h-fit">
         <dl class="grid grid-cols-[8rem_1fr] gap-y-2 text-compact">
           <dt class="text-text-secondary">{{ t("slos.field.sliType") }}</dt>
           <dd>{{ sliTypeLabel(form.sli_type) }}</dd>
@@ -310,7 +373,8 @@
         <OBanner variant="info" class="mt-3">
           {{ t("slos.backfillNote") }}
         </OBanner>
-      </SloSection>
+        </SloSection>
+      </div>
     </div>
   </OPageLayout>
 </template>
@@ -324,12 +388,15 @@ import { useStore } from "vuex";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import SloSection from "@/components/slos/SloSection.vue";
+import SloPreviewChart from "@/components/slos/SloPreviewChart.vue";
+import SloExpressionField from "@/components/slos/SloExpressionField.vue";
 import SelectFolderDropDown from "@/components/common/sidebar/SelectFolderDropDown.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
-import ORadioCards from "@/lib/forms/OptionGroup/OOptionGroup.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import useStreams from "@/composables/useStreams";
+import useSqlSuggestions from "@/composables/useSuggestions";
 import OTagInput from "@/lib/forms/TagInput/OTagInput.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -372,10 +439,30 @@ const groupByList = ref<string[]>([]);
 const isGrouped = computed(() => groupByList.value.length > 0);
 
 const sliTypeOptions = computed(() => [
-  { value: "count", label: t("slos.type.count"), description: t("slos.type.countDescription") },
-  { value: "time_slice", label: t("slos.type.timeSlice"), description: t("slos.type.timeSliceDescription") },
-  { value: "alert", label: t("slos.type.alert"), description: t("slos.type.alertDescription"), disable: true },
+  {
+    value: "count",
+    label: t("slos.type.count"),
+    icon: "functions",
+    description: t("slos.type.countDescription"),
+  },
+  {
+    value: "time_slice",
+    label: t("slos.type.timeSlice"),
+    icon: "timelapse",
+    description: t("slos.type.timeSliceDescription"),
+  },
+  {
+    value: "alert",
+    label: t("slos.type.alert"),
+    icon: "gpp_maybe",
+    description: t("slos.type.alertDescription"),
+    disable: true,
+  },
 ]);
+
+const sliTypeDescription = computed(
+  () => sliTypeOptions.value.find((o) => o.value === form.sli_type)?.description ?? "",
+);
 
 const streamTypeOptions = [
   { value: "logs", label: "logs" },
@@ -418,6 +505,47 @@ function onStreamTypeChange(value: unknown) {
   form.config.stream = "";
   loadStreams(String(value ?? ""));
 }
+
+// ── Field typeahead ─────────────────────────────────────────────────────────
+// The selected stream's schema feeds three places: token suggestions inside
+// the scope / good-when expressions, and the group-by picker. Loaded when the
+// stream changes; a failure leaves the inputs as plain text rather than
+// blocking the form.
+const { getStream } = useStreams();
+const streamFields = ref<{ label: string; value: string }[]>([]);
+const streamFieldNames = computed(() => streamFields.value.map((f) => f.value));
+
+// The expression editors are the SAME editor the logs search bar uses, so
+// their completions come from the SAME machinery — `updateFieldKeywords`
+// builds the field list (dropping the timestamp column) and merges it with
+// the SQL keyword and function sets. Nothing about autocomplete is
+// reimplemented here.
+const { autoCompleteKeywords, autoCompleteSuggestions, updateFieldKeywords } =
+  useSqlSuggestions();
+
+async function loadStreamFields(streamName: string) {
+  if (!streamName || !form.config.stream_type) {
+    streamFields.value = [];
+    updateFieldKeywords([]);
+    return;
+  }
+  try {
+    const data: any = await getStream(streamName, form.config.stream_type, true);
+    const schema = data?.schema ?? [];
+    streamFields.value = schema
+      .map((c: any) => ({ label: c.name, value: c.name }))
+      .sort((a: any, b: any) => a.value.localeCompare(b.value));
+    updateFieldKeywords(schema);
+  } catch {
+    streamFields.value = [];
+    updateFieldKeywords([]);
+  }
+}
+
+watch(
+  () => form.config.stream,
+  (stream) => loadStreamFields(String(stream ?? "")),
+);
 
 const comparatorOptions = [
   { value: "<", label: "<" },
@@ -600,5 +728,7 @@ onMounted(async () => {
   // SLO already uses looks unset.
   await load();
   await loadStreams(form.config.stream_type);
+  // The stream watcher does not fire for the hydrated value.
+  await loadStreamFields(form.config.stream ?? "");
 });
 </script>

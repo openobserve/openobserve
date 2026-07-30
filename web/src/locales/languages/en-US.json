@@ -10663,7 +10663,8 @@
       "timeSlice": "Time slice",
       "timeSliceDescription": "a per-slice condition, e.g. p95 < 500 ms — uptime = good slices",
       "alert": "Alert-based",
-      "alertDescription": "uptime of an existing alert"
+      "alertDescription": "uptime of an existing alert",
+      "alertUnavailable": "Alert-based SLIs are not available yet"
     },
     "window": {
       "7d": "7 days",
@@ -10734,7 +10735,8 @@
       "reservation": "Reservation",
       "sliType": "SLI type",
       "owner": "Owner",
-      "folder": "Folder"
+      "folder": "Folder",
+      "streamPlaceholder": "Select a stream"
     },
     "empty": {
       "title": "No SLOs yet",
@@ -10791,6 +10793,12 @@
     "moveTitle": "Move {count} SLO(s) to another folder",
     "moveSelected": "Move {count} selected",
     "moved": "Moved {count} SLO(s) to {folder}",
-    "moveFailed": "Move failed"
+    "moveFailed": "Move failed",
+    "preview": {
+      "title": "Preview",
+      "goodEvents": "Good events",
+      "badEvents": "Bad events",
+      "needsDefinition": "Pick a stream and define \"good when\" to preview"
+    }
   }
 }
