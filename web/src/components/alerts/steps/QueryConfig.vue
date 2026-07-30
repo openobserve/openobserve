@@ -3085,6 +3085,10 @@ export default defineComponent({
       if (((fv("logGroupBy") as string[]) ?? []).filter((f: string) => f?.trim()).length === 0) {
         triggerThreshold.value = 1;
         triggerOperator.value = ">=";
+        // The Simple/Multi toggle only renders while a group-by exists, so with
+        // the last one gone the user can no longer turn multi-alert off — turn it
+        // off here or every Save 400s (M-10 requires ≥1 group_by for per-group).
+        setFV("query_condition.aggregation.multi_alert", false);
       }
     };
     const onLogGroupByChange = () => {
@@ -3198,6 +3202,9 @@ export default defineComponent({
       if (remaining === 0) {
         triggerThreshold.value = 1;
         triggerOperator.value = ">=";
+        // Same reason as the log branch: with no group-by left the toggle is
+        // hidden, so multi_alert must be cleared here or Save 400s (M-10).
+        setFV("query_condition.aggregation.multi_alert", false);
       }
     };
 
