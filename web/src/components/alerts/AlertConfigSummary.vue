@@ -83,7 +83,10 @@ const warningText = computed(() => {
   if (!agg || agg.warning_value === undefined || agg.warning_value === null) {
     return EMPTY;
   }
-  return `${agg.function}(${agg.having?.column}) ${agg.having?.operator} ${agg.warning_value}`;
+  const fn = agg.function || "";
+  const col = agg.having?.column || "";
+  const op = agg.having?.operator || "";
+  return `${fn}(${col}) ${op} ${agg.warning_value}`;
 });
 
 const sections = computed(() => [
