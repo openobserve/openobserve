@@ -141,6 +141,16 @@ type AgentObservationBuffer = std::collections::BTreeMap<
 #[cfg(not(feature = "enterprise"))]
 type AgentObservationBuffer = Option<std::convert::Infallible>;
 
+/// Canonical agent-identity fields the registry wrote onto the span, captured
+/// before UDS refactoring so they can be re-inserted if the stream's UDS field
+/// list does not (yet) include them (see [`restore_canonical_agent_fields`]).
+struct CanonicalAgentFields {
+    agent_name: Option<String>,
+    agent_id: Option<String>,
+    env: Option<String>,
+    version: Option<String>,
+}
+
 fn normalize_llm_field_types(record_val: &mut Map<String, json::Value>) {
     for &field in GEN_AI_INT64_FIELDS.iter() {
         if let Some(value) = record_val.get_mut(field)
@@ -178,7 +188,7 @@ fn collect_gen_ai_agent_observation(
     record_val: &mut Map<String, json::Value>,
     mapping_config: &GenAiAgentMappingConfig,
     observations: &mut AgentObservationBuffer,
-) -> Option<(Option<String>, Option<String>)> {
+) -> Option<CanonicalAgentFields> {
     #[cfg(feature = "enterprise")]
     {
         let observation =
@@ -190,7 +200,12 @@ fn collect_gen_ai_agent_observation(
                 record_val,
                 mapping_config,
             )?;
-        let canonical_fields = (observation.agent_name.clone(), observation.agent_id.clone());
+        let canonical_fields = CanonicalAgentFields {
+            agent_name: observation.agent_name.clone(),
+            agent_id: observation.agent_id.clone(),
+            env: observation.env.clone(),
+            version: observation.version.clone(),
+        };
         let agent_key = observation.agent_key.clone();
         let identity_source = observation.identity_source.clone();
         let buffer_size_before = observations.len();
@@ -223,17 +238,23 @@ fn collect_gen_ai_agent_observation(
 
 fn restore_canonical_agent_fields(
     record_val: &mut Map<String, json::Value>,
-    canonical_fields: Option<(Option<String>, Option<String>)>,
+    canonical_fields: Option<CanonicalAgentFields>,
 ) {
-    let Some((agent_name, agent_id)) = canonical_fields else {
+    let Some(fields) = canonical_fields else {
         return;
     };
 
-    if let Some(agent_name) = agent_name {
+    if let Some(agent_name) = fields.agent_name {
         record_val.insert("gen_ai_agent_name".to_string(), json::json!(agent_name));
     }
-    if let Some(agent_id) = agent_id {
+    if let Some(agent_id) = fields.agent_id {
         record_val.insert("gen_ai_agent_id".to_string(), json::json!(agent_id));
+    }
+    if let Some(env) = fields.env {
+        record_val.insert("gen_ai_agent_env".to_string(), json::json!(env));
+    }
+    if let Some(version) = fields.version {
+        record_val.insert("gen_ai_agent_version".to_string(), json::json!(version));
     }
 }
 
@@ -1691,6 +1712,38 @@ mod tests {
                 .get("_o2_ingest_ts")
                 .and_then(|value| value.as_i64())
                 .is_some_and(|value| value > 1)
+        );
+    }
+
+    #[test]
+    fn test_restore_canonical_agent_fields_restores_env_and_version() {
+        // Simulates a UDS stream whose field list dropped the canonical agent
+        // columns during refactor_map: every canonical field must be restored,
+        // env/version included, so version-scoped queries can filter on them.
+        let mut record = json!({"_timestamp": 1_i64}).as_object().unwrap().clone();
+
+        super::restore_canonical_agent_fields(
+            &mut record,
+            Some(super::CanonicalAgentFields {
+                agent_name: Some("o2_ai_agent".to_string()),
+                agent_id: None,
+                env: Some("production".to_string()),
+                version: Some("0.1.0".to_string()),
+            }),
+        );
+
+        assert_eq!(
+            record.get("gen_ai_agent_name").and_then(|v| v.as_str()),
+            Some("o2_ai_agent")
+        );
+        assert!(!record.contains_key("gen_ai_agent_id"));
+        assert_eq!(
+            record.get("gen_ai_agent_env").and_then(|v| v.as_str()),
+            Some("production")
+        );
+        assert_eq!(
+            record.get("gen_ai_agent_version").and_then(|v| v.as_str()),
+            Some("0.1.0")
         );
     }
 

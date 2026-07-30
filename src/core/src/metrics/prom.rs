@@ -869,12 +869,31 @@ fn get_metadata_object(schema: &Schema) -> Option<MetadataObject> {
     super::get_prom_metadata_from_schema(schema).map(Into::into)
 }
 
+/// Default lookback window for `/api/v1/series` when `start` is omitted.
+///
+/// The Prometheus spec makes `start`/`end` optional (defaulting to the full
+/// TSDB range), but an unbounded range is rejected by the file_list layer and
+/// would mean a full-retention scan. 24h keeps low-frequency metrics (daily
+/// jobs) discoverable while bounding the query cost.
+const DEFAULT_SERIES_LOOKBACK_MICROS: i64 = 24 * 3600 * 1_000_000;
+
+fn normalize_series_time_range(start: i64, end: i64) -> (i64, i64) {
+    let end = if end <= 0 { now_micros() } else { end };
+    let start = if start <= 0 {
+        end - DEFAULT_SERIES_LOOKBACK_MICROS
+    } else {
+        start
+    };
+    (start, end)
+}
+
 pub async fn get_series(
     org_id: &str,
     selector: Option<parser::VectorSelector>,
     start: i64,
     end: i64,
 ) -> Result<Vec<serde_json::Value>> {
+    let (start, end) = normalize_series_time_range(start, end);
     let metric_name = match selector.as_ref().and_then(try_into_metric_name) {
         Some(name) => name,
         None => {
@@ -1600,5 +1619,29 @@ mod tests {
             at: None,
         };
         assert_eq!(try_into_metric_name(&sel), Some("direct_name".to_string()));
+    }
+
+    #[test]
+    fn test_normalize_series_time_range_defaults_to_lookback() {
+        // omitted start arrives as 0 (see validate_metadata_params); it must
+        // become a bounded window or file_list rejects the query (issue #13120)
+        let end = now_micros();
+        let (start, end_out) = normalize_series_time_range(0, end);
+        assert_eq!(end_out, end);
+        assert_eq!(start, end - DEFAULT_SERIES_LOOKBACK_MICROS);
+    }
+
+    #[test]
+    fn test_normalize_series_time_range_defaults_end_to_now() {
+        let before = now_micros();
+        let (start, end) = normalize_series_time_range(0, 0);
+        assert!(end >= before);
+        assert_eq!(start, end - DEFAULT_SERIES_LOOKBACK_MICROS);
+    }
+
+    #[test]
+    fn test_normalize_series_time_range_explicit_values_untouched() {
+        let (start, end) = normalize_series_time_range(1_000, 2_000);
+        assert_eq!((start, end), (1_000, 2_000));
     }
 }

@@ -16,8 +16,7 @@
 use std::collections::BTreeMap;
 
 use config::meta::{
-    alerts::{ConditionGroup, ConditionList},
-    pipeline::components::{ConditionParams, ScorerRef},
+    pipeline::components::ScorerRef,
     self_reporting::{
         evaluator::EVALUATOR_STREAM, llm_scores::LLM_SCORES_STREAM,
         usage::is_reserved_self_reporting_stream,
@@ -27,6 +26,12 @@ use sea_orm::{
     ColumnTrait, ConnectionTrait, EntityTrait, Order, QueryFilter, QueryOrder, Schema, Set,
 };
 use serde::{Deserialize, Serialize};
+
+pub mod completion_window;
+pub mod span_selector;
+
+pub use completion_window::*;
+pub use span_selector::*;
 
 use super::get_lock;
 use crate::{
@@ -38,30 +43,8 @@ use crate::{
 /// Valid job states.
 pub const VALID_STATUSES: &[&str] = &["draft", "active", "paused", "degraded", "archived"];
 
-/// Lowest configurable idle window, matching the default scheduler poll interval.
-pub const MIN_COMPLETION_IDLE_WINDOW_SECS: i64 = 45;
-pub const DEFAULT_TRACE_IDLE_WINDOW_SECS: i64 = 2 * 60;
-pub const DEFAULT_TRACE_MAX_AGE_SECS: i64 = 30 * 60;
-pub const DEFAULT_SESSION_IDLE_WINDOW_SECS: i64 = 2 * 60;
-pub const DEFAULT_SESSION_MAX_AGE_SECS: i64 = 4 * 60 * 60;
-
 pub type ScorerInputMapping = BTreeMap<String, String>;
 pub type JobInputMapping = BTreeMap<String, ScorerInputMapping>;
-pub type SpanSelectorBindings = BTreeMap<String, String>;
-
-pub const DEFAULT_SPAN_SELECTOR_MAXIMUM_SPANS: usize = 5;
-pub const SPAN_SELECTOR_FIELD_VALUE_MAX_CHARS: usize = 1_000;
-pub const SPAN_SELECTOR_OUTPUT_MAX_CHARS: usize = 40_000;
-pub const DEFAULT_SPAN_SELECTOR_FIELDS: [&str; 8] = [
-    "name",
-    "status",
-    "gen_ai_tool_name",
-    "gen_ai_tool_call_id",
-    "gen_ai_tool_call_arguments",
-    "gen_ai_tool_call_result",
-    "gen_ai_input_messages",
-    "gen_ai_output_messages",
-];
 
 pub fn is_reserved_eval_source_stream(stream: &str) -> bool {
     let stream = stream.trim().to_ascii_lowercase();
@@ -77,112 +60,6 @@ pub fn is_reserved_eval_source_stream(stream: &str) -> bool {
                 | "o2_eval_task_trace"
                 | "o2_eval_task_session"
         )
-}
-
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum SpanSelectorFieldMode {
-    #[default]
-    Default,
-    Custom,
-}
-
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(default, rename_all = "camelCase")]
-pub struct SpanSelector {
-    pub id: String,
-    pub name: String,
-    pub filter_condition: serde_json::Value,
-    pub field_mode: SpanSelectorFieldMode,
-    pub fields: Vec<String>,
-    pub maximum_spans: usize,
-}
-
-impl Default for SpanSelector {
-    fn default() -> Self {
-        Self {
-            id: String::new(),
-            name: String::new(),
-            filter_condition: serde_json::json!({}),
-            field_mode: SpanSelectorFieldMode::Default,
-            fields: Vec::new(),
-            maximum_spans: DEFAULT_SPAN_SELECTOR_MAXIMUM_SPANS,
-        }
-    }
-}
-
-impl SpanSelector {
-    pub fn field_count(&self) -> usize {
-        match self.field_mode {
-            SpanSelectorFieldMode::Default => DEFAULT_SPAN_SELECTOR_FIELDS.len(),
-            SpanSelectorFieldMode::Custom => self.fields.len(),
-        }
-    }
-
-    pub fn validate(&self) -> Result<(), &'static str> {
-        if self.id.trim().is_empty() {
-            return Err("Span Selector id cannot be empty");
-        }
-        if self.name.trim().is_empty() {
-            return Err("Span Selector name cannot be empty");
-        }
-        if self.maximum_spans == 0 {
-            return Err("Span Selector maximumSpans must be greater than zero");
-        }
-        if !is_valid_selector_filter(&self.filter_condition) {
-            return Err("Span Selector filterCondition is invalid");
-        }
-
-        if matches!(self.field_mode, SpanSelectorFieldMode::Custom) {
-            if self.fields.is_empty() {
-                return Err("Custom Span Selector schema requires at least one field");
-            }
-            let mut fields = std::collections::BTreeSet::new();
-            for field in &self.fields {
-                let field = field.trim();
-                if field.is_empty() {
-                    return Err("Span Selector field names cannot be empty");
-                }
-                if !fields.insert(field) {
-                    return Err("Span Selector fields must be unique");
-                }
-            }
-        }
-
-        if self
-            .maximum_spans
-            .saturating_mul(self.field_count())
-            .saturating_mul(SPAN_SELECTOR_FIELD_VALUE_MAX_CHARS)
-            > SPAN_SELECTOR_OUTPUT_MAX_CHARS
-        {
-            return Err("Span Selector output budget exceeds 40000 characters");
-        }
-        Ok(())
-    }
-}
-
-fn is_valid_selector_filter(filter: &serde_json::Value) -> bool {
-    if filter.is_null()
-        || filter.as_object().is_some_and(|value| value.is_empty())
-        || filter
-            .get("type")
-            .and_then(serde_json::Value::as_str)
-            .is_some_and(|value| value.eq_ignore_ascii_case("all"))
-    {
-        return true;
-    }
-
-    if let Ok(condition) = serde_json::from_value::<ConditionParams>(filter.clone()) {
-        return match condition {
-            ConditionParams::V1 { conditions } => conditions.has_conditions(),
-            ConditionParams::V2 { conditions } => conditions.validate().is_ok(),
-        };
-    }
-    if let Ok(conditions) = serde_json::from_value::<ConditionGroup>(filter.clone()) {
-        return conditions.validate().is_ok();
-    }
-    serde_json::from_value::<ConditionList>(filter.clone())
-        .is_ok_and(|conditions| conditions.has_conditions())
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -267,87 +144,6 @@ impl std::fmt::Display for TargetScope {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(self.as_str())
     }
-}
-
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(default, rename_all = "camelCase")]
-pub struct TraceEvalConfig {
-    pub idle_window_secs: i64,
-    pub max_age_secs: i64,
-    pub end_signal: Option<serde_json::Value>,
-}
-
-impl Default for TraceEvalConfig {
-    fn default() -> Self {
-        Self {
-            idle_window_secs: DEFAULT_TRACE_IDLE_WINDOW_SECS,
-            max_age_secs: DEFAULT_TRACE_MAX_AGE_SECS,
-            end_signal: None,
-        }
-    }
-}
-
-impl TraceEvalConfig {
-    pub fn validate(&self) -> Result<(), &'static str> {
-        validate_completion_window(self.idle_window_secs, self.max_age_secs)?;
-        validate_end_signal(self.end_signal.as_ref())
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(default, rename_all = "camelCase")]
-pub struct SessionEvalConfig {
-    pub idle_window_secs: i64,
-    pub max_age_secs: i64,
-    pub end_signal: Option<serde_json::Value>,
-}
-
-impl Default for SessionEvalConfig {
-    fn default() -> Self {
-        Self {
-            idle_window_secs: DEFAULT_SESSION_IDLE_WINDOW_SECS,
-            max_age_secs: DEFAULT_SESSION_MAX_AGE_SECS,
-            end_signal: None,
-        }
-    }
-}
-
-impl SessionEvalConfig {
-    pub fn validate(&self) -> Result<(), &'static str> {
-        validate_completion_window(self.idle_window_secs, self.max_age_secs)?;
-        validate_end_signal(self.end_signal.as_ref())
-    }
-}
-
-fn validate_end_signal(end_signal: Option<&serde_json::Value>) -> Result<(), &'static str> {
-    let Some(end_signal) = end_signal else {
-        return Ok(());
-    };
-
-    let condition = serde_json::from_value::<ConditionParams>(end_signal.clone())
-        .map_err(|_| "End signal must be a valid condition")?;
-
-    match condition {
-        ConditionParams::V1 { conditions } if conditions.has_conditions() => Ok(()),
-        ConditionParams::V2 { conditions } if conditions.validate().is_ok() => Ok(()),
-        _ => Err("End signal must contain at least one condition"),
-    }
-}
-
-fn validate_completion_window(
-    idle_window_secs: i64,
-    max_age_secs: i64,
-) -> Result<(), &'static str> {
-    if idle_window_secs < MIN_COMPLETION_IDLE_WINDOW_SECS {
-        return Err("Completion idle window must be at least 45 seconds");
-    }
-    if max_age_secs <= 0 {
-        return Err("Completion max age must be greater than zero");
-    }
-    if idle_window_secs > max_age_secs {
-        return Err("Completion idle window cannot exceed max age");
-    }
-    Ok(())
 }
 
 /// Valid state transitions. Maps from current state to allowed next states.
@@ -1080,7 +876,10 @@ mod tests {
         let job = OnlineEvalJob::from(model);
 
         assert_eq!(job.target_scope, TargetScope::Trace);
-        assert_eq!(job.trace_config.as_ref().unwrap().idle_window_secs, 120);
+        assert_eq!(
+            job.trace_config.as_ref().unwrap().idle_window_secs,
+            DEFAULT_TRACE_IDLE_WINDOW_SECS
+        );
         assert!(job.session_config.is_none());
         assert!(!job.uses_hidden_pipeline());
     }
@@ -1121,7 +920,10 @@ mod tests {
         assert!(job.validate_target_scope().is_err());
         job.session_config = None;
         job.apply_target_scope_defaults();
-        assert_eq!(job.session_config.as_ref().unwrap().idle_window_secs, 120);
+        assert_eq!(
+            job.session_config.as_ref().unwrap().idle_window_secs,
+            DEFAULT_SESSION_IDLE_WINDOW_SECS
+        );
         assert_eq!(
             job.session_config.as_ref().unwrap().max_age_secs,
             DEFAULT_SESSION_MAX_AGE_SECS
@@ -1149,52 +951,6 @@ mod tests {
         assert_eq!(job.trace_config.as_ref().unwrap(), &config);
         assert!(job.validate_target_scope().is_ok());
         assert!(job.session_config.is_none());
-    }
-
-    #[test]
-    fn test_completion_config_enforces_scheduler_poll_interval_minimum() {
-        let below_minimum = TraceEvalConfig {
-            idle_window_secs: MIN_COMPLETION_IDLE_WINDOW_SECS - 1,
-            ..TraceEvalConfig::default()
-        };
-        assert_eq!(
-            below_minimum.validate(),
-            Err("Completion idle window must be at least 45 seconds")
-        );
-
-        let at_minimum = TraceEvalConfig {
-            idle_window_secs: MIN_COMPLETION_IDLE_WINDOW_SECS,
-            ..TraceEvalConfig::default()
-        };
-        assert!(at_minimum.validate().is_ok());
-    }
-
-    #[test]
-    fn test_completion_config_rejects_invalid_or_empty_end_signal() {
-        let invalid = TraceEvalConfig {
-            end_signal: Some(serde_json::json!({"field": "status"})),
-            ..TraceEvalConfig::default()
-        };
-        assert_eq!(
-            invalid.validate(),
-            Err("End signal must be a valid condition")
-        );
-
-        let empty = SessionEvalConfig {
-            end_signal: Some(serde_json::json!({
-                "version": 2,
-                "conditions": {
-                    "filterType": "group",
-                    "logicalOperator": "AND",
-                    "conditions": []
-                }
-            })),
-            ..SessionEvalConfig::default()
-        };
-        assert_eq!(
-            empty.validate(),
-            Err("End signal must contain at least one condition")
-        );
     }
 
     #[test]
@@ -1269,77 +1025,6 @@ mod tests {
             ("s2".to_string(), "selector-1".to_string()),
         ]);
         job
-    }
-
-    #[test]
-    fn test_span_selector_default_schema_and_camel_case_wire_shape() {
-        let selector = SpanSelector {
-            id: "selector-1".to_string(),
-            name: "default".to_string(),
-            ..SpanSelector::default()
-        };
-
-        assert_eq!(selector.field_count(), DEFAULT_SPAN_SELECTOR_FIELDS.len());
-        assert!(selector.validate().is_ok());
-
-        let value = serde_json::to_value(selector).unwrap();
-        assert_eq!(value["fieldMode"], "default");
-        assert_eq!(value["maximumSpans"], DEFAULT_SPAN_SELECTOR_MAXIMUM_SPANS);
-        assert!(value.get("filterCondition").is_some());
-    }
-
-    #[test]
-    fn test_span_selector_rejects_invalid_custom_schema_and_output_budget() {
-        let mut selector = SpanSelector {
-            id: "selector-1".to_string(),
-            name: "custom".to_string(),
-            field_mode: SpanSelectorFieldMode::Custom,
-            fields: Vec::new(),
-            maximum_spans: 1,
-            ..SpanSelector::default()
-        };
-
-        assert_eq!(
-            selector.validate(),
-            Err("Custom Span Selector schema requires at least one field")
-        );
-
-        selector.fields = vec!["name".to_string(), "name".to_string()];
-        assert_eq!(
-            selector.validate(),
-            Err("Span Selector fields must be unique")
-        );
-
-        selector.fields = (0..9).map(|idx| format!("field_{idx}")).collect();
-        selector.maximum_spans = 5;
-        assert_eq!(
-            selector.validate(),
-            Err("Span Selector output budget exceeds 40000 characters")
-        );
-    }
-
-    #[test]
-    fn test_span_selector_rejects_an_incomplete_filter_condition() {
-        let selector = SpanSelector {
-            id: "selector-1".to_string(),
-            name: "invalid-filter".to_string(),
-            filter_condition: serde_json::json!({
-                "filterType": "group",
-                "logicalOperator": "AND",
-                "conditions": [{
-                    "filterType": "condition",
-                    "column": "span_status",
-                    "operator": "=",
-                    "logicalOperator": "AND"
-                }]
-            }),
-            ..SpanSelector::default()
-        };
-
-        assert_eq!(
-            selector.validate(),
-            Err("Span Selector filterCondition is invalid")
-        );
     }
 
     #[test]

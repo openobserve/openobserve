@@ -784,7 +784,8 @@ pub async fn get_session_details(
     let use_cache = get_use_cache_from_request(&query);
     let user_id_opt = Some(user_id.to_string());
 
-    let query_sql = traces::session::trace_ids_sql(&stream_name, &session_id_columns, &session_id);
+    let query_sql =
+        traces::session::trace_ids_sql(&stream_name, &session_id_columns, &session_id, None);
 
     let mut req = config::meta::search::Request {
         query: config::meta::search::Query {
