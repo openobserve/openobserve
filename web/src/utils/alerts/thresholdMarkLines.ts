@@ -32,13 +32,9 @@ export interface ThresholdMarkLine {
   show_label: false;
 }
 
-const has = (v: unknown): v is string | number =>
-  v !== undefined && v !== null && v !== "";
+const has = (v: unknown): v is string | number => v !== undefined && v !== null && v !== "";
 
-export function buildThresholdMarkLines(
-  critical: unknown,
-  warning: unknown,
-): ThresholdMarkLine[] {
+export function buildThresholdMarkLines(critical: unknown, warning: unknown): ThresholdMarkLine[] {
   const lines: ThresholdMarkLine[] = [];
   if (has(critical)) {
     lines.push({

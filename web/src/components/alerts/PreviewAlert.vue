@@ -44,7 +44,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-
 import { ref, watch, onMounted, computed, nextTick } from "vue";
 import { buildThresholdMarkLines } from "@/utils/alerts/thresholdMarkLines";
 import {
@@ -60,7 +59,6 @@ import { useI18n } from "vue-i18n";
 import searchService from "@/services/search";
 import { b64EncodeUnicode, smartDecodeVrlFunction } from "@/utils/zincutils";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-
 
 let dashboardPanelData: any = null;
 

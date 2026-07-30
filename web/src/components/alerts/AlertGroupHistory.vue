@@ -69,7 +69,7 @@
       :persist-columns="true"
       table-id="alert-group-history"
       :enable-column-resize="true"
-      class="flex-1 min-h-0"
+      class="min-h-0 flex-1"
       data-test="alerts-alertgrouphistory-table"
     >
       <template #toolbar-trailing>
@@ -86,36 +86,21 @@
       </template>
 
       <template #cell-at="{ row }">
-        <OTimeCell
-          :value="row.at"
-          unit="us"
-          mode="relative"
-          :timezone="store.state.timezone"
-        />
+        <OTimeCell :value="row.at" unit="us" mode="relative" :timezone="store.state.timezone" />
       </template>
 
       <template #cell-group="{ row }">
-        <span class="font-mono text-compact text-text-heading">
+        <span class="text-compact text-text-heading font-mono">
           {{ row.group_labels || t("alerts.groups.rollupRow") }}
         </span>
       </template>
 
       <template #cell-change="{ row }">
         <div class="flex items-center gap-1">
-          <OTag
-            v-if="row.from_level"
-            type="alertLevel"
-            :value="row.from_level"
-            size="sm"
-          />
+          <OTag v-if="row.from_level" type="alertLevel" :value="row.from_level" size="sm" />
           <span v-else class="text-text-secondary">—</span>
           <span class="text-text-secondary">→</span>
-          <OTag
-            v-if="row.to_level"
-            type="alertLevel"
-            :value="row.to_level"
-            size="sm"
-          />
+          <OTag v-if="row.to_level" type="alertLevel" :value="row.to_level" size="sm" />
           <span v-else class="text-text-secondary">—</span>
         </div>
       </template>
@@ -125,7 +110,7 @@
       </template>
 
       <template #cell-value="{ row }">
-        <span class="font-mono text-compact text-text-secondary">
+        <span class="text-compact text-text-secondary font-mono">
           {{ formatValue(row.value) }}
         </span>
       </template>
@@ -192,9 +177,7 @@ const rows = computed<TransitionRow[]>(() =>
 /** `—` for an absent reading — a vanished group observed nothing, and 0 would
  *  read as a real measurement. */
 const formatValue = (value?: number | null) =>
-  value === undefined || value === null
-    ? "—"
-    : String(Math.round(value * 100) / 100);
+  value === undefined || value === null ? "—" : String(Math.round(value * 100) / 100);
 
 const columns = computed<OTableColumnDef[]>(() => [
   {
@@ -227,9 +210,7 @@ const columns = computed<OTableColumnDef[]>(() => [
     resizable: true,
     // Without the Group column something has to absorb the leftover width,
     // and the level change is the row's centrepiece.
-    meta: props.showGroupColumn
-      ? { align: "left" }
-      : { align: "left", flex: true },
+    meta: props.showGroupColumn ? { align: "left" } : { align: "left", flex: true },
   },
   {
     id: "to_outcome",

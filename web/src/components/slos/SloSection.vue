@@ -25,7 +25,7 @@
 <template>
   <OCard :data-test="dataTest">
     <OCardSection>
-      <h3 class="mb-3 text-lg text-text-heading">{{ title }}</h3>
+      <h3 class="text-text-heading mb-3 text-lg">{{ title }}</h3>
       <slot />
     </OCardSection>
   </OCard>

@@ -91,12 +91,8 @@ describe("AlertEvaluationHistory", () => {
         }),
       ],
     });
-    expect(
-      wrapper.find('[data-test="alerts-alertevaluationhistory-table"]').exists(),
-    ).toBe(true);
-    expect(
-      wrapper.findAll('[data-test="alerts-alertevaluationhistory-status"]'),
-    ).toHaveLength(2);
+    expect(wrapper.find('[data-test="alerts-alertevaluationhistory-table"]').exists()).toBe(true);
+    expect(wrapper.findAll('[data-test="alerts-alertevaluationhistory-status"]')).toHaveLength(2);
     // conditionSummary: "actual operator threshold".
     expect(wrapper.text()).toContain("92.5 >= 80");
     expect(wrapper.text()).toContain("12.25 >= 80");
@@ -135,15 +131,11 @@ describe("AlertEvaluationHistory", () => {
 
   it("shows the empty state when no evaluations are in the window", async () => {
     wrapper = await mountComp({ hits: [] });
-    expect(
-      wrapper.find('[data-test="alerts-alertevaluationhistory-empty"]').exists(),
-    ).toBe(true);
+    expect(wrapper.find('[data-test="alerts-alertevaluationhistory-empty"]').exists()).toBe(true);
   });
 
   it("shows the empty state when the fetch fails", async () => {
-    vi.mocked(alertsService.getHistory).mockRejectedValue(
-      new Error("API Error"),
-    );
+    vi.mocked(alertsService.getHistory).mockRejectedValue(new Error("API Error"));
     wrapper = mount(AlertEvaluationHistory, {
       props: { alertId: "alert-1" },
       global: { plugins: [i18n, store] },
@@ -151,9 +143,7 @@ describe("AlertEvaluationHistory", () => {
     await flushPromises();
     await new Promise((resolve) => setTimeout(resolve, 75));
     await flushPromises();
-    expect(
-      wrapper.find('[data-test="alerts-alertevaluationhistory-empty"]').exists(),
-    ).toBe(true);
+    expect(wrapper.find('[data-test="alerts-alertevaluationhistory-empty"]').exists()).toBe(true);
   });
 
   it("re-fetches with a wider window when the range changes", async () => {
@@ -172,9 +162,7 @@ describe("AlertEvaluationHistory", () => {
 
   it("re-fetches when the refresh button is clicked", async () => {
     wrapper = await mountComp();
-    await wrapper
-      .find('[data-test="alerts-alertevaluationhistory-refresh"]')
-      .trigger("click");
+    await wrapper.find('[data-test="alerts-alertevaluationhistory-refresh"]').trigger("click");
     await flushPromises();
     expect(alertsService.getHistory).toHaveBeenCalledTimes(2);
   });

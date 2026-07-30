@@ -117,7 +117,7 @@
           data-test="slos-slodetail-groups-table"
         >
           <template #cell-group_key="{ row }">
-            <span class="font-mono text-compact">{{ row.group_key }}</span>
+            <span class="text-compact font-mono">{{ row.group_key }}</span>
           </template>
           <template #cell-sli="{ row }">
             <span v-if="!row.no_data" class="tabular-nums">{{ formatSli(row.sli) }}</span>
@@ -154,7 +154,7 @@
 
       <OTabPanel name="config">
         <OContent v-if="slo">
-          <dl class="grid grid-cols-[10rem_1fr] gap-y-2 gap-x-4 text-compact">
+          <dl class="text-compact grid grid-cols-[10rem_1fr] gap-x-4 gap-y-2">
             <dt class="text-text-secondary">{{ t("slos.field.sliType") }}</dt>
             <dd>{{ sliTypeLabel(slo.sli_type) }}</dd>
 
@@ -328,11 +328,41 @@ const stats = computed<StatItem[]>(() => {
 });
 
 const groupColumns = computed<OTableColumnDef<SloStatus>[]>(() => [
-  { id: "group_key", header: t("slos.column.group"), accessor: (r) => r.group_key, sortable: true, size: 280 },
-  { id: "sli", header: t("slos.column.sli"), accessor: (r) => r.sli ?? -1, sortable: true, size: 130 },
-  { id: "budget", header: t("slos.column.budgetRemaining"), accessor: (r) => r.error_budget_remaining ?? null, sortable: true, size: 160 },
-  { id: "burn", header: t("slos.column.burnRate"), accessor: (r) => r.burn_rate ?? -1, sortable: true, size: 120 },
-  { id: "coverage", header: t("slos.column.coverage"), accessor: (r) => r.coverage, sortable: true, size: 120 },
+  {
+    id: "group_key",
+    header: t("slos.column.group"),
+    accessor: (r) => r.group_key,
+    sortable: true,
+    size: 280,
+  },
+  {
+    id: "sli",
+    header: t("slos.column.sli"),
+    accessor: (r) => r.sli ?? -1,
+    sortable: true,
+    size: 130,
+  },
+  {
+    id: "budget",
+    header: t("slos.column.budgetRemaining"),
+    accessor: (r) => r.error_budget_remaining ?? null,
+    sortable: true,
+    size: 160,
+  },
+  {
+    id: "burn",
+    header: t("slos.column.burnRate"),
+    accessor: (r) => r.burn_rate ?? -1,
+    sortable: true,
+    size: 120,
+  },
+  {
+    id: "coverage",
+    header: t("slos.column.coverage"),
+    accessor: (r) => r.coverage,
+    sortable: true,
+    size: 120,
+  },
 ]);
 
 async function load() {

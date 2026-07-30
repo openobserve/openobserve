@@ -200,9 +200,9 @@ describe("conditionSummary", () => {
   });
 
   it("zero is a real observation, not an empty value", () => {
-    expect(
-      conditionSummary({ actual_value: 0, threshold_value: 5, threshold_operator: "<" }),
-    ).toBe("0 < 5");
+    expect(conditionSummary({ actual_value: 0, threshold_value: 5, threshold_operator: "<" })).toBe(
+      "0 < 5",
+    );
   });
 
   // §7.5: a capped SingleQuery count is a lower bound, never shown as exact.

@@ -103,10 +103,7 @@
       </OBanner>
 
       <OContent v-if="isMultiAlert" class="shrink-0 pt-3">
-        <OStatStrip
-          :items="groupStats"
-          data-test="alerts-alertdetail-group-stats"
-        />
+        <OStatStrip :items="groupStats" data-test="alerts-alertdetail-group-stats" />
       </OContent>
 
       <!-- A grouped alert that never opted in has no Groups tab, because it
@@ -162,11 +159,7 @@
         <!-- Custom trigger content: OTab's default slot exists for exactly
              this (badges) — prop-driven label/icon cannot carry the firing
              count the mock shows on the Groups tab. -->
-        <OTab
-          v-if="isMultiAlert"
-          name="groups"
-          data-test="alerts-alertdetail-tab-groups"
-        >
+        <OTab v-if="isMultiAlert" name="groups" data-test="alerts-alertdetail-tab-groups">
           <OIcon name="layers" size="sm" class="o-tab__icon shrink-0" />
           <span class="o-tab__label truncate">{{ t("alerts.groups.tab") }}</span>
           <OTag
@@ -178,14 +171,10 @@
           />
         </OTab>
         <OTab name="history" :label="t('alerts.history')" icon="history" />
-        <OTab
-          name="configuration"
-          :label="t('alerts.configuration')"
-          icon="settings"
-        />
+        <OTab name="configuration" :label="t('alerts.configuration')" icon="settings" />
       </OTabs>
 
-      <OTabPanels v-model="activeTab" class="flex-1 min-h-0">
+      <OTabPanels v-model="activeTab" class="min-h-0 flex-1">
         <OTabPanel v-if="isMultiAlert" name="groups" stretch>
           <AlertGroupsTable
             :groups="groupData?.list || []"
@@ -242,10 +231,7 @@
               </OToggleGroup>
             </OContent>
             <div class="min-h-0 flex-1">
-              <AlertEvaluationHistory
-                v-if="historyView === 'evaluations'"
-                :alert-id="alertId"
-              />
+              <AlertEvaluationHistory v-if="historyView === 'evaluations'" :alert-id="alertId" />
               <AlertGroupHistory
                 v-else
                 :transitions="transitions"
@@ -294,11 +280,7 @@ import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import alertsService from "@/services/alerts";
-import type {
-  AlertGroup,
-  AlertGroupsResponse,
-  AlertGroupTransition,
-} from "@/ts/interfaces/alert";
+import type { AlertGroup, AlertGroupsResponse, AlertGroupTransition } from "@/ts/interfaces/alert";
 
 const { t } = useI18n();
 const route = useRoute();
@@ -332,9 +314,7 @@ const onHistoryViewChange = (value: unknown) => {
 // The single-alert GET returns `query_condition`; the list endpoint calls the
 // same object `condition`. Accept either so this page works from both shapes.
 const aggregation = computed(
-  () =>
-    alert.value?.query_condition?.aggregation ||
-    alert.value?.condition?.aggregation,
+  () => alert.value?.query_condition?.aggregation || alert.value?.condition?.aggregation,
 );
 
 // Mirror the backend `QueryCondition::multi_alert_enabled()`: the evaluation
@@ -344,9 +324,7 @@ const aggregation = computed(
 // — e.g. a stale `promql_multi_alert` left behind after switching PromQL → SQL.
 const isMultiAlert = computed(() => {
   const qc = alert.value?.query_condition ?? alert.value?.condition;
-  return qc?.type === "promql"
-    ? !!qc?.promql_multi_alert
-    : !!qc?.aggregation?.multi_alert;
+  return qc?.type === "promql" ? !!qc?.promql_multi_alert : !!qc?.aggregation?.multi_alert;
 });
 
 // Grouped, but still evaluating as one collapsed result. The distinction the
@@ -354,8 +332,7 @@ const isMultiAlert = computed(() => {
 // `multi_alert` decides whether each group gets its own state and page.
 const isGroupedButSimple = computed(
   () =>
-    !isMultiAlert.value &&
-    (aggregation.value?.group_by || []).some((c: string) => c && c.trim()),
+    !isMultiAlert.value && (aggregation.value?.group_by || []).some((c: string) => c && c.trim()),
 );
 
 // The GET response carries no rollup level, and M-2 defines the rollup as the
@@ -498,9 +475,7 @@ const fetchTransitions = async () => {
     // param deliberately means "unfiltered" — so scope it here. This also
     // hides stale per-group rows left behind if the alert was once a
     // multi-alert; without a Group column they would be unreadable.
-    transitions.value = isMultiAlert.value
-      ? list
-      : list.filter((tr) => tr.group_key === "");
+    transitions.value = isMultiAlert.value ? list : list.filter((tr) => tr.group_key === "");
   } catch {
     transitions.value = [];
   } finally {

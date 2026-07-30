@@ -72,7 +72,7 @@
          content's intrinsic width and the grid overflows the viewport — which
          is the horizontal page scroll. `minmax(0, …)` lets it actually take
          only the remaining space. -->
-    <div class="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_33rem] gap-4">
+    <div class="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_33rem]">
       <!-- `min-w-0` for the same reason as the track above: a flex item's
            default `min-width: auto` would let a wide child (the query
            editors) push the column past its share. -->
@@ -122,202 +122,196 @@
             data-test="slos-addslo-description"
           />
         </SloSection>
-  
-          <SloSection :title="t('slos.section.sli')">
-            <OToggleGroup
-              v-model="form.sli_type"
-              data-test="slos-addslo-sli-type"
+
+        <SloSection :title="t('slos.section.sli')">
+          <OToggleGroup v-model="form.sli_type" data-test="slos-addslo-sli-type">
+            <OToggleGroupItem
+              v-for="opt in sliTypeOptions"
+              :key="opt.value"
+              :value="opt.value"
+              :disabled="opt.disable"
+              :tooltip="opt.disable ? t('slos.type.alertUnavailable') : undefined"
+              size="sm"
+              :data-test="`slos-addslo-sli-type-${opt.value}`"
             >
-              <OToggleGroupItem
-                v-for="opt in sliTypeOptions"
-                :key="opt.value"
-                :value="opt.value"
-                :disabled="opt.disable"
-                :tooltip="opt.disable ? t('slos.type.alertUnavailable') : undefined"
-                size="sm"
-                :data-test="`slos-addslo-sli-type-${opt.value}`"
-              >
-                <template #icon-left>
-                  <OIcon :name="opt.icon" size="sm" />
-                </template>
-                {{ opt.label }}
-              </OToggleGroupItem>
-            </OToggleGroup>
-            <p
-              class="text-xs text-text-secondary mt-1"
-              data-test="slos-addslo-sli-type-description"
-            >
-              {{ sliTypeDescription }}
-            </p>
-  
-            <template v-if="form.sli_type === 'count'">
-              <div class="grid grid-cols-2 gap-3 mt-3">
-                <OSelect
-                  v-model="form.config.stream_type"
-                  :label="t('slos.field.streamType')"
-                  :options="streamTypeOptions"
-                  :searchable="false"
-                  data-test="slos-addslo-stream-type"
-                  @update:model-value="onStreamTypeChange"
-                />
-                <OSelect
-                  v-model="form.config.stream"
-                  :label="t('slos.field.stream')"
-                  :options="streamOptions"
-                  :loading="isFetchingStreams"
-                  :disabled="!form.config.stream_type"
-                  :placeholder="t('slos.field.streamPlaceholder')"
-                  required
-                  data-test="slos-addslo-stream"
-                />
-              </div>
-              <SloExpressionField
-                v-model="form.config.scope"
-                editor-id="slo-scope-editor"
-                :label="t('slos.field.scope')"
-                :hint="t('slos.field.scopeHint')"
-                :keywords="autoCompleteKeywords"
-                :suggestions="autoCompleteSuggestions"
-                class="mt-3"
-                data-test="slos-addslo-scope"
+              <template #icon-left>
+                <OIcon :name="opt.icon" size="sm" />
+              </template>
+              {{ opt.label }}
+            </OToggleGroupItem>
+          </OToggleGroup>
+          <p class="text-text-secondary mt-1 text-xs" data-test="slos-addslo-sli-type-description">
+            {{ sliTypeDescription }}
+          </p>
+
+          <template v-if="form.sli_type === 'count'">
+            <div class="mt-3 grid grid-cols-2 gap-3">
+              <OSelect
+                v-model="form.config.stream_type"
+                :label="t('slos.field.streamType')"
+                :options="streamTypeOptions"
+                :searchable="false"
+                data-test="slos-addslo-stream-type"
+                @update:model-value="onStreamTypeChange"
               />
-              <SloExpressionField
-                v-model="form.config.good_expr"
-                editor-id="slo-good-expr-editor"
-                :label="t('slos.field.goodWhen')"
-                :hint="t('slos.field.goodWhenHint')"
-                :keywords="autoCompleteKeywords"
-                :suggestions="autoCompleteSuggestions"
+              <OSelect
+                v-model="form.config.stream"
+                :label="t('slos.field.stream')"
+                :options="streamOptions"
+                :loading="isFetchingStreams"
+                :disabled="!form.config.stream_type"
+                :placeholder="t('slos.field.streamPlaceholder')"
                 required
-                class="mt-3"
-                data-test="slos-addslo-good-expr"
+                data-test="slos-addslo-stream"
               />
-            </template>
-  
-            <template v-else-if="form.sli_type === 'time_slice'">
-              <div class="grid grid-cols-2 gap-3 mt-3">
-                <OSelect
-                  v-model="form.config.stream_type"
-                  :label="t('slos.field.streamType')"
-                  :options="streamTypeOptions"
-                  :searchable="false"
-                  data-test="slos-addslo-timeslice-stream-type"
-                  @update:model-value="onStreamTypeChange"
-                />
-                <OSelect
-                  v-model="form.config.stream"
-                  :label="t('slos.field.stream')"
-                  :options="streamOptions"
-                  :loading="isFetchingStreams"
-                  :disabled="!form.config.stream_type"
-                  :placeholder="t('slos.field.streamPlaceholder')"
-                  required
-                  data-test="slos-addslo-timeslice-stream"
-                />
-              </div>
-              <OInput
-                v-model="form.config.query"
-                :label="t('slos.field.aggregate')"
-                :hint="t('slos.field.aggregateHint')"
-                class="mt-3"
-                required
-                placeholder="approx_percentile_cont(duration_ms, 0.95)"
-              />
-              <div class="grid grid-cols-2 gap-3 mt-3">
-                <OSelect
-                  v-model="form.config.comparator"
-                  :label="t('slos.field.comparator')"
-                  :options="comparatorOptions"
-                />
-                <OInput
-                  v-model.number="form.config.threshold"
-                  :label="t('slos.field.threshold')"
-                  type="number"
-                />
-              </div>
-              <SloExpressionField
-                v-model="form.config.scope"
-                editor-id="slo-timeslice-scope-editor"
-                :label="t('slos.field.scope')"
-                :keywords="autoCompleteKeywords"
-                :suggestions="autoCompleteSuggestions"
-                class="mt-3"
-                data-test="slos-addslo-timeslice-scope"
-              />
-            </template>
-  
-            <OBanner v-else variant="info" class="mt-3">
-              {{ t("slos.alertSli.unavailable") }}
-            </OBanner>
-          </SloSection>
-  
-          <SloSection :title="t('slos.section.objective')">
-            <div class="grid grid-cols-2 gap-3">
-              <OInput
-                v-model.number="form.target"
-                :label="t('slos.field.target')"
-                type="number"
-                step="0.001"
-                suffix="%"
-                required
-                data-test="slos-addslo-target"
-              />
-              <div class="flex items-end pb-2 text-compact text-text-secondary">
-                {{ budgetHint }}
-              </div>
             </div>
-  
-            <!-- OToggleGroup renders OToggleGroupItem children; it has no
+            <SloExpressionField
+              v-model="form.config.scope"
+              editor-id="slo-scope-editor"
+              :label="t('slos.field.scope')"
+              :hint="t('slos.field.scopeHint')"
+              :keywords="autoCompleteKeywords"
+              :suggestions="autoCompleteSuggestions"
+              class="mt-3"
+              data-test="slos-addslo-scope"
+            />
+            <SloExpressionField
+              v-model="form.config.good_expr"
+              editor-id="slo-good-expr-editor"
+              :label="t('slos.field.goodWhen')"
+              :hint="t('slos.field.goodWhenHint')"
+              :keywords="autoCompleteKeywords"
+              :suggestions="autoCompleteSuggestions"
+              required
+              class="mt-3"
+              data-test="slos-addslo-good-expr"
+            />
+          </template>
+
+          <template v-else-if="form.sli_type === 'time_slice'">
+            <div class="mt-3 grid grid-cols-2 gap-3">
+              <OSelect
+                v-model="form.config.stream_type"
+                :label="t('slos.field.streamType')"
+                :options="streamTypeOptions"
+                :searchable="false"
+                data-test="slos-addslo-timeslice-stream-type"
+                @update:model-value="onStreamTypeChange"
+              />
+              <OSelect
+                v-model="form.config.stream"
+                :label="t('slos.field.stream')"
+                :options="streamOptions"
+                :loading="isFetchingStreams"
+                :disabled="!form.config.stream_type"
+                :placeholder="t('slos.field.streamPlaceholder')"
+                required
+                data-test="slos-addslo-timeslice-stream"
+              />
+            </div>
+            <OInput
+              v-model="form.config.query"
+              :label="t('slos.field.aggregate')"
+              :hint="t('slos.field.aggregateHint')"
+              class="mt-3"
+              required
+              placeholder="approx_percentile_cont(duration_ms, 0.95)"
+            />
+            <div class="mt-3 grid grid-cols-2 gap-3">
+              <OSelect
+                v-model="form.config.comparator"
+                :label="t('slos.field.comparator')"
+                :options="comparatorOptions"
+              />
+              <OInput
+                v-model.number="form.config.threshold"
+                :label="t('slos.field.threshold')"
+                type="number"
+              />
+            </div>
+            <SloExpressionField
+              v-model="form.config.scope"
+              editor-id="slo-timeslice-scope-editor"
+              :label="t('slos.field.scope')"
+              :keywords="autoCompleteKeywords"
+              :suggestions="autoCompleteSuggestions"
+              class="mt-3"
+              data-test="slos-addslo-timeslice-scope"
+            />
+          </template>
+
+          <OBanner v-else variant="info" class="mt-3">
+            {{ t("slos.alertSli.unavailable") }}
+          </OBanner>
+        </SloSection>
+
+        <SloSection :title="t('slos.section.objective')">
+          <div class="grid grid-cols-2 gap-3">
+            <OInput
+              v-model.number="form.target"
+              :label="t('slos.field.target')"
+              type="number"
+              step="0.001"
+              suffix="%"
+              required
+              data-test="slos-addslo-target"
+            />
+            <div class="text-compact text-text-secondary flex items-end pb-2">
+              {{ budgetHint }}
+            </div>
+          </div>
+
+          <!-- OToggleGroup renders OToggleGroupItem children; it has no
                  `options` prop. Passing one rendered an empty bar, which left
                  S-3's rolling window and S-4's slice interval unreachable. -->
-            <OToggleGroup
-              v-model="form.window_secs"
-              :label="t('slos.field.window')"
-              class="mt-3"
-              data-test="slos-addslo-window"
+          <OToggleGroup
+            v-model="form.window_secs"
+            :label="t('slos.field.window')"
+            class="mt-3"
+            data-test="slos-addslo-window"
+          >
+            <OToggleGroupItem
+              v-for="opt in windowOptions"
+              :key="opt.value"
+              :value="opt.value"
+              size="sm"
+              :data-test="`slos-addslo-window-${opt.value}`"
             >
-              <OToggleGroupItem
-                v-for="opt in windowOptions"
-                :key="opt.value"
-                :value="opt.value"
-                size="sm"
-                :data-test="`slos-addslo-window-${opt.value}`"
-              >
-                {{ opt.label }}
-              </OToggleGroupItem>
-            </OToggleGroup>
-            <OToggleGroup
-              v-model="form.slice_interval_secs"
-              :label="t('slos.field.sliceInterval')"
-              class="mt-3"
-              data-test="slos-addslo-slice"
+              {{ opt.label }}
+            </OToggleGroupItem>
+          </OToggleGroup>
+          <OToggleGroup
+            v-model="form.slice_interval_secs"
+            :label="t('slos.field.sliceInterval')"
+            class="mt-3"
+            data-test="slos-addslo-slice"
+          >
+            <OToggleGroupItem
+              v-for="opt in sliceOptions"
+              :key="opt.value"
+              :value="opt.value"
+              :disabled="opt.disable"
+              size="sm"
+              :data-test="`slos-addslo-slice-${opt.value}`"
             >
-              <OToggleGroupItem
-                v-for="opt in sliceOptions"
-                :key="opt.value"
-                :value="opt.value"
-                :disabled="opt.disable"
-                size="sm"
-                :data-test="`slos-addslo-slice-${opt.value}`"
-              >
-                {{ opt.label }}
-              </OToggleGroupItem>
-            </OToggleGroup>
-            <p v-if="isGrouped" class="text-compact text-text-secondary mt-1">
-              {{ t("slos.groupedSliceNote") }}
-            </p>
-          </SloSection>
-  
-          <SloSection :title="t('slos.section.grouping')">
-            <!-- Constraining wrapper: OTagInput's root is `h-full`. -->
-            <OSelect
-              v-model="groupByList"
-              :label="t('slos.field.groupBy')"
-              :options="streamFieldNames"
-              multiple
-              :placeholder="t('slos.field.groupByPlaceholder')"
-              data-test="slos-addslo-group-by"
-            />
+              {{ opt.label }}
+            </OToggleGroupItem>
+          </OToggleGroup>
+          <p v-if="isGrouped" class="text-compact text-text-secondary mt-1">
+            {{ t("slos.groupedSliceNote") }}
+          </p>
+        </SloSection>
+
+        <SloSection :title="t('slos.section.grouping')">
+          <!-- Constraining wrapper: OTagInput's root is `h-full`. -->
+          <OSelect
+            v-model="groupByList"
+            :label="t('slos.field.groupBy')"
+            :options="streamFieldNames"
+            multiple
+            :placeholder="t('slos.field.groupByPlaceholder')"
+            data-test="slos-addslo-group-by"
+          />
           <OInput
             v-if="isGrouped"
             v-model.number="form.groups_estimate"
@@ -344,35 +338,35 @@
           :good-expr="form.config.good_expr"
         />
 
-      <!-- Summary. Mirrors the backend's own arithmetic so a budget rejection
+        <!-- Summary. Mirrors the backend's own arithmetic so a budget rejection
            at save time is never the first time a user sees the numbers. -->
-      <SloSection :title="t('slos.section.summary')" class="h-fit">
-        <dl class="grid grid-cols-[8rem_1fr] gap-y-2 text-compact">
-          <dt class="text-text-secondary">{{ t("slos.field.sliType") }}</dt>
-          <dd>{{ sliTypeLabel(form.sli_type) }}</dd>
+        <SloSection :title="t('slos.section.summary')" class="h-fit">
+          <dl class="text-compact grid grid-cols-[8rem_1fr] gap-y-2">
+            <dt class="text-text-secondary">{{ t("slos.field.sliType") }}</dt>
+            <dd>{{ sliTypeLabel(form.sli_type) }}</dd>
 
-          <dt class="text-text-secondary">{{ t("slos.field.target") }}</dt>
-          <dd>{{ formatTarget(form.target || 0) }}</dd>
+            <dt class="text-text-secondary">{{ t("slos.field.target") }}</dt>
+            <dd>{{ formatTarget(form.target || 0) }}</dd>
 
-          <dt class="text-text-secondary">{{ t("slos.field.window") }}</dt>
-          <dd>{{ formatWindow(form.window_secs) }} {{ t("slos.rolling") }}</dd>
+            <dt class="text-text-secondary">{{ t("slos.field.window") }}</dt>
+            <dd>{{ formatWindow(form.window_secs) }} {{ t("slos.rolling") }}</dd>
 
-          <dt class="text-text-secondary">{{ t("slos.field.errorBudget") }}</dt>
-          <dd>{{ budgetDuration }}</dd>
+            <dt class="text-text-secondary">{{ t("slos.field.errorBudget") }}</dt>
+            <dd>{{ budgetDuration }}</dd>
 
-          <dt class="text-text-secondary">{{ t("slos.field.maxBurnRate") }}</dt>
-          <dd>×{{ maxBurn }}</dd>
+            <dt class="text-text-secondary">{{ t("slos.field.maxBurnRate") }}</dt>
+            <dd>×{{ maxBurn }}</dd>
 
-          <dt class="text-text-secondary">{{ t("slos.field.groupBy") }}</dt>
-          <dd>{{ isGrouped ? groupByList.join(", ") : t("slos.noGrouping") }}</dd>
+            <dt class="text-text-secondary">{{ t("slos.field.groupBy") }}</dt>
+            <dd>{{ isGrouped ? groupByList.join(", ") : t("slos.noGrouping") }}</dd>
 
-          <dt class="text-text-secondary">{{ t("slos.field.reservation") }}</dt>
-          <dd>{{ reservationLabel }}</dd>
-        </dl>
+            <dt class="text-text-secondary">{{ t("slos.field.reservation") }}</dt>
+            <dd>{{ reservationLabel }}</dd>
+          </dl>
 
-        <OBanner variant="info" class="mt-3">
-          {{ t("slos.backfillNote") }}
-        </OBanner>
+          <OBanner variant="info" class="mt-3">
+            {{ t("slos.backfillNote") }}
+          </OBanner>
         </SloSection>
       </div>
     </div>
@@ -520,8 +514,7 @@ const streamFieldNames = computed(() => streamFields.value.map((f) => f.value));
 // builds the field list (dropping the timestamp column) and merges it with
 // the SQL keyword and function sets. Nothing about autocomplete is
 // reimplemented here.
-const { autoCompleteKeywords, autoCompleteSuggestions, updateFieldKeywords } =
-  useSqlSuggestions();
+const { autoCompleteKeywords, autoCompleteSuggestions, updateFieldKeywords } = useSqlSuggestions();
 
 async function loadStreamFields(streamName: string) {
   if (!streamName || !form.config.stream_type) {
@@ -646,8 +639,7 @@ async function load() {
   const body = res.data ?? {};
   // Unwrap the adjacent tagging back into the flat model the form edits.
   const cfg = body.config ?? {};
-  const flat =
-    body.sli_type === "count" ? (cfg.source?.query ?? cfg.source ?? {}) : cfg;
+  const flat = body.sli_type === "count" ? (cfg.source?.query ?? cfg.source ?? {}) : cfg;
   Object.assign(form, {
     name: body.name,
     description: body.description ?? "",

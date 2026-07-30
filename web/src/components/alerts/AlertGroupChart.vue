@@ -38,7 +38,7 @@
 <template>
   <div class="flex flex-col gap-2" data-test="alerts-alertgroupchart">
     <div class="flex items-center justify-between gap-2">
-      <span class="text-compact font-bold text-text-heading">
+      <span class="text-compact text-text-heading font-bold">
         {{ t("alerts.groups.evaluation") }}
       </span>
       <OToggleGroup
@@ -73,7 +73,7 @@
         class="flex h-full items-center justify-center"
         data-test="alerts-alertgroupchart-empty"
       >
-        <span class="text-sm text-text-secondary">
+        <span class="text-text-secondary text-sm">
           {{ t("alerts.groups.chartUnavailable") }}
         </span>
       </div>
@@ -121,9 +121,7 @@ const RANGE_MS: Record<string, number> = {
   "24h": 24 * 60 * 60 * 1000,
 };
 
-const queryCondition = computed(
-  () => props.alert?.query_condition || props.alert?.condition,
-);
+const queryCondition = computed(() => props.alert?.query_condition || props.alert?.condition);
 const aggregation = computed(() => queryCondition.value?.aggregation);
 
 const onRangeChange = (value: unknown) => {
@@ -208,11 +206,8 @@ const build = async () => {
   // series needs the whole combination as its name. Left as separate columns
   // the renderer labels a line by just one of them, and two groups sharing
   // that column become indistinguishable.
-  const groupCols: string[] = (agg?.group_by || []).filter(
-    (f: string) => f && f.trim() !== "",
-  );
-  const composite =
-    groupCols.length > 1 ? withCompositeGroupLabel(chartQuery, groupCols) : null;
+  const groupCols: string[] = (agg?.group_by || []).filter((f: string) => f && f.trim() !== "");
+  const composite = groupCols.length > 1 ? withCompositeGroupLabel(chartQuery, groupCols) : null;
   if (composite) chartQuery = composite;
 
   const panel: any = cloneDeep(getDefaultDashboardPanelData());

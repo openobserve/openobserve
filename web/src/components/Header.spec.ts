@@ -188,8 +188,7 @@ describe("Header Component", () => {
     it("should display OpenObserve logo by default", async () => {
       const logoWrapper = createWrapper({
         mountType: "mount",
-        stubsOverrides: {
-        },
+        stubsOverrides: {},
       });
 
       await logoWrapper.vm.$nextTick();
@@ -214,8 +213,7 @@ describe("Header Component", () => {
         configOverrides: {
           isEnterprise: "true",
         },
-        stubsOverrides: {
-        },
+        stubsOverrides: {},
       });
 
       // Wait for component to render
@@ -245,8 +243,7 @@ describe("Header Component", () => {
             theme: "dark",
           },
         },
-        stubsOverrides: {
-        },
+        stubsOverrides: {},
       });
 
       await darkWrapper.vm.$nextTick();
@@ -276,8 +273,7 @@ describe("Header Component", () => {
         configOverrides: {
           isEnterprise: "true",
         },
-        stubsOverrides: {
-        },
+        stubsOverrides: {},
       });
 
       await customWrapper.vm.$nextTick();
@@ -307,8 +303,7 @@ describe("Header Component", () => {
         configOverrides: {
           isEnterprise: "true",
         },
-        stubsOverrides: {
-        },
+        stubsOverrides: {},
       });
 
       await customWrapper.vm.$nextTick();
@@ -336,8 +331,7 @@ describe("Header Component", () => {
             },
           },
         },
-        stubsOverrides: {
-        },
+        stubsOverrides: {},
       });
 
       await quotaWrapper.vm.$nextTick();
@@ -368,8 +362,7 @@ describe("Header Component", () => {
         configOverrides: {
           isEnterprise: "true",
         },
-        stubsOverrides: {
-        },
+        stubsOverrides: {},
       });
 
       await quotaWrapper.vm.$nextTick();
@@ -422,8 +415,7 @@ describe("Header Component", () => {
         configOverrides: {
           isEnterprise: "true",
         },
-        stubsOverrides: {
-        },
+        stubsOverrides: {},
       });
 
       await quotaWrapper.vm.$nextTick();
@@ -450,8 +442,7 @@ describe("Header Component", () => {
         configOverrides: {
           isEnterprise: "true",
         },
-        stubsOverrides: {
-        },
+        stubsOverrides: {},
       });
 
       await aiWrapper.vm.$nextTick();
@@ -476,8 +467,7 @@ describe("Header Component", () => {
         configOverrides: {
           isEnterprise: "false",
         },
-        stubsOverrides: {
-        },
+        stubsOverrides: {},
       });
 
       await aiWrapper.vm.$nextTick();
@@ -502,8 +492,7 @@ describe("Header Component", () => {
         configOverrides: {
           isEnterprise: "true",
         },
-        stubsOverrides: {
-        },
+        stubsOverrides: {},
       });
 
       await aiWrapper.vm.$nextTick();
@@ -529,8 +518,7 @@ describe("Header Component", () => {
         configOverrides: {
           isEnterprise: "true",
         },
-        stubsOverrides: {
-        },
+        stubsOverrides: {},
       });
 
       await aiWrapper.vm.$nextTick();
@@ -557,8 +545,7 @@ describe("Header Component", () => {
         configOverrides: {
           isEnterprise: "true",
         },
-        stubsOverrides: {
-        },
+        stubsOverrides: {},
       });
 
       await aiWrapper.vm.$nextTick();
@@ -584,8 +571,7 @@ describe("Header Component", () => {
         configOverrides: {
           isEnterprise: "true",
         },
-        stubsOverrides: {
-        },
+        stubsOverrides: {},
       });
 
       await aiWrapper.vm.$nextTick();
@@ -616,8 +602,7 @@ describe("Header Component", () => {
         configOverrides: {
           isEnterprise: "true",
         },
-        stubsOverrides: {
-        },
+        stubsOverrides: {},
       });
 
       await aiWrapper.vm.$nextTick();
@@ -648,8 +633,7 @@ describe("Header Component", () => {
         configOverrides: {
           isEnterprise: "true",
         },
-        stubsOverrides: {
-        },
+        stubsOverrides: {},
       });
 
       await aiWrapper.vm.$nextTick();
@@ -872,8 +856,7 @@ describe("Header Component", () => {
       // The test now verifies the OTooltip is co-located with the profile btn.
       const tooltipWrapper = createWrapper({
         mountType: "mount",
-        stubsOverrides: {
-        },
+        stubsOverrides: {},
       });
 
       const profileBtn = tooltipWrapper.find('[data-test="header-my-account-profile-icon"]');
@@ -1001,8 +984,7 @@ describe("Header Component", () => {
     it("should render with light theme logo", async () => {
       const lightWrapper = createWrapper({
         mountType: "mount",
-        stubsOverrides: {
-        },
+        stubsOverrides: {},
       });
 
       await lightWrapper.vm.$nextTick();
@@ -1025,8 +1007,7 @@ describe("Header Component", () => {
             theme: "dark",
           },
         },
-        stubsOverrides: {
-        },
+        stubsOverrides: {},
       });
 
       await darkWrapper.vm.$nextTick();
@@ -1126,8 +1107,7 @@ describe("Header Component", () => {
             },
           },
         },
-        stubsOverrides: {
-        },
+        stubsOverrides: {},
       });
 
       const html = wrapper.html();
@@ -1192,8 +1172,7 @@ describe("Header Component", () => {
         configOverrides: {
           isEnterprise: "true",
         },
-        stubsOverrides: {
-        },
+        stubsOverrides: {},
       });
 
       await customWrapper.vm.$nextTick();

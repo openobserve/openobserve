@@ -202,7 +202,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             {{ warningThresholdError }}
                           </div>
                         </div>
-                        <div class="flex items-center gap-1 h-8.5">
+                        <div class="flex h-8.5 items-center gap-1">
                           <OFormCheckbox
                             name="trigger_condition.notify_on_warning"
                             :label="t('alerts.notifyOnWarning')"
@@ -300,7 +300,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             {{ aggregationWarningError }}
                           </div>
                         </div>
-                        <div class="flex items-center gap-1 h-8.5">
+                        <div class="flex h-8.5 items-center gap-1">
                           <OFormCheckbox
                             name="trigger_condition.notify_on_warning"
                             :label="t('alerts.notifyOnWarning')"
@@ -395,11 +395,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                      fires on any breaching group, so a group-count rule has no
                      meaning there and M-10 rejects it at save time. -->
                 <div
-                  v-if="
-                    selectedFunction !== 'total_events' &&
-                    hasLogGroupByFields &&
-                    !isMultiAlert
-                  "
+                  v-if="selectedFunction !== 'total_events' && hasLogGroupByFields && !isMultiAlert"
                   class="rounded-default text-compact flex items-start gap-3 px-3 py-2"
                   data-test="alert-having-groups-row"
                 >
@@ -586,7 +582,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             {{ warningThresholdError }}
                           </div>
                         </div>
-                        <div class="flex items-center gap-1 h-8.5">
+                        <div class="flex h-8.5 items-center gap-1">
                           <OFormCheckbox
                             name="trigger_condition.notify_on_warning"
                             :label="t('alerts.notifyOnWarning')"
@@ -683,7 +679,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             {{ aggregationWarningError }}
                           </div>
                         </div>
-                        <div class="flex items-center gap-1 h-8.5">
+                        <div class="flex h-8.5 items-center gap-1">
                           <OFormCheckbox
                             name="trigger_condition.notify_on_warning"
                             :label="t('alerts.notifyOnWarning')"
@@ -775,9 +771,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                      branch above for why. -->
                 <div
                   v-if="
-                    selectedFunction !== 'total_events' &&
-                    hasMetricGroupByFields &&
-                    !isMultiAlert
+                    selectedFunction !== 'total_events' && hasMetricGroupByFields && !isMultiAlert
                   "
                   class="rounded-default text-compact flex items-start gap-3 px-3 py-2"
                 >
@@ -1403,7 +1397,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         {{ warningThresholdError }}
                       </div>
                     </div>
-                    <div class="flex items-center gap-1 h-8.5">
+                    <div class="flex h-8.5 items-center gap-1">
                       <OFormCheckbox
                         name="trigger_condition.notify_on_warning"
                         :label="t('alerts.notifyOnWarning')"
@@ -1517,7 +1511,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           {{ promqlWarningError }}
                         </div>
                       </div>
-                      <div class="flex items-center gap-1 h-8.5">
+                      <div class="flex h-8.5 items-center gap-1">
                         <OFormCheckbox
                           name="trigger_condition.notify_on_warning"
                           :label="t('alerts.notifyOnWarning')"
@@ -2371,12 +2365,8 @@ export default defineComponent({
     const showCountWarningRow = ref(false);
     const showAggWarningRow = ref(false);
     const showPromqlWarningRow = ref(false);
-    const countWarningVisible = computed(
-      () => showCountWarningRow.value || countWarningSet.value,
-    );
-    const aggWarningVisible = computed(
-      () => showAggWarningRow.value || aggWarningSet.value,
-    );
+    const countWarningVisible = computed(() => showCountWarningRow.value || countWarningSet.value);
+    const aggWarningVisible = computed(() => showAggWarningRow.value || aggWarningSet.value);
     const promqlWarningVisible = computed(
       () => showPromqlWarningRow.value || promqlWarningSet.value,
     );
@@ -2515,7 +2505,6 @@ export default defineComponent({
       },
       { immediate: true },
     );
-
 
     // name="trigger_condition.operator" owns the value, but it is NOT written yet
     // when this runs — field.handleChange commits after us — so the new operator

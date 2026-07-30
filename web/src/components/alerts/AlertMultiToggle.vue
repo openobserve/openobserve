@@ -55,7 +55,7 @@
           @update:model-value="emit('change', $event)"
         />
       </div>
-      <p class="text-xs text-text-secondary">
+      <p class="text-text-secondary text-xs">
         {{ enabled ? t(onDescriptionKey) : t("alerts.multiAlert.simpleDescription") }}
       </p>
     </div>

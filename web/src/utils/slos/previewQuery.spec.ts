@@ -14,11 +14,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import {
-  FIELD_TOKEN_REGEX,
-  buildSloPreviewQuery,
-  replaceTrailingFieldToken,
-} from "./previewQuery";
+import { FIELD_TOKEN_REGEX, buildSloPreviewQuery, replaceTrailingFieldToken } from "./previewQuery";
 
 describe("buildSloPreviewQuery", () => {
   it("counts matching rows for the good series", () => {

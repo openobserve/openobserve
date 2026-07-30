@@ -106,8 +106,7 @@ const functionOptions = [
 const mountComponent = (propsOverrides = {}) =>
   mount(TransformSelector, {
     global: {
-      stubs: {
-      },
+      stubs: {},
     },
     props: {
       functionOptions,

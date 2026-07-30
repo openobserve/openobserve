@@ -31,10 +31,7 @@
  *   highest percentile as its own sample — the p99 is the one people alert on.
  */
 
-import {
-  computeRateWindow,
-  getMetricDefaults,
-} from "@/utils/metrics/metricDefaults";
+import { computeRateWindow, getMetricDefaults } from "@/utils/metrics/metricDefaults";
 
 export interface PromqlSample {
   id: string;

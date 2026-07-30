@@ -30,13 +30,7 @@
  */
 
 /** Canonical outcomes the backend can send. */
-export type RunOutcome =
-  | "firing"
-  | "normal"
-  | "succeeded"
-  | "error"
-  | "notify_failed"
-  | "skipped";
+export type RunOutcome = "firing" | "normal" | "succeeded" | "error" | "notify_failed" | "skipped";
 
 /**
  * Coarse bucket used for colouring and counting.
@@ -148,13 +142,17 @@ const LEVEL_RANK: Record<AlertLevel, number> = {
 };
 
 export function levelRank(level: unknown): number {
-  const v = String(level ?? "").trim().toLowerCase();
+  const v = String(level ?? "")
+    .trim()
+    .toLowerCase();
   return LEVEL_RANK[v as AlertLevel] ?? -1;
 }
 
 /** Levels that mean the alert is currently triggered. */
 export function isFiringLevel(level: unknown): boolean {
-  const v = String(level ?? "").trim().toLowerCase();
+  const v = String(level ?? "")
+    .trim()
+    .toLowerCase();
   return v === "warning" || v === "critical";
 }
 
@@ -162,7 +160,9 @@ export function isFiringLevel(level: unknown): boolean {
 export function mostSevereLevel(levels: unknown[]): AlertLevel | null {
   let best: AlertLevel | null = null;
   for (const l of levels) {
-    const v = String(l ?? "").trim().toLowerCase() as AlertLevel;
+    const v = String(l ?? "")
+      .trim()
+      .toLowerCase() as AlertLevel;
     if (!(v in LEVEL_RANK)) continue;
     if (best === null || LEVEL_RANK[v] > LEVEL_RANK[best]) best = v;
   }
@@ -205,11 +205,7 @@ export function conditionSummary(row: {
   // the backend flags it and the value renders as a lower bound, not exact.
   const prefix = row.value_is_lower_bound === true ? "≥" : "";
   const parts = [prefix + fmt(row.actual_value)];
-  if (
-    row.threshold_value !== undefined &&
-    row.threshold_value !== null &&
-    row.threshold_operator
-  ) {
+  if (row.threshold_value !== undefined && row.threshold_value !== null && row.threshold_operator) {
     parts.push(String(row.threshold_operator), fmt(row.threshold_value));
   }
   return parts.join(" ");
@@ -217,7 +213,11 @@ export function conditionSummary(row: {
 
 /** Human label for a level. */
 export function levelLabel(level: unknown): string {
-  switch (String(level ?? "").trim().toLowerCase()) {
+  switch (
+    String(level ?? "")
+      .trim()
+      .toLowerCase()
+  ) {
     case "critical":
       return "Critical";
     case "warning":

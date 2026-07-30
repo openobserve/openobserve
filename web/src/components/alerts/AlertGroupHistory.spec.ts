@@ -25,9 +25,7 @@ import type { AlertGroupTransition } from "@/ts/interfaces/alert";
 // Factories
 // ---------------------------------------------------------------------------
 
-function makeTransition(
-  overrides: Partial<AlertGroupTransition> = {},
-): AlertGroupTransition {
+function makeTransition(overrides: Partial<AlertGroupTransition> = {}): AlertGroupTransition {
   return {
     group_key: "host=web-1",
     group_labels: "host=web-1",
@@ -42,9 +40,7 @@ function makeTransition(
 }
 
 /** The rollup row — the only history a simple (non-multi) alert has. */
-function makeRollupTransition(
-  overrides: Partial<AlertGroupTransition> = {},
-): AlertGroupTransition {
+function makeRollupTransition(overrides: Partial<AlertGroupTransition> = {}): AlertGroupTransition {
   return makeTransition({
     group_key: "",
     group_labels: "",
@@ -78,21 +74,15 @@ describe("AlertGroupHistory", () => {
   describe("multi-alert mode (default, show-group-column omitted)", () => {
     it("renders the transitions table with the group column", () => {
       wrapper = mountComp();
-      expect(
-        wrapper.find('[data-test="alerts-alertgrouphistory-table"]').exists(),
-      ).toBe(true);
-      expect(wrapper.find('[data-test="o2-table-th-group"]').exists()).toBe(
-        true,
-      );
+      expect(wrapper.find('[data-test="alerts-alertgrouphistory-table"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="o2-table-th-group"]').exists()).toBe(true);
       expect(wrapper.text()).toContain("host=web-1");
     });
 
     it("keeps every column of the original layout", () => {
       wrapper = mountComp();
       for (const id of ["at", "group", "change", "to_outcome", "value"]) {
-        expect(wrapper.find(`[data-test="o2-table-th-${id}"]`).exists()).toBe(
-          true,
-        );
+        expect(wrapper.find(`[data-test="o2-table-th-${id}"]`).exists()).toBe(true);
       }
     });
 
@@ -100,12 +90,8 @@ describe("AlertGroupHistory", () => {
       wrapper = mountComp({
         groupFilter: { group_key: "host=web-1", group_labels: "host=web-1" },
       });
-      expect(
-        wrapper.find('[data-test="alerts-alertgrouphistory-filter"]').exists(),
-      ).toBe(true);
-      await wrapper
-        .find('[data-test="alerts-alertgrouphistory-clear-filter"]')
-        .trigger("click");
+      expect(wrapper.find('[data-test="alerts-alertgrouphistory-filter"]').exists()).toBe(true);
+      await wrapper.find('[data-test="alerts-alertgrouphistory-clear-filter"]').trigger("click");
       expect(wrapper.emitted("clear-filter")).toHaveLength(1);
     });
 
@@ -121,17 +107,11 @@ describe("AlertGroupHistory", () => {
         transitions: [makeRollupTransition()],
         showGroupColumn: false,
       });
-      expect(
-        wrapper.find('[data-test="alerts-alertgrouphistory-table"]').exists(),
-      ).toBe(true);
-      expect(wrapper.find('[data-test="o2-table-th-group"]').exists()).toBe(
-        false,
-      );
+      expect(wrapper.find('[data-test="alerts-alertgrouphistory-table"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="o2-table-th-group"]').exists()).toBe(false);
       // The remaining columns are all still there.
       for (const id of ["at", "change", "to_outcome", "value"]) {
-        expect(wrapper.find(`[data-test="o2-table-th-${id}"]`).exists()).toBe(
-          true,
-        );
+        expect(wrapper.find(`[data-test="o2-table-th-${id}"]`).exists()).toBe(true);
       }
     });
 
@@ -151,18 +131,14 @@ describe("AlertGroupHistory", () => {
         transitions: [makeRollupTransition()],
         showGroupColumn: false,
       });
-      expect(
-        wrapper.find('[data-test="alerts-alertgrouphistory-filter"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="alerts-alertgrouphistory-filter"]').exists()).toBe(false);
     });
   });
 
   describe("empty state", () => {
     it("shows the empty state when there are no transitions", () => {
       wrapper = mountComp({ transitions: [], showGroupColumn: false });
-      expect(
-        wrapper.find('[data-test="alerts-alertgrouphistory-empty"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="alerts-alertgrouphistory-empty"]').exists()).toBe(true);
     });
 
     it("suppresses the empty state while loading", () => {
@@ -171,18 +147,14 @@ describe("AlertGroupHistory", () => {
         loading: true,
         showGroupColumn: false,
       });
-      expect(
-        wrapper.find('[data-test="alerts-alertgrouphistory-empty"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="alerts-alertgrouphistory-empty"]').exists()).toBe(false);
     });
   });
 
   describe("refresh", () => {
     it("emits refresh when the refresh button is clicked", async () => {
       wrapper = mountComp();
-      await wrapper
-        .find('[data-test="alerts-alertgrouphistory-refresh"]')
-        .trigger("click");
+      await wrapper.find('[data-test="alerts-alertgrouphistory-refresh"]').trigger("click");
       expect(wrapper.emitted("refresh")).toHaveLength(1);
     });
   });

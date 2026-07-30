@@ -56,18 +56,18 @@
 
     <template v-if="model.kind === 'burn_rate'">
       <div>
-        <div class="flex items-center justify-between mb-2">
+        <div class="mb-2 flex items-center justify-between">
           <span class="font-medium">{{ t("slos.alert.suggested") }}</span>
           <span class="text-compact text-text-secondary">
             {{ t("slos.alert.suggestedFor", { window: windowLabel }) }}
           </span>
         </div>
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+        <div class="grid grid-cols-1 gap-2 sm:grid-cols-3">
           <button
             v-for="p in presets"
             :key="p.key"
             type="button"
-            class="text-left rounded-default border p-3 hover:border-primary transition-colors"
+            class="rounded-default hover:border-primary border p-3 text-left transition-colors"
             :class="isActivePreset(p) ? 'border-primary bg-primary/5' : 'border-border'"
             :data-test="`slos-sloalertcondition-preset-${p.key}`"
             @click="applyPreset(p)"
@@ -75,7 +75,13 @@
             <div class="text-compact text-text-secondary">{{ p.label }}</div>
             <div class="text-lg font-semibold tabular-nums">×{{ p.threshold }}</div>
             <div class="text-compact text-text-secondary">
-              {{ t("slos.alert.presetDetail", { long: p.longLabel, short: p.shortLabel, budget: p.budgetPct }) }}
+              {{
+                t("slos.alert.presetDetail", {
+                  long: p.longLabel,
+                  short: p.shortLabel,
+                  budget: p.budgetPct,
+                })
+              }}
             </div>
           </button>
         </div>
@@ -86,7 +92,7 @@
 
       <div class="grid grid-cols-[7rem_1fr] items-center gap-3">
         <span class="text-negative font-medium">{{ t("slos.alert.criticalIf") }}</span>
-        <div class="flex items-center gap-2 flex-wrap">
+        <div class="flex flex-wrap items-center gap-2">
           <span>{{ t("slos.alert.burnRate") }}</span>
           <OSelect v-model="model.operator" :options="operatorOptions" class="w-20" />
           <OInput v-model.number="model.critical" type="number" step="0.1" class="w-28" />
@@ -203,9 +209,7 @@ const slos = ref<Slo[]>([]);
 
 const org = computed(() => store.state.selectedOrganization?.identifier);
 
-const sloOptions = computed(() =>
-  slos.value.map((s) => ({ value: s.id, label: s.name })),
-);
+const sloOptions = computed(() => slos.value.map((s) => ({ value: s.id, label: s.name })));
 
 const selectedSlo = computed(() => slos.value.find((s) => s.id === model.value.slo_id) || null);
 

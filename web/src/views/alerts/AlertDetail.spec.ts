@@ -74,9 +74,7 @@ function makeMultiAlert() {
   };
 }
 
-function makeRollupTransition(
-  overrides: Partial<AlertGroupTransition> = {},
-): AlertGroupTransition {
+function makeRollupTransition(overrides: Partial<AlertGroupTransition> = {}): AlertGroupTransition {
   return {
     group_key: "",
     group_labels: "",
@@ -90,9 +88,7 @@ function makeRollupTransition(
   };
 }
 
-function makeGroupTransition(
-  overrides: Partial<AlertGroupTransition> = {},
-): AlertGroupTransition {
+function makeGroupTransition(overrides: Partial<AlertGroupTransition> = {}): AlertGroupTransition {
   return makeRollupTransition({
     group_key: "host=web-1",
     group_labels: "host=web-1",
@@ -121,10 +117,7 @@ async function mountView({
   alert = makeSimpleAlert(),
   transitions = [] as AlertGroupTransition[],
   evaluations = [] as any[],
-  groupsResponse = { list: [], capped: false, group_cap: 100 } as Record<
-    string,
-    any
-  >,
+  groupsResponse = { list: [], capped: false, group_cap: 100 } as Record<string, any>,
 } = {}) {
   vi.mocked(alertsService.get_by_alert_id).mockResolvedValue({
     data: alert,
@@ -174,9 +167,7 @@ describe("AlertDetail — History tab", () => {
 
   /** Flip the simple-alert History tab from Evaluations to Level changes. */
   async function switchToLevelChanges(w: VueWrapper) {
-    await w
-      .find('[data-test="alerts-alertdetail-history-view-transitions"]')
-      .trigger("click");
+    await w.find('[data-test="alerts-alertdetail-history-view-transitions"]').trigger("click");
     await flushPromises();
     await new Promise((resolve) => setTimeout(resolve, 75));
     await flushPromises();
@@ -188,19 +179,9 @@ describe("AlertDetail — History tab", () => {
         evaluations: [makeEvaluation()],
         transitions: [makeRollupTransition()],
       });
-      expect(
-        wrapper
-          .find('[data-test="alerts-alertdetail-history-view"]')
-          .exists(),
-      ).toBe(true);
-      expect(
-        wrapper
-          .find('[data-test="alerts-alertevaluationhistory-table"]')
-          .exists(),
-      ).toBe(true);
-      expect(wrapper.text()).not.toContain(
-        "Per-group history is available for multi-alerts only",
-      );
+      expect(wrapper.find('[data-test="alerts-alertdetail-history-view"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="alerts-alertevaluationhistory-table"]').exists()).toBe(true);
+      expect(wrapper.text()).not.toContain("Per-group history is available for multi-alerts only");
       // The evaluation's value context is on the page.
       expect(wrapper.text()).toContain("92.5 >= 80");
       expect(alertsService.getHistory).toHaveBeenCalledWith(
@@ -211,11 +192,7 @@ describe("AlertDetail — History tab", () => {
 
     it("shows the evaluations empty state when no runs are in the window", async () => {
       wrapper = await mountView({ evaluations: [] });
-      expect(
-        wrapper
-          .find('[data-test="alerts-alertevaluationhistory-empty"]')
-          .exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="alerts-alertevaluationhistory-empty"]').exists()).toBe(true);
     });
 
     it("Level changes view shows rollup transitions without the group column", async () => {
@@ -223,18 +200,12 @@ describe("AlertDetail — History tab", () => {
         transitions: [makeRollupTransition()],
       });
       await switchToLevelChanges(wrapper);
-      expect(
-        wrapper.find('[data-test="alerts-alertgrouphistory-table"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="alerts-alertgrouphistory-table"]').exists()).toBe(true);
       // The rollup transition's value is on the page.
       expect(wrapper.text()).toContain("1234.5");
-      expect(wrapper.find('[data-test="o2-table-th-group"]').exists()).toBe(
-        false,
-      );
+      expect(wrapper.find('[data-test="o2-table-th-group"]').exists()).toBe(false);
       expect(wrapper.find('[data-test="o2-table-th-at"]').exists()).toBe(true);
-      expect(
-        wrapper.find('[data-test="alerts-alertgrouphistory-filter"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="alerts-alertgrouphistory-filter"]').exists()).toBe(false);
     });
 
     it("Level changes keeps only rollup rows, hiding stale per-group leftovers", async () => {
@@ -250,9 +221,7 @@ describe("AlertDetail — History tab", () => {
     it("Level changes shows the normal empty state when the rollup has no transitions yet", async () => {
       wrapper = await mountView({ transitions: [] });
       await switchToLevelChanges(wrapper);
-      expect(
-        wrapper.find('[data-test="alerts-alertgrouphistory-empty"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="alerts-alertgrouphistory-empty"]').exists()).toBe(true);
     });
 
     it("Level changes shows the empty state when only stale per-group rows exist", async () => {
@@ -260,9 +229,7 @@ describe("AlertDetail — History tab", () => {
         transitions: [makeGroupTransition()],
       });
       await switchToLevelChanges(wrapper);
-      expect(
-        wrapper.find('[data-test="alerts-alertgrouphistory-empty"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="alerts-alertgrouphistory-empty"]').exists()).toBe(true);
     });
 
     it("has no groups tab and never fetches groups", async () => {
@@ -278,10 +245,7 @@ describe("AlertDetail — History tab", () => {
     it("defaults to the groups tab and fetches groups", async () => {
       wrapper = await mountView({ alert: makeMultiAlert() });
       expect(wrapper.find('[data-otab-name="groups"]').exists()).toBe(true);
-      expect(alertsService.list_groups).toHaveBeenCalledWith(
-        "default",
-        "alert-1",
-      );
+      expect(alertsService.list_groups).toHaveBeenCalledWith("default", "alert-1");
     });
 
     it("keeps the group column and shows every group's transitions", async () => {
@@ -296,20 +260,14 @@ describe("AlertDetail — History tab", () => {
       await historyTab.trigger("click");
       await flushPromises();
 
-      expect(wrapper.find('[data-test="o2-table-th-group"]').exists()).toBe(
-        true,
-      );
+      expect(wrapper.find('[data-test="o2-table-th-group"]').exists()).toBe(true);
       // Unfiltered: the per-group row AND the rollup row both render.
       expect(wrapper.text()).toContain("host=web-1");
       expect(wrapper.text()).toContain("6789.1");
       expect(wrapper.text()).toContain("1234.5");
       // No Evaluations/Level-changes toggle and no per-evaluation fetch —
       // the multi-alert history view is exactly what it was.
-      expect(
-        wrapper
-          .find('[data-test="alerts-alertdetail-history-view"]')
-          .exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="alerts-alertdetail-history-view"]').exists()).toBe(false);
       expect(alertsService.getHistory).not.toHaveBeenCalled();
     });
 
@@ -324,9 +282,7 @@ describe("AlertDetail — History tab", () => {
           groups_observed: 12,
         },
       });
-      const badge = wrapper.find(
-        '[data-test="alerts-alertdetail-tab-groups-count"]',
-      );
+      const badge = wrapper.find('[data-test="alerts-alertdetail-tab-groups-count"]');
       expect(badge.exists()).toBe(true);
       expect(badge.text()).toBe("3");
     });
@@ -342,11 +298,7 @@ describe("AlertDetail — History tab", () => {
           groups_firing_is_lower_bound: true,
         },
       });
-      expect(
-        wrapper
-          .find('[data-test="alerts-alertdetail-tab-groups-count"]')
-          .text(),
-      ).toBe("≥5");
+      expect(wrapper.find('[data-test="alerts-alertdetail-tab-groups-count"]').text()).toBe("≥5");
     });
 
     it("shows no badge when nothing is firing — zero is calm", async () => {
@@ -361,11 +313,9 @@ describe("AlertDetail — History tab", () => {
         },
       });
       expect(wrapper.find('[data-otab-name="groups"]').exists()).toBe(true);
-      expect(
-        wrapper
-          .find('[data-test="alerts-alertdetail-tab-groups-count"]')
-          .exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="alerts-alertdetail-tab-groups-count"]').exists()).toBe(
+        false,
+      );
     });
   });
 
@@ -380,8 +330,7 @@ describe("AlertDetail — History tab", () => {
       const chart = wrapper.find("alert-group-chart-stub");
       expect(chart.exists()).toBe(true);
       expect(
-        chart.element.compareDocumentPosition(tabs.element) &
-          Node.DOCUMENT_POSITION_FOLLOWING,
+        chart.element.compareDocumentPosition(tabs.element) & Node.DOCUMENT_POSITION_FOLLOWING,
       ).toBeTruthy();
     });
   });

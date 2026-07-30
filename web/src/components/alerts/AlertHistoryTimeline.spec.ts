@@ -75,7 +75,12 @@ describe("AlertHistoryTimeline — error bucket", () => {
 
   it("allows the error label to be overridden alongside firing/ok", () => {
     const text = mount(AlertHistoryTimeline, {
-      props: { history: withError, firingLabel: "Failed", okLabel: "Success", errorLabel: "Broken" },
+      props: {
+        history: withError,
+        firingLabel: "Failed",
+        okLabel: "Success",
+        errorLabel: "Broken",
+      },
     }).text();
     expect(text).toContain("1 Broken");
     expect(text).not.toContain("Error");

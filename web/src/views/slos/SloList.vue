@@ -90,10 +90,7 @@
           >
             {{ t("slos.moveSelected", { count: selectedIds.length }) }}
           </OButton>
-          <OToggleGroup
-            v-model="typeFilter"
-            data-test="slos-slolist-type-filter"
-          >
+          <OToggleGroup v-model="typeFilter" data-test="slos-slolist-type-filter">
             <OToggleGroupItem
               v-for="opt in typeOptions"
               :key="opt.value"
@@ -157,12 +154,8 @@
 
       <template #cell-budget="{ row }">
         <div v-if="hasBudget(row)" class="flex items-center gap-2">
-          <OProgressBar
-            :value="budgetBarValue(row)"
-            :tone="budgetTone(row)"
-            class="w-20"
-          />
-          <span class="tabular-nums font-semibold" :class="budgetTextClass(row)">
+          <OProgressBar :value="budgetBarValue(row)" :tone="budgetTone(row)" class="w-20" />
+          <span class="font-semibold tabular-nums" :class="budgetTextClass(row)">
             {{ formatBudget(row.status.error_budget_remaining) }}
           </span>
         </div>
@@ -181,10 +174,7 @@
       </template>
 
       <template #cell-coverage="{ row }">
-        <span
-          class="tabular-nums"
-          :class="isLowCoverage(row) ? 'text-warning font-semibold' : ''"
-        >
+        <span class="tabular-nums" :class="isLowCoverage(row) ? 'text-warning font-semibold' : ''">
           {{ formatCoverage(row.status?.coverage) }}
         </span>
       </template>
@@ -394,7 +384,13 @@ const typeOptions = computed(() => [
 const columns = computed<OTableColumnDef<SloListItem>[]>(() => [
   { id: "name", header: t("slos.column.name"), accessor: (r) => r.name, sortable: true, size: 260 },
   { id: "health", header: t("slos.column.status"), accessor: (r) => health(r), size: 130 },
-  { id: "sli", header: t("slos.column.statusVsTarget"), accessor: (r) => r.status?.sli ?? -1, sortable: true, size: 170 },
+  {
+    id: "sli",
+    header: t("slos.column.statusVsTarget"),
+    accessor: (r) => r.status?.sli ?? -1,
+    sortable: true,
+    size: 170,
+  },
   {
     id: "budget",
     header: t("slos.column.budgetRemaining"),
@@ -403,10 +399,27 @@ const columns = computed<OTableColumnDef<SloListItem>[]>(() => [
     sortable: true,
     size: 190,
   },
-  { id: "burn", header: t("slos.column.burnRate"), accessor: (r) => r.status?.burn_rate ?? -1, sortable: true, size: 110 },
-  { id: "coverage", header: t("slos.column.coverage"), accessor: (r) => r.status?.coverage ?? 0, sortable: true, size: 100 },
+  {
+    id: "burn",
+    header: t("slos.column.burnRate"),
+    accessor: (r) => r.status?.burn_rate ?? -1,
+    sortable: true,
+    size: 110,
+  },
+  {
+    id: "coverage",
+    header: t("slos.column.coverage"),
+    accessor: (r) => r.status?.coverage ?? 0,
+    sortable: true,
+    size: 100,
+  },
   { id: "window", header: t("slos.column.window"), accessor: (r) => r.window_secs, size: 100 },
-  { id: "tags", header: t("slos.column.tags"), accessor: (r) => (r.tags || []).join(","), size: 180 },
+  {
+    id: "tags",
+    header: t("slos.column.tags"),
+    accessor: (r) => (r.tags || []).join(","),
+    size: 180,
+  },
   {
     id: "folder",
     header: t("slos.column.folder"),
@@ -488,10 +501,38 @@ const stats = computed<StatItem[]>(() => {
   for (const r of rows.value) counts[health(r)] += 1;
   const total = rows.value.length;
   return [
-    { key: "budget_blown", label: t("slos.health.budget_blown"), value: counts.budget_blown, icon: "local_fire_department", tone: "error", max: total },
-    { key: "at_risk", label: t("slos.health.at_risk"), value: counts.at_risk, icon: "trending_down", tone: "warning", max: total },
-    { key: "meeting", label: t("slos.health.meeting"), value: counts.meeting, icon: "check_circle", tone: "success", max: total },
-    { key: "no_data", label: t("slos.health.no_data"), value: counts.no_data, icon: "help", tone: "neutral", max: total },
+    {
+      key: "budget_blown",
+      label: t("slos.health.budget_blown"),
+      value: counts.budget_blown,
+      icon: "local_fire_department",
+      tone: "error",
+      max: total,
+    },
+    {
+      key: "at_risk",
+      label: t("slos.health.at_risk"),
+      value: counts.at_risk,
+      icon: "trending_down",
+      tone: "warning",
+      max: total,
+    },
+    {
+      key: "meeting",
+      label: t("slos.health.meeting"),
+      value: counts.meeting,
+      icon: "check_circle",
+      tone: "success",
+      max: total,
+    },
+    {
+      key: "no_data",
+      label: t("slos.health.no_data"),
+      value: counts.no_data,
+      icon: "help",
+      tone: "neutral",
+      max: total,
+    },
     { key: "total", label: t("slos.totalSlos"), value: total, tone: "primary", selectable: false },
   ];
 });
@@ -599,7 +640,10 @@ async function toggleEnabled(row: SloListItem) {
   try {
     await sloService.setEnabled(org.value, row.id, !row.enabled);
     row.enabled = !row.enabled;
-    toast({ variant: "success", message: row.enabled ? t("slos.resumed") : t("slos.pausedNotice") });
+    toast({
+      variant: "success",
+      message: row.enabled ? t("slos.resumed") : t("slos.pausedNotice"),
+    });
   } catch (e: any) {
     toast({ variant: "error", message: e?.response?.data?.message || t("slos.updateFailed") });
   }

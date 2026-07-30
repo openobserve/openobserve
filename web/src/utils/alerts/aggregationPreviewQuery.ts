@@ -153,10 +153,7 @@ export const buildGroupLabelProjection = (groupBy: string[]): string | null => {
  * in the projection and in `GROUP BY`, and both have to move together or the
  * statement stops being valid.
  */
-export const withCompositeGroupLabel = (
-  query: string,
-  groupBy: string[],
-): string | null => {
+export const withCompositeGroupLabel = (query: string, groupBy: string[]): string | null => {
   const projection = buildGroupLabelProjection(groupBy);
   if (!projection) return null;
   const cols = groupBy.filter((c) => c && c.trim() !== "");
@@ -292,4 +289,3 @@ export const getDefaultDashboardPanelData: any = () => ({
     },
   },
 });
-

@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Priority & tags (Feature 2). Anomaly configs appear in the same
            alert list, so they carry the same triage metadata. -->
       <div class="mb-6! flex items-start pb-0!">
-        <div class="flex items-center font-semibold w-47.5 h-9">
+        <div class="flex h-9 w-47.5 items-center font-semibold">
           {{ t("alerts.priority") }}
           <OIcon name="info" size="sm" class="text-icon-color ml-1 cursor-pointer">
             <OTooltip :content="t('alerts.priorityTooltip')" side="right" />
@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <div class="mb-6! flex items-start pb-0!">
-        <div class="flex items-center font-semibold w-47.5 h-9">
+        <div class="flex h-9 w-47.5 items-center font-semibold">
           {{ t("alerts.tags") }}
           <OIcon name="info" size="sm" class="text-icon-color ml-1 cursor-pointer">
             <OTooltip :content="t('alerts.tagsTooltip')" side="right" />

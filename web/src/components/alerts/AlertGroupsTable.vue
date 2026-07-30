@@ -76,13 +76,9 @@
          ambiguous the moment a value contains a separator. -->
     <template #cell-group="{ row }">
       <div v-if="row.labels?.length" class="flex flex-wrap items-center gap-2">
-        <span
-          v-for="label in row.labels"
-          :key="label.name"
-          class="inline-flex items-center gap-1"
-        >
-          <span class="text-2xs uppercase text-text-tertiary">{{ label.name }}</span>
-          <span class="font-mono text-compact text-text-heading">{{ label.value }}</span>
+        <span v-for="label in row.labels" :key="label.name" class="inline-flex items-center gap-1">
+          <span class="text-2xs text-text-tertiary uppercase">{{ label.name }}</span>
+          <span class="text-compact text-text-heading font-mono">{{ label.value }}</span>
         </span>
       </div>
       <span v-else class="text-text-secondary">—</span>
@@ -98,12 +94,7 @@
     </template>
 
     <template #cell-last_outcome="{ row }">
-      <OTag
-        v-if="row.last_outcome"
-        type="alertState"
-        :value="row.last_outcome"
-        size="sm"
-      />
+      <OTag v-if="row.last_outcome" type="alertState" :value="row.last_outcome" size="sm" />
       <span v-else class="text-text-secondary">—</span>
     </template>
 
@@ -200,9 +191,7 @@ const search = ref("");
 const rows = computed<AlertGroup[]>(() => {
   const term = search.value.trim().toLowerCase();
   if (!term) return props.groups;
-  return props.groups.filter((g) =>
-    (g.group_labels || "").toLowerCase().includes(term),
-  );
+  return props.groups.filter((g) => (g.group_labels || "").toLowerCase().includes(term));
 });
 
 const onEmptyAction = (id: string) => {

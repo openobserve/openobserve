@@ -98,11 +98,11 @@
          classified to. Rows written before those fields existed render "—". -->
     <template #cell-condition="{ row }">
       <div class="flex min-w-0 items-center gap-1.5">
-        <span class="font-mono text-compact whitespace-nowrap tabular-nums">
+        <span class="text-compact font-mono whitespace-nowrap tabular-nums">
           {{ conditionSummary(row) }}
         </span>
         <template v-if="row.level">
-          <span class="text-2xs shrink-0 text-text-secondary">→</span>
+          <span class="text-2xs text-text-secondary shrink-0">→</span>
           <OTag type="alertLevel" :value="row.level" size="sm" class="shrink-0" />
         </template>
       </div>
@@ -111,9 +111,7 @@
     <template #cell-evaluation_time="{ row }">
       <span class="text-compact tabular-nums">
         {{
-          row.evaluation_took_in_secs != null
-            ? row.evaluation_took_in_secs.toFixed(3) + "s"
-            : "—"
+          row.evaluation_took_in_secs != null ? row.evaluation_took_in_secs.toFixed(3) + "s" : "—"
         }}
       </span>
     </template>
@@ -196,8 +194,7 @@ const fetchHistory = async () => {
   loading.value = true;
   try {
     const endTime = Date.now() * 1000;
-    const startTime =
-      endTime - (RANGE_MS[range.value] ?? RANGE_MS["1h"]) * 1000;
+    const startTime = endTime - (RANGE_MS[range.value] ?? RANGE_MS["1h"]) * 1000;
     const res = await alertsService.getHistory(orgId, {
       alert_id: props.alertId,
       start_time: startTime,

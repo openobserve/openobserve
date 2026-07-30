@@ -358,10 +358,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   whatever outcome it last recorded, so showing it would display
                   "Firing" forever on something that is not running.
                 -->
-                <OTooltip
-                  v-if="showRunOutcome(row)"
-                  :content="runOutcomeTooltip(row)"
-                >
+                <OTooltip v-if="showRunOutcome(row)" :content="runOutcomeTooltip(row)">
                   <OTag
                     type="alertState"
                     :value="row.last_outcome"
@@ -719,7 +716,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @updated="updateAcrossFolders"
         data-test="dashboard-move-to-another-folder-dialog"
       />
-
     </template>
   </div>
 </template>
@@ -744,10 +740,7 @@ import { useRouter } from "vue-router";
 import useStreams from "@/composables/useStreams";
 
 import { convertUnixToDateFormat as convertUnixToFormat } from "@/utils/date";
-import {
-  outcomeLabel,
-  shouldShowRunOutcome,
-} from "@/utils/alerts/runOutcome";
+import { outcomeLabel, shouldShowRunOutcome } from "@/utils/alerts/runOutcome";
 import { useI18n } from "vue-i18n";
 import { debounce } from "lodash-es";
 import alertsService from "@/services/alerts";
@@ -982,9 +975,7 @@ export default defineComponent({
     // Never present the outcome as live state: it is the result of the LAST
     // evaluation, so it is always qualified with when that ran.
     const runOutcomeTooltip = (row: any): string => {
-      const at = row?.last_outcome_at
-        ? convertUnixToDateFormat(row.last_outcome_at)
-        : null;
+      const at = row?.last_outcome_at ? convertUnixToDateFormat(row.last_outcome_at) : null;
       const label = outcomeLabel(row?.last_outcome);
       return at ? `${label} ${t("alerts.asOf")} ${at}` : label;
     };

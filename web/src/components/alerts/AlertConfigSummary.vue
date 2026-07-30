@@ -24,7 +24,7 @@
   <div class="flex flex-col gap-4" data-test="alerts-alertconfigsummary">
     <OCard v-for="section in sections" :key="section.key">
       <OCardSection role="body">
-        <h3 class="mb-3 text-lg text-text-heading">{{ section.title }}</h3>
+        <h3 class="text-text-heading mb-3 text-lg">{{ section.title }}</h3>
         <dl class="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
           <div
             v-for="field in section.fields"
@@ -32,13 +32,10 @@
             class="flex flex-col gap-1"
             :data-test="`alerts-alertconfigsummary-${field.key}`"
           >
-            <dt class="text-xs text-text-secondary">
+            <dt class="text-text-secondary text-xs">
               {{ field.label }}
             </dt>
-            <dd
-              class="text-sm text-text-heading"
-              :class="field.mono ? 'font-mono break-all' : ''"
-            >
+            <dd class="text-text-heading text-sm" :class="field.mono ? 'font-mono break-all' : ''">
               {{ field.value }}
             </dd>
           </div>
@@ -63,9 +60,7 @@ const EMPTY = "—";
 
 // The single-alert GET calls this `query_condition`; the list calls the same
 // object `condition`. Accept either.
-const queryCondition = computed(
-  () => props.alert?.query_condition || props.alert?.condition,
-);
+const queryCondition = computed(() => props.alert?.query_condition || props.alert?.condition);
 const aggregation = computed(() => queryCondition.value?.aggregation);
 
 const isBlank = (v: any) => v === undefined || v === null || v === "";
@@ -135,9 +130,7 @@ const sections = computed(() => [
       {
         key: "group-by",
         label: t("alerts.groups.groupBy"),
-        value: aggregation.value?.group_by?.length
-          ? aggregation.value.group_by.join(", ")
-          : EMPTY,
+        value: aggregation.value?.group_by?.length ? aggregation.value.group_by.join(", ") : EMPTY,
         mono: true,
       },
       {
@@ -180,9 +173,7 @@ const sections = computed(() => [
       {
         key: "destinations",
         label: t("alerts.destination"),
-        value: props.alert?.destinations?.length
-          ? props.alert.destinations.join(", ")
-          : EMPTY,
+        value: props.alert?.destinations?.length ? props.alert.destinations.join(", ") : EMPTY,
       },
     ],
   },

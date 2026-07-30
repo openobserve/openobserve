@@ -137,9 +137,7 @@ export function buildSQLContext(
             formatter: markLine.name ? "{b}:{c}" : "{c}",
             position: "insideEndTop",
           },
-          ...(markLine.color
-            ? { lineStyle: { color: markLine.color } }
-            : {}),
+          ...(markLine.color ? { lineStyle: { color: markLine.color } } : {}),
         };
       }) ?? []
     );
