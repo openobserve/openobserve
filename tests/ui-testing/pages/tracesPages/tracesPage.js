@@ -35,9 +35,9 @@ export class TracesPage {
 
     // Search Results
     // Source: web/src/plugins/traces/components/TracesSearchResultList.vue
-    // Source: web/src/components/TenstackTable.vue (rows use o2-table-detail-{ts})
+    // Source: web/src/lib/core/Table/OTable.vue (rows use o2-table-row-{index})
     this.searchResultList = '[data-test="traces-search-result-list"]';
-    this.searchResultItem = '[data-test^="o2-table-detail-"]';
+    this.searchResultItem = '[data-test="traces-search-result-list"] [data-test^="o2-table-row-"]:not([data-test="o2-table-row-drag-handle"])';
     this.searchResultCount = '[data-test="traces-count-badge"]';
     this.tracesCountBadge = '[data-test="traces-count-badge"]';
     this.tracesErrorCountBadge = '[data-test="traces-error-count-badge"]';
@@ -740,7 +740,7 @@ export class TracesPage {
     const maxAttempts = 3;
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
-        // A real row is rendered as a TR with data-test^="o2-table-detail-"
+        // A real row is rendered as a TR with data-test^="o2-table-row-"
         // — the count badge is shown even with 0 results, so do NOT use it
         // here as a positive signal.
         const firstRow = this.page.locator(this.searchResultItem).first();
@@ -1149,7 +1149,7 @@ export class TracesPage {
     // result-row error detection lives on TenstackTable cells; rely on the
     // top-level table row marker for error trace styling.
     const errorRow = this.page
-      .locator(`${this.searchResultList} [data-test^="o2-table-detail-"]`)
+      .locator(`${this.searchResultList} [data-test^="o2-table-row-"]:not([data-test="o2-table-row-drag-handle"])`)
       .first();
     if (await errorRow.isVisible({ timeout: 5000 }).catch(() => false)) {
       await errorRow.click();
@@ -2400,7 +2400,7 @@ export class TracesPage {
    * @returns {Locator}
    */
   getLogsTimestampHeader() {
-    return this.page.locator('[data-test="log-search-result-table-th-timestamp"]');
+    return this.page.locator('[data-test="o2-table-th-timestamp"]');
   }
 
   /**
@@ -2408,7 +2408,7 @@ export class TracesPage {
    * @returns {Locator}
    */
   getFirstLogTimestampCell() {
-    return this.page.locator('[data-test="logs-search-result-logs-table"] tbody tr:first-child td').first();
+    return this.page.locator('[data-test="logs-search-result-logs-table"] tbody tr[data-test^="o2-table-row-"]').first().locator('[data-test^="o2-table-cell-"]').first();
   }
 
   /**

@@ -28,24 +28,24 @@ const endSignal = {
 };
 
 describe("completionWindowDefaultsForScope", () => {
-  it("uses the documented 2-minute / 30-minute trace window", () => {
+  it("uses the documented 30-second / 30-minute trace window", () => {
     expect(completionWindowDefaultsForScope("trace")).toEqual({
-      idleWindowSecs: 120,
+      idleWindowSecs: 30,
       maxAgeSecs: 1800,
     });
     expect(TRACE_COMPLETION_WINDOW_DEFAULTS).toEqual({
-      idleWindowSecs: 120,
+      idleWindowSecs: 30,
       maxAgeSecs: 1800,
     });
   });
 
-  it("uses the documented 2-minute / 4-hour session window", () => {
+  it("uses the documented 30-minute / 4-hour session window", () => {
     expect(completionWindowDefaultsForScope("session")).toEqual({
-      idleWindowSecs: 120,
+      idleWindowSecs: 1800,
       maxAgeSecs: 14400,
     });
     expect(SESSION_COMPLETION_WINDOW_DEFAULTS).toEqual({
-      idleWindowSecs: 120,
+      idleWindowSecs: 1800,
       maxAgeSecs: 14400,
     });
   });

@@ -54,7 +54,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OTableColumnToggle
         :columns="columns"
         :column-visibility="columnVisibility"
+        :has-resized-columns="tableRef?.hasResizedColumns ?? false"
         @update:column-visibility="setColumnVisibility"
+        @reset:column-sizes="tableRef?.resetColumnSizes()"
       />
       <OButton
         variant="outline"
@@ -74,6 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="pipeline-history-table bg-card-glass-bg h-full"
       >
         <OTable
+          ref="tableRef"
           :frame="false"
           :data="rows"
           :columns="columns"
@@ -458,7 +461,7 @@ import http from "@/services/http";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { COL } from "@/lib/core/Table/OTable.types";
-import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import type { OTableColumnDef, OTableExposed } from "@/lib/core/Table/OTable.types";
 
 const { t } = useI18n();
 const store = useStore();
@@ -479,6 +482,10 @@ const pagination = ref({
 });
 
 const pageSizeOptions = [10, 20, 50, 100];
+
+// The column toggle is teleported out of the table, so it reads resize state and
+// the reset action off the table instance rather than OTable's built-in toolbar.
+const tableRef = ref<OTableExposed | null>(null);
 
 const { columnVisibility, setColumnVisibility } = useExternalColumnToggle(
   "pipelines-pipeline-history-list",

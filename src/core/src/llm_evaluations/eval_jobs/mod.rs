@@ -361,6 +361,8 @@ pub async fn manual_evaluate(
                 o2_enterprise::enterprise::llm_evaluations::eval_jobs::tasks::EvaluationQueryWindow {
                     start_us: body.start_time,
                     end_us: body.end_time,
+                    // manual evaluations use the caller's window verbatim
+                    ingest_cutoff_us: None,
                 },
             reason: body
                 .reason

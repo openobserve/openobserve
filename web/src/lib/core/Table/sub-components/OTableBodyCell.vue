@@ -2,12 +2,17 @@
 
 <script setup lang="ts">
 import type { Cell, Row } from "@tanstack/vue-table";
-import { computed, inject, ref } from "vue";
+import { computed, inject, ref, useSlots } from "vue";
 import { FlexRender } from "@tanstack/vue-table";
 import { useSanitizedHtml } from "../composables/useSanitizedHtml";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import { OTableTreeContextKey } from "../composables/useTableTree";
+import { OTableCellActionsKey } from "../OTable.types";
+import { PIVOT_TABLE_TOTAL_COLUMN_WIDTH } from "@/utils/dashboard/constants";
 import { copyToClipboard } from "@/utils/clipboard";
+
+const slots = useSlots();
 
 const { sanitize } = useSanitizedHtml();
 
@@ -16,7 +21,9 @@ let copyTimer: ReturnType<typeof setTimeout> | null = null;
 
 async function handleCopy(event: MouseEvent) {
   event.stopPropagation();
-  const value = String(props.cell.getValue() ?? "");
+  // Copy what the user sees: the formatted display value (dashboard format fns
+  // handle units, timestamps and no_value_replacement), not the raw cell value.
+  const value = String(displayValue.value ?? "");
   const success = await copyToClipboard(value, { silent: true });
   if (success) {
     copied.value = true;
@@ -39,10 +46,14 @@ const props = defineProps<{
   bordered?: boolean;
   enableCellCopy?: boolean;
   getCellStyle?: (params: { columnId: string; row: any; value: any }) => Record<string, any>;
+  /** Pivot row-field cell merge: hide the cell's content / inner border so a
+   *  group of equal row-field values reads as one merged cell. */
+  pivotMerge?: { hideContent: boolean; hideBorder: boolean } | null;
 }>();
 
 const emit = defineEmits<{
   "cell-click": [params: { columnId: string; row: any; value: any }];
+  "cell-contextmenu": [params: { columnId: string; row: any; value: any }];
 }>();
 
 const meta = computed(() => props.cell.column.columnDef.meta as any);
@@ -70,6 +81,12 @@ const slotAlignClass = computed(() => {
   return "flex items-center w-full min-w-0";
 });
 
+// Slotted content truncates to one line unless `wrap` is on, mirroring the
+// default (non-slot) behaviour.
+const slotContentClass = computed(() =>
+  props.wrap ? "min-w-0 flex-1 wrap-anywhere whitespace-normal" : "truncate min-w-0 flex-1",
+);
+
 const isPinned = computed(() => props.cell.column.getIsPinned?.() ?? false);
 
 const pinOffset = computed(() => {
@@ -83,11 +100,58 @@ const rawValue = computed(() => props.cell.getValue());
 
 const displayValue = computed(() => {
   const formatFn = meta.value?.format as ((value: any, row: any) => any) | undefined;
-  if (rawValue.value === null || rawValue.value === undefined) return rawValue.value;
-  return formatFn ? formatFn(rawValue.value, props.row.original) : rawValue.value;
+  // Call `format` even for null/undefined: dashboard format fns turn empty cells
+  // into the configured `no_value_replacement`.
+  if (!formatFn) return rawValue.value;
+  return formatFn(rawValue.value, props.row.original);
 });
 
+// ── Cell copy ─────────────────────────────────────────────────────
+// Empty cells get no copy affordance (matches the pre-migration table).
+const hasCopyableValue = computed(() => {
+  const value = rawValue.value;
+  if (value === null || value === undefined || value === "undefined") return false;
+  return String(value).trim() !== "";
+});
+
+const showCellCopy = computed(
+  () => !!props.enableCellCopy && !slots.default && hasCopyableValue.value,
+);
+
+// The button shares a flex row with the value instead of floating over it, so it
+// can never overlap the text. Right-aligned (numeric) columns put the button on
+// the left; left/center-aligned columns put it on the right.
+const copyRowAlignClass = computed(() => {
+  if (align.value === "center") return "justify-center";
+  if (align.value === "right") return "justify-end";
+  return "";
+});
+
+const copyValueClass = computed(() =>
+  props.wrap ? "min-w-0 wrap-anywhere whitespace-normal" : "min-w-0 truncate",
+);
+
 const horizontalScroll = inject<{ value: boolean } | null>("o2TableHorizontalScroll", null);
+
+// Keep right-pinned total cells in step with the sticky header and footer.
+const stickyColTotals = inject<{ value: boolean } | null>("o2TableStickyColTotals", null);
+const pivotTotalStyle = computed<Record<string, any>>(() => {
+  if (!stickyColTotals?.value || !meta.value?._isTotalColumn) return {};
+  const rightOffset = (meta.value._totalColRightIndex ?? 0) * PIVOT_TABLE_TOTAL_COLUMN_WIDTH;
+  return {
+    position: "sticky",
+    right: `${rightOffset}px`,
+    zIndex: 2,
+    // Pinned width, so the column can't diverge from the fixed-width sticky
+    // header under table-auto/w-full.
+    width: `${PIVOT_TABLE_TOTAL_COLUMN_WIDTH}px`,
+    minWidth: `${PIVOT_TABLE_TOTAL_COLUMN_WIDTH}px`,
+    maxWidth: `${PIVOT_TABLE_TOTAL_COLUMN_WIDTH}px`,
+    backgroundColor: "var(--color-table-cell-bg)",
+    // Same left-edge separator as the header, so it runs down the whole column.
+    boxShadow: "-2px 0 4px -2px var(--color-border-default)",
+  };
+});
 
 const isAutoWidth = computed(() => meta.value?.autoWidth === true);
 
@@ -96,8 +160,11 @@ const cellStyle = computed(() => {
   if (isAutoWidth.value) {
     // Elastic column: no width (absorbs the table's leftover space), but honour
     // minSize so it can't collapse — it pushes the table to scroll instead.
+    // While WRAPPING the floor has to go: the pre-migration table gave the fill
+    // column `flex: 1 1 0; min-width: 0` so it shrank to the row and the text
+    // wrapped. Keeping minSize here pins the column open and nothing ever wraps.
     const min = props.cell.column.columnDef.minSize;
-    if (min) base.minWidth = `${min}px`;
+    if (min && !props.wrap) base.minWidth = `${min}px`;
   } else {
     const sizeVar = `var(--header-${props.cell.column.id.replace(/[^a-zA-Z0-9]/g, "-")}-size)`;
     base.width = sizeVar;
@@ -108,6 +175,12 @@ const cellStyle = computed(() => {
       base.maxWidth = sizeVar;
     } else if (!horizontalScroll?.value) {
       base.maxWidth = sizeVar;
+    } else if (props.wrap) {
+      // Wrapping drops the table's `min-w-max`, so auto layout would otherwise
+      // squeeze these sized columns to fit the container. The pre-migration
+      // table pinned them with `flex-shrink: 0` and let the ROW scroll instead;
+      // only the fill column was allowed to shrink.
+      base.minWidth = sizeVar;
     }
   }
   if (isPinned.value === "left") {
@@ -127,7 +200,9 @@ const cellStyle = computed(() => {
     row: props.row.original,
     value: rawValue.value,
   });
-  return extra ? { ...base, ...extra } : base;
+  const merged = extra ? { ...base, ...extra } : base;
+  // Right-pinned pivot total columns win (sticky position + fixed width).
+  return { ...merged, ...pivotTotalStyle.value };
 });
 
 const highlightedHtml = computed(() => {
@@ -173,6 +248,31 @@ function handleClick() {
     value: props.cell.getValue(),
   });
 }
+
+// Right-click. Emitted as plain values (not the TanStack cell) so a consumer's
+// context menu keeps rendering correctly even after the virtualizer recycles
+// the row underneath it. The event is NOT prevented — the consumer decides
+// whether to open a menu or leave the native one alone.
+function handleContextMenu() {
+  emit("cell-contextmenu", {
+    columnId: props.cell.column.id,
+    row: props.row.original,
+    value: props.cell.getValue(),
+  });
+}
+
+// ── Cell hover-actions ────────────────────────────────────────────
+// The shared single-active-cell context tracks which cell the pointer is over,
+// keyed by `cell.id` (already `${row.id}_${column.id}`).
+const hasCellActions = computed(() => !!slots["cell-hover-actions"]);
+const cellActionsCtx = inject(OTableCellActionsKey, null);
+const isCellActionActive = computed(() => cellActionsCtx?.activeCellKey.value === props.cell.id);
+function onCellActionsEnter() {
+  if (hasCellActions.value) cellActionsCtx?.setActiveCell(props.cell.id);
+}
+function onCellActionsLeave() {
+  if (hasCellActions.value) cellActionsCtx?.setActiveCell(null);
+}
 </script>
 
 <template>
@@ -189,7 +289,7 @@ function handleClick() {
         : meta?.compactPadding
           ? 'px-1 align-middle'
           : 'px-2 align-middle',
-      bordered ? 'border-table-row-divider border-b' : '',
+      bordered && !pivotMerge?.hideBorder ? 'border-table-row-divider border-b' : '',
       alignClass,
       isAction ? 'w-0 whitespace-nowrap' : '',
       isPinned
@@ -198,14 +298,15 @@ function handleClick() {
           : 'bg-table-cell-bg group-hover/row:bg-table-row-hover-bg transition-colors duration-150'
         : '',
       wrap
-        ? 'break-words whitespace-normal'
+        ? 'wrap-anywhere whitespace-normal'
         : horizontalScroll?.value
           ? 'whitespace-nowrap'
           : isAction
             ? 'overflow-hidden whitespace-nowrap'
             : 'overflow-hidden text-ellipsis whitespace-nowrap',
       meta?.cellClass ?? '',
-      isTreeColumn ? 'relative' : '',
+      isTreeColumn || hasCellActions ? 'relative' : '',
+      enableCellCopy ? 'group/cell' : '',
       isTreeColumn && treeMeta?.isParent && treeMeta?.isExpanded ? 'o2-tree-parent-expanded' : '',
       isTreeColumn && treeMeta && treeMeta.parentId !== null ? 'o2-tree-child' : '',
       isTreeColumn && treeMeta?.isLastChild ? 'o2-tree-last-child' : '',
@@ -223,6 +324,9 @@ function handleClick() {
         : {},
     ]"
     @click="handleClick"
+    @contextmenu="handleContextMenu"
+    @mouseenter="onCellActionsEnter"
+    @mouseleave="onCellActionsLeave"
   >
     <!-- Tree-mode wrapper: indent + chevron + cell content -->
     <div
@@ -252,7 +356,7 @@ function handleClick() {
       </span>
       <div class="min-w-0 flex-1">
         <div v-if="$slots.default" :class="slotAlignClass">
-          <div v-if="!isAction" class="min-w-0 flex-1 truncate"><slot /></div>
+          <div v-if="!isAction" :class="slotContentClass"><slot /></div>
           <slot v-else />
         </div>
         <FlexRender
@@ -267,11 +371,45 @@ function handleClick() {
       </div>
     </div>
 
-    <template v-else>
+    <!-- Pivot-merged cells hide their content (the group's first row shows it). -->
+    <template v-else-if="!pivotMerge?.hideContent">
       <div v-if="$slots.default" :class="slotAlignClass">
         <!-- Non-action slot content truncates with an ellipsis by default. -->
-        <div v-if="!isAction" class="min-w-0 flex-1 truncate"><slot /></div>
+        <div v-if="!isAction" :class="slotContentClass"><slot /></div>
         <slot v-else />
+      </div>
+      <!-- Copy-enabled cell: value and copy button share a flex row, so the
+           button sits beside the text instead of covering it. -->
+      <div
+        v-else-if="showCellCopy"
+        class="flex w-full min-w-0 items-center"
+        :class="copyRowAlignClass"
+      >
+        <FlexRender
+          v-if="cell.column.columnDef.cell"
+          :render="cell.column.columnDef.cell"
+          :props="cell.getContext()"
+        />
+        <span
+          v-else-if="highlightedHtml"
+          :class="[defaultTextClass, copyValueClass]"
+          v-html="highlightedHtml"
+        />
+        <span v-else :class="[defaultTextClass, copyValueClass]">
+          {{ displayValue }}
+        </span>
+        <OButton
+          variant="ghost"
+          size="icon-xs-sq"
+          :data-test="`o2-table-cell-copy-${cell.column.id}`"
+          :data-copied="copied ? 'true' : undefined"
+          class="h-4! min-h-0! w-4! shrink-0 opacity-0 transition-opacity group-hover/cell:opacity-100"
+          :class="align === 'right' ? 'order-first mr-1' : 'ml-1'"
+          :title="copied ? 'Copied!' : 'Copy'"
+          @click="handleCopy"
+        >
+          <OIcon :name="copied ? 'check' : 'content-copy'" size="sm" />
+        </OButton>
       </div>
       <!-- Custom cell render via TanStack FlexRender -->
       <FlexRender
@@ -287,17 +425,21 @@ function handleClick() {
       </span>
     </template>
 
-    <!-- Cell copy button (visible on hover) -->
-    <button
-      v-if="enableCellCopy && !$slots.default"
-      type="button"
-      :data-test="`o2-table-cell-copy-${cell.column.id}`"
-      class="bg-surface-base border-border-default rounded-default text-text-muted hover:text-text-body absolute right-1 cursor-pointer border p-0.5 leading-none opacity-0 transition-opacity group-hover:opacity-100"
-      :title="copied ? 'Copied!' : 'Copy'"
-      @click="handleCopy"
+    <!-- Per-cell hover-action overlay. Spans the cell's right edge full-height
+         so it anchors both flow content and self-positioned content. -->
+    <div
+      v-if="hasCellActions"
+      class="o2-table-cell-hover-actions absolute inset-y-0 right-0 z-2 flex items-center"
+      :data-test="`o2-table-cell-hover-actions-${cell.column.id}`"
     >
-      <OIcon :name="copied ? 'check' : 'content-copy'" size="xs" />
-    </button>
+      <slot
+        name="cell-hover-actions"
+        :row="row.original"
+        :column="cell.column.columnDef"
+        :value="rawValue"
+        :active="isCellActionActive"
+      />
+    </div>
   </td>
 </template>
 

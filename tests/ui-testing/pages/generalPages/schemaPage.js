@@ -58,7 +58,7 @@ class SchemaPage {
         this.logsSearchErrorMessage = page.locator('[data-test="logs-search-error-state"]');
         this.dateTimeBtn = page.locator('[data-test="date-time-btn"]');
         this.dateTimeRelativeTab = page.locator('[data-test="date-time-relative-tab"]');
-        this.logTableExpandMenu = page.locator('[data-test="log-table-column-1-_timestamp"] [data-test="table-row-expand-menu"]');
+        this.logTableExpandMenu = page.locator('[data-test="o2-table-expand-1"]');
 
         // IndexList / stream picker (OSelect in listbox/multiple mode)
         // OSelect uses `inheritAttrs: false` and forwards `data-test` onto the
@@ -125,7 +125,7 @@ class SchemaPage {
             closeButton: 'close',
             dateTimeBtn: '[data-test="date-time-btn"]',
             dateTimeRelativeTab: '[data-test="date-time-relative-tab"]',
-            logTableExpandMenu: '[data-test="log-table-column-1-_timestamp"] [data-test="table-row-expand-menu"]',
+            logTableExpandMenu: '[data-test="o2-table-expand-1"]',
             logsUserDefinedFieldsBtn: '[data-test="logs-user-defined-fields-btn"]',
             logSearchIndexAllFieldBtn: '[data-test="log-search-index-list-interesting-_all-field-btn"]',
             logSearchIndexFieldSearchInput: '[data-test="log-search-index-list-field-search-input"]',

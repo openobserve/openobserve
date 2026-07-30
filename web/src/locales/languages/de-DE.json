@@ -8871,7 +8871,11 @@
       "validation": {
         "nameRequired": "Job name is required",
         "streamRequired": "A stream is required",
-        "idleWindowMinimum": "Leerlauffenster muss mindestens 45 Sekunden betragen",
+        "idleWindowMinimum": "Leerlauffenster muss mindestens 1 Sekunde betragen",
+        "idleWindowMaximumTrace": "Trace-Leerlauffenster darf 30 Minuten nicht überschreiten",
+        "idleWindowMaximumSession": "Sitzungs-Leerlauffenster darf 4 Stunden nicht überschreiten",
+        "maxAgeMaximumTrace": "Maximales Trace-Alter darf 2 Stunden nicht überschreiten",
+        "maxAgeMaximumSession": "Maximales Sitzungsalter darf 24 Stunden nicht überschreiten",
         "samplingValueRequired": "A sampling value is required"
       }
     }
