@@ -10,6 +10,7 @@
  */
 
 import { expect } from '@playwright/test';
+import { getOrgIdentifier } from '../../playwright-tests/utils/cloud-auth.js';
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
 
 export class AlertManagement {
@@ -331,6 +332,42 @@ export class AlertManagement {
     }
 
     /**
+     * Bring a just-created alert's row into view, polling with reload + search.
+     *
+     * A freshly saved alert is not necessarily in the next list response —
+     * propagation on a loaded alpha runs behind the save, and the list is served
+     * from a cache. The previous code did ONE reload + search and then waited 15s
+     * on the cell, which is what failed in run 30563626137
+     * (`getByRole('cell', { name: 'Automation_Alert_...' })` never visible) across
+     * several Alerts specs. This mirrors pipelinesPage.locatePipelineRow: keep
+     * reloading and re-searching until the row shows up, on an escalating schedule.
+     *
+     * @param {string} alertName
+     * @returns {import('@playwright/test').Locator} the alert's cell
+     */
+    async locateAlertRow(alertName) {
+        const cell = () => this.page.getByRole('cell', { name: alertName }).first();
+
+        if (await cell().isVisible({ timeout: 3000 }).catch(() => false)) return cell();
+
+        testLogger.info('Alert row not visible — polling list with reload', { alertName });
+        const orgName = getOrgIdentifier() || process.env["ORGNAME"] || 'default';
+        const alertsUrl = `/web/alerts?org_identifier=${orgName}`;
+
+        await expect.poll(async () => {
+            await this.page.goto(alertsUrl).catch(() => {});
+            await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
+            await this.searchAlert(alertName).catch(() => {});
+            return await cell().isVisible({ timeout: 3000 }).catch(() => false);
+        }, {
+            intervals: [2000, 3000, 5000, 5000, 10000],
+            timeout: 90000,
+        }).toBe(true);
+
+        return cell();
+    }
+
+    /**
      * Trigger an alert manually from the alert list's more options menu
      * @param {string} alertName - Name of the alert to trigger
      * @returns {Promise<boolean>} - True if trigger was successful
@@ -338,24 +375,7 @@ export class AlertManagement {
     async triggerAlertManually(alertName) {
         testLogger.info('Triggering alert manually', { alertName });
 
-        let alertCell = this.page.getByRole('cell', { name: alertName }).first();
-        let isVisible = await alertCell.isVisible({ timeout: 3000 }).catch(() => false);
-
-        if (!isVisible) {
-            const orgName = process.env["ORGNAME"] || 'default';
-            const alertsUrl = `/web/alerts?org_identifier=${orgName}`;
-            await this.page.goto(alertsUrl);
-            await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
-            await this.page.waitForTimeout(2000);
-            testLogger.info('Navigated to alerts page');
-
-            await this.searchAlert(alertName);
-            await this.page.waitForTimeout(2000);
-
-            alertCell = this.page.getByRole('cell', { name: alertName }).first();
-        }
-
-        await alertCell.waitFor({ state: 'visible', timeout: 15000 });
+        const alertCell = await this.locateAlertRow(alertName);
         testLogger.info('Found alert cell', { alertName });
 
         const alertRow = alertCell.locator('xpath=ancestor::tr');
