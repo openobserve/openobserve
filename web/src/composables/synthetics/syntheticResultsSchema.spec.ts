@@ -38,6 +38,9 @@ import {
   mapHistogram,
   mapKpi,
   mapRun,
+  evidenceSeverity,
+  indexEvidenceByStep,
+  type EvidenceEvent,
 } from "./syntheticResultsSchema";
 
 describe("syntheticResultsSchema query builders", () => {
@@ -902,5 +905,119 @@ describe("run timing breakdown", () => {
       started_ts: 1_700_000_000_000_000,
     });
     expect(run.queueDelayMs).toBe(0);
+  });
+});
+
+// ── Evidence ranking and step attribution ──────────────────────────────────
+
+/** A minimal event; every field the shape requires, overridable per case. */
+const evidenceEv = (over: Partial<EvidenceEvent>): EvidenceEvent => ({
+  ts: 0,
+  stepId: "s1",
+  kind: "response",
+  level: null,
+  text: null,
+  message: null,
+  stack: null,
+  method: null,
+  url: null,
+  status: null,
+  resourceType: null,
+  initiatedTs: null,
+  durationMs: null,
+  firstParty: true,
+  ...over,
+});
+
+describe("evidence severity ranking", () => {
+  it("ranks a page error above a failed request above a console error", () => {
+    expect(evidenceSeverity(evidenceEv({ kind: "pageerror" }))).toBeLessThan(
+      evidenceSeverity(evidenceEv({ kind: "requestfailed" })),
+    );
+    expect(evidenceSeverity(evidenceEv({ kind: "requestfailed" }))).toBeLessThan(
+      evidenceSeverity(evidenceEv({ kind: "console", level: "error" })),
+    );
+  });
+
+  it("ranks a 5xx above a 4xx above a healthy response", () => {
+    expect(evidenceSeverity(evidenceEv({ status: 503 }))).toBeLessThan(
+      evidenceSeverity(evidenceEv({ status: 401 })),
+    );
+    expect(evidenceSeverity(evidenceEv({ status: 401 }))).toBeLessThan(
+      evidenceSeverity(evidenceEv({ status: 200 })),
+    );
+  });
+
+  it("treats a crash as a page error, not as an unranked kind", () => {
+    expect(evidenceSeverity(evidenceEv({ kind: "crash" }))).toBe(
+      evidenceSeverity(evidenceEv({ kind: "pageerror" })),
+    );
+  });
+
+  it("does not promote a non-error console line", () => {
+    // A console.log is not a finding; it must not outrank a 404.
+    expect(evidenceSeverity(evidenceEv({ kind: "console", level: "log" }))).toBeGreaterThan(
+      evidenceSeverity(evidenceEv({ status: 404 })),
+    );
+  });
+});
+
+describe("indexEvidenceByStep", () => {
+  it("buckets events under their own step", () => {
+    const { byStep } = indexEvidenceByStep([
+      evidenceEv({ stepId: "s1" }),
+      evidenceEv({ stepId: "s2" }),
+      evidenceEv({ stepId: "s1" }),
+    ]);
+    expect(byStep.get("s1")).toHaveLength(2);
+    expect(byStep.get("s2")).toHaveLength(1);
+  });
+
+  it("returns unattributed events separately rather than under a null key", () => {
+    // "we could not attribute this" is a finding, not a step.
+    const { byStep, unattributed } = indexEvidenceByStep([
+      evidenceEv({ stepId: null }),
+      evidenceEv({ stepId: "s1" }),
+    ]);
+    expect(unattributed).toHaveLength(1);
+    expect(byStep.has("s1")).toBe(true);
+    expect(byStep.size).toBe(1);
+  });
+
+  it("ranks each bucket by severity, worst first", () => {
+    const { byStep } = indexEvidenceByStep([
+      evidenceEv({ status: 200 }),
+      evidenceEv({ kind: "pageerror" }),
+      evidenceEv({ status: 503 }),
+    ]);
+    expect(
+      byStep.get("s1")!.map((e) => (e.kind === "pageerror" ? "page" : String(e.status))),
+    ).toEqual(["page", "503", "200"]);
+  });
+
+  it("ranks first-party above third-party at equal severity", () => {
+    // Third-party is ranked below, never dropped (design D6).
+    const { byStep } = indexEvidenceByStep([
+      evidenceEv({ status: 503, firstParty: false, url: "https://cdn.example.io/a" }),
+      evidenceEv({ status: 503, firstParty: true, url: "https://app.example.dev/b" }),
+    ]);
+    expect(byStep.get("s1")!.map((e) => e.firstParty)).toEqual([true, false]);
+  });
+
+  it("orders equal-severity, equal-party events by when they were initiated", () => {
+    const { byStep } = indexEvidenceByStep([
+      evidenceEv({ status: 200, initiatedTs: 300 }),
+      evidenceEv({ status: 200, initiatedTs: 100 }),
+      evidenceEv({ status: 200, initiatedTs: 200 }),
+    ]);
+    expect(byStep.get("s1")!.map((e) => e.initiatedTs)).toEqual([100, 200, 300]);
+  });
+
+  it("falls back to the observed timestamp when nothing was initiated", () => {
+    const { byStep } = indexEvidenceByStep([
+      evidenceEv({ kind: "console", level: "log", ts: 500 }),
+      evidenceEv({ kind: "console", level: "log", ts: 100 }),
+    ]);
+    expect(byStep.get("s1")!.map((e) => e.ts)).toEqual([100, 500]);
   });
 });

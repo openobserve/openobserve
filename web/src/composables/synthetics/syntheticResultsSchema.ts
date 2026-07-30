@@ -559,6 +559,66 @@ export function foldEvidenceBundle(
   };
 }
 
+/**
+ * Severity rank, 1 (worst) … 6. Lower sorts first.
+ *
+ * Ordering is the guidance — there is no verdict anywhere in this feature, so
+ * "what to read first" is the only steer the UI gives (design NG1).
+ */
+export function evidenceSeverity(e: EvidenceEvent): number {
+  if (e.kind === "pageerror" || e.kind === "crash") return 1;
+  if (e.kind === "requestfailed") return 2;
+  if (e.kind === "console" && e.level === "error") return 3;
+  if (e.kind === "response") {
+    const s = e.status ?? 0;
+    if (s >= 500) return 4;
+    if (s >= 400) return 5;
+  }
+  return 6;
+}
+
+/**
+ * Severity, then first-party, then initiation order.
+ *
+ * Third-party is ranked BELOW first-party and never dropped: a failing
+ * third-party script is a legitimate cause of a broken page, and ordering
+ * degrades gracefully where a filter would discard evidence silently (X-8.2).
+ */
+function byEvidenceRank(a: EvidenceEvent, b: EvidenceEvent): number {
+  const sev = evidenceSeverity(a) - evidenceSeverity(b);
+  if (sev !== 0) return sev;
+  if (a.firstParty !== b.firstParty) return a.firstParty ? -1 : 1;
+  return (a.initiatedTs ?? a.ts) - (b.initiatedTs ?? b.ts);
+}
+
+/**
+ * Split a bundle by step, each bucket ranked worst-first.
+ *
+ * Unattributed events come back SEPARATELY rather than under a null key.
+ * Bucketing is best-effort — a live 158-event bundle carried only two distinct
+ * `step_id`s — so "we could not attribute this" is a finding the caller must be
+ * able to state, not a step it can quietly index.
+ */
+export function indexEvidenceByStep(events: EvidenceEvent[]): {
+  byStep: Map<string, EvidenceEvent[]>;
+  unattributed: EvidenceEvent[];
+} {
+  const byStep = new Map<string, EvidenceEvent[]>();
+  const unattributed: EvidenceEvent[] = [];
+  for (const e of events) {
+    if (!e.stepId) {
+      unattributed.push(e);
+      continue;
+    }
+    const list = byStep.get(e.stepId);
+    if (list) list.push(e);
+    else byStep.set(e.stepId, [e]);
+  }
+  for (const list of byStep.values()) list.sort(byEvidenceRank);
+  unattributed.sort(byEvidenceRank);
+  return { byStep, unattributed };
+}
+
 export interface NetworkStats {
   requests: number;
   failed: number;
