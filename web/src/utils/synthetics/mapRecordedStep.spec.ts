@@ -212,6 +212,52 @@ describe("mapRecordedStep", () => {
     expect(step.settle?.observed_duration_ms).toBe(1800);
   });
 
+  // T2b-3 / Task 7: the bridge. The recorder stamps `origin: "recorded"` and
+  // this is the seam it crosses into the editor's model — a mapper that dropped
+  // it would leave every recorded candidate looking author-written, and healing
+  // reads `origin` to decide what it may touch (H2, H4).
+  it("should carry provenance across the bridge, and claim no author intent", () => {
+    const step = mapWireStep({
+      id: "s11",
+      action: "click",
+      locator: {
+        candidates: [
+          { kind: "test_attribute", value: '[data-test="a"]', origin: "recorded" },
+          { kind: "role", value: 'role=button[name="Go"]', origin: "recorded" },
+        ],
+      },
+    });
+
+    expect(step.locator?.candidates.map((c) => c.origin)).toEqual(["recorded", "recorded"]);
+    // A fresh recording is by definition not author-ordered, and the recorder
+    // writes the field absent rather than false — writing it would claim
+    // someone had looked at the list.
+    expect(step.locator?.author_ordered).toBeUndefined();
+  });
+
+  it("should carry a combined locator's parts back out for replay", () => {
+    const from = [{ value: '[data-test="row"]' }, { relation: "and" as const, value: "#b" }];
+    const step = mapWireStep({
+      id: "s12",
+      action: "click",
+      locator: {
+        candidates: [
+          {
+            kind: "test_attribute",
+            value: '[data-test="row"] >> internal:and="#b"',
+            origin: "composite",
+            from,
+          },
+        ],
+        author_ordered: true,
+      },
+    });
+
+    expect(step.locator?.candidates[0].from).toEqual(from);
+    expect(buildWireFromStep(step)?.locator?.candidates[0].from).toEqual(from);
+    expect(buildWireFromStep(step)?.locator?.author_ordered).toBe(true);
+  });
+
   it("should default unknown actions to click and warn", () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const mapped = mapWireStep({ id: "s8", action: "frobnicate" });
