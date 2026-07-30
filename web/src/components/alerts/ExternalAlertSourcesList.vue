@@ -16,11 +16,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <OPageLayout
-    constrained
-    content-size="md"
     :title="t('alert_sources.header')"
     :subtitle="t('alert_sources.subtitle')"
     title-data-test="alert-sources-list-title"
+    scroll
+    pad-y
   >
     <template #actions>
       <OButton
@@ -33,63 +33,89 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </template>
 
-    <div
-      v-if="defaultSource"
-      class="q-pa-md"
-      style="border: 1px solid var(--border-default); border-radius: 8px"
-    >
-      <div class="row items-center justify-between q-mb-sm">
-        <div class="text-subtitle1">{{ t("alert_sources.webhookUrlLabel") }}</div>
-        <div class="row items-center">
-          <OButton
-            variant="ghost"
-            size="icon-sm"
-            :icon-left="revealed ? 'visibility-off' : 'visibility'"
-            data-test="alert-sources-reveal-btn"
-            @click="toggleReveal"
-          />
-          <OButton
-            variant="ghost"
-            size="icon-sm"
-            icon-left="content-copy"
-            data-test="alert-sources-copy-btn"
-            @click="copyUrl"
-          />
+    <div v-if="defaultSource" class="flex flex-col gap-6 text-sm">
+      <!-- Webhook URL -->
+      <div class="flex flex-col gap-2">
+        <div class="flex items-center justify-between">
+          <div class="font-semibold">{{ t("alert_sources.webhookUrlLabel") }}</div>
+          <div class="flex items-center gap-2">
+            <OButton
+              variant="ghost"
+              size="icon-xs-sq"
+              :icon-left="revealed ? 'visibility-off' : 'visibility'"
+              :title="revealed ? t('alert_sources.hideToken') : t('alert_sources.revealToken')"
+              data-test="alert-sources-reveal-btn"
+              @click="toggleReveal"
+            />
+            <OButton
+              variant="outline-destructive"
+              size="sm-action"
+              data-test="alert-sources-rotate-btn"
+              @click="confirmRotate"
+            >
+              <OIcon name="autorenew" size="sm" />
+              {{ t("alert_sources.rotateToken") }}
+            </OButton>
+            <OButton
+              :variant="defaultSource.enabled ? 'ghost-destructive' : 'ghost-success'"
+              size="sm-action"
+              data-test="alert-sources-toggle-enabled-btn"
+              @click="toggleEnabled"
+            >
+              <OIcon :name="defaultSource.enabled ? 'pause' : 'play-arrow'" size="sm" />
+              {{ defaultSource.enabled ? t("alert_sources.disable") : t("alert_sources.enable") }}
+            </OButton>
+          </div>
         </div>
-      </div>
-      <OCodeCell :value="displayedUrl" :copy="false" data-test="alert-sources-url-cell" />
-
-      <div class="row items-center q-mt-md" style="gap: 8px">
-        <OButton
-          variant="outline-destructive"
-          size="sm"
-          icon-left="autorenew"
-          data-test="alert-sources-rotate-btn"
-          @click="confirmRotate"
-        >
-          {{ t("alert_sources.rotateToken") }}
-        </OButton>
-        <OButton
-          :variant="defaultSource.enabled ? 'ghost-destructive' : 'ghost-success'"
-          size="sm"
-          :icon-left="defaultSource.enabled ? 'pause' : 'play-arrow'"
-          data-test="alert-sources-toggle-enabled-btn"
-          @click="toggleEnabled"
-        >
-          {{ defaultSource.enabled ? t("alert_sources.disable") : t("alert_sources.enable") }}
-        </OButton>
-      </div>
-
-      <div class="q-mt-lg">
-        <div class="text-subtitle2 q-mb-sm">{{ t("alert_sources.statusHeader") }}</div>
-        <OEmptyState
-          v-if="sourceStatuses.length === 0"
-          size="inline"
-          :title="t('alert_sources.statusNotConnected')"
+        <p class="text-text-secondary">{{ t("alert_sources.webhookUrlHelp") }}</p>
+        <CopyContent
+          :key="revealed ? 'revealed' : 'masked'"
+          :content="fullUrl"
+          :display-content="displayedUrl"
+          data-test="alert-sources-url-cell"
         />
-        <div v-for="status in sourceStatuses" :key="status.detectedSource" class="q-mb-sm">
-          <div class="row items-center" style="gap: 8px">
-            <span class="text-body2">{{ status.detectedSource }}</span>
+      </div>
+
+      <!-- Alerting tool + setup -->
+      <div class="flex flex-col gap-2">
+        <div class="font-semibold">{{ t("alert_sources.sourceTypeLabel") }}</div>
+        <OTabs v-model="selectedSetupType" dense data-test="alert-sources-setup-type-tabs">
+          <OTab
+            name="grafana"
+            :label="t('alert_sources.sourceTypes.grafana')"
+            data-test="alert-sources-setup-type-grafana"
+          />
+          <OTab
+            name="alertmanager"
+            :label="t('alert_sources.sourceTypes.alertmanager')"
+            data-test="alert-sources-setup-type-alertmanager"
+          />
+          <OTab
+            name="generic"
+            :label="t('alert_sources.sourceTypes.generic')"
+            data-test="alert-sources-setup-type-generic"
+          />
+        </OTabs>
+        <p class="text-text-secondary">
+          {{ t(`alert_sources.setup.${selectedSetupType}Steps`) }}
+        </p>
+        <CopyContent v-if="selectedSetupType === 'alertmanager'" :content="alertmanagerSnippet" />
+        <CopyContent v-else-if="selectedSetupType === 'generic'" :content="genericSnippet" />
+      </div>
+
+      <!-- Status -->
+      <div
+        class="rounded-surface border-border-default bg-surface-panel flex flex-col gap-3 border p-3"
+        data-test="alert-sources-status"
+      >
+        <div class="font-semibold">{{ t("alert_sources.statusHeader") }}</div>
+        <div v-if="sourceStatuses.length === 0" class="flex items-start gap-2">
+          <OTag variant="default-outline">{{ t("alert_sources.statusNotConnected") }}</OTag>
+          <p class="text-text-secondary">{{ t("alert_sources.statusNotConnectedHelp") }}</p>
+        </div>
+        <div v-for="status in sourceStatuses" :key="status.detectedSource" class="flex flex-col gap-1">
+          <div class="flex items-center gap-2">
+            <span>{{ status.detectedSource }}</span>
             <OTag v-if="status.status === 'receiving'" variant="success-soft" dot>
               {{ t("alert_sources.statusReceiving") }}
             </OTag>
@@ -99,19 +125,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTag v-else variant="default-outline">
               {{ t("alert_sources.statusNotConnected") }}
             </OTag>
-            <span class="text-caption text-grey-7">
+            <span class="text-text-secondary">
               {{ t("alert_sources.acceptedCount") }}: {{ status.acceptedCount }},
               {{ t("alert_sources.rejectedCount") }}: {{ status.rejectedCount }}
             </span>
           </div>
-          <div v-if="status.resolveWiringHint" class="text-caption text-warning q-mt-xs">
+          <div v-if="status.resolveWiringHint" class="text-warning">
             {{ t("alert_sources.resolveHintMessage") }}
           </div>
         </div>
       </div>
     </div>
 
-    <div class="q-mt-lg">
+    <div class="mt-6">
       <OButton
         variant="ghost"
         size="sm"
@@ -121,10 +147,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         {{ t("alert_sources.advancedSectionTitle") }}
       </OButton>
-      <div v-if="showAdvanced" class="q-mt-sm">
-        <p class="text-caption text-grey-7">{{ t("alert_sources.advancedSectionDesc") }}</p>
+      <div v-if="showAdvanced" class="mt-2 flex flex-col gap-3 text-sm">
+        <p class="text-text-secondary">{{ t("alert_sources.advancedSectionDesc") }}</p>
         <div v-if="!showAddEditor">
-          <div class="row justify-end q-mb-sm">
+          <div class="mb-2 flex justify-end">
             <OButton
               variant="primary"
               size="sm"
@@ -181,15 +207,18 @@ import { useI18n } from "vue-i18n";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import OCodeCell from "@/lib/core/Table/cells/OCodeCell.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
+import CopyContent from "@/components/CopyContent.vue";
 import AddExternalAlertSource from "./AddExternalAlertSource.vue";
 import alertSources from "@/services/alert_sources";
 import { getAlertSourceStatus } from "@/utils/alertSourceStatus";
 import { copyToClipboard } from "@/utils/clipboard";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { getEndPoint, getIngestionURL } from "@/utils/zincutils";
 import type { AlertSourceIntegration } from "@/ts/interfaces/alertSources";
 
 interface SourceStatusRow {
@@ -206,10 +235,12 @@ export default defineComponent({
     OPageLayout,
     OButton,
     OTag,
-    OEmptyState,
-    OCodeCell,
+    OIcon,
     OTable,
+    OTabs,
+    OTab,
     ConfirmDialog,
+    CopyContent,
     AddExternalAlertSource,
   },
   setup() {
@@ -226,6 +257,7 @@ export default defineComponent({
       rotateDialogVisible: false,
       showAdvanced: false,
       showAddEditor: false,
+      selectedSetupType: "grafana" as "grafana" | "alertmanager" | "generic",
       advancedColumns: [
         { id: "name", header: this.t("alert_sources.name"), accessorKey: "name", sortable: true },
         { id: "source_type", header: this.t("alert_sources.sourceType"), accessorKey: "source_type" },
@@ -243,12 +275,33 @@ export default defineComponent({
     additionalIntegrations(): AlertSourceIntegration[] {
       return this.integrations.filter((i) => i.name !== "default");
     },
+    fullUrl(): string {
+      if (!this.defaultSource) return "";
+      const ingestionURL = getIngestionURL();
+      const base = getEndPoint(ingestionURL).url;
+      return `${base}${this.defaultSource.url}`;
+    },
     displayedUrl(): string {
       if (!this.defaultSource) return "";
-      if (this.revealed) return this.defaultSource.url;
+      if (this.revealed) return this.fullUrl;
       const token = this.defaultSource.token;
       const masked = `${token.slice(0, 6)}****${token.slice(-4)}`;
-      return this.defaultSource.url.replace(token, masked);
+      return this.fullUrl.replace(token, masked);
+    },
+    alertmanagerSnippet(): string {
+      return [
+        "receivers:",
+        "  - name: openobserve-incidents",
+        "    webhook_configs:",
+        `      - url: "${this.fullUrl}"`,
+        "        send_resolved: true",
+      ].join("\n");
+    },
+    genericSnippet(): string {
+      return [
+        `curl -X POST '${this.fullUrl}' -H 'Content-Type: application/json' \\`,
+        `  -d '{"status":"firing","labels":{"alertname":"HighCPU","service":"checkout"}}'`,
+      ].join("\n");
     },
   },
   mounted() {
@@ -292,7 +345,7 @@ export default defineComponent({
     },
     copyUrl() {
       if (!this.defaultSource) return;
-      copyToClipboard(this.defaultSource.url);
+      copyToClipboard(this.fullUrl);
     },
     confirmRotate() {
       this.rotateDialogVisible = true;

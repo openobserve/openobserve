@@ -5469,11 +5469,12 @@
   },
   "alert_sources": {
     "header": "Alert Sources",
-    "subtitle": "Feed external alerts (Grafana, Alertmanager, webhooks) into Incidents",
+    "subtitle": "Send alerts from Grafana, Prometheus Alertmanager, or any tool that can call a webhook — they'll show up here and get correlated into Incidents automatically.",
     "defaultSourceName": "default",
-    "webhookUrlLabel": "Webhook URL",
-    "revealToken": "Reveal token",
-    "hideToken": "Hide token",
+    "webhookUrlLabel": "1. Your webhook URL",
+    "webhookUrlHelp": "This URL is unique to your organization. Paste it into the alerting tool you choose below — no extra auth headers required.",
+    "revealToken": "Reveal full URL",
+    "hideToken": "Hide full URL",
     "copyUrl": "Copy URL",
     "copiedSuccess": "Copied to clipboard",
     "rotateToken": "Rotate token",
@@ -5485,10 +5486,23 @@
     "disable": "Disable",
     "enabledSuccess": "Alert source enabled",
     "disabledSuccess": "Alert source disabled",
-    "statusHeader": "Status",
+    "sourceTypeLabel": "2. Choose your alerting tool",
+    "setupLabel": "3. Configure it",
+    "sourceTypes": {
+      "grafana": "Grafana",
+      "alertmanager": "Alertmanager",
+      "generic": "Generic / custom"
+    },
+    "setup": {
+      "grafanaSteps": "In Grafana: go to Alerting → Contact points → New contact point, choose \"Webhook\" as the integration, and paste the URL above into the URL field. Save, then attach the contact point to a notification policy.",
+      "alertmanagerSteps": "In your Alertmanager config, add a webhook_configs receiver pointing at the URL above. Keep send_resolved: true — without it Alertmanager never tells us when an alert clears, so incidents can't auto-resolve.",
+      "genericSteps": "Any tool that can POST JSON works. Send a firing or resolved status with labels — for example:"
+    },
+    "statusHeader": "4. Check it's working",
     "statusReceiving": "Receiving",
     "statusStale": "Stale",
     "statusNotConnected": "Not yet connected",
+    "statusNotConnectedHelp": "No events received yet. Send a test alert from the tool you configured above — this panel updates after you hit Refresh.",
     "lastEvent": "Last event",
     "lastEventNever": "Never",
     "acceptedCount": "Accepted",
@@ -5496,7 +5510,7 @@
     "resolveHintMessage": "Receiving alerts but no resolved events seen yet — check your source's resolve/recovery settings so incidents can auto-resolve.",
     "refresh": "Refresh",
     "advancedSectionTitle": "Advanced: additional sources",
-    "advancedSectionDesc": "Add a separate source for isolated deduplication, instead of sharing the default webhook URL.",
+    "advancedSectionDesc": "Only needed if you want a second, separate webhook URL — for example, to keep one team's alerts deduplicated apart from another's. Most setups only need the default source above.",
     "add": "Add source",
     "addTitle": "Add Alert Source",
     "name": "Name",
@@ -5506,7 +5520,8 @@
     "actions": "Actions",
     "createdSuccess": "Alert source created",
     "error": "Error loading alert sources",
-    "senderError": "Error loading source status"
+    "senderError": "Error loading source status",
+    "docsCta": "Read the full setup guide"
   },
   "alert_destinations": {
     "header": "Notification Destinations",
