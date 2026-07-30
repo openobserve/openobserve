@@ -244,9 +244,7 @@ describe("BrowserJourney recording", () => {
     // and OCollapsible unmounts collapsed content — so open it before asserting. The
     // point of this test is that no field is MISSING, not that all of them are
     // visible at once.
-    const advanced = wrapper.find(
-      '[data-test="synthetics-journey-step-group-advanced"] button',
-    );
+    const advanced = wrapper.find('[data-test="synthetics-journey-step-group-advanced"] button');
     expect(advanced.exists()).toBe(true);
     if (advanced.attributes("data-state") !== "open") await advanced.trigger("click");
 
@@ -468,7 +466,13 @@ describe("BrowserJourney per-step failure evidence", () => {
 
   const journey = [
     { id: "s1", action: "navigate", name: "Open app", value: "https://app.test", code: "" },
-    { id: "s2", action: "click", name: "Sign in", code: "", locator: { candidates: [{ kind: "css", value: "#go" }] } },
+    {
+      id: "s2",
+      action: "click",
+      name: "Sign in",
+      code: "",
+      locator: { candidates: [{ kind: "css", value: "#go" }] },
+    },
   ];
 
   function mountFailed() {

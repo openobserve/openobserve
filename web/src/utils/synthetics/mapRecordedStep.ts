@@ -174,10 +174,7 @@ export function mapWireStep(wire: WireStep, opts: MapWireStepOptions = {}): Brow
 }
 
 /** Convert a list of extension wire steps into UI steps. */
-export function mapWireSteps(
-  wires: WireStep[],
-  opts: MapWireStepOptions = {},
-): BrowserStep[] {
+export function mapWireSteps(wires: WireStep[], opts: MapWireStepOptions = {}): BrowserStep[] {
   return wires.map((w) => mapWireStep(w, opts));
 }
 

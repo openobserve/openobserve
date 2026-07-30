@@ -53,18 +53,18 @@ describe("BrowserJourneyLocator", () => {
 
   it("says what the fallback list is for rather than how long it is", () => {
     const wrapper = render();
-    expect(
-      wrapper.find(test("synthetics-journey-step-locator-fallbacks-lead")).text(),
-    ).toMatch(/tried in order/i);
+    expect(wrapper.find(test("synthetics-journey-step-locator-fallbacks-lead")).text()).toMatch(
+      /tried in order/i,
+    );
   });
 
   // A pinned step never falls back, so the lead-in would be a lie; the pinned note
   // stands in for it and the rows render inert.
   it("drops the fallback lead-in when the step is pinned", () => {
     const wrapper = render({ ...BUNDLE, user_override: { kind: "css", value: "#pinned" } });
-    expect(
-      wrapper.find(test("synthetics-journey-step-locator-fallbacks-lead")).exists(),
-    ).toBe(false);
+    expect(wrapper.find(test("synthetics-journey-step-locator-fallbacks-lead")).exists()).toBe(
+      false,
+    );
     expect(wrapper.find(test("synthetics-journey-step-locator-pinned-note")).exists()).toBe(true);
   });
 
@@ -208,9 +208,9 @@ describe("BrowserJourneyLocator empty bundle", () => {
     const wrapper = render(EMPTY);
     expect(wrapper.find(test("synthetics-journey-step-locator-primary")).exists()).toBe(false);
     expect(wrapper.find(test("synthetics-journey-step-locator-fallbacks")).exists()).toBe(false);
-    expect(
-      wrapper.find(test("synthetics-journey-step-locator-positional-warning")).exists(),
-    ).toBe(false);
+    expect(wrapper.find(test("synthetics-journey-step-locator-positional-warning")).exists()).toBe(
+      false,
+    );
   });
 
   it("marks the input required — the block only renders when a target is needed", () => {
@@ -270,13 +270,9 @@ describe("BrowserJourneyLocator derived kind", () => {
 
   it("shows the derived kind as a read-only badge while typing", async () => {
     const wrapper = render();
-    expect(wrapper.find(test("synthetics-journey-step-locator-derived-kind")).exists()).toBe(
-      false,
-    );
+    expect(wrapper.find(test("synthetics-journey-step-locator-derived-kind")).exists()).toBe(false);
     await typeOverride(wrapper, "text=Sign in");
-    expect(wrapper.find(test("synthetics-journey-step-locator-derived-kind")).text()).toBe(
-      "Text",
-    );
+    expect(wrapper.find(test("synthetics-journey-step-locator-derived-kind")).text()).toBe("Text");
   });
 
   it("prefills the override from a candidate without carrying its stored kind", async () => {
@@ -284,14 +280,10 @@ describe("BrowserJourneyLocator derived kind", () => {
     await wrapper
       .find(test("synthetics-journey-step-locator-start-from-primary-btn"))
       .trigger("click");
-    const input = wrapper.find(
-      `${test("synthetics-journey-step-locator-override-input")} input`,
-    );
+    const input = wrapper.find(`${test("synthetics-journey-step-locator-override-input")} input`);
     // Primary candidate is a bare [data-test=…] stored as test_attribute; the badge
     // describes what is in the box, which is CSS. Documented and intended (D3).
     expect((input.element as HTMLInputElement).value).toBe('[data-test="login-sign-in"]');
-    expect(wrapper.find(test("synthetics-journey-step-locator-derived-kind")).text()).toBe(
-      "CSS",
-    );
+    expect(wrapper.find(test("synthetics-journey-step-locator-derived-kind")).text()).toBe("CSS");
   });
 });

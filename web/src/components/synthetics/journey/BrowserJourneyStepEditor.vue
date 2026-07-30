@@ -2,12 +2,7 @@
 // Copyright 2026 OpenObserve Inc.
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
-import type {
-  BrowserStep,
-  SettleResponse,
-  StepAssertion,
-  StepLocator,
-} from "@/types/synthetics";
+import type { BrowserStep, SettleResponse, StepAssertion, StepLocator } from "@/types/synthetics";
 import {
   ACTION_LABELS,
   DEFAULT_SETTLE_BUDGET_MS,
@@ -230,9 +225,7 @@ const settleObservedLine = computed(() => {
  */
 const hasRecordedSettle = computed(
   () =>
-    !!settleNavigationLine.value ||
-    settleResponses.value.length > 0 ||
-    !!settleObservedLine.value,
+    !!settleNavigationLine.value || settleResponses.value.length > 0 || !!settleObservedLine.value,
 );
 
 function settleResponseLabel(response: SettleResponse): string {
@@ -309,10 +302,8 @@ const effectiveTarget = computed(() => {
 
 const summary = computed(() => {
   const action = ACTION_LABELS[props.step.action] ?? props.step.action;
-  const target = showTarget.value ? effectiveTarget.value : props.step.value ?? "";
-  const sentence = target
-    ? t("synthetics.journey.summaryWithTarget", { action, target })
-    : action;
+  const target = showTarget.value ? effectiveTarget.value : (props.step.value ?? "");
+  const sentence = target ? t("synthetics.journey.summaryWithTarget", { action, target }) : action;
   const effectiveTimeout = props.step.timeout ?? timeoutDefault.value;
   return t("synthetics.journey.summaryWaitingUpTo", {
     sentence,
@@ -375,10 +366,7 @@ const advancedCaption = computed(
     <!-- What this step will do, in the author's words rather than the tool's.
          Composed from the same values the fields below show, so the two cannot
          disagree. -->
-    <p
-      class="text-text-body m-0 text-sm"
-      data-test="synthetics-journey-step-summary"
-    >
+    <p class="text-text-body m-0 text-sm" data-test="synthetics-journey-step-summary">
       {{ summary }}
     </p>
 
@@ -534,10 +522,7 @@ const advancedCaption = computed(
         />
         <!-- Additive to the placeholder, which P1.1.5 mandates: says what blank
              means, and on navigate/assert that the default is also the ceiling. -->
-        <p
-          class="text-text-secondary m-0 text-xs"
-          data-test="synthetics-journey-step-timeout-help"
-        >
+        <p class="text-text-secondary m-0 text-xs" data-test="synthetics-journey-step-timeout-help">
           {{ timeoutHelp }}
         </p>
         <p

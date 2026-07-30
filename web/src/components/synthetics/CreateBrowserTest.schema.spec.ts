@@ -234,7 +234,12 @@ describe("makeBrowserCheckSaveSchema field-level step rules", () => {
     const result = schema.safeParse(
       form([
         opened,
-        { id: "2", action: "assert", locator: pin, assertion: { kind: "element_text", expected: "" } },
+        {
+          id: "2",
+          action: "assert",
+          locator: pin,
+          assertion: { kind: "element_text", expected: "" },
+        },
       ]),
     );
 
@@ -244,7 +249,10 @@ describe("makeBrowserCheckSaveSchema field-level step rules", () => {
 
   it("should accept a visibility assertion, which needs no expected value", () => {
     const result = schema.safeParse(
-      form([opened, { id: "2", action: "assert", locator: pin, assertion: { kind: "element_visible" } }]),
+      form([
+        opened,
+        { id: "2", action: "assert", locator: pin, assertion: { kind: "element_visible" } },
+      ]),
     );
 
     expect(result.success).toBe(true);

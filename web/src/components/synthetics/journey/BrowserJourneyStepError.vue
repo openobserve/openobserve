@@ -1,5 +1,6 @@
-<script setup lang="ts">
 // Copyright 2026 OpenObserve Inc.
+
+<script setup lang="ts">
 /**
  * What the runner saw on a step that failed during replay.
  *
@@ -115,11 +116,7 @@ const fidelityNotes = computed(() => props.result.fidelity?.notes ?? []);
 
     <!-- X-8.2: what the preview could not reproduce. Silence here is the failure
          mode the requirement exists to prevent. -->
-    <div
-      v-if="fidelityNotes.length"
-      class="px-3 pb-3"
-      data-test="synthetics-journey-step-fidelity"
-    >
+    <div v-if="fidelityNotes.length" class="px-3 pb-3" data-test="synthetics-journey-step-fidelity">
       <span class="text-2xs text-text-label font-medium">
         {{ t("synthetics.journey.fidelityLabel") }}
       </span>

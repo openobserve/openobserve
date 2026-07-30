@@ -39,9 +39,7 @@ describe("BrowserJourneyStepEditor targeting", () => {
   it("renders the locator block, never the v1 selector pair", () => {
     const wrapper = render();
     expect(wrapper.find(test("synthetics-journey-step-locator")).exists()).toBe(true);
-    expect(wrapper.find(test("synthetics-journey-step-selector-type-select")).exists()).toBe(
-      false,
-    );
+    expect(wrapper.find(test("synthetics-journey-step-selector-type-select")).exists()).toBe(false);
     expect(wrapper.find(test("synthetics-journey-step-selector-input")).exists()).toBe(false);
   });
 
@@ -126,9 +124,9 @@ describe("BrowserJourneyStepEditor inline field errors", () => {
       { action: "assert", assertion: { kind: "element_text", expected: "" } },
       { expectedErrorMessage: "Enter the value this assertion should expect" },
     );
-    expect(
-      wrapper.find(test("synthetics-journey-step-assertion-expected-input")).text(),
-    ).toContain("Enter the value this assertion should expect");
+    expect(wrapper.find(test("synthetics-journey-step-assertion-expected-input")).text()).toContain(
+      "Enter the value this assertion should expect",
+    );
   });
 
   it("renders no error text when the host passes none", () => {
@@ -148,9 +146,9 @@ describe("BrowserJourneyStepEditor inline field errors", () => {
 // which is a control whose only effect is to let an author close what they need.
 describe("BrowserJourneyStepEditor field layout", () => {
   const groups = (wrapper: ReturnType<typeof render>) =>
-    wrapper.findAll('[data-test^="synthetics-journey-step-group-"]').map((g) =>
-      g.attributes("data-test"),
-    );
+    wrapper
+      .findAll('[data-test^="synthetics-journey-step-group-"]')
+      .map((g) => g.attributes("data-test"));
 
   it("renders the always-visible block and exactly one collapsible", () => {
     const wrapper = render();
@@ -163,9 +161,7 @@ describe("BrowserJourneyStepEditor field layout", () => {
   // OCollapsible unmounts collapsed content, so `Advanced` must be opened before
   // its fields are in the DOM — it being closed by default is the point.
   async function openAdvanced(wrapper: ReturnType<typeof render>) {
-    await wrapper
-      .find(`${test("synthetics-journey-step-group-advanced")} button`)
-      .trigger("click");
+    await wrapper.find(`${test("synthetics-journey-step-group-advanced")} button`).trigger("click");
   }
 
   it("needs no click to reach action, name, target and value", () => {
@@ -197,9 +193,7 @@ describe("BrowserJourneyStepEditor field layout", () => {
   // one existed.
   it("reaches the settle budget on a hand-added step with no settle data", async () => {
     const wrapper = render();
-    expect(wrapper.find(test("synthetics-journey-step-settle-budget-input")).exists()).toBe(
-      false,
-    );
+    expect(wrapper.find(test("synthetics-journey-step-settle-budget-input")).exists()).toBe(false);
     await openAdvanced(wrapper);
     expect(wrapper.find(test("synthetics-journey-step-settle-budget-input")).exists()).toBe(true);
   });
@@ -308,7 +302,12 @@ describe("BrowserJourneyStepEditor plain language", () => {
 
   it("renames the Playwright terms out of the visible copy", () => {
     const wrapper = render({
-      locator: { candidates: [{ kind: "css", value: "#a" }, { kind: "css", value: "#b" }] },
+      locator: {
+        candidates: [
+          { kind: "css", value: "#a" },
+          { kind: "css", value: "#b" },
+        ],
+      },
     });
     const txt = wrapper.text();
     expect(txt).toContain("How to find this element");
@@ -360,16 +359,14 @@ describe("BrowserJourneyStepEditor flow-control help", () => {
 // the only place a wire is still present.
 describe("BrowserJourneyStepEditor action-change notice", () => {
   const selectAction = async (wrapper: ReturnType<typeof render>, action: string) => {
-    await wrapper
-      .findComponent({ name: "OSelect" })
-      .vm.$emit("update:modelValue", action);
+    await wrapper.findComponent({ name: "OSelect" }).vm.$emit("update:modelValue", action);
   };
 
   it("says the step is rebuilt when a recorded wire is discarded", async () => {
     const wrapper = render({ wire: { id: "w1", action: "click" } as never });
-    expect(
-      wrapper.find(test("synthetics-journey-step-action-changed-notice")).exists(),
-    ).toBe(false);
+    expect(wrapper.find(test("synthetics-journey-step-action-changed-notice")).exists()).toBe(
+      false,
+    );
 
     await selectAction(wrapper, "navigate");
     expect(wrapper.find(test("synthetics-journey-step-action-changed-notice")).text()).toMatch(
@@ -380,16 +377,16 @@ describe("BrowserJourneyStepEditor action-change notice", () => {
   it("stays silent for a stored step, which carries no wire to lose", async () => {
     const wrapper = render(); // no `wire` — the shape mapWireSteps now produces
     await selectAction(wrapper, "navigate");
-    expect(
-      wrapper.find(test("synthetics-journey-step-action-changed-notice")).exists(),
-    ).toBe(false);
+    expect(wrapper.find(test("synthetics-journey-step-action-changed-notice")).exists()).toBe(
+      false,
+    );
   });
 
   it("stays silent when the action is re-selected unchanged", async () => {
     const wrapper = render({ wire: { id: "w1", action: "click" } as never });
     await selectAction(wrapper, "click");
-    expect(
-      wrapper.find(test("synthetics-journey-step-action-changed-notice")).exists(),
-    ).toBe(false);
+    expect(wrapper.find(test("synthetics-journey-step-action-changed-notice")).exists()).toBe(
+      false,
+    );
   });
 });

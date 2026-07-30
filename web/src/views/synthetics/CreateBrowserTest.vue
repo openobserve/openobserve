@@ -850,7 +850,7 @@ function onClearResults() {
               class="h-full!"
               @need-extension-setup="onNeedExtensionSetup"
               @replay="onReplay"
-        @replay-up-to="onReplayUpTo"
+              @replay-up-to="onReplayUpTo"
               @stop-replay="onStopReplay"
               @clear-results="onClearResults"
               @auto-record-consumed="autoRecord = false"
