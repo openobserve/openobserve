@@ -120,7 +120,10 @@ export class SanityPage {
         this.functionListSearchInputField = page.locator('[data-test="functions-list-search-input-field"]');
         this.functionListAddButton = page.locator('[data-test="function-list-add-function-btn"]');
         this.functionListDeleteFirstBtn = page.locator('[data-test="function-list-delete-function-btn"]').first();
-        this.addFunctionNameInputField = page.locator('[data-test="add-function-name-input-field"]');
+        // Function name is an inline-edited title (OFormInlineEdit): a display
+        // trigger swaps to an input on click.
+        this.addFunctionNameTrigger = page.locator('[data-test="add-function-name-input-trigger"]');
+        this.addFunctionNameInputField = page.locator('[data-test="add-function-name-input-input"]');
         this.addFunctionSaveBtn = page.locator('[data-test="add-function-save-btn"]');
 
         // ============================================================
@@ -468,8 +471,10 @@ export class SanityPage {
         await this.functionListAddButton.waitFor({ state: 'visible', timeout: 10000 });
         await this.functionListAddButton.click();
 
+        // Open the inline editor via its trigger, then fill the revealed input.
+        await this.addFunctionNameTrigger.waitFor({ state: 'visible', timeout: 10000 });
+        await this.addFunctionNameTrigger.click();
         await this.addFunctionNameInputField.waitFor({ state: 'visible', timeout: 10000 });
-        await this.addFunctionNameInputField.click();
         await this.addFunctionNameInputField.fill(uniqueFunctionName);
 
         // Drive the Monaco VRL editor via keyboard input — Monaco's setValue does not

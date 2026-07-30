@@ -110,8 +110,10 @@ export class PipelinesPage {
         this.pipelineNameRequiredMessage = page.locator(
           '[data-test="pipeline-editor-name-input-error"]'
         ).first();
-        // Pipeline name OInput - auto-derived `-field` for the native input.
-        this.pipelineNameInput = page.locator('[data-test="pipeline-editor-name-input-field"]');
+        // Pipeline name is an inline-edited title (OFormInlineEdit): a display
+        // trigger swaps to an input on click. -trigger opens, -input edits.
+        this.pipelineNameTrigger = page.locator('[data-test="pipeline-editor-name-input-trigger"]');
+        this.pipelineNameInput = page.locator('[data-test="pipeline-editor-name-input-input"]');
         // Source/destination node required errors are toasts in PipelineEditor.
         // OToast emits `data-test="o-toast-default"` (no variant) with the
         // message on `data-test-message`. Match the message attribute prefix.
@@ -219,7 +221,9 @@ export class PipelinesPage {
         this.toastError = page.locator('[data-test-variant="error"]');
         this.toastSuccess = page.locator('[data-test-variant="success"]');
         this.functionNameInput = page.locator('[data-test="add-function-name-input"]');
-        this.functionNameInputField = page.locator('[data-test="add-function-name-input-field"]');
+        // Function name is an inline-edited title (OFormInlineEdit): -trigger opens, -input edits.
+        this.functionNameTrigger = page.locator('[data-test="add-function-name-input-trigger"]');
+        this.functionNameInputField = page.locator('[data-test="add-function-name-input-input"]');
         this.addConditionSaveButton = page.locator('[data-test="add-condition-drawer"] [data-test="o-drawer-primary-btn"]');
         this.enrichmentTableTab = '[data-test="pipeline-section-tab-enrichmentTables"]';
         // Added data-test "enrichment-tables-add-btn" on the New Enrichment
@@ -764,8 +768,10 @@ export class PipelinesPage {
             .first()
             .waitFor({ state: 'detached', timeout: 10000 })
             .catch(() => {});
+        // Open the inline editor via its trigger, then fill the revealed input.
+        await this.pipelineNameTrigger.waitFor({ state: 'visible', timeout: 10000 });
+        await this.pipelineNameTrigger.click();
         await this.pipelineNameInput.waitFor({ state: 'visible', timeout: 10000 });
-        await this.pipelineNameInput.click();
         await this.pipelineNameInput.fill(pipelineName);
     }
 
@@ -1001,6 +1007,9 @@ export class PipelinesPage {
     }
 
     async enterFunctionName(name) {
+        // Open the inline editor, then fill the revealed input.
+        await this.functionNameTrigger.click();
+        await this.functionNameInputField.waitFor({ state: 'visible', timeout: 10000 });
         await this.functionNameInputField.fill(name);
     }
 
@@ -3253,7 +3262,9 @@ export class PipelinesPage {
      * @returns {Promise<boolean>} True if input is visible
      */
     async isPipelineNameInputVisible() {
-        return await this.pipelineNameInput.isVisible({ timeout: 5000 }).catch(() => false);
+        // The name trigger is what renders on the editor page (the input only
+        // appears once opened) — use it as the "still on the page" signal.
+        return await this.pipelineNameTrigger.isVisible({ timeout: 5000 }).catch(() => false);
     }
 
     /**

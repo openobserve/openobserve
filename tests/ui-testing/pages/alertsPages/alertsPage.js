@@ -63,8 +63,10 @@ export class AlertsPage {
             // Alert creation locators - Alerts 2.0 Wizard UI
             addAlertButton: '[data-test="alert-list-add-alert-btn"]',
             alertNameInput: '[data-test="add-alert-name-input"]',
-            // OInput inner native input - always use the `-field` variant for fill/clear operations (§4)
-            alertNameInputField: '[data-test="add-alert-name-input-field"]',
+            // Alert name is an inline-edited title (OFormInlineEdit): a display
+            // trigger swaps to an input on click. -trigger opens, -input edits.
+            alertNameTrigger: '[data-test="add-alert-name-input-trigger"]',
+            alertNameInputField: '[data-test="add-alert-name-input-input"]',
             alertSubmitButton: '[data-test="add-alert-submit-btn"]',
             alertBackButton: '[data-test="add-alert-back-btn"]',
 
@@ -819,8 +821,10 @@ export class AlertsPage {
      * @param {string} name - Alert name
      */
     async fillAlertName(name) {
-        // OInput renders data-test on outer <div>; wait on wrapper for visibility, fill on inner -field input
-        await this.page.locator(this.locators.alertNameInput).waitFor({ state: 'visible', timeout: 3000 });
+        // Inline-edit title: click the trigger to open the editor, then fill the input.
+        await this.page.locator(this.locators.alertNameTrigger).waitFor({ state: 'visible', timeout: 3000 });
+        await this.page.locator(this.locators.alertNameTrigger).click();
+        await this.page.locator(this.locators.alertNameInputField).waitFor({ state: 'visible', timeout: 3000 });
         await this.page.locator(this.locators.alertNameInputField).fill(name);
         testLogger.info(`Filled alert name: ${name}`);
     }
@@ -1106,8 +1110,10 @@ export class AlertsPage {
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
 
-        // v3 UI validates non-empty name — clear input and submit to trigger validation
-        await this.page.locator(this.locators.alertNameInputField).click();
+        // v3 UI validates non-empty name — open the inline editor, clear it, then
+        // submit to trigger validation.
+        await this.page.locator(this.locators.alertNameTrigger).click();
+        await this.page.locator(this.locators.alertNameInputField).waitFor({ state: 'visible', timeout: 3000 });
         await this.page.locator(this.locators.alertNameInputField).clear();
 
         // Click Save to trigger required-field validation
@@ -1134,7 +1140,8 @@ export class AlertsPage {
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
 
-        await this.page.locator(this.locators.alertNameInput).click();
+        await this.page.locator(this.locators.alertNameTrigger).click();
+        await this.page.locator(this.locators.alertNameInputField).waitFor({ state: 'visible', timeout: 3000 });
         await this.page.locator(this.locators.alertNameInputField).fill('abc');
 
         // Click Save to trigger field validation (v3 UI — no Continue button)
@@ -2458,7 +2465,9 @@ export class AlertsPage {
      * Fill the alert name input
      */
     async fillAlertName(alertName) {
-        // OInput renders data-test on outer <div>; use -field suffix for the native input
+        // Inline-edit title: click the trigger to open the editor, then fill the input.
+        await this.page.locator(this.locators.alertNameTrigger).click();
+        await this.page.locator(this.locators.alertNameInputField).waitFor({ state: 'visible', timeout: 3000 });
         await this.page.locator(this.locators.alertNameInputField).fill(alertName);
         testLogger.info('Filled alert name', { alertName });
     }

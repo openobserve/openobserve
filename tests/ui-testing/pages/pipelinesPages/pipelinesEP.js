@@ -10,9 +10,10 @@ export class PipelinesEP {
         this.functionStreamTab = '[data-test="pipeline-section-tab-functions"]';
         this.createFunctionToggle = page.locator('[data-test="create-function-toggle"] div').nth(2);
         this.createFunctionButton = this.page.locator('[data-test="function-list-add-function-btn"]');
-        // OInput: outer wrapper has data-test="foo"; inner native <input> has data-test="foo-field".
-        // Use the -field suffix for fill() and waitFor({ state: 'attached' }) + force: true.
-        this.functionNameInput = '[data-test="add-function-name-input-field"]';
+        // Function name is an inline-edited title (OFormInlineEdit): a display
+        // trigger swaps to an input on click. -trigger opens, -input edits.
+        this.functionNameTrigger = '[data-test="add-function-name-input-trigger"]';
+        this.functionNameInput = '[data-test="add-function-name-input-input"]';
         this.saveFunctionButton = '[data-test="add-function-save-btn"]';
         this.logsSearchField = '[data-test="logs-vrl-function-editor"]';
         this.logsSearchFieldCollapseButton = '[data-test="logs-search-field-list-collapse-btn"]';
@@ -120,14 +121,14 @@ export class PipelinesEP {
     }
 
     async _fillFunctionName(functionName) {
-        // OInput renders the wrapper div with data-test="foo" and the inner <input>
-        // with data-test="foo-field". The inner input is a controlled input (:value binding).
-        // Clicking the outer wrapper focuses the inner input; then keyboard.type() dispatches
-        // proper input events that Vue's reactive system picks up correctly.
-        const wrapper = this.page.locator('[data-test="add-function-name-input"]');
-        await wrapper.waitFor({ state: 'visible', timeout: 15000 });
-        await wrapper.click();
-        await this.page.waitForTimeout(200);
+        // Name is an inline-edited title (OFormInlineEdit): clicking the display
+        // trigger swaps in an input and focuses it (auto-selecting the current
+        // value). keyboard.type() then dispatches proper input events that Vue's
+        // reactive system picks up correctly.
+        const trigger = this.page.locator(this.functionNameTrigger);
+        await trigger.waitFor({ state: 'visible', timeout: 15000 });
+        await trigger.click();
+        await this.page.locator(this.functionNameInput).waitFor({ state: 'visible', timeout: 15000 });
         await this.page.keyboard.type(functionName, { delay: 30 });
     }
 
