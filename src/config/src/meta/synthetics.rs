@@ -633,27 +633,58 @@ pub struct SshAuth {
 // `locator` is optional, with a defined absent-behaviour, which is what lets the
 // phases ship independently.
 
-/// One way to find an element. Ordered most-stable-first inside a bundle.
+/// One part of a combined locator, and how it attaches to what precedes it.
+///
+/// Structured rather than a bare string because the relation CANNOT be
+/// recomputed: whether two locators name the same element or one contains the
+/// other depends on DOM structure the editor never sees. It is a decision a
+/// human made, so it is stored. `value` stays authoritative for execution — the
+/// probe, the player and results display all keep handing the candidate's own
+/// `value` to `page.locator()`, so no consumer needs a builder.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct CompositePart {
+    pub value: String,
+    /// Absent on the FIRST part, which is the base the others attach to.
+    /// "and" | "has" | "has_not" | "descendant" on every later part.
+    #[serde(default)]
+    pub relation: Option<String>,
+}
+
+/// One way to find an element. The bundle's order is the resolution order.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct LocatorCandidate {
     /// "test_attribute" | "role" | "text" | "css" | "xpath"
     pub kind: String,
     pub value: String,
+    /// Where it came from: "recorded" (default) | "authored" | "composite".
+    /// Healing may only touch a recorded entry — see the H1-H6 contract.
+    #[serde(default)]
+    pub origin: Option<String>,
+    /// What a combined locator was built from, and how. Required when
+    /// `origin == "composite"`, forbidden otherwise.
+    #[serde(default)]
+    pub from: Option<Vec<CompositePart>>,
 }
 
-/// Every way the recorder found to identify one element, plus an optional
-/// author pin. Candidates are machine-derived evidence and read-only in the UI;
-/// `user_override` is the only channel for author intent, which is what makes
-/// "never heal a pinned step" fall out for free.
+/// Every way to identify one element, in the order they are tried.
+///
+/// The order is the author's, not the recorder's: they drag rows, add their own
+/// locators and combine recorded ones. That replaced `user_override`, a single
+/// exclusive pin whose only way to say "prefer this one" was to turn fallback
+/// off entirely. An ordered list says the same thing by deleting the others,
+/// and can also say "prefer mine, fall back to the recording", which a pin
+/// could not.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields)]
 pub struct StepLocator {
     #[serde(default)]
     pub candidates: Vec<LocatorCandidate>,
-    /// When set, used exclusively — never falls back to `candidates`.
+    /// A human has reordered, added, deleted or combined. Healing must never
+    /// reorder such a list.
     #[serde(default)]
-    pub user_override: Option<LocatorCandidate>,
+    pub author_ordered: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1029,7 +1060,33 @@ const MAX_STEPS: usize = 50;
 /// the HTTP resolve/ack bodies rather than the Lambda invoke payload, so neither
 /// storage nor transport needs changing.
 const MAX_STEPS_JSON_BYTES: usize = 262_144;
-const MAX_LOCATOR_CANDIDATES: usize = 5;
+/// What a stored bundle may hold.
+///
+/// There are two caps, and only this one is the server's. The RECORDER stops at
+/// five (`locatorBundle.ts`), which bounds probe cost per run without asking the
+/// author — the fifth way to find an element adds almost nothing once the first
+/// four have failed. The extra three here leave room for locators the author
+/// wrote and combinations they built: past five they are choosing the probe cost
+/// explicitly, and that difference is what justifies two numbers. Enforcing the
+/// recorder's five here would refuse the author's own work.
+const MAX_STORED_LOCATOR_CANDIDATES: usize = 8;
+
+/// Where a candidate came from. Provenance, not stability — how long a locator
+/// keeps working is derived from its `value`, never stored (P2.2.3).
+const LOCATOR_ORIGINS: &[&str] = &["recorded", "authored", "composite"];
+
+/// How one part of a combined locator attaches to the part before it.
+///
+/// Named after Playwright's own operations rather than CSS's, because the
+/// stored value IS a Playwright selector string and anyone debugging a monitor
+/// reads Playwright's documentation: `and` is `.and(b)`, `has` and `has_not`
+/// are `.filter({ has })` / `.filter({ hasNot })`, `descendant` is `.locator(b)`.
+///
+/// All four validate; the editor offers two. That is the whole reason the
+/// relation is stored — adding `has_not` or `descendant` later is a UI change,
+/// not a schema migration. `.or()` is deliberately absent: it unions in DOM
+/// order and so destroys the preference the ordered bundle exists to express.
+const COMPOSITE_RELATIONS: &[&str] = &["and", "has", "has_not", "descendant"];
 
 /// The recorder's test-id attribute when a monitor does not set one.
 ///
@@ -1512,6 +1569,90 @@ fn validate_v2_assertion(i: usize, assertion: &StepAssertion) -> Result<(), Stri
     Ok(())
 }
 
+/// Provenance and composition rules for one candidate in a bundle.
+///
+/// Structure only. Whether a combined locator actually matches anything cannot
+/// be decided here — it depends on the page — and the editor has no live DOM
+/// either, so it is unverified until it runs (R2b.c). What IS decidable is that
+/// a composite says what it was built from, that a non-composite does not
+/// claim to be one, and that the parts form a base plus a chain of joins.
+fn validate_locator_candidate(
+    i: usize,
+    c: usize,
+    candidate: &LocatorCandidate,
+) -> Result<(), String> {
+    let origin = candidate.origin.as_deref().unwrap_or("recorded");
+    if !LOCATOR_ORIGINS.contains(&origin) {
+        return Err(format!(
+            "config.steps[{i}].locator.candidates[{c}].origin: unknown origin '{origin}' \
+             (valid: {})",
+            LOCATOR_ORIGINS.join(", ")
+        ));
+    }
+
+    let Some(parts) = candidate.from.as_ref() else {
+        if origin == "composite" {
+            return Err(format!(
+                "config.steps[{i}].locator.candidates[{c}]: origin 'composite' requires 'from'"
+            ));
+        }
+        return Ok(());
+    };
+
+    // A `from` on anything else is a claim the value does not back up: nothing
+    // built it, so nothing can rebuild or explain it.
+    if origin != "composite" {
+        return Err(format!(
+            "config.steps[{i}].locator.candidates[{c}]: 'from' is only valid on a \
+             'composite' candidate, not on '{origin}'"
+        ));
+    }
+    // One part is not a combination, it is the part itself.
+    if parts.len() < 2 {
+        return Err(format!(
+            "config.steps[{i}].locator.candidates[{c}].from: a composite needs at least 2 \
+             parts, got {}",
+            parts.len()
+        ));
+    }
+
+    for (p, part) in parts.iter().enumerate() {
+        if part.value.trim().is_empty() {
+            return Err(format!(
+                "config.steps[{i}].locator.candidates[{c}].from[{p}]: 'value' must not be empty"
+            ));
+        }
+        match (p, part.relation.as_deref()) {
+            // The base is what the later parts attach to. A relation on it would
+            // have nothing to relate to.
+            (0, Some(r)) => {
+                return Err(format!(
+                    "config.steps[{i}].locator.candidates[{c}].from[0]: the base part must \
+                     carry no relation, got '{r}'"
+                ));
+            }
+            (0, None) => {}
+            (_, None) => {
+                return Err(format!(
+                    "config.steps[{i}].locator.candidates[{c}].from[{p}]: every part after the \
+                     base must carry a relation (valid: {})",
+                    COMPOSITE_RELATIONS.join(", ")
+                ));
+            }
+            (_, Some(r)) if !COMPOSITE_RELATIONS.contains(&r) => {
+                return Err(format!(
+                    "config.steps[{i}].locator.candidates[{c}].from[{p}].relation: unknown \
+                     relation '{r}' (valid: {})",
+                    COMPOSITE_RELATIONS.join(", ")
+                ));
+            }
+            (_, Some(_)) => {}
+        }
+    }
+
+    Ok(())
+}
+
 /// Validate every step in a journey. There is one step format, so this is the
 /// only step-validation path — the untyped version-1 branch beside it was
 /// deleted with version 1 itself (Phase 2c).
@@ -1592,16 +1733,20 @@ fn validate_v2_steps(steps: &[serde_json::Value]) -> Result<(), String> {
                     step.action
                 )
             })?;
-            if locator.candidates.is_empty() && locator.user_override.is_none() {
+            if locator.candidates.is_empty() {
                 return Err(format!(
-                    "config.steps[{i}].locator: needs at least one candidate or a user_override"
+                    "config.steps[{i}].locator: needs at least one candidate"
                 ));
             }
-            if locator.candidates.len() > MAX_LOCATOR_CANDIDATES {
+            if locator.candidates.len() > MAX_STORED_LOCATOR_CANDIDATES {
                 return Err(format!(
-                    "config.steps[{i}].locator.candidates: too many ({} > {MAX_LOCATOR_CANDIDATES})",
+                    "config.steps[{i}].locator.candidates: too many ({} > \
+                     {MAX_STORED_LOCATOR_CANDIDATES})",
                     locator.candidates.len()
                 ));
+            }
+            for (c, candidate) in locator.candidates.iter().enumerate() {
+                validate_locator_candidate(i, c, candidate)?;
             }
         }
 
@@ -2594,33 +2739,196 @@ mod tests {
         assert!(err.contains("locator"), "{err}");
     }
 
-    #[test]
-    fn test_v2_user_override_satisfies_the_locator_requirement() {
+    // ── Provenance and composition (Phase 2b) ────────────────────────────
+    //
+    // `user_override` is GONE. It was a single exclusive pin whose only way to
+    // say "prefer this one" was to turn fallback off entirely; the ordered
+    // bundle says the same thing by deleting the others, and can also say
+    // "prefer mine, fall back to the recording". Deleting rather than
+    // deprecating is safe only because the pin feature never deployed — a
+    // stored one would now be an unknown field, and `fetch_due`'s
+    // `unwrap_or_default()` would silently empty `browser_devices` on every
+    // scheduling pass rather than erroring.
+
+    fn locator_with(candidates: serde_json::Value) -> Synthetic {
+        let mut step = v2_click_step();
+        step["locator"] = serde_json::json!({ "candidates": candidates });
+        v2_synthetic(serde_json::json!([v2_nav_step(), step]))
+    }
+
+    fn locator_error(candidates: serde_json::Value) -> String {
         let (locs, brs, devs) = allowed();
-        let step = serde_json::json!({
-            "id": "s2",
-            "action": "click",
-            "name": "Sign In",
-            "locator": {
-                "candidates": [],
-                "user_override": { "kind": "css", "value": "#pinned" }
-            }
-        });
-        let s = v2_synthetic(serde_json::json!([v2_nav_step(), step]));
-        assert!(s.validate(&locs, &brs, &devs, true).is_ok());
+        locator_with(candidates)
+            .validate(&locs, &brs, &devs, true)
+            .unwrap_err()
+    }
+
+    fn locator_ok(candidates: serde_json::Value) {
+        let (locs, brs, devs) = allowed();
+        let r = locator_with(candidates).validate(&locs, &brs, &devs, true);
+        assert!(r.is_ok(), "{}", r.unwrap_err());
     }
 
     #[test]
-    fn test_v2_caps_locator_candidates_at_five() {
+    fn test_a_stored_user_override_is_now_rejected() {
         let (locs, brs, devs) = allowed();
-        let candidates: Vec<_> = (0..6)
-            .map(|i| serde_json::json!({ "kind": "css", "value": format!("#c{i}") }))
-            .collect();
         let mut step = v2_click_step();
-        step["locator"]["candidates"] = serde_json::json!(candidates);
+        step["locator"]["user_override"] = serde_json::json!({ "kind": "css", "value": "#pin" });
         let s = v2_synthetic(serde_json::json!([v2_nav_step(), step]));
         let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
-        assert!(err.contains("candidates"), "{err}");
+        // Loud on purpose: it means stored data exists that we believed did not.
+        assert!(err.contains("unknown field `user_override`"), "{err}");
+    }
+
+    #[test]
+    fn test_an_empty_bundle_is_now_the_only_way_to_miss_a_target() {
+        // The rule used to read "at least one candidate OR a user_override".
+        let (locs, brs, devs) = allowed();
+        let mut step = v2_click_step();
+        step["locator"] = serde_json::json!({ "candidates": [] });
+        let s = v2_synthetic(serde_json::json!([v2_nav_step(), step]));
+        let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
+        assert!(err.contains("needs at least one candidate"), "{err}");
+    }
+
+    #[test]
+    fn test_origin_defaults_to_recorded_and_an_unknown_one_is_rejected() {
+        locator_ok(serde_json::json!([{ "kind": "css", "value": "#a" }]));
+        locator_ok(serde_json::json!([{ "kind": "css", "value": "#a", "origin": "authored" }]));
+
+        let err = locator_error(
+            serde_json::json!([{ "kind": "css", "value": "#a", "origin": "invented" }]),
+        );
+        assert!(
+            err.contains("steps[1].locator.candidates[0].origin"),
+            "{err}"
+        );
+        assert!(err.contains("invented"), "{err}");
+    }
+
+    #[test]
+    fn test_a_composite_must_say_what_it_was_built_from() {
+        let err = locator_error(
+            serde_json::json!([{ "kind": "css", "value": "#a", "origin": "composite" }]),
+        );
+        assert!(err.contains("requires 'from'"), "{err}");
+
+        // One part is not a combination, it is the part itself.
+        let err = locator_error(serde_json::json!([{
+            "kind": "css", "value": "#a", "origin": "composite",
+            "from": [{ "value": "#a" }]
+        }]));
+        assert!(err.contains("at least 2 parts"), "{err}");
+    }
+
+    #[test]
+    fn test_from_is_rejected_on_a_candidate_nothing_built() {
+        let err = locator_error(serde_json::json!([{
+            "kind": "css", "value": "#a", "origin": "recorded",
+            "from": [{ "value": "#a" }, { "relation": "and", "value": "#b" }]
+        }]));
+        assert!(
+            err.contains("only valid on a 'composite' candidate"),
+            "{err}"
+        );
+    }
+
+    #[test]
+    fn test_the_base_part_carries_no_relation_and_every_later_one_does() {
+        let base_has_relation = locator_error(serde_json::json!([{
+            "kind": "css", "value": "#a", "origin": "composite",
+            "from": [{ "relation": "and", "value": "#a" }, { "relation": "and", "value": "#b" }]
+        }]));
+        assert!(base_has_relation.contains("from[0]"), "{base_has_relation}");
+        assert!(
+            base_has_relation.contains("must carry no relation"),
+            "{base_has_relation}"
+        );
+
+        let join_has_none = locator_error(serde_json::json!([{
+            "kind": "css", "value": "#a", "origin": "composite",
+            "from": [{ "value": "#a" }, { "value": "#b" }]
+        }]));
+        assert!(join_has_none.contains("from[1]"), "{join_has_none}");
+        assert!(
+            join_has_none.contains("must carry a relation"),
+            "{join_has_none}"
+        );
+    }
+
+    #[test]
+    fn test_all_four_relations_validate_even_the_two_the_editor_does_not_offer() {
+        // E2b.12. This is the whole reason the relation is stored: adding
+        // `has_not` or `descendant` to the dialog later is a UI change, not a
+        // schema migration.
+        for relation in ["and", "has", "has_not", "descendant"] {
+            locator_ok(serde_json::json!([{
+                "kind": "css", "value": "#a", "origin": "composite",
+                "from": [{ "value": "#a" }, { "relation": relation, "value": "#b" }]
+            }]));
+        }
+
+        let err = locator_error(serde_json::json!([{
+            "kind": "css", "value": "#a", "origin": "composite",
+            "from": [{ "value": "#a" }, { "relation": "or", "value": "#b" }]
+        }]));
+        // `.or()` unions in DOM order, destroying the preference the ordered
+        // bundle exists to express. Rejected on merit, not deferred.
+        assert!(err.contains("from[1].relation"), "{err}");
+        assert!(err.contains("'or'"), "{err}");
+    }
+
+    #[test]
+    fn test_a_three_way_composite_validates() {
+        locator_ok(serde_json::json!([{
+            "kind": "test_attribute", "value": "#a", "origin": "composite",
+            "from": [
+                { "value": "[data-test=\"row\"]" },
+                { "relation": "and", "value": "[data-org=\"acme\"]" },
+                { "relation": "has", "value": "internal:text=\"acme_prod\"" }
+            ]
+        }]));
+    }
+
+    #[test]
+    fn test_author_ordered_defaults_false_and_round_trips() {
+        let (locs, brs, devs) = allowed();
+        let mut step = v2_click_step();
+        step["locator"]["author_ordered"] = serde_json::json!(true);
+        let s = v2_synthetic(serde_json::json!([v2_nav_step(), step]));
+        assert!(s.validate(&locs, &brs, &devs, true).is_ok());
+
+        let bare: StepLocator =
+            serde_json::from_value(serde_json::json!({ "candidates": [] })).unwrap();
+        assert!(!bare.author_ordered);
+    }
+
+    #[test]
+    fn test_a_bundle_carrying_none_of_the_new_fields_still_validates() {
+        // Deployment skew: `oo` Rust ships before the web and crx builds that
+        // start sending provenance, so the old shape has to keep working.
+        locator_ok(serde_json::json!([
+            { "kind": "test_attribute", "value": "[data-test=\"login-sign-in\"]" },
+            { "kind": "role", "value": "role=button[name=\"Sign In\"]" }
+        ]));
+    }
+
+    #[test]
+    fn test_the_stored_cap_leaves_room_for_the_author() {
+        // The recorder still stops at 5, in crx. The extra three here are for
+        // locators the author wrote and combinations they built — past that they
+        // are choosing the probe cost explicitly, and enforcing the recorder's
+        // cap on the server would refuse their own work.
+        let candidates = |n: usize| -> serde_json::Value {
+            (0..n)
+                .map(|i| serde_json::json!({ "kind": "css", "value": format!("#c{i}") }))
+                .collect::<Vec<_>>()
+                .into()
+        };
+        locator_ok(candidates(MAX_STORED_LOCATOR_CANDIDATES));
+
+        let err = locator_error(candidates(MAX_STORED_LOCATOR_CANDIDATES + 1));
+        assert!(err.contains("too many (9 > 8)"), "{err}");
     }
 
     #[test]
