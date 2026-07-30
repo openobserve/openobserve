@@ -2837,7 +2837,6 @@
       "recordCount": "record count",
       "measure": "{fn} of {field}",
       "measureByDimension": "{subject} by {dimension}",
-      "andMore": "{subject} +{count} more",
       "streamOverview": "{stream} overview"
     },
     "selectField": "Field",

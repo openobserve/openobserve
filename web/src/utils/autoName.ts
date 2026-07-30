@@ -20,13 +20,12 @@ const MAX_MEASURES = 2;
 const capitalize = (value: string): string =>
   value.length > 0 ? value[0].toUpperCase() + value.slice(1) : value;
 
-/** Trim, collapse runs of whitespace, and clamp so a name never bloats the header. */
-const tidy = (value: string, maxLength = 80): string => {
-  const collapsed = value.replace(/\s+/g, " ").trim();
-  return collapsed.length > maxLength
-    ? `${collapsed.slice(0, maxLength - 1).trimEnd()}…`
-    : collapsed;
-};
+/**
+ * Collapse runs of whitespace and trim. The FULL name is kept — the header
+ * truncates it visually with CSS (an ellipsis in the saved value is wrong; the
+ * stored name must be the complete one).
+ */
+const tidy = (value: string): string => value.replace(/\s+/g, " ").trim();
 
 // ── Dashboard panels ───────────────────────────────────────────────────────
 
@@ -164,13 +163,10 @@ export function buildPanelAutoName(
 
   if (measures.length === 0) return streamFallback();
 
-  let subject = measures.slice(0, MAX_MEASURES).join(", ");
-  if (measures.length > MAX_MEASURES) {
-    subject = t("dashboard.autoName.andMore", {
-      subject,
-      count: measures.length - MAX_MEASURES,
-    });
-  }
+  // Name after the first couple of measures only — a short, readable name beats
+  // a complete one. A trailing "+N more" count just reads as clutter, so extra
+  // measures are dropped silently rather than tallied.
+  const subject = measures.slice(0, MAX_MEASURES).join(", ");
 
   // Breakdown is the explicit "split by" axis; on charts without one, a
   // non-time X field plays the same role. The time bucket is excluded by both

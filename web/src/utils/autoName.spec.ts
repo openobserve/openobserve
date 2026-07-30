@@ -8,7 +8,6 @@ const templates: Record<string, string> = {
   "dashboard.autoName.recordCount": "record count",
   "dashboard.autoName.measure": "{fn} of {field}",
   "dashboard.autoName.measureByDimension": "{subject} by {dimension}",
-  "dashboard.autoName.andMore": "{subject} +{count} more",
   "dashboard.autoName.streamOverview": "{stream} overview",
   "alerts.autoName.anomaly": "anomaly_{stream}",
   "alerts.autoName.realTime": "realtime_{stream}",
@@ -85,7 +84,7 @@ describe("buildPanelAutoName", () => {
     expect(name).toBe("Max of duration");
   });
 
-  it("summarises past two measures instead of listing them all", () => {
+  it("names after the first two measures and drops the rest (no '+N more' clutter)", () => {
     const name = buildPanelAutoName(
       panel({
         y: [
@@ -97,7 +96,7 @@ describe("buildPanelAutoName", () => {
       t,
     );
 
-    expect(name).toBe("Avg of duration, Max of duration +1 more");
+    expect(name).toBe("Avg of duration, Max of duration");
   });
 
   it("prefers a field's display label over its column", () => {
