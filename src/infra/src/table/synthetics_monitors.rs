@@ -448,6 +448,10 @@ pub struct AlertState {
     pub last_alert_at: i64,
     /// Whether the check is currently in the alerting state.
     pub alerting: bool,
+    /// When a degradation was last reported, in microseconds. 0 = not currently
+    /// degraded. Degradation persists for as long as the certificate takes to
+    /// expire, so it is suppressed by transition rather than by a time window.
+    pub degraded_notified_at: i64,
 }
 
 /// Reads the alert state without pulling the whole monitor (config, secrets and
@@ -461,14 +465,16 @@ pub async fn get_alert_state<C: ConnectionTrait>(
         .column(Column::ConsecutiveFailures)
         .column(Column::LastAlertAt)
         .column(Column::Alerting)
-        .into_tuple::<(i32, i64, bool)>()
+        .column(Column::DegradedNotifiedAt)
+        .into_tuple::<(i32, i64, bool, i64)>()
         .one(conn)
         .await?;
     Ok(row.map(
-        |(consecutive_failures, last_alert_at, alerting)| AlertState {
+        |(consecutive_failures, last_alert_at, alerting, degraded_notified_at)| AlertState {
             consecutive_failures,
             last_alert_at,
             alerting,
+            degraded_notified_at,
         },
     ))
 }
@@ -506,10 +512,15 @@ pub async fn update_alert_state_if<C: ConnectionTrait>(
         )
         .col_expr(Column::LastAlertAt, Expr::value(state.last_alert_at))
         .col_expr(Column::Alerting, Expr::value(state.alerting))
+        .col_expr(
+            Column::DegradedNotifiedAt,
+            Expr::value(state.degraded_notified_at),
+        )
         .filter(Column::Id.eq(id))
         .filter(Column::ConsecutiveFailures.eq(expected.consecutive_failures))
         .filter(Column::LastAlertAt.eq(expected.last_alert_at))
         .filter(Column::Alerting.eq(expected.alerting))
+        .filter(Column::DegradedNotifiedAt.eq(expected.degraded_notified_at))
         .exec(conn)
         .await?;
     Ok(res.rows_affected > 0)
@@ -696,6 +707,7 @@ mod tests {
             consecutive_failures: 0,
             last_alert_at: 0,
             alerting: false,
+            degraded_notified_at: 0,
             owner: None,
             created_at: 1750000000000000,
             updated_at: 1750000000000000,

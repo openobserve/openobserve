@@ -476,6 +476,47 @@ pub async fn fail_dispatch<C: ConnectionTrait>(
 }
 
 /// Deletes stale Pending rows whose valid_until has passed (missed entirely).
+/// Locations of this run's jobs that did not pass, worst first.
+///
+/// A notification for a completed run previously said only "the check is
+/// failing" — `CheckNotification` had no location field at all, and
+/// `AckResponse.location` is the location of whichever job happened to ack LAST,
+/// which would name an arbitrary one. With six locations and one broken, the
+/// message could not say which.
+///
+/// Read from `synthetics_jobs` rather than aggregated on the run row because the
+/// run keeps only `MAX(status)` — one integer, no per-location detail. Costs one
+/// query, on run completion only, not per ack.
+///
+/// Job status ints are the `synthetics_jobs` scale: 3=Passed, 4=Failed,
+/// 5=Warning, 6=Error. Anything other than Passed is returned.
+pub async fn failing_locations<C: ConnectionTrait>(
+    conn: &C,
+    run_id: &str,
+) -> Result<Vec<String>, errors::Error> {
+    let rows = Entity::find()
+        .select_only()
+        .column(Column::Location)
+        .column(Column::Status)
+        .filter(Column::RunId.eq(run_id))
+        .filter(Column::Status.ne(3))
+        .into_tuple::<(String, i32)>()
+        .all(conn)
+        .await?;
+    let mut rows = rows;
+    // Worst first: Error(6) > Warning(5) > Failed(4). A reader scanning the first
+    // line of a message should see the most severe location, not the
+    // alphabetically first.
+    rows.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+    let mut out: Vec<String> = Vec::with_capacity(rows.len());
+    for (loc, _) in rows {
+        if !out.contains(&loc) {
+            out.push(loc);
+        }
+    }
+    Ok(out)
+}
+
 pub async fn prune_stale<C: ConnectionTrait>(conn: &C, now_us: i64) -> Result<u64, errors::Error> {
     let sql = r#"
         DELETE FROM synthetics_jobs

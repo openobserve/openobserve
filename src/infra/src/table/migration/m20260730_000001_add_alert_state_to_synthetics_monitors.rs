@@ -32,6 +32,11 @@
 //!   - `alerting` — whether the check is currently in the alerting state. This is what makes a
 //!     recovery notification possible: without it "recovered" cannot be told from "was never
 //!     alerting", and once a cooldown exists, silence stops meaning recovery.
+//!   - `degraded_notified_at` — when a degradation was last reported, in microseconds. 0 = not
+//!     currently degraded. Degradation needs TRANSITION-based suppression, not time-based: a
+//!     certificate inside a 30-day warning window is `warning` on every single run, so notifying
+//!     per run is unusable while treating it as healthy means it never notifies at all until the
+//!     certificate actually expires — after the outage it existed to prevent.
 
 use sea_orm_migration::prelude::*;
 
@@ -90,6 +95,21 @@ impl MigrationTrait for Migration {
                 )
                 .await?;
         }
+        if !manager.has_column(TABLE, "degraded_notified_at").await? {
+            manager
+                .alter_table(
+                    Table::alter()
+                        .table(Synthetics::Table)
+                        .add_column_if_not_exists(
+                            ColumnDef::new(Synthetics::DegradedNotifiedAt)
+                                .big_integer()
+                                .not_null()
+                                .default(0),
+                        )
+                        .to_owned(),
+                )
+                .await?;
+        }
         Ok(())
     }
 
@@ -100,6 +120,7 @@ impl MigrationTrait for Migration {
             ("consecutive_failures", Synthetics::ConsecutiveFailures),
             ("last_alert_at", Synthetics::LastAlertAt),
             ("alerting", Synthetics::Alerting),
+            ("degraded_notified_at", Synthetics::DegradedNotifiedAt),
         ] {
             if manager.has_column(TABLE, name).await? {
                 manager
@@ -128,6 +149,7 @@ enum Synthetics {
     ConsecutiveFailures,
     LastAlertAt,
     Alerting,
+    DegradedNotifiedAt,
 }
 
 #[cfg(test)]

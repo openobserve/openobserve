@@ -1120,6 +1120,10 @@ async fn process_ack(
     // notifications.
     use o2_enterprise::enterprise::synthetics::job_api::AlertDecision;
     let recovery = matches!(resp.alert, AlertDecision::Recovered);
+    let flaky = matches!(resp.alert, AlertDecision::Flaky);
+    // A degrading target is `warning` on every run for as long as the condition
+    // lasts, so this one is throttled by transition upstream, not by cooldown.
+    let degraded = matches!(resp.alert, AlertDecision::Degraded);
     let should_notify = !matches!(resp.alert, AlertDecision::Silent);
     if should_notify && !resp.destinations.is_empty() {
         let notification = openobserve_core::synthetics::CheckNotification {
@@ -1136,6 +1140,9 @@ async fn process_ack(
             checked_at,
             recovery,
             consecutive_failures: resp.consecutive_failures,
+            flaky,
+            degraded,
+            failing_locations: resp.failing_locations.clone(),
         };
         tokio::spawn(async move {
             openobserve_core::synthetics::notify_check_result(notification).await;

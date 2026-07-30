@@ -43,6 +43,21 @@ pub struct CheckNotification {
     pub recovery: bool,
     /// How many runs in a row had failed when this fired. 0 on a recovery.
     pub consecutive_failures: i32,
+    /// The run recovered by retrying. Informational, not an incident.
+    pub flaky: bool,
+    /// The target is reachable but degrading — a certificate inside its warning
+    /// window, or a failing SFTP probe on a host that authenticated.
+    ///
+    /// Kept distinct from `flaky` because they arrive as the same `warning`
+    /// status: a flaky run fixed itself and needs no action, a degrading one
+    /// will not fix itself and needs action before it becomes an outage.
+    pub degraded: bool,
+    /// Locations that did not pass, worst first.
+    ///
+    /// Previously absent entirely, so a six-location check with one broken
+    /// region could only say "the check is failing" and the reader had to open
+    /// the UI to find out where.
+    pub failing_locations: Vec<String>,
 }
 
 /// Fires once per run (when all jobs have completed) for non-passing runs.
@@ -55,6 +70,9 @@ pub async fn notify_check_result(n: CheckNotification) {
     // A passing run is worth sending exactly once: when it ends an incident
     // somebody was already told about. Otherwise it is a confirmation nobody
     // asked for.
+    //
+    // A flaky run reports as `warning`, not `passed`, so it is not caught here —
+    // the decision to send it was already made upstream against `cooldown_mins`.
     if !n.recovery && (n.status == "passed" || n.status == "up") {
         return;
     }
@@ -82,6 +100,12 @@ pub async fn notify_check_result(n: CheckNotification) {
                         "[OpenObserve Synthetics] ✅ {} has RECOVERED",
                         n.monitor_name
                     )
+                } else if n.degraded {
+                    // Not "is WARNING": the point of the message is that this
+                    // needs action before it becomes an outage.
+                    format!("[OpenObserve Synthetics] 🟡 {} is DEGRADED", n.monitor_name)
+                } else if n.flaky {
+                    format!("[OpenObserve Synthetics] 🔁 {} is FLAKY", n.monitor_name)
                 } else {
                     format!(
                         "[OpenObserve Synthetics] {} {} is {}",
@@ -124,6 +148,20 @@ fn status_headline(n: &CheckNotification) -> String {
     if n.recovery {
         return format!("{} has recovered", n.monitor_name);
     }
+    // `warning` covers two unrelated things, and they need opposite responses:
+    // a flaky run already fixed itself, a degrading target will not.
+    if n.degraded {
+        return format!(
+            "{} is reachable but degrading — this needs attention before it fails",
+            n.monitor_name
+        );
+    }
+    if n.flaky {
+        return format!(
+            "{} passed only after retries (flaky) — it recovered on its own",
+            n.monitor_name
+        );
+    }
     match n.status.as_str() {
         "warning" => format!("{} passed only after retries (flaky)", n.monitor_name),
         "error" => format!(
@@ -165,6 +203,24 @@ fn run_url(n: &CheckNotification) -> String {
 /// Slack-compatible webhook payload (also renders fine in Teams/Discord-style
 /// webhooks that accept a `text` field).
 #[cfg(feature = "enterprise")]
+/// "2 of 6: mumbai, frankfurt" — or just the count when we could not attribute.
+///
+/// Answers "which region is broken", which the message previously could not: it
+/// carried only how many locations were checked, so a one-of-six failure and a
+/// six-of-six outage read identically.
+fn locations_line(n: &CheckNotification) -> String {
+    let total = if n.job_count > 0 { n.job_count } else { 1 };
+    if n.failing_locations.is_empty() {
+        return total.to_string();
+    }
+    format!(
+        "{} of {}: {}",
+        n.failing_locations.len(),
+        total,
+        n.failing_locations.join(", ")
+    )
+}
+
 fn build_slack_json(n: &CheckNotification) -> String {
     let checked_secs = n.checked_at / 1_000_000;
     let mut lines = vec![
@@ -172,10 +228,7 @@ fn build_slack_json(n: &CheckNotification) -> String {
         String::new(),
         format!("*Monitor:* {} ({})", n.monitor_name, n.monitor_type),
         format!("*Target:* {}", n.target),
-        format!(
-            "*Locations checked:* {}",
-            if n.job_count > 0 { n.job_count } else { 1 }
-        ),
+        format!("*Locations:* {}", locations_line(n)),
     ];
     if let Some(e) = n.error.as_deref().filter(|e| !e.is_empty()) {
         lines.push(format!("*Error:* ```{e}```"));
@@ -196,10 +249,7 @@ fn build_plain_text(n: &CheckNotification) -> String {
         format!("Monitor: {} ({})", n.monitor_name, n.monitor_type),
         format!("Target: {}", n.target),
         format!("Status: {}", n.status),
-        format!(
-            "Locations checked: {}",
-            if n.job_count > 0 { n.job_count } else { 1 }
-        ),
+        format!("Locations: {}", locations_line(n)),
     ];
     if let Some(e) = n.error.as_deref().filter(|e| !e.is_empty()) {
         lines.push(format!("Error: {e}"));
@@ -213,10 +263,14 @@ fn build_plain_text(n: &CheckNotification) -> String {
 #[cfg(feature = "enterprise")]
 fn build_email_html(n: &CheckNotification) -> String {
     // TODO: update with a better template for all the checks
-    let color = match n.status.as_str() {
-        "warning" => "#b58105",
-        "error" => "#b45309",
-        _ => "#c62828",
+    let color = if n.recovery {
+        "#2e7d32"
+    } else {
+        match n.status.as_str() {
+            "warning" => "#b58105",
+            "error" => "#b45309",
+            _ => "#c62828",
+        }
     };
     let error_row = match n.error.as_deref().filter(|e| !e.is_empty()) {
         Some(e) => format!(
@@ -236,7 +290,7 @@ fn build_email_html(n: &CheckNotification) -> String {
         <td style="padding:6px 12px;">{target}</td></tr>
     <tr><td style="padding:6px 12px;color:#666;">Status</td>
         <td style="padding:6px 12px;font-weight:bold;color:{color};">{status}</td></tr>
-    <tr><td style="padding:6px 12px;color:#666;">Locations checked</td>
+    <tr><td style="padding:6px 12px;color:#666;">Locations</td>
         <td style="padding:6px 12px;">{jobs}</td></tr>
     <tr><td style="padding:6px 12px;color:#666;">Time</td>
         <td style="padding:6px 12px;">{checked_at}</td></tr>
@@ -252,7 +306,7 @@ fn build_email_html(n: &CheckNotification) -> String {
         mtype = html_escape(&n.monitor_type),
         target = html_escape(&n.target),
         status = n.status.to_uppercase(),
-        jobs = if n.job_count > 0 { n.job_count } else { 1 },
+        jobs = html_escape(&locations_line(n)),
         checked_at = checked_at_utc(n.checked_at),
         url = run_url(n),
     )

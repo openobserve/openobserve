@@ -43,6 +43,11 @@ pub struct Model {
     /// "recovered" cannot be told from "was never alerting" — and once a
     /// cooldown exists, silence stops meaning recovery.
     pub alerting: bool,
+    /// When a degradation was last reported, in microseconds. 0 = not currently
+    /// degraded. Separate from `last_alert_at` because a degradation persists —
+    /// a certificate is `warning` on every run for weeks — so it needs
+    /// transition-based suppression rather than a time window.
+    pub degraded_notified_at: i64,
     pub owner: Option<String>,
     pub created_at: i64,
     pub updated_at: i64,
@@ -82,6 +87,7 @@ mod tests {
             consecutive_failures: 0,
             last_alert_at: 0,
             alerting: false,
+            degraded_notified_at: 0,
             owner: None,
             created_at: 1750000000000000,
             updated_at: 1750000000000000,
