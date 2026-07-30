@@ -7,9 +7,6 @@ license.workspace = true
 [features]
 default = []
 cloud = []
-# Exposes `table::test_harness` (the migrated-SQLite test database) to other
-# crates' test builds. Never enable it outside [dev-dependencies].
-test-utils = ["dep:tempfile"]
 
 [dependencies]
 anyhow.workspace = true
@@ -47,9 +44,6 @@ tonic.workspace = true
 opentelemetry.workspace = true
 tracing-opentelemetry.workspace = true
 proto.workspace = true
-# test-utils only (the harness creates its SQLite file in a temp dir); a
-# plain build never links it.
-tempfile = { workspace = true, optional = true }
 
 [dev-dependencies]
 collapse.workspace = true

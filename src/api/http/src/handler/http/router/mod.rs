@@ -26,7 +26,7 @@ use axum::{
 use config::get_config;
 use openobserve_api_common::X_O2_ASSISTANT_SESSION_ID;
 use openobserve_api_management::request::{
-    alerts, authz, dashboards, folders, organization, slos, users,
+    alerts, authz, dashboards, folders, organization, users,
 };
 use openobserve_api_search::{promql, search, traces};
 use openobserve_core::auth::AuthExtractor;
@@ -830,25 +830,24 @@ pub fn service_routes() -> Router {
         .route("/v2/{org_id}/reports/{report_id}/trigger", put(dashboards::reports::trigger_report_v2))
 
         // Folders (v2)
-        // SLOs. Deliberately NOT enterprise-gated: nothing about SLO
-        // measurement is an enterprise capability, and the handlers already
-        // return 501 when ZO_SLO_ENABLED is false. Literal segments are
-        // registered before the {slo_id} catch-all, per the router's ordering
-        // rule.
-        .route(
-            "/{org_id}/slos",
-            get(slos::list_slos).post(slos::create_slo),
-        )
-        // Before the {slo_id} catch-all, or "move" is parsed as an SLO id.
-        .route("/{org_id}/slos/move", post(slos::move_slos))
-        .route("/{org_id}/slos/{slo_id}/enable", put(slos::enable_slo))
-        .route("/{org_id}/slos/{slo_id}/groups", get(slos::get_slo_groups))
-        .route(
-            "/{org_id}/slos/{slo_id}",
-            get(slos::get_slo)
-                .put(slos::update_slo)
-                .delete(slos::delete_slo),
-        )
+        // TODO(slo): deferred. Restoring these also means restoring their
+        // ROUTE_PERMISSIONS entries in o2-enterprise — the coverage test
+        // pairs the two.
+        //
+        // .route(
+        //     "/{org_id}/slos",
+        //     get(slos::list_slos).post(slos::create_slo),
+        // )
+        // // Before the {slo_id} catch-all, or "move" is parsed as an SLO id.
+        // .route("/{org_id}/slos/move", post(slos::move_slos))
+        // .route("/{org_id}/slos/{slo_id}/enable", put(slos::enable_slo))
+        // .route("/{org_id}/slos/{slo_id}/groups", get(slos::get_slo_groups))
+        // .route(
+        //     "/{org_id}/slos/{slo_id}",
+        //     get(slos::get_slo)
+        //         .put(slos::update_slo)
+        //         .delete(slos::delete_slo),
+        // )
         .route("/v2/{org_id}/folders/{folder_type}", get(folders::list_folders).post(folders::create_folder))
         .route("/v2/{org_id}/folders/{folder_type}/{folder_id}", get(folders::get_folder).put(folders::update_folder).delete(folders::delete_folder))
         .route("/v2/{org_id}/folders/{folder_type}/name/{folder_name}", get(folders::get_folder_by_name))
