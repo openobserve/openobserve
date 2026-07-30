@@ -15,28 +15,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="q-pa-md" style="max-width: 480px">
-    <div class="text-h6 q-mb-md">{{ t("alert_sources.addTitle") }}</div>
-    <q-input
+  <div class="flex max-w-md flex-col gap-3">
+    <div class="text-base font-semibold">{{ t("alert_sources.addTitle") }}</div>
+    <OInput
       v-model="form.name"
       :label="t('alert_sources.name')"
-      dense
-      outlined
       data-test="add-alert-source-name-input"
-      class="q-mb-md"
     />
-    <q-select
+    <OSelect
       v-model="form.source_type"
       :options="sourceTypeOptions"
       :label="t('alert_sources.sourceType')"
-      dense
-      outlined
-      emit-value
-      map-options
       data-test="add-alert-source-type-select"
-      class="q-mb-md"
     />
-    <div class="row justify-end" style="gap: 8px">
+    <div class="flex justify-end gap-2">
       <OButton variant="outline" size="sm" data-test="add-alert-source-cancel-btn" @click="cancel">
         {{ t("alert_sources.cancel") }}
       </OButton>
@@ -52,12 +44,14 @@ import { defineComponent } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 import alertSources from "@/services/alert_sources";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "AddExternalAlertSource",
-  components: { OButton },
+  components: { OButton, OInput, OSelect },
   emits: ["created", "cancel:hideform"],
   setup() {
     const store = useStore();

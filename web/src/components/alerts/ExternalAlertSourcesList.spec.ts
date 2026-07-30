@@ -38,6 +38,9 @@ function buildWrapper() {
     state: {
       selectedOrganization: { identifier: "myorg" },
       zoConfig: { incidents_enabled: true },
+      userInfo: { email: "admin@example.com" },
+      organizationData: { organizationPasscode: "passcode" },
+      API_ENDPOINT: "http://localhost:5080",
     },
   });
   const i18n = createI18n({ legacy: false, locale: "en", messages: { en: {} } });
@@ -84,7 +87,7 @@ describe("ExternalAlertSourcesList", () => {
     const wrapper = buildWrapper();
     await flushPromises();
     await (wrapper.vm as any).copyUrl();
-    expect(copyToClipboard).toHaveBeenCalledWith(DEFAULT_SOURCE.url);
+    expect(copyToClipboard).toHaveBeenCalledWith(`http://localhost:5080${DEFAULT_SOURCE.url}`);
   });
 
   it("shows 'not_connected' status when no senders exist", async () => {
