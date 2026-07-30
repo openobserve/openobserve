@@ -15,6 +15,9 @@
 
 //! Composite alerts — Feature 4 of `alerts_2.md`.
 //!
+//! TODO(composite): the feature is deferred — this module is pure logic with
+//! tests and is deliberately not wired into the scheduler, API, or UI yet.
+//!
 //! Pure logic only: expression parsing/evaluation over child *states*, the
 //! stale-child policy (§6.4), and the write-time guards (child counts, cycles).
 //! Composites never re-run child queries — that is the whole point of building

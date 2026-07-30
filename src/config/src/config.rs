@@ -651,9 +651,11 @@ pub struct Config {
 /// Feature 5 — SLO measurement (`alerts_2.md` §6b).
 #[derive(Debug, Serialize, EnvConfig, Default)]
 pub struct Slo {
+    // TODO(slo): the SLO feature is deferred; default stays false (and the
+    // SLO menu entry is hidden in MainLayout.vue) until it ships.
     #[env_config(
         name = "ZO_SLO_ENABLED",
-        default = true,
+        default = false,
         help = "Enable SLO measurement and SLO-based alerts. Set false to switch the feature off entirely: no per-SLO ingest job is scheduled, nothing is written to the slo_slices stream, and the SLO APIs answer 501."
     )]
     pub enabled: bool,

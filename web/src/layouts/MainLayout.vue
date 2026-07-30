@@ -446,14 +446,16 @@ export default defineComponent({
         link: "/alerts",
         name: "alertList",
       },
-      {
-        // Directly after Alerts: an SLO is what an SLO alert burns against,
-        // and the two are navigated together.
-        title: t("menu.slos"),
-        icon: "target",
-        link: "/slos",
-        name: "sloList",
-      },
+      // TODO(slo): the SLO feature is deferred — menu entry hidden until it
+      // ships. Restore this entry (directly after Alerts: an SLO is what an
+      // SLO alert burns against) and the navGroups "alerts" group will absorb
+      // it again.
+      // {
+      //   title: t("menu.slos"),
+      //   icon: "target",
+      //   link: "/slos",
+      //   name: "sloList",
+      // },
       {
         title: t("menu.ingestion"),
         icon: "data-plus-line",
