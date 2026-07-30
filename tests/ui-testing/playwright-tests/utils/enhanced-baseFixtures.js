@@ -184,7 +184,7 @@ function enforceOrgOnNavigation(page) {
 async function settleNavRail(page, pathname) {
   // /web/login and the OIDC callback have no rail by design.
   if (/\/(login|cb)$/.test(pathname || '')) return;
-  const appeared = await page.locator(NAV_RAIL_SELECTOR)
+  const appeared = await page.locator(NAV_RAIL_SELECTOR).first()
     .waitFor({ state: 'visible', timeout: 20000 })
     .then(() => true)
     .catch(() => false);
@@ -199,7 +199,13 @@ async function settleNavRail(page, pathname) {
  * only for the hung-/config case.
  */
 const NAV_RAIL_ATTEMPTS = [30000, 45000, 45000];
-const NAV_RAIL_SELECTOR = '[data-test="menu-link-\\/-item"]';
+// ANY menu link inside the rail, not the home item specifically.
+// MainLayout.filterMenus() drops entries listed in the server's custom_hide_menus
+// config, so pinning the readiness check on one particular item risks waiting
+// forever for a link that environment has hidden. A non-empty navLinks renders at
+// least one MenuLink, which is exactly the condition callers depend on. Scoped to
+// navbar-main-nav so the header's own menu-link-help/slack items cannot satisfy it.
+const NAV_RAIL_SELECTOR = '[data-test="navbar-main-nav"] [data-test^="menu-link-"]';
 
 /**
  * Wait for MainLayout to populate the nav rail, reloading to retry a hung GET
@@ -209,7 +215,7 @@ const NAV_RAIL_SELECTOR = '[data-test="menu-link-\\/-item"]';
  */
 async function waitForNavRail(page) {
   for (let i = 0; i < NAV_RAIL_ATTEMPTS.length; i++) {
-    const appeared = await page.locator(NAV_RAIL_SELECTOR)
+    const appeared = await page.locator(NAV_RAIL_SELECTOR).first()
       .waitFor({ state: 'visible', timeout: NAV_RAIL_ATTEMPTS[i] })
       .then(() => true)
       .catch(() => false);
@@ -263,7 +269,7 @@ async function verifyAuthentication(page) {
     // a hung request. Reloading issues a fresh /config, which does.
     if (!(await waitForNavRail(page))) {
       throw new Error(
-        'Nav rail never populated: [data-test="menu-link-\\/-item"] absent after ' +
+        `Nav rail never populated: no ${NAV_RAIL_SELECTOR} after ` +
         `${NAV_RAIL_ATTEMPTS.length} attempts with reloads. The app shell rendered, so the session is ` +
         'valid — GET /config never resolved and MainLayout never set menuReady.'
       );
