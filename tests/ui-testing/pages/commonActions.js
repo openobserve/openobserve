@@ -123,10 +123,31 @@ export async function gotoMetricsEditor(page) {
         // about:blank and friends have no query string — keep the fallback.
     }
 
-    await page.goto(
-        `${process.env.ZO_BASE_URL}/web/metrics/editor?org_identifier=${orgIdentifier}`
-    );
-    await page.locator('[data-test="metrics-page"]').waitFor({ state: 'visible', timeout: 30000 });
+    const editorUrl = `${process.env.ZO_BASE_URL}/web/metrics/editor?org_identifier=${orgIdentifier}`;
+    const metricsPage = page.locator('[data-test="metrics-page"]');
+
+    // Reload once rather than waiting longer. Like every other route, the editor
+    // mounts only after the SPA has config + org context, and when that request
+    // hangs the route never mounts at all — waiting cannot recover it, a fresh load
+    // can. A flat 30s here lost EVERY Metrics test in run 30552638159 attempt 2 to
+    // `waiting for locator('[data-test="metrics-page"]') to be visible`.
+    await page.goto(editorUrl);
+    let visible = await metricsPage.waitFor({ state: 'visible', timeout: 30000 })
+        .then(() => true).catch(() => false);
+
+    if (!visible) {
+        testLogger.warn('Metrics editor did not mount in 30s — reloading once');
+        await page.goto(editorUrl);
+        visible = await metricsPage.waitFor({ state: 'visible', timeout: 45000 })
+            .then(() => true).catch(() => false);
+    }
+
+    if (!visible) {
+        throw new Error(
+            'Metrics editor never mounted: [data-test="metrics-page"] absent after a reload. ' +
+            `URL: ${editorUrl}`
+        );
+    }
 }
 
 // Common Locator exports
