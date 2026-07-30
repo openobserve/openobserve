@@ -80,9 +80,17 @@ export async function deleteDashboard(page, dashboardName) {
     page.waitForSelector('[data-test="dashboard-table"]', { timeout: 20000 }),
   ]);
 
-  const deleteButton = page
+  // Wait for THIS dashboard's row specifically — the generic table/API wait
+  // above can resolve before the target row has rendered (e.g. under
+  // parallel workers where other dashboards are being created/removed at
+  // the same time), leaving the delete-button locator below pointed at
+  // nothing until it times out.
+  const nameCell = page
     .locator(`[data-test="dashboard-name-cell-${dashboardName}"]`)
-    .first()
+    .first();
+  await nameCell.waitFor({ state: 'visible', timeout: 20000 });
+
+  const deleteButton = nameCell
     .locator('xpath=ancestor::*[starts-with(@data-test,"o2-table-row-")]')
     .locator('[data-test="dashboard-delete"]');
   await deleteButton.click();

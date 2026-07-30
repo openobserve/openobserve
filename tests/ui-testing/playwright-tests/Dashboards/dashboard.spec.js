@@ -12,7 +12,10 @@ import { waitForDateTimeButtonToBeEnabled } from "../../pages/dashboardPages/das
 import PageManager from "../../pages/page-manager";
 import { waitForStreamComplete, waitForTableWithData } from "../utils/streaming-helpers.js";
 
-const randomDashboardName =
+// Each test runs in parallel (mode: "parallel" below), so the name must be
+// generated fresh per test — a single shared name caused cross-test races
+// where one test's create/delete collided with another's mid-flight.
+const generateDashboardName = () =>
   "Dashboard_" + Math.random().toString(36).substr(2, 9);
 
 test.describe.configure({ mode: "parallel" });
@@ -30,6 +33,7 @@ test.describe("dashboard UI testcases", () => {
   });
   test("should add and delete the dashboard", async ({ page }) => {
     const pm = new PageManager(page);
+    const randomDashboardName = generateDashboardName();
 
     // Navigate to the dashboard list
     await pm.dashboardList.menuItem("dashboards-item");
@@ -51,6 +55,7 @@ test.describe("dashboard UI testcases", () => {
   test("should create a duplicate of the dashboard", async ({ page }) => {
     // Initialize Page Objects
     const pm = new PageManager(page);
+    const randomDashboardName = generateDashboardName();
 
     //navigate to the dashboard list
     await pm.dashboardList.menuItem("dashboards-item");
@@ -84,6 +89,7 @@ test.describe("dashboard UI testcases", () => {
   test("should create a dashboard and add the breakdown", async ({ page }) => {
     // Initialize Page Objects
     const pm = new PageManager(page);
+    const randomDashboardName = generateDashboardName();
 
     // Generate a unique panel name
     const panelName =
@@ -133,6 +139,7 @@ test.describe("dashboard UI testcases", () => {
   }) => {
     // Initialize only the used Page Objects
     const pm = new PageManager(page);
+    const randomDashboardName = generateDashboardName();
 
     // Generate a unique panel name
     const panelName =
@@ -179,6 +186,7 @@ test.describe("dashboard UI testcases", () => {
     page,
   }) => {
     const pm = new PageManager(page);
+    const randomDashboardName = generateDashboardName();
 
     // Generate unique panel name
     const panelName =
@@ -197,6 +205,11 @@ test.describe("dashboard UI testcases", () => {
     await pm.chartTypeSelector.setCustomSQL(
       'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1", kubernetes_container_name as "breakdown_1" FROM "e2e_automate" GROUP BY x_axis_1, breakdown_1'
     );
+
+    // Wait for the SQL parser to extract fields and render them in the field
+    // list before adding them — on alpha1 this parse can take longer than the
+    // 10s default in searchAndAddField's own waitFor, causing a race.
+    await pm.chartTypeSelector.waitForFieldListRow("y_axis_1", 20000);
 
     // Map query results to chart axes
     await pm.chartTypeSelector.searchAndAddField("y_axis_1", "y");
@@ -217,6 +230,7 @@ test.describe("dashboard UI testcases", () => {
   }) => {
     // Initialize Page Objects
     const pm = new PageManager(page);
+    const randomDashboardName = generateDashboardName();
 
     // Generate a unique panel name
     const panelName =
@@ -263,6 +277,7 @@ test.describe("dashboard UI testcases", () => {
     page,
   }) => {
     const pm = new PageManager(page);
+    const randomDashboardName = generateDashboardName();
     const panelName =
       pm.dashboardPanelActions.generateUniquePanelName("panel-test");
 
@@ -320,6 +335,7 @@ test.describe("dashboard UI testcases", () => {
     page,
   }) => {
     const pm = new PageManager(page);
+    const randomDashboardName = generateDashboardName();
     const panelName =
       pm.dashboardPanelActions.generateUniquePanelName("panel-test");
 
@@ -385,6 +401,7 @@ test.describe("dashboard UI testcases", () => {
     page,
   }) => {
     const pm = new PageManager(page);
+    const randomDashboardName = generateDashboardName();
     const panelName =
       pm.dashboardPanelActions.generateUniquePanelName("panel-test");
     // const dateTimeHelper = new DateTimeHelper(page);
@@ -438,6 +455,7 @@ test.describe("dashboard UI testcases", () => {
     page,
   }) => {
     const pm = new PageManager(page);
+    const randomDashboardName = generateDashboardName();
     const panelName =
       pm.dashboardPanelActions.generateUniquePanelName("panel-test");
 
@@ -489,6 +507,7 @@ test.describe("dashboard UI testcases", () => {
     page,
   }) => {
     const pm = new PageManager(page);
+    const randomDashboardName = generateDashboardName();
     const panelName =
       pm.dashboardPanelActions.generateUniquePanelName("panel-test");
 
@@ -544,6 +563,7 @@ test.describe("dashboard UI testcases", () => {
     page,
   }) => {
     const pm = new PageManager(page);
+    const randomDashboardName = generateDashboardName();
     const panelName =
       pm.dashboardPanelActions.generateUniquePanelName("panel-test");
 
@@ -616,6 +636,7 @@ test.describe("dashboard UI testcases", () => {
   }) => {
     // Initialize only the necessary Page Objects
     const pm = new PageManager(page);
+    const randomDashboardName = generateDashboardName();
 
     // Generate a unique panel name
     const panelName =
@@ -661,6 +682,7 @@ test.describe("dashboard UI testcases", () => {
     page,
   }) => {
     const pm = new PageManager(page);
+    const randomDashboardName = generateDashboardName();
     const panelName =
       pm.dashboardPanelActions.generateUniquePanelName("panel-test");
     // Navigate to dashboards
@@ -703,6 +725,7 @@ test.describe("dashboard UI testcases", () => {
     page,
   }) => {
     const pm = new PageManager(page);
+    const randomDashboardName = generateDashboardName();
     const panelName =
       pm.dashboardPanelActions.generateUniquePanelName("panel-test");
 
@@ -723,6 +746,11 @@ test.describe("dashboard UI testcases", () => {
     await pm.chartTypeSelector.setCustomSQL(
       'SELECT histogram(_timestamp) as xAxis1, count(_timestamp) as yAxis1, kubernetes_container_name as breakdown1 FROM "e2e_automate" GROUP BY xAxis1, breakdown1'
     );
+
+    // Wait for the SQL parser to extract fields and render them in the field
+    // list before adding them — avoids a race on alpha1 where parsing takes
+    // longer than searchAndAddField's own 10s waitFor.
+    await pm.chartTypeSelector.waitForFieldListRow("xAxis1", 20000);
 
     await pm.chartTypeSelector.searchAndAddField("xAxis1", "x");
     await pm.chartTypeSelector.searchAndAddField("yAxis1", "y");
@@ -752,6 +780,7 @@ test.describe("dashboard UI testcases", () => {
     page,
   }) => {
     const pm = new PageManager(page);
+    const randomDashboardName = generateDashboardName();
     const panelName =
       pm.dashboardPanelActions.generateUniquePanelName("line-panel-test");
 
@@ -769,6 +798,11 @@ test.describe("dashboard UI testcases", () => {
     await pm.chartTypeSelector.setCustomSQL(
       'SELECT histogram(_timestamp) as xAxis1, count(_timestamp) as yAxis1, kubernetes_container_name as breakdown1 FROM "e2e_automate" GROUP BY xAxis1, breakdown1'
     );
+
+    // Wait for the SQL parser to extract fields and render them in the field
+    // list before adding them — avoids a race on alpha1 where parsing takes
+    // longer than searchAndAddField's own 10s waitFor.
+    await pm.chartTypeSelector.waitForFieldListRow("xAxis1", 20000);
 
     await pm.chartTypeSelector.searchAndAddField("xAxis1", "x");
     await pm.chartTypeSelector.searchAndAddField("yAxis1", "y");
@@ -844,6 +878,7 @@ test.describe("dashboard UI testcases", () => {
     page,
   }) => {
     const pm = new PageManager(page);
+    const randomDashboardName = generateDashboardName();
     const panelName =
       pm.dashboardPanelActions.generateUniquePanelName("complex-case-panel-test");
 
