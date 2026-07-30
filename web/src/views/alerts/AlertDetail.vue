@@ -337,14 +337,17 @@ const aggregation = computed(
     alert.value?.condition?.aggregation,
 );
 
-// Both opt-ins count: `aggregation.multi_alert` for SQL/aggregation alerts,
-// `promql_multi_alert` for per-series PromQL alerts — either one gives the
-// alert per-group state and therefore a Groups tab.
-const isMultiAlert = computed(
-  () =>
-    !!aggregation.value?.multi_alert ||
-    !!(alert.value?.query_condition ?? alert.value?.condition)?.promql_multi_alert,
-);
+// Mirror the backend `QueryCondition::multi_alert_enabled()`: the evaluation
+// mode is chosen by query TYPE, never OR-ed. A PromQL alert reads
+// `promql_multi_alert`; every other type reads `aggregation.multi_alert`. ORing
+// them would show a Groups tab for an alert the scheduler evaluates as simple
+// — e.g. a stale `promql_multi_alert` left behind after switching PromQL → SQL.
+const isMultiAlert = computed(() => {
+  const qc = alert.value?.query_condition ?? alert.value?.condition;
+  return qc?.type === "promql"
+    ? !!qc?.promql_multi_alert
+    : !!qc?.aggregation?.multi_alert;
+});
 
 // Grouped, but still evaluating as one collapsed result. The distinction the
 // banner exists to explain: grouping produces the SERIES on the chart,

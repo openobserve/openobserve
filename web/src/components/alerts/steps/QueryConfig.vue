@@ -2496,11 +2496,22 @@ export default defineComponent({
     );
 
     // The PromQL choice has no group-by to wait for — it is visible whenever
-    // the PromQL tab is, so normalise on entering it.
+    // the PromQL tab is, so normalise on entering it. Also clear the OTHER
+    // family's opt-in on every switch: the backend picks the flag by query type
+    // (`multi_alert_enabled()`), so a stale flag left behind by the other type
+    // would silently resurface — and mislead the Groups tab / Multi badge — the
+    // next time the user switches back.
     watch(
       () => localTab.value,
       (tab) => {
-        if (tab === "promql") normalizePromqlMultiAlertFlag();
+        if (tab === "promql") {
+          normalizePromqlMultiAlertFlag();
+          if (fv("query_condition.aggregation.multi_alert")) {
+            setFV("query_condition.aggregation.multi_alert", false);
+          }
+        } else if (fv("query_condition.promql_multi_alert")) {
+          setFV("query_condition.promql_multi_alert", false);
+        }
       },
       { immediate: true },
     );

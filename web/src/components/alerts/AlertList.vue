@@ -1512,10 +1512,10 @@ export default defineComponent({
             // below survive an opt-out (§5.3 leaves the rollup row alone), so
             // without this flag a simple alert would keep advertising the
             // group summary from back when it was a multi-alert.
-            multi_alert: !!(
-              data.condition?.aggregation?.multi_alert ||
-              data.condition?.promql_multi_alert
-            ),
+            multi_alert:
+              data.condition?.type === "promql"
+                ? !!data.condition?.promql_multi_alert
+                : !!data.condition?.aggregation?.multi_alert,
             // Multi-alert fan-out counts (§5.4). `undefined` — not 0 — for an
             // alert that never opted in, so the cell can render "—" rather
             // than claiming it observed zero groups.

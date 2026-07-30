@@ -127,13 +127,18 @@ const sections = computed(() => [
       {
         key: "evaluation-mode",
         label: t("alerts.multiAlert.evaluationMode"),
-        // Three shapes: per-series (PromQL opt-in), per-group (aggregation
-        // opt-in), or simple.
-        value: queryCondition.value?.promql_multi_alert
-          ? t("alerts.multiAlert.perSeries")
-          : aggregation.value?.multi_alert
-            ? t("alerts.multiAlert.perGroup")
-            : t("alerts.multiAlert.simple"),
+        // Type-scoped like the backend `multi_alert_enabled()`: PromQL reads
+        // promql_multi_alert (→ per-series), every other type reads
+        // aggregation.multi_alert (→ per-group); otherwise simple. Branching on
+        // type avoids a stale flag from the other family mislabelling the mode.
+        value:
+          queryCondition.value?.type === "promql"
+            ? queryCondition.value?.promql_multi_alert
+              ? t("alerts.multiAlert.perSeries")
+              : t("alerts.multiAlert.simple")
+            : aggregation.value?.multi_alert
+              ? t("alerts.multiAlert.perGroup")
+              : t("alerts.multiAlert.simple"),
       },
     ],
   },
