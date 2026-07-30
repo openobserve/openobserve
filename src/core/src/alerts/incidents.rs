@@ -727,6 +727,129 @@ pub async fn correlate_alert_to_incident(
     Ok(Some(outcome))
 }
 
+/// External-event twin of [`correlate_alert_to_incident`].
+///
+/// Feeds an externally-ingested alert (from the External Alert Sources feature)
+/// through the same incident-correlation machinery as internal alerts. Labels are
+/// taken verbatim from the external record — there is no `query_condition` to
+/// enrich from, so the condition-dimension enrichment step is skipped.
+///
+/// `base_destinations` are the integration's configured destinations (for the org
+/// default, the default integration's config). Severity is parsed from the
+/// external record (falling back to `P3`) rather than resolved by the enterprise
+/// default used on the internal path.
+///
+/// Notification behaviour mirrors the internal path:
+/// - `NewIncidentCreated` / `NewAlertTypeJoined` → notify merged destinations.
+/// - `ExistingAlertRepeated` → notification suppressed (same subject already in incident).
+///
+/// The `#[cfg(feature = "cloud")]` AI-credit deduction from the internal path is
+/// intentionally NOT replicated here: it is structurally coupled to `&Alert` and
+/// P1 external events do not consume incident credits.
+pub async fn correlate_external_event(
+    org_id: &str,
+    external: &infra::table::external_alerts::ExternalAlertRecord,
+    base_destinations: Vec<String>,
+) -> Result<Option<IncidentCorrelationOutcome>, anyhow::Error> {
+    use config::meta::alerts::incidents::{IncidentSeverity, KeyType};
+
+    // Labels come straight from the external record (no query-condition enrichment).
+    let labels: HashMap<String, String> =
+        serde_json::from_value(external.labels.clone()).unwrap_or_default();
+
+    log::debug!(
+        "[incidents] External event '{}' labels: {:?}",
+        external.title,
+        labels
+    );
+
+    // Same parallel correlation the internal path uses.
+    let parallel_result = correlate_parallel(org_id, &labels).await;
+
+    let group_values = parallel_result.final_group_values;
+    let mut key_type = parallel_result.final_key_type;
+    let correlation_reason = parallel_result.correlation_reason;
+
+    // Extract service name using both results.
+    let service_name = extract_service_name_parallel(&labels, &parallel_result.service_discovery);
+
+    // If group_values is empty, isolate by subject id to prevent incorrect grouping.
+    if group_values.is_empty() {
+        key_type = KeyType::AlertId;
+        log::warn!(
+            "[incidents] External event '{}' has no group_values - isolated by alert_id",
+            external.title
+        );
+    }
+
+    log::info!(
+        "[incidents] External event '{}' correlation result: reason={}, key_type={:?}, dimensions={:?}, service_discovery_success={}, semantic_extraction_success={}",
+        external.title,
+        correlation_reason,
+        key_type,
+        group_values,
+        parallel_result.service_discovery.is_some(),
+        parallel_result.semantic_extraction.is_some()
+    );
+
+    // Build the correlation subject for the external path.
+    let subject = CorrelationSubject {
+        id: external.id.clone(),
+        name: external.title.clone(),
+        org_id: org_id.to_string(),
+        kind: AlertKind::External,
+        base_destinations,
+        severity: Some(external.severity.parse().unwrap_or(IncidentSeverity::P3)),
+    };
+
+    let triggered_at = external.last_seen_at;
+
+    // Find or create incident.
+    let outcome = find_or_create_incident(
+        org_id,
+        &group_values,
+        key_type,
+        &subject,
+        triggered_at,
+        &correlation_reason,
+        &service_name,
+    )
+    .await?;
+
+    // Send incident notification unless the outcome is a repeated alert (suppressed
+    // by design). External events always carry a single occurrence, so there is no
+    // empty-`notify_rows` manual-trigger case to guard against here.
+    match &outcome {
+        IncidentCorrelationOutcome::NewIncidentCreated { incident_id, .. }
+        | IncidentCorrelationOutcome::NewAlertTypeJoined { incident_id, .. } => {
+            let event = match &outcome {
+                IncidentCorrelationOutcome::NewIncidentCreated { .. } => "new_incident_created",
+                _ => "new_alert_correlated",
+            };
+            let merged_destinations =
+                collect_incident_destinations(org_id, incident_id, &subject.base_destinations)
+                    .await;
+            send_incident_notifications_inner(
+                org_id,
+                &subject.name,
+                incident_id,
+                event,
+                triggered_at,
+                &merged_destinations,
+                None,
+            )
+            .await;
+        }
+        IncidentCorrelationOutcome::ExistingAlertRepeated { incident_id, .. } => {
+            log::debug!(
+                "[incidents] Suppressing notification for repeated external event in incident {incident_id}"
+            );
+        }
+    }
+
+    Ok(Some(outcome))
+}
+
 /// Query Service Discovery for group_values using the correlation API
 ///
 /// Uses ServiceStorage::correlate() for proper dimension matching
