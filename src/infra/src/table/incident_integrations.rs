@@ -77,6 +77,7 @@ impl From<Model> for IncidentIntegrationRecord {
 pub struct SenderRecord {
     pub integration_id: String,
     pub detected_source: String,
+    pub sender_label: Option<String>,
     pub first_received_at: i64,
     pub last_received_at: i64,
     pub accepted_count: i64,
@@ -89,6 +90,7 @@ impl From<SenderModel> for SenderRecord {
         Self {
             integration_id: m.integration_id,
             detected_source: m.detected_source,
+            sender_label: m.sender_label,
             first_received_at: m.first_received_at,
             last_received_at: m.last_received_at,
             accepted_count: m.accepted_count,
@@ -255,6 +257,7 @@ pub async fn rotate_token(org_id: &str, id: &str) -> Result<String, errors::Erro
 pub async fn touch_sender(
     integration_id: &str,
     detected_source: &str,
+    sender_label: Option<&str>,
     now: i64,
     accepted: u32,
     rejected: u32,
@@ -262,9 +265,14 @@ pub async fn touch_sender(
 ) -> Result<(), errors::Error> {
     let _lock = get_lock().await;
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let existing = SenderEntity::find()
+    let mut existing_query = SenderEntity::find()
         .filter(SenderColumn::IntegrationId.eq(integration_id))
-        .filter(SenderColumn::DetectedSource.eq(detected_source))
+        .filter(SenderColumn::DetectedSource.eq(detected_source));
+    existing_query = match sender_label {
+        Some(label) => existing_query.filter(SenderColumn::SenderLabel.eq(label)),
+        None => existing_query.filter(SenderColumn::SenderLabel.is_null()),
+    };
+    let existing = existing_query
         .one(client)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
@@ -274,6 +282,7 @@ pub async fn touch_sender(
             client,
             integration_id,
             detected_source,
+            sender_label,
             now,
             accepted,
             rejected,
@@ -286,6 +295,7 @@ pub async fn touch_sender(
         id: Set(config::ider::uuid()),
         integration_id: Set(integration_id.to_owned()),
         detected_source: Set(detected_source.to_owned()),
+        sender_label: Set(sender_label.map(|s| s.to_owned())),
         first_received_at: Set(now),
         last_received_at: Set(now),
         accepted_count: Set(accepted as i64),
@@ -301,6 +311,7 @@ pub async fn touch_sender(
                     client,
                     integration_id,
                     detected_source,
+                    sender_label,
                     now,
                     accepted,
                     rejected,
@@ -317,12 +328,13 @@ async fn update_sender(
     client: &sea_orm::DatabaseConnection,
     integration_id: &str,
     detected_source: &str,
+    sender_label: Option<&str>,
     now: i64,
     accepted: u32,
     rejected: u32,
     resolved_seen: bool,
 ) -> Result<(), errors::Error> {
-    SenderEntity::update_many()
+    let mut query = SenderEntity::update_many()
         .col_expr(
             SenderColumn::AcceptedCount,
             Expr::col(SenderColumn::AcceptedCount).add(accepted as i64),
@@ -334,7 +346,12 @@ async fn update_sender(
         .col_expr(SenderColumn::LastReceivedAt, Expr::value(now))
         .col_expr(SenderColumn::ResolvedSeen, Expr::value(resolved_seen))
         .filter(SenderColumn::IntegrationId.eq(integration_id))
-        .filter(SenderColumn::DetectedSource.eq(detected_source))
+        .filter(SenderColumn::DetectedSource.eq(detected_source));
+    query = match sender_label {
+        Some(label) => query.filter(SenderColumn::SenderLabel.eq(label)),
+        None => query.filter(SenderColumn::SenderLabel.is_null()),
+    };
+    query
         .exec(client)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;

@@ -22,6 +22,7 @@ pub struct Model {
     pub id: String,
     pub integration_id: String,
     pub detected_source: String,
+    pub sender_label: Option<String>,
     pub first_received_at: i64,
     pub last_received_at: i64,
     pub accepted_count: i64,
