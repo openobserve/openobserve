@@ -75,24 +75,6 @@
       </OButton>
     </template>
 
-    <template #header-tabs>
-      <OTabs
-        v-if="!notFound" v-model="activeTab" dense data-test="alerts-alertdetail-tabs">
-        <OTab
-          v-if="isMultiAlert"
-          name="groups"
-          :label="t('alerts.groups.tab')"
-          icon="layers"
-        />
-        <OTab name="history" :label="t('alerts.history')" icon="history" />
-        <OTab
-          name="configuration"
-          :label="t('alerts.configuration')"
-          icon="settings"
-        />
-      </OTabs>
-    </template>
-
     <OContent v-if="notFound" class="py-6">
       <OEmptyState
         size="hero"
@@ -163,6 +145,46 @@
         <AlertGroupChart :alert="alert" />
       </OContent>
 
+      <!-- The tabs live HERE, below the stat strip and the chart, not in the
+           page header: everything above is shared context visible on every
+           tab — only the region below actually switches. A header tab strip
+           would promise the whole page changes. Per the tab-strip house rule
+           the strip takes no horizontal wrapper padding (the first label
+           self-aligns to the px-page-edge grid) and carries its own bottom
+           divider via `bordered`. -->
+      <OTabs
+        v-model="activeTab"
+        dense
+        bordered
+        class="shrink-0"
+        data-test="alerts-alertdetail-tabs"
+      >
+        <!-- Custom trigger content: OTab's default slot exists for exactly
+             this (badges) — prop-driven label/icon cannot carry the firing
+             count the mock shows on the Groups tab. -->
+        <OTab
+          v-if="isMultiAlert"
+          name="groups"
+          data-test="alerts-alertdetail-tab-groups"
+        >
+          <OIcon name="layers" size="sm" class="o-tab__icon shrink-0" />
+          <span class="o-tab__label truncate">{{ t("alerts.groups.tab") }}</span>
+          <OTag
+            v-if="firingBadge"
+            variant="error-soft"
+            size="sm"
+            :label="firingBadge"
+            data-test="alerts-alertdetail-tab-groups-count"
+          />
+        </OTab>
+        <OTab name="history" :label="t('alerts.history')" icon="history" />
+        <OTab
+          name="configuration"
+          :label="t('alerts.configuration')"
+          icon="settings"
+        />
+      </OTabs>
+
       <OTabPanels v-model="activeTab" class="flex-1 min-h-0">
         <OTabPanel v-if="isMultiAlert" name="groups" stretch>
           <AlertGroupsTable
@@ -173,6 +195,16 @@
           />
         </OTabPanel>
 
+        <!-- Multi-alerts keep the per-group transitions view untouched.
+
+             Simple alerts get TWO readings of "history", because the
+             transitions table is write-on-change: an alert that has been
+             Critical for an hour has one transition but sixty evaluations.
+             "Evaluations" (default — it answers "is it running, what did it
+             measure?") reads the per-run record from the triggers stream;
+             "Level changes" reads the rollup row's transitions
+             (group_key ""), without the Group column/filter that would
+             repeat the same non-answer on every line. -->
         <OTabPanel name="history" stretch>
           <AlertGroupHistory
             v-if="isMultiAlert"
@@ -182,11 +214,47 @@
             @clear-filter="clearGroupFilter"
             @refresh="fetchTransitions"
           />
-          <OContent v-else class="py-4">
-            <p class="text-sm text-text-secondary">
-              {{ t("alerts.groups.historyOnlyForMulti") }}
-            </p>
-          </OContent>
+          <!-- `v-else-if="alert"`, not a bare else: until the GET resolves the
+               page cannot know which mode it is in, and mounting the
+               evaluations view speculatively fires its fetch even for alerts
+               that turn out to be multi. -->
+          <div v-else-if="alert" class="flex h-full min-h-0 flex-col">
+            <OContent class="shrink-0 py-2">
+              <OToggleGroup
+                :model-value="historyView"
+                data-test="alerts-alertdetail-history-view"
+                @update:model-value="onHistoryViewChange"
+              >
+                <OToggleGroupItem
+                  value="evaluations"
+                  size="sm"
+                  data-test="alerts-alertdetail-history-view-evaluations"
+                >
+                  {{ t("alerts.groups.evaluationsView") }}
+                </OToggleGroupItem>
+                <OToggleGroupItem
+                  value="transitions"
+                  size="sm"
+                  data-test="alerts-alertdetail-history-view-transitions"
+                >
+                  {{ t("alerts.groups.levelChangesView") }}
+                </OToggleGroupItem>
+              </OToggleGroup>
+            </OContent>
+            <div class="min-h-0 flex-1">
+              <AlertEvaluationHistory
+                v-if="historyView === 'evaluations'"
+                :alert-id="alertId"
+              />
+              <AlertGroupHistory
+                v-else
+                :transitions="transitions"
+                :loading="loadingTransitions"
+                :show-group-column="false"
+                @refresh="fetchTransitions"
+              />
+            </div>
+          </div>
         </OTabPanel>
 
         <OTabPanel name="configuration" stretch>
@@ -206,6 +274,7 @@ import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 
 import AlertConfigSummary from "@/components/alerts/AlertConfigSummary.vue";
+import AlertEvaluationHistory from "@/components/alerts/AlertEvaluationHistory.vue";
 import AlertGroupChart from "@/components/alerts/AlertGroupChart.vue";
 import AlertGroupHistory from "@/components/alerts/AlertGroupHistory.vue";
 import AlertGroupsTable from "@/components/alerts/AlertGroupsTable.vue";
@@ -214,8 +283,11 @@ import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OContent from "@/lib/core/Content/OContent.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
@@ -247,6 +319,15 @@ const historyGroupFilter = ref<AlertGroup | null>(null);
 // tabs and a working Edit button for something that does not exist.
 const notFound = ref(false);
 const activeTab = ref<string | number>("history");
+// Simple alerts only: which reading of "history" the tab shows. Evaluations
+// is the default — the transitions log is write-on-change, so it answers
+// "when did it change?" but not "has it been running, and what did it see?".
+const historyView = ref<"evaluations" | "transitions">("evaluations");
+
+const onHistoryViewChange = (value: unknown) => {
+  if (value !== "evaluations" && value !== "transitions") return;
+  historyView.value = value;
+};
 
 // The single-alert GET returns `query_condition`; the list endpoint calls the
 // same object `condition`. Accept either so this page works from both shapes.
@@ -295,6 +376,16 @@ const withBound = (value?: number, isLowerBound?: boolean) => {
   if (value === undefined || value === null) return "—";
   return isLowerBound ? `≥${value}` : String(value);
 };
+
+// The Groups tab carries the firing count as a badge (per the mock). Colour
+// is information: zero firing is calm, so the badge only appears when
+// something is actually firing. Uses the pre-cap counter with its `≥`
+// lower-bound marker, same as the stat strip — never the list length.
+const firingBadge = computed(() => {
+  const firing = groupData.value?.groups_firing;
+  if (firing === undefined || firing === null || firing <= 0) return "";
+  return withBound(firing, groupData.value?.groups_firing_is_lower_bound);
+});
 
 const firingSummary = computed(() => {
   const d = groupData.value;
@@ -391,7 +482,15 @@ const fetchTransitions = async () => {
       alertId.value,
       historyGroupFilter.value?.group_key,
     );
-    transitions.value = res.data?.list || [];
+    const list: AlertGroupTransition[] = res.data?.list || [];
+    // A simple alert's history is the rollup row, whose group_key is "".
+    // The backend cannot be asked for it directly — an empty group_key query
+    // param deliberately means "unfiltered" — so scope it here. This also
+    // hides stale per-group rows left behind if the alert was once a
+    // multi-alert; without a Group column they would be unreadable.
+    transitions.value = isMultiAlert.value
+      ? list
+      : list.filter((tr) => tr.group_key === "");
   } catch {
     transitions.value = [];
   } finally {

@@ -5388,7 +5388,10 @@
       "rollupRow": "All groups (rollup)",
       "noHistoryTitle": "No transitions recorded",
       "noHistoryDescription": "Level changes appear here as groups start firing, escalate or recover.",
-      "historyOnlyForMulti": "Per-group history is available for multi-alerts only. This alert evaluates as a single result.",
+      "evaluationsView": "Evaluations",
+      "levelChangesView": "Level changes",
+      "noEvaluationsTitle": "No evaluations in this window",
+      "noEvaluationsDescription": "Each run of this alert appears here. Try a wider time range, and check that the alert is enabled.",
       "firingCount": "{count} firing",
       "ofNGroups": "of {count} groups",
       "evaluation": "Evaluation",
@@ -10731,8 +10734,7 @@
       "reservation": "Reservation",
       "sliType": "SLI type",
       "owner": "Owner",
-      "folder": "Folder",
-      "streamPlaceholder": "Select a stream"
+      "folder": "Folder"
     },
     "empty": {
       "title": "No SLOs yet",

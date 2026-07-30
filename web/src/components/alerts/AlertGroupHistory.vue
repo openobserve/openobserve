@@ -14,7 +14,12 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
 
 <!--
-  Per-group level history for a multi-alert (alerts_2.md M-8).
+  Level history from the durable transitions table (alerts_2.md M-8).
+
+  For a multi-alert this is per-group history; for a simple alert it is the
+  rollup row's history, and the parent passes `show-group-column: false`
+  because a Group column where every row names the same rollup would carry
+  no information.
 
   Sourced from the durable `alert_state_transitions` table rather than the
   triggers stream, which is why a group's history survives the group itself:
@@ -160,8 +165,11 @@ const props = withDefaults(
     transitions: AlertGroupTransition[];
     loading?: boolean;
     groupFilter?: AlertGroup | null;
+    /** Off for simple alerts: every transition belongs to the rollup row, so
+     *  a Group column would repeat the same non-answer on every line. */
+    showGroupColumn?: boolean;
   }>(),
-  { loading: false, groupFilter: null },
+  { loading: false, groupFilter: null, showGroupColumn: true },
 );
 
 const emit = defineEmits<{
@@ -198,14 +206,18 @@ const columns = computed<OTableColumnDef[]>(() => [
     resizable: true,
     meta: { align: "left" },
   },
-  {
-    id: "group",
-    accessorKey: "group_labels",
-    header: t("alerts.groups.group"),
-    cell: " ",
-    resizable: true,
-    meta: { align: "left", flex: true },
-  },
+  ...(props.showGroupColumn
+    ? [
+        {
+          id: "group",
+          accessorKey: "group_labels",
+          header: t("alerts.groups.group"),
+          cell: " ",
+          resizable: true,
+          meta: { align: "left", flex: true },
+        } as OTableColumnDef,
+      ]
+    : []),
   {
     id: "change",
     accessorKey: "to_level",
@@ -213,7 +225,11 @@ const columns = computed<OTableColumnDef[]>(() => [
     cell: " ",
     size: 200,
     resizable: true,
-    meta: { align: "left" },
+    // Without the Group column something has to absorb the leftover width,
+    // and the level change is the row's centrepiece.
+    meta: props.showGroupColumn
+      ? { align: "left" }
+      : { align: "left", flex: true },
   },
   {
     id: "to_outcome",
