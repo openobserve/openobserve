@@ -174,8 +174,7 @@
                   <pre
                     v-else
                     class="text-compact m-0 font-mono leading-[1.6] break-words whitespace-pre-wrap"
-                    >{{ row?.sql }}</pre
-                  >
+                    >{{ row?.sql }}</pre>
                 </div>
               </div>
             </div>
@@ -217,8 +216,7 @@
                   <pre
                     v-else
                     class="text-compact m-0 font-mono leading-[1.6] break-words whitespace-pre-wrap"
-                    >{{ row?.function }}</pre
-                  >
+                    >{{ row?.function }}</pre>
                 </div>
               </div>
             </div>
@@ -480,7 +478,7 @@ export default defineComponent({
         return t("logs.searchHistory.sixtySeconds");
       } else {
         const minutes = Math.floor(delay / 60);
-        return t("logs.searchHistory.minutes", { minutes });
+        return t("logs.searchHistory.minutes", { count: minutes });
       }
     });
 

@@ -434,7 +434,7 @@ export default defineComponent({
             toast({
               variant: "warning",
               message: t("settings.cipherKeysPage.bulkDeletePartial", {
-                successful: successful.length,
+                count: successful.length,
                 failed: unsuccessful.length,
               }),
             });

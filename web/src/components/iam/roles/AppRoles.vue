@@ -295,7 +295,7 @@ const bulkDeleteUserRoles = async () => {
     } else if (successful.length > 0 && unsuccessful.length > 0) {
       toast({
         message: t("iam.appRoles.bulkDeletePartial", {
-          successful: successful.length,
+          count: successful.length,
           unsuccessful: unsuccessful.length,
         }),
         variant: "warning",

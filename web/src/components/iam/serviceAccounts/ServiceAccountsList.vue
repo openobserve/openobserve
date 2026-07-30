@@ -268,20 +268,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTabPanel name="curl">
               <pre
                 class="bg-surface-subtle text-text-body rounded-default overflow-auto p-3 text-xs whitespace-pre-wrap"
-                >{{ tokenCurlSnippet }}</pre
-              >
+                >{{ tokenCurlSnippet }}</pre>
             </OTabPanel>
             <OTabPanel name="header">
               <pre
                 class="bg-surface-subtle text-text-body rounded-default overflow-auto p-3 text-xs whitespace-pre-wrap"
-                >{{ tokenHeaderSnippet }}</pre
-              >
+                >{{ tokenHeaderSnippet }}</pre>
             </OTabPanel>
             <OTabPanel name="env">
               <pre
                 class="bg-surface-subtle text-text-body rounded-default overflow-auto p-3 text-xs whitespace-pre-wrap"
-                >{{ tokenEnvSnippet }}</pre
-              >
+                >{{ tokenEnvSnippet }}</pre>
             </OTabPanel>
           </OTabPanels>
 
@@ -967,14 +964,14 @@ export default defineComponent({
         } else if (successful.length > 0 && unsuccessful.length > 0) {
           toast({
             message: t("serviceAccounts.toast.bulkDeletePartial", {
-              successful: successful.length,
+              count: successful.length,
               failed: unsuccessful.length,
             }),
             variant: "warning",
           });
         } else if (unsuccessful.length > 0) {
           toast({
-            message: t("serviceAccounts.toast.bulkDeleteFailed", { failed: unsuccessful.length }),
+            message: t("serviceAccounts.toast.bulkDeleteFailed", { count: unsuccessful.length }),
             variant: "error",
           });
         }

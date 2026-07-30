@@ -389,7 +389,7 @@ const bulkDeleteUserGroups = async () => {
     } else if (successful.length > 0 && unsuccessful.length > 0) {
       toast({
         message: t("iam.appGroups.bulkDeletePartial", {
-          successCount: successful.length,
+          count: successful.length,
           failCount: unsuccessful.length,
         }),
         variant: "warning",

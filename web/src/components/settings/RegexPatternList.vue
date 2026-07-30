@@ -145,7 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #bottom>
               <div class="flex items-center gap-2">
                 <span class="text-xs font-normal">
-                  {{ resultTotal }} {{ t("regex_patterns.bottom_header") }}
+                  {{ t("regex_patterns.bottom_header", { count: resultTotal }) }}
                 </span>
                 <OButton
                   v-if="selectedPatterns.length > 0"
@@ -497,7 +497,7 @@ export default defineComponent({
         } else if (successful.length > 0 && unsuccessful.length > 0) {
           toast({
             message: t("settings.regexPatternList.bulkDeletePartial", {
-              successful: successful.length,
+              count: successful.length,
               unsuccessful: unsuccessful.length,
             }),
             variant: "warning",

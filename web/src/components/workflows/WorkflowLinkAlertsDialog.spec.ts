@@ -401,7 +401,7 @@ describe("WorkflowLinkAlertsDialog", () => {
 
       expect(mockToast).toHaveBeenCalledWith({
         message: i18n.global.t("workflow.linkAlerts.linkPartial", {
-          ok: 1,
+          count: 1,
           failed: 1,
         }),
         variant: "warning",

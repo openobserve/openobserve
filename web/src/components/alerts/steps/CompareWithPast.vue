@@ -229,7 +229,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref, watch, computed, inject, type PropType } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { useI18nTyped, type I18nKey } from "@/types/i18n";
 import { useStore } from "vuex";
 import { getUUID } from "@/utils/zincutils";
 import CustomDateTimePicker from "@/components/CustomDateTimePicker.vue";
@@ -350,18 +350,17 @@ export default defineComponent({
       commit();
     };
 
-    // Static unit labels for the offset display ("15m" → "15 Minute(s)"). These
-    // are NOT counted nouns — the literal "(s)" is part of the label — so they
-    // stay plain keys and are deliberately NOT pluralized (unlike the *Count
-    // keys used by convertMinutesToDisplayValue below).
-    const relativePeriods = computed(() => [
-      { label: t("alerts.compareWithPast.periodSeconds"), value: "s" },
-      { label: t("alerts.compareWithPast.periodMinutes"), value: "m" },
-      { label: t("alerts.compareWithPast.periodHours"), value: "h" },
-      { label: t("alerts.compareWithPast.periodDays"), value: "d" },
-      { label: t("alerts.compareWithPast.periodWeeks"), value: "w" },
-      { label: t("alerts.compareWithPast.periodMonths"), value: "M" },
-    ]);
+    // Offset code ("15m") → counted noun ("15 Minutes"). Shares the *Count plural
+    // keys with convertMinutesToDisplayValue so "1m" reads "1 Minute", not
+    // "1 Minutes".
+    const UNIT_COUNT_KEYS: Record<string, I18nKey> = {
+      s: "alerts.compareWithPast.secondCount",
+      m: "alerts.compareWithPast.minuteCount",
+      h: "alerts.compareWithPast.hourCount",
+      d: "alerts.compareWithPast.dayCount",
+      w: "alerts.compareWithPast.weekCount",
+      M: "alerts.compareWithPast.monthCount",
+    };
 
     const getDisplayValue = (value: string) => {
       if (typeof value !== "string") return value;
@@ -370,10 +369,10 @@ export default defineComponent({
       if (!match) return value;
 
       const [, numberPart, unitPart] = match;
-      const period = relativePeriods.value.find((p) => p.value === unitPart);
+      const countKey = UNIT_COUNT_KEYS[unitPart];
 
-      if (period) {
-        return `${numberPart} ${period.label}`;
+      if (countKey) {
+        return t(countKey, Number(numberPart));
       }
 
       return value;

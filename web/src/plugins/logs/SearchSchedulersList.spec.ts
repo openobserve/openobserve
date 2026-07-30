@@ -643,7 +643,7 @@ describe("SearchSchedulersList Component", () => {
       store.state.zoConfig.usage_publish_interval = 180;
 
       const delayMsg = wrapper.vm.delayMessage;
-      expect(delayMsg).toBe("3 minute(s)");
+      expect(delayMsg).toBe("3 minutes");
     });
 
     it("should handle exactly 60 seconds", () => {
@@ -657,7 +657,7 @@ describe("SearchSchedulersList Component", () => {
       store.state.zoConfig.usage_publish_interval = 7200;
 
       const delayMsg = wrapper.vm.delayMessage;
-      expect(delayMsg).toBe("120 minute(s)");
+      expect(delayMsg).toBe("120 minutes");
     });
   });
 

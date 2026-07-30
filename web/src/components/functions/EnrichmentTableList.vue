@@ -152,7 +152,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <div style="max-width: 300px">
                             <strong>{{ t("function.statusAllCompleted") }}</strong
                             ><br />
-                            {{ row.urlJobs.length }} {{ t("function.urlJobsCompleted") }}<br />
+                            {{ t("function.urlJobsCompleted", { count: row.urlJobs.length })
+                            }}<br />
                             <br />
                             <em style="font-size: 0.85em">{{
                               t("function.clickUrlToSeeDetails")

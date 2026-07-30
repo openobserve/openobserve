@@ -769,7 +769,6 @@
     "lastPage": "Last page",
     "sqlQuery": "SQL Query",
     "queryEditorLabel": "Query Editor:",
-    "pluralSuffix": "(s)",
     "addFieldToTable": "Add field to table",
     "removeFieldFromTable": "Remove field from table",
     "rows": "rows",
@@ -828,7 +827,7 @@
     "patternAnomalyLowFreqPlural": "This pattern appears less frequently than expected ({freq} vs avg {avg}, z-score: {z})",
     "patternZScore": "Z-score: {zScore} (avg frequency: {avgFrequency})",
     "patternVariablesHeader": "Variables",
-    "patternVariablesDetected": "{count} variable(s) detected",
+    "patternVariablesDetected": "{count} variable detected | {count} variables detected",
     "patternNoVariablesDetected": "No variables detected",
     "patternTemplate": "Pattern Template",
     "patternVariablesWithCount": "Variables ({count})",
@@ -928,7 +927,7 @@
     "applySearch": "Adjust filter parameters and click 'Run query'.",
     "searchSavedView": "Search saved views",
     "searchSavedFunction": "Search",
-    "streamNotExist": "The following [STREAM_NAME] stream(s) were not found. Please verify if the streams exist.",
+    "streamNotExist": "The following [STREAM_NAME] streams were not found. Please verify if the streams exist.",
     "noFieldFound": "No fields found for the selected stream",
     "noFieldFoundInStream": "No field found in selected stream.",
     "quickPickStreamsLabel": "Recently active streams",
@@ -1769,7 +1768,7 @@
     "revokeInvitationTitle": "Revoke Invitation",
     "revokeInvitationMsg": "Are you sure you want to revoke the invitation for {email}?",
     "deleteUsersTitle": "Delete Users",
-    "deleteUsersMsg": "Are you sure you want to delete {count} user(s)?"
+    "deleteUsersMsg": "Are you sure you want to delete {count} user? | Are you sure you want to delete {count} users?"
   },
   "invitation": {
     "pendingInvitations": "Pending Invitations",
@@ -1813,7 +1812,7 @@
     "confirmRefreshHead": "Rotate Token",
     "confirmRefreshBtn": "Rotate token",
     "confirmBulkDeleteHead": "Delete Service Accounts",
-    "confirmBulkDeleteMsg": "Are you sure you want to delete {count} service account(s)?",
+    "confirmBulkDeleteMsg": "Are you sure you want to delete {count} service account? | Are you sure you want to delete {count} service accounts?",
     "confirmBulkDeleteBtn": "Delete {count} accounts",
     "downloadToken": "Download Token",
     "token": "Token",
@@ -1884,9 +1883,9 @@
       "deleteError": "Error while deleting service account.",
       "rotateError": "Error while rotating token.",
       "bulkDeleteError": "Error while deleting service accounts.",
-      "bulkDeleteSuccess": "Deleted {count} service account(s).",
-      "bulkDeletePartial": "Deleted {successful} service account(s); {failed} failed.",
-      "bulkDeleteFailed": "Failed to delete {failed} service account(s)."
+      "bulkDeleteSuccess": "Deleted {count} service account. | Deleted {count} service accounts.",
+      "bulkDeletePartial": "Deleted {count} service account; {failed} failed. | Deleted {count} service accounts; {failed} failed.",
+      "bulkDeleteFailed": "Failed to delete {count} service account. | Failed to delete {count} service accounts."
     }
   },
   "iam": {
@@ -1986,7 +1985,7 @@
     "rolesPage": {
       "subtitle": "Roles bundle permissions — assign them to Users, Service Accounts, or Groups to grant access.",
       "delete": {
-        "impact": "{count} user(s) and any service accounts bound to this role will lose access."
+        "impact": "{count} user and any service accounts bound to this role will lose access. | {count} users and any service accounts bound to this role will lose access."
       },
       "bulkDelete": {
         "impact": "Any users and service accounts bound to these roles will lose access."
@@ -2017,7 +2016,7 @@
     "groupsPage": {
       "subtitle": "User Groups bundle roles — add members to a group to grant them all its roles at once.",
       "delete": {
-        "impact": "{count} member(s) will lose the roles granted by this group."
+        "impact": "{count} member will lose the roles granted by this group. | {count} members will lose the roles granted by this group."
       },
       "bulkDelete": {
         "impact": "Members of these groups will lose the roles granted by them."
@@ -2027,12 +2026,12 @@
       "deleteGroupTitle": "Delete Group",
       "deleteGroupConfirm": "Are you sure you want to delete '{name}'?",
       "bulkDeleteGroupsTitle": "Bulk Delete Groups",
-      "bulkDeleteGroupsConfirm": "Are you sure you want to delete {count} group(s)?",
+      "bulkDeleteGroupsConfirm": "Are you sure you want to delete {count} group? | Are you sure you want to delete {count} groups?",
       "groupDeletedSuccess": "Group deleted successfully!",
       "errorDeletingGroup": "Error while deleting group!",
-      "bulkDeleteSuccess": "Successfully deleted {count} group(s)",
-      "bulkDeletePartial": "Deleted {successCount} group(s). Failed to delete {failCount} group(s)",
-      "bulkDeleteFailed": "Failed to delete {count} group(s)",
+      "bulkDeleteSuccess": "Successfully deleted {count} group | Successfully deleted {count} groups",
+      "bulkDeletePartial": "Deleted {count} group. Failed to delete {failCount}. | Deleted {count} groups. Failed to delete {failCount}.",
+      "bulkDeleteFailed": "Failed to delete {count} group | Failed to delete {count} groups",
       "errorDeletingGroups": "Error while deleting groups"
     },
     "groupRoles": {
@@ -2089,9 +2088,9 @@
       "inProgress": "In progress",
       "loading": "Loading…",
       "noTasks": "No cleanup tasks found for this organization.",
-      "attempts": "{n} attempt(s)",
+      "attempts": "{n} attempt | {n} attempts",
       "refreshingEvery5s": "Refreshing every 5s…",
-      "stepsFailedPermanently": "{n} step(s) failed permanently — deletion is blocked until resolved.",
+      "stepsFailedPermanently": "{n} step failed permanently — deletion is blocked until resolved. | {n} steps failed permanently — deletion is blocked until resolved.",
       "close": "Close",
       "refresh": "Refresh",
       "deleteStreams": "Delete Streams"
@@ -2100,12 +2099,12 @@
       "deleteRole": "Delete Role",
       "deleteConfirm": "Are you sure you want to delete '{roleName}' role?",
       "bulkDeleteRoles": "Bulk Delete Roles",
-      "bulkDeleteConfirm": "Are you sure you want to delete {count} role(s)?",
+      "bulkDeleteConfirm": "Are you sure you want to delete {count} role? | Are you sure you want to delete {count} roles?",
       "roleDeletedSuccess": "Role deleted successfully!",
       "roleDeleteError": "Error while deleting role!",
-      "bulkDeleteSuccess": "Successfully deleted {count} role(s)",
-      "bulkDeletePartial": "Deleted {successful} role(s). Failed to delete {unsuccessful} role(s)",
-      "bulkDeleteFailed": "Failed to delete {count} role(s)",
+      "bulkDeleteSuccess": "Successfully deleted {count} role | Successfully deleted {count} roles",
+      "bulkDeletePartial": "Deleted {count} role. Failed to delete {unsuccessful}. | Deleted {count} roles. Failed to delete {unsuccessful}.",
+      "bulkDeleteFailed": "Failed to delete {count} role | Failed to delete {count} roles",
       "bulkDeleteRolesError": "Error while deleting roles"
     },
     "permissionsTable": {
@@ -2155,9 +2154,9 @@
       "pleaseWait": "Please wait...",
       "invitationRevokedSuccess": "Invitation revoked successfully.",
       "errorRevokingInvitation": "Error while revoking invitation.",
-      "deletedUsersSuccess": "Successfully deleted {count} user(s)",
-      "deletedUsersPartial": "Deleted {count} user(s), but {failed} failed",
-      "failedToDeleteUsers": "Failed to delete {count} user(s)",
+      "deletedUsersSuccess": "Successfully deleted {count} user | Successfully deleted {count} users",
+      "deletedUsersPartial": "Deleted {count} user, but {failed} failed | Deleted {count} users, but {failed} failed",
+      "failedToDeleteUsers": "Failed to delete {count} user | Failed to delete {count} users",
       "errorDeletingUsers": "Error while deleting users",
       "errorUpdatingOrgMember": "Error while updating organization member",
       "orgMemberUpdatedSuccess": "Organization member updated successfully."
@@ -2289,7 +2288,7 @@
     "defaultFtsKeysUsed": "Default FTS keys used (no custom keys set).",
     "userDefinedSchemaCount": "User Defined Schema ({count})",
     "otherFieldsSchemaTooltip": "Other fields show only the schema fields that existed before the stream was configured to use a user-defined schema.",
-    "addFieldsTitle": "Add Field(s)",
+    "addFieldsTitle": "Add Fields",
     "dataRetentionDaysLabel": "Data Retention (days)",
     "globalRetentionDays": "Global retention is {days} days",
     "retentionMinOneDay": "Retention period must be at least 1 day",
@@ -2308,7 +2307,7 @@
     "fetchingFunctions": "Fetching functions...",
     "associateFunction": "Associate Function",
     "noFunctionsFound": "No functions found",
-    "streamsUnit": "Stream(s)",
+    "streamsUnit": "{count} Stream | {count} Streams",
     "deleteAssociatedAlertsPipelinesBatch": "Delete all Pipelines and Alerts associated with the selected streams",
     "allFieldsCount": "All Fields ({count})",
     "performanceFieldsDialog": {
@@ -2420,7 +2419,7 @@
     "runs": {
       "title": "Workflow Runs",
       "edit": "Edit Workflow",
-      "staleGraphWarning": "This workflow has been edited since this run — {count} step(s) it executed no longer exist, so their status isn't shown here."
+      "staleGraphWarning": "This workflow has been edited since this run — {count} step it executed no longer exists, so its status isn't shown here. | This workflow has been edited since this run — {count} steps it executed no longer exist, so their status isn't shown here."
     },
     "history": {
       "button": "Runs",
@@ -2512,10 +2511,10 @@
       "notVerified": "Not verified — an earlier step errored, so records may not have reached this one.",
       "run": "Run Test",
       "allPassed": "All steps passed.",
-      "nErrored": "{count} step(s) errored.",
+      "nErrored": "{count} step errored. | {count} steps errored.",
       "ok": "OK",
       "skipped": "Skipped",
-      "errorsN": "{count} error(s)",
+      "errorsN": "{count} error | {count} errors",
       "runError": "Unable to run the test.",
       "stepResult": {
         "viewHint": "Click To View Input / Output",
@@ -2554,8 +2553,8 @@
       "linkN": "Link {count} Selected",
       "skip": "Skip For Now",
       "linking": "Linking...",
-      "linkSuccess": "Linked To {count} Alert(s)",
-      "linkPartial": "Linked To {ok} Alert(s), {failed} Failed",
+      "linkSuccess": "Linked To {count} Alert | Linked To {count} Alerts",
+      "linkPartial": "Linked To {count} Alert, {failed} Failed | Linked To {count} Alerts, {failed} Failed",
       "linkError": "Unable To Link Alerts."
     },
     "chooseTrigger": "Choose a Trigger",
@@ -2890,7 +2889,7 @@
     "lastUsed": "Last Used",
     "deleteTemplate": "Delete Template",
     "deleteConfirmation": "Are you sure you want to delete \"{name}\"?",
-    "bulkDeleteConfirmation": "Are you sure you want to delete {count} template(s)?",
+    "bulkDeleteConfirmation": "Are you sure you want to delete {count} template? | Are you sure you want to delete {count} templates?",
     "search": "Search templates",
     "loadFailed": "Failed to load templates",
     "saveRequiredFields": "Please fill in all required fields",
@@ -2937,7 +2936,7 @@
     "deleteFunctionsDialogTitle": "Delete Functions",
     "noPipelinesAssociated": "No pipelines associated with this function",
     "statusAllCompleted": "Status: All Completed",
-    "urlJobsCompleted": "URL job(s) completed",
+    "urlJobsCompleted": "{count} URL job completed | {count} URL jobs completed",
     "clickUrlToSeeDetails": "Click \"Url\" to see details",
     "statusProcessing": "Status: Processing",
     "jobsCurrentlyProcessing": "One or more jobs are currently processing",
@@ -2947,7 +2946,7 @@
     "jobsFailedNote": "One or more jobs have failed",
     "clickToRetryFailedJobs": "Click to see details and retry failed jobs",
     "statusPending": "Status: Pending",
-    "jobsWaitingToBeProcessed": "Job(s) waiting to be processed",
+    "jobsWaitingToBeProcessed": "Jobs waiting to be processed",
     "deleteEnrichmentTableTitle": "Delete Enrichment Table",
     "deleteEnrichmentTableConfirm": "Are you sure you want to delete enrichment table?",
     "bulkDeleteEnrichmentTablesTitle": "Bulk Delete Enrichment Tables",
@@ -3514,7 +3513,7 @@
     "deleteDashboardConfirmTitle": "Delete dashboard",
     "deleteDashboardConfirmMsg": "Are you sure you want to delete the dashboard?",
     "deleteDashboardsConfirmTitle": "Delete Dashboards",
-    "deleteDashboardsConfirmMsg": "Are you sure you want to delete {count} dashboard(s)?",
+    "deleteDashboardsConfirmMsg": "Are you sure you want to delete {count} dashboard? | Are you sure you want to delete {count} dashboards?",
     "edit": "Edit Dashboard",
     "duplicate": "Duplicate Dashboard",
     "move_to_another_folder": "Move to another Folder",
@@ -4067,7 +4066,7 @@
     },
     "dashboardQueryBuilder": {
       "withoutFieldDragError": "Without field, not able to drag",
-      "maxFieldsAllowed": "Max {count} field(s) in {axis}-Axis is allowed.",
+      "maxFieldsAllowed": "Max {count} field in {axis}-Axis is allowed. | Max {count} fields in {axis}-Axis are allowed.",
       "addZeroOrOneLabelField": "Add 0 or 1 label field here",
       "addOneField": "Add 1 field here",
       "addOneOrMoreFields": "Add one or more fields here"
@@ -4168,7 +4167,7 @@
       "retry": "Retry",
       "loading": "Loading gallery...",
       "selectPrompt": "Select dashboards",
-      "addCount": "Add {count} dashboard(s)",
+      "addCount": "Add {count} dashboard | Add {count} dashboards",
       "selectedCount": "{count} selected",
       "searchPlaceholder": "Search dashboards...",
       "dashboardsAvailable": "{count} available",
@@ -4196,8 +4195,8 @@
       "fetchFileError": "Failed to fetch {file}: {status}",
       "fileError": "{file}: {error}",
       "unknownError": "Unknown error",
-      "importSuccess": "Successfully imported {count} dashboard(s)!",
-      "importPartial": "Imported {count} dashboard(s), but {failCount} failed. Check console for details.",
+      "importSuccess": "Successfully imported {count} dashboard! | Successfully imported {count} dashboards!",
+      "importPartial": "Imported {count} dashboard, but {failCount} failed. Check console for details. | Imported {count} dashboards, but {failCount} failed. Check console for details.",
       "importFailed": "Failed to import dashboards: {error}",
       "addFailed": "Failed to add dashboards: {error}"
     },
@@ -4260,9 +4259,9 @@
       "copy": "Copy",
       "startTime": "Start Time",
       "endTime": "End Time",
-      "variables": "Variable(s)",
-      "fixedVariables": "Fixed Variable(s)",
-      "dynamicVariables": "Dynamic Variable(s)"
+      "variables": "Variables",
+      "fixedVariables": "Fixed Variables",
+      "dynamicVariables": "Dynamic Variables"
     },
     "dashboards": {
       "selected": "{count} selected",
@@ -4281,9 +4280,9 @@
       "errorExporting": "Error exporting dashboards",
       "deletingDashboards": "Deleting dashboards...",
       "noneSelectedForDeletion": "No dashboards selected for deletion",
-      "partialDeleteResult": "{successCount} dashboard(s) deleted successfully, {failCount} failed",
-      "failedToDeleteCount": "Failed to delete {failCount} dashboard(s)",
-      "deletedSuccessfullyCount": "{count} dashboard(s) deleted successfully",
+      "partialDeleteResult": "{count} dashboard deleted successfully, {failCount} failed | {count} dashboards deleted successfully, {failCount} failed",
+      "failedToDeleteCount": "Failed to delete {count} dashboard | Failed to delete {count} dashboards",
+      "deletedSuccessfullyCount": "{count} dashboard deleted successfully | {count} dashboards deleted successfully",
       "errorDeleting": "Error deleting dashboards. Please try again."
     },
     "chartSelection": {
@@ -4546,16 +4545,16 @@
       "invalidJsonFormat": "Invalid JSON format",
       "invalidJsonFormatUrl": "Invalid JSON format in the URL",
       "errorFetchingData": "Error fetching data",
-      "noJsonFilesSelected": "No JSON file(s) selected for import",
+      "noJsonFilesSelected": "No JSON files selected for import",
       "invalidJsonContent": "Invalid JSON content",
       "fileFallback": "File {n}",
       "jsonFileLabel": "JSON {n}",
       "errorProcessingFile": "Error processing file",
-      "filesImportedSuccessfully": "{n} File(s) Imported Successfully",
-      "filesFailedToImport": "{n} File(s) Failed to Import",
+      "filesImportedSuccessfully": "{n} File Imported Successfully | {n} Files Imported Successfully",
+      "filesFailedToImport": "{n} File Failed to Import | {n} Files Failed to Import",
       "pleaseEnterUrl": "Please Enter a URL for import",
-      "dashboardsImportedSuccessfully": "{n} Dashboard(s) Imported Successfully",
-      "dashboardsFailedToImport": "{n} Dashboard(s) Failed to Import",
+      "dashboardsImportedSuccessfully": "{n} Dashboard Imported Successfully | {n} Dashboards Imported Successfully",
+      "dashboardsFailedToImport": "{n} Dashboard Failed to Import | {n} Dashboards Failed to Import",
       "failedToImportDashboard": "Failed to Import Dashboard",
       "validationFailed": "Validation failed: {error}",
       "dashboardImportedSuccessfully": "Dashboard Imported Successfully",
@@ -4583,7 +4582,7 @@
     "addDashboardPage": {
       "addedSuccessfully": "Dashboard added successfully.",
       "creationFailed": "Dashboard creation failed.",
-      "filesFailedValidation": "{count} file(s) did not pass validation constraints"
+      "filesFailedValidation": "{count} file did not pass validation constraints | {count} files did not pass validation constraints"
     },
     "copyLegend": "Copy legend",
     "exitAnnotationsMode": "Exit Annotations Mode",
@@ -5830,7 +5829,7 @@
       "markAsResolvedTooltip": "Mark incident as resolved and close it",
       "reopenIncidentTooltip": "Reopen this resolved incident",
       "editIncidentTitleTooltip": "Edit incident title",
-      "firedTimes": "Fired {count} time(s)",
+      "firedTimes": "Fired {count} time | Fired {count} times",
       "incidentAnalysis": "Incident Analysis",
       "noAlertActivityData": "No alert activity data"
     },
@@ -5890,12 +5889,7 @@
       "goToConditions": "Go to Conditions",
       "goToConditionsTooltip": "Click on \"Go to Conditions\" to verify the events for selected comparison windows",
       "comparisonDisabledTooltip": "Comparison windows are only supported in SQL mode. Switch to SQL in the Alert Rules tab.",
-      "periodSeconds": "Second(s)",
-      "periodMinutes": "Minute(s)",
-      "periodHours": "Hour(s)",
-      "periodDays": "Day(s)",
-      "periodWeeks": "Week(s)",
-      "periodMonths": "Month(s)",
+      "secondCount": "{n} Second | {n} Seconds",
       "minuteCount": "{n} Minute | {n} Minutes",
       "hourCount": "{n} Hour | {n} Hours",
       "dayCount": "{n} Day | {n} Days",
@@ -6216,14 +6210,14 @@
       "unknownDestinationType": "Unknown destination type",
       "testFailedUnknownError": "Test failed with unknown error"
     },
-    "confirmDeleteAlerts": "Are you sure you want to delete {count} alert(s)?",
-    "confirmDeleteDestinations": "Are you sure you want to delete {count} destination(s)?",
+    "confirmDeleteAlerts": "Are you sure you want to delete {count} alert? | Are you sure you want to delete {count} alerts?",
+    "confirmDeleteDestinations": "Are you sure you want to delete {count} destination? | Are you sure you want to delete {count} destinations?",
     "prebuiltDestination": "Prebuilt {type} destination",
     "errorValidations": "Error Validations",
     "outputMessagesLabel": "Output Messages",
     "incidentSingular": "Incident",
     "incidentPlural": "Incidents",
-    "confirmDeleteTemplates": "Are you sure you want to delete {count} template(s)?",
+    "confirmDeleteTemplates": "Are you sure you want to delete {count} template? | Are you sure you want to delete {count} templates?",
     "periodHours": "{count} Hours",
     "periodMins": "{count} Mins",
     "periodHoursMins": "{hours} Hours {mins} Mins"
@@ -6373,7 +6367,7 @@
       "destinationCreation": "Destination Creation",
       "jsonStringEmpty": "JSON string is empty",
       "invalidJsonFormat": "Invalid JSON format",
-      "importSuccess": "Successfully imported destination(s)",
+      "importSuccess": "Successfully imported destinations",
       "importError": "Error importing Destination please check the JSON",
       "unknownError": "Unknown Error",
       "nameRequired": "Destination - {index}: The \"name\" field is required and should be a valid string.",
@@ -6704,7 +6698,7 @@
     "rumKeyLabel": "RUM Key",
     "newUserKeyBtnLbl": "Add User Key",
     "addUserKeyTitle": "Create User Key",
-    "organizationLabel": "Select Organization(s): ",
+    "organizationLabel": "Select Organizations: ",
     "save": "Save",
     "cancel": "Cancel",
     "apiNamePlaceHolder": "Key Name",
@@ -6795,7 +6789,7 @@
     "domainPlaceholder": "e.g. example.com",
     "domainHint": "Enter domain names without the {at_sign} symbol",
     "addDomain": "Add Domain",
-    "domainConfiguredCount": "{count} domain(s) configured",
+    "domainConfiguredCount": "{count} domain configured | {count} domains configured",
     "allowAllUsersFromDomain": "Allow all users from {domain}",
     "allowOnlySpecificUsers": "Allow only specific users from {domain}",
     "blockSpecificUsers": "Block only specific users from {domain}",
@@ -6886,7 +6880,7 @@
     "logoTextUpdatedSuccessfully": "Logo text updated successfully.",
     "errorUpdatingImage": "Error while updating image.",
     "fileFormatConstraint": "(Only .png, .jpg, .jpeg, .gif, .bmp formats & Max Size: 150x30px)",
-    "filesValidationFailed": "{count} file(s) did not pass validation constraints",
+    "filesValidationFailed": "{count} file did not pass validation constraints | {count} files did not pass validation constraints",
     "genAiAgentMapping": {
       "tabLabel": "GenAI Agent Mapping",
       "title": "GenAI Agent Mapping",
@@ -6957,7 +6951,7 @@
       "viewDimensions": "View dimensions",
       "viewServices": "Click to view services",
       "dimensionsFor": "Dimensions for",
-      "correlatedViaSharedDimensions": "service(s) correlated via shared dimensions",
+      "correlatedViaSharedDimensions": "services correlated via shared dimensions",
       "correlationDimensions": "Correlation Dimensions",
       "noSharedDimensions": "No shared dimensions found across services",
       "suggestionsDialogTitle": "Correlation Suggestions",
@@ -7078,7 +7072,7 @@
       "resetServicesConfirmTitle": "Reset All Discovered Services?",
       "resetServicesConfirmMessage": "This will delete all discovered services for this organization. Services will be automatically re-discovered as new telemetry data is ingested. This action cannot be undone.",
       "resetServicesConfirmWarning": "Services will be automatically re-discovered as new telemetry data is ingested. This action cannot be undone.",
-      "resetServicesSuccess": "Successfully deleted {count} discovered service(s).",
+      "resetServicesSuccess": "Successfully deleted {count} discovered service. | Successfully deleted {count} discovered services.",
       "resetServicesFailed": "Failed to reset services",
       "workload": "Workload",
       "goToConfiguration": "Go to Configuration",
@@ -7174,14 +7168,14 @@
       "deleteCipherKeyTitle": "Delete Cipher Key",
       "deleteCipherKeyMessage": "Are you sure you want to delete Cipher Key?",
       "deleteCipherKeysTitle": "Delete Cipher Keys",
-      "deleteCipherKeysMessage": "Are you sure you want to delete {count} cipher key(s)?",
+      "deleteCipherKeysMessage": "Are you sure you want to delete {count} cipher key? | Are you sure you want to delete {count} cipher keys?",
       "loadingData": "Please wait while loading data...",
       "fetchFailed": "Failed to fetch cipher keys. Please try again.",
       "processingDelete": "Please wait while processing delete request...",
       "deleteSuccess": "Cipher Key deleted successfully",
-      "bulkDeleteSuccess": "Successfully deleted {count} cipher key(s)",
-      "bulkDeletePartial": "Deleted {successful} cipher key(s), but {failed} failed",
-      "bulkDeleteFailed": "Failed to delete {count} cipher key(s)",
+      "bulkDeleteSuccess": "Successfully deleted {count} cipher key | Successfully deleted {count} cipher keys",
+      "bulkDeletePartial": "Deleted {count} cipher key, but {failed} failed | Deleted {count} cipher keys, but {failed} failed",
+      "bulkDeleteFailed": "Failed to delete {count} cipher key | Failed to delete {count} cipher keys",
       "bulkDeleteError": "Error while deleting cipher keys"
     },
     "correlationSettingsPage": {
@@ -7217,7 +7211,7 @@
       "tabUrlImport": "URL Import",
       "jsonStringEmpty": "JSON string is empty",
       "invalidJsonFormat": "Invalid JSON format",
-      "importSuccess": "Successfully imported {count} pattern(s)",
+      "importSuccess": "Successfully imported {count} pattern | Successfully imported {count} patterns",
       "importError": "Error importing Regex Pattern please check the JSON",
       "nameRequired": "Regex pattern - {index}: name is required",
       "patternRequired": "Regex pattern - {index}: is required",
@@ -7242,8 +7236,8 @@
       "storageEnabled": "Storage Enabled",
       "extendTrialForName": "Extend Trial for {name}",
       "setNewTrialExtensionPeriod": "Set the new trial extension period.",
-      "extendTrialByWeeks": "Extend trial by {n} week(s)",
-      "weeks": "Week(s)",
+      "extendTrialByWeeks": "Extend trial by {n} week | Extend trial by {n} weeks",
+      "weeks": "Weeks",
       "createContractForName": "Create External Contract for {name}",
       "extendContractForName": "Extend External Contract for {name}",
       "createContract": "Create Contract",
@@ -7358,7 +7352,7 @@
       "discoveredPatternsHelp": "We discovered these deployment patterns in your streams. Use them to configure service correlation.",
       "goToServices": "Go to Services",
       "toSeeDiscoveredServices": "to see the actual discovered services.",
-      "fieldsConfigured": "{n} field(s) configured",
+      "fieldsConfigured": "{n} field configured | {n} fields configured",
       "recommended": "Recommended:",
       "recommendedUse": "Use",
       "coversTelemetry": "— covers {coverage}% of your telemetry.",
@@ -7397,7 +7391,7 @@
       "exportTitle": "Export Regex Pattern",
       "delete": "Delete",
       "bulkDeleteTitle": "Delete Regex Patterns",
-      "bulkDeleteMessage": "Are you sure you want to delete {n} regex pattern(s)?",
+      "bulkDeleteMessage": "Are you sure you want to delete {n} regex pattern? | Are you sure you want to delete {n} regex patterns?",
       "deleteTitle": "Delete Regex Pattern",
       "deleteMessage": "Are you sure you want to delete this regex pattern?",
       "errorFetching": "Error fetching regex patterns",
@@ -7405,9 +7399,9 @@
       "errorDeleting": "Error deleting regex pattern",
       "exportedSuccess": "Regex pattern exported successfully",
       "errorExporting": "Error exporting regex pattern",
-      "bulkDeleteSuccess": "Successfully deleted {n} regex pattern(s)",
-      "bulkDeletePartial": "Deleted {successful} regex pattern(s), but {unsuccessful} failed",
-      "bulkDeleteFailed": "Failed to delete {n} regex pattern(s)",
+      "bulkDeleteSuccess": "Successfully deleted {n} regex pattern | Successfully deleted {n} regex patterns",
+      "bulkDeletePartial": "Deleted {count} regex pattern, but {unsuccessful} failed | Deleted {count} regex patterns, but {unsuccessful} failed",
+      "bulkDeleteFailed": "Failed to delete {n} regex pattern | Failed to delete {n} regex patterns",
       "errorBulkDeleting": "Error while deleting regex patterns"
     },
     "setAiCreditsFor": "Set AI Credits for {name}"
@@ -7443,7 +7437,7 @@
     "reloadReports": "Reload reports",
     "moveToFolder": "Move to Folder",
     "deleteReportsTitle": "Delete Reports",
-    "deleteReportsMsg": "Are you sure you want to delete {count} report(s)?",
+    "deleteReportsMsg": "Are you sure you want to delete {count} report? | Are you sure you want to delete {count} reports?",
     "add": "New report",
     "search": "Search report",
     "update": "Update Report",
@@ -8113,7 +8107,7 @@
       "service": "Service",
       "duration": "Duration",
       "start": "Start",
-      "requestResent": "Request resent {count} time(s)",
+      "requestResent": "Request resent {count} time | Request resent {count} times",
       "resends": "Resends",
       "spanIdTitle": "Span ID: {id}",
       "inputTokens": "Input Tokens",
@@ -8424,12 +8418,12 @@
     "create_regex_pattern_field": "Redact / Drop using Regex",
     "import": "Import",
     "import_title": "Import Pattern",
-    "bottom_header": "Pattern(s)",
+    "bottom_header": "{count} Pattern | {count} Patterns",
     "filter_by_tag": "Filter by Tag",
     "refresh": "Refresh",
     "loading_patterns": "Loading patterns...",
     "try_again": "Try Again",
-    "showing_patterns": "Showing {count} pattern(s)",
+    "showing_patterns": "Showing {count} pattern | Showing {count} patterns",
     "preview": "Preview",
     "no_patterns_found": "No patterns found",
     "no_description": "No description available",
@@ -8438,7 +8432,7 @@
     "valid_examples": "Valid Examples",
     "close": "Close",
     "import_this_pattern": "Import This Pattern",
-    "patterns_loaded": "Loaded {count} pattern(s)",
+    "patterns_loaded": "Loaded {count} pattern | Loaded {count} patterns",
     "failed_to_load": "Failed to load patterns",
     "no_patterns_selected": "Please select at least one pattern",
     "name_required": "* Name is required",
@@ -8511,12 +8505,12 @@
     "unstableDimensionTooltip": "This dimension is unstable and may produce unreliable correlations.",
     "title": "Correlated Metrics - {service}",
     "loading": "Loading correlation data...",
-    "loadingMetrics": "Loading {count} metric stream(s)...",
+    "loadingMetrics": "Loading {count} metric stream... | Loading {count} metric streams...",
     "failedToLoad": "Unable to Load Correlation Data",
     "retryButton": "Retry",
     "noMetrics": "No Metrics Selected",
     "matchedDimensions": "Matched Dimensions",
-    "metricsButton": "{count} Metric(s)",
+    "metricsButton": "{count} Metric | {count} Metrics",
     "metricsTooltip": "Select metric streams to display",
     "selectMetrics": "Select Metric Streams",
     "correlatedLogs": "Logs",
@@ -8584,7 +8578,7 @@
     "service": "Service: {service}",
     "tracesPlaceholder": "Traces will be implemented here",
     "correlatedTracesFor": "Correlated traces for service: {service}",
-    "metricsSelector": "{selected} of {total} Metric(s)",
+    "metricsSelector": "{selected} of {count} Metric | {selected} of {count} Metrics",
     "dimensions": "Filters",
     "all": "All",
     "loadingTraces": "Loading traces...",
@@ -8595,7 +8589,7 @@
     "noMetricsDescription": "Select metrics from the sidebar to view charts.",
     "directTraceMatch": "Direct Trace Match",
     "openTraceInNewWindow": "Open trace in new window",
-    "spans": "span(s)",
+    "spans": "spans",
     "dimensionBasedCorrelation": "Dimension-based Correlation",
     "tracesFromService": "Traces from service: {service}",
     "noTracesFound": "No Traces Found",
@@ -8887,8 +8881,8 @@
     "builtInRefreshed": "Built-in models refreshed",
     "noModelsSelected": "No models selected to export",
     "confirmDeleteSelectedTitle": "Delete Selected Models",
-    "confirmDeleteSelectedMessage": "Are you sure you want to delete {count} selected model(s)?",
-    "deletedModelsNotif": "Deleted {count} model(s)",
+    "confirmDeleteSelectedMessage": "Are you sure you want to delete {count} selected model? | Are you sure you want to delete {count} selected models?",
+    "deletedModelsNotif": "Deleted {count} model | Deleted {count} models",
     "goBack": "Go Back",
     "modelNamePlaceholder": "e.g. GPT-4o",
     "matchPatternPlaceholder": "e.g. gpt-4.*",
@@ -9157,12 +9151,12 @@
     "importProviderRequired": "Provider *",
     "scoreConfigLibrary": {
       "searchPlaceholder": "Search Score Configs...",
-      "scoreConfigsLabel": "score config(s)"
+      "scoreConfigsLabel": "{count} score config | {count} score configs"
     },
     "scorerLibrary": {
       "noProvidersMessage": "Create a Provider first before importing LLM Judge scorers.",
       "searchPlaceholder": "Search Scorers...",
-      "scorerCountSuffix": "scorer(s)"
+      "scorerCountSuffix": "{count} scorer | {count} scorers"
     },
     "title": "Evaluations",
     "description": "Configure LLM providers, score definitions, scorers, and live evaluation jobs.",
@@ -9219,7 +9213,7 @@
       "noCompatibleJobs": "No {scope} Eval Jobs use the {stream} trace stream.",
       "loadJobsError": "Failed to load Eval Jobs.",
       "run": "Run evaluation",
-      "queued": "Queued {count} evaluation task(s).",
+      "queued": "Queued {count} evaluation task. | Queued {count} evaluation tasks.",
       "runError": "Failed to queue the evaluation."
     },
     "tabs": {
@@ -10337,7 +10331,7 @@
       "invalidEndTime": "The selected end time is  invalid. Please choose a valid time",
       "fetchFailed": "Failed to fetch search history. Please try again later.",
       "sixtySeconds": "60 seconds",
-      "minutes": "{minutes} minute(s)"
+      "minutes": "{count} minute | {count} minutes"
     },
     "searchJobInspector": {
       "title": "Search Job Inspector",
@@ -10741,7 +10735,7 @@
       "setupConnected": "Connected ✓"
     },
     "dialog": {
-      "bulkDeleteBody": "Are you sure you want to delete {count} check(s)? This action cannot be undone.",
+      "bulkDeleteBody": "Are you sure you want to delete {count} check? This action cannot be undone. | Are you sure you want to delete {count} checks? This action cannot be undone.",
       "bulkDeleteTitle": "Delete Checks",
       "deleteSingleBody": "Are you sure you want to delete \"{name}\"? This action cannot be undone.",
       "deleteSingleTitle": "Delete Check",
@@ -10784,7 +10778,7 @@
       "actionLabel": "Action",
       "addStep": "Add Step",
       "addStepManually": "Add a step manually",
-      "bulkDeleteStepsBody": "Delete {count} step(s)? This cannot be undone.",
+      "bulkDeleteStepsBody": "Delete {count} step? This cannot be undone. | Delete {count} steps? This cannot be undone.",
       "bulkDeleteStepsTitle": "Delete steps",
       "cancel": "Cancel",
       "capturingLive": "capturing live",
@@ -11298,13 +11292,13 @@
     "table": {
       "assertions": "Assertions",
       "avg": "Avg",
-      "bulkEnableSuccess": "Enabled {count} check(s).",
-      "bulkEnableToast": "Enabling {count} check(s)…",
+      "bulkEnableSuccess": "Enabled {count} check. | Enabled {count} checks.",
+      "bulkEnableToast": "Enabling {count} check… | Enabling {count} checks…",
       "bulkPartialSuccess": "{success} succeeded, {fail} failed.",
-      "bulkPauseSuccess": "Paused {count} check(s).",
-      "bulkPauseToast": "Pausing {count} check(s)…",
-      "bulkTriggerSuccess": "Triggered {count} check(s).",
-      "bulkTriggerToast": "Triggering {count} check(s)…",
+      "bulkPauseSuccess": "Paused {count} check. | Paused {count} checks.",
+      "bulkPauseToast": "Pausing {count} check… | Pausing {count} checks…",
+      "bulkTriggerSuccess": "Triggered {count} check. | Triggered {count} checks.",
+      "bulkTriggerToast": "Triggering {count} check… | Triggering {count} checks…",
       "check": "Check",
       "checksFooterTitle": "Checks",
       "checksSuffix": "checks",
@@ -11776,15 +11770,15 @@
     }
   },
   "functions": {
-    "confirmDeleteFunctions": "Are you sure you want to delete {count} function(s)?",
-    "confirmDeleteEnrichmentTables": "Are you sure you want to delete {count} enrichment table(s)?",
+    "confirmDeleteFunctions": "Are you sure you want to delete {count} function? | Are you sure you want to delete {count} functions?",
+    "confirmDeleteEnrichmentTables": "Are you sure you want to delete {count} enrichment table? | Are you sure you want to delete {count} enrichment tables?",
     "newCsvFileUrl": "New CSV File URL",
     "replacementCsvFileUrl": "Replacement CSV File URL",
     "newCsvFileUrlHelp": "Enter a new URL to add to this enrichment table",
     "replacementCsvFileUrlHelp": "Enter a URL to replace all existing URLs"
   },
   "actionScripts": {
-    "confirmDeleteActionScripts": "Are you sure you want to delete {count} action script(s)?"
+    "confirmDeleteActionScripts": "Are you sure you want to delete {count} action script? | Are you sure you want to delete {count} action scripts?"
   },
   "toastMessages": {
     "actionScripts": {

@@ -69,7 +69,7 @@ the Free Software Foundation, either version 3 of the License, or
           <span>{{ allVisibleSelected ? t("common.clearAll") : t("common.selectAll") }}</span>
         </label>
         <span class="text-text-secondary text-xs">
-          {{ filteredEntries.length }} {{ t("onlineEvals.scorerLibrary.scorerCountSuffix") }}
+          {{ t("onlineEvals.scorerLibrary.scorerCountSuffix", { count: filteredEntries.length }) }}
         </span>
       </div>
 

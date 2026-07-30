@@ -297,7 +297,7 @@ const linkSelected = async () => {
     });
   } else if (ok && failed) {
     toast({
-      message: t("workflow.linkAlerts.linkPartial", { ok, failed }),
+      message: t("workflow.linkAlerts.linkPartial", { count: ok, failed }),
       variant: "warning",
     });
   } else {

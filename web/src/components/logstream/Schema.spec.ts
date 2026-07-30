@@ -3873,7 +3873,7 @@ describe("Schema Component Tests", () => {
     });
 
     it("should block onSubmit when a field has no data type", async () => {
-      // The data-type select is visible + required in the Add Field(s) card, so a
+      // The data-type select is visible + required in the Add Fields card, so a
       // row with a valid name but no type also blocks the save.
       wrapper.vm.isDialogOpen = true;
       wrapper.vm.newSchemaFieldsForm.setFieldValue("newSchemaFields", [
@@ -3892,7 +3892,7 @@ describe("Schema Component Tests", () => {
     });
 
     it("should save on Enter from a field-name input", async () => {
-      // Enter in the Add Field(s) name input triggers the settings save (the
+      // Enter in the Add Fields name input triggers the settings save (the
       // nested <form> otherwise swallows Enter with 2+ rows).
       wrapper.vm.isDialogOpen = true;
       wrapper.vm.newSchemaFieldsForm.setFieldValue("newSchemaFields", [

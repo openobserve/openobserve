@@ -242,7 +242,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #bottom="scope">
             <div class="flex w-full items-center justify-between py-2">
               <div class="flex w-full items-center text-xs font-normal">
-                {{ scope.totalRows }} {{ t("logStream.streamsUnit") }}
+                {{ t("logStream.streamsUnit", { count: scope.totalRows }) }}
                 <OButton
                   v-if="selectedIds.length > 0"
                   icon-left="delete"

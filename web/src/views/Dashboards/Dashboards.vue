@@ -1582,14 +1582,17 @@ export default defineComponent({
             // Partial success
             toast({
               variant: "warning",
-              message: t("dashboard.dashboards.partialDeleteResult", { successCount, failCount }),
+              message: t("dashboard.dashboards.partialDeleteResult", {
+                count: successCount,
+                failCount,
+              }),
               timeout: 5000,
             });
           } else if (failCount > 0) {
             // All failed
             toast({
               variant: "error",
-              message: t("dashboard.dashboards.failedToDeleteCount", { failCount }),
+              message: t("dashboard.dashboards.failedToDeleteCount", { count: failCount }),
             });
           } else {
             // All successful

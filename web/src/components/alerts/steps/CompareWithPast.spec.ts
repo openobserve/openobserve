@@ -245,31 +245,31 @@ describe("CompareWithPast.vue", () => {
 
   describe("Get Display Value", () => {
     it("should convert seconds correctly", () => {
-      expect(wrapper.vm.getDisplayValue("30s")).toBe("30 Second(s)");
-      expect(wrapper.vm.getDisplayValue("1s")).toBe("1 Second(s)");
+      expect(wrapper.vm.getDisplayValue("30s")).toBe("30 Seconds");
+      expect(wrapper.vm.getDisplayValue("1s")).toBe("1 Second");
     });
 
     it("should convert minutes correctly", () => {
-      expect(wrapper.vm.getDisplayValue("15m")).toBe("15 Minute(s)");
-      expect(wrapper.vm.getDisplayValue("1m")).toBe("1 Minute(s)");
+      expect(wrapper.vm.getDisplayValue("15m")).toBe("15 Minutes");
+      expect(wrapper.vm.getDisplayValue("1m")).toBe("1 Minute");
     });
 
     it("should convert hours correctly", () => {
-      expect(wrapper.vm.getDisplayValue("2h")).toBe("2 Hour(s)");
-      expect(wrapper.vm.getDisplayValue("24h")).toBe("24 Hour(s)");
+      expect(wrapper.vm.getDisplayValue("2h")).toBe("2 Hours");
+      expect(wrapper.vm.getDisplayValue("24h")).toBe("24 Hours");
     });
 
     it("should convert days correctly", () => {
-      expect(wrapper.vm.getDisplayValue("7d")).toBe("7 Day(s)");
-      expect(wrapper.vm.getDisplayValue("1d")).toBe("1 Day(s)");
+      expect(wrapper.vm.getDisplayValue("7d")).toBe("7 Days");
+      expect(wrapper.vm.getDisplayValue("1d")).toBe("1 Day");
     });
 
     it("should convert weeks correctly", () => {
-      expect(wrapper.vm.getDisplayValue("2w")).toBe("2 Week(s)");
+      expect(wrapper.vm.getDisplayValue("2w")).toBe("2 Weeks");
     });
 
     it("should convert months correctly", () => {
-      expect(wrapper.vm.getDisplayValue("3M")).toBe("3 Month(s)");
+      expect(wrapper.vm.getDisplayValue("3M")).toBe("3 Months");
     });
 
     it("should return original value for invalid format", () => {
@@ -449,7 +449,7 @@ describe("CompareWithPast.vue", () => {
     });
 
     it("should handle very large time values", () => {
-      expect(wrapper.vm.getDisplayValue("999d")).toBe("999 Day(s)");
+      expect(wrapper.vm.getDisplayValue("999d")).toBe("999 Days");
       expect(wrapper.vm.convertMinutesToDisplayValue(999999)).toBe("23 Months");
     });
 

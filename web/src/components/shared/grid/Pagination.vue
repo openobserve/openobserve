@@ -45,8 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OButton>
       <div class="ml-1">
         {{ resultTotal }}
-        {{ pageTitle.slice(-1) == "s" ? pageTitle.slice(0, -1) : pageTitle
-        }}{{ t("search.pluralSuffix") }}
+        {{ countedPageTitle }}
       </div>
     </div>
     <div class="ml-auto">
@@ -105,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 // @ts-nocheck
-import { defineComponent, ref } from "vue";
+import { computed, defineComponent, ref } from "vue";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
@@ -150,11 +149,21 @@ export default defineComponent({
       store.dispatch("setSearchCollapseToggle", store.state.searchCollapsibleSection == 0 ? 20 : 0);
     };
 
+    // `pageTitle` is supplied by the caller already translated and normally plural
+    // ("Dashboards"). Pick the form that matches the row count rather than printing
+    // the untranslatable "(s)" suffix this used to append.
+    const countedPageTitle = computed(() => {
+      const title: string = props.pageTitle ?? "";
+      if (props.resultTotal === 1 && title.slice(-1) === "s") return title.slice(0, -1);
+      return title;
+    });
+
     return {
       t,
       store,
       router,
       maxRecords,
+      countedPageTitle,
       toggleSidePanel,
       searchCollapseImage,
       changePagination,

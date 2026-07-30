@@ -48,7 +48,9 @@ the Free Software Foundation, either version 3 of the License, or
           }}</span>
         </div>
         <span class="text-text-secondary text-xs">
-          {{ filteredEntries.length }} {{ t("onlineEvals.scoreConfigLibrary.scoreConfigsLabel") }}
+          {{
+            t("onlineEvals.scoreConfigLibrary.scoreConfigsLabel", { count: filteredEntries.length })
+          }}
         </span>
       </div>
 
