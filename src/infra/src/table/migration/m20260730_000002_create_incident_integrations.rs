@@ -96,6 +96,22 @@ impl MigrationTrait for Migration {
             )
             .await?;
 
+        // Unique (org_id, name) so `ensure_default_for_org`'s get-or-create is
+        // race-safe across nodes — the DB constraint is what actually closes
+        // the race; the app-level find-then-insert alone cannot.
+        manager
+            .create_index(
+                Index::create()
+                    .if_not_exists()
+                    .table(IncidentIntegrations::Table)
+                    .name("idx_incident_integrations_org_name")
+                    .col(IncidentIntegrations::OrgId)
+                    .col(IncidentIntegrations::Name)
+                    .unique()
+                    .to_owned(),
+            )
+            .await?;
+
         manager
             .create_table(
                 Table::create()
