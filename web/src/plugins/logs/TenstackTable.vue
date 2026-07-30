@@ -284,8 +284,8 @@ class="tw:mr-1" />
             :class="[
               'tw:absolute tw:flex tw:items-center tw:justify-start tw:border-b-[1px]',
               // Wrap on: bound the row to the table width (like main) so the
-              // flex:auto last cell has an edge to break-all against. Wrap off:
-              // let the row grow to its widest line for horizontal scrolling.
+              // flex:auto last cell has  an edge to break-all against. Wrap off:
+              // let the row grow to its  widest line for horizontal scrolling.
               wrap ? 'tw:w-full' : 'tw:w-max',
               !(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow
                 ? 'tw:cursor-pointer'
