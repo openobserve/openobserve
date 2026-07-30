@@ -238,6 +238,15 @@ pub async fn drain_monitor<C: ConnectionTrait>(
 ///
 /// Three steps: SELECT candidate IDs → UPDATE status/lease fields → SELECT
 /// full rows. No raw SQL, works on SQLite and Postgres.
+///
+/// `lease_secs` is a floor request, not the decision. Both probes hardcode 300s
+/// client-side while a check's retry sequence — which runs *inside* the leased
+/// job — is bounded only by `JOB_LEASE_SECS`, so an under-lease means the lease
+/// expires while the probe is still working: the reaper terminates the job,
+/// completes the run as an error, and the probe's real result is then rejected as
+/// a stale ack. A client cannot be trusted to know how long its job may take, so
+/// the server raises any request up to the budget the config validation already
+/// guarantees every check fits inside.
 pub async fn lease_batch<C: ConnectionTrait>(
     conn: &C,
     pool: &str,
@@ -247,6 +256,7 @@ pub async fn lease_batch<C: ConnectionTrait>(
     lease_secs: i64,
     browser: Option<bool>,
 ) -> Result<Vec<LeasedRow>, errors::Error> {
+    let lease_secs = lease_secs.max(config::meta::synthetics::JOB_LEASE_SECS);
     let lease_expires_at = now_us + lease_secs * 1_000_000;
 
     // Step 1: pick candidate IDs.

@@ -936,14 +936,94 @@ const DEFAULT_JOURNEY_BUDGET_MS: u32 = 300_000;
 const MIN_JOURNEY_BUDGET_MS: u32 = 5_000;
 const MAX_JOURNEY_BUDGET_MS: u32 = 900_000;
 
-/// Lease held on a browser job while it runs — must stay in sync with
-/// `LEASE_SECS` in o2-enterprise `synthetics/dispatcher/mod.rs`.
+/// Lease held on a job while it runs — must stay in sync with `LEASE_SECS` in
+/// o2-enterprise `synthetics/dispatcher/mod.rs`, and is the floor the job API
+/// applies to every agent lease (`synthetics_jobs::lease_batch`).
+///
+/// Applies to every check type, not just browser. Both agents ask for a 300s
+/// lease, so any check whose retry sequence runs longer than that has its lease
+/// expire while the probe is still working — the reaper then terminates the job
+/// and completes the run as an error, and the probe's real result is rejected
+/// when it finally acks. The validation below is what keeps every check's worst
+/// case inside this number, which is in turn what lets the server lease for it
+/// unconditionally.
 ///
 /// NOTE: the AWS Lambda function timeout must be >= this value, or runs are
 /// killed mid-journey. That setting lives outside this repository and cannot be
 /// asserted here. 900s is also AWS's maximum, so raising `retries` or
 /// `journey_budget_ms` further requires re-deriving all three together.
-const BROWSER_LEASE_SECS: i64 = 900;
+pub const JOB_LEASE_SECS: i64 = 900;
+
+/// Ceiling for ONE attempt of a non-browser check, in milliseconds.
+///
+/// Net `timeout_ms` was previously unbounded: every protocol config defaults it
+/// to 10s, but nothing rejected `timeout_ms: 3_600_000`, so the worst case of a
+/// retry sequence had no upper limit and could not be checked against the lease.
+const MAX_NET_TIMEOUT_MS: u32 = 300_000;
+const MIN_NET_TIMEOUT_MS: u32 = 1_000;
+
+/// Worst-case wall clock for one leased job, in milliseconds.
+///
+/// Retries happen INSIDE the leased job, so the lease has to cover the whole
+/// sequence rather than one attempt: `attempts x per_attempt + gaps`. The
+/// `multiplier` is for work the probe repeats sequentially within the same job —
+/// browser device combos — which the lease also covers.
+///
+/// Shared by the browser and protocol paths so the two cannot drift; they differ
+/// only in what one attempt costs and whether anything multiplies it.
+fn worst_case_run_ms(
+    per_attempt_ms: u32,
+    multiplier: i64,
+    retries: i32,
+    wait_before_retry_secs: i32,
+) -> i64 {
+    let attempts = i64::from(retries) + 1;
+    multiplier
+        * (attempts * i64::from(per_attempt_ms)
+            + i64::from(retries) * i64::from(wait_before_retry_secs) * 1_000)
+}
+
+/// Bounds a protocol check's `timeout_ms` and its full retry sequence.
+///
+/// The browser path has had this since `journey_budget_ms` was introduced; the
+/// protocol path never did. Both agents ask for a 300s lease while
+/// `timeout_ms` was unbounded and `retries` goes to 3, so a check needing more
+/// than the lease was accepted, and then on every single run the reaper
+/// terminated the job mid-flight and the probe's real result was thrown away as
+/// a stale ack — a passing check reporting an error forever.
+///
+/// `timeout_ms` is read from the raw config rather than a typed struct because
+/// every protocol config declares the same field with the same serde default, so
+/// an absent field legitimately means the default.
+fn validate_net_retry_budget(
+    config: &serde_json::Value,
+    retries: i32,
+    wait_before_retry_secs: i32,
+) -> Result<(), String> {
+    let timeout_ms = config
+        .get("timeout_ms")
+        .and_then(|v| v.as_u64())
+        .and_then(|v| u32::try_from(v).ok())
+        .unwrap_or_else(default_timeout_ms);
+
+    if !(MIN_NET_TIMEOUT_MS..=MAX_NET_TIMEOUT_MS).contains(&timeout_ms) {
+        return Err(format!(
+            "config.timeout_ms: must be {MIN_NET_TIMEOUT_MS}..={MAX_NET_TIMEOUT_MS}, got {timeout_ms}"
+        ));
+    }
+
+    let worst_case_ms = worst_case_run_ms(timeout_ms, 1, retries, wait_before_retry_secs);
+    if worst_case_ms > JOB_LEASE_SECS * 1_000 {
+        return Err(format!(
+            "config: a full retry sequence must fit inside the {JOB_LEASE_SECS}s job lease, but \
+             (retries={retries} + 1) x timeout_ms={timeout_ms} + retries x \
+             wait_before_retry_secs={wait_before_retry_secs} needs {worst_case_ms}ms. Lower \
+             timeout_ms, retries, or wait_before_retry_secs — a check that outlives its lease has \
+             its job terminated mid-run and its real result rejected as a stale ack."
+        ));
+    }
+    Ok(())
+}
 
 /// The complete v2 action vocabulary — exactly Playwright's recorder action
 /// model, minus what a monitor cannot use.
@@ -1344,7 +1424,7 @@ impl Synthetic {
         allowed_browsers: &[String],
         allowed_devices: &[String],
     ) -> Result<(), String> {
-        match self.monitor_type {
+        let type_check = match self.monitor_type {
             SyntheticType::Browser => {
                 let cfg: BrowserConfig = serde_json::from_value(self.config.clone())
                     .map_err(|e| format!("config: not a valid browser config: {e}"))?;
@@ -1420,7 +1500,20 @@ impl Synthetic {
                 // banner check (a rejected auth still proves SSH is up).
                 Ok(())
             }
+        };
+        // Type errors first: "not a valid tcp config" is more fundamental than
+        // anything derived from its fields, and a config that fails to parse has
+        // no meaningful timeout to report on.
+        type_check?;
+
+        // Every protocol check gets the same retry-budget-vs-lease bound the
+        // browser path applies inside `validate_browser_config`. Done here, once,
+        // rather than in each arm: the arms are per-type and this rule is not, and
+        // adding a check type should not be able to opt out of it silently.
+        if self.monitor_type != SyntheticType::Browser {
+            validate_net_retry_budget(&self.config, self.retries, self.wait_before_retry_secs)?;
         }
+        Ok(())
     }
 }
 
@@ -1664,14 +1757,11 @@ fn validate_browser_config(
     // duplicate. Which is verbatim what the LEASE_SECS comment in
     // `dispatcher/mod.rs` was written to prevent.
     let devices = i64::try_from(cfg.browser_devices.len().max(1)).unwrap_or(1);
-    let worst_case_ms = devices
-        * (attempts * i64::from(budget_ms)
-            + i64::from(retries) * i64::from(wait_before_retry_secs) * 1_000);
-    let lease_ms = BROWSER_LEASE_SECS * 1_000;
-    if worst_case_ms > lease_ms {
+    let worst_case_ms = worst_case_run_ms(budget_ms, devices, retries, wait_before_retry_secs);
+    if worst_case_ms > JOB_LEASE_SECS * 1_000 {
         return Err(format!(
             "config: a full retry sequence across all browser/device combos must fit inside the \
-             {BROWSER_LEASE_SECS}s job lease, but browser_devices={devices} x (retries={retries} x \
+             {JOB_LEASE_SECS}s job lease, but browser_devices={devices} x (retries={retries} x \
              journey_budget_ms={budget_ms} + wait_before_retry_secs={wait_before_retry_secs}) needs \
              {worst_case_ms}ms. Lower journey_budget_ms, retries, or the number of browser/device \
              combos — a run that outlives its lease is requeued and executed a second time."
@@ -2162,6 +2252,95 @@ mod tests {
             vec!["chromium".to_string(), "firefox".to_string()],
             vec!["desktop".to_string(), "mobile".to_string()],
         )
+    }
+
+    fn valid_tcp_synthetic() -> Synthetic {
+        Synthetic {
+            name: "db port".to_string(),
+            monitor_type: SyntheticType::Tcp,
+            target: "db.example.com".to_string(),
+            frequency: SyntheticFrequency {
+                frequency_type: SyntheticFrequencyType::Minutes,
+                interval: 5,
+                cron: String::new(),
+                timezone: None,
+            },
+            locations: vec!["aws-us-east-1".to_string()],
+            enabled: true,
+            alert_if_fails: 1,
+            wait_before_retry_secs: 5,
+            config: serde_json::json!({ "port": 5432, "timeout_ms": 10000 }),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn net_retry_sequence_must_fit_the_job_lease() {
+        let (locs, brs, devs) = allowed();
+        // The lease covers the whole retry sequence because retries run inside
+        // the leased job. 4 x 300s alone is 1200s, past the 900s lease.
+        let mut s = valid_tcp_synthetic();
+        s.config = serde_json::json!({ "port": 5432, "timeout_ms": 300_000 });
+        s.retries = 3;
+        s.wait_before_retry_secs = 0;
+        let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
+        assert!(err.contains("job lease"), "{err}");
+
+        // The gaps count too: 3 x 250s = 750s of attempts is fine on its own,
+        // but not with 300s of waiting between them.
+        let mut s = valid_tcp_synthetic();
+        s.config = serde_json::json!({ "port": 5432, "timeout_ms": 250_000 });
+        s.retries = 2;
+        s.wait_before_retry_secs = 300;
+        let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
+        assert!(err.contains("job lease"), "{err}");
+    }
+
+    #[test]
+    fn net_timeout_is_bounded_at_all() {
+        let (locs, brs, devs) = allowed();
+        // Was previously unbounded: every protocol config defaults timeout_ms to
+        // 10s, but nothing rejected an hour, so the worst case had no ceiling to
+        // check the lease against.
+        let mut s = valid_tcp_synthetic();
+        s.config = serde_json::json!({ "port": 5432, "timeout_ms": 3_600_000 });
+        s.retries = 0;
+        let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
+        assert!(err.starts_with("config.timeout_ms:"), "{err}");
+    }
+
+    #[test]
+    fn net_defaults_and_ordinary_configs_still_validate() {
+        let (locs, brs, devs) = allowed();
+        // A config with no timeout_ms at all must use the serde default rather
+        // than 0, which would otherwise trip the new minimum.
+        let mut s = valid_tcp_synthetic();
+        s.config = serde_json::json!({ "port": 5432 });
+        assert!(s.validate(&locs, &brs, &devs, true).is_ok());
+
+        // The worst realistic config: max retries and a 60s timeout is 240s of
+        // attempts plus 90s of gaps — comfortably inside the lease. This must
+        // keep passing, or the bound is too tight to be shipped.
+        let mut s = valid_tcp_synthetic();
+        s.config = serde_json::json!({ "port": 5432, "timeout_ms": 60_000 });
+        s.retries = 3;
+        s.wait_before_retry_secs = 30;
+        assert!(
+            s.validate(&locs, &brs, &devs, true).is_ok(),
+            "{:?}",
+            s.validate(&locs, &brs, &devs, true)
+        );
+    }
+
+    #[test]
+    fn worst_case_counts_attempts_gaps_and_the_multiplier() {
+        // retries=0 is one attempt and no gaps.
+        assert_eq!(worst_case_run_ms(10_000, 1, 0, 30), 10_000);
+        // retries=2 is three attempts and two gaps.
+        assert_eq!(worst_case_run_ms(10_000, 1, 2, 30), 30_000 + 60_000);
+        // The multiplier applies to the whole sequence, not one attempt — the
+        // probe repeats the entire retry sequence per device inside one lease.
+        assert_eq!(worst_case_run_ms(10_000, 2, 2, 30), 2 * (30_000 + 60_000));
     }
 
     #[test]
