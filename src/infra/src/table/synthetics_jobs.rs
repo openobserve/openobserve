@@ -79,7 +79,8 @@ pub struct LeasedRow {
     pub metadata: String,
 }
 
-/// Returned by `dead_letter_expired` for each job that exhausted all retries.
+/// Returned by `dead_letter_expired` for each job it terminated. The caller owns
+/// completing the job's run — see `reason` for which of the three ways it ended.
 #[derive(Debug)]
 pub struct DeadLetteredRow {
     pub id: String,
@@ -90,6 +91,47 @@ pub struct DeadLetteredRow {
     pub dispatch_attempts: i32,
     pub run_id: String,
     pub metadata: String,
+    pub reason: DeadLetterReason,
+}
+
+/// Why a job was terminated without a probe result.
+///
+/// All three end the same way — the run is completed with Error — but they are
+/// different operational problems, and collapsing them into one message costs
+/// the reader the only clue about which one they have. `NeverDispatched` means
+/// no probe polled that location at all (a dead private agent); the other two
+/// mean a probe took the job and went away.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DeadLetterReason {
+    /// A probe held the lease, never acked, and has no dispatch attempts left.
+    AttemptsExhausted,
+    /// The lease expired and the job is now past `valid_until`. Requeueing it
+    /// would produce a result stamped for a window that has already closed, so
+    /// the next scheduled run is the right retry, not this one.
+    Expired,
+    /// Never claimed by anything before `valid_until` passed.
+    NeverDispatched,
+}
+
+/// Classifies a row selected by `dead_letter_expired`. Split out from the query
+/// so the mapping is testable without a database.
+///
+/// `status` is on the `synthetics_jobs` scale (0=Pending, 1=Leased).
+pub fn dead_letter_reason(
+    status: i32,
+    dispatch_attempts: i32,
+    max_attempts: i32,
+) -> DeadLetterReason {
+    if status == 0 {
+        // Pending and past its window: nothing ever leased it, so the attempt
+        // count says nothing about why. A leased row with 0 attempts would be a
+        // different story, which is why status is checked first.
+        DeadLetterReason::NeverDispatched
+    } else if dispatch_attempts >= max_attempts {
+        DeadLetterReason::AttemptsExhausted
+    } else {
+        DeadLetterReason::Expired
+    }
 }
 
 // ── Scheduler: enqueue ────────────────────────────────────────────────────────
@@ -370,7 +412,16 @@ pub async fn ack_complete<C: ConnectionTrait>(
 
 // ── Reaper ────────────────────────────────────────────────────────────────────
 
-/// Resets expired leases back to Pending (status=0) when dispatch_attempts < max_attempts.
+/// Resets expired leases back to Pending (status=0) when the job has dispatch
+/// attempts left *and* is still inside its validity window.
+///
+/// The `valid_until` guard is what makes the retry budget real. Without it this
+/// requeues a job whose window has already closed, and `prune_stale` — which
+/// runs later in the same reaper tick — deletes it again immediately, because
+/// `valid_until` is one interval (60s for a 1-minute check) while a lease is
+/// 300s or more. So the row went Pending → deleted within one tick,
+/// `dispatch_attempts` never got past 1, `max_attempts` was unreachable, and
+/// the run it belonged to was never completed by anyone.
 pub async fn requeue_expired<C: ConnectionTrait>(
     conn: &C,
     now_us: i64,
@@ -381,6 +432,7 @@ pub async fn requeue_expired<C: ConnectionTrait>(
         SET status = 0, claimed_by = NULL, claimed_at = NULL, lease_expires_at = NULL
         WHERE status = 1
           AND lease_expires_at < $1
+          AND valid_until >= $1
           AND dispatch_attempts < $2
     "#;
     let res = conn
@@ -393,20 +445,38 @@ pub async fn requeue_expired<C: ConnectionTrait>(
     Ok(res.rows_affected())
 }
 
-/// Marks permanently failed rows as Dead (status=2) when dispatch_attempts >= max_attempts.
-/// Returns the affected rows so the reaper can update monitor status and write to streams.
+/// Marks every job that can no longer produce a probe result as Dead (status=2)
+/// and returns the rows the caller must now account for.
+///
+/// Covers all three terminal shapes, because each one leaves a run that nobody
+/// else will ever finish:
+///
+/// - leased, lease expired, no attempts left → `AttemptsExhausted`
+/// - leased, lease expired, past `valid_until` → `Expired` (a retry would report against a closed
+///   window; the next scheduled run is the right retry)
+/// - pending, past `valid_until` → `NeverDispatched`, previously the business of `prune_stale`,
+///   which DELETEd the row and so destroyed the only record that the run was still owed a job
+///
+/// The caller **must** complete the run for every row returned. The per-row
+/// compare-and-swap below is what makes that safe to do exactly once: the reaper
+/// runs on every alert_manager node, and a bulk `UPDATE ... WHERE id IN (...)`
+/// after a separate SELECT lets two nodes both believe they terminated the same
+/// job. That was harmless while the caller only wrote to a stream; it is not
+/// harmless now that the caller increments a run counter, because a double
+/// increment pushes `jobs_done` past `job_count` and completes the run early,
+/// with a result that is missing a location.
 pub async fn dead_letter_expired<C: ConnectionTrait>(
     conn: &C,
     now_us: i64,
     max_attempts: i32,
 ) -> Result<Vec<DeadLetteredRow>, errors::Error> {
-    // Step 1: find candidates before marking them dead.
+    // Step 1: find candidates before marking them dead. `status` comes back so
+    // the CAS can require the row not to have moved under us.
     let select_sql = r#"
-        SELECT id, synthetics_id, synthetics_name, org_id, location, dispatch_attempts, run_id, metadata
+        SELECT id, synthetics_id, synthetics_name, org_id, location, dispatch_attempts, run_id, metadata, status
         FROM synthetics_jobs
-        WHERE status = 1
-          AND lease_expires_at < $1
-          AND dispatch_attempts >= $2
+        WHERE (status = 1 AND lease_expires_at < $1 AND (dispatch_attempts >= $2 OR valid_until < $1))
+           OR (status = 0 AND valid_until < $1)
     "#;
     let rows = conn
         .query_all(Statement::from_sql_and_values(
@@ -420,40 +490,45 @@ pub async fn dead_letter_expired<C: ConnectionTrait>(
         return Ok(vec![]);
     }
 
-    let dead: Vec<DeadLetteredRow> = rows
+    let candidates: Vec<(DeadLetteredRow, i32)> = rows
         .into_iter()
         .filter_map(|row| {
-            Some(DeadLetteredRow {
-                id: row.try_get::<String>("", "id").ok()?,
-                synthetics_id: row.try_get("", "synthetics_id").ok()?,
-                synthetics_name: row.try_get("", "synthetics_name").ok()?,
-                org_id: row.try_get("", "org_id").ok()?,
-                location: row.try_get("", "location").ok()?,
-                dispatch_attempts: row.try_get("", "dispatch_attempts").ok()?,
-                run_id: row.try_get("", "run_id").ok()?,
-                metadata: row.try_get("", "metadata").unwrap_or_default(),
-            })
+            let status: i32 = row.try_get("", "status").ok()?;
+            let dispatch_attempts: i32 = row.try_get("", "dispatch_attempts").ok()?;
+            let reason = dead_letter_reason(status, dispatch_attempts, max_attempts);
+            Some((
+                DeadLetteredRow {
+                    id: row.try_get::<String>("", "id").ok()?,
+                    synthetics_id: row.try_get("", "synthetics_id").ok()?,
+                    synthetics_name: row.try_get("", "synthetics_name").ok()?,
+                    org_id: row.try_get("", "org_id").ok()?,
+                    location: row.try_get("", "location").ok()?,
+                    dispatch_attempts,
+                    run_id: row.try_get("", "run_id").ok()?,
+                    metadata: row.try_get("", "metadata").unwrap_or_default(),
+                    reason,
+                },
+                status,
+            ))
         })
         .collect();
 
-    // Step 2: mark them all dead.
-    let ids: Vec<Value> = dead.iter().map(|r| Value::from(r.id.clone())).collect();
-    let placeholders: String = ids
-        .iter()
-        .enumerate()
-        .map(|(i, _)| format!("${}", i + 1))
-        .collect::<Vec<_>>()
-        .join(", ");
-    let update_sql = format!(
-        "UPDATE synthetics_jobs SET status = 2 WHERE id IN ({})",
-        placeholders
-    );
-    conn.execute(Statement::from_sql_and_values(
-        conn.get_database_backend(),
-        &update_sql,
-        ids,
-    ))
-    .await?;
+    // Step 2: claim each row individually. Only rows this call actually
+    // transitioned are returned, so only one node ever accounts for a job.
+    let update_sql = "UPDATE synthetics_jobs SET status = 2 WHERE id = $1 AND status = $2";
+    let mut dead = Vec::with_capacity(candidates.len());
+    for (row, prev_status) in candidates {
+        let res = conn
+            .execute(Statement::from_sql_and_values(
+                conn.get_database_backend(),
+                update_sql,
+                [Value::from(row.id.clone()), Value::from(prev_status)],
+            ))
+            .await?;
+        if res.rows_affected() == 1 {
+            dead.push(row);
+        }
+    }
 
     Ok(dead)
 }
@@ -545,6 +620,15 @@ pub async fn failing_locations<C: ConnectionTrait>(
     Ok(out)
 }
 
+/// Backstop for pending rows past `valid_until`.
+///
+/// `dead_letter_expired` runs earlier in the same reaper tick and moves these to
+/// Dead after completing their runs, so in normal operation this matches nothing.
+/// It stays as a floor: if the dead-letter path ever fails to claim a row, the
+/// row is still removed rather than left to be re-examined every 30 seconds
+/// forever. A row this deletes is a run that will not complete, so a non-zero
+/// count here is a bug signal, not routine housekeeping — the reaper logs it at
+/// warn for that reason.
 pub async fn prune_stale<C: ConnectionTrait>(conn: &C, now_us: i64) -> Result<u64, errors::Error> {
     let sql = r#"
         DELETE FROM synthetics_jobs
@@ -606,5 +690,45 @@ mod tests {
         assert_eq!(row.synthetics_id, "mon-1");
         assert_eq!(row.run_id, "3Fzn001XXXXXXXXXXXXXXXX");
         assert_eq!(row.dispatch_attempts, 1);
+    }
+
+    const MAX: i32 = 3;
+
+    #[test]
+    fn pending_row_is_never_dispatched_whatever_its_attempt_count() {
+        // Status decides this, not the counter. A Pending row past `valid_until`
+        // was never leased for the window that just closed, so reporting
+        // "did not respond after N attempts" would blame a probe that was never
+        // asked. Both counts must classify the same way.
+        assert_eq!(
+            dead_letter_reason(0, 0, MAX),
+            DeadLetterReason::NeverDispatched
+        );
+        assert_eq!(
+            dead_letter_reason(0, MAX, MAX),
+            DeadLetterReason::NeverDispatched
+        );
+    }
+
+    #[test]
+    fn leased_row_separates_a_spent_budget_from_a_closed_window() {
+        // At or over the budget: retries are genuinely exhausted.
+        assert_eq!(
+            dead_letter_reason(1, MAX, MAX),
+            DeadLetterReason::AttemptsExhausted
+        );
+        assert_eq!(
+            dead_letter_reason(1, MAX + 1, MAX),
+            DeadLetterReason::AttemptsExhausted
+        );
+        // Under the budget: attempts were left, but the window closed first, so
+        // this is the case `requeue_expired` deliberately declines to retry.
+        // Before the `valid_until` guard, this row was requeued and then deleted
+        // by `prune_stale` in the same tick, which is why it needs its own name.
+        assert_eq!(dead_letter_reason(1, 0, MAX), DeadLetterReason::Expired);
+        assert_eq!(
+            dead_letter_reason(1, MAX - 1, MAX),
+            DeadLetterReason::Expired
+        );
     }
 }
