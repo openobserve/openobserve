@@ -508,7 +508,7 @@ const _anomalyCache = new Map<
 >();
 import { useI18n } from "vue-i18n";
 import { b64EncodeUnicode } from "@/utils/zincutils";
-import { isFiringOutcome } from "@/utils/alerts/runOutcome";
+import { isFiringOutcome, isErrorOutcome } from "@/utils/alerts/runOutcome";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import alertsService from "@/services/alerts";
@@ -823,13 +823,16 @@ const loadHistoryAndSplit = async () => {
         service: h.stream_name ?? "—",
         description: h.alert_name ?? "",
         timeAgo: relativeTime_(h.timestamp),
+        // Firing rows need a sort key too — without rawTs they scored 0 and
+        // always sorted beneath every failure row regardless of timestamp.
+        rawTs: h.timestamp,
         failCount: 0,
       }));
 
     // Dedup failed: one row per alert_name, most recent timestamp, total count
     const failedMap = new Map<string, any>();
     hits
-      .filter((h) => h.status?.toLowerCase() === "failed")
+      .filter((h) => isErrorOutcome(h.status))
       .forEach((h) => {
         const key = h.alert_name ?? h.id ?? "unknown";
         const existing = failedMap.get(key);
