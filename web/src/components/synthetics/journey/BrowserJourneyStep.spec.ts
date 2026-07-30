@@ -198,9 +198,11 @@ describe("BrowserJourneyStep", () => {
     });
 
     // ── Timeout guard rails (spec P1.1.4, P1.1.5 / T1-13, T1-14) ───────────
-    // The recorder no longer stamps a timeout, so this field renders empty. An
-    // empty box reads as "no timeout", which is wrong and invites needless
-    // overrides — show the default the runner will actually apply.
+    // Only the warning is asserted here. The field itself, its placeholder and
+    // the retired-action notice all live inside BrowserJourneyStepEditor — the
+    // input behind its Advanced group — and are covered by that component's own
+    // spec. Reaching for them through this wrapper tested the layout of a
+    // component this one only embeds.
     describe("timeout guard rails", () => {
       const timeoutInput = (w: VueWrapper) =>
         w.find('[data-test="synthetics-journey-step-timeout-input"]');
