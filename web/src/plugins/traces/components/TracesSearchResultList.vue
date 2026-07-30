@@ -272,12 +272,21 @@ const addSearchTerm = (
 const sendToAiChat = (value: string) => emit("send-to-ai-chat", value);
 
 /**
- * Server sort cycles asc → desc → cleared. On the cleared tick the column is
- * empty, so fall back to the default trace sort rather than send an empty field.
+ * OTable's server sort cycles asc → desc → cleared, but a trace list is never
+ * unsorted: it always falls back to `start_time desc`. Mapping the cleared tick
+ * straight to that default made the sort a dead end — the list starts on
+ * `start_time desc`, so the first click on the timestamp column IS the cleared
+ * tick, and it just re-applied desc. Ascending was unreachable.
+ *
+ * The pre-migration table had no cleared state at all — it toggled
+ * `desc ⇄ asc` on the active column:
+ *   field === sortBy ? (sortOrder === "desc" ? "asc" : "desc") : "desc"
+ * so treat "cleared" as "flip the current order" to restore that.
  */
 const onSortChange = (params: { column: string; order: "asc" | "desc" }) => {
   if (!params.column) {
-    emit("sort-change", "start_time", "desc");
+    const field = props.sortBy || "start_time";
+    emit("sort-change", field, props.sortOrder === "desc" ? "asc" : "desc");
   } else {
     emit("sort-change", params.column, params.order);
   }
