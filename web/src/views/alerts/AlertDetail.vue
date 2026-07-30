@@ -268,7 +268,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
@@ -533,17 +533,12 @@ const editAlert = () => {
   });
 };
 
-// Multi-alerts land on Groups (the reason the page exists for them); everything
-// else has no groups tab, so History is the only sensible default.
-watch(isMultiAlert, (multi) => {
-  if (multi) {
-    activeTab.value = "groups";
-    fetchGroups();
-  }
-});
-
 onMounted(async () => {
   await fetchAlert();
+  // Multi-alerts land on Groups (the reason the page exists for them); everything
+  // else has no groups tab, so History is the only sensible default. The alert is
+  // fetched exactly once and never re-fetched, so handling the initial load here
+  // is enough — a separate watch on isMultiAlert would just re-fire fetchGroups().
   if (isMultiAlert.value) {
     activeTab.value = "groups";
     await fetchGroups();
