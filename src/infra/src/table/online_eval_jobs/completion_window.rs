@@ -126,6 +126,22 @@ fn completion_window_defaults() -> &'static CompletionWindowDefaults {
     })
 }
 
+/// Validate a trace completion window — job-supplied or configuration values.
+pub fn validate_trace_completion_window(
+    idle_window_secs: i64,
+    max_age_secs: i64,
+) -> Result<(), &'static str> {
+    validate_completion_window(idle_window_secs, max_age_secs, &TRACE_COMPLETION_LIMITS)
+}
+
+/// Validate a session completion window — job-supplied or configuration values.
+pub fn validate_session_completion_window(
+    idle_window_secs: i64,
+    max_age_secs: i64,
+) -> Result<(), &'static str> {
+    validate_completion_window(idle_window_secs, max_age_secs, &SESSION_COMPLETION_LIMITS)
+}
+
 fn resolve_window_defaults(
     scope: &str,
     idle_secs: i64,
@@ -166,11 +182,7 @@ impl Default for TraceEvalConfig {
 
 impl TraceEvalConfig {
     pub fn validate(&self) -> Result<(), &'static str> {
-        validate_completion_window(
-            self.idle_window_secs,
-            self.max_age_secs,
-            &TRACE_COMPLETION_LIMITS,
-        )?;
+        validate_trace_completion_window(self.idle_window_secs, self.max_age_secs)?;
         validate_end_signal(self.end_signal.as_ref())
     }
 }
@@ -196,11 +208,7 @@ impl Default for SessionEvalConfig {
 
 impl SessionEvalConfig {
     pub fn validate(&self) -> Result<(), &'static str> {
-        validate_completion_window(
-            self.idle_window_secs,
-            self.max_age_secs,
-            &SESSION_COMPLETION_LIMITS,
-        )?;
+        validate_session_completion_window(self.idle_window_secs, self.max_age_secs)?;
         validate_end_signal(self.end_signal.as_ref())
     }
 }
