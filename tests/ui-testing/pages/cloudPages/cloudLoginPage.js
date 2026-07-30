@@ -34,13 +34,34 @@ class CloudLoginPage {
 
     // ===== NAVIGATION METHODS =====
 
+    /**
+     * The active org is derived from the `org_identifier` QUERY PARAM on every
+     * page load — it is NOT part of the session.
+     *
+     * MainLayout.vue resolves it in onBeforeMount from
+     * `url.searchParams.get("org_identifier")`, and the only store behind it
+     * (`useLocalOrganization` in utils/storage.ts) is an in-memory module ref, so
+     * nothing about the active org survives a reload and `storageState` cannot
+     * carry it. Navigating to a bare `/web/...` therefore silently lands on the
+     * USER'S DEFAULT org, not this shard's.
+     *
+     * That was harmless while every shard used one org. Now that the alpha1 matrix
+     * spreads 13 shards over 6 orgs, a bare navigation puts the test in the wrong
+     * org entirely — which is how this suite failed on run 30531452187 with the
+     * org selector reading `Dash_automation` and no side nav at all.
+     */
+    orgParam() {
+        const org = process.env['ORGNAME'] || getOrgIdentifier();
+        return org ? `?org_identifier=${encodeURIComponent(org)}` : '';
+    }
+
     async gotoHomePage() {
-        await this.page.goto('/web/');
+        await this.page.goto(`/web/${this.orgParam()}`);
         await this.page.waitForLoadState('domcontentloaded');
     }
 
     async gotoLogsPage() {
-        await this.page.goto('/web/logs');
+        await this.page.goto(`/web/logs${this.orgParam()}`);
         await this.page.waitForLoadState('domcontentloaded');
     }
 

@@ -37,6 +37,34 @@ function cloudConfigMatchesTargetOrg() {
   }
 }
 
+/**
+ * Hard postcondition for global setup: the org the API helpers will use
+ * (cloud-config.json) must be the org this shard was assigned (ORGNAME).
+ *
+ * This is the guard rail for the 6-org matrix. A shard whose two org sources
+ * disagree does not fail cleanly — it ingests into one org and asserts against
+ * another, producing "no data" failures scattered across unrelated specs. That
+ * costs hours to trace back. Failing here instead names the problem in one line,
+ * before a single test runs, and it will catch any future change to the
+ * shared-auth/matrix wiring that reintroduces the split.
+ */
+function assertOrgAlignment() {
+  const targetOrg = process.env.ORGNAME;
+  if (!targetOrg || targetOrg === 'default') return;
+  if (cloudConfigMatchesTargetOrg()) {
+    testLogger.info(`[alpha1] Org alignment verified — ORGNAME and cloud-config both = ${targetOrg}`);
+    return;
+  }
+  let actual = '<unreadable>';
+  try {
+    actual = JSON.parse(fs.readFileSync(CLOUD_CONFIG_FILE, 'utf-8')).orgIdentifier;
+  } catch { /* keep placeholder */ }
+  throw new Error(
+    `[alpha1] Org misalignment: ORGNAME=${targetOrg} but cloud-config.json orgIdentifier=${actual}. ` +
+    `API helpers would target "${actual}" while the UI targets "${targetOrg}". Refusing to run the shard.`
+  );
+}
+
 async function globalSetup() {
   testLogger.info('[alpha1] Starting global setup - Dex email login');
 
@@ -67,6 +95,7 @@ async function globalSetup() {
         testLogger.warn('[alpha1] cloud-config.json org does not match ORGNAME — falling back to Dex login');
       } else if (valid) {
         testLogger.info('[alpha1] Shared auth state is valid');
+        assertOrgAlignment();
         // Still need to do ingestion for shard-specific streams
         const specFiles = process.argv.filter(arg => /\.spec\.(js|ts)$/.test(arg));
         const isCleanupOnly = specFiles.length === 1 && /cleanup\.spec\.(js|ts)$/.test(specFiles[0]);
@@ -122,6 +151,7 @@ async function globalSetup() {
       testLogger.info(`[alpha1] Auth state saved to ${AUTH_FILE}`);
 
       await fetchCloudConfig(page);
+      assertOrgAlignment();
 
       const specFiles = process.argv.filter(arg => /\.spec\.(js|ts)$/.test(arg));
       const isCleanupOnly = specFiles.length === 1 && /cleanup\.spec\.(js|ts)$/.test(specFiles[0]);
@@ -622,16 +652,24 @@ async function verifySharedAuth(baseUrl) {
     await menuItem.waitFor({ state: 'visible', timeout: 15000 });
     testLogger.info('[alpha1] Shared auth verified — menu visible');
 
-    // Re-apply org switch + persist if active org doesn't match target
-    if (targetOrg && targetOrg !== 'default') {
-      const activeOrg = new URL(page.url()).searchParams.get('org_identifier');
-      if (activeOrg !== targetOrg) {
-        testLogger.info(`[alpha1] Active org (${activeOrg}) != target (${targetOrg}); re-switching`);
-        await switchOrgViaDropdown(page, targetOrg);
-        await context.storageState({ path: AUTH_FILE });
-        testLogger.info(`[alpha1] Auth state re-saved with target org active`);
-      }
-    }
+    // NOTE ON THE ACTIVE ORG — do not "fix" this by re-switching and re-saving.
+    //
+    // The active org CANNOT be carried in storageState. MainLayout.vue resolves it
+    // in onBeforeMount from `url.searchParams.get("org_identifier")`, and the store
+    // behind it (`useLocalOrganization`, utils/storage.ts) is an in-memory module
+    // ref that is wiped on every page load. So switching via the dropdown affects
+    // only the live page; the next navigation re-derives the org from the URL, or
+    // falls back to the user's default org when the param is absent.
+    //
+    // The old check here compared `page.url()`'s org_identifier against targetOrg
+    // immediately after navigating WITH that very param, so it was self-fulfilling
+    // and the re-switch never ran — which was harmless, because a re-switch would
+    // not have persisted anything either.
+    //
+    // Org correctness is enforced where it actually works: every in-app navigation
+    // carries `org_identifier` (see enforceOrgOnNavigation in
+    // enhanced-baseFixtures.js), and the API side is pinned by cloud-config.json
+    // below.
 
     // Re-derive cloud-config.json for THIS shard's org.
     //
