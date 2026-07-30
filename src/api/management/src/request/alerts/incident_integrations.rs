@@ -94,6 +94,7 @@ pub struct ListIntegrationsResponse {
 pub struct SenderResponse {
     pub integration_id: String,
     pub detected_source: String,
+    pub display_name: String,
     pub first_received_at: i64,
     pub last_received_at: i64,
     pub accepted_count: i64,
@@ -106,9 +107,14 @@ pub struct SenderResponse {
 impl From<infra::table::incident_integrations::SenderRecord> for SenderResponse {
     fn from(r: infra::table::incident_integrations::SenderRecord) -> Self {
         let resolve_wiring_hint = r.accepted_count > 0 && !r.resolved_seen;
+        let display_name = openobserve_core::alerts::external_alerts::resolve_display_name(
+            &r.detected_source,
+            r.sender_label.as_deref(),
+        );
         Self {
             integration_id: r.integration_id,
             detected_source: r.detected_source,
+            display_name,
             first_received_at: r.first_received_at,
             last_received_at: r.last_received_at,
             accepted_count: r.accepted_count,
@@ -424,5 +430,38 @@ mod tests {
         };
         let resp: SenderResponse = r.into();
         assert!(!resp.resolve_wiring_hint);
+    }
+
+    #[test]
+    fn test_sender_response_display_name_uses_label_when_present() {
+        let record = infra::table::incident_integrations::SenderRecord {
+            integration_id: "int-1".to_string(),
+            detected_source: "generic".to_string(),
+            sender_label: Some("solarwinds".to_string()),
+            first_received_at: 1,
+            last_received_at: 2,
+            accepted_count: 3,
+            rejected_count: 0,
+            resolved_seen: false,
+        };
+        let response = SenderResponse::from(record);
+        assert_eq!(response.display_name, "solarwinds");
+        assert_eq!(response.detected_source, "generic");
+    }
+
+    #[test]
+    fn test_sender_response_display_name_falls_back_to_detected_source() {
+        let record = infra::table::incident_integrations::SenderRecord {
+            integration_id: "int-1".to_string(),
+            detected_source: "grafana".to_string(),
+            sender_label: None,
+            first_received_at: 1,
+            last_received_at: 2,
+            accepted_count: 3,
+            rejected_count: 0,
+            resolved_seen: false,
+        };
+        let response = SenderResponse::from(record);
+        assert_eq!(response.display_name, "grafana");
     }
 }
