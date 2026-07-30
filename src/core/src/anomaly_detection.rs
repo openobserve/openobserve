@@ -362,10 +362,10 @@ pub async fn create_config(
     validate_config_request(&req)?;
 
     // Feature 2 (PT-7): same normalization the alerts path uses, so a tag
-    // means the same thing on both and a filter matches across them. Errors
-    // name the offending tag.
-    let normalized_tags = config::meta::alerts::tags::normalize_tags(&req.tags)
-        .map_err(|e| anyhow::anyhow!("Invalid tag: {e}"))?;
+    // means the same thing on both. Kept typed, not stringified, so the API
+    // layer can downcast it to a 400.
+    let normalized_tags =
+        config::meta::alerts::tags::normalize_tags(&req.tags).map_err(anyhow::Error::new)?;
 
     let db = ORM_CLIENT
         .get()
@@ -680,8 +680,9 @@ pub async fn update_config(
         active_model.priority = Set(priority.map(|p| p.to_i32()));
     }
     if let Some(tags) = req.tags {
-        let normalized = config::meta::alerts::tags::normalize_tags(&tags)
-            .map_err(|e| anyhow::anyhow!("Invalid tag: {e}"))?;
+        // Typed for the same reason as on create: the API downcasts to 400.
+        let normalized =
+            config::meta::alerts::tags::normalize_tags(&tags).map_err(anyhow::Error::new)?;
         active_model.tags = Set(if normalized.is_empty() {
             None // an explicit empty list clears the tags
         } else {

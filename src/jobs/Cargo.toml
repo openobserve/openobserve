@@ -81,6 +81,3 @@ serde_json.workspace = true
 tokio.workspace = true
 tonic.workspace = true
 wal.workspace = true
-
-[dev-dependencies]
-infra = { workspace = true, features = ["test-utils"] }

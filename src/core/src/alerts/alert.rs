@@ -313,7 +313,22 @@ fn validate_multi_alert_config(alert: &Alert) -> Result<(), AlertError> {
         &alert.trigger_condition,
         alert.creates_incident,
     )
-    .map_err(AlertError::InvalidMultiAlert)
+    .map_err(AlertError::InvalidMultiAlert)?;
+
+    // Checked here, not in `validate_multi_alert`, because the grouping
+    // config is a sibling of the query condition rather than part of it.
+    // Same shape as MN-11's incidents rule.
+    let notification_grouping = alert
+        .deduplication
+        .as_ref()
+        .and_then(|d| d.grouping.as_ref())
+        .is_some_and(|g| g.enabled);
+    if alert.query_condition.multi_alert_enabled() && notification_grouping {
+        return Err(AlertError::InvalidMultiAlert(
+            config::meta::alerts::grouping::MultiAlertError::NotificationGroupingUnsupported,
+        ));
+    }
+    Ok(())
 }
 
 /// Drop the per-group rows of an alert that is no longer a multi-alert (§5.3).
@@ -2990,6 +3005,40 @@ mod threshold_validation_tests {
             .unwrap()
             .multi_alert = false;
 
+        assert!(validate_rules(&alert).is_ok());
+    }
+
+    /// §5.5: alert-level notification grouping would collapse per-group pages
+    /// back into one batch — rejected at save time, never silently rerouted.
+    #[test]
+    fn test_multi_alert_rejects_notification_grouping() {
+        let mut alert = multi_alert_fixture();
+        alert.deduplication = Some(config::meta::alerts::deduplication::DeduplicationConfig {
+            enabled: true,
+            grouping: Some(config::meta::alerts::deduplication::GroupingConfig {
+                enabled: true,
+                ..serde_json::from_str("{}").expect("GroupingConfig defaults")
+            }),
+            ..Default::default()
+        });
+
+        let err = validate_rules(&alert).unwrap_err();
+        assert!(matches!(
+            err,
+            AlertError::InvalidMultiAlert(
+                config::meta::alerts::grouping::MultiAlertError::NotificationGroupingUnsupported
+            )
+        ));
+
+        // Grouping configured but DISABLED must stay valid.
+        alert
+            .deduplication
+            .as_mut()
+            .unwrap()
+            .grouping
+            .as_mut()
+            .unwrap()
+            .enabled = false;
         assert!(validate_rules(&alert).is_ok());
     }
 

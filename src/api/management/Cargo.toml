@@ -107,4 +107,3 @@ zip.workspace = true
 [dev-dependencies]
 arrow-schema.workspace = true
 cron.workspace = true
-infra = { workspace = true, features = ["test-utils"] }

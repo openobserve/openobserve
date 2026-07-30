@@ -52,19 +52,6 @@ pub type RwAHashSet<K> = tokio::sync::RwLock<HashSet<K>>;
 pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 
 // for DDL commands and migrations
-// 54: m20260725_000001_create_alert_states_tables (alert run state, Part IV)
-// 55: m20260725_000002_add_threshold_and_level_columns (multi-level thresholds)
-// 56: m20260726_000001_add_priority_and_tags_to_alerts (priority & tags)
-// 57: m20260726_000002_add_priority_and_tags_to_anomaly_config (same, anomalies)
-// 58: m20260726_000003 / m20260727_00000x (group lifecycle, SLO tables)
-// 59: m20260723_000001_add_env_version_to_gen_ai_agents (from main)
-// 60: m20260728_000001_create_workflows_associations_table (from main)
-//
-// main reached 55 independently while this branch reached 58, so the numbers
-// overlap: both sides spent 54 and 55 on different migrations. The merged
-// chain therefore has to sit above BOTH, or the migrator would treat an
-// already-recorded version as current and silently skip whichever migrations
-// it thinks have run.
 pub const DB_SCHEMA_VERSION: u64 = 61;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 

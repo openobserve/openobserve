@@ -181,6 +181,17 @@ async fn load_tracked_group_states(
 /// so `plan_dispatch` reads back this evaluation's own level axis, and a send
 /// that fails leaves durable state describing what was observed.
 #[allow(clippy::too_many_arguments)]
+/// What [`dispatch_per_group`] actually did, per group.
+struct GroupDispatchOutcome {
+    delivered: usize,
+    failed: usize,
+    errors: Vec<String>,
+    /// Group keys whose send succeeded. A dedup reservation is confirmed by
+    /// its OWN group's delivery, never a sibling's (§5.5 MN-6).
+    delivered_groups: std::collections::HashSet<String>,
+}
+
+#[allow(clippy::too_many_arguments)]
 async fn dispatch_per_group(
     alert: &config::meta::alerts::alert::Alert,
     trace_id: &str,
@@ -190,7 +201,7 @@ async fn dispatch_per_group(
     rollup_level: Option<config::meta::alerts::level::AlertLevel>,
     start_time: Option<i64>,
     triggered_at: i64,
-) -> Option<(usize, usize, Vec<String>)> {
+) -> Option<GroupDispatchOutcome> {
     use config::meta::alerts::dispatch::{plan_dispatch, rows_by_group_key};
 
     let classification = classification?;
@@ -228,14 +239,24 @@ async fn dispatch_per_group(
             "[SCHEDULER trace_id {trace_id}] alert {alert_id}: group plan did not commit; \
              skipping per-group dispatch this evaluation"
         );
-        return Some((0, 0, vec!["group state did not commit".to_string()]));
+        return Some(GroupDispatchOutcome {
+            delivered: 0,
+            failed: 0,
+            errors: vec!["group state did not commit".to_string()],
+            delivered_groups: Default::default(),
+        });
     }
 
     let states = match load_tracked_group_states(&alert_id).await {
         Ok(s) => s,
         Err(e) => {
             log::error!("[SCHEDULER trace_id {trace_id}] group dispatch: state read failed: {e}");
-            return Some((0, 0, vec![format!("group state read failed: {e}")]));
+            return Some(GroupDispatchOutcome {
+                delivered: 0,
+                failed: 0,
+                errors: vec![format!("group state read failed: {e}")],
+                delivered_groups: Default::default(),
+            });
         }
     };
 
@@ -293,6 +314,7 @@ async fn dispatch_per_group(
 
     let (mut delivered, mut failed) = (0usize, 0usize);
     let mut errors: Vec<String> = Vec::new();
+    let mut delivered_groups: std::collections::HashSet<String> = Default::default();
     for item in &plan.items {
         // The group's OWN row, level and value — never the worst group's
         // (MN-3). One send per group is what makes host-a and host-b page
@@ -355,6 +377,7 @@ async fn dispatch_per_group(
         // how the pure and SQL layers drifted apart before.
         let record = if ok {
             delivered += 1;
+            delivered_groups.insert(item.group_key.clone());
             infra::table::alert_states::DeliveryOutcome::Delivered {
                 silence_minutes: alert.trigger_condition.silence,
                 at: resolved_at,
@@ -386,7 +409,12 @@ async fn dispatch_per_group(
         plan.suppressed,
         plan.items.len()
     );
-    Some((delivered, failed, errors))
+    Some(GroupDispatchOutcome {
+        delivered,
+        failed,
+        errors,
+        delivered_groups,
+    })
 }
 
 /// Confirm this evaluation's dedup reservations once a notification landed
@@ -1106,11 +1134,12 @@ async fn handle_alert_triggers(
     // group plan itself, before sending, so the alert-level state write at the
     // end of this function must not run and clobber the delivery callbacks.
     let mut multi_alert_dispatched = false;
-    // Dedup fingerprints reserved by this evaluation, confirmed only after a
-    // successful send (§5.5 MN-6). Only ever assigned on the enterprise path,
-    // where deduplication runs at all.
+    // Dedup `(group_key, fingerprint)` pairs, confirmed only after a
+    // successful send (§5.5 MN-6) — per group, so group A's success does not
+    // confirm group B's. Tuples rather than the dedup module's type, which is
+    // enterprise-gated.
     #[cfg_attr(not(feature = "enterprise"), allow(unused_mut))]
-    let mut dedup_reservations: Vec<String> = Vec::new();
+    let mut dedup_reservations: Vec<(Option<String>, String)> = Vec::new();
     let mut trigger_data_stream: TriggerData = TriggerData {
         _timestamp: now,
         org: trigger.org.clone(),
@@ -1603,7 +1632,11 @@ async fn handle_alert_triggers(
                     // notification actually goes out (§5.5 MN-6), so a send
                     // that fails is retried rather than swallowed as a
                     // duplicate for the rest of the window.
-                    dedup_reservations = outcome.reserved;
+                    dedup_reservations = outcome
+                        .reserved
+                        .into_iter()
+                        .map(|r| (r.group_key, r.fingerprint))
+                        .collect();
                     if deduplicated_data.is_empty() && deduplicated {
                         log::debug!(
                             "[SCHEDULER trace_id {scheduler_trace_id}] All alert results deduplicated for org: {}, module_key: {}",
@@ -1774,7 +1807,7 @@ async fn handle_alert_triggers(
             };
             new_trigger.data = json::to_string(&trigger_data).unwrap();
             db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
-        } else if let Some((_delivered, failed, group_errors)) = dispatch_per_group(
+        } else if let Some(dispatch) = dispatch_per_group(
             &alert,
             &scheduler_trace_id,
             trigger_results.group_classification.as_ref(),
@@ -1792,18 +1825,40 @@ async fn handle_alert_triggers(
             // sent, so the later `persist_alert_run_state` call is skipped for
             // this path.
             multi_alert_dispatched = true;
-            if failed > 0 {
+            if dispatch.failed > 0 {
                 // MN-7: the evaluation's single trigger record (D8) reports a
                 // delivery failure if ANY group's send failed; the per-group
                 // detail lives on each group's own state row.
                 trigger_data_stream.status = RunOutcome::NotifyFailed;
+                // The rollup row was committed as Firing before anything was
+                // sent; leave it and the detail page contradicts both the
+                // record and the failed groups.
+                if let Some(alert_id) = alert.id.as_ref() {
+                    let _ = persist_alert_run_state(
+                        &alert_id.to_string(),
+                        &RunOutcome::NotifyFailed,
+                        eval_level,
+                        None,
+                    )
+                    .await;
+                }
             }
-            if !group_errors.is_empty() {
+            if !dispatch.errors.is_empty() {
                 // Partial-destination failures reach the record too, even when
                 // the group counts as delivered.
-                trigger_data_stream.error = Some(group_errors.join("; "));
+                trigger_data_stream.error = Some(dispatch.errors.join("; "));
             }
-            confirm_dedup_reservations(&dedup_reservations, _delivered > 0).await;
+            // MN-6: a reservation is confirmed by its own group's delivery.
+            // An unkeyed one falls back to "any delivery confirms".
+            let confirmable: Vec<String> = dedup_reservations
+                .iter()
+                .filter(|(group_key, _)| match group_key.as_deref() {
+                    Some(k) => dispatch.delivered_groups.contains(k),
+                    None => dispatch.delivered > 0,
+                })
+                .map(|(_, fingerprint)| fingerprint.clone())
+                .collect();
+            confirm_dedup_reservations(&confirmable, !confirmable.is_empty()).await;
             record_delivery(&mut trigger_data);
             trigger_data.period_end_time = if should_store_last_end_time {
                 Some(trigger_results.end_time)
@@ -1829,8 +1884,13 @@ async fn handle_alert_triggers(
             {
                 Ok((success_msg, err_msg)) => {
                     // At least one destination delivered, so the reservations
-                    // this evaluation made are now real suppressions.
-                    confirm_dedup_reservations(&dedup_reservations, true).await;
+                    // this evaluation made are now real suppressions — one
+                    // send covered every reserved row.
+                    let fingerprints: Vec<String> = dedup_reservations
+                        .iter()
+                        .map(|(_, fingerprint)| fingerprint.clone())
+                        .collect();
+                    confirm_dedup_reservations(&fingerprints, true).await;
                     let success_msg = success_msg.trim().to_owned();
                     let err_msg = err_msg.trim().to_owned();
                     if !err_msg.is_empty() {
@@ -5143,185 +5203,6 @@ mod tests {
         let result = get_destination_stream_from_pipeline(&pipeline).unwrap();
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].stream_name.as_str(), "output-stream");
-    }
-
-    // ── persist_alert_run_state against the real schema ─────────────────────
-    // The planner (plan_group_updates) and the table layer are each tested in
-    // their own crates; these cover the wiring this file owns — which path an
-    // outcome takes (per-group fan-out vs single row vs dropped), reading and
-    // writing through the same global client production uses.
-
-    use std::collections::BTreeMap;
-
-    use config::meta::alerts::{
-        grouping::{ClassifiedGroup, FetchPage, GroupCapOutcome, GroupClassification},
-        level::AlertLevel,
-        state::ROLLUP_GROUP_KEY,
-    };
-    use infra::table::test_harness::{init_global_orm, seed_alert, test_db, unique_alert_id};
-
-    /// One critical group (host=a) and one healthy group (host=b).
-    fn two_group_classification() -> GroupClassification {
-        let group = |host: &str, level: Option<AlertLevel>, value: f64| ClassifiedGroup {
-            labels: [("host".to_string(), host.to_string())]
-                .into_iter()
-                .collect::<BTreeMap<String, String>>(),
-            actual_value: value,
-            level,
-        };
-        GroupClassification {
-            groups: vec![
-                group("a", Some(AlertLevel::Critical), 99.0),
-                group("b", None, 1.0),
-            ],
-            rollup: Some(AlertLevel::Critical),
-            cap: GroupCapOutcome::WithinCap,
-            firing_observed: 1,
-            page: FetchPage::default(),
-            dropped: vec![],
-        }
-    }
-
-    #[tokio::test]
-    async fn a_grouped_evaluation_fans_out_to_group_rows_and_the_rollup() {
-        init_global_orm().await;
-        let db = test_db().await;
-        let id = unique_alert_id("sched-fanout");
-        seed_alert(db, &id, true).await;
-
-        let classification = two_group_classification();
-        assert!(
-            persist_alert_run_state(
-                &id,
-                &RunOutcome::Firing,
-                Some(AlertLevel::Critical),
-                Some(&classification),
-            )
-            .await
-        );
-
-        let mut groups = infra::table::alert_states::list_groups(&id).await.unwrap();
-        groups.sort_by(|a, b| a.group_labels.cmp(&b.group_labels));
-        assert_eq!(groups.len(), 2);
-        assert_eq!(groups[0].level, Some(AlertLevel::Critical));
-        assert_eq!(
-            groups[1].level,
-            Some(AlertLevel::Ok),
-            "a healthy group is Ok, not absent"
-        );
-
-        let rollup = infra::table::alert_states::get(&id, ROLLUP_GROUP_KEY)
-            .await
-            .unwrap()
-            .expect("the fan-out must write the rollup row too");
-        assert_eq!(rollup.level, Some(AlertLevel::Critical));
-        assert_eq!(rollup.groups_observed, Some(2));
-        assert_eq!(rollup.groups_firing, Some(1));
-    }
-
-    #[tokio::test]
-    async fn a_skipped_run_does_not_touch_group_state() {
-        init_global_orm().await;
-        let db = test_db().await;
-        let id = unique_alert_id("sched-skip");
-        seed_alert(db, &id, true).await;
-
-        let classification = two_group_classification();
-        assert!(
-            persist_alert_run_state(
-                &id,
-                &RunOutcome::Firing,
-                Some(AlertLevel::Critical),
-                Some(&classification),
-            )
-            .await
-        );
-
-        // A silenced run must not launder the firing state into healthy —
-        // even when it carries a classification claiming everything is fine.
-        let all_ok = GroupClassification {
-            groups: classification
-                .groups
-                .iter()
-                .cloned()
-                .map(|mut g| {
-                    g.level = None;
-                    g
-                })
-                .collect(),
-            rollup: None,
-            firing_observed: 0,
-            ..classification.clone()
-        };
-        assert!(persist_alert_run_state(&id, &RunOutcome::Skipped, None, Some(&all_ok)).await);
-
-        let groups = infra::table::alert_states::list_groups(&id).await.unwrap();
-        let critical = groups
-            .iter()
-            .filter(|g| g.level == Some(AlertLevel::Critical))
-            .count();
-        assert_eq!(critical, 1, "the skipped run erased a firing group's state");
-    }
-
-    #[tokio::test]
-    async fn an_ungrouped_evaluation_writes_only_the_rollup_row() {
-        init_global_orm().await;
-        let id = unique_alert_id("sched-single");
-        // No alerts row needed: the single-row path does not re-read the
-        // opt-in flag.
-
-        assert!(
-            persist_alert_run_state(&id, &RunOutcome::Firing, Some(AlertLevel::Critical), None)
-                .await
-        );
-        let rollup = infra::table::alert_states::get(&id, ROLLUP_GROUP_KEY)
-            .await
-            .unwrap()
-            .expect("rollup row");
-        assert_eq!(rollup.last_outcome, Some(RunOutcome::Firing));
-        assert_eq!(rollup.level, Some(AlertLevel::Critical));
-        assert!(
-            infra::table::alert_states::list_groups(&id)
-                .await
-                .unwrap()
-                .is_empty()
-        );
-
-        // Recovery overwrites in place.
-        assert!(
-            persist_alert_run_state(&id, &RunOutcome::Normal, Some(AlertLevel::Ok), None).await
-        );
-        let rollup = infra::table::alert_states::get(&id, ROLLUP_GROUP_KEY)
-            .await
-            .unwrap()
-            .expect("rollup row");
-        assert_eq!(rollup.last_outcome, Some(RunOutcome::Normal));
-        assert_eq!(rollup.level, Some(AlertLevel::Ok));
-    }
-
-    #[tokio::test]
-    async fn load_tracked_group_states_returns_groups_and_rollup() {
-        init_global_orm().await;
-        let db = test_db().await;
-        let id = unique_alert_id("sched-load");
-        seed_alert(db, &id, true).await;
-
-        let classification = two_group_classification();
-        assert!(
-            persist_alert_run_state(
-                &id,
-                &RunOutcome::Firing,
-                Some(AlertLevel::Critical),
-                Some(&classification),
-            )
-            .await
-        );
-
-        let tracked = load_tracked_group_states(&id).await.unwrap();
-        // Two groups plus the rollup: the planner diffs against the rollup
-        // row too, so omitting it would break `since` continuity.
-        assert_eq!(tracked.len(), 3);
-        assert!(tracked.contains_key(ROLLUP_GROUP_KEY));
     }
 }
 

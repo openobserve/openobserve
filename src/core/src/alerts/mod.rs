@@ -186,8 +186,17 @@ impl QueryConditionExt for QueryCondition {
                     promql_critical,
                     self.promql_warning_value,
                 );
-                let req = promql_service::MetricsQueryRequest {
-                    query: format!(
+                // Observation completeness (M-11), the PromQL mirror of the
+                // SQL multi path dropping its HAVING: with the threshold in
+                // the expression, a recovered series just stops being
+                // returned and could only recover K evaluations late via the
+                // reaper, with a NULL value. Per-series alerts therefore run
+                // the raw expression and classify in Rust; single alerts keep
+                // the filtered query unchanged.
+                let query = if self.promql_multi_alert {
+                    format!("({v})")
+                } else {
+                    format!(
                         "({}) {} {}",
                         v,
                         match &condition.operator {
@@ -195,7 +204,10 @@ impl QueryConditionExt for QueryCondition {
                             _ => condition.operator.to_string(),
                         },
                         promql_filter
-                    ),
+                    )
+                };
+                let req = promql_service::MetricsQueryRequest {
+                    query,
                     start,
                     end,
                     step: std::cmp::max(
@@ -274,11 +286,11 @@ impl QueryConditionExt for QueryCondition {
                 // observation rather than a bare series count. Direction is
                 // operator-aware: for `<`/`<=` the worst offender is the MIN.
                 //
-                // KNOWN LIMITATION (§7.5): the PromQL filter is widened only
-                // to the warning level, so a healthy run returns no series and
-                // records actual_value=None — history shows "— → Ok". An
-                // unfiltered observation query would fix it; deliberately
-                // deferred to the SLO work.
+                // KNOWN LIMITATION (§7.5) — single alerts only: their filter
+                // is widened just to the warning level, so a healthy run
+                // returns no series and records actual_value=None — history
+                // shows "— → Ok". Per-series alerts run unfiltered (above)
+                // and record the real healthy reading.
                 eval_results.actual_value = config::meta::alerts::level::worst_observed_value(
                     &series_values,
                     condition.operator,

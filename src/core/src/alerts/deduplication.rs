@@ -122,6 +122,17 @@ fn row_group_key(alert: &Alert, row: &Map<String, Value>) -> Option<String> {
     Some(config::meta::alerts::grouping::group_key(&labels))
 }
 
+/// One fingerprint reserved by a dedup pass, tagged with the group whose
+/// delivery must confirm it (§5.5 MN-4/MN-6). Group A's send can succeed
+/// while B's fails; confirming B on A's success would suppress B's retry as
+/// a duplicate for the rest of the window.
+pub struct ReservedFingerprint {
+    pub fingerprint: String,
+    /// `None` for anything that is not an opted-in multi-alert, whose single
+    /// send confirms every reservation.
+    pub group_key: Option<String>,
+}
+
 /// What one pass of [`apply_deduplication`] decided.
 pub struct DeduplicationOutcome {
     /// The rows that survived deduplication and should be notified on.
@@ -132,10 +143,10 @@ pub struct DeduplicationOutcome {
     /// confirmed as delivered (§5.5 MN-6).
     ///
     /// The caller must pass these to [`confirm_notification_sent`] once the
-    /// notification actually goes out. Until it does, they do not suppress:
-    /// that is what lets a failed send be retried instead of being swallowed
-    /// as a duplicate for the rest of the window.
-    pub reserved: Vec<String>,
+    /// notification actually goes out — per group for a multi-alert. Until it
+    /// does, they do not suppress: that is what lets a failed send be retried
+    /// instead of being swallowed as a duplicate for the rest of the window.
+    pub reserved: Vec<ReservedFingerprint>,
 }
 
 /// Confirm reservations whose notification was delivered (§5.5 MN-6).
@@ -448,8 +459,13 @@ async fn apply_deduplication_impl(
                 fingerprint
             );
 
+            // The reservation carries its group so the caller can confirm it
+            // against that group's OWN delivery outcome, not a sibling's.
+            reserved.push(ReservedFingerprint {
+                group_key: row_group_key(alert, &row),
+                fingerprint,
+            });
             deduplicated_rows.push(row);
-            reserved.push(fingerprint);
         }
     }
 

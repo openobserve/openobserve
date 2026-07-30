@@ -85,6 +85,11 @@ pub enum MultiAlertError {
     /// A PromQL alert opted in without a `promql_condition`: there is no
     /// threshold to classify a series against, so no group can have a level.
     PromqlConditionMissing,
+    /// Alert-level notification grouping batches every group under one
+    /// fingerprint with enqueue-time delivery accounting, collapsing the
+    /// per-group pages this feature exists to split apart. Rejected until
+    /// per-group batching (§5.5 MN-4) exists.
+    NotificationGroupingUnsupported,
 }
 
 impl std::fmt::Display for MultiAlertError {
@@ -115,6 +120,10 @@ impl std::fmt::Display for MultiAlertError {
             ),
             Self::PromqlConditionMissing => f.write_str(
                 "per-series alerting needs a PromQL condition to classify each series against",
+            ),
+            Self::NotificationGroupingUnsupported => f.write_str(
+                "per-group alerting cannot yet be combined with notification grouping; turn off \
+                 notification grouping or per-group alerting",
             ),
         }
     }
@@ -383,12 +392,10 @@ pub fn classify_promql_series(
 /// not "the fetch hit a limit". The consequence is identical either way: once
 /// groups are dropped, a tracked group's absence no longer proves it vanished.
 ///
-/// `reached_healthy` is derived rather than assumed. The PromQL expression is
-/// widened only to the warning threshold, so in the normal case every returned
-/// series is firing and this is `false` — which is harmless while nothing was
-/// dropped, because `completeness()` already treats an unfilled page as
-/// complete. A recovered series simply stops being returned, and M-7 ages it
-/// out; that is the intended path, not a gap.
+/// `reached_healthy` is derived, not assumed: a per-series alert runs its
+/// expression unfiltered (M-11), so it means "a non-firing series was
+/// present". All-firing makes it `false`, harmless while nothing was dropped
+/// — `completeness()` treats an unfilled page as complete.
 pub fn promql_fetch_page(observed: usize, firing_observed: usize, cap: usize) -> FetchPage {
     FetchPage {
         filled: cap > 0 && observed > cap,

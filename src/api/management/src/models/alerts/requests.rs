@@ -110,6 +110,7 @@ pub struct AnomalyAlertFields {
     /// Also accepts the name `threshold` (integer, e.g. 97) for API convenience.
     #[serde(
         default,
+        alias = "threshold",
         skip_serializing_if = "Option::is_none",
         deserialize_with = "config::meta::slo::lenient_f64::deserialize_opt"
     )]
@@ -177,8 +178,10 @@ pub struct UpdateAnomalyAlertFields {
     pub detection_window_seconds: Option<i64>,
     pub training_window_days: Option<i32>,
     pub retrain_interval_days: Option<i32>,
+    /// Also accepts the name `threshold`, matching the create body.
     #[serde(
         default,
+        alias = "threshold",
         skip_serializing_if = "Option::is_none",
         deserialize_with = "config::meta::slo::lenient_f64::deserialize_opt"
     )]

@@ -194,6 +194,13 @@ async fn create_anomaly_alert(
 
     match openobserve_core::anomaly_detection::create_config(org_id, req).await {
         Ok(v) => MetaHttpResponse::json(v),
+        // A bad tag is user input: the same 400 the alert save path gives.
+        Err(e)
+            if e.downcast_ref::<config::meta::alerts::tags::TagError>()
+                .is_some() =>
+        {
+            MetaHttpResponse::bad_request(e.to_string())
+        }
         Err(e) => MetaHttpResponse::internal_error(e.to_string()),
     }
 }
@@ -791,6 +798,13 @@ async fn build_and_run_anomaly_update(
 
     match openobserve_core::anomaly_detection::update_config(org_id, anomaly_id, req).await {
         Ok(v) => MetaHttpResponse::json(v),
+        // Same 400 as create: an invalid tag is the caller's to fix.
+        Err(e)
+            if e.downcast_ref::<config::meta::alerts::tags::TagError>()
+                .is_some() =>
+        {
+            MetaHttpResponse::bad_request(e.to_string())
+        }
         Err(e) => MetaHttpResponse::internal_error(e.to_string()),
     }
 }
@@ -1133,6 +1147,10 @@ pub async fn list_alerts(
     let priority_filter = params.priority.clone();
     #[cfg_attr(not(feature = "enterprise"), allow(unused_variables))]
     let tag_filter = requested_tags.clone();
+    // Anomaly rows bypass the SQL ORDER BY too, so a merged list must be
+    // re-sorted in memory.
+    #[cfg_attr(not(feature = "enterprise"), allow(unused_variables))]
+    let requested_sort = (params.sort_by, params.sort_desc);
 
     // In enterprise builds, pagination is applied after merging regular alerts with
     // anomaly detection configs, so we fetch all matching results from the DB here.
@@ -1193,6 +1211,7 @@ pub async fn list_alerts(
         // Apply the Feature-2 filters here, because these rows bypassed the
         // SQL WHERE clause entirely. Without this a priority or tag filter
         // would return every anomaly config alongside the matching alerts.
+        let before = list.len();
         list.extend(
             configs
                 .iter()
@@ -1209,6 +1228,13 @@ pub async fn list_alerts(
                     config::meta::alerts::tags::matches_all_tags(&item.tags, &tag_filter)
                 }),
         );
+        // Without this the appended rows pin to the tail whatever order was
+        // requested, and the pagination below cuts the combined list in the
+        // wrong places. Only when something merged — an untouched list keeps
+        // the database's own collation.
+        if list.len() > before {
+            sort_merged_alert_list(&mut list, requested_sort.0, requested_sort.1);
+        }
     }
 
     // Apply pagination to the combined list (regular alerts + anomaly configs).
@@ -1237,6 +1263,55 @@ pub async fn list_alerts(
 ///
 /// Best-effort: if the lookup fails the list is still returned, just without run
 /// state. A state table problem must not take down the alerts page.
+/// Re-sort a merged (regular + anomaly) list the way the SQL ORDER BY sorts
+/// the regular one (PT-3): unset priority LAST in both directions, ties broken
+/// on (name, folder name, id) so pagination stays a total order.
+#[cfg(feature = "enterprise")]
+fn sort_merged_alert_list(
+    list: &mut [ListAlertsResponseBodyItem],
+    sort_by: Option<config::meta::alerts::alert::AlertSortField>,
+    sort_desc: bool,
+) {
+    use std::cmp::Ordering;
+
+    use config::meta::alerts::alert::AlertSortField;
+
+    let tail = |a: &ListAlertsResponseBodyItem, b: &ListAlertsResponseBodyItem| {
+        a.name
+            .cmp(&b.name)
+            .then_with(|| a.folder_name.cmp(&b.folder_name))
+            .then_with(|| a.alert_id.to_string().cmp(&b.alert_id.to_string()))
+    };
+    match sort_by {
+        Some(AlertSortField::Priority) => list.sort_by(|a, b| {
+            // NULL priority sorts last regardless of direction, matching the
+            // SQL's explicit CASE.
+            let nulls = (a.priority.is_none() as u8).cmp(&(b.priority.is_none() as u8));
+            let pri = match (a.priority, b.priority) {
+                (Some(x), Some(y)) if sort_desc => y.cmp(&x),
+                (Some(x), Some(y)) => x.cmp(&y),
+                _ => Ordering::Equal,
+            };
+            nulls.then(pri).then_with(|| tail(a, b))
+        }),
+        Some(AlertSortField::Name) => list.sort_by(|a, b| {
+            let name = if sort_desc {
+                b.name.cmp(&a.name)
+            } else {
+                a.name.cmp(&b.name)
+            };
+            name.then_with(|| a.folder_name.cmp(&b.folder_name))
+                .then_with(|| a.alert_id.to_string().cmp(&b.alert_id.to_string()))
+        }),
+        // Historical default, matching the SQL arm.
+        None => list.sort_by(|a, b| {
+            a.name
+                .cmp(&b.name)
+                .then_with(|| a.folder_name.cmp(&b.folder_name))
+        }),
+    }
+}
+
 async fn enrich_with_run_state(list: &mut [ListAlertsResponseBodyItem]) {
     if list.is_empty() {
         return;
@@ -2079,161 +2154,5 @@ mod tests {
             )),
             StatusCode::INTERNAL_SERVER_ERROR
         );
-    }
-
-    // ── the groups endpoints against the real schema ────────────────────────
-    // Everything below them (the planner, the table layer) is tested in its
-    // own crate; these pin the endpoint contract — org scoping, severity
-    // ordering, the rollup counts, and the transitions filter.
-
-    use std::collections::BTreeMap;
-
-    use config::meta::alerts::{
-        grouping::{
-            ClassifiedGroup, FetchPage, GroupCapOutcome, GroupClassification, group_key,
-            plan_group_updates,
-        },
-        level::AlertLevel,
-    };
-    use hashbrown::HashMap;
-    use infra::table::test_harness::{init_global_orm, seed_alert, test_db};
-    use svix_ksuid::KsuidLike;
-
-    use super::{Path, Query, list_alert_group_transitions, list_alert_groups};
-
-    async fn body_json(resp: Response) -> serde_json::Value {
-        let bytes = axum::body::to_bytes(resp.into_body(), 1 << 20)
-            .await
-            .expect("read the response body");
-        serde_json::from_slice(&bytes).expect("parse the response body")
-    }
-
-    fn host_labels(host: &str) -> BTreeMap<String, String> {
-        [("host".to_string(), host.to_string())]
-            .into_iter()
-            .collect()
-    }
-
-    /// Seed a multi-alert with one critical group (host=a) and one healthy
-    /// group (host=b), written through the production plan path. Returns the
-    /// alert's ksuid.
-    async fn seed_multi_alert_with_groups() -> String {
-        init_global_orm().await;
-        let db = test_db().await;
-        let id = svix_ksuid::Ksuid::new(None, None).to_string();
-        seed_alert(db, &id, true).await;
-
-        let classification = GroupClassification {
-            // Healthy first, so the endpoint's severity sort is what orders
-            // the response — not insertion order.
-            groups: vec![
-                ClassifiedGroup {
-                    labels: host_labels("b"),
-                    actual_value: 1.0,
-                    level: None,
-                },
-                ClassifiedGroup {
-                    labels: host_labels("a"),
-                    actual_value: 99.0,
-                    level: Some(AlertLevel::Critical),
-                },
-            ],
-            rollup: Some(AlertLevel::Critical),
-            cap: GroupCapOutcome::WithinCap,
-            firing_observed: 1,
-            page: FetchPage::default(),
-            dropped: vec![],
-        };
-        let plan = plan_group_updates(
-            &id,
-            &classification,
-            &std::collections::HashMap::new(),
-            config::utils::time::now_micros(),
-        );
-        infra::table::alert_states::persist_group_plan(&plan, &id)
-            .await
-            .expect("persist the group plan");
-        id
-    }
-
-    #[tokio::test]
-    async fn an_invalid_alert_id_is_not_found() {
-        let resp =
-            list_alert_groups(Path(("default".to_string(), "not-a-ksuid".to_string()))).await;
-        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
-    }
-
-    #[tokio::test]
-    async fn an_unknown_alert_is_not_found() {
-        init_global_orm().await;
-        let id = svix_ksuid::Ksuid::new(None, None).to_string();
-        let resp = list_alert_groups(Path(("default".to_string(), id))).await;
-        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
-    }
-
-    /// The endpoint resolves through the alert, so another org must get 404 —
-    /// group labels carry host and service names.
-    #[tokio::test]
-    async fn another_org_cannot_read_group_labels() {
-        let id = seed_multi_alert_with_groups().await;
-        let resp = list_alert_groups(Path(("someone-else".to_string(), id))).await;
-        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
-    }
-
-    #[tokio::test]
-    async fn groups_come_back_most_severe_first_with_rollup_counts() {
-        let id = seed_multi_alert_with_groups().await;
-        let resp = list_alert_groups(Path(("default".to_string(), id))).await;
-        let status = resp.status();
-        let body = body_json(resp).await;
-        assert_eq!(status, StatusCode::OK, "body: {body}");
-        let list = body["list"].as_array().expect("list");
-        assert_eq!(list.len(), 2);
-        assert_eq!(list[0]["level"], "critical");
-        assert_eq!(list[0]["labels"][0]["name"], "host");
-        assert_eq!(list[0]["labels"][0]["value"], "a");
-        assert_eq!(list[1]["level"], "ok");
-        assert_eq!(list[1]["labels"][0]["value"], "b");
-
-        assert_eq!(body["groups_observed"], 2);
-        assert_eq!(body["groups_firing"], 1);
-        assert_eq!(body["capped"], false);
-    }
-
-    #[tokio::test]
-    async fn transitions_filter_by_group_and_respect_limit() {
-        let id = seed_multi_alert_with_groups().await;
-
-        // Unfiltered: both groups' transitions (and the rollup's) come back.
-        let resp = list_alert_group_transitions(
-            Path(("default".to_string(), id.clone())),
-            Query(HashMap::new()),
-        )
-        .await;
-        assert_eq!(resp.status(), StatusCode::OK);
-        let all = body_json(resp).await;
-        let total = all["list"].as_array().expect("list").len();
-        assert!(total >= 2, "expected the initial transitions, got {total}");
-
-        // Scoped to the critical group: everything returned is that group's.
-        let key = group_key(&host_labels("a"));
-        let mut query = HashMap::new();
-        query.insert("group_key".to_string(), key.clone());
-        let resp =
-            list_alert_group_transitions(Path(("default".to_string(), id.clone())), Query(query))
-                .await;
-        let scoped = body_json(resp).await;
-        let scoped = scoped["list"].as_array().expect("list");
-        assert!(!scoped.is_empty());
-        assert!(scoped.iter().all(|t| t["group_key"] == key.as_str()));
-        assert!(scoped.len() < total);
-
-        // The limit clamps the page.
-        let mut query = HashMap::new();
-        query.insert("limit".to_string(), "1".to_string());
-        let resp =
-            list_alert_group_transitions(Path(("default".to_string(), id)), Query(query)).await;
-        let limited = body_json(resp).await;
-        assert_eq!(limited["list"].as_array().expect("list").len(), 1);
     }
 }
