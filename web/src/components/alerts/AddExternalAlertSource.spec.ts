@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mount } from "@vue/test-utils";
 import { createStore } from "vuex";
 import { createI18n } from "vue-i18n";
-import AddAlertSource from "./AddAlertSource.vue";
+import AddExternalAlertSource from "./AddExternalAlertSource.vue";
 import alertSources from "@/services/alert_sources";
 
 vi.mock("@/services/alert_sources", () => ({
@@ -14,10 +14,10 @@ function buildWrapper() {
     state: { selectedOrganization: { identifier: "myorg" } },
   });
   const i18n = createI18n({ legacy: false, locale: "en", messages: { en: {} } });
-  return mount(AddAlertSource, { global: { plugins: [store, i18n] } });
+  return mount(AddExternalAlertSource, { global: { plugins: [store, i18n] } });
 }
 
-describe("AddAlertSource", () => {
+describe("AddExternalAlertSource", () => {
   beforeEach(() => vi.clearAllMocks());
 
   it("calls create with name and source_type, then emits created", async () => {

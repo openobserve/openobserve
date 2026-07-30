@@ -153,7 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
           </OTable>
         </div>
-        <AddAlertSource
+        <AddExternalAlertSource
           v-else
           @created="fetchIntegrations"
           @cancel:hideform="showAddEditor = false"
@@ -185,7 +185,7 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OCodeCell from "@/lib/core/Table/cells/OCodeCell.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
-import AddAlertSource from "./AddAlertSource.vue";
+import AddExternalAlertSource from "./AddExternalAlertSource.vue";
 import alertSources from "@/services/alert_sources";
 import { getAlertSourceStatus } from "@/utils/alertSourceStatus";
 import { copyToClipboard } from "@/utils/clipboard";
@@ -201,7 +201,7 @@ interface SourceStatusRow {
 }
 
 export default defineComponent({
-  name: "AlertSourcesList",
+  name: "ExternalAlertSourcesList",
   components: {
     OPageLayout,
     OButton,
@@ -210,7 +210,7 @@ export default defineComponent({
     OCodeCell,
     OTable,
     ConfirmDialog,
-    AddAlertSource,
+    AddExternalAlertSource,
   },
   setup() {
     const store = useStore();

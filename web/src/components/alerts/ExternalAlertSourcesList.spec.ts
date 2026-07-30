@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { createStore } from "vuex";
 import { createI18n } from "vue-i18n";
-import AlertSourcesList from "./AlertSourcesList.vue";
+import ExternalAlertSourcesList from "./ExternalAlertSourcesList.vue";
 import alertSources from "@/services/alert_sources";
 
 vi.mock("@/services/alert_sources", () => ({
@@ -41,12 +41,12 @@ function buildWrapper() {
     },
   });
   const i18n = createI18n({ legacy: false, locale: "en", messages: { en: {} } });
-  return mount(AlertSourcesList, {
+  return mount(ExternalAlertSourcesList, {
     global: { plugins: [store, i18n] },
   });
 }
 
-describe("AlertSourcesList", () => {
+describe("ExternalAlertSourcesList", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     (alertSources.list as any).mockResolvedValue({
@@ -146,12 +146,12 @@ describe("AlertSourcesList", () => {
     expect((wrapper.vm as any).additionalIntegrations[0].name).toBe("grafana-staging");
   });
 
-  it("toggling showAddEditor shows the AddAlertSource component", async () => {
+  it("toggling showAddEditor shows the AddExternalAlertSource component", async () => {
     const wrapper = buildWrapper();
     await flushPromises();
     (wrapper.vm as any).showAdvanced = true;
     (wrapper.vm as any).showAddEditor = true;
     await flushPromises();
-    expect(wrapper.findComponent({ name: "AddAlertSource" }).exists()).toBe(true);
+    expect(wrapper.findComponent({ name: "AddExternalAlertSource" }).exists()).toBe(true);
   });
 });

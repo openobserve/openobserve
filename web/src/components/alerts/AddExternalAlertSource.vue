@@ -56,7 +56,7 @@ import alertSources from "@/services/alert_sources";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
-  name: "AddAlertSource",
+  name: "AddExternalAlertSource",
   components: { OButton },
   emits: ["created", "cancel:hideform"],
   setup() {
