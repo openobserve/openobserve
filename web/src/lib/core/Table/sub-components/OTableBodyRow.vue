@@ -35,12 +35,25 @@ const props = defineProps<{
   rowStyleFn?: (row: any) => Record<string, any>;
   /** Virtual scroll: callback for measuring row DOM element height */
   measureEl?: (el: HTMLElement | null) => void;
+  /** Variable-height mode: the virtualizer's measureElement callback. When set,
+   *  the row reports its real height and is re-measured on reflow. */
+  measureRowElement?: (el: Element | null) => void;
+  /** Variable-height mode flag. */
+  dynamicRowHeight?: boolean;
+  /** Virtual index of this row — written as `data-index` so the virtualizer can
+   *  key the measurement in variable-height mode. */
+  virtualIndex?: number;
   /** Status bar color — renders a 4px left border indicator per row */
   statusBarColor?: string;
   /** Enable hover-visible copy button on cells */
   enableCellCopy?: boolean;
   /** Per-cell inline style function */
   getCellStyle?: (params: { columnId: string; row: any; value: any }) => Record<string, any>;
+  /** Pivot row-field cell merge. */
+  getPivotMerge?: (
+    row: any,
+    columnId: string,
+  ) => { hideContent: boolean; hideBorder: boolean } | null;
   /** When true, renders a drag handle grip icon as the first cell. */
   enableRowReorder?: boolean;
   /** Per-row predicate: when false, the drag handle is hidden for this row. */
@@ -55,11 +68,21 @@ const emit = defineEmits<{
   "row-mouseenter": [row: any, event: MouseEvent];
   "row-mouseleave": [row: any];
   "cell-click": [params: { columnId: string; row: any; value: any }];
+  "cell-contextmenu": [params: { columnId: string; row: any; value: any }];
 }>();
 
 const slots = useSlots();
 
 const rowRef = ref<HTMLElement | null>(null);
+
+// Keeps rowRef in sync and, in variable-height mode, hands the element to the
+// virtualizer so its real height is measured.
+function setRowRef(el: any) {
+  rowRef.value = (el as HTMLElement) ?? null;
+  if (props.dynamicRowHeight && props.measureRowElement && el) {
+    props.measureRowElement(el);
+  }
+}
 
 onMounted(() => {
   if (props.measureEl && rowRef.value) {
@@ -144,8 +167,9 @@ function onRowMouseleave() {
 
 <template>
   <tr
-    ref="rowRef"
+    :ref="setRowRef"
     :data-test="`o2-table-row-${row.index}`"
+    :data-index="dynamicRowHeight ? virtualIndex : undefined"
     :tabindex="clickable ? 0 : undefined"
     :class="[
       'group/row',
@@ -173,7 +197,7 @@ function onRowMouseleave() {
     <td
       v-if="expansionEnabled"
       :class="[
-        'w-4 min-w-4 px-0 text-center align-middle',
+        'w-6 max-w-6 min-w-6 px-0 text-center align-middle',
         bordered ? 'border-table-row-divider border-b' : '',
       ]"
       data-test="o2-table-expand-cell"
@@ -245,7 +269,9 @@ function onRowMouseleave() {
       :bordered="bordered"
       :enable-cell-copy="enableCellCopy"
       :get-cell-style="getCellStyle"
+      :pivot-merge="getPivotMerge ? getPivotMerge(row.original, cell.column.id) : null"
       @cell-click="emit('cell-click', $event)"
+      @cell-contextmenu="emit('cell-contextmenu', $event)"
     >
       <template v-if="slots[`cell-${cell.column.id}`]" #default>
         <slot
@@ -255,6 +281,10 @@ function onRowMouseleave() {
           :column="cell.column.columnDef"
           :index="row.index"
         />
+      </template>
+      <!-- Per-cell hover-action overlay — forwarded to every cell -->
+      <template v-if="slots['cell-hover-actions']" #cell-hover-actions="caProps">
+        <slot name="cell-hover-actions" v-bind="caProps" />
       </template>
     </OTableBodyCell>
   </tr>
@@ -305,11 +335,27 @@ function onRowMouseleave() {
 </template>
 
 <style scoped>
-/* keep(complex-state): per-row status spine, painted as an inset box-shadow on
-   the row's first cell (a `> td:first-child` child-combinator target) — an extra
-   <td> would add a phantom column and misalign cells under table-fixed. */
+/* keep(complex-state): per-row status spine on the row's first cell (an extra
+   <td> would add a phantom column and misalign cells under table-fixed). Drawn
+   as a stacked ::before rather than an inset box-shadow so the expand button,
+   which overflows the spine and paints a hover background, can't cover it.
+   pointer-events:none keeps it click-through. */
 .o2-table-row-with-status > td:first-child {
-  box-shadow: inset 0.25rem 0 0 0 var(--row-status-color, transparent);
+  position: relative;
+  /* Inset the content past the 0.25rem status spine so the expand chevron isn't
+     jammed against the coloured left border. */
+  padding-left: 0.5rem;
+}
+.o2-table-row-with-status > td:first-child::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 0.25rem;
+  background: var(--row-status-color, transparent);
+  z-index: 2;
+  pointer-events: none;
 }
 
 /* keep(generated-content): continuation of the tree connector vertical line

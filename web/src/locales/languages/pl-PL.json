@@ -8871,7 +8871,11 @@
       "validation": {
         "nameRequired": "Nazwa zadania jest wymagana",
         "streamRequired": "Strumień jest wymagany",
-        "idleWindowMinimum": "Okno bezczynności musi wynosić co najmniej 45 sekund",
+        "idleWindowMinimum": "Okno bezczynności musi wynosić co najmniej 1 sekundę",
+        "idleWindowMaximumTrace": "Okno bezczynności trace nie może przekraczać 30 minut",
+        "idleWindowMaximumSession": "Okno bezczynności sesji nie może przekraczać 4 godzin",
+        "maxAgeMaximumTrace": "Maksymalny wiek trace nie może przekraczać 2 godzin",
+        "maxAgeMaximumSession": "Maksymalny wiek sesji nie może przekraczać 24 godzin",
         "samplingValueRequired": "Wartość próbkowania jest wymagana"
       }
     }

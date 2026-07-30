@@ -663,8 +663,8 @@ describe("TraceDetailsSidebar", async () => {
         await flushPromises();
         await wrapper.vm.$nextTick();
 
-        // TenstackTable renders rows with data-test="o2-table-detail-{timestamp}"
-        const eventRows = wrapper.findAll('[data-test^="o2-table-detail-"]');
+        // OTable renders rows with data-test="o2-table-row-{index}"
+        const eventRows = wrapper.findAll('[data-test^="o2-table-row-"]');
         expect(eventRows.length).toBeGreaterThan(0);
       });
 
@@ -672,15 +672,16 @@ describe("TraceDetailsSidebar", async () => {
         await flushPromises();
         await wrapper.vm.$nextTick();
 
-        // TenstackTable renders an expand button for each row
-        const expandBtn = wrapper.find('[data-test="table-row-expand-menu"]');
+        // One expand button per row: o2-table-expand-{index}, distinct from the
+        // wrapping cell o2-table-expand-cell.
+        const expandBtn = wrapper.find('[data-test="o2-table-expand-0"]');
         expect(expandBtn.exists()).toBe(true);
 
         await expandBtn.trigger("click");
         await flushPromises();
         await wrapper.vm.$nextTick();
 
-        // After expansion TenstackTable inserts an expanded row (data-test="o2-table-expanded-row-{index}")
+        // After expansion OTable inserts an expanded row (data-test="o2-table-expanded-row-{index}")
         const expandedRow = wrapper.find('[data-test^="o2-table-expanded-row-"]');
         expect(expandedRow.exists()).toBe(true);
       });
@@ -705,8 +706,8 @@ describe("TraceDetailsSidebar", async () => {
           await wrapper.vm.$nextTick();
 
           // Events are not filtered by searchQuery — all rows remain visible.
-          // TenstackTable renders rows with data-test="o2-table-detail-{timestamp}"
-          const eventRows = wrapper.findAll('[data-test^="o2-table-detail-"]');
+          // OTable renders rows with data-test="o2-table-row-{index}"
+          const eventRows = wrapper.findAll('[data-test^="o2-table-row-"]');
           expect(eventRows.length).toBeGreaterThan(0);
         });
       });

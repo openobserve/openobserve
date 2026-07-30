@@ -167,57 +167,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Traces table -->
-      <div class="rounded-default min-h-0 flex-1 overflow-hidden">
-        <TenstackTable
-          :rows="correlatedViews"
+      <div
+        class="rounded-default min-h-0 flex-1 overflow-hidden"
+        data-test="rum-player-traces-tab-table"
+      >
+        <OTable
+          :data="correlatedViews"
           :columns="traceColumns"
           :row-height="32"
-          :enable-row-expand="false"
-          :enable-text-highlight="false"
-          :enable-status-bar="false"
           :default-columns="false"
           :enable-column-reorder="true"
-          :enable-ai-context-button="false"
           :row-class="traceRowClass"
-          data-test="rum-player-traces-tab-table"
-          @click:dataRow="handleTraceRowClick"
+          :show-global-filter="false"
+          pagination="none"
+          @row-click="handleTraceRowClick"
         >
-          <template #cell-timestamp="{ item, cell }">
-            <div
-              class="overflow-hidden whitespace-nowrap"
-              :style="{ width: cell.column.getSize() + 'px' }"
-            >
-              <span class="text-xs tabular-nums">
-                {{ formatTraceTimestamp(item.metadata?.start_time) }}
-              </span>
-            </div>
+          <template #cell-timestamp="{ row }">
+            <span class="text-xs tabular-nums">
+              {{ formatTraceTimestamp(row.metadata?.start_time) }}
+            </span>
           </template>
-          <template #cell-route="{ item, cell }">
-            <div class="overflow-hidden" :style="{ width: cell.column.getSize() + 'px' }">
-              <span class="block truncate font-mono text-xs" :title="item.route">
-                {{ shortRoute(item.route) }}
-              </span>
-            </div>
+          <template #cell-route="{ row }">
+            <span class="block truncate font-mono text-xs" :title="row.route">
+              {{ shortRoute(row.route) }}
+            </span>
           </template>
-          <template #cell-duration="{ item, cell }">
-            <div
-              class="overflow-hidden whitespace-nowrap"
-              :style="{ width: cell.column.getSize() + 'px' }"
-            >
-              <span class="text-xs tabular-nums">
-                {{ formatTimeWithSuffix(item.metadata?.e2eDuration * 1000) }}
-              </span>
-            </div>
+          <template #cell-duration="{ row }">
+            <span class="text-xs tabular-nums">
+              {{ formatTimeWithSuffix(row.metadata?.e2eDuration * 1000) }}
+            </span>
           </template>
-          <template #cell-status="{ item, cell }">
-            <div
-              class="flex items-center overflow-hidden"
-              :style="{ width: cell.column.getSize() + 'px' }"
-            >
-              <TraceStatusCell :item="{ errors: item.metadata?.errorCount ?? 0 }" />
-            </div>
+          <template #cell-status="{ row }">
+            <TraceStatusCell :item="{ errors: row.metadata?.errorCount ?? 0 }" />
           </template>
-        </TenstackTable>
+        </OTable>
       </div>
     </div>
   </div>
@@ -238,7 +221,7 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import TraceStatusCell from "@/plugins/traces/components/TraceStatusCell.vue";
-import TenstackTable from "@/components/TenstackTable.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
 import TraceDetails from "@/plugins/traces/TraceDetails.vue";
 
 const { t } = useI18n();
@@ -293,7 +276,7 @@ const traceColumns = computed(() => [
     size: 100,
     minSize: 100,
     maxSize: 200,
-    meta: { align: "left", slot: true },
+    meta: { align: "left" },
   },
   {
     id: "route",
@@ -302,7 +285,7 @@ const traceColumns = computed(() => [
     size: 400,
     minSize: 80,
     maxSize: 800,
-    meta: { align: "left", slot: true },
+    meta: { align: "left" },
   },
   {
     id: "duration",
@@ -311,7 +294,7 @@ const traceColumns = computed(() => [
     size: 100,
     minSize: 50,
     maxSize: 200,
-    meta: { align: "left", slot: true },
+    meta: { align: "left" },
   },
   {
     id: "status",
@@ -320,7 +303,7 @@ const traceColumns = computed(() => [
     size: 120,
     minSize: 80,
     maxSize: 180,
-    meta: { align: "left", slot: true },
+    meta: { align: "left" },
   },
 ]);
 

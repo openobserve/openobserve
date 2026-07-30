@@ -958,7 +958,7 @@ pub fn service_routes() -> Router {
             .route("/{org_id}/settings/gen_ai/agent_registry", delete(gen_ai::clear_agent_registry))
             .route("/{org_id}/gen_ai/agents", get(gen_ai::list_scored_agents));
 
-        if get_o2_config().common.online_evals_enabled {
+        if get_o2_config().llm_eval_config.enabled {
             router = router
                 // LLM Providers (Online Eval Phase 2)
                 .route("/{org_id}/providers", get(providers::list_providers).post(providers::create_provider))

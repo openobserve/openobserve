@@ -53,7 +53,7 @@ export class HomePage {
         this.logo = page.locator('[data-test="header-openobserve-logo"]').first();
 
         // ===== PAGE LOAD INDICATORS (for verifying navigation completed) =====
-        this.logsPageIndicator = page.locator('[data-test="logs-search-bar-refresh-btn"]').or(page.locator('[data-test="log-table-column-0-source"]')).first();
+        this.logsPageIndicator = page.locator('[data-test="logs-search-bar-refresh-btn"]').or(page.locator('[data-test="o2-table-row-0"] [data-test="o2-table-cell-source"]')).first();
         this.streamsPageIndicator = page.locator('[data-test="streams-search-stream-input"]').or(page.locator('[data-test="stream-add-stream-btn"]')).first();
         this.dashboardsPageIndicator = page.locator('[data-test="dashboard-new"]').or(page.locator('[data-test="dashboard-table"]')).first();
         this.alertsPageIndicator = page.locator('[data-test="alert-list-page"]').or(page.locator('[data-test="alerts-page"]')).first();
