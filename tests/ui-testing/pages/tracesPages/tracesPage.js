@@ -982,6 +982,39 @@ export class TracesPage {
   }
 
   /**
+   * Classify the trace-search panel into one of its terminal states.
+   *
+   * `hasTraceResults()` and `isNoResultsVisible()` each answer one yes/no
+   * question against a single moment in time, so a caller that reads both while
+   * a search is still in flight gets `false` from both and cannot tell "the
+   * search produced nothing" apart from "the search has not finished". On the
+   * alpha1 shards — now all running concurrently — searches routinely outlive
+   * those helpers' internal waits, which is what turned this into a hard failure
+   * on all three attempts of run 30447620921.
+   *
+   * Callers should poll this until it stops returning 'pending'.
+   *
+   * @returns {Promise<'results'|'empty'|'error'|'pending'>}
+   */
+  async getSearchTerminalState() {
+    if (await this.page.locator(this.searchResultItem).first().isVisible({ timeout: 1000 }).catch(() => false)) {
+      return 'results';
+    }
+    if (await this.page.locator(this.errorMessage).isVisible({ timeout: 500 }).catch(() => false)) {
+      return 'error';
+    }
+    if (await this.page.locator(this.resultNotFoundText).isVisible({ timeout: 500 }).catch(() => false)) {
+      return 'empty';
+    }
+    // Traces may render no "not found" text and only update the count badge.
+    const badgeVisible = await this.page.locator(this.tracesCountBadge).isVisible({ timeout: 500 }).catch(() => false);
+    if (badgeVisible && (await this.page.locator(this.searchResultItem).count()) === 0) {
+      return 'empty';
+    }
+    return 'pending';
+  }
+
+  /**
    * Check if error message is visible
    * @returns {Promise<boolean>}
    */

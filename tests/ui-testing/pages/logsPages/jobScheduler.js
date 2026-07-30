@@ -156,32 +156,12 @@ async deleteJobSearch(trace_id) {
 
   async restartJobSearch(trace_id) {
     // Restart button is only enabled when status_code === 2 (completed) or 3 (failed).
-    // Retry until the button becomes enabled.
-    const maxRetries = 8;
-    let clicked = false;
-
-    for (let attempt = 0; attempt < maxRetries; attempt++) {
-        const rowIndex = await this._getJobRowIndex(trace_id, 15000);
-        if (rowIndex === -1) throw new Error(`Job with trace ID ${trace_id} not found in scheduler list`);
-
-        const row = this.page.locator(`[data-test="o2-table-row-${rowIndex}"]`);
-        await row.waitFor({ state: 'visible', timeout: 10000 });
-
-        const restartBtn = row.locator('[data-test="search-scheduler-restart-btn"]');
-        const isEnabled = await restartBtn.isEnabled();
-        if (isEnabled) {
-            await restartBtn.click();
-            clicked = true;
-            break;
-        }
-
-        testLogger.warn(`Restart button for trace ID ${trace_id} is not enabled (attempt ${attempt + 1}/${maxRetries}). Retrying...`);
-        if (attempt < maxRetries - 1) await this.page.waitForTimeout(5000);
-    }
-
-    if (!clicked) {
-        throw new Error(`Restart button for trace ID ${trace_id} remained disabled after ${maxRetries} attempts.`);
-    }
+    const restartBtn = await this._awaitEnabledRowButton(
+        trace_id,
+        'search-scheduler-restart-btn',
+        'Restart',
+    );
+    await restartBtn.click();
 
     await expect(
         this.page.locator('[data-test="o-toast-message"]').filter({ hasText: 'Search Job has been restarted successfully' }).first()
@@ -189,13 +169,54 @@ async deleteJobSearch(trace_id) {
 }
 
 
-async cancelJobSearch(trace_id) {
-    const rowIndex = await this._getJobRowIndex(trace_id);
-    if (rowIndex === -1) throw new Error(`Job with trace ID ${trace_id} not found in scheduler list`);
+/**
+ * Re-fetch the scheduler list until the named per-row action button for `trace_id`
+ * is present AND enabled, then return its locator.
+ *
+ * Row action buttons are gated on the job's server-side status, so their enabled
+ * state is a data condition, not a rendering one — clicking straight away just
+ * parks Playwright on an auto-waiting click until the action timeout expires
+ * (`84 x waiting for element to be visible, enabled and stable` in the CI log).
+ * Re-fetching the list on each poll is what actually advances the state; a
+ * `waitFor` on a single stale row never would.
+ *
+ * @param {string} trace_id
+ * @param {string} buttonTestId  data-test of the row button
+ * @param {string} label         human name used in the failure message
+ * @param {number} [timeoutMs=180000]
+ */
+async _awaitEnabledRowButton(trace_id, buttonTestId, label, timeoutMs = 180000) {
+    let button = null;
 
-    const row = this.page.locator(`[data-test="o2-table-row-${rowIndex}"]`);
-    await row.waitFor({ state: 'visible', timeout: 15000 });
-    await row.locator('[data-test="search-scheduler-cancel-btn"]').click();
+    await expect.poll(async () => {
+        const rowIndex = await this._getJobRowIndex(trace_id, 15000);
+        if (rowIndex === -1) return false;
+
+        const row = this.page.locator(`[data-test="o2-table-row-${rowIndex}"]`);
+        if (!(await row.isVisible({ timeout: 10000 }).catch(() => false))) return false;
+
+        const candidate = row.locator(`[data-test="${buttonTestId}"]`);
+        if (!(await candidate.isVisible({ timeout: 5000 }).catch(() => false))) return false;
+        if (!(await candidate.isEnabled().catch(() => false))) return false;
+
+        button = candidate;
+        return true;
+    }, {
+        message: `${label} button for trace ID ${trace_id} never became enabled — the search job did not reach an actionable state`,
+        intervals: [2000, 3000, 5000, 5000, 10000, 10000, 15000],
+        timeout: timeoutMs,
+    }).toBe(true);
+
+    return button;
+}
+
+async cancelJobSearch(trace_id) {
+    const cancelButton = await this._awaitEnabledRowButton(
+        trace_id,
+        'search-scheduler-cancel-btn',
+        'Cancel',
+    );
+    await cancelButton.click();
     await this.page.locator('[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]').click();
 
     await expect(
@@ -204,33 +225,18 @@ async cancelJobSearch(trace_id) {
 }
 
 async exploreJob(trace_id) {
-    // The explore button is disabled while the job is pending (status=0) or failed (status=3).
-    // Retry: each attempt re-fetches the list and checks whether the button is enabled.
-    const maxRetries = 5;
-    let clicked = false;
-
-    for (let attempt = 0; attempt < maxRetries; attempt++) {
-        const rowIndex = await this._getJobRowIndex(trace_id, 15000);
-        if (rowIndex === -1) throw new Error(`Job with trace ID ${trace_id} not found in scheduler list`);
-
-        const row = this.page.locator(`[data-test="o2-table-row-${rowIndex}"]`);
-        await row.waitFor({ state: 'visible', timeout: 10000 });
-
-        const exploreButton = row.locator('[data-test="search-scheduler-explore-btn"]');
-        const isEnabled = await exploreButton.isEnabled();
-        if (isEnabled) {
-            await exploreButton.click();
-            clicked = true;
-            break;
-        }
-
-        testLogger.warn(`Explore button for trace ID ${trace_id} is not enabled (attempt ${attempt + 1}/${maxRetries}).`);
-        if (attempt < maxRetries - 1) await this.page.waitForTimeout(5000);
-    }
-
-    if (!clicked) {
-        throw new Error(`Explore button for trace ID ${trace_id} remained disabled after ${maxRetries} attempts.`);
-    }
+    // The explore button is disabled while the job is pending (status=0) or failed
+    // (status=3), so this waits on the JOB reaching a completed state — not on a
+    // fixed number of tries. The old 5 x 5s budget (~25s) was a bet on scheduler
+    // latency that stopped holding once the alpha1 shards began running in
+    // parallel: a job still pending at 25s hard-failed the test. Wait on the real
+    // condition with a budget that covers a loaded backend instead.
+    const exploreButton = await this._awaitEnabledRowButton(
+        trace_id,
+        'search-scheduler-explore-btn',
+        'Explore',
+    );
+    await exploreButton.click();
 
     await expect(
         this.page.locator('[data-test="o-toast-message"]').filter({ hasText: 'Search Job have been applied successfully' }).first()

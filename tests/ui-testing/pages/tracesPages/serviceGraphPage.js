@@ -4,6 +4,8 @@
 
 import { expect } from '@playwright/test';
 
+const { getAuthHeaders, getOrgIdentifier } = require('../../playwright-tests/utils/cloud-auth.js');
+
 export class ServiceGraphPage {
   constructor(page) {
     this.page = page;
@@ -84,15 +86,31 @@ export class ServiceGraphPage {
       localStorage.setItem('serviceGraph_streamFilter', stream);
     }, streamName);
 
-    const org = process.env['ORGNAME'] || 'default';
+    const org = getOrgIdentifier() || process.env['ORGNAME'] || 'default';
     const baseUrl = (process.env['ZO_BASE_URL'] || '').replace(/\/+$/, '');
     const url = `${baseUrl}/web/traces?tab=service-graph&org_identifier=${org}`;
+
+    // The ECharts container is only rendered once the topology request resolves,
+    // so gate on that response rather than on `networkidle` — a busy SPA can
+    // starve networkidle indefinitely, and the old `.catch(() => {})` then handed
+    // a still-loading page to a 15s chart assertion.
+    const topologyResponse = this.page
+      .waitForResponse(
+        (res) => res.url().includes('/traces/service_graph/topology'),
+        { timeout: 60000 }
+      )
+      .catch(() => null);
+
     await this.page.goto(url);
-    await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
+    await topologyResponse;
+    await this.page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
   }
 
   async expectServiceGraphPageVisible() {
-    await expect(this.page.locator(this.chartContainer)).toBeVisible({ timeout: 15000 });
+    // 45s (not 15s): the chart mounts after the topology response, and on the
+    // alpha1 shards — which now all run concurrently — that response has been
+    // observed well past 15s. The wait is still on the real render signal.
+    await expect(this.page.locator(this.chartContainer)).toBeVisible({ timeout: 45000 });
   }
 
   async isServiceGraphVisible() {
@@ -151,18 +169,16 @@ export class ServiceGraphPage {
   // ===== TOPOLOGY API =====
 
   async getTopologyViaAPI() {
-    const orgId = process.env['ORGNAME'] || 'default';
+    // Resolve org + credentials through the shared cloud-auth helpers, exactly
+    // like service-graph-ingestion.js does. Reading ORGNAME/ZO_ROOT_USER_* here
+    // directly meant the assertions could query a different org (and with
+    // undefined self-hosted credentials) from the one the fixture data was
+    // ingested into — silently returning an empty topology instead of failing.
+    const orgId = getOrgIdentifier() || 'default';
     const baseUrl = process.env['INGESTION_URL'] || process.env['ZO_BASE_URL'];
     const response = await this.page.request.get(
       `${baseUrl}/api/${orgId}/traces/service_graph/topology/current`,
-      {
-        headers: {
-          Authorization: 'Basic ' + Buffer.from(
-            `${process.env['ZO_ROOT_USER_EMAIL']}:${process.env['ZO_ROOT_USER_PASSWORD']}`
-          ).toString('base64'),
-          'Content-Type': 'application/json',
-        },
-      }
+      { headers: getAuthHeaders() }
     );
     if (!response.ok()) {
       const text = await response.text();
@@ -172,26 +188,65 @@ export class ServiceGraphPage {
     return { status: response.status(), data };
   }
 
-  async getNodeCount() {
+  /**
+   * Topology snapshot with the response envelope normalised.
+   * The API has been seen returning both `{nodes, edges}` and `{data: {nodes, edges}}`.
+   */
+  async getTopology() {
     const result = await this.getTopologyViaAPI();
-    return result.data?.nodes?.length || result.data?.data?.nodes?.length || 0;
+    const data = result.data?.nodes ? result.data : result.data?.data;
+    return { nodes: data?.nodes || [], edges: data?.edges || [], status: result.status };
+  }
+
+  /**
+   * Re-read the topology until `pick` returns a value.
+   *
+   * `/topology/current` serves a rolling aggregation window, so a lookup can hit
+   * a snapshot taken while the daemon is mid-rebuild and get back an empty set
+   * even though the data is present a second later. Polling the lookup — rather
+   * than asserting on one snapshot — removes that race without weakening what is
+   * being asserted: an entity that genuinely does not exist still fails.
+   */
+  async _pollTopology(pick, { timeoutMs = 30000, pollIntervalMs = 2000 } = {}) {
+    const deadline = Date.now() + timeoutMs;
+    let found;
+    do {
+      const { nodes, edges } = await this.getTopology();
+      found = pick(nodes, edges);
+      if (found !== undefined) return found;
+      await this.page.waitForTimeout(pollIntervalMs);
+    } while (Date.now() < deadline);
+    return undefined;
+  }
+
+  async getNodeCount() {
+    return (await this.getTopology()).nodes.length;
   }
 
   async getEdgeCount() {
-    const result = await this.getTopologyViaAPI();
-    return result.data?.edges?.length || result.data?.data?.edges?.length || 0;
+    return (await this.getTopology()).edges.length;
   }
 
   async findNodeByLabel(label) {
-    const result = await this.getTopologyViaAPI();
-    const nodes = result.data?.nodes || result.data?.data?.nodes || [];
-    return nodes.find(n => n.label === label || n.id === label);
+    return await this._pollTopology((nodes) => nodes.find(n => n.label === label || n.id === label));
   }
 
   async findEdge(fromService, toService) {
-    const result = await this.getTopologyViaAPI();
-    const edges = result.data?.edges || result.data?.data?.edges || [];
-    return edges.find(e => e.from === fromService && e.to === toService);
+    return await this._pollTopology((_nodes, edges) =>
+      edges.find(e => e.from === fromService && e.to === toService));
+  }
+
+  /**
+   * All edges whose `from`/`to` matches `service`, polled until at least one
+   * exists so callers never assert against a mid-rebuild empty snapshot.
+   */
+  async findEdgesForService(service, direction) {
+    const key = direction === 'upstream' ? 'to' : 'from';
+    const matches = await this._pollTopology((_nodes, edges) => {
+      const hits = edges.filter(e => e[key] === service);
+      return hits.length > 0 ? hits : undefined;
+    });
+    return matches || [];
   }
 
   // ===== NODE/EDGE INTERACTION =====

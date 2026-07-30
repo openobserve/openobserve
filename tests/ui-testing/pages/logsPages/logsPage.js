@@ -13,6 +13,13 @@ const testLogger = require('../../playwright-tests/utils/test-logger.js');
 const { getAuthHeaders, getOrgIdentifier, isCloudEnvironment } = require('../../playwright-tests/utils/cloud-auth.js');
 const MonacoEditorHelper = require('../../playwright-tests/utils/MonacoEditorHelper.js');
 
+/**
+ * Collapse whitespace so an editor value can be compared to the query we asked
+ * for without tripping over Monaco's own indentation/newline handling. Only
+ * whitespace is normalised — any difference in tokens is a real mismatch.
+ */
+const normalizeQueryText = (text) => String(text ?? '').replace(/\s+/g, ' ').trim();
+
 export class LogsPage {
     constructor(page) {
         this.page = page;
@@ -1308,18 +1315,66 @@ export class LogsPage {
         const editor = this.page.locator(this.queryEditor);
         await editor.waitFor({ state: 'visible', timeout: 10000 });
 
-        // Click to focus the editor
-        await editor.click();
-
-        // Use .inputarea.fill() directly - this is more reliable than keyboard.type()
-        // as it avoids Monaco editor line number interference (the "1 SELECT" bug)
-        // The .fill() method will replace the selected content
         const inputArea = editor.locator('.inputarea');
-        await inputArea.waitFor({ state: 'visible', timeout: 5000 });
 
-        // Select all existing content
-        await this.page.keyboard.press(process.platform === "darwin" ? "Meta+A" : "Control+A");
-        await inputArea.fill(query);
+        // Fill, then VERIFY the editor really holds the query, retrying if not.
+        //
+        // Ctrl+A followed by inputarea.fill() is racy: if the select-all has not
+        // been applied by the time the fill lands, Monaco merges the new text into
+        // the old content instead of replacing it. The result is a syntactically
+        // broken query that still contains the fragment callers check for with
+        // waitForEditorValue() — so the test ran it and failed on a server-side
+        // `SQL error: ParserError(...)` that looked like a product bug (Logs-Core
+        // join.spec.js in run 30447620921). Reading back Monaco's model is the only
+        // way to know the editor state is what we asked for.
+        const attempts = 3;
+        for (let attempt = 1; attempt <= attempts; attempt++) {
+            await editor.click();
+            await inputArea.waitFor({ state: 'visible', timeout: 5000 });
+            await this.page.keyboard.press(process.platform === "darwin" ? "Meta+A" : "Control+A");
+            await inputArea.fill(query);
+
+            const actual = await this.getQueryEditorValue();
+            if (actual === null) {
+                // Monaco is not reachable (not yet lazy-loaded, or this editor is not
+                // a Monaco instance). We cannot verify, so do not invent a failure —
+                // behave exactly as before the verification was added.
+                testLogger.debug('Query editor value unreadable (no Monaco model) — skipping fill verification');
+                return;
+            }
+            if (normalizeQueryText(actual) === normalizeQueryText(query)) {
+                return;
+            }
+
+            testLogger.warn('Query editor content did not match after fill, retrying', {
+                attempt,
+                attempts,
+                expected: query,
+                actual,
+            });
+        }
+
+        throw new Error(
+            `Query editor did not accept the query after ${attempts} attempts.\n` +
+            `Expected: ${query}\nActual:   ${await this.getQueryEditorValue()}`
+        );
+    }
+
+    /**
+     * Read the current value out of the Monaco model backing the query editor.
+     * `window.monaco` is exposed by CodeQueryEditor.vue specifically for e2e reads.
+     * Returns null when no Monaco model can be resolved for this editor.
+     */
+    async getQueryEditorValue() {
+        return await this.page.evaluate((selector) => {
+            const host = document.querySelector(selector);
+            if (!host || !window.monaco?.editor?.getEditors) return null;
+            for (const ed of window.monaco.editor.getEditors()) {
+                const node = ed.getDomNode?.();
+                if (node && host.contains(node)) return ed.getValue?.() ?? '';
+            }
+            return null;
+        }, this.queryEditor).catch(() => null);
     }
 
     async typeQuery(query) {

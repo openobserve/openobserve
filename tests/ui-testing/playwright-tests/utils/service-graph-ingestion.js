@@ -2116,6 +2116,69 @@ async function waitForServiceRegistry(page, {
 }
 
 /**
+ * Poll the topology API until BOTH nodes and edges have reached their expected
+ * counts.
+ *
+ * WHY (not just waitForServiceGraphData): the daemon publishes edges and nodes
+ * independently, so a topology that already reports 26 edges can still report 0
+ * nodes for another aggregation cycle. The old setup covered that gap with a
+ * fixed 30s sleep, which is neither long enough on a loaded runner nor needed on
+ * an idle one. Polling the actual node count is the condition callers care
+ * about, so it is both faster in the common case and correct in the slow one.
+ *
+ * @param {import('@playwright/test').Page} page
+ * @param {object} opts
+ * @param {number} [opts.minNodes=10]
+ * @param {number} [opts.minEdges=10]
+ * @param {number} [opts.maxWaitMs=120000]
+ * @param {number} [opts.pollIntervalMs=5000]
+ * @returns {Promise<{success: boolean, nodes: number, edges: number, waitedMs: number}>}
+ */
+async function waitForTopologyReady(page, {
+  minNodes = 10,
+  minEdges = 10,
+  maxWaitMs = 120000,
+  pollIntervalMs = 5000,
+} = {}) {
+  const startTime = Date.now();
+  let lastNodes = 0;
+  let lastEdges = 0;
+
+  while (Date.now() - startTime < maxWaitMs) {
+    const result = await getTopology(page);
+    const data = result.data?.nodes ? result.data : result.data?.data;
+    lastNodes = data?.nodes?.length || 0;
+    lastEdges = data?.edges?.length || 0;
+
+    if (lastNodes >= minNodes && lastEdges >= minEdges) {
+      testLogger.info('Topology ready', {
+        nodes: lastNodes,
+        edges: lastEdges,
+        waitedMs: Date.now() - startTime,
+      });
+      return { success: true, nodes: lastNodes, edges: lastEdges, waitedMs: Date.now() - startTime };
+    }
+
+    testLogger.debug('Polling topology readiness', {
+      nodes: lastNodes,
+      edges: lastEdges,
+      minNodes,
+      minEdges,
+    });
+    await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+  }
+
+  testLogger.warn('Topology readiness poll timed out', {
+    nodes: lastNodes,
+    edges: lastEdges,
+    minNodes,
+    minEdges,
+    maxWaitMs,
+  });
+  return { success: false, nodes: lastNodes, edges: lastEdges, waitedMs: Date.now() - startTime };
+}
+
+/**
  * Get current service graph topology
  */
 async function getTopology(page) {
@@ -2200,6 +2263,7 @@ module.exports = {
 
   // Wait / polling
   waitForServiceGraphData,
+  waitForTopologyReady,
   waitForServiceRegistry,
   getTopology,
 };

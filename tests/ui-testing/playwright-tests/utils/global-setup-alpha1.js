@@ -17,6 +17,26 @@ const CLOUD_CONFIG_FILE = path.join(AUTH_DIR, 'cloud-config.json');
  * Retries up to 3 times with fresh browser per attempt and stagger delay
  * to handle Dex concurrency when 13 parallel shards login simultaneously.
  */
+/**
+ * True when cloud-config.json points at the org this shard is supposed to use.
+ *
+ * Every API-level helper resolves its org through cloud-config.json while the
+ * browser session and URL params follow ORGNAME. With the alpha1 matrix now
+ * spread across six orgs, the two disagreeing means a shard ingests into one org
+ * and asserts against another — so a mismatch has to invalidate the fast path
+ * rather than be tolerated.
+ */
+function cloudConfigMatchesTargetOrg() {
+  const targetOrg = process.env.ORGNAME;
+  if (!targetOrg || targetOrg === 'default') return true;
+  try {
+    const config = JSON.parse(fs.readFileSync(CLOUD_CONFIG_FILE, 'utf-8'));
+    return config.orgIdentifier === targetOrg;
+  } catch {
+    return false;
+  }
+}
+
 async function globalSetup() {
   testLogger.info('[alpha1] Starting global setup - Dex email login');
 
@@ -40,7 +60,12 @@ async function globalSetup() {
     testLogger.info('[alpha1] Found shared auth state from cleanup job — skipping Dex login');
     try {
       const valid = await verifySharedAuth(baseUrl);
-      if (valid) {
+      if (valid && !cloudConfigMatchesTargetOrg()) {
+        // verifySharedAuth re-derives cloud-config.json for this shard's org; if
+        // that did not stick we must NOT proceed, or the shard would ingest into
+        // the barrier job's org while asserting against its own.
+        testLogger.warn('[alpha1] cloud-config.json org does not match ORGNAME — falling back to Dex login');
+      } else if (valid) {
         testLogger.info('[alpha1] Shared auth state is valid');
         // Still need to do ingestion for shard-specific streams
         const specFiles = process.argv.filter(arg => /\.spec\.(js|ts)$/.test(arg));
@@ -607,6 +632,21 @@ async function verifySharedAuth(baseUrl) {
         testLogger.info(`[alpha1] Auth state re-saved with target org active`);
       }
     }
+
+    // Re-derive cloud-config.json for THIS shard's org.
+    //
+    // The shared auth artifact is produced by the pre-test-cleanup barrier job,
+    // which logs in against the workflow's `orgname` input — not against the
+    // shard's per-matrix org. Taking the fast path therefore inherits the
+    // barrier's cloud-config.json, and every helper that resolves the org via
+    // getOrgIdentifier() (data ingestion, service-graph ingestion, API auth)
+    // would target the BARRIER's org while the browser session, the UI and
+    // everything reading process.env.ORGNAME target the shard's org. Tests then
+    // ingest into one org and assert against another.
+    //
+    // Re-fetching here keeps the fast path (one Dex login for the whole matrix)
+    // while making the shard's config self-consistent.
+    await fetchCloudConfig(page);
     return true;
   } catch (e) {
     testLogger.warn(`[alpha1] Shared auth verification error: ${e.message}`);

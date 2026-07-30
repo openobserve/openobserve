@@ -226,14 +226,20 @@ test.describe("Traces Search testcases", () => {
       // Verify the search bar is still functional
       await pm.tracesPage.expectSearchBarVisible();
 
-      // Verify we can see either results or a proper message
-      const hasResults = await pm.tracesPage.hasTraceResults();
-      const hasNoResults = await pm.tracesPage.isNoResultsVisible();
+      // Verify we settle into one of the panel's terminal states. Polling (rather
+      // than sampling hasTraceResults/isNoResultsVisible once) is what makes this
+      // deterministic: a search still in flight reads as 'pending' instead of
+      // masquerading as "neither results nor a message", and a search that never
+      // settles still fails — with the state it was stuck in.
+      await expect
+        .poll(async () => await pm.tracesPage.getSearchTerminalState(), {
+          message: 'trace search never reached a terminal state (results / empty / error)',
+          intervals: [1000, 2000, 3000, 5000, 5000],
+          timeout: 60000,
+        })
+        .not.toBe('pending');
 
-      // At least one state should be present
-      const validState = hasResults || hasNoResults;
-      expect(validState).toBeTruthy();
-      testLogger.info(`Stream selected state verified: hasResults=${hasResults}, hasNoResults=${hasNoResults}`);
+      testLogger.info(`Stream selected state verified: ${await pm.tracesPage.getSearchTerminalState()}`);
     } else {
       // Neither state is visible - this might be a different UI state or error
       testLogger.info('Neither no-stream message nor stream selector visible - checking page state');

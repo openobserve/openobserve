@@ -5,6 +5,7 @@ const { expect } = require('@playwright/test')
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
 const fetch = require('node-fetch');
 const { getAuthHeaders } = require('../../playwright-tests/utils/cloud-auth.js');
+const { TRANSIENT_NETWORK_ERROR } = require('../../playwright-tests/utils/transient-network-errors.js');
 import { openNavFlyoutChild } from '../commonActions.js';
 
 const randomNodeName = `remote-node-${Math.floor(Math.random() * 1000)}`;
@@ -54,7 +55,7 @@ async function fetchWithRetry(url, options, maxRetries = 3) {
             return response;
         } catch (err) {
             const message = String(err && err.message ? err.message : err);
-            const isTransient = /premature close|ECONNRESET|socket hang up|network|EPIPE|other side closed/i.test(message);
+            const isTransient = TRANSIENT_NETWORK_ERROR.test(message);
             if (!isTransient || attempt === maxRetries) {
                 throw err;
             }
@@ -1674,7 +1675,25 @@ export class PipelinesPage {
         await this.page.waitForTimeout(3000);
     }
 
-    async deletePipelineByName(pipelineName) {
+    /**
+     * Bring a pipeline's row into view in the pipeline list and return its edit button.
+     *
+     * A pipeline that was just saved is not necessarily in the next list response:
+     * propagation in CI is slow (cross-cluster, search re-index), the list may be
+     * showing a filtered tab, and a long unfiltered list can leave the row on a
+     * virtual page. So: apply the search filter, and if the row still is not there
+     * poll with a reload until it is.
+     *
+     * Every caller that needs to act on a specific pipeline row must go through
+     * here — clicking the row locator directly just parks Playwright on an
+     * auto-waiting click until the action timeout expires, which is what made
+     * openPipelineForEdit fail with a bare 45s `locator.click` timeout on both CI
+     * attempts of run 30447620921.
+     *
+     * @param {string} pipelineName
+     * @returns {import('@playwright/test').Locator} the row's edit button
+     */
+    async locatePipelineRow(pipelineName) {
         // Use the edit button (always inline) as the row-visibility sentinel.
         // Delete is inside the more-options dropdown and is not in the DOM until opened.
         const editBtn = this.page.locator(`[data-test="pipeline-list-${pipelineName}-update-pipeline"]`);
@@ -1693,7 +1712,7 @@ export class PipelinesPage {
             // Per-pipeline propagation in CI can be slow (cross-cluster, search
             // re-index, etc.). Match the reportsPage.pauseReport budget (180s,
             // escalating intervals) instead of a 3-attempt cap that timed out.
-            testLogger.info(`deletePipelineByName: pipeline ${pipelineName} not visible, polling list with reload`);
+            testLogger.info(`locatePipelineRow: pipeline ${pipelineName} not visible, polling list with reload`);
             await expect.poll(async () => {
                 const apiPromise = this.page.waitForResponse(
                     (resp) => /\/api\/[^/]+\/pipelines(\?|$)/.test(resp.url()) && resp.request().method() === 'GET' && resp.status() === 200,
@@ -1727,14 +1746,28 @@ export class PipelinesPage {
                 timeout: 180000,
             }).toBe(true);
         }
+
+        return editBtn;
+    }
+
+    async deletePipelineByName(pipelineName) {
+        await this.locatePipelineRow(pipelineName);
         await this.openMoreOptionsAndClickDelete(pipelineName);
         await this.confirmDeletePipeline();
         await this.verifyPipelineDeleted();
     }
 
     async openPipelineForEdit(pipelineName) {
-        await this.page.locator(`[data-test="pipeline-list-${pipelineName}-update-pipeline"]`).click();
-        await this.page.waitForTimeout(2000);
+        const editBtn = await this.locatePipelineRow(pipelineName);
+        await expect(editBtn).toBeEnabled({ timeout: 15000 });
+        await editBtn.click();
+        // Wait for the pipeline editor canvas rather than a fixed 2s sleep — the
+        // editor mounts VueFlow asynchronously and a loaded runner routinely needs
+        // longer than 2s, which left callers clicking into a half-mounted canvas.
+        await this.page
+            .locator('[data-test="add-pipeline-save-btn"]')
+            .waitFor({ state: 'visible', timeout: 30000 });
+        await this.vueFlowPane.waitFor({ state: 'visible', timeout: 30000 });
     }
 
     async clickConditionNode() {

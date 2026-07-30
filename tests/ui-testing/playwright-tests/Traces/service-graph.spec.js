@@ -5,63 +5,39 @@
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
-const {
-  generateFullTopology,
-  generateAllEdgeCases,
-  ingestTraces,
-  waitForServiceGraphData,
-  getTopology,
-} = require('../utils/service-graph-ingestion.js');
+const { ensureServiceGraphData } = require('../utils/service-graph-setup.js');
+
+// Thresholds shared by the setup barrier and the topology assertions, so the
+// data the suite waits for is exactly the data it asserts on.
+const MIN_TOPOLOGY_NODES = 10;
+const MIN_TOPOLOGY_EDGES = 10;
 
 test.describe("Service Graph testcases", { tag: '@enterprise' }, () => {
   test.describe.configure({ mode: 'parallel' });
 
   let pm;
 
-  test.beforeAll(async ({ browser }) => {
-    // 4-min daemon wait + 30s buffer + ingestion time exceeds the default 3-5 min test timeout.
+  test.beforeAll(async ({ browser }, testInfo) => {
+    // Up to 3 ingest/poll rounds of 2 min each, plus ingestion time.
     test.setTimeout(600000); // 10 minutes for beforeAll
-    testLogger.info('=== SERVICE GRAPH SETUP: Ingesting trace data ===');
+    testLogger.info('=== SERVICE GRAPH SETUP: Ensuring topology data ===');
     const context = await browser.newContext({
       storageState: 'playwright-tests/utils/auth/user.json',
     });
     const page = await context.newPage();
 
     try {
-      // Generate traces for full topology + edge cases
-      const fullTraces = generateFullTopology({ tracesPerFlow: 3, errorRate: 0.2 });
-      const edgeCaseTraces = generateAllEdgeCases();
-      const allTraces = [...fullTraces, ...edgeCaseTraces];
-
-      testLogger.info(`Generated ${allTraces.length} traces for ingestion`);
-
-      // Ingest all traces
-      await ingestTraces(page, allTraces, { delayMs: 50 });
-      testLogger.info('Trace ingestion complete');
-
-      // Wait for the service graph daemon to process (runs every ~30s)
-      // Increased to 4 minutes to allow 6-8 daemon cycles for full topology processing
-      testLogger.info('Waiting for service graph daemon to process data...');
-      const waitResult = await waitForServiceGraphData(page, {
-        maxWaitMs: 240000,  // 4 minutes (was 2 min) - allows more daemon cycles
-        pollIntervalMs: 10000,
-        expectedMinEdges: 10,
+      // This file runs in `mode: 'parallel'`, so beforeAll fires once per worker.
+      // ensureServiceGraphData elects a single ingesting worker per shard and makes
+      // every worker block until the topology API actually reports the expected
+      // nodes AND edges — the previous version ingested from every worker and then
+      // let the tests run against an empty topology when the daemon lagged, which
+      // is what turned daemon latency into five hard failures on every CI attempt.
+      const { nodes, edges } = await ensureServiceGraphData(page, testInfo.project.outputDir, {
+        minNodes: MIN_TOPOLOGY_NODES,
+        minEdges: MIN_TOPOLOGY_EDGES,
       });
-
-      if (waitResult.success) {
-        testLogger.info(`Service graph data ready: ${waitResult.edges.length} edges found after ${waitResult.waitedMs}ms`);
-        // Additional wait to ensure all nodes are fully created after edges appear
-        testLogger.info('Waiting additional 30s for node creation to complete...');
-        await new Promise(resolve => setTimeout(resolve, 30000));
-      } else {
-        testLogger.warn(`Service graph data may be incomplete after ${waitResult.waitedMs}ms - continuing with available data`);
-      }
-
-      // Verify topology data is available
-      const topoResult = await getTopology(page);
-      const topoData = topoResult.data?.nodes ? topoResult.data : topoResult.data?.data;
-      testLogger.info(`Topology available: ${topoData?.nodes?.length || 0} nodes, ${topoData?.edges?.length || 0} edges`);
-
+      testLogger.info(`Topology available: ${nodes} nodes, ${edges} edges`);
     } finally {
       await page.close();
       await context.close();
@@ -91,20 +67,17 @@ test.describe("Service Graph testcases", { tag: '@enterprise' }, () => {
   }, async ({ page }) => {
     testLogger.info('=== Verifying topology API data ===');
 
-    const result = await pm.serviceGraphPage.getTopologyViaAPI();
-    const data = result.data?.nodes ? result.data : result.data?.data;
-    const nodes = data?.nodes || [];
-    const edges = data?.edges || [];
+    const { nodes, edges } = await pm.serviceGraphPage.getTopology();
 
     testLogger.info(`API returned: ${nodes.length} nodes, ${edges.length} edges`);
 
     // Verify minimum expected node count (15 production + edge case services)
-    expect(nodes.length).toBeGreaterThanOrEqual(10);
-    testLogger.info(`Node count check passed: ${nodes.length} >= 10`);
+    expect(nodes.length).toBeGreaterThanOrEqual(MIN_TOPOLOGY_NODES);
+    testLogger.info(`Node count check passed: ${nodes.length} >= ${MIN_TOPOLOGY_NODES}`);
 
     // Verify minimum expected edge count
-    expect(edges.length).toBeGreaterThanOrEqual(10);
-    testLogger.info(`Edge count check passed: ${edges.length} >= 10`);
+    expect(edges.length).toBeGreaterThanOrEqual(MIN_TOPOLOGY_EDGES);
+    testLogger.info(`Edge count check passed: ${edges.length} >= ${MIN_TOPOLOGY_EDGES}`);
 
     // Verify key services exist as nodes
     const nodeLabels = nodes.map(n => n.label || n.id);
@@ -174,19 +147,14 @@ test.describe("Service Graph testcases", { tag: '@enterprise' }, () => {
   }, async ({ page }) => {
     testLogger.info('=== Verifying api-gateway connections ===');
 
-    // API validation of connections
-    const result = await pm.serviceGraphPage.getTopologyViaAPI();
-    const data = result.data?.nodes ? result.data : result.data?.data;
-    const edges = data?.edges || [];
-
-    // api-gateway upstream: edges where to === 'api-gateway'
-    const upstreamEdges = edges.filter(e => e.to === 'api-gateway');
+    // API validation of connections. Both lookups poll the topology so a snapshot
+    // taken mid-rebuild cannot present as "api-gateway has no connections".
+    const upstreamEdges = await pm.serviceGraphPage.findEdgesForService('api-gateway', 'upstream');
     const upstreamServices = upstreamEdges.map(e => e.from);
     testLogger.info(`api-gateway upstream services: ${upstreamServices.join(', ')}`);
     expect(upstreamServices).toContain('frontend-app');
 
-    // api-gateway downstream: edges where from === 'api-gateway'
-    const downstreamEdges = edges.filter(e => e.from === 'api-gateway');
+    const downstreamEdges = await pm.serviceGraphPage.findEdgesForService('api-gateway', 'downstream');
     const downstreamServices = downstreamEdges.map(e => e.to);
     testLogger.info(`api-gateway downstream services: ${downstreamServices.join(', ')}`);
 

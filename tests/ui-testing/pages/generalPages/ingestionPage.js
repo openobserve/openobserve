@@ -5,6 +5,8 @@ const https = require('https');
 const nodeFetch = require('node-fetch');
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
 const { getAuthHeaders, getOrgIdentifier } = require('../../playwright-tests/utils/cloud-auth.js');
+const { TRANSIENT_NETWORK_ERROR } = require('../../playwright-tests/utils/transient-network-errors.js');
+const { waitForStreamData } = require('../../playwright-tests/utils/data-ingestion.js');
 
 // node-fetch v2 keep-alive pooling + gzip decompression is the root cause of
 // "Premature close" / ECONNRESET flakiness in CI.
@@ -32,7 +34,7 @@ async function fetchWithRetry(url, options, maxRetries = 3) {
       return response;
     } catch (err) {
       const message = String(err && err.message ? err.message : err);
-      const isTransient = /premature close|ECONNRESET|socket hang up|network|EPIPE|other side closed/i.test(message);
+      const isTransient = TRANSIENT_NETWORK_ERROR.test(message);
       if (!isTransient) {
         testLogger.warn('Non-transient fetch error (not retrying)', { url, error: message });
         throw err;
@@ -85,7 +87,10 @@ export class IngestionPage {
     const streams = ["default", "e2e_automate"];
 
     for (const streamName of streams) {
-      const fetchResponse = await fetch(
+      // fetchWithRetry (not a bare fetch): this path had no retry, no keep-alive
+      // opt-out and no 5xx handling, so a single refused/reset connection during
+      // the parallel-shard ingestion burst failed the test outright.
+      const fetchResponse = await fetchWithRetry(
         `${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`,
         {
           method: "POST",
@@ -240,6 +245,20 @@ export class IngestionPage {
       const failedStreams = results.failed.map(f => `${f.stream} (${f.status || f.error})`).join(", ");
       throw new Error(`ingestionJoinUnion: Failed to ingest to streams: ${failedStreams}`);
     }
+
+    // A 200 from ingestion means the records were ACCEPTED, not that the stream is
+    // queryable — schema registration and the WAL→index hop happen afterwards.
+    // Callers immediately join these two brand-new streams, and a join issued
+    // before both are searchable is rejected by the backend ("Search SQL execute
+    // error" / parser errors), which surfaces as a product bug instead of the
+    // setup race it actually is. Reproduced locally on every other run.
+    for (const streamName of streams) {
+      const ready = await waitForStreamData(this.page, streamName, 1, 60000, 2000);
+      if (!ready) {
+        throw new Error(`ingestionJoinUnion: stream '${streamName}' never became queryable after ingestion`);
+      }
+    }
+    testLogger.info(`ingestionJoinUnion: both streams are queryable`);
 
     // Return stream names so test can use them for selection
     return { streamA, streamB, testRunId: runId, results };

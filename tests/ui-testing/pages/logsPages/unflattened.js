@@ -237,12 +237,33 @@ class UnflattenedPage {
         // column OR an FTS column (body/message/log), so target whichever
         // first cell of this row is rendered rather than "source" only.
         const sourceCell = this.page.locator(`[data-test^="log-table-column-${rowIndex}-"]`).first();
-        await sourceCell.waitFor({ state: 'visible', timeout: 15000 });
-        await sourceCell.click();
-        // Wait for the detail drawer to be open — deterministic on drawer state.
-        await this.page
-            .locator('[data-test="logs-search-result-detail-dialog"][data-state="open"]')
-            .waitFor({ state: 'visible', timeout: 10000 });
+        const drawer = this.page.locator('[data-test="logs-search-result-detail-dialog"][data-state="open"]');
+
+        // Retry the open: the row click can be swallowed when the virtualised
+        // TanStack table re-renders underneath it (a background search settling,
+        // a column resize), which detaches the <tr> mid-click. The click then
+        // "succeeds" with nothing listening and the drawer never opens — the exact
+        // failure seen on Logs-Core in run 30447620921, where the drawer wait
+        // expired even though the row was there. Re-clicking a freshly resolved
+        // row is what makes this converge; a longer single wait would not.
+        let opened = false;
+        for (let attempt = 1; attempt <= 3 && !opened; attempt++) {
+            await sourceCell.waitFor({ state: 'visible', timeout: 15000 });
+            await sourceCell.click();
+            opened = await drawer
+                .waitFor({ state: 'visible', timeout: 10000 })
+                .then(() => true)
+                .catch(() => false);
+            if (!opened) {
+                console.warn(`openLogRowDetail: drawer did not open for row ${rowIndex} (attempt ${attempt}/3), re-clicking`);
+            }
+        }
+        if (!opened) {
+            // Surface the real condition rather than letting openJsonDetailTab fail
+            // on a missing tab inside a drawer that was never opened.
+            throw new Error(`Log detail drawer did not open for row ${rowIndex} after 3 attempts`);
+        }
+
         await this.openJsonDetailTab();
         // JSON content renders asynchronously after the drawer opens. Wait for the
         // first detail key to actually render instead of a fixed 3s sleep — the keys
