@@ -202,7 +202,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             {{ warningThresholdError }}
                           </div>
                         </div>
-                        <div class="flex items-center gap-1 leading-8.5">
+                        <div class="flex items-center gap-1 h-8.5">
                           <OFormCheckbox
                             name="trigger_condition.notify_on_warning"
                             :label="t('alerts.notifyOnWarning')"
@@ -213,7 +213,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <OButton
                           variant="ghost"
                           size="icon-circle-sm"
-                          class="text-icon-color hover:text-status-error-text"
+                          class="text-icon-color hover:text-status-error-text self-center"
                           :aria-label="t('alerts.removeWarning')"
                           data-test="alert-remove-warning-button"
                           @click="removeCountWarning"
@@ -300,7 +300,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             {{ aggregationWarningError }}
                           </div>
                         </div>
-                        <div class="flex items-center gap-1 leading-8.5">
+                        <div class="flex items-center gap-1 h-8.5">
                           <OFormCheckbox
                             name="trigger_condition.notify_on_warning"
                             :label="t('alerts.notifyOnWarning')"
@@ -311,7 +311,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <OButton
                           variant="ghost"
                           size="icon-circle-sm"
-                          class="text-icon-color hover:text-status-error-text"
+                          class="text-icon-color hover:text-status-error-text self-center"
                           :aria-label="t('alerts.removeWarning')"
                           data-test="alert-remove-warning-button"
                           @click="removeAggWarning"
@@ -586,7 +586,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             {{ warningThresholdError }}
                           </div>
                         </div>
-                        <div class="flex items-center gap-1 leading-8.5">
+                        <div class="flex items-center gap-1 h-8.5">
                           <OFormCheckbox
                             name="trigger_condition.notify_on_warning"
                             :label="t('alerts.notifyOnWarning')"
@@ -597,7 +597,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <OButton
                           variant="ghost"
                           size="icon-circle-sm"
-                          class="text-icon-color hover:text-status-error-text"
+                          class="text-icon-color hover:text-status-error-text self-center"
                           :aria-label="t('alerts.removeWarning')"
                           data-test="alert-remove-warning-button"
                           @click="removeCountWarning"
@@ -683,7 +683,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             {{ aggregationWarningError }}
                           </div>
                         </div>
-                        <div class="flex items-center gap-1 leading-8.5">
+                        <div class="flex items-center gap-1 h-8.5">
                           <OFormCheckbox
                             name="trigger_condition.notify_on_warning"
                             :label="t('alerts.notifyOnWarning')"
@@ -694,7 +694,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <OButton
                           variant="ghost"
                           size="icon-circle-sm"
-                          class="text-icon-color hover:text-status-error-text"
+                          class="text-icon-color hover:text-status-error-text self-center"
                           :aria-label="t('alerts.removeWarning')"
                           data-test="alert-remove-warning-button"
                           @click="removeAggWarning"
@@ -1403,7 +1403,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         {{ warningThresholdError }}
                       </div>
                     </div>
-                    <div class="flex items-center gap-1 leading-8.5">
+                    <div class="flex items-center gap-1 h-8.5">
                       <OFormCheckbox
                         name="trigger_condition.notify_on_warning"
                         :label="t('alerts.notifyOnWarning')"
@@ -1414,7 +1414,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OButton
                       variant="ghost"
                       size="icon-circle-sm"
-                      class="text-icon-color hover:text-status-error-text"
+                      class="text-icon-color hover:text-status-error-text self-center"
                       :aria-label="t('alerts.removeWarning')"
                       data-test="alert-remove-warning-button"
                       @click="removeCountWarning"
@@ -1517,7 +1517,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           {{ promqlWarningError }}
                         </div>
                       </div>
-                      <div class="flex items-center gap-1 leading-8.5">
+                      <div class="flex items-center gap-1 h-8.5">
                         <OFormCheckbox
                           name="trigger_condition.notify_on_warning"
                           :label="t('alerts.notifyOnWarning')"
@@ -1528,7 +1528,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <OButton
                         variant="ghost"
                         size="icon-circle-sm"
-                        class="text-icon-color hover:text-status-error-text"
+                        class="text-icon-color hover:text-status-error-text self-center"
                         :aria-label="t('alerts.removeWarning')"
                         data-test="alert-remove-warning-button"
                         @click="removePromqlWarning"
