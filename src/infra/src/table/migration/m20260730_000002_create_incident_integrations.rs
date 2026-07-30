@@ -134,6 +134,11 @@ impl MigrationTrait for Migration {
                             .not_null(),
                     )
                     .col(
+                        ColumnDef::new(IncidentIntegrationSenders::SenderLabel)
+                            .string()
+                            .null(),
+                    )
+                    .col(
                         ColumnDef::new(IncidentIntegrationSenders::FirstReceivedAt)
                             .big_integer()
                             .not_null(),
@@ -173,6 +178,7 @@ impl MigrationTrait for Migration {
                     .name("idx_incident_integration_senders_unique")
                     .col(IncidentIntegrationSenders::IntegrationId)
                     .col(IncidentIntegrationSenders::DetectedSource)
+                    .col(IncidentIntegrationSenders::SenderLabel)
                     .unique()
                     .to_owned(),
             )
@@ -214,6 +220,7 @@ enum IncidentIntegrationSenders {
     Id,
     IntegrationId,
     DetectedSource,
+    SenderLabel,
     FirstReceivedAt,
     LastReceivedAt,
     AcceptedCount,
