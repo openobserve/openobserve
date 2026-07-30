@@ -151,6 +151,7 @@ mod m20260727_000002_add_slo_columns_to_alerts;
 mod m20260728_000001_create_workflows_associations_table;
 mod m20260729_000001_add_promql_multi_alert_to_alerts;
 mod m20260730_000001_add_alert_state_to_synthetics_monitors;
+mod m20260730_000002_create_incident_integrations;
 
 /// Apply **only** the SLO tables, for targeted integration tests.
 ///
@@ -341,6 +342,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260728_000001_create_workflows_associations_table::Migration),
             Box::new(m20260729_000001_add_promql_multi_alert_to_alerts::Migration),
             Box::new(m20260730_000001_add_alert_state_to_synthetics_monitors::Migration),
+            Box::new(m20260730_000002_create_incident_integrations::Migration),
         ]
     }
 }
