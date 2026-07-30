@@ -10210,7 +10210,10 @@
       "none": "No evidence bundle was uploaded for this attempt.",
       "loadFailed": "Could not load the evidence bundle: {error}",
       "retry": "Retry",
-      "stack": "stack"
+      "stack": "stack",
+      "unattributedCount": "{count} events were not attributed to any step",
+      "stepFilterBanner": "Showing events for step {step}",
+      "clearStepFilter": "Clear"
     },
     "runDetail": {
       "evidenceSection": "Evidence",
