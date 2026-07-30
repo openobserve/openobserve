@@ -364,6 +364,8 @@
   },
   "common": {
     "beta": "测试版",
+    "play": "播放",
+    "pause": "暂停",
     "close": "关闭",
     "cancel": "取消",
     "ok": "确定",
@@ -514,7 +516,9 @@
     "fillRequiredFields": "请填写必填字段",
     "test": "测试",
     "username": "用户名",
-    "password": "密码"
+    "password": "密码",
+    "field": "字段",
+    "enterValueOrVariable": "输入值或 $variable"
   },
   "flow": {
     "stepPicker": {
@@ -905,9 +909,13 @@
     "language": "语言",
     "actions": "操作",
     "keyboardShortcuts": "键盘快捷键",
-    "synthetic": "合成监控"
+    "synthetic": "合成监控",
+    "experience": "体验"
   },
   "rum": {
+    "noSessionReplay": "无可用会话回放",
+    "seek": "跳转",
+    "playbackSpeed": "播放速度",
     "title": "用户体验监控",
     "subtitle": "监控真实用户会话、错误和前端性能",
     "issueColumn": "问题",
@@ -1016,6 +1024,7 @@
     "desktop": "桌面",
     "mobile": "手机",
     "tablet": "平板电脑",
+    "platform": "平台",
     "vsPreviousPeriod": "与前一时期相比",
     "seeSessions": "查看会议",
     "openErrorTracking": "在 “错误跟踪” 中打开",
@@ -1652,6 +1661,8 @@
     "object": "对象",
     "serviceAccounts": "服务账号",
     "ingestionTokens": "写入令牌",
+    "syntheticsTokens": "合成监控令牌",
+    "syntheticsTokensDesc": "组织级 o2syn_ 令牌，您的私有合成代理用于拉取任务",
     "serviceAccountsName": "服务账户名称",
     "basicUsers": "用户",
     "organizationMembers": "组织成员",
@@ -2081,7 +2092,6 @@
     "search": "搜索工作流",
     "refresh": "刷新工作流",
     "trigger": "触发器",
-    "triggerAlertFired": "警报触发",
     "steps": "步骤",
     "status": "状态",
     "updated": "已更新",
@@ -2133,13 +2143,21 @@
       "cta": "创建工作流",
       "soonCta": "将在未来版本中提供",
       "comingSoon": "即将推出",
-      "soon": "即将",
-      "alertFired": "警报触发",
-      "alertFiredDesc": "警报触发时运行",
-      "schedule": "计划",
-      "scheduleDesc": "按计划运行",
-      "webhook": "Webhook",
-      "webhookDesc": "在传入 Webhook 上运行"
+      "soon": "即将"
+    },
+    "triggerKind": {
+      "alertFired": {
+        "label": "告警触发",
+        "node": "告警触发器",
+        "desc": "当告警触发时运行",
+        "intro": "当关联的告警触发时，每个下游步骤都会收到此负载。"
+      },
+      "incidentEvent": {
+        "label": "事件事件",
+        "node": "事件触发器",
+        "desc": "在事件生命周期事件上运行",
+        "intro": "当事件事件发生时，每个下游步骤都会收到此负载。"
+      }
     },
     "triggerMeta": {
       "orgId": "警报所属的组织 ID。",
@@ -2178,9 +2196,6 @@
       "skipped": "已跳过",
       "errorsN": "{count} 个错误",
       "runError": "无法运行测试。",
-      "saveToTestTitle": "保存并测试",
-      "saveToTestBody": "测试将运行此工作流的已保存版本。是否先保存更改？",
-      "saveAndTest": "保存并测试",
       "stepResult": {
         "viewHint": "点击查看输入/输出",
         "input": "输入",
@@ -2227,7 +2242,6 @@
       "kindTrigger": "触发器",
       "kindLogic": "逻辑",
       "kindAction": "操作",
-      "alertTrigger": "告警触发器",
       "condition": "条件",
       "function": "函数",
       "sendToDestination": "目标",
@@ -2252,7 +2266,6 @@
       "triggerAlertsNone": "此组织中未找到任何警报。",
       "triggerAlertsError": "无法加载警报",
       "triggerNote": "当任何选中的警报触发时，此工作流将运行。",
-      "triggerPayloadIntro": "当关联的警报触发时，每个下游步骤都会收到此载荷。",
       "triggerStructureTitle": "载荷结构",
       "triggerStructureHint": "悬停字段查看详情",
       "triggerDetailHint": "悬停或聚焦上方字段以查看其类型和含义。",
@@ -2261,6 +2274,10 @@
       "triggerDataBlock": "data[] · 警报的行",
       "triggerDataColumns": "结果列",
       "triggerDataExampleNote": "仅示例——实际列来自警报的查询。",
+      "incidentEventTypeLabel": "事件类型",
+      "incidentCommonTitle": "公共字段（每个事件）",
+      "incidentSpecificTitle": "事件特定字段",
+      "incidentNoExtraFields": "此事件不添加公共字段之外的字段。",
       "triggerDataBlockNote": "每个匹配记录对应一个对象的数组。其列来自警报自身的查询，因此因警报而异——请以 data[].<column> 的形式引用它们。",
       "conditionBody": "设置分支规则",
       "conditionBodySet": "根据规则分支",
@@ -2399,7 +2416,7 @@
     "periodGreaterThanZero": "周期必须大于 0",
     "frequencyGreaterThanSeconds": "频率必须大于 {seconds} 秒。",
     "minimumFrequencyMinutes": "最小频率应为 {minutes} 分钟",
-    "streamSelectionNameInvalid": "仅使用字母数字和 '+=,.@-_' 字符，不含空格。",
+    "streamSelectionNameInvalid": "仅使用字母数字和 '+=,.{'@'}-_' 字符，不含空格。",
     "functionAlreadyAssociated": "该函数已关联",
     "atLeastOneCondition": "请至少添加一个条件",
     "fillAllConditionFields": "请填写所有条件字段（列、运算符和值均为必填项）",
@@ -2602,6 +2619,9 @@
     "resetRUMTokenLabel": "重置 RUM Token",
     "generateRUMTokenLabel": "生成 RUM Token",
     "generateRUMTokenMessage": "生成 RUM 令牌以为您的组织启用 RUM。",
+    "rumPlatform": "平台",
+    "rumPlatformBrowser": "浏览器",
+    "rumPlatformReactNative": "React Native",
     "npmStepTitle": "NPM 安装方法",
     "recommendedLabel": "推荐",
     "customLabel": "自定义",
@@ -2836,7 +2856,7 @@
     "addToFavorites": "添加到收藏夹",
     "removeFromFavorites": "从收藏夹移除",
     "noFavoritesTitle": "暂无收藏的仪表盘",
-    "noFavoritesMessage": "点击任意仪表盘上的心形图标，即可在这里跨文件夹查看。",
+    "noFavoritesMessage": "点击任意仪表板上的星标图标即可在此处查看，跨所有文件夹。",
     "moreActions": "更多动作",
     "save": "保存",
     "cancel": "取消",
@@ -3673,7 +3693,8 @@
       "clause": "子句 {number}",
       "selectOperation": "选择操作",
       "addAnotherClause": "添加另一个子句",
-      "removeClause": "移除子句"
+      "removeClause": "移除子句",
+      "addClause": "添加子句"
     },
     "viewDashboard": {
       "refreshToApplyVariables": "刷新以应用最新的变量更改",
@@ -3700,7 +3721,9 @@
       "add": "添加",
       "value": "值",
       "markAsNonTimestamp": "将此字段标记为非时间戳",
-      "renderDataAsJson": "以 JSON / 数组格式渲染数据"
+      "renderDataAsJson": "以 JSON / 数组格式渲染数据",
+      "sortBy": "排序依据",
+      "havingHint": "聚合过滤"
     },
     "customChartTypeSelector": {
       "exampleOfCustomCharts": "自定义图表示例",
@@ -3911,6 +3934,10 @@
       "addedSuccessfully": "仪表盘添加成功。",
       "creationFailed": "仪表盘创建失败。",
       "filesFailedValidation": "{count} 个文件未通过验证约束"
+    },
+    "rawQueryBuilder": {
+      "query": "查询",
+      "instruction": "编写 SQL 查询以执行复杂操作。"
     }
   },
   "panel": {
@@ -4603,6 +4630,14 @@
     "lastSuccessfulAt": "上次成功于",
     "lastTrainedAt": "上次训练于",
     "status": "状态",
+    "stateActive": "活跃",
+    "statePaused": "已暂停",
+    "stateFailed": "失败",
+    "summaryActive": "活跃",
+    "summaryPaused": "已暂停",
+    "summaryFailed": "失败",
+    "summaryRecent": "触发 < 15 分钟",
+    "summaryTotal": "总计",
     "numOfEvents": "活动数量",
     "view": "查看",
     "webhook": "Web Hook",
@@ -4779,6 +4814,13 @@
       "id": "身份证",
       "status": "状态",
       "severity": "严重程度",
+      "severityCritical": "P1 · 严重",
+      "severityHigh": "P2 · 高",
+      "severityMedium": "P3 · 中",
+      "severityLow": "P4 · 低",
+      "moreDimensions": "+{count} 更多",
+      "filterAll": "全部",
+      "filterActive": "活跃",
       "alertCount": "告警",
       "firstAlertAt": "第一次告警",
       "lastAlertAt": "最后的告警",
@@ -4829,6 +4871,41 @@
       "rcaInProgress": "正在分析根本原因...",
       "rcaCompleted": "根本原因分析已完成",
       "noRcaYet": "没有根本原因分析可用。点击 “分析” 开始。",
+      "rcaAnalyzeIncident": "分析事件",
+      "rcaAnalyzing": "AI SRE 代理正在分析此事件，请稍候……",
+      "rcaAnalyzingHint": "分析完成后，报告将在此处显示。",
+      "rcaReanalyzing": "AI SRE 代理正在查看自上次分析以来的变化…",
+      "rcaReanalyzingHint": "分析完成后，报告将更新。",
+      "rcaStartedAgo": "{time} 前开始",
+      "rcaCancel": "取消",
+      "rcaCancelling": "取消中…",
+      "rcaCancelled": "分析已取消",
+      "rcaCancelFailed": "取消分析失败",
+      "rcaFailed": "AI 分析失败",
+      "rcaFailedGeneric": "执行 RCA 分析失败",
+      "rcaRetry": "重试分析",
+      "rcaStale": "此分析运行时间异常长，可能已停止。您可以取消并重试。",
+      "rcaStatus": "AI 分析",
+      "rcaStatusAnalyzing": "分析中",
+      "rcaStatusFailed": "失败",
+      "rcaStatusReady": "就绪",
+      "rcaStatusNone": "未分析",
+      "rcaAnalyzedAgo": "{time} 前已分析",
+      "rcaCopy": "复制报告",
+      "rcaCopied": "报告已复制到剪贴板",
+      "rcaCopyFailed": "复制报告失败",
+      "rcaDownload": "下载为 Markdown",
+      "rcaReanalyze": "重新分析",
+      "rcaFreshAnalysis": "全新分析",
+      "rcaFreshAnalysisHint": "从头分析，忽略之前的报告",
+      "rcaBuildOnPrevious": "基于之前的报告",
+      "rcaBuildOnPreviousHint": "发送当前报告以便代理扩展它",
+      "rcaHistory": "报告历史",
+      "rcaHistoryCurrent": "当前",
+      "rcaHistoryEmpty": "没有更早的报告",
+      "rcaHistoryLoadFailed": "加载报告历史失败",
+      "rcaViewingArchived": "您正在查看较早的报告",
+      "rcaBackToCurrent": "返回当前报告",
       "sreChat": "询问SRE助手",
       "goBack": "返回",
       "incident": "事件",
@@ -5438,7 +5515,7 @@
       "modeWorkspace": "收藏夹",
       "workspace": {
         "emptyScratchpadTitle": "您还没有收藏",
-        "emptyScratchpadDesc": "在探索中（卡片上的♥）将指标添加到收藏夹，以在此处收集。当您想保留时，转换为仪表盘。"
+        "emptyScratchpadDesc": "在探索中将指标添加到收藏夹（卡片上的★）以在此处收集它们。当您想保留它们时，转换为仪表板。"
       },
       "visualizePlaceholder": "可视化即将推出——在此处从PromQL查询构建图表。",
       "railsAriaLabel": "指标过滤器",
@@ -5457,7 +5534,8 @@
       "queryFailed": "查询失败",
       "noData": "无数据",
       "noMetrics": "此组织中尚无指标。",
-      "learnIngest": "了解如何摄入指标",
+      "setupIngestion": "设置指标采集",
+      "setupIngestionDesc": "连接指标数据源",
       "noMatch": "没有指标符合当前过滤器",
       "noMatchHint": "尝试移除标签过滤器，清除前缀/后缀选择，或从“有数据”切换到“全部”。",
       "noMatchHintFavorites": "尝试移除标签过滤器，或从“有数据”切换到“全部”。",
@@ -5485,6 +5563,7 @@
         "helpAria": "关于{name}：{help}",
         "refreshAria": "刷新{name}",
         "refreshTooltip": "刷新此指标",
+        "refreshToApplyTimeRange": "刷新以应用所选时间范围",
         "configureAria": "为{name}配置函数",
         "configureTooltip": "配置函数",
         "favoriteAddAria": "将{name}添加到收藏夹",
@@ -5843,7 +5922,18 @@
       "agentIdFields": "代理 ID 备用字段",
       "agentIdHelp": "传入属性用作 gen_ai.agent.id 的备用属性。",
       "agentIdInfo": "仅在标准 gen_ai.agent.id 属性缺失或为空时才选中。每行添加一个传入遥测属性。",
+      "envFields": "环境回退字段",
+      "envHelp": "用作代理环境的传入属性。",
+      "envInfo": "仅在标准 deployment.environment.name 属性缺失或为空时检查。每行添加一个传入的遥测属性。",
+      "versionFields": "版本回退字段",
+      "versionHelp": "用作代理版本的传入属性。",
+      "versionInfo": "仅在标准 gen_ai.agent.version 属性缺失或为空时检查。每行添加一个传入的遥测属性。",
       "fieldsPlaceholder": "代理人姓名\nllm.agent.name",
+      "agentNamePlaceholder": "my.custom.agent_name\nteam.agent.label",
+      "agentIdPlaceholder": "my.custom.agent_id\nteam.agent.uid",
+      "envPlaceholder": "my.custom.env\ntier",
+      "versionPlaceholder": "my.custom.version\nrelease.tag",
+      "alwaysAppliedStandard": "标准（首先检查）：",
       "applyDefaults": "应用默认值",
       "resetToEmpty": "重置为空",
       "clearRegistry": "清除注册表",
@@ -6408,6 +6498,12 @@
     "querySource": "查询来源"
   },
   "traces": {
+    "agentDefaultVariant": "默认",
+    "agentNoEnv": "(无环境)",
+    "agentNoVersion": "(无版本)",
+    "allAgents": "所有代理",
+    "agentCountBadgeSingular": "{count} 个代理",
+    "agentCountBadgePlural": "{count} 个代理",
     "serviceGraph": {
       "searchPlaceholder": "搜索服务",
       "noStreamsDetected": "未检测到任何数据流。确保服务图表指标包含 stream_name 标签。",
@@ -6621,6 +6717,8 @@
     },
     "sessionsList": {
       "streamLabel": "流",
+      "loadingAgents": "正在加载代理…",
+      "loadingStreams": "正在加载流…",
       "noStreamsTooltip": "没有 LLM 数据流可用。",
       "session": "会话",
       "sessions": "会议",
@@ -6635,6 +6733,7 @@
       "loading": "正在加载会话...",
       "tokenTooltip": "输入：{输入} · 输出：{输出} · 总计：{总计}",
       "durationNs": "ns",
+      "errorCountTooltip": "此会话中有 {count} 个错误",
       "unknownUser": "未知用户",
       "columns": {
         "timestamp": "时间戳",
@@ -6865,6 +6964,8 @@
     "lLMInsightsDashboard": {
       "stream": "流",
       "agent": "代理",
+      "compareEntry": "比较版本",
+      "compareEntryHint": "并排比较此代理的两个版本",
       "failedToLoad": "加载 Insights 失败",
       "retry": "重试",
       "noAgentsInRange": "此范围内无代理",
@@ -7153,7 +7254,7 @@
     "skillContentRequired": "技能内容为必填内容",
     "genericConfig": "配置",
     "genericData": "JSON 配置",
-    "genericDataPlaceholder": "{}",
+    "genericDataPlaceholder": "{'{}'}",
     "invalidJson": "必须是有效的 JSON"
   },
   "cipherKey": {
@@ -7711,6 +7812,57 @@
   },
   "aiObservability": {
     "title": "LLM 可观测性",
+    "deltaStrip": {
+      "metricLabel": {
+        "volume": "流量",
+        "errorRate": "错误率",
+        "p50": "P50 延迟",
+        "p95": "P95 延迟",
+        "p99": "P99 延迟",
+        "cost": "每次追踪成本"
+      },
+      "insufficientLabel": "指示性的",
+      "tooltip": {
+        "ciRange": "{level}% 置信区间: {lower} 至 {upper}",
+        "method": "方法: {method}",
+        "associativeHigher": "B 高于 A — 环境不同，因此这是关联性的，并非 B 导致的证明。",
+        "associativeLower": "B 低于 A — 环境不同，因此这是关联性的，并非 B 导致的证明。",
+        "causalRegressed": "在相同的时钟窗口内，B 相对于 A 出现回归。",
+        "causalImproved": "在相同的时钟窗口内，B 相对于 A 有所改进。",
+        "insufficient": "尚无足够样本得出可靠结论 — 请将此差值仅视为指示性数据。",
+        "methodNewcombe": "Wilson/Newcombe 比例置信区间",
+        "methodBootstrap": "自助法重采样"
+      }
+    },
+    "overlayChart": {
+      "seriesA": "版本 A",
+      "seriesB": "版本 B",
+      "xAxisSinceRollout": "上线后小时数",
+      "xAxisWallClock": "时间",
+      "lowResolution": "时间分辨率不足以在此窗口中绘制两个版本 — 缩小日期范围（或切换到“自每次上线以来”）",
+      "xAxisSinceRolloutMinutes": "上线后分钟数",
+      "xAxisSinceRolloutHours": "上线后小时数",
+      "xAxisSinceRolloutDays": "上线后天数",
+      "xAxisWallClockMinutes": "分钟（已过，时钟时间）",
+      "xAxisWallClockHours": "小时（已过，时钟时间）",
+      "xAxisWallClockDays": "天（已过，时钟时间）"
+    },
+    "errorDiff": {
+      "title": "故障变化",
+      "introduced": "引入",
+      "fixed": "已修复",
+      "shared": "共有",
+      "noData": "此窗口中没有可比较的故障数据。",
+      "subtitle": "每个故障类别如何从 {a} 变为 {b}。",
+      "introducedHint": "{b} 中新增",
+      "fixedHint": "{b} 中消失",
+      "sharedHint": "两个版本中都有",
+      "legendA": "A",
+      "legendB": "B",
+      "legendDelta": "Δ",
+      "sharedColHeader": "{a} → {b}",
+      "countIn": "{count} 个在 {version} 中"
+    },
     "sections": {
       "monitor": "监视器",
       "evaluate": "评估"
@@ -7735,13 +7887,17 @@
       "scorers": "创建和管理对 LLM 输出进行评分的记分员",
       "scoreConfigs": "配置评估时使用的评分标准"
     },
+    "scope": {
+      "env": "环境",
+      "agent": "代理",
+      "version": "版本"
+    },
     "agentGraph": {
       "stream": "流",
       "agent": "代理",
       "noAgentsTitle": "未找到代理",
       "noAgentsDescription": "在此时间范围内未发现任何代理。请尝试扩大时间范围，或检查您的追踪是否包含 gen_ai 代理属性。",
-      "agentCountSingular": "代理",
-      "agentCountPlural": "代理"
+      "versionAgnosticHint": "不同版本的拓扑结构相同——图表按环境而非版本划分范围。使用版本比较来比较版本。"
     },
     "kpi": {
       "totalCost": "总成本",
@@ -7796,12 +7952,20 @@
       },
       "loopsTitle": "循环代理",
       "loopsHint": "每个追踪中多次重新运行相同工具的代理",
+      "summaryLoops": "循环代理",
+      "summaryFailures": "故障分类",
+      "summaryAgents": "受影响的代理",
       "failuresTitle": "失败分类",
       "failuresHint": "按种类分组的错误，按代理",
+      "footerLoops": "循环次数",
+      "footerFailures": "故障类别",
       "costTitle": "按代理的成本和失败",
       "costHint": "哪些代理驱动支出和错误",
       "noLoops": "在此范围内未检测到循环行为",
       "noFailures": "在此范围内没有代理失败",
+      "noLoopsForAgent": "在此范围内 {agent} 没有循环行为——请切换代理或扩大时间范围",
+      "noFailuresForAgent": "在此范围内 {agent} 没有故障——请切换代理或扩大时间范围",
+      "scopeLabel": "范围",
       "noCost": "在此范围内没有记录代理成本",
       "unknownAgent": "(未知代理)",
       "colAgent": "代理",
@@ -7822,6 +7986,8 @@
         "worstLoopTraces": "最差追踪（重复最多优先）",
         "topCostTraces": "最耗资源的追踪",
         "noTraces": "未找到此信号的追踪",
+        "footerTraces": "追踪",
+        "footerErrors": "错误",
         "errorsTitle": "错误信息说明",
         "noErrors": "未捕获到错误消息 — 打开追踪进行检查",
         "colTraceId": "追踪",
@@ -7838,6 +8004,39 @@
         "loopExplain": "高重复率通常意味着代理未缓存结果或正在进行重试。打开下面的最差追踪以查看重复调用。",
         "failExplain": "这些是此故障类别背后的实际错误消息 — 阅读它们以找到修复方法，或打开追踪以查看发生位置。",
         "costExplain": "这些追踪导致了该代理的成本。打开最昂贵的追踪以查看运行内容。"
+      }
+    },
+    "versionCompare": {
+      "entry": "比较版本…",
+      "entryDisabledHint": "需要至少此代理的 2 个版本才能比较",
+      "datePickerDisabled": "在此模式下，窗口按版本划分",
+      "sampledNote": "延迟和成本间隔是根据每个版本最多 {cap} 个随机采样的追踪计算的。",
+      "manual": {
+        "windowA": "版本 A 窗口",
+        "windowB": "版本 B 窗口"
+      },
+      "bar": {
+        "versionA": "版本 A",
+        "versionB": "版本 B",
+        "align": "对齐",
+        "alignSinceRollout": "按每次发布",
+        "alignSameWallClock": "相同绝对时间",
+        "alignManual": "手动",
+        "exit": "退出比较",
+        "samePickHint": "选择两个不同的版本进行比较",
+        "autoWindow": "自动: {duration}",
+        "windowLabelA": "版本 A 窗口",
+        "windowLabelB": "版本 B 窗口"
+      },
+      "banner": {
+        "smallSample": "数据太少无法比较——A 有 {nA}，B 有 {nB}。请扩大窗口或等待更多流量。",
+        "disjoint": "这些版本在不同时间运行——差异可能反映流量变化，而非版本本身。",
+        "partial": "这些版本部分并发运行——差异可能部分由各自运行时间解释。"
+      },
+      "windowCard": {
+        "label": "{env} · {version} — {window} · {count} 个追踪",
+        "clamp": "基线仅运行了 {duration}——比较每个版本的第一个 {duration}。",
+        "labelNoEnv": "{version} — {window} · {count} 个追踪"
       }
     }
   },
@@ -7873,6 +8072,32 @@
       "paused": "作业已暂停",
       "activateError": "激活作业失败",
       "pauseError": "暂停作业失败"
+    },
+    "manualEvaluation": {
+      "titles": {
+        "span": "评估跨度",
+        "trace": "评估追踪",
+        "session": "评估会话"
+      },
+      "targetLabels": {
+        "span": "跨度 ID",
+        "trace": "追踪 ID",
+        "session": "会话 ID"
+      },
+      "scopes": {
+        "span": "跨度",
+        "trace": "追踪",
+        "session": "会话"
+      },
+      "description": "选择一个评估作业以针对此目标运行。评估工作器将加载此页面时间范围内的源遥测数据。",
+      "jobLabel": "评估作业",
+      "jobPlaceholder": "选择一个评估作业",
+      "jobRequired": "选择一个评估作业",
+      "noCompatibleJobs": "没有{scope}评估作业使用{stream}追踪流。",
+      "loadJobsError": "加载评估作业失败。",
+      "run": "运行评估",
+      "queued": "已排队 {count} 个评估任务。",
+      "runError": "排队评估失败。"
     },
     "tabs": {
       "quality": "质量",
@@ -8084,6 +8309,7 @@
       "degraded": "已降级",
       "archived": "已存档"
     },
+    "summaryAll": "全部",
     "buttons": {
       "cancel": "取消",
       "close": "关闭",
@@ -8094,17 +8320,13 @@
     },
     "scorerTypeDialog": {
       "title": "创建新的评分器",
-      "intro": "选择评分器类型。选择你想要的评分方式并运行它。",
+      "intro": "选择评分器类型。两者都是一等选项——选择适合您编写和运行的方式。",
       "llmJudgeTitle": "LLM评分器",
       "llmJudgeDescription": "使用配置的提供商进行语义评估。",
       "llmJudgeCta": "配置评判器",
       "remoteTitle": "远程评分器",
       "remoteDescription": "调用自己的 HTTP 端点进行评分。",
-      "remoteCta": "配置端点",
-      "codeTitle": "代码评分器",
-      "codeDescription": "即将推出。",
-      "codeCta": "将在未来版本中提供",
-      "comingSoonBadge": "即将推出"
+      "remoteCta": "配置端点"
     },
     "provider": {
       "backTo": "返回提供商",
@@ -8407,48 +8629,6 @@
       "healthyLabel": "健康：",
       "typeLabel": "类型：",
       "promptVariablesLabel": "此提示中的变量：",
-      "promptVariableGuide": {
-        "title": "可用的提示变量",
-        "description": "这些变量可用于上述提示。每个变量如何填充取决于评估作业评估的内容。",
-        "columns": {
-          "variable": "提示变量"
-        },
-        "scopes": {
-          "span": "跨度",
-          "trace": "追踪",
-          "session": "会话"
-        },
-        "statuses": {
-          "jobMapped": "在评估作业中映射",
-          "systemProvided": "系统提供",
-          "requiresSelector": "系统提供 · 需要跨度选择器",
-          "selectorRequired": "需要跨度选择器",
-          "unavailable": "不可用"
-        },
-        "variables": {
-          "inputOutput": {
-            "span": "将这些映射到包含输入和输出的跨度字段。",
-            "trace": "来自追踪根跨度的输入和输出。",
-            "session": "不可用 — 会话没有单一的输入或输出。"
-          },
-          "statistics": {
-            "span": "在评估单个跨度时，像其他评分变量一样映射此名称。",
-            "trace": "跟踪指标：跨度计数、持续时间、LLM 和工具调用、错误、令牌和成本。",
-            "session": "会话指标：跟踪和轮次计数、持续时间和错误。"
-          },
-          "spans": {
-            "span": "在评估单个跨度时，像其他评分变量一样映射此名称。",
-            "trace": "由评估任务的跨度选择器选择的跟踪跨度子集（已过滤）。",
-            "session": "不适用于会话。"
-          },
-          "steps": {
-            "span": "在评估单个跨度时，像其他评分变量一样映射此名称。",
-            "trace": "按时间顺序排列的跨度；当跟踪很长时，中间部分会折叠。",
-            "session": "按时间顺序排列的跟踪，表示为对话轮次。"
-          }
-        },
-        "indexDescription": "{spansVar} 和 {stepsVar} 以 JSON 数组形式提供。引用整个变量 — 不支持像 {indexedVar} 这样的索引访问。"
-      },
       "identitySection": "身份",
       "judgeSection": "LLM配置",
       "endpointSection": "网址",
@@ -8592,23 +8772,6 @@
         "samplingAll": "评估每个匹配项",
         "samplingRate": "按比率随机采样",
         "samplingCount": "前 N 个匹配项",
-        "manualSection": "手动评估",
-        "manualHelp": "将此任务的评分器排入一个明确的目标。手动运行绕过自动采样，并在评分元数据上记录原因。",
-        "manualTargetIdLabel": "目标 ID",
-        "manualSpanIdLabel": "跨度 ID",
-        "manualSpanIdPlaceholder": "span_id",
-        "manualTraceIdLabel": "跟踪 ID",
-        "manualTraceIdPlaceholder": "trace_id",
-        "manualSessionIdLabel": "会话 ID",
-        "manualSessionIdPlaceholder": "session_id",
-        "manualReasonLabel": "原因",
-        "manualReasonPlaceholder": "您为什么要重新运行此目标？",
-        "manualVariablesLabel": "变量 JSON",
-        "manualVariablesObjectError": "变量必须是 JSON 对象",
-        "manualTargetRequired": "目标 ID 为必填项",
-        "manualSubmit": "运行手动评估",
-        "manualSuccess": "已排队 {count} 项评估任务",
-        "manualError": "手动评估失败",
         "metadataSection": "元数据",
         "versionLabel": "版本",
         "pipelineLabel": "管道 ID",
@@ -8770,20 +8933,27 @@
       "inputMapping": {
         "title": "提示变量",
         "hint": {
-          "span": "将每个变量映射到提供其值的跨度字段。",
-          "trace": "跟踪值自动填充。将其他任何内容映射到跨度字段。",
-          "session": "会话值自动填充。将其他任何内容映射到跨度字段。"
+          "span": "将每个变量映射到跨度属性。",
+          "trace": "将每个变量映射到系统提供的值或跨度属性。",
+          "session": "将每个变量映射到系统提供的值或跨度属性。"
+        },
+        "placeholder": "选择一个值",
+        "searchPlaceholder": "搜索系统值和跨度属性…",
+        "groups": {
+          "systemProvided": "系统提供的值 · 对于此作业评估的每个{scope}",
+          "spanAttributes": "跨度属性"
         },
         "selectScorers": "选择评分器来配置他们的映射。",
         "noVariables": "此评分器没有模板变量可供映射。",
         "variableCount": "{count} 变量",
         "systemProvided": {
-          "title": "{scope} 变量",
-          "description": "OpenObserve 从 {scope} 本身提供这些值。评分器提示可以直接使用它们，无需映射。",
+          "about": "关于系统提供的值",
+          "title": "{scope} 系统值",
+          "description": "OpenObserve 为此作业评估的每个{scope}单独构建这些值。在映射评分器的提示变量时，将它们用作源。",
           "badge": "系统提供",
           "selectorRequired": "需要跨度选择器",
           "columns": {
-            "variable": "提示变量",
+            "variable": "值",
             "source": "来源",
             "description": "提供的值"
           },
@@ -8830,7 +9000,7 @@
           "fields": "为自定义模式至少选择一个字段。",
           "maximumSpans": "最大跨度数必须为正整数。",
           "budget": "所选字段的跨度过多。减少跨度数量，或读取更少的字段。",
-          "binding": "为每个评分器选择一个跨度选择器。"
+          "binding": "为每个使用追踪跨度的评分器选择一个跨度选择器。"
         }
       },
       "preview": {
@@ -8868,6 +9038,8 @@
       "saveError": "无法保存评测任务",
       "createdAndActivated": "评估作业已创建并激活",
       "createdButActivateFailed": "评估作业已创建，但激活失败",
+      "savedAndActivated": "评估作业已保存并激活",
+      "savedButActivateFailed": "评估作业已保存，但激活失败",
       "validation": {
         "nameRequired": "Job name is required",
         "streamRequired": "A stream is required",
@@ -9294,6 +9466,44 @@
     "lastRefreshed": "上次刷新时间：{时间}"
   },
   "synthetics": {
+    "tokens": {
+      "title": "合成令牌",
+      "explanation": "组织级的 o2syn_ 令牌，您的私有代理在拉取作业时用于认证。公共（Lambda）位置自动使用默认令牌；创建一个命名令牌并将其嵌入区域的代理中，以限定该区域的爆炸半径。",
+      "summary": "您的私有代理用于拉取作业的令牌。",
+      "rotateDefaultBtn": "轮换默认",
+      "createTokenBtn": "创建令牌",
+      "searchPlaceholder": "搜索令牌",
+      "default": "默认",
+      "tokenNameLabel": "名称",
+      "tokenNamePlaceholder": "us-east",
+      "tokenNameHint": "以区域或站点命名，然后通过设置命令将其嵌入该区域的代理中。",
+      "tokenColumn": "令牌",
+      "agentsColumn": "代理",
+      "createdBy": "创建者",
+      "createTokenTitle": "创建合成令牌",
+      "newTokenRevealed": "新令牌 — 立即复制",
+      "rawTokenLabel": "令牌（仅显示一次）",
+      "installHint": "粘贴到代理设置命令中：--token=<token>",
+      "installCmdLabel": "安装命令（包含令牌）",
+      "installCmdHint": "在代理主机上运行此命令。令牌已内置 — 将<location-name>替换为您的区域位置。它将不再显示。",
+      "copyCmdBtn": "复制命令",
+      "copyTokenBtn": "复制令牌",
+      "copiedToast": "令牌已复制到剪贴板",
+      "disableDefaultBlocked": "默认令牌无法禁用 — 请先轮换它",
+      "nameReserved": "'default' 已保留 — 使用轮换来替换默认令牌",
+      "fetchError": "加载令牌失败",
+      "createSuccess": "令牌已创建",
+      "createError": "创建令牌失败",
+      "rotateSuccess": "默认令牌已轮换 — 旧令牌在您禁用它之前保持有效",
+      "rotateError": "轮换令牌失败",
+      "enabledSuccess": "令牌已启用",
+      "disabledSuccess": "令牌已禁用",
+      "updateError": "更新令牌失败",
+      "empty": {
+        "title": "没有合成令牌",
+        "description": "创建一个命名令牌来限定区域代理的范围，或使用组织默认令牌。"
+      }
+    },
     "authNetwork": {
       "addCookie": "添加 Cookie",
       "addHeader": "添加标头",
@@ -9671,12 +9881,15 @@
       "assertions": "断言",
       "assertionsFailed": "失败",
       "assertionsPassed": "通过",
+      "assertionsNotEvaluated": "未评估",
+      "assertionsNotEvaluatedHint": "请求从未返回响应，因此未进行任何断言。",
       "certExpires": "过期 {date}",
       "completed": "已完成",
       "daysRemaining": "剩余 {days} 天",
       "error": "错误",
       "failed": "失败",
       "init": "初始化",
+      "loading": "加载运行详情",
       "location": "位置",
       "notFound": "未找到运行",
       "passed": "通过",
@@ -9708,7 +9921,7 @@
       "clearFiltersDesc": "移除所有活动过滤器",
       "device": "设备",
       "duration": "持续时间",
-      "editMonitor": "编辑监视器",
+      "editCheck": "编辑检查",
       "error": "错误",
       "failed": "失败",
       "failedRuns": "运行失败",
@@ -10091,6 +10304,11 @@
         "browserNote": "浏览器测试目前无法从私有位置运行 — 仅支持协议检查（HTTP、TCP、TLS、SSH）。",
         "locationNameLabel": "位置名称",
         "locationNamePlaceholder": "公司总部",
+        "typeTitle": "此代理运行的内容",
+        "typeProtocol": "网络",
+        "typeBrowser": "浏览器",
+        "typeProtocolHint": "HTTP、TCP、TLS 和 SSH 检查。运行 Go 代理 — Docker、Kubernetes、Linux 或 Windows。",
+        "typeBrowserHint": "浏览器旅程。运行 Playwright 镜像 — 仅限 Docker 或 Kubernetes。",
         "tabDocker": "Docker",
         "tabK8s": "Kubernetes",
         "tabLinux": "Linux",
@@ -10108,6 +10326,7 @@
         "agentsSubtitle": "代理从您的基础设施中自行注册，在此处为只读。",
         "agentName": "代理",
         "recoverAgent": "恢复此代理 — 复制预填名称的设置命令",
+        "restartConfig": "重启配置 — 复制此代理的设置命令以重新运行安装/ Docker 重启（例如在令牌轮换后）",
         "noAgents": "尚无代理为此位置注册。",
         "checksTitle": "从此位置运行的检查",
         "checkName": "名称",

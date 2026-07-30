@@ -364,6 +364,8 @@
   },
   "common": {
     "beta": "베타",
+    "play": "재생",
+    "pause": "일시 정지",
     "close": "닫기",
     "cancel": "취소",
     "ok": "확인",
@@ -514,7 +516,9 @@
     "fillRequiredFields": "필수 필드를 입력해 주세요",
     "test": "테스트",
     "username": "사용자 이름",
-    "password": "비밀번호"
+    "password": "비밀번호",
+    "field": "필드",
+    "enterValueOrVariable": "값 또는 $variable 입력"
   },
   "flow": {
     "stepPicker": {
@@ -905,9 +909,13 @@
     "language": "언어",
     "actions": "액션",
     "keyboardShortcuts": "키보드 단축키",
-    "synthetic": "Synthetics"
+    "synthetic": "Synthetics",
+    "experience": "경험"
   },
   "rum": {
+    "noSessionReplay": "세션 재생 불가",
+    "seek": "찾기",
+    "playbackSpeed": "재생 속도",
     "title": "실제 사용자 모니터링",
     "subtitle": "실제 사용자 세션, 오류 및 프론트엔드 성능 모니터링",
     "issueColumn": "이슈",
@@ -1016,6 +1024,7 @@
     "desktop": "데스크톱",
     "mobile": "핸드폰",
     "tablet": "타블렛",
+    "platform": "플랫폼",
     "vsPreviousPeriod": "이전 기간과 비교",
     "seeSessions": "세션 보기",
     "openErrorTracking": "오류 추적에서 열기",
@@ -1652,6 +1661,8 @@
     "object": "오브젝트",
     "serviceAccounts": "서비스 계정",
     "ingestionTokens": "인제스트 토큰",
+    "syntheticsTokens": "신세틱스 토큰",
+    "syntheticsTokensDesc": "조직 수준의 o2syn_ 토큰으로, 개인 신세틱스 에이전트가 작업을 가져오는 데 사용합니다.",
     "serviceAccountsName": "서비스 계정 이름",
     "basicUsers": "유저",
     "organizationMembers": "조직 구성원",
@@ -2081,7 +2092,6 @@
     "search": "워크플로우 검색",
     "refresh": "워크플로우 새로고침",
     "trigger": "트리거",
-    "triggerAlertFired": "알림 발생",
     "steps": "단계",
     "status": "상태",
     "updated": "업데이트됨",
@@ -2133,13 +2143,21 @@
       "cta": "워크플로 만들기",
       "soonCta": "향후 릴리스에서 사용 가능",
       "comingSoon": "곧 출시",
-      "soon": "곧",
-      "alertFired": "알림 실행됨",
-      "alertFiredDesc": "알림이 실행될 때 실행",
-      "schedule": "일정",
-      "scheduleDesc": "일정에 따라 실행",
-      "webhook": "웹훅",
-      "webhookDesc": "수신 웹훅에서 실행"
+      "soon": "곧"
+    },
+    "triggerKind": {
+      "alertFired": {
+        "label": "알림 실행됨",
+        "node": "알림 트리거",
+        "desc": "알림이 실행될 때 실행",
+        "intro": "연결된 알림이 실행되면 모든 다운스트림 단계가 이 페이로드를 수신합니다."
+      },
+      "incidentEvent": {
+        "label": "인시던트 이벤트",
+        "node": "인시던트 트리거",
+        "desc": "인시던트 라이프사이클 이벤트에서 실행",
+        "intro": "인시던트 이벤트가 발생하면 모든 다운스트림 단계가 이 페이로드를 수신합니다."
+      }
     },
     "triggerMeta": {
       "orgId": "알림이 속한 조직 ID.",
@@ -2178,9 +2196,6 @@
       "skipped": "건너뜀",
       "errorsN": "{count}개 오류",
       "runError": "테스트를 실행할 수 없습니다.",
-      "saveToTestTitle": "저장 및 테스트",
-      "saveToTestBody": "테스트는 저장된 버전의 워크플로를 실행합니다. 먼저 변경 사항을 저장하시겠습니까?",
-      "saveAndTest": "저장 및 테스트",
       "stepResult": {
         "viewHint": "입력/출력을 보려면 클릭",
         "input": "입력",
@@ -2227,7 +2242,6 @@
       "kindTrigger": "트리거",
       "kindLogic": "로직",
       "kindAction": "액션",
-      "alertTrigger": "알림 트리거",
       "condition": "조건",
       "function": "함수",
       "sendToDestination": "대상",
@@ -2252,7 +2266,6 @@
       "triggerAlertsNone": "이 조직에서 알림을 찾을 수 없습니다.",
       "triggerAlertsError": "알림을 불러올 수 없음",
       "triggerNote": "이 워크플로는 선택한 알림 중 하나가 실행될 때 실행됩니다.",
-      "triggerPayloadIntro": "연결된 알림이 실행되면 모든 다운스트림 단계가 이 페이로드를 수신합니다.",
       "triggerStructureTitle": "페이로드 구조",
       "triggerStructureHint": "세부 정보를 보려면 필드 위로 마우스를 가져가세요.",
       "triggerDetailHint": "위의 필드 위로 마우스를 가져가거나 포커스하여 해당 유형과 의미를 확인하세요.",
@@ -2261,6 +2274,10 @@
       "triggerDataBlock": "data[] · 알림 행",
       "triggerDataColumns": "결과 열",
       "triggerDataExampleNote": "예시일 뿐 — 실제 열은 알림 쿼리에서 가져옵니다.",
+      "incidentEventTypeLabel": "이벤트 유형",
+      "incidentCommonTitle": "공통 필드 (모든 이벤트)",
+      "incidentSpecificTitle": "이벤트별 필드",
+      "incidentNoExtraFields": "이 이벤트는 공통 필드 외에 추가 필드가 없습니다.",
       "triggerDataBlockNote": "일치하는 각 레코드당 하나의 객체를 포함하는 배열입니다. 열은 알림 자체 쿼리에서 가져오므로 알림마다 다릅니다. data[].<column>으로 참조하세요.",
       "conditionBody": "분기할 규칙 설정",
       "conditionBodySet": "규칙에 따라 분기",
@@ -2399,7 +2416,7 @@
     "periodGreaterThanZero": "기간은 0보다 커야 합니다",
     "frequencyGreaterThanSeconds": "빈도는 {seconds}초보다 커야 합니다.",
     "minimumFrequencyMinutes": "최소 빈도는 {minutes}분이어야 합니다",
-    "streamSelectionNameInvalid": "공백 없이 영숫자와 '+=,.@-_' 문자만 사용하세요.",
+    "streamSelectionNameInvalid": "Use alphanumeric and '+=,.{'@'}-_' characters only, without spaces.",
     "functionAlreadyAssociated": "함수가 이미 연결되어 있습니다",
     "atLeastOneCondition": "조건을 하나 이상 추가하세요",
     "fillAllConditionFields": "모든 조건 필드를 입력하세요(열, 연산자, 값은 필수입니다)",
@@ -2602,6 +2619,9 @@
     "resetRUMTokenLabel": "RUM 토큰 초기화",
     "generateRUMTokenLabel": "RUM 토큰 생성",
     "generateRUMTokenMessage": "RUM 토큰을 생성하여 조직에 RUM을 활성화하십시오.",
+    "rumPlatform": "플랫폼",
+    "rumPlatformBrowser": "브라우저",
+    "rumPlatformReactNative": "React Native",
     "npmStepTitle": "NPM 설치 방법",
     "recommendedLabel": "추천합니다",
     "customLabel": "커스텀",
@@ -2836,7 +2856,7 @@
     "addToFavorites": "즐겨찾기에 추가",
     "removeFromFavorites": "즐겨찾기에서 제거",
     "noFavoritesTitle": "아직 즐겨찾는 대시보드가 없습니다",
-    "noFavoritesMessage": "모든 폴더에서 대시보드의 하트 아이콘을 클릭하면 여기에 표시됩니다.",
+    "noFavoritesMessage": "대시보드에서 별표 아이콘을 클릭하면 모든 폴더에서 여기에서 볼 수 있습니다.",
     "moreActions": "추가 작업",
     "save": "저장",
     "cancel": "취소",
@@ -3673,7 +3693,8 @@
       "clause": "절 {number}",
       "selectOperation": "연산 선택",
       "addAnotherClause": "다른 절 추가",
-      "removeClause": "절 제거"
+      "removeClause": "절 제거",
+      "addClause": "절 추가"
     },
     "viewDashboard": {
       "refreshToApplyVariables": "최신 변수 변경 사항을 적용하려면 새로고침하세요.",
@@ -3700,7 +3721,9 @@
       "add": "추가",
       "value": "값",
       "markAsNonTimestamp": "이 필드를 타임스탬프가 아닌 것으로 표시",
-      "renderDataAsJson": "데이터를 JSON / 배열로 렌더링"
+      "renderDataAsJson": "데이터를 JSON / 배열로 렌더링",
+      "sortBy": "정렬 기준",
+      "havingHint": "집계 필터"
     },
     "customChartTypeSelector": {
       "exampleOfCustomCharts": "사용자 정의 차트 예시",
@@ -3911,6 +3934,10 @@
       "addedSuccessfully": "대시보드가 성공적으로 추가되었습니다.",
       "creationFailed": "대시보드 생성 실패",
       "filesFailedValidation": "{count}개 파일이 유효성 검사 제약 조건을 통과하지 못했습니다."
+    },
+    "rawQueryBuilder": {
+      "query": "쿼리",
+      "instruction": "복잡한 작업을 위해 SQL 쿼리를 작성하세요."
     }
   },
   "panel": {
@@ -4603,6 +4630,14 @@
     "lastSuccessfulAt": "마지막 성공 날짜",
     "lastTrainedAt": "마지막 교육 날짜",
     "status": "상태",
+    "stateActive": "활성",
+    "statePaused": "일시 중지됨",
+    "stateFailed": "실패",
+    "summaryActive": "활성",
+    "summaryPaused": "일시 중지됨",
+    "summaryFailed": "실패",
+    "summaryRecent": "15분 미만 실행됨",
+    "summaryTotal": "전체",
     "numOfEvents": "이벤트 개수",
     "view": "보기",
     "webhook": "웹 후크",
@@ -4779,6 +4814,13 @@
       "id": "신분증",
       "status": "상태",
       "severity": "심각도",
+      "severityCritical": "P1 · 심각",
+      "severityHigh": "P2 · 높음",
+      "severityMedium": "P3 · 중간",
+      "severityLow": "P4 · 낮음",
+      "moreDimensions": "+{count}개 더",
+      "filterAll": "모두",
+      "filterActive": "활성",
       "alertCount": "알림",
       "firstAlertAt": "첫 번째 경고",
       "lastAlertAt": "마지막 알림",
@@ -4829,6 +4871,41 @@
       "rcaInProgress": "근본 원인 분석 중...",
       "rcaCompleted": "근본 원인 분석 완료",
       "noRcaYet": "근본 원인 분석이 없습니다.시작하려면 '분석'을 클릭하세요.",
+      "rcaAnalyzeIncident": "인시던트 분석",
+      "rcaAnalyzing": "AI SRE 에이전트가 이 인시던트를 분석 중입니다. 기다려 주세요…",
+      "rcaAnalyzingHint": "분석이 완료되면 보고서가 여기에 표시됩니다.",
+      "rcaReanalyzing": "AI SRE 에이전트가 마지막 분석 이후 변경된 사항을 확인 중입니다…",
+      "rcaReanalyzingHint": "분석이 완료되면 보고서가 업데이트됩니다.",
+      "rcaStartedAgo": "{time} 전에 시작됨",
+      "rcaCancel": "취소",
+      "rcaCancelling": "취소 중…",
+      "rcaCancelled": "분석 취소됨",
+      "rcaCancelFailed": "분석 취소 실패",
+      "rcaFailed": "AI 분석 실패",
+      "rcaFailedGeneric": "RCA 분석 수행 실패",
+      "rcaRetry": "분석 재시도",
+      "rcaStale": "이 분석이 비정상적으로 오래 실행 중이며 중단되었을 수 있습니다. 취소하고 다시 시도할 수 있습니다.",
+      "rcaStatus": "AI 분석",
+      "rcaStatusAnalyzing": "분석 중",
+      "rcaStatusFailed": "실패",
+      "rcaStatusReady": "준비",
+      "rcaStatusNone": "분석되지 않음",
+      "rcaAnalyzedAgo": "{time} 전에 분석됨",
+      "rcaCopy": "보고서 복사",
+      "rcaCopied": "클립보드에 보고서가 복사되었습니다",
+      "rcaCopyFailed": "보고서 복사 실패",
+      "rcaDownload": "Markdown으로 다운로드",
+      "rcaReanalyze": "재분석",
+      "rcaFreshAnalysis": "새 분석",
+      "rcaFreshAnalysisHint": "이전 보고서를 무시하고 처음부터 분석",
+      "rcaBuildOnPrevious": "이전 보고서 기반으로 진행",
+      "rcaBuildOnPreviousHint": "에이전트가 확장할 수 있도록 현재 보고서 보내기",
+      "rcaHistory": "보고서 기록",
+      "rcaHistoryCurrent": "현재",
+      "rcaHistoryEmpty": "이전 보고서 없음",
+      "rcaHistoryLoadFailed": "보고서 기록 로드 실패",
+      "rcaViewingArchived": "이전 보고서를 보고 있습니다",
+      "rcaBackToCurrent": "현재 보고서로 돌아가기",
       "sreChat": "SRE 도우미에게 문의",
       "goBack": "뒤로 가기",
       "incident": "인시던트",
@@ -5438,7 +5515,7 @@
       "modeWorkspace": "즐겨찾기",
       "workspace": {
         "emptyScratchpadTitle": "아직 즐겨찾기가 없습니다",
-        "emptyScratchpadDesc": "탐색에서 메트릭을 즐겨찾기에 추가(카드의 ♥)하여 여기에 모으세요. 유지하려면 대시보드로 변환하세요."
+        "emptyScratchpadDesc": "Explore에서 즐겨찾기에 메트릭을 추가(카드의 ★)하여 여기에 수집하세요. 유지하려면 대시보드로 변환하세요."
       },
       "visualizePlaceholder": "시각화 기능이 곧 제공됩니다 — 바로 여기서 PromQL 쿼리로 차트를 만드세요.",
       "railsAriaLabel": "메트릭 필터",
@@ -5457,7 +5534,8 @@
       "queryFailed": "쿼리 실패",
       "noData": "데이터 없음",
       "noMetrics": "이 조직에 아직 메트릭이 없습니다.",
-      "learnIngest": "메트릭 수집 방법 알아보기",
+      "setupIngestion": "메트릭 수집 설정",
+      "setupIngestionDesc": "메트릭 데이터 소스 연결",
       "noMatch": "현재 필터와 일치하는 메트릭이 없습니다",
       "noMatchHint": "라벨 필터를 제거하거나, 접두사/접미사 선택을 지우거나, \"데이터 있음\"에서 \"전체\"로 전환해 보세요.",
       "noMatchHintFavorites": "레이블 필터를 제거하거나 “With data”에서 “All”로 전환해 보십시오.",
@@ -5485,6 +5563,7 @@
         "helpAria": "{name} 정보: {help}",
         "refreshAria": "{name} 새로고침",
         "refreshTooltip": "이 메트릭 새로고침",
+        "refreshToApplyTimeRange": "선택한 시간 범위를 적용하려면 새로고침",
         "configureAria": "{name}에 대한 함수 구성",
         "configureTooltip": "함수 구성",
         "favoriteAddAria": "{name}을(를) 즐겨찾기에 추가",
@@ -5843,7 +5922,18 @@
       "agentIdFields": "에이전트 ID 폴백 필드",
       "agentIdHelp": "gen_ai.agent.id의 폴백으로 사용할 수신 속성입니다.",
       "agentIdInfo": "표준 gen_ai.agent.id 속성이 없거나 비어 있는 경우에만 확인합니다.수신되는 텔레메트리 속성을 한 줄에 하나씩 추가합니다.",
+      "envFields": "환경 폴백 필드",
+      "envHelp": "에이전트 환경으로 사용할 수신 속성입니다.",
+      "envInfo": "표준 deployment.environment.name 속성이 없거나 비어 있을 때만 확인됩니다. 한 줄에 하나의 수신 텔레메트리 속성을 추가하세요.",
+      "versionFields": "버전 폴백 필드",
+      "versionHelp": "에이전트 버전으로 사용할 수신 속성입니다.",
+      "versionInfo": "표준 gen_ai.agent.version 속성이 없거나 비어 있을 때만 확인됩니다. 한 줄에 하나의 수신 텔레메트리 속성을 추가하세요.",
       "fieldsPlaceholder": "에이전트 이름\nllm.agent.name",
+      "agentNamePlaceholder": "my.custom.agent_name\nteam.agent.label",
+      "agentIdPlaceholder": "my.custom.agent_id\nteam.agent.uid",
+      "envPlaceholder": "my.custom.env\ntier",
+      "versionPlaceholder": "my.custom.version\nrelease.tag",
+      "alwaysAppliedStandard": "표준 (먼저 확인됨):",
       "applyDefaults": "기본값 적용",
       "resetToEmpty": "빈 상태로 재설정",
       "clearRegistry": "레지스트리 지우기",
@@ -6408,6 +6498,12 @@
     "querySource": "쿼리 소스"
   },
   "traces": {
+    "agentDefaultVariant": "기본값",
+    "agentNoEnv": "(환경 없음)",
+    "agentNoVersion": "(버전 없음)",
+    "allAgents": "모든 에이전트",
+    "agentCountBadgeSingular": "{count} 에이전트",
+    "agentCountBadgePlural": "{count} 에이전트",
     "serviceGraph": {
       "searchPlaceholder": "검색 서비스",
       "noStreamsDetected": "스트림이 감지되지 않았습니다.서비스 그래프 메트릭에 stream_name 레이블이 포함되어 있는지 확인하세요.",
@@ -6621,6 +6717,8 @@
     },
     "sessionsList": {
       "streamLabel": "스트림",
+      "loadingAgents": "에이전트 로딩 중…",
+      "loadingStreams": "스트림 로딩 중…",
       "noStreamsTooltip": "LLM 스트림을 사용할 수 없습니다.",
       "session": "세션",
       "sessions": "세션",
@@ -6635,6 +6733,7 @@
       "loading": "세션 로드 중...",
       "tokenTooltip": "입력: {입력} · 출력: {출력} · 합계: {합계}",
       "durationNs": "ns",
+      "errorCountTooltip": "이 세션에서 {count}개의 오류",
       "unknownUser": "알 수 없는 사용자",
       "columns": {
         "timestamp": "타임스탬프",
@@ -6865,6 +6964,8 @@
     "lLMInsightsDashboard": {
       "stream": "스트림",
       "agent": "에이전트",
+      "compareEntry": "버전 비교",
+      "compareEntryHint": "이 에이전트의 두 버전을 나란히 비교",
       "failedToLoad": "인사이트 로드 실패",
       "retry": "재시도",
       "noAgentsInRange": "이 범위에 에이전트 없음",
@@ -7153,7 +7254,7 @@
     "skillContentRequired": "스킬 콘텐츠 필수",
     "genericConfig": "구성",
     "genericData": "JSON 구성",
-    "genericDataPlaceholder": "{}",
+    "genericDataPlaceholder": "{'{}'}",
     "invalidJson": "유효한 JSON이어야 합니다."
   },
   "cipherKey": {
@@ -7711,6 +7812,57 @@
   },
   "aiObservability": {
     "title": "LLM 옵저버빌리티",
+    "deltaStrip": {
+      "metricLabel": {
+        "volume": "볼륨",
+        "errorRate": "오류율",
+        "p50": "P50 지연 시간",
+        "p95": "P95 지연 시간",
+        "p99": "P99 지연 시간",
+        "cost": "트레이스당 비용"
+      },
+      "insufficientLabel": "지표적",
+      "tooltip": {
+        "ciRange": "{level}% CI: {lower} ~ {upper}",
+        "method": "방법: {method}",
+        "associativeHigher": "B가 A보다 높음 — 환경이 다르므로 이는 연관성일 뿐, B가 원인이라는 증거는 아닙니다.",
+        "associativeLower": "B가 A보다 낮음 — 환경이 다르므로 이는 연관성일 뿐, B가 원인이라는 증거는 아닙니다.",
+        "causalRegressed": "같은 실제 시간 범위에서 B가 A보다 성능이 저하됨.",
+        "causalImproved": "같은 실제 시간 범위에서 B가 A보다 성능이 개선됨.",
+        "insufficient": "확실한 결론을 내리기에는 샘플이 충분하지 않음 — 이 차이는 참고용으로만 간주하십시오.",
+        "methodNewcombe": "Wilson/Newcombe 비율 CI",
+        "methodBootstrap": "부트스트랩 재표본추출"
+      }
+    },
+    "overlayChart": {
+      "seriesA": "버전 A",
+      "seriesB": "버전 B",
+      "xAxisSinceRollout": "출시 후 시간",
+      "xAxisWallClock": "시간",
+      "lowResolution": "이 창에서 두 버전을 모두 표시할 시간 해상도가 충분하지 않습니다 — 날짜 범위를 좁히거나 (또는 “각 출시 이후”로 전환)하십시오.",
+      "xAxisSinceRolloutMinutes": "출시 후 시간 (분)",
+      "xAxisSinceRolloutHours": "출시 후 시간 (시간)",
+      "xAxisSinceRolloutDays": "출시 후 시간 (일)",
+      "xAxisWallClockMinutes": "분 (경과, 실제 시간)",
+      "xAxisWallClockHours": "시간 (경과, 실제 시간)",
+      "xAxisWallClockDays": "일 (경과, 실제 시간)"
+    },
+    "errorDiff": {
+      "title": "실패 변경 사항",
+      "introduced": "도입됨",
+      "fixed": "수정됨",
+      "shared": "공유됨",
+      "noData": "이 창에서 비교할 실패 데이터가 없습니다.",
+      "subtitle": "각 실패 클래스가 {a}에서 {b}로 어떻게 변경되었는지.",
+      "introducedHint": "{b}에서 새로 발생",
+      "fixedHint": "{b}에서 사라짐",
+      "sharedHint": "두 버전 모두에 있음",
+      "legendA": "A",
+      "legendB": "B",
+      "legendDelta": "Δ",
+      "sharedColHeader": "{a} → {b}",
+      "countIn": "{count} (버전 {version})"
+    },
     "sections": {
       "monitor": "모니터",
       "evaluate": "평가"
@@ -7735,13 +7887,17 @@
       "scorers": "LLM 결과를 채점하는 채점자 생성 및 관리",
       "scoreConfigs": "평가에 사용되는 채점 루브릭을 구성합니다."
     },
+    "scope": {
+      "env": "환경",
+      "agent": "에이전트",
+      "version": "버전"
+    },
     "agentGraph": {
       "stream": "스트림",
       "agent": "에이전트",
       "noAgentsTitle": "에이전트를 찾을 수 없음",
       "noAgentsDescription": "이 시간 범위에서 에이전트를 찾을 수 없습니다. 시간 범위를 넓히거나 추적에 gen_ai 에이전트 속성이 포함되어 있는지 확인하세요.",
-      "agentCountSingular": "에이전트",
-      "agentCountPlural": "에이전트들"
+      "versionAgnosticHint": "토폴로지는 버전 간에 동일합니다 — 그래프는 환경별로 범위가 지정되며, 버전별로 지정되지 않습니다. 버전 비교를 사용하여 버전을 비교하세요."
     },
     "kpi": {
       "totalCost": "총 비용",
@@ -7796,12 +7952,20 @@
       },
       "loopsTitle": "루핑 에이전트",
       "loopsHint": "트레이스당 동일한 도구를 여러 번 재실행하는 에이전트",
+      "summaryLoops": "루핑 에이전트",
+      "summaryFailures": "오류 분류",
+      "summaryAgents": "영향받은 에이전트",
       "failuresTitle": "실패 분류",
       "failuresHint": "에이전트별로 종류별로 그룹화된 오류",
+      "footerLoops": "루프",
+      "footerFailures": "오류 클래스",
       "costTitle": "에이전트별 비용 및 실패",
       "costHint": "어떤 에이전트가 지출과 오류를 유발하는지",
       "noLoops": "이 범위에서 루핑 동작이 감지되지 않음",
       "noFailures": "이 범위에서 에이전트 실패 없음",
+      "noLoopsForAgent": "이 범위에서 {agent}에 대한 루핑 동작 없음 — 에이전트를 변경하거나 시간 범위를 넓히세요.",
+      "noFailuresForAgent": "이 범위에서 {agent}에 대한 오류 없음 — 에이전트를 변경하거나 시간 범위를 넓히세요.",
+      "scopeLabel": "범위",
       "noCost": "이 범위에서 에이전트 비용 기록 없음",
       "unknownAgent": "(알 수 없는 에이전트)",
       "colAgent": "에이전트",
@@ -7822,6 +7986,8 @@
         "worstLoopTraces": "최악의 트레이스 (반복 순)",
         "topCostTraces": "가장 비용이 많이 드는 트레이스",
         "noTraces": "이 신호에 대한 트레이스가 없습니다",
+        "footerTraces": "트레이스",
+        "footerErrors": "오류",
         "errorsTitle": "오류가 나타내는 것",
         "noErrors": "캡처된 오류 메시지가 없습니다 — 검사할 트레이스를 열어보세요",
         "colTraceId": "트레이스",
@@ -7838,6 +8004,39 @@
         "loopExplain": "반복률이 높다는 것은 일반적으로 에이전트가 결과를 캐싱하지 않거나 재시도 중임을 의미합니다. 아래의 최악의 트레이스를 열어 반복된 호출을 확인하세요.",
         "failExplain": "이것들은 이 실패 클래스의 실제 오류 메시지입니다 — 수정 방법을 찾으려면 읽어보거나, 발생 위치를 보려면 트레이스를 여세요.",
         "costExplain": "이 트레이스들이 이 에이전트의 비용을 발생시켰습니다. 가장 비용이 많이 드는 트레이스를 열어 실행된 내용을 확인하세요."
+      }
+    },
+    "versionCompare": {
+      "entry": "버전 비교…",
+      "entryDisabledHint": "비교하려면 이 에이전트의 버전이 최소 2개 필요합니다.",
+      "datePickerDisabled": "이 모드에서는 윈도우가 버전별로 있습니다.",
+      "sampledNote": "지연 시간 및 비용 간격은 버전당 최대 {cap}개의 무작위 샘플링된 트레이스에서 계산됩니다.",
+      "manual": {
+        "windowA": "버전 A 윈도우",
+        "windowB": "버전 B 윈도우"
+      },
+      "bar": {
+        "versionA": "버전 A",
+        "versionB": "버전 B",
+        "align": "정렬",
+        "alignSinceRollout": "각 롤아웃 이후",
+        "alignSameWallClock": "동일한 실제 시간",
+        "alignManual": "수동",
+        "exit": "비교 종료",
+        "samePickHint": "비교할 두 개의 다른 버전을 선택하세요.",
+        "autoWindow": "자동: {duration}",
+        "windowLabelA": "버전 A 윈도우",
+        "windowLabelB": "버전 B 윈도우"
+      },
+      "banner": {
+        "smallSample": "비교하기에 데이터가 너무 적습니다 — A에 {nA}, B에 {nB} 있습니다. 윈도우를 넓히거나 더 많은 트래픽을 기다리세요.",
+        "disjoint": "이 버전들은 다른 시간에 실행되었습니다 — 차이는 버전 자체가 아닌 트래픽 변화를 반영할 수 있습니다.",
+        "partial": "이 버전들은 부분적으로 동시에 실행되었습니다 — 차이는 각각 실행된 시점에 의해 부분적으로 설명될 수 있습니다."
+      },
+      "windowCard": {
+        "label": "{env} · {version} — {window} · {count} 트레이스",
+        "clamp": "기준선은 {duration}만 실행되었습니다 — 각 버전의 첫 {duration}을 비교합니다.",
+        "labelNoEnv": "{version} — {window} · {count} 트레이스"
       }
     }
   },
@@ -7873,6 +8072,32 @@
       "paused": "작업이 일시 중지되었습니다",
       "activateError": "작업 활성화 실패",
       "pauseError": "작업 일시 중지 실패"
+    },
+    "manualEvaluation": {
+      "titles": {
+        "span": "스팬 평가",
+        "trace": "트레이스 평가",
+        "session": "세션 평가"
+      },
+      "targetLabels": {
+        "span": "스팬 ID",
+        "trace": "트레이스 ID",
+        "session": "세션 ID"
+      },
+      "scopes": {
+        "span": "스팬",
+        "trace": "트레이스",
+        "session": "세션"
+      },
+      "description": "이 대상에 대해 실행할 평가 작업을 선택하세요. 평가 작업자는 이 페이지의 시간 범위에서 소스 텔레메트리를 로드합니다.",
+      "jobLabel": "평가 작업",
+      "jobPlaceholder": "평가 작업 선택",
+      "jobRequired": "평가 작업 선택",
+      "noCompatibleJobs": "{scope} 평가 작업 중 {stream} 트레이스 스트림을 사용하는 작업이 없습니다.",
+      "loadJobsError": "평가 작업을 불러오지 못했습니다.",
+      "run": "평가 실행",
+      "queued": "{count}개의 평가 작업이 대기열에 추가되었습니다.",
+      "runError": "평가 대기열 추가에 실패했습니다."
     },
     "tabs": {
       "quality": "품질",
@@ -8084,6 +8309,7 @@
       "degraded": "저하됨",
       "archived": "보관됨"
     },
+    "summaryAll": "모두",
     "buttons": {
       "cancel": "취소",
       "close": "닫기",
@@ -8094,17 +8320,13 @@
     },
     "scorerTypeDialog": {
       "title": "새 채점자 생성",
-      "intro": "채점자 유형을 선택합니다.작성하려는 방식에 맞는 것을 골라 실행하세요.",
+      "intro": "스코어 유형을 선택하세요. 두 가지 모두 일급 옵션입니다. 작성 및 실행 방식에 맞는 것을 선택하세요.",
       "llmJudgeTitle": "LLM 심사위원",
       "llmJudgeDescription": "구성된 공급자를 사용하여 의미론적으로 평가합니다.",
       "llmJudgeCta": "심사자 구성",
       "remoteTitle": "리모트",
       "remoteDescription": "자체 HTTP 엔드포인트를 호출하여 점수를 매기세요.",
-      "remoteCta": "엔드포인트 구성",
-      "codeTitle": "코드",
-      "codeDescription": "곧 출시될 예정입니다.",
-      "codeCta": "향후 릴리스에서 제공 예정",
-      "comingSoonBadge": "곧 제공 예정"
+      "remoteCta": "엔드포인트 구성"
     },
     "provider": {
       "backTo": "제공업체로 돌아가기",
@@ -8407,48 +8629,6 @@
       "healthyLabel": "정상:",
       "typeLabel": "유형:",
       "promptVariablesLabel": "이 프롬프트의 변수:",
-      "promptVariableGuide": {
-        "title": "사용 가능한 프롬프트 변수",
-        "description": "이 변수들은 위의 프롬프트에서 사용할 수 있습니다. 각 변수가 어떻게 채워지는지는 Eval Job이 평가하는 대상에 따라 다릅니다.",
-        "columns": {
-          "variable": "프롬프트 변수"
-        },
-        "scopes": {
-          "span": "스팬",
-          "trace": "트레이스",
-          "session": "세션"
-        },
-        "statuses": {
-          "jobMapped": "Eval Job에서 매핑",
-          "systemProvided": "시스템 제공",
-          "requiresSelector": "시스템 제공 · 스팬 선택기 필요",
-          "selectorRequired": "스팬 선택기 필요",
-          "unavailable": "사용 불가"
-        },
-        "variables": {
-          "inputOutput": {
-            "span": "입력과 출력을 보유한 스팬 필드에 매핑하세요.",
-            "trace": "트레이스의 루트 스팬에서 가져온 입력 및 출력.",
-            "session": "사용 불가 — 세션에는 단일 입력 또는 출력이 없습니다."
-          },
-          "statistics": {
-            "span": "단일 스팬을 평가할 때 다른 스코어 변수와 마찬가지로 이 이름을 매핑하십시오.",
-            "trace": "트레이스 메트릭: 스팬 수, 기간, LLM 및 도구 호출, 오류, 토큰, 비용.",
-            "session": "세션 메트릭: 트레이스 및 턴 수, 기간, 오류."
-          },
-          "spans": {
-            "span": "단일 스팬을 평가할 때 다른 스코어 변수와 마찬가지로 이 이름을 매핑하십시오.",
-            "trace": "평가 작업의 스팬 선택기로 선택된 트레이스 스팬의 필터링된 하위 집합입니다.",
-            "session": "세션에는 사용할 수 없습니다."
-          },
-          "steps": {
-            "span": "단일 스팬을 평가할 때 다른 스코어 변수와 마찬가지로 이 이름을 매핑하십시오.",
-            "trace": "시간 순서의 스팬; 트레이스가 매우 길면 중간이 접힙니다.",
-            "session": "시간 순서의 트레이스, 대화 턴으로 표현됩니다."
-          }
-        },
-        "indexDescription": "{spansVar} 및 {stepsVar}는 JSON 배열로 도착합니다. 전체 변수를 참조하십시오 — {indexedVar}와 같은 인덱스 접근은 지원되지 않습니다."
-      },
       "identitySection": "정체성",
       "judgeSection": "심사위원 구성",
       "endpointSection": "끝점",
@@ -8592,23 +8772,6 @@
         "samplingAll": "모든 일치 항목 평가",
         "samplingRate": "비율로 무작위 샘플링",
         "samplingCount": "처음 N개 일치 항목",
-        "manualSection": "수동 평가",
-        "manualHelp": "이 작업의 스코어를 하나의 명시적 대상에 대해 대기열에 추가합니다. 수동 실행은 자동 샘플링을 우회하고 점수 메타데이터에 이유를 기록합니다.",
-        "manualTargetIdLabel": "대상 ID",
-        "manualSpanIdLabel": "스팬 ID",
-        "manualSpanIdPlaceholder": "span_id",
-        "manualTraceIdLabel": "트레이스 ID",
-        "manualTraceIdPlaceholder": "trace_id",
-        "manualSessionIdLabel": "세션 ID",
-        "manualSessionIdPlaceholder": "session_id",
-        "manualReasonLabel": "이유",
-        "manualReasonPlaceholder": "이 대상을 다시 실행하는 이유는 무엇입니까?",
-        "manualVariablesLabel": "변수 JSON",
-        "manualVariablesObjectError": "변수는 JSON 객체여야 합니다.",
-        "manualTargetRequired": "대상 ID가 필요합니다.",
-        "manualSubmit": "수동 평가 실행",
-        "manualSuccess": "대기열에 추가된 {count}개 평가 작업",
-        "manualError": "수동 평가 실패",
         "metadataSection": "메타데이터",
         "versionLabel": "버전",
         "pipelineLabel": "파이프라인 ID",
@@ -8770,20 +8933,27 @@
       "inputMapping": {
         "title": "프롬프트 변수",
         "hint": {
-          "span": "각 변수를 값을 제공하는 스팬 필드에 매핑합니다.",
-          "trace": "트레이스 값은 자동으로 채워집니다. 다른 것은 스팬 필드에 매핑하세요.",
-          "session": "세션 값은 자동으로 채워집니다. 다른 것은 스팬 필드에 매핑하세요."
+          "span": "각 변수를 스팬 속성에 매핑하세요.",
+          "trace": "각 변수를 시스템 제공 값 또는 스팬 속성에 매핑하세요.",
+          "session": "각 변수를 시스템 제공 값 또는 스팬 속성에 매핑하세요."
+        },
+        "placeholder": "값 선택",
+        "searchPlaceholder": "시스템 값 및 스팬 속성 검색…",
+        "groups": {
+          "systemProvided": "시스템 제공 값 · 이 작업이 평가하는 각 {scope}에 대해",
+          "spanAttributes": "스팬 속성"
         },
         "selectScorers": "매핑을 구성할 채점자를 선택합니다.",
         "noVariables": "이 채점기에는 매핑할 템플릿 변수가 없습니다.",
         "variableCount": "{개수} 개 변수",
         "systemProvided": {
-          "title": "{scope} 변수",
-          "description": "OpenObserve는 {scope} 자체에서 이러한 값을 제공합니다. 스코어러 프롬프트는 매핑 없이 직접 사용할 수 있습니다.",
+          "about": "시스템 제공 값 정보",
+          "title": "{scope} 시스템 값",
+          "description": "OpenObserve는 이 작업이 평가하는 각 {scope}에 대해 이러한 값을 별도로 구축합니다. 스코어의 프롬프트 변수를 매핑할 때 소스로 사용하세요.",
           "badge": "시스템 제공",
           "selectorRequired": "스팬 선택기 필요",
           "columns": {
-            "variable": "프롬프트 변수",
+            "variable": "값",
             "source": "소스",
             "description": "제공된 값"
           },
@@ -8830,7 +9000,7 @@
           "fields": "사용자 정의 스키마에 대해 최소 하나의 필드를 선택하세요.",
           "maximumSpans": "최대 스팬 수는 양의 정수여야 합니다.",
           "budget": "선택한 필드에 비해 스팬이 너무 많습니다. 스팬 수를 줄이거나 더 적은 필드를 읽으세요.",
-          "binding": "각 점수 계산기에 대해 스팬 선택기를 선택하세요."
+          "binding": "트레이스 스팬을 사용하는 각 스코어에 대해 스팬 선택기를 선택하세요."
         }
       },
       "preview": {
@@ -8868,6 +9038,8 @@
       "saveError": "평가 작업을 저장하지 못했습니다.",
       "createdAndActivated": "평가 작업이 생성되고 활성화되었습니다",
       "createdButActivateFailed": "평가 작업이 생성되었으나 활성화에 실패했습니다",
+      "savedAndActivated": "평가 작업이 저장되고 활성화되었습니다.",
+      "savedButActivateFailed": "평가 작업이 저장되었지만 활성화에 실패했습니다.",
       "validation": {
         "nameRequired": "Job name is required",
         "streamRequired": "A stream is required",
@@ -9294,6 +9466,44 @@
     "lastRefreshed": "마지막 새로 고침: {time}"
   },
   "synthetics": {
+    "tokens": {
+      "title": "신세틱스 토큰",
+      "explanation": "조직 수준의 o2syn_ 토큰입니다. 비공개 에이전트가 작업을 가져올 때 인증에 사용합니다. 공개(Lambda) 위치는 기본 토큰을 자동으로 사용합니다. 명명된 토큰을 생성하여 지역의 에이전트에 포함시키면 해당 지역의 영향 범위를 제한할 수 있습니다.",
+      "summary": "비공개 에이전트가 작업을 가져오는 데 사용하는 토큰입니다.",
+      "rotateDefaultBtn": "기본 토큰 교체",
+      "createTokenBtn": "토큰 생성",
+      "searchPlaceholder": "토큰 검색",
+      "default": "기본",
+      "tokenNameLabel": "이름",
+      "tokenNamePlaceholder": "us-east",
+      "tokenNameHint": "지역 또는 사이트 이름으로 지정한 후 설정 명령을 통해 해당 지역의 에이전트에 포함시키세요.",
+      "tokenColumn": "토큰",
+      "agentsColumn": "에이전트",
+      "createdBy": "생성자",
+      "createTokenTitle": "신세틱스 토큰 생성",
+      "newTokenRevealed": "새 토큰 — 지금 복사하세요",
+      "rawTokenLabel": "토큰 (한 번만 표시됨)",
+      "installHint": "에이전트 설정 명령에 붙여넣으세요: --token=<token>",
+      "installCmdLabel": "설치 명령 (토큰 포함)",
+      "installCmdHint": "에이전트 호스트에서 실행하세요. 토큰이 내장되어 있습니다. <location-name>을 사용자 위치로 바꾸세요. 다시 표시되지 않습니다.",
+      "copyCmdBtn": "명령 복사",
+      "copyTokenBtn": "토큰 복사",
+      "copiedToast": "토큰이 클립보드에 복사되었습니다.",
+      "disableDefaultBlocked": "기본 토큰은 비활성화할 수 없습니다. 먼저 교체하세요.",
+      "nameReserved": "'default'는 예약되어 있습니다. Rotate를 사용하여 기본 토큰을 교체하세요.",
+      "fetchError": "토큰을 불러오지 못했습니다.",
+      "createSuccess": "토큰이 생성되었습니다.",
+      "createError": "토큰 생성에 실패했습니다.",
+      "rotateSuccess": "기본 토큰이 순환되었습니다 — 기존 토큰은 비활성화할 때까지 유효합니다.",
+      "rotateError": "토큰 순환 실패",
+      "enabledSuccess": "토큰 활성화됨",
+      "disabledSuccess": "토큰 비활성화됨",
+      "updateError": "토큰 업데이트 실패",
+      "empty": {
+        "title": "신세틱 토큰 없음",
+        "description": "명명된 토큰을 생성하여 지역 에이전트를 범위 지정하거나 조직 기본값을 사용하십시오."
+      }
+    },
     "authNetwork": {
       "addCookie": "쿠키 추가",
       "addHeader": "헤더 추가",
@@ -9671,12 +9881,15 @@
       "assertions": "어설션",
       "assertionsFailed": "실패",
       "assertionsPassed": "통과",
+      "assertionsNotEvaluated": "평가되지 않음",
+      "assertionsNotEvaluatedHint": "요청이 응답을 반환하지 않았으므로 아무것도 확인되지 않았습니다.",
       "certExpires": "만료 {date}",
       "completed": "완료됨",
       "daysRemaining": "{days}일 남음",
       "error": "오류",
       "failed": "실패",
       "init": "초기화",
+      "loading": "실행 세부 정보 로딩 중",
       "location": "위치",
       "notFound": "실행을 찾을 수 없음",
       "passed": "통과",
@@ -9708,7 +9921,7 @@
       "clearFiltersDesc": "모든 활성 필터 제거",
       "device": "기기",
       "duration": "지속",
-      "editMonitor": "모니터 편집",
+      "editCheck": "검사 편집",
       "error": "오류",
       "failed": "실패",
       "failedRuns": "실패한 실행",
@@ -10091,6 +10304,11 @@
         "browserNote": "브라우저 테스트는 아직 개인 위치에서 실행할 수 없습니다 — 프로토콜 검사만 가능합니다(HTTP, TCP, TLS, SSH).",
         "locationNameLabel": "위치 이름",
         "locationNamePlaceholder": "회사 본사",
+        "typeTitle": "이 에이전트가 실행하는 작업",
+        "typeProtocol": "네트워크",
+        "typeBrowser": "브라우저",
+        "typeProtocolHint": "HTTP, TCP, TLS 및 SSH 검사를 수행합니다. Go 에이전트를 실행합니다 — Docker, Kubernetes, Linux 또는 Windows.",
+        "typeBrowserHint": "브라우저 여정을 수행합니다. Playwright 이미지를 실행합니다 — Docker 또는 Kubernetes에서만 가능합니다.",
         "tabDocker": "Docker",
         "tabK8s": "Kubernetes",
         "tabLinux": "Linux",
@@ -10108,6 +10326,7 @@
         "agentsSubtitle": "에이전트는 인프라에서 자체 등록되며 여기서는 읽기 전용입니다.",
         "agentName": "에이전트",
         "recoverAgent": "이 에이전트 복구 — 이름이 미리 채워진 설정 명령을 복사하세요",
+        "restartConfig": "설정 재시작 — 이 에이전트의 설정 명령을 복사하여 설치/도커 재시작을 다시 실행하십시오 (예: 토큰 순환 후)",
         "noAgents": "이 위치에 등록된 에이전트가 아직 없습니다.",
         "checksTitle": "이 위치에서 실행 중인 검사",
         "checkName": "이름",

@@ -364,6 +364,8 @@
   },
   "common": {
     "beta": "Beta",
+    "play": "Oynat",
+    "pause": "Duraklat",
     "close": "Kapat",
     "cancel": "İptal",
     "ok": "Tamam.",
@@ -514,7 +516,9 @@
     "fillRequiredFields": "Lütfen gerekli alanları doldurun",
     "test": "Test",
     "username": "Kullanıcı adı",
-    "password": "Şifre"
+    "password": "Şifre",
+    "field": "Alan",
+    "enterValueOrVariable": "Değer veya $variable girin"
   },
   "flow": {
     "stepPicker": {
@@ -905,9 +909,13 @@
     "language": "Dil",
     "actions": "Eylemler",
     "keyboardShortcuts": "Klavye Kısayolları",
-    "synthetic": "Sentetikler"
+    "synthetic": "Sentetikler",
+    "experience": "Deneyim"
   },
   "rum": {
+    "noSessionReplay": "Kullanılabilir oturum tekrarı yok",
+    "seek": "Ara",
+    "playbackSpeed": "Oynatma hızı",
     "title": "Gerçek Kullanıcı İzleme",
     "subtitle": "Gerçek kullanıcı oturumlarını, hataları ve ön uç performansını izleyin",
     "issueColumn": "Sorun",
@@ -1016,6 +1024,7 @@
     "desktop": "Masaüstü",
     "mobile": "Mobil",
     "tablet": "Tablet",
+    "platform": "Platform",
     "vsPreviousPeriod": "önceki döneme göre",
     "seeSessions": "Oturumları görün",
     "openErrorTracking": "Hata İzlemede Aç",
@@ -1652,6 +1661,8 @@
     "object": "Nesne",
     "serviceAccounts": "Hizmet Hesapları",
     "ingestionTokens": "Yutma Jetonları",
+    "syntheticsTokens": "Synthetics Tokenları",
+    "syntheticsTokensDesc": "Kuruluş düzeyinde o2syn_ tokenları, özel sentetik aracılarınızın işleri çekmek için kullandığı",
     "serviceAccountsName": "Hizmet Hesapları Adı",
     "basicUsers": "Kullanıcılar",
     "organizationMembers": "Organizasyon Üyeleri",
@@ -2081,7 +2092,6 @@
     "search": "İş Akışlarını Ara",
     "refresh": "İş Akışlarını Yenile",
     "trigger": "Tetikleyici",
-    "triggerAlertFired": "Uyarı Tetiklendi",
     "steps": "Adımlar",
     "status": "Durum",
     "updated": "Güncellendi",
@@ -2133,13 +2143,21 @@
       "cta": "İş Akışı Oluştur",
       "soonCta": "Gelecek Bir Sürümde Mevcut",
       "comingSoon": "Çok Yakında",
-      "soon": "Yakında",
-      "alertFired": "Uyarı Tetiklendi",
-      "alertFiredDesc": "Bir Uyarı Tetiklendiğinde Çalıştır",
-      "schedule": "Zamanlama",
-      "scheduleDesc": "Bir Zamanlamayla Çalıştır",
-      "webhook": "Webhook",
-      "webhookDesc": "Gelen Webhook Üzerinde Çalıştır"
+      "soon": "Yakında"
+    },
+    "triggerKind": {
+      "alertFired": {
+        "label": "Uyarı Tetiklendi",
+        "node": "Uyarı Tetikleyicisi",
+        "desc": "Bir uyarı tetiklendiğinde çalıştır",
+        "intro": "Bağlı bir uyarı tetiklendiğinde, her alt akış adımı bu yükü alır."
+      },
+      "incidentEvent": {
+        "label": "Olay Etkinliği",
+        "node": "Olay Tetikleyicisi",
+        "desc": "Bir olay yaşam döngüsü etkinliğinde çalıştır",
+        "intro": "Bir olay etkinliği meydana geldiğinde, her alt akış adımı bu yükü alır."
+      }
     },
     "triggerMeta": {
       "orgId": "Uyarının ait olduğu Organizasyon Kimliği.",
@@ -2178,9 +2196,6 @@
       "skipped": "Atlandı",
       "errorsN": "{count} hata",
       "runError": "Test çalıştırılamıyor.",
-      "saveToTestTitle": "Kaydet ve Test Et",
-      "saveToTestBody": "Test, bu iş akışının kaydedilmiş sürümünü çalıştırır. Önce değişikliklerinizi kaydedin.",
-      "saveAndTest": "Kaydet ve Test Et",
       "stepResult": {
         "viewHint": "Giriş/Çıkışı Görüntülemek İçin Tıklayın",
         "input": "Giriş",
@@ -2227,7 +2242,6 @@
       "kindTrigger": "Tetikleyici",
       "kindLogic": "Mantık",
       "kindAction": "Eylem",
-      "alertTrigger": "Uyarı Tetikleyicisi",
       "condition": "Koşul",
       "function": "Fonksiyon",
       "sendToDestination": "Hedef",
@@ -2252,7 +2266,6 @@
       "triggerAlertsNone": "Bu Organizasyonda Uyarı Bulunamadı.",
       "triggerAlertsError": "Uyarılar Yüklenemiyor",
       "triggerNote": "Bu İş Akışı, Seçilen Uyarılardan Herhangi Biri Tetiklendiğinde Çalışır.",
-      "triggerPayloadIntro": "Bağlı bir uyarı tetiklendiğinde, her alt akış adımı bu yükü alır.",
       "triggerStructureTitle": "Yük Yapısı",
       "triggerStructureHint": "Detaylar İçin Bir Alanın Üzerine Gel",
       "triggerDetailHint": "Türünü ve Anlamını Görmek İçin Yukarıdaki Bir Alanın Üzerine Gel veya Odaklan.",
@@ -2261,6 +2274,10 @@
       "triggerDataBlock": "data[] · Uyarınızın Satırları",
       "triggerDataColumns": "Sonuç Sütunları",
       "triggerDataExampleNote": "Yalnızca örnek — gerçek sütunlar uyarınızın sorgusundan gelir.",
+      "incidentEventTypeLabel": "Etkinlik Türü",
+      "incidentCommonTitle": "Ortak Alanlar (Her Etkinlik)",
+      "incidentSpecificTitle": "Etkinliğe Özel Alanlar",
+      "incidentNoExtraFields": "Bu etkinlik, ortak olanların ötesinde alan eklemez.",
       "triggerDataBlockNote": "Eşleşen her kayıt için bir nesne içeren bir dizi. Sütunları uyarının kendi sorgusundan gelir, bu nedenle uyarıya göre değişir — onlara data[].<column> olarak başvurun.",
       "conditionBody": "Dallanma Kuralı Ayarla",
       "conditionBodySet": "Bir Kurala Göre Dallanır",
@@ -2399,7 +2416,7 @@
     "periodGreaterThanZero": "Süre 0'dan büyük olmalıdır",
     "frequencyGreaterThanSeconds": "Sıklık {seconds} saniyeden büyük olmalıdır.",
     "minimumFrequencyMinutes": "Minimum sıklık {minutes} dakika olmalıdır",
-    "streamSelectionNameInvalid": "Yalnızca alfanümerik karakterler ve '+=,.@-_' kullanın, boşluk kullanmayın.",
+    "streamSelectionNameInvalid": "Yalnızca alfanümerik ve '+=,.{'@'}-_' karakterlerini kullanın, boşluksuz.",
     "functionAlreadyAssociated": "İşlev zaten ilişkilendirilmiş",
     "atLeastOneCondition": "Lütfen en az bir koşul ekleyin",
     "fillAllConditionFields": "Lütfen tüm koşul alanlarını doldurun (sütun, operatör ve değer gereklidir)",
@@ -2602,6 +2619,9 @@
     "resetRUMTokenLabel": "RUM Jetonunu Sıfırla",
     "generateRUMTokenLabel": "RUM Token Oluştur",
     "generateRUMTokenMessage": "Kuruluşunuz için RUM'u etkinleştirmek için RUM Token oluşturun.",
+    "rumPlatform": "Platform",
+    "rumPlatformBrowser": "Tarayıcı",
+    "rumPlatformReactNative": "React Native",
     "npmStepTitle": "NPM Kurulum Yöntemi",
     "recommendedLabel": "Önerilen",
     "customLabel": "Özel",
@@ -2836,7 +2856,7 @@
     "addToFavorites": "Favorilere ekle",
     "removeFromFavorites": "Favorilerden kaldır",
     "noFavoritesTitle": "Henüz favori pano yok",
-    "noFavoritesMessage": "Herhangi bir panodaki kalp simgesine tıklayarak tüm klasörlerde burada görebilirsiniz.",
+    "noFavoritesMessage": "Herhangi bir gösterge panosundaki yıldız simgesine tıklayarak tüm klasörlerde burada görebilirsiniz.",
     "moreActions": "Daha fazla eylem",
     "save": "Kaydet",
     "cancel": "İptal",
@@ -3673,7 +3693,8 @@
       "clause": "Cümle {number}",
       "selectOperation": "İşlem Seç",
       "addAnotherClause": "Başka bir cümle ekle",
-      "removeClause": "Cümleyi kaldır"
+      "removeClause": "Cümleyi kaldır",
+      "addClause": "Koşul ekle"
     },
     "viewDashboard": {
       "refreshToApplyVariables": "En son değişken değişikliklerini uygulamak için yenileyin",
@@ -3700,7 +3721,9 @@
       "add": "Ekle",
       "value": "Değer",
       "markAsNonTimestamp": "Bu alanı zaman damgası olmayan olarak işaretle",
-      "renderDataAsJson": "Veriyi JSON / Dizi olarak işle"
+      "renderDataAsJson": "Veriyi JSON / Dizi olarak işle",
+      "sortBy": "Sıralama Ölçütü",
+      "havingHint": "Toplam üzerinde filtrele"
     },
     "customChartTypeSelector": {
       "exampleOfCustomCharts": "Özel grafik örneği",
@@ -3911,6 +3934,10 @@
       "addedSuccessfully": "Pano başarıyla eklendi.",
       "creationFailed": "Pano oluşturma başarısız.",
       "filesFailedValidation": "{count} dosya doğrulama kısıtlamalarını geçemedi"
+    },
+    "rawQueryBuilder": {
+      "query": "Sorgu",
+      "instruction": "Karmaşık işlemler için bir SQL sorgusu yazın."
     }
   },
   "panel": {
@@ -4603,6 +4630,14 @@
     "lastSuccessfulAt": "Son Başarılı Şurada",
     "lastTrainedAt": "En son eğitildi",
     "status": "Durum",
+    "stateActive": "Aktif",
+    "statePaused": "Duraklatıldı",
+    "stateFailed": "Başarısız",
+    "summaryActive": "Aktif",
+    "summaryPaused": "Duraklatıldı",
+    "summaryFailed": "Başarısız",
+    "summaryRecent": "Tetiklenmiş < 15d",
+    "summaryTotal": "Toplam",
     "numOfEvents": "Etkinlik Sayısı",
     "view": "Görünüm",
     "webhook": "Web Kancası",
@@ -4779,6 +4814,13 @@
       "id": "KİMLİK",
       "status": "Durum",
       "severity": "Şiddeti",
+      "severityCritical": "P1 · Kritik",
+      "severityHigh": "P2 · Yüksek",
+      "severityMedium": "P3 · Orta",
+      "severityLow": "P4 · Düşük",
+      "moreDimensions": "+{count} daha",
+      "filterAll": "Tümü",
+      "filterActive": "Aktif",
       "alertCount": "Uyarılar",
       "firstAlertAt": "İlk Uyarı",
       "lastAlertAt": "Son Uyarı",
@@ -4829,6 +4871,41 @@
       "rcaInProgress": "Kök nedeni analiz etmek...",
       "rcaCompleted": "Kök neden analizi tamamlandı",
       "noRcaYet": "Kök neden analizi mevcut değildir. Başlamak için 'Analiz Et'i tıklayın.",
+      "rcaAnalyzeIncident": "Olayı Analiz Et",
+      "rcaAnalyzing": "AI SRE Agent bu olayı analiz ediyor, lütfen bekleyin…",
+      "rcaAnalyzingHint": "Analiz tamamlandığında rapor burada görünecektir.",
+      "rcaReanalyzing": "AI SRE Ajanı, son analizden bu yana neyin değiştiğini inceliyor…",
+      "rcaReanalyzingHint": "Analiz tamamlandığında rapor güncellenecektir.",
+      "rcaStartedAgo": "{time} önce başlatıldı",
+      "rcaCancel": "İptal",
+      "rcaCancelling": "İptal ediliyor…",
+      "rcaCancelled": "Analiz iptal edildi",
+      "rcaCancelFailed": "Analiz iptal edilemedi",
+      "rcaFailed": "AI analizi başarısız oldu",
+      "rcaFailedGeneric": "RCA analizi gerçekleştirilemedi",
+      "rcaRetry": "Analizi yeniden dene",
+      "rcaStale": "Bu analiz alışılmadık şekilde uzun süredir çalışıyor ve durmuş olabilir. İptal edip tekrar deneyebilirsiniz.",
+      "rcaStatus": "AI Analizi",
+      "rcaStatusAnalyzing": "Analiz ediliyor",
+      "rcaStatusFailed": "Başarısız",
+      "rcaStatusReady": "Hazır",
+      "rcaStatusNone": "Analiz edilmedi",
+      "rcaAnalyzedAgo": "{time} önce analiz edildi",
+      "rcaCopy": "Raporu kopyala",
+      "rcaCopied": "Rapor panoya kopyalandı",
+      "rcaCopyFailed": "Rapor kopyalanamadı",
+      "rcaDownload": "Markdown olarak indir",
+      "rcaReanalyze": "Yeniden analiz et",
+      "rcaFreshAnalysis": "Taze analiz",
+      "rcaFreshAnalysisHint": "Önceki raporu yok sayarak sıfırdan analiz et",
+      "rcaBuildOnPrevious": "Önceki raporun üzerine inşa et",
+      "rcaBuildOnPreviousHint": "Ajanın genişletmesi için mevcut raporu gönder",
+      "rcaHistory": "Rapor geçmişi",
+      "rcaHistoryCurrent": "Mevcut",
+      "rcaHistoryEmpty": "Daha önceki rapor yok",
+      "rcaHistoryLoadFailed": "Rapor geçmişi yüklenemedi",
+      "rcaViewingArchived": "Daha önceki bir raporu görüntülüyorsunuz",
+      "rcaBackToCurrent": "Mevcut rapora dön",
       "sreChat": "SRE Asistanına Sor",
       "goBack": "Geri Dön",
       "incident": "Olay",
@@ -5438,7 +5515,7 @@
       "modeWorkspace": "Favoriler",
       "workspace": {
         "emptyScratchpadTitle": "Henüz favoriniz yok",
-        "emptyScratchpadDesc": "Metrikleri favorilerinize eklemek için Keşfet'te (karttaki ♥) kullanın. Bunları saklamak istediğinizde, bir panoya dönüştürün."
+        "emptyScratchpadDesc": "Metrikleri toplamak için Explore'da (bir karttaki ★) favorilerinize ekleyin. Bunları saklamak istediğinizde, bir panele dönüştürün."
       },
       "visualizePlaceholder": "Görselleştir yakında geliyor — burada bir PromQL sorgusundan grafik oluşturun.",
       "railsAriaLabel": "Metrik filtreleri",
@@ -5457,7 +5534,8 @@
       "queryFailed": "Sorgu başarısız",
       "noData": "Veri yok",
       "noMetrics": "Bu kuruluşta henüz metrik yok.",
-      "learnIngest": "Metrik alma hakkında bilgi edinin",
+      "setupIngestion": "Metrik alımını ayarla",
+      "setupIngestionDesc": "Bir metrik veri kaynağı bağla",
       "noMatch": "Mevcut filtrelerle eşleşen metrik yok",
       "noMatchHint": "Bir etiket filtresini kaldırmayı, ön ek/son ek seçimlerini temizlemeyi veya “Veri ile”den “Tümü”ne geçmeyi deneyin.",
       "noMatchHintFavorites": "Bir etiket filtresini kaldırmayı veya \"Veriyle\"den \"Tümü\"ne geçmeyi deneyin.",
@@ -5485,6 +5563,7 @@
         "helpAria": "{name} hakkında: {help}",
         "refreshAria": "{name} yenile",
         "refreshTooltip": "Bu metriği yenile",
+        "refreshToApplyTimeRange": "Seçilen zaman aralığını uygulamak için yenile",
         "configureAria": "{name} için fonksiyonu yapılandır",
         "configureTooltip": "Fonksiyonu yapılandır",
         "favoriteAddAria": "{name} favorilerinize ekleyin",
@@ -5843,7 +5922,18 @@
       "agentIdFields": "Ajan Kimliği geri dönüş alanları",
       "agentIdHelp": "gen_ai.agent.id için yedek olarak kullanılacak gelen öznitelikler.",
       "agentIdInfo": "Yalnızca standart gen_ai.agent.id özniteliği eksik veya boş olduğunda kontrol edilir. Satır başına bir gelen telemetri özelliği ekleyin.",
+      "envFields": "Ortam geri dönüş alanları",
+      "envHelp": "Ajanın ortamı olarak kullanılacak gelen öznitelikler.",
+      "envInfo": "Yalnızca standart deployment.environment.name özniteliği eksik veya boş olduğunda kontrol edilir. Satır başına bir gelen telemetri özniteliği ekleyin.",
+      "versionFields": "Sürüm geri dönüş alanları",
+      "versionHelp": "Ajanın sürümü olarak kullanılacak gelen öznitelikler.",
+      "versionInfo": "Yalnızca standart gen_ai.agent.version özniteliği eksik veya boş olduğunda kontrol edilir. Satır başına bir gelen telemetri özniteliği ekleyin.",
       "fieldsPlaceholder": "ajanın adı\nllm.agent.adı",
+      "agentNamePlaceholder": "my.custom.agent_name\nteam.agent.label",
+      "agentIdPlaceholder": "my.custom.agent_id\nteam.agent.uid",
+      "envPlaceholder": "my.custom.env\ntier",
+      "versionPlaceholder": "my.custom.version\nrelease.tag",
+      "alwaysAppliedStandard": "Standart (önce kontrol edilen):",
       "applyDefaults": "Varsayılanları uygula",
       "resetToEmpty": "Boşa sıfırla",
       "clearRegistry": "Kayıt defterini temizle",
@@ -6408,6 +6498,12 @@
     "querySource": "Sorgu Kaynağı"
   },
   "traces": {
+    "agentDefaultVariant": "varsayılan",
+    "agentNoEnv": "(Ortam yok)",
+    "agentNoVersion": "(Sürüm yok)",
+    "allAgents": "Tüm Ajanlar",
+    "agentCountBadgeSingular": "{count} ajan",
+    "agentCountBadgePlural": "{count} ajan",
     "serviceGraph": {
       "searchPlaceholder": "Arama Hizmetleri",
       "noStreamsDetected": "Akış algılanmadı. Hizmet grafiği metriklerinin akış_adı etiketleri içerdiğinden emin olun.",
@@ -6621,6 +6717,8 @@
     },
     "sessionsList": {
       "streamLabel": "Akış",
+      "loadingAgents": "Ajanlar yükleniyor…",
+      "loadingStreams": "Akışlar yükleniyor…",
       "noStreamsTooltip": "LLM akışı mevcut değil.",
       "session": "oturum, toplantı, celse",
       "sessions": "oturumları",
@@ -6635,6 +6733,7 @@
       "loading": "Oturumlar yükleniyor...",
       "tokenTooltip": "Giriş: {input} · Çıktı: {output} · Toplam: {toplam}",
       "durationNs": "ns",
+      "errorCountTooltip": "Bu oturumda {count} hata",
       "unknownUser": "Bilinmeyen kullanıcı",
       "columns": {
         "timestamp": "Zaman damgası",
@@ -6865,6 +6964,8 @@
     "lLMInsightsDashboard": {
       "stream": "Akış",
       "agent": "Aracı",
+      "compareEntry": "Sürümleri Karşılaştır",
+      "compareEntryHint": "Bu ajanın iki sürümünü yan yana karşılaştırın",
       "failedToLoad": "İçgörüler yüklenemedi",
       "retry": "Yeniden Dene",
       "noAgentsInRange": "Bu Aralıkta Aracı Yok",
@@ -7153,7 +7254,7 @@
     "skillContentRequired": "Beceri içeriği gereklidir",
     "genericConfig": "Yapılandırma",
     "genericData": "JSON yapılandırması",
-    "genericDataPlaceholder": "{}",
+    "genericDataPlaceholder": "{'{}'}",
     "invalidJson": "Geçerli JSON olmalıdır"
   },
   "cipherKey": {
@@ -7711,6 +7812,57 @@
   },
   "aiObservability": {
     "title": "LLM Gözlemlenebilirlik",
+    "deltaStrip": {
+      "metricLabel": {
+        "volume": "Hacim",
+        "errorRate": "Hata oranı",
+        "p50": "P50 gecikme",
+        "p95": "P95 gecikme",
+        "p99": "P99 gecikme",
+        "cost": "Maliyet / iz"
+      },
+      "insufficientLabel": "gösterge",
+      "tooltip": {
+        "ciRange": "{level}% GA: {lower} - {upper}",
+        "method": "Yöntem: {method}",
+        "associativeHigher": "B, A'dan daha yüksek — ortamlar farklı, bu nedenle bu ilişkiseldir, B'nin buna neden olduğunun kanıtı değildir.",
+        "associativeLower": "B, A'dan daha düşük — ortamlar farklı, bu nedenle bu ilişkiseldir, B'nin buna neden olduğunun kanıtı değildir.",
+        "causalRegressed": "B, aynı duvar saati penceresi altında A'ya göre geriledi.",
+        "causalImproved": "B, aynı duvar saati penceresi altında A'ya göre iyileşti.",
+        "insufficient": "Kesin bir sonuç için henüz yeterli örnek yok — bu deltayı yalnızca gösterge olarak değerlendirin.",
+        "methodNewcombe": "Wilson/Newcombe oran GA'sı",
+        "methodBootstrap": "bootstrap yeniden örnekleme"
+      }
+    },
+    "overlayChart": {
+      "seriesA": "Sürüm A",
+      "seriesB": "Sürüm B",
+      "xAxisSinceRollout": "Dağıtımdan bu yana geçen saat",
+      "xAxisWallClock": "Zaman",
+      "lowResolution": "Bu pencerede her iki sürümü çizmek için yeterli zaman çözünürlüğü yok — tarih aralığını daraltın (veya \"Her dağıtımdan bu yana\" seçeneğine geçin).",
+      "xAxisSinceRolloutMinutes": "Dağıtımdan bu yana geçen dakika",
+      "xAxisSinceRolloutHours": "Dağıtımdan bu yana geçen saat",
+      "xAxisSinceRolloutDays": "Dağıtımdan bu yana geçen gün",
+      "xAxisWallClockMinutes": "Dakika (geçen, duvar saati)",
+      "xAxisWallClockHours": "Saat (geçen, duvar saati)",
+      "xAxisWallClockDays": "Gün (geçen, duvar saati)"
+    },
+    "errorDiff": {
+      "title": "Hata değişiklikleri",
+      "introduced": "Eklendi",
+      "fixed": "Düzeltildi",
+      "shared": "Paylaşılan",
+      "noData": "Bu pencerede karşılaştırılacak hata verisi yok.",
+      "subtitle": "Her hata sınıfının {a}'dan {b}'ye nasıl değiştiği.",
+      "introducedHint": "{b}'de yeni",
+      "fixedHint": "{b}'de kayboldu",
+      "sharedHint": "her iki sürümde de",
+      "legendA": "A",
+      "legendB": "B",
+      "legendDelta": "Δ",
+      "sharedColHeader": "{a} → {b}",
+      "countIn": "{count} içinde {version}"
+    },
     "sections": {
       "monitor": "Monitör",
       "evaluate": "Değerlendirmek"
@@ -7735,13 +7887,17 @@
       "scorers": "LLM çıktılarını derecelendiren puanları oluşturun ve yönetin",
       "scoreConfigs": "Değerlendirmeleriniz tarafından kullanılan puanlama derecelerini yapılandırın"
     },
+    "scope": {
+      "env": "Ortam",
+      "agent": "Aracı",
+      "version": "Sürüm"
+    },
     "agentGraph": {
       "stream": "Akış",
       "agent": "Ajan",
       "noAgentsTitle": "Hiçbir ajan bulunamadı",
       "noAgentsDescription": "Bu zaman aralığında hiçbir ajan bulunamadı. Zaman aralığını genişletmeyi deneyin veya izlemelerinizin gen_ai ajan niteliklerini içerdiğini kontrol edin.",
-      "agentCountSingular": "ajan",
-      "agentCountPlural": "ajanlar"
+      "versionAgnosticHint": "Topoloji sürümler arasında aynıdır — grafik ortama göre kapsamlandırılır, sürüme göre değil. Sürümleri karşılaştırmak için sürüm karşılaştırmasını kullanın."
     },
     "kpi": {
       "totalCost": "Toplam Maliyet",
@@ -7796,12 +7952,20 @@
       },
       "loopsTitle": "Döngü yapan ajanlar",
       "loopsHint": "Ajanlar aynı aracı iz başına birçok kez yeniden çalıştırıyor",
+      "summaryLoops": "Döngü yapan aracılar",
+      "summaryFailures": "Hata taksonomisi",
+      "summaryAgents": "Etkilenen aracılar",
       "failuresTitle": "Hata sınıflandırması",
       "failuresHint": "Ajan başına türe göre gruplandırılmış hatalar",
+      "footerLoops": "Döngüler",
+      "footerFailures": "Hata sınıfları",
       "costTitle": "Ajana göre maliyet ve hatalar",
       "costHint": "Hangi ajanlar harcamayı ve hataları yönlendiriyor",
       "noLoops": "Bu aralıkta döngü davranışı algılanmadı",
       "noFailures": "Bu aralıkta ajan hatası yok",
+      "noLoopsForAgent": "Bu aralıkta {agent} için döngü davranışı yok — aracı değiştirin veya zaman aralığını genişletin",
+      "noFailuresForAgent": "Bu aralıkta {agent} için hata yok — aracı değiştirin veya zaman aralığını genişletin",
+      "scopeLabel": "Kapsam",
       "noCost": "Bu aralıkta ajan maliyeti kaydedilmedi",
       "unknownAgent": "(bilinmeyen ajan)",
       "colAgent": "Ajan",
@@ -7822,6 +7986,8 @@
         "worstLoopTraces": "En kötü izler (en çok tekrarlayanlar önce)",
         "topCostTraces": "En pahalı izler",
         "noTraces": "Bu sinyal için iz bulunamadı",
+        "footerTraces": "İzler",
+        "footerErrors": "Hatalar",
         "errorsTitle": "Hataların söyledikleri",
         "noErrors": "Hata mesajı yakalanmadı — incelemek için bir iz açın",
         "colTraceId": "İz",
@@ -7838,6 +8004,39 @@
         "loopExplain": "Yüksek tekrar oranı genellikle ajanın sonuçları önbelleğe almadığı veya yeniden denediği anlamına gelir. Tekrarlanan çağrıları görmek için aşağıdaki en kötü izleri açın.",
         "failExplain": "Bunlar, bu hata sınıfının arkasındaki gerçek hata mesajlarıdır — düzeltmeyi bulmak için okuyun veya nerede olduğunu görmek için bir iz açın.",
         "costExplain": "Bu izler, bu ajanın harcamasını yönlendirdi. En pahalı olanları açarak ne çalıştığını görün."
+      }
+    },
+    "versionCompare": {
+      "entry": "Sürümleri karşılaştır…",
+      "entryDisabledHint": "Karşılaştırmak için bu aracının en az 2 sürümü gerekir",
+      "datePickerDisabled": "Bu modda pencereler sürüm başınadır",
+      "sampledNote": "Gecikme ve maliyet aralıkları, sürüm başına en fazla {cap} rastgele örneklenmiş izden hesaplanır.",
+      "manual": {
+        "windowA": "Sürüm A penceresi",
+        "windowB": "Sürüm B penceresi"
+      },
+      "bar": {
+        "versionA": "Sürüm A",
+        "versionB": "Sürüm B",
+        "align": "Hizala",
+        "alignSinceRollout": "Her dağıtımdan itibaren",
+        "alignSameWallClock": "Aynı saat dilimi",
+        "alignManual": "Manuel",
+        "exit": "Karşılaştırmadan çık",
+        "samePickHint": "Karşılaştırmak için iki farklı sürüm seçin",
+        "autoWindow": "oto: {duration}",
+        "windowLabelA": "Sürüm A penceresi",
+        "windowLabelB": "Sürüm B penceresi"
+      },
+      "banner": {
+        "smallSample": "Karşılaştırmak için çok az veri — A'da {nA}, B'de {nB} var. Pencereyi genişletin veya daha fazla trafik bekleyin.",
+        "disjoint": "Bu sürümler farklı zamanlarda çalıştı — farklılıklar sürümün kendisinden değil, trafik değişikliklerinden kaynaklanıyor olabilir.",
+        "partial": "Bu sürümler kısmen eşzamanlıydı — farklılıklar kısmen her birinin ne zaman çalıştığıyla açıklanabilir."
+      },
+      "windowCard": {
+        "label": "{env} · {version} — {window} · {count} iz",
+        "clamp": "Temel yalnızca {duration} çalıştı — her sürümün ilk {duration} süresi karşılaştırılıyor.",
+        "labelNoEnv": "{version} — {window} · {count} iz"
       }
     }
   },
@@ -7873,6 +8072,32 @@
       "paused": "İş duraklatıldı",
       "activateError": "İş etkinleştirilemedi",
       "pauseError": "İş duraklatılamadı"
+    },
+    "manualEvaluation": {
+      "titles": {
+        "span": "Aralığı değerlendir",
+        "trace": "İzi değerlendir",
+        "session": "Oturumu değerlendir"
+      },
+      "targetLabels": {
+        "span": "Aralık Kimliği",
+        "trace": "İz Kimliği",
+        "session": "Oturum Kimliği"
+      },
+      "scopes": {
+        "span": "aralık",
+        "trace": "iz",
+        "session": "oturum"
+      },
+      "description": "Bu hedefe karşı çalıştırılacak bir Değerlendirme İşi seçin. Değerlendirme çalışanı, kaynak telemetriyi bu sayfanın zaman aralığından yükleyecektir.",
+      "jobLabel": "Değerlendirme İşi",
+      "jobPlaceholder": "Bir Değerlendirme İşi Seçin",
+      "jobRequired": "Bir Değerlendirme İşi Seçin",
+      "noCompatibleJobs": "Hiçbir {scope} Değerlendirme İşi, {stream} iz akışını kullanmıyor.",
+      "loadJobsError": "Değerlendirme İşleri yüklenemedi.",
+      "run": "Değerlendirmeyi çalıştır",
+      "queued": "{count} değerlendirme görevi sıraya alındı.",
+      "runError": "Değerlendirme sıraya alınamadı."
     },
     "tabs": {
       "quality": "Kalite",
@@ -8084,6 +8309,7 @@
       "degraded": "Bozulmuş",
       "archived": "Arşivlenmiş"
     },
+    "summaryAll": "Tümü",
     "buttons": {
       "cancel": "İptal",
       "close": "Kapat",
@@ -8094,17 +8320,13 @@
     },
     "scorerTypeDialog": {
       "title": "Yeni bir Golcü Oluştur",
-      "intro": "Golcü türünü seçin. Nasıl yazmak istediğinize uygun olanı seçin ve çalıştırın.",
+      "intro": "Puanlayıcı türünü seçin. Her ikisi de birinci sınıf seçeneklerdir — nasıl yazmak ve çalıştırmak istediğinize uygun olanı seçin.",
       "llmJudgeTitle": "LLM Yargıcı",
       "llmJudgeDescription": "Anlamsal olarak değerlendirmek için yapılandırılmış bir sağlayıcı kullanın.",
       "llmJudgeCta": "Yargıcı Yapılandır",
       "remoteTitle": "Uzaktan",
       "remoteDescription": "Puanlama için kendi HTTP uç noktanızı arayın.",
-      "remoteCta": "Uç Noktayı Yapılandır",
-      "codeTitle": "Kod",
-      "codeDescription": "Yakında geliyor.",
-      "codeCta": "Gelecekteki bir sürümde kullanılabilir",
-      "comingSoonBadge": "Yakında"
+      "remoteCta": "Uç Noktayı Yapılandır"
     },
     "provider": {
       "backTo": "Sağlayıcılara Geri Dön",
@@ -8407,48 +8629,6 @@
       "healthyLabel": "Sağlıklı:",
       "typeLabel": "Tür:",
       "promptVariablesLabel": "Bu istemdeki değişkenler:",
-      "promptVariableGuide": {
-        "title": "Kullanılabilir İstem Değişkenleri",
-        "description": "Bu değişkenler yukarıdaki istemde kullanılabilir. Her birinin nasıl doldurulduğu, Eval Job'ın neyi değerlendirdiğine bağlıdır.",
-        "columns": {
-          "variable": "İstem değişkeni"
-        },
-        "scopes": {
-          "span": "Span",
-          "trace": "Trace",
-          "session": "Oturum"
-        },
-        "statuses": {
-          "jobMapped": "Eval Job'da Eşle",
-          "systemProvided": "Sistem tarafından sağlanır",
-          "requiresSelector": "Sistem tarafından sağlanır · Span Seçici gerektirir",
-          "selectorRequired": "Span Seçici gerekli",
-          "unavailable": "Kullanılamaz"
-        },
-        "variables": {
-          "inputOutput": {
-            "span": "Bunları, giriş ve çıkışı tutan span alanlarına eşleyin.",
-            "trace": "Trace'in kök span'ından gelen giriş ve çıkış.",
-            "session": "Kullanılamaz — bir oturumun tek bir girişi veya çıkışı yoktur."
-          },
-          "statistics": {
-            "span": "Tek bir span değerlendirilirken bu adı diğer herhangi bir puanlama değişkeni gibi eşleyin.",
-            "trace": "İz metrikleri: span sayısı, süre, LLM ve araç çağrıları, hatalar, token'lar ve maliyet.",
-            "session": "Oturum metrikleri: iz ve dönüş sayıları, süre ve hatalar."
-          },
-          "spans": {
-            "span": "Tek bir span değerlendirilirken bu adı diğer herhangi bir puanlama değişkeni gibi eşleyin.",
-            "trace": "İzdeki span'lerin filtrelenmiş bir alt kümesi, Eval İşi'nin Span Seçici'si tarafından seçilir.",
-            "session": "Oturumlar için kullanılamaz."
-          },
-          "steps": {
-            "span": "Tek bir span değerlendirilirken bu adı diğer herhangi bir puanlama değişkeni gibi eşleyin.",
-            "trace": "Zaman sırasına göre span'ler; iz çok uzun olduğunda orta kısım katlanır.",
-            "session": "Zaman sırasına göre izler, konuşma dönüşleri olarak temsil edilir."
-          }
-        },
-        "indexDescription": "{spansVar} ve {stepsVar} JSON dizileri olarak gelir. Tüm değişkene başvurun — {indexedVar} gibi indekslenmiş erişim desteklenmez."
-      },
       "identitySection": "Kimlik",
       "judgeSection": "Hakim yapılandırması",
       "endpointSection": "Bitiş noktası",
@@ -8592,23 +8772,6 @@
         "samplingAll": "Her eşleşmeyi değerlendir",
         "samplingRate": "Orana göre rastgele örnek",
         "samplingCount": "İlk N eşleşme",
-        "manualSection": "Manuel Değerlendirme",
-        "manualHelp": "Bu işin puanlayıcılarını belirli bir hedef için sıraya koyun. Manuel çalıştırmalar otomatik örneklemeyi atlar ve nedeni puan meta verilerine kaydeder.",
-        "manualTargetIdLabel": "Hedef Kimliği",
-        "manualSpanIdLabel": "Span Kimliği",
-        "manualSpanIdPlaceholder": "span_id",
-        "manualTraceIdLabel": "İz Kimliği",
-        "manualTraceIdPlaceholder": "trace_id",
-        "manualSessionIdLabel": "Oturum Kimliği",
-        "manualSessionIdPlaceholder": "session_id",
-        "manualReasonLabel": "Neden",
-        "manualReasonPlaceholder": "Bu hedefi neden yeniden çalıştırıyorsunuz?",
-        "manualVariablesLabel": "Değişkenler JSON",
-        "manualVariablesObjectError": "Değişkenler bir JSON nesnesi olmalıdır",
-        "manualTargetRequired": "Hedef Kimliği gereklidir",
-        "manualSubmit": "Manuel Değerlendirmeyi Çalıştır",
-        "manualSuccess": "{count} değerlendirme görevi sıraya alındı",
-        "manualError": "Manuel değerlendirme başarısız oldu",
         "metadataSection": "Meta Veri",
         "versionLabel": "Sürüm",
         "pipelineLabel": "Pipeline ID",
@@ -8770,20 +8933,27 @@
       "inputMapping": {
         "title": "Prompt değişkenleri",
         "hint": {
-          "span": "Her değişkeni, değerini sağlayan span alanına eşleyin.",
-          "trace": "Trace değerleri otomatik olarak doldurulur. Diğer her şeyi bir span alanına eşleyin.",
-          "session": "Oturum değerleri otomatik olarak doldurulur. Diğer her şeyi bir span alanına eşleyin."
+          "span": "Her değişkeni bir span özniteliğine eşleyin.",
+          "trace": "Her değişkeni sistem tarafından sağlanan bir değere veya span özniteliğine eşleyin.",
+          "session": "Her değişkeni sistem tarafından sağlanan bir değere veya span özniteliğine eşleyin."
+        },
+        "placeholder": "Bir değer seçin",
+        "searchPlaceholder": "Sistem değerlerini ve span özniteliklerini ara…",
+        "groups": {
+          "systemProvided": "Sistem tarafından sağlanan değerler · Bu işin değerlendirdiği her {scope} için",
+          "spanAttributes": "Span öznitelikleri"
         },
         "selectScorers": "Eşlemelerini yapılandırmak için puanları seçin.",
         "noVariables": "Bu puanın eşlenecek şablon değişkenleri yoktur.",
         "variableCount": "{count} değişkenler",
         "systemProvided": {
-          "title": "{scope} Değişkenleri",
-          "description": "OpenObserve bu değerleri {scope}’un kendisinden sağlar. Bir puanlayıcı prompt'u bunları doğrudan kullanabilir — eşleme gerekmez.",
+          "about": "Sistem tarafından sağlanan değerler hakkında",
+          "title": "{scope} sistem değerleri",
+          "description": "OpenObserve, bu işin değerlendirdiği her {scope} için bu değerleri ayrı ayrı oluşturur. Puanlayıcının istem değişkenlerini eşlerken bunları kaynak olarak kullanın.",
           "badge": "Sistem tarafından sağlanır",
           "selectorRequired": "Span Seçici gerekli",
           "columns": {
-            "variable": "Prompt değişkeni",
+            "variable": "Değer",
             "source": "Kaynak",
             "description": "Sağlanan değer"
           },
@@ -8830,7 +9000,7 @@
           "fields": "Özel şema için en az bir alan seçin.",
           "maximumSpans": "Maksimum span sayısı pozitif bir tam sayı olmalıdır.",
           "budget": "Seçilen alanlar için çok fazla span var. Span sayısını azaltın veya daha az alan okuyun.",
-          "binding": "Her puanlayıcı için bir Span Seçici seçin."
+          "binding": "İz spanları kullanan her puanlayıcı için bir Span Seçici seçin."
         }
       },
       "preview": {
@@ -8868,6 +9038,8 @@
       "saveError": "Eval işi kaydedilemedi",
       "createdAndActivated": "Değerlendirme işi oluşturuldu ve etkinleştirildi",
       "createdButActivateFailed": "Değerlendirme işi oluşturuldu ancak etkinleştirme başarısız oldu",
+      "savedAndActivated": "Değerlendirme işi kaydedildi ve etkinleştirildi",
+      "savedButActivateFailed": "Değerlendirme işi kaydedildi, ancak etkinleştirme başarısız",
       "validation": {
         "nameRequired": "Job name is required",
         "streamRequired": "A stream is required",
@@ -9294,6 +9466,44 @@
     "lastRefreshed": "Son yenilenme: {time}"
   },
   "synthetics": {
+    "tokens": {
+      "title": "Sentetik Token'lar",
+      "explanation": "Özel aracılarınızın işleri çekerken kimlik doğrulaması yapmak için kullandığı kuruluş düzeyindeki o2syn_ token'ları. Genel (Lambda) konumları varsayılan token'ı otomatik olarak kullanır; adlandırılmış bir token oluşturun ve bu bölgenin etki alanını sınırlamak için bir bölgenin aracılarına yerleştirin.",
+      "summary": "Özel aracılarınızın işleri çekmek için kullandığı token'lar.",
+      "rotateDefaultBtn": "Varsayılanı döndür",
+      "createTokenBtn": "Token oluştur",
+      "searchPlaceholder": "Token'ları ara",
+      "default": "Varsayılan",
+      "tokenNameLabel": "Ad",
+      "tokenNamePlaceholder": "us-east",
+      "tokenNameHint": "Bölge veya site adını verin, ardından kurulum komutuyla bu bölgenin aracılarına yerleştirin.",
+      "tokenColumn": "Token",
+      "agentsColumn": "Aracılar",
+      "createdBy": "Oluşturan",
+      "createTokenTitle": "Sentetik token oluştur",
+      "newTokenRevealed": "Yeni token — şimdi kopyalayın",
+      "rawTokenLabel": "Token (bir kez gösterilir)",
+      "installHint": "Aracı kurulum komutuna yapıştırın: --token=<token>",
+      "installCmdLabel": "Kurulum komutu (token dahil)",
+      "installCmdHint": "Bunu aracı ana bilgisayarında çalıştırın. Token içine gömülüdür — <location-name> değerini konumunuzla değiştirin. Bir daha gösterilmeyecek.",
+      "copyCmdBtn": "Komutu kopyala",
+      "copyTokenBtn": "Token'ı kopyala",
+      "copiedToast": "Token panoya kopyalandı",
+      "disableDefaultBlocked": "Varsayılan token devre dışı bırakılamaz — önce döndürün",
+      "nameReserved": "'default' ayrılmıştır — varsayılan token'ı değiştirmek için Döndür'ü kullanın",
+      "fetchError": "Token'lar yüklenemedi",
+      "createSuccess": "Token oluşturuldu",
+      "createError": "Token oluşturulamadı",
+      "rotateSuccess": "Varsayılan token döndürüldü — eskisi, onu devre dışı bırakana kadar geçerli kalır.",
+      "rotateError": "Token döndürme başarısız oldu.",
+      "enabledSuccess": "Token etkinleştirildi.",
+      "disabledSuccess": "Token devre dışı bırakıldı.",
+      "updateError": "Token güncelleme başarısız oldu.",
+      "empty": {
+        "title": "Sentetik token yok.",
+        "description": "Bir bölgenin ajanlarını kapsamak için adlandırılmış bir token oluşturun veya organizasyon varsayılanını kullanın."
+      }
+    },
     "authNetwork": {
       "addCookie": "Çerez ekle",
       "addHeader": "Başlık ekle",
@@ -9671,12 +9881,15 @@
       "assertions": "İddialar",
       "assertionsFailed": "Başarısız",
       "assertionsPassed": "Başarılı",
+      "assertionsNotEvaluated": "Değerlendirilmedi.",
+      "assertionsNotEvaluatedHint": "İstek hiçbir zaman bir yanıt döndürmedi, bu nedenle hiçbir şey onaylanmadı.",
       "certExpires": "{date} tarihinde sona eriyor",
       "completed": "tamamlandı",
       "daysRemaining": "{days} gün kaldı",
       "error": "Hata",
       "failed": "Başarısız",
       "init": "Başlangıç",
+      "loading": "Çalıştırma ayrıntıları yükleniyor.",
       "location": "Konum",
       "notFound": "Çalıştırma bulunamadı",
       "passed": "Başarılı",
@@ -9708,7 +9921,7 @@
       "clearFiltersDesc": "Tüm etkin filtreleri kaldır",
       "device": "Cihaz",
       "duration": "Süre",
-      "editMonitor": "Monitörü Düzenle",
+      "editCheck": "Kontrolü Düzenle",
       "error": "Hata",
       "failed": "Başarısız",
       "failedRuns": "Başarısız Çalışmalar",
@@ -10091,6 +10304,11 @@
         "browserNote": "Tarayıcı testleri henüz özel konumlardan çalıştırılamıyor — yalnızca protokol kontrolleri (HTTP, TCP, TLS, SSH).",
         "locationNameLabel": "Konum adı",
         "locationNamePlaceholder": "Merkez Ofis",
+        "typeTitle": "Bu ajanın çalıştırdığı şey",
+        "typeProtocol": "Ağ",
+        "typeBrowser": "Tarayıcı",
+        "typeProtocolHint": "HTTP, TCP, TLS ve SSH kontrolleri. Go ajanını çalıştırır — Docker, Kubernetes, Linux veya Windows.",
+        "typeBrowserHint": "Tarayıcı yolculukları. Playwright imajını çalıştırır — yalnızca Docker veya Kubernetes.",
         "tabDocker": "Docker",
         "tabK8s": "Kubernetes",
         "tabLinux": "Linux",
@@ -10108,6 +10326,7 @@
         "agentsSubtitle": "Agent'lar altyapınızdan kendi kendine kaydolur ve burada salt okunurdur.",
         "agentName": "Agent",
         "recoverAgent": "Bu agent'ı kurtar — adıyla önceden doldurulmuş bir kurulum komutunu kopyala",
+        "restartConfig": "Yapılandırmayı yeniden başlat — kurulumu yeniden çalıştırmak için bu ajanın kurulum komutunu kopyalayın / docker yeniden başlatma (örneğin bir token döndürme işleminden sonra).",
         "noAgents": "Bu konum için henüz hiçbir agent kaydolmadı.",
         "checksTitle": "Bu konumdan çalışan kontroller",
         "checkName": "Ad",

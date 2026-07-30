@@ -364,6 +364,8 @@
   },
   "common": {
     "beta": "Beta",
+    "play": "Reproduzir",
+    "pause": "Pausar",
     "close": "Fechar",
     "cancel": "Cancelar",
     "ok": "Ok",
@@ -514,7 +516,9 @@
     "fillRequiredFields": "Preencha os campos obrigatórios",
     "test": "Teste",
     "username": "Nome de usuário",
-    "password": "Senha"
+    "password": "Senha",
+    "field": "Campo",
+    "enterValueOrVariable": "Insira valor ou $variable"
   },
   "flow": {
     "stepPicker": {
@@ -905,9 +909,13 @@
     "language": "Idioma",
     "actions": "Ações",
     "keyboardShortcuts": "Atalhos de teclado",
-    "synthetic": "Sintéticos"
+    "synthetic": "Sintéticos",
+    "experience": "Experiência"
   },
   "rum": {
+    "noSessionReplay": "Nenhum replay de sessão disponível",
+    "seek": "Buscar",
+    "playbackSpeed": "Velocidade de reprodução",
     "title": "Monitoramento de usuários reais",
     "subtitle": "Monitore sessões de usuários reais, erros e desempenho do frontend",
     "issueColumn": "Problema",
@@ -1016,6 +1024,7 @@
     "desktop": "Desktop",
     "mobile": "Móvel",
     "tablet": "Tablet",
+    "platform": "Plataforma",
     "vsPreviousPeriod": "versus período anterior",
     "seeSessions": "Veja as sessões",
     "openErrorTracking": "Abrir no Rastreamento de Erros",
@@ -1652,6 +1661,8 @@
     "object": "Objeto",
     "serviceAccounts": "Contas de serviço",
     "ingestionTokens": "Tokens de ingestão",
+    "syntheticsTokens": "Tokens de Synthetics",
+    "syntheticsTokensDesc": "Tokens o2syn_ no nível da organização que seus agentes de sintéticos privados usam para buscar trabalhos",
     "serviceAccountsName": "Nome das contas de serviço",
     "basicUsers": "Usuários",
     "organizationMembers": "Membros da Organização",
@@ -2081,7 +2092,6 @@
     "search": "Pesquisar fluxos de trabalho",
     "refresh": "Atualizar fluxos de trabalho",
     "trigger": "Gatilho",
-    "triggerAlertFired": "Alerta disparado",
     "steps": "Etapas",
     "status": "Status",
     "updated": "Atualizado",
@@ -2133,13 +2143,21 @@
       "cta": "Criar Fluxo de Trabalho",
       "soonCta": "Disponível em uma Versão Futura",
       "comingSoon": "Em Breve",
-      "soon": "Em Breve",
-      "alertFired": "Alerta Disparado",
-      "alertFiredDesc": "Executar Quando um Alerta Disparar",
-      "schedule": "Agendamento",
-      "scheduleDesc": "Executar em um Agendamento",
-      "webhook": "Webhook",
-      "webhookDesc": "Executar em um Webhook de Entrada"
+      "soon": "Em Breve"
+    },
+    "triggerKind": {
+      "alertFired": {
+        "label": "Alarme Disparado",
+        "node": "Gatilho de Alarme",
+        "desc": "Executar quando um alarme disparar",
+        "intro": "Quando um alarme vinculado dispara, cada etapa downstream recebe este payload."
+      },
+      "incidentEvent": {
+        "label": "Evento de Incidente",
+        "node": "Gatilho de Incidente",
+        "desc": "Executar em um evento de ciclo de vida de incidente",
+        "intro": "Quando um evento de incidente ocorre, cada etapa downstream recebe este payload."
+      }
     },
     "triggerMeta": {
       "orgId": "ID da organização à qual o alerta pertence.",
@@ -2178,9 +2196,6 @@
       "skipped": "Pulado",
       "errorsN": "{count} erro(s)",
       "runError": "Não foi possível executar o teste.",
-      "saveToTestTitle": "Salvar e Testar",
-      "saveToTestBody": "O teste executa a versão salva deste workflow. Salvar suas alterações primeiro?",
-      "saveAndTest": "Salvar e Testar",
       "stepResult": {
         "viewHint": "Clique para ver Entrada / Saída",
         "input": "Entrada",
@@ -2227,7 +2242,6 @@
       "kindTrigger": "Gatilho",
       "kindLogic": "Lógica",
       "kindAction": "Ação",
-      "alertTrigger": "Gatilho de alerta",
       "condition": "Condição",
       "function": "Função",
       "sendToDestination": "Destino",
@@ -2252,7 +2266,6 @@
       "triggerAlertsNone": "Nenhum alerta encontrado nesta organização.",
       "triggerAlertsError": "Não foi possível carregar alertas",
       "triggerNote": "Este workflow é executado quando qualquer um dos alertas selecionados dispara.",
-      "triggerPayloadIntro": "Quando um alerta vinculado dispara, cada etapa downstream recebe este payload.",
       "triggerStructureTitle": "Estrutura do Payload",
       "triggerStructureHint": "Passe o mouse sobre um campo para ver detalhes",
       "triggerDetailHint": "Passe o mouse ou foque em um campo acima para ver seu tipo e significado.",
@@ -2261,6 +2274,10 @@
       "triggerDataBlock": "data[] · Linhas do seu Alerta",
       "triggerDataColumns": "Colunas de Resultado",
       "triggerDataExampleNote": "Apenas exemplo — as colunas reais vêm da consulta do seu alerta.",
+      "incidentEventTypeLabel": "Tipo de Evento",
+      "incidentCommonTitle": "Campos Comuns (Todo Evento)",
+      "incidentSpecificTitle": "Campos Específicos do Evento",
+      "incidentNoExtraFields": "Este evento não adiciona campos além dos comuns.",
       "triggerDataBlockNote": "Um array com um objeto por registro correspondente. Suas colunas vêm da própria consulta do alerta, então diferem por alerta — referencie-as como data[].<column>.",
       "conditionBody": "Definir uma regra para ramificar",
       "conditionBodySet": "Ramifica em uma regra",
@@ -2399,7 +2416,7 @@
     "periodGreaterThanZero": "O período deve ser maior que 0",
     "frequencyGreaterThanSeconds": "A frequência deve ser maior que {seconds} segundos.",
     "minimumFrequencyMinutes": "A frequência mínima deve ser de {minutes} minutos",
-    "streamSelectionNameInvalid": "Use apenas caracteres alfanuméricos e '+=,.@-_', sem espaços.",
+    "streamSelectionNameInvalid": "Use apenas caracteres alfanuméricos e '+=,.{'@'}-_', sem espaços.",
     "functionAlreadyAssociated": "A função já está associada",
     "atLeastOneCondition": "Adicione pelo menos uma condição",
     "fillAllConditionFields": "Preencha todos os campos da condição (coluna, operador e valor são obrigatórios)",
@@ -2602,6 +2619,9 @@
     "resetRUMTokenLabel": "Redefinir token RUM",
     "generateRUMTokenLabel": "Gerar token RUM",
     "generateRUMTokenMessage": "Gere o token RUM para habilitar o RUM para sua organização.",
+    "rumPlatform": "Plataforma",
+    "rumPlatformBrowser": "Navegador",
+    "rumPlatformReactNative": "React Native",
     "npmStepTitle": "Método de instalação do NPM",
     "recommendedLabel": "Recomendado",
     "customLabel": "Personalizado",
@@ -2836,7 +2856,7 @@
     "addToFavorites": "Adicionar aos favoritos",
     "removeFromFavorites": "Remover dos favoritos",
     "noFavoritesTitle": "Nenhum painel favorito ainda",
-    "noFavoritesMessage": "Clique no ícone de coração em qualquer painel para vê-lo aqui, em todas as pastas.",
+    "noFavoritesMessage": "Clique no ícone de estrela em qualquer painel para vê-lo aqui, em todas as pastas.",
     "moreActions": "Mais ações",
     "save": "Salvar",
     "cancel": "Cancelar",
@@ -3673,7 +3693,8 @@
       "clause": "Cláusula {number}",
       "selectOperation": "Selecionar Operação",
       "addAnotherClause": "Adicionar outra cláusula",
-      "removeClause": "Remover cláusula"
+      "removeClause": "Remover cláusula",
+      "addClause": "Adicionar cláusula"
     },
     "viewDashboard": {
       "refreshToApplyVariables": "Atualize para aplicar as alterações mais recentes nas variáveis",
@@ -3700,7 +3721,9 @@
       "add": "Adicionar",
       "value": "Valor",
       "markAsNonTimestamp": "Marcar este campo como não timestamp",
-      "renderDataAsJson": "Renderizar Dados como JSON / Array"
+      "renderDataAsJson": "Renderizar Dados como JSON / Array",
+      "sortBy": "Ordenar Por",
+      "havingHint": "Filtrar no agregado"
     },
     "customChartTypeSelector": {
       "exampleOfCustomCharts": "Exemplo de gráficos personalizados",
@@ -3911,6 +3934,10 @@
       "addedSuccessfully": "Painel adicionado com sucesso.",
       "creationFailed": "Falha ao criar painel.",
       "filesFailedValidation": "{count} arquivo(s) não passaram nas restrições de validação"
+    },
+    "rawQueryBuilder": {
+      "query": "Consulta",
+      "instruction": "Escreva uma consulta SQL para ações complexas."
     }
   },
   "panel": {
@@ -4603,6 +4630,14 @@
     "lastSuccessfulAt": "Último sucesso em",
     "lastTrainedAt": "Treinado pela última vez em",
     "status": "Status",
+    "stateActive": "Ativo",
+    "statePaused": "Pausado",
+    "stateFailed": "Falhou",
+    "summaryActive": "Ativo",
+    "summaryPaused": "Pausado",
+    "summaryFailed": "Falhou",
+    "summaryRecent": "Disparado < 15m",
+    "summaryTotal": "Total",
     "numOfEvents": "Número de eventos",
     "view": "Visualizar",
     "webhook": "Web Hook",
@@ -4779,6 +4814,13 @@
       "id": "CARTEIRA DE IDENTIDADE",
       "status": "Status",
       "severity": "Severidade",
+      "severityCritical": "P1 · Crítico",
+      "severityHigh": "P2 · Alto",
+      "severityMedium": "P3 · Médio",
+      "severityLow": "P4 · Baixo",
+      "moreDimensions": "+{count} mais",
+      "filterAll": "Todos",
+      "filterActive": "Ativo",
       "alertCount": "Alertas",
       "firstAlertAt": "Primeiro alerta",
       "lastAlertAt": "Último alerta",
@@ -4829,6 +4871,41 @@
       "rcaInProgress": "Analisando a causa raiz...",
       "rcaCompleted": "Análise da causa raiz concluída",
       "noRcaYet": "Nenhuma análise de causa raiz disponível. Clique em “Analisar” para começar.",
+      "rcaAnalyzeIncident": "Analisar Incidente",
+      "rcaAnalyzing": "O Agente SRE de IA está analisando este incidente, aguarde…",
+      "rcaAnalyzingHint": "O relatório aparecerá aqui assim que a análise estiver concluída.",
+      "rcaReanalyzing": "O AI SRE Agent está vendo o que mudou desde a última análise…",
+      "rcaReanalyzingHint": "O relatório será atualizado assim que a análise estiver concluída.",
+      "rcaStartedAgo": "Iniciado há {time}",
+      "rcaCancel": "Cancelar",
+      "rcaCancelling": "Cancelando…",
+      "rcaCancelled": "Análise cancelada",
+      "rcaCancelFailed": "Falha ao cancelar análise",
+      "rcaFailed": "Falha na análise de IA",
+      "rcaFailedGeneric": "Falha ao realizar análise RCA",
+      "rcaRetry": "Repetir análise",
+      "rcaStale": "Esta análise está rodando por um tempo incomum e pode ter parado. Você pode cancelá-la e tentar novamente.",
+      "rcaStatus": "Análise de IA",
+      "rcaStatusAnalyzing": "Analisando",
+      "rcaStatusFailed": "Falhou",
+      "rcaStatusReady": "Pronto",
+      "rcaStatusNone": "Não analisado",
+      "rcaAnalyzedAgo": "Analisado há {time}",
+      "rcaCopy": "Copiar relatório",
+      "rcaCopied": "Relatório copiado para a área de transferência",
+      "rcaCopyFailed": "Falha ao copiar relatório",
+      "rcaDownload": "Baixar como Markdown",
+      "rcaReanalyze": "Reanalisar",
+      "rcaFreshAnalysis": "Nova análise",
+      "rcaFreshAnalysisHint": "Analisar do zero, ignorando o relatório anterior",
+      "rcaBuildOnPrevious": "Construir sobre o relatório anterior",
+      "rcaBuildOnPreviousHint": "Enviar o relatório atual para que o agente o estenda",
+      "rcaHistory": "Histórico de relatórios",
+      "rcaHistoryCurrent": "Atual",
+      "rcaHistoryEmpty": "Nenhum relatório anterior",
+      "rcaHistoryLoadFailed": "Falha ao carregar histórico de relatórios",
+      "rcaViewingArchived": "Você está vendo um relatório anterior",
+      "rcaBackToCurrent": "Voltar ao relatório atual",
       "sreChat": "Perguntar ao Assistente SRE",
       "goBack": "Voltar",
       "incident": "Incidente",
@@ -5438,7 +5515,7 @@
       "modeWorkspace": "Favoritos",
       "workspace": {
         "emptyScratchpadTitle": "Você ainda não tem favoritos",
-        "emptyScratchpadDesc": "Adicione métricas aos seus favoritos no Explorar (o ♥ em um cartão) para coletá-las aqui. Quando quiser mantê-las, converta para um painel."
+        "emptyScratchpadDesc": "Adicione métricas aos seus favoritos no Explore (a ★ em um card) para coletá-las aqui. Quando quiser mantê-las, converta para um painel."
       },
       "visualizePlaceholder": "Visualizar em breve — construa um gráfico a partir de uma consulta PromQL, aqui mesmo.",
       "railsAriaLabel": "Filtros de métricas",
@@ -5457,7 +5534,8 @@
       "queryFailed": "Consulta falhou",
       "noData": "Sem dados",
       "noMetrics": "Ainda não há métricas nesta organização.",
-      "learnIngest": "Saiba como ingerir métricas",
+      "setupIngestion": "Configurar ingestão de métricas",
+      "setupIngestionDesc": "Conectar uma fonte de dados de métricas",
       "noMatch": "Nenhuma métrica corresponde aos filtros atuais",
       "noMatchHint": "Tente remover um filtro de rótulo, limpar seleções de prefixo/sufixo ou mudar de “Com dados” para “Todas”.",
       "noMatchHintFavorites": "Tente remover um filtro de rótulo ou mudar de “Com dados” para “Todos”.",
@@ -5485,6 +5563,7 @@
         "helpAria": "Sobre {name}: {help}",
         "refreshAria": "Atualizar {name}",
         "refreshTooltip": "Atualizar esta métrica",
+        "refreshToApplyTimeRange": "Atualizar para aplicar o intervalo de tempo selecionado",
         "configureAria": "Configurar função para {name}",
         "configureTooltip": "Configurar função",
         "favoriteAddAria": "Adicionar {name} aos seus favoritos",
@@ -5843,7 +5922,18 @@
       "agentIdFields": "Campos alternativos de ID do agente",
       "agentIdHelp": "Atributos de entrada a serem usados como substitutos para gen_ai.agent.id.",
       "agentIdInfo": "Verificado somente quando o atributo gen_ai.agent.id padrão está ausente ou vazio. Adicione um atributo de telemetria de entrada por linha.",
+      "envFields": "Campos de fallback do ambiente",
+      "envHelp": "Atributos recebidos para usar como ambiente do agente.",
+      "envInfo": "Verificado apenas quando o atributo padrão deployment.environment.name estiver ausente ou vazio. Adicione um atributo de telemetria recebido por linha.",
+      "versionFields": "Campos de fallback da versão",
+      "versionHelp": "Atributos recebidos para usar como versão do agente.",
+      "versionInfo": "Verificado apenas quando o atributo padrão gen_ai.agent.version estiver ausente ou vazio. Adicione um atributo de telemetria recebido por linha.",
       "fieldsPlaceholder": "agente.nome\nllm.agent.name",
+      "agentNamePlaceholder": "my.custom.agent_name\nteam.agent.label",
+      "agentIdPlaceholder": "my.custom.agent_id\nteam.agent.uid",
+      "envPlaceholder": "my.custom.env\ntier",
+      "versionPlaceholder": "my.custom.version\nrelease.tag",
+      "alwaysAppliedStandard": "Padrão (verificado primeiro):",
       "applyDefaults": "Aplicar padrões",
       "resetToEmpty": "Redefinir como vazio",
       "clearRegistry": "Limpar registro",
@@ -6408,6 +6498,12 @@
     "querySource": "Fonte da consulta"
   },
   "traces": {
+    "agentDefaultVariant": "padrão",
+    "agentNoEnv": "(Sem ambiente)",
+    "agentNoVersion": "(Sem versão)",
+    "allAgents": "Todos os Agentes",
+    "agentCountBadgeSingular": "{count} agente",
+    "agentCountBadgePlural": "{count} agentes",
     "serviceGraph": {
       "searchPlaceholder": "Serviços de pesquisa",
       "noStreamsDetected": "Nenhum fluxo detectado. Certifique-se de que as métricas do gráfico de serviço incluam rótulos stream_name.",
@@ -6621,6 +6717,8 @@
     },
     "sessionsList": {
       "streamLabel": "Stream",
+      "loadingAgents": "Carregando agentes…",
+      "loadingStreams": "Carregando streams…",
       "noStreamsTooltip": "Não há streams LLM disponíveis.",
       "session": "sessão",
       "sessions": "sessões",
@@ -6635,6 +6733,7 @@
       "loading": "Carregando sessões...",
       "tokenTooltip": "Entrada: {entrada} · Saída: {saída} · Total: {total}",
       "durationNs": "ns",
+      "errorCountTooltip": "{count} erros nesta sessão",
       "unknownUser": "Usuário desconhecido",
       "columns": {
         "timestamp": "Carimbo de data/hora",
@@ -6865,6 +6964,8 @@
     "lLMInsightsDashboard": {
       "stream": "Stream",
       "agent": "Agente",
+      "compareEntry": "Comparar versões",
+      "compareEntryHint": "Comparar duas versões deste agente lado a lado",
       "failedToLoad": "Falha ao carregar Insights",
       "retry": "Tentar novamente",
       "noAgentsInRange": "Nenhum Agente Neste Intervalo",
@@ -7153,7 +7254,7 @@
     "skillContentRequired": "O conteúdo da habilidade é obrigatório",
     "genericConfig": "Configuração",
     "genericData": "Configuração JSON",
-    "genericDataPlaceholder": "{}",
+    "genericDataPlaceholder": "{'{}'}",
     "invalidJson": "Deve ser um JSON válido"
   },
   "cipherKey": {
@@ -7711,6 +7812,57 @@
   },
   "aiObservability": {
     "title": "Observabilidade do LLM",
+    "deltaStrip": {
+      "metricLabel": {
+        "volume": "Volume",
+        "errorRate": "Taxa de erro",
+        "p50": "Latência P50",
+        "p95": "Latência P95",
+        "p99": "Latência P99",
+        "cost": "Custo / trace"
+      },
+      "insufficientLabel": "indicativo",
+      "tooltip": {
+        "ciRange": "{level}% IC: {lower} a {upper}",
+        "method": "Método: {method}",
+        "associativeHigher": "B é maior que A — os ambientes diferem, portanto isso é associativo, não prova que B causou isso.",
+        "associativeLower": "B é menor que A — os ambientes diferem, portanto isso é associativo, não prova que B causou isso.",
+        "causalRegressed": "B regrediu em relação a A na mesma janela de tempo real.",
+        "causalImproved": "B melhorou em relação a A na mesma janela de tempo real.",
+        "insufficient": "Ainda não há amostras suficientes para um veredito confiável — trate este delta como apenas indicativo.",
+        "methodNewcombe": "IC de proporção Wilson/Newcombe",
+        "methodBootstrap": "reamostragem bootstrap"
+      }
+    },
+    "overlayChart": {
+      "seriesA": "Versão A",
+      "seriesB": "Versão B",
+      "xAxisSinceRollout": "Horas desde o lançamento",
+      "xAxisWallClock": "Tempo",
+      "lowResolution": "Resolução de tempo insuficiente para plotar ambas as versões nesta janela — reduza o intervalo de datas (ou mude para \"Desde cada lançamento\").",
+      "xAxisSinceRolloutMinutes": "Minutos desde o lançamento",
+      "xAxisSinceRolloutHours": "Horas desde o lançamento",
+      "xAxisSinceRolloutDays": "Dias desde o lançamento",
+      "xAxisWallClockMinutes": "Minutos (decorridos, tempo real)",
+      "xAxisWallClockHours": "Horas (decorridas, tempo real)",
+      "xAxisWallClockDays": "Dias (decorridos, tempo real)"
+    },
+    "errorDiff": {
+      "title": "Mudanças de falhas",
+      "introduced": "Introduzido",
+      "fixed": "Corrigido",
+      "shared": "Compartilhado",
+      "noData": "Nenhum dado de falha para comparar nesta janela.",
+      "subtitle": "Como cada classe de falha mudou de {a} para {b}.",
+      "introducedHint": "novo em {b}",
+      "fixedHint": "ausente em {b}",
+      "sharedHint": "em ambas as versões",
+      "legendA": "A",
+      "legendB": "B",
+      "legendDelta": "Δ",
+      "sharedColHeader": "{a} → {b}",
+      "countIn": "{count} em {version}"
+    },
     "sections": {
       "monitor": "Monitor",
       "evaluate": "Avalie"
@@ -7735,13 +7887,17 @@
       "scorers": "Crie e gerencie os marcadores que classificam os resultados do LLM",
       "scoreConfigs": "Configure as rubricas de pontuação usadas por suas avaliações"
     },
+    "scope": {
+      "env": "Ambiente",
+      "agent": "Agente",
+      "version": "Versão"
+    },
     "agentGraph": {
       "stream": "Stream",
       "agent": "Agente",
       "noAgentsTitle": "Nenhum agente encontrado",
       "noAgentsDescription": "Nenhum agente foi descoberto neste intervalo de tempo. Tente ampliar o intervalo ou verifique se seus traces incluem atributos de agente gen_ai.",
-      "agentCountSingular": "agente",
-      "agentCountPlural": "agentes"
+      "versionAgnosticHint": "A topologia é a mesma em todas as versões — o gráfico é delimitado por ambiente, não por versão. Use a comparação de versões para comparar versões."
     },
     "kpi": {
       "totalCost": "Custo total",
@@ -7796,12 +7952,20 @@
       },
       "loopsTitle": "Agentes em loop",
       "loopsHint": "Agentes executando a mesma ferramenta várias vezes por trace",
+      "summaryLoops": "Agentes em loop",
+      "summaryFailures": "Taxonomia de falhas",
+      "summaryAgents": "Agentes afetados",
       "failuresTitle": "Taxonomia de falhas",
       "failuresHint": "Erros agrupados por tipo, por agente",
+      "footerLoops": "Loops",
+      "footerFailures": "Classes de falha",
       "costTitle": "Custo e falhas por agente",
       "costHint": "Quais agentes geram gastos e erros",
       "noLoops": "Nenhum comportamento de loop detectado neste intervalo",
       "noFailures": "Nenhuma falha de agente neste intervalo",
+      "noLoopsForAgent": "Nenhum comportamento de loop para {agent} neste intervalo — mude de agente ou amplie o intervalo de tempo",
+      "noFailuresForAgent": "Nenhuma falha para {agent} neste intervalo — mude de agente ou amplie o intervalo de tempo",
+      "scopeLabel": "Escopo",
       "noCost": "Nenhum custo de agente registrado neste intervalo",
       "unknownAgent": "(agente desconhecido)",
       "colAgent": "Agente",
@@ -7822,6 +7986,8 @@
         "worstLoopTraces": "Piores rastreios (mais repetições primeiro)",
         "topCostTraces": "Rastreios mais caros",
         "noTraces": "Nenhum rastreio encontrado para este sinal",
+        "footerTraces": "Traces",
+        "footerErrors": "Erros",
         "errorsTitle": "O que os erros dizem",
         "noErrors": "Nenhuma mensagem de erro capturada — abra um rastreio para inspecionar",
         "colTraceId": "Rastreio",
@@ -7838,6 +8004,39 @@
         "loopExplain": "Uma alta taxa de repetição geralmente significa que o agente não está armazenando resultados em cache ou está tentando novamente. Abra os piores rastreios abaixo para ver as chamadas repetidas.",
         "failExplain": "Estas são as mensagens de erro reais por trás desta classe de falha — leia-as para encontrar a correção, ou abra um rastreio para ver onde ocorreu.",
         "costExplain": "Estes rastreios impulsionaram o gasto deste agente. Abra os mais caros para ver o que foi executado."
+      }
+    },
+    "versionCompare": {
+      "entry": "Comparar versões…",
+      "entryDisabledHint": "Requer pelo menos 2 versões deste agente para comparar",
+      "datePickerDisabled": "As janelas são por versão neste modo",
+      "sampledNote": "Os intervalos de latência e custo são calculados a partir de até {cap} traces amostrados aleatoriamente por versão.",
+      "manual": {
+        "windowA": "Janela da Versão A",
+        "windowB": "Janela da Versão B"
+      },
+      "bar": {
+        "versionA": "Versão A",
+        "versionB": "Versão B",
+        "align": "Alinhar",
+        "alignSinceRollout": "Desde cada rollout",
+        "alignSameWallClock": "Mesmo tempo real",
+        "alignManual": "Manual",
+        "exit": "Sair da comparação",
+        "samePickHint": "Escolha duas versões diferentes para comparar",
+        "autoWindow": "auto: {duration}",
+        "windowLabelA": "Janela da Versão A",
+        "windowLabelB": "Janela da Versão B"
+      },
+      "banner": {
+        "smallSample": "Dados insuficientes para comparar — A tem {nA}, B tem {nB}. Amplie a janela ou aguarde mais tráfego.",
+        "disjoint": "Essas versões foram executadas em momentos diferentes — as diferenças podem refletir mudanças no tráfego, não na versão em si.",
+        "partial": "Essas versões foram parcialmente concorrentes — as diferenças podem ser parcialmente explicadas pelo momento de execução de cada uma."
+      },
+      "windowCard": {
+        "label": "{env} · {version} — {window} · {count} traces",
+        "clamp": "A linha de base foi executada apenas por {duration} — comparando os primeiros {duration} de cada versão.",
+        "labelNoEnv": "{version} — {window} · {count} traces"
       }
     }
   },
@@ -7873,6 +8072,32 @@
       "paused": "Trabalho pausado",
       "activateError": "Falha ao ativar o trabalho",
       "pauseError": "Falha ao pausar o trabalho"
+    },
+    "manualEvaluation": {
+      "titles": {
+        "span": "Avaliar span",
+        "trace": "Avaliar trace",
+        "session": "Avaliar sessão"
+      },
+      "targetLabels": {
+        "span": "ID do span",
+        "trace": "ID do trace",
+        "session": "ID da sessão"
+      },
+      "scopes": {
+        "span": "span",
+        "trace": "trace",
+        "session": "sessão"
+      },
+      "description": "Escolha um Eval Job para executar contra este alvo. O worker de avaliação carregará a telemetria de origem do intervalo de tempo desta página.",
+      "jobLabel": "Eval Job",
+      "jobPlaceholder": "Selecionar um Eval Job",
+      "jobRequired": "Selecionar um Job de Avaliação",
+      "noCompatibleJobs": "Nenhum Job de Avaliação {scope} usa o stream de trace {stream}.",
+      "loadJobsError": "Falha ao carregar Jobs de Avaliação.",
+      "run": "Executar avaliação",
+      "queued": "{count} tarefa(s) de avaliação em fila.",
+      "runError": "Falha ao enfileirar a avaliação."
     },
     "tabs": {
       "quality": "Qualidade",
@@ -8084,6 +8309,7 @@
       "degraded": "Degradado",
       "archived": "Arquivado"
     },
+    "summaryAll": "Todos",
     "buttons": {
       "cancel": "Cancelar",
       "close": "Fechar",
@@ -8094,17 +8320,13 @@
     },
     "scorerTypeDialog": {
       "title": "Crie um novo marcador",
-      "intro": "Escolha o tipo de marcador. Escolha o que melhor se adequa à sua criação e execute-o.",
+      "intro": "Escolha o tipo de scorer. Ambas são opções de primeira linha — escolha a que melhor se adequa à forma como deseja criar e executar.",
       "llmJudgeTitle": "Juiz LLM",
       "llmJudgeDescription": "Use um provedor configurado para avaliar semanticamente.",
       "llmJudgeCta": "Configurar Avaliador",
       "remoteTitle": "Remoto",
       "remoteDescription": "Ligue para seu próprio endpoint HTTP para pontuar.",
-      "remoteCta": "Configurar Endpoint",
-      "codeTitle": "Código",
-      "codeDescription": "Em breve.",
-      "codeCta": "Disponível em uma versão futura",
-      "comingSoonBadge": "Em Breve"
+      "remoteCta": "Configurar Endpoint"
     },
     "provider": {
       "backTo": "Voltar para Provedores",
@@ -8407,48 +8629,6 @@
       "healthyLabel": "Saudável:",
       "typeLabel": "Tipo:",
       "promptVariablesLabel": "Variáveis neste prompt:",
-      "promptVariableGuide": {
-        "title": "Variáveis de Prompt Disponíveis",
-        "description": "Essas variáveis podem ser usadas no prompt acima. Como cada uma é preenchida depende do que o Trabalho de Avaliação avalia.",
-        "columns": {
-          "variable": "Variável de prompt"
-        },
-        "scopes": {
-          "span": "Span",
-          "trace": "Trace",
-          "session": "Sessão"
-        },
-        "statuses": {
-          "jobMapped": "Mapear no Trabalho de Avaliação",
-          "systemProvided": "Fornecido pelo sistema",
-          "requiresSelector": "Fornecido pelo sistema · requer Seletor de Span",
-          "selectorRequired": "Seletor de Span necessário",
-          "unavailable": "Não disponível"
-        },
-        "variables": {
-          "inputOutput": {
-            "span": "Mapeie estes para os campos de span que contêm a entrada e a saída.",
-            "trace": "Entrada e saída do span raiz do trace.",
-            "session": "Não disponível — uma sessão não tem uma única entrada ou saída."
-          },
-          "statistics": {
-            "span": "Mapeie este nome como qualquer outra variável de scorer ao avaliar um único span.",
-            "trace": "Métricas de trace: contagem de spans, duração, chamadas de LLM e ferramentas, erros, tokens e custo.",
-            "session": "Métricas de sessão: contagens de traces e turnos, duração e erros."
-          },
-          "spans": {
-            "span": "Mapeie este nome como qualquer outra variável de scorer ao avaliar um único span.",
-            "trace": "Um subconjunto filtrado dos spans do trace, escolhido pelo Seletor de Span do Eval Job.",
-            "session": "Não disponível para sessões."
-          },
-          "steps": {
-            "span": "Mapeie este nome como qualquer outra variável de scorer ao avaliar um único span.",
-            "trace": "Spans em ordem cronológica; o meio é dobrado quando o trace é muito longo.",
-            "session": "Traces em ordem cronológica, representados como turnos de conversa."
-          }
-        },
-        "indexDescription": "{spansVar} e {stepsVar} chegam como arrays JSON. Referencie a variável inteira — acesso indexado como {indexedVar} não é suportado."
-      },
       "identitySection": "Identidade",
       "judgeSection": "Configuração do juiz",
       "endpointSection": "Ponto final",
@@ -8592,23 +8772,6 @@
         "samplingAll": "Avaliar cada correspondência",
         "samplingRate": "Amostra aleatória por taxa",
         "samplingCount": "Primeiras N correspondências",
-        "manualSection": "Avaliação Manual",
-        "manualHelp": "Coloque os scorers deste job na fila para um alvo explícito. Execuções manuais ignoram a amostragem automática e registram o motivo nos metadados da pontuação.",
-        "manualTargetIdLabel": "ID do Alvo",
-        "manualSpanIdLabel": "ID do Span",
-        "manualSpanIdPlaceholder": "span_id",
-        "manualTraceIdLabel": "ID do Trace",
-        "manualTraceIdPlaceholder": "trace_id",
-        "manualSessionIdLabel": "ID da Sessão",
-        "manualSessionIdPlaceholder": "session_id",
-        "manualReasonLabel": "Motivo",
-        "manualReasonPlaceholder": "Por que você está re-executando este alvo?",
-        "manualVariablesLabel": "Variáveis JSON",
-        "manualVariablesObjectError": "As variáveis devem ser um objeto JSON",
-        "manualTargetRequired": "ID do Alvo é obrigatório",
-        "manualSubmit": "Executar Avaliação Manual",
-        "manualSuccess": "Tarefa(s) de avaliação {count} enfileirada(s)",
-        "manualError": "Avaliação manual falhou",
         "metadataSection": "Metadados",
         "versionLabel": "Versão",
         "pipelineLabel": "ID do Pipeline",
@@ -8770,20 +8933,27 @@
       "inputMapping": {
         "title": "Variáveis do prompt",
         "hint": {
-          "span": "Mapeie cada variável para o campo do span que fornece seu valor.",
-          "trace": "Os valores do trace são preenchidos automaticamente. Mapeie qualquer outra coisa para um campo do span.",
-          "session": "Os valores da sessão são preenchidos automaticamente. Mapeie qualquer outra coisa para um campo do span."
+          "span": "Mapeie cada variável para um atributo de span.",
+          "trace": "Mapeie cada variável para um valor fornecido pelo sistema ou atributo de span.",
+          "session": "Mapeie cada variável para um valor fornecido pelo sistema ou atributo de span."
+        },
+        "placeholder": "Selecionar um valor",
+        "searchPlaceholder": "Pesquisar valores do sistema e atributos de span…",
+        "groups": {
+          "systemProvided": "Valores fornecidos pelo sistema · Para cada {scope} que este job avalia",
+          "spanAttributes": "Atributos de span"
         },
         "selectScorers": "Selecione marcadores para configurar seus mapeamentos.",
         "noVariables": "Esse marcador não tem variáveis de modelo para mapear.",
         "variableCount": "variáveis {count}",
         "systemProvided": {
-          "title": "Variáveis de {scope}",
-          "description": "O OpenObserve fornece esses valores do próprio {scope}. Um prompt de scorer pode usá-los diretamente — nenhum mapeamento necessário.",
+          "about": "Sobre valores fornecidos pelo sistema",
+          "title": "Valores do sistema {scope}",
+          "description": "O OpenObserve constrói esses valores separadamente para cada {scope} que este job avalia. Use-os como fontes ao mapear as variáveis de prompt do scorer.",
           "badge": "Fornecido pelo sistema",
           "selectorRequired": "Span Selector obrigatório",
           "columns": {
-            "variable": "Variável do prompt",
+            "variable": "Valor",
             "source": "Origem",
             "description": "Valor fornecido"
           },
@@ -8830,7 +9000,7 @@
           "fields": "Selecione pelo menos um campo para um esquema personalizado.",
           "maximumSpans": "O máximo de spans deve ser um número inteiro positivo.",
           "budget": "Muitos spans para os campos selecionados. Reduza a contagem de spans ou leia menos campos.",
-          "binding": "Selecione um Seletor de Span para cada scorer."
+          "binding": "Selecione um Seletor de Span para cada scorer que usa spans de trace."
         }
       },
       "preview": {
@@ -8868,10 +9038,12 @@
       "saveError": "Falha ao salvar o trabalho de avaliação",
       "createdAndActivated": "Trabalho de avaliação criado e ativado",
       "createdButActivateFailed": "Trabalho de avaliação criado, mas a ativação falhou",
+      "savedAndActivated": "Job de avaliação salvo e ativado",
+      "savedButActivateFailed": "Job de avaliação salvo, mas ativação falhou",
       "validation": {
         "nameRequired": "Job name is required",
         "streamRequired": "A stream is required",
-        "idleWindowMinimum": "A janela ociosa deve ter pelo menos 1 segundo",
+        "idleWindowMinimum": "A janela de inatividade deve ter pelo menos 1 segundo",
         "idleWindowMaximumTrace": "A janela ociosa de trace não pode exceder 30 minutos",
         "idleWindowMaximumSession": "A janela ociosa de sessão não pode exceder 4 horas",
         "maxAgeMaximumTrace": "A idade máxima de trace não pode exceder 2 horas",
@@ -9294,6 +9466,44 @@
     "lastRefreshed": "Última atualização: {time}"
   },
   "synthetics": {
+    "tokens": {
+      "title": "Tokens de Sintéticos",
+      "explanation": "Tokens o2syn_ de nível de organização que seus agentes privados usam para autenticar ao buscar jobs. Locais públicos (Lambda) usam o token padrão automaticamente; crie um token nomeado e incorpore-o nos agentes de uma região para limitar o raio de explosão dessa região.",
+      "summary": "Tokens que seus agentes privados usam para buscar jobs.",
+      "rotateDefaultBtn": "Rotacionar padrão",
+      "createTokenBtn": "Criar token",
+      "searchPlaceholder": "Pesquisar tokens",
+      "default": "Padrão",
+      "tokenNameLabel": "Nome",
+      "tokenNamePlaceholder": "us-east",
+      "tokenNameHint": "Nomeie-o de acordo com a região ou site e, em seguida, incorpore-o nos agentes dessa região através do comando de configuração.",
+      "tokenColumn": "Token",
+      "agentsColumn": "Agentes",
+      "createdBy": "Criado por",
+      "createTokenTitle": "Criar token de sintéticos",
+      "newTokenRevealed": "Novo token — copie agora",
+      "rawTokenLabel": "Token (mostrado uma vez)",
+      "installHint": "Cole no comando de configuração do agente: --token=<token>",
+      "installCmdLabel": "Comando de instalação (token incluído)",
+      "installCmdHint": "Execute isso no host do agente. O token está embutido — substitua <location-name> pelo seu local. Não será mostrado novamente.",
+      "copyCmdBtn": "Copiar comando",
+      "copyTokenBtn": "Copiar token",
+      "copiedToast": "Token copiado para a área de transferência",
+      "disableDefaultBlocked": "O token padrão não pode ser desativado — rotacione-o primeiro",
+      "nameReserved": "'default' é reservado — use Rotacionar para substituir o token padrão",
+      "fetchError": "Falha ao carregar tokens",
+      "createSuccess": "Token criado",
+      "createError": "Falha ao criar token",
+      "rotateSuccess": "Token padrão rotacionado — o antigo permanece válido até desativá-lo",
+      "rotateError": "Falha ao rotacionar token",
+      "enabledSuccess": "Token ativado",
+      "disabledSuccess": "Token desativado",
+      "updateError": "Falha ao atualizar token",
+      "empty": {
+        "title": "Nenhum token de sintéticos",
+        "description": "Crie um token nomeado para escopo dos agentes de uma região, ou use o padrão da organização."
+      }
+    },
     "authNetwork": {
       "addCookie": "Adicionar cookie",
       "addHeader": "Adicionar cabeçalho",
@@ -9671,12 +9881,15 @@
       "assertions": "Asserções",
       "assertionsFailed": "Falhou",
       "assertionsPassed": "Passou",
+      "assertionsNotEvaluated": "Não avaliado",
+      "assertionsNotEvaluatedHint": "A requisição nunca retornou uma resposta, então nada foi verificado.",
       "certExpires": "Expira em {date}",
       "completed": "concluído",
       "daysRemaining": "{days} dias restantes",
       "error": "Erro",
       "failed": "Falhou",
       "init": "Inicialização",
+      "loading": "Carregando detalhes da execução",
       "location": "Localização",
       "notFound": "Execução não encontrada",
       "passed": "Passou",
@@ -9708,7 +9921,7 @@
       "clearFiltersDesc": "Remover todos os filtros ativos",
       "device": "Dispositivo",
       "duration": "Duração",
-      "editMonitor": "Monitor de edição",
+      "editCheck": "Editar Verificação",
       "error": "Erro",
       "failed": "Falhou",
       "failedRuns": "Execuções com falha",
@@ -10091,6 +10304,11 @@
         "browserNote": "Os testes de navegador ainda não podem ser executados a partir de locais privados — apenas verificações de protocolo (HTTP, TCP, TLS, SSH).",
         "locationNameLabel": "Nome do local",
         "locationNamePlaceholder": "Sede Corporativa",
+        "typeTitle": "O que este agente executa",
+        "typeProtocol": "Rede",
+        "typeBrowser": "Navegador",
+        "typeProtocolHint": "Verificações HTTP, TCP, TLS e SSH. Executa o agente Go — Docker, Kubernetes, Linux ou Windows.",
+        "typeBrowserHint": "Jornadas do navegador. Executa a imagem Playwright — apenas Docker ou Kubernetes.",
         "tabDocker": "Docker",
         "tabK8s": "Kubernetes",
         "tabLinux": "Linux",
@@ -10108,6 +10326,7 @@
         "agentsSubtitle": "Os agentes se registram automaticamente a partir da sua infraestrutura e são somente leitura aqui.",
         "agentName": "Agente",
         "recoverAgent": "Recupere este agente — copie um comando de configuração pré-preenchido com seu nome",
+        "restartConfig": "Reiniciar configuração — copie o comando de configuração deste agente para reexecutar a instalação / reinicialização do docker (ex.: após uma rotação de token)",
         "noAgents": "Nenhum agente se registrou para este local ainda.",
         "checksTitle": "Verificações em execução a partir deste local",
         "checkName": "Nome",

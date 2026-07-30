@@ -364,6 +364,8 @@
   },
   "common": {
     "beta": "Beta",
+    "play": "Phát",
+    "pause": "Tạm dừng",
     "close": "Đóng",
     "cancel": "Hủy",
     "ok": "OK",
@@ -514,7 +516,9 @@
     "fillRequiredFields": "Vui lòng điền các trường bắt buộc",
     "test": "Kiểm tra",
     "username": "Tên đăng nhập",
-    "password": "Mật khẩu"
+    "password": "Mật khẩu",
+    "field": "Trường",
+    "enterValueOrVariable": "Nhập giá trị hoặc $variable"
   },
   "flow": {
     "stepPicker": {
@@ -905,9 +909,13 @@
     "language": "Ngôn ngữ",
     "actions": "Hành động",
     "keyboardShortcuts": "Phím tắt",
-    "synthetic": "Synthetics"
+    "synthetic": "Synthetics",
+    "experience": "Trải nghiệm"
   },
   "rum": {
+    "noSessionReplay": "Không có phiên phát lại",
+    "seek": "Tua",
+    "playbackSpeed": "Tốc độ phát",
     "title": "Giám sát người dùng thực",
     "subtitle": "Giám sát phiên người dùng thực, lỗi và hiệu suất giao diện người dùng",
     "issueColumn": "Vấn đề",
@@ -1016,6 +1024,7 @@
     "desktop": "Máy tính để bàn",
     "mobile": "Di động",
     "tablet": "Máy tính bảng",
+    "platform": "Nền tảng",
     "vsPreviousPeriod": "so với kỳ trước",
     "seeSessions": "Xem các phiên",
     "openErrorTracking": "Mở trong Theo dõi lỗi",
@@ -1652,6 +1661,8 @@
     "object": "Đối tượng",
     "serviceAccounts": "Tài khoản dịch vụ",
     "ingestionTokens": "Token nạp dữ liệu",
+    "syntheticsTokens": "Token Synthetics",
+    "syntheticsTokensDesc": "Token o2syn_ cấp tổ chức mà các agent synthetics riêng của bạn dùng để kéo công việc",
     "serviceAccountsName": "Tên tài khoản dịch vụ",
     "basicUsers": "Người dùng",
     "organizationMembers": "Thành viên tổ chức",
@@ -2081,7 +2092,6 @@
     "search": "Tìm kiếm quy trình làm việc",
     "refresh": "Làm mới quy trình làm việc",
     "trigger": "Bộ kích hoạt",
-    "triggerAlertFired": "Cảnh báo đã kích hoạt",
     "steps": "Các bước",
     "status": "Trạng thái",
     "updated": "Đã cập nhật",
@@ -2133,13 +2143,21 @@
       "cta": "Tạo quy trình",
       "soonCta": "Có trong bản phát hành tương lai",
       "comingSoon": "Sắp ra mắt",
-      "soon": "Sớm",
-      "alertFired": "Cảnh báo đã kích hoạt",
-      "alertFiredDesc": "Chạy khi có cảnh báo",
-      "schedule": "Lịch trình",
-      "scheduleDesc": "Chạy theo lịch trình",
-      "webhook": "Webhook",
-      "webhookDesc": "Chạy trên một Webhook đến"
+      "soon": "Sớm"
+    },
+    "triggerKind": {
+      "alertFired": {
+        "label": "Cảnh báo đã kích hoạt",
+        "node": "Kích hoạt cảnh báo",
+        "desc": "Chạy khi có cảnh báo kích hoạt",
+        "intro": "Khi một cảnh báo được liên kết kích hoạt, mọi bước tiếp theo đều nhận được tải trọng này."
+      },
+      "incidentEvent": {
+        "label": "Sự kiện sự cố",
+        "node": "Kích hoạt sự cố",
+        "desc": "Chạy khi có sự kiện vòng đời sự cố",
+        "intro": "Khi một sự kiện sự cố xảy ra, mọi bước tiếp theo đều nhận được tải trọng này."
+      }
     },
     "triggerMeta": {
       "orgId": "ID tổ chức mà cảnh báo thuộc về.",
@@ -2178,9 +2196,6 @@
       "skipped": "Đã bỏ qua",
       "errorsN": "{count} lỗi",
       "runError": "Không thể chạy kiểm tra.",
-      "saveToTestTitle": "Lưu & Kiểm tra",
-      "saveToTestBody": "Kiểm tra chạy phiên bản đã lưu của workflow này. Bạn có muốn lưu các thay đổi trước không?",
-      "saveAndTest": "Lưu & Kiểm tra",
       "stepResult": {
         "viewHint": "Nhấp để xem Đầu vào / Đầu ra",
         "input": "Đầu vào",
@@ -2227,7 +2242,6 @@
       "kindTrigger": "Trình kích hoạt",
       "kindLogic": "Logic",
       "kindAction": "Hành động",
-      "alertTrigger": "Trình kích hoạt cảnh báo",
       "condition": "Điều kiện",
       "function": "Hàm",
       "sendToDestination": "Đích",
@@ -2252,7 +2266,6 @@
       "triggerAlertsNone": "Không tìm thấy cảnh báo nào trong tổ chức này.",
       "triggerAlertsError": "Không thể tải cảnh báo",
       "triggerNote": "Quy trình này chạy khi bất kỳ cảnh báo nào được chọn kích hoạt.",
-      "triggerPayloadIntro": "Khi một cảnh báo được liên kết kích hoạt, mọi bước tiếp theo đều nhận được tải trọng này.",
       "triggerStructureTitle": "Cấu trúc tải trọng",
       "triggerStructureHint": "Di chuột qua trường để xem chi tiết",
       "triggerDetailHint": "Di chuột hoặc tập trung vào trường bên trên để xem loại và ý nghĩa của nó.",
@@ -2261,6 +2274,10 @@
       "triggerDataBlock": "data[] · Các hàng của cảnh báo của bạn",
       "triggerDataColumns": "Các cột kết quả",
       "triggerDataExampleNote": "Chỉ là ví dụ — các cột thực tế đến từ truy vấn của cảnh báo của bạn.",
+      "incidentEventTypeLabel": "Loại sự kiện",
+      "incidentCommonTitle": "Trường chung (Mọi sự kiện)",
+      "incidentSpecificTitle": "Trường cụ thể của sự kiện",
+      "incidentNoExtraFields": "Sự kiện này không thêm trường nào ngoài các trường chung.",
       "triggerDataBlockNote": "Một mảng với một đối tượng cho mỗi bản ghi khớp. Các cột của nó đến từ truy vấn riêng của cảnh báo, vì vậy chúng khác nhau theo từng cảnh báo — tham chiếu chúng dưới dạng data[].<cột>.",
       "conditionBody": "Đặt quy tắc để rẽ nhánh",
       "conditionBodySet": "Rẽ nhánh theo quy tắc",
@@ -2399,7 +2416,7 @@
     "periodGreaterThanZero": "Khoảng thời gian phải lớn hơn 0",
     "frequencyGreaterThanSeconds": "Tần suất phải lớn hơn {seconds} giây.",
     "minimumFrequencyMinutes": "Tần suất tối thiểu phải là {minutes} phút",
-    "streamSelectionNameInvalid": "Chỉ sử dụng ký tự chữ số và '+=,.@-_', không có khoảng trắng.",
+    "streamSelectionNameInvalid": "Chỉ sử dụng ký tự chữ và số và '+=,.{'@'}-_', không có khoảng trắng.",
     "functionAlreadyAssociated": "Hàm đã được liên kết",
     "atLeastOneCondition": "Vui lòng thêm ít nhất một điều kiện",
     "fillAllConditionFields": "Vui lòng điền tất cả các trường điều kiện (cột, toán tử và giá trị là bắt buộc)",
@@ -2602,6 +2619,9 @@
     "resetRUMTokenLabel": "Đặt lại Token RUM",
     "generateRUMTokenLabel": "Tạo Token RUM",
     "generateRUMTokenMessage": "Tạo Token RUM để kích hoạt RUM cho tổ chức của bạn.",
+    "rumPlatform": "Nền tảng",
+    "rumPlatformBrowser": "Trình duyệt",
+    "rumPlatformReactNative": "React Native",
     "npmStepTitle": "Phương pháp cài đặt NPM",
     "recommendedLabel": "Khuyên dùng",
     "customLabel": "Tùy chỉnh",
@@ -2836,7 +2856,7 @@
     "addToFavorites": "Thêm vào yêu thích",
     "removeFromFavorites": "Xóa khỏi yêu thích",
     "noFavoritesTitle": "Chưa có bảng điều khiển yêu thích nào",
-    "noFavoritesMessage": "Nhấp vào biểu tượng trái tim trên bất kỳ bảng điều khiển nào để xem nó ở đây, trên tất cả các thư mục.",
+    "noFavoritesMessage": "Nhấp vào biểu tượng ngôi sao trên bất kỳ bảng điều khiển nào để xem nó ở đây, trên tất cả các thư mục.",
     "moreActions": "Thao tác khác",
     "save": "Lưu",
     "cancel": "Hủy",
@@ -3673,7 +3693,8 @@
       "clause": "Mệnh đề {number}",
       "selectOperation": "Chọn thao tác",
       "addAnotherClause": "Thêm mệnh đề khác",
-      "removeClause": "Xóa mệnh đề"
+      "removeClause": "Xóa mệnh đề",
+      "addClause": "Thêm điều khoản"
     },
     "viewDashboard": {
       "refreshToApplyVariables": "Làm mới để áp dụng các thay đổi biến mới nhất",
@@ -3700,7 +3721,9 @@
       "add": "Thêm",
       "value": "Giá trị",
       "markAsNonTimestamp": "Đánh dấu trường này là không phải timestamp",
-      "renderDataAsJson": "Hiển thị dữ liệu dưới dạng JSON / Mảng"
+      "renderDataAsJson": "Hiển thị dữ liệu dưới dạng JSON / Mảng",
+      "sortBy": "Sắp xếp theo",
+      "havingHint": "Lọc theo tổng hợp"
     },
     "customChartTypeSelector": {
       "exampleOfCustomCharts": "Ví dụ về biểu đồ tùy chỉnh",
@@ -3911,6 +3934,10 @@
       "addedSuccessfully": "Dashboard đã được thêm thành công.",
       "creationFailed": "Tạo Dashboard thất bại.",
       "filesFailedValidation": "{count} tệp không vượt qua ràng buộc xác thực"
+    },
+    "rawQueryBuilder": {
+      "query": "Truy vấn",
+      "instruction": "Viết truy vấn SQL cho các hành động phức tạp."
     }
   },
   "panel": {
@@ -4603,6 +4630,14 @@
     "lastSuccessfulAt": "Thành công lần cuối lúc",
     "lastTrainedAt": "Được huấn luyện lần cuối lúc",
     "status": "Trạng thái",
+    "stateActive": "Đang hoạt động",
+    "statePaused": "Đã tạm dừng",
+    "stateFailed": "Thất bại",
+    "summaryActive": "Đang hoạt động",
+    "summaryPaused": "Đã tạm dừng",
+    "summaryFailed": "Thất bại",
+    "summaryRecent": "Đã kích hoạt < 15m",
+    "summaryTotal": "Tổng cộng",
     "numOfEvents": "Số lượng sự kiện",
     "view": "Xem",
     "webhook": "Web Hook",
@@ -4779,6 +4814,13 @@
       "id": "Mã",
       "status": "Trạng thái",
       "severity": "Mức độ nghiêm trọng",
+      "severityCritical": "P1 · Nghiêm trọng",
+      "severityHigh": "P2 · Cao",
+      "severityMedium": "P3 · Trung bình",
+      "severityLow": "P4 · Thấp",
+      "moreDimensions": "+{count} khác",
+      "filterAll": "Tất cả",
+      "filterActive": "Đang hoạt động",
       "alertCount": "Cảnh báo",
       "firstAlertAt": "Cảnh báo đầu tiên",
       "lastAlertAt": "Cảnh báo cuối cùng",
@@ -4829,6 +4871,41 @@
       "rcaInProgress": "Đang phân tích nguyên nhân gốc rễ...",
       "rcaCompleted": "Phân tích nguyên nhân gốc rễ hoàn tất",
       "noRcaYet": "Không có phân tích nguyên nhân gốc rễ. Nhấp 'Phân tích' để bắt đầu.",
+      "rcaAnalyzeIncident": "Phân tích sự cố",
+      "rcaAnalyzing": "AI SRE Agent đang phân tích sự cố này, vui lòng đợi…",
+      "rcaAnalyzingHint": "Báo cáo sẽ xuất hiện ở đây sau khi phân tích hoàn tất.",
+      "rcaReanalyzing": "AI SRE Agent đang xem xét những thay đổi kể từ lần phân tích trước…",
+      "rcaReanalyzingHint": "Báo cáo sẽ được cập nhật sau khi phân tích hoàn tất.",
+      "rcaStartedAgo": "Đã bắt đầu cách đây {time}",
+      "rcaCancel": "Hủy",
+      "rcaCancelling": "Đang hủy…",
+      "rcaCancelled": "Đã hủy phân tích",
+      "rcaCancelFailed": "Không thể hủy phân tích",
+      "rcaFailed": "Phân tích AI thất bại",
+      "rcaFailedGeneric": "Không thể thực hiện phân tích RCA",
+      "rcaRetry": "Thử lại phân tích",
+      "rcaStale": "Phân tích này đã chạy quá lâu bất thường và có thể đã dừng. Bạn có thể hủy và thử lại.",
+      "rcaStatus": "Phân tích AI",
+      "rcaStatusAnalyzing": "Đang phân tích",
+      "rcaStatusFailed": "Thất bại",
+      "rcaStatusReady": "Sẵn sàng",
+      "rcaStatusNone": "Chưa được phân tích",
+      "rcaAnalyzedAgo": "Đã phân tích cách đây {time}",
+      "rcaCopy": "Sao chép báo cáo",
+      "rcaCopied": "Báo cáo đã được sao chép vào clipboard",
+      "rcaCopyFailed": "Không thể sao chép báo cáo",
+      "rcaDownload": "Tải xuống dưới dạng Markdown",
+      "rcaReanalyze": "Phân tích lại",
+      "rcaFreshAnalysis": "Phân tích mới",
+      "rcaFreshAnalysisHint": "Phân tích từ đầu, bỏ qua báo cáo trước",
+      "rcaBuildOnPrevious": "Xây dựng dựa trên báo cáo trước",
+      "rcaBuildOnPreviousHint": "Gửi báo cáo hiện tại để agent mở rộng nó",
+      "rcaHistory": "Lịch sử báo cáo",
+      "rcaHistoryCurrent": "Hiện tại",
+      "rcaHistoryEmpty": "Không có báo cáo trước đó",
+      "rcaHistoryLoadFailed": "Không thể tải lịch sử báo cáo",
+      "rcaViewingArchived": "Bạn đang xem một báo cáo trước đó",
+      "rcaBackToCurrent": "Quay lại báo cáo hiện tại",
       "sreChat": "Hỏi trợ lý SRE",
       "goBack": "Quay lại",
       "incident": "Sự cố",
@@ -5438,7 +5515,7 @@
       "modeWorkspace": "Yêu thích",
       "workspace": {
         "emptyScratchpadTitle": "Bạn chưa có mục yêu thích nào",
-        "emptyScratchpadDesc": "Thêm số liệu vào yêu thích trong Khám phá (♥ trên thẻ) để tập hợp chúng ở đây. Khi muốn giữ lại, hãy Chuyển đổi thành bảng điều khiển."
+        "emptyScratchpadDesc": "Thêm metrics vào yêu thích trong Explore (★ trên một thẻ) để thu thập chúng ở đây. Khi bạn muốn giữ lại, hãy Chuyển đổi thành bảng điều khiển."
       },
       "visualizePlaceholder": "Trực quan hóa sắp ra mắt — xây dựng biểu đồ từ truy vấn PromQL ngay tại đây.",
       "railsAriaLabel": "Bộ lọc số liệu",
@@ -5457,7 +5534,8 @@
       "queryFailed": "Truy vấn thất bại",
       "noData": "Không có dữ liệu",
       "noMetrics": "Chưa có số liệu trong tổ chức này.",
-      "learnIngest": "Tìm hiểu cách nhập số liệu",
+      "setupIngestion": "Thiết lập thu thập metrics",
+      "setupIngestionDesc": "Kết nối nguồn dữ liệu metrics",
       "noMatch": "Không có số liệu nào khớp với bộ lọc hiện tại",
       "noMatchHint": "Hãy thử xóa bộ lọc nhãn, xóa lựa chọn tiền tố/hậu tố, hoặc chuyển từ “Có dữ liệu” sang “Tất cả”.",
       "noMatchHintFavorites": "Thử loại bỏ bộ lọc nhãn hoặc chuyển từ “Có dữ liệu” sang “Tất cả”.",
@@ -5485,6 +5563,7 @@
         "helpAria": "Giới thiệu {name}: {help}",
         "refreshAria": "Làm mới {name}",
         "refreshTooltip": "Làm mới số liệu này",
+        "refreshToApplyTimeRange": "Làm mới để áp dụng khoảng thời gian đã chọn",
         "configureAria": "Cấu hình chức năng cho {name}",
         "configureTooltip": "Cấu hình chức năng",
         "favoriteAddAria": "Thêm {name} vào yêu thích",
@@ -5843,7 +5922,18 @@
       "agentIdFields": "Trường dự phòng ID tác nhân",
       "agentIdHelp": "Các thuộc tính đến để sử dụng làm dự phòng cho gen_ai.agent.id.",
       "agentIdInfo": "Chỉ được kiểm tra khi thuộc tính gen_ai.agent.id tiêu chuẩn bị thiếu hoặc trống. Thêm một thuộc tính telemetry đến mỗi dòng.",
+      "envFields": "Trường dự phòng môi trường",
+      "envHelp": "Thuộc tính đến để sử dụng làm môi trường của agent.",
+      "envInfo": "Chỉ được kiểm tra khi thuộc tính deployment.environment.name tiêu chuẩn bị thiếu hoặc trống. Thêm một thuộc tính telemetry đến mỗi dòng.",
+      "versionFields": "Trường dự phòng phiên bản",
+      "versionHelp": "Thuộc tính đến để sử dụng làm phiên bản của agent.",
+      "versionInfo": "Chỉ được kiểm tra khi thuộc tính gen_ai.agent.version tiêu chuẩn bị thiếu hoặc trống. Thêm một thuộc tính telemetry đến mỗi dòng.",
       "fieldsPlaceholder": "agent.name\nllm.agent.name",
+      "agentNamePlaceholder": "my.custom.agent_name\nteam.agent.label",
+      "agentIdPlaceholder": "my.custom.agent_id\nteam.agent.uid",
+      "envPlaceholder": "my.custom.env\ntier",
+      "versionPlaceholder": "my.custom.version\nrelease.tag",
+      "alwaysAppliedStandard": "Tiêu chuẩn (được kiểm tra trước):",
       "applyDefaults": "Áp dụng mặc định",
       "resetToEmpty": "Đặt lại về trống",
       "clearRegistry": "Xóa sổ đăng ký",
@@ -6408,6 +6498,12 @@
     "querySource": "Nguồn truy vấn"
   },
   "traces": {
+    "agentDefaultVariant": "mặc định",
+    "agentNoEnv": "(Không có môi trường)",
+    "agentNoVersion": "(Không có phiên bản)",
+    "allAgents": "Tất cả tác nhân",
+    "agentCountBadgeSingular": "{count} tác nhân",
+    "agentCountBadgePlural": "{count} tác nhân",
     "serviceGraph": {
       "searchPlaceholder": "Dịch vụ tìm kiếm",
       "noStreamsDetected": "Không phát hiện luồng nào. Đảm bảo số liệu đồ thị dịch vụ bao gồm nhãn stream_name.",
@@ -6621,6 +6717,8 @@
     },
     "sessionsList": {
       "streamLabel": "Luồng",
+      "loadingAgents": "Đang tải tác nhân…",
+      "loadingStreams": "Đang tải luồng…",
       "noStreamsTooltip": "Không có luồng LLM nào khả dụng.",
       "session": "phiên",
       "sessions": "phiên",
@@ -6635,6 +6733,7 @@
       "loading": "Đang tải phiên…",
       "tokenTooltip": "Đầu vào: {input} · Đầu ra: {output} · Tổng: {total}",
       "durationNs": "ns",
+      "errorCountTooltip": "{count} lỗi trong phiên này",
       "unknownUser": "Người dùng không xác định",
       "columns": {
         "timestamp": "Dấu thời gian",
@@ -6865,6 +6964,8 @@
     "lLMInsightsDashboard": {
       "stream": "Luồng",
       "agent": "Tác nhân",
+      "compareEntry": "So sánh phiên bản",
+      "compareEntryHint": "So sánh hai phiên bản của tác nhân này cạnh nhau",
       "failedToLoad": "Không tải được Insights",
       "retry": "Thử lại",
       "noAgentsInRange": "Không có tác nhân nào trong phạm vi này",
@@ -7153,7 +7254,7 @@
     "skillContentRequired": "Nội dung kỹ năng là bắt buộc",
     "genericConfig": "Cấu hình",
     "genericData": "Cấu hình JSON",
-    "genericDataPlaceholder": "{}",
+    "genericDataPlaceholder": "{'{}'}",
     "invalidJson": "Phải là JSON hợp lệ"
   },
   "cipherKey": {
@@ -7711,6 +7812,57 @@
   },
   "aiObservability": {
     "title": "Khả năng quan sát AI",
+    "deltaStrip": {
+      "metricLabel": {
+        "volume": "Khối lượng",
+        "errorRate": "Tỷ lệ lỗi",
+        "p50": "Độ trễ P50",
+        "p95": "Độ trễ P95",
+        "p99": "Độ trễ P99",
+        "cost": "Chi phí / trace"
+      },
+      "insufficientLabel": "mang tính chỉ dẫn",
+      "tooltip": {
+        "ciRange": "{level}% CI: {lower} đến {upper}",
+        "method": "Phương pháp: {method}",
+        "associativeHigher": "B cao hơn A — môi trường khác nhau, vì vậy điều này chỉ mang tính liên kết, không phải bằng chứng B gây ra.",
+        "associativeLower": "B thấp hơn A — môi trường khác nhau, vì vậy điều này chỉ mang tính liên kết, không phải bằng chứng B gây ra.",
+        "causalRegressed": "B suy giảm so với A trong cùng cửa sổ thời gian thực.",
+        "causalImproved": "B cải thiện so với A trong cùng cửa sổ thời gian thực.",
+        "insufficient": "Chưa đủ mẫu để đưa ra kết luận chắc chắn — hãy coi mức chênh lệch này chỉ mang tính chỉ dẫn.",
+        "methodNewcombe": "Khoảng tin cậy tỷ lệ Wilson/Newcombe",
+        "methodBootstrap": "tái lấy mẫu bootstrap"
+      }
+    },
+    "overlayChart": {
+      "seriesA": "Phiên bản A",
+      "seriesB": "Phiên bản B",
+      "xAxisSinceRollout": "Giờ kể từ khi triển khai",
+      "xAxisWallClock": "Thời gian",
+      "lowResolution": "Không đủ độ phân giải thời gian để vẽ cả hai phiên bản trong cửa sổ này — thu hẹp phạm vi ngày (hoặc chuyển sang “Kể từ mỗi lần triển khai”).",
+      "xAxisSinceRolloutMinutes": "Phút kể từ khi triển khai",
+      "xAxisSinceRolloutHours": "Giờ kể từ khi triển khai",
+      "xAxisSinceRolloutDays": "Ngày kể từ khi triển khai",
+      "xAxisWallClockMinutes": "Phút (đã trôi qua, thời gian thực)",
+      "xAxisWallClockHours": "Giờ (đã trôi qua, thời gian thực)",
+      "xAxisWallClockDays": "Ngày (đã trôi qua, thời gian thực)"
+    },
+    "errorDiff": {
+      "title": "Thay đổi lỗi",
+      "introduced": "Được giới thiệu",
+      "fixed": "Đã sửa",
+      "shared": "Chung",
+      "noData": "Không có dữ liệu lỗi để so sánh trong cửa sổ này.",
+      "subtitle": "Cách mỗi lớp lỗi thay đổi từ {a} sang {b}.",
+      "introducedHint": "mới trong {b}",
+      "fixedHint": "biến mất trong {b}",
+      "sharedHint": "trong cả hai phiên bản",
+      "legendA": "A",
+      "legendB": "B",
+      "legendDelta": "Δ",
+      "sharedColHeader": "{a} → {b}",
+      "countIn": "{count} trong {version}"
+    },
     "sections": {
       "monitor": "Giám sát",
       "evaluate": "Đánh giá"
@@ -7735,13 +7887,17 @@
       "scorers": "Tạo và quản lý các bộ chấm điểm đánh giá đầu ra LLM",
       "scoreConfigs": "Cấu hình các tiêu chí chấm điểm được sử dụng bởi các đánh giá của bạn"
     },
+    "scope": {
+      "env": "Môi trường",
+      "agent": "Tác nhân",
+      "version": "Phiên bản"
+    },
     "agentGraph": {
       "stream": "Luồng",
       "agent": "Tác nhân",
       "noAgentsTitle": "Không tìm thấy tác nhân nào",
       "noAgentsDescription": "Không có tác nhân nào được phát hiện trong khoảng thời gian này. Hãy thử mở rộng khoảng thời gian hoặc kiểm tra xem dấu vết của bạn có bao gồm các thuộc tính tác nhân gen_ai không.",
-      "agentCountSingular": "tác nhân",
-      "agentCountPlural": "các tác nhân"
+      "versionAgnosticHint": "Cấu trúc liên kết giống nhau trên các phiên bản — biểu đồ phạm vi theo môi trường, không theo phiên bản. Sử dụng so sánh phiên bản để so sánh các phiên bản."
     },
     "kpi": {
       "totalCost": "Tổng chi phí",
@@ -7796,12 +7952,20 @@
       },
       "loopsTitle": "Agent bị lặp",
       "loopsHint": "Agent chạy lại cùng một công cụ nhiều lần mỗi trace",
+      "summaryLoops": "Tác nhân lặp",
+      "summaryFailures": "Phân loại lỗi",
+      "summaryAgents": "Tác nhân bị ảnh hưởng",
       "failuresTitle": "Phân loại lỗi",
       "failuresHint": "Lỗi được nhóm theo loại, theo từng agent",
+      "footerLoops": "Vòng lặp",
+      "footerFailures": "Lớp lỗi",
       "costTitle": "Chi phí & lỗi theo agent",
       "costHint": "Các agent nào gây ra chi phí và lỗi",
       "noLoops": "Không phát hiện hành vi lặp trong phạm vi này",
       "noFailures": "Không có lỗi agent nào trong phạm vi này",
+      "noLoopsForAgent": "Không có hành vi lặp cho {agent} trong phạm vi này — hãy chuyển tác nhân hoặc mở rộng phạm vi thời gian",
+      "noFailuresForAgent": "Không có lỗi cho {agent} trong phạm vi này — hãy chuyển tác nhân hoặc mở rộng phạm vi thời gian",
+      "scopeLabel": "Phạm vi",
       "noCost": "Không có chi phí agent nào được ghi nhận trong phạm vi này",
       "unknownAgent": "(agent không xác định)",
       "colAgent": "Agent",
@@ -7822,6 +7986,8 @@
         "worstLoopTraces": "Dấu vết tệ nhất (nhiều lần lặp nhất trước)",
         "topCostTraces": "Dấu vết tốn kém nhất",
         "noTraces": "Không tìm thấy dấu vết nào cho tín hiệu này",
+        "footerTraces": "Dấu vết",
+        "footerErrors": "Lỗi",
         "errorsTitle": "Lỗi nói gì",
         "noErrors": "Không có thông báo lỗi nào được ghi lại — mở một dấu vết để kiểm tra",
         "colTraceId": "Dấu vết",
@@ -7838,6 +8004,39 @@
         "loopExplain": "Tỷ lệ lặp cao thường có nghĩa là agent không lưu cache kết quả hoặc đang thử lại. Mở các dấu vết tệ nhất bên dưới để xem các cuộc gọi lặp.",
         "failExplain": "Đây là các thông báo lỗi thực tế đằng sau lớp lỗi này — đọc chúng để tìm cách khắc phục, hoặc mở một dấu vết để xem nó xảy ra ở đâu.",
         "costExplain": "Các dấu vết này đã làm tăng chi tiêu của agent này. Mở các dấu vết tốn kém nhất để xem những gì đã chạy."
+      }
+    },
+    "versionCompare": {
+      "entry": "So sánh phiên bản…",
+      "entryDisabledHint": "Cần ít nhất 2 phiên bản của tác nhân này để so sánh",
+      "datePickerDisabled": "Các cửa sổ là theo từng phiên bản trong chế độ này",
+      "sampledNote": "Khoảng thời gian độ trễ & chi phí được tính từ tối đa {cap} dấu vết được lấy mẫu ngẫu nhiên cho mỗi phiên bản.",
+      "manual": {
+        "windowA": "Cửa sổ phiên bản A",
+        "windowB": "Cửa sổ phiên bản B"
+      },
+      "bar": {
+        "versionA": "Phiên bản A",
+        "versionB": "Phiên bản B",
+        "align": "Căn chỉnh",
+        "alignSinceRollout": "Kể từ mỗi lần triển khai",
+        "alignSameWallClock": "Cùng thời gian thực",
+        "alignManual": "Thủ công",
+        "exit": "Thoát so sánh",
+        "samePickHint": "Chọn hai phiên bản khác nhau để so sánh",
+        "autoWindow": "tự động: {duration}",
+        "windowLabelA": "Cửa sổ phiên bản A",
+        "windowLabelB": "Cửa sổ phiên bản B"
+      },
+      "banner": {
+        "smallSample": "Quá ít dữ liệu để so sánh — A có {nA}, B có {nB}. Mở rộng cửa sổ hoặc đợi thêm lưu lượng.",
+        "disjoint": "Các phiên bản này chạy vào các thời điểm khác nhau — sự khác biệt có thể phản ánh thay đổi lưu lượng, không phải bản thân phiên bản.",
+        "partial": "Các phiên bản này chạy một phần đồng thời — sự khác biệt có thể được giải thích một phần bởi thời điểm mỗi phiên bản chạy."
+      },
+      "windowCard": {
+        "label": "{env} · {version} — {window} · {count} dấu vết",
+        "clamp": "Đường cơ sở chỉ chạy {duration} — so sánh {duration} đầu tiên của mỗi phiên bản.",
+        "labelNoEnv": "{version} — {window} · {count} dấu vết"
       }
     }
   },
@@ -7873,6 +8072,32 @@
       "paused": "Công việc đã tạm dừng",
       "activateError": "Không thể kích hoạt công việc",
       "pauseError": "Không thể tạm dừng công việc"
+    },
+    "manualEvaluation": {
+      "titles": {
+        "span": "Đánh giá span",
+        "trace": "Đánh giá dấu vết",
+        "session": "Đánh giá phiên"
+      },
+      "targetLabels": {
+        "span": "ID Span",
+        "trace": "ID Dấu vết",
+        "session": "ID Phiên"
+      },
+      "scopes": {
+        "span": "span",
+        "trace": "dấu vết",
+        "session": "phiên"
+      },
+      "description": "Chọn một Công việc Đánh giá để chạy trên mục tiêu này. Trình xử lý đánh giá sẽ tải dữ liệu viễn thám nguồn từ phạm vi thời gian của trang này.",
+      "jobLabel": "Công việc Đánh giá",
+      "jobPlaceholder": "Chọn một Công việc Đánh giá",
+      "jobRequired": "Chọn một công việc đánh giá",
+      "noCompatibleJobs": "Không có công việc đánh giá {scope} nào sử dụng luồng trace {stream}.",
+      "loadJobsError": "Không thể tải các công việc đánh giá.",
+      "run": "Chạy đánh giá",
+      "queued": "Đã xếp hàng {count} nhiệm vụ đánh giá.",
+      "runError": "Không thể xếp hàng đánh giá."
     },
     "tabs": {
       "quality": "Chất lượng",
@@ -8084,6 +8309,7 @@
       "degraded": "Suy giảm",
       "archived": "Đã lưu trữ"
     },
+    "summaryAll": "Tất cả",
     "buttons": {
       "cancel": "Hủy",
       "close": "Đóng",
@@ -8094,17 +8320,13 @@
     },
     "scorerTypeDialog": {
       "title": "Tạo bộ chấm điểm mới",
-      "intro": "Chọn loại bộ chấm điểm. Cả ba đều là tùy chọn hàng đầu — chọn loại phù hợp với cách bạn muốn soạn và chạy nó.",
+      "intro": "Chọn loại chấm điểm. Cả hai đều là các tùy chọn hạng nhất — hãy chọn cái phù hợp với cách bạn muốn tạo và chạy nó.",
       "llmJudgeTitle": "LLM Judge",
       "llmJudgeDescription": "Sử dụng mô hình ngôn ngữ — thông qua Nhà cung cấp bạn đã cấu hình — để đánh giá ngữ nghĩa.",
       "llmJudgeCta": "Cấu hình trọng tài",
       "remoteTitle": "Từ xa",
       "remoteDescription": "Gọi điểm cuối HTTP của riêng bạn — giữ logic đánh giá trong môi trường của bạn.",
-      "remoteCta": "Cấu hình điểm cuối",
-      "codeTitle": "Mã",
-      "codeDescription": "Viết hàm chấm điểm bằng Python hoặc JavaScript và đẩy nó từ môi trường cục bộ của bạn.",
-      "codeCta": "Có sẵn trong bản phát hành tương lai",
-      "comingSoonBadge": "Sắp ra mắt"
+      "remoteCta": "Cấu hình điểm cuối"
     },
     "provider": {
       "backTo": "Quay lại Nhà cung cấp",
@@ -8407,48 +8629,6 @@
       "healthyLabel": "Khỏe mạnh:",
       "typeLabel": "Loại:",
       "promptVariablesLabel": "Các biến trong lời nhắc này:",
-      "promptVariableGuide": {
-        "title": "Các biến lời nhắc khả dụng",
-        "description": "Các biến này có thể được sử dụng trong lời nhắc ở trên. Cách mỗi biến được điền phụ thuộc vào những gì Công việc Đánh giá đánh giá.",
-        "columns": {
-          "variable": "Biến lời nhắc"
-        },
-        "scopes": {
-          "span": "Span",
-          "trace": "Trace",
-          "session": "Phiên"
-        },
-        "statuses": {
-          "jobMapped": "Ánh xạ trong Công việc Đánh giá",
-          "systemProvided": "Hệ thống cung cấp",
-          "requiresSelector": "Hệ thống cung cấp · yêu cầu Trình chọn Span",
-          "selectorRequired": "Yêu cầu Trình chọn Span",
-          "unavailable": "Không khả dụng"
-        },
-        "variables": {
-          "inputOutput": {
-            "span": "Ánh xạ các trường này với các trường span chứa đầu vào và đầu ra.",
-            "trace": "Đầu vào và đầu ra từ span gốc của trace.",
-            "session": "Không khả dụng — một phiên không có đầu vào hoặc đầu ra duy nhất."
-          },
-          "statistics": {
-            "span": "Ánh xạ tên này như bất kỳ biến scorer nào khác khi đánh giá một span đơn.",
-            "trace": "Chỉ số trace: số lượng span, thời lượng, số lần gọi LLM và công cụ, lỗi, token và chi phí.",
-            "session": "Chỉ số session: số lượng trace và lượt, thời lượng và lỗi."
-          },
-          "spans": {
-            "span": "Ánh xạ tên này như bất kỳ biến scorer nào khác khi đánh giá một span đơn.",
-            "trace": "Một tập con đã lọc các span của trace, được chọn bởi Span Selector của Eval Job.",
-            "session": "Không khả dụng cho các session."
-          },
-          "steps": {
-            "span": "Ánh xạ tên này như bất kỳ biến scorer nào khác khi đánh giá một span đơn.",
-            "trace": "Các span theo thứ tự thời gian; phần giữa được gấp lại khi trace rất dài.",
-            "session": "Các trace theo thứ tự thời gian, được biểu diễn như các lượt hội thoại."
-          }
-        },
-        "indexDescription": "{spansVar} và {stepsVar} đến dưới dạng mảng JSON. Tham chiếu toàn bộ biến — truy cập theo chỉ mục như {indexedVar} không được hỗ trợ."
-      },
       "identitySection": "Identity",
       "judgeSection": "Cấu hình trình đánh giá",
       "endpointSection": "Điểm cuối",
@@ -8592,23 +8772,6 @@
         "samplingAll": "Đánh giá mọi kết quả khớp",
         "samplingRate": "Lấy mẫu ngẫu nhiên theo tỷ lệ",
         "samplingCount": "N kết quả khớp đầu tiên",
-        "manualSection": "Đánh giá Thủ công",
-        "manualHelp": "Xếp hàng các scorer của công việc này cho một mục tiêu rõ ràng. Các lần chạy thủ công bỏ qua việc lấy mẫu tự động và ghi lý do trên metadata của điểm.",
-        "manualTargetIdLabel": "ID Mục tiêu",
-        "manualSpanIdLabel": "ID Span",
-        "manualSpanIdPlaceholder": "span_id",
-        "manualTraceIdLabel": "ID Trace",
-        "manualTraceIdPlaceholder": "trace_id",
-        "manualSessionIdLabel": "ID Session",
-        "manualSessionIdPlaceholder": "session_id",
-        "manualReasonLabel": "Lý do",
-        "manualReasonPlaceholder": "Tại sao bạn chạy lại mục tiêu này?",
-        "manualVariablesLabel": "JSON Biến",
-        "manualVariablesObjectError": "Biến phải là một đối tượng JSON",
-        "manualTargetRequired": "ID Mục tiêu là bắt buộc",
-        "manualSubmit": "Chạy Đánh giá Thủ công",
-        "manualSuccess": "Đã xếp hàng {count} tác vụ đánh giá",
-        "manualError": "Đánh giá thủ công thất bại",
         "metadataSection": "Siêu dữ liệu",
         "versionLabel": "Phiên bản",
         "pipelineLabel": "ID pipeline",
@@ -8770,20 +8933,27 @@
       "inputMapping": {
         "title": "Biến prompt",
         "hint": {
-          "span": "Ánh xạ mỗi biến tới trường span cung cấp giá trị của nó.",
-          "trace": "Giá trị trace được điền tự động. Ánh xạ bất kỳ giá trị nào khác tới trường span.",
-          "session": "Giá trị phiên được điền tự động. Ánh xạ bất kỳ giá trị nào khác tới trường span."
+          "span": "Ánh xạ từng biến tới một thuộc tính span.",
+          "trace": "Ánh xạ từng biến tới một giá trị do hệ thống cung cấp hoặc thuộc tính span.",
+          "session": "Ánh xạ từng biến tới một giá trị do hệ thống cung cấp hoặc thuộc tính span."
+        },
+        "placeholder": "Chọn một giá trị",
+        "searchPlaceholder": "Tìm kiếm giá trị hệ thống và thuộc tính span…",
+        "groups": {
+          "systemProvided": "Giá trị do hệ thống cung cấp · Cho mỗi {scope} mà công việc này đánh giá",
+          "spanAttributes": "Thuộc tính span"
         },
         "selectScorers": "Chọn người chấm điểm để cấu hình ánh xạ của họ.",
         "noVariables": "Người chấm điểm này không có biến mẫu nào để ánh xạ.",
         "variableCount": "{count} biến",
         "systemProvided": {
-          "title": "Biến {scope}",
-          "description": "OpenObserve cung cấp các giá trị này từ chính {scope}. Một prompt của bộ chấm điểm có thể sử dụng chúng trực tiếp — không cần ánh xạ.",
+          "about": "Về giá trị do hệ thống cung cấp",
+          "title": "Giá trị hệ thống của {scope}",
+          "description": "OpenObserve xây dựng các giá trị này riêng biệt cho từng {scope} mà công việc này đánh giá. Sử dụng chúng làm nguồn khi ánh xạ các biến prompt của bộ chấm điểm.",
           "badge": "Hệ thống cung cấp",
           "selectorRequired": "Cần có Span Selector",
           "columns": {
-            "variable": "Biến prompt",
+            "variable": "Giá trị",
             "source": "Nguồn",
             "description": "Giá trị được cung cấp"
           },
@@ -8830,7 +9000,7 @@
           "fields": "Chọn ít nhất một trường cho schema tùy chỉnh.",
           "maximumSpans": "Số span tối đa phải là một số nguyên dương.",
           "budget": "Quá nhiều span cho các trường đã chọn. Hãy giảm số lượng span hoặc đọc ít trường hơn.",
-          "binding": "Chọn một Span Selector cho mỗi bộ chấm điểm."
+          "binding": "Chọn một Span Selector cho mỗi bộ chấm điểm sử dụng trace spans."
         }
       },
       "preview": {
@@ -8868,10 +9038,12 @@
       "saveError": "Không thể lưu công việc đánh giá",
       "createdAndActivated": "Công việc đánh giá đã được tạo và kích hoạt",
       "createdButActivateFailed": "Công việc đánh giá đã được tạo, nhưng kích hoạt thất bại",
+      "savedAndActivated": "Công việc đánh giá đã được lưu và kích hoạt",
+      "savedButActivateFailed": "Công việc đánh giá đã được lưu, nhưng kích hoạt thất bại",
       "validation": {
         "nameRequired": "Tên công việc là bắt buộc",
         "streamRequired": "Một luồng là bắt buộc",
-        "idleWindowMinimum": "Thời gian chờ tối thiểu phải là 1 giây",
+        "idleWindowMinimum": "Cửa sổ không hoạt động phải ít nhất 1 giây",
         "idleWindowMaximumTrace": "Cửa sổ chờ của trace không được vượt quá 30 phút",
         "idleWindowMaximumSession": "Cửa sổ chờ của phiên không được vượt quá 4 giờ",
         "maxAgeMaximumTrace": "Tuổi tối đa của trace không được vượt quá 2 giờ",
@@ -9294,6 +9466,44 @@
     "lastRefreshed": "Làm mới lần cuối: {time}"
   },
   "synthetics": {
+    "tokens": {
+      "title": "Token Synthetics",
+      "explanation": "Các token o2syn_ cấp tổ chức mà các đại lý riêng của bạn sử dụng để xác thực khi họ kéo công việc. Các vị trí công cộng (Lambda) sử dụng token mặc định tự động; hãy tạo một token có tên và nhúng nó vào các đại lý của một vùng để giới hạn phạm vi ảnh hưởng của vùng đó.",
+      "summary": "Các token mà đại lý riêng của bạn sử dụng để kéo công việc.",
+      "rotateDefaultBtn": "Xoay mặc định",
+      "createTokenBtn": "Tạo token",
+      "searchPlaceholder": "Tìm kiếm token",
+      "default": "Mặc định",
+      "tokenNameLabel": "Tên",
+      "tokenNamePlaceholder": "us-east",
+      "tokenNameHint": "Đặt tên theo vùng hoặc trang web, sau đó nhúng nó vào các đại lý của vùng đó thông qua lệnh thiết lập.",
+      "tokenColumn": "Token",
+      "agentsColumn": "Đại lý",
+      "createdBy": "Được tạo bởi",
+      "createTokenTitle": "Tạo token synthetics",
+      "newTokenRevealed": "Token mới — sao chép ngay",
+      "rawTokenLabel": "Token (hiển thị một lần)",
+      "installHint": "Dán vào lệnh thiết lập agent: --token=<token>",
+      "installCmdLabel": "Lệnh cài đặt (có token)",
+      "installCmdHint": "Chạy lệnh này trên máy chủ agent. Token đã được nhúng — thay thế <location-name> bằng vị trí của bạn. Nó sẽ không được hiển thị lại.",
+      "copyCmdBtn": "Sao chép lệnh",
+      "copyTokenBtn": "Sao chép token",
+      "copiedToast": "Token đã được sao chép vào clipboard",
+      "disableDefaultBlocked": "Token mặc định không thể bị vô hiệu hóa — hãy xoay nó trước",
+      "nameReserved": "'default' đã được dành riêng — sử dụng Rotate để thay thế token mặc định",
+      "fetchError": "Không thể tải token",
+      "createSuccess": "Token đã được tạo",
+      "createError": "Không thể tạo token",
+      "rotateSuccess": "Token mặc định đã xoay — token cũ vẫn có hiệu lực cho đến khi bạn vô hiệu hóa nó",
+      "rotateError": "Không thể xoay token",
+      "enabledSuccess": "Token đã bật",
+      "disabledSuccess": "Token đã tắt",
+      "updateError": "Không thể cập nhật token",
+      "empty": {
+        "title": "Không có token tổng hợp",
+        "description": "Tạo token có tên để phạm vi các agent của khu vực hoặc sử dụng token mặc định của tổ chức."
+      }
+    },
     "authNetwork": {
       "addCookie": "Thêm cookie",
       "addHeader": "Thêm tiêu đề",
@@ -9671,12 +9881,15 @@
       "assertions": "Khẳng định",
       "assertionsFailed": "Thất bại",
       "assertionsPassed": "Đã qua",
+      "assertionsNotEvaluated": "Chưa được đánh giá",
+      "assertionsNotEvaluatedHint": "Yêu cầu không bao giờ trả về phản hồi, vì vậy không có gì được khẳng định.",
       "certExpires": "Hết hạn {date}",
       "completed": "đã hoàn thành",
       "daysRemaining": "còn {days} ngày",
       "error": "Lỗi",
       "failed": "Thất bại",
       "init": "khởi tạo",
+      "loading": "Đang tải chi tiết lần chạy",
       "location": "Vị trí",
       "notFound": "Không tìm thấy lần chạy",
       "passed": "Đã qua",
@@ -9708,7 +9921,7 @@
       "clearFiltersDesc": "Xóa tất cả bộ lọc đang hoạt động",
       "device": "Thiết bị",
       "duration": "Thời lượng",
-      "editMonitor": "Chỉnh sửa màn hình",
+      "editCheck": "Chỉnh sửa kiểm tra",
       "error": "Lỗi",
       "failed": "Thất bại",
       "failedRuns": "Các lần chạy thất bại",
@@ -10091,6 +10304,11 @@
         "browserNote": "Các bài kiểm tra trình duyệt chưa thể chạy từ vị trí riêng tư — chỉ kiểm tra giao thức (HTTP, TCP, TLS, SSH).",
         "locationNameLabel": "Tên vị trí",
         "locationNamePlaceholder": "Trụ sở chính",
+        "typeTitle": "Những gì agent này chạy",
+        "typeProtocol": "Mạng",
+        "typeBrowser": "Trình duyệt",
+        "typeProtocolHint": "Kiểm tra HTTP, TCP, TLS và SSH. Chạy agent Go — Docker, Kubernetes, Linux hoặc Windows.",
+        "typeBrowserHint": "Hành trình trình duyệt. Chạy hình ảnh Playwright — chỉ Docker hoặc Kubernetes.",
         "tabDocker": "Docker",
         "tabK8s": "Kubernetes",
         "tabLinux": "Linux",
@@ -10108,6 +10326,7 @@
         "agentsSubtitle": "Các agent tự đăng ký từ cơ sở hạ tầng của bạn và chỉ đọc ở đây.",
         "agentName": "Agent",
         "recoverAgent": "Khôi phục agent này — sao chép lệnh thiết lập đã được điền sẵn tên của nó",
+        "restartConfig": "Cấu hình khởi động lại — sao chép lệnh thiết lập của agent này để chạy lại cài đặt / khởi động lại docker (ví dụ: sau khi xoay token)",
         "noAgents": "Chưa có agent nào đăng ký cho vị trí này.",
         "checksTitle": "Các kiểm tra đang chạy từ vị trí này",
         "checkName": "Tên",

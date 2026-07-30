@@ -364,6 +364,8 @@
   },
   "common": {
     "beta": "Bèta",
+    "play": "Afspelen",
+    "pause": "Pauze",
     "close": "Sluiten",
     "cancel": "Annuleer",
     "ok": "Oké",
@@ -514,7 +516,9 @@
     "fillRequiredFields": "Vul de verplichte velden in",
     "test": "Test",
     "username": "Gebruikersnaam",
-    "password": "Wachtwoord"
+    "password": "Wachtwoord",
+    "field": "Veld",
+    "enterValueOrVariable": "Voer waarde of $variable in"
   },
   "flow": {
     "stepPicker": {
@@ -905,9 +909,13 @@
     "language": "taal",
     "actions": "Acties",
     "keyboardShortcuts": "Sneltoetsen",
-    "synthetic": "Synthetics"
+    "synthetic": "Synthetics",
+    "experience": "Ervaring"
   },
   "rum": {
+    "noSessionReplay": "Geen sessieherhaling beschikbaar",
+    "seek": "Zoeken",
+    "playbackSpeed": "Afspeelsnelheid",
     "title": "Monitoring van echte gebruikers",
     "subtitle": "Monitor echte gebruikerssessies, fouten en frontend-prestaties",
     "issueColumn": "Probleem",
@@ -1016,6 +1024,7 @@
     "desktop": "Bureaublad",
     "mobile": "Mobiel",
     "tablet": "Tablet",
+    "platform": "Platform",
     "vsPreviousPeriod": "versus vorige periode",
     "seeSessions": "Bekijk de sessies",
     "openErrorTracking": "Openen in Foutopsporing",
@@ -1652,6 +1661,8 @@
     "object": "Voorwerp",
     "serviceAccounts": "Serviceaccounts",
     "ingestionTokens": "Tokens voor inname",
+    "syntheticsTokens": "Synthetische tokens",
+    "syntheticsTokensDesc": "Organisatieniveau o2syn_-tokens die uw private synthetische agents gebruiken om taken op te halen",
     "serviceAccountsName": "Naam van serviceaccounts",
     "basicUsers": "Gebruikers",
     "organizationMembers": "Organisatieleden",
@@ -2081,7 +2092,6 @@
     "search": "Workflows doorzoeken",
     "refresh": "Workflows vernieuwen",
     "trigger": "Trigger",
-    "triggerAlertFired": "Alert geactiveerd",
     "steps": "Stappen",
     "status": "Status",
     "updated": "Bijgewerkt",
@@ -2133,13 +2143,21 @@
       "cta": "Workflow maken",
       "soonCta": "Beschikbaar in een toekomstige release",
       "comingSoon": "Binnenkort beschikbaar",
-      "soon": "Binnenkort",
-      "alertFired": "Alert geactiveerd",
-      "alertFiredDesc": "Uitvoeren wanneer een alert wordt geactiveerd",
-      "schedule": "Schema",
-      "scheduleDesc": "Uitvoeren volgens een schema",
-      "webhook": "Webhook",
-      "webhookDesc": "Uitvoeren bij binnenkomende webhook"
+      "soon": "Binnenkort"
+    },
+    "triggerKind": {
+      "alertFired": {
+        "label": "Alert geactiveerd",
+        "node": "Alert trigger",
+        "desc": "Uitvoeren wanneer een alert wordt geactiveerd",
+        "intro": "Wanneer een gekoppelde alert wordt geactiveerd, ontvangt elke downstream-stap deze payload."
+      },
+      "incidentEvent": {
+        "label": "Incidentgebeurtenis",
+        "node": "Incidenttrigger",
+        "desc": "Uitvoeren bij een incidentlevenscyclusgebeurtenis",
+        "intro": "Wanneer een incidentgebeurtenis optreedt, ontvangt elke downstream-stap deze payload."
+      }
     },
     "triggerMeta": {
       "orgId": "Organisatie-ID waartoe de waarschuwing behoort.",
@@ -2178,9 +2196,6 @@
       "skipped": "Overgeslagen",
       "errorsN": "{count} fout(en)",
       "runError": "Kan de test niet uitvoeren.",
-      "saveToTestTitle": "Opslaan en testen",
-      "saveToTestBody": "Testen voert de opgeslagen versie van deze workflow uit. Wilt u eerst uw wijzigingen opslaan?",
-      "saveAndTest": "Opslaan en testen",
       "stepResult": {
         "viewHint": "Klik om invoer/uitvoer te bekijken",
         "input": "Invoer",
@@ -2227,7 +2242,6 @@
       "kindTrigger": "Trigger",
       "kindLogic": "Logica",
       "kindAction": "Actie",
-      "alertTrigger": "Meldingstrigger",
       "condition": "Voorwaarde",
       "function": "Functie",
       "sendToDestination": "Bestemming",
@@ -2252,7 +2266,6 @@
       "triggerAlertsNone": "Geen waarschuwingen gevonden in deze organisatie.",
       "triggerAlertsError": "Kan waarschuwingen niet laden",
       "triggerNote": "Deze workflow wordt uitgevoerd wanneer een van de geselecteerde waarschuwingen afgaat.",
-      "triggerPayloadIntro": "Wanneer een gekoppelde waarschuwing afgaat, ontvangt elke downstream-stap deze payload.",
       "triggerStructureTitle": "Payload-structuur",
       "triggerStructureHint": "Hover over een veld voor details",
       "triggerDetailHint": "Hover of focus een veld hierboven om het type en de betekenis te zien.",
@@ -2261,6 +2274,10 @@
       "triggerDataBlock": "data[] · Rijen van uw waarschuwing",
       "triggerDataColumns": "Resultaatkolommen",
       "triggerDataExampleNote": "Alleen voorbeeld — de werkelijke kolommen komen uit de query van uw waarschuwing.",
+      "incidentEventTypeLabel": "Gebeurtenistype",
+      "incidentCommonTitle": "Algemene velden (elke gebeurtenis)",
+      "incidentSpecificTitle": "Gebeurtenisspecifieke velden",
+      "incidentNoExtraFields": "Deze gebeurtenis voegt geen velden toe naast de algemene.",
       "triggerDataBlockNote": "Een array met één object per overeenkomend record. De kolommen komen uit de eigen query van de waarschuwing, dus verschillen per waarschuwing — verwijs ernaar als data[].<kolom>.",
       "conditionBody": "Stel een regel in om op te splitsen",
       "conditionBodySet": "Vertakt op een regel",
@@ -2399,7 +2416,7 @@
     "periodGreaterThanZero": "Periode moet groter zijn dan 0",
     "frequencyGreaterThanSeconds": "Frequentie moet groter zijn dan {seconds} seconden.",
     "minimumFrequencyMinutes": "Minimale frequentie moet {minutes} minuten zijn",
-    "streamSelectionNameInvalid": "Gebruik alleen alfanumerieke tekens en '+=,.@-_', zonder spaties.",
+    "streamSelectionNameInvalid": "Gebruik alleen alfanumerieke tekens en '+=,.{'@'}-_' zonder spaties.",
     "functionAlreadyAssociated": "Functie is al gekoppeld",
     "atLeastOneCondition": "Voeg minstens één voorwaarde toe",
     "fillAllConditionFields": "Vul alle voorwaardevelden in (kolom, operator en waarde zijn verplicht)",
@@ -2602,6 +2619,9 @@
     "resetRUMTokenLabel": "RUM-token opnieuw instellen",
     "generateRUMTokenLabel": "Genereer een RUM-token",
     "generateRUMTokenMessage": "Genereer een RUM-token om RUM voor uw organisatie mogelijk te maken.",
+    "rumPlatform": "Platform",
+    "rumPlatformBrowser": "Browser",
+    "rumPlatformReactNative": "React Native",
     "npmStepTitle": "NPM-installatiemethode",
     "recommendedLabel": "Aanbevolen",
     "customLabel": "Op maat",
@@ -2836,7 +2856,7 @@
     "addToFavorites": "Toevoegen aan favorieten",
     "removeFromFavorites": "Verwijderen uit favorieten",
     "noFavoritesTitle": "Nog geen favoriete dashboards",
-    "noFavoritesMessage": "Klik op het hartpictogram op een dashboard om het hier te zien, in alle mappen.",
+    "noFavoritesMessage": "Klik op het sterpictogram op een dashboard om het hier te zien, in alle mappen.",
     "moreActions": "Meer acties",
     "save": "Opslaan",
     "cancel": "Annuleer",
@@ -3673,7 +3693,8 @@
       "clause": "Clausule {number}",
       "selectOperation": "Selecteer bewerking",
       "addAnotherClause": "Nog een clausule toevoegen",
-      "removeClause": "Clausule verwijderen"
+      "removeClause": "Clausule verwijderen",
+      "addClause": "Clausule toevoegen"
     },
     "viewDashboard": {
       "refreshToApplyVariables": "Vernieuwen om de laatste variabelewijzigingen toe te passen",
@@ -3700,7 +3721,9 @@
       "add": "Toevoegen",
       "value": "Waarde",
       "markAsNonTimestamp": "Markeer dit veld als niet-tijdstempel",
-      "renderDataAsJson": "Gegevens weergeven als JSON / Array"
+      "renderDataAsJson": "Gegevens weergeven als JSON / Array",
+      "sortBy": "Sorteren op",
+      "havingHint": "Filteren op het aggregaat"
     },
     "customChartTypeSelector": {
       "exampleOfCustomCharts": "Voorbeeld van aangepaste grafieken",
@@ -3911,6 +3934,10 @@
       "addedSuccessfully": "Dashboard succesvol toegevoegd.",
       "creationFailed": "Dashboard aanmaken mislukt.",
       "filesFailedValidation": "{count} bestand(en) voldeden niet aan validatievereisten"
+    },
+    "rawQueryBuilder": {
+      "query": "Query",
+      "instruction": "Schrijf een SQL-query voor complexe acties."
     }
   },
   "panel": {
@@ -4603,6 +4630,14 @@
     "lastSuccessfulAt": "Laatst succesvol bij",
     "lastTrainedAt": "Laatst opgeleid bij",
     "status": "Status",
+    "stateActive": "Actief",
+    "statePaused": "Gepauzeerd",
+    "stateFailed": "Mislukt",
+    "summaryActive": "Actief",
+    "summaryPaused": "Gepauzeerd",
+    "summaryFailed": "Mislukt",
+    "summaryRecent": "Geactiveerd < 15m",
+    "summaryTotal": "Totaal",
     "numOfEvents": "Aantal evenementen",
     "view": "Bekijken",
     "webhook": "Webhook",
@@ -4779,6 +4814,13 @@
       "id": "ID",
       "status": "Status",
       "severity": "Ernst",
+      "severityCritical": "P1 · Kritiek",
+      "severityHigh": "P2 · Hoog",
+      "severityMedium": "P3 · Gemiddeld",
+      "severityLow": "P4 · Laag",
+      "moreDimensions": "+{count} meer",
+      "filterAll": "Alle",
+      "filterActive": "Actief",
       "alertCount": "Waarschuwingen",
       "firstAlertAt": "Eerste waarschuwing",
       "lastAlertAt": "Laatste waarschuwing",
@@ -4829,6 +4871,41 @@
       "rcaInProgress": "De hoofdoorzaak analyseren...",
       "rcaCompleted": "Analyse van de hoofdoorzaak voltooid",
       "noRcaYet": "Geen analyse van de hoofdoorzaak beschikbaar. Klik op 'Analyseren' om te beginnen.",
+      "rcaAnalyzeIncident": "Incident analyseren",
+      "rcaAnalyzing": "AI SRE-agent analyseert dit incident, een ogenblik geduld…",
+      "rcaAnalyzingHint": "Het rapport verschijnt hier zodra de analyse is voltooid.",
+      "rcaReanalyzing": "AI SRE Agent bekijkt wat er is veranderd sinds de laatste analyse…",
+      "rcaReanalyzingHint": "Het rapport wordt bijgewerkt zodra de analyse is voltooid.",
+      "rcaStartedAgo": "{time} geleden gestart",
+      "rcaCancel": "Annuleren",
+      "rcaCancelling": "Bezig met annuleren…",
+      "rcaCancelled": "Analyse geannuleerd",
+      "rcaCancelFailed": "Kan analyse niet annuleren",
+      "rcaFailed": "AI-analyse mislukt",
+      "rcaFailedGeneric": "Kan RCA-analyse niet uitvoeren",
+      "rcaRetry": "Analyse opnieuw proberen",
+      "rcaStale": "Deze analyse duurt ongewoon lang en is mogelijk gestopt. U kunt deze annuleren en opnieuw proberen.",
+      "rcaStatus": "AI-analyse",
+      "rcaStatusAnalyzing": "Bezig met analyseren",
+      "rcaStatusFailed": "Mislukt",
+      "rcaStatusReady": "Gereed",
+      "rcaStatusNone": "Niet geanalyseerd",
+      "rcaAnalyzedAgo": "{time} geleden geanalyseerd",
+      "rcaCopy": "Rapport kopiëren",
+      "rcaCopied": "Rapport naar klembord gekopieerd",
+      "rcaCopyFailed": "Kan rapport niet kopiëren",
+      "rcaDownload": "Downloaden als Markdown",
+      "rcaReanalyze": "Opnieuw analyseren",
+      "rcaFreshAnalysis": "Nieuwe analyse",
+      "rcaFreshAnalysisHint": "Vanaf nul analyseren, het vorige rapport negeren",
+      "rcaBuildOnPrevious": "Voortbouwen op eerder rapport",
+      "rcaBuildOnPreviousHint": "Stuur het huidige rapport zodat de agent het uitbreidt",
+      "rcaHistory": "Rapportgeschiedenis",
+      "rcaHistoryCurrent": "Huidig",
+      "rcaHistoryEmpty": "Geen eerdere rapporten",
+      "rcaHistoryLoadFailed": "Kan rapportgeschiedenis niet laden",
+      "rcaViewingArchived": "U bekijkt een eerder rapport",
+      "rcaBackToCurrent": "Terug naar huidig rapport",
       "sreChat": "Vraag de SRE-assistent",
       "goBack": "Terug",
       "incident": "Incident",
@@ -5438,7 +5515,7 @@
       "modeWorkspace": "Favorieten",
       "workspace": {
         "emptyScratchpadTitle": "Je hebt nog geen favorieten",
-        "emptyScratchpadDesc": "Voeg metrieken toe aan je favorieten in Verkennen (de ♥ op een kaart) om ze hier te verzamelen. Als je ze wilt behouden, converteer dan naar een dashboard."
+        "emptyScratchpadDesc": "Voeg metrieken toe aan uw favorieten in Explore (de ★ op een kaart) om ze hier te verzamelen. Wanneer u ze wilt behouden, converteer naar een dashboard."
       },
       "visualizePlaceholder": "Visualiseren komt binnenkort — bouw hier een grafiek uit een PromQL-query.",
       "railsAriaLabel": "Metriekfilters",
@@ -5457,7 +5534,8 @@
       "queryFailed": "Query mislukt",
       "noData": "Geen gegevens",
       "noMetrics": "Nog geen metrieken in deze organisatie.",
-      "learnIngest": "Leer hoe je metrieken importeert",
+      "setupIngestion": "Metriekopname instellen",
+      "setupIngestionDesc": "Een metriekgegevensbron verbinden",
       "noMatch": "Geen metrieken komen overeen met de huidige filters",
       "noMatchHint": "Probeer een labelfilter te verwijderen, voorvoegsel/achtervoegsel selecties te wissen, of te schakelen van “Met gegevens” naar “Alle”.",
       "noMatchHintFavorites": "Probeer een labelfilter te verwijderen, of schakel van “Met gegevens” naar “Alles”.",
@@ -5485,6 +5563,7 @@
         "helpAria": "Over {name}: {help}",
         "refreshAria": "Vernieuw {name}",
         "refreshTooltip": "Vernieuw deze metriek",
+        "refreshToApplyTimeRange": "Vernieuwen om het geselecteerde tijdsbereik toe te passen",
         "configureAria": "Configureer functie voor {name}",
         "configureTooltip": "Functie configureren",
         "favoriteAddAria": "Voeg {name} toe aan je favorieten",
@@ -5843,7 +5922,18 @@
       "agentIdFields": "Terugvalvelden voor Agent-ID",
       "agentIdHelp": "Inkomende attributen om te gebruiken als noodoplossing voor gen_ai.agent.id.",
       "agentIdInfo": "Alleen aangevinkt als het standaardkenmerk gen_ai.agent.id ontbreekt of leeg is. Voeg één inkomend telemetriekenmerk per regel toe.",
+      "envFields": "Omgevings-reservevelden",
+      "envHelp": "Inkomende attributen om te gebruiken als omgeving van de agent.",
+      "envInfo": "Alleen gecontroleerd wanneer het standaard deployment.environment.name-attribuut ontbreekt of leeg is. Voeg één inkomend telemetrie-attribuut per regel toe.",
+      "versionFields": "Versie-reservevelden",
+      "versionHelp": "Inkomende attributen om te gebruiken als versie van de agent.",
+      "versionInfo": "Alleen gecontroleerd wanneer het standaard gen_ai.agent.version-attribuut ontbreekt of leeg is. Voeg één inkomend telemetrie-attribuut per regel toe.",
       "fieldsPlaceholder": "agent.naam\nllm.agent.name",
+      "agentNamePlaceholder": "my.custom.agent_name\\nteam.agent.label",
+      "agentIdPlaceholder": "my.custom.agent_id\\nteam.agent.uid",
+      "envPlaceholder": "my.custom.env\\ntier",
+      "versionPlaceholder": "my.custom.version\\nrelease.tag",
+      "alwaysAppliedStandard": "Standaard (eerst gecontroleerd):",
       "applyDefaults": "Standaardwaarden toepassen",
       "resetToEmpty": "Terugzetten naar leeg",
       "clearRegistry": "Register wissen",
@@ -6408,6 +6498,12 @@
     "querySource": "Bron van de zoekopdracht"
   },
   "traces": {
+    "agentDefaultVariant": "standaard",
+    "agentNoEnv": "(Geen omgeving)",
+    "agentNoVersion": "(Geen versie)",
+    "allAgents": "Alle agents",
+    "agentCountBadgeSingular": "{count} agent",
+    "agentCountBadgePlural": "{count} agenten",
     "serviceGraph": {
       "searchPlaceholder": "Diensten voor het zoeken",
       "noStreamsDetected": "Er zijn geen streams gedetecteerd. Zorg ervoor dat de statistieken van servicegrafieken stream_name-labels bevatten.",
@@ -6621,6 +6717,8 @@
     },
     "sessionsList": {
       "streamLabel": "Stream",
+      "loadingAgents": "Agenten laden…",
+      "loadingStreams": "Streams laden…",
       "noStreamsTooltip": "Geen LLM-streams beschikbaar.",
       "session": "sessie",
       "sessions": "sessies",
@@ -6635,6 +6733,7 @@
       "loading": "Sessies worden geladen...",
       "tokenTooltip": "Invoer: {input} · Uitgang: {output} · Totaal: {total}",
       "durationNs": "ns",
+      "errorCountTooltip": "{count} fouten in deze sessie",
       "unknownUser": "Onbekende gebruiker",
       "columns": {
         "timestamp": "Tijdstempel",
@@ -6865,6 +6964,8 @@
     "lLMInsightsDashboard": {
       "stream": "Stream",
       "agent": "Agent",
+      "compareEntry": "Versies vergelijken",
+      "compareEntryHint": "Twee versies van deze agent naast elkaar vergelijken",
       "failedToLoad": "Inzichten laden mislukt",
       "retry": "Opnieuw proberen",
       "noAgentsInRange": "Geen agenten in dit bereik",
@@ -7153,7 +7254,7 @@
     "skillContentRequired": "Vaardigheidsinhoud is vereist",
     "genericConfig": "Configuratie",
     "genericData": "JSON-configuratie",
-    "genericDataPlaceholder": "{}",
+    "genericDataPlaceholder": "{'{}'}",
     "invalidJson": "Moet een geldige JSON zijn"
   },
   "cipherKey": {
@@ -7711,6 +7812,57 @@
   },
   "aiObservability": {
     "title": "LLM-waarneembaarheid",
+    "deltaStrip": {
+      "metricLabel": {
+        "volume": "Volume",
+        "errorRate": "Foutpercentage",
+        "p50": "P50-latentie",
+        "p95": "P95-latentie",
+        "p99": "P99-latentie",
+        "cost": "Kosten / trace"
+      },
+      "insufficientLabel": "indicatief",
+      "tooltip": {
+        "ciRange": "{level}% BI: {lower} tot {upper}",
+        "method": "Methode: {method}",
+        "associativeHigher": "B is hoger dan A — de omgevingen verschillen, dus dit is associatief, geen bewijs dat B het veroorzaakte.",
+        "associativeLower": "B is lager dan A — de omgevingen verschillen, dus dit is associatief, geen bewijs dat B het veroorzaakte.",
+        "causalRegressed": "B is achteruitgegaan ten opzichte van A in hetzelfde kloktijdvenster.",
+        "causalImproved": "B is verbeterd ten opzichte van A in hetzelfde kloktijdvenster.",
+        "insufficient": "Nog niet genoeg monsters voor een betrouwbare conclusie — behandel deze delta als indicatief.",
+        "methodNewcombe": "Wilson/Newcombe proportie-BI",
+        "methodBootstrap": "bootstrap-hersampling"
+      }
+    },
+    "overlayChart": {
+      "seriesA": "Versie A",
+      "seriesB": "Versie B",
+      "xAxisSinceRollout": "Uren sinds uitrol",
+      "xAxisWallClock": "Tijd",
+      "lowResolution": "Niet genoeg tijdsresolutie om beide versies in dit venster te plotten — verklein het datumbereik (of schakel over naar “Sinds elke uitrol”).",
+      "xAxisSinceRolloutMinutes": "Minuten sinds uitrol",
+      "xAxisSinceRolloutHours": "Uren sinds uitrol",
+      "xAxisSinceRolloutDays": "Dagen sinds uitrol",
+      "xAxisWallClockMinutes": "Minuten (verstreken, kloktijd)",
+      "xAxisWallClockHours": "Uren (verstreken, kloktijd)",
+      "xAxisWallClockDays": "Dagen (verstreken, kloktijd)"
+    },
+    "errorDiff": {
+      "title": "Foutwijzigingen",
+      "introduced": "Geïntroduceerd",
+      "fixed": "Opgelost",
+      "shared": "Gedeeld",
+      "noData": "Geen foutgegevens om te vergelijken in dit venster.",
+      "subtitle": "Hoe elke foutklasse veranderde van {a} naar {b}.",
+      "introducedHint": "nieuw in {b}",
+      "fixedHint": "verdwenen in {b}",
+      "sharedHint": "in beide versies",
+      "legendA": "A",
+      "legendB": "B",
+      "legendDelta": "Δ",
+      "sharedColHeader": "{a} → {b}",
+      "countIn": "{count} in {version}"
+    },
     "sections": {
       "monitor": "Monitor",
       "evaluate": "Evalueer"
@@ -7735,13 +7887,17 @@
       "scorers": "Creëer en beheer de scorers die LLM-resultaten beoordelen",
       "scoreConfigs": "Configureer de scorerubrieken die voor uw evaluaties worden gebruikt"
     },
+    "scope": {
+      "env": "Omgeving",
+      "agent": "Agent",
+      "version": "Versie"
+    },
     "agentGraph": {
       "stream": "Stream",
       "agent": "Agent",
       "noAgentsTitle": "Geen agents gevonden",
       "noAgentsDescription": "Er zijn geen agents gevonden in dit tijdsbereik. Probeer het tijdsbereik te vergroten of controleer of uw traces gen_ai agent-attributen bevatten.",
-      "agentCountSingular": "agent",
-      "agentCountPlural": "agenten"
+      "versionAgnosticHint": "Topologie is hetzelfde over versies — de grafiek scope per omgeving, niet per versie. Gebruik versievergelijking om versies te vergelijken."
     },
     "kpi": {
       "totalCost": "Totale kosten",
@@ -7796,12 +7952,20 @@
       },
       "loopsTitle": "Lussende agenten",
       "loopsHint": "Agenten die hetzelfde gereedschap vele malen per trace opnieuw uitvoeren",
+      "summaryLoops": "Lussende agents",
+      "summaryFailures": "Foutentaxonomie",
+      "summaryAgents": "Getroffen agents",
       "failuresTitle": "Fouttaxonomie",
       "failuresHint": "Fouten gegroepeerd per soort, per agent",
+      "footerLoops": "Lussen",
+      "footerFailures": "Foutklassen",
       "costTitle": "Kosten en fouten per agent",
       "costHint": "Welke agenten kosten en fouten veroorzaken",
       "noLoops": "Geen lusgedrag gedetecteerd in dit bereik",
       "noFailures": "Geen agentfouten in dit bereik",
+      "noLoopsForAgent": "Geen lusgedrag voor {agent} in dit bereik — wissel van agent of vergroot het tijdsbereik",
+      "noFailuresForAgent": "Geen fouten voor {agent} in dit bereik — wissel van agent of vergroot het tijdsbereik",
+      "scopeLabel": "Bereik",
       "noCost": "Geen agentkosten geregistreerd in dit bereik",
       "unknownAgent": "(onbekende agent)",
       "colAgent": "Agent",
@@ -7822,6 +7986,8 @@
         "worstLoopTraces": "Slechtste traces (meeste herhalingen eerst)",
         "topCostTraces": "Duurste traces",
         "noTraces": "Geen traces gevonden voor dit signaal",
+        "footerTraces": "Traces",
+        "footerErrors": "Fouten",
         "errorsTitle": "Wat de fouten zeggen",
         "noErrors": "Geen foutmeldingen vastgelegd — open een trace om te inspecteren",
         "colTraceId": "Trace",
@@ -7838,6 +8004,39 @@
         "loopExplain": "Een hoge herhalingsratio betekent meestal dat de agent resultaten niet in de cache opslaat of opnieuw probeert. Open hieronder de slechtste traces om de herhaalde aanroepen te zien.",
         "failExplain": "Dit zijn de daadwerkelijke foutmeldingen achter deze foutklasse — lees ze om de oplossing te vinden, of open een trace om te zien waar het gebeurde.",
         "costExplain": "Deze traces hebben de uitgaven van deze agent veroorzaakt. Open de duurste om te zien wat er werd uitgevoerd."
+      }
+    },
+    "versionCompare": {
+      "entry": "Versies vergelijken…",
+      "entryDisabledHint": "Vereist minimaal 2 versies van deze agent om te vergelijken",
+      "datePickerDisabled": "Vensters zijn per versie in deze modus",
+      "sampledNote": "Latentie- & kostenintervallen worden berekend op basis van maximaal {cap} willekeurig geselecteerde traces per versie.",
+      "manual": {
+        "windowA": "Venster versie A",
+        "windowB": "Venster versie B"
+      },
+      "bar": {
+        "versionA": "Versie A",
+        "versionB": "Versie B",
+        "align": "Uitlijnen",
+        "alignSinceRollout": "Sinds elke uitrol",
+        "alignSameWallClock": "Zelfde kloktijd",
+        "alignManual": "Handmatig",
+        "exit": "Vergelijking afsluiten",
+        "samePickHint": "Kies twee verschillende versies om te vergelijken",
+        "autoWindow": "auto: {duration}",
+        "windowLabelA": "Venster versie A",
+        "windowLabelB": "Venster versie B"
+      },
+      "banner": {
+        "smallSample": "Te weinig gegevens om te vergelijken — A heeft {nA}, B heeft {nB}. Vergroot het venster of wacht op meer verkeer.",
+        "disjoint": "Deze versies liepen op verschillende tijdstippen — verschillen kunnen verkeerswijzigingen weerspiegelen, niet de versie zelf.",
+        "partial": "Deze versies waren gedeeltelijk gelijktijdig — verschillen kunnen deels worden verklaard door het moment waarop elk liep."
+      },
+      "windowCard": {
+        "label": "{env} · {version} — {window} · {count} traces",
+        "clamp": "Baseline draaide slechts {duration} — vergelijk de eerste {duration} van elke versie.",
+        "labelNoEnv": "{version} — {window} · {count} traces"
       }
     }
   },
@@ -7873,6 +8072,32 @@
       "paused": "Taak gepauzeerd",
       "activateError": "Activeren van taak mislukt",
       "pauseError": "Pauzeren van taak mislukt"
+    },
+    "manualEvaluation": {
+      "titles": {
+        "span": "Span evalueren",
+        "trace": "Trace evalueren",
+        "session": "Sessie evalueren"
+      },
+      "targetLabels": {
+        "span": "Span-ID",
+        "trace": "Trace-ID",
+        "session": "Sessie-ID"
+      },
+      "scopes": {
+        "span": "span",
+        "trace": "trace",
+        "session": "sessie"
+      },
+      "description": "Kies een Eval Job om uit te voeren op dit doel. De evaluatieworker laadt de brontelemetrie uit het tijdsbereik van deze pagina.",
+      "jobLabel": "Eval Job",
+      "jobPlaceholder": "Selecteer een Eval Job",
+      "jobRequired": "Selecteer een evaluatieopdracht",
+      "noCompatibleJobs": "Geen {scope} evaluatieopdrachten gebruiken de {stream} trace-stroom.",
+      "loadJobsError": "Evaluatieopdrachten laden mislukt.",
+      "run": "Evaluatie uitvoeren",
+      "queued": "{count} evaluatieta(a)k(en) in de wachtrij gezet.",
+      "runError": "Evaluatie in wachtrij zetten mislukt."
     },
     "tabs": {
       "quality": "Kwaliteit",
@@ -8084,6 +8309,7 @@
       "degraded": "Gedegradeerd",
       "archived": "Gearchiveerd"
     },
+    "summaryAll": "Alle",
     "buttons": {
       "cancel": "Annuleer",
       "close": "Sluiten",
@@ -8094,17 +8320,13 @@
     },
     "scorerTypeDialog": {
       "title": "Maak een nieuwe scorer",
-      "intro": "Kies het type scorer. Kies wat past bij de manier waarop je wilt schrijven en voer het uit.",
+      "intro": "Kies het scorer-type. Beide zijn eersteklas opties — kies wat het beste past bij hoe je het wilt schrijven en uitvoeren.",
       "llmJudgeTitle": "LLM-jurylid",
       "llmJudgeDescription": "Gebruik een geconfigureerde provider om semantisch te evalueren.",
       "llmJudgeCta": "Judge configureren",
       "remoteTitle": "Op afstand",
       "remoteDescription": "Bel je eigen HTTP-eindpunt om te scoren.",
-      "remoteCta": "Endpoint configureren",
-      "codeTitle": "Code",
-      "codeDescription": "Binnenkort beschikbaar.",
-      "codeCta": "Beschikbaar in een toekomstige release",
-      "comingSoonBadge": "Binnenkort beschikbaar"
+      "remoteCta": "Endpoint configureren"
     },
     "provider": {
       "backTo": "Terug naar Providers",
@@ -8407,48 +8629,6 @@
       "healthyLabel": "Gezond:",
       "typeLabel": "Type:",
       "promptVariablesLabel": "Variabelen in deze prompt:",
-      "promptVariableGuide": {
-        "title": "Beschikbare promptvariabelen",
-        "description": "Deze variabelen kunnen in de bovenstaande prompt worden gebruikt. Hoe elk wordt ingevuld, hangt af van wat de evaluatietaak evalueert.",
-        "columns": {
-          "variable": "Promptvariabele"
-        },
-        "scopes": {
-          "span": "Span",
-          "trace": "Trace",
-          "session": "Sessie"
-        },
-        "statuses": {
-          "jobMapped": "Toewijzen in evaluatietaak",
-          "systemProvided": "Door systeem verstrekt",
-          "requiresSelector": "Door systeem verstrekt · vereist Span-selector",
-          "selectorRequired": "Span-selector vereist",
-          "unavailable": "Niet beschikbaar"
-        },
-        "variables": {
-          "inputOutput": {
-            "span": "Wijs deze toe aan de span-velden die de invoer en uitvoer bevatten.",
-            "trace": "Invoer en uitvoer van de root-span van de trace.",
-            "session": "Niet beschikbaar — een sessie heeft geen enkele invoer of uitvoer."
-          },
-          "statistics": {
-            "span": "Wijs deze naam toe zoals elke andere scorer-variabele bij het evalueren van een enkele span.",
-            "trace": "Trace-statistieken: aantal spans, duur, LLM- en tool-aanroepen, fouten, tokens en kosten.",
-            "session": "Sessie-statistieken: aantal traces en turns, duur en fouten."
-          },
-          "spans": {
-            "span": "Wijs deze naam toe zoals elke andere scorer-variabele bij het evalueren van een enkele span.",
-            "trace": "Een gefilterde subset van de spans van de trace, gekozen door de Span Selector van de Eval Job.",
-            "session": "Niet beschikbaar voor sessies."
-          },
-          "steps": {
-            "span": "Wijs deze naam toe zoals elke andere scorer-variabele bij het evalueren van een enkele span.",
-            "trace": "Spans in tijdsvolgorde; het midden wordt gevouwen als de trace erg lang is.",
-            "session": "Traces in tijdsvolgorde, weergegeven als gespreksbeurten."
-          }
-        },
-        "indexDescription": "{spansVar} en {stepsVar} arriveren als JSON-arrays. Verwijs naar de hele variabele — geïndexeerde toegang zoals {indexedVar} wordt niet ondersteund."
-      },
       "identitySection": "Identiteit",
       "judgeSection": "Configuratie van de rechter",
       "endpointSection": "Eindpunt",
@@ -8592,23 +8772,6 @@
         "samplingAll": "Elke match evalueren",
         "samplingRate": "Willekeurige steekproef op basis van percentage",
         "samplingCount": "Eerste N matches",
-        "manualSection": "Handmatige Evaluatie",
-        "manualHelp": "Zet de scorers van deze job in de wachtrij voor één expliciet doel. Handmatige runs omzeilen automatische sampling en registreren de reden in de score-metadata.",
-        "manualTargetIdLabel": "Doel-ID",
-        "manualSpanIdLabel": "Span-ID",
-        "manualSpanIdPlaceholder": "span_id",
-        "manualTraceIdLabel": "Trace-ID",
-        "manualTraceIdPlaceholder": "trace_id",
-        "manualSessionIdLabel": "Sessie-ID",
-        "manualSessionIdPlaceholder": "session_id",
-        "manualReasonLabel": "Reden",
-        "manualReasonPlaceholder": "Waarom voer je dit doel opnieuw uit?",
-        "manualVariablesLabel": "Variabelen JSON",
-        "manualVariablesObjectError": "Variabelen moeten een JSON-object zijn",
-        "manualTargetRequired": "Doel-ID is vereist",
-        "manualSubmit": "Start Handmatige Evaluatie",
-        "manualSuccess": "In wachtrij gezet: {count} evaluatieta(a)k(en)",
-        "manualError": "Handmatige evaluatie mislukt",
         "metadataSection": "Metadata",
         "versionLabel": "Versie",
         "pipelineLabel": "Pipeline-ID",
@@ -8770,20 +8933,27 @@
       "inputMapping": {
         "title": "Promptvariabelen",
         "hint": {
-          "span": "Wijs elke variabele toe aan het span-veld dat de waarde levert.",
-          "trace": "Trace-waarden worden automatisch ingevuld. Wijs al het andere toe aan een span-veld.",
-          "session": "Sessiewaarden worden automatisch ingevuld. Wijs al het andere toe aan een span-veld."
+          "span": "Wijs elke variabele toe aan een span-attribuut.",
+          "trace": "Wijs elke variabele toe aan een door het systeem geleverde waarde of span-attribuut.",
+          "session": "Wijs elke variabele toe aan een door het systeem geleverde waarde of span-attribuut."
+        },
+        "placeholder": "Selecteer een waarde",
+        "searchPlaceholder": "Doorzoek systeemwaarden en span-attributen…",
+        "groups": {
+          "systemProvided": "Door het systeem geleverde waarden · Voor elke {scope} die deze opdracht evalueert",
+          "spanAttributes": "Span-attributen"
         },
         "selectScorers": "Selecteer scorers om hun mappings te configureren.",
         "noVariables": "Deze scorer heeft geen sjabloonvariabelen om in kaart te brengen.",
         "variableCount": "{count} variabelen",
         "systemProvided": {
-          "title": "{scope} Variabelen",
-          "description": "OpenObserve levert deze waarden vanuit de {scope} zelf. Een scorer-prompt kan ze direct gebruiken — geen toewijzing nodig.",
+          "about": "Over door het systeem geleverde waarden",
+          "title": "{scope} systeemwaarden",
+          "description": "OpenObserve bouwt deze waarden apart voor elke {scope} die deze opdracht evalueert. Gebruik ze als bronnen bij het toewijzen van de promptvariabelen van de scorer.",
           "badge": "Systeem geleverd",
           "selectorRequired": "Span Selector vereist",
           "columns": {
-            "variable": "Promptvariabele",
+            "variable": "Waarde",
             "source": "Bron",
             "description": "Waarde geleverd"
           },
@@ -8830,7 +9000,7 @@
           "fields": "Selecteer ten minste één veld voor een aangepast schema.",
           "maximumSpans": "Maximum aantal spans moet een positief geheel getal zijn.",
           "budget": "Te veel spans voor de geselecteerde velden. Verlaag het aantal spans of lees minder velden.",
-          "binding": "Selecteer een Span Selector voor elke scorer."
+          "binding": "Selecteer een span-selector voor elke scorer die trace-spans gebruikt."
         }
       },
       "preview": {
@@ -8868,10 +9038,12 @@
       "saveError": "Kon de evaluatietaak niet opslaan",
       "createdAndActivated": "Evaluatietaak aangemaakt en geactiveerd",
       "createdButActivateFailed": "Evaluatietaak aangemaakt, maar activeren is mislukt",
+      "savedAndActivated": "Evaluatieopdracht opgeslagen en geactiveerd",
+      "savedButActivateFailed": "Evaluatieopdracht opgeslagen, maar activering mislukt",
       "validation": {
         "nameRequired": "Job name is required",
         "streamRequired": "A stream is required",
-        "idleWindowMinimum": "Inactief venster moet ten minste 1 seconde zijn",
+        "idleWindowMinimum": "Inactief venster moet minimaal 1 seconde zijn",
         "idleWindowMaximumTrace": "Trace-inactiviteitsvenster mag niet langer zijn dan 30 minuten",
         "idleWindowMaximumSession": "Sessie-inactiviteitsvenster mag niet langer zijn dan 4 uur",
         "maxAgeMaximumTrace": "Maximale trace-leeftijd mag niet langer zijn dan 2 uur",
@@ -9294,6 +9466,44 @@
     "lastRefreshed": "Laatst vernieuwd: {time}"
   },
   "synthetics": {
+    "tokens": {
+      "title": "Synthetische tokens",
+      "explanation": "Organisatiebrede o2syn_-tokens die uw privé-agents gebruiken om te authenticeren wanneer ze opdrachten ophalen. Openbare (Lambda) locaties gebruiken automatisch het standaardtoken; maak een benoemd token en voeg het in de agents van een regio in om de impactradius van die regio te beperken.",
+      "summary": "Tokens die uw privé-agents gebruiken om opdrachten op te halen.",
+      "rotateDefaultBtn": "Standaard roteren",
+      "createTokenBtn": "Token aanmaken",
+      "searchPlaceholder": "Tokens doorzoeken",
+      "default": "Standaard",
+      "tokenNameLabel": "Naam",
+      "tokenNamePlaceholder": "us-east",
+      "tokenNameHint": "Noem het naar de regio of site en voeg het vervolgens in de agents van die regio via de installatieopdracht.",
+      "tokenColumn": "Token",
+      "agentsColumn": "Agents",
+      "createdBy": "Aangemaakt door",
+      "createTokenTitle": "Synthetisch token aanmaken",
+      "newTokenRevealed": "Nieuw token — kopieer het nu",
+      "rawTokenLabel": "Token (eenmalig weergegeven)",
+      "installHint": "Plak in de installatieopdracht van de agent: --token=<token>",
+      "installCmdLabel": "Installatieopdracht (token inbegrepen)",
+      "installCmdHint": "Voer dit uit op de agent-host. Het token is ingebakken — vervang <location-name> door uw locatie. Het wordt niet opnieuw weergegeven.",
+      "copyCmdBtn": "Opdracht kopiëren",
+      "copyTokenBtn": "Token kopiëren",
+      "copiedToast": "Token naar klembord gekopieerd",
+      "disableDefaultBlocked": "Het standaardtoken kan niet worden uitgeschakeld — roteer het eerst",
+      "nameReserved": "'default' is gereserveerd — gebruik Roteren om het standaardtoken te vervangen",
+      "fetchError": "Tokens laden mislukt",
+      "createSuccess": "Token aangemaakt",
+      "createError": "Token aanmaken mislukt",
+      "rotateSuccess": "Standaard token gerouleerd — de oude blijft geldig totdat u het uitschakelt",
+      "rotateError": "Token rouleren mislukt",
+      "enabledSuccess": "Token ingeschakeld",
+      "disabledSuccess": "Token uitgeschakeld",
+      "updateError": "Token bijwerken mislukt",
+      "empty": {
+        "title": "Geen synthetische tokens",
+        "description": "Maak een benoemd token om de agents van een regio te scopen, of gebruik de org-standaard."
+      }
+    },
     "authNetwork": {
       "addCookie": "Cookie toevoegen",
       "addHeader": "Header toevoegen",
@@ -9671,12 +9881,15 @@
       "assertions": "Asserts",
       "assertionsFailed": "Mislukt",
       "assertionsPassed": "Geslaagd",
+      "assertionsNotEvaluated": "Niet geëvalueerd",
+      "assertionsNotEvaluatedHint": "Het verzoek heeft nooit een antwoord geretourneerd, dus er is niets gecontroleerd.",
       "certExpires": "Verloopt op {date}",
       "completed": "voltooid",
       "daysRemaining": "{days} dagen resterend",
       "error": "Fout",
       "failed": "Mislukt",
       "init": "init",
+      "loading": "Uitvoeringsdetails laden",
       "location": "Locatie",
       "notFound": "Run niet gevonden",
       "passed": "Geslaagd",
@@ -9708,7 +9921,7 @@
       "clearFiltersDesc": "Alle actieve filters verwijderen",
       "device": "Apparaat",
       "duration": "Duur",
-      "editMonitor": "Monitor bewerken",
+      "editCheck": "Check bewerken",
       "error": "Fout",
       "failed": "Mislukt",
       "failedRuns": "Mislukte runs",
@@ -10091,6 +10304,11 @@
         "browserNote": "Browser tests kunnen nog niet vanaf privélocaties worden uitgevoerd — alleen protocolcontroles (HTTP, TCP, TLS, SSH).",
         "locationNameLabel": "Locatienaam",
         "locationNamePlaceholder": "Corp hoofdkantoor",
+        "typeTitle": "Wat deze agent uitvoert",
+        "typeProtocol": "Net",
+        "typeBrowser": "Browser",
+        "typeProtocolHint": "HTTP-, TCP-, TLS- en SSH-checks. Voert de Go-agent uit — Docker, Kubernetes, Linux of Windows.",
+        "typeBrowserHint": "Browserreizen. Voert het Playwright-image uit — alleen Docker of Kubernetes.",
         "tabDocker": "Docker",
         "tabK8s": "Kubernetes",
         "tabLinux": "Linux",
@@ -10108,6 +10326,7 @@
         "agentsSubtitle": "Agenten registreren zichzelf vanuit uw infrastructuur en zijn hier alleen-lezen.",
         "agentName": "Agent",
         "recoverAgent": "Herstel deze agent — kopieer een installatieopdracht vooraf ingevuld met zijn naam",
+        "restartConfig": "Configureer herstart — kopieer het installatiecommando van deze agent om installatie/docker herstart opnieuw uit te voeren (bijv. na een tokenroulatie)",
         "noAgents": "Er hebben zich nog geen agenten geregistreerd voor deze locatie.",
         "checksTitle": "Controles die vanaf deze locatie worden uitgevoerd",
         "checkName": "Naam",

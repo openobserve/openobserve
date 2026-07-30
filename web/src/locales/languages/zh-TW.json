@@ -364,6 +364,8 @@
   },
   "common": {
     "beta": "測試版",
+    "play": "播放",
+    "pause": "暫停",
     "close": "關閉",
     "cancel": "取消",
     "ok": "確定",
@@ -514,7 +516,9 @@
     "fillRequiredFields": "請填寫必填欄位",
     "test": "測試",
     "username": "使用者名稱",
-    "password": "密碼"
+    "password": "密碼",
+    "field": "欄位",
+    "enterValueOrVariable": "輸入值或 $variable"
   },
   "flow": {
     "stepPicker": {
@@ -905,9 +909,13 @@
     "language": "語言",
     "actions": "動作",
     "keyboardShortcuts": "鍵盤快捷鍵",
-    "synthetic": "合成監控"
+    "synthetic": "合成監控",
+    "experience": "體驗"
   },
   "rum": {
+    "noSessionReplay": "無可用工作階段重播",
+    "seek": "跳轉",
+    "playbackSpeed": "播放速度",
     "title": "真實使用者監控",
     "subtitle": "監控真實使用者工作階段、錯誤和前端效能",
     "issueColumn": "問題",
@@ -1016,6 +1024,7 @@
     "desktop": "桌上型電腦",
     "mobile": "行動裝置",
     "tablet": "平板電腦",
+    "platform": "平台",
     "vsPreviousPeriod": "與前期相比",
     "seeSessions": "查看工作階段",
     "openErrorTracking": "在錯誤追蹤中開啟",
@@ -1652,6 +1661,8 @@
     "object": "物件",
     "serviceAccounts": "服務帳戶",
     "ingestionTokens": "擷取權杖",
+    "syntheticsTokens": "合成監控權杖",
+    "syntheticsTokensDesc": "組織層級的 o2syn_ 權杖，您的私有合成監控代理程式用於拉取任務",
     "serviceAccountsName": "服務帳戶名稱",
     "basicUsers": "使用者",
     "organizationMembers": "組織成員",
@@ -2081,7 +2092,6 @@
     "search": "搜尋工作流程",
     "refresh": "重新整理工作流程",
     "trigger": "觸發器",
-    "triggerAlertFired": "警示觸發",
     "steps": "步驟",
     "status": "狀態",
     "updated": "已更新",
@@ -2133,13 +2143,21 @@
       "cta": "建立工作流程",
       "soonCta": "將在未來版本中提供",
       "comingSoon": "即將推出",
-      "soon": "即將",
-      "alertFired": "警報觸發時",
-      "alertFiredDesc": "在警報觸發時執行",
-      "schedule": "排程",
-      "scheduleDesc": "按排程執行",
-      "webhook": "Webhook",
-      "webhookDesc": "在傳入 Webhook 上執行"
+      "soon": "即將"
+    },
+    "triggerKind": {
+      "alertFired": {
+        "label": "警示觸發",
+        "node": "警示觸發",
+        "desc": "當警示觸發時執行",
+        "intro": "當關聯的警示觸發時，每個下游步驟都會收到此酬載。"
+      },
+      "incidentEvent": {
+        "label": "事件事件",
+        "node": "事件觸發器",
+        "desc": "在事件生命週期事件上執行",
+        "intro": "當發生事件事件時，每個下游步驟都會收到此酬載。"
+      }
     },
     "triggerMeta": {
       "orgId": "警示所屬的組織 ID。",
@@ -2178,9 +2196,6 @@
       "skipped": "已跳過",
       "errorsN": "{count} 個錯誤",
       "runError": "無法執行測試。",
-      "saveToTestTitle": "儲存並測試",
-      "saveToTestBody": "測試會執行此工作流程的已儲存版本。是否先儲存您的變更？",
-      "saveAndTest": "儲存並測試",
       "stepResult": {
         "viewHint": "點擊檢視輸入／輸出",
         "input": "輸入",
@@ -2227,7 +2242,6 @@
       "kindTrigger": "觸發器",
       "kindLogic": "邏輯",
       "kindAction": "動作",
-      "alertTrigger": "警示觸發器",
       "condition": "條件",
       "function": "函數",
       "sendToDestination": "目的地",
@@ -2252,7 +2266,6 @@
       "triggerAlertsNone": "此組織中未找到任何警示。",
       "triggerAlertsError": "無法載入警示",
       "triggerNote": "當任何選取的警示觸發時，此工作流程會執行。",
-      "triggerPayloadIntro": "當連結的警示觸發時，每個下游步驟都會收到此酬載。",
       "triggerStructureTitle": "酬載結構",
       "triggerStructureHint": "懸停欄位以查看詳細資訊",
       "triggerDetailHint": "懸停或聚焦上方欄位以查看其類型和意義。",
@@ -2261,6 +2274,10 @@
       "triggerDataBlock": "data[] · 您的警示資料列",
       "triggerDataColumns": "結果欄位",
       "triggerDataExampleNote": "僅為範例 — 實際欄位來自您的警示查詢。",
+      "incidentEventTypeLabel": "事件類型",
+      "incidentCommonTitle": "通用欄位（每個事件）",
+      "incidentSpecificTitle": "事件特定欄位",
+      "incidentNoExtraFields": "此事件不添加通用欄位以外的欄位。",
       "triggerDataBlockNote": "每個匹配記錄一個物件的陣列。其欄位來自警示自身的查詢，因此因警示而異 — 以 data[].<column> 形式參照。",
       "conditionBody": "設定分支規則",
       "conditionBodySet": "根據規則分支",
@@ -2399,7 +2416,7 @@
     "periodGreaterThanZero": "週期必須大於 0",
     "frequencyGreaterThanSeconds": "頻率必須大於 {seconds} 秒。",
     "minimumFrequencyMinutes": "最小頻率應為 {minutes} 分鐘",
-    "streamSelectionNameInvalid": "僅使用英數字和 '+=,.@-_' 字元，不含空格。",
+    "streamSelectionNameInvalid": "僅使用字母數字和 '+=,.{'@'}-_' 字元，不得包含空格。",
     "functionAlreadyAssociated": "此函式已關聯",
     "atLeastOneCondition": "請至少新增一個條件",
     "fillAllConditionFields": "請填寫所有條件欄位（欄、運算子和值均為必填）",
@@ -2602,6 +2619,9 @@
     "resetRUMTokenLabel": "重設 RUM 權杖",
     "generateRUMTokenLabel": "產生 RUM 權杖",
     "generateRUMTokenMessage": "產生 RUM 權杖以啟用組織的 RUM 功能。",
+    "rumPlatform": "平台",
+    "rumPlatformBrowser": "瀏覽器",
+    "rumPlatformReactNative": "React Native",
     "npmStepTitle": "NPM 安裝方式",
     "recommendedLabel": "推薦",
     "customLabel": "自訂",
@@ -2836,7 +2856,7 @@
     "addToFavorites": "新增至最愛",
     "removeFromFavorites": "從最愛移除",
     "noFavoritesTitle": "尚無最愛儀表板",
-    "noFavoritesMessage": "點選任何儀表板上的心形圖示，即可在此跨所有資料夾檢視。",
+    "noFavoritesMessage": "點擊任何儀表板上的星號圖示，即可在此處查看所有資料夾的內容。",
     "moreActions": "更多操作",
     "save": "儲存",
     "cancel": "取消",
@@ -2985,7 +3005,12 @@
     "typeText": "文字",
     "sectionValueFormatting": "數值格式化",
     "sectionFieldType": "欄位類型",
-    "configSectionFieldOverridesAliases": ["欄位覆寫", "覆寫設定", "覆寫", "欄位格式化"],
+    "configSectionFieldOverridesAliases": [
+      "欄位覆寫",
+      "覆寫設定",
+      "覆寫",
+      "欄位格式化"
+    ],
     "sectionAlignment": "對齊",
     "alignLeft": "靠左",
     "alignCenter": "置中",
@@ -3668,7 +3693,8 @@
       "clause": "條件 {number}",
       "selectOperation": "選擇操作",
       "addAnotherClause": "新增其他條件",
-      "removeClause": "移除條件"
+      "removeClause": "移除條件",
+      "addClause": "新增子句"
     },
     "viewDashboard": {
       "refreshToApplyVariables": "重新整理以套用最新變數變更",
@@ -3695,7 +3721,9 @@
       "add": "新增",
       "value": "值",
       "markAsNonTimestamp": "將此欄位標記為非時間戳記",
-      "renderDataAsJson": "將資料呈現為 JSON / 陣列"
+      "renderDataAsJson": "將資料呈現為 JSON / 陣列",
+      "sortBy": "排序依據",
+      "havingHint": "對彙總進行篩選"
     },
     "customChartTypeSelector": {
       "exampleOfCustomCharts": "自訂圖表範例",
@@ -3906,6 +3934,10 @@
       "addedSuccessfully": "儀表板新增成功。",
       "creationFailed": "儀表板建立失敗。",
       "filesFailedValidation": "{count} 個檔案未通過驗證限制"
+    },
+    "rawQueryBuilder": {
+      "query": "查詢",
+      "instruction": "編寫 SQL 查詢以執行複雜操作。"
     }
   },
   "panel": {
@@ -4598,6 +4630,14 @@
     "lastSuccessfulAt": "上次成功於",
     "lastTrainedAt": "上次訓練時間",
     "status": "狀態",
+    "stateActive": "作用中",
+    "statePaused": "已暫停",
+    "stateFailed": "失敗",
+    "summaryActive": "作用中",
+    "summaryPaused": "已暫停",
+    "summaryFailed": "失敗",
+    "summaryRecent": "觸發 < 15 分鐘",
+    "summaryTotal": "總計",
     "numOfEvents": "事件數量",
     "view": "檢視",
     "webhook": "Webhook",
@@ -4774,6 +4814,13 @@
       "id": "ID",
       "status": "狀態",
       "severity": "嚴重程度",
+      "severityCritical": "P1 · 嚴重",
+      "severityHigh": "P2 · 高",
+      "severityMedium": "P3 · 中",
+      "severityLow": "P4 · 低",
+      "moreDimensions": "+{count} 更多",
+      "filterAll": "全部",
+      "filterActive": "作用中",
       "alertCount": "警示數",
       "firstAlertAt": "首次警示",
       "lastAlertAt": "最近警示",
@@ -4824,6 +4871,41 @@
       "rcaInProgress": "正在分析根因...",
       "rcaCompleted": "根因分析完成",
       "noRcaYet": "尚無根因分析。按一下 [分析] 以開始。",
+      "rcaAnalyzeIncident": "分析事件",
+      "rcaAnalyzing": "AI SRE 代理正在分析此事件，請稍候…",
+      "rcaAnalyzingHint": "分析完成後，報告將顯示在此處。",
+      "rcaReanalyzing": "AI SRE Agent 正在查看自上次分析以來的變化…",
+      "rcaReanalyzingHint": "分析完成後，報告將更新。",
+      "rcaStartedAgo": "開始於 {time} 前",
+      "rcaCancel": "取消",
+      "rcaCancelling": "取消中…",
+      "rcaCancelled": "分析已取消",
+      "rcaCancelFailed": "取消分析失敗",
+      "rcaFailed": "AI 分析失敗",
+      "rcaFailedGeneric": "執行 RCA 分析失敗",
+      "rcaRetry": "重試分析",
+      "rcaStale": "此分析執行時間異常長，可能已停止。您可以取消並重試。",
+      "rcaStatus": "AI 分析",
+      "rcaStatusAnalyzing": "分析中",
+      "rcaStatusFailed": "失敗",
+      "rcaStatusReady": "就緒",
+      "rcaStatusNone": "未分析",
+      "rcaAnalyzedAgo": "已分析於 {time} 前",
+      "rcaCopy": "複製報告",
+      "rcaCopied": "報告已複製到剪貼簿",
+      "rcaCopyFailed": "複製報告失敗",
+      "rcaDownload": "下載為 Markdown",
+      "rcaReanalyze": "重新分析",
+      "rcaFreshAnalysis": "全新分析",
+      "rcaFreshAnalysisHint": "從頭開始分析，忽略先前的報告",
+      "rcaBuildOnPrevious": "基於先前的報告建構",
+      "rcaBuildOnPreviousHint": "發送當前報告以便 Agent 擴展它",
+      "rcaHistory": "報告歷史",
+      "rcaHistoryCurrent": "當前",
+      "rcaHistoryEmpty": "沒有更早的報告",
+      "rcaHistoryLoadFailed": "載入報告歷史失敗",
+      "rcaViewingArchived": "您正在查看較早的報告",
+      "rcaBackToCurrent": "返回當前報告",
       "sreChat": "詢問 SRE 助理",
       "goBack": "返回",
       "incident": "事件",
@@ -5433,7 +5515,7 @@
       "modeWorkspace": "我的最愛",
       "workspace": {
         "emptyScratchpadTitle": "您尚無任何最愛",
-        "emptyScratchpadDesc": "在「探索」中將指標加入最愛（卡片上的 ♥）即可在此收集。若想保留，請轉換為儀表板。"
+        "emptyScratchpadDesc": "在 Explore 中將指標加入最愛（卡片上的 ★）以在此處收集它們。當您想保留它們時，轉換為儀表板。"
       },
       "visualizePlaceholder": "視覺化即將推出 — 直接在此從 PromQL 查詢建立圖表。",
       "railsAriaLabel": "指標篩選器",
@@ -5452,7 +5534,8 @@
       "queryFailed": "查詢失敗",
       "noData": "無資料",
       "noMetrics": "此組織尚無任何指標。",
-      "learnIngest": "了解如何匯入指標",
+      "setupIngestion": "設定指標擷取",
+      "setupIngestionDesc": "連接指標資料來源",
       "noMatch": "沒有符合目前篩選條件的指標",
       "noMatchHint": "請嘗試移除標籤篩選器、清除前綴/後綴選項，或從「有資料」切換為「全部」。",
       "noMatchHintFavorites": "嘗試移除標籤篩選器，或從「有資料」切換至「全部」。",
@@ -5480,6 +5563,7 @@
         "helpAria": "關於 {name}：{help}",
         "refreshAria": "重新整理 {name}",
         "refreshTooltip": "重新整理此指標",
+        "refreshToApplyTimeRange": "重新整理以套用選定的時間範圍",
         "configureAria": "為 {name} 配置函數",
         "configureTooltip": "配置函數",
         "favoriteAddAria": "將 {name} 加入我的最愛",
@@ -5838,7 +5922,18 @@
       "agentIdFields": "代理 ID 回退欄位",
       "agentIdHelp": "用作 gen_ai.agent.id 回退的傳入屬性。",
       "agentIdInfo": "僅在標準 gen_ai.agent.id 屬性缺失或為空時檢查。每行新增一個傳入遙測屬性。",
+      "envFields": "環境後備欄位",
+      "envHelp": "用作 Agent 環境的傳入屬性。",
+      "envInfo": "僅在標準 deployment.environment.name 屬性缺失或為空時檢查。每行新增一個傳入遙測屬性。",
+      "versionFields": "版本後備欄位",
+      "versionHelp": "用作 Agent 版本的傳入屬性。",
+      "versionInfo": "僅在標準 gen_ai.agent.version 屬性缺失或為空時檢查。每行新增一個傳入遙測屬性。",
       "fieldsPlaceholder": "agent.name\nllm.agent.name",
+      "agentNamePlaceholder": "my.custom.agent_name\nteam.agent.label",
+      "agentIdPlaceholder": "my.custom.agent_id\nteam.agent.uid",
+      "envPlaceholder": "my.custom.env\ntier",
+      "versionPlaceholder": "my.custom.version\nrelease.tag",
+      "alwaysAppliedStandard": "標準（優先檢查）：",
       "applyDefaults": "套用預設值",
       "resetToEmpty": "重設為空",
       "clearRegistry": "清除註冊表",
@@ -6403,6 +6498,12 @@
     "querySource": "查詢來源"
   },
   "traces": {
+    "agentDefaultVariant": "預設",
+    "agentNoEnv": "（無環境）",
+    "agentNoVersion": "(無版本)",
+    "allAgents": "所有代理",
+    "agentCountBadgeSingular": "{count} 個代理",
+    "agentCountBadgePlural": "{count} 個代理",
     "serviceGraph": {
       "searchPlaceholder": "搜尋服務",
       "noStreamsDetected": "未偵測到串流。請確保服務圖表指標包含 stream_name 標籤。",
@@ -6616,6 +6717,8 @@
     },
     "sessionsList": {
       "streamLabel": "串流",
+      "loadingAgents": "正在載入代理…",
+      "loadingStreams": "正在載入串流…",
       "noStreamsTooltip": "無可用的 LLM 串流。",
       "session": "工作階段",
       "sessions": "工作階段",
@@ -6630,6 +6733,7 @@
       "loading": "正在載入工作階段…",
       "tokenTooltip": "輸入：{input} · 輸出：{output} · 總計：{total}",
       "durationNs": "ns",
+      "errorCountTooltip": "此工作階段中有 {count} 個錯誤",
       "unknownUser": "未知使用者",
       "columns": {
         "timestamp": "時間戳記",
@@ -6860,6 +6964,8 @@
     "lLMInsightsDashboard": {
       "stream": "串流",
       "agent": "代理",
+      "compareEntry": "比較版本",
+      "compareEntryHint": "並排比較此代理的兩個版本",
       "failedToLoad": "載入深入解析失敗",
       "retry": "重試",
       "noAgentsInRange": "此範圍內無代理",
@@ -7148,7 +7254,7 @@
     "skillContentRequired": "技能內容為必填",
     "genericConfig": "組態",
     "genericData": "JSON 組態",
-    "genericDataPlaceholder": "{}",
+    "genericDataPlaceholder": "{'{}'}",
     "invalidJson": "必須為有效的 JSON"
   },
   "cipherKey": {
@@ -7706,6 +7812,57 @@
   },
   "aiObservability": {
     "title": "AI 可觀測性",
+    "deltaStrip": {
+      "metricLabel": {
+        "volume": "資料量",
+        "errorRate": "錯誤率",
+        "p50": "P50 延遲",
+        "p95": "P95 延遲",
+        "p99": "P99 延遲",
+        "cost": "成本/追蹤"
+      },
+      "insufficientLabel": "參考性",
+      "tooltip": {
+        "ciRange": "{level}% 信賴區間: {lower} 至 {upper}",
+        "method": "方法: {method}",
+        "associativeHigher": "B 高於 A — 環境不同，因此此為相關性，而非 B 導致的證明。",
+        "associativeLower": "B 低於 A — 環境不同，因此此為相關性，而非 B 導致的證明。",
+        "causalRegressed": "在相同時鐘時間視窗下，B 相對於 A 惡化。",
+        "causalImproved": "在相同時鐘時間視窗下，B 相對於 A 改善。",
+        "insufficient": "尚無足夠樣本得出可靠結論 — 請將此差異僅視為參考。",
+        "methodNewcombe": "Wilson/Newcombe 比例信賴區間",
+        "methodBootstrap": "自助抽樣法"
+      }
+    },
+    "overlayChart": {
+      "seriesA": "版本 A",
+      "seriesB": "版本 B",
+      "xAxisSinceRollout": "上線後小時數",
+      "xAxisWallClock": "時間",
+      "lowResolution": "在此視窗中時間解析度不足，無法繪製兩個版本 — 請縮小日期範圍（或切換至「自各次上線後」）。",
+      "xAxisSinceRolloutMinutes": "上線後分鐘數",
+      "xAxisSinceRolloutHours": "上線後小時數",
+      "xAxisSinceRolloutDays": "上線後天數",
+      "xAxisWallClockMinutes": "分鐘（已過，時鐘時間）",
+      "xAxisWallClockHours": "小時（已過，時鐘時間）",
+      "xAxisWallClockDays": "天（已過，時鐘時間）"
+    },
+    "errorDiff": {
+      "title": "失敗變化",
+      "introduced": "引入",
+      "fixed": "已修復",
+      "shared": "共同",
+      "noData": "此視窗中無可比較的失敗資料。",
+      "subtitle": "每個失敗類別如何從 {a} 變為 {b}。",
+      "introducedHint": "在 {b} 中新增",
+      "fixedHint": "在 {b} 中消失",
+      "sharedHint": "兩個版本中都存在",
+      "legendA": "A",
+      "legendB": "B",
+      "legendDelta": "Δ",
+      "sharedColHeader": "{a} → {b}",
+      "countIn": "{count} 在 {version} 中"
+    },
     "sections": {
       "monitor": "監控",
       "evaluate": "評估"
@@ -7730,13 +7887,17 @@
       "scorers": "建立和管理對 LLM 輸出進行評分的評分器",
       "scoreConfigs": "設定評估所使用的評分標準"
     },
+    "scope": {
+      "env": "環境",
+      "agent": "代理",
+      "version": "版本"
+    },
     "agentGraph": {
       "stream": "串流",
       "agent": "代理",
       "noAgentsTitle": "找不到任何代理",
       "noAgentsDescription": "在此時間範圍內未發現任何代理。請嘗試擴大時間範圍，或檢查您的追蹤是否包含 gen_ai 代理屬性。",
-      "agentCountSingular": "代理",
-      "agentCountPlural": "代理"
+      "versionAgnosticHint": "拓撲在各版本間相同 — 圖表按環境而非版本限定範圍。使用版本比較來比較版本。"
     },
     "kpi": {
       "totalCost": "總成本",
@@ -7791,12 +7952,20 @@
       },
       "loopsTitle": "迴圈代理",
       "loopsHint": "代理在每個追蹤中重複執行相同工具多次",
+      "summaryLoops": "循環代理",
+      "summaryFailures": "失敗分類",
+      "summaryAgents": "受影響的代理",
       "failuresTitle": "失敗分類",
       "failuresHint": "按類型分組的錯誤，每個代理",
+      "footerLoops": "循環",
+      "footerFailures": "失敗類別",
       "costTitle": "按代理劃分的成本與失敗",
       "costHint": "哪些代理導致支出和錯誤",
       "noLoops": "在此範圍內未偵測到迴圈行為",
       "noFailures": "在此範圍內無代理失敗",
+      "noLoopsForAgent": "在該範圍內 {agent} 無循環行為 — 切換代理或擴大時間範圍",
+      "noFailuresForAgent": "在該範圍內 {agent} 無失敗 — 切換代理或擴大時間範圍",
+      "scopeLabel": "範圍",
       "noCost": "在此範圍內無代理成本記錄",
       "unknownAgent": "（未知代理）",
       "colAgent": "代理",
@@ -7817,6 +7986,8 @@
         "worstLoopTraces": "最差追蹤（重複次數最多的優先）",
         "topCostTraces": "最昂貴的追蹤",
         "noTraces": "此訊號找不到任何追蹤",
+        "footerTraces": "追蹤",
+        "footerErrors": "錯誤",
         "errorsTitle": "錯誤訊息說明",
         "noErrors": "未擷取到錯誤訊息 — 請開啟追蹤進行檢查",
         "colTraceId": "追蹤",
@@ -7833,6 +8004,39 @@
         "loopExplain": "高重複率通常表示代理程式未快取結果或正在重試。請開啟下方最差的追蹤以查看重複的呼叫。",
         "failExplain": "這些是此失敗類別背後的實際錯誤訊息 — 請閱讀以尋找解決方案，或開啟追蹤以查看發生位置。",
         "costExplain": "這些追蹤驅動了此代理程式的花費。請開啟最昂貴的追蹤以查看執行了哪些內容。"
+      }
+    },
+    "versionCompare": {
+      "entry": "比較版本…",
+      "entryDisabledHint": "需要此代理至少 2 個版本才能比較",
+      "datePickerDisabled": "在此模式下，時間窗口是每個版本獨立的",
+      "sampledNote": "延遲和成本區間是根據每個版本最多 {cap} 個隨機抽樣追蹤計算的。",
+      "manual": {
+        "windowA": "版本 A 窗口",
+        "windowB": "版本 B 窗口"
+      },
+      "bar": {
+        "versionA": "版本 A",
+        "versionB": "版本 B",
+        "align": "對齊",
+        "alignSinceRollout": "自從每次推出",
+        "alignSameWallClock": "相同實際時間",
+        "alignManual": "手動",
+        "exit": "退出比較",
+        "samePickHint": "選擇兩個不同的版本進行比較",
+        "autoWindow": "自動：{duration}",
+        "windowLabelA": "版本 A 窗口",
+        "windowLabelB": "版本 B 窗口"
+      },
+      "banner": {
+        "smallSample": "資料太少無法比較 — A 有 {nA}，B 有 {nB}。擴大窗口或等待更多流量。",
+        "disjoint": "這些版本在不同時間運行 — 差異可能反映流量變化，而非版本本身。",
+        "partial": "這些版本部分並行 — 差異可能部分由各版本的運行時間解釋。"
+      },
+      "windowCard": {
+        "label": "{env} · {version} — {window} · {count} 個追蹤",
+        "clamp": "基準線僅運行了 {duration} — 比較每個版本的第一個 {duration}。",
+        "labelNoEnv": "{version} — {window} · {count} 個追蹤"
       }
     }
   },
@@ -7868,6 +8072,32 @@
       "paused": "作業已暫停",
       "activateError": "啟用作業失敗",
       "pauseError": "暫停作業失敗"
+    },
+    "manualEvaluation": {
+      "titles": {
+        "span": "評估跨度",
+        "trace": "評估追蹤",
+        "session": "評估會話"
+      },
+      "targetLabels": {
+        "span": "跨度 ID",
+        "trace": "追蹤 ID",
+        "session": "會話 ID"
+      },
+      "scopes": {
+        "span": "跨度",
+        "trace": "追蹤",
+        "session": "會話"
+      },
+      "description": "選擇一個評估任務對這個目標執行。評估工作程序將從此頁面的時間範圍載入來源遙測資料。",
+      "jobLabel": "評估任務",
+      "jobPlaceholder": "選擇評估任務",
+      "jobRequired": "選擇評估任務",
+      "noCompatibleJobs": "沒有 {scope} 評估任務使用 {stream} 追蹤串流。",
+      "loadJobsError": "載入評估任務失敗。",
+      "run": "執行評估",
+      "queued": "已排入佇列 {count} 個評估任務。",
+      "runError": "排入評估佇列失敗。"
     },
     "tabs": {
       "quality": "品質",
@@ -8079,6 +8309,7 @@
       "degraded": "已降級",
       "archived": "已封存"
     },
+    "summaryAll": "全部",
     "buttons": {
       "cancel": "取消",
       "close": "關閉",
@@ -8089,17 +8320,13 @@
     },
     "scorerTypeDialog": {
       "title": "建立新的評分器",
-      "intro": "選擇評分器類型。三種皆為一等選項 — 請選擇最符合您撰寫與執行方式的類型。",
+      "intro": "選擇評分器類型。兩者都是一等選項 — 選擇最符合您編寫和執行方式的那個。",
       "llmJudgeTitle": "LLM 評審",
       "llmJudgeDescription": "透過您已設定的供應商使用語言模型進行語意評估。",
       "llmJudgeCta": "設定評審",
       "remoteTitle": "遠端",
       "remoteDescription": "呼叫您自己的 HTTP 端點 — 將評估邏輯保留在您的環境內。",
-      "remoteCta": "設定端點",
-      "codeTitle": "程式碼",
-      "codeDescription": "撰寫 Python 或 JavaScript 評分函式，並從您的本機環境推送。",
-      "codeCta": "未來版本將提供",
-      "comingSoonBadge": "即將推出"
+      "remoteCta": "設定端點"
     },
     "provider": {
       "backTo": "返回供應商",
@@ -8402,48 +8629,6 @@
       "healthyLabel": "健康：",
       "typeLabel": "類型：",
       "promptVariablesLabel": "此提示中的變數：",
-      "promptVariableGuide": {
-        "title": "可用的提示變數",
-        "description": "這些變數可用於上面的提示中。每個變數的填入方式取決於評估工作所評估的內容。",
-        "columns": {
-          "variable": "提示變數"
-        },
-        "scopes": {
-          "span": "跨度",
-          "trace": "追蹤",
-          "session": "會話"
-        },
-        "statuses": {
-          "jobMapped": "在評估工作中映射",
-          "systemProvided": "系統提供",
-          "requiresSelector": "系統提供 · 需要跨度選擇器",
-          "selectorRequired": "需要跨度選擇器",
-          "unavailable": "不可用"
-        },
-        "variables": {
-          "inputOutput": {
-            "span": "將這些映射到包含輸入和輸出的跨度字段。",
-            "trace": "來自追蹤根跨度的輸入和輸出。",
-            "session": "不可用 — 會話沒有單一的輸入或輸出。"
-          },
-          "statistics": {
-            "span": "評估單一跨度時，像其他評分者變數一樣映射此名稱。",
-            "trace": "追蹤指標：跨度數量、持續時間、LLM 與工具呼叫、錯誤、令牌和成本。",
-            "session": "會話指標：追蹤和回合數量、持續時間和錯誤。"
-          },
-          "spans": {
-            "span": "評估單一跨度時，像其他評分者變數一樣映射此名稱。",
-            "trace": "由評估工作的跨度選擇器選取的追蹤跨度過濾子集。",
-            "session": "不適用於會話。"
-          },
-          "steps": {
-            "span": "評估單一跨度時，像其他評分者變數一樣映射此名稱。",
-            "trace": "按時間順序排列的跨度；當追蹤很長時，中間部分會折疊。",
-            "session": "按時間順序排列的追蹤，表示為對話回合。"
-          }
-        },
-        "indexDescription": "{spansVar} 和 {stepsVar} 以 JSON 陣列形式到達。請參考整個變數 — 不支援像 {indexedVar} 這樣的索引存取。"
-      },
       "identitySection": "識別",
       "judgeSection": "評審設定",
       "endpointSection": "端點",
@@ -8587,23 +8772,6 @@
         "samplingAll": "評估每個相符項目",
         "samplingRate": "依比率隨機取樣",
         "samplingCount": "前 N 個相符項目",
-        "manualSection": "手動評估",
-        "manualHelp": "將此工作的評分者排入明確目標。手動執行繞過自動抽樣，並在分數中繼資料上記錄原因。",
-        "manualTargetIdLabel": "目標 ID",
-        "manualSpanIdLabel": "跨度 ID",
-        "manualSpanIdPlaceholder": "span_id",
-        "manualTraceIdLabel": "追蹤 ID",
-        "manualTraceIdPlaceholder": "trace_id",
-        "manualSessionIdLabel": "會話 ID",
-        "manualSessionIdPlaceholder": "session_id",
-        "manualReasonLabel": "原因",
-        "manualReasonPlaceholder": "為什麼要重新執行此目標？",
-        "manualVariablesLabel": "變數 JSON",
-        "manualVariablesObjectError": "變數必須是 JSON 物件",
-        "manualTargetRequired": "目標 ID 為必填",
-        "manualSubmit": "執行手動評估",
-        "manualSuccess": "已排入 {count} 個評估任務",
-        "manualError": "手動評估失敗",
         "metadataSection": "中繼資料",
         "versionLabel": "版本",
         "pipelineLabel": "管線 ID",
@@ -8765,20 +8933,27 @@
       "inputMapping": {
         "title": "提示變數",
         "hint": {
-          "span": "將每個變數映射到提供其值的跨度欄位。",
-          "trace": "追蹤值自動填入。將其他內容映射到跨度欄位。",
-          "session": "工作階段值自動填入。將其他內容映射到跨度欄位。"
+          "span": "將每個變數映射到跨度屬性。",
+          "trace": "將每個變數映射到系統提供的值或跨度屬性。",
+          "session": "將每個變數映射到系統提供的值或跨度屬性。"
+        },
+        "placeholder": "選擇一個值",
+        "searchPlaceholder": "搜尋系統值和跨度屬性…",
+        "groups": {
+          "systemProvided": "系統提供的值 · 針對此任務評估的每個 {scope}",
+          "spanAttributes": "跨度屬性"
         },
         "selectScorers": "選擇評分器以設定其對應。",
         "noVariables": "此評分器沒有可對應的範本變數。",
         "variableCount": "{count} 個變數",
         "systemProvided": {
-          "title": "{scope} 變數",
-          "description": "OpenObserve 從 {scope} 本身提供這些值。評分器提示可以直接使用它們 — 無需映射。",
+          "about": "關於系統提供的值",
+          "title": "{scope} 系統值",
+          "description": "OpenObserve 會為此任務評估的每個 {scope} 分別建立這些值。在映射評分器的提示變數時，可將它們用作來源。",
           "badge": "系統提供",
           "selectorRequired": "需要跨度選擇器",
           "columns": {
-            "variable": "提示變數",
+            "variable": "值",
             "source": "來源",
             "description": "提供的值"
           },
@@ -8825,7 +9000,7 @@
           "fields": "請為自訂結構選取至少一個欄位。",
           "maximumSpans": "最大區間數必須是正整數。",
           "budget": "選取的欄位對應的區間過多。請減少區間數，或減少讀取的欄位。",
-          "binding": "為每個評分器選取一個區間選擇器。"
+          "binding": "為每個使用追蹤跨度的評分器選擇一個跨度選擇器。"
         }
       },
       "preview": {
@@ -8863,10 +9038,12 @@
       "saveError": "儲存評估作業失敗",
       "createdAndActivated": "評估作業已建立並啟用",
       "createdButActivateFailed": "評估作業已建立，但啟用失敗",
+      "savedAndActivated": "評估任務已儲存並啟用",
+      "savedButActivateFailed": "評估任務已儲存，但啟用失敗",
       "validation": {
         "nameRequired": "Job name is required",
         "streamRequired": "A stream is required",
-        "idleWindowMinimum": "閒置視窗必須至少1秒",
+        "idleWindowMinimum": "閒置視窗必須至少 1 秒",
         "idleWindowMaximumTrace": "Trace 閒置視窗不能超過30分鐘",
         "idleWindowMaximumSession": "工作階段閒置視窗不能超過4小時",
         "maxAgeMaximumTrace": "Trace 最大時長不能超過2小時",
@@ -9289,6 +9466,44 @@
     "lastRefreshed": "上次重新整理：{time}"
   },
   "synthetics": {
+    "tokens": {
+      "title": "合成監控權杖",
+      "explanation": "組織層級的 o2syn_ 權杖，您的私有代理程式在拉取任務時用來驗證。公開 (Lambda) 位置會自動使用預設權杖；建立具名權杖並嵌入到區域的代理程式中，以限制該區域的影響範圍。",
+      "summary": "您的私有代理程式用來拉取任務的權杖。",
+      "rotateDefaultBtn": "輪換預設",
+      "createTokenBtn": "建立權杖",
+      "searchPlaceholder": "搜尋權杖",
+      "default": "預設",
+      "tokenNameLabel": "名稱",
+      "tokenNamePlaceholder": "us-east",
+      "tokenNameHint": "以區域或站點命名，然後透過設定命令將其嵌入該區域的代理程式中。",
+      "tokenColumn": "權杖",
+      "agentsColumn": "代理程式",
+      "createdBy": "建立者",
+      "createTokenTitle": "建立合成監控權杖",
+      "newTokenRevealed": "新權杖 — 立即複製",
+      "rawTokenLabel": "權杖 (僅顯示一次)",
+      "installHint": "貼到代理程式設定命令中：--token=<token>",
+      "installCmdLabel": "安裝命令 (已包含權杖)",
+      "installCmdHint": "在代理程式主機上執行此命令。權杖已內嵌 — 將 <location-name> 替換為您的位置。它將不再顯示。",
+      "copyCmdBtn": "複製命令",
+      "copyTokenBtn": "複製權杖",
+      "copiedToast": "權杖已複製到剪貼簿",
+      "disableDefaultBlocked": "無法停用預設權杖 — 請先輪換它",
+      "nameReserved": "'default' 已保留 — 請使用輪換來取代預設權杖",
+      "fetchError": "載入權杖失敗",
+      "createSuccess": "權杖已建立",
+      "createError": "建立權杖失敗",
+      "rotateSuccess": "預設令牌已輪換 — 舊令牌在您停用之前仍有效",
+      "rotateError": "輪換令牌失敗",
+      "enabledSuccess": "令牌已啟用",
+      "disabledSuccess": "令牌已停用",
+      "updateError": "更新令牌失敗",
+      "empty": {
+        "title": "無合成令牌",
+        "description": "建立具名令牌以限定區域代理，或使用組織預設值。"
+      }
+    },
     "authNetwork": {
       "addCookie": "新增 Cookie",
       "addHeader": "新增標頭",
@@ -9666,12 +9881,15 @@
       "assertions": "斷言",
       "assertionsFailed": "失敗",
       "assertionsPassed": "通過",
+      "assertionsNotEvaluated": "未評估",
+      "assertionsNotEvaluatedHint": "請求從未返回回應，因此未進行任何斷言。",
       "certExpires": "到期 {date}",
       "completed": "已完成",
       "daysRemaining": "剩餘 {days} 天",
       "error": "錯誤",
       "failed": "失敗",
       "init": "init",
+      "loading": "正在載入執行詳情",
       "location": "位置",
       "notFound": "找不到執行",
       "passed": "通過",
@@ -9703,7 +9921,7 @@
       "clearFiltersDesc": "移除所有作用中的篩選",
       "device": "裝置",
       "duration": "持續時間",
-      "editMonitor": "編輯監控",
+      "editCheck": "編輯檢查",
       "error": "錯誤",
       "failed": "失敗",
       "failedRuns": "失敗的執行",
@@ -10086,6 +10304,11 @@
         "browserNote": "瀏覽器測試目前無法從私人位置執行 — 僅限協議檢查 (HTTP, TCP, TLS, SSH)。",
         "locationNameLabel": "位置名稱",
         "locationNamePlaceholder": "公司總部",
+        "typeTitle": "此代理執行的內容",
+        "typeProtocol": "網路",
+        "typeBrowser": "瀏覽器",
+        "typeProtocolHint": "HTTP、TCP、TLS 和 SSH 檢查。執行 Go 代理 — Docker、Kubernetes、Linux 或 Windows。",
+        "typeBrowserHint": "瀏覽器旅程。僅執行 Playwright 映像 — Docker 或 Kubernetes。",
         "tabDocker": "Docker",
         "tabK8s": "Kubernetes",
         "tabLinux": "Linux",
@@ -10103,6 +10326,7 @@
         "agentsSubtitle": "代理程式從您的基礎架構自行註冊，且在此為唯讀。",
         "agentName": "代理程式",
         "recoverAgent": "恢復此代理程式 — 複製已預填其名稱的設定命令",
+        "restartConfig": "重新啟動配置 — 複製此代理的設置命令以重新執行安裝 / docker 重新啟動（例如在令牌輪換後）",
         "noAgents": "此位置尚未有代理程式註冊。",
         "checksTitle": "從此位置執行的檢查",
         "checkName": "名稱",

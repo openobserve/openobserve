@@ -364,6 +364,8 @@
   },
   "common": {
     "beta": "ベータ",
+    "play": "再生",
+    "pause": "一時停止",
     "close": "閉じる",
     "cancel": "[キャンセル]",
     "ok": "OK",
@@ -514,7 +516,9 @@
     "fillRequiredFields": "必須項目を入力してください",
     "test": "テスト",
     "username": "ユーザー名",
-    "password": "パスワード"
+    "password": "パスワード",
+    "field": "フィールド",
+    "enterValueOrVariable": "値を入力するか、$variable を指定"
   },
   "flow": {
     "stepPicker": {
@@ -905,9 +909,13 @@
     "language": "言語",
     "actions": "アクション",
     "keyboardShortcuts": "キーボードショートカット",
-    "synthetic": "合成モニタリング"
+    "synthetic": "合成モニタリング",
+    "experience": "エクスペリエンス"
   },
   "rum": {
+    "noSessionReplay": "利用可能なセッションリプレイはありません",
+    "seek": "シーク",
+    "playbackSpeed": "再生速度",
     "title": "リアルユーザーモニタリング",
     "subtitle": "実際のユーザーセッション、エラー、フロントエンドのパフォーマンスを監視",
     "issueColumn": "問題",
@@ -1016,6 +1024,7 @@
     "desktop": "デスクトップ",
     "mobile": "モバイル",
     "tablet": "タブレット",
+    "platform": "プラットフォーム",
     "vsPreviousPeriod": "前期間との比較",
     "seeSessions": "セッションを見る",
     "openErrorTracking": "エラートラッキングで開く",
@@ -1652,6 +1661,8 @@
     "object": "オブジェクト",
     "serviceAccounts": "サービスアカウント",
     "ingestionTokens": "インジェストトークン",
+    "syntheticsTokens": "シンセティックストークン",
+    "syntheticsTokensDesc": "組織レベルの o2syn_ トークン。プライベートシンセティックエージェントがジョブを取得するために使用します。",
     "serviceAccountsName": "サービスアカウント名",
     "basicUsers": "ユーザ",
     "organizationMembers": "組織メンバー",
@@ -2081,7 +2092,6 @@
     "search": "ワークフローを検索",
     "refresh": "ワークフローを更新",
     "trigger": "トリガー",
-    "triggerAlertFired": "アラート発火",
     "steps": "ステップ",
     "status": "ステータス",
     "updated": "更新済み",
@@ -2133,13 +2143,21 @@
       "cta": "ワークフローを作成",
       "soonCta": "今後のリリースで利用可能",
       "comingSoon": "近日公開",
-      "soon": "間もなく",
-      "alertFired": "アラート発火",
-      "alertFiredDesc": "アラート発火時に実行",
-      "schedule": "スケジュール",
-      "scheduleDesc": "スケジュールに従って実行",
-      "webhook": "Webhook",
-      "webhookDesc": "受信Webhookで実行"
+      "soon": "間もなく"
+    },
+    "triggerKind": {
+      "alertFired": {
+        "label": "アラート発火",
+        "node": "アラートトリガー",
+        "desc": "アラート発火時に実行",
+        "intro": "リンクされたアラートが発火すると、後続のすべてのステップがこのペイロードを受け取ります。"
+      },
+      "incidentEvent": {
+        "label": "インシデントイベント",
+        "node": "インシデントトリガー",
+        "desc": "インシデントライフサイクルイベントで実行",
+        "intro": "インシデントイベントが発生すると、後続のすべてのステップがこのペイロードを受け取ります。"
+      }
     },
     "triggerMeta": {
       "orgId": "アラートが属する組織ID。",
@@ -2178,9 +2196,6 @@
       "skipped": "スキップ",
       "errorsN": "{count} エラー",
       "runError": "テストを実行できません。",
-      "saveToTestTitle": "保存してテスト",
-      "saveToTestBody": "テストは保存済みのワークフローバージョンを実行します。先に変更を保存しますか？",
-      "saveAndTest": "保存してテスト",
       "stepResult": {
         "viewHint": "クリックして入力/出力を表示",
         "input": "入力",
@@ -2227,7 +2242,6 @@
       "kindTrigger": "トリガー",
       "kindLogic": "ロジック",
       "kindAction": "アクション",
-      "alertTrigger": "アラートトリガー",
       "condition": "条件",
       "function": "関数",
       "sendToDestination": "宛先",
@@ -2252,7 +2266,6 @@
       "triggerAlertsNone": "この組織にはアラートが見つかりません。",
       "triggerAlertsError": "アラートを読み込めません",
       "triggerNote": "このワークフローは、選択されたアラートのいずれかが発生したときに実行されます。",
-      "triggerPayloadIntro": "リンクされたアラートが発生すると、後続の各ステップがこのペイロードを受け取ります。",
       "triggerStructureTitle": "ペイロード構造",
       "triggerStructureHint": "フィールドにカーソルを合わせると詳細が表示されます",
       "triggerDetailHint": "上のフィールドにカーソルを合わせるかフォーカスすると、その型と意味が表示されます。",
@@ -2261,6 +2274,10 @@
       "triggerDataBlock": "data[] · アラートの行",
       "triggerDataColumns": "結果列",
       "triggerDataExampleNote": "これは例です。実際の列はアラートのクエリから取得されます。",
+      "incidentEventTypeLabel": "イベントタイプ",
+      "incidentCommonTitle": "共通フィールド（すべてのイベント）",
+      "incidentSpecificTitle": "イベント固有のフィールド",
+      "incidentNoExtraFields": "このイベントは共通フィールド以外のフィールドを追加しません。",
       "triggerDataBlockNote": "一致したレコードごとに1つのオブジェクトを持つ配列です。その列はアラート独自のクエリから取得されるため、アラートごとに異なります。data[].<column> として参照します。",
       "conditionBody": "分岐するルールを設定",
       "conditionBodySet": "ルールで分岐",
@@ -2399,7 +2416,7 @@
     "periodGreaterThanZero": "期間は 0 より大きくする必要があります",
     "frequencyGreaterThanSeconds": "頻度は {seconds} 秒より大きくする必要があります。",
     "minimumFrequencyMinutes": "最小頻度は {minutes} 分である必要があります",
-    "streamSelectionNameInvalid": "英数字と '+=,.@-_' の文字のみを使用し、スペースは使用しないでください。",
+    "streamSelectionNameInvalid": "英数字と '+=,.{'@'}-_' 文字のみを使用し、スペースなし。",
     "functionAlreadyAssociated": "関数はすでに関連付けられています",
     "atLeastOneCondition": "少なくとも 1 つの条件を追加してください",
     "fillAllConditionFields": "すべての条件フィールドを入力してください（列、演算子、値は必須です）",
@@ -2602,6 +2619,9 @@
     "resetRUMTokenLabel": "RUM トークンをリセット",
     "generateRUMTokenLabel": "RUM トークンを生成",
     "generateRUMTokenMessage": "組織でRUMを有効にするにはRUMトークンを生成してください。",
+    "rumPlatform": "プラットフォーム",
+    "rumPlatformBrowser": "ブラウザ",
+    "rumPlatformReactNative": "React Native",
     "npmStepTitle": "NPM によるインストール方法",
     "recommendedLabel": "推奨",
     "customLabel": "カスタム",
@@ -2836,7 +2856,7 @@
     "addToFavorites": "お気に入りに追加",
     "removeFromFavorites": "お気に入りから削除",
     "noFavoritesTitle": "まだお気に入りのダッシュボードはありません",
-    "noFavoritesMessage": "任意のダッシュボードのハートアイコンをクリックすると、すべてのフォルダにわたってここに表示されます。",
+    "noFavoritesMessage": "任意のダッシュボードの星アイコンをクリックすると、すべてのフォルダからここに表示されます。",
     "moreActions": "その他のアクション",
     "save": "保存",
     "cancel": "キャンセル",
@@ -3673,7 +3693,8 @@
       "clause": "句 {number}",
       "selectOperation": "操作を選択",
       "addAnotherClause": "別の句を追加",
-      "removeClause": "句を削除"
+      "removeClause": "句を削除",
+      "addClause": "句を追加"
     },
     "viewDashboard": {
       "refreshToApplyVariables": "最新の変数変更を適用するには更新してください",
@@ -3700,7 +3721,9 @@
       "add": "追加",
       "value": "値",
       "markAsNonTimestamp": "このフィールドを非タイムスタンプとしてマーク",
-      "renderDataAsJson": "データをJSON/配列としてレンダリング"
+      "renderDataAsJson": "データをJSON/配列としてレンダリング",
+      "sortBy": "並び替え",
+      "havingHint": "集計でフィルター"
     },
     "customChartTypeSelector": {
       "exampleOfCustomCharts": "カスタムチャートの例",
@@ -3911,6 +3934,10 @@
       "addedSuccessfully": "ダッシュボードが正常に追加されました。",
       "creationFailed": "ダッシュボードの作成に失敗しました。",
       "filesFailedValidation": "{count} 個のファイルが検証制約を通過しませんでした"
+    },
+    "rawQueryBuilder": {
+      "query": "クエリ",
+      "instruction": "複雑なアクションにはSQLクエリを記述してください。"
     }
   },
   "panel": {
@@ -4603,6 +4630,14 @@
     "lastSuccessfulAt": "最終成功日時",
     "lastTrainedAt": "最終研修日",
     "status": "ステータス",
+    "stateActive": "アクティブ",
+    "statePaused": "一時停止",
+    "stateFailed": "失敗",
+    "summaryActive": "アクティブ",
+    "summaryPaused": "一時停止",
+    "summaryFailed": "失敗",
+    "summaryRecent": "発火 < 15m",
+    "summaryTotal": "合計",
     "numOfEvents": "イベント数",
     "view": "表示",
     "webhook": "Webhook",
@@ -4779,6 +4814,13 @@
       "id": "ID",
       "status": "ステータス",
       "severity": "重大度",
+      "severityCritical": "P1 · 重大",
+      "severityHigh": "P2 · 高",
+      "severityMedium": "P3 · 中",
+      "severityLow": "P4 · 低",
+      "moreDimensions": "+{count} 件以上",
+      "filterAll": "すべて",
+      "filterActive": "アクティブ",
       "alertCount": "アラート",
       "firstAlertAt": "ファーストアラート",
       "lastAlertAt": "最終アラート",
@@ -4829,6 +4871,41 @@
       "rcaInProgress": "根本原因を分析中...",
       "rcaCompleted": "根本原因分析が完了しました",
       "noRcaYet": "根本原因分析はありません。[分析] をクリックして開始します。",
+      "rcaAnalyzeIncident": "インシデントを分析",
+      "rcaAnalyzing": "AI SREエージェントがこのインシデントを分析中です。お待ちください…",
+      "rcaAnalyzingHint": "分析が完了すると、ここにレポートが表示されます。",
+      "rcaReanalyzing": "AI SREエージェントが最後の分析からの変更を確認しています…",
+      "rcaReanalyzingHint": "分析が完了すると、レポートが更新されます。",
+      "rcaStartedAgo": "{time}前に開始",
+      "rcaCancel": "キャンセル",
+      "rcaCancelling": "キャンセル中…",
+      "rcaCancelled": "分析をキャンセルしました",
+      "rcaCancelFailed": "分析のキャンセルに失敗しました",
+      "rcaFailed": "AI分析に失敗しました",
+      "rcaFailedGeneric": "RCA分析の実行に失敗しました",
+      "rcaRetry": "分析を再試行",
+      "rcaStale": "この分析は異常に長く実行されており、停止した可能性があります。キャンセルして再試行できます。",
+      "rcaStatus": "AI分析",
+      "rcaStatusAnalyzing": "分析中",
+      "rcaStatusFailed": "失敗",
+      "rcaStatusReady": "準備完了",
+      "rcaStatusNone": "未分析",
+      "rcaAnalyzedAgo": "{time}前に分析済み",
+      "rcaCopy": "レポートをコピー",
+      "rcaCopied": "レポートをクリップボードにコピーしました",
+      "rcaCopyFailed": "レポートのコピーに失敗しました",
+      "rcaDownload": "Markdownとしてダウンロード",
+      "rcaReanalyze": "再分析",
+      "rcaFreshAnalysis": "新規分析",
+      "rcaFreshAnalysisHint": "以前のレポートを無視してゼロから分析",
+      "rcaBuildOnPrevious": "以前のレポートを基に分析",
+      "rcaBuildOnPreviousHint": "現在のレポートを送信してエージェントに拡張させる",
+      "rcaHistory": "レポート履歴",
+      "rcaHistoryCurrent": "現在",
+      "rcaHistoryEmpty": "以前のレポートはありません",
+      "rcaHistoryLoadFailed": "レポート履歴の読み込みに失敗しました",
+      "rcaViewingArchived": "以前のレポートを表示しています",
+      "rcaBackToCurrent": "現在のレポートに戻る",
       "sreChat": "SREアシスタントに聞く",
       "goBack": "戻る",
       "incident": "インシデント",
@@ -5438,7 +5515,7 @@
       "modeWorkspace": "お気に入り",
       "workspace": {
         "emptyScratchpadTitle": "まだお気に入りはありません",
-        "emptyScratchpadDesc": "探索（カードの♥）でメトリクスをお気に入りに追加すると、ここに集められます。保存したい場合は、ダッシュボードに変換してください。"
+        "emptyScratchpadDesc": "Exploreでメトリクスをお気に入りに追加（カードの★）すると、ここに収集されます。保持したい場合は、ダッシュボードに変換してください。"
       },
       "visualizePlaceholder": "可視化は近日公開予定 — PromQLクエリからチャートを作成できます。",
       "railsAriaLabel": "メトリクスフィルター",
@@ -5457,7 +5534,8 @@
       "queryFailed": "クエリ失敗",
       "noData": "データなし",
       "noMetrics": "この組織にはまだメトリクスがありません。",
-      "learnIngest": "メトリクスの取り込み方法を学ぶ",
+      "setupIngestion": "メトリクス取り込みの設定",
+      "setupIngestionDesc": "メトリクスデータソースに接続",
       "noMatch": "現在のフィルターに一致するメトリクスはありません",
       "noMatchHint": "ラベルフィルターを削除するか、プレフィックス/サフィックスの選択をクリアするか、「データあり」から「すべて」に切り替えてみてください。",
       "noMatchHintFavorites": "ラベルフィルターを削除するか、「データあり」から「すべて」に切り替えてみてください。",
@@ -5485,6 +5563,7 @@
         "helpAria": "{name} について: {help}",
         "refreshAria": "{name} を更新",
         "refreshTooltip": "このメトリクスを更新",
+        "refreshToApplyTimeRange": "選択した時間範囲を適用するには更新してください",
         "configureAria": "{name} の関数を設定",
         "configureTooltip": "関数を設定",
         "favoriteAddAria": "{name} をお気に入りに追加",
@@ -5843,7 +5922,18 @@
       "agentIdFields": "エージェント ID フォールバックフィールド",
       "agentIdHelp": "gen_ai.agent.id のフォールバックとして使用する受信アトリビュート。",
       "agentIdInfo": "標準の gen_ai.agent.id 属性が欠落しているか、空の場合にのみチェックされます。1 行に 1 つの受信テレメトリ属性を追加します。",
+      "envFields": "環境フォールバックフィールド",
+      "envHelp": "エージェントの環境として使用する受信属性。",
+      "envInfo": "標準の deployment.environment.name 属性がないか空の場合のみチェックされます。1行に1つの受信テレメトリー属性を追加してください。",
+      "versionFields": "バージョンフォールバックフィールド",
+      "versionHelp": "エージェントのバージョンとして使用する受信属性。",
+      "versionInfo": "標準の gen_ai.agent.version 属性がないか空の場合のみチェックされます。1行に1つの受信テレメトリー属性を追加してください。",
       "fieldsPlaceholder": "エージェント名\nllm.agent.name",
+      "agentNamePlaceholder": "my.custom.agent_name\\nteam.agent.label",
+      "agentIdPlaceholder": "my.custom.agent_id\\nteam.agent.uid",
+      "envPlaceholder": "my.custom.env\\ntier",
+      "versionPlaceholder": "my.custom.version\\nrelease.tag",
+      "alwaysAppliedStandard": "標準（最初にチェックされる）:",
       "applyDefaults": "デフォルトを適用",
       "resetToEmpty": "空にリセット",
       "clearRegistry": "レジストリをクリア",
@@ -6408,6 +6498,12 @@
     "querySource": "クエリーソース"
   },
   "traces": {
+    "agentDefaultVariant": "デフォルト",
+    "agentNoEnv": "（環境なし）",
+    "agentNoVersion": "(バージョンなし)",
+    "allAgents": "すべてのエージェント",
+    "agentCountBadgeSingular": "{count} エージェント",
+    "agentCountBadgePlural": "{count} エージェント",
     "serviceGraph": {
       "searchPlaceholder": "検索サービス",
       "noStreamsDetected": "ストリームは検出されませんでした。サービスグラフのメトリクスに stream_name ラベルが含まれていることを確認してください。",
@@ -6621,6 +6717,8 @@
     },
     "sessionsList": {
       "streamLabel": "ストリーム",
+      "loadingAgents": "エージェントを読み込み中…",
+      "loadingStreams": "ストリームを読み込み中…",
       "noStreamsTooltip": "LLM ストリームはありません。",
       "session": "セッション",
       "sessions": "セッション",
@@ -6635,6 +6733,7 @@
       "loading": "セッションをロード中...",
       "tokenTooltip": "入力:{入力} · 出力:{出力} · 合計:{合計}",
       "durationNs": "ns",
+      "errorCountTooltip": "このセッションの{count}エラー",
       "unknownUser": "不明なユーザー",
       "columns": {
         "timestamp": "タイムスタンプ",
@@ -6865,6 +6964,8 @@
     "lLMInsightsDashboard": {
       "stream": "ストリーム",
       "agent": "エージェント",
+      "compareEntry": "バージョンを比較",
+      "compareEntryHint": "このエージェントの2つのバージョンを横に並べて比較",
       "failedToLoad": "インサイトの読み込みに失敗しました",
       "retry": "再試行",
       "noAgentsInRange": "この範囲にエージェントはありません",
@@ -7153,7 +7254,7 @@
     "skillContentRequired": "スキルの内容が必要です",
     "genericConfig": "コンフィギュレーション",
     "genericData": "JSON コンフィギュレーション",
-    "genericDataPlaceholder": "{}",
+    "genericDataPlaceholder": "{'{}'}",
     "invalidJson": "有効な JSON である必要があります"
   },
   "cipherKey": {
@@ -7711,6 +7812,57 @@
   },
   "aiObservability": {
     "title": "LLM オブザーバビリティ",
+    "deltaStrip": {
+      "metricLabel": {
+        "volume": "ボリューム",
+        "errorRate": "エラーレート",
+        "p50": "P50レイテンシ",
+        "p95": "P95レイテンシ",
+        "p99": "P99レイテンシ",
+        "cost": "コスト/トレース"
+      },
+      "insufficientLabel": "参考値",
+      "tooltip": {
+        "ciRange": "{level}% CI: {lower} から {upper}",
+        "method": "方法: {method}",
+        "associativeHigher": "BはAより高い — 環境が異なるため、これは関連性であり、Bが原因である証明ではありません。",
+        "associativeLower": "BはAより低い — 環境が異なるため、これは関連性であり、Bが原因である証明ではありません。",
+        "causalRegressed": "同じ実時間ウィンドウで、BはAに対して悪化しました。",
+        "causalImproved": "同じ実時間ウィンドウで、BはAに対して改善しました。",
+        "insufficient": "確定的な判断をするにはまだサンプルが不足しています — この差分は参考値として扱ってください。",
+        "methodNewcombe": "Wilson/Newcombe割合信頼区間",
+        "methodBootstrap": "ブートストラップ再サンプリング"
+      }
+    },
+    "overlayChart": {
+      "seriesA": "バージョンA",
+      "seriesB": "バージョンB",
+      "xAxisSinceRollout": "ロールアウトからの時間（時間）",
+      "xAxisWallClock": "時間",
+      "lowResolution": "このウィンドウで両方のバージョンをプロットするのに十分な時間分解能がありません — 日付範囲を狭めるか、「各ロールアウトからの経過時間」に切り替えてください。",
+      "xAxisSinceRolloutMinutes": "ロールアウトからの時間（分）",
+      "xAxisSinceRolloutHours": "ロールアウトからの時間（時間）",
+      "xAxisSinceRolloutDays": "ロールアウトからの時間（日）",
+      "xAxisWallClockMinutes": "分（経過実時間）",
+      "xAxisWallClockHours": "時間（経過実時間）",
+      "xAxisWallClockDays": "日（経過実時間）"
+    },
+    "errorDiff": {
+      "title": "障害の変化",
+      "introduced": "新規",
+      "fixed": "修正",
+      "shared": "共通",
+      "noData": "このウィンドウで比較する障害データがありません。",
+      "subtitle": "各障害クラスが{a}から{b}にどのように変化したか。",
+      "introducedHint": "{b}で新規",
+      "fixedHint": "{b}で消失",
+      "sharedHint": "両方のバージョンにある",
+      "legendA": "A",
+      "legendB": "B",
+      "legendDelta": "Δ",
+      "sharedColHeader": "{a} → {b}",
+      "countIn": "{count} 件中 {version}"
+    },
     "sections": {
       "monitor": "モニター",
       "evaluate": "評価する"
@@ -7735,13 +7887,17 @@
       "scorers": "LLM アウトプットを採点するスコアラーの作成と管理",
       "scoreConfigs": "評価に使用するスコアリングルーブリックを設定します"
     },
+    "scope": {
+      "env": "環境",
+      "agent": "エージェント",
+      "version": "バージョン"
+    },
     "agentGraph": {
       "stream": "ストリーム",
       "agent": "エージェント",
       "noAgentsTitle": "エージェントが見つかりません",
       "noAgentsDescription": "この時間範囲ではエージェントが見つかりませんでした。時間範囲を広げるか、トレースにgen_aiエージェント属性が含まれていることを確認してください。",
-      "agentCountSingular": "エージェント",
-      "agentCountPlural": "エージェント"
+      "versionAgnosticHint": "トポロジはバージョン間で同じです — グラフは環境でスコープされ、バージョンではありません。バージョン比較を使用してバージョンを比較します。"
     },
     "kpi": {
       "totalCost": "合計費用",
@@ -7796,12 +7952,20 @@
       },
       "loopsTitle": "ループしているエージェント",
       "loopsHint": "トレースごとに同じツールを何度も再実行するエージェント",
+      "summaryLoops": "ループするエージェント",
+      "summaryFailures": "障害分類",
+      "summaryAgents": "影響を受けたエージェント",
       "failuresTitle": "障害の分類",
       "failuresHint": "エラーを種類別、エージェント別にグループ化",
+      "footerLoops": "ループ",
+      "footerFailures": "障害クラス",
       "costTitle": "エージェント別のコストと障害",
       "costHint": "どのエージェントが費用とエラーを引き起こしているか",
       "noLoops": "この範囲でループ動作は検出されませんでした",
       "noFailures": "この範囲でエージェント障害はありません",
+      "noLoopsForAgent": "この範囲では {agent} にループ動作はありません — エージェントを切り替えるか、時間範囲を広げてください",
+      "noFailuresForAgent": "この範囲では {agent} に障害はありません — エージェントを切り替えるか、時間範囲を広げてください",
+      "scopeLabel": "スコープ",
       "noCost": "この範囲でエージェントコストは記録されていません",
       "unknownAgent": "(不明なエージェント)",
       "colAgent": "エージェント",
@@ -7822,6 +7986,8 @@
         "worstLoopTraces": "最悪のトレース（繰り返しが多い順）",
         "topCostTraces": "最もコストの高いトレース",
         "noTraces": "このシグナルのトレースが見つかりません",
+        "footerTraces": "トレース",
+        "footerErrors": "エラー",
         "errorsTitle": "エラーの内容",
         "noErrors": "エラーメッセージは取得されていません — トレースを開いて確認",
         "colTraceId": "トレース",
@@ -7838,6 +8004,39 @@
         "loopExplain": "繰り返し率が高い場合は、通常エージェントが結果をキャッシュしていないか、再試行していることを意味します。以下の最悪のトレースを開いて繰り返し呼び出しを確認してください。",
         "failExplain": "これらがこの障害クラスの実際のエラーメッセージです — 修正方法を見つけるために読むか、トレースを開いて発生場所を確認してください。",
         "costExplain": "これらのトレースがこのエージェントのコストを押し上げました。最もコストの高いものを開いて何が実行されたか確認してください。"
+      }
+    },
+    "versionCompare": {
+      "entry": "バージョンを比較...",
+      "entryDisabledHint": "比較するにはこのエージェントの少なくとも2つのバージョンが必要です",
+      "datePickerDisabled": "このモードではウィンドウはバージョンごとです",
+      "sampledNote": "レイテンシとコストの間隔は、バージョンごとに最大 {cap} のランダムサンプリングされたトレースから計算されます。",
+      "manual": {
+        "windowA": "バージョンAのウィンドウ",
+        "windowB": "バージョンBのウィンドウ"
+      },
+      "bar": {
+        "versionA": "バージョンA",
+        "versionB": "バージョンB",
+        "align": "整列",
+        "alignSinceRollout": "各ロールアウト以降",
+        "alignSameWallClock": "同じ実時間",
+        "alignManual": "手動",
+        "exit": "比較を終了",
+        "samePickHint": "比較する2つの異なるバージョンを選択してください",
+        "autoWindow": "自動: {duration}",
+        "windowLabelA": "バージョンAのウィンドウ",
+        "windowLabelB": "バージョンBのウィンドウ"
+      },
+      "banner": {
+        "smallSample": "比較するにはデータが少なすぎます — Aには{nA}、Bには{nB}。ウィンドウを広げるか、さらにトラフィックを待ってください。",
+        "disjoint": "これらのバージョンは異なる時間に実行されました — 差異はバージョン自体ではなく、トラフィックの変化を反映している可能性があります。",
+        "partial": "これらのバージョンは部分的に同時実行されました — 差異はそれぞれの実行時期によって部分的に説明される可能性があります。"
+      },
+      "windowCard": {
+        "label": "{env} · {version} — {window} · {count} トレース",
+        "clamp": "ベースラインは {duration} のみ実行されました — 各バージョンの最初の {duration} を比較します。",
+        "labelNoEnv": "{version} — {window} · {count} トレース"
       }
     }
   },
@@ -7873,6 +8072,32 @@
       "paused": "ジョブが一時停止されました",
       "activateError": "ジョブの有効化に失敗しました",
       "pauseError": "ジョブの一時停止に失敗しました"
+    },
+    "manualEvaluation": {
+      "titles": {
+        "span": "スパンを評価",
+        "trace": "トレースを評価",
+        "session": "セッションを評価"
+      },
+      "targetLabels": {
+        "span": "スパンID",
+        "trace": "トレースID",
+        "session": "セッションID"
+      },
+      "scopes": {
+        "span": "スパン",
+        "trace": "トレース",
+        "session": "セッション"
+      },
+      "description": "このターゲットに対して実行する評価ジョブを選択してください。評価ワーカーはこのページの時間範囲からソーステレメトリを読み込みます。",
+      "jobLabel": "評価ジョブ",
+      "jobPlaceholder": "評価ジョブを選択",
+      "jobRequired": "評価ジョブを選択",
+      "noCompatibleJobs": "{scope}の評価ジョブは{stream}トレースストリームを使用していません。",
+      "loadJobsError": "評価ジョブの読み込みに失敗しました。",
+      "run": "評価を実行",
+      "queued": "{count}件の評価タスクをキューに入れました。",
+      "runError": "評価のキューイングに失敗しました。"
     },
     "tabs": {
       "quality": "品質",
@@ -8084,6 +8309,7 @@
       "degraded": "劣化しました",
       "archived": "アーカイブ済み"
     },
+    "summaryAll": "すべて",
     "buttons": {
       "cancel": "[キャンセル]",
       "close": "閉じる",
@@ -8094,17 +8320,13 @@
     },
     "scorerTypeDialog": {
       "title": "新しいスコアラーを作成",
-      "intro": "スコアラータイプを選択します。オーサリングしたい方法に合うものを選んで実行してください。",
+      "intro": "スコアラーの種類を選択してください。どちらも第一級のオプションです — 作成と実行方法に合った方を選んでください。",
       "llmJudgeTitle": "LLMジャッジ",
       "llmJudgeDescription": "設定されたプロバイダーを使用してセマンティックに評価します。",
       "llmJudgeCta": "ジャッジを設定",
       "remoteTitle": "リモート",
       "remoteDescription": "独自の HTTP エンドポイントを呼び出してスコアリングを行います。",
-      "remoteCta": "エンドポイントを設定",
-      "codeTitle": "コード",
-      "codeDescription": "近日公開予定。",
-      "codeCta": "今後のリリースで利用可能",
-      "comingSoonBadge": "近日公開"
+      "remoteCta": "エンドポイントを設定"
     },
     "provider": {
       "backTo": "プロバイダーに戻る",
@@ -8407,48 +8629,6 @@
       "healthyLabel": "健全性:",
       "typeLabel": "型:",
       "promptVariablesLabel": "このプロンプト内の変数：",
-      "promptVariableGuide": {
-        "title": "利用可能なプロンプト変数",
-        "description": "これらの変数は上のプロンプトで使用できます。各変数がどのように埋められるかは、Eval Jobが評価する内容に依存します。",
-        "columns": {
-          "variable": "プロンプト変数"
-        },
-        "scopes": {
-          "span": "スパン",
-          "trace": "トレース",
-          "session": "セッション"
-        },
-        "statuses": {
-          "jobMapped": "Eval Jobでのマッピング",
-          "systemProvided": "システム提供",
-          "requiresSelector": "システム提供 · スパンセレクタが必要",
-          "selectorRequired": "スパンセレクタが必要",
-          "unavailable": "利用不可"
-        },
-        "variables": {
-          "inputOutput": {
-            "span": "これらを入力と出力を保持するスパンフィールドにマッピングします。",
-            "trace": "トレースのルートスパンからの入力と出力。",
-            "session": "利用不可 — セッションには単一の入力または出力がありません。"
-          },
-          "statistics": {
-            "span": "単一スパンを評価する際、この名前を他のスコアラー変数と同様にマッピングします。",
-            "trace": "トレースメトリクス: スパン数、期間、LLMおよびツール呼び出し、エラー、トークン、コスト。",
-            "session": "セッションメトリクス: トレース数とターン数、期間、エラー。"
-          },
-          "spans": {
-            "span": "単一スパンを評価する際、この名前を他のスコアラー変数と同様にマッピングします。",
-            "trace": "Eval Jobのスパンセレクタによって選択された、トレースのスパンのフィルタリングされたサブセット。",
-            "session": "セッションでは利用できません。"
-          },
-          "steps": {
-            "span": "単一スパンを評価する際、この名前を他のスコアラー変数と同様にマッピングします。",
-            "trace": "時間順のスパン; トレースが非常に長い場合、中央は折り畳まれます。",
-            "session": "時間順のトレース、会話のターンとして表現。"
-          }
-        },
-        "indexDescription": "{spansVar} と {stepsVar} はJSON配列として到着します。変数全体を参照します — {indexedVar} のようなインデックスアクセスはサポートされていません。"
-      },
       "identitySection": "アイデンティティ",
       "judgeSection": "ジャッジ構成",
       "endpointSection": "終点",
@@ -8592,23 +8772,6 @@
         "samplingAll": "一致するものをすべて評価",
         "samplingRate": "レートによるランダムサンプリング",
         "samplingCount": "最初のN件の一致",
-        "manualSection": "手動評価",
-        "manualHelp": "このジョブのスコアラーを1つの明示的なターゲットに対してキューに入れます。手動実行は自動サンプリングをバイパスし、スコアメタデータに理由を記録します。",
-        "manualTargetIdLabel": "ターゲットID",
-        "manualSpanIdLabel": "スパンID",
-        "manualSpanIdPlaceholder": "span_id",
-        "manualTraceIdLabel": "トレースID",
-        "manualTraceIdPlaceholder": "trace_id",
-        "manualSessionIdLabel": "セッションID",
-        "manualSessionIdPlaceholder": "session_id",
-        "manualReasonLabel": "理由",
-        "manualReasonPlaceholder": "このターゲットを再実行する理由は何ですか？",
-        "manualVariablesLabel": "変数JSON",
-        "manualVariablesObjectError": "変数はJSONオブジェクトである必要があります",
-        "manualTargetRequired": "ターゲットIDが必要です",
-        "manualSubmit": "手動評価を実行",
-        "manualSuccess": "キューに入れられた {count} 件の評価タスク",
-        "manualError": "手動評価に失敗しました",
         "metadataSection": "メタデータ",
         "versionLabel": "バージョン",
         "pipelineLabel": "パイプラインID",
@@ -8770,20 +8933,27 @@
       "inputMapping": {
         "title": "プロンプト変数",
         "hint": {
-          "span": "各変数を、その値を提供するスパンフィールドにマッピングします。",
-          "trace": "トレース値は自動的に入力されます。その他はスパンフィールドにマッピングします。",
-          "session": "セッション値は自動的に入力されます。その他はスパンフィールドにマッピングします。"
+          "span": "各変数をスパン属性にマッピングします。",
+          "trace": "各変数をシステム提供の値またはスパン属性にマッピングします。",
+          "session": "各変数をシステム提供の値またはスパン属性にマッピングします。"
+        },
+        "placeholder": "値を選択",
+        "searchPlaceholder": "システム値とスパン属性を検索…",
+        "groups": {
+          "systemProvided": "システム提供の値 · このジョブが評価する各{scope}に対して",
+          "spanAttributes": "スパン属性"
         },
         "selectScorers": "スコアラーを選択してマッピングを設定します。",
         "noVariables": "このスコアラーには、マップするテンプレート変数がありません。",
         "variableCount": "{カウント} 変数",
         "systemProvided": {
-          "title": "{scope} 変数",
-          "description": "OpenObserve は {scope} 自体からこれらの値を提供します。スコアラーのプロンプトは直接使用でき、マッピングは不要です。",
+          "about": "システム提供の値について",
+          "title": "{scope}のシステム値",
+          "description": "OpenObserveは、このジョブが評価する各{scope}に対してこれらの値を個別に構築します。スコアラーのプロンプト変数をマッピングする際にソースとして使用してください。",
           "badge": "システム提供",
           "selectorRequired": "スパンセレクターが必要",
           "columns": {
-            "variable": "プロンプト変数",
+            "variable": "値",
             "source": "ソース",
             "description": "提供される値"
           },
@@ -8830,7 +9000,7 @@
           "fields": "カスタムスキーマには少なくとも1つのフィールドを選択してください。",
           "maximumSpans": "最大スパン数は正の整数である必要があります。",
           "budget": "選択されたフィールドに対してスパンが多すぎます。スパン数を減らすか、読み取るフィールドを減らしてください。",
-          "binding": "すべてのスコアラーにスパンセレクターを選択してください。"
+          "binding": "トレーススパンを使用する各スコアラーのスパンセレクターを選択してください。"
         }
       },
       "preview": {
@@ -8868,10 +9038,12 @@
       "saveError": "評価ジョブの保存に失敗しました",
       "createdAndActivated": "評価ジョブが作成され、有効化されました",
       "createdButActivateFailed": "評価ジョブは作成されましたが、有効化に失敗しました",
+      "savedAndActivated": "評価ジョブが保存され、有効化されました",
+      "savedButActivateFailed": "評価ジョブは保存されましたが、有効化に失敗しました",
       "validation": {
         "nameRequired": "Job name is required",
         "streamRequired": "A stream is required",
-        "idleWindowMinimum": "アイドルウィンドウは1秒以上である必要があります",
+        "idleWindowMinimum": "アイドルウィンドウは少なくとも1秒以上である必要があります",
         "idleWindowMaximumTrace": "トレースのアイドルウィンドウは30分を超えることはできません",
         "idleWindowMaximumSession": "セッションのアイドルウィンドウは4時間を超えることはできません",
         "maxAgeMaximumTrace": "トレースの最大保持時間は2時間を超えることはできません",
@@ -9294,6 +9466,44 @@
     "lastRefreshed": "最終更新日:{time}"
   },
   "synthetics": {
+    "tokens": {
+      "title": "シンセティックストークン",
+      "explanation": "組織レベルのo2syn_トークン。プライベートエージェントがジョブをプルする際の認証に使用します。公開（Lambda）ロケーションはデフォルトトークンを自動的に使用します。名前付きトークンを作成し、リージョンのエージェントに埋め込んで、そのリージョンの影響範囲を制限します。",
+      "summary": "プライベートエージェントがジョブをプルするために使用するトークン。",
+      "rotateDefaultBtn": "デフォルトをローテート",
+      "createTokenBtn": "トークンを作成",
+      "searchPlaceholder": "トークンを検索",
+      "default": "デフォルト",
+      "tokenNameLabel": "名前",
+      "tokenNamePlaceholder": "us-east",
+      "tokenNameHint": "リージョンまたはサイトにちなんで名前を付け、セットアップコマンドでそのリージョンのエージェントに埋め込んでください。",
+      "tokenColumn": "トークン",
+      "agentsColumn": "エージェント",
+      "createdBy": "作成者",
+      "createTokenTitle": "シンセティックストークンを作成",
+      "newTokenRevealed": "新しいトークン — 今すぐコピー",
+      "rawTokenLabel": "トークン（一度だけ表示）",
+      "installHint": "エージェントセットアップコマンドに貼り付け: --token=<token>",
+      "installCmdLabel": "インストールコマンド（トークン含む）",
+      "installCmdHint": "エージェントホストでこれを実行してください。トークンは組み込まれています — <location-name>をあなたのロケーションに置き換えてください。再表示されません。",
+      "copyCmdBtn": "コマンドをコピー",
+      "copyTokenBtn": "トークンをコピー",
+      "copiedToast": "トークンをクリップボードにコピーしました",
+      "disableDefaultBlocked": "デフォルトトークンは無効にできません — 先にローテートしてください",
+      "nameReserved": "'default'は予約されています — ローテートを使用してデフォルトトークンを置き換えてください",
+      "fetchError": "トークンの読み込みに失敗しました",
+      "createSuccess": "トークンを作成しました",
+      "createError": "トークンの作成に失敗しました",
+      "rotateSuccess": "デフォルトトークンがローテーションされました — 無効にするまで古いトークンは有効です",
+      "rotateError": "トークンのローテーションに失敗しました",
+      "enabledSuccess": "トークンが有効になりました",
+      "disabledSuccess": "トークンが無効になりました",
+      "updateError": "トークンの更新に失敗しました",
+      "empty": {
+        "title": "シンセティックトークンがありません",
+        "description": "名前付きトークンを作成してリージョンのエージェントをスコープするか、組織のデフォルトを使用してください。"
+      }
+    },
     "authNetwork": {
       "addCookie": "クッキーを追加",
       "addHeader": "ヘッダーを追加",
@@ -9671,12 +9881,15 @@
       "assertions": "アサーション",
       "assertionsFailed": "失敗",
       "assertionsPassed": "成功",
+      "assertionsNotEvaluated": "未評価",
+      "assertionsNotEvaluatedHint": "リクエストが応答を返さなかったため、何もアサートされませんでした。",
       "certExpires": "有効期限 {date}",
       "completed": "完了",
       "daysRemaining": "残り{days}日",
       "error": "エラー",
       "failed": "失敗",
       "init": "初期化",
+      "loading": "実行詳細を読み込み中",
       "location": "ロケーション",
       "notFound": "実行が見つかりません",
       "passed": "成功",
@@ -9708,7 +9921,7 @@
       "clearFiltersDesc": "すべてのアクティブフィルターを削除",
       "device": "デバイス",
       "duration": "所要時間",
-      "editMonitor": "モニターを編集",
+      "editCheck": "チェックを編集",
       "error": "エラー",
       "failed": "失敗",
       "failedRuns": "失敗した実行",
@@ -10091,6 +10304,11 @@
         "browserNote": "ブラウザテストはまだプライベートロケーションから実行できません — プロトコルチェックのみ (HTTP, TCP, TLS, SSH)。",
         "locationNameLabel": "ロケーション名",
         "locationNamePlaceholder": "本社",
+        "typeTitle": "このエージェントが実行するもの",
+        "typeProtocol": "ネット",
+        "typeBrowser": "ブラウザ",
+        "typeProtocolHint": "HTTP、TCP、TLS、SSHチェック。Goエージェントを実行 — Docker、Kubernetes、Linux、Windows。",
+        "typeBrowserHint": "ブラウザジャーニー。Playwrightイメージを実行 — DockerまたはKubernetesのみ。",
         "tabDocker": "Docker",
         "tabK8s": "Kubernetes",
         "tabLinux": "Linux",
@@ -10108,6 +10326,7 @@
         "agentsSubtitle": "エージェントはインフラから自己登録し、ここでは読み取り専用です。",
         "agentName": "エージェント",
         "recoverAgent": "このエージェントを復元 — 名前が事前入力されたセットアップコマンドをコピーします",
+        "restartConfig": "再起動設定 — このエージェントのセットアップコマンドをコピーして、インストール/ docker再起動を再実行します（例：トークンローテーション後）",
         "noAgents": "このロケーションにまだエージェントが登録されていません。",
         "checksTitle": "このロケーションから実行されるチェック",
         "checkName": "名前",
