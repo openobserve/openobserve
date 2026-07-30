@@ -41,8 +41,9 @@ use crate::{
 pub mod runtime;
 #[derive(Serialize, Deserialize)]
 pub struct InputMap {
-    complete: Vec<Value>,
     node_map: HashMap<String, Vec<Value>>,
+    #[serde(default)]
+    input_map: HashMap<String, Vec<Value>>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -453,7 +454,6 @@ async fn execute_workflow(
     let executable = ExecutablePipeline::new_from_workflow(&workflow).await?;
 
     let now = chrono::Utc::now().timestamp_micros();
-    let input_copy = inputs.clone();
     let res = executable.process_workflow(org_id, inputs, None).await?;
 
     let mut errored_input_map = HashMap::new();
@@ -498,33 +498,41 @@ async fn execute_workflow(
         }
     }
 
-    if !workflow_errors.is_empty() {
-        let ip_map = InputMap {
-            complete: input_copy,
-            node_map: errored_input_map,
-        };
+    let ip_map = InputMap {
+        node_map: errored_input_map,
+        input_map: res.inputs,
+    };
 
-        let errors = WorkflowRunErrors {
-            org_id: org_id.to_string(),
-            cluster: config::get_cluster_name(),
-            id: 0, // will be set directly in db
-            workflow_id: id.to_string(),
-            run_id: run_id.to_string(),
-            ran_at: now,
-            data: workflow_errors,
-            input_data: Some(serde_json::to_string(&ip_map).unwrap()),
-        };
-        // workflow has already run, so not much point in returning error because
-        // we couldn't save the errors to db, log and ignore
-        if let Err(e) = db::workflows::save_workflow_errors(errors).await {
-            log::error!(
-                "[Workflows] : error saving workflow run errors for run id {run_id} for workflow {org_id}/{id} in db : {e}"
-            );
-        }
-        return Ok(WorkflowExecutionStatus::Errored);
+    // if this is not empty, then some node errored
+    let errored = !workflow_errors.is_empty();
+
+    // we hijack the workflow run errors to store both the error as well as execution history map
+    // as both have essentially the same structure and no point in duplicating tables and adding
+    // migration true error v/s just run can be distinguished by workflow_errors is empty or
+    // not.
+    let errors = WorkflowRunErrors {
+        org_id: org_id.to_string(),
+        cluster: config::get_cluster_name(),
+        id: 0, // will be set directly in db
+        workflow_id: id.to_string(),
+        run_id: run_id.to_string(),
+        ran_at: now,
+        data: workflow_errors,
+        input_data: Some(serde_json::to_string(&ip_map).unwrap()),
+    };
+    // workflow has already run, so not much point in returning error because
+    // we couldn't save the errors to db, log and ignore
+    if let Err(e) = db::workflows::save_workflow_errors(errors).await {
+        log::error!(
+            "[Workflows] : error saving workflow run errors for run id {run_id} for workflow {org_id}/{id} in db : {e}"
+        );
     }
 
-    Ok(WorkflowExecutionStatus::Success)
+    if errored {
+        Ok(WorkflowExecutionStatus::Errored)
+    } else {
+        Ok(WorkflowExecutionStatus::Success)
+    }
 }
 
 pub async fn get_workflow_errors(
@@ -545,6 +553,21 @@ pub async fn retry_run(
     let workflow = workflows::get_by_org_wid(org_id, wid)
         .await?
         .ok_or(anyhow::anyhow!("workflow with given id not found"))?;
+
+    let mut start_id = None;
+    for node in &workflow.nodes {
+        if matches!(node.data, NodeData::WorkflowTrigger) {
+            start_id = Some(node.id.clone());
+            break;
+        }
+    }
+    let Some(start_id) = start_id else {
+        log::error!(
+            "missing workflow trigger node in workflow {org_id}/{wid} for retry run {run_id}"
+        );
+        return Err(anyhow::anyhow!("workflow trigger node missing in workflow"));
+    };
+
     let executable = ExecutablePipeline::new_from_workflow(&workflow).await?;
 
     let errors = match workflows::list_errors_for_workflow_run(org_id, wid, run_id).await {
@@ -577,12 +600,11 @@ pub async fn retry_run(
         anyhow::anyhow!("error deserializing inputs : {e}")
     })?;
 
-    let inputs = match from_node.as_ref() {
-        Some(node) => ip_map.node_map.remove(node).ok_or(anyhow::anyhow!(
-            "node id {node} does not have any associated input data in the stored inputs"
-        ))?,
-        None => ip_map.complete,
-    };
+    let node_id = from_node.as_ref().unwrap_or(&start_id);
+
+    let inputs = ip_map.node_map.remove(node_id).ok_or(anyhow::anyhow!(
+        "node id {node_id} does not have any associated input data in the stored inputs"
+    ))?;
 
     let res = executable
         .process_workflow(org_id, inputs, from_node)

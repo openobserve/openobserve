@@ -39,6 +39,7 @@ use openobserve_api_common::extractors::Headers;
 use openobserve_core::auth::UserEmail;
 use search_service::{self as SearchService, query_range::get_settings_max_query_range};
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
 use crate::{
     common::{meta::http::HttpResponse as MetaHttpResponse, utils::http::get_or_create_trace_id},
@@ -56,6 +57,7 @@ pub struct WorkflowTestInput {
 #[derive(Serialize)]
 pub struct WorkflowTestResult {
     errors: HashMap<String, NodeErrors>,
+    inputs: HashMap<String, Vec<Value>>,
 }
 
 #[derive(Serialize)]
@@ -387,7 +389,10 @@ pub async fn test_workflow(
     workflow.org_id = org_id.clone();
     workflow.id = format!("test-{}", config::ider::uuid());
     match workflows::test_workflow(&org_id, workflow, inputs.inputs, inputs.from_node).await {
-        Ok(v) => MetaHttpResponse::json(WorkflowTestResult { errors: v.errors }),
+        Ok(v) => MetaHttpResponse::json(WorkflowTestResult {
+            errors: v.errors,
+            inputs: v.inputs,
+        }),
         Err(e) => MetaHttpResponse::bad_request(e),
     }
 }
@@ -528,7 +533,10 @@ pub async fn retry_workflow(
     Json(details): Json<WorkflowRetryDetails>,
 ) -> Response {
     match workflows::retry_run(&org_id, &workflow_id, &details.run_id, details.from_node).await {
-        Ok(v) => MetaHttpResponse::json(WorkflowTestResult { errors: v.errors }),
+        Ok(v) => MetaHttpResponse::json(WorkflowTestResult {
+            errors: v.errors,
+            inputs: v.inputs,
+        }),
         Err(e) => MetaHttpResponse::bad_request(e),
     }
 }
