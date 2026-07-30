@@ -84,7 +84,6 @@ const test = baseTest.extend({
     // Add wait helpers to page
     page.waitHelpers = waitUtils.create(page);
 
-    await retryHungConfigRequest(page);
     enforceOrgOnNavigation(page);
 
     testLogger.debug('New page created with global session and wait helpers');
@@ -107,52 +106,6 @@ const test = baseTest.extend({
 });
 
 const expect = test.expect;
-
-/**
- * Retry a hung `GET /config` at the network layer.
- *
- * WHY THIS EXISTS
- * ---------------
- * MainLayout gates the whole left nav on /config resolving, and on alpha1 at
- * 13-shard concurrency that single request sometimes never comes back. Trace
- * evidence from run 30563626137: in a failing test the ONLY menu-link elements in
- * the DOM were the header's ai/help/slack — the rail had no items at all — while a
- * passing test in the same shard had the full rail.
- *
- * Reloading the page recovers it only sometimes (3 of 18 observed), because a
- * reload re-issues every request and can simply hang again. Retrying just this one
- * request, with a short timeout, is both faster and far more likely to land — and
- * it needs no page reload, so no test state is disturbed.
- *
- * Fails open in every direction: any error falls through to `route.continue()`, so
- * the worst case is exactly today's behaviour.
- */
-async function retryHungConfigRequest(page) {
-  const CONFIG_ATTEMPTS = 3;
-  const PER_ATTEMPT_MS = 20000;
-
-  await page.route(/\/config(\?.*)?$/, async (route) => {
-    for (let attempt = 1; attempt <= CONFIG_ATTEMPTS; attempt++) {
-      try {
-        const response = await route.fetch({ timeout: PER_ATTEMPT_MS });
-        if (attempt > 1) testLogger.info(`GET /config succeeded on attempt ${attempt}`);
-        await route.fulfill({ response });
-        return;
-      } catch (error) {
-        testLogger.warn(
-          `GET /config did not respond within ${PER_ATTEMPT_MS}ms ` +
-          `(attempt ${attempt}/${CONFIG_ATTEMPTS}) — retrying the request`,
-          { error: String(error && error.message ? error.message : error) }
-        );
-      }
-    }
-    // Out of retries: hand it back to the browser so behaviour matches the
-    // un-intercepted case rather than failing the navigation outright.
-    await route.continue().catch(() => {});
-  }).catch((e) => {
-    testLogger.warn('Could not install /config retry route', { error: e.message });
-  });
-}
 
 /**
  * Guarantee every in-app navigation carries this shard's `org_identifier`.
