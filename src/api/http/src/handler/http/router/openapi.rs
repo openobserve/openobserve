@@ -256,14 +256,8 @@ use crate::{common::meta, handler::http::request};
         openobserve_api_management::request::alerts::deduplication::preview_semantic_groups_diff,
         openobserve_api_management::request::alerts::deduplication::save_semantic_groups,
         openobserve_api_management::request::alerts::dedup_stats::get_dedup_summary,
-        // TODO(slo): deferred, along with the routes in `router/mod.rs`.
-        // openobserve_api_management::request::slos::list_slos,
-        // openobserve_api_management::request::slos::get_slo,
-        // openobserve_api_management::request::slos::create_slo,
-        // openobserve_api_management::request::slos::update_slo,
-        // openobserve_api_management::request::slos::delete_slo,
-        // openobserve_api_management::request::slos::enable_slo,
-        // openobserve_api_management::request::slos::get_slo_groups,
+        // TODO(slo): the SLO handlers are deferred along with their routes
+        // in `router/mod.rs`, so they are not documented here.
         request::synthetics::list_synthetics,
         request::synthetics::create_synthetic,
         request::synthetics::get_synthetic,
