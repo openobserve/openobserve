@@ -653,8 +653,8 @@ pub struct Config {
 pub struct Slo {
     #[env_config(
         name = "ZO_SLO_ENABLED",
-        default = false,
-        help = "Enable SLO measurement and SLO-based alerts. Off by default: it schedules a per-SLO ingest job and writes to the slo_slices stream."
+        default = true,
+        help = "Enable SLO measurement and SLO-based alerts. Set false to switch the feature off entirely: no per-SLO ingest job is scheduled, nothing is written to the slo_slices stream, and the SLO APIs answer 501."
     )]
     pub enabled: bool,
     #[env_config(
