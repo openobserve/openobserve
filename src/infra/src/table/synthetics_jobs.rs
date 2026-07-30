@@ -298,6 +298,10 @@ pub async fn lease_batch<C: ConnectionTrait>(
 /// Returns the `run_id` of the updated row (for callers to increment run counter).
 ///
 /// Status values: 3=Passed, 4=Failed, 5=Warning, 6=Error (dispatch error).
+///
+/// Returns `Some(run_id)` when the ack applied, and **`None` when it did not** —
+/// either the job does not exist or it was no longer Claimed, i.e. a duplicate or
+/// stale ack. The caller must treat `None` as "do not touch run accounting".
 pub async fn ack_complete<C: ConnectionTrait>(
     conn: &C,
     job_id: &str,
@@ -305,24 +309,48 @@ pub async fn ack_complete<C: ConnectionTrait>(
     result_json: Option<&str>,
     now_us: i64,
 ) -> Result<Option<String>, errors::Error> {
+    // `AND status = 1` makes the ack idempotent: only a job still in the Claimed
+    // state can be completed. Without it a duplicate ack succeeded, the caller
+    // called `increment_jobs_done` a second time for one job, `jobs_done`
+    // overshot `job_count`, and the run was declared complete on a PARTIAL set of
+    // results — the roll-up status computed from whichever jobs happened to have
+    // finished.
+    //
+    // Duplicate acks are reachable today without any concurrency work: the
+    // aws-sdk-lambda client retries a timed-out `RequestResponse` invoke, which
+    // re-executes a check that is already running.
+    //
+    // This does NOT cover the reaper-reassignment case — the row goes back to
+    // status 1 for the new holder, so the evicted holder's late ack still
+    // matches. That needs `claimed_by` on the ack, which spans both probes and a
+    // compatibility window, and is tracked separately.
     let sql = r#"
         UPDATE synthetics_jobs
         SET status = $1, result = $2, completed_at = $3
-        WHERE id = $4
+        WHERE id = $4 AND status = 1
     "#;
-    conn.execute(Statement::from_sql_and_values(
-        conn.get_database_backend(),
-        sql,
-        [
-            Value::from(status),
-            result_json
-                .map(Value::from)
-                .unwrap_or(Value::from(None::<String>)),
-            Value::from(now_us),
-            Value::from(job_id.to_owned()),
-        ],
-    ))
-    .await?;
+    let applied = conn
+        .execute(Statement::from_sql_and_values(
+            conn.get_database_backend(),
+            sql,
+            [
+                Value::from(status),
+                result_json
+                    .map(Value::from)
+                    .unwrap_or(Value::from(None::<String>)),
+                Value::from(now_us),
+                Value::from(job_id.to_owned()),
+            ],
+        ))
+        .await?;
+
+    // `None` means "this ack did not apply" — the caller must NOT increment the
+    // run counter. Returning the run_id anyway is what made the guard above
+    // pointless in an earlier draft: the SELECT below succeeds regardless of
+    // whether the UPDATE matched.
+    if applied.rows_affected() == 0 {
+        return Ok(None);
+    }
 
     // Fetch run_id so caller can call synthetics_runs::increment_jobs_done.
     let select_sql = "SELECT run_id FROM synthetics_jobs WHERE id = $1";

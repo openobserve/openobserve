@@ -1652,15 +1652,29 @@ fn validate_browser_config(
         ));
     }
     let attempts = i64::from(retries) + 1;
-    let worst_case_ms = attempts * i64::from(budget_ms)
-        + i64::from(retries) * i64::from(wait_before_retry_secs) * 1_000;
+    // Multiplied by the device count, because the probe runs `browser_devices`
+    // SEQUENTIALLY INSIDE the leased job (`browser-probe/src/index.ts:124`) — the
+    // lease covers the whole job, not one device.
+    //
+    // Without this the check was per-device while the work was per-job, so a
+    // perfectly ordinary "desktop + mobile" config computed 605ms of budget,
+    // passed validation, and then blew its 900s lease on EVERY run: the reaper
+    // requeued mid-journey, the journey executed again, and that produced
+    // duplicate result records, doubled browser cost and alerts caused by the
+    // duplicate. Which is verbatim what the LEASE_SECS comment in
+    // `dispatcher/mod.rs` was written to prevent.
+    let devices = i64::try_from(cfg.browser_devices.len().max(1)).unwrap_or(1);
+    let worst_case_ms = devices
+        * (attempts * i64::from(budget_ms)
+            + i64::from(retries) * i64::from(wait_before_retry_secs) * 1_000);
     let lease_ms = BROWSER_LEASE_SECS * 1_000;
     if worst_case_ms > lease_ms {
         return Err(format!(
-            "config.journey_budget_ms: a full retry sequence must fit inside the {BROWSER_LEASE_SECS}s job lease, \
-             but retries={retries} x journey_budget_ms={budget_ms} (+ wait_before_retry_secs={wait_before_retry_secs}) \
-             needs {worst_case_ms}ms. Lower journey_budget_ms or retries — a run that outlives its lease is requeued \
-             and executed a second time."
+            "config: a full retry sequence across all browser/device combos must fit inside the \
+             {BROWSER_LEASE_SECS}s job lease, but browser_devices={devices} x (retries={retries} x \
+             journey_budget_ms={budget_ms} + wait_before_retry_secs={wait_before_retry_secs}) needs \
+             {worst_case_ms}ms. Lower journey_budget_ms, retries, or the number of browser/device \
+             combos — a run that outlives its lease is requeued and executed a second time."
         ));
     }
 
@@ -2719,6 +2733,56 @@ mod tests {
         assert!(err.contains("journey_budget_ms"), "{err}");
         assert!(err.contains("retries"), "{err}");
         assert!(err.contains("lease"), "{err}");
+    }
+
+    // The invariant above was per-DEVICE while the work is per-JOB: the probe runs
+    // `browser_devices` sequentially inside the leased job, so the real worst case
+    // is multiplied by the combo count. Missing that, a perfectly ordinary
+    // desktop+mobile config passed validation and then blew its lease on EVERY
+    // run — which is exactly the duplicate-execution failure the lease was raised
+    // to 900s to prevent.
+    #[test]
+    fn test_browser_lease_budget_is_multiplied_by_device_count() {
+        let (locs, brs, devs) = allowed();
+        let mut s = valid_browser_synthetic();
+        s.retries = 1;
+        s.wait_before_retry_secs = 5;
+        s.config["journey_budget_ms"] = serde_json::json!(300_000);
+
+        // One device: 1 * (2 * 300s + 5s) = 605s, inside the 900s lease.
+        s.config["browser_devices"] =
+            serde_json::json!([{"browser": "chromium", "device": "desktop"}]);
+        assert!(s.validate(&locs, &brs, &devs, true).is_ok());
+
+        // Two devices: 2 * 605s = 1210s. Same per-device budget, twice the work.
+        s.config["browser_devices"] = serde_json::json!([
+            {"browser": "chromium", "device": "desktop"},
+            {"browser": "chromium", "device": "mobile"},
+        ]);
+        let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
+        // Every lever the operator can pull must be named, device count included —
+        // it is the one they are most likely to be able to give up.
+        assert!(err.contains("browser_devices"), "{err}");
+        assert!(err.contains("journey_budget_ms"), "{err}");
+        assert!(err.contains("retries"), "{err}");
+        assert!(err.contains("lease"), "{err}");
+    }
+
+    #[test]
+    fn test_browser_two_devices_fit_with_a_smaller_budget() {
+        // The rejection above must be escapable by lowering the budget, not only
+        // by dropping a device.
+        let (locs, brs, devs) = allowed();
+        let mut s = valid_browser_synthetic();
+        s.retries = 1;
+        s.wait_before_retry_secs = 5;
+        // 2 devices * (2 * 200s + 5s) = 810s, inside 900s.
+        s.config["journey_budget_ms"] = serde_json::json!(200_000);
+        s.config["browser_devices"] = serde_json::json!([
+            {"browser": "chromium", "device": "desktop"},
+            {"browser": "chromium", "device": "mobile"},
+        ]);
+        assert!(s.validate(&locs, &brs, &devs, true).is_ok());
     }
 
     #[test]
