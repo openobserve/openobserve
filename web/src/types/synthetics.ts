@@ -286,6 +286,12 @@ export type RecorderPushPayload =
       duration_ms: number;
       error?: string;
       structuredError?: StructuredError;
+      /** X-8.2 divergence notes, as the extension emits them. Declared here as
+       *  well as on `StepReplayResult` because this is the INBOUND shape the
+       *  composable reads from; without it, reading `payload.fidelity` does not
+       *  type-check, and dropping the read instead would make every divergence
+       *  silent again — a skipped step reading as a pass. */
+      fidelity?: { level: string; notes: string[] };
     }
   | { method: "stepReplayStarted"; stepId: string; stepName?: string };
 
