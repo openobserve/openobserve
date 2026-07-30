@@ -578,7 +578,7 @@ async function performGlobalIngestion(page) {
     { name: 'e2e_automate', data: logsdata },
   ];
 
-  for (const stream of streams) {
+  const ingestOnce = async () => {
     try {
       const response = await page.evaluate(async ({ headers, orgId, streamName, data }) => {
         const r = await fetch(`/api/${orgId}/${streamName}/_json`, {
@@ -587,54 +587,58 @@ async function performGlobalIngestion(page) {
           body: JSON.stringify(data),
         });
         return { status: r.status, text: await r.text() };
-      }, { headers, orgId, streamName: stream.name, data: stream.data });
+      }, { headers, orgId, streamName: 'e2e_automate', data: logsdata });
 
       if (response.status === 200) {
-        testLogger.info(`[alpha1] Ingested test data into '${stream.name}'`, { status: response.status });
+        testLogger.info(`[alpha1] Ingested test data into 'e2e_automate'`, { status: response.status });
       } else {
-        testLogger.warn(`[alpha1] Ingestion into '${stream.name}' returned ${response.status}`, { body: response.text.substring(0, 200) });
+        testLogger.warn(`[alpha1] Ingestion into 'e2e_automate' returned ${response.status}`, { body: response.text.substring(0, 200) });
       }
     } catch (e) {
-      testLogger.warn(`[alpha1] Failed to ingest into '${stream.name}'`, { error: e.message });
+      testLogger.warn(`[alpha1] Failed to ingest into 'e2e_automate'`, { error: e.message });
     }
-  }
+  };
 
-  // Wait for streams to be indexed
-  testLogger.info('[alpha1] Waiting for streams to be indexed...');
-  const maxWaitMs = 90000;
-  const pollIntervalMs = 3000;
-  const startTime = Date.now();
-
-  while (Date.now() - startTime < maxWaitMs) {
+  const isRegistered = async () => {
     try {
       const streamsResult = await page.evaluate(async ({ orgId, headers }) => {
         const r = await fetch(`/api/${orgId}/streams?type=logs&page_num=0&page_size=1000`, { headers });
         if (!r.ok) return { ok: false, status: r.status };
         const data = await r.json();
-        const names = (data.list || []).map(s => s.name);
-        return { ok: true, names };
+        return { ok: true, names: (data.list || []).map(s => s.name) };
       }, { orgId, headers });
-
-      if (streamsResult.ok) {
-        const hasE2e = streamsResult.names.includes('e2e_automate');
-        if (hasE2e) {
-          testLogger.info(`[alpha1] e2e_automate indexed after ${Date.now() - startTime}ms`);
-          break;
-        }
-        testLogger.debug(`[alpha1] e2e_automate not yet indexed, waiting...`);
-      } else {
-        testLogger.debug(`[alpha1] Streams API returned ${streamsResult.status}, retrying...`);
-      }
+      return streamsResult.ok && streamsResult.names.includes('e2e_automate');
     } catch (e) {
       testLogger.debug(`[alpha1] Error checking streams: ${e.message}`);
+      return false;
     }
+  };
 
-    await page.waitForTimeout(pollIntervalMs);
+  // Same ingest -> poll -> RE-INGEST loop as performGlobalIngestionWithFetch; see the
+  // comment there. A 200 from ingestion does not mean the stream is listed, and the
+  // old warn-and-continue left shards running against an org where selectStream
+  // could never find e2e_automate.
+  const rounds = 3;
+  const perRoundMs = 60000;
+  const pollIntervalMs = 3000;
+
+  for (let round = 1; round <= rounds; round++) {
+    await ingestOnce();
+    const startTime = Date.now();
+    while (Date.now() - startTime < perRoundMs) {
+      if (await isRegistered()) {
+        testLogger.info(`[alpha1] e2e_automate registered (round ${round}, ${Date.now() - startTime}ms)`);
+        return;
+      }
+      await page.waitForTimeout(pollIntervalMs);
+    }
+    testLogger.warn(`[alpha1] e2e_automate not listed after round ${round}/${rounds} — re-ingesting`);
   }
 
-  if (Date.now() - startTime >= maxWaitMs) {
-    testLogger.warn(`[alpha1] Streams not fully indexed after ${maxWaitMs}ms — tests may fail on stream selection`);
-  }
+  testLogger.error(
+    `[alpha1] e2e_automate never appeared in the streams list after ${rounds} ingest rounds — ` +
+    `stream-selection tests in this shard will fail`
+  );
 }
 
 /**
@@ -742,52 +746,69 @@ async function performGlobalIngestionWithFetch() {
   // tests that used to rely on a shared 'auto_playwright_stream' now self-ingest their
   // own unique per-run streams, so we no longer pre-create (or wait on) that stream —
   // on the shared cloud org it was routinely stuck "being deleted" by other branch runs.
-  const streams = [
-    { name: 'e2e_automate', data: logsdata },
-  ];
-
-  for (const stream of streams) {
+  const ingestOnce = async () => {
     try {
-      const r = await fetch(`${baseUrl}/api/${orgId}/${stream.name}/_json`, {
+      const r = await fetch(`${baseUrl}/api/${orgId}/e2e_automate/_json`, {
         method: 'POST',
         headers,
-        body: JSON.stringify(stream.data),
+        body: JSON.stringify(logsdata),
       });
       if (r.ok) {
-        testLogger.info(`[alpha1] Ingested test data into '${stream.name}'`, { status: r.status });
+        testLogger.info(`[alpha1] Ingested test data into 'e2e_automate'`, { status: r.status });
       } else {
         const text = await r.text();
-        testLogger.warn(`[alpha1] Ingestion into '${stream.name}' returned ${r.status}`, { body: text.substring(0, 200) });
+        testLogger.warn(`[alpha1] Ingestion into 'e2e_automate' returned ${r.status}`, { body: text.substring(0, 200) });
       }
     } catch (e) {
-      testLogger.warn(`[alpha1] Failed to ingest into '${stream.name}'`, { error: e.message });
+      testLogger.warn(`[alpha1] Failed to ingest into 'e2e_automate'`, { error: e.message });
     }
-  }
+  };
 
-  // Wait for streams to be indexed
-  testLogger.info('[alpha1] Waiting for streams to be indexed...');
-  const maxWaitMs = 90000;
-  const pollIntervalMs = 3000;
-  const startTime = Date.now();
-
-  while (Date.now() - startTime < maxWaitMs) {
+  const isRegistered = async () => {
     try {
       const r = await fetch(`${baseUrl}/api/${orgId}/streams?type=logs&page_num=0&page_size=1000`, { headers });
-      if (r.ok) {
-        const data = await r.json();
-        const names = (data.list || []).map(s => s.name);
-        if (names.includes('e2e_automate')) {
-          testLogger.info(`[alpha1] e2e_automate indexed after ${Date.now() - startTime}ms`);
-          return;
-        }
-      }
+      if (!r.ok) return false;
+      const data = await r.json();
+      return (data.list || []).map((s) => s.name).includes('e2e_automate');
     } catch (e) {
       testLogger.debug(`[alpha1] Error checking streams: ${e.message}`);
+      return false;
     }
-    await new Promise(r => setTimeout(r, pollIntervalMs));
+  };
+
+  // Ingest, then poll for the stream to appear in the streams list — RE-INGESTING
+  // between rounds instead of just waiting longer.
+  //
+  // A 200 from ingestion does not mean the stream is listed: registration is
+  // asynchronous, and the streams list is served from a cache that a single slow
+  // round can miss entirely. The old code ingested once, waited 90s, then logged
+  // "Streams not fully indexed — tests may fail on stream selection" and carried
+  // on — which is exactly what happened to Logs-Features in run 30552638159, where
+  // every share-link test then died on
+  // `selectStream: Failed to find stream "e2e_automate" after 5 attempts`.
+  // selectStream already reloads between its own attempts, so a stream missing
+  // there is genuinely absent, not a stale dropdown; only re-ingesting recovers it.
+  const rounds = 3;
+  const perRoundMs = 60000;
+  const pollIntervalMs = 3000;
+
+  for (let round = 1; round <= rounds; round++) {
+    await ingestOnce();
+    const startTime = Date.now();
+    while (Date.now() - startTime < perRoundMs) {
+      if (await isRegistered()) {
+        testLogger.info(`[alpha1] e2e_automate registered (round ${round}, ${Date.now() - startTime}ms)`);
+        return;
+      }
+      await new Promise((r) => setTimeout(r, pollIntervalMs));
+    }
+    testLogger.warn(`[alpha1] e2e_automate not listed after round ${round}/${rounds} — re-ingesting`);
   }
 
-  testLogger.warn(`[alpha1] Streams not fully indexed after ${maxWaitMs}ms — tests may fail on stream selection`);
+  testLogger.error(
+    `[alpha1] e2e_automate never appeared in the streams list after ${rounds} ingest rounds — ` +
+    `stream-selection tests in this shard will fail`
+  );
 }
 
 module.exports = globalSetup;
