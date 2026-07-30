@@ -327,12 +327,7 @@ fn validate_multi_alert_config(alert: &Alert) -> Result<(), AlertError> {
 /// the sweep can be turned off entirely (`ZO_ALERT_GROUP_SWEEP_INTERVAL=0`),
 /// and rollback is supposed to be immediate.
 async fn clean_up_opted_out_groups(alert: &Alert) {
-    let opted_in = alert
-        .query_condition
-        .aggregation
-        .as_ref()
-        .is_some_and(|a| a.multi_alert);
-    if opted_in {
+    if alert.query_condition.multi_alert_enabled() {
         return;
     }
     let Some(alert_id) = alert.id.as_ref().map(|id| id.to_string()) else {
@@ -2853,6 +2848,83 @@ mod threshold_validation_tests {
             multi_alert: true,
         });
         alert
+    }
+
+    /// A PromQL per-series alert. No `aggregation` at all — the grouping lives
+    /// in the expression, which is the whole reason this family needed its own
+    /// opt-in field.
+    fn promql_multi_alert_fixture() -> Alert {
+        let mut alert = Alert::default();
+        alert.query_condition.query_type = config::meta::alerts::QueryType::PromQL;
+        alert.query_condition.promql = Some("sum by (pod) (rate(errors[5m]))".to_string());
+        alert.query_condition.promql_condition = Some(config::meta::alerts::Condition {
+            column: "value".into(),
+            operator: config::meta::alerts::Operator::GreaterThan,
+            value: json!(10),
+            ignore_case: false,
+        });
+        alert.query_condition.promql_multi_alert = true;
+        alert.trigger_condition.operator = config::meta::alerts::Operator::GreaterThanEquals;
+        alert.trigger_condition.threshold = 1;
+        alert
+    }
+
+    #[test]
+    fn test_a_valid_promql_multi_alert_passes_the_rules() {
+        assert!(validate_rules(&promql_multi_alert_fixture()).is_ok());
+    }
+
+    /// The bug this whole family risked: `validate_multi_alert` used to return
+    /// `Ok` the moment `aggregation` was `None`, so a PromQL alert could not be
+    /// rejected for anything at all.
+    #[test]
+    fn test_promql_multi_alert_is_no_longer_waved_through_for_lacking_an_aggregation() {
+        let mut alert = promql_multi_alert_fixture();
+        alert.creates_incident = true;
+        assert!(alert.query_condition.aggregation.is_none());
+        let err = validate_rules(&alert).unwrap_err();
+        assert!(
+            format!("{err}").contains("incident"),
+            "expected the MN-11 rejection, got: {err}"
+        );
+    }
+
+    #[test]
+    fn test_promql_multi_alert_rejects_an_unorderable_operator() {
+        let mut alert = promql_multi_alert_fixture();
+        alert
+            .query_condition
+            .promql_condition
+            .as_mut()
+            .unwrap()
+            .operator = config::meta::alerts::Operator::EqualTo;
+        assert!(validate_rules(&alert).is_err());
+    }
+
+    #[test]
+    fn test_promql_multi_alert_rejects_a_series_count_threshold() {
+        let mut alert = promql_multi_alert_fixture();
+        alert.trigger_condition.threshold = 3;
+        assert!(validate_rules(&alert).is_err());
+    }
+
+    /// Without a condition there is no threshold to classify a series against.
+    #[test]
+    fn test_promql_multi_alert_rejects_a_missing_condition() {
+        let mut alert = promql_multi_alert_fixture();
+        alert.query_condition.promql_condition = None;
+        assert!(validate_rules(&alert).is_err());
+    }
+
+    /// The opt-in is the ONLY thing that turns per-series evaluation on — a
+    /// PromQL alert that simply returns many series keeps collapsing (M-9).
+    #[test]
+    fn test_a_promql_alert_that_did_not_opt_in_is_unaffected_by_the_rules() {
+        let mut alert = promql_multi_alert_fixture();
+        alert.query_condition.promql_multi_alert = false;
+        alert.creates_incident = true;
+        alert.trigger_condition.threshold = 42;
+        assert!(validate_rules(&alert).is_ok());
     }
 
     #[test]

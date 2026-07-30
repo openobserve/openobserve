@@ -5349,7 +5349,9 @@
       "incidentConflict": "Per-group alerting cannot yet be combined with incident creation.",
       "multiTimeRangeConflict": "Per-group alerting cannot be combined with multi-window comparison.",
       "groupedButSimple": "This alert groups by {columns}, but evaluates as a single result — every group collapses into one state, one silence window and one notification. Turn on per-group alerting to give each group its own level, recovery and page.",
-      "enableCta": "Enable per-group alerting"
+      "enableCta": "Enable per-group alerting",
+      "perSeries": "Multi alert (per series)",
+      "perSeriesDescription": "Evaluate every series the query returns on its own, and notify separately for each one. The series' labels are its identity — use the expression's `by (…)` clause to choose them."
     },
     "groups": {
       "tab": "Groups",

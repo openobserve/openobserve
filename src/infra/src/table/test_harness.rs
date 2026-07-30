@@ -328,3 +328,74 @@ pub async fn seed_alert(conn: &DatabaseConnection, alert_id: &str, multi_alert: 
         .await
         .expect("seed alert row");
 }
+
+/// Seed a PROMQL alert row whose per-series opt-in is `promql_multi_alert`.
+///
+/// Deliberately leaves `query_aggregation` NULL, because that is the shape a
+/// real PromQL alert has: its grouping lives in the expression, not in a
+/// `group_by` column list. A helper that set both would hide the bug this
+/// exists to catch — a reader that consults only the aggregation JSON answers
+/// "not a multi-alert" for every PromQL alert there is.
+pub async fn seed_promql_alert(
+    conn: &DatabaseConnection,
+    alert_id: &str,
+    promql_multi_alert: bool,
+) {
+    use sea_orm::{EntityTrait, Set, sea_query::OnConflict};
+
+    use crate::table::entity::{alerts, folders};
+
+    let folder = folders::ActiveModel {
+        id: Set("default".to_string()),
+        org: Set("default".to_string()),
+        folder_id: Set("default".to_string()),
+        name: Set("default".to_string()),
+        description: Set(None),
+        r#type: Set(0),
+    };
+    folders::Entity::insert(folder)
+        .on_conflict(OnConflict::column(folders::Column::Id).do_nothing().to_owned())
+        .do_nothing()
+        .exec(conn)
+        .await
+        .expect("seed folder row");
+
+    let model = alerts::ActiveModel {
+        id: Set(alert_id.to_string()),
+        org: Set("default".to_string()),
+        folder_id: Set("default".to_string()),
+        name: Set(alert_id.to_string()),
+        stream_type: Set("metrics".to_string()),
+        stream_name: Set("s".to_string()),
+        is_real_time: Set(false),
+        destinations: Set(serde_json::json!([])),
+        workflows: Set(serde_json::json!([])),
+        trigger_threshold_operator: Set(">=".to_string()),
+        row_template_type: Set(0),
+        enabled: Set(true),
+        tz_offset: Set(0),
+        // 2 = PromQL, matching `folder_type_into_i16`'s sibling mapping for
+        // query types in the alerts table.
+        query_type: Set(2),
+        query_promql: Set(Some("sum by (pod) (rate(errors[5m]))".to_string())),
+        query_promql_multi_alert: Set(promql_multi_alert.then_some(true)),
+        trigger_period_seconds: Set(60),
+        trigger_threshold_count: Set(1),
+        trigger_frequency_type: Set(0),
+        trigger_frequency_seconds: Set(60),
+        trigger_silence_seconds: Set(0),
+        align_time: Set(false),
+        dedup_enabled: Set(false),
+        creates_incident: Set(false),
+        ..Default::default()
+    };
+    alerts::Entity::insert(model)
+        .on_conflict(
+            OnConflict::column(alerts::Column::Id)
+                .update_column(alerts::Column::QueryPromqlMultiAlert)
+                .to_owned(),
+        )
+        .exec(conn)
+        .await
+        .expect("seed promql alert row");
+}

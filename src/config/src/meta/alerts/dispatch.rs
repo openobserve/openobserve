@@ -396,9 +396,49 @@ pub fn rows_by_group_key(
 ) -> HashMap<String, Map<String, Value>> {
     let mut out = HashMap::with_capacity(records.len());
     for row in records {
-        let key = super::grouping::group_key(&row_group_labels(row, group_by));
+        let key = crate::meta::alerts::grouping::group_key(&row_group_labels(row, group_by));
         // First row wins: deterministic, and a `GROUP BY` result should not
         // repeat a key anyway (dispatch reports it if one does).
+        out.entry(key).or_insert_with(|| row.clone());
+    }
+    out
+}
+
+/// Fields the PromQL evaluation adds to each series row that are measurements,
+/// not identity. Excluded from the group key so a series does not become a new
+/// group every time its value moves.
+const PROMQL_NON_LABEL_FIELDS: [&str; 2] = ["value", "_timestamp"];
+
+/// A PromQL series' group labels: its FULL label set.
+///
+/// The aggregation counterpart takes an explicit `group_by` column list; a
+/// series has no such list, and does not need one — its labels already are its
+/// identity, and the expression's own `by (…)` clause is where that set is
+/// chosen. Reading all of them keeps the group key and the PromQL grouping
+/// from ever disagreeing.
+pub fn promql_series_labels(row: &Map<String, Value>) -> BTreeMap<String, String> {
+    row.iter()
+        .filter(|(k, _)| !PROMQL_NON_LABEL_FIELDS.contains(&k.as_str()))
+        .map(|(k, v)| {
+            let rendered = match v.as_str() {
+                Some(s) => s.to_string(),
+                None => v.to_string(),
+            };
+            (k.clone(), rendered)
+        })
+        .collect()
+}
+
+/// [`rows_by_group_key`] for PromQL series.
+///
+/// Separate function rather than a `group_by: Option<&[String]>` parameter so
+/// a caller cannot pass an empty list and silently collapse every series into
+/// one group — which is exactly what happens today if PromQL rows are fed to
+/// the aggregation path.
+pub fn rows_by_series_key(records: &[Map<String, Value>]) -> HashMap<String, Map<String, Value>> {
+    let mut out = HashMap::with_capacity(records.len());
+    for row in records {
+        let key = crate::meta::alerts::grouping::group_key(&promql_series_labels(row));
         out.entry(key).or_insert_with(|| row.clone());
     }
     out
@@ -480,6 +520,70 @@ mod tests {
             .iter()
             .map(|(k, v)| (k.to_string(), v.to_string()))
             .collect()
+    }
+
+    // ===================== PromQL series identity =========================
+
+    #[test]
+    fn promql_series_labels_take_every_label_and_drop_the_measurements() {
+        let r = row(&[
+            ("pod", json!("web-1")),
+            ("namespace", json!("prod")),
+            ("value", json!(42.5)),
+            ("_timestamp", json!(1_000_000)),
+        ]);
+        assert_eq!(
+            super::promql_series_labels(&r),
+            labels(&[("pod", "web-1"), ("namespace", "prod")])
+        );
+    }
+
+    /// The point of excluding `value`: a series must keep its identity as its
+    /// measurement moves, or every evaluation would look like a brand-new group
+    /// and nothing would ever resolve.
+    #[test]
+    fn a_series_keeps_its_key_when_only_its_value_changes() {
+        let a = row(&[("pod", json!("web-1")), ("value", json!(1.0))]);
+        let b = row(&[("pod", json!("web-1")), ("value", json!(99.0))]);
+        assert_eq!(
+            crate::meta::alerts::grouping::group_key(&super::promql_series_labels(&a)),
+            crate::meta::alerts::grouping::group_key(&super::promql_series_labels(&b))
+        );
+    }
+
+    #[test]
+    fn rows_by_series_key_gives_each_series_its_own_row() {
+        let rows = vec![
+            row(&[("pod", json!("web-1")), ("value", json!(1.0))]),
+            row(&[("pod", json!("web-2")), ("value", json!(2.0))]),
+        ];
+        let by_key = super::rows_by_series_key(&rows);
+        assert_eq!(by_key.len(), 2);
+        for r in &rows {
+            let key = crate::meta::alerts::grouping::group_key(&super::promql_series_labels(r));
+            assert_eq!(by_key.get(&key).unwrap().get("value"), r.get("value"));
+        }
+    }
+
+    /// What the aggregation extractor would have done to PromQL rows: with no
+    /// `group_by` columns every series gets the same empty label set, so they
+    /// collapse into one key and share one notification payload. This is the
+    /// regression `rows_by_series_key` exists to prevent.
+    #[test]
+    fn the_aggregation_extractor_would_collapse_every_series_into_one() {
+        let rows = vec![
+            row(&[("pod", json!("web-1")), ("value", json!(1.0))]),
+            row(&[("pod", json!("web-2")), ("value", json!(2.0))]),
+        ];
+        assert_eq!(super::rows_by_group_key(&rows, &[]).len(), 1);
+        assert_eq!(super::rows_by_series_key(&rows).len(), 2);
+    }
+
+    /// A non-string label value is still an identity.
+    #[test]
+    fn a_numeric_label_is_rendered_rather_than_dropped() {
+        let r = row(&[("shard", json!(3)), ("value", json!(1.0))]);
+        assert_eq!(super::promql_series_labels(&r), labels(&[("shard", "3")]));
     }
 
     fn tc(notify_on_warning: Option<bool>) -> TriggerCondition {

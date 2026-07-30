@@ -137,6 +137,9 @@ impl TryFrom<alerts::Model> for MetaAlert {
                     serde_json::from_value::<config::meta::alerts::level::ThresholdConfig>(v).ok()
                 })
                 .and_then(|t| t.promql_warning),
+            // NULL is `false`: every alert written before the column existed
+            // keeps its collapsed evaluation.
+            promql_multi_alert: value.query_promql_multi_alert.unwrap_or(false),
             aggregation: query_aggregation.map(|a| a.into()),
             vrl_function: value.query_vrl_function,
             search_event_type: query_search_event_type.map(|t| t.into()),
@@ -761,6 +764,7 @@ fn update_mutable_fields(
         .map(intermediate::QueryAggregation::from)
         .map(serde_json::to_value)
         .transpose()?;
+    let promql_multi_alert = alert.query_condition.promql_multi_alert;
     let query_slo_condition = alert
         .query_condition
         .slo_condition
@@ -860,6 +864,9 @@ fn update_mutable_fields(
     alert_am.query_promql = Set(query_promql);
     alert_am.query_promql_condition = Set(query_promql_condition);
     alert_am.query_aggregation = Set(query_aggregation);
+    // Written as NULL when off, so the column reads the same for an alert that
+    // opted out and one that predates the feature.
+    alert_am.query_promql_multi_alert = Set(promql_multi_alert.then_some(true));
     alert_am.query_slo_condition = Set(query_slo_condition);
     alert_am.slo_id = Set(slo_id);
     alert_am.query_vrl_function = Set(query_vrl_function);
@@ -946,6 +953,7 @@ mod tests {
             query_promql: None,
             query_promql_condition: None,
             query_aggregation: None,
+            query_promql_multi_alert: None,
             query_vrl_function: None,
             query_search_event_type: None,
             query_multi_time_range: None,
@@ -1091,5 +1099,50 @@ mod tests {
         let id = Ksuid::new(None, None).to_string();
         let alert = MetaAlert::try_from(make_model(&id)).unwrap();
         assert_eq!(alert.destinations, vec!["dest-1"]);
+    }
+
+    // ── promql_multi_alert: column ⇄ meta ───────────────────────────────────
+
+    #[test]
+    fn test_try_from_model_reads_the_promql_multi_alert_column() {
+        let id = Ksuid::new(None, None).to_string();
+        let mut m = make_model(&id);
+        m.query_promql_multi_alert = Some(true);
+        let alert = MetaAlert::try_from(m).unwrap();
+        assert!(alert.query_condition.promql_multi_alert);
+    }
+
+    /// NULL is the shape every alert written before the column existed has.
+    /// Reading it as anything but `false` would flip all of them to per-series
+    /// evaluation on the deploy that adds the column.
+    #[test]
+    fn test_a_null_promql_multi_alert_column_reads_as_off() {
+        let id = Ksuid::new(None, None).to_string();
+        let mut m = make_model(&id);
+        m.query_promql_multi_alert = None;
+        let alert = MetaAlert::try_from(m).unwrap();
+        assert!(!alert.query_condition.promql_multi_alert);
+    }
+
+    #[test]
+    fn test_an_explicit_false_column_also_reads_as_off() {
+        let id = Ksuid::new(None, None).to_string();
+        let mut m = make_model(&id);
+        m.query_promql_multi_alert = Some(false);
+        let alert = MetaAlert::try_from(m).unwrap();
+        assert!(!alert.query_condition.promql_multi_alert);
+    }
+
+    /// The flag must not depend on the aggregation blob, which a real PromQL
+    /// alert does not have at all.
+    #[test]
+    fn test_the_promql_flag_survives_a_model_with_no_aggregation() {
+        let id = Ksuid::new(None, None).to_string();
+        let mut m = make_model(&id);
+        m.query_aggregation = None;
+        m.query_promql_multi_alert = Some(true);
+        let alert = MetaAlert::try_from(m).unwrap();
+        assert!(alert.query_condition.promql_multi_alert);
+        assert!(alert.query_condition.aggregation.is_none());
     }
 }

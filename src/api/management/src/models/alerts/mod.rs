@@ -367,6 +367,13 @@ pub struct QueryCondition {
     #[schema(example = 300.0)]
     pub promql_warning_value: Option<f64>,
 
+    /// Evaluate and page per SERIES rather than collapsing the query to one
+    /// verdict (M-9). PromQL's counterpart to `aggregation.multi_alert`; the
+    /// group key is the series' full label set, chosen by the expression's own
+    /// `by (…)` clause.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub promql_multi_alert: bool,
+
     /// Aggregation configuration for "custom" query type.
     pub aggregation: Option<Aggregation>,
 
@@ -601,6 +608,7 @@ impl From<meta_alerts::QueryCondition> for QueryCondition {
             promql: value.promql,
             promql_condition: value.promql_condition.map(|pc| pc.into()),
             promql_warning_value: value.promql_warning_value,
+            promql_multi_alert: value.promql_multi_alert,
             aggregation: value.aggregation.map(|a| a.into()),
             vrl_function: value.vrl_function,
             search_event_type: value.search_event_type.map(|t| t.into()),
@@ -793,6 +801,7 @@ impl From<QueryCondition> for meta_alerts::QueryCondition {
             promql: value.promql,
             promql_condition: value.promql_condition.map(|pc| pc.into()),
             promql_warning_value: value.promql_warning_value,
+            promql_multi_alert: value.promql_multi_alert,
             aggregation: value.aggregation.map(|a| a.into()),
             vrl_function: value.vrl_function,
             search_event_type: value.search_event_type.map(|t| t.into()),
@@ -1407,6 +1416,7 @@ mod tests {
             promql: None,
             promql_condition: None,
             promql_warning_value: None,
+            promql_multi_alert: false,
             aggregation: None,
             vrl_function: None,
             search_event_type: None,
@@ -1420,6 +1430,65 @@ mod tests {
         assert!(qc.aggregation.is_none());
     }
 
+    /// The API model is the only path a client can set this flag through, so
+    /// a conversion that silently dropped it would make the whole feature
+    /// unreachable over HTTP while every layer below it still worked.
+    #[test]
+    fn test_promql_multi_alert_survives_the_round_trip_through_the_api_model() {
+        let qc = QueryCondition {
+            query_type: QueryType::PromQL,
+            conditions: None,
+            sql: None,
+            promql: Some("sum by (pod) (rate(errors[5m]))".to_string()),
+            promql_condition: None,
+            promql_warning_value: None,
+            promql_multi_alert: true,
+            aggregation: None,
+            vrl_function: None,
+            search_event_type: None,
+            multi_time_range: None,
+            slo_condition: None,
+        };
+        let meta = meta_alerts::QueryCondition::from(qc);
+        assert!(meta.promql_multi_alert);
+        assert!(meta.multi_alert_enabled());
+
+        // ...and back out again, for the GET that renders the edit form.
+        let back = QueryCondition::from(meta);
+        assert!(back.promql_multi_alert);
+    }
+
+    #[test]
+    fn test_promql_multi_alert_defaults_off_through_the_api_model() {
+        let meta = meta_alerts::QueryCondition {
+            query_type: meta_alerts::QueryType::PromQL,
+            conditions: None,
+            sql: None,
+            promql: Some("up == 0".to_string()),
+            promql_condition: None,
+            promql_warning_value: None,
+            promql_multi_alert: false,
+            aggregation: None,
+            vrl_function: None,
+            search_event_type: None,
+            multi_time_range: None,
+            slo_condition: None,
+        };
+        assert!(!QueryCondition::from(meta).promql_multi_alert);
+    }
+
+    /// A request body that never mentions the field must parse, and parse as
+    /// off — that is every PromQL alert any existing client sends.
+    #[test]
+    fn test_an_api_payload_without_the_field_parses_as_off() {
+        let body = serde_json::json!({
+            "type": "promql",
+            "promql": "up == 0",
+        });
+        let qc: QueryCondition = serde_json::from_value(body).expect("deserializable");
+        assert!(!qc.promql_multi_alert);
+    }
+
     #[test]
     fn test_query_condition_to_meta_sql() {
         let qc = QueryCondition {
@@ -1429,6 +1498,7 @@ mod tests {
             promql: None,
             promql_condition: None,
             promql_warning_value: None,
+            promql_multi_alert: false,
             aggregation: None,
             vrl_function: Some("fn".to_string()),
             search_event_type: None,

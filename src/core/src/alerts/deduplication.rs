@@ -92,14 +92,30 @@ pub fn calculate_fingerprint(
 /// `None` for anything that is not an opted-in multi-alert, which is what
 /// keeps every pre-existing alert's fingerprint unchanged.
 fn row_group_key(alert: &Alert, row: &Map<String, Value>) -> Option<String> {
-    let agg = alert.query_condition.aggregation.as_ref()?;
-    if !agg.multi_alert {
+    if !alert.query_condition.multi_alert_enabled() {
         return None;
     }
-    let group_by = agg.group_by.as_ref()?;
-    // Same extractor the evaluation and dispatch use, so the fingerprint's
-    // notion of "which group" cannot drift from the state row's.
-    let labels = config::meta::alerts::dispatch::row_group_labels(row, group_by);
+    // Same extractors the evaluation and dispatch use, so the fingerprint's
+    // notion of "which group" cannot drift from the state row's. Which one
+    // applies is decided by the family, exactly as it is in dispatch: reading
+    // `aggregation.group_by` for a PromQL alert yields no columns and hence no
+    // group component, which would give every SERIES the same fingerprint and
+    // let one series' notification dedup away another's — the precise failure
+    // the note above this function warns about.
+    let labels = match alert.query_condition.query_type {
+        config::meta::alerts::QueryType::PromQL => {
+            config::meta::alerts::dispatch::promql_series_labels(row)
+        }
+        _ => {
+            let group_by = alert
+                .query_condition
+                .aggregation
+                .as_ref()?
+                .group_by
+                .as_ref()?;
+            config::meta::alerts::dispatch::row_group_labels(row, group_by)
+        }
+    };
     Some(config::meta::alerts::grouping::group_key(&labels))
 }
 
@@ -435,4 +451,106 @@ async fn apply_deduplication_impl(
     }
 
     Ok((deduplicated_rows, reserved))
+}
+
+#[cfg(test)]
+mod tests {
+    use config::meta::alerts::{
+        Aggregation, AggFunction, Condition, Operator, QueryType,
+        alert::Alert,
+    };
+    use serde_json::{Map, Value, json};
+
+    use super::row_group_key;
+
+    fn row(pairs: &[(&str, Value)]) -> Map<String, Value> {
+        pairs.iter().map(|(k, v)| (k.to_string(), v.clone())).collect()
+    }
+
+    fn promql_alert(multi: bool) -> Alert {
+        let mut a = Alert::default();
+        a.query_condition.query_type = QueryType::PromQL;
+        a.query_condition.promql = Some("sum by (pod) (rate(errors[5m]))".into());
+        a.query_condition.promql_multi_alert = multi;
+        a
+    }
+
+    fn agg_alert(multi: bool) -> Alert {
+        let mut a = Alert::default();
+        a.query_condition.query_type = QueryType::SQL;
+        a.query_condition.aggregation = Some(Aggregation {
+            group_by: Some(vec!["host".into()]),
+            function: AggFunction::Avg,
+            having: Condition {
+                column: "alert_agg_value".into(),
+                operator: Operator::GreaterThan,
+                value: json!(90),
+                ignore_case: false,
+            },
+            warning_value: None,
+            multi_alert: multi,
+        });
+        a
+    }
+
+    /// M-5, PromQL flavour. Without a per-series component in the fingerprint,
+    /// every series of one alert dedups against every other — so the first
+    /// series to page suppresses all the rest for the whole window, which is
+    /// the exact opposite of what per-series alerting is for.
+    #[test]
+    fn a_promql_multi_alert_gets_a_distinct_group_key_per_series() {
+        let alert = promql_alert(true);
+        let a = row_group_key(&alert, &row(&[("pod", json!("web-1")), ("value", json!(5.0))]));
+        let b = row_group_key(&alert, &row(&[("pod", json!("web-2")), ("value", json!(9.0))]));
+
+        assert!(a.is_some(), "a per-series alert must carry a group component");
+        assert_ne!(a, b, "two series must not share one fingerprint");
+    }
+
+    /// The value moves every evaluation; the identity must not.
+    #[test]
+    fn a_promql_series_keeps_its_key_as_its_value_changes() {
+        let alert = promql_alert(true);
+        let a = row_group_key(&alert, &row(&[("pod", json!("web-1")), ("value", json!(5.0))]));
+        let b = row_group_key(&alert, &row(&[("pod", json!("web-1")), ("value", json!(500.0))]));
+        // `is_some` first: without it this passes trivially when BOTH are None,
+        // which is exactly the broken state — `None == None`.
+        assert!(a.is_some(), "a per-series alert must carry a group component");
+        assert_eq!(a, b);
+    }
+
+    /// Upgrade safety: a PromQL alert that never opted in must keep the
+    /// fingerprint it has today, or every live silence window is invalidated.
+    #[test]
+    fn a_promql_alert_that_did_not_opt_in_has_no_group_component() {
+        let alert = promql_alert(false);
+        assert_eq!(
+            row_group_key(&alert, &row(&[("pod", json!("web-1")), ("value", json!(5.0))])),
+            None
+        );
+    }
+
+    #[test]
+    fn the_aggregation_family_is_unchanged() {
+        let alert = agg_alert(true);
+        let a = row_group_key(&alert, &row(&[("host", json!("a")), ("alert_agg_value", json!(1))]));
+        let b = row_group_key(&alert, &row(&[("host", json!("b")), ("alert_agg_value", json!(1))]));
+        assert!(a.is_some());
+        assert_ne!(a, b);
+
+        let simple = agg_alert(false);
+        assert_eq!(
+            row_group_key(&simple, &row(&[("host", json!("a"))])),
+            None
+        );
+    }
+
+    /// An SLO alert has no per-group dispatch (see `multi_alert_enabled`), so
+    /// it must not grow a group component either.
+    #[test]
+    fn an_slo_alert_has_no_group_component() {
+        let mut alert = Alert::default();
+        alert.query_condition.query_type = QueryType::Slo;
+        assert_eq!(row_group_key(&alert, &row(&[("group", json!("g"))])), None);
+    }
 }

@@ -436,10 +436,16 @@ pub async fn delete_groups_with<C: sea_orm::ConnectionTrait>(
 /// Whether the alert still has `multi_alert` set, read inside a caller's
 /// transaction (§5.3).
 ///
-/// Reads the one JSON column rather than rebuilding the whole `Alert`: the
-/// question is a single boolean, and the intermediate-layer conversion would
-/// pull in folder and destination lookups that have no business inside the
-/// state transaction.
+/// Reads the two storage locations rather than rebuilding the whole `Alert`:
+/// the question is a single boolean, and the intermediate-layer conversion
+/// would pull in folder and destination lookups that have no business inside
+/// the state transaction.
+///
+/// Two columns because the two alert families store the opt-in differently — a
+/// SQL alert inside the `query_aggregation` JSON, a PromQL alert in its own
+/// `query_promql_multi_alert` column (a PromQL alert has no aggregation). Read
+/// only the JSON one and every PromQL multi-alert would answer `false` here and
+/// have this evaluation's group writes silently dropped, every single time.
 ///
 /// A missing alert row answers `false` — the alert was deleted mid-evaluation,
 /// and writing group rows for it would strand them.
@@ -447,15 +453,19 @@ async fn multi_alert_still_enabled<C: sea_orm::ConnectionTrait>(
     conn: &C,
     alert_id: &str,
 ) -> Result<bool, errors::Error> {
-    let Some(agg) = alerts::Entity::find_by_id(alert_id)
+    let Some((agg, promql_multi)) = alerts::Entity::find_by_id(alert_id)
         .select_only()
         .column(alerts::Column::QueryAggregation)
-        .into_tuple::<Option<sea_orm::JsonValue>>()
+        .column(alerts::Column::QueryPromqlMultiAlert)
+        .into_tuple::<(Option<sea_orm::JsonValue>, Option<bool>)>()
         .one(conn)
         .await?
     else {
         return Ok(false);
     };
+    if promql_multi.unwrap_or(false) {
+        return Ok(true);
+    }
     Ok(agg
         .as_ref()
         .and_then(|v| v.get("multi_alert"))
@@ -839,7 +849,7 @@ mod tests {
 
     use config::meta::alerts::state::StateUpdate;
 
-    use crate::table::test_harness::{seed_alert, test_db, unique_alert_id};
+    use crate::table::test_harness::{seed_alert, seed_promql_alert, test_db, unique_alert_id};
 
     /// The silence window a `Delivered { silence_minutes: 10, at: 1_100 }`
     /// callback produces — computed by `dispatch::delivery_success_update`,
@@ -1107,6 +1117,80 @@ mod tests {
                 .is_none(),
             "and it writes no rollup either — the whole plan is dropped"
         );
+    }
+
+    /// The bug the two-column read exists to prevent. `multi_alert_still_enabled`
+    /// runs INSIDE the plan's transaction, so a reader that consults only
+    /// `query_aggregation` answers `false` for every PromQL alert — and every
+    /// per-series evaluation would have its group writes silently dropped, on
+    /// every single run, with only a debug log to show for it.
+    #[tokio::test]
+    async fn test_a_promql_multi_alerts_group_plan_commits() {
+        let db = test_db().await;
+        let alert_id = unique_alert_id("promql-opt-in");
+        seed_promql_alert(db, &alert_id, true).await;
+
+        let plan = GroupPlan {
+            updates: vec![
+                update_of(group_row(&alert_id, "pod=web-1", AlertLevel::Critical, 2_000)),
+                update_of(group_row(&alert_id, "pod=web-2", AlertLevel::Warning, 2_000)),
+                update_of(group_row(&alert_id, ROLLUP_GROUP_KEY, AlertLevel::Critical, 2_000)),
+            ],
+            evicted: vec![],
+        };
+        persist_group_plan_with(db, &plan, &alert_id).await.unwrap();
+
+        let groups = list_groups_with(db, &alert_id).await.unwrap();
+        assert_eq!(groups.len(), 2, "both series should have state rows");
+        assert!(
+            get_with(db, &alert_id, ROLLUP_GROUP_KEY)
+                .await
+                .unwrap()
+                .is_some(),
+            "and the rollup row is written too"
+        );
+    }
+
+    /// The opt-out half: a PromQL alert that turned per-series off gets the
+    /// same mid-evaluation drop a SQL alert does.
+    #[tokio::test]
+    async fn test_a_promql_group_plan_is_dropped_once_the_opt_in_is_off() {
+        let db = test_db().await;
+        let alert_id = unique_alert_id("promql-opt-out");
+        seed_promql_alert(db, &alert_id, false).await;
+
+        let plan = GroupPlan {
+            updates: vec![update_of(group_row(
+                &alert_id,
+                "pod=web-1",
+                AlertLevel::Critical,
+                2_000,
+            ))],
+            evicted: vec![],
+        };
+        persist_group_plan_with(db, &plan, &alert_id).await.unwrap();
+
+        assert!(list_groups_with(db, &alert_id).await.unwrap().is_empty());
+    }
+
+    /// A PromQL alert has no `query_aggregation` at all — the opt-in must be
+    /// read from its own column, not inferred from a missing JSON blob.
+    #[tokio::test]
+    async fn test_the_promql_opt_in_is_read_without_any_aggregation_present() {
+        let db = test_db().await;
+        let alert_id = unique_alert_id("promql-no-agg");
+        seed_promql_alert(db, &alert_id, true).await;
+
+        let stored = crate::table::entity::alerts::Entity::find_by_id(alert_id.clone())
+            .one(db)
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(
+            stored.query_aggregation.is_none(),
+            "the fixture must not paper over the real shape"
+        );
+        assert_eq!(stored.query_promql_multi_alert, Some(true));
     }
 
     #[tokio::test]

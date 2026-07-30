@@ -301,6 +301,22 @@ impl QueryConditionExt for QueryCondition {
                         })
                         .filter(|label| !label.is_empty())
                 });
+                // ── Per-series fan-out (M-1/M-2/M-3, gated by M-9) ──────────
+                // Additive, exactly like the aggregation path above: the
+                // worst-series collapse computed already is what the single
+                // per-evaluation trigger record needs (D8); this only ADDS the
+                // per-group view.
+                if self.promql_multi_alert {
+                    eval_results.group_classification =
+                        Some(config::meta::alerts::grouping::classify_promql_series(
+                            &values,
+                            condition.operator,
+                            promql_critical,
+                            self.promql_warning_value,
+                            get_config().limit.alert_max_groups,
+                        ));
+                }
+
                 eval_results.level = level;
                 eval_results.data = level.map(|_| values);
                 log::info!(

@@ -475,6 +475,27 @@ pub struct QueryCondition {
         deserialize_with = "crate::meta::slo::lenient_f64::deserialize_opt"
     )]
     pub promql_warning_value: Option<f64>,
+    /// Per-group alerting for a PromQL alert (M-9), where a "group" is one
+    /// returned SERIES.
+    ///
+    /// A sibling of `promql_condition` rather than a member of
+    /// [`Aggregation::multi_alert`], because a PromQL alert has no
+    /// `aggregation` at all — its grouping is expressed in the PromQL itself
+    /// (`sum by (pod) (…)`), not in a `group_by` column list.
+    ///
+    /// The group key is the series' FULL label set. That is what a series'
+    /// identity already is in Prometheus, and it means the expression stays
+    /// the single place grouping is decided — a separate label picker could
+    /// only ever disagree with the `by (…)` clause beside it.
+    ///
+    /// `#[serde(default)]` carries the same backward-compatibility guarantee
+    /// as its aggregation counterpart: an alert stored before this field
+    /// existed deserializes to `false` and keeps its collapsed evaluation
+    /// byte-for-byte. Nothing is inferred from the query returning several
+    /// series — that would change paging cadence for every existing PromQL
+    /// alert that happens to be unaggregated.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub promql_multi_alert: bool,
     pub aggregation: Option<Aggregation>,
     #[serde(default)]
     pub vrl_function: Option<String>,
@@ -489,6 +510,39 @@ pub struct QueryCondition {
     /// whose documented scope is threshold and level configuration only (D1).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub slo_condition: Option<crate::meta::slo::condition::SloCondition>,
+}
+
+impl QueryCondition {
+    /// Whether this alert evaluates and pages per group.
+    ///
+    /// The aggregation and PromQL families store the opt-in in different places
+    /// because they define a group differently — an aggregation alert by its
+    /// `group_by` columns, a PromQL alert by each returned series' labels.
+    /// Every caller downstream of evaluation cares only about the answer, so
+    /// asking through one accessor is what keeps a family from being silently
+    /// honoured by only half the dispatch path.
+    ///
+    /// **SLO alerts answer `false`, and that is correct — do not "fix" it.**
+    /// `SloCondition.multi_alert` exists (SA-13) and `slo::evaluate` does read
+    /// every group when it is set, but only to pick the WORST one:
+    /// `evaluate_slo_alert` collapses the results into a single `level` +
+    /// `group_label` and never populates `group_classification`. Per-group
+    /// state rows are written only when a classification exists
+    /// (`persist_alert_run_state`), so an SLO alert has none, and SA-13's
+    /// "reuses Feature 3 verbatim" is not yet implemented.
+    ///
+    /// Returning `true` here would therefore switch OFF the alert-level
+    /// delivery decision — silence windows, the escalation baseline,
+    /// `notify_on_warning` — with nothing per-group to replace it, because no
+    /// per-group dispatch runs. That is a regression, not a fix. When SA-13
+    /// lands, this arm changes at the same time as the dispatch that justifies
+    /// it. Pinned by `test_slo_alerts_deliberately_answer_false`.
+    pub fn multi_alert_enabled(&self) -> bool {
+        match self.query_type {
+            QueryType::PromQL => self.promql_multi_alert,
+            _ => self.aggregation.as_ref().is_some_and(|a| a.multi_alert),
+        }
+    }
 }
 
 impl MemorySize for QueryCondition {
@@ -2340,6 +2394,155 @@ mod test {
         assert_eq!(AggFunction::try_from("p95").unwrap(), AggFunction::P95);
         assert_eq!(AggFunction::try_from("p99").unwrap(), AggFunction::P99);
         assert!(AggFunction::try_from("unknown").is_err());
+    }
+
+    // ── multi_alert_enabled: one question, two storage locations ────────────
+
+    fn agg_with_multi(multi: bool) -> Aggregation {
+        Aggregation {
+            group_by: Some(vec!["host".to_string()]),
+            function: AggFunction::Avg,
+            having: Condition {
+                column: "alert_agg_value".to_string(),
+                operator: Operator::GreaterThan,
+                value: serde_json::json!(90),
+                ignore_case: false,
+            },
+            warning_value: None,
+            multi_alert: multi,
+        }
+    }
+
+    #[test]
+    fn test_multi_alert_enabled_reads_the_aggregation_for_sql_alerts() {
+        let q = QueryCondition {
+            query_type: QueryType::SQL,
+            aggregation: Some(agg_with_multi(true)),
+            ..Default::default()
+        };
+        assert!(q.multi_alert_enabled());
+    }
+
+    #[test]
+    fn test_multi_alert_enabled_reads_the_promql_flag_for_promql_alerts() {
+        let q = QueryCondition {
+            query_type: QueryType::PromQL,
+            promql_multi_alert: true,
+            ..Default::default()
+        };
+        assert!(q.multi_alert_enabled());
+    }
+
+    /// The cross-family trap. A PromQL alert carrying a stray aggregation must
+    /// NOT be treated as per-group: its rows have no `group_by` columns, so the
+    /// aggregation extractor would hand every series the same empty label set
+    /// and collapse them into one group.
+    #[test]
+    fn test_a_promql_alert_ignores_an_aggregation_multi_alert_flag() {
+        let q = QueryCondition {
+            query_type: QueryType::PromQL,
+            promql_multi_alert: false,
+            aggregation: Some(agg_with_multi(true)),
+            ..Default::default()
+        };
+        assert!(!q.multi_alert_enabled());
+    }
+
+    /// And the mirror: a SQL alert must not be switched on by the PromQL flag,
+    /// which nothing in its evaluation path would honour.
+    #[test]
+    fn test_a_sql_alert_ignores_the_promql_multi_alert_flag() {
+        let q = QueryCondition {
+            query_type: QueryType::SQL,
+            promql_multi_alert: true,
+            aggregation: Some(agg_with_multi(false)),
+            ..Default::default()
+        };
+        assert!(!q.multi_alert_enabled());
+    }
+
+    /// SLO alerts must answer `false` until SA-13 actually lands.
+    ///
+    /// `slo_condition.multi_alert` reads every group, but only so
+    /// `evaluate_slo_alert` can pick the worst; it never builds a
+    /// `GroupClassification`, and group state rows are written only when one
+    /// exists. So there is no per-group dispatch for an SLO alert — and
+    /// answering `true` would switch off the ALERT-level delivery decision
+    /// (silence, escalation baseline, notify_on_warning) with nothing to
+    /// replace it. This test is the tripwire for anyone who reads
+    /// `SloCondition.multi_alert` and assumes the accessor is missing a case.
+    #[test]
+    fn test_slo_alerts_deliberately_answer_false() {
+        let q = QueryCondition {
+            query_type: QueryType::Slo,
+            aggregation: None,
+            ..Default::default()
+        };
+        assert!(
+            !q.multi_alert_enabled(),
+            "turning this true silences SLO alerts: it disables alert-level \
+             delivery gating, and no per-group dispatch runs for QueryType::Slo. \
+             Land SA-13's dispatch first, in the same change."
+        );
+    }
+
+    #[test]
+    fn test_multi_alert_enabled_is_false_by_default_for_every_query_type() {
+        for qt in [
+            QueryType::Custom,
+            QueryType::SQL,
+            QueryType::PromQL,
+            QueryType::Slo,
+        ] {
+            let q = QueryCondition {
+                query_type: qt.clone(),
+                ..Default::default()
+            };
+            assert!(!q.multi_alert_enabled(), "{qt} defaulted to enabled");
+        }
+    }
+
+    // ── Upgrade safety for the new flag ─────────────────────────────────────
+
+    /// THE guarantee (M-9/D26): every PromQL alert already stored was
+    /// serialized without this field. If it read back as anything but `false`,
+    /// all of them would switch to per-series evaluation on deploy — different
+    /// paging cadence, and every in-flight silence fingerprint invalidated.
+    #[test]
+    fn test_promql_multi_alert_defaults_to_false_when_absent_from_stored_json() {
+        let stored = serde_json::json!({
+            "type": "promql",
+            "promql": "up == 0",
+        });
+        let parsed: QueryCondition = serde_json::from_value(stored).expect("deserializable");
+        assert!(!parsed.promql_multi_alert);
+        assert!(!parsed.multi_alert_enabled());
+    }
+
+    /// `skip_serializing_if` keeps the field out of the payload when off, so
+    /// turning the feature on never rewrites rows that are not using it.
+    #[test]
+    fn test_promql_multi_alert_is_omitted_from_json_when_off() {
+        let q = QueryCondition {
+            query_type: QueryType::PromQL,
+            promql_multi_alert: false,
+            ..Default::default()
+        };
+        let v = serde_json::to_value(&q).expect("serializable");
+        assert!(v.get("promql_multi_alert").is_none(), "{v}");
+    }
+
+    #[test]
+    fn test_promql_multi_alert_round_trips_when_on() {
+        let q = QueryCondition {
+            query_type: QueryType::PromQL,
+            promql_multi_alert: true,
+            ..Default::default()
+        };
+        let v = serde_json::to_value(&q).expect("serializable");
+        assert_eq!(v.get("promql_multi_alert"), Some(&serde_json::json!(true)));
+        let back: QueryCondition = serde_json::from_value(v).expect("deserializable");
+        assert!(back.promql_multi_alert);
     }
 
     #[test]

@@ -196,6 +196,11 @@ async fn dispatch_per_group(
 
     let classification = classification?;
     let alert_id = alert.id.as_ref()?.to_string();
+    // How this alert's rows carry their group identity. A PromQL alert has no
+    // `group_by` at all — feeding its rows to the column-list extractor would
+    // hand every series the SAME empty label set, so all of them would collapse
+    // into one group key and each other's notification payloads.
+    let is_promql = alert.query_condition.query_type == config::meta::alerts::QueryType::PromQL;
     let group_by = alert
         .query_condition
         .aggregation
@@ -244,7 +249,11 @@ async fn dispatch_per_group(
         );
     }
 
-    let rows = rows_by_group_key(records, &group_by);
+    let rows = if is_promql {
+        config::meta::alerts::dispatch::rows_by_series_key(records)
+    } else {
+        rows_by_group_key(records, &group_by)
+    };
     let cfg = get_config();
 
     let plan = plan_dispatch(
@@ -1304,11 +1313,7 @@ async fn handle_alert_triggers(
     // exists to remove — and would freeze every group's `last_seen`, which
     // M-7 reads as disappearance.
     let evaluates_through_silence = config::meta::alerts::dispatch::evaluates_through_silence(
-        alert
-            .query_condition
-            .aggregation
-            .as_ref()
-            .is_some_and(|a| a.multi_alert),
+        alert.query_condition.multi_alert_enabled(),
         multi_level,
     );
     if trigger_results.data.is_some()
@@ -1344,11 +1349,7 @@ async fn handle_alert_triggers(
     // whole alert would mute every group at once, and a group that starts
     // firing mid-window would never page at all.
     let alert_level_delivery = config::meta::alerts::dispatch::alert_level_delivery_applies(
-        alert
-            .query_condition
-            .aggregation
-            .as_ref()
-            .is_some_and(|a| a.multi_alert),
+        alert.query_condition.multi_alert_enabled(),
         multi_level,
     );
     let delivery = if alert_level_delivery {
@@ -1423,11 +1424,7 @@ async fn handle_alert_triggers(
         // (M-5), no per-group delivery state (MN-6), and no per-group failure
         // accounting (MN-7). The groups would be silently collapsed back into
         // the single notification multi-alerts exist to split apart.
-        let is_multi_alert = alert
-            .query_condition
-            .aggregation
-            .as_ref()
-            .is_some_and(|a| a.multi_alert);
+        let is_multi_alert = alert.query_condition.multi_alert_enabled();
 
         // Check if grouping is enabled BEFORE deduplication (enterprise-only feature)
         #[cfg(feature = "enterprise")]

@@ -82,6 +82,9 @@ pub enum MultiAlertError {
     /// group last week" to hold one state row, and dispatch would page the
     /// group once per window.
     MultiTimeRangeUnsupported,
+    /// A PromQL alert opted in without a `promql_condition`: there is no
+    /// threshold to classify a series against, so no group can have a level.
+    PromqlConditionMissing,
 }
 
 impl std::fmt::Display for MultiAlertError {
@@ -109,6 +112,9 @@ impl std::fmt::Display for MultiAlertError {
             Self::MultiTimeRangeUnsupported => f.write_str(
                 "per-group alerting cannot be combined with multi-window comparison; remove the \
                  comparison periods or turn off per-group alerting",
+            ),
+            Self::PromqlConditionMissing => f.write_str(
+                "per-series alerting needs a PromQL condition to classify each series against",
             ),
         }
     }
@@ -146,12 +152,22 @@ pub fn validate_multi_alert(
     // because two of the rules are about what surrounds it: an alert with no
     // aggregation cannot have opted in at all, and multi-window comparison is
     // a sibling field.
+    if !query.multi_alert_enabled() {
+        return Ok(());
+    }
+
+    // A PromQL multi-alert groups by each returned series' labels, so the two
+    // aggregation-shaped rules below (a `group_by` must exist, `having` must be
+    // orderable) have no counterpart — the expression supplies the grouping and
+    // `promql_condition.operator` supplies the direction. Everything the two
+    // families share is checked for both.
+    if query.query_type == super::QueryType::PromQL {
+        return validate_promql_multi_alert(query, tc, creates_incident);
+    }
+
     let Some(agg) = query.aggregation.as_ref() else {
         return Ok(());
     };
-    if !agg.multi_alert {
-        return Ok(());
-    }
 
     // MN-11: incident correlation is a third delivery route whose per-group
     // identity v1 does not define. Rejecting beats the two silent
@@ -191,6 +207,52 @@ pub fn validate_multi_alert(
     // The warning gate is the easy one to forget: legacy Warning fires on
     // `firing_count >= warning_threshold.unwrap_or(threshold)`, so a critical
     // gate of `>= 1` with a warning gate of 3 still diverges from M-2.
+    if let Some(w) = tc.warning_threshold
+        && !is_any_group_gate(tc.operator, w)
+    {
+        return Err(MultiAlertError::WarningCountGateNotAnyGroup);
+    }
+
+    Ok(())
+}
+
+/// The PromQL half of [`validate_multi_alert`].
+///
+/// Shares MN-11, the multi-window rule and the M-10 count gates with the
+/// aggregation path — they are properties of per-group dispatch, not of how
+/// groups are derived. What differs is the direction check: it reads
+/// `promql_condition.operator` rather than `having.operator`, and there is no
+/// `group_by` to require because the series' labels ARE the group.
+fn validate_promql_multi_alert(
+    query: &super::QueryCondition,
+    tc: &TriggerCondition,
+    creates_incident: bool,
+) -> Result<(), MultiAlertError> {
+    if creates_incident {
+        return Err(MultiAlertError::IncidentsUnsupported);
+    }
+    if query.multi_time_range.as_ref().is_some_and(|r| !r.is_empty()) {
+        return Err(MultiAlertError::MultiTimeRangeUnsupported);
+    }
+
+    // Without a condition there is no threshold to classify a series against,
+    // so there is nothing to be per-group about.
+    let Some(condition) = query.promql_condition.as_ref() else {
+        return Err(MultiAlertError::PromqlConditionMissing);
+    };
+    if !matches!(
+        condition.operator,
+        Operator::GreaterThan
+            | Operator::GreaterThanEquals
+            | Operator::LessThan
+            | Operator::LessThanEquals
+    ) {
+        return Err(MultiAlertError::OperatorNotOrderable);
+    }
+
+    if !is_any_group_gate(tc.operator, tc.threshold) {
+        return Err(MultiAlertError::CountGateNotAnyGroup);
+    }
     if let Some(w) = tc.warning_threshold
         && !is_any_group_gate(tc.operator, w)
     {
@@ -266,6 +328,63 @@ impl FetchPage {
     /// count is exact even though the total is not.
     pub fn firing_is_lower_bound(&self) -> bool {
         self.filled && !self.reached_healthy
+    }
+}
+
+/// Classify a PromQL evaluation's returned series into per-group state (M-11).
+///
+/// Extracted from the evaluation loop so the feature's core arithmetic is
+/// reachable without a live PromQL search behind it — the loop it came from is
+/// a several-hundred-line async function, which is where per-series logic would
+/// otherwise have gone untested.
+///
+/// `rows` are the series rows the evaluation already built (labels + `value` +
+/// `_timestamp`). Labels come from the shared extractor, so the keys here are
+/// byte-identical to the ones dispatch will re-derive when it looks up each
+/// group's notification payload.
+pub fn classify_promql_series(
+    rows: &[serde_json::Map<String, serde_json::Value>],
+    operator: super::Operator,
+    critical: f64,
+    warning: Option<f64>,
+    cap: usize,
+) -> GroupClassification {
+    let observations: Vec<GroupObservation> = rows
+        .iter()
+        .filter_map(|row| {
+            let value = row.get("value")?.as_f64()?;
+            let labels = super::dispatch::promql_series_labels(row);
+            Some(GroupObservation::new(labels, value))
+        })
+        .collect();
+
+    let classification = classify_groups_by(
+        observations,
+        |v| super::level::evaluate_level_values(v, operator, critical, warning),
+        cap,
+    );
+    let observed = classification.groups.len() + classification.dropped.len();
+    let page = promql_fetch_page(observed, classification.firing_observed, cap);
+    classification.with_page(page)
+}
+
+/// How a PromQL evaluation's series set behaved, as a [`FetchPage`].
+///
+/// PromQL has no page-size knob — the query returns every matching series and
+/// the M-6 cap is applied afterwards — so `filled` means "we had to drop some",
+/// not "the fetch hit a limit". The consequence is identical either way: once
+/// groups are dropped, a tracked group's absence no longer proves it vanished.
+///
+/// `reached_healthy` is derived rather than assumed. The PromQL expression is
+/// widened only to the warning threshold, so in the normal case every returned
+/// series is firing and this is `false` — which is harmless while nothing was
+/// dropped, because `completeness()` already treats an unfilled page as
+/// complete. A recovered series simply stops being returned, and M-7 ages it
+/// out; that is the intended path, not a gap.
+pub fn promql_fetch_page(observed: usize, firing_observed: usize, cap: usize) -> FetchPage {
+    FetchPage {
+        filled: cap > 0 && observed > cap,
+        reached_healthy: firing_observed < observed,
     }
 }
 
@@ -2745,6 +2864,334 @@ mod tests {
             warning_value: None,
             multi_alert,
         }
+    }
+
+    // ── M-9 for PromQL: per-SERIES alerting ─────────────────────────────────
+
+    /// A PromQL alert that has opted in to per-series evaluation.
+    fn promql_qc(op: Operator, multi: bool) -> crate::meta::alerts::QueryCondition {
+        crate::meta::alerts::QueryCondition {
+            query_type: crate::meta::alerts::QueryType::PromQL,
+            promql: Some("sum by (pod) (rate(errors[5m]))".to_string()),
+            promql_condition: Some(Condition {
+                column: "value".to_string(),
+                operator: op,
+                value: json!(10),
+                ignore_case: false,
+            }),
+            promql_multi_alert: multi,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn test_a_valid_promql_multi_alert_is_accepted() {
+        let q = promql_qc(Operator::GreaterThan, true);
+        assert!(validate_multi_alert(&q, &tc(Operator::GreaterThanEquals, 1, None), false).is_ok());
+    }
+
+    /// The old code returned `Ok` the instant `aggregation` was `None`, so a
+    /// PromQL alert could not be rejected for anything. Each rule below would
+    /// have silently passed.
+    #[test]
+    fn test_promql_multi_alert_is_no_longer_exempt_from_every_rule() {
+        let q = promql_qc(Operator::GreaterThan, true);
+        let any_group = tc(Operator::GreaterThanEquals, 1, None);
+
+        assert_eq!(
+            validate_multi_alert(&q, &any_group, true).unwrap_err(),
+            MultiAlertError::IncidentsUnsupported,
+        );
+        assert_eq!(
+            validate_multi_alert(&q, &tc(Operator::GreaterThanEquals, 5, None), false).unwrap_err(),
+            MultiAlertError::CountGateNotAnyGroup,
+        );
+        assert_eq!(
+            validate_multi_alert(
+                &q,
+                &tc(Operator::GreaterThanEquals, 1, Some(3)),
+                false
+            )
+            .unwrap_err(),
+            MultiAlertError::WarningCountGateNotAnyGroup,
+        );
+        assert_eq!(
+            validate_multi_alert(
+                &promql_qc(Operator::EqualTo, true),
+                &any_group,
+                false
+            )
+            .unwrap_err(),
+            MultiAlertError::OperatorNotOrderable,
+        );
+    }
+
+    #[test]
+    fn test_promql_multi_alert_needs_a_condition_to_classify_against() {
+        let mut q = promql_qc(Operator::GreaterThan, true);
+        q.promql_condition = None;
+        assert_eq!(
+            validate_multi_alert(&q, &tc(Operator::GreaterThanEquals, 1, None), false).unwrap_err(),
+            MultiAlertError::PromqlConditionMissing,
+        );
+    }
+
+    #[test]
+    fn test_promql_multi_alert_rejects_multi_window_comparison() {
+        let mut q = promql_qc(Operator::GreaterThan, true);
+        q.multi_time_range = Some(vec![crate::meta::alerts::CompareHistoricData {
+            offset: "1w".to_string(),
+        }]);
+        assert_eq!(
+            validate_multi_alert(&q, &tc(Operator::GreaterThanEquals, 1, None), false).unwrap_err(),
+            MultiAlertError::MultiTimeRangeUnsupported,
+        );
+    }
+
+    /// The same upgrade-safety guarantee the aggregation flag gets: a PromQL
+    /// alert that never opted in is not subject to any of these rules, however
+    /// many series its expression happens to return.
+    #[test]
+    fn test_a_promql_alert_that_did_not_opt_in_is_left_alone() {
+        let q = promql_qc(Operator::EqualTo, false);
+        assert!(validate_multi_alert(&q, &tc(Operator::GreaterThanEquals, 9, None), true).is_ok());
+    }
+
+    /// A PromQL alert has no `group_by`, and must not be rejected for it — the
+    /// series' labels are the grouping. This is the rule that does NOT carry
+    /// over between the two families.
+    #[test]
+    fn test_promql_multi_alert_is_not_rejected_for_having_no_group_by() {
+        let q = promql_qc(Operator::GreaterThan, true);
+        assert!(q.aggregation.is_none());
+        assert!(validate_multi_alert(&q, &tc(Operator::GreaterThanEquals, 1, None), false).is_ok());
+    }
+
+    // ── PromQL series classification (M-11) ─────────────────────────────────
+
+    fn series(pairs: &[(&str, &str)], value: f64) -> serde_json::Map<String, serde_json::Value> {
+        let mut m = serde_json::Map::new();
+        for (k, v) in pairs {
+            m.insert(k.to_string(), json!(v));
+        }
+        m.insert("value".to_string(), json!(value));
+        m.insert("_timestamp".to_string(), json!(1_000_000));
+        m
+    }
+
+    #[test]
+    fn test_each_series_becomes_its_own_group() {
+        let rows = vec![
+            series(&[("pod", "web-1")], 50.0),
+            series(&[("pod", "web-2")], 20.0),
+            series(&[("pod", "web-3")], 5.0),
+        ];
+        let c = super::classify_promql_series(&rows, Operator::GreaterThan, 10.0, None, 500);
+
+        // Every returned series gets a group, including the healthy one: a
+        // non-firing group still needs its state row, or M-7 has nothing to
+        // age when it later disappears.
+        assert_eq!(c.groups.len(), 3);
+        // ...but only the two above the threshold count as firing (5.0 is not).
+        assert_eq!(c.firing_observed, 2);
+        assert_eq!(c.rollup, Some(AlertLevel::Critical));
+
+        // And the healthy one carries no level, rather than a defaulted Ok.
+        let quiet = c
+            .groups
+            .iter()
+            .find(|g| g.labels.get("pod").map(String::as_str) == Some("web-3"))
+            .expect("the healthy series is still tracked");
+        assert_eq!(quiet.level, None);
+    }
+
+    #[test]
+    fn test_each_series_is_classified_against_its_own_value() {
+        // The whole point of per-series: one bad pod does not make every pod
+        // critical, and one good pod does not rescue the bad one.
+        let rows = vec![
+            series(&[("pod", "hot")], 100.0),
+            series(&[("pod", "warm")], 15.0),
+        ];
+        let c = super::classify_promql_series(&rows, Operator::GreaterThan, 50.0, Some(10.0), 500);
+        let by_pod = |p: &str| {
+            c.groups
+                .iter()
+                .find(|g| g.labels.get("pod").map(String::as_str) == Some(p))
+                .expect("group present")
+                .level
+        };
+        assert_eq!(by_pod("hot"), Some(AlertLevel::Critical));
+        assert_eq!(by_pod("warm"), Some(AlertLevel::Warning));
+        // M-2: the rollup is the most severe group.
+        assert_eq!(c.rollup, Some(AlertLevel::Critical));
+    }
+
+    /// The `<` direction: smaller is more severe, so the warning band sits
+    /// ABOVE critical. Getting this backwards would classify every series in
+    /// the wrong band.
+    #[test]
+    fn test_a_descending_operator_classifies_the_right_way_round() {
+        let rows = vec![
+            series(&[("pod", "starved")], 1.0),
+            series(&[("pod", "low")], 7.0),
+            series(&[("pod", "fine")], 99.0),
+        ];
+        let c = super::classify_promql_series(&rows, Operator::LessThan, 5.0, Some(10.0), 500);
+        let lvl = |p: &str| {
+            c.groups
+                .iter()
+                .find(|g| g.labels.get("pod").map(String::as_str) == Some(p))
+                .expect("group present")
+                .level
+        };
+        assert_eq!(lvl("starved"), Some(AlertLevel::Critical));
+        assert_eq!(lvl("low"), Some(AlertLevel::Warning));
+        assert_eq!(lvl("fine"), None);
+    }
+
+    #[test]
+    fn test_the_group_key_is_the_whole_label_set() {
+        // Two series differing only in a SECOND label are different groups —
+        // they would collapse into one if only `pod` were read.
+        let rows = vec![
+            series(&[("pod", "web-1"), ("region", "us")], 50.0),
+            series(&[("pod", "web-1"), ("region", "eu")], 60.0),
+        ];
+        let c = super::classify_promql_series(&rows, Operator::GreaterThan, 10.0, None, 500);
+        assert_eq!(c.groups.len(), 2);
+    }
+
+    #[test]
+    fn test_a_series_with_no_numeric_value_is_skipped_not_defaulted() {
+        // Defaulting a missing value to 0 would invent an observation, and for
+        // a `<` operator that fabricated zero would page as critical.
+        let mut bad = series(&[("pod", "broken")], 0.0);
+        bad.insert("value".to_string(), json!("not a number"));
+        let rows = vec![series(&[("pod", "ok")], 50.0), bad];
+        let c = super::classify_promql_series(&rows, Operator::GreaterThan, 10.0, None, 500);
+        assert_eq!(c.groups.len(), 1);
+        assert_eq!(c.groups[0].labels.get("pod").map(String::as_str), Some("ok"));
+    }
+
+    #[test]
+    fn test_the_cap_truncates_severity_first_and_reports_the_overflow() {
+        let rows: Vec<_> = (0..5)
+            .map(|i| series(&[("pod", &format!("p{i}"))], 10.0 + i as f64))
+            .collect();
+        let c = super::classify_promql_series(&rows, Operator::GreaterThan, 5.0, None, 2);
+
+        assert_eq!(c.groups.len(), 2, "truncated to the cap");
+        assert_eq!(c.dropped.len(), 3);
+        assert_eq!(
+            c.cap,
+            GroupCapOutcome::Exceeded {
+                observed: 5,
+                cap: 2
+            },
+            "the PRE-cap count is reported, not the truncated one",
+        );
+        // M-6/M-7: an overflowed read must not let absence prove disappearance.
+        assert_eq!(c.page.completeness(), GroupPageCompleteness::Truncated);
+    }
+
+    #[test]
+    fn test_the_rollup_survives_truncation_because_admission_is_severity_first() {
+        // The most severe series must be retained no matter how tight the cap,
+        // or the alert's own level would be wrong.
+        let rows = vec![
+            series(&[("pod", "quiet")], 11.0),
+            series(&[("pod", "loud")], 999.0),
+        ];
+        let c = super::classify_promql_series(&rows, Operator::GreaterThan, 100.0, Some(10.0), 1);
+        assert_eq!(c.groups.len(), 1);
+        assert_eq!(c.groups[0].labels.get("pod").map(String::as_str), Some("loud"));
+        assert_eq!(c.rollup, Some(AlertLevel::Critical));
+    }
+
+    #[test]
+    fn test_no_series_is_an_empty_classification_not_an_error() {
+        // The normal healthy case: the filtered expression returns nothing.
+        let c = super::classify_promql_series(&[], Operator::GreaterThan, 10.0, None, 500);
+        assert!(c.groups.is_empty());
+        assert_eq!(c.rollup, None);
+        assert_eq!(c.firing_observed, 0);
+        // And absence is trustworthy, so M-7 may age the vanished groups out.
+        assert_eq!(c.page.completeness(), GroupPageCompleteness::Complete);
+    }
+
+    /// The keys this produces must match the ones dispatch re-derives, or every
+    /// dispatch item fails to find its row and the feature breaks silently.
+    #[test]
+    fn test_the_classification_keys_match_what_dispatch_will_look_up() {
+        let rows = vec![
+            series(&[("pod", "web-1"), ("region", "us")], 50.0),
+            series(&[("pod", "web-2"), ("region", "eu")], 60.0),
+        ];
+        let c = super::classify_promql_series(&rows, Operator::GreaterThan, 10.0, None, 500);
+        let by_key = crate::meta::alerts::dispatch::rows_by_series_key(&rows);
+
+        for g in &c.groups {
+            let key = super::group_key(&g.labels);
+            assert!(
+                by_key.contains_key(&key),
+                "classification produced key {key} that dispatch cannot resolve; keys were {:?}",
+                by_key.keys().collect::<Vec<_>>()
+            );
+        }
+    }
+
+    // ── PromQL fetch-page semantics (M-6/M-7) ───────────────────────────────
+
+    #[test]
+    fn test_promql_page_is_complete_while_nothing_was_dropped() {
+        // Every returned series is firing (the expression is filtered), so
+        // `reached_healthy` is false — yet absence still proves disappearance,
+        // because nothing was cut off.
+        let page = super::promql_fetch_page(3, 3, 500);
+        assert!(!page.filled);
+        assert!(!page.reached_healthy);
+        assert_eq!(page.completeness(), GroupPageCompleteness::Complete);
+        assert!(!page.observed_is_lower_bound());
+    }
+
+    #[test]
+    fn test_promql_page_is_truncated_once_the_cap_drops_series() {
+        let page = super::promql_fetch_page(501, 501, 500);
+        assert!(page.filled);
+        assert_eq!(page.completeness(), GroupPageCompleteness::Truncated);
+        assert!(page.observed_is_lower_bound());
+        assert!(page.firing_is_lower_bound());
+    }
+
+    /// Aging must not run against a truncated read, or the dropped series would
+    /// be resolved as recovered on the next sweep.
+    #[test]
+    fn test_aging_is_blocked_when_the_cap_dropped_series() {
+        let truncated = super::promql_fetch_page(501, 501, 500).completeness();
+        assert!(!may_age_groups(
+            Some(&crate::meta::self_reporting::usage::RunOutcome::Firing),
+            truncated
+        ));
+        let complete = super::promql_fetch_page(3, 3, 500).completeness();
+        assert!(may_age_groups(
+            Some(&crate::meta::self_reporting::usage::RunOutcome::Firing),
+            complete
+        ));
+    }
+
+    #[test]
+    fn test_a_cap_of_zero_means_unlimited_and_never_truncates() {
+        let page = super::promql_fetch_page(10_000, 10_000, 0);
+        assert!(!page.filled);
+        assert_eq!(page.completeness(), GroupPageCompleteness::Complete);
+    }
+
+    #[test]
+    fn test_exactly_at_the_cap_is_not_truncated() {
+        // Off-by-one: dropping starts ABOVE the cap, not at it.
+        assert!(!super::promql_fetch_page(500, 500, 500).filled);
+        assert!(super::promql_fetch_page(501, 500, 500).filled);
     }
 
     // ── M-9: the flag itself ────────────────────────────────────────────────

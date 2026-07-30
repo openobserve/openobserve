@@ -1549,7 +1549,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </div>
                 </div>
-                <div class="rounded-default text-compact flex items-start gap-3 px-3 py-2">
+                <!-- Simple vs Multi alert (M-9), PromQL flavour. Unlike the
+                     builder branches there is no group-by field to gate on:
+                     a PromQL alert's grouping is the expression's own
+                     `by (…)` clause, so the choice is always offered once a
+                     condition exists to classify each series against. -->
+                <AlertMultiToggle
+                  :enabled="isPromqlMultiAlert"
+                  name="query_condition.promql_multi_alert"
+                  unit="series"
+                  @change="onPromqlMultiAlertChange"
+                />
+
+                <!-- Series-count gate — hidden for a per-series alert, for the
+                     same reason the group-count row is: per-series evaluation
+                     fires on ANY breaching series, so a count rule has no
+                     meaning and M-10 rejects it at save time. -->
+                <div
+                  v-if="!isPromqlMultiAlert"
+                  class="rounded-default text-compact flex items-start gap-3 px-3 py-2"
+                >
                   <span
                     class="text-text-heading text-compact w-40 min-w-40 shrink-0 leading-8.5 font-bold whitespace-nowrap"
                     >{{ t("alerts.havingSeries") }} *
@@ -2403,6 +2422,32 @@ export default defineComponent({
     );
     const isMultiAlert = computed(() => multiAlertStore.value);
 
+    // PromQL's own opt-in. A separate field because a PromQL alert has no
+    // aggregation for `multi_alert` to live inside — see QueryCondition.
+    const promqlMultiAlertStore = form.useStore(
+      (s: any) => !!s.values?.query_condition?.promql_multi_alert,
+    );
+    const isPromqlMultiAlert = computed(() => promqlMultiAlertStore.value);
+
+    /** M-10 for the series-count gate — same rule, same reason as groups. */
+    const onPromqlMultiAlertChange = (value: unknown) => {
+      if (!value) return;
+      setFV("trigger_condition.operator", ">=");
+      setFV("trigger_condition.threshold", 1);
+    };
+
+    /**
+     * Give the PromQL Simple/Multi choice a real `false` to select, for the
+     * same reason the aggregation one needs it: an alert saved before the field
+     * existed reads `undefined`, and a two-option control would render with
+     * NEITHER selected.
+     */
+    const normalizePromqlMultiAlertFlag = () => {
+      if (fv("query_condition.promql_multi_alert") === undefined) {
+        setFV("query_condition.promql_multi_alert", false);
+      }
+    };
+
     /**
      * Keep the group-count gate consistent with the M-10 rule when the toggle
      * flips.
@@ -2446,6 +2491,16 @@ export default defineComponent({
       () => [hasLogGroupByFields.value, hasMetricGroupByFields.value],
       ([log, metric]) => {
         if (log || metric) normalizeMultiAlertFlag();
+      },
+      { immediate: true },
+    );
+
+    // The PromQL choice has no group-by to wait for — it is visible whenever
+    // the PromQL tab is, so normalise on entering it.
+    watch(
+      () => localTab.value,
+      (tab) => {
+        if (tab === "promql") normalizePromqlMultiAlertFlag();
       },
       { immediate: true },
     );
@@ -3495,6 +3550,8 @@ export default defineComponent({
       hasMetricGroupByFields,
       isMultiAlert,
       onMultiAlertChange,
+      isPromqlMultiAlert,
+      onPromqlMultiAlertChange,
       checkEveryFrequency,
       onCheckEveryChange,
       restoreDefaultFrequency,

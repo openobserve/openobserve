@@ -124,6 +124,10 @@ export const defaultAlertValue: any = () => {
         },
       },
       promql_condition: null,
+      // Per-SERIES alerting for PromQL (M-9). PromQL's counterpart to
+      // aggregation.multi_alert — a PromQL alert has no aggregation, so the
+      // flag cannot live there.
+      promql_multi_alert: false,
       vrl_function: null,
       multi_time_range: [],
     },

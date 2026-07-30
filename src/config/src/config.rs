@@ -65,7 +65,7 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // chain therefore has to sit above BOTH, or the migrator would treat an
 // already-recorded version as current and silently skip whichever migrations
 // it thinks have run.
-pub const DB_SCHEMA_VERSION: u64 = 60;
+pub const DB_SCHEMA_VERSION: u64 = 61;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables

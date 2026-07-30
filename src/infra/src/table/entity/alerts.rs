@@ -29,6 +29,9 @@ pub struct Model {
     pub query_promql: Option<String>,
     pub query_promql_condition: Option<Json>,
     pub query_aggregation: Option<Json>,
+    /// Per-series alerting for a PromQL alert. NULL means the alert predates
+    /// the feature, which is the same as `false`.
+    pub query_promql_multi_alert: Option<bool>,
     pub query_vrl_function: Option<String>,
     pub query_search_event_type: Option<i16>,
     pub query_multi_time_range: Option<Json>,
@@ -120,6 +123,7 @@ mod tests {
             query_promql: None,
             query_promql_condition: None,
             query_aggregation: None,
+            query_promql_multi_alert: None,
             query_vrl_function: None,
             query_search_event_type: None,
             query_multi_time_range: None,

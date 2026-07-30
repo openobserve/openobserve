@@ -35,11 +35,7 @@
       class="text-text-heading text-compact min-w-22.5 shrink-0 leading-8.5 font-bold whitespace-nowrap"
     >
       {{ t("alerts.multiAlert.label") }}
-      <OTooltip
-        :content="t('alerts.multiAlert.perGroupDescription')"
-        :delay="300"
-        side="top"
-      />
+      <OTooltip :content="t(onDescriptionKey)" :delay="300" side="top" />
     </span>
     <div class="flex flex-col gap-1">
       <!-- An explicit two-option choice, not a switch (§5.4 calls it a
@@ -49,7 +45,7 @@
            was the label beside it. For a control that changes how many alerts
            this monitor becomes, both options have to be visible at once. -->
       <OFormOptionGroup
-        name="query_condition.aggregation.multi_alert"
+        :name="name"
         type="radio"
         orientation="horizontal"
         size="sm"
@@ -58,11 +54,7 @@
         @update:model-value="emit('change', $event)"
       />
       <p class="text-xs text-text-secondary">
-        {{
-          enabled
-            ? t("alerts.multiAlert.perGroupDescription")
-            : t("alerts.multiAlert.simpleDescription")
-        }}
+        {{ enabled ? t(onDescriptionKey) : t("alerts.multiAlert.simpleDescription") }}
       </p>
     </div>
   </div>
@@ -75,16 +67,46 @@ import { useI18n } from "vue-i18n";
 import OFormOptionGroup from "@/lib/forms/OptionGroup/OFormOptionGroup.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
-defineProps<{ enabled: boolean }>();
+const props = withDefaults(
+  defineProps<{
+    enabled: boolean;
+    /**
+     * Field this choice writes. Defaults to the aggregation flag; a PromQL
+     * alert passes `query_condition.promql_multi_alert`, because it has no
+     * aggregation for the flag to live inside.
+     */
+    name?: string;
+    /**
+     * What one unit of fan-out IS for this alert. `group` = one row of a
+     * GROUP BY; `series` = one PromQL series. The distinction is not cosmetic:
+     * telling a PromQL user their alert splits "per group" invites them to
+     * look for a Group By field that this tab does not have.
+     */
+    unit?: "group" | "series";
+  }>(),
+  {
+    name: "query_condition.aggregation.multi_alert",
+    unit: "group",
+  },
+);
 
 const emit = defineEmits<{ change: [value: unknown] }>();
 
 const { t } = useI18n();
 
-// Boolean option values, so the field still stores the same `multi_alert`
-// boolean the API expects — the control changed, the payload did not.
+const onLabelKey = computed(() =>
+  props.unit === "series" ? "alerts.multiAlert.perSeries" : "alerts.multiAlert.perGroup",
+);
+const onDescriptionKey = computed(() =>
+  props.unit === "series"
+    ? "alerts.multiAlert.perSeriesDescription"
+    : "alerts.multiAlert.perGroupDescription",
+);
+
+// Boolean option values, so the field still stores the same boolean the API
+// expects — the control changed, the payload did not.
 const options = computed(() => [
   { label: t("alerts.multiAlert.simple"), value: false },
-  { label: t("alerts.multiAlert.perGroup"), value: true },
+  { label: t(onLabelKey.value), value: true },
 ]);
 </script>
