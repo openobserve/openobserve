@@ -686,7 +686,9 @@ describe("ValueMappingPopUp", () => {
       const legacy = [{ type: "value", value: "1", text: "Up", color: "#16a34a" }];
       wrapper = createWrapper({ valueMapping: legacy });
       expect(
-        wrapper.find('[data-test="dashboard-addpanel-config-value-mapping-value-input-0"]').exists(),
+        wrapper
+          .find('[data-test="dashboard-addpanel-config-value-mapping-value-input-0"]')
+          .exists(),
       ).toBe(true);
     });
   });
