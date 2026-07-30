@@ -68,9 +68,18 @@ const queryCondition = computed(
 );
 const aggregation = computed(() => queryCondition.value?.aggregation);
 
+const isBlank = (v: any) => v === undefined || v === null || v === "";
+
 const conditionText = computed(() => {
+  const qc = queryCondition.value;
+  // PromQL keeps its threshold on promql_condition (the expression itself is the
+  // query); render the comparison so it doesn't fall through to "—".
+  if (qc?.type === "promql") {
+    const pc = qc.promql_condition;
+    return isBlank(pc?.value) ? EMPTY : `${pc.operator || ""} ${pc.value}`.trim();
+  }
   const agg = aggregation.value;
-  if (!agg) return queryCondition.value?.sql || EMPTY;
+  if (!agg) return qc?.sql || EMPTY;
   const fn = agg.function || "";
   const col = agg.having?.column || "";
   const op = agg.having?.operator || "";
@@ -79,8 +88,15 @@ const conditionText = computed(() => {
 });
 
 const warningText = computed(() => {
+  const qc = queryCondition.value;
+  // PromQL warning lives on promql_warning_value and shares the critical operator.
+  if (qc?.type === "promql") {
+    return isBlank(qc.promql_warning_value)
+      ? EMPTY
+      : `${qc.promql_condition?.operator || ""} ${qc.promql_warning_value}`.trim();
+  }
   const agg = aggregation.value;
-  if (!agg || agg.warning_value === undefined || agg.warning_value === null) {
+  if (isBlank(agg?.warning_value)) {
     return EMPTY;
   }
   const fn = agg.function || "";
