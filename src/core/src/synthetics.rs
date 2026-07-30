@@ -200,8 +200,6 @@ fn run_url(n: &CheckNotification) -> String {
     )
 }
 
-/// Slack-compatible webhook payload (also renders fine in Teams/Discord-style
-/// webhooks that accept a `text` field).
 #[cfg(feature = "enterprise")]
 /// "2 of 6: mumbai, frankfurt" — or just the count when we could not attribute.
 ///
@@ -221,6 +219,9 @@ fn locations_line(n: &CheckNotification) -> String {
     )
 }
 
+/// Slack-compatible webhook payload (also renders fine in Teams/Discord-style
+/// webhooks that accept a `text` field).
+#[cfg(feature = "enterprise")]
 fn build_slack_json(n: &CheckNotification) -> String {
     let checked_secs = n.checked_at / 1_000_000;
     let mut lines = vec![
