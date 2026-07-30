@@ -12,11 +12,24 @@ class CloudLoginPage {
 
         // ===== NAVIGATION MENU SELECTORS =====
         this.homePageMenu = page.locator('[data-test="menu-link-\\/-item"]');
+        // Mounts with the SPA on a valid session — present before /config resolves.
+        this.appShell = page.locator('[data-test="navbar-main-nav"]');
     }
 
     // ===== ASSERTION METHODS =====
 
-    async expectHomePageMenuVisible(timeout = 15000) {
+    /**
+     * The nav rail is gated on GET /config, not on auth.
+     *
+     * MainLayout.vue holds `navLinks` at [] until `menuReady` flips, which happens
+     * only once `zoConfig.version` is populated — so ONavbar renders no MenuLink
+     * items and this element is ABSENT from the DOM, not hidden. Asserting the app
+     * shell first separates "not logged in" from "config still loading"; the 90s
+     * budget on the rail matches enhanced-baseFixtures.verifyAuthentication and
+     * covers a backend serving 13 shards booting at once.
+     */
+    async expectHomePageMenuVisible(timeout = 90000) {
+        await expect(this.appShell).toBeVisible({ timeout: 30000 });
         await expect(this.homePageMenu).toBeVisible({ timeout });
     }
 

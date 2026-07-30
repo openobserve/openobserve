@@ -168,10 +168,33 @@ function enforceOrgOnNavigation(page) {
  */
 async function verifyAuthentication(page) {
   try {
-    // Increase timeout for authentication verification, especially important for first test in suite
+    // STEP 1 — is the session actually valid?
+    //
+    // The app shell (header + nav rail) mounts as soon as the SPA boots with a
+    // valid session. If we were unauthenticated we would be on Dex or /web/login
+    // and neither would exist. This is the real auth signal.
+    await page.waitHelpers.waitForElementVisible('[data-test="navbar-main-nav"]', {
+      timeout: 30000,
+      description: 'app shell / nav rail (auth verification)'
+    });
+
+    // STEP 2 — has the nav rail been populated yet?
+    //
+    // This is NOT an auth concern, it is a config-loading one, and conflating the
+    // two is why a slow backend used to report as "User not authenticated. Global
+    // setup might have failed." — sending every investigation down the wrong path.
+    //
+    // MainLayout.vue gates the rail on `menuReady`, which only flips once GET
+    // /config has resolved (`zoConfig.version` non-empty); until then `navLinks`
+    // is [] and ONavbar renders NO MenuLink items at all — the element is absent
+    // from the DOM, not merely hidden. On alpha1 with 13 shards booting at once
+    // that single request routinely takes longer than the old 15s budget, which
+    // failed tests across nearly every shard in run 30552638159. 90s covers a
+    // loaded backend; MainLayout also fails open on a /config error, so a real
+    // failure still reveals the menu rather than burning the whole budget.
     await page.waitHelpers.waitForElementVisible('[data-test="menu-link-\\/-item"]', {
-      timeout: 15000,
-      description: 'home menu link (auth verification)'
+      timeout: 90000,
+      description: 'home menu link (nav rail populated after GET /config)'
     });
     return true;
   } catch (error) {

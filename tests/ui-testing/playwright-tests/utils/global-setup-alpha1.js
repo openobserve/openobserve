@@ -10,6 +10,22 @@ const AUTH_FILE = path.join(AUTH_DIR, 'user.json');
 const CLOUD_CONFIG_FILE = path.join(AUTH_DIR, 'cloud-config.json');
 
 /**
+ * How long to wait for the left nav rail to appear.
+ *
+ * The rail is NOT an auth signal — MainLayout.vue holds `navLinks` at [] until
+ * `menuReady` flips, which happens only once GET /config resolves
+ * (`zoConfig.version` non-empty). Until then ONavbar renders no MenuLink items and
+ * `menu-link-/-item` is absent from the DOM entirely.
+ *
+ * At 15s this repeatedly read as "login failed" on alpha1 while 13 shards booted
+ * at once, so globalSetup threw away perfectly good Dex sessions and burned full
+ * ~2.5min retry attempts (Traces did this twice in run 30552638159). MainLayout
+ * fails open if /config errors, so a genuine backend failure still reveals the
+ * menu rather than consuming this budget.
+ */
+const NAV_RAIL_TIMEOUT = 90000;
+
+/**
  * Global setup for Alpha1 cloud tests
  * Handles Dex "Continue with Email" login flow with retry logic:
  *   alpha.o2aks1.internal.zinclabs.dev → Dex → email/password → approval → redirect back
@@ -360,7 +376,11 @@ async function performDexLogin(page, baseUrl, userEmail, userPassword) {
     throw new Error(`Login failed — redirected back to Dex after token exchange: ${page.url()}`);
   }
 
-  await page.locator('[data-test="menu-link-\\/-item"]').waitFor({ state: 'visible', timeout: 15000 });
+  // NAV_RAIL_TIMEOUT, not 15s: the rail only renders after GET /config resolves
+  // (MainLayout `menuReady`). A slow config was making Dex logins "fail" here and
+  // burn full retry attempts — Traces spent two ~2.5min attempts on it in run
+  // 30552638159 despite the login itself having succeeded.
+  await page.locator('[data-test="menu-link-\\/-item"]').waitFor({ state: 'visible', timeout: NAV_RAIL_TIMEOUT });
   testLogger.info('[alpha1] Login successful — main menu visible');
 }
 
@@ -420,7 +440,7 @@ async function switchOrgViaDropdown(page, targetOrgId) {
   // Land on /web/ so the navbar (and its org dropdown) renders
   const baseUrl = (process.env.ZO_BASE_URL || '').replace(/\/$/, '');
   await page.goto(`${baseUrl}/web/`, { waitUntil: 'domcontentloaded', timeout: 30000 });
-  await page.locator('[data-test="menu-link-\\/-item"]').waitFor({ state: 'visible', timeout: 20000 });
+  await page.locator('[data-test="menu-link-\\/-item"]').waitFor({ state: 'visible', timeout: NAV_RAIL_TIMEOUT });
   await page.waitForTimeout(2000); // navbar dropdown needs SPA hydration
 
   // Map identifier → org name (dropdown options are by name, not identifier)
@@ -649,7 +669,7 @@ async function verifySharedAuth(baseUrl) {
 
     // Verify the main menu is visible
     const menuItem = page.locator('[data-test="menu-link-\\/-item"]');
-    await menuItem.waitFor({ state: 'visible', timeout: 15000 });
+    await menuItem.waitFor({ state: 'visible', timeout: NAV_RAIL_TIMEOUT });
     testLogger.info('[alpha1] Shared auth verified — menu visible');
 
     // NOTE ON THE ACTIVE ORG — do not "fix" this by re-switching and re-saving.
