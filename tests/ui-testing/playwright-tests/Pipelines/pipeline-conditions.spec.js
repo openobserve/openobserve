@@ -51,9 +51,18 @@ test.describe("Pipeline Conditions - Comprehensive Tests", () => {
       `e2e_conditions_operators${streamSuffix}`
     ];
 
-    for (const streamName of streamNames) {
-      await pageManager.logsPage.ingestData(streamName, logsdata.slice(0, 10));
-    }
+    // Ingest the seven streams CONCURRENTLY. ingestData deliberately sends records
+    // one at a time, spaced, so each is treated as unique — that is 10 spaced
+    // requests per stream, and doing the streams sequentially made it 70 in a row.
+    // On a loaded alpha1 that alone outran the 300s test timeout and every test in
+    // this file died in "beforeEach" (run 30552638159 attempt 2). The streams are
+    // independent and worker-scoped, so overlapping them is safe and turns
+    // sum-of-streams into max-of-streams.
+    await Promise.all(
+      streamNames.map((streamName) =>
+        pageManager.logsPage.ingestData(streamName, logsdata.slice(0, 10))
+      )
+    );
 
     // Brief wait for stream schemas to be established
     await page.waitForTimeout(3000);
