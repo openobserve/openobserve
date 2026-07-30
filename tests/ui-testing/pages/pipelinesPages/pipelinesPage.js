@@ -257,7 +257,7 @@ export class PipelinesPage {
         this.monacoEditorViewLines = page.locator('.monaco-editor .view-lines');
         this.searchStreamInput = page.getByPlaceholder('Search Stream');
         this.exploreButton = page.getByRole('button', { name: 'Explore' });
-        this.timestampColumnMenu = page.locator('[data-test="log-table-column-1-_timestamp"] [data-test="table-row-expand-menu"]');
+        this.timestampColumnMenu = page.locator('[data-test="o2-table-expand-1"]');
         this.nameCell = page.getByRole('cell', { name: 'Name' });
         this.streamIcon = page.getByRole("img", { name: "Stream", exact: true });
         this.outputStreamIcon = page.getByRole("img", { name: "Output Stream" });
@@ -2071,7 +2071,7 @@ export class PipelinesPage {
         await this.exploreButton.first().click();
         await this.page.waitForTimeout(3000);
 
-        await this.page.waitForSelector('[data-test="logs-search-result-table-body"]');
+        await this.page.waitForSelector('[data-test="o2-table-body"]');
 
         // Expand the log table menu
         await this.timestampColumnMenu.click();

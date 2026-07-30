@@ -35,7 +35,7 @@ export class SanityPage {
         // generic "source" column OR an FTS column (e.g. body/message/log), so
         // target whichever first-row cell is rendered. A click on any cell
         // bubbles to the row handler that opens the detail dialog.
-        this.resultColumnSource = page.locator('[data-test^="log-table-column-0-"]').first();
+        this.resultColumnSource = page.locator('[data-test="o2-table-row-0"] [data-test^="o2-table-cell-"]').first();
         this.closeDialog = page.locator('[data-test="logs-search-result-detail-dialog"] [data-test="o-drawer-close-btn"]');
 
         // ============================================================
@@ -159,8 +159,8 @@ export class SanityPage {
         // ============================================================
         // Advanced Histogram / Timestamp locators
         // ============================================================
-        this.timestampColumn = page.locator('[data-test="log-table-column-1-_timestamp"]');
-        this.timestampExpandMenu = page.locator('[data-test="log-table-column-0-_timestamp"] [data-test="table-row-expand-menu"]');
+        this.timestampColumn = page.locator('[data-test="o2-table-row-1"] [data-test="o2-table-cell-_timestamp"]');
+        this.timestampExpandMenu = page.locator('[data-test="o2-table-expand-0"]');
 
         // ============================================================
         // Toast locators (used for success / error verification)

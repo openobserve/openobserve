@@ -81,7 +81,9 @@ describe("SearchResult Component", () => {
           DetailTable: true,
           ChartRenderer: true,
           SanitizedHtmlRenderer: true,
-          TenstackTable: true,
+          OTable: true,
+          CellActions: true,
+          O2AIContextAddBtn: true,
           PatternDetailsDialog: true,
           TracesAnalysisDashboard: true,
           ODrawer: oDrawerStub,
@@ -496,10 +498,14 @@ describe("SearchResult Component", () => {
       wrapper.vm.searchObj.data.resultGrid.colSizes = {};
       wrapper.vm.searchObj.data.stream.selectedStream = ["new-stream"];
 
+      // handleColumnSizesUpdate converts column-id-keyed sizes into the CSS-var
+      // persistence format so saved views load correctly.
       const newSizes = { col1: 100 };
       await wrapper.vm.handleColumnSizesUpdate(newSizes);
 
-      expect(wrapper.vm.searchObj.data.resultGrid.colSizes["new-stream"]).toEqual([newSizes]);
+      expect(wrapper.vm.searchObj.data.resultGrid.colSizes["new-stream"]).toEqual([
+        { "--col-col1-size": 100, "--header-col1-size": 100 },
+      ]);
     });
 
     it("should handle empty column order update", async () => {

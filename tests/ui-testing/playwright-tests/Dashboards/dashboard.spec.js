@@ -732,7 +732,7 @@ test.describe("dashboard UI testcases", () => {
       timeout: 10000,
     });
 
-    // TanStack table rows use data-test="dashboard-data-row" / "dashboard-data-row-cell"
+    // Rows use data-test="o2-table-row-<index>" / "o2-table-cell-<columnId>"
     const dataRows = pm.dashboardPanelActions.getTableDataRows();
     await dataRows.first().waitFor({ state: "visible", timeout: 15000 });
 
