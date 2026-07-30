@@ -108,22 +108,31 @@ function lockIsStale(paths) {
 async function ingestAndAwaitTopology(page, {
   minNodes = 10,
   minEdges = 10,
-  rounds = 3,
+  rounds = 2,
   roundWaitMs = 120_000,
+  deadlineAt = null,
   onProgress = () => {},
 } = {}) {
   let last = { success: false, nodes: 0, edges: 0 };
 
   for (let round = 1; round <= rounds; round++) {
+    // Respect the caller's overall budget. beforeAll gets 10 minutes; blowing
+    // through that turns a slow daemon into a hook timeout, which fails every test
+    // in the file AND leaves the shard with no blob report to diagnose from.
+    if (deadlineAt && Date.now() >= deadlineAt) {
+      testLogger.warn(`Service graph setup budget exhausted before round ${round}`);
+      break;
+    }
     const traces = [...generateFullTopology({ tracesPerFlow: 3, errorRate: 0.2 }), ...generateAllEdgeCases()];
     testLogger.info(`Service graph setup round ${round}/${rounds}: ingesting ${traces.length} traces`);
     await ingestTraces(page, traces, { delayMs: 50 });
     onProgress();
 
+    const budgetLeft = deadlineAt ? Math.max(0, deadlineAt - Date.now()) : roundWaitMs;
     last = await waitForTopologyReady(page, {
       minNodes,
       minEdges,
-      maxWaitMs: roundWaitMs,
+      maxWaitMs: Math.min(roundWaitMs, budgetLeft),
       pollIntervalMs: 5000,
     });
     onProgress();
@@ -159,6 +168,17 @@ async function ensureServiceGraphData(page, outputDir, opts = {}) {
   const { minNodes = 10, minEdges = 10 } = opts;
   const paths = lockPaths(outputDir);
 
+  // HARD overall budget, because beforeAll only gets 10 minutes.
+  //
+  // The waiter path is the dangerous one: wait for the owner's marker, then, if the
+  // owner died, run a FULL ingest cycle of its own. With the original numbers that
+  // was 7 min of waiting + 6.8 min of takeover = 13.8 min — past the hook timeout,
+  // which fails every test in the file and, because the hook never returns, leaves
+  // the shard with no blob report at all. That is the shape the Traces shard showed
+  // in run 30552638159: 41 minutes, "Run cloud tests" never completing, no artifact.
+  const TOTAL_BUDGET_MS = 8 * 60_000;
+  const deadlineAt = Date.now() + TOTAL_BUDGET_MS;
+
   fs.mkdirSync(path.dirname(paths.root), { recursive: true });
 
   let isOwner = false;
@@ -174,6 +194,7 @@ async function ensureServiceGraphData(page, outputDir, opts = {}) {
     try {
       const result = await ingestAndAwaitTopology(page, {
         ...opts,
+        deadlineAt,
         onProgress: () => touch(paths.heartbeat, String(Date.now())),
       });
       touch(paths.ready, JSON.stringify({ ...result, at: Date.now() }));
@@ -188,10 +209,16 @@ async function ensureServiceGraphData(page, outputDir, opts = {}) {
 
   // Not the owner: wait for the owner's marker, then verify the topology
   // ourselves. Never trust the marker alone.
-  const waitDeadline = Date.now() + (opts.rounds ?? 3) * (opts.roundWaitMs ?? 120_000) + 60_000;
+  // Give the owner at most HALF the budget before taking over, so a takeover still
+  // has room to finish inside the hook timeout.
+  const waitDeadline = Math.min(deadlineAt, Date.now() + TOTAL_BUDGET_MS / 2);
   while (Date.now() < waitDeadline) {
     if (fs.existsSync(paths.ready)) {
-      const ready = await waitForTopologyReady(page, { minNodes, minEdges, maxWaitMs: 60_000 });
+      const ready = await waitForTopologyReady(page, {
+        minNodes,
+        minEdges,
+        maxWaitMs: Math.min(60_000, Math.max(0, deadlineAt - Date.now())),
+      });
       if (ready.success) return { nodes: ready.nodes, edges: ready.edges };
       break; // marker present but data gone — fall through and ingest ourselves
     }
@@ -210,6 +237,8 @@ async function ensureServiceGraphData(page, outputDir, opts = {}) {
   // Owner died, never finished, or produced data that has since disappeared.
   const result = await ingestAndAwaitTopology(page, {
     ...opts,
+    deadlineAt,
+    rounds: 1, // takeover: one round only — the remaining budget must fit the hook timeout
     onProgress: () => touch(paths.heartbeat, String(Date.now())),
   });
   touch(paths.ready, JSON.stringify({ ...result, at: Date.now() }));
