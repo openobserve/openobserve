@@ -3355,8 +3355,6 @@
     "valueMappingFrom": "Từ",
     "valueMappingTo": "Đến",
     "valueMappingDisplayValue": "Giá trị hiển thị",
-    "valueMappingSetColor": "Đặt màu",
-    "valueMappingRemoveColor": "Xóa màu",
     "valueMappingAddNew": "+ Thêm ánh xạ mới",
     "valueMappingApply": "Áp dụng",
     "valueMappingTypeValue": "Giá trị",

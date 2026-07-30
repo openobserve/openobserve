@@ -3350,8 +3350,6 @@
     "valueMappingFrom": "從",
     "valueMappingTo": "至",
     "valueMappingDisplayValue": "顯示值",
-    "valueMappingSetColor": "設定色彩",
-    "valueMappingRemoveColor": "移除色彩",
     "valueMappingAddNew": "+ 新增對應",
     "valueMappingApply": "套用",
     "valueMappingTypeValue": "值",

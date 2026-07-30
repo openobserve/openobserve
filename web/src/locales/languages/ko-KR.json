@@ -3355,8 +3355,6 @@
     "valueMappingFrom": "에서",
     "valueMappingTo": "에",
     "valueMappingDisplayValue": "표시 값",
-    "valueMappingSetColor": "색상 설정",
-    "valueMappingRemoveColor": "색상 제거",
     "valueMappingAddNew": "+ 새 매핑 추가",
     "valueMappingApply": "신청하기",
     "valueMappingTypeValue": "가치",

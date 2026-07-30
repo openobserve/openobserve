@@ -3355,8 +3355,6 @@
     "valueMappingFrom": "От",
     "valueMappingTo": "До",
     "valueMappingDisplayValue": "Отображаемое значение",
-    "valueMappingSetColor": "Установить цвет",
-    "valueMappingRemoveColor": "Удалить цвет",
     "valueMappingAddNew": "+ Добавить новое сопоставление",
     "valueMappingApply": "Применить",
     "valueMappingTypeValue": "Значение",

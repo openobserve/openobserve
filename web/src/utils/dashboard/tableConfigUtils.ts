@@ -135,7 +135,10 @@ export const lookupValueMappingFull = (
   }
 
   // Threshold match (gt/lt/gte/lte) — numeric comparison against the operand.
+  // Last matching threshold wins, matching the column-formatting conditional
+  // rules convention (e.g. `>1000` overrides `>400` for 2301).
   if (!Number.isNaN(numValue)) {
+    let thresholdHit: any = null;
     for (const [key, mapping] of cache.entries()) {
       if (typeof key === "string" && key.startsWith("__op_")) {
         const rest = key.slice(5); // "__op_".length === 5
@@ -148,9 +151,10 @@ export const lookupValueMappingFull = (
           (op === "lt" && numValue < operand) ||
           (op === "gte" && numValue >= operand) ||
           (op === "lte" && numValue <= operand);
-        if (hit) return mapping;
+        if (hit) thresholdHit = mapping;
       }
     }
+    if (thresholdHit) return thresholdHit;
   }
 
   // Regex match

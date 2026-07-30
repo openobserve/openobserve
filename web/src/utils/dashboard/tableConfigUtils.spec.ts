@@ -371,6 +371,17 @@ describe("tableConfigUtils", () => {
       expect(cache).not.toBeNull();
       expect(lookupValueMappingFull(1, cache)?.textColor).toBe("#0f0");
     });
+    it("resolves overlapping thresholds with last-match-wins (column-formatting parity)", () => {
+      // Both `>400` and `>1000` match 2301; the later mapping must win.
+      const cache = buildValueMappingCache([
+        { type: "gt", value: "400", text: "Warn", color: "#fa0" },
+        { type: "gt", value: "1000", text: "Critical", color: "#f00" },
+      ]);
+      expect(lookupValueMapping(2301, cache)).toBe("Critical");
+      expect(lookupValueMappingFull(2301, cache)?.color).toBe("#f00");
+      // Only the first threshold matches 500 → it wins by default.
+      expect(lookupValueMapping(500, cache)).toBe("Warn");
+    });
   });
 
   describe("resolveMetricValueStyle (mappings)", () => {

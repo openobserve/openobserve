@@ -3355,8 +3355,6 @@
     "valueMappingFrom": "Nereden",
     "valueMappingTo": "Kime",
     "valueMappingDisplayValue": "Ekran Değeri",
-    "valueMappingSetColor": "Rengi ayarla",
-    "valueMappingRemoveColor": "Rengi kaldır",
     "valueMappingAddNew": "+ Yeni bir eşleme ekle",
     "valueMappingApply": "Uygula",
     "valueMappingTypeValue": "Değer",

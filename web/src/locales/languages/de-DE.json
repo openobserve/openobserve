@@ -3355,8 +3355,6 @@
     "valueMappingFrom": "Von",
     "valueMappingTo": "Zu",
     "valueMappingDisplayValue": "Wert anzeigen",
-    "valueMappingSetColor": "Farbe einstellen",
-    "valueMappingRemoveColor": "Farbe entfernen",
     "valueMappingAddNew": "+ Neues Mapping hinzufügen",
     "valueMappingApply": "Bewerben",
     "valueMappingTypeValue": "Wert",

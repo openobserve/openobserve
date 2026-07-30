@@ -3355,8 +3355,6 @@
     "valueMappingFrom": "Desde",
     "valueMappingTo": "Para",
     "valueMappingDisplayValue": "Mostrar valor",
-    "valueMappingSetColor": "Definir color",
-    "valueMappingRemoveColor": "Eliminar color",
     "valueMappingAddNew": "+ Añadir un nuevo mapeo",
     "valueMappingApply": "Aplica",
     "valueMappingTypeValue": "Valor",

@@ -3355,8 +3355,6 @@
     "valueMappingFrom": "から",
     "valueMappingTo": "に",
     "valueMappingDisplayValue": "[値を表示]",
-    "valueMappingSetColor": "色を設定",
-    "valueMappingRemoveColor": "色を削除",
     "valueMappingAddNew": "+ 新しいマッピングを追加",
     "valueMappingApply": "申し込む",
     "valueMappingTypeValue": "価値",

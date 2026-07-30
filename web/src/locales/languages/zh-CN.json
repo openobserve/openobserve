@@ -3355,8 +3355,6 @@
     "valueMappingFrom": "来自",
     "valueMappingTo": "至",
     "valueMappingDisplayValue": "显示值",
-    "valueMappingSetColor": "设置颜色",
-    "valueMappingRemoveColor": "移除颜色",
     "valueMappingAddNew": "+ 添加新映射",
     "valueMappingApply": "申请",
     "valueMappingTypeValue": "价值",
