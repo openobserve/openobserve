@@ -648,6 +648,23 @@ pub fn basic_routes() -> Router {
         router = router.route("/docs", get(|| async { Redirect::permanent("/swagger/") }));
     }
 
+    // External alert source webhooks — token-authenticated inside the handler itself
+    // (never via auth_middleware), so these must stay in basic_routes rather than
+    // service_routes. See GHSA-wffq-g8qf-ccmv: do not widen the shared token
+    // classifier in validator.rs to cover this token type.
+    router = router
+        .route(
+            "/api/v2/{org_id}/incidents/events",
+            post(alerts::external_events::ingest_events),
+        )
+        .route(
+            "/api/v2/{org_id}/incidents/events/{token}",
+            post(alerts::external_events::ingest_events_url_token),
+        )
+        .route_layer(DefaultBodyLimit::max(
+            alerts::external_events::MAX_BODY_BYTES,
+        ));
+
     router
 }
 
