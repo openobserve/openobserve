@@ -54,6 +54,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :scroll-margin="0"
           :horizontal-scroll="true"
           :enable-column-reorder="true"
+          :enable-column-resize="true"
+          :pinned-first-column="timestampCol"
           :default-columns="false"
           :show-global-filter="false"
           pagination="none"

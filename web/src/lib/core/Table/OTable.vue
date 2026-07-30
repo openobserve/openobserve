@@ -318,8 +318,14 @@ const { table, effectiveColumns, columnOrder, userReorderedColumns, columnSizing
         return globalFilterLocal.value;
       },
       rowKey: props.rowKey,
-      enableColumnResize: props.enableColumnResize,
-      enableColumnReorder: props.enableColumnReorder,
+      // Getters, not snapshots: TanStack reads `enableColumnResizing` off these,
+      // so a snapshot freezes resize at whatever the flag was on first mount.
+      get enableColumnResize() {
+        return props.enableColumnResize;
+      },
+      get enableColumnReorder() {
+        return props.enableColumnReorder;
+      },
       enableColumnPin: props.enableColumnPin,
       get columnVisibility() {
         return internalColumnVisibility.value;
