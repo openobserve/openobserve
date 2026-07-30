@@ -12,8 +12,8 @@ import type {
   TlsCheckConfig,
 } from "@/types/synthetics";
 import { convertDateToTimestamp } from "@/utils/timezone";
-import { journeyToWireSteps, mapWireSteps } from "./mapRecordedStep";
-import { buildV2Steps, isV2Journey } from "./buildV2Steps";
+import { mapWireSteps } from "./mapRecordedStep";
+import { buildV2Steps } from "./buildV2Steps";
 import { useLocalTimezone } from "../storage";
 
 // ── Outbound: BrowserCheck → API payload ─────────────────────────────────────
@@ -125,12 +125,11 @@ export function buildCreateBrowserTestPayload(check: BrowserCheck): Record<strin
     frequency: buildFrequency(schedule),
 
     config: {
-      // `steps_version` describes the whole array, so the journey qualifies as a
-      // whole or not at all — see isV2Journey. A v2 payload is built field by
-      // field rather than spread, because the server refuses unknown fields.
-      ...(isV2Journey(journey)
-        ? { steps_version: 2, steps: buildV2Steps(journey) }
-        : { steps: journeyToWireSteps(journey) }),
+      // One step format, so no version key: the server refuses unknown fields,
+      // and `steps_version` is now one of them. Steps are built field by field
+      // rather than spread, for the same reason. A journey that cannot be built
+      // throws here — the save gate is what stops it getting this far.
+      steps: buildV2Steps(journey),
       browser_devices: browserDevices ?? [{ browser: "chromium", device: "desktop" }],
       timeout_ms: 30000,
       capture: {

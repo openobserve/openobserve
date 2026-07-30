@@ -19,12 +19,10 @@ import { SELECTOR_ACTIONS, isPageLevelAssertion } from "@/constants/synthetics";
 /**
  * "Does this step say which element to act on?" — the one rule, in one place.
  *
- * A version-1 step answers with `selector`; a version-2 step answers with a
- * `locator` bundle and carries no `selector` at all (buildV2Steps writes none,
- * so a saved v2 check comes back without one). Validating on `selector` alone
- * therefore rejected every v2 journey the moment it was reopened for editing —
- * the same class of bug as spec P2.5.6, where results rendering read `selector`
- * and had to learn to resolve locators too.
+ * A step answers with its `locator` bundle, and with nothing else. The version-1
+ * `selector` channel used to count too, but it no longer reaches the wire —
+ * `buildV2Steps` writes only the bundle — so accepting a bare `selector` here
+ * would wave a journey past the gate that the server then answers with a 400.
  *
  * Structural parameter types rather than `BrowserStep`: the save-time zod schema
  * validates a parsed plain object, not the editor model, and both must decide
@@ -32,7 +30,6 @@ import { SELECTOR_ACTIONS, isPageLevelAssertion } from "@/constants/synthetics";
  */
 export interface TargetableStep {
   action: string;
-  selector?: string | null;
   locator?: {
     candidates?: readonly { kind: string; value: string }[] | null;
     user_override?: { kind: string; value: string } | null;
@@ -51,11 +48,10 @@ export function stepNeedsTarget(step: TargetableStep): boolean {
   return true;
 }
 
-/** Whether this step names an element by either the v1 or the v2 channel. */
+/** Whether this step names an element. */
 export function stepHasTarget(step: TargetableStep): boolean {
   if (step.locator?.candidates?.length) return true;
-  if (step.locator?.user_override?.value?.trim()) return true;
-  return !!step.selector?.trim();
+  return !!step.locator?.user_override?.value?.trim();
 }
 
 /** The save-blocking condition: this step must name an element and does not. */

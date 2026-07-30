@@ -315,13 +315,15 @@ describe("BrowserJourney step validation", () => {
     return (wrapper.vm as any).validateStepSelectors();
   }
 
-  it("should pass a v1 journey whose steps carry selectors", () => {
+  // The version-1 channel. Only the locator bundle reaches the wire now, so a
+  // step whose element lives in `selector` alone would be posted target-less.
+  it("should fail a step whose only target is a version-1 selector", () => {
     expect(
       validate([
         { id: "1", action: "navigate", value: "https://app.test" },
         { id: "2", action: "click", selector: "#login" },
       ]),
-    ).toBe(true);
+    ).toBe(false);
   });
 
   // Regression: a v2 step identifies its element with a locator bundle and has

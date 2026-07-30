@@ -10509,7 +10509,8 @@
       "expectedRequired": "Enter the value this assertion should expect",
       "urlInvalid": "Enter a valid URL starting with http:// or https://",
       "urlRequired": "Starting URL is required",
-      "fixHighlightedFields": "Fix the highlighted fields before saving"
+      "fixHighlightedFields": "Fix the highlighted fields before saving",
+      "retiredAction": "\"{action}\" is no longer supported — remove or replace \"{step}\""
     },
     "privateLocations": {
       "searchPlaceholder": "Search locations...",

@@ -9,17 +9,25 @@
 
 import { z } from "zod";
 import { stepIsMissingTarget } from "@/utils/synthetics/stepTarget";
+import { isStorableAction } from "@/utils/synthetics/buildV2Steps";
 import { assertionNeedsExpected } from "@/constants/synthetics";
 import type { AssertionKind } from "@/types/synthetics";
 
-/** The version-2 locator bundle, as it sits on an editor step. */
+/**
+ * Message factory. Params are passed through to vue-i18n so a failure can name
+ * the step it is about — "Selector is required" on a twenty-step journey is a
+ * scavenger hunt.
+ */
+type Translate = (_key: string, _params?: Record<string, unknown>) => string;
+
+/** The locator bundle, as it sits on an editor step. */
 const locatorCandidateSchema = z.object({ kind: z.string(), value: z.string() });
 const locatorSchema = z.object({
   candidates: z.array(locatorCandidateSchema).nullish(),
   user_override: locatorCandidateSchema.nullish(),
 });
 
-export const makeBrowserCheckGateSchema = (t: (_key: string) => string) =>
+export const makeBrowserCheckGateSchema = (t: Translate) =>
   z.object({
     name: z.string().min(1, t("synthetics.validation.nameRequired")).trim(),
     url: z
@@ -45,7 +53,7 @@ export const browserCheckGateDefaults = (): BrowserCheckGateForm => ({
   url: "",
 });
 
-export const makeBrowserCheckSaveSchema = (t: (_key: string) => string) =>
+export const makeBrowserCheckSaveSchema = (t: Translate) =>
   z
     .object({
       name: z.string().min(1, t("synthetics.validation.nameRequired")).trim(),
@@ -73,15 +81,12 @@ export const makeBrowserCheckSaveSchema = (t: (_key: string) => string) =>
             // steps arrive named from the recorder, which is why requiring it
             // lands on hand-added steps rather than on every recording.
             name: z.string().trim().min(1, t("synthetics.validation.stepNameRequired")),
-            selector: z.string().optional(),
-            selectorType: z.string().optional(),
             value: z.string().optional(),
             timeout: z.number().optional(),
-            code: z.string().optional(),
-            // A version-2 step names its element here and carries no `selector`.
-            // Declared explicitly because z.object strips what it does not
-            // declare — leaving it out made every v2 step look target-less to
-            // the refinement below.
+            // A step names its element here, and nowhere else. Declared
+            // explicitly because z.object strips what it does not declare —
+            // leaving it out made every step look target-less to the
+            // refinement below.
             locator: locatorSchema.optional(),
             // `expected` is declared, not just tolerated by `.loose()`, so the
             // refinement below can read it in a typed way.
@@ -105,13 +110,30 @@ export const makeBrowserCheckSaveSchema = (t: (_key: string) => string) =>
         });
       }
 
-      // Every element-acting step must name its element, by either channel.
+      // The two rules that decide whether a journey can be stored at all.
+      // They used to be answered by isV2Journey, whose only consequence was a
+      // quiet fall back to the version-1 payload shape — which discarded every
+      // locator bundle the recorder had captured. Version 1 is gone, so the
+      // answer has to reach the author, on the step it is about.
       for (let i = 0; i < val.journey.length; i++) {
-        if (stepIsMissingTarget(val.journey[i])) {
+        const step = val.journey[i];
+
+        if (!isStorableAction(step.action)) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["journey", i, "action"],
+            message: t("synthetics.validation.retiredAction", {
+              step: step.name,
+              action: step.action,
+            }),
+          });
+        }
+
+        if (stepIsMissingTarget(step)) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             path: ["journey", i, "selector"],
-            message: t("synthetics.validation.selectorRequired"),
+            message: t("synthetics.validation.selectorRequired", { step: step.name }),
           });
         }
       }

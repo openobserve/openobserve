@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from "vitest";
 import type { BrowserStep } from "@/types/synthetics";
-import { buildV2Step, buildV2Steps, isV2Journey } from "./buildV2Steps";
+import { buildV2Step, buildV2Steps, isSaveableJourney } from "./buildV2Steps";
 
 function step(overrides: Partial<BrowserStep> = {}): BrowserStep {
   return {
@@ -27,20 +27,20 @@ const nav = (): BrowserStep => ({
   code: "",
 });
 
-describe("isV2Journey", () => {
+describe("isSaveableJourney", () => {
   it("accepts a journey whose every element step carries a bundle", () => {
-    expect(isV2Journey([nav(), step()])).toBe(true);
+    expect(isSaveableJourney([nav(), step()])).toBe(true);
   });
 
-  // All-or-nothing: `steps_version` describes the whole array. A half-lifted
-  // journey stored as v2 would fail validation on the bundle-less steps, and
-  // stored as v1 would silently discard the bundles that were captured.
+  // All-or-nothing: a half-recorded journey has no honest shape. Storing it
+  // would fail validation on the bundle-less steps, and there is no longer a
+  // version-1 shape to fall back to.
   it("rejects a journey where one step has no bundle", () => {
-    expect(isV2Journey([nav(), step(), step({ id: "s3", locator: undefined })])).toBe(false);
+    expect(isSaveableJourney([nav(), step(), step({ id: "s3", locator: undefined })])).toBe(false);
   });
 
   it("rejects a journey containing a retired action", () => {
-    expect(isV2Journey([nav(), step(), step({ id: "s3", action: "wait" })])).toBe(false);
+    expect(isSaveableJourney([nav(), step(), step({ id: "s3", action: "wait" })])).toBe(false);
   });
 
   it("accepts a page-level assertion with no element at all", () => {
@@ -51,11 +51,11 @@ describe("isV2Journey", () => {
       selector: undefined,
       assertion: { kind: "url_matches", expected: "**/web/**" },
     });
-    expect(isV2Journey([nav(), urlAssert])).toBe(true);
+    expect(isSaveableJourney([nav(), urlAssert])).toBe(true);
   });
 
   it("rejects an empty journey", () => {
-    expect(isV2Journey([])).toBe(false);
+    expect(isSaveableJourney([])).toBe(false);
   });
 });
 
@@ -146,8 +146,8 @@ describe("buildV2Step", () => {
     expect(buildV2Step(step({ timeout: 45000 })).timeout_ms).toBe(45000);
   });
 
-  it("refuses to build a step that has no version-2 equivalent", () => {
-    expect(() => buildV2Step(step({ action: "hover" }))).toThrow(/no version-2 equivalent/);
+  it("refuses to build a step that cannot be stored", () => {
+    expect(() => buildV2Step(step({ action: "hover" }))).toThrow(/cannot be stored/);
   });
 
   it("maps a whole journey in order", () => {
@@ -155,12 +155,12 @@ describe("buildV2Step", () => {
   });
 });
 
-// SE-18 regression. `steps_version` describes the whole array, so isV2Journey
-// uses .every(): one hand-added step without a locator flipped an entire recorded
-// journey to v1, sending every other step's bundle, settle and assertion down the
-// untyped path. A seeded bundle plus an author-supplied pin keeps it v2.
-describe("SE-18: a completed manual step does not downgrade the journey", () => {
-  it("stays version 2 when a hand-added step names its element via locator", () => {
+// SE-18 regression. The gate is all-or-nothing, so one hand-added step without a
+// locator used to flip an entire recorded journey to version 1, sending every
+// other step's bundle, settle and assertion down the untyped path. It now blocks
+// the save instead — and a seeded bundle plus an author-supplied pin still passes.
+describe("SE-18: a completed manual step does not block the save", () => {
+  it("stays saveable when a hand-added step names its element via locator", () => {
     const journey: BrowserStep[] = [
       { id: "s1", action: "navigate", name: "Open app", value: "https://example.com", code: "" },
       {
@@ -171,6 +171,6 @@ describe("SE-18: a completed manual step does not downgrade the journey", () => 
         locator: { candidates: [], user_override: { kind: "css", value: "#sign-in" } },
       },
     ];
-    expect(isV2Journey(journey)).toBe(true);
+    expect(isSaveableJourney(journey)).toBe(true);
   });
 });

@@ -38,10 +38,20 @@ export const ACTION_ICONS: Record<StepAction, IconName> = {
 };
 
 // ── Action groups ────────────────────────────────────────────────────────
+/**
+ * Actions that act on an element and so must name one.
+ *
+ * Mirrors the server's `V2_ELEMENT_ACTIONS` (`synthetics.rs`). `press` belongs
+ * here for that reason: the server requires a locator for it, and while a
+ * bundle-less journey could still fall back to the version-1 payload shape the
+ * disagreement only cost a silent downgrade. With version 1 gone it would be a
+ * 400 at save time instead.
+ */
 export const SELECTOR_ACTIONS: readonly StepAction[] = [
   "click",
   "type",
   "select",
+  "press",
   "check",
   "uncheck",
   "upload",
