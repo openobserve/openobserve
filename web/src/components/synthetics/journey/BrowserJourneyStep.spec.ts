@@ -156,28 +156,25 @@ describe("BrowserJourneyStep", () => {
       expect(actionSelect.exists()).toBe(false);
     });
 
-    it("should show selector fields for click action", () => {
+    // The v1 Selector-type + Selector pair is gone (SE-7 / SE-18): a version-2
+    // step names its element through the locator bundle, and that is the only
+    // targeting UI. `stepNeedsTarget` decides when it renders.
+    it("should show the target block for click action", () => {
       wrapper = mountStep({
         step: makeStep({ action: "click", selector: "#btn" }),
         expanded: true,
       });
 
-      const selectorInput = wrapper.find('[data-test="synthetics-journey-step-selector-input"]');
-      const selectorTypeSelect = wrapper.find(
-        '[data-test="synthetics-journey-step-selector-type-select"]',
-      );
-      expect(selectorInput.exists()).toBe(true);
-      expect(selectorTypeSelect.exists()).toBe(true);
+      expect(wrapper.find('[data-test="synthetics-journey-step-locator"]').exists()).toBe(true);
     });
 
-    it("should hide selector fields for navigate action", () => {
+    it("should hide the target block for navigate action", () => {
       wrapper = mountStep({
         step: makeStep({ action: "navigate", value: "https://example.com" }),
         expanded: true,
       });
 
-      const selectorInput = wrapper.find('[data-test="synthetics-journey-step-selector-input"]');
-      expect(selectorInput.exists()).toBe(false);
+      expect(wrapper.find('[data-test="synthetics-journey-step-locator"]').exists()).toBe(false);
     });
 
     it("should show value input for type action", () => {
@@ -210,19 +207,29 @@ describe("BrowserJourneyStep", () => {
       const warning = (w: VueWrapper) =>
         w.find('[data-test="synthetics-journey-step-timeout-warning"]');
 
-      it("shows the 60s navigate/assert default as placeholder when unset", () => {
+      // SE-5 moved the timeout behind the one `Advanced` collapsible, which
+      // opens itself only when the step carries a non-default. A step with no
+      // explicit timeout is exactly the case that stays closed, and
+      // OCollapsible unmounts collapsed content — so these cases have to open
+      // it before the field is in the DOM.
+      const openAdvanced = (w: VueWrapper) =>
+        w.find('[data-test="synthetics-journey-step-group-advanced"] button').trigger("click");
+
+      it("shows the 60s navigate/assert default as placeholder when unset", async () => {
         wrapper = mountStep({
           step: makeStep({ action: "navigate", timeout: undefined }),
           expanded: true,
         });
+        await openAdvanced(wrapper);
         expect(timeoutInput(wrapper).attributes("placeholder")).toBe("60000");
       });
 
-      it("shows the 30s interaction default as placeholder when unset", () => {
+      it("shows the 30s interaction default as placeholder when unset", async () => {
         wrapper = mountStep({
           step: makeStep({ action: "click", timeout: undefined }),
           expanded: true,
         });
+        await openAdvanced(wrapper);
         expect(timeoutInput(wrapper).attributes("placeholder")).toBe("30000");
       });
 
@@ -242,11 +249,16 @@ describe("BrowserJourneyStep", () => {
         expect(warning(wrapper).exists()).toBe(false);
       });
 
-      it("does not warn when no explicit timeout is set", () => {
+      // Opens `Advanced` first, or the absence proves nothing: an unset timeout
+      // is the one case that leaves the section collapsed, so the warning would
+      // be missing whether or not the component wanted to render it.
+      it("does not warn when no explicit timeout is set", async () => {
         wrapper = mountStep({
           step: makeStep({ action: "click", timeout: undefined }),
           expanded: true,
         });
+        await openAdvanced(wrapper);
+        expect(timeoutInput(wrapper).exists()).toBe(true);
         expect(warning(wrapper).exists()).toBe(false);
       });
 
@@ -262,22 +274,12 @@ describe("BrowserJourneyStep", () => {
     });
 
     // ── Retired actions (spec X-9 / T1-9) ──────────────────────────────────
-    it("flags a retired action on an existing step", () => {
-      wrapper = mountStep({
-        step: makeStep({ action: "wait", timeout: 30000 }),
-        expanded: true,
-      });
-      expect(wrapper.find('[data-test="synthetics-journey-step-retired-action"]').exists()).toBe(
-        true,
-      );
-    });
-
-    it("does not flag a supported action", () => {
-      wrapper = mountStep({ step: makeStep({ action: "click" }), expanded: true });
-      expect(wrapper.find('[data-test="synthetics-journey-step-retired-action"]').exists()).toBe(
-        false,
-      );
-    });
+    // T1-9 is "the editor no longer OFFERS the four retired actions" — the
+    // picker filter, covered by constants/synthetics.spec.ts. The per-step
+    // notice this file used to assert was deleted deliberately: `actionOptions`
+    // filters RETIRED_ACTIONS out, the recorder never emits one, and no v1
+    // journeys exist, so nothing could reach it — and it named no replacement.
+    // Its absence is pinned by BrowserJourneyStepEditor.spec.ts.
 
     it("should show timeout input when expanded", () => {
       wrapper = mountStep({ step: makeStep(), expanded: true });
