@@ -10,11 +10,9 @@ function step(overrides: Partial<BrowserStep> = {}): BrowserStep {
     action: "click",
     name: "Sign In",
     selector: '[data-test="login-sign-in"]',
-    selectorType: "TestID",
     locator: {
       candidates: [{ kind: "test_attribute", value: '[data-test="login-sign-in"]' }],
     },
-    code: "",
     ...overrides,
   };
 }
@@ -24,7 +22,6 @@ const nav = (): BrowserStep => ({
   action: "navigate",
   name: "Open",
   value: "https://example.com",
-  code: "",
 });
 
 describe("isSaveableJourney", () => {
@@ -60,8 +57,8 @@ describe("isSaveableJourney", () => {
 });
 
 describe("buildV2Step", () => {
-  // The server validates v2 steps with deny_unknown_fields, so a stray `code`
-  // or `selectorType` is a 400 rather than a harmless extra.
+  // The server validates steps with deny_unknown_fields, so a stray `code` or
+  // `selectorType` would be a 400 rather than a harmless extra.
   it("emits only fields the schema knows", () => {
     const wire = buildV2Step(step());
     expect(Object.keys(wire).sort()).toEqual(["action", "id", "locator", "name"]);
@@ -162,12 +159,11 @@ describe("buildV2Step", () => {
 describe("SE-18: a completed manual step does not block the save", () => {
   it("stays saveable when a hand-added step names its element via locator", () => {
     const journey: BrowserStep[] = [
-      { id: "s1", action: "navigate", name: "Open app", value: "https://example.com", code: "" },
+      { id: "s1", action: "navigate", name: "Open app", value: "https://example.com" },
       {
         id: "s2",
         action: "click",
         name: "Sign in",
-        code: "",
         locator: { candidates: [], user_override: { kind: "css", value: "#sign-in" } },
       },
     ];

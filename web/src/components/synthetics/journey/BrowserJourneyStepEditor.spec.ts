@@ -19,7 +19,6 @@ function render(step: Partial<BrowserStep> = {}) {
     id: "s1",
     action: "click",
     name: "Sign in",
-    code: "",
     locator: { candidates: [], user_override: null },
     ...step,
   };
@@ -92,7 +91,6 @@ describe("BrowserJourneyStepEditor inline field errors", () => {
       id: "s1",
       action: "click",
       name: "Sign in",
-      code: "",
       locator: { candidates: [], user_override: null },
       ...step,
     };

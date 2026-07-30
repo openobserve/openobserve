@@ -1,7 +1,5 @@
 // Copyright 2026 OpenObserve Inc.
 
-export type SelectorType = "CSS" | "XPath" | "Text" | "TestID" | "Role";
-
 // ── Replay state machine ──────────────────────────────────────────────────────
 export type ReplayPhase = "idle" | "running" | "passed" | "failed" | "stopped";
 
@@ -144,7 +142,6 @@ export interface BrowserStep {
   action: StepAction;
   name?: string;
   selector?: string;
-  selectorType?: SelectorType;
   /** Version-2 locator bundle. Absent on v1 steps, which use `selector`. */
   locator?: StepLocator;
   /** Version-2 settle block: what to wait for after this step's action. */
@@ -157,7 +154,6 @@ export interface BrowserStep {
   alwaysRun?: boolean;
   value?: string;
   timeout?: number; // ms; undefined = runner's per-category default
-  code: string;
   // Original, untouched extension step (see WireStep). Preserved for replay,
   // which sends the rich step back to the extension verbatim. Absent on
   // manually-added steps.
@@ -178,7 +174,6 @@ export interface WireStep {
   id: string;
   action: string; // navigate | click | type | press | select | check | uncheck | setInputFiles | waitFor | assert | screenshot
   selector?: string;
-  selector_type?: "css" | "xpath" | "text" | "role" | "data-test";
   /**
    * Version-2 evidence captured by the extension. Present on recorded steps
    * only; a hand-added step has none until it is re-recorded.

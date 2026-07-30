@@ -51,7 +51,6 @@ function makeStep(overrides: Partial<BrowserStep> = {}): BrowserStep {
     name: "Open page",
     value: "https://example.com",
     timeout: 30000,
-    code: "",
     ...overrides,
   };
 }

@@ -138,11 +138,11 @@ describe("useSyntheticsRecorder", () => {
 
       // Stream steps
       const browserSteps: WireStep[] = [
-        { id: "s1", action: "click", selector: "#go", selector_type: "css" },
+        { id: "s1", action: "click", selector: "#go" },
       ];
       emitStreamEvent({ method: "setActions", browserSteps });
       expect(r.liveSteps.value).toHaveLength(1);
-      expect(r.liveSteps.value[0].selectorType).toBe("CSS");
+      expect(r.liveSteps.value[0].selector).toBe("#go");
 
       emitStreamEvent({ method: "recordingStarted", tabId: 9, url: "https://app.test/next" });
       expect(r.currentUrl.value).toBe("https://app.test/next");

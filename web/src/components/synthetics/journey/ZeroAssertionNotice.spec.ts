@@ -15,7 +15,7 @@ const i18n = createI18n({
 });
 
 function step(overrides: Partial<BrowserStep> = {}): BrowserStep {
-  return { id: "s1", action: "click", name: "Sign In", code: "", ...overrides };
+  return { id: "s1", action: "click", name: "Sign In", ...overrides };
 }
 
 function render(steps: BrowserStep[]) {

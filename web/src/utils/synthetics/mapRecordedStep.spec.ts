@@ -25,10 +25,8 @@ describe("mapRecordedStep", () => {
       action: "navigate",
       name: "Open login",
       selector: undefined,
-      selectorType: undefined,
       value: "https://app.example.com/login",
       timeout: 10000,
-      code: "",
       wire: { ...wire, id: expect.any(String) }, // wire.id is now the step's own UUID
     });
   });
@@ -38,7 +36,6 @@ describe("mapRecordedStep", () => {
       id: "s4",
       action: "click",
       selector: "#login-btn",
-      selector_type: "css",
       name: "Click login",
       timeout_ms: 10000,
       button: "left",
@@ -62,7 +59,6 @@ describe("mapRecordedStep", () => {
       id: "m1",
       action: "click",
       timeout: 30000,
-      code: "",
       ...over,
     });
 
@@ -77,9 +73,9 @@ describe("mapRecordedStep", () => {
       });
     });
 
-    it("should map a manual click step preserving selector + selector_type", () => {
-      const w = buildWireFromStep(lean({ action: "click", selector: "#go", selectorType: "CSS" }));
-      expect(w).toMatchObject({ action: "click", selector: "#go", selector_type: "css" });
+    it("should map a manual click step preserving its selector", () => {
+      const w = buildWireFromStep(lean({ action: "click", selector: "#go" }));
+      expect(w).toMatchObject({ action: "click", selector: "#go" });
     });
 
     it("should map a manual type step value to wire value", () => {
@@ -127,15 +123,13 @@ describe("mapRecordedStep", () => {
       action: "click",
       selector: "#go",
       timeout: 30000,
-      code: "",
     };
-    const waitStep: BrowserStep = { id: "m2", action: "wait", timeout: 30000, code: "" };
+    const waitStep: BrowserStep = { id: "m2", action: "wait", timeout: 30000 };
     const hoverStep: BrowserStep = {
       id: "m3",
       action: "hover",
       selector: ".el",
       timeout: 30000,
-      code: "",
     };
 
     const wires = journeyToWireSteps([recorded, manual, waitStep, hoverStep]);
@@ -146,33 +140,19 @@ describe("mapRecordedStep", () => {
     expect(wires[1]).toMatchObject({ action: "click", selector: "#go" });
   });
 
-  it("should map a type wire step with css selector_type to CSS", () => {
+  it("should map a type wire step with its selector and value", () => {
     const wire: WireStep = {
       id: "s2",
       action: "type",
       name: "Fill #email",
       selector: "#email",
-      selector_type: "css",
       value: "user@example.com",
       timeout_ms: 10000,
     };
     const mapped = mapWireStep(wire);
     expect(mapped.action).toBe("type");
     expect(mapped.selector).toBe("#email");
-    expect(mapped.selectorType).toBe("CSS");
     expect(mapped.value).toBe("user@example.com");
-  });
-
-  it("should map a click wire step and map data-test selector_type to TestID", () => {
-    const mapped = mapWireStep({
-      id: "s3",
-      action: "click",
-      selector: "submit",
-      selector_type: "data-test",
-      button: "left",
-    });
-    expect(mapped.action).toBe("click");
-    expect(mapped.selectorType).toBe("TestID");
   });
 
   it("should map a press wire step using the key as value", () => {
@@ -186,7 +166,6 @@ describe("mapRecordedStep", () => {
       id: "s5",
       action: "assert",
       selector: ".dashboard",
-      selector_type: "css",
       text: "Welcome",
       value: "ignored",
     });
@@ -262,9 +241,9 @@ describe("mapRecordedStep", () => {
   });
 
   it("should not carry a timeout into the wire step unless the author set one", () => {
-    expect(buildWireFromStep({ id: "s1", action: "click", code: "" })?.timeout_ms).toBeUndefined();
+    expect(buildWireFromStep({ id: "s1", action: "click" })?.timeout_ms).toBeUndefined();
     expect(
-      buildWireFromStep({ id: "s1", action: "click", code: "", timeout: 4200 })?.timeout_ms,
+      buildWireFromStep({ id: "s1", action: "click", timeout: 4200 })?.timeout_ms,
     ).toBe(4200);
   });
 
@@ -345,7 +324,6 @@ describe("mapRecordedStep", () => {
     const wire = buildWireFromStep({
       id: "s1",
       action: "assert",
-      code: "",
       assertion: { kind: "element_text", expected: "Signed in" },
     });
     expect(wire?.text).toBe("Signed in");

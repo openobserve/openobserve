@@ -14,7 +14,6 @@ import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import JourneySteps from "./JourneySteps.vue";
-import UpgradeJourneyBanner from "./UpgradeJourneyBanner.vue";
 import ZeroAssertionNotice from "./ZeroAssertionNotice.vue";
 import TestIdMisconfiguredNotice from "./TestIdMisconfiguredNotice.vue";
 import { DEFAULT_TEST_ID_ATTR } from "@/constants/synthetics";
@@ -490,7 +489,6 @@ function handleInsertBelow(row: BrowserStep) {
     id: getUUIDv7(true),
     action: "click",
     name: "",
-    code: "",
     // A new step is a version-2 step: its identity is the locator bundle, never a
     // bare `selector`. Seeding it empty is what makes the editor render the
     // Locator block from the start, and what lets isV2Journey stay true once the
@@ -515,7 +513,6 @@ function addStep() {
       id: getUUIDv7(true),
       action: "click",
       name: "",
-      code: "",
       // See handleInsertBelow — a new step is version 2.
       locator: { candidates: [], user_override: null },
     },
@@ -671,15 +668,6 @@ function openChromeExtensions() {
         </OButton>
       </div>
     </div>
-
-    <!-- Version-2 upgrade offer. Sits above the steps because saving is refused
-         while a retired action remains, and the remedy belongs next to the
-         problem rather than in a menu. -->
-    <UpgradeJourneyBanner
-      v-if="!readonly"
-      :steps="modelValue"
-      @upgrade="(steps) => emit('update:modelValue', steps)"
-    />
 
     <!-- A journey that verifies nothing can pass against a broken application,
          so the author is offered an assertion rather than left to think of it. -->

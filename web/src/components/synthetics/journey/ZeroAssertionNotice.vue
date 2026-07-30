@@ -44,7 +44,6 @@ function addAssertion() {
     action: "assert",
     name: t("synthetics.journey.assertionSuggestedName"),
     assertion: { kind: "element_visible" },
-    code: "",
   });
   dismissed.value = true;
 }

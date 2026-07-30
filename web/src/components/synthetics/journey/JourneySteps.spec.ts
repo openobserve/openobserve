@@ -70,10 +70,8 @@ function makeStep(overrides: Partial<BrowserStep> = {}): BrowserStep {
     action: "click",
     name: "Click Login Button",
     selector: "#login-btn",
-    selectorType: "CSS",
     value: "",
     timeout: 30000,
-    code: "",
     ...overrides,
   };
 }

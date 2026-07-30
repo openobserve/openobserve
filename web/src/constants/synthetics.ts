@@ -144,9 +144,8 @@ export const actionOptions = (Object.keys(ACTION_LABELS) as StepAction[])
   }));
 
 // The selector-type picker (CSS / XPath / Text / TestID / Role) is gone with the
-// v1 authoring path: a version-2 step names its element with a locator bundle,
-// whose value carries its own engine prefix. `SelectorType` itself survives in
-// types/synthetics.ts for liftJourney, which issue 006 owns.
+// v1 authoring path: a step names its element with a locator bundle, whose value
+// carries its own engine prefix.
 
 // ── Value field labels (action-specific) ─────────────────────────────────
 export const VALUE_LABELS: Record<string, string> = {

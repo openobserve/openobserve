@@ -225,7 +225,6 @@ describe("BrowserJourney recording", () => {
       id: "s1",
       action: "click",
       name: "Sign in",
-      code: "",
       locator: { candidates: [{ kind: "test_attribute", value: '[data-test="sign-in"]' }] },
       settle: {
         navigation: { url_pattern: "**/web/**" },
@@ -270,7 +269,6 @@ describe("BrowserJourney recording", () => {
       action: "navigate",
       name: "Open page",
       value: "https://old.test",
-      code: "",
       wire: { id: "w1", action: "navigate", url: "https://old.test" },
     };
 
@@ -291,7 +289,7 @@ describe("BrowserJourney recording", () => {
 
   it("should emit clear-results when modelValue becomes empty", async () => {
     wrapper = mountJourney({
-      modelValue: [{ id: "s1", action: "click", name: "Step 1", code: "" }],
+      modelValue: [{ id: "s1", action: "click", name: "Step 1" }],
     });
 
     // Clearing all steps should trigger the length watcher to emit clear-results
@@ -416,7 +414,6 @@ describe("BrowserJourney step creation", () => {
       action: "navigate",
       name: "Open app",
       value: "https://app.test",
-      code: "",
     };
     wrapper = mountJourney({ modelValue: [existing] });
 
@@ -467,14 +464,8 @@ describe("BrowserJourney per-step failure evidence", () => {
   });
 
   const journey = [
-    { id: "s1", action: "navigate", name: "Open app", value: "https://app.test", code: "" },
-    {
-      id: "s2",
-      action: "click",
-      name: "Sign in",
-      code: "",
-      locator: { candidates: [{ kind: "css", value: "#go" }] },
-    },
+    { id: "s1", action: "navigate", name: "Open app", value: "https://app.test" },
+    { id: "s2", action: "click", name: "Sign in", locator: { candidates: [{ kind: "css", value: "#go" }] } },
   ];
 
   function mountFailed() {
