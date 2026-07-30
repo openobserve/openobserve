@@ -23,7 +23,7 @@
 <template>
   <div class="flex flex-col gap-4" data-test="alerts-alertconfigsummary">
     <OCard v-for="section in sections" :key="section.key">
-      <OCardSection>
+      <OCardSection role="body">
         <h3 class="mb-3 text-lg text-text-heading">{{ section.title }}</h3>
         <dl class="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
           <div
@@ -32,7 +32,7 @@
             class="flex flex-col gap-1"
             :data-test="`alerts-alertconfigsummary-${field.key}`"
           >
-            <dt class="text-2xs uppercase text-text-tertiary">
+            <dt class="text-xs text-text-secondary">
               {{ field.label }}
             </dt>
             <dd

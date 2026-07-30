@@ -258,7 +258,7 @@
         </OTabPanel>
 
         <OTabPanel name="configuration" stretch>
-          <OContent class="py-4">
+          <OContent class="h-full overflow-y-auto py-4">
             <AlertConfigSummary v-if="alert" :alert="alert" />
           </OContent>
         </OTabPanel>
