@@ -150,9 +150,9 @@ const subs = computed<CardSubstitutions>(() => ({
       :subs="subs"
       data-test="rum-web-setup-card"
     >
-      <!-- Platform switch sits inline with the card title, on the trailing
-           edge — the guide it selects starts directly underneath it. -->
-      <template #hero-actions>
+      <!-- Platform switch sits on its own row directly under the card title,
+           ahead of the tagline and meta chips it selects the guide for. -->
+      <template #hero-under-title>
         <OToggleGroup
           :model-value="platform"
           type="single"
