@@ -40,7 +40,7 @@ import { useI18n } from "vue-i18n";
 import { getImageURL } from "../../../utils/zincutils";
 
 export default defineComponent({
-  name: "QTableNoData",
+  name: "NoOrganizationSelected",
   setup() {
     const { t } = useI18n();
 

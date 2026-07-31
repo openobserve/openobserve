@@ -163,7 +163,7 @@ describe("ServiceAccountsList Component", () => {
             props: ["open", "modelValue", "isUpdated"],
             emits: ["update:open", "update:modelValue", "updated"],
           },
-          QTablePagination: true,
+          Pagination: true,
           NoData: true,
           ODialog: {
             name: "ODialog",

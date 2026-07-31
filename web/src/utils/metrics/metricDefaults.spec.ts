@@ -18,10 +18,12 @@ import {
   CARD_KIND,
   baseNameOf,
   buildSelector,
+  computePercentileWindow,
   computeRateWindow,
   computeStepSeconds,
   formatPromDuration,
   getMetricDefaults,
+  MIN_PERCENTILE_SAMPLES,
   inferUnit,
   resolveCardKind,
   resolveVariant,
@@ -30,6 +32,10 @@ import {
 
 /** The rate window every truth-table expectation below is written against. */
 const W = "4m";
+/** The percentile window a gauge falls back to when no time context is given:
+ *  MIN_PERCENTILE_SAMPLES x the 15s default scrape. Deliberately NOT `W` — a
+ *  quantile needs far more samples than a rate. */
+const PW = "5m";
 
 /** Shorthand: the default (index 0) query for a metric, with no filters. */
 const defaultQuery = (name: string, type?: string, ctx?: Record<string, any>) =>
@@ -126,6 +132,72 @@ describe("rate window (PRD 6.4)", () => {
     expect(formatPromDuration(3660)).toBe("1h1m");
     expect(formatPromDuration(90)).toBe("1m30s");
     expect(formatPromDuration(86400)).toBe("1d");
+  });
+});
+
+/**
+ * The rate window is sized for `rate()`, which needs two samples. Reusing it for
+ * `quantile_over_time` gave a 15m view a 1m window — FOUR samples at a 15s
+ * scrape — where p90 lands at index 0.9 x 3 = 2.7 and p99 at 2.97: both
+ * interpolate between the same top pair and draw as one line. Widening the
+ * window is what makes the percentiles actually separate.
+ */
+describe("percentile window", () => {
+  const toSeconds = (d: string) =>
+    [...d.matchAll(/(\d+)([dhms])/g)].reduce(
+      (acc, m) => acc + Number(m[1]) * { d: 86400, h: 3600, m: 60, s: 1 }[m[2] as "d"],
+      0,
+    );
+  const RANGES = { "15m": 900, "1h": 3600, "6h": 21600, "24h": 86400, "7d": 604800 };
+
+  it("is never narrower than the rate window", () => {
+    // The rate window already guarantees no gaps between evaluation points; a
+    // quantile can never want LESS data than a rate. Includes ranges so short
+    // that the range/4 cap would otherwise undercut it.
+    for (const range of [60, 300, ...Object.values(RANGES), 3600 * 300]) {
+      for (const scrape of [10, 15, 60]) {
+        expect(
+          toSeconds(computePercentileWindow(range, undefined, scrape)),
+          `range=${range} scrape=${scrape}`,
+        ).toBeGreaterThanOrEqual(toSeconds(computeRateWindow(range, undefined, scrape)));
+      }
+    }
+  });
+
+  it("gives a 15m view far more than the four samples the rate window did", () => {
+    const before = toSeconds(computeRateWindow(RANGES["15m"], 120, 15)) / 15;
+    const after = toSeconds(computePercentileWindow(RANGES["15m"], 120, 15)) / 15;
+    expect(before).toBe(4); // the bug
+    expect(after).toBeGreaterThanOrEqual(15);
+  });
+
+  it("reaches the sample target once the range allows it", () => {
+    for (const label of ["1h", "6h", "24h", "7d"] as const) {
+      const samples = toSeconds(computePercentileWindow(RANGES[label], 120, 15)) / 15;
+      expect(samples, label).toBeGreaterThanOrEqual(MIN_PERCENTILE_SAMPLES);
+    }
+  });
+
+  it("caps at a quarter of the view so the chart keeps its variation", () => {
+    // Without the cap a 15m view would ask for 5m — a third of the range — and
+    // every point would report nearly the same global quantile.
+    for (const range of Object.values(RANGES)) {
+      const w = toSeconds(computePercentileWindow(range, 120, 15));
+      const rate = toSeconds(computeRateWindow(range, 120, 15));
+      // The cap may only be overridden by the floor (the rate window itself).
+      expect(w <= range / 4 || w === rate, `range=${range}`).toBe(true);
+    }
+  });
+
+  it("scales with the scrape interval rather than assuming 15s", () => {
+    expect(computePercentileWindow(6 * 3600, 120, 15)).toBe("5m"); // 20 x 15s
+    expect(computePercentileWindow(6 * 3600, 120, 30)).toBe("10m"); // 20 x 30s
+  });
+
+  it("survives a zero/garbage range without emitting an invalid duration", () => {
+    for (const bad of [0, -1, NaN, undefined as any]) {
+      expect(computePercentileWindow(bad, 120, 15)).toMatch(/^\d+[dhms]/);
+    }
   });
 });
 
@@ -610,7 +682,7 @@ describe("percentile checkbox sets are honoured", () => {
     const r = resolveVariant(gauge(), "percentiles", { percentiles: [75] });
     expect(r?.queries).toHaveLength(1);
     expect(r?.queries[0].legendTemplate).toBe("p75");
-    expect(r?.queries[0].expr).toBe('quantile(0.75, {__name__="queue_depth"})');
+    expect(r?.queries[0].expr).toBe(`quantile_over_time(0.75, {__name__="queue_depth"}[${PW}])`);
   });
 
   it("resolves a mixed subset exactly", () => {
@@ -621,6 +693,44 @@ describe("percentile checkbox sets are honoured", () => {
   it("defaults to p50/p90/p99 out of the five offered", () => {
     const r = resolveVariant(gauge(), "percentiles");
     expect(r?.queries.map((q: any) => q.legendTemplate)).toEqual(["p50", "p90", "p99"]);
+  });
+
+  /**
+   * `quantile(φ, v)` aggregates ACROSS the series present at each timestamp, so
+   * on a single-series gauge every percentile returns that one series' own value
+   * — three identical lines under three different legends. Percentiles for a
+   * gauge are a question about TIME.
+   */
+  it("asks for percentiles over time, not across series", () => {
+    const r = resolveVariant(gauge(), "percentiles", { percentiles: [50, 99] });
+    for (const q of r!.queries) {
+      expect(q.expr).toMatch(/^quantile_over_time\(/);
+      expect(q.expr).toContain(`[${PW}]`);
+    }
+    // Distinct ratios — the whole point is that the series no longer coincide.
+    expect(new Set(r!.queries.map((q: any) => q.expr)).size).toBe(2);
+  });
+
+  /**
+   * A range vector may only be taken over a SELECTOR. The NaN-guard retry path
+   * rewrites the selector into `(x and x > -Inf)`, and `(...)[5m]` does not
+   * parse — nor does the subquery form `(...)[5m:]`, which the engine rejects
+   * unless the inner expression is already a matrix. So the percentile queries
+   * must be built from the UNGUARDED selector even in guarded mode.
+   */
+  it("keeps a parseable range vector when the NaN guard is on", () => {
+    const guarded = getMetricDefaults("queue_depth", "gauge", undefined, {
+      rateWindow: W,
+      applyNanGuard: true,
+    });
+    const r = resolveVariant(guarded, "percentiles", { percentiles: [99] });
+
+    expect(r!.queries[0].expr).toBe(`quantile_over_time(0.99, {__name__="queue_depth"}[${PW}])`);
+    expect(r!.queries[0].expr).not.toContain("> -Inf");
+
+    // The guard still applies to the variants that can carry it.
+    const avg = resolveVariant(guarded, "avg");
+    expect(avg!.queries[0].expr).toContain("> -Inf");
   });
 });
 

@@ -6,8 +6,8 @@
 // Selectors for TanStack table in dashboard mode
 export const TABLE_SELECTOR = '[data-test="dashboard-panel-table"]';
 export const TABLE_HEADER_SELECTOR = `${TABLE_SELECTOR} thead tr th`;
-// TanStack table renders dashboard data rows directly in tbody with data-test="dashboard-data-row"
-export const TABLE_DATA_ROW_SELECTOR = `${TABLE_SELECTOR} [data-test="dashboard-data-row"]`;
+// Rows render directly in tbody, keyed data-test="o2-table-row-<index>"
+export const TABLE_DATA_ROW_SELECTOR = `${TABLE_SELECTOR} [data-test^="o2-table-row-"]`;
 
 /**
  * Waits until the panel editor has finished (re-)running its query AND the table has
@@ -54,7 +54,7 @@ export async function waitForPanelTableSettled(
   const signature = () =>
     page.evaluate((sel) => {
       const rows = document.querySelectorAll(
-        `${sel} [data-test="dashboard-data-row"]`,
+        `${sel} [data-test^="o2-table-row-"]`,
       );
       const first = rows[0]?.textContent ?? "";
       const last = rows[rows.length - 1]?.textContent ?? "";
@@ -96,18 +96,15 @@ export async function readColumnCells(page, colIndex = 0, limit = 10) {
   return page.evaluate(
     ({ sel, ci, max }) => {
       const rows = Array.from(
-        document.querySelectorAll(`${sel} [data-test="dashboard-data-row"]`),
+        document.querySelectorAll(`${sel} [data-test^="o2-table-row-"]`),
       ).slice(0, max);
 
       return rows
         .map((row) => {
           const cell = row.querySelectorAll("td")[ci];
           if (!cell) return null;
-          const valueEl = cell.querySelector(
-            '[data-test="dashboard-table-cell-value"]',
-          );
           return {
-            text: (valueEl?.textContent ?? cell.textContent ?? "").trim(),
+            text: (cell.textContent ?? "").trim(),
             bgColor: getComputedStyle(cell).backgroundColor,
           };
         })
@@ -140,7 +137,7 @@ export async function getTableHeaders(page) {
 
 /**
  * Get the text content of a specific table cell.
- * TanStack table (dashboard mode) renders data rows directly in tbody with class dashboard-data-row.
+ * Rows render directly in tbody, keyed data-test="o2-table-row-<index>".
  * Each cell: <td class="copy-cell-td"><div>text<button class="copy-btn">...</button></div></td>
  *
  * @param {import('@playwright/test').Page} page
@@ -152,8 +149,8 @@ export async function getTableCellText(page, rowIndex, colIndex) {
   return page.$eval(
     TABLE_SELECTOR,
     (table, { ri, ci }) => {
-      // TanStack dashboard mode: rows use data-test="dashboard-data-row"
-      const rows = Array.from(table.querySelectorAll('[data-test="dashboard-data-row"]'));
+      // Rows use data-test="o2-table-row-<index>"
+      const rows = Array.from(table.querySelectorAll('[data-test^="o2-table-row-"]'));
       // Fall back to any tbody tr if data-test is not present
       const allRows = rows.length > 0 ? rows : Array.from(table.querySelectorAll("tbody tr")).filter((r) => r.querySelectorAll("td").length >= 1);
       const row = allRows[ri];

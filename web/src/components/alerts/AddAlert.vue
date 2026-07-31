@@ -32,23 +32,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             onClick: goBackToAlertsList,
             dataTest: 'add-alert-back-btn',
           }"
-          :subtitle="beingUpdated || anomalyEditMode ? activeFolderName : ''"
+          title-overflow="visible"
         >
-          <!-- EDIT MODE: the alert/anomaly name is the title and the folder its
-             subtitle — matching the dashboard header. CREATE MODE keeps the
-             inline name input + folder select in the #tabs area (an <h1> can't
-             host form inputs), per the AddPanel convention. -->
+          <!-- The name IS the title in both modes, so creating no longer means
+             filling a boxed field wedged into the toolbar: it renders as heading
+             text and swaps to an input on click. Create mode also gets a
+             generated name that tracks the stream + condition until the user
+             types (see alertAutoName / useAutoName). EDIT mode is readonly —
+             OInlineEdit then renders the saved name as plain heading text with
+             no affordance, which is exactly what this header showed before.
+             Anomaly and alert names bind the SAME `name` field — see the note on
+             the folder select below for why the anomaly path never binds
+             anomalyConfig.name directly. -->
           <template #title>
-            <template v-if="beingUpdated || anomalyEditMode">
-              <span v-if="!isAnomalyMode" class="truncate" :title="formData.name">
-                {{ formData.name }}
-                <OTooltip v-if="formData.name?.length > 24" :content="formData.name" />
-              </span>
-              <span v-else class="truncate" :title="anomalyConfig.name">
-                {{ anomalyConfig.name }}
-                <OTooltip v-if="anomalyConfig.name?.length > 24" :content="anomalyConfig.name" />
-              </span>
-            </template>
+            <OFormInlineEdit
+              ref="step1Ref"
+              name="name"
+              :readonly="beingUpdated || anomalyEditMode"
+              :data-test="isAnomalyMode ? 'add-anomaly-name-input' : 'add-alert-name-input'"
+              :placeholder="
+                isAnomalyMode
+                  ? t('alerts.anomalyNamePlaceholder')
+                  : t('alerts.alertNamePlaceholder')
+              "
+              :aria-label="
+                isAnomalyMode ? t('alerts.anomalyName') : t('alerts.incidents.alertName')
+              "
+              :edit-hint="
+                alertAutoName.isAuto.value
+                  ? t('common.inlineEdit.autoHint')
+                  : t('alerts.renameHint')
+              "
+              @update:model-value="alertAutoName.markManual"
+              @commit="alertAutoName.onCommit"
+              @cancel="alertAutoName.onCommit"
+            />
           </template>
 
           <!-- EDIT MODE (anomaly): status + last-run + retry trail the name -->
@@ -83,54 +101,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
 
-          <!-- CREATE MODE: Alert Name input + Folder select, inline beside the back tile -->
-          <template #tabs>
-            <div
-              v-if="!(beingUpdated || anomalyEditMode)"
-              class="flex min-w-0 items-center gap-1.5"
-            >
-              <div class="flex shrink-0 items-center gap-1.5">
-                <div class="text-text-heading text-xs font-semibold whitespace-nowrap">
-                  {{ isAnomalyMode ? t("alerts.anomalyName") : t("alerts.incidents.alertName") }}
-                  <span class="text-text-body">*</span>
-                </div>
-                <OFormInput
-                  v-if="!isAnomalyMode"
-                  ref="step1Ref"
-                  name="name"
-                  data-test="add-alert-name-input"
-                  :placeholder="t('alerts.alertNamePlaceholder')"
-                  class="topbar-name-input h-7! min-h-7! max-w-37.5 min-w-30 text-sm @max-[1300px]/topbar:min-w-25 @max-[850px]/topbar:min-w-22.5 @max-[680px]/topbar:min-w-17.5"
-                />
-                <!-- Anomaly name binds the SAME `name` field as the alert name, not
-                   `anomalyConfig.name`: a bare OInput has no field for the schema
-                   to paint, so a blank name could only ever toast. useAlertForm's
-                   formData.name → anomalyConfig.name watcher still feeds the value
-                   saveAnomalyDetection reads, and anomaly edit-load already seeds
-                   it via setF("name", data.name). -->
-                <OFormInput
-                  v-else
-                  ref="anomalyNameRef"
-                  name="name"
-                  data-test="add-anomaly-name-input"
-                  :placeholder="t('alerts.anomalyNamePlaceholder')"
-                  class="topbar-name-input h-7! min-h-7! max-w-37.5 min-w-30 text-sm @max-[1300px]/topbar:min-w-25 @max-[850px]/topbar:min-w-22.5 @max-[680px]/topbar:min-w-17.5"
-                />
-              </div>
-
-              <!-- Folder -->
-              <div class="flex shrink-0 items-center gap-1.5">
-                <div class="text-text-heading text-xs font-semibold whitespace-nowrap">
-                  {{ t("alerts.folder") }}
-                </div>
-                <InlineSelectFolderDropdown
-                  :model-value="activeFolderId as string"
-                  type="alerts"
-                  class="topbar-folder-select max-w-35 min-w-15"
-                  @update:model-value="updateActiveFolderId({ value: $event })"
-                />
-              </div>
-            </div>
+          <!-- The description line states what this page is AND where the alert
+             will land: "Add Alert in <folder>", the folder being a text-styled
+             dropdown. Parked on the right of the header it was invisible; read
+             as part of the sentence directly under the name it is exactly where
+             someone looks to answer "where is this being saved?". Edit mode
+             prints the folder as plain text — an alert does not move folders
+             from here.
+             (The anomaly name binds the SAME `name` field as the alert name,
+             not `anomalyConfig.name`: a bare input has no field for the schema
+             to paint, so a blank name could only ever toast. The
+             formData.name → anomalyConfig.name watcher in useAlertForm still
+             feeds the value saveAnomalyDetection reads, and anomaly edit-load
+             seeds it via setF("name", data.name).) -->
+          <template #subtitle>
+            <span class="flex min-w-0 items-center gap-1 leading-normal">
+              <span class="whitespace-nowrap">
+                {{ t("alerts.modeInFolder", { mode: headerModeLabel }) }}
+              </span>
+              <InlineSelectFolderDropdown
+                v-if="!(beingUpdated || anomalyEditMode)"
+                variant="inline"
+                :model-value="activeFolderId as string"
+                type="alerts"
+                @update:model-value="updateActiveFolderId({ value: $event })"
+              />
+              <span v-else class="text-text-body min-w-0 truncate font-medium">
+                {{ activeFolderName }}
+              </span>
+            </span>
           </template>
         </OPageHeader>
       </template>
@@ -149,6 +148,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
             </div>
             <div class="flex items-center gap-4 px-3 py-2">
+              <!-- Alert Type -->
+              <div class="flex items-center gap-1.5">
+                <div class="text-text-heading text-xs font-semibold whitespace-nowrap">
+                  {{ t("alerts.alertType") }}
+                </div>
+                <OFormSelect
+                  data-test="add-alert-type-select-dropdown"
+                  name="is_real_time"
+                  :options="alertTypeOptions"
+                  :disabled="beingUpdated || anomalyEditMode"
+                  class="alert-type-select min-w-27.5 @max-[900px]/stream-config:min-w-23.75 @max-[750px]/stream-config:min-w-21.25 @max-[600px]/stream-config:min-w-18.75"
+                  :searchable="false"
+                />
+              </div>
+
               <!-- Stream Type -->
               <div class="flex items-center gap-1.5">
                 <div class="text-text-heading text-xs font-semibold whitespace-nowrap">
@@ -167,7 +181,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <!-- Stream Name -->
-              <div class="flex items-center gap-1.5">
+              <div class="flex min-w-0 flex-1 items-center gap-1.5">
                 <div class="text-text-heading text-xs font-semibold whitespace-nowrap">
                   {{ t("alerts.stream_name") }} <span class="text-text-body">*</span>
                 </div>
@@ -177,28 +191,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="add-alert-stream-name-select-dropdown"
                   :options="indexOptions"
                   :loading="isFetchingStreams"
-                  class="stream-name-select w-40! @max-[900px]/stream-config:w-30! @max-[750px]/stream-config:w-27.5! @max-[600px]/stream-config:w-20!"
+                  class="stream-name-select w-full! min-w-0"
                   :disabled="beingUpdated || anomalyEditMode || !formData.stream_type"
                   @update:model-value="updateStreamFields($event)"
                 />
                 <OTooltip
                   v-if="!formData.stream_type"
                   :content="t('alerts.selectStreamTypeFirst')"
-                />
-              </div>
-
-              <!-- Alert Type -->
-              <div class="flex items-center gap-1.5">
-                <div class="text-text-heading text-xs font-semibold whitespace-nowrap">
-                  {{ t("alerts.alertType") }}
-                </div>
-                <OFormSelect
-                  data-test="add-alert-type-select-dropdown"
-                  name="is_real_time"
-                  :options="alertTypeOptions"
-                  :disabled="beingUpdated || anomalyEditMode"
-                  class="alert-type-select min-w-27.5 @max-[900px]/stream-config:min-w-23.75 @max-[750px]/stream-config:min-w-21.25 @max-[600px]/stream-config:min-w-18.75"
-                  :searchable="false"
                 />
               </div>
             </div>
@@ -549,9 +548,11 @@ import { useAlertForm, defaultAlertValue } from "@/composables/useAlertForm";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
-import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import OFormInlineEdit from "@/lib/forms/InlineEdit/OFormInlineEdit.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import { useAutoName } from "@/composables/useAutoName";
+import { buildAlertAutoName } from "@/utils/autoName";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 
@@ -599,7 +600,7 @@ export default defineComponent({
     OTag,
     OTooltip,
     OForm,
-    OFormInput,
+    OFormInlineEdit,
     OFormSelect,
     OPageHeader,
   },
@@ -666,6 +667,20 @@ export default defineComponent({
       return tabs.filter((tab: any) => (tab as any).show !== false);
     });
 
+    // Mode as the subtitle, exactly as AddPanel does it ("Add Panel" / "Edit
+    // Panel"): the header then reads NAME first, what-you're-doing second, and
+    // the two pages have the same shape. The containing folder is already the
+    // back button's label, so the subtitle no longer repeats it.
+    const headerModeLabel = computed(() => {
+      const editing = alertForm.beingUpdated.value || alertForm.anomalyEditMode.value;
+      if (alertForm.isAnomalyMode.value) {
+        return editing
+          ? alertForm.t("alerts.editAnomalyMode")
+          : alertForm.t("alerts.addAnomalyMode");
+      }
+      return editing ? alertForm.t("alerts.editAlertMode") : alertForm.t("alerts.addAlertMode");
+    });
+
     const activeFolderName = computed(() => {
       const folders = alertForm.store.state.organizationData.foldersByType?.alerts ?? [];
       const found = folders.find((f: any) => f.folderId === alertForm.activeFolderId.value);
@@ -690,8 +705,26 @@ export default defineComponent({
       alertForm.updateStreams();
     };
 
+    // ── Smart alert name ─────────────────────────────────────────────────────
+    // A new alert names itself after what it actually watches ("k8s_logs where
+    // status >= 500") and keeps re-deriving that as the stream and condition
+    // change — until the first keystroke in the header, after which the name is
+    // the user's. Editing an existing alert (or anomaly) is excluded outright:
+    // a saved name is never regenerated behind the user's back.
+    const alertNameSuggestion = computed(() =>
+      buildAlertAutoName(alertForm.formData.value, alertForm.t),
+    );
+    const alertAutoName = useAutoName({
+      suggestion: alertNameSuggestion,
+      currentValue: () => (alertForm.formData.value?.name ?? "") as string,
+      apply: (name: string) => alertForm.setF("name", name),
+      enabled: () => !alertForm.beingUpdated.value && !alertForm.anomalyEditMode.value,
+    });
+
     return {
       ...alertForm,
+      alertAutoName,
+      headerModeLabel,
       isAnomalyDetectionEnabled,
       alertTypeOptions,
       alertTabs,
@@ -709,20 +742,20 @@ export default defineComponent({
    flow. A class passed to OInput/OFormSelect lands on the ROOT wrapper — the
    flex-col holding the control AND its message — so an in-flow message would
    grow these fixed-height topbar rows, escape the card, and be painted over by
-   the next card. `top:100%` resolves against the wrapper; the topbar input's
-   h-7 clamp genuinely compresses it, so it anchors correctly, while the three
-   selects deliberately carry NO h-7 clamp (it only ever shrank the wrapper box,
+   the next card. `top:100%` resolves against the wrapper. The selects
+   deliberately carry NO height clamp (it only ever shrank the wrapper box,
    never the 2.125rem trigger, which mis-anchored the floating message).
    pointer-events:none so the floating text can't swallow clicks on the tab bar
    it overlaps. `:deep` because [role="alert"] renders inside the child
-   component. All widths and container-query steps are template utilities. */
-.topbar-name-input,
+   component. All widths and container-query steps are template utilities.
+   The alert-name field is NOT listed here: OInlineEdit renders its message
+   BESIDE the name (below is the subtitle band), so it adds no height either and
+   needs no wrapper override. */
 .stream-type-select,
 .stream-name-select {
   position: relative;
 }
 
-.topbar-name-input :deep([role="alert"]),
 .stream-type-select :deep([role="alert"]),
 .stream-name-select :deep([role="alert"]) {
   position: absolute;

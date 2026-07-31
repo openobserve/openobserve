@@ -87,10 +87,6 @@ describe("QueryBuilder", () => {
     return mount(QueryBuilder, {
       global: {
         stubs: {
-          QCard: false,
-          QCardSection: false,
-          QSeparator: false,
-          QBtn: false,
           MetricSelector: true,
           LabelFilterEditor: true,
           OperationsList: true,

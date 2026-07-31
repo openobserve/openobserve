@@ -5,7 +5,12 @@ export default class DashboardactionPage {
   constructor(page) {
     this.page = page;
 
-    this.panelNameInput = page.locator('[data-test="dashboard-panel-name"] input');
+    // The panel name is now an inline-edited title (OFormInlineEdit): a display
+    // trigger swaps to an input on click. Click the trigger, then fill the input.
+    // The display trigger holds a `-value` span with the (auto-generated) name.
+    this.panelNameTrigger = page.locator('[data-test="dashboard-panel-name-trigger"]');
+    this.panelNameInput = page.locator('[data-test="dashboard-panel-name-input"]');
+    this.panelNameValue = page.locator('[data-test="dashboard-panel-name-value"]');
     this.panelSaveBtn = page.locator('[data-test="dashboard-panel-save"]');
     this.applyDashboard = page.locator('[data-test="dashboard-apply"]');
     this.addPanelBtn = page.locator('[data-test="dashboard-panel-add"]');
@@ -22,7 +27,7 @@ export default class DashboardactionPage {
     // toast is produced).
     this.panelNameError = page.locator('[data-test="dashboard-panel-name-error"]');
     // TanStack table data rows / cells (source data-tests in TenstackTable.vue)
-    this.tableDataRow = page.locator('[data-test="dashboard-panel-table"] [data-test="dashboard-data-row"]');
+    this.tableDataRow = page.locator('[data-test="dashboard-panel-table"] [data-test^="o2-table-row-"]');
   }
 
   // Returns the error toast locator for assertions
@@ -35,16 +40,26 @@ export default class DashboardactionPage {
     return this.panelNameError;
   }
 
+  // Returns the auto-generated panel-name display locator (the read-only value
+  // span shown in display mode) for asserting a name is always present.
+  getPanelNameValue() {
+    return this.panelNameValue;
+  }
+
   // Returns all dashboard panel table data rows
   getTableDataRows() {
     return this.tableDataRow;
   }
 
-  // Returns the nth data cell (data-test="dashboard-data-row-cell") of the first data row
+  // Returns the nth data cell (data-test="o2-table-cell-<columnId>") of the first data row.
+  // Excludes the nested o2-table-cell-copy-* / o2-table-cell-hover-actions-* elements,
+  // which share the o2-table-cell- prefix but are not data cells.
   firstRowNthCell(index) {
     return this.tableDataRow
       .first()
-      .locator('[data-test="dashboard-data-row-cell"]')
+      .locator(
+        '[data-test^="o2-table-cell-"]:not([data-test^="o2-table-cell-copy-"]):not([data-test^="o2-table-cell-hover-actions-"])'
+      )
       .nth(index);
   }
 
@@ -83,7 +98,9 @@ export default class DashboardactionPage {
 
   // Add panel name
   async addPanelName(panelName) {
-    await this.panelNameInput.click();
+    // Open the inline editor, then fill the revealed input.
+    await this.panelNameTrigger.click();
+    await this.panelNameInput.waitFor({ state: "visible" });
     await this.panelNameInput.fill(panelName);
   }
 

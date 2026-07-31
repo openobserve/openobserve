@@ -365,7 +365,7 @@ export default defineComponent({
     );
 
     // Backend `/config` flag `online_evals_enabled` — controlled by
-    // enterprise `O2_ONLINE_EVALS_ENABLED`. Reactive so the menu picks it up regardless
+    // enterprise `O2_EVAL_ENABLED`. Reactive so the menu picks it up regardless
     // of whether the config response arrived before or after this component
     // mounted.
     const isOnlineEvalsEnabled = computed(() => {
@@ -446,6 +446,16 @@ export default defineComponent({
         link: "/alerts",
         name: "alertList",
       },
+      // TODO(slo): the SLO feature is deferred — menu entry hidden until it
+      // ships. Restore this entry (directly after Alerts: an SLO is what an
+      // SLO alert burns against) and the navGroups "alerts" group will absorb
+      // it again.
+      // {
+      //   title: t("menu.slos"),
+      //   icon: "target",
+      //   link: "/slos",
+      //   name: "sloList",
+      // },
       {
         title: t("menu.ingestion"),
         icon: "data-plus-line",

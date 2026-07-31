@@ -30,15 +30,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          back chevron in the module-icon slot, the workflow name input inline
          after the title, and the Test / Cancel / Save actions right-aligned. -->
     <OPageHeader
-      :title="headerTitle"
+      :subtitle="headerModeLabel"
+      title-overflow="visible"
       :back="{ label: t('workflow.header'), onClick: goBack, dataTest: 'workflow-editor-back' }"
       class="border-border-default border-b px-4"
     >
       <!-- Beta tag inside the title line (see WorkflowsList: #title-trail sits
            after the title+subtitle column, stranding it far from the title). -->
+      <!-- The workflow NAME is the title, inline-edited in place, with the mode
+           as the subtitle — matching the panel, alert, function and pipeline
+           editors. Editable on CREATE only, exactly as before: on edit it was
+           already shown read-only as the header title. -->
+      <!-- Mode + description share the meta line, the same shape as the alert
+           editor's "Add Alert in <folder>". The description is inline-edited
+           here rather than beside the title, where a growing name pushed it
+           sideways on every keystroke. -->
+      <template #subtitle>
+        <span class="flex min-w-0 items-center gap-1 leading-normal">
+          <span class="whitespace-nowrap">{{ headerModeLabel }}</span>
+          <OInlineEdit
+            v-if="!workflowObj.isEditWorkflow"
+            v-model="workflowObj.currentSelectedWorkflow.description"
+            tone="meta"
+            data-test="workflow-editor-description"
+            :placeholder="t('workflow.descriptionPlaceholder')"
+            :aria-label="t('workflow.description')"
+          />
+        </span>
+      </template>
+
       <template #title>
         <span class="inline-flex min-w-0 items-center gap-2">
-          <span class="truncate">{{ headerTitle }}</span>
+          <OInlineEdit
+            v-model="workflowObj.currentSelectedWorkflow.name"
+            data-test="workflow-editor-name"
+            :placeholder="t('workflow.namePlaceholder')"
+            :aria-label="t('workflow.name')"
+            :edit-hint="t('workflow.renameHint')"
+            :readonly="workflowObj.isEditWorkflow"
+            :error="workflowObj.nameError"
+            :error-message="workflowObj.nameError ? t('workflow.nameRequired') : undefined"
+            @update:model-value="workflowObj.nameError = false"
+          />
           <BetaBadge />
         </span>
       </template>
@@ -46,28 +79,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            header title (mirrors the pipeline editor, where the name input is
            gated to the create route). Enable/disable status isn't shown here —
            it's managed from the list, same as pipelines. -->
-      <template v-if="!workflowObj.isEditWorkflow" #title-trail>
-        <div class="flex items-center gap-2">
-          <div class="w-56 shrink-0">
-            <OInput
-              v-model="workflowObj.currentSelectedWorkflow.name"
-              data-test="workflow-editor-name"
-              hide-bottom-space
-              :placeholder="t('workflow.namePlaceholder')"
-              :error="workflowObj.nameError"
-              @update:model-value="workflowObj.nameError = false"
-            />
-          </div>
-          <div class="w-72 shrink-0">
-            <OInput
-              v-model="workflowObj.currentSelectedWorkflow.description"
-              data-test="workflow-editor-description"
-              hide-bottom-space
-              :placeholder="t('workflow.descriptionPlaceholder')"
-            />
-          </div>
-        </div>
-      </template>
 
       <template #actions>
         <!-- History (Runs) — only meaningful for a saved workflow. Navigates to
@@ -192,7 +203,7 @@ import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 
 import OButton from "@/lib/core/Button/OButton.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
+import OInlineEdit from "@/lib/forms/InlineEdit/OInlineEdit.vue";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import BetaBadge from "@/components/common/BetaBadge.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -225,15 +236,10 @@ const { t } = useI18n();
 const router = useRouter();
 const store = useStore();
 
-// On edit the saved name is the title; on create it's "New Workflow" — the same
-// label as the list's create button, mirroring how the pipeline editor's create
-// route reuses `pipeline.addPipeline` for its crumb (the name itself is typed in
-// the title-trail input). Shared by the `title` prop (which feeds the h1's
-// tooltip) and the `#title` slot that renders it next to the Beta tag.
-const headerTitle = computed(() =>
-  workflowObj.isEditWorkflow
-    ? workflowObj.currentSelectedWorkflow.name || t("workflow.header")
-    : t("workflow.create"),
+// The name itself is the title now (see #title), so the header's meta line
+// carries the mode — the same shape as the panel, alert and pipeline editors.
+const headerModeLabel = computed(() =>
+  workflowObj.isEditWorkflow ? t("workflow.editMode") : t("workflow.create"),
 );
 const {
   resetWorkflowData,

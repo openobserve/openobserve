@@ -42,10 +42,6 @@ async function mountTable(props: Record<string, any> = {}) {
           props: ["rows", "level", "parent", "customFilteredPermissions", "filter"],
           template: '<div data-test="nested-permissions-table-stub" />',
         },
-        QVirtualScroll: {
-          props: ["items", "rows", "columns", "tableColspan"],
-          template: `<div><slot name="before" /><slot v-for="item in items" :item="item" /></div>`,
-        },
       },
     },
     props: {

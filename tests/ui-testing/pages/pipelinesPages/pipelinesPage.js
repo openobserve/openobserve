@@ -110,8 +110,10 @@ export class PipelinesPage {
         this.pipelineNameRequiredMessage = page.locator(
           '[data-test="pipeline-editor-name-input-error"]'
         ).first();
-        // Pipeline name OInput - auto-derived `-field` for the native input.
-        this.pipelineNameInput = page.locator('[data-test="pipeline-editor-name-input-field"]');
+        // Pipeline name is an inline-edited title (OFormInlineEdit): a display
+        // trigger swaps to an input on click. -trigger opens, -input edits.
+        this.pipelineNameTrigger = page.locator('[data-test="pipeline-editor-name-input-trigger"]');
+        this.pipelineNameInput = page.locator('[data-test="pipeline-editor-name-input-input"]');
         // Source/destination node required errors are toasts in PipelineEditor.
         // OToast emits `data-test="o-toast-default"` (no variant) with the
         // message on `data-test-message`. Match the message attribute prefix.
@@ -219,7 +221,9 @@ export class PipelinesPage {
         this.toastError = page.locator('[data-test-variant="error"]');
         this.toastSuccess = page.locator('[data-test-variant="success"]');
         this.functionNameInput = page.locator('[data-test="add-function-name-input"]');
-        this.functionNameInputField = page.locator('[data-test="add-function-name-input-field"]');
+        // Function name is an inline-edited title (OFormInlineEdit): -trigger opens, -input edits.
+        this.functionNameTrigger = page.locator('[data-test="add-function-name-input-trigger"]');
+        this.functionNameInputField = page.locator('[data-test="add-function-name-input-input"]');
         this.addConditionSaveButton = page.locator('[data-test="add-condition-drawer"] [data-test="o-drawer-primary-btn"]');
         this.enrichmentTableTab = '[data-test="pipeline-section-tab-enrichmentTables"]';
         // Added data-test "enrichment-tables-add-btn" on the New Enrichment
@@ -253,7 +257,7 @@ export class PipelinesPage {
         this.monacoEditorViewLines = page.locator('.monaco-editor .view-lines');
         this.searchStreamInput = page.getByPlaceholder('Search Stream');
         this.exploreButton = page.getByRole('button', { name: 'Explore' });
-        this.timestampColumnMenu = page.locator('[data-test="log-table-column-1-_timestamp"] [data-test="table-row-expand-menu"]');
+        this.timestampColumnMenu = page.locator('[data-test="o2-table-expand-1"]');
         this.nameCell = page.getByRole('cell', { name: 'Name' });
         this.streamIcon = page.getByRole("img", { name: "Stream", exact: true });
         this.outputStreamIcon = page.getByRole("img", { name: "Output Stream" });
@@ -764,8 +768,10 @@ export class PipelinesPage {
             .first()
             .waitFor({ state: 'detached', timeout: 10000 })
             .catch(() => {});
+        // Open the inline editor via its trigger, then fill the revealed input.
+        await this.pipelineNameTrigger.waitFor({ state: 'visible', timeout: 10000 });
+        await this.pipelineNameTrigger.click();
         await this.pipelineNameInput.waitFor({ state: 'visible', timeout: 10000 });
-        await this.pipelineNameInput.click();
         await this.pipelineNameInput.fill(pipelineName);
     }
 
@@ -1001,6 +1007,9 @@ export class PipelinesPage {
     }
 
     async enterFunctionName(name) {
+        // Open the inline editor, then fill the revealed input.
+        await this.functionNameTrigger.click();
+        await this.functionNameInputField.waitFor({ state: 'visible', timeout: 10000 });
         await this.functionNameInputField.fill(name);
     }
 
@@ -2062,7 +2071,7 @@ export class PipelinesPage {
         await this.exploreButton.first().click();
         await this.page.waitForTimeout(3000);
 
-        await this.page.waitForSelector('[data-test="logs-search-result-table-body"]');
+        await this.page.waitForSelector('[data-test="o2-table-body"]');
 
         // Expand the log table menu
         await this.timestampColumnMenu.click();
@@ -3253,7 +3262,9 @@ export class PipelinesPage {
      * @returns {Promise<boolean>} True if input is visible
      */
     async isPipelineNameInputVisible() {
-        return await this.pipelineNameInput.isVisible({ timeout: 5000 }).catch(() => false);
+        // The name trigger is what renders on the editor page (the input only
+        // appears once opened) — use it as the "still on the page" signal.
+        return await this.pipelineNameTrigger.isVisible({ timeout: 5000 }).catch(() => false);
     }
 
     /**
@@ -3875,27 +3886,30 @@ export class PipelinesPage {
 
     /**
      * Get status counts from history/backfill page
-     * @returns {Promise<{success: number, error: number, warning: number}>} Status counts
+     * @returns {Promise<{success: number, error: number, warning: number, skipped: number}>} Status counts
      */
     async getStatusCounts() {
         // Each status badge stamps `data-test-status="<status>"` (lowercased).
-        // Backend TriggerDataStatus enum (usage.rs) defines exactly four values:
-        //   completed | failed | condition_not_satisfied | skipped
-        // getStatusVariant() in PipelineHistory.vue maps them to badge variants.
+        // Accept both the current RunOutcome vocabulary and legacy trigger
+        // statuses while old rows remain in the triggers stream.
         const successCount = await this.page.locator(
+            '[data-test="pipeline-history-status-badge"][data-test-status="firing"], ' +
+            '[data-test="pipeline-history-status-badge"][data-test-status="normal"], ' +
+            '[data-test="pipeline-history-status-badge"][data-test-status="succeeded"], ' +
             '[data-test="pipeline-history-status-badge"][data-test-status="completed"], ' +
+            '[data-test="pipeline-history-status-badge"][data-test-status="condition_not_satisfied"], ' +
             '[data-test="pipeline-history-status-badge"][data-test-status="success"], ' +
             '[data-test="pipeline-history-status-badge"][data-test-status="ok"]'
         ).count();
         const errorCount = await this.page.locator(
-            '[data-test="pipeline-history-status-badge"][data-test-status="failed"], ' +
-            '[data-test="pipeline-history-status-badge"][data-test-status="error"]'
+            '[data-test="pipeline-history-status-badge"][data-test-status="error"], ' +
+            '[data-test="pipeline-history-status-badge"][data-test-status="notify_failed"], ' +
+            '[data-test="pipeline-history-status-badge"][data-test-status="failed"]'
         ).count();
         const warningCount = await this.page.locator(
             '[data-test="pipeline-history-status-badge"][data-test-status="warning"]'
         ).count();
         const skippedCount = await this.page.locator(
-            '[data-test="pipeline-history-status-badge"][data-test-status="condition_not_satisfied"], ' +
             '[data-test="pipeline-history-status-badge"][data-test-status="skipped"]'
         ).count();
         return {

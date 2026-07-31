@@ -52,7 +52,7 @@ pub type RwAHashSet<K> = tokio::sync::RwLock<HashSet<K>>;
 pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 
 // for DDL commands and migrations
-pub const DB_SCHEMA_VERSION: u64 = 55;
+pub const DB_SCHEMA_VERSION: u64 = 61;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -632,6 +632,74 @@ pub struct Config {
     pub pipeline: Pipeline,
     pub health_check: HealthCheck,
     pub enrichment_table: EnrichmentTable,
+    pub slo: Slo,
+}
+
+/// Feature 5 — SLO measurement (`alerts_2.md` §6b).
+#[derive(Debug, Serialize, EnvConfig, Default)]
+pub struct Slo {
+    // TODO(slo): the SLO feature is deferred; default stays false (and the
+    // SLO menu entry is hidden in MainLayout.vue) until it ships.
+    #[env_config(
+        name = "ZO_SLO_ENABLED",
+        default = false,
+        help = "Enable SLO measurement and SLO-based alerts. Set false to switch the feature off entirely: no per-SLO ingest job is scheduled, nothing is written to the slo_slices stream, and the SLO APIs answer 501."
+    )]
+    pub enabled: bool,
+    #[env_config(
+        name = "ZO_SLO_INGEST_DELAY_SECS",
+        default = 60,
+        help = "How far behind now the ingest job reads, so late-arriving data is present before a slice is measured. A slice is never measured until it is this far in the past."
+    )]
+    pub ingest_delay_secs: i64,
+    #[env_config(
+        name = "ZO_SLO_RECOMPUTE_SLICES",
+        default = 3,
+        help = "How many trailing slices each pass recomputes, to pick up data that arrived after those slices were first measured. Re-emitted rows win on revision."
+    )]
+    pub recompute_slices: i64,
+    #[env_config(
+        name = "ZO_SLO_MIN_COVERAGE",
+        default = 0.9,
+        help = "Coverage floor, 0..1. Below this the SLO reads as no-data and its alerts FREEZE rather than resolving — unmeasured time must never read as uptime."
+    )]
+    pub min_coverage: f64,
+    #[env_config(
+        name = "ZO_SLO_MAX_GROUPS",
+        default = 500,
+        help = "Hard cap on status rows per SLO. Group cardinality past this trips GroupOverflow rather than silently truncating."
+    )]
+    pub max_groups: i64,
+    #[env_config(
+        name = "ZO_SLO_MAX_SLICE_ROWS_PER_ORG",
+        default = 250000000,
+        help = "Per-org budget over logical (group, slice) rows. Bounds the SLOs x GROUPS x window product, which is indefensible even where each factor is individually fine."
+    )]
+    pub max_slice_rows_per_org: i64,
+    #[env_config(
+        name = "ZO_SLO_REVISION_HEADROOM",
+        default = 1.2,
+        help = "Multiplier pricing physical excess (late-data re-emissions) over logical rows. Values below 1.0 are clamped; it is a multiplier, not a discount."
+    )]
+    pub revision_headroom: f64,
+    #[env_config(
+        name = "ZO_SLO_RECONCILE_INTERVAL_SECS",
+        default = 3600,
+        help = "How often the running aggregate is rebuilt from the slices. This is the bound on cache drift after a crash, and is load-bearing rather than hygiene."
+    )]
+    pub reconcile_interval_secs: i64,
+    #[env_config(
+        name = "ZO_SLO_BACKFILL_CHUNK_SECS",
+        default = 86400,
+        help = "How much history one backfill chunk covers. One aggregate query per chunk produces every slice in it."
+    )]
+    pub backfill_chunk_secs: i64,
+    #[env_config(
+        name = "ZO_SLO_MAX_BURN_WINDOW_PAIRS",
+        default = 8,
+        help = "Max distinct (long, short) burn-rate window pairs precomputed per SLO per pass. Alerts share these, so the cost is per SLO, not per alert."
+    )]
+    pub max_burn_window_pairs: i64,
 }
 
 #[derive(Serialize, EnvConfig, Default)]
@@ -1753,8 +1821,44 @@ pub struct Limit {
     pub http_slow_log_threshold: u64,
     #[env_config(name = "ZO_ALERT_SCHEDULE_INTERVAL", default = 10)] // seconds
     pub alert_schedule_interval: i64,
+    #[env_config(
+        name = "ZO_ALERT_HYBRID_COUNT_THRESHOLD",
+        default = 100,
+        help = "Count-based alerts whose row sentinel exceeds this switch to a COUNT(*) decision query plus a 100-row payload sample (alerts_2.md 4.4c). Clamped up to the 100-row floor."
+    )]
+    pub alert_hybrid_count_threshold: i64,
     #[env_config(name = "ZO_ALERT_SCHEDULE_CONCURRENCY", default = 5)]
     pub alert_schedule_concurrency: i64,
+    #[env_config(
+        name = "ZO_ALERT_MAX_GROUPS",
+        default = 500,
+        help = "Cardinality cap for multi-alerts (alerts_2.md M-6): the most per-group state rows one alert may track. Overflow is evaluated and counted but not persisted beyond the cap, and the true count is surfaced as a warning. 0 = unlimited."
+    )]
+    pub alert_max_groups: usize,
+    #[env_config(
+        name = "ZO_ALERT_GROUP_DISAPPEARANCE_K",
+        default = 3,
+        help = "A multi-alert group unseen for K x the alert's frequency is resolved to Ok (alerts_2.md M-7). Must exceed 1, or a single slow evaluation resolves every group and re-fires it on the next pass."
+    )]
+    pub alert_group_disappearance_k: i64,
+    #[env_config(
+        name = "ZO_ALERT_GROUP_REAP_GRACE_SECS",
+        default = 3600,
+        help = "How long a resolved multi-alert group's state row is retained before deletion (alerts_2.md M-7). Its transition history is kept regardless."
+    )]
+    pub alert_group_reap_grace_secs: i64,
+    #[env_config(
+        name = "ZO_ALERT_MAX_GROUP_NOTIFICATIONS_PER_EVAL",
+        default = 0,
+        help = "Cap on per-group notifications sent by one multi-alert evaluation (alerts_2.md §5.5 MN-8/D48). 0 = unlimited, which is the default because paging per group is the feature's contract and the group cap already bounds the worst case. Dispatch is worst-first, so a cap always delivers the most severe groups; anything dropped is logged."
+    )]
+    pub alert_max_group_notifications_per_eval: usize,
+    #[env_config(
+        name = "ZO_ALERT_GROUP_SWEEP_INTERVAL",
+        default = 60,
+        help = "How often the multi-alert group lifecycle sweep runs, in seconds (alerts_2.md M-7). The sweep only decides fates on elapsed time, so it need not match any alert's frequency. 0 disables it, which stops vanished groups from ever resolving or being reaped."
+    )]
+    pub alert_group_sweep_interval: u64,
     #[env_config(name = "ZO_ALERT_SCHEDULE_TIMEOUT", default = 90)] // seconds
     pub alert_schedule_timeout: i64,
     #[env_config(
@@ -1811,6 +1915,18 @@ pub struct Limit {
     )]
     pub scheduler_backfill_concurrency: i64,
     #[env_config(
+        name = "ZO_SCHEDULER_SLO_CONCURRENCY",
+        default = 0,
+        help = "Max SLO SLI-ingest jobs pulled per cycle and the worker-pool size. Only used when ZO_SCHEDULER_PER_MODULE_PULLERS=true. 0 inherits ZO_ALERT_SCHEDULE_CONCURRENCY."
+    )]
+    pub scheduler_slo_concurrency: i64,
+    #[env_config(
+        name = "ZO_SCHEDULER_SLO_BACKFILL_CONCURRENCY",
+        default = 1,
+        help = "Max SLO backfill jobs pulled per cycle and the SLO backfill worker-pool size. Only used when ZO_SCHEDULER_PER_MODULE_PULLERS=true. Defaults to 1 so a bulk historical scan never crowds out latency-sensitive incremental SLI passes."
+    )]
+    pub scheduler_slo_backfill_concurrency: i64,
+    #[env_config(
         name = "ZO_SCHEDULER_ANOMALY_CONCURRENCY",
         default = 0,
         help = "Max anomaly-detection jobs pulled per cycle and the worker-pool size. Only used when ZO_SCHEDULER_PER_MODULE_PULLERS=true. 0 inherits ZO_ALERT_SCHEDULE_CONCURRENCY."
@@ -1844,6 +1960,18 @@ pub struct Limit {
         help = "Poll cadence in seconds for the backfill puller. Only used when ZO_SCHEDULER_PER_MODULE_PULLERS=true. 0 inherits ZO_ALERT_SCHEDULE_INTERVAL."
     )]
     pub scheduler_backfill_interval: i64,
+    #[env_config(
+        name = "ZO_SCHEDULER_SLO_INTERVAL",
+        default = 0, // seconds
+        help = "Poll cadence in seconds for the SLO SLI-ingest puller. Only used when ZO_SCHEDULER_PER_MODULE_PULLERS=true. 0 inherits ZO_ALERT_SCHEDULE_INTERVAL."
+    )]
+    pub scheduler_slo_interval: i64,
+    #[env_config(
+        name = "ZO_SCHEDULER_SLO_BACKFILL_INTERVAL",
+        default = 0, // seconds
+        help = "Poll cadence in seconds for the SLO backfill puller. Only used when ZO_SCHEDULER_PER_MODULE_PULLERS=true. 0 inherits ZO_ALERT_SCHEDULE_INTERVAL."
+    )]
+    pub scheduler_slo_backfill_interval: i64,
     #[env_config(
         name = "ZO_SCHEDULER_ANOMALY_INTERVAL",
         default = 0, // seconds
@@ -3796,6 +3924,18 @@ pub fn ensure_not_empty(s: &str, name: &str) -> Result<(), anyhow::Error> {
 
 #[cfg(test)]
 mod tests {
+    /// Every `#[env_config]` default must parse.
+    ///
+    /// The macro reads defaults from a **string literal**, so a Rust digit
+    /// separator (`86_400`) is not a number to it — it is a `ParseIntError`
+    /// raised inside `init()`, which panics the process at startup rather
+    /// than failing anything reviewable. This test is the only cheap guard:
+    /// it forces every default through the same parse the binary does.
+    #[test]
+    fn every_env_config_default_parses() {
+        let _ = super::Config::init().expect("a default failed to parse");
+    }
+
     use super::*;
 
     #[test]

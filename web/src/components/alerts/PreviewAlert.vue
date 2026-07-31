@@ -45,6 +45,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { ref, watch, onMounted, computed, nextTick } from "vue";
+import { buildThresholdMarkLines } from "@/utils/alerts/thresholdMarkLines";
+import {
+  cleanAggregationQuery,
+  getDefaultDashboardPanelData,
+} from "@/utils/alerts/aggregationPreviewQuery";
 import PanelSchemaRenderer from "../dashboards/PanelSchemaRenderer.vue";
 import { reactive } from "vue";
 import { onBeforeMount } from "vue";
@@ -54,110 +59,6 @@ import { useI18n } from "vue-i18n";
 import searchService from "@/services/search";
 import { b64EncodeUnicode, smartDecodeVrlFunction } from "@/utils/zincutils";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-
-const getDefaultDashboardPanelData: any = () => ({
-  data: {
-    version: 2,
-    id: "",
-    type: "line",
-    title: "",
-    description: "",
-    config: {
-      show_legends: true,
-      legends_position: "bottom",
-      unit: "short",
-      unit_custom: "",
-      promql_legend: "",
-      axis_border_show: true,
-      connect_nulls: true,
-      no_value_replacement: "",
-      wrap_table_cells: false,
-      table_transpose: false,
-      table_dynamic_columns: false,
-      base_map: {
-        type: "osm",
-      },
-      map_view: {
-        zoom: 1,
-        lat: 0,
-        lng: 0,
-      },
-      // Custom chart options for alert preview to prevent tooltip clipping
-      custom_chart_options: {
-        tooltip: {
-          appendToBody: true,
-          confine: false,
-        },
-      },
-      mark_line: [],
-    },
-    queryType: "sql",
-    queries: [
-      {
-        query: "",
-        customQuery: false,
-        query_fn: null,
-        fields: {
-          stream: "",
-          stream_type: "logs",
-          x: [],
-          y: [],
-          z: [],
-          breakdown: [],
-          filter: {
-            filterType: "group",
-            logicalOperator: "AND",
-            conditions: [],
-          },
-          latitude: null,
-          longitude: null,
-          weight: null,
-        },
-        config: {
-          promql_legend: "",
-          layer_type: "scatter",
-          weight_fixed: 1,
-          limit: 0,
-          // gauge min and max values
-          min: 0,
-          max: 100,
-          time_shift: [],
-        },
-      },
-    ],
-  },
-  layout: {
-    splitter: 20,
-    querySplitter: 20,
-    showQueryBar: false,
-    isConfigPanelOpen: false,
-    currentQueryIndex: 0,
-  },
-  meta: {
-    parsedQuery: "",
-    dragAndDrop: {
-      dragging: false,
-      dragElement: null,
-      dragSource: null,
-      dragSourceIndex: null,
-      currentDragArea: null,
-      targetDragIndex: null,
-    },
-    errors: {
-      queryErrors: [],
-    },
-    editorValue: "",
-    dateTime: { start_time: "", end_time: "" },
-    filterValue: <any>[],
-    stream: {
-      selectedStreamFields: [],
-      customQueryFields: [],
-      functions: [],
-      streamResults: <any>[],
-      filterField: "",
-    },
-  },
-});
 
 let dashboardPanelData: any = null;
 
@@ -263,51 +164,6 @@ const searchTypeForPanel = computed(() => (props.isAggregationEnabled ? "dashboa
 //  • Ensure histogram(_timestamp) AS zo_sql_key is in SELECT and GROUP BY
 //  • Move zo_sql_num immediately after zo_sql_key in the SELECT list so the
 //    field order is: zo_sql_key, zo_sql_num, <breakdown fields…>
-const cleanAggregationQuery = (query: string): string => {
-  let cleaned = query;
-  // Remove HAVING clause (and everything after it)
-  cleaned = cleaned.replace(/\s+HAVING\s+[\s\S]*$/gi, "");
-  // Remove zo_sql_min_time and zo_sql_max_time from SELECT list
-  cleaned = cleaned.replace(/,\s*[^,\n]*?\s+[aA][sS]\s+zo_sql_min_time/g, "");
-  cleaned = cleaned.replace(/,\s*[^,\n]*?\s+[aA][sS]\s+zo_sql_max_time/g, "");
-  // Rename aggregation value aliases to zo_sql_num
-  cleaned = cleaned.replace(/\bzo_sql_val\b/g, "zo_sql_num");
-  cleaned = cleaned.replace(/\balert_agg_value\b/g, "zo_sql_num");
-  // Ensure histogram(...) is aliased as zo_sql_key
-  cleaned = cleaned.replace(/\bhistogram\s*\([^)]+\)(?:\s+[aA][sS]\s+\w+)?/g, (match) => {
-    if (/\bas\s+zo_sql_key\b/i.test(match)) return match;
-    return match.replace(/\s+[aA][sS]\s+\w+$/, "") + " AS zo_sql_key";
-  });
-  // If zo_sql_key is still absent, inject histogram(_timestamp) AS zo_sql_key
-  if (!/\bzo_sql_key\b/i.test(cleaned)) {
-    cleaned = cleaned.replace(/\bSELECT\s+/i, "SELECT histogram(_timestamp) AS zo_sql_key, ");
-    if (/\bGROUP\s+BY\s+/i.test(cleaned)) {
-      // Existing GROUP BY — prepend zo_sql_key to it
-      cleaned = cleaned.replace(/\bGROUP\s+BY\s+/i, "GROUP BY zo_sql_key, ");
-    } else {
-      // No GROUP BY at all — append one before ORDER BY / LIMIT or at end
-      if (/\bORDER\s+BY\b/i.test(cleaned)) {
-        cleaned = cleaned.replace(/\bORDER\s+BY\b/i, "GROUP BY zo_sql_key ORDER BY");
-      } else if (/\bLIMIT\b/i.test(cleaned)) {
-        cleaned = cleaned.replace(/\bLIMIT\b/i, "GROUP BY zo_sql_key LIMIT");
-      } else {
-        cleaned += " GROUP BY zo_sql_key";
-      }
-    }
-  }
-  // Move zo_sql_num field to sit right after zo_sql_key in the SELECT list.
-  // Pattern: remove ", <expr> AS zo_sql_num" from wherever it is, then
-  // re-insert it immediately after the zo_sql_key field expression.
-  const numFieldMatch = cleaned.match(/,\s*([^,]+?\s+[aA][sS]\s+zo_sql_num)/);
-  if (numFieldMatch) {
-    const numExpr = numFieldMatch[1].trim();
-    // Remove the original occurrence (with its leading comma)
-    cleaned = cleaned.replace(numFieldMatch[0], "");
-    // Insert right after zo_sql_key field (before the next comma or FROM)
-    cleaned = cleaned.replace(/(\bzo_sql_key\b(?:\s*\))?)/i, `$1, ${numExpr}`);
-  }
-  return cleaned.trim();
-};
 
 // Determine chart type based on result schema from API
 const determineChartType = (extractedFields: {
@@ -463,9 +319,20 @@ const fetchQuerySchema = async () => {
         label: field,
       }));
 
-      const thresholdValue =
-        props.formData.query_condition?.aggregation?.having?.value ??
-        props.formData.trigger_condition?.threshold;
+      const aggregationCfg = props.formData.query_condition?.aggregation;
+      const hasHavingValue =
+        aggregationCfg?.having?.value !== undefined &&
+        aggregationCfg?.having?.value !== null &&
+        aggregationCfg?.having?.value !== "";
+      const thresholdValue = hasHavingValue
+        ? aggregationCfg.having.value
+        : props.formData.trigger_condition?.threshold;
+      // Warning must come from the same threshold family as the critical value
+      // (aggregate value vs row count) — mixing the two would draw a line on
+      // the wrong scale.
+      const warningValue = hasHavingValue
+        ? aggregationCfg?.warning_value
+        : props.formData.trigger_condition?.warning_threshold;
 
       dashboardPanelData.data.type = "line";
       dashboardPanelData.data.queryType = "sql";
@@ -501,13 +368,10 @@ const fetchQuerySchema = async () => {
       ];
       dashboardPanelData.data.queries[0].fields.z = [];
       dashboardPanelData.data.queries[0].fields.breakdown = breakdown;
-      dashboardPanelData.data.config.mark_line = [
-        {
-          name: "Threshold",
-          type: "yAxis",
-          value: String(thresholdValue ?? ""),
-        },
-      ];
+      dashboardPanelData.data.config.mark_line = buildThresholdMarkLines(
+        thresholdValue,
+        warningValue,
+      );
 
       if (
         !dashboardPanelData.data.queries[0].fields.filter ||
@@ -573,15 +437,12 @@ const fetchQuerySchema = async () => {
     dashboardPanelData.data.queries[0].fields.stream = props.formData.stream_name;
     dashboardPanelData.data.queries[0].fields.stream_type = props.formData.stream_type;
     dashboardPanelData.data.queryType = "sql";
-    dashboardPanelData.data.config.mark_line = props.formData.trigger_condition?.threshold
-      ? [
-          {
-            name: "Threshold",
-            type: "yAxis",
-            value: String(props.formData.trigger_condition.threshold),
-          },
-        ]
-      : [];
+    // Critical + optional Warning marklines (alerts_2.md Feature 1). Both are
+    // drawn so the two bands are visible on the preview, matching the mock.
+    dashboardPanelData.data.config.mark_line = buildThresholdMarkLines(
+      props.formData.trigger_condition?.threshold,
+      props.formData.trigger_condition?.warning_threshold,
+    );
 
     // Set the fields from schema
     dashboardPanelData.data.queries[0].fields.x = fields.x;
@@ -1047,11 +908,10 @@ const refreshData = () => {
     dashboardPanelData.data.type = "line"; // Default chart type for PromQL time-series
 
     // Add threshold mark line from promql_condition
-    const promqlThreshold = props.formData.query_condition?.promql_condition?.value;
-    dashboardPanelData.data.config.mark_line =
-      promqlThreshold !== undefined && promqlThreshold !== null && promqlThreshold !== ""
-        ? [{ name: "Threshold", type: "yAxis", value: String(promqlThreshold) }]
-        : [];
+    dashboardPanelData.data.config.mark_line = buildThresholdMarkLines(
+      props.formData.query_condition?.promql_condition?.value,
+      props.formData.query_condition?.promql_warning_value,
+    );
 
     // Update both refs together to prevent double watcher triggers
     const newChartData = cloneDeep(dashboardPanelData.data);
@@ -1097,19 +957,12 @@ const refreshData = () => {
     dashboardPanelData.data.config.table_dynamic_columns = false; // VRL not supported in custom mode
     dashboardPanelData.data.queries[0].fields.stream = props.formData.stream_name;
     dashboardPanelData.data.queries[0].fields.stream_type = props.formData.stream_type;
-    const thresholdValue = props.formData.trigger_condition?.threshold;
-
     dashboardPanelData.data.queryType = "sql";
     dashboardPanelData.data.type = "line"; // Line chart for histogram
-    dashboardPanelData.data.config.mark_line = thresholdValue
-      ? [
-          {
-            name: "Threshold",
-            type: "yAxis",
-            value: String(thresholdValue),
-          },
-        ]
-      : [];
+    dashboardPanelData.data.config.mark_line = buildThresholdMarkLines(
+      props.formData.trigger_condition?.threshold,
+      props.formData.trigger_condition?.warning_threshold,
+    );
 
     // Update both refs together to prevent double watcher triggers
     const newChartData = cloneDeep(dashboardPanelData.data);

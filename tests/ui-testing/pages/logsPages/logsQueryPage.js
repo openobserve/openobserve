@@ -11,7 +11,7 @@ export class LogsQueryPage {
     this.errorMessage = '[data-test="logs-search-error-state"]';
     this.utilitiesMenuButton = '[data-test="logs-search-bar-utilities-menu-btn"]';
     this.resetFiltersButton = '[data-test="logs-search-bar-reset-filters-btn"]';
-    this.resultDetail = '[data-test="logs-search-result-detail-undefined"]';
+    this.resultDetail = '[data-test="o2-table-row-0"]';
     this.histogramToggle = '[data-test="logs-search-bar-show-histogram-toggle-btn"]';
     // OSwitch renders the wrapper data-test on a div and the state on an inner
     // <button data-state="checked|unchecked"> — drill into that button. Note: a sibling

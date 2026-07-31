@@ -110,8 +110,6 @@ function createWrapper(props: Record<string, any> = {}) {
       plugins: [i18n, store],
       stubs: {
         ODrawer: ODrawerStub,
-        QTimeline: { template: "<div><slot /></div>" },
-        QTimelineEntry: { template: "<div />" },
       },
     },
   });

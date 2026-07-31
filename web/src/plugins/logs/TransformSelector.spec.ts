@@ -106,25 +106,7 @@ const functionOptions = [
 const mountComponent = (propsOverrides = {}) =>
   mount(TransformSelector, {
     global: {
-      stubs: {
-        QBtnGroup: { template: "<div><slot /></div>" },
-        QToggle: { template: '<input type="checkbox" />' },
-        QTooltip: true,
-        QBtnDropdown: {
-          template: '<div data-test="btn-dropdown"><slot /><slot name="default" /></div>',
-        },
-        QList: { template: "<ul><slot /></ul>" },
-        QSelect: { template: "<select />" },
-        QInput: { template: "<input />" },
-        QIcon: { template: "<span />" },
-        QItem: { template: "<li><slot /></li>" },
-        QItemSection: { template: "<div><slot /></div>" },
-        QItemLabel: { template: "<span><slot /></span>" },
-        QBtn: {
-          template:
-            '<button :disabled="$attrs.disable" @click="$attrs.onClick?.($event)"><slot /></button>',
-        },
-      },
+      stubs: {},
     },
     props: {
       functionOptions,

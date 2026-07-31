@@ -31,7 +31,9 @@ const { mockQCopyToClipboard, cellActionsColumnRef } = vi.hoisted(() => ({
   mockQCopyToClipboard: vi.fn().mockResolvedValue(undefined),
   cellActionsColumnRef: {
     id: undefined as string | undefined,
-    columnDef: { meta: { disableCellAction: false } },
+    // #cell-hover-actions passes the OTableColumnDef directly, so `meta` lives
+    // at the top level.
+    meta: { disableCellAction: false },
   },
 }));
 vi.mock("@/utils/clipboard", () => ({
@@ -76,47 +78,49 @@ vi.mock("@/plugins/logs/data-table/CellActions.vue", () => ({
   },
 }));
 
-// ─── TenstackTable stub — renders loading/empty/cell slots ──────────────────
-// Also renders cell-actions slot so CellActions can be exercised in tests.
+// ─── OTable stub — renders loading/empty/cell slots ─────────
+// Also renders the cell-hover-actions slot so CellActions can be exercised.
 // setup() exposes cellActionsColumnRef so each test can control column.id — the
 // component's @copy handler uses column.id + row[column.id] from the slot scope,
 // not the event args emitted by CellActions.
-vi.mock("@/components/TenstackTable.vue", () => ({
+vi.mock("@/lib/core/Table/OTable.vue", () => ({
   default: {
-    name: "TenstackTable",
+    name: "OTable",
     props: [
       "columns",
-      "rows",
+      "data",
       "rowClass",
       "loading",
       "sortBy",
       "sortOrder",
       "sortFieldMap",
+      "sorting",
       "rowHeight",
+      "virtualScroll",
+      "fillHeight",
+      "scrollEl",
+      "scrollMargin",
       "enableColumnReorder",
-      "enableRowExpand",
-      "enableTextHighlight",
-      "enableCellActions",
-      "enableStatusBar",
       "defaultColumns",
+      "showGlobalFilter",
       "selectedStreamFields",
     ],
-    emits: ["click:data-row", "sort-change", "closeColumn", "update:columnOrder"],
+    emits: ["row-click", "sort-change", "close-column", "column-order-change"],
     setup() {
       return { cellActionsColumn: cellActionsColumnRef };
     },
-    // Mirror the real skeleton behaviour used by TenstackTable.
-    // Also render cell slots for the first row so slot-split tests can assert on rendered output.
+    // Mirror the loading skeleton + cell slots so slot-split tests can assert on
+    // rendered output.
     template: `
       <div data-test="stub-traces-table">
         <div v-if="loading && (!$slots.loading)" data-test="tenstack-table-skeleton-body">Skeleton loading...</div>
-        <slot v-if="loading && (!rows || rows.length === 0) && $slots.loading" name="loading" />
+        <slot v-if="loading && (!data || data.length === 0) && $slots.loading" name="loading" />
         <slot v-else-if="!loading" name="empty" />
-        <template v-if="rows && rows.length">
-          <div data-test="stub-cell-span_status"><slot name="cell-span_status" :item="rows[0]" /></div>
-          <div data-test="stub-cell-status"><slot name="cell-status" :item="rows[0]" /></div>
+        <template v-if="data && data.length">
+          <div data-test="stub-cell-span_status"><slot name="cell-span_status" :row="data[0]" /></div>
+          <div data-test="stub-cell-status"><slot name="cell-status" :row="data[0]" /></div>
           <div data-test="stub-cell-actions-wrapper">
-            <slot name="cell-actions" :row="rows[0]" :column="cellActionsColumn" :active="true" />
+            <slot name="cell-hover-actions" :row="data[0]" :column="cellActionsColumn" :active="true" />
           </div>
         </template>
       </div>
@@ -257,8 +261,8 @@ describe("TracesSearchResultList", () => {
     it("re-emits row-click from TracesTable", async () => {
       const hits = [makeHit("t1")];
       wrapper = mount_({ hits, loading: false });
-      const table = wrapper.findComponent({ name: "TenstackTable" });
-      await table.vm.$emit("click:data-row", hits[0]);
+      const table = wrapper.findComponent({ name: "OTable" });
+      await table.vm.$emit("row-click", hits[0]);
       expect(wrapper.emitted("row-click")).toBeTruthy();
       expect(wrapper.emitted("row-click")![0]).toEqual([hits[0]]);
     });
@@ -268,7 +272,7 @@ describe("TracesSearchResultList", () => {
     it.skip("re-emits load-more from TracesTable", async () => {
       const hits = [makeHit("t1")];
       wrapper = mount_({ hits, loading: false });
-      const table = wrapper.findComponent({ name: "TenstackTable" });
+      const table = wrapper.findComponent({ name: "OTable" });
       await table.vm.$emit("load-more");
       expect(wrapper.emitted("load-more")).toBeTruthy();
     });
@@ -278,21 +282,21 @@ describe("TracesSearchResultList", () => {
   describe("row error class", () => {
     it("passes a rowClass function to TracesTable", () => {
       wrapper = mount_({ hits: [makeHit("t1")], loading: false });
-      const table = wrapper.findComponent({ name: "TenstackTable" });
+      const table = wrapper.findComponent({ name: "OTable" });
       const rowClassFn = table.props("rowClass") as (row: any) => string;
       expect(typeof rowClassFn).toBe("function");
     });
 
     it("returns 'oz-table__row--error' for rows with errors", () => {
       wrapper = mount_({ hits: [makeHit("t1", 2)], loading: false });
-      const table = wrapper.findComponent({ name: "TenstackTable" });
+      const table = wrapper.findComponent({ name: "OTable" });
       const rowClassFn = table.props("rowClass") as (row: any) => string;
       expect(rowClassFn(makeHit("t1", 2))).toBe("oz-table__row--error");
     });
 
     it("returns empty string for rows without errors", () => {
       wrapper = mount_({ hits: [makeHit("t1", 0)], loading: false });
-      const table = wrapper.findComponent({ name: "TenstackTable" });
+      const table = wrapper.findComponent({ name: "OTable" });
       const rowClassFn = table.props("rowClass") as (row: any) => string;
       expect(rowClassFn(makeHit("t1", 0))).toBe("");
     });
@@ -316,7 +320,7 @@ describe("TracesSearchResultList", () => {
         loading: false,
         searchMode: "spans",
       });
-      const table = wrapper.findComponent({ name: "TenstackTable" });
+      const table = wrapper.findComponent({ name: "OTable" });
       const rowClassFn = table.props("rowClass") as (row: any) => string;
       expect(rowClassFn(makeSpanHit("s1", "ERROR"))).toBe("oz-table__row--error");
     });
@@ -327,7 +331,7 @@ describe("TracesSearchResultList", () => {
         loading: false,
         searchMode: "spans",
       });
-      const table = wrapper.findComponent({ name: "TenstackTable" });
+      const table = wrapper.findComponent({ name: "OTable" });
       const rowClassFn = table.props("rowClass") as (row: any) => string;
       expect(rowClassFn(makeSpanHit("s1", "OK"))).toBe("");
     });
@@ -338,7 +342,7 @@ describe("TracesSearchResultList", () => {
         loading: false,
         searchMode: "traces",
       });
-      const table = wrapper.findComponent({ name: "TenstackTable" });
+      const table = wrapper.findComponent({ name: "OTable" });
       const rowClassFn = table.props("rowClass") as (row: any) => string;
       // traces mode: errors > 0 triggers error class
       expect(rowClassFn({ ...makeHit("t1", 2), span_status: "OK" })).toBe("oz-table__row--error");
@@ -381,8 +385,8 @@ describe("TracesSearchResultList", () => {
         sortOrder: "asc",
         searchMode: "spans" as any,
       });
-      const table = wrapper.findComponent({ name: "TenstackTable" });
-      await table.vm.$emit("closeColumn", { id: "span_status" });
+      const table = wrapper.findComponent({ name: "OTable" });
+      await table.vm.$emit("close-column", { id: "span_status" });
 
       expect(wrapper.emitted("sort-change")).toBeTruthy();
       expect(wrapper.emitted("sort-change")![0]).toEqual(["start_time", "desc"]);
@@ -396,8 +400,8 @@ describe("TracesSearchResultList", () => {
         sortOrder: "desc",
         searchMode: "spans" as any,
       });
-      const table = wrapper.findComponent({ name: "TenstackTable" });
-      await table.vm.$emit("closeColumn", { id: "span_status" });
+      const table = wrapper.findComponent({ name: "OTable" });
+      await table.vm.$emit("close-column", { id: "span_status" });
 
       expect(wrapper.emitted("sort-change")).toBeFalsy();
     });
@@ -410,8 +414,8 @@ describe("TracesSearchResultList", () => {
         sortOrder: "desc",
         searchMode: "spans" as any,
       });
-      const table = wrapper.findComponent({ name: "TenstackTable" });
-      await table.vm.$emit("closeColumn", { id: "span_status" });
+      const table = wrapper.findComponent({ name: "OTable" });
+      await table.vm.$emit("close-column", { id: "span_status" });
 
       expect(sharedSearchObj.data.stream.selectedFields).not.toContain("span_status");
       expect(sharedSearchObj.data.resultGrid.columns.some((c: any) => c.id === "span_status")).toBe(

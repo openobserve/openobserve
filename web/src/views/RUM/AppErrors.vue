@@ -111,6 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             stream-type="logs"
             :enable-grouping="true"
             :query="errorTrackingState.data.editorValue"
+            :base-filter="fieldListBaseFilter"
             @event-emitted="handleSidebarEvent"
           />
         </div>
@@ -261,7 +262,7 @@ import ErrorsFilterBar, {
 import OTag from "@/lib/core/Badge/OTag.vue";
 import useErrorTracking from "@/composables/useErrorTracking";
 import useErrorIssuesData from "@/composables/rum/useErrorIssuesData";
-import { issueKey, formatRelativeTime } from "@/utils/rum/errorIssueUtils";
+import { issueKey, formatRelativeTime, escapeSqlString } from "@/utils/rum/errorIssueUtils";
 import { addCommasToNumber } from "@/utils/formatters";
 import { useStore } from "vuex";
 import DateTime from "@/components/DateTime.vue";
@@ -441,6 +442,19 @@ const onServiceFilterChange = (value: string) => {
   serviceFilter.value = value;
   runQuery();
 };
+
+// The sidebar shares `_rumdata` with sessions/views/actions, so without these
+// its value counts are whole-stream counts and dwarf the issue table's. Mirror
+// the non-editable part of the issues query (buildIssuesSql) — `type='error'`
+// plus the service chip. The status/type chips are excluded on purpose: they
+// filter the grouped result set client-side, not the underlying rows.
+const fieldListBaseFilter = computed(() => {
+  const clauses = ["type='error'"];
+  if (serviceFilter.value) {
+    clauses.push(`service='${escapeSqlString(serviceFilter.value)}'`);
+  }
+  return clauses.join(" AND ");
+});
 
 // Dynamic editor height based on content lines
 const errorEditorHeight = computed(() => {

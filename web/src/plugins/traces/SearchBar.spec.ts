@@ -1096,7 +1096,6 @@ describe("SearchBar", () => {
 
       const resetBtn = wrapper.find('[data-test="traces-search-bar-reset-filters-btn"]');
       expect(resetBtn.exists()).toBe(true);
-      // QTooltip uses <Teleport> and renders outside the button — check via component tree
       expect(wrapper.findComponent({ name: "OTooltip" }).exists()).toBe(true);
     });
 

@@ -29,7 +29,7 @@ use config::{
     ider::SnowflakeIdGenerator,
     meta::{
         alerts::alert::Alert,
-        self_reporting::usage::{RequestStats, TriggerData, TriggerDataStatus, TriggerDataType},
+        self_reporting::usage::{RequestStats, RunOutcome, TriggerData, TriggerDataType},
         stream::{PartitionTimeLevel, StreamParams, StreamPartition, StreamType},
     },
     utils::{flatten, json::*, schema::format_partition_key},
@@ -150,7 +150,7 @@ pub async fn evaluate_trigger(triggers: TriggerAlertData) {
             next_run_at: now,
             is_realtime: true,
             is_silenced: false,
-            status: TriggerDataStatus::Completed,
+            status: RunOutcome::Firing,
             start_time: now,
             end_time: 0,
             retries: 0,
@@ -173,12 +173,12 @@ pub async fn evaluate_trigger(triggers: TriggerAlertData) {
             alert.name
         );
         match alert
-            .send_notification(&trace_id, val, now, None, now)
+            .send_notification(&trace_id, val, now, None, now, None, None, None)
             .await
         {
             Err(e) => {
                 log::error!("Failed to send notification: {e}");
-                trigger_data_stream.status = TriggerDataStatus::Failed;
+                trigger_data_stream.status = RunOutcome::NotifyFailed;
                 trigger_data_stream.error =
                     Some(format!("error sending notification for alert: {e}"));
             }

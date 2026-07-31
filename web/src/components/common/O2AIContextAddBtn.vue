@@ -22,10 +22,9 @@
 </template>
 
 <style scoped>
-/* keep(lib-override:o2-button): `.ai-btn` is this component's row-button modifier — it is
-   passed in through `props.class` by plugins/logs/TenstackTable.vue and
-   components/TenstackTable.vue, and every element it styles (the OButton root and
-   the <img class="ai-icon"> above) is rendered HERE, so this is the owning scope.
+/* keep(lib-override:o2-button): `.ai-btn` is this component's row-button modifier,
+   an absolute-positioning variant a caller can opt into via `props.class`. Every
+   element it styles is rendered here, so this is the owning scope.
    Why the !important: OButton's own base `relative` outranks the positioning
    passed via props. `translate` (not `transform`) is the property to override —
    Tailwind v4 emits -translate-y-1/2 through the CSS `translate` shorthand. */
@@ -67,11 +66,11 @@ const props = defineProps({
     default: "",
     required: false,
   },
-  //the size of the button can be in xs , sm , md , lg , xl
-  //can be in pixels as well
+  // Accepted for backward compatibility but deliberately not applied: the button
+  // always renders at the "icon-toolbar" size so every AI icon looks identical.
   size: {
     type: String,
-    default: "xs",
+    default: "icon-toolbar",
     required: false,
   },
   // String or object: Vue compiles static style="" attributes into objects.

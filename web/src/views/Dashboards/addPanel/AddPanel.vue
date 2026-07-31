@@ -16,115 +16,132 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/no-unused-components -->
 <template>
-  <OPageLayout
-    :back="{
-      label: currentDashboardData.data?.title || t('dashboard.header'),
-      onClick: goBack,
-      dataTest: 'dashboard-back-btn',
-    }"
-    :title="editMode ? t('panel.editPanel') : t('panel.addPanel')"
-    bleed
-  >
-    <template #header-tabs>
-      <OForm id="add-panel-form" :form="form">
-        <OFormInput
-          data-test="dashboard-panel-name"
-          name="title"
-          :label="t('panel.name')"
-          required
-          labelPosition="inside"
-          class="dynamic-input max-w-125 min-w-50 [transition:width_0.2s_ease]"
-          :style="inputStyle"
-        />
-      </OForm>
-    </template>
-    <template #actions>
-      <OButton
-        variant="outline"
-        size="sm"
-        @click="showTutorial"
-        data-test="dashboard-panel-tutorial-btn"
-        >{{ t("dashboard.addPanel.dashboardTutorial") }}</OButton
-      >
-      <OButton
-        v-if="!['html', 'markdown', 'custom_chart'].includes(dashboardPanelData.data.type)"
-        variant="outline"
-        size="icon-sm"
-        @click="showViewPanel = true"
-        data-test="dashboard-panel-data-view-query-inspector-btn"
-        icon-left="info-outline"
-      >
-        <OTooltip
-          side="left"
-          align="center"
-          :content="t('dashboard.addPanel.queryInspector')"
-          shortcut-id="panelEditorQueryInspector"
-        />
-      </OButton>
-      <DateTimePickerDashboard
-        v-if="selectedDate"
-        v-model="selectedDate"
-        ref="dateTimePickerRef"
-        :disable="disable"
-        @hide="setTimeForVariables"
-        data-test="dashboard-global-date-time-picker"
-      />
-      <OButton
-        variant="outline-destructive"
-        size="sm-action"
-        @click="goBackToDashboardList"
-        data-test="dashboard-panel-discard"
-        >{{ t("panel.discard") }}</OButton
-      >
-      <OButton
-        variant="outline"
-        size="sm-action"
-        data-test="dashboard-panel-save"
-        type="submit"
-        form="add-panel-form"
-        :loading="isSavingPanel"
-        >{{ t("panel.save") }}</OButton
-      >
-      <template v-if="!['html', 'markdown'].includes(dashboardPanelData.data.type)">
-        <OButton
-          v-if="config.isEnterprise === 'false'"
-          variant="primary"
-          size="sm-action"
-          data-test="dashboard-apply"
-          :loading="searchRequestTraceIds.length > 0"
-          :disabled="searchRequestTraceIds.length > 0"
-          @click="() => runQuery(false)"
-          >{{ t("panel.apply") }}</OButton
+  <OPageLayout bleed>
+    <!-- The panel NAME is the page title (inline-edited in place) and the
+         mode is demoted to the subtitle, so the header answers "which panel"
+         first and "what am I doing to it" second. That means owning the
+         header: <OForm> has to be an ANCESTOR of OPageHeader for the title
+         field to inject the form context, and it cannot simply wrap the whole
+         page because the body renders AddSettingVariable, which owns a form of
+         its own (nested <form> elements). `contents` keeps the wrapper out of
+         the layout box model. The header's Save still submits by form id. -->
+    <template #header>
+      <OForm id="add-panel-form" :form="form" class="contents">
+        <OPageHeader
+          :back="{
+            label: currentDashboardData.data?.title || t('dashboard.header'),
+            onClick: goBack,
+            dataTest: 'dashboard-back-btn',
+          }"
+          :subtitle="editMode ? t('panel.editPanel') : t('panel.addPanel')"
+          title-overflow="visible"
         >
-        <OButtonGroup v-if="config.isEnterprise === 'true'" radius="lg">
-          <OButton
-            :data-test="searchRequestTraceIds.length > 0 ? 'dashboard-cancel' : 'dashboard-apply'"
-            :variant="searchRequestTraceIds.length > 0 ? 'destructive' : 'primary'"
-            size="sm-action"
-            @click="onApplyBtnClick"
-          >
-            {{ searchRequestTraceIds.length > 0 ? t("panel.cancel") : t("panel.apply") }}
-          </OButton>
-
-          <ODropdown side="bottom" align="end">
-            <template #trigger>
-              <OButton
-                :variant="searchRequestTraceIds.length > 0 ? 'destructive' : 'primary'"
-                size="icon-sm"
-                class="h-8.5!"
-                :disabled="searchRequestTraceIds.length > 0"
-                icon-left="keyboard-arrow-down"
+          <template #title>
+            <OFormInlineEdit
+              data-test="dashboard-panel-name"
+              name="title"
+              :placeholder="t('panel.namePlaceholder')"
+              :aria-label="t('panel.name')"
+              :edit-hint="
+                panelAutoName.isAuto.value ? t('common.inlineEdit.autoHint') : t('panel.renameHint')
+              "
+              @update:model-value="panelAutoName.markManual"
+              @commit="panelAutoName.onCommit"
+              @cancel="panelAutoName.onCommit"
+            />
+          </template>
+          <template #actions>
+            <OButton
+              variant="outline"
+              size="sm"
+              @click="showTutorial"
+              data-test="dashboard-panel-tutorial-btn"
+              >{{ t("dashboard.addPanel.dashboardTutorial") }}</OButton
+            >
+            <OButton
+              v-if="!['html', 'markdown', 'custom_chart'].includes(dashboardPanelData.data.type)"
+              variant="outline"
+              size="icon-sm"
+              @click="showViewPanel = true"
+              data-test="dashboard-panel-data-view-query-inspector-btn"
+              icon-left="info-outline"
+            >
+              <OTooltip
+                side="left"
+                align="center"
+                :content="t('dashboard.addPanel.queryInspector')"
+                shortcut-id="panelEditorQueryInspector"
               />
+            </OButton>
+            <DateTimePickerDashboard
+              v-if="selectedDate"
+              v-model="selectedDate"
+              ref="dateTimePickerRef"
+              :disable="disable"
+              @hide="setTimeForVariables"
+              data-test="dashboard-global-date-time-picker"
+            />
+            <OButton
+              variant="outline-destructive"
+              size="sm-action"
+              @click="goBackToDashboardList"
+              data-test="dashboard-panel-discard"
+              >{{ t("panel.discard") }}</OButton
+            >
+            <OButton
+              variant="outline"
+              size="sm-action"
+              data-test="dashboard-panel-save"
+              type="submit"
+              form="add-panel-form"
+              :loading="isSavingPanel"
+              >{{ t("panel.save") }}</OButton
+            >
+            <template v-if="!['html', 'markdown'].includes(dashboardPanelData.data.type)">
+              <OButton
+                v-if="config.isEnterprise === 'false'"
+                variant="primary"
+                size="sm-action"
+                data-test="dashboard-apply"
+                :loading="searchRequestTraceIds.length > 0"
+                :disabled="searchRequestTraceIds.length > 0"
+                @click="() => runQuery(false)"
+                >{{ t("panel.apply") }}</OButton
+              >
+              <OButtonGroup v-if="config.isEnterprise === 'true'" radius="lg">
+                <OButton
+                  :data-test="
+                    searchRequestTraceIds.length > 0 ? 'dashboard-cancel' : 'dashboard-apply'
+                  "
+                  :variant="searchRequestTraceIds.length > 0 ? 'destructive' : 'primary'"
+                  size="sm-action"
+                  @click="onApplyBtnClick"
+                >
+                  {{ searchRequestTraceIds.length > 0 ? t("panel.cancel") : t("panel.apply") }}
+                </OButton>
+
+                <ODropdown side="bottom" align="end">
+                  <template #trigger>
+                    <OButton
+                      :variant="searchRequestTraceIds.length > 0 ? 'destructive' : 'primary'"
+                      size="icon-sm"
+                      class="h-8.5!"
+                      :disabled="searchRequestTraceIds.length > 0"
+                      icon-left="keyboard-arrow-down"
+                    />
+                  </template>
+                  <ODropdownItem @select="runQuery(true)">
+                    <div class="flex items-center gap-2">
+                      <OIcon name="refresh" size="xs" />
+                      <span>{{ t("dashboard.addPanel.refreshCacheAndApply") }}</span>
+                    </div>
+                  </ODropdownItem>
+                </ODropdown>
+              </OButtonGroup>
             </template>
-            <ODropdownItem @select="runQuery(true)">
-              <div class="flex items-center gap-2">
-                <OIcon name="refresh" size="xs" />
-                <span>{{ t("dashboard.addPanel.refreshCacheAndApply") }}</span>
-              </div>
-            </ODropdownItem>
-          </ODropdown>
-        </OButtonGroup>
-      </template>
+          </template>
+        </OPageHeader>
+      </OForm>
     </template>
     <!-- PanelEditor Content Area -->
     <PanelEditor
@@ -218,12 +235,15 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 import OForm from "@/lib/forms/Form/OForm.vue";
-import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import OFormInlineEdit from "@/lib/forms/InlineEdit/OFormInlineEdit.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
+import { useAutoName } from "@/composables/useAutoName";
+import { buildPanelAutoName } from "@/utils/autoName";
 import { makeAddPanelSchema, type AddPanelForm } from "./AddPanel.schema";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
+import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 
 const QueryInspector = defineAsyncComponent(() => {
   return import("@/components/dashboards/QueryInspector.vue");
@@ -237,8 +257,9 @@ export default defineComponent({
     OButtonGroup,
     OButton,
     OPageLayout,
+    OPageHeader,
     OForm,
-    OFormInput,
+    OFormInlineEdit,
     ODropdown,
     ODropdownItem,
     OTooltip,
@@ -331,6 +352,28 @@ export default defineComponent({
         }
       },
     );
+
+    // ── Smart panel name ─────────────────────────────────────────────────────
+    // A new panel names itself after what it measures ("Avg of duration by
+    // service") and keeps re-deriving that as the query is built — until the
+    // first keystroke in the header, after which the name is the user's. Edit
+    // mode is excluded outright: a saved panel's title is never regenerated.
+    // dontUpdateMeta keeps a generated title from tripping the "required"
+    // error state before the user has done anything.
+    // The time column is deployment-configurable, so it has to be read from
+    // config rather than assumed to be `_timestamp` — the same value
+    // usePanelFields compares against when it builds the fields.
+    const panelNameSuggestion = computed(() =>
+      buildPanelAutoName(dashboardPanelData, t, {
+        timestampColumn: store.state.zoConfig?.timestamp_column,
+      }),
+    );
+    const panelAutoName = useAutoName({
+      suggestion: panelNameSuggestion,
+      currentValue: () => (form.state.values.title ?? "") as string,
+      apply: (name: string) => form.setFieldValue("title", name, { dontUpdateMeta: true }),
+      enabled: () => !editMode.value,
+    });
 
     let variablesData: any = reactive({});
     const { registerAiChatHandler, removeAiChatHandler } = useAiChat();
@@ -1449,23 +1492,6 @@ export default defineComponent({
 
     // [END] cancel running queries
 
-    const inputStyle = computed(() => {
-      if (!dashboardPanelData.data.title) {
-        return { width: "200px", transition: "width 0.2s ease" };
-      }
-
-      // Grow with the title, but clamp to a 200px floor so the inside label
-      // ("Name of Panel *") always fits. Bounds are enforced inline because the
-      // scoped `.dynamic-input` selector doesn't match OInput through the
-      // OFormInput → Field wrapper layers; inline styles fall through via $attrs
-      // and DO reach the input.
-      const contentWidth = Math.min(
-        Math.max(dashboardPanelData.data.title.length * 8 + 60, 200),
-        400,
-      );
-      return { width: `${contentWidth}px`, transition: "width 0.2s ease" };
-    });
-
     const debouncedUpdateChartConfig = debounce((newVal) => {
       if (!isEqual(chartData.value, newVal)) {
         const configNeedsApiCall = checkIfConfigChangeRequiredApiCallOrNot(chartData.value, newVal);
@@ -1728,7 +1754,7 @@ export default defineComponent({
       cancelAddPanelQuery,
       disable,
       config,
-      inputStyle,
+      panelAutoName,
       setTimeForVariables,
       dateTimeForVariables,
       seriesData,

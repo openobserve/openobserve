@@ -157,284 +157,360 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
 
-        <!-- Steps skeleton -->
-        <template v-if="loading">
-          <OCard class="gap-0 p-0">
-            <OCardSection role="header" class="gap-2">
-              <OSkeleton type="text" class="h-4 w-14" />
-            </OCardSection>
-            <OSeparator />
-            <OCardSection role="body" class="flex flex-col gap-2 p-3">
-              <div
-                v-for="i in 4"
-                :key="i"
-                class="rounded-default border-border-default flex items-center gap-2 border p-2"
-              >
-                <OSkeleton type="rect" class="rounded-default h-12 w-18 shrink-0" />
-                <OSkeleton type="circle" class="h-6 w-6 shrink-0" />
-                <OSkeleton type="text" class="h-4 flex-1" />
-                <OSkeleton type="text" class="h-4 w-16 shrink-0" />
-              </div>
-            </OCardSection>
-          </OCard>
-        </template>
-        <!-- Lambda execution error (no steps) -->
+        <!-- Attempts: a compact selector, because the info bar is already six
+             chips wide and a retried run adds nothing the chip does not say. -->
         <div
-          v-else-if="isErrorRun"
-          class="border-badge-error-ol-border/30 rounded-default m-2 overflow-hidden border bg-[var(--color-badge-error-soft-bg)]"
-          role="alert"
-          data-test="synthetics-run-detail-steps-error-banner"
+          v-if="!loading && attemptViews.length > 1"
+          class="flex items-center gap-2 px-2 pt-3"
+          data-test="synthetics-run-detail-attempt-select"
         >
-          <div class="flex items-start gap-2 p-3">
-            <OIcon name="error" class="text-status-error-text shrink-0" size="md" />
-            <div class="min-w-0 flex-1">
-              <div class="flex flex-wrap items-center gap-2">
-                <span class="text-status-error-text text-sm font-bold">
-                  {{ currentRun.errorType }}
-                </span>
-              </div>
-              <OButton
-                v-if="currentRun.errorStack"
-                variant="ghost-destructive"
-                size="xs"
-                class="mt-1"
-                data-test="synthetics-run-detail-error-expand-btn"
-                @click="stackOpen = !stackOpen"
-              >
-                <template #icon-left>
-                  <OIcon
-                    name="expand-more"
-                    size="xs"
-                    class="transition-transform duration-150"
-                    :class="{ 'rotate-180': stackOpen }"
-                  />
-                </template>
-                <span class="text-2xs text-status-error-text font-semibold">
-                  {{ t("synthetics.runDetail.viewFullError") }}
-                </span>
-              </OButton>
-              <pre
-                v-if="stackOpen && currentRun.errorStack"
-                class="text-2xs text-text-body bg-code-bg rounded-default mt-2 overflow-auto p-[10px_12px] font-mono leading-[1.6] whitespace-pre-wrap"
-                data-test="synthetics-run-detail-error-stack"
-                >{{ currentRun.errorStack }}</pre
-              >
-            </div>
-          </div>
+          <span class="text-text-secondary text-xs">
+            {{ t("synthetics.runDetail.attemptsLabel", { count: attemptViews.length }) }}
+          </span>
+          <OSelect
+            v-model="selectedAttemptValue"
+            :options="attemptOptions"
+            size="sm"
+            class="w-56"
+            data-test="synthetics-run-detail-attempt-dropdown"
+          />
+          <!-- Superseded attempts keep only a compact timeline; the full
+               forensics are retained for the attempt that decided the run. -->
+          <span
+            v-if="currentAttempt?.compact"
+            class="text-text-secondary text-xs"
+            data-test="synthetics-run-detail-attempt-reduced"
+          >
+            {{ t("synthetics.runDetail.attemptReducedDetail") }}
+          </span>
         </div>
 
-        <!-- ══ Split: Replay Player (left) + Steps Timeline (right) ══ -->
-        <div v-else-if="steps.length > 0" class="flex min-h-0 flex-1 items-start">
-          <!-- ── Left: Session Replay Player ── -->
-          <OCard v-if="currentRun.hasReplay" class="w-[30%] min-w-[30rem] gap-0 p-0">
-            <OCardSection role="header" class="gap-2">
-              <OIcon name="smart_display" size="sm" class="text-accent" />
-              <span class="text-text-heading text-sm font-bold">{{
-                t("synthetics.runDetail.sessionReplay")
-              }}</span>
-              <span class="flex-1" />
-              <span class="text-2xs text-text-secondary font-mono">
-                {{
-                  t("synthetics.runDetail.stepOf", {
-                    selected: selectedStep?.id,
-                    total: steps.length,
-                  })
-                }}
-              </span>
-            </OCardSection>
-            <OSeparator />
+        <!-- Steps and Evidence are siblings, not stacked. Stacking them pushed
+             a 158-row event list above the step table and broke the drawer's
+             scroll: OTabPanels owns the scroll container (`grow scroll="y"`). -->
+        <OTabs
+          v-if="!loading"
+          v-model="detailTab"
+          class="border-border-default mt-2 shrink-0 border-b px-2"
+        >
+          <OTab name="steps" data-test="synthetics-run-detail-tab-steps">
+            {{ t("synthetics.runs.tabSteps") }}
+          </OTab>
+          <OTab name="evidence" data-test="synthetics-run-detail-tab-evidence">
+            {{ t("synthetics.runDetail.evidenceSection") }}
+          </OTab>
+        </OTabs>
 
-            <div class="flex h-95 flex-col">
-              <div class="min-h-0 flex-1">
-                <VideoPlayer :events="[]" :segments="[]" :is-loading="false" />
-              </div>
-            </div>
-          </OCard>
+        <div class="min-h-0 flex-1">
+          <OTabPanels v-model="detailTab" grow scroll="y" class="h-full min-h-0">
+            <OTabPanel name="evidence">
+              <!-- v-if, not v-show: this is what makes the fetch happen on open
+                   rather than with the record. -->
+              <EvidencePanel
+                v-if="detailTab === 'evidence'"
+                :evidence-key="evidenceKey"
+                :resolve-url="screenshotUrl"
+                :step-defs="evidenceStepDefs"
+                :record-truncated="evidenceTruncated"
+                :run-passed="currentRun.status === 'pass'"
+              />
+            </OTabPanel>
 
-          <!-- ── Right: Execution Timeline ── -->
-          <div class="flex h-full min-h-0 min-w-0 flex-1 flex-col">
-            <div class="flex items-center gap-2 px-3 py-4">
-              <h4 class="text-text-heading m-0 text-sm font-bold">
-                {{ t("synthetics.journey.steps") }}
-              </h4>
-              <OBadge variant="default" size="sm">{{ steps.length }}</OBadge>
-              <span class="flex-1" />
-            </div>
-
-            <div class="min-h-0 flex-1 overflow-auto pb-2">
-              <!-- JourneySteps in results mode -->
-              <JourneySteps
-                :data="stepsWithTotal"
-                mode="results"
-                action-key="action"
-                name-key="name"
-                detail-key="detail"
-                icon-key="icon"
-                :dot-state-fn="stepDotState"
-                :expanded-ids="expandedStepIdsArr"
-                @update:expanded-ids="handleUpdateExpanded"
-              >
-                <!-- Screenshot thumbnail -->
-                <template #screenshot-thumb="{ row }">
-                  <img
-                    v-if="row.screenshotKey"
-                    :src="screenshotUrl(row.screenshotKey)"
-                    :alt="t('synthetics.runDetail.screenshotAlt')"
-                    class="h-full w-full object-cover"
-                  />
-                  <OIcon v-else name="image" size="xs" class="text-text-secondary" />
-                </template>
-
-                <!-- Expanded content: screenshot + metadata + error -->
-                <template #expansion="{ row }">
-                  <div class="flex gap-4 p-3">
-                    <div class="w-[40%] shrink-0">
-                      <div class="rounded-default border-border-default overflow-hidden border">
-                        <div
-                          class="flex aspect-[16/10] items-center justify-center overflow-hidden"
-                          :class="
-                            row.status === 'fail' ? 'bg-status-error-bg' : 'bg-surface-subtle'
-                          "
-                        >
-                          <div v-if="row.screenshotKey" class="group relative h-full w-full">
-                            <OButton
-                              variant="ghost"
-                              size="sm"
-                              class="h-full! w-full rounded-none! border-0! p-0!"
-                              data-test="synthetics-run-detail-step-screenshot-thumb"
-                              @click="openLightbox(row.id)"
-                            >
-                              <img
-                                :src="screenshotUrl(row.screenshotKey)"
-                                :alt="t('synthetics.runDetail.screenshotAlt')"
-                                class="h-full w-full object-contain transition-opacity group-hover:opacity-90"
-                              />
-                            </OButton>
-                            <div
-                              class="rounded-default bg-surface-base/80 pointer-events-none absolute top-2 right-2 flex h-7 w-7 items-center justify-center opacity-0 transition-opacity group-hover:opacity-100"
-                              aria-hidden="true"
-                            >
-                              <OIcon name="fullscreen" size="sm" class="text-text-body" />
-                            </div>
-                          </div>
-                          <template v-else>
-                            <OIcon
-                              name="image"
-                              :class="
-                                row.status === 'fail'
-                                  ? 'text-status-error-text'
-                                  : 'text-text-secondary'
-                              "
-                              size="lg"
-                            />
-                            <span
-                              class="text-xs font-semibold"
-                              :class="
-                                row.status === 'fail'
-                                  ? 'text-status-error-text'
-                                  : 'text-text-secondary'
-                              "
-                            >
-                              {{
-                                row.status === "fail"
-                                  ? t("synthetics.runDetail.failureScreenshot")
-                                  : t("synthetics.runDetail.screenshotPlaceholder")
-                              }}
-                            </span>
-                          </template>
-                        </div>
-                      </div>
+            <OTabPanel name="steps">
+              <!-- Steps skeleton -->
+              <template v-if="loading">
+                <OCard class="gap-0 p-0">
+                  <OCardSection role="header" class="gap-2">
+                    <OSkeleton type="text" class="h-4 w-14" />
+                  </OCardSection>
+                  <OSeparator />
+                  <OCardSection role="body" class="flex flex-col gap-2 p-3">
+                    <div
+                      v-for="i in 4"
+                      :key="i"
+                      class="rounded-default border-border-default flex items-center gap-2 border p-2"
+                    >
+                      <OSkeleton type="rect" class="rounded-default h-12 w-18 shrink-0" />
+                      <OSkeleton type="circle" class="h-6 w-6 shrink-0" />
+                      <OSkeleton type="text" class="h-4 flex-1" />
+                      <OSkeleton type="text" class="h-4 w-16 shrink-0" />
                     </div>
+                  </OCardSection>
+                </OCard>
+              </template>
+              <!-- Lambda execution error (no steps) -->
+              <div
+                v-else-if="isErrorRun"
+                class="border-badge-error-ol-border/30 rounded-default m-2 overflow-hidden border bg-[var(--color-badge-error-soft-bg)]"
+                role="alert"
+                data-test="synthetics-run-detail-steps-error-banner"
+              >
+                <div class="flex items-start gap-2 p-3">
+                  <OIcon name="error" class="text-status-error-text shrink-0" size="md" />
+                  <div class="min-w-0 flex-1">
+                    <div class="flex flex-wrap items-center gap-2">
+                      <span class="text-status-error-text text-sm font-bold">
+                        {{ currentRun.errorType }}
+                      </span>
+                    </div>
+                    <OButton
+                      v-if="currentRun.errorStack"
+                      variant="ghost-destructive"
+                      size="xs"
+                      class="mt-1"
+                      data-test="synthetics-run-detail-error-expand-btn"
+                      @click="stackOpen = !stackOpen"
+                    >
+                      <template #icon-left>
+                        <OIcon
+                          name="expand-more"
+                          size="xs"
+                          class="transition-transform duration-150"
+                          :class="{ 'rotate-180': stackOpen }"
+                        />
+                      </template>
+                      <span class="text-2xs text-status-error-text font-semibold">
+                        {{ t("synthetics.runDetail.viewFullError") }}
+                      </span>
+                    </OButton>
+                    <pre
+                      v-if="stackOpen && currentRun.errorStack"
+                      class="text-2xs text-text-body bg-code-bg rounded-default mt-2 overflow-auto p-[10px_12px] font-mono leading-[1.6] whitespace-pre-wrap"
+                      data-test="synthetics-run-detail-error-stack"
+                      >{{ currentRun.errorStack }}</pre
+                    >
+                  </div>
+                </div>
+              </div>
 
-                    <div class="flex flex-1 flex-col gap-4">
-                      <dl class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-sm">
-                        <dt
-                          class="text-text-secondary text-sm font-semibold tracking-wide capitalize"
-                        >
-                          {{ t("synthetics.runDetail.detailAction") }}
-                        </dt>
-                        <dd class="text-text-secondary">{{ row.action }}</dd>
-                        <dt
-                          class="text-text-secondary text-sm font-semibold tracking-wide capitalize"
-                        >
-                          {{ t("synthetics.runDetail.detailSelector") }}
-                        </dt>
-                        <dd class="text-text-secondary">{{ row.detail }}</dd>
-                        <dt
-                          class="text-text-secondary text-sm font-semibold tracking-wide capitalize"
-                        >
-                          {{ t("synthetics.runDetail.detailUrl") }}
-                        </dt>
-                        <dd class="text-text-secondary truncate">
-                          {{ row.url || currentRun.url }}
-                        </dd>
-                        <dt
-                          class="text-text-secondary text-sm font-semibold tracking-wide capitalize"
-                        >
-                          {{ t("synthetics.results.duration") }}
-                        </dt>
-                        <dd class="text-text-secondary">{{ row.durStr }}</dd>
-                      </dl>
+              <!-- ══ Split: Replay Player (left) + Steps Timeline (right) ══ -->
+              <div v-else-if="steps.length > 0" class="flex min-h-0 flex-1 items-start">
+                <!-- ── Left: Session Replay Player ── -->
+                <OCard v-if="currentRun.hasReplay" class="w-[30%] min-w-[30rem] gap-0 p-0">
+                  <OCardSection role="header" class="gap-2">
+                    <OIcon name="smart_display" size="sm" class="text-accent" />
+                    <span class="text-text-heading text-sm font-bold">{{
+                      t("synthetics.runDetail.sessionReplay")
+                    }}</span>
+                    <span class="flex-1" />
+                    <span class="text-2xs text-text-secondary font-mono">
+                      {{
+                        t("synthetics.runDetail.stepOf", {
+                          selected: selectedStep?.id,
+                          total: steps.length,
+                        })
+                      }}
+                    </span>
+                  </OCardSection>
+                  <OSeparator />
 
-                      <div
-                        v-if="row.status === 'fail' && row.error"
-                        class="rounded-default border-badge-error-ol-border/30 overflow-hidden border"
-                        :data-test="`synthetics-run-detail-step-error-card-${row.id}`"
-                      >
-                        <div
-                          class="flex items-center gap-2 bg-[var(--color-badge-error-soft-bg)] px-3 py-2"
-                        >
-                          <OIcon
-                            name="error"
-                            size="sm"
-                            class="text-status-error-text"
-                            aria-hidden="true"
-                          />
-                          <span class="text-text-heading flex-1 text-xs font-semibold">{{
-                            t("synthetics.results.error")
-                          }}</span>
-                        </div>
-                        <div class="px-3 py-3">
-                          <pre
-                            class="text-text-body m-0 font-mono text-xs leading-relaxed whitespace-pre-wrap"
-                            :class="{
-                              'max-h-24 overflow-hidden':
-                                !expandedStepErrors.has(row.id) && (row.error?.length ?? 0) > 200,
-                            }"
-                            >{{ row.error }}</pre
-                          >
-                          <div class="mt-1.5 flex items-center gap-2">
-                            <OButton
-                              v-if="(row.error?.length ?? 0) > 200"
-                              variant="ghost"
-                              size="xs"
-                              class="text-text-link text-xs font-semibold"
-                              data-test="synthetics-run-detail-toggle-step-error-btn"
-                              @click="toggleStepError(row.id)"
-                            >
-                              {{
-                                expandedStepErrors.has(row.id)
-                                  ? t("synthetics.runDetail.showLess")
-                                  : t("synthetics.runDetail.showFullError")
-                              }}
-                            </OButton>
-                            <OButton
-                              variant="ghost"
-                              size="xs"
-                              data-test="synthetics-run-detail-step-view-error-btn"
-                              @click="openErrorFullscreen(row.id)"
-                            >
-                              {{ t("synthetics.runDetail.viewFullErrorBtn") }}
-                            </OButton>
-                          </div>
-                        </div>
-                      </div>
+                  <div class="flex h-95 flex-col">
+                    <div class="min-h-0 flex-1">
+                      <VideoPlayer :events="[]" :segments="[]" :is-loading="false" />
                     </div>
                   </div>
-                </template>
-              </JourneySteps>
-            </div>
-          </div>
+                </OCard>
+
+                <!-- ── Right: Execution Timeline ── -->
+                <div class="flex h-full min-h-0 min-w-0 flex-1 flex-col">
+                  <div class="flex items-center gap-2 px-3 py-4">
+                    <h4 class="text-text-heading m-0 text-sm font-bold">
+                      {{ t("synthetics.journey.steps") }}
+                    </h4>
+                    <OBadge variant="default" size="sm">{{ steps.length }}</OBadge>
+                    <span class="flex-1" />
+                  </div>
+
+                  <div class="min-h-0 flex-1 overflow-auto pb-2">
+                    <!-- JourneySteps in results mode -->
+                    <JourneySteps
+                      :data="stepsWithTotal"
+                      mode="results"
+                      action-key="action"
+                      name-key="name"
+                      detail-key="detail"
+                      icon-key="icon"
+                      :dot-state-fn="stepDotState"
+                      :expanded-ids="expandedStepIdsArr"
+                      @update:expanded-ids="handleUpdateExpanded"
+                    >
+                      <!-- Screenshot thumbnail -->
+                      <template #screenshot-thumb="{ row }">
+                        <img
+                          v-if="row.screenshotKey"
+                          :src="screenshotUrl(row.screenshotKey)"
+                          :alt="t('synthetics.runDetail.screenshotAlt')"
+                          class="h-full w-full object-cover"
+                        />
+                        <OIcon v-else name="image" size="xs" class="text-text-secondary" />
+                      </template>
+
+                      <!-- Expanded content: screenshot + metadata + error -->
+                      <template #expansion="{ row }">
+                        <div class="flex gap-4 p-3">
+                          <div class="w-[40%] shrink-0">
+                            <div
+                              class="rounded-default border-border-default overflow-hidden border"
+                            >
+                              <div
+                                class="flex aspect-[16/10] items-center justify-center overflow-hidden"
+                                :class="
+                                  row.status === 'fail' ? 'bg-status-error-bg' : 'bg-surface-subtle'
+                                "
+                              >
+                                <div v-if="row.screenshotKey" class="group relative h-full w-full">
+                                  <OButton
+                                    variant="ghost"
+                                    size="sm"
+                                    class="h-full! w-full rounded-none! border-0! p-0!"
+                                    data-test="synthetics-run-detail-step-screenshot-thumb"
+                                    @click="openLightbox(row.id)"
+                                  >
+                                    <img
+                                      :src="screenshotUrl(row.screenshotKey)"
+                                      :alt="t('synthetics.runDetail.screenshotAlt')"
+                                      class="h-full w-full object-contain transition-opacity group-hover:opacity-90"
+                                    />
+                                  </OButton>
+                                  <div
+                                    class="rounded-default bg-surface-base/80 pointer-events-none absolute top-2 right-2 flex h-7 w-7 items-center justify-center opacity-0 transition-opacity group-hover:opacity-100"
+                                    aria-hidden="true"
+                                  >
+                                    <OIcon name="fullscreen" size="sm" class="text-text-body" />
+                                  </div>
+                                </div>
+                                <template v-else>
+                                  <OIcon
+                                    name="image"
+                                    :class="
+                                      row.status === 'fail'
+                                        ? 'text-status-error-text'
+                                        : 'text-text-secondary'
+                                    "
+                                    size="lg"
+                                  />
+                                  <span
+                                    class="text-xs font-semibold"
+                                    :class="
+                                      row.status === 'fail'
+                                        ? 'text-status-error-text'
+                                        : 'text-text-secondary'
+                                    "
+                                  >
+                                    {{
+                                      row.status === "fail"
+                                        ? t("synthetics.runDetail.failureScreenshot")
+                                        : t("synthetics.runDetail.screenshotPlaceholder")
+                                    }}
+                                  </span>
+                                </template>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div class="flex flex-1 flex-col gap-4">
+                            <dl class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-sm">
+                              <dt
+                                class="text-text-secondary text-sm font-semibold tracking-wide capitalize"
+                              >
+                                {{ t("synthetics.runDetail.detailAction") }}
+                              </dt>
+                              <dd class="text-text-secondary">{{ row.action }}</dd>
+                              <dt
+                                class="text-text-secondary text-sm font-semibold tracking-wide capitalize"
+                              >
+                                {{ t("synthetics.runDetail.detailSelector") }}
+                              </dt>
+                              <dd class="text-text-secondary">{{ row.detail }}</dd>
+                              <dt
+                                class="text-text-secondary text-sm font-semibold tracking-wide capitalize"
+                              >
+                                {{ t("synthetics.runDetail.detailUrl") }}
+                              </dt>
+                              <dd class="text-text-secondary truncate">
+                                {{ row.url || currentRun.url }}
+                              </dd>
+                              <dt
+                                class="text-text-secondary text-sm font-semibold tracking-wide capitalize"
+                              >
+                                {{ t("synthetics.results.duration") }}
+                              </dt>
+                              <dd class="text-text-secondary">{{ row.durStr }}</dd>
+                            </dl>
+
+                            <div
+                              v-if="row.status === 'fail' && row.error"
+                              class="rounded-default border-badge-error-ol-border/30 overflow-hidden border"
+                              :data-test="`synthetics-run-detail-step-error-card-${row.id}`"
+                            >
+                              <div
+                                class="flex items-center gap-2 bg-[var(--color-badge-error-soft-bg)] px-3 py-2"
+                              >
+                                <OIcon
+                                  name="error"
+                                  size="sm"
+                                  class="text-status-error-text"
+                                  aria-hidden="true"
+                                />
+                                <span class="text-text-heading flex-1 text-xs font-semibold">{{
+                                  t("synthetics.results.error")
+                                }}</span>
+                              </div>
+                              <div class="px-3 py-3">
+                                <pre
+                                  class="text-text-body m-0 font-mono text-xs leading-relaxed whitespace-pre-wrap"
+                                  :class="{
+                                    'max-h-24 overflow-hidden':
+                                      !expandedStepErrors.has(row.id) &&
+                                      (row.error?.length ?? 0) > 200,
+                                  }"
+                                  >{{ row.error }}</pre
+                                >
+                                <div class="mt-1.5 flex items-center gap-2">
+                                  <OButton
+                                    v-if="(row.error?.length ?? 0) > 200"
+                                    variant="ghost"
+                                    size="xs"
+                                    class="text-text-link text-xs font-semibold"
+                                    data-test="synthetics-run-detail-toggle-step-error-btn"
+                                    @click="toggleStepError(row.id)"
+                                  >
+                                    {{
+                                      expandedStepErrors.has(row.id)
+                                        ? t("synthetics.runDetail.showLess")
+                                        : t("synthetics.runDetail.showFullError")
+                                    }}
+                                  </OButton>
+                                  <OButton
+                                    variant="ghost"
+                                    size="xs"
+                                    data-test="synthetics-run-detail-step-view-error-btn"
+                                    @click="openErrorFullscreen(row.id)"
+                                  >
+                                    {{ t("synthetics.runDetail.viewFullErrorBtn") }}
+                                  </OButton>
+                                </div>
+                              </div>
+                            </div>
+                            <!-- P5.4 items 3-5: what the runner saw. Written by the
+                           probe on every failed run and rendered by nothing
+                           until now, which is why every failure looked alike. -->
+                            <StepEvidence
+                              v-if="row.evidence"
+                              :detail="row.evidence"
+                              :evidence="row.appEvidence"
+                              :truncated="evidenceTruncated"
+                              class="mt-3"
+                            />
+                          </div>
+                        </div>
+                      </template>
+                    </JourneySteps>
+                  </div>
+                </div>
+              </div>
+            </OTabPanel>
+          </OTabPanels>
         </div>
       </div>
     </div>
@@ -500,6 +576,7 @@ import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import StepEvidence from "@/components/synthetics/StepEvidence.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import BetaBadge from "@/components/common/BetaBadge.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
@@ -511,7 +588,17 @@ import JourneySteps from "@/components/synthetics/journey/JourneySteps.vue";
 import type { StepDotState } from "@/components/synthetics/journey/JourneySteps.vue";
 import useSyntheticResults from "@/composables/useSyntheticResults";
 import ProtocolRunSummary from "@/components/synthetics/results/ProtocolRunSummary.vue";
+import EvidencePanel from "@/components/synthetics/results/EvidencePanel.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import OTab from "@/lib/navigation/Tabs/OTab.vue";
+import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
+import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
+import { buildAttemptViews } from "@/composables/synthetics/syntheticResultsSchema";
 import type {
+  AttemptView,
+  FailureDetail,
+  StepEvidence as StepEvidenceSummary,
   SyntheticRunDetail,
   RecordedStep,
 } from "@/composables/synthetics/syntheticResultsSchema";
@@ -645,6 +732,10 @@ interface StepRow {
   durColor: string;
   error: string | null;
   screenshotKey: string | null;
+  /** P5.4 items 3-5, present only on the step that actually failed. */
+  evidence: FailureDetail | null;
+  /** Browser-side evidence for this step, when the probe captured any. */
+  appEvidence: StepEvidenceSummary | null;
 }
 
 function fmtDur(ms: number): string {
@@ -652,13 +743,24 @@ function fmtDur(ms: number): string {
 }
 
 /** Merge recorded_step definitions with last_attempt_step execution results. */
-function buildSteps(detail: SyntheticRunDetail | null): StepRow[] {
-  if (!detail || !detail.lastAttemptSteps.length) return [];
+/**
+ * @param attempt — the attempt being viewed. Its steps and failure detail are
+ *   used in place of the record's top-level ones, so switching attempts
+ *   re-renders the table instead of showing the deciding attempt's steps under
+ *   another attempt's label.
+ */
+function buildSteps(
+  detail: SyntheticRunDetail | null,
+  attempt: AttemptView | null = null,
+): StepRow[] {
+  const steps = attempt?.steps ?? detail?.lastAttemptSteps ?? [];
+  const failureDetail = attempt ? attempt.failureDetail : (detail?.failureDetail ?? null);
+  if (!detail || !steps.length) return [];
   const recordedMap = new Map<string, RecordedStep>();
   for (const rs of detail.recordedSteps) {
     recordedMap.set(rs.id, rs);
   }
-  return detail.lastAttemptSteps.map((ex, idx) => {
+  return steps.map((ex, idx) => {
     const recorded = recordedMap.get(ex.step_id);
     const isFail = ex.status === "fail";
     return {
@@ -675,7 +777,17 @@ function buildSteps(detail: SyntheticRunDetail | null): StepRow[] {
       durStr: fmtDur(ex.duration_ms),
       durColor: isFail ? "var(--color-status-error-text)" : "var(--color-text-secondary)",
       error: ex.error,
-      screenshotKey: ex.screenshot_key,
+      // A superseded attempt's screenshots are uploaded under an attempt-scoped
+      // key, so they are resolved from THAT attempt's refs. Falling back to the
+      // record's key would show the surviving attempt's pixels under the
+      // failing attempt's label.
+      screenshotKey: attempt?.screenshotKeys.get(ex.step_id) ?? ex.screenshot_key,
+      // Scoped to the failing step: the report describes one failure, and
+      // hanging it off every row would imply each step had its own.
+      evidence: failureDetail && failureDetail.stepId === ex.step_id ? failureDetail : null,
+      // Per step, not per failure: the step that CAUSED the problem is often
+      // not the one that failed, so evidence hangs off whichever step owns it.
+      appEvidence: detail.evidenceByStep.find((e) => e.stepId === ex.step_id) ?? null,
     };
   });
 }
@@ -731,9 +843,21 @@ const artifactUrls = ref<Record<string, string>>({});
 async function presignRunArtifacts() {
   const detail = synthetics.runDetail.value;
   if (!detail) return;
-  const keys = [...detail.lastAttemptSteps.map((s) => s.screenshot_key), detail.traceKey].filter(
-    (k): k is string => !!k,
-  );
+  // Every attempt's artifacts, not only the deciding one's: switching attempts
+  // in the strip must not trigger a second presign round-trip, and a superseded
+  // attempt's screenshots live under their own keys.
+  const keys = [
+    ...detail.lastAttemptSteps.map((s) => s.screenshot_key),
+    detail.traceKey,
+    detail.evidenceKey,
+    // Evidence bundles as well as screenshots and traces, so opening the
+    // Evidence tab and switching attempts inside it cost no further round-trip.
+    ...detail.retryHistory.flatMap((a) => [
+      ...a.screenshotKeys.values(),
+      a.traceKey,
+      a.evidenceKey,
+    ]),
+  ].filter((k): k is string => !!k);
   if (!keys.length) return;
   const orgId = store.state.selectedOrganization.identifier;
   try {
@@ -770,6 +894,32 @@ function screenshotUrl(key: string | null): string {
   const orgId = store.state.selectedOrganization.identifier;
   return syntheticsService.artifactUrl(orgId, key, folderName.value);
 }
+
+// ── Evidence tab ──────────────────────────────────────────────────────────
+//
+// The panel reads the BUNDLE, not `evidence_by_step`: that field is an anomaly
+// index and is empty whenever the network behaved, which is the common shape of
+// a browser failure (a locator that never matched).
+/** Which panel the drawer is showing. Steps first — it is what the run is. */
+const detailTab = ref<"steps" | "evidence">("steps");
+
+/** The SELECTED attempt's own bundle — attempt 0 bare, retries `attempt-N-`. */
+/** `evidence_truncated` from the record, for both the step rows and the panel. */
+const evidenceTruncated = computed(() => synthetics.runDetail.value?.evidenceTruncated ?? false);
+
+const evidenceKey = computed(
+  () => currentAttempt.value?.evidenceKey ?? synthetics.runDetail.value?.evidenceKey ?? null,
+);
+
+/** step_id -> definition, for naming groups. Reuses the run's own snapshot so a
+ *  later edit to the check cannot relabel this run's history. */
+const evidenceStepDefs = computed(() => {
+  const m = new Map<string, { name: string; selector: string | null }>();
+  for (const rs of synthetics.runDetail.value?.recordedSteps ?? []) {
+    m.set(rs.id, { name: rs.name || rs.id, selector: rs.selector });
+  }
+  return m;
+});
 
 // ── Display model for the current run (mapped from SyntheticRunDetail) ─────
 interface DisplayRun {
@@ -833,6 +983,51 @@ function toDisplayRun(detail: SyntheticRunDetail | null): DisplayRun {
       : {}),
   };
 }
+
+// ── Attempts (C2) ─────────────────────────────────────────────────────────
+//
+// One record carries every attempt the execution made. Switching between them
+// is local state — `retry_history` is already on the row, so the strip costs no
+// request.
+const attemptViews = computed<AttemptView[]>(() =>
+  synthetics.runDetail.value ? buildAttemptViews(synthetics.runDetail.value) : [],
+);
+const selectedAttempt = ref(0);
+// The deciding attempt is the default: it is the one the run's verdict and the
+// record's top-level fields describe. Reset on every new run, or the index
+// would point into the previous run's (possibly shorter) list.
+watch(attemptViews, (views) => {
+  selectedAttempt.value = Math.max(0, views.length - 1);
+});
+const currentAttempt = computed<AttemptView | null>(
+  () => attemptViews.value[selectedAttempt.value] ?? null,
+);
+
+/**
+ * Options for the attempt selector.
+ *
+ * Labelled 1-based ("Attempt 2 of 3") while `attempt` on the record is 0-based;
+ * displaying the raw index invites off-by-one bug reports. The deciding attempt
+ * is marked, because that is the one the record's top-level fields describe —
+ * and on a flaky run it is the attempt that PASSED while the run reads warning.
+ */
+const attemptOptions = computed(() =>
+  attemptViews.value.map((a, i) => ({
+    label:
+      `${t("synthetics.runDetail.attemptN", { n: a.attempt + 1 })} · ${fmtDur(a.durationMs)}` +
+      ` · ${a.status === "passed" ? t("synthetics.results.passed") : t("synthetics.results.failed")}` +
+      (a.decided ? ` · ${t("synthetics.runDetail.attemptDecided")}` : ""),
+    value: String(i),
+  })),
+);
+
+/** OSelect works in strings; the index is the identity. */
+const selectedAttemptValue = computed({
+  get: () => String(selectedAttempt.value),
+  set: (v: string) => {
+    selectedAttempt.value = Number(v);
+  },
+});
 
 // ── State ─────────────────────────────────────────────────────────────────
 const stackOpen = ref(true);
@@ -925,7 +1120,7 @@ const displayMonitorName = computed(
 
 const steps = computed<StepRow[]>(() => {
   if (synthetics.runDetail.value) {
-    return buildSteps(synthetics.runDetail.value);
+    return buildSteps(synthetics.runDetail.value, currentAttempt.value);
   }
   return [];
 });
@@ -1050,7 +1245,44 @@ const infoChips = computed<InfoChip[]>(() => [
     value: locationLabel(currentRun.value.location),
     icon: locationIcon(currentRun.value.location),
   },
+  // C4 — probe start-up is INSIDE the duration above. Shown separately rather
+  // than subtracted, because a cold Lambda's 113s init is itself the finding:
+  // unlabelled it made every Lambda location look permanently slower than a
+  // private agent at every percentile.
+  ...(initMs.value > 0
+    ? [
+        {
+          label: t("synthetics.runDetail.initTime"),
+          value: fmtDur(initMs.value),
+          icon: "bolt",
+        },
+      ]
+    : []),
+  // C5 — scheduled → started. Null (not 0) when the record predates the field,
+  // so an unknown delay is never rendered as a perfect one.
+  ...(queueDelayMs.value !== null
+    ? [
+        {
+          label: t("synthetics.runDetail.queueDelay"),
+          value: fmtDur(queueDelayMs.value),
+          icon: "schedule",
+        },
+      ]
+    : []),
+  ...(attemptViews.value.length > 1
+    ? [
+        {
+          label: t("synthetics.runDetail.attempts"),
+          value: `⟳${attemptViews.value.length}`,
+          icon: "replay",
+          colorClass: "text-status-warning-text",
+        },
+      ]
+    : []),
 ]);
+
+const initMs = computed(() => synthetics.runDetail.value?.initMs ?? 0);
+const queueDelayMs = computed(() => synthetics.runDetail.value?.queueDelayMs ?? null);
 
 // ── Emit status to parent (for drawer header-right badge) ──────────────────
 watch(

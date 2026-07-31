@@ -40,6 +40,11 @@ pub struct Model {
     /// Folder PK (folders.id KSUID). Stores the same FK as the alerts table.
     pub folder_id: String,
     pub owner: Option<String>,
+    /// Feature 2 (PT-1): priority storage ids 1..=5, P1 = 1. NULL = unset.
+    /// Same ids as `alerts.priority` so one enum serves both tables.
+    pub priority: Option<i32>,
+    /// Feature 2 (PT-6): JSON array of normalized tags. NULL = none.
+    pub tags: Option<Json>,
     /// 0=waiting, 1=ready, 2=training, 3=failed, 4=disabled
     pub status: i32,
     pub retries: i32,
@@ -100,6 +105,8 @@ mod tests {
             alert_destinations: None,
             folder_id: "folder1".to_string(),
             owner: None,
+            priority: None,
+            tags: None,
             status: 0,
             retries: 0,
             last_updated: 0,

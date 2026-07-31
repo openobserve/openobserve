@@ -147,7 +147,7 @@ export class MetricsBuilderPage {
         // PromQL tables and dashboard panel tables.
         this.dashboardPanelTable = page.locator('[data-test="dashboard-panel-table"], [data-test="promql-table-chart"]').first();
         this.tableHeaderCells = page.locator('[data-test^="o2-table-th-"]:not([data-test*="-sort-"]):not([data-test*="-remove-"])');
-        this.tableRows = page.locator('[data-test="dashboard-data-row"]');
+        this.tableRows = page.locator('[data-test^="o2-table-row-"]');
 
         // Chart renderer
         this.chartRenderer = page.locator('[data-test="chart-renderer"]');
@@ -260,7 +260,9 @@ export class MetricsBuilderPage {
     }
 
     getPanelNameInput() {
-        return this.page.locator('[data-test="dashboard-panel-name-field"]');
+        // Panel name is an inline-edited title (OFormInlineEdit): in display mode
+        // it renders as a read-only value span, not an input. Read its text.
+        return this.page.locator('[data-test="dashboard-panel-name-value"]');
     }
 
     getDashboardApplyBtn() {
@@ -1357,7 +1359,7 @@ export class MetricsBuilderPage {
      *
      * The PromQL table chart races between the query response and the row
      * render — the data API can return rows that haven't yet hydrated into
-     * `[data-test="dashboard-data-row"]` DOM nodes when we read. Poll for up
+     * `[data-test^="o2-table-row-"]` DOM nodes when we read. Poll for up
      * to 15s for either rows OR the table-loading indicator to settle to a
      * stable count, so we never measure a mid-render zero.
      *

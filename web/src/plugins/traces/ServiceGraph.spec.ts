@@ -209,13 +209,6 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
           AppTabs: true,
           ChartRenderer: true,
           ServiceGraphSidePanel: true,
-          QCard: false,
-          QCardSection: false,
-          QSelect: false,
-          QInput: false,
-          QBtn: false,
-          QIcon: false,
-          QTooltip: false,
           ODialog: ODialogStub,
           ServiceGraphNoDataState: {
             template: '<div data-test="service-graph-no-data-state" />',

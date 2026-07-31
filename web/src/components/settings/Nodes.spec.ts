@@ -136,7 +136,7 @@ function mountComponent() {
       plugins: [mockI18n],
       provide: { store: mockStore },
       stubs: {
-        QTablePagination: {
+        Pagination: {
           template: "<div class='pagination' />",
           props: ["scope", "resultTotal", "perPageOptions", "position"],
           emits: ["update:changeRecordPerPage"],
@@ -385,7 +385,7 @@ describe("Nodes", () => {
           plugins: [mockI18n],
           provide: { store: storeWithoutSuperCluster },
           stubs: {
-            QTablePagination: { template: "<div />" },
+            Pagination: { template: "<div />" },
             NoData: { template: "<div />" },
           },
         },

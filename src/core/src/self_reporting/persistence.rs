@@ -118,7 +118,15 @@ async fn ingest_buffered_data(thread_id: usize, buffered: Vec<ReportingData>) {
                 enqueued_on_failure = true;
 
                 for trigger_json in triggers.clone() {
-                    let trigger: TriggerData = json::from_value(trigger_json).unwrap();
+                    let Ok(mut trigger) = json::from_value::<TriggerData>(trigger_json) else {
+                        log::warn!(
+                            "[SELF-REPORTING] Skipping un-parseable TriggerData while re-enqueueing"
+                        );
+                        continue;
+                    };
+                    // Records written by a pre-rename build carry the legacy
+                    // outcome vocabulary; correct them before re-enqueueing.
+                    trigger.normalize_legacy_outcome();
                     if let Err(e) =
                         usage_reporting::enqueue(ReportingData::Trigger(Box::new(trigger))).await
                     {
@@ -135,7 +143,8 @@ async fn ingest_buffered_data(thread_id: usize, buffered: Vec<ReportingData>) {
     // If configured, automatically add each trigger's own org
     if cfg.common.usage_report_to_own_org && usage_reporting_mode != "remote" {
         for trigger_json in triggers {
-            if let Ok(trigger) = json::from_value::<TriggerData>(trigger_json.clone()) {
+            if let Ok(mut trigger) = json::from_value::<TriggerData>(trigger_json.clone()) {
+                trigger.normalize_legacy_outcome();
                 let org_id = &trigger.org;
                 #[cfg(feature = "cloud")]
                 match organization::is_org_in_free_trial_period(org_id).await {
