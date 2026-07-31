@@ -47,14 +47,24 @@ Install `protoc`:
 
 ```
 # Linux
-wget https://github.com/protocolbuffers/protobuf/releases/download/v21.12/protoc-21.12-linux-x86_64.zip
-unzip protoc-21.12-linux-x86_64.zip -d protoc
+# Replace VERSION with the latest release from https://github.com/protocolbuffers/protobuf/releases
+# (e.g. 29.3)
+VERSION=29.3
+wget https://github.com/protocolbuffers/protobuf/releases/download/v${VERSION}/protoc-${VERSION}-linux-x86_64.zip
+unzip protoc-${VERSION}-linux-x86_64.zip -d protoc
 sudo cp protoc/bin/protoc /usr/local/bin/
 sudo cp -r protoc/include/google /usr/local/include/
 
+# Set environment variable for protobuf include path (Linux)
+export PROTOC_INCLUDE=/usr/local/include
+# Add this to your shell profile (~/.bashrc, ~/.zshrc, etc.) to make it permanent
+# You could also set it in your .env file
+
 # Windows
-curl -L -o protoc-21.12-win64.zip https://github.com/protocolbuffers/protobuf/releases/download/v21.12/protoc-21.12-win64.zip
-unzip protoc-21.12-win64.zip -d protoc
+# Replace VERSION with the latest release from https://github.com/protocolbuffers/protobuf/releases
+VERSION=29.3
+curl -L -o protoc-${VERSION}-win64.zip https://github.com/protocolbuffers/protobuf/releases/download/v${VERSION}/protoc-${VERSION}-win64.zip
+unzip protoc-${VERSION}-win64.zip -d protoc
 cp protoc/bin/protoc.exe C:/windows/system32/protoc.exe
 cp -r protoc/include/google C:/windows/system32/
 
@@ -64,7 +74,7 @@ brew install protobuf
 # Set environment variable for protobuf include path (macOS)
 export PROTOC_INCLUDE=/opt/homebrew/include
 # Add this to your shell profile (~/.zshrc, ~/.bashrc, etc.) to make it permanent
-You could also set it in your .env file
+# You could also set it in your .env file
 ```
 
 Build the binary:
