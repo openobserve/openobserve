@@ -39,6 +39,8 @@ export const convertPanelData = async (
   chartPanelStyle: any,
   annotations: any,
   loading: any = false,
+  // Metric sparkline: per-query histogram hits (SQL metric only).
+  sparklineData?: any,
 ) => {
   // based on the panel config, using the switch calling the appropriate converter
   // based on panel Data chartType is taken for ignoring unnecessary api calls
@@ -105,6 +107,7 @@ export const convertPanelData = async (
               chartPanelStyle,
               annotations,
               loading,
+              sparklineData,
             )),
           };
         } catch (error) {

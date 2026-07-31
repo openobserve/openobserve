@@ -206,6 +206,75 @@ export const usePanelSQLExecutor = (ctx: {
     }
   };
 
+  // Isolated 2nd fetch: a UI histogram (is_ui_histogram=true) of the SAME query,
+  // used ONLY to draw the metric sparkline. Fully guarded and fire-and-forget —
+  // any failure leaves state.sparklineData empty and the metric shows value-only.
+  const fetchSparklineHistogram = (
+    query: string,
+    it: any,
+    startISOTimestamp: string,
+    endISOTimestamp: string,
+    pageType: string,
+    currentQueryIndex: number,
+    abortControllerRef: any,
+  ) => {
+    try {
+      if (abortControllerRef?.signal?.aborted) return;
+      const { traceId } = generateTraceContext();
+      const hits: any[] = [];
+      const payload: any = {
+        queryReq: {
+          query: {
+            sql: query,
+            query_fn: buildQueryFn(it),
+            start_time: startISOTimestamp,
+            end_time: endISOTimestamp,
+            size: -1,
+            histogram_interval: undefined,
+          },
+          ...getRegionClusterParams(),
+        },
+        type: "histogram",
+        isPagination: false,
+        traceId,
+        org_id: store?.state?.selectedOrganization?.identifier,
+        pageType,
+        searchType: searchType.value ?? "dashboards",
+        meta: {
+          currentQueryIndex,
+          panel_id: panelSchema.value.id,
+          panel_name: panelSchema.value.title,
+          is_ui_histogram: true,
+        },
+        clear_cache: false,
+      };
+      // Same contract as handleSearchResponse: (requestPayload, streamResponse).
+      // The response is the 2nd arg; the 1st is our own request (type "histogram").
+      fetchQueryDataWithHttpStream(payload, {
+        data: (_payload: any, response: any) => {
+          if (response?.type === "search_response_hits") {
+            const h = response?.content?.results?.hits;
+            if (Array.isArray(h)) hits.push(...h);
+          }
+        },
+        error: () => removeTraceId(traceId),
+        complete: () => {
+          // Reassign the whole array so the render watcher (shallow ref) fires.
+          const next = Array.isArray(state.sparklineData) ? state.sparklineData.slice() : [];
+          next[currentQueryIndex] = hits.slice();
+          state.sparklineData = next;
+          removeTraceId(traceId);
+        },
+        reset: () => {
+          hits.length = 0;
+        },
+      });
+      addTraceId(traceId);
+    } catch {
+      // best-effort: never block the panel on the sparkline fetch
+    }
+  };
+
   const executeSQL = async (
     startISOTimestamp: any,
     endISOTimestamp: any,
@@ -218,6 +287,7 @@ export const usePanelSQLExecutor = (ctx: {
         queries: [],
       };
       state.resultMetaData = [];
+      state.sparklineData = [];
       state.annotations = [];
       state.isOperationCancelled = false;
 
@@ -648,6 +718,19 @@ export const usePanelSQLExecutor = (ctx: {
             panelQueryIndex,
             abortControllerRef,
           );
+
+          // Best-effort 2nd fetch for the metric sparkline trend (isolated).
+          if (panelSchema.value.type === "metric" && panelSchema.value.config?.sparkline?.enabled) {
+            fetchSparklineHistogram(
+              query,
+              it,
+              startISOTimestamp,
+              endISOTimestamp,
+              pageType,
+              panelQueryIndex,
+              abortControllerRef,
+            );
+          }
 
           // Wait for annotations to complete if they were started
           if (annotationsPromise) {

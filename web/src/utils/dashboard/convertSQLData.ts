@@ -201,6 +201,8 @@ export const convertMultiSQLData = async (
   chartPanelStyle: any,
   annotations: any,
   loading?: any,
+  // Metric sparkline: per-query histogram hits (aligned with searchQueryData).
+  sparklineData?: any,
 ) => {
   if (!Array.isArray(searchQueryData) || searchQueryData.length === 0) {
     // this sets a blank object until it loads
@@ -251,6 +253,7 @@ export const convertMultiSQLData = async (
         chartPanelStyle,
         annotations,
         loading,
+        Array.isArray(sparklineData) ? sparklineData[i] : undefined,
       ),
     );
   }
@@ -329,14 +332,86 @@ export const convertMultiSQLData = async (
       "",
     );
     const labelFontSize = Math.max(11, Math.min(14, Math.round(gridData.gridWidth / 30)));
+
+    // Panel-level sparkline (all metric cells share the same config).
+    const panelSpark = panelSchema?.config?.sparkline;
+    const sparkOn = !!panelSpark?.enabled;
+    const sparkBackground = sparkOn && panelSpark?.layout === "background";
+    const sparkBottom = sparkOn && !sparkBackground;
+
     // The label renders below the value inside the same cell, so the value's
-    // vertical budget is the cell height minus the label line and gaps.
-    // Sizing against the longest value keeps all cells' fonts identical.
+    // vertical budget is the cell height minus the label line and gaps. With a
+    // bottom sparkline the value occupies only the top ~58% of the cell.
+    const valueBandHeight = sparkBottom
+      ? gridData.gridHeight * 0.58 - labelFontSize - 10
+      : gridData.gridHeight - labelFontSize - 10;
     const sharedFontSize = calculateMetricFontSize(
       longestText,
       gridData.gridWidth,
-      gridData.gridHeight - labelFontSize - 10,
+      Math.max(1, valueBandHeight),
     );
+
+    // Draw a mini sparkline (line/area/bar) inside a cell rect.
+    const buildCellSparkline = (
+      data: number[],
+      cfg: any,
+      left: number,
+      top: number,
+      width: number,
+      height: number,
+    ): any[] => {
+      const n = data.length;
+      if (n < 2) return [];
+      const min = Math.min(...data);
+      const max = Math.max(...data);
+      const range = max - min || 1;
+      const hpad = width * 0.06;
+      const bandTop = sparkBackground ? top : top + height * 0.6;
+      const bandH = sparkBackground ? height : height * 0.33;
+      const xAt = (i: number) => left + hpad + (i / (n - 1)) * (width - 2 * hpad);
+      const yAt = (v: number) => bandTop + bandH - ((v - min) / range) * bandH;
+      const color = cfg?.color || chartColor("--color-chart-metric-text");
+      const opacity = sparkBackground ? 0.35 : 1;
+      const out: any[] = [];
+      if (cfg?.type === "bar") {
+        const bw = ((width - 2 * hpad) / n) * 0.6;
+        for (let i = 0; i < n; i++) {
+          const x = xAt(i);
+          const y = yAt(data[i]);
+          out.push({
+            type: "rect",
+            shape: { x: x - bw / 2, y, width: bw, height: bandTop + bandH - y },
+            style: { fill: color, opacity },
+            silent: true,
+          });
+        }
+      } else {
+        const points = data.map((v, i) => [xAt(i), yAt(v)]);
+        if (cfg?.type === "area") {
+          const fillOpacity = typeof cfg?.fillOpacity === "number" ? cfg.fillOpacity : 0.15;
+          out.push({
+            type: "polygon",
+            shape: {
+              points: [...points, [xAt(n - 1), bandTop + bandH], [xAt(0), bandTop + bandH]],
+            },
+            style: { fill: color, opacity: sparkBackground ? fillOpacity * 0.6 : fillOpacity },
+            silent: true,
+          });
+        }
+        out.push({
+          type: "polyline",
+          shape: { points },
+          style: {
+            stroke: color,
+            lineWidth: typeof cfg?.lineWidth === "number" ? cfg.lineWidth : 2,
+            fill: "none",
+            opacity,
+          },
+          silent: true,
+        });
+      }
+      return out;
+    };
 
     allMetricSeries.forEach((s: any, idx: number) => {
       const cell = gridData?.gridArray?.[idx];
@@ -349,6 +424,11 @@ export const convertMultiSQLData = async (
       const cy = cellTop + cellHeight / 2;
       const fill = s?._metricFillColor ?? chartColor("--color-text-heading");
       const cellBg = s?._metricBgColor;
+      // With a bottom sparkline the value sits in the top band; otherwise centered.
+      const valueY = sparkBottom ? cellTop + cellHeight * 0.3 : cy - labelFontSize / 2 - 2;
+      const labelY = sparkBottom
+        ? valueY + sharedFontSize / 2 + labelFontSize / 2 + 4
+        : cy + sharedFontSize / 2 + 4;
       // Grid-cell rect (px) is the hover zone; cx/cy/fontSize place + size the
       // copy icon beside the number, clamped inside the cell.
       s._metricLayout = {
@@ -357,7 +437,7 @@ export const convertMultiSQLData = async (
         width: cellWidth,
         height: cellHeight,
         cx,
-        cy: cy - labelFontSize / 2 - 2,
+        cy: valueY,
         fontSize: sharedFontSize,
         // vertical space under the value taken by the field label, so a
         // below-the-value copy button clears it
@@ -375,6 +455,19 @@ export const convertMultiSQLData = async (
               silent: true,
             });
           }
+          // per-cell sparkline trend (behind the value)
+          if (sparkOn && Array.isArray(s._metricSparkData)) {
+            children.push(
+              ...buildCellSparkline(
+                s._metricSparkData,
+                s._metricSparkConfig,
+                cellLeft,
+                cellTop,
+                cellWidth,
+                cellHeight,
+              ),
+            );
+          }
           children.push({
             type: "text",
             style: {
@@ -384,7 +477,7 @@ export const convertMultiSQLData = async (
               align: "center",
               verticalAlign: "middle",
               x: cx,
-              y: cy - labelFontSize / 2 - 2,
+              y: valueY,
               fill,
             },
           });
@@ -397,7 +490,7 @@ export const convertMultiSQLData = async (
               align: "center",
               verticalAlign: "middle",
               x: cx,
-              y: cy + sharedFontSize / 2 + 4,
+              y: labelY,
               fill,
               opacity: 0.65,
             },
@@ -739,6 +832,8 @@ export const convertSQLData = async (
   chartPanelStyle: any,
   annotations: any,
   loading?: any,
+  // Metric sparkline: histogram hits for this query (fed to the sparkline trend).
+  sparklineData?: any,
 ) => {
   return convertSQLChartData(
     panelSchema,
@@ -751,5 +846,6 @@ export const convertSQLData = async (
     chartPanelStyle,
     annotations,
     loading,
+    sparklineData,
   );
 };

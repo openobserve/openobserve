@@ -1713,6 +1713,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <BackGroundColorConfig />
       </div>
     </OCollapsible>
+
+    <!-- Section: Sparkline (metric only) -->
+    <OCollapsible
+      variant="config"
+      v-if="dashboardPanelData.data.type == 'metric'"
+      v-show="isSectionVisible('sparkline')"
+      :model-value="isExpanded('sparkline')"
+      :icon="SECTION_ICONS.sparkline"
+      @update:modelValue="
+        (v) => {
+          expandedSections.sparkline = v;
+        }
+      "
+      :label="t('dashboard.configSectionSparkline')"
+      class="border-card-glass-border border-t border-solid"
+    >
+      <div class="box-border flex flex-col gap-2.5 overflow-x-hidden px-3 py-2.5">
+        <SparklineConfig />
+      </div>
+    </OCollapsible>
   </div>
 </template>
 
@@ -1739,6 +1759,7 @@ import CustomDateTimePicker from "@/components/CustomDateTimePicker.vue";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import ColorPaletteDropDown from "./ColorPaletteDropDown.vue";
 import BackGroundColorConfig from "./BackGroundColorConfig.vue";
+import SparklineConfig from "./SparklineConfig.vue";
 import OverrideConfig from "./OverrideConfig.vue";
 import ConfigPanelSearch from "./ConfigPanelSearch.vue";
 import { useConfigPanel } from "../../../composables/dashboard/useConfigPanel";
@@ -1802,6 +1823,7 @@ export default defineComponent({
     DateTimePickerDashboard,
     ColorPaletteDropDown,
     BackGroundColorConfig,
+    SparklineConfig,
     OverrideConfig,
     PromQLChartConfig,
     OButton,

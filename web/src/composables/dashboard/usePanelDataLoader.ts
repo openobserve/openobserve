@@ -151,6 +151,8 @@ export const usePanelDataLoader = (
     },
     annotations: [] as any,
     resultMetaData: [] as any, // 2D array: [queryIndex][partitionIndex]
+    // Metric sparkline: per-query histogram hits from a 2nd is_ui_histogram fetch.
+    sparklineData: [] as any,
     lastTriggeredAt: null as any,
     isCachedDataDifferWithCurrentTimeRange: false,
     searchRequestTraceIds: <string[]>[],

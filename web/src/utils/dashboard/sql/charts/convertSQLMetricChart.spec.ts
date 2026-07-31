@@ -16,6 +16,8 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   applyMetricChart,
+  buildMetricSparkline,
+  extractSparklineValues,
   calculateMetricFontSize,
   METRIC_COPY_BTN_SLOT_PX,
   METRIC_MIN_FONT_PX,
@@ -274,5 +276,147 @@ describe("applyMetricChart", () => {
     // getUnitValue mock returns the value as-is; formatUnitValue mock converts to string.
     // Uses the LAST value of the series (mock y1 = [100, 200, 300]).
     expect(result.style.text).toBe("300");
+  });
+
+  describe("sparkline", () => {
+    it("draws value only (one series, no axes) when sparkline is disabled", () => {
+      const ctx = makeMockContext();
+      applyMetricChart(ctx);
+      expect(ctx.options.series).toHaveLength(1);
+      expect(ctx.options.xAxis).toEqual([]);
+      expect(ctx.options.yAxis).toEqual([]);
+    });
+
+    it("adds a line sparkline series (layered behind the value) when enabled with >= 2 points", () => {
+      const ctx = makeMockContext();
+      ctx.panelSchema.config.sparkline = { enabled: true, type: "line", layout: "bottom" };
+      applyMetricChart(ctx);
+      expect(ctx.options.series).toHaveLength(2);
+      // text series first (grid extracts series[0]); sparkline second, layered via z.
+      expect(ctx.options.series[0]._metricText).toBe("300");
+      expect(ctx.options.series[1].type).toBe("line");
+      expect(ctx.options.series[1].data).toEqual([100, 200, 300]);
+      // a hidden cartesian grid + axes back the sparkline
+      expect(ctx.options.grid).toBeDefined();
+      expect(ctx.options.xAxis[0].show).toBe(false);
+      expect(ctx.options.yAxis[0].show).toBe(false);
+    });
+
+    it("uses a bar series for type=bar and an areaStyle for type=area", () => {
+      const bar = makeMockContext();
+      bar.panelSchema.config.sparkline = { enabled: true, type: "bar" };
+      applyMetricChart(bar);
+      expect(bar.options.series[1].type).toBe("bar");
+
+      const area = makeMockContext();
+      area.panelSchema.config.sparkline = { enabled: true, type: "area" };
+      applyMetricChart(area);
+      expect(area.options.series[1].type).toBe("line");
+      expect(area.options.series[1].areaStyle).toBeDefined();
+    });
+
+    it("falls back to value-only when the series has fewer than 2 points", () => {
+      const ctx = makeMockContext({
+        getAxisDataFromKey: vi.fn((key: string) => (key === "y1" ? [42] : [])),
+      });
+      ctx.panelSchema.config.sparkline = { enabled: true, type: "line" };
+      applyMetricChart(ctx);
+      expect(ctx.options.series).toHaveLength(1);
+      expect(ctx.options.xAxis).toEqual([]);
+    });
+
+    it("prefers the histogram (ctx.sparklineData) series over the metric's own values", () => {
+      const ctx = makeMockContext();
+      ctx.panelSchema.config.sparkline = { enabled: true, type: "line" };
+      ctx.sparklineData = [
+        { zo_sql_key: 3, zo_sql_num: 7 },
+        { zo_sql_key: 1, zo_sql_num: 5 },
+        { zo_sql_key: 2, zo_sql_num: 9 },
+      ];
+      applyMetricChart(ctx);
+      // ordered oldest→newest by zo_sql_key → [5, 9, 7] (not the y1 [100,200,300])
+      expect(ctx.options.series[1].data).toEqual([5, 9, 7]);
+    });
+  });
+});
+
+describe("extractSparklineValues", () => {
+  it("returns [] for empty / non-array input", () => {
+    expect(extractSparklineValues(undefined)).toEqual([]);
+    expect(extractSparklineValues([])).toEqual([]);
+  });
+
+  it("orders by zo_sql_key and maps zo_sql_num", () => {
+    expect(
+      extractSparklineValues([
+        { zo_sql_key: 30, zo_sql_num: 3 },
+        { zo_sql_key: 10, zo_sql_num: 1 },
+        { zo_sql_key: 20, zo_sql_num: 2 },
+      ]),
+    ).toEqual([1, 2, 3]);
+  });
+
+  it("falls back to an aliased value column when zo_sql_num is absent", () => {
+    expect(
+      extractSparklineValues([
+        { _timestamp: 1, y_axis_1: 11 },
+        { _timestamp: 2, y_axis_1: 22 },
+      ]),
+    ).toEqual([11, 22]);
+  });
+
+  it("drops non-numeric points", () => {
+    expect(
+      extractSparklineValues([
+        { zo_sql_key: 1, zo_sql_num: 5 },
+        { zo_sql_key: 2, zo_sql_num: "n/a" },
+      ]),
+    ).toEqual([5]);
+  });
+});
+
+describe("buildMetricSparkline", () => {
+  it("returns null when disabled, absent, or fewer than 2 points", () => {
+    expect(buildMetricSparkline([1, 2, 3], { enabled: false }, "#000")).toBeNull();
+    expect(buildMetricSparkline([1, 2, 3], undefined, "#000")).toBeNull();
+    expect(buildMetricSparkline([1], { enabled: true }, "#000")).toBeNull();
+  });
+
+  it("degrades to null when non-numeric points leave fewer than 2 valid", () => {
+    expect(buildMetricSparkline([1, "x"] as any, { enabled: true }, "#000")).toBeNull();
+  });
+
+  it("builds a line series + hidden grid/axes (bottom layout)", () => {
+    const s = buildMetricSparkline([10, 20, 30], { enabled: true, type: "line" }, "#abc");
+    expect(s?.series.type).toBe("line");
+    expect(s?.series.data).toEqual([10, 20, 30]);
+    expect(s?.xAxis[0].show).toBe(false);
+    expect(s?.yAxis[0].show).toBe(false);
+    expect(s?.polarCenterY).toBe("30%");
+    expect(s?.valueBandFactor).toBe(0.6);
+    expect(s?.resolved.type).toBe("line");
+  });
+
+  it("uses a bar series for type=bar and an areaStyle for type=area", () => {
+    expect(buildMetricSparkline([1, 2], { enabled: true, type: "bar" }, "#abc")?.series.type).toBe(
+      "bar",
+    );
+    const area = buildMetricSparkline([1, 2], { enabled: true, type: "area" }, "#abc");
+    expect(area?.series.type).toBe("line");
+    expect(area?.series.areaStyle).toBeDefined();
+  });
+
+  it("centers the value over a full-height trend for background layout", () => {
+    const s = buildMetricSparkline([1, 2], { enabled: true, layout: "background" }, "#abc");
+    expect(s?.polarCenterY).toBe("50%");
+    expect(s?.valueBandFactor).toBe(1);
+  });
+
+  it("falls back to the passed color when none is set, and defaults lineWidth to 1", () => {
+    const s = buildMetricSparkline([1, 2, 3], { enabled: true, color: null }, "#3f7994");
+    expect(s?.resolved.color).toBe("#3f7994");
+    expect(s?.series.lineStyle.color).toBe("#3f7994");
+    expect(s?.resolved.lineWidth).toBe(1);
+    expect(s?.series.lineStyle.width).toBe(1);
   });
 });

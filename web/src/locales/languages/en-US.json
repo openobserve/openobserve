@@ -3411,6 +3411,18 @@
     "configSectionComparison": "Comparison",
     "configSectionMarkLines": "Mark Lines",
     "configSectionBackground": "Background",
+    "configSectionSparkline": "Sparkline",
+    "sparklineEnable": "Show sparkline",
+    "sparklineType": "Chart type",
+    "sparklineTypeLine": "Line",
+    "sparklineTypeArea": "Area",
+    "sparklineTypeBar": "Bar",
+    "sparklineLayout": "Layout",
+    "sparklineLayoutBottom": "Bottom",
+    "sparklineLayoutBackground": "Background",
+    "sparklineColor": "Color",
+    "sparklineFillOpacity": "Fill opacity",
+    "sparklineLineWidth": "Line width",
     "dashboardMapsQueryBuilder": {
       "maxFieldAllowed": "Max {count} field in {axis} is allowed.",
       "withoutFieldNotDrag": "Without field, not able to drag"

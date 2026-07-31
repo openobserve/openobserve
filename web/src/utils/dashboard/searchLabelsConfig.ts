@@ -33,6 +33,7 @@ const SECTION_DEFS = [
   { id: "comparison", icon: "compare-arrows" },
   { id: "markLines", icon: "timeline" },
   { id: "background", icon: "color-lens" },
+  { id: "sparkline", icon: "show-chart" },
 ] as const satisfies ReadonlyArray<SectionDef>;
 
 export type SectionId = (typeof SECTION_DEFS)[number]["id"];

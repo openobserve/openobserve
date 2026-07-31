@@ -56,6 +56,9 @@ export interface SQLContext {
   // Mutable ECharts options object (mutated by chart handlers)
   options: any;
 
+  // Metric sparkline: histogram hits for this query (optional; drives the trend).
+  sparklineData?: any;
+
   // Closure-based helpers
   /** Returns axis data array for the given field alias. */
   getAxisDataFromKey: (key: string) => any[];

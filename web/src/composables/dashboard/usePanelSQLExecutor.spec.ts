@@ -676,4 +676,73 @@ describe("usePanelSQLExecutor", () => {
       expect(payload.meta.fallback_order_by_col).toBeNull();
     });
   });
+
+  // ─── metric sparkline (isolated 2nd is_ui_histogram fetch) ────────────────────
+
+  describe("metric sparkline histogram fetch", () => {
+    const metricQuery = {
+      query: "SELECT count(_timestamp) as y_axis_1 FROM logs",
+      vrlFunctionQuery: "",
+      fields: { stream: "logs", stream_type: "logs", x: [{ alias: "ts" }] },
+      config: { time_shift: [] },
+    };
+    const makeMetricCtx = (sparklineEnabled: boolean) =>
+      makeCtx({
+        panelSchema: ref({
+          id: "panel-metric-1",
+          title: "Metric Panel",
+          type: "metric",
+          queryType: "sql",
+          config: sparklineEnabled ? { sparkline: { enabled: true } } : {},
+          queries: [metricQuery],
+        }),
+      });
+
+    it("fires a 2nd is_ui_histogram request when sparkline is enabled", async () => {
+      const { ctx, fetchQueryDataWithHttpStream } = makeMetricCtx(true);
+      const { executeSQL } = usePanelSQLExecutor(ctx);
+      await executeSQL(0, 300_000_000, null);
+
+      const histCall = fetchQueryDataWithHttpStream.mock.calls.find(
+        ([p]: any) => p?.meta?.is_ui_histogram === true,
+      );
+      expect(histCall).toBeTruthy();
+    });
+
+    it("does NOT fire the 2nd fetch when sparkline is disabled", async () => {
+      const { ctx, fetchQueryDataWithHttpStream } = makeMetricCtx(false);
+      const { executeSQL } = usePanelSQLExecutor(ctx);
+      await executeSQL(0, 300_000_000, null);
+
+      const histCall = fetchQueryDataWithHttpStream.mock.calls.find(
+        ([p]: any) => p?.meta?.is_ui_histogram === true,
+      );
+      expect(histCall).toBeUndefined();
+    });
+
+    it("captures hits from the stream response (2nd handler arg), not the request payload", async () => {
+      const { ctx, state, fetchQueryDataWithHttpStream } = makeMetricCtx(true);
+      const { executeSQL } = usePanelSQLExecutor(ctx);
+      await executeSQL(0, 300_000_000, null);
+
+      const histCall = fetchQueryDataWithHttpStream.mock.calls.find(
+        ([p]: any) => p?.meta?.is_ui_histogram === true,
+      );
+      const [payload, handlers] = histCall;
+      // 1st arg is our OWN request payload (type "histogram"); 2nd is the stream
+      // response. A handler that reads the request's `type` would capture nothing.
+      expect(payload.type).toBe("histogram");
+      const hits = [
+        { zo_sql_key: "2026-01-01T00:00:00", zo_sql_num: 5 },
+        { zo_sql_key: "2026-01-01T00:01:00", zo_sql_num: 7 },
+      ];
+      handlers.data(payload, {
+        type: "search_response_hits",
+        content: { results: { hits } },
+      });
+      handlers.complete();
+
+      expect(state.sparklineData[0]).toEqual(hits);
+    });
+  });
 });

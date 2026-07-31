@@ -93,6 +93,8 @@ export const getDefaultDashboardPanelData: any = (store: any) => ({
         colorBySeries: [],
       },
       background: null,
+      // Metric sparkline (value + trend); null = disabled
+      sparkline: null,
       // PromQL aggregation config
       aggregation: "last",
       // GeoMap config

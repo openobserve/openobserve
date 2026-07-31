@@ -123,6 +123,8 @@ const FALLBACKS: Record<string, string> = {
   "--color-trace-span-35": "#3B82F6",
   // Metric-panel text default (contrast fallback when a panel has no background).
   "--color-chart-metric-text": "#000000",
+  // Brand accent (--color-primary-600), light value — metric sparkline default color.
+  "--color-accent": "#3f7994",
 };
 
 /**

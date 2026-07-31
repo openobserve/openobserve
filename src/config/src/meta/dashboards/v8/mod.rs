@@ -313,6 +313,27 @@ pub struct BackgroundValue {
     pub color: String,
 }
 
+/// Optional trend sparkline drawn inside the metric ("Metric Text") panel — the
+/// value + a small line/area/bar chart of the underlying series (KPI stat card).
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
+#[serde(default)]
+#[serde(rename_all = "camelCase")]
+pub struct Sparkline {
+    pub enabled: bool,
+    #[serde(skip_serializing_if = "Option::is_none", rename = "type")]
+    typee: Option<String>, // "line" | "area" | "bar"
+    #[serde(skip_serializing_if = "Option::is_none")]
+    layout: Option<String>, // "bottom" | "background"
+    #[serde(skip_serializing_if = "Option::is_none")]
+    color: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<f64>)]
+    fill_opacity: Option<OrdF64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<f64>)]
+    line_width: Option<OrdF64>,
+}
+
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct StreamFieldObj {
@@ -413,6 +434,8 @@ pub struct PanelConfig {
     color: Option<ColorCfg>,
     #[serde(skip_serializing_if = "Option::is_none")]
     background: Option<Background>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    sparkline: Option<Sparkline>,
     #[serde(skip_serializing_if = "Option::is_none")]
     trellis: Option<Trellis>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1364,6 +1387,33 @@ mod tests {
         assert!(back.get("textColor").is_none());
         assert_eq!(back["color"], "#16a34a");
         assert_eq!(back["text"], "Up");
+    }
+
+    #[test]
+    fn test_sparkline_default_and_roundtrip() {
+        // Default (disabled) sparkline: enabled=false, all optionals absent.
+        let json = serde_json::to_value(&Sparkline::default()).unwrap();
+        assert_eq!(json["enabled"], false);
+        assert!(json.get("type").is_none());
+        assert!(json.get("layout").is_none());
+
+        // Populated sparkline round-trips with camelCase keys.
+        let s: Sparkline = serde_json::from_value(serde_json::json!({
+            "enabled": true,
+            "type": "area",
+            "layout": "bottom",
+            "color": "#3b82f6",
+            "fillOpacity": 0.15,
+            "lineWidth": 2.0
+        }))
+        .unwrap();
+        assert!(s.enabled);
+        assert_eq!(s.typee, Some("area".to_string()));
+        assert_eq!(s.layout, Some("bottom".to_string()));
+        let back = serde_json::to_value(&s).unwrap();
+        assert_eq!(back["type"], "area");
+        assert_eq!(back["fillOpacity"], 0.15);
+        assert_eq!(back["lineWidth"], 2.0);
     }
 
     #[test]

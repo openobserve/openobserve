@@ -512,6 +512,50 @@ describe("Convert PromQL Data Utils", () => {
       });
     });
 
+    it("keeps the metric value AND the sparkline series when sparkline is enabled", async () => {
+      const panelSchema = {
+        id: "panel1",
+        type: "metric",
+        config: {
+          background: { value: { color: "#FFFFFF" } },
+          sparkline: { enabled: true },
+        },
+        queries: [{ config: { promql_legend: "" } }],
+      };
+      const searchQueryData = [
+        {
+          resultType: "matrix",
+          result: [
+            {
+              metric: { job: "test-job" },
+              values: [
+                [1640435200, "42"],
+                [1640435260, "45"],
+                [1640435320, "40"],
+              ],
+            },
+          ],
+        },
+      ];
+
+      const result = await convertPromQLData(
+        panelSchema,
+        searchQueryData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockAnnotations,
+      );
+
+      // Both the value-text series and the sparkline trend series must survive:
+      // the "one metric value" reduction must not drop the value text (the bug
+      // was slicing after flatten, which kept only the trailing sparkline).
+      expect(result.options.series.length).toBe(2);
+      const textSeries = result.options.series.find((s: any) => s._metricText !== undefined);
+      expect(textSeries).toBeDefined();
+      expect(textSeries._metricText).toBeDefined();
+    });
+
     it("should handle bar chart type", async () => {
       const panelSchema = {
         id: "panel1",
