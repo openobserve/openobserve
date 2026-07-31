@@ -60,8 +60,7 @@ const meta = computed(() => props.cell.column.columnDef.meta as any);
 const align = computed(() => meta.value?.align ?? "left");
 
 // Record-name column weight. Only the default-rendered text path uses this;
-// custom cells style their own.
-const defaultTextClass = computed(() => ["text-text-body"]);
+const defaultTextClass = computed(() => ["text-inherit"]);
 
 const alignClass = computed(() => {
   if (align.value === "center") return "text-center";
