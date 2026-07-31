@@ -276,18 +276,28 @@ mod tests {
     /// those handlers re-verify identity by email.
     #[test]
     fn path_scoped_exemptions_are_intentional() {
-        assert!(may_skip_permission_check(true, false, false), "invites");
         assert!(
-            may_skip_permission_check(false, true, false),
+            may_skip_permission_check(true, false, false, false),
+            "invites"
+        );
+        assert!(
+            may_skip_permission_check(false, true, false, false),
+            "invite reject"
+        );
+        assert!(
+            may_skip_permission_check(false, false, true, false),
             "member_subscription"
         );
-        assert!(may_skip_permission_check(false, false, true), "org LIST");
+        assert!(
+            may_skip_permission_check(false, false, false, true),
+            "org LIST"
+        );
     }
 
     /// A user absent from the target org, on an ordinary route, is not exempt.
     #[test]
     fn ordinary_request_for_nonmember_is_not_exempt() {
-        assert!(!may_skip_permission_check(false, false, false));
+        assert!(!may_skip_permission_check(false, false, false, false));
     }
 
     /// SECURITY REGRESSION GUARD: an MCP-flagged request must NOT skip the
@@ -309,7 +319,7 @@ mod tests {
         // match one of the three path-scoped pre-provisioning cases. There is
         // no MCP input that flips the result.
         assert!(
-            !may_skip_permission_check(false, false, false),
+            !may_skip_permission_check(false, false, false, false),
             "SECURITY: a request that matches none of the invite / \
              member_subscription / org-LIST cases must be permission-checked, \
              regardless of whether it is an MCP request. The MCP exemption \
