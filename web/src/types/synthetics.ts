@@ -15,6 +15,16 @@ export interface StructuredError {
 }
 
 /** Per-step outcome pushed by the extension via stepReplayResult. */
+/**
+ * What the player reported about one replayed step.
+ *
+ * `fidelity` carries the X-8.2 divergence notes: the preview cannot reproduce every
+ * probe behaviour (ordered candidate fallback, navigation and response settle, some
+ * assertion kinds, an author-set timeout below 60 s, uploads, retired actions), and
+ * the requirement is that it SAYS so per step rather than diverging in silence. The
+ * extension emits these; the web layer used to drop them here, so every one of those
+ * divergences was invisible and a skipped step could read as a pass.
+ */
 export interface StepReplayResult {
   stepId: string;
   stepName: string;
@@ -22,6 +32,7 @@ export interface StepReplayResult {
   durationMs: number;
   error?: string;
   structuredError?: StructuredError;
+  fidelity?: { level: string; notes: string[] };
 }
 
 export type StepAction =
@@ -30,11 +41,103 @@ export type StepAction =
   | "type"
   | "select"
   | "press"
+  // `check` / `uncheck` / `upload` are version-2 additions. The recorder used to
+  // collapse a checkbox interaction to a plain click, which made the replayed
+  // journey depend on the box's starting state — a page that renders it
+  // pre-ticked silently inverted the journey (spec X-9.3).
+  | "check"
+  | "uncheck"
+  | "upload"
   | "hover"
   | "scroll"
   | "wait"
   | "assert"
   | "screenshot";
+
+// ── Version-2 locator bundle ────────────────────────────────────────────────
+// A v1 step identifies its element with a single selector, so any cosmetic
+// markup change breaks the monitor. A v2 step carries every way the recorder
+// could find the element, ordered most-stable-first, and the runner falls back
+// through them.
+//
+// Ordering matters and is not cosmetic: candidates only agree while the markup
+// is unchanged. Once it changes — the case fallback exists for — a lower-ranked
+// candidate may match a *different* element, so rank is what breaks ties.
+
+/** Ordered most stable to least. `css`/`xpath` are structural and brittle. */
+export type LocatorKind = "test_attribute" | "role" | "text" | "css" | "xpath";
+
+export interface LocatorCandidate {
+  kind: LocatorKind;
+  value: string;
+}
+
+export interface StepLocator {
+  /**
+   * Machine-derived evidence from the recording session. Read-only in the UI:
+   * author intent is expressed only by pinning, which keeps the stored list
+   * byte-comparable for the self-healing precondition.
+   */
+  candidates: LocatorCandidate[];
+  /** Author-pinned. When set, used exclusively — never falls back. */
+  user_override?: LocatorCandidate | null;
+}
+
+// ── Version-2 settle block ──────────────────────────────────────────────────
+// What the page demonstrably did after a step, observed while recording and
+// waited for again at run time. This is what replaces hard sleeps: a sleep is
+// simultaneously too short when the application is slow and pure waste when it
+// is fast, whereas a settle signal is neither.
+//
+// Every signal is advisory unless an author marks it required. A recorded signal
+// is evidence from one session, not a contract — an endpoint that gets renamed
+// must annotate the step, not turn a healthy journey red.
+
+export interface SettleNavigation {
+  /** Glob over the URL with the query string stripped, e.g. `**\/web/**`. */
+  url_pattern: string;
+}
+
+export interface SettleResponse {
+  url_pattern: string;
+  method?: string;
+  /**
+   * Author-set only. The recorder always emits `false`: deciding that a run is
+   * meaningless without a given call is a judgement about the application, not
+   * something a recording can observe.
+   */
+  required?: boolean;
+}
+
+export interface StepSettle {
+  navigation?: SettleNavigation;
+  responses?: SettleResponse[];
+  /** How long settling took while recording. Reporting only — never a timeout. */
+  observed_duration_ms?: number;
+  /** How long this step may spend settling. Absent means the runner's 30s. */
+  budget_ms?: number;
+}
+
+// ── Version-2 assertions ────────────────────────────────────────────────────
+// A journey that only clicks can click its way through a broken application and
+// still pass. An assertion is what turns a sequence of interactions into a
+// statement about an outcome.
+
+export type AssertionKind =
+  | "element_visible"
+  | "element_not_visible"
+  | "element_text"
+  | "url_matches"
+  | "page_title"
+  | "element_attribute";
+
+export interface StepAssertion {
+  kind: AssertionKind;
+  /** Required for every kind except the two visibility ones. */
+  expected?: string;
+  /** Required for `element_attribute`. */
+  attribute?: string;
+}
 
 export interface BrowserStep {
   id: string;
@@ -42,8 +145,18 @@ export interface BrowserStep {
   name?: string;
   selector?: string;
   selectorType?: SelectorType;
+  /** Version-2 locator bundle. Absent on v1 steps, which use `selector`. */
+  locator?: StepLocator;
+  /** Version-2 settle block: what to wait for after this step's action. */
+  settle?: StepSettle;
+  /** Version-2 typed assertion. Required on `assert`, forbidden elsewhere. */
+  assertion?: StepAssertion;
+  /** Failure skips the step and the run continues (cookie banners, popups). */
+  optional?: boolean;
+  /** Runs even after an earlier step failed (logout, cleanup). */
+  alwaysRun?: boolean;
   value?: string;
-  timeout?: number; // ms, default 30000
+  timeout?: number; // ms; undefined = runner's per-category default
   code: string;
   // Original, untouched extension step (see WireStep). Preserved for replay,
   // which sends the rich step back to the extension verbatim. Absent on
@@ -63,9 +176,18 @@ export type RecorderMode = "recording" | "inspecting" | "asserting" | "playing";
  */
 export interface WireStep {
   id: string;
-  action: string; // navigate | click | type | press | select | setInputFiles | waitFor | assert | screenshot
+  action: string; // navigate | click | type | press | select | check | uncheck | setInputFiles | waitFor | assert | screenshot
   selector?: string;
   selector_type?: "css" | "xpath" | "text" | "role" | "data-test";
+  /**
+   * Version-2 evidence captured by the extension. Present on recorded steps
+   * only; a hand-added step has none until it is re-recorded.
+   */
+  locator?: StepLocator;
+  settle?: StepSettle;
+  assertion?: StepAssertion;
+  optional?: boolean;
+  always_run?: boolean;
   name?: string;
   timeout_ms?: number;
   url?: string;
@@ -164,6 +286,12 @@ export type RecorderPushPayload =
       duration_ms: number;
       error?: string;
       structuredError?: StructuredError;
+      /** X-8.2 divergence notes, as the extension emits them. Declared here as
+       *  well as on `StepReplayResult` because this is the INBOUND shape the
+       *  composable reads from; without it, reading `payload.fidelity` does not
+       *  type-check, and dropping the read instead would make every divergence
+       *  silent again — a skipped step reading as a pass. */
+      fidelity?: { level: string; notes: string[] };
     }
   | { method: "stepReplayStarted"; stepId: string; stepName?: string };
 

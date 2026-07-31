@@ -17,7 +17,7 @@ const OInputStub = {
   props: ["modelValue", "label", "placeholder", "type"],
   emits: ["update:modelValue"],
   template:
-    '<input v-bind="$attrs" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" :data-label="label" />',
+    '<input v-bind="$attrs" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" :data-label="label" :placeholder="placeholder" />',
 };
 const OSelectStub = {
   props: ["modelValue", "label", "options"],
@@ -156,28 +156,25 @@ describe("BrowserJourneyStep", () => {
       expect(actionSelect.exists()).toBe(false);
     });
 
-    it("should show selector fields for click action", () => {
+    // The v1 Selector-type + Selector pair is gone (SE-7 / SE-18): a version-2
+    // step names its element through the locator bundle, and that is the only
+    // targeting UI. `stepNeedsTarget` decides when it renders.
+    it("should show the target block for click action", () => {
       wrapper = mountStep({
         step: makeStep({ action: "click", selector: "#btn" }),
         expanded: true,
       });
 
-      const selectorInput = wrapper.find('[data-test="synthetics-journey-step-selector-input"]');
-      const selectorTypeSelect = wrapper.find(
-        '[data-test="synthetics-journey-step-selector-type-select"]',
-      );
-      expect(selectorInput.exists()).toBe(true);
-      expect(selectorTypeSelect.exists()).toBe(true);
+      expect(wrapper.find('[data-test="synthetics-journey-step-locator"]').exists()).toBe(true);
     });
 
-    it("should hide selector fields for navigate action", () => {
+    it("should hide the target block for navigate action", () => {
       wrapper = mountStep({
         step: makeStep({ action: "navigate", value: "https://example.com" }),
         expanded: true,
       });
 
-      const selectorInput = wrapper.find('[data-test="synthetics-journey-step-selector-input"]');
-      expect(selectorInput.exists()).toBe(false);
+      expect(wrapper.find('[data-test="synthetics-journey-step-locator"]').exists()).toBe(false);
     });
 
     it("should show value input for type action", () => {
@@ -199,6 +196,90 @@ describe("BrowserJourneyStep", () => {
       const valueInput = wrapper.find('[data-test="synthetics-journey-step-value-input"]');
       expect(valueInput.exists()).toBe(true);
     });
+
+    // ── Timeout guard rails (spec P1.1.4, P1.1.5 / T1-13, T1-14) ───────────
+    // The recorder no longer stamps a timeout, so this field renders empty. An
+    // empty box reads as "no timeout", which is wrong and invites needless
+    // overrides — show the default the runner will actually apply.
+    describe("timeout guard rails", () => {
+      const timeoutInput = (w: VueWrapper) =>
+        w.find('[data-test="synthetics-journey-step-timeout-input"]');
+      const warning = (w: VueWrapper) =>
+        w.find('[data-test="synthetics-journey-step-timeout-warning"]');
+
+      // SE-5 moved the timeout behind the one `Advanced` collapsible, which
+      // opens itself only when the step carries a non-default. A step with no
+      // explicit timeout is exactly the case that stays closed, and
+      // OCollapsible unmounts collapsed content — so these cases have to open
+      // it before the field is in the DOM.
+      const openAdvanced = (w: VueWrapper) =>
+        w.find('[data-test="synthetics-journey-step-group-advanced"] button').trigger("click");
+
+      it("shows the 60s navigate/assert default as placeholder when unset", async () => {
+        wrapper = mountStep({
+          step: makeStep({ action: "navigate", timeout: undefined }),
+          expanded: true,
+        });
+        await openAdvanced(wrapper);
+        expect(timeoutInput(wrapper).attributes("placeholder")).toBe("60000");
+      });
+
+      it("shows the 30s interaction default as placeholder when unset", async () => {
+        wrapper = mountStep({
+          step: makeStep({ action: "click", timeout: undefined }),
+          expanded: true,
+        });
+        await openAdvanced(wrapper);
+        expect(timeoutInput(wrapper).attributes("placeholder")).toBe("30000");
+      });
+
+      it("warns when the author lowers the timeout below the category default", () => {
+        wrapper = mountStep({
+          step: makeStep({ action: "click", timeout: 5000 }),
+          expanded: true,
+        });
+        expect(warning(wrapper).exists()).toBe(true);
+      });
+
+      it("does not warn at or above the category default", () => {
+        wrapper = mountStep({
+          step: makeStep({ action: "click", timeout: 30000 }),
+          expanded: true,
+        });
+        expect(warning(wrapper).exists()).toBe(false);
+      });
+
+      // Opens `Advanced` first, or the absence proves nothing: an unset timeout
+      // is the one case that leaves the section collapsed, so the warning would
+      // be missing whether or not the component wanted to render it.
+      it("does not warn when no explicit timeout is set", async () => {
+        wrapper = mountStep({
+          step: makeStep({ action: "click", timeout: undefined }),
+          expanded: true,
+        });
+        await openAdvanced(wrapper);
+        expect(timeoutInput(wrapper).exists()).toBe(true);
+        expect(warning(wrapper).exists()).toBe(false);
+      });
+
+      // The warning is advisory. Lowering is the author's call — it must never
+      // block, only inform.
+      it("keeps the timeout editable while warning", () => {
+        wrapper = mountStep({
+          step: makeStep({ action: "click", timeout: 5000 }),
+          expanded: true,
+        });
+        expect(timeoutInput(wrapper).attributes("disabled")).toBeUndefined();
+      });
+    });
+
+    // ── Retired actions (spec X-9 / T1-9) ──────────────────────────────────
+    // T1-9 is "the editor no longer OFFERS the four retired actions" — the
+    // picker filter, covered by constants/synthetics.spec.ts. The per-step
+    // notice this file used to assert was deleted deliberately: `actionOptions`
+    // filters RETIRED_ACTIONS out, the recorder never emits one, and no v1
+    // journeys exist, so nothing could reach it — and it named no replacement.
+    // Its absence is pinned by BrowserJourneyStepEditor.spec.ts.
 
     it("should show timeout input when expanded", () => {
       wrapper = mountStep({ step: makeStep(), expanded: true });
@@ -401,6 +482,173 @@ describe("BrowserJourneyStep", () => {
 
       const dot = wrapper.find('[data-test="synthetics-journey-step-dot-0"]');
       expect(dot.exists()).toBe(true);
+    });
+  });
+
+  // ── Value inputs per action ───────────────────────────────────────────────
+  describe("value input", () => {
+    const valueInput = () => wrapper.find('[data-test="synthetics-journey-step-value-input"]');
+
+    it("should render the file path input for an upload step", () => {
+      wrapper = mountStep({
+        step: makeStep({ action: "upload", value: "/tmp/a.pdf" }),
+        expanded: true,
+      });
+
+      expect(valueInput().exists()).toBe(true);
+      expect(valueInput().attributes("value")).toBe("/tmp/a.pdf");
+    });
+
+    it("should render the option input for a select step", () => {
+      wrapper = mountStep({
+        step: makeStep({ action: "select", value: "India" }),
+        expanded: true,
+      });
+
+      expect(valueInput().attributes("value")).toBe("India");
+    });
+
+    it("should not render a generic value input for an assert step", () => {
+      // BrowserJourneyAssertion owns the expected value; a second input took
+      // typing and had it dropped at save (buildV2Steps drops `value` on assert).
+      wrapper = mountStep({
+        step: makeStep({ action: "assert", assertion: { kind: "element_text", expected: "Hi" } }),
+        expanded: true,
+      });
+
+      expect(valueInput().exists()).toBe(false);
+    });
+  });
+
+  // ── Wire round-trip on edit ───────────────────────────────────────────────
+  describe("value edits reach the replayed wire step", () => {
+    function editedWire(step: BrowserStep, newValue: string) {
+      wrapper = mountStep({ step, expanded: true });
+      const input = wrapper.find('[data-test="synthetics-journey-step-value-input"]');
+      input.setValue(newValue);
+      const emitted = wrapper.emitted("update:step") as BrowserStep[][];
+      return emitted[0][0].wire!;
+    }
+
+    it("should write an edited navigate URL to wire.url, not wire.value", async () => {
+      const step = makeStep({
+        action: "navigate",
+        value: "https://old.test",
+        wire: { id: "step-1", action: "navigate", url: "https://old.test", pageAlias: "page" },
+      });
+
+      const wire = editedWire(step, "https://new.test");
+
+      expect(wire.url).toBe("https://new.test");
+      expect(wire.pageAlias).toBe("page"); // extension metadata survives the edit
+    });
+
+    it("should write an edited press key to wire.key", async () => {
+      const step = makeStep({
+        action: "press",
+        value: "Enter",
+        wire: { id: "step-1", action: "press", key: "Enter" },
+      });
+
+      expect(editedWire(step, "Tab").key).toBe("Tab");
+    });
+
+    it("should write an edited select option to wire.options", async () => {
+      const step = makeStep({
+        action: "select",
+        value: "India",
+        wire: { id: "step-1", action: "select", options: ["India"] },
+      });
+
+      expect(editedWire(step, "Japan").options).toEqual(["Japan"]);
+    });
+  });
+
+  // ── Settle block (spec P4.1.5, P3.4.3) ────────────────────────────────────
+  describe("settle", () => {
+    const settleStep = () =>
+      makeStep({
+        action: "click",
+        settle: {
+          navigation: { url_pattern: "**/web/**" },
+          responses: [{ url_pattern: "**/api/login", method: "POST", required: false }],
+          observed_duration_ms: 1200,
+          budget_ms: 5000,
+        },
+        wire: { id: "step-1", action: "click" },
+      });
+
+    it("should let the author mark a recorded response as required", async () => {
+      wrapper = mountStep({ step: settleStep(), expanded: true });
+
+      const checkbox = wrapper.find('[data-test="synthetics-journey-step-settle-required-0"]');
+      expect(checkbox.exists()).toBe(true);
+
+      await checkbox.setValue(true);
+
+      const emitted = wrapper.emitted("update:step") as BrowserStep[][];
+      const next = emitted[0][0];
+      expect(next.settle?.responses?.[0].required).toBe(true);
+      // ...and it travels with the replayed step, not just the saved one.
+      expect(next.wire?.settle?.responses?.[0].required).toBe(true);
+    });
+
+    it("should show the settle budget and let the author change it", async () => {
+      wrapper = mountStep({ step: settleStep(), expanded: true });
+
+      const budget = wrapper.find('[data-test="synthetics-journey-step-settle-budget-input"]');
+      expect(budget.attributes("value")).toBe("5000");
+
+      await budget.setValue("12000");
+
+      const emitted = wrapper.emitted("update:step") as BrowserStep[][];
+      expect(emitted[0][0].settle?.budget_ms).toBe(12000);
+    });
+
+    it("should drop the budget when the field is cleared", async () => {
+      wrapper = mountStep({ step: settleStep(), expanded: true });
+
+      await wrapper.find('[data-test="synthetics-journey-step-settle-budget-input"]').setValue("");
+
+      const emitted = wrapper.emitted("update:step") as BrowserStep[][];
+      const next = emitted[0][0];
+      expect(next.settle?.budget_ms).toBeUndefined();
+      expect(next.settle?.navigation?.url_pattern).toBe("**/web/**"); // evidence kept
+    });
+
+    it("should warn when the budget falls outside the server-accepted range", () => {
+      const step = settleStep();
+      step.settle!.budget_ms = 90000;
+      wrapper = mountStep({ step, expanded: true });
+
+      expect(
+        wrapper.find('[data-test="synthetics-journey-step-settle-budget-warning"]').exists(),
+      ).toBe(true);
+    });
+
+    it("should not warn for a budget inside the range", () => {
+      wrapper = mountStep({ step: settleStep(), expanded: true });
+
+      expect(
+        wrapper.find('[data-test="synthetics-journey-step-settle-budget-warning"]').exists(),
+      ).toBe(false);
+    });
+
+    // Only the recorded lines are conditional. The block itself holds the budget
+    // input, which is the ONLY way to create a budget — gating it on "has settle
+    // data" made it unreachable on a hand-added step (SE-16). This asserted the
+    // wrapper's absence, which happened to hold while the settle fields sat in
+    // their own collapsed group; merging that group into `Advanced` means a step
+    // carrying any non-default (this fixture sets `timeout`) opens it.
+    it("should render no recorded evidence when the step has none", () => {
+      wrapper = mountStep({ step: makeStep({ action: "click" }), expanded: true });
+
+      expect(wrapper.find('[data-test="synthetics-journey-step-settle"]').text()).not.toContain(
+        "Waits for (recorded)",
+      );
+      expect(
+        wrapper.find('[data-test="synthetics-journey-step-settle-budget-input"]').exists(),
+      ).toBe(true);
     });
   });
 });
