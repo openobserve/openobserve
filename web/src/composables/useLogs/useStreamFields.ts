@@ -1201,12 +1201,17 @@ export const useStreamFields = () => {
         }
 
         // The last column absorbs whatever width the fixed ones leave over — the
-        // pre-migration table did this with `flex: 1 1 auto` on the last column,
-        // OTable's equivalent is `meta.autoWidth`. Without an absorber the table
-        // (table-layout:auto + w-full) spreads the surplus across EVERY column,
-        // so the fixed-width timestamp visibly stretches whenever the selected
-        // columns are narrower than the panel. `minSize` stops it collapsing
-        // below its own measured width.
+        // pre-migration table did this with `flex: 1 1 auto; overflow: hidden` on
+        // the last column, OTable's equivalent is `meta.fillRemaining`. Without an
+        // absorber the table (table-layout:auto + w-full) spreads the surplus
+        // across EVERY column, so the fixed-width timestamp visibly stretches
+        // whenever the selected columns are narrower than the panel. `minSize`
+        // stops it collapsing below its own measured width.
+        // `fillRemaining` rather than a plain `autoWidth`: this column must stay
+        // inside the viewport and ellipsis-truncate, exactly as the old table did.
+        // (`autoWidth` alone is content-sized — right for the default `source`
+        // column, which pre-migration was `width: auto` and scrolled, but it makes
+        // a long `body` value stretch the column to thousands of pixels.)
         // `resultGrid.columns` is untyped, so `.at()` widens to `{}` — name the
         // few fields we touch rather than reaching through `any`.
         interface GridColumn {
@@ -1218,7 +1223,7 @@ export const useStreamFields = () => {
         const lastColumn = searchObj.data.resultGrid.columns.at(-1) as GridColumn | undefined;
         if (lastColumn && lastColumn.id !== store.state.zoConfig.timestamp_column) {
           lastColumn.minSize = lastColumn.size;
-          lastColumn.meta = { ...lastColumn.meta, autoWidth: true };
+          lastColumn.meta = { ...lastColumn.meta, autoWidth: true, fillRemaining: true };
         }
       }
 

@@ -126,6 +126,9 @@ function startResize(header: any, event: MouseEvent | TouchEvent) {
 }
 
 const horizontalScroll = inject<{ value: boolean } | null>("o2TableHorizontalScroll", null);
+// The table drops `min-w-max` when a bounded filler is present, so sized columns
+// must pin their min-width the same way they do while wrapping.
+const boundedFillTable = inject<{ value: boolean } | null>("o2TableBoundedFill", null);
 
 function handleSort(columnId: string, toggleHandler?: (event: Event) => void, event?: MouseEvent) {
   const meta = props.table.getColumn(columnId)?.columnDef?.meta as any;
@@ -188,8 +191,38 @@ function handleDraggableUpdate(next: string[]): void {
   emit("update:columnOrder", pinFirst(cursor === reordered.length ? fullOrder : reordered));
 }
 
+// Sized columns sharing a table with a bounded filler are pinned to their own
+// size in BOTH directions: min so the auto layout can't squeeze them (the table
+// has no `min-w-max` here), max so their content can't stretch them. Must stay
+// in step with `isSizeClamped` in OTableBodyCell.
+function sizeClamped(header: any): boolean {
+  const meta = header.column.columnDef.meta as any;
+  return (
+    !!boundedFillTable?.value &&
+    !props.wrap &&
+    !meta?.autoWidth &&
+    !meta?.fixedWidth &&
+    !meta?.isAction
+  );
+}
+
 function isAutoWidthColumn(header: any): boolean {
   return (header.column.columnDef.meta as any)?.autoWidth === true;
+}
+
+/**
+ * Elastic (fill) column header. Must stay in step with the matching branch in
+ * OTableBodyCell's `cellStyle` — see the comments there for why a scrolling
+ * table needs `max-width: 0` to keep the column at the viewport instead of
+ * stretching to its longest value.
+ */
+function autoWidthHeaderStyle(header: any): Record<string, string> {
+  const style: Record<string, string> = {};
+  const min = header.column.columnDef.minSize;
+  if (min && !props.wrap) style.minWidth = `${min}px`;
+  const meta = header.column.columnDef.meta as any;
+  if (meta?.fillRemaining && horizontalScroll?.value && !props.wrap) style.maxWidth = "0";
+  return style;
 }
 
 function headerAlignClass(header: any): string {
@@ -458,9 +491,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
         ]"
         :style="{
           ...(isAutoWidthColumn(header)
-            ? header.column.columnDef.minSize && !wrap
-              ? { minWidth: `${header.column.columnDef.minSize}px` }
-              : {}
+            ? autoWidthHeaderStyle(header)
             : (header.column.columnDef.meta as any)?.fixedWidth
               ? {
                   width: headerSizeVar(header),
@@ -468,9 +499,15 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
                   maxWidth: headerSizeVar(header),
                 }
               : horizontalScroll?.value
-                ? wrap
-                  ? { width: headerSizeVar(header), minWidth: headerSizeVar(header) }
-                  : { width: headerSizeVar(header) }
+                ? sizeClamped(header)
+                  ? {
+                      width: headerSizeVar(header),
+                      minWidth: headerSizeVar(header),
+                      maxWidth: headerSizeVar(header),
+                    }
+                  : wrap
+                    ? { width: headerSizeVar(header), minWidth: headerSizeVar(header) }
+                    : { width: headerSizeVar(header) }
                 : { width: headerSizeVar(header), maxWidth: headerSizeVar(header) }),
           ...(header.column.getIsPinned?.() === 'left'
             ? {
@@ -732,9 +769,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
         ]"
         :style="{
           ...(isAutoWidthColumn(header)
-            ? header.column.columnDef.minSize && !wrap
-              ? { minWidth: `${header.column.columnDef.minSize}px` }
-              : {}
+            ? autoWidthHeaderStyle(header)
             : (header.column.columnDef.meta as any)?.fixedWidth
               ? {
                   width: headerSizeVar(header),
@@ -742,9 +777,15 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
                   maxWidth: headerSizeVar(header),
                 }
               : horizontalScroll?.value
-                ? wrap
-                  ? { width: headerSizeVar(header), minWidth: headerSizeVar(header) }
-                  : { width: headerSizeVar(header) }
+                ? sizeClamped(header)
+                  ? {
+                      width: headerSizeVar(header),
+                      minWidth: headerSizeVar(header),
+                      maxWidth: headerSizeVar(header),
+                    }
+                  : wrap
+                    ? { width: headerSizeVar(header), minWidth: headerSizeVar(header) }
+                    : { width: headerSizeVar(header) }
                 : { width: headerSizeVar(header), maxWidth: headerSizeVar(header) }),
           ...(header.column.getIsPinned?.() === 'left'
             ? {

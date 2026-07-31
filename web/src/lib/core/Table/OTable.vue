@@ -712,6 +712,23 @@ const hasFillColumn = computed(() =>
   }),
 );
 
+// A *bounded* filler (`meta.fillRemaining`) takes the leftover width but stays
+// inside the container and clips, where a plain `autoWidth` filler is allowed to
+// grow to its longest value and push the table into horizontal scroll. The
+// pre-migration logs table drew exactly this line: the default `source` column
+// was `width: auto` (content-sized, scrolls), while the last *selected* column
+// was `flex: 1 1 auto; overflow: hidden` (leftover, clipped). A bounded filler
+// therefore has to drop the table's `min-w-max`, which would otherwise size
+// every column to max-content and defeat the clamp.
+const hasBoundedFill = computed(() =>
+  table.getVisibleLeafColumns().some((c) => (c.columnDef.meta as any)?.fillRemaining),
+);
+
+// Sized cells need this: without `min-w-max` the auto layout would squeeze them
+// to fit the container, so they pin their min-width and let the ROW scroll —
+// only the filler is allowed to give up space (same rule as wrap mode).
+provide("o2TableBoundedFill", hasBoundedFill);
+
 // Suppress the horizontal scrollbar for fill tables that aren't intentionally
 // scrolling (sub-pixel rounding otherwise shows a 1-2px scrollbar). Keep it for
 // horizontal-scroll tables and frozen flex tables ONLY when the columns
@@ -1147,7 +1164,7 @@ defineExpose({
             // at its longest line so the text never wraps. Sticky total columns
             // still need their explicit content width.
             props.horizontalScroll
-              ? props.wrap && !props.stickyColTotals
+              ? (props.wrap || hasBoundedFill) && !props.stickyColTotals
                 ? 'w-full'
                 : isDelegatedScroll
                   ? 'min-w-max'
