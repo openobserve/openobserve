@@ -392,9 +392,8 @@ export class AlertManagement {
             // The trigger endpoint evaluates the alert AND synchronously delivers the
             // notification, surfacing sink delivery errors as a 500. In that case the
             // trigger mechanics (menu action → PATCH → evaluation) worked; only the
-            // external webhook sink misbehaved (e.g. httpbin/webhook.site returning
-            // 503s). Delivery correctness is covered by the round-trip validation
-            // tests, not this UI feature test.
+            // notification sink returned an error on delivery. Delivery correctness is
+            // covered by the round-trip validation tests, not this UI feature test.
             if (status === 500 && /Error sending notification/i.test(body?.message || '')) {
                 testLogger.warn('Alert trigger reached delivery but sink rejected the notification — treating trigger as successful', { status, body });
                 return true;
@@ -420,10 +419,9 @@ export class AlertManagement {
             await errorNotification.waitFor({ state: 'visible', timeout: 3000 });
             const errorText = await errorNotification.textContent().catch(() => 'Unknown error');
             // "Error sending notification" means the trigger fired and reached delivery,
-            // but the external sink rejected it (e.g. httpbin/webhook.site 5xx). The
-            // trigger mechanism worked — only sink delivery failed, which this UI feature
-            // test does not assert. Treat it as success; a genuine trigger failure
-            // ("Failed to trigger") still returns false.
+            // but the notification sink rejected it. The trigger mechanism worked — only
+            // sink delivery failed, which this UI feature test does not assert. Treat it
+            // as success; a genuine trigger failure ("Failed to trigger") still returns false.
             if (/Error sending notification/i.test(errorText)) {
                 testLogger.warn('Trigger reached delivery but sink rejected it — treating trigger as successful', { errorText });
                 return true;

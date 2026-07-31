@@ -939,6 +939,18 @@ export class AlertsPage {
         await input.press('Enter');
     }
 
+    /**
+     * Add one "Additional Variable" (context attribute) on the Advanced tab.
+     * The empty-state "Add Variable" button creates the first key/value row; the key
+     * and value inputs share a data-test across rows, so `.last()` targets the newest.
+     */
+    async addAlertVariable(key, value) {
+        await this.page.locator(this.locators.contextAttributesAddButton).click();
+        await this.page.locator(`${this.locators.contextAttributeKeyInput} input`).last().fill(key);
+        await this.page.locator(`${this.locators.contextAttributeValueInput} input`).last().fill(value);
+        testLogger.info('Added alert variable', { key });
+    }
+
     /** Open the destinations select and pick the first available option. */
     async selectFirstDestination() {
         const dropdown = this.page.locator(this.locators.alertDestinationsSelect);

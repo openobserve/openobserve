@@ -152,6 +152,12 @@ async function getAlertTransitions(page, alertId, { limit = 20 } = {}) {
   return r.ok() ? r.json() : { list: [] };
 }
 
+/** Full alert object as stored (includes context_attributes, description, priority, tags). */
+async function getAlert(page, alertId) {
+  const r = await api(page, 'get', `${urls().v2}/alerts/${alertId}?folder=default`);
+  return r.ok() ? r.json() : null;
+}
+
 /**
  * Poll the alert list until `name` has a run outcome (i.e. the scheduler evaluated it),
  * or the timeout elapses. Returns the list item (or null). Scheduled alerts are picked
@@ -193,7 +199,7 @@ module.exports = {
   BASE, STREAM, SINK, TMPL, DEST,
   uniq, urls, api,
   simpleAlert, multiAlert, groupedSimpleAlert, realtimeAlert,
-  createAlert, listAlerts, findAlertId, deleteAlerts, seedAlertFixtures,
+  createAlert, listAlerts, findAlertId, getAlert, deleteAlerts, seedAlertFixtures,
   ingest, getAlertGroups, getAlertTransitions,
   waitForAlertOutcome, waitForAlertLevel, isFiringOutcome,
 };

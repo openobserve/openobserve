@@ -30,7 +30,7 @@ const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const logData = require('../../fixtures/log.json');
 const { getOrgIdentifier } = require('../utils/cloud-auth.js');
-const { findAlertId, deleteAlerts } = require('../utils/alerts-api-helpers.js');
+const { findAlertId, getAlert, deleteAlerts } = require('../utils/alerts-api-helpers.js');
 
 const NETWORK_IDLE_TIMEOUT_MS = 30000;
 const TEST_STREAM = 'e2e_automate';
@@ -47,7 +47,7 @@ async function openWizardOnAdvancedTab(page, pm, alertName) {
     await pm.alertsPage.openAdvancedTab();
 }
 
-test.describe('Alerts — priority & tags', {
+test.describe('Alerts — priority, tags & additional variables', {
     tag: ['@alerts-priority-tags', '@smoke', '@alerts', '@P1'],
 }, () => {
     let pm;
@@ -120,6 +120,42 @@ test.describe('Alerts — priority & tags', {
         await pm.alertsPage.expectAlertPriorityInList(alertName, /P3/); // human form, not integer 3
         await pm.alertsPage.expectAlertTagsInList(alertName, ['prod', 'service:checkout']); // normalized
         testLogger.info('Round trip verified: P3 + normalized tags rendered on the list');
+    });
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Additional Variables (context_attributes) — same silent-drop risk, same guard
+    // ─────────────────────────────────────────────────────────────────────────
+    test('an additional variable survives save and round-trips through the alert', async ({ page }) => {
+        const suffix = Math.random().toString(36).substring(2, 8);
+        const alertName = 'auto_prio_vars_' + suffix;
+        createdAlertNames.push(alertName);
+        await openWizardOnAdvancedTab(page, pm, alertName);
+
+        // Add one key/value variable on the Advanced tab.
+        await pm.alertsPage.addAlertVariable('team', 'payments');
+
+        // Destination is required to submit; it lives on the "Alert Rules" tab, not Advanced.
+        await pm.alertsPage.openConditionTab();
+        await pm.alertsPage.selectFirstDestination();
+
+        const savePromise = page
+            .waitForResponse((r) => r.url().includes('/alerts') && r.request().method() === 'POST', { timeout: 45000 })
+            .catch(() => null);
+        await pm.alertsPage.submitAlertForm();
+        const saveResp = await savePromise;
+        expect(saveResp, 'alert save request must reach the API').toBeTruthy();
+        expect(saveResp.ok(), `save failed: ${saveResp.status()}`).toBeTruthy();
+
+        // Variables have no list column, so verify the round trip through the stored alert
+        // (form -> payload -> API request model -> domain -> DB) — the same chain that
+        // silently dropped priority/tags during development.
+        const id = await findAlertId(page, alertName);
+        expect(id, 'the saved alert must be findable by name').toBeTruthy();
+        const alert = await getAlert(page, id);
+        expect(alert, 'GET must return the saved alert').toBeTruthy();
+        expect(alert.context_attributes, 'the Additional Variable must survive the full round trip')
+            .toMatchObject({ team: 'payments' });
+        testLogger.info('Round trip verified: additional variable persisted on the alert');
     });
 
     // ─────────────────────────────────────────────────────────────────────────
