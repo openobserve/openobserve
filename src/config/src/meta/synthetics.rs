@@ -954,6 +954,32 @@ const MAX_JOURNEY_BUDGET_MS: u32 = 900_000;
 /// `journey_budget_ms` further requires re-deriving all three together.
 pub const JOB_LEASE_SECS: i64 = 900;
 
+/// Ceiling on a check's worst-case run, in seconds.
+///
+/// Deliberately BELOW `JOB_LEASE_SECS`, because three bounds are stacked and each
+/// has to fit inside the next:
+///
+/// ```text
+///   check worst case  <=  Lambda function timeout  <  job lease
+///        840s                    840s                   900s
+///     (validated here)      (deployed by the            (reaper)
+///                            ECR deploy scripts)
+/// ```
+///
+/// Validating against the LEASE was wrong: it let the control plane accept a
+/// check the execution environment cannot finish. On the managed path the probe
+/// is a Lambda, and a function that hits its timeout is killed mid-run — the
+/// check reports a failure that never happened, and no amount of lease headroom
+/// helps because the process is already gone.
+///
+/// The 60s gap under the lease is what dispatch and the ack need: a run that
+/// finishes exactly at the function timeout still has to report before the reaper
+/// decides the lease expired.
+///
+/// Keep this in step with `LAMBDA_TIMEOUT_SECS` in both probes'
+/// `scripts/build-and-push-ecr.sh`, which re-assert it on every deploy.
+pub const MAX_CHECK_BUDGET_SECS: i64 = 840;
+
 /// Ceiling for ONE attempt of a non-browser check, in milliseconds.
 ///
 /// Net `timeout_ms` was previously unbounded: every protocol config defaults it
@@ -1013,9 +1039,9 @@ fn validate_net_retry_budget(
     }
 
     let worst_case_ms = worst_case_run_ms(timeout_ms, 1, retries, wait_before_retry_secs);
-    if worst_case_ms > JOB_LEASE_SECS * 1_000 {
+    if worst_case_ms > MAX_CHECK_BUDGET_SECS * 1_000 {
         return Err(format!(
-            "config: a full retry sequence must fit inside the {JOB_LEASE_SECS}s job lease, but \
+            "config: a full retry sequence must fit inside the {MAX_CHECK_BUDGET_SECS}s run budget, but \
              (retries={retries} + 1) x timeout_ms={timeout_ms} + retries x \
              wait_before_retry_secs={wait_before_retry_secs} needs {worst_case_ms}ms. Lower \
              timeout_ms, retries, or wait_before_retry_secs — a check that outlives its lease has \
@@ -1757,10 +1783,10 @@ fn validate_browser_config(
     // `dispatcher/mod.rs` was written to prevent.
     let devices = i64::try_from(cfg.browser_devices.len().max(1)).unwrap_or(1);
     let worst_case_ms = worst_case_run_ms(budget_ms, devices, retries, wait_before_retry_secs);
-    if worst_case_ms > JOB_LEASE_SECS * 1_000 {
+    if worst_case_ms > MAX_CHECK_BUDGET_SECS * 1_000 {
         return Err(format!(
             "config: a full retry sequence across all browser/device combos must fit inside the \
-             {JOB_LEASE_SECS}s job lease, but browser_devices={devices} x (retries={retries} x \
+             {MAX_CHECK_BUDGET_SECS}s run budget, but browser_devices={devices} x (retries={retries} x \
              journey_budget_ms={budget_ms} + wait_before_retry_secs={wait_before_retry_secs}) needs \
              {worst_case_ms}ms. Lower journey_budget_ms, retries, or the number of browser/device \
              combos — a run that outlives its lease is requeued and executed a second time."
@@ -2274,25 +2300,45 @@ mod tests {
     }
 
     #[test]
+    fn the_three_budgets_stay_correctly_ordered() {
+        // check worst case <= Lambda function timeout < job lease.
+        //
+        // Validating against the LEASE let the control plane accept a check the
+        // execution environment cannot finish: on the managed path a function that
+        // hits its timeout is killed mid-run, so the check reports a failure that
+        // never happened and lease headroom is irrelevant — the process is gone.
+        //
+        // If someone raises the budget to meet the lease, this fails and they have
+        // to go and change the deployed Lambda timeout too.
+        assert!(
+            MAX_CHECK_BUDGET_SECS < JOB_LEASE_SECS,
+            "the run budget ({MAX_CHECK_BUDGET_SECS}s) must leave headroom under \
+             the lease ({JOB_LEASE_SECS}s) for dispatch and the ack"
+        );
+        // AWS caps a Lambda at 900s, so the lease cannot usefully exceed it.
+        assert!(JOB_LEASE_SECS <= 900);
+    }
+
+    #[test]
     fn net_retry_sequence_must_fit_the_job_lease() {
         let (locs, brs, devs) = allowed();
-        // The lease covers the whole retry sequence because retries run inside
-        // the leased job. 4 x 300s alone is 1200s, past the 900s lease.
+        // The budget covers the whole retry sequence because retries run inside
+        // the leased job. 4 x 300s alone is 1200s, past the 840s run budget.
         let mut s = valid_tcp_synthetic();
         s.config = serde_json::json!({ "port": 5432, "timeout_ms": 300_000 });
         s.retries = 3;
         s.wait_before_retry_secs = 0;
         let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
-        assert!(err.contains("job lease"), "{err}");
+        assert!(err.contains("run budget"), "{err}");
 
         // The gaps count too: 3 x 250s = 750s of attempts is fine on its own,
-        // but not with 300s of waiting between them.
+        // but not with 600s of waiting between them.
         let mut s = valid_tcp_synthetic();
         s.config = serde_json::json!({ "port": 5432, "timeout_ms": 250_000 });
         s.retries = 2;
         s.wait_before_retry_secs = 300;
         let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
-        assert!(err.contains("job lease"), "{err}");
+        assert!(err.contains("run budget"), "{err}");
     }
 
     #[test]
@@ -2969,12 +3015,15 @@ mod tests {
         let mut s = valid_browser_synthetic();
         s.retries = 1;
         s.wait_before_retry_secs = 0;
-        // Exactly 2 * 450s = 900s — equal to the lease, which is permitted.
-        s.config["journey_budget_ms"] = serde_json::json!(450_000);
+        // Exactly 2 * 420s = 840s — equal to the run budget, which is permitted.
+        // The budget, not the lease: a Lambda is killed at its function timeout,
+        // so a check has to fit THAT, and the lease keeps 60s of headroom above it
+        // for dispatch and the ack.
+        s.config["journey_budget_ms"] = serde_json::json!(420_000);
         assert!(s.validate(&locs, &brs, &devs, true).is_ok());
 
         // One millisecond more per attempt tips it over.
-        s.config["journey_budget_ms"] = serde_json::json!(450_001);
+        s.config["journey_budget_ms"] = serde_json::json!(420_001);
         assert!(s.validate(&locs, &brs, &devs, true).is_err());
     }
 
