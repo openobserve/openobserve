@@ -999,10 +999,13 @@ const inlineTriggerClasses = computed(() => [
   "text-text-body text-xs font-medium",
   "ring-1 ring-inset transition-[color,background-color,box-shadow] duration-150",
   "focus:outline-none focus-visible:outline-accent/40 focus-visible:outline-2",
+  // The hover ring is gated on !hasError so it can't override the resting error
+  // ring on hover (equal specificity, later class wins) and hide the error.
   props.disabled
     ? "ring-transparent cursor-not-allowed opacity-60"
-    : "cursor-pointer hover:bg-surface-subtle hover:text-text-heading hover:ring-border-default",
-  hasError.value ? "ring-select-border-error" : props.disabled ? "" : "ring-transparent",
+    : hasError.value
+      ? "ring-select-border-error cursor-pointer hover:bg-surface-subtle hover:text-text-heading"
+      : "ring-transparent cursor-pointer hover:bg-surface-subtle hover:text-text-heading hover:ring-border-default",
 ]);
 
 const triggerEndPadding = computed(() =>

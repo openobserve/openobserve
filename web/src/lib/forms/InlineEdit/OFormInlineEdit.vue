@@ -39,6 +39,7 @@ defineExpose({ focus: () => inlineEditRef.value?.focus() });
         :placeholder="props.placeholder"
         :aria-label="props.ariaLabel"
         :edit-hint="props.editHint"
+        :tone="props.tone"
         :size="props.size"
         :maxlength="props.maxlength"
         :disabled="props.disabled"
