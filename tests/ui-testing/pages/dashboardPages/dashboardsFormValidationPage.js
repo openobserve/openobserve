@@ -551,6 +551,9 @@ export class DashboardsFormValidationPage {
 
     // ── AddPanel / PanelEditor helpers ────────────────────────────────────────
 
+    // The name display trigger (always rendered) — use it as the "editor opened"
+    // anchor. The `-input` only exists while editing, so it can't anchor setup.
+    getPanelNameTriggerLocator() { return this.page.locator(this.panelNameTrigger); }
     getPanelNameFieldLocator()  { return this.page.locator(this.panelNameField); }
     getPanelNameErrorLocator()  { return this.page.locator(this.panelNameError); }
     getPanelSaveBtnLocator()    { return this.page.locator(this.panelSaveBtn); }

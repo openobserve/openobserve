@@ -1097,8 +1097,10 @@ test.describe("Dashboard AddPanel panel name form validation", () => {
             await pm.dashboardCreate.addPanelSmart();
         }
 
-        // Confirm we are in the panel editor (apply button is the reliable anchor)
-        await pm.dashboardsFormValidation.getPanelNameFieldLocator().waitFor({ state: 'visible', timeout: 15000 });
+        // Confirm we are in the panel editor. The name is an inline-edited title:
+        // its display trigger is always visible, whereas the `-input` only mounts
+        // once the trigger is clicked — so the trigger is the correct anchor.
+        await pm.dashboardsFormValidation.getPanelNameTriggerLocator().waitFor({ state: 'visible', timeout: 15000 });
         testLogger.info('Panel editor opened');
     });
 
