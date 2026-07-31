@@ -223,8 +223,9 @@ describe("dashboardCapability", () => {
   });
 
   describe("filterDashboardBySchema — reflow", () => {
-    it("packs remaining panels left-to-right, top-to-bottom with no horizontal gaps and total width per row <= 12, preserving w/h", () => {
+    it("packs remaining panels left-to-right, top-to-bottom with no horizontal gaps and total width per row <= grid, preserving w/h", () => {
       // Arrange — 4 panels, each half-width (w=6); the second panel (top-right) is dropped.
+      // Uses an explicit 12-col grid so the packing/wrapping is readable at small scale.
       const p1 = makePanel(1, 0, 0, 6, 4, "SELECT session_id FROM _rumdata");
       const p2 = makePanel(2, 6, 0, 6, 4, "SELECT view_largest_contentful_paint FROM _rumdata");
       const p3 = makePanel(3, 0, 4, 6, 4, "SELECT error_id FROM _rumdata");
@@ -233,7 +234,7 @@ describe("dashboardCapability", () => {
       const presentFields = new Set(["session_id", "error_id", "service"]); // LCP absent
 
       // Act
-      const result = filterDashboardBySchema(dashboard, presentFields);
+      const result = filterDashboardBySchema(dashboard, presentFields, 12);
 
       // Assert
       const panels = result.dashboard.panels ?? [];
@@ -252,6 +253,36 @@ describe("dashboardCapability", () => {
       rows.forEach((totalWidth) => {
         expect(totalWidth).toBeLessThanOrEqual(12);
       });
+    });
+
+    it("packs 192-grid tiles into one full-width row by default (mobile-only Overview regression)", () => {
+      // Arrange — the real RUM Overview after schema conversion: four w=48 stat tiles that
+      // were spread across columns x=48/96 and rows y=0/6/12, plus three browser-only
+      // Web Vitals tiles in column x=0 that get dropped for a mobile-only stream.
+      const totalErrors = makePanel(1, 48, 0, 48, 8, "SELECT error_id FROM _rumdata");
+      const totalSessions = makePanel(2, 96, 0, 48, 8, "SELECT session_id FROM _rumdata");
+      const totalUnhandled = makePanel(3, 48, 6, 48, 8, "SELECT error_handling FROM _rumdata");
+      const sessionWithErrors = makePanel(4, 48, 12, 48, 8, "SELECT session_id FROM _rumdata");
+      const lcp = makePanel(5, 0, 0, 48, 8, "SELECT view_largest_contentful_paint FROM _rumdata");
+      const dashboard = makeDashboard([
+        totalErrors,
+        totalSessions,
+        totalUnhandled,
+        sessionWithErrors,
+        lcp,
+      ]);
+      const presentFields = new Set(["error_id", "session_id", "error_handling"]); // LCP absent
+
+      // Act — default grid width (192), i.e. the production path.
+      const result = filterDashboardBySchema(dashboard, presentFields);
+
+      // Assert — the four survivors sit side-by-side in a single row at full width,
+      // NOT clamped to w=12 and stacked one per row.
+      const panels = result.dashboard.panels ?? [];
+      expect(panels).toHaveLength(4);
+      panels.forEach((p) => expect(p.layout.w).toBe(48));
+      expect(panels.map((p) => p.layout.x)).toEqual([0, 48, 96, 144]);
+      expect(panels.every((p) => p.layout.y === 0)).toBe(true);
     });
 
     it("preserves original width and height of surviving panels exactly", () => {
