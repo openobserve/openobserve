@@ -58,9 +58,9 @@ vi.mock("@/components/ingestion/setupCard/SetupCardRenderer.vue", () => ({
   default: {
     name: "SetupCardRenderer",
     props: ["content", "subs"],
-    // Renders the hero-actions slot like the real component does — the
+    // Renders the hero-under-title slot like the real component does — the
     // platform switch lives there, so the tests below need it in the DOM.
-    template: '<div data-test="rum-web-setup-card"><slot name="hero-actions" /></div>',
+    template: '<div data-test="rum-web-setup-card"><slot name="hero-under-title" /></div>',
   },
 }));
 
