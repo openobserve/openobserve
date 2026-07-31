@@ -712,6 +712,14 @@ const hasFillColumn = computed(() =>
   }),
 );
 
+// A bounded filler clips instead of growing, so the table must drop `min-w-max`
+// — that would size every column to max-content and defeat the clamp.
+const hasBoundedFill = computed(() =>
+  table.getVisibleLeafColumns().some((c) => (c.columnDef.meta as any)?.fillRemaining),
+);
+
+provide("o2TableBoundedFill", hasBoundedFill);
+
 // Suppress the horizontal scrollbar for fill tables that aren't intentionally
 // scrolling (sub-pixel rounding otherwise shows a 1-2px scrollbar). Keep it for
 // horizontal-scroll tables and frozen flex tables ONLY when the columns
@@ -1147,7 +1155,7 @@ defineExpose({
             // at its longest line so the text never wraps. Sticky total columns
             // still need their explicit content width.
             props.horizontalScroll
-              ? props.wrap && !props.stickyColTotals
+              ? (props.wrap || hasBoundedFill) && !props.stickyColTotals
                 ? 'w-full'
                 : isDelegatedScroll
                   ? 'min-w-max'

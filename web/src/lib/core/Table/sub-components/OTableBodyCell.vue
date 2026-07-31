@@ -154,6 +154,21 @@ const pivotTotalStyle = computed<Record<string, any>>(() => {
 
 const isAutoWidth = computed(() => meta.value?.autoWidth === true);
 
+const boundedFillTable = inject<{ value: boolean } | null>("o2TableBoundedFill", null);
+// The clamp only counteracts `min-w-max`; a container-bounded table needs none.
+const inBoundedFillTable = computed(
+  () => !!boundedFillTable?.value && !!horizontalScroll?.value && !props.wrap,
+);
+const isBoundedFill = computed(
+  () => meta.value?.fillRemaining === true && inBoundedFillTable.value,
+);
+// Sized siblings of a bounded filler pin to their own size and clip — otherwise
+// a long value stretches the column (nothing else caps it when scrolling).
+const isSizeClamped = computed(
+  () =>
+    inBoundedFillTable.value && !isAutoWidth.value && !isAction.value && !meta.value?.fixedWidth,
+);
+
 const cellStyle = computed(() => {
   const base: Record<string, any> = {};
   if (isAutoWidth.value) {
@@ -164,6 +179,11 @@ const cellStyle = computed(() => {
     // wrapped. Keeping minSize here pins the column open and nothing ever wraps.
     const min = props.cell.column.columnDef.minSize;
     if (min && !props.wrap) base.minWidth = `${min}px`;
+    // `max-width: 0` keeps the filler's text out of the intrinsic-width sum, so
+    // it takes the leftover instead of sizing to its longest value; min-width
+    // still floors it. Never `width: 100%` — the percentage resolves against a
+    // table sized from its own cells and the column runs away to ~500000px.
+    if (isBoundedFill.value) base.maxWidth = "0";
   } else {
     const sizeVar = `var(--header-${props.cell.column.id.replace(/[^a-zA-Z0-9]/g, "-")}-size)`;
     base.width = sizeVar;
@@ -173,6 +193,10 @@ const cellStyle = computed(() => {
       base.minWidth = sizeVar;
       base.maxWidth = sizeVar;
     } else if (!horizontalScroll?.value) {
+      base.maxWidth = sizeVar;
+    } else if (isSizeClamped.value) {
+      // min: auto layout can't squeeze it; max: its content can't stretch it.
+      base.minWidth = sizeVar;
       base.maxWidth = sizeVar;
     } else if (props.wrap) {
       // Wrapping drops the table's `min-w-max`, so auto layout would otherwise
@@ -299,7 +323,9 @@ function onCellActionsLeave() {
       wrap
         ? 'wrap-anywhere whitespace-normal'
         : horizontalScroll?.value
-          ? 'whitespace-nowrap'
+          ? isBoundedFill || isSizeClamped
+            ? 'overflow-hidden text-ellipsis whitespace-nowrap'
+            : 'whitespace-nowrap'
           : isAction
             ? 'overflow-hidden whitespace-nowrap'
             : 'overflow-hidden text-ellipsis whitespace-nowrap',

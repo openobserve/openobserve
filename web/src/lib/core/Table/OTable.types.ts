@@ -101,6 +101,17 @@ export interface OTableColumnMeta {
   isName?: boolean;
   /** Format function applied to cell value before rendering */
   format?: (value: any, row: any) => any;
+  /**
+   * Elastic column: no explicit width, so it absorbs the leftover. In a
+   * `horizontalScroll` table it is content-sized — it grows to its longest
+   * value and the table scrolls.
+   */
+  autoWidth?: boolean;
+  /**
+   * Bounded elastic column: absorbs the leftover like `autoWidth`, but stays
+   * inside the container and ellipsis-truncates. Set alongside `autoWidth`.
+   */
+  fillRemaining?: boolean;
   /** Arbitrary metadata for custom cell renderers */
   [key: string]: any;
 }
