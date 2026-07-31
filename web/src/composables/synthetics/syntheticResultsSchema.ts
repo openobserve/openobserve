@@ -257,6 +257,17 @@ export interface RecordedStep {
   value: string | null;
   key: string | null;
   text: string | null;
+  /**
+   * The locator bundle as authored — every candidate the probe MAY walk, in
+   * the order it walks them.
+   *
+   * `candidates_tried` on the result says what ran; this says what was
+   * available. The difference is the whole question "was a fallback tried?":
+   * one authored candidate means no fallback existed, which reads very
+   * differently from three authored and the first one matching. The mapper has
+   * always passed this through untouched — only the type omitted it.
+   */
+  locator?: { candidates?: Array<{ kind: string; value: string; origin?: string }> };
 }
 
 export interface StepExecution {
@@ -267,6 +278,15 @@ export interface StepExecution {
   start_time: number;
   end_time: number;
   screenshot_key: string | null;
+  /**
+   * This step's OWN settle signals and locator candidates, as the probe wrote
+   * them. Declared because the record has carried them all along — the mapper
+   * spreads the raw step — while only the run-level `failure_detail` copy was
+   * ever read, which credited the failing step with the whole journey's traffic.
+   */
+  settle_signals?: unknown[];
+  candidates_tried?: unknown[];
+  settle_ms?: number;
 }
 
 export interface RetryAttempt {
@@ -557,6 +577,162 @@ export function foldEvidenceBundle(
     },
     truncated: recordTruncated || named.some((e) => e.kind === "truncation"),
   };
+}
+
+/**
+ * Severity rank, 1 (worst) … 6. Lower sorts first.
+ *
+ * Ordering is the guidance — there is no verdict anywhere in this feature, so
+ * "what to read first" is the only steer the UI gives (design NG1).
+ */
+export function evidenceSeverity(e: EvidenceEvent): number {
+  if (e.kind === "pageerror" || e.kind === "crash") return 1;
+  if (e.kind === "requestfailed") return 2;
+  if (e.kind === "console" && e.level === "error") return 3;
+  if (e.kind === "response") {
+    const s = e.status ?? 0;
+    if (s >= 500) return 4;
+    if (s >= 400) return 5;
+  }
+  return 6;
+}
+
+/**
+ * Severity, then first-party, then initiation order.
+ *
+ * Third-party is ranked BELOW first-party and never dropped: a failing
+ * third-party script is a legitimate cause of a broken page, and ordering
+ * degrades gracefully where a filter would discard evidence silently (X-8.2).
+ */
+function byEvidenceRank(a: EvidenceEvent, b: EvidenceEvent): number {
+  const sev = evidenceSeverity(a) - evidenceSeverity(b);
+  if (sev !== 0) return sev;
+  if (a.firstParty !== b.firstParty) return a.firstParty ? -1 : 1;
+  return (a.initiatedTs ?? a.ts) - (b.initiatedTs ?? b.ts);
+}
+
+/**
+ * Split a bundle by step, each bucket ranked worst-first.
+ *
+ * Unattributed events come back SEPARATELY rather than under a null key.
+ * Bucketing is best-effort — a live 158-event bundle carried only two distinct
+ * `step_id`s — so "we could not attribute this" is a finding the caller must be
+ * able to state, not a step it can quietly index.
+ */
+/** Normalise one raw `settle_signals` entry. Shared by both call sites. */
+function mapSettleSignal(sig: any): SettleSignal {
+  return {
+    kind: sig?.kind,
+    signal: str(sig?.signal),
+    status: sig?.status,
+    required: !!sig?.required,
+    waitedMs: typeof sig?.waited_ms === "number" ? sig.waited_ms : 0,
+  };
+}
+
+/**
+ * The evidence one step owns, as opposed to the run's.
+ *
+ * `failure_detail.settle_signals` is an ACCUMULATION across the whole journey:
+ * on a live 16-step failure it held 13 signals — one from step 2, six from step
+ * 8, two from step 14 — and the failing step owned none of them. Rendering that
+ * list under the failed step reads as "step 15 waited on /auth/login", which the
+ * page never did; the signal that actually went stale belonged to step 14.
+ *
+ * So attribution comes from the step's own row, and only the narrative fields
+ * (the error, the recorded baseline) come from `failure_detail`, and only for
+ * the step that failed.
+ *
+ * Returns null when the step has nothing of its own to show, so a passing step
+ * does not grow an empty evidence block.
+ */
+/**
+ * The full locator ladder: every authored candidate, annotated with what
+ * happened to it.
+ *
+ * `candidates_tried` lists only the rungs the probe actually stood on, so a
+ * step that matched on the first candidate looks identical to a step that had
+ * no other candidate to try. Both render as one row, and the reader cannot tell
+ * "the primary worked" from "there was nothing else". Folding the authored
+ * bundle back in makes the untried rungs visible as `not_tried` — a value the
+ * type has always allowed and nothing ever produced.
+ *
+ * Paired by VALUE, not by position: a probe that skips a rung would otherwise
+ * shift every outcome onto the wrong candidate.
+ */
+export function mergeLocatorLadder(
+  tried: LocatorAttempt[],
+  authored: Array<{ kind: string; value: string }> | undefined,
+): LocatorAttempt[] {
+  // No bundle on the record (it predates them) — the attempts are all we know.
+  if (!authored?.length) return tried;
+
+  const byValue = new Map(tried.map((c) => [c.value, c]));
+  const ladder: LocatorAttempt[] = authored.map(
+    (a) => byValue.get(a.value) ?? { kind: a.kind, value: a.value, outcome: "not_tried" },
+  );
+
+  // Anything the probe reached for that the bundle does not list — self-healing
+  // can go outside the bundle, and dropping it would hide the locator that ran.
+  const authoredValues = new Set(authored.map((a) => a.value));
+  for (const c of tried) {
+    if (!authoredValues.has(c.value)) ladder.push(c);
+  }
+  return ladder;
+}
+
+export function stepOwnDetail(
+  ex: StepExecution,
+  failureDetail: FailureDetail | null,
+  /** The step's authored locator bundle, so untried rungs stay visible. */
+  authoredCandidates?: Array<{ kind: string; value: string }>,
+): FailureDetail | null {
+  const isFailing = !!failureDetail && failureDetail.stepId === ex.step_id;
+  const signals = Array.isArray(ex.settle_signals) ? ex.settle_signals.map(mapSettleSignal) : [];
+  const candidates = mergeLocatorLadder(
+    Array.isArray(ex.candidates_tried) ? (ex.candidates_tried as LocatorAttempt[]) : [],
+    authoredCandidates,
+  );
+  const settleMs = typeof ex.settle_ms === "number" ? ex.settle_ms : null;
+
+  if (!isFailing && !signals.length && !candidates.length) return null;
+
+  return {
+    stepId: ex.step_id,
+    stepName: isFailing ? failureDetail!.stepName : "",
+    stepIndex: isFailing ? failureDetail!.stepIndex : 0,
+    // Only the failing step gets the error — it is the one statement on the
+    // record that describes a failure, and it describes exactly one.
+    error: isFailing ? failureDetail!.error : "",
+    candidatesTried: candidates,
+    settleSignals: signals,
+    settleMs,
+    // The recorded baseline is written per failure, not per step, so it stays
+    // with the failing step rather than being invented for its neighbours.
+    observedDurationMs: isFailing ? failureDetail!.observedDurationMs : null,
+    screenshotKey: isFailing ? failureDetail!.screenshotKey : null,
+    traceKey: isFailing ? failureDetail!.traceKey : null,
+  };
+}
+
+export function indexEvidenceByStep(events: EvidenceEvent[]): {
+  byStep: Map<string, EvidenceEvent[]>;
+  unattributed: EvidenceEvent[];
+} {
+  const byStep = new Map<string, EvidenceEvent[]>();
+  const unattributed: EvidenceEvent[] = [];
+  for (const e of events) {
+    if (!e.stepId) {
+      unattributed.push(e);
+      continue;
+    }
+    const list = byStep.get(e.stepId);
+    if (list) list.push(e);
+    else byStep.set(e.stepId, [e]);
+  }
+  for (const list of byStep.values()) list.sort(byEvidenceRank);
+  unattributed.sort(byEvidenceRank);
+  return { byStep, unattributed };
 }
 
 export interface NetworkStats {
@@ -1528,15 +1704,7 @@ function mapFailureDetail(raw: unknown, recordTraceKey?: unknown): FailureDetail
     stepIndex: typeof d.step_index === "number" ? d.step_index : 0,
     error: str(d.error),
     candidatesTried: Array.isArray(d.candidates_tried) ? d.candidates_tried : [],
-    settleSignals: Array.isArray(d.settle_signals)
-      ? d.settle_signals.map((sig: any) => ({
-          kind: sig?.kind,
-          signal: str(sig?.signal),
-          status: sig?.status,
-          required: !!sig?.required,
-          waitedMs: typeof sig?.waited_ms === "number" ? sig.waited_ms : 0,
-        }))
-      : [],
+    settleSignals: Array.isArray(d.settle_signals) ? d.settle_signals.map(mapSettleSignal) : [],
     settleMs: typeof d.settle_ms === "number" ? d.settle_ms : null,
     observedDurationMs: typeof d.observed_duration_ms === "number" ? d.observed_duration_ms : null,
     screenshotKey: d.screenshot_key ? str(d.screenshot_key) : null,
@@ -1791,20 +1959,20 @@ function timeBucketKey(tsMs: number, bucketMs: number): number {
 }
 
 /**
- * The selector to show for a recorded step, whichever schema version it uses.
+ * The selector to show for a recorded step.
  *
- * A v1 step has one `selector`. A v2 step has a locator bundle instead, so
- * reading `selector` alone leaves every v2 run showing empty selectors in
- * results — a regression that would look like missing data rather than a schema
- * mismatch (spec P2.5.6).
+ * A step's identity is its locator bundle, so reading a bare `selector` alone
+ * left every run showing empty selectors in results — a regression that looked
+ * like missing data rather than a schema mismatch (spec P2.5.6).
  *
- * A pinned `user_override` wins, because that is the locator the run actually
- * used; otherwise it is the primary candidate, which is what the run would have
- * started from.
+ * Position 0: the author's first choice, and what the run started from. This
+ * used to check a pin first. That branch is gone, and with it the third copy of
+ * "pin, else primary" — the other two were in `crx` and in the step editor.
+ * A stored pin, if one somehow exists, is ignored rather than honoured: the
+ * server refuses to store one, so acting on it would mean showing a locator the
+ * run could not have used.
  */
 export function effectiveSelector(step: Record<string, any>): string | null {
-  const pinned = step?.locator?.user_override;
-  if (pinned?.value) return str(pinned.value);
   const primary = step?.locator?.candidates?.[0];
   if (primary?.value) return str(primary.value);
   return step?.selector ? str(step.selector) : null;

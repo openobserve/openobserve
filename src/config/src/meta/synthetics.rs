@@ -619,40 +619,72 @@ pub struct SshAuth {
     pub secret: String,
 }
 
-// ── Version-2 step record ─────────────────────────────────────────────────────
+// ── Step record ───────────────────────────────────────────────────────────────
 //
-// v1 steps are untyped JSON with a single `selector` and a recorder-stamped
-// `timeout_ms`. v2 replaces that with this typed, server-validated structure.
+// The retired version-1 step was untyped JSON with a single `selector` and a
+// recorder-stamped `timeout_ms`. This typed, server-validated structure replaced
+// it, and is now the only shape a monitor can hold.
 //
 // The envelope is defined ONCE, complete, even though later phases populate
 // parts of it: `settle.navigation` (Phase 3), `settle.responses` (Phase 4),
-// `assertion` / `optional` / `always_run` (Phase 5). Bumping `steps_version` per
-// phase would break deployment skew — `deny_unknown_fields` means an additive
-// field from a newer recorder would be refused by an older server. Every block
-// except `locator` is optional, with a defined absent-behaviour, which is what
-// lets the phases ship independently.
+// `assertion` / `optional` / `always_run` (Phase 5). Versioning it per phase
+// would break deployment skew — `deny_unknown_fields` means an additive field
+// from a newer recorder would be refused by an older server. Every block except
+// `locator` is optional, with a defined absent-behaviour, which is what lets the
+// phases ship independently.
 
-/// One way to find an element. Ordered most-stable-first inside a bundle.
+/// One part of a combined locator, and how it attaches to what precedes it.
+///
+/// Structured rather than a bare string because the relation CANNOT be
+/// recomputed: whether two locators name the same element or one contains the
+/// other depends on DOM structure the editor never sees. It is a decision a
+/// human made, so it is stored. `value` stays authoritative for execution — the
+/// probe, the player and results display all keep handing the candidate's own
+/// `value` to `page.locator()`, so no consumer needs a builder.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct CompositePart {
+    pub value: String,
+    /// Absent on the FIRST part, which is the base the others attach to.
+    /// "and" | "has" | "has_not" | "descendant" on every later part.
+    #[serde(default)]
+    pub relation: Option<String>,
+}
+
+/// One way to find an element. The bundle's order is the resolution order.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct LocatorCandidate {
     /// "test_attribute" | "role" | "text" | "css" | "xpath"
     pub kind: String,
     pub value: String,
+    /// Where it came from: "recorded" (default) | "authored" | "composite".
+    /// Healing may only touch a recorded entry — see the H1-H6 contract.
+    #[serde(default)]
+    pub origin: Option<String>,
+    /// What a combined locator was built from, and how. Required when
+    /// `origin == "composite"`, forbidden otherwise.
+    #[serde(default)]
+    pub from: Option<Vec<CompositePart>>,
 }
 
-/// Every way the recorder found to identify one element, plus an optional
-/// author pin. Candidates are machine-derived evidence and read-only in the UI;
-/// `user_override` is the only channel for author intent, which is what makes
-/// "never heal a pinned step" fall out for free.
+/// Every way to identify one element, in the order they are tried.
+///
+/// The order is the author's, not the recorder's: they drag rows, add their own
+/// locators and combine recorded ones. That replaced `user_override`, a single
+/// exclusive pin whose only way to say "prefer this one" was to turn fallback
+/// off entirely. An ordered list says the same thing by deleting the others,
+/// and can also say "prefer mine, fall back to the recording", which a pin
+/// could not.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields)]
 pub struct StepLocator {
     #[serde(default)]
     pub candidates: Vec<LocatorCandidate>,
-    /// When set, used exclusively — never falls back to `candidates`.
+    /// A human has reordered, added, deleted or combined. Healing must never
+    /// reorder such a list.
     #[serde(default)]
-    pub user_override: Option<LocatorCandidate>,
+    pub author_ordered: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -755,10 +787,6 @@ pub struct BrowserConfig {
     #[serde(default = "default_browser_devices")]
     pub browser_devices: Vec<BrowserDevice>,
     pub runtime: Option<String>,
-    /// Which step schema `steps` uses. Explicit, never inferred from shape.
-    /// Absent means 1, so every stored monitor reads back as v1.
-    #[serde(default = "default_steps_version")]
-    pub steps_version: u8,
     #[serde(default)]
     pub steps: Vec<serde_json::Value>,
     #[serde(default)]
@@ -831,10 +859,6 @@ fn default_browser_timeout_ms() -> u32 {
     30_000
 }
 
-fn default_steps_version() -> u8 {
-    1
-}
-
 fn default_tls_port() -> u16 {
     443
 }
@@ -887,43 +911,6 @@ fn capture_off() -> String {
 }
 
 // ── Payload validation ────────────────────────────────────────────────────────
-
-/// Step actions the browser probe knows how to execute — must stay in sync with
-/// `buildStepCode` in browser-probe/src/runner.ts. The probe silently no-ops
-/// unknown actions (they "pass" without doing anything), so rejecting them here
-/// is the only guard. "scroll" is recorder-emitted but currently a probe no-op.
-const KNOWN_STEP_ACTIONS: &[&str] = &[
-    "navigate",
-    "click",
-    "fill",
-    "type",
-    "select",
-    "check",
-    "uncheck",
-    "keydown",
-    "press",
-    "hover",
-    "scroll",
-    "wait",
-    "waitFor",
-    "assert",
-    "screenshot",
-    "upload",
-    "setInputFiles",
-];
-
-/// Actions that require a non-empty `selector`.
-const SELECTOR_ACTIONS: &[&str] = &[
-    "click",
-    "fill",
-    "type",
-    "select",
-    "check",
-    "uncheck",
-    "hover",
-    "upload",
-    "setInputFiles",
-];
 
 /// Wall-clock ceiling for ONE browser attempt, in milliseconds.
 ///
@@ -1046,15 +1033,6 @@ const V2_ELEMENT_ACTIONS: &[&str] = &[
     "click", "fill", "press", "select", "check", "uncheck", "upload", "assert",
 ];
 
-/// Actions retired from the vocabulary (spec X-9, Q-10 / D-6).
-///
-/// A stored v1 monitor containing one keeps EXECUTING — validation runs on
-/// create and update, never on read — but it cannot be saved again until it is
-/// migrated. Rejecting on write while accepting on read is what lets the
-/// retirement land without a flag day, and what stops an author unknowingly
-/// re-saving a journey whose sleeps are the reason it is flaky.
-const RETIRED_STEP_ACTIONS: &[&str] = &["hover", "scroll", "wait", "waitFor", "screenshot"];
-
 /// The closed set of assertion kinds (spec P5.1).
 ///
 /// Closed on purpose: the probe fails an unknown kind rather than passing it, so
@@ -1076,14 +1054,39 @@ const V2_VISIBILITY_ASSERTION_KINDS: &[&str] = &["element_visible", "element_not
 const V2_PAGE_LEVEL_ASSERTION_KINDS: &[&str] = &["url_matches", "page_title"];
 
 const MAX_STEPS: usize = 50;
-const MAX_STEPS_JSON_BYTES: usize = 100_000;
-/// v2 steps carry up to 5 locator candidates and 5 settle patterns each, roughly
-/// 3-4x a v1 step. A maximal 50-step journey lands near 60KB; the cap is set well
-/// clear of that. The `config` column is already JSON (jsonb on PostgreSQL), and
-/// steps travel over the HTTP resolve/ack bodies rather than the Lambda invoke
-/// payload, so neither storage nor transport needs changing.
-const MAX_STEPS_JSON_BYTES_V2: usize = 262_144;
-const MAX_LOCATOR_CANDIDATES: usize = 5;
+/// A step carries up to 5 locator candidates and 5 settle patterns. A maximal
+/// 50-step journey lands near 60KB; the cap is set well clear of that. The
+/// `config` column is already JSON (jsonb on PostgreSQL), and steps travel over
+/// the HTTP resolve/ack bodies rather than the Lambda invoke payload, so neither
+/// storage nor transport needs changing.
+const MAX_STEPS_JSON_BYTES: usize = 262_144;
+/// What a stored bundle may hold.
+///
+/// There are two caps, and only this one is the server's. The RECORDER stops at
+/// five (`locatorBundle.ts`), which bounds probe cost per run without asking the
+/// author — the fifth way to find an element adds almost nothing once the first
+/// four have failed. The extra three here leave room for locators the author
+/// wrote and combinations they built: past five they are choosing the probe cost
+/// explicitly, and that difference is what justifies two numbers. Enforcing the
+/// recorder's five here would refuse the author's own work.
+const MAX_STORED_LOCATOR_CANDIDATES: usize = 8;
+
+/// Where a candidate came from. Provenance, not stability — how long a locator
+/// keeps working is derived from its `value`, never stored (P2.2.3).
+const LOCATOR_ORIGINS: &[&str] = &["recorded", "authored", "composite"];
+
+/// How one part of a combined locator attaches to the part before it.
+///
+/// Named after Playwright's own operations rather than CSS's, because the
+/// stored value IS a Playwright selector string and anyone debugging a monitor
+/// reads Playwright's documentation: `and` is `.and(b)`, `has` and `has_not`
+/// are `.filter({ has })` / `.filter({ hasNot })`, `descendant` is `.locator(b)`.
+///
+/// All four validate; the editor offers two. That is the whole reason the
+/// relation is stored — adding `has_not` or `descendant` later is a UI change,
+/// not a schema migration. `.or()` is deliberately absent: it unions in DOM
+/// order and so destroys the preference the ordered bundle exists to express.
+const COMPOSITE_RELATIONS: &[&str] = &["and", "has", "has_not", "descendant"];
 
 /// The recorder's test-id attribute when a monitor does not set one.
 ///
@@ -1566,39 +1569,93 @@ fn validate_v2_assertion(i: usize, assertion: &StepAssertion) -> Result<(), Stri
     Ok(())
 }
 
-/// Reject the retired actions on a v1 create or update (Q-10.a).
+/// Provenance and composition rules for one candidate in a bundle.
 ///
-/// The error names every offending index and action rather than the first,
-/// because an author fixing them one round-trip at a time is exactly the
-/// friction that makes people give up and leave the sleeps in.
-fn reject_retired_v1_actions(steps: &[serde_json::Value]) -> Result<(), String> {
-    let offenders: Vec<String> = steps
-        .iter()
-        .enumerate()
-        .filter_map(|(i, step)| {
-            let action = step.get("action").and_then(|v| v.as_str())?;
-            RETIRED_STEP_ACTIONS
-                .contains(&action)
-                .then(|| format!("{} ({action})", i + 1))
-        })
-        .collect();
-
-    if offenders.is_empty() {
-        return Ok(());
+/// Structure only. Whether a combined locator actually matches anything cannot
+/// be decided here — it depends on the page — and the editor has no live DOM
+/// either, so it is unverified until it runs (R2b.c). What IS decidable is that
+/// a composite says what it was built from, that a non-composite does not
+/// claim to be one, and that the parts form a base plus a chain of joins.
+fn validate_locator_candidate(
+    i: usize,
+    c: usize,
+    candidate: &LocatorCandidate,
+) -> Result<(), String> {
+    let origin = candidate.origin.as_deref().unwrap_or("recorded");
+    if !LOCATOR_ORIGINS.contains(&origin) {
+        return Err(format!(
+            "config.steps[{i}].locator.candidates[{c}].origin: unknown origin '{origin}' \
+             (valid: {})",
+            LOCATOR_ORIGINS.join(", ")
+        ));
     }
 
-    Err(format!(
-        "config.steps: step {} use actions that have been retired ({}). None of them can be \
-         replayed — they have no counterpart in the recorder's action model — and a hard sleep is \
-         the single largest source of the flakiness this schema exists to remove. Upgrade this \
-         journey to steps_version 2, which converts each sleep into a settle budget on the \
-         preceding step and drops the unreplayable steps. Existing runs are unaffected until you \
-         save.",
-        offenders.join(", "),
-        RETIRED_STEP_ACTIONS.join(", ")
-    ))
+    let Some(parts) = candidate.from.as_ref() else {
+        if origin == "composite" {
+            return Err(format!(
+                "config.steps[{i}].locator.candidates[{c}]: origin 'composite' requires 'from'"
+            ));
+        }
+        return Ok(());
+    };
+
+    // A `from` on anything else is a claim the value does not back up: nothing
+    // built it, so nothing can rebuild or explain it.
+    if origin != "composite" {
+        return Err(format!(
+            "config.steps[{i}].locator.candidates[{c}]: 'from' is only valid on a \
+             'composite' candidate, not on '{origin}'"
+        ));
+    }
+    // One part is not a combination, it is the part itself.
+    if parts.len() < 2 {
+        return Err(format!(
+            "config.steps[{i}].locator.candidates[{c}].from: a composite needs at least 2 \
+             parts, got {}",
+            parts.len()
+        ));
+    }
+
+    for (p, part) in parts.iter().enumerate() {
+        if part.value.trim().is_empty() {
+            return Err(format!(
+                "config.steps[{i}].locator.candidates[{c}].from[{p}]: 'value' must not be empty"
+            ));
+        }
+        match (p, part.relation.as_deref()) {
+            // The base is what the later parts attach to. A relation on it would
+            // have nothing to relate to.
+            (0, Some(r)) => {
+                return Err(format!(
+                    "config.steps[{i}].locator.candidates[{c}].from[0]: the base part must \
+                     carry no relation, got '{r}'"
+                ));
+            }
+            (0, None) => {}
+            (_, None) => {
+                return Err(format!(
+                    "config.steps[{i}].locator.candidates[{c}].from[{p}]: every part after the \
+                     base must carry a relation (valid: {})",
+                    COMPOSITE_RELATIONS.join(", ")
+                ));
+            }
+            (_, Some(r)) if !COMPOSITE_RELATIONS.contains(&r) => {
+                return Err(format!(
+                    "config.steps[{i}].locator.candidates[{c}].from[{p}].relation: unknown \
+                     relation '{r}' (valid: {})",
+                    COMPOSITE_RELATIONS.join(", ")
+                ));
+            }
+            (_, Some(_)) => {}
+        }
+    }
+
+    Ok(())
 }
 
+/// Validate every step in a journey. There is one step format, so this is the
+/// only step-validation path — the untyped version-1 branch beside it was
+/// deleted with version 1 itself (Phase 2c).
 fn validate_v2_steps(steps: &[serde_json::Value]) -> Result<(), String> {
     let mut seen_ids = std::collections::HashSet::new();
 
@@ -1618,9 +1675,9 @@ fn validate_v2_steps(steps: &[serde_json::Value]) -> Result<(), String> {
 
         if !V2_STEP_ACTIONS.contains(&step.action.as_str()) {
             return Err(format!(
-                "config.steps[{i}]: action '{}' is not valid in steps_version 2 (valid: {}). \
-                 hover, scroll, wait and screenshot have no equivalent in the recorder's action \
-                 model and cannot be replayed; type and keydown are aliases of fill and press.",
+                "config.steps[{i}]: action '{}' is not valid (valid: {}). hover, scroll, wait \
+                 and screenshot have no equivalent in the recorder's action model and cannot be \
+                 replayed; type and keydown are aliases of fill and press.",
                 step.action,
                 V2_STEP_ACTIONS.join(", ")
             ));
@@ -1676,16 +1733,20 @@ fn validate_v2_steps(steps: &[serde_json::Value]) -> Result<(), String> {
                     step.action
                 )
             })?;
-            if locator.candidates.is_empty() && locator.user_override.is_none() {
+            if locator.candidates.is_empty() {
                 return Err(format!(
-                    "config.steps[{i}].locator: needs at least one candidate or a user_override"
+                    "config.steps[{i}].locator: needs at least one candidate"
                 ));
             }
-            if locator.candidates.len() > MAX_LOCATOR_CANDIDATES {
+            if locator.candidates.len() > MAX_STORED_LOCATOR_CANDIDATES {
                 return Err(format!(
-                    "config.steps[{i}].locator.candidates: too many ({} > {MAX_LOCATOR_CANDIDATES})",
+                    "config.steps[{i}].locator.candidates: too many ({} > \
+                     {MAX_STORED_LOCATOR_CANDIDATES})",
                     locator.candidates.len()
                 ));
+            }
+            for (c, candidate) in locator.candidates.iter().enumerate() {
+                validate_locator_candidate(i, c, candidate)?;
             }
         }
 
@@ -1809,101 +1870,17 @@ fn validate_browser_config(
     let steps_bytes = serde_json::to_string(&cfg.steps)
         .map(|s| s.len())
         .unwrap_or(0);
-    let max_bytes = if cfg.steps_version >= 2 {
-        MAX_STEPS_JSON_BYTES_V2
-    } else {
-        MAX_STEPS_JSON_BYTES
-    };
-    if steps_bytes > max_bytes {
+    if steps_bytes > MAX_STEPS_JSON_BYTES {
         return Err(format!(
-            "config.steps: serialized steps too large ({steps_bytes} > {max_bytes} bytes)"
+            "config.steps: serialized steps too large ({steps_bytes} > {MAX_STEPS_JSON_BYTES} bytes)"
         ));
     }
 
-    // v2 steps are typed and validated separately; v1 keeps its historical
-    // untyped path byte-for-byte so no stored monitor changes behaviour.
-    if cfg.steps_version >= 2 {
-        validate_v2_steps(&cfg.steps)?;
-        return validate_browser_devices_and_schedule(
-            cfg,
-            frequency,
-            allowed_browsers,
-            allowed_devices,
-        );
-    }
-
-    // Q-10 / D-6: retired actions are refused on write while stored monitors
-    // carrying them keep executing on read.
-    reject_retired_v1_actions(&cfg.steps)?;
-
-    let mut seen_ids = std::collections::HashSet::new();
-    for (i, step) in cfg.steps.iter().enumerate() {
-        let action = step
-            .get("action")
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| format!("config.steps[{i}]: missing 'action'"))?;
-        if !KNOWN_STEP_ACTIONS.contains(&action) {
-            return Err(format!(
-                "config.steps[{i}]: unknown action '{action}' (known: {})",
-                KNOWN_STEP_ACTIONS.join(", ")
-            ));
-        }
-
-        // The probe opens about:blank and never auto-navigates — a journey
-        // whose first step isn't a navigate runs against a blank page.
-        if i == 0 && action != "navigate" {
-            return Err(format!(
-                "config.steps[0]: first step must be 'navigate', got '{action}'"
-            ));
-        }
-
-        if let Some(id) = step.get("id").and_then(|v| v.as_str()) {
-            if id.is_empty() {
-                return Err(format!("config.steps[{i}]: 'id' must not be empty"));
-            }
-            if !seen_ids.insert(id.to_string()) {
-                return Err(format!("config.steps[{i}]: duplicate step id '{id}'"));
-            }
-        } else {
-            return Err(format!("config.steps[{i}]: missing 'id'"));
-        }
-
-        if action == "navigate" {
-            let step_url = step
-                .get("url")
-                .and_then(|v| v.as_str())
-                .ok_or_else(|| format!("config.steps[{i}]: navigate step missing 'url'"))?;
-            validate_http_url(&format!("config.steps[{i}].url"), step_url)?;
-        }
-        if SELECTOR_ACTIONS.contains(&action) {
-            let selector = step.get("selector").and_then(|v| v.as_str()).unwrap_or("");
-            if selector.is_empty() {
-                return Err(format!(
-                    "config.steps[{i}]: '{action}' step requires a non-empty 'selector'"
-                ));
-            }
-        }
-        if (action == "type" || action == "fill")
-            && step.get("value").and_then(|v| v.as_str()).is_none()
-        {
-            return Err(format!(
-                "config.steps[{i}]: '{action}' step requires a 'value'"
-            ));
-        }
-        if let Some(timeout) = step.get("timeout_ms").and_then(|v| v.as_u64())
-            && !(100..=60_000).contains(&timeout)
-        {
-            return Err(format!(
-                "config.steps[{i}].timeout_ms: must be 100..=60000, got {timeout}"
-            ));
-        }
-    }
-
+    validate_v2_steps(&cfg.steps)?;
     validate_browser_devices_and_schedule(cfg, frequency, allowed_browsers, allowed_devices)
 }
 
-/// Shared by the v1 and v2 step paths — everything about a browser config that
-/// is not the steps themselves.
+/// Everything about a browser config that is not the steps themselves.
 fn validate_browser_devices_and_schedule(
     cfg: &BrowserConfig,
     frequency: &SyntheticFrequency,
@@ -2236,7 +2213,16 @@ mod tests {
             config: serde_json::json!({
                 "steps": [
                     { "id": "s1", "action": "navigate", "url": "https://example.com" },
-                    { "id": "s2", "action": "click", "selector": "#login" }
+                    {
+                        "id": "s2",
+                        "action": "click",
+                        "name": "Sign in",
+                        "locator": {
+                            "candidates": [
+                                { "kind": "css", "value": "#login" }
+                            ]
+                        }
+                    }
                 ],
                 "browser_devices": [ { "browser": "chromium", "device": "desktop" } ],
                 "timeout_ms": 30000
@@ -2353,16 +2339,15 @@ mod tests {
     }
 
     // ── Version-2 steps (spec Phase 2, P2.1/P2.2) ────────────────────────────
-    // v2 replaces the untyped step blob with a typed, server-validated one. The
-    // envelope is defined ONCE with its complete field set, and later phases
-    // populate blocks that ship optional from day one (settle, assertion,
-    // optional/always_run). Bumping the version per phase would break
-    // deployment skew: v2 rejects unknown fields, so an additive field from a
-    // newer recorder would be refused by an older server.
+    // The typed, server-validated step replaced an untyped blob. The envelope is
+    // defined ONCE with its complete field set, and later phases populate blocks
+    // that ship optional from day one (settle, assertion, optional/always_run).
+    // Versioning it per phase would break deployment skew: the step rejects
+    // unknown fields, so an additive field from a newer recorder would be
+    // refused by an older server.
 
     fn v2_synthetic(steps: serde_json::Value) -> Synthetic {
         let mut s = valid_browser_synthetic();
-        s.config["steps_version"] = serde_json::json!(2);
         s.config["steps"] = steps;
         s
     }
@@ -2467,13 +2452,43 @@ mod tests {
     }
 
     #[test]
-    fn test_v1_unchanged_when_steps_version_absent() {
-        // Regression guard: every stored monitor must keep validating exactly as
-        // before. v1 steps carry a bare `selector` and no locator bundle.
+    fn test_a_stray_steps_version_is_ignored_not_honoured() {
+        // Deployment skew, in the direction the rollout actually goes. `oo` Rust
+        // ships before the web build that stops sending the key, so for one
+        // release an older web app posts `steps_version: 2` at a server that has
+        // never heard of it. BrowserConfig does not deny unknown fields, so the
+        // key is dropped — and, crucially, it selects nothing: the same rules
+        // apply either way.
         let (locs, brs, devs) = allowed();
-        let s = valid_browser_synthetic();
-        assert!(s.config.get("steps_version").is_none());
+        let mut s = valid_browser_synthetic();
+        s.config["steps_version"] = serde_json::json!(2);
         assert!(s.validate(&locs, &brs, &devs, true).is_ok());
+
+        let cfg: BrowserConfig = serde_json::from_value(s.config.clone()).unwrap();
+        assert_eq!(cfg.steps.len(), 2);
+    }
+
+    #[test]
+    fn test_step_rules_apply_with_no_version_marker_at_all() {
+        // The rules used to be reached only when `steps_version >= 2`. Absent the
+        // fork, a journey in the retired version-1 shape — a bare `selector` and
+        // no locator bundle — has to be refused rather than routed elsewhere.
+        let (locs, brs, devs) = allowed();
+        let mut s = valid_browser_synthetic();
+        s.config["steps"] = serde_json::json!([
+            { "id": "s1", "action": "navigate", "url": "https://example.com" },
+            { "id": "s2", "action": "click", "name": "Sign in", "selector": "#login" }
+        ]);
+        let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
+        assert!(err.contains("unknown field `selector`"), "{err}");
+    }
+
+    #[test]
+    fn test_one_size_cap_applies_to_every_journey() {
+        // There were two, forked on the version. The surviving one is the larger
+        // of the pair, because a step carrying a locator bundle and a settle
+        // block is 3-4x the size of the untyped step it replaced.
+        assert_eq!(MAX_STEPS_JSON_BYTES, 262_144);
     }
 
     #[test]
@@ -2545,45 +2560,151 @@ mod tests {
         }
     }
 
+    // ── The cross-repo contract (Phases 2b + 2c) ─────────────────────────
+    //
+    // Every other test in this module builds its own fixture, so all of them
+    // could pass while the payload the WEB app actually sends is refused. These
+    // are the bytes `buildCreateBrowserTestPayload` produces for a journey that
+    // exercises the whole surface at once: a recorded bundle, a locator the
+    // author wrote, a combined one with its parts, an author-owned order, a
+    // settle block and a typed assertion.
+    //
+    // Its twin is `web/src/utils/synthetics/payloadContract.spec.ts`, which
+    // asserts the web side emits exactly this. Neither repo can import from the
+    // other, so two copies of the same bytes is the only mechanism there is —
+    // if they drift, one of them fails.
+    const WEB_PAYLOAD_STEPS: &str = r##"[
+            {
+                "id": "s1",
+                "action": "navigate",
+                "name": "Open app",
+                "url": "https://app.test/login"
+            },
+            {
+                "id": "s2",
+                "action": "fill",
+                "name": "Username",
+                "value": "omkar",
+                "locator": {
+                    "candidates": [
+                        {
+                            "kind": "test_attribute",
+                            "value": "[data-test=\"login-user-id-field\"]",
+                            "origin": "recorded"
+                        }
+                    ]
+                }
+            },
+            {
+                "id": "s3",
+                "action": "click",
+                "name": "Switch org",
+                "locator": {
+                    "candidates": [
+                        {
+                            "kind": "test_attribute",
+                            "value": "[data-test=\"org-row\"] >> internal:and=\"div >> internal:has-text=/^acme_prod$/\"",
+                            "origin": "composite",
+                            "from": [
+                                {
+                                    "value": "[data-test=\"org-row\"]"
+                                },
+                                {
+                                    "value": "div >> internal:has-text=/^acme_prod$/",
+                                    "relation": "and"
+                                }
+                            ]
+                        },
+                        {
+                            "kind": "css",
+                            "value": "#my-own",
+                            "origin": "authored"
+                        },
+                        {
+                            "kind": "test_attribute",
+                            "value": "[data-test=\"org-row\"] >> nth=1",
+                            "origin": "recorded"
+                        }
+                    ],
+                    "author_ordered": true
+                },
+                "settle": {
+                    "navigation": {
+                        "url_pattern": "**/web/**"
+                    },
+                    "responses": [
+                        {
+                            "url_pattern": "**/auth/login",
+                            "method": "POST",
+                            "required": false
+                        }
+                    ]
+                }
+            },
+            {
+                "id": "s4",
+                "action": "assert",
+                "name": "Profile visible",
+                "locator": {
+                    "candidates": [
+                        {
+                            "kind": "test_attribute",
+                            "value": "[data-test=\"header-my-account-profile-icon\"]"
+                        }
+                    ]
+                },
+                "assertion": {
+                    "kind": "element_visible"
+                }
+            }
+        ]"##;
+
     #[test]
-    fn test_v1_rejects_retired_actions_on_write_naming_every_offender() {
-        // Q-10.a: the error names EVERY offending step index and action, not the
-        // first — fixing them one round-trip at a time is the friction that makes
-        // authors give up and leave the sleeps in.
+    fn test_the_payload_the_web_app_sends_validates() {
         let (locs, brs, devs) = allowed();
-        let mut s = valid_browser_synthetic();
-        s.config["steps"] = serde_json::json!([
-            { "id": "s1", "action": "navigate", "url": "https://example.com" },
-            { "id": "s2", "action": "wait", "timeout_ms": 30000 },
-            { "id": "s3", "action": "click", "selector": "#go" },
-            { "id": "s4", "action": "hover", "selector": "#menu" }
-        ]);
-        let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
-        assert!(err.contains("2 (wait)"), "{err}");
-        assert!(err.contains("4 (hover)"), "{err}");
-        assert!(
-            !err.contains("3 ("),
-            "the healthy click must not be named: {err}"
-        );
-        // Q-10.b: the remedy is offered in the message, not left to be guessed.
-        assert!(err.contains("steps_version 2"), "{err}");
+        let steps: serde_json::Value =
+            serde_json::from_str(WEB_PAYLOAD_STEPS).expect("the web payload must be valid JSON");
+        let s = v2_synthetic(steps);
+
+        let result = s.validate(&locs, &brs, &devs, true);
+        assert!(result.is_ok(), "{}", result.unwrap_err());
     }
 
     #[test]
-    fn test_v1_retired_actions_still_deserialize_so_stored_monitors_keep_running() {
-        // D-6: rejection is a WRITE-path rule. Nothing calls `validate` when a
-        // monitor is loaded to be executed, and a stored journey carrying a
-        // legacy `wait` must keep running until its author migrates it.
-        let cfg: BrowserConfig = serde_json::from_value(serde_json::json!({
-            "steps": [
-                { "id": "s1", "action": "navigate", "url": "https://example.com" },
-                { "id": "s2", "action": "wait", "timeout_ms": 30000 }
-            ]
-        }))
-        .expect("a stored v1 config with a retired action must still load");
-        assert_eq!(cfg.steps.len(), 2);
-        assert_eq!(cfg.steps[1]["action"], "wait");
-        assert_eq!(cfg.steps_version, 1);
+    fn test_every_field_the_web_sends_is_one_the_step_struct_knows() {
+        // `validate` alone would pass on a payload whose `from` was silently
+        // dropped. Deserializing is what proves deny_unknown_fields accepts the
+        // shape AND that the fields survive — which is the whole point of
+        // building the payload key by key rather than by spreading a model.
+        let steps: Vec<serde_json::Value> = serde_json::from_str(WEB_PAYLOAD_STEPS).unwrap();
+        let combined: BrowserStepV2 = serde_json::from_value(steps[2].clone())
+            .expect("the org-switcher step must deserialize");
+        let locator = combined.locator.expect("it carries a bundle");
+
+        assert!(locator.author_ordered);
+        assert_eq!(locator.candidates.len(), 3);
+
+        let composite = &locator.candidates[0];
+        assert_eq!(composite.origin.as_deref(), Some("composite"));
+        let from = composite
+            .from
+            .as_ref()
+            .expect("a composite says what built it");
+        assert_eq!(from.len(), 2);
+        assert!(
+            from[0].relation.is_none(),
+            "the base part carries no relation"
+        );
+        assert_eq!(from[1].relation.as_deref(), Some("and"));
+
+        assert_eq!(locator.candidates[1].origin.as_deref(), Some("authored"));
+
+        // The last step's bundle carries NO origin at all — the shape every
+        // bundle recorded before Phase 2b has. It has to keep validating while
+        // the deploy catches up, which is why `origin` is optional rather than
+        // defaulted at the serde layer.
+        let legacy: BrowserStepV2 = serde_json::from_value(steps[3].clone()).unwrap();
+        assert!(legacy.locator.unwrap().candidates[0].origin.is_none());
     }
 
     fn v2_assert_step(assertion: serde_json::Value) -> serde_json::Value {
@@ -2765,33 +2886,196 @@ mod tests {
         assert!(err.contains("locator"), "{err}");
     }
 
-    #[test]
-    fn test_v2_user_override_satisfies_the_locator_requirement() {
+    // ── Provenance and composition (Phase 2b) ────────────────────────────
+    //
+    // `user_override` is GONE. It was a single exclusive pin whose only way to
+    // say "prefer this one" was to turn fallback off entirely; the ordered
+    // bundle says the same thing by deleting the others, and can also say
+    // "prefer mine, fall back to the recording". Deleting rather than
+    // deprecating is safe only because the pin feature never deployed — a
+    // stored one would now be an unknown field, and `fetch_due`'s
+    // `unwrap_or_default()` would silently empty `browser_devices` on every
+    // scheduling pass rather than erroring.
+
+    fn locator_with(candidates: serde_json::Value) -> Synthetic {
+        let mut step = v2_click_step();
+        step["locator"] = serde_json::json!({ "candidates": candidates });
+        v2_synthetic(serde_json::json!([v2_nav_step(), step]))
+    }
+
+    fn locator_error(candidates: serde_json::Value) -> String {
         let (locs, brs, devs) = allowed();
-        let step = serde_json::json!({
-            "id": "s2",
-            "action": "click",
-            "name": "Sign In",
-            "locator": {
-                "candidates": [],
-                "user_override": { "kind": "css", "value": "#pinned" }
-            }
-        });
-        let s = v2_synthetic(serde_json::json!([v2_nav_step(), step]));
-        assert!(s.validate(&locs, &brs, &devs, true).is_ok());
+        locator_with(candidates)
+            .validate(&locs, &brs, &devs, true)
+            .unwrap_err()
+    }
+
+    fn locator_ok(candidates: serde_json::Value) {
+        let (locs, brs, devs) = allowed();
+        let r = locator_with(candidates).validate(&locs, &brs, &devs, true);
+        assert!(r.is_ok(), "{}", r.unwrap_err());
     }
 
     #[test]
-    fn test_v2_caps_locator_candidates_at_five() {
+    fn test_a_stored_user_override_is_now_rejected() {
         let (locs, brs, devs) = allowed();
-        let candidates: Vec<_> = (0..6)
-            .map(|i| serde_json::json!({ "kind": "css", "value": format!("#c{i}") }))
-            .collect();
         let mut step = v2_click_step();
-        step["locator"]["candidates"] = serde_json::json!(candidates);
+        step["locator"]["user_override"] = serde_json::json!({ "kind": "css", "value": "#pin" });
         let s = v2_synthetic(serde_json::json!([v2_nav_step(), step]));
         let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
-        assert!(err.contains("candidates"), "{err}");
+        // Loud on purpose: it means stored data exists that we believed did not.
+        assert!(err.contains("unknown field `user_override`"), "{err}");
+    }
+
+    #[test]
+    fn test_an_empty_bundle_is_now_the_only_way_to_miss_a_target() {
+        // The rule used to read "at least one candidate OR a user_override".
+        let (locs, brs, devs) = allowed();
+        let mut step = v2_click_step();
+        step["locator"] = serde_json::json!({ "candidates": [] });
+        let s = v2_synthetic(serde_json::json!([v2_nav_step(), step]));
+        let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
+        assert!(err.contains("needs at least one candidate"), "{err}");
+    }
+
+    #[test]
+    fn test_origin_defaults_to_recorded_and_an_unknown_one_is_rejected() {
+        locator_ok(serde_json::json!([{ "kind": "css", "value": "#a" }]));
+        locator_ok(serde_json::json!([{ "kind": "css", "value": "#a", "origin": "authored" }]));
+
+        let err = locator_error(
+            serde_json::json!([{ "kind": "css", "value": "#a", "origin": "invented" }]),
+        );
+        assert!(
+            err.contains("steps[1].locator.candidates[0].origin"),
+            "{err}"
+        );
+        assert!(err.contains("invented"), "{err}");
+    }
+
+    #[test]
+    fn test_a_composite_must_say_what_it_was_built_from() {
+        let err = locator_error(
+            serde_json::json!([{ "kind": "css", "value": "#a", "origin": "composite" }]),
+        );
+        assert!(err.contains("requires 'from'"), "{err}");
+
+        // One part is not a combination, it is the part itself.
+        let err = locator_error(serde_json::json!([{
+            "kind": "css", "value": "#a", "origin": "composite",
+            "from": [{ "value": "#a" }]
+        }]));
+        assert!(err.contains("at least 2 parts"), "{err}");
+    }
+
+    #[test]
+    fn test_from_is_rejected_on_a_candidate_nothing_built() {
+        let err = locator_error(serde_json::json!([{
+            "kind": "css", "value": "#a", "origin": "recorded",
+            "from": [{ "value": "#a" }, { "relation": "and", "value": "#b" }]
+        }]));
+        assert!(
+            err.contains("only valid on a 'composite' candidate"),
+            "{err}"
+        );
+    }
+
+    #[test]
+    fn test_the_base_part_carries_no_relation_and_every_later_one_does() {
+        let base_has_relation = locator_error(serde_json::json!([{
+            "kind": "css", "value": "#a", "origin": "composite",
+            "from": [{ "relation": "and", "value": "#a" }, { "relation": "and", "value": "#b" }]
+        }]));
+        assert!(base_has_relation.contains("from[0]"), "{base_has_relation}");
+        assert!(
+            base_has_relation.contains("must carry no relation"),
+            "{base_has_relation}"
+        );
+
+        let join_has_none = locator_error(serde_json::json!([{
+            "kind": "css", "value": "#a", "origin": "composite",
+            "from": [{ "value": "#a" }, { "value": "#b" }]
+        }]));
+        assert!(join_has_none.contains("from[1]"), "{join_has_none}");
+        assert!(
+            join_has_none.contains("must carry a relation"),
+            "{join_has_none}"
+        );
+    }
+
+    #[test]
+    fn test_all_four_relations_validate_even_the_two_the_editor_does_not_offer() {
+        // E2b.12. This is the whole reason the relation is stored: adding
+        // `has_not` or `descendant` to the dialog later is a UI change, not a
+        // schema migration.
+        for relation in ["and", "has", "has_not", "descendant"] {
+            locator_ok(serde_json::json!([{
+                "kind": "css", "value": "#a", "origin": "composite",
+                "from": [{ "value": "#a" }, { "relation": relation, "value": "#b" }]
+            }]));
+        }
+
+        let err = locator_error(serde_json::json!([{
+            "kind": "css", "value": "#a", "origin": "composite",
+            "from": [{ "value": "#a" }, { "relation": "or", "value": "#b" }]
+        }]));
+        // `.or()` unions in DOM order, destroying the preference the ordered
+        // bundle exists to express. Rejected on merit, not deferred.
+        assert!(err.contains("from[1].relation"), "{err}");
+        assert!(err.contains("'or'"), "{err}");
+    }
+
+    #[test]
+    fn test_a_three_way_composite_validates() {
+        locator_ok(serde_json::json!([{
+            "kind": "test_attribute", "value": "#a", "origin": "composite",
+            "from": [
+                { "value": "[data-test=\"row\"]" },
+                { "relation": "and", "value": "[data-org=\"acme\"]" },
+                { "relation": "has", "value": "internal:text=\"acme_prod\"" }
+            ]
+        }]));
+    }
+
+    #[test]
+    fn test_author_ordered_defaults_false_and_round_trips() {
+        let (locs, brs, devs) = allowed();
+        let mut step = v2_click_step();
+        step["locator"]["author_ordered"] = serde_json::json!(true);
+        let s = v2_synthetic(serde_json::json!([v2_nav_step(), step]));
+        assert!(s.validate(&locs, &brs, &devs, true).is_ok());
+
+        let bare: StepLocator =
+            serde_json::from_value(serde_json::json!({ "candidates": [] })).unwrap();
+        assert!(!bare.author_ordered);
+    }
+
+    #[test]
+    fn test_a_bundle_carrying_none_of_the_new_fields_still_validates() {
+        // Deployment skew: `oo` Rust ships before the web and crx builds that
+        // start sending provenance, so the old shape has to keep working.
+        locator_ok(serde_json::json!([
+            { "kind": "test_attribute", "value": "[data-test=\"login-sign-in\"]" },
+            { "kind": "role", "value": "role=button[name=\"Sign In\"]" }
+        ]));
+    }
+
+    #[test]
+    fn test_the_stored_cap_leaves_room_for_the_author() {
+        // The recorder still stops at 5, in crx. The extra three here are for
+        // locators the author wrote and combinations they built — past that they
+        // are choosing the probe cost explicitly, and enforcing the recorder's
+        // cap on the server would refuse their own work.
+        let candidates = |n: usize| -> serde_json::Value {
+            (0..n)
+                .map(|i| serde_json::json!({ "kind": "css", "value": format!("#c{i}") }))
+                .collect::<Vec<_>>()
+                .into()
+        };
+        locator_ok(candidates(MAX_STORED_LOCATOR_CANDIDATES));
+
+        let err = locator_error(candidates(MAX_STORED_LOCATOR_CANDIDATES + 1));
+        assert!(err.contains("too many (9 > 8)"), "{err}");
     }
 
     #[test]
@@ -2847,33 +3131,34 @@ mod tests {
     }
 
     #[test]
-    fn test_v2_raises_the_steps_size_cap() {
-        // v2 steps are heavier (up to 5 candidates + settle patterns each), so
-        // the cap moves 100_000 -> 262_144. A payload between the two must be
-        // rejected as v1 and accepted as v2.
+    fn test_the_steps_size_cap_accommodates_a_locator_bundle() {
+        // A step carrying up to 5 candidates and 5 settle patterns is 3-4x the
+        // untyped step it replaced, which is why the cap sits at 262_144 rather
+        // than the 100_000 that bounded the retired shape.
         let (locs, brs, devs) = allowed();
-        let filler = "x".repeat(150_000);
-        let big_steps = serde_json::json!([
-            v2_nav_step(),
-            {
+        let step = |name: String| {
+            serde_json::json!({
                 "id": "s2",
                 "action": "click",
-                "name": filler,
+                "name": name,
                 "locator": { "candidates": [ { "kind": "css", "value": "#a" } ] }
-            }
-        ]);
-        let v2 = v2_synthetic(big_steps.clone());
+            })
+        };
+
+        let ok = v2_synthetic(serde_json::json!([
+            v2_nav_step(),
+            step("x".repeat(150_000))
+        ]));
         assert!(
-            v2.validate(&locs, &brs, &devs, true).is_ok(),
-            "v2 should allow ~150KB"
+            ok.validate(&locs, &brs, &devs, true).is_ok(),
+            "~150KB is within the cap"
         );
 
-        let mut v1 = valid_browser_synthetic();
-        v1.config["steps"] = serde_json::json!([
-            { "id": "s1", "action": "navigate", "url": "https://example.com" },
-            { "id": "s2", "action": "click", "selector": "#a", "name": "x".repeat(150_000) }
-        ]);
-        let err = v1.validate(&locs, &brs, &devs, true).unwrap_err();
+        let too_big = v2_synthetic(serde_json::json!([
+            v2_nav_step(),
+            step("x".repeat(300_000))
+        ]));
+        let err = too_big.validate(&locs, &brs, &devs, true).unwrap_err();
         assert!(err.contains("too large"), "{err}");
     }
 
@@ -3106,7 +3391,14 @@ mod tests {
         let (locs, brs, devs) = allowed();
         let mut s = valid_browser_synthetic();
         s.config = serde_json::json!({
-            "steps": [ { "id": "s1", "action": "click", "selector": "#x" } ],
+            "steps": [
+                {
+                    "id": "s1",
+                    "action": "click",
+                    "name": "Sign in",
+                    "locator": { "candidates": [ { "kind": "css", "value": "#x" } ] }
+                }
+            ],
             "browser_devices": [ { "browser": "chromium", "device": "desktop" } ],
             "timeout_ms": 30000
         });

@@ -321,11 +321,31 @@ export const BADGE_GROUPS = {
       online: { variant: "success-soft" },
       degraded: { variant: "warning-soft" },
       warning: { variant: "amber-soft" },
+      // A cluster node that is starting up but not yet serving.
+      prepare: { variant: "warning-soft" },
       critical: { variant: "error-soft" },
       offline: { variant: "error-soft" },
       failed: { variant: "error-soft" },
       down: { variant: "error-soft" },
       unknown: { variant: "default-soft" },
+    },
+  },
+
+  // Cluster node roles — plain (a role is a category, not a severity), one stable
+  // colour per role so the same node type reads the same everywhere.
+  nodeRole: {
+    mode: "plain",
+    shape: "pill",
+    values: {
+      all: { variant: "primary-soft", label: "All" },
+      ingester: { variant: "teal-soft" },
+      querier: { variant: "blue-soft" },
+      compactor: { variant: "purple-soft" },
+      flattencompactor: { variant: "purple-soft", label: "Flatten Compactor" },
+      router: { variant: "orange-soft" },
+      alertmanager: { variant: "amber-soft", label: "Alert Manager" },
+      actionserver: { variant: "lime-soft", label: "Action Server" },
+      script: { variant: "default-soft" },
     },
   },
 

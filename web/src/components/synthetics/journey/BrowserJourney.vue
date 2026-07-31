@@ -1,5 +1,20 @@
+<!-- Copyright 2026 OpenObserve Inc.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+-->
+
 <script setup lang="ts">
-// Copyright 2026 OpenObserve Inc.
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import type { BrowserStep, ReplayPhase, StepReplayResult } from "@/types/synthetics";
@@ -14,7 +29,6 @@ import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import JourneySteps from "./JourneySteps.vue";
-import UpgradeJourneyBanner from "./UpgradeJourneyBanner.vue";
 import ZeroAssertionNotice from "./ZeroAssertionNotice.vue";
 import TestIdMisconfiguredNotice from "./TestIdMisconfiguredNotice.vue";
 import { DEFAULT_TEST_ID_ATTR } from "@/constants/synthetics";
@@ -490,12 +504,11 @@ function handleInsertBelow(row: BrowserStep) {
     id: getUUIDv7(true),
     action: "click",
     name: "",
-    code: "",
     // A new step is a version-2 step: its identity is the locator bundle, never a
     // bare `selector`. Seeding it empty is what makes the editor render the
     // Locator block from the start, and what lets isV2Journey stay true once the
     // author supplies a locator instead of flipping the journey to v1 (SE-18).
-    locator: { candidates: [], user_override: null },
+    locator: { candidates: [] },
   });
   emit("update:modelValue", next);
 }
@@ -515,9 +528,8 @@ function addStep() {
       id: getUUIDv7(true),
       action: "click",
       name: "",
-      code: "",
       // See handleInsertBelow — a new step is version 2.
-      locator: { candidates: [], user_override: null },
+      locator: { candidates: [] },
     },
   ]);
 }
@@ -671,15 +683,6 @@ function openChromeExtensions() {
         </OButton>
       </div>
     </div>
-
-    <!-- Version-2 upgrade offer. Sits above the steps because saving is refused
-         while a retired action remains, and the remedy belongs next to the
-         problem rather than in a menu. -->
-    <UpgradeJourneyBanner
-      v-if="!readonly"
-      :steps="modelValue"
-      @upgrade="(steps) => emit('update:modelValue', steps)"
-    />
 
     <!-- A journey that verifies nothing can pass against a broken application,
          so the author is offered an assertion rather than left to think of it. -->
