@@ -1291,17 +1291,30 @@ fn normalize_latest_session_hits(
             user_ids.dedup();
         }
     }
-    let order: HashMap<&str, usize> = session_ids
+    let page_order: HashMap<&str, usize> = session_ids
         .iter()
         .enumerate()
         .map(|(index, session_id)| (session_id.as_str(), index))
         .collect();
-    hits.sort_by_key(|hit| {
-        hit.get("session_id")
-            .and_then(|value| value.as_str())
-            .and_then(|session_id| order.get(session_id))
-            .copied()
-            .unwrap_or(usize::MAX)
+    // Phase 1 selects the page by matching-span timestamp, while phase 2
+    // computes the timestamp displayed by the UI from all spans in a session.
+    // Sort by that final value so the returned Timestamp column is descending,
+    // matching the behavior of the previous Rust-side session aggregation.
+    // Preserve phase 1 order as a deterministic tie-breaker.
+    hits.sort_by(|left, right| {
+        let start_time =
+            |hit: &json::Value| json::get_int_value(hit.get("start_time").unwrap_or_default());
+        let page_index = |hit: &json::Value| {
+            hit.get("session_id")
+                .and_then(|value| value.as_str())
+                .and_then(|session_id| page_order.get(session_id))
+                .copied()
+                .unwrap_or(usize::MAX)
+        };
+
+        start_time(right)
+            .cmp(&start_time(left))
+            .then_with(|| page_index(left).cmp(&page_index(right)))
     });
     hits
 }
@@ -1561,21 +1574,35 @@ mod tests {
 
     #[test]
     fn normalize_latest_sessions_removes_internal_fields_and_stabilizes_users() {
-        let hits = vec![json!({
-            "session_id": "session-1",
-            "zo_sql_timestamp": 123,
-            "gen_ai_input_messages": [
-                {"role": "assistant", "content": "hi"},
-                {"role": "user", "content": "show me the weather"}
-            ],
-            "user_ids": ["zeta", "alpha", "zeta", ""]
-        })];
+        let hits = vec![
+            json!({
+                "session_id": "session-1",
+                "start_time": 100,
+                "zo_sql_timestamp": 300,
+                "gen_ai_input_messages": [
+                    {"role": "assistant", "content": "hi"},
+                    {"role": "user", "content": "show me the weather"}
+                ],
+                "user_ids": ["zeta", "alpha", "zeta", ""]
+            }),
+            json!({
+                "session_id": "session-2",
+                "start_time": 200,
+                "zo_sql_timestamp": 200,
+                "gen_ai_input_messages": [],
+                "user_ids": []
+            }),
+        ];
 
-        let normalized = normalize_latest_session_hits(hits, &["session-1".to_string()]);
-        assert_eq!(normalized[0]["first_user_message"], "show me the weather");
-        assert_eq!(normalized[0]["user_ids"], json!(["alpha", "zeta"]));
-        assert!(normalized[0].get("zo_sql_timestamp").is_none());
-        assert!(normalized[0].get("gen_ai_input_messages").is_none());
+        let normalized = normalize_latest_session_hits(
+            hits,
+            &["session-1".to_string(), "session-2".to_string()],
+        );
+        assert_eq!(normalized[0]["session_id"], "session-2");
+        assert_eq!(normalized[1]["first_user_message"], "show me the weather");
+        assert_eq!(normalized[1]["user_ids"], json!(["alpha", "zeta"]));
+        assert!(normalized[1].get("zo_sql_timestamp").is_none());
+        assert!(normalized[1].get("gen_ai_input_messages").is_none());
     }
 
     #[test]
