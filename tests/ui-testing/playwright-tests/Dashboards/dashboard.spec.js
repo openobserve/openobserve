@@ -518,11 +518,13 @@ test.describe("dashboard UI testcases", () => {
     await pm.dashboardPanelActions.applyDashboardBtn();
 
     // The panel title auto-generates from the configured stream/fields, so it is
-    // never empty — a name is always present without the user typing one.
+    // never empty — a name is always present without the user typing one. Assert
+    // it is NOT the empty-state placeholder ("Untitled panel"), which the value
+    // span would fall back to if auto-naming produced nothing.
     await expect(pm.dashboardPanelActions.getPanelNameValue()).toBeVisible();
     await expect(
       pm.dashboardPanelActions.getPanelNameValue()
-    ).not.toHaveText("");
+    ).not.toHaveText("Untitled panel");
 
     // Set an explicit name and save again
     await pm.dashboardPanelActions.addPanelName(panelName);

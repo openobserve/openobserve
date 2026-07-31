@@ -364,7 +364,6 @@
   },
   "common": {
     "inlineEdit": {
-      "editHint": "Click to rename",
       "autoHint": "Click to rename. Until you do, this name is generated from your configuration and keeps up as you change it."
     },
     "beta": "Beta",

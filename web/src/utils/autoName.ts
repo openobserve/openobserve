@@ -63,6 +63,23 @@ interface PanelField {
   args?: PanelFieldArg[];
 }
 
+/** The slice of a panel's state that naming reads (`dashboardPanelData`). */
+interface PanelAutoNameInput {
+  data?: {
+    type?: string;
+    queries?: Array<{
+      customQuery?: boolean;
+      fields?: {
+        stream?: string;
+        x?: PanelField[];
+        y?: PanelField[];
+        breakdown?: PanelField[];
+      };
+    }>;
+  };
+  layout?: { currentQueryIndex?: number };
+}
+
 /** Chart types that carry no field config at all — nothing to derive a name from. */
 const FIELDLESS_CHART_TYPES = ["markdown", "html", "custom_chart"];
 
@@ -136,7 +153,7 @@ const measureLabel = (field: PanelField, t: TranslateFn, timestampColumn: string
  * Returns "" when the panel has nothing worth describing yet.
  */
 export function buildPanelAutoName(
-  panelData: any,
+  panelData: PanelAutoNameInput | null | undefined,
   t: TranslateFn,
   options: PanelAutoNameOptions = {},
 ): string {
@@ -151,7 +168,7 @@ export function buildPanelAutoName(
   const streamFallback = () =>
     stream ? tidy(capitalize(t("dashboard.autoName.streamOverview", { stream }))) : "";
 
-  if (FIELDLESS_CHART_TYPES.includes(data.type)) return streamFallback();
+  if (data.type && FIELDLESS_CHART_TYPES.includes(data.type)) return streamFallback();
 
   // A hand-written query exposes only generated aliases (x_axis_1, y_axis_1);
   // naming a panel after those is worse than saying nothing about them.
@@ -227,6 +244,17 @@ interface AlertCondition {
   conditions?: AlertCondition[];
 }
 
+/** The slice of an alert form that naming reads. */
+interface AlertAutoNameInput {
+  stream_name?: string;
+  is_real_time?: string | boolean;
+  query_condition?: {
+    type?: string;
+    aggregation?: { function?: string | null; having?: { column?: string } | null } | null;
+    conditions?: AlertCondition;
+  } | null;
+}
+
 /** First leaf condition of a (possibly nested) condition group. */
 const firstLeafCondition = (group: AlertCondition | undefined): AlertCondition | null => {
   for (const node of group?.conditions ?? []) {
@@ -246,7 +274,10 @@ const firstLeafCondition = (group: AlertCondition | undefined): AlertCondition |
  * Returns "" until a stream is chosen — before that there is nothing to name
  * the alert after.
  */
-export function buildAlertAutoName(formData: any, t: TranslateFn): string {
+export function buildAlertAutoName(
+  formData: AlertAutoNameInput | null | undefined,
+  t: TranslateFn,
+): string {
   const stream = (formData?.stream_name || "").trim();
   if (!stream) return "";
 
