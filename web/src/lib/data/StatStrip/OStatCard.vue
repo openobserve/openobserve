@@ -134,7 +134,7 @@ const trendClass = computed(() =>
   <component
     :is="clickable ? 'button' : 'div'"
     :type="clickable ? 'button' : undefined"
-    class="rounded-default bg-surface-base flex min-w-0 flex-col justify-center gap-1 border px-2.5 py-1 text-left transition-colors"
+    class="rounded-default bg-surface-base flex min-w-0 flex-col justify-center gap-1 overflow-hidden border px-2.5 py-1 text-left transition-colors"
     :class="[
       selected ? 'border-accent' : 'border-border-default',
       clickable ? 'cursor-pointer' : '',
@@ -144,8 +144,12 @@ const trendClass = computed(() =>
   >
     <div class="flex min-w-0 items-center justify-between gap-2">
       <div class="flex min-w-0 items-baseline gap-1.5">
+        <!-- The VALUE never shrinks: it is the payload, and a clipped "499.51…" is
+             a useless number. When the tile is too narrow (5 tiles on a laptop),
+             the squeeze is absorbed by the label below, which stays readable
+             truncated because the tone icon already identifies the metric. -->
         <span
-          class="truncate text-2xl leading-none font-semibold"
+          class="shrink-0 text-2xl leading-none font-semibold whitespace-nowrap"
           :class="isMuted ? 'text-text-muted' : tc.value"
         >
           <slot name="value">{{ displayValue }}</slot>

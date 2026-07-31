@@ -584,6 +584,18 @@ pub async fn list(
         .into_response()
 }
 
+/// How many times smaller a stream is on disk than as ingested. Returns 0.0 when
+/// either side is missing, so streams without stats never outrank real ratios.
+fn compression_ratio(stream: &meta::stream::Stream) -> f64 {
+    let raw = stream.stats.storage_size;
+    let compressed = stream.stats.compressed_size;
+    if raw > 0.0 && compressed > 0.0 {
+        raw / compressed
+    } else {
+        0.0
+    }
+}
+
 /// Compares two streams for sorting based on the field and ASC/DESC
 fn stream_comparator(
     a: &meta::stream::Stream,
@@ -608,6 +620,14 @@ fn stream_comparator(
             .stats
             .index_size
             .partial_cmp(&b.stats.index_size)
+            .unwrap_or(Ordering::Equal),
+        // Newest-record timestamp — lets the UI sort streams by how recently they
+        // last received data.
+        "doc_time_max" => a.stats.doc_time_max.cmp(&b.stats.doc_time_max),
+        // Compression ratio (ingested / on disk). Streams with no data on either
+        // side have no ratio and sort as 0, i.e. below every real ratio ascending.
+        "compression" => compression_ratio(a)
+            .partial_cmp(&compression_ratio(b))
             .unwrap_or(Ordering::Equal),
         _ => a.name.cmp(&b.name),
     };
@@ -1094,6 +1114,39 @@ mod tests {
         let b = make_stream("b", 0, 0.0, 0.0, 7.0);
         assert_eq!(
             stream_comparator(&a, &b, "index_size", true),
+            Ordering::Less
+        );
+    }
+
+    #[test]
+    fn test_comparator_by_doc_time_max() {
+        let mut a = make_stream("a", 0, 0.0, 0.0, 0.0);
+        let mut b = make_stream("b", 0, 0.0, 0.0, 0.0);
+        a.stats.doc_time_max = 100;
+        b.stats.doc_time_max = 200;
+        assert_eq!(
+            stream_comparator(&a, &b, "doc_time_max", true),
+            Ordering::Less
+        );
+        assert_eq!(
+            stream_comparator(&a, &b, "doc_time_max", false),
+            Ordering::Greater
+        );
+    }
+
+    #[test]
+    fn test_comparator_by_compression() {
+        // 10 MB ingested / 1 MB on disk = 10x beats 10 MB / 5 MB = 2x.
+        let a = make_stream("a", 0, 10.0, 5.0, 0.0);
+        let b = make_stream("b", 0, 10.0, 1.0, 0.0);
+        assert_eq!(
+            stream_comparator(&a, &b, "compression", true),
+            Ordering::Less
+        );
+        // A stream with no sizes has no ratio and sorts below a real one.
+        let empty = make_stream("c", 0, 0.0, 0.0, 0.0);
+        assert_eq!(
+            stream_comparator(&empty, &a, "compression", true),
             Ordering::Less
         );
     }

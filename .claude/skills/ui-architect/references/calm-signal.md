@@ -77,15 +77,43 @@ Once a strip is `selectable`, four rules keep every strip behaving identically
   active → paused`, `P1 → P2 → P3 → P4`, `degraded → paused → active → draft →
   archived`. This mirrors the row rail's "critical colour on the left edge": what
   needs attention lives on the left, everywhere.
-- **The "All" / "Total" tile is LAST and never highlighted.** It only clears the
-  facet; it is never itself the active tile. Wire `:selected-key` to the *raw
-  filter value* (`null` / `"all"` when unfiltered) so nothing shows the ring while
-  viewing everything — never fall back to selecting "All" as the default.
+- **The "All" / "Total" tile is LAST, stays CLICKABLE, and is never highlighted.**
+  It only clears the facet; it is never itself the active tile. Wire `:selected-key`
+  to the *raw filter value* (`null` / `"all"` when unfiltered) so nothing shows the
+  ring while viewing everything — never fall back to selecting "All" as the default.
+  **Never put `selectable: false` on it** — that is the one wrong way to express
+  "never highlighted": it turns the tile into a plain `<div>`, so clicking it does
+  nothing and the strip has no way back to unfiltered (the bug users report as
+  "All isn't clickable"). "Never highlighted" is achieved by the `selectedKey`
+  wiring above, not by disabling the tile. `selectable: false` is only for a tile
+  that is genuinely not a facet at all (a pure read-out with no matching filter).
 - **Selection toggles off.** Re-clicking the already-active tile clears the filter
   (back to unfiltered), matching every other strip:
   `onSelect(key) → filter = key === "all" || filter === key ? cleared : key`.
 - **Selected state is an accent border, not a fill** — the `OStatCard` default;
   see Step 3.
+- **A strip in `#subheader` is a CLAIM ABOUT THE ROWS — scope decides position.**
+  Inside the table frame, a strip promises "these numbers describe the list below",
+  so it must be computed from the same filtered set *and* be facet-clickable. Before
+  writing one, check the fetch: **if the list is server-paginated you only hold one
+  page**, so page-local sums are not totals — never sum the visible page and label
+  it "Total". When the numbers genuinely can't meet the promise (server pagination,
+  or totals that come from a different, wider endpoint such as an org-summary API),
+  do **not** put them in `#subheader` — lift them to the page level as a read-only
+  strip in `OPageLayout`'s **`#subnav`**, where they read as page context instead of
+  a row summary, and label them for their real scope ("Total Streams", not
+  "Streams"). What stays honest under pagination is anything derived from the single
+  row in front of you: relative recency, a state rail, a per-row ratio. Reference:
+  Alerts (client-side list → filterable `#subheader` strip) vs Streams
+  (server-paginated list → org footprint in `#subnav`).
+- **`ODataBarCell` needs the whole set — client-paginated tables only.** Its bar is
+  a share of the `max` the caller computes over the rendered rows, so on a
+  **server-paginated** table it silently means "biggest on this page": the scale
+  changes as you page, and the same stream draws a different bar on page 1 and page
+  4. On such a table drop the bars and let the (sortable) numbers rank the rows —
+  right-aligned + `tabular-nums` already scans fine, and the stray part-width
+  underlines read as artefacts rather than data. Same test as the strip: can this
+  mark be computed from data you actually hold?
 
 **Tile → section → drawer linkage.** When a tile drills into a table or a detail
 drawer, reuse the **same glyph + tone** on the section header and the drawer header

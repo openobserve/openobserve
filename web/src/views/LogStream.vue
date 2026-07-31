@@ -37,6 +37,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </template>
 
+      <!-- Org-wide stream footprint. Deliberately OUTSIDE the table: these totals
+           come from the org summary endpoint and cover every stream type, so they
+           must not sit in the table's #subheader where they would read as a
+           summary of the (server-paginated, type-filtered) rows below. Read-only
+           for the same reason — they are page context, not a facet. -->
+      <template #subnav>
+        <div class="px-page-edge py-1.5" data-test="log-stream-summary">
+          <OStatStrip :items="summaryStats" :loading="summaryLoading" />
+        </div>
+      </template>
+
       <div class="bg-card-glass-bg h-full">
         <OTable
           data-test="log-stream-table"
@@ -61,6 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :enable-column-resize="true"
           :persist-columns="true"
           table-id="streams-log-stream-list"
+          :get-row-style="streamRowStyle"
           class="h-full w-full"
         >
           <!-- Toolbar inside the table frame: stream-type filter + search. -->
@@ -107,7 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               icon-left="refresh"
               :loading="loadingState"
               data-test="log-stream-refresh-stats-btn"
-              @click="() => getLogStream(true)"
+              @click="refreshStreams"
             >
               <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="streamsRefresh" />
             </OButton>
@@ -124,6 +136,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span :data-test="`log-stream-name-cell-${row.name}`" class="text-text-body">{{
               row.name
             }}</span>
+          </template>
+          <!-- Liveness: relative "last ingested" + a dot for streams taking data
+               right now. Stale / never-ingested streams read from the row rail and
+               OTimeCell's muted empty label instead of another colour. -->
+          <template #cell-doc_time_max="{ row }">
+            <span class="inline-flex min-w-0 items-center justify-end gap-1.5">
+              <span
+                v-if="streamState(row) === 'hot'"
+                class="bg-success-500 h-1.5 w-1.5 shrink-0 rounded-full"
+              />
+              <OTimeCell
+                :value="row.doc_time_max"
+                unit="us"
+                mode="relative"
+                :timezone="store.state.timezone"
+                :empty-label="t('logStream.neverIngested')"
+              />
+            </span>
+          </template>
+          <!-- Compression gets its OWN column rather than riding along inside the
+               Compressed Size cell: two numbers in one right-aligned cell means
+               neither can own the column's edge. Muted, because a healthy ratio is
+               context — only a failing one (below 1x, compressed bigger than raw)
+               earns colour. -->
+          <template #cell-compression="{ row }">
+            <span
+              class="tabular-nums"
+              :class="isPoorCompression(row) ? 'text-status-warning-text' : 'text-text-body'"
+            >
+              {{ compressionRatio(row.storage_size, row.compressed_size) || "—" }}
+            </span>
           </template>
           <template #cell-actions="{ row }">
             <div class="actions-container flex items-center">
@@ -339,8 +382,13 @@ import { useI18n } from "vue-i18n";
 
 import OTable from "@/lib/core/Table/OTable.vue";
 import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
+import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
+import type { StatItem, StatTrend } from "@/lib/data/StatStrip/OStatStrip.types";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import streamService from "../services/stream";
+import organizationsService from "../services/organizations";
+import { addCommasToNumber, formatEventCount } from "@/utils/formatters";
 import SchemaIndex from "../components/logstream/schema.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import EmptyStateIngestionChip from "@/lib/core/EmptyState/EmptyStateIngestionChip.vue";
@@ -379,6 +427,8 @@ export default defineComponent({
     OSearchInput,
     OCheckbox,
     OTable,
+    OTimeCell,
+    OStatStrip,
   },
   emits: [],
   setup() {
@@ -417,6 +467,33 @@ export default defineComponent({
 
     const streamTabs: never[] = [];
     const { removeStream, getStream, getPaginatedStreams, addNewStreams } = useStreams();
+
+    // Stats are absent until the ingester has flushed a stream, so "no number
+    // yet" renders as a muted em dash rather than a misleading "0 MB".
+    const hasStat = (v: unknown): boolean => v !== null && v !== undefined && v !== "";
+    const formatCount = (v: unknown): string => (hasStat(v) ? addCommasToNumber(Number(v)) : "—");
+    const formatBytes = (v: unknown): string => (hasStat(v) ? formatSizeFromMB(Number(v)) : "—");
+
+    // How many times smaller the data is on disk than as ingested, e.g. "80.5x".
+    // Plain "x", not the "×" multiplication sign — that glyph sits on the maths
+    // mid-line and reads as a stray mark next to a number. Empty string (not "—")
+    // when either side is missing, so callers can simply omit it.
+    const compressionRatio = (rawSize: unknown, compressedSize: unknown): string => {
+      const raw = Number(rawSize);
+      const compressed = Number(compressedSize);
+      if (!(raw > 0) || !(compressed > 0)) return "";
+      return `${(raw / compressed).toFixed(1)}x`;
+    };
+
+    // Below 1x the compressed copy is BIGGER than what was ingested — compression is
+    // doing nothing for this stream. That is the only case in the column that earns
+    // colour; a healthy ratio stays muted context.
+    const isPoorCompression = (row: any): boolean => {
+      const raw = Number(row?.storage_size);
+      const compressed = Number(row?.compressed_size);
+      return raw > 0 && compressed > 0 && raw / compressed < 1;
+    };
+
     const columns = ref<OTableColumnDef[]>([
       {
         id: "name",
@@ -430,8 +507,27 @@ export default defineComponent({
         meta: { align: "left", flex: true },
       },
       {
+        id: "doc_time_max",
+        accessorKey: "doc_time_max",
+        header: t("logStream.lastIngested"),
+        // NOT sortable: this table is `sorting="server"`, and the streams endpoint's
+        // comparator only accepts name / doc_num / storage_size / compressed_size /
+        // index_size — any other key falls through to `_ => name` with no error, so
+        // a sort control here would silently order by name. Flip to `true` (id
+        // already matches the `doc_time_max` stats field) once the backend
+        // comparator ships that arm.
+        sortable: false,
+        resizable: true,
+        hideable: true,
+        size: 140,
+        // Right-aligned so it joins the numeric block instead of floating in the
+        // middle of the row: all the data columns then share one edge, and the
+        // table's spare width collects in a single gap after the name.
+        meta: { align: "right" },
+      },
+      {
         id: "doc_num",
-        accessorFn: (row: any) => row.doc_num?.toLocaleString?.() ?? row.doc_num,
+        accessorFn: (row: any) => formatCount(row.doc_num),
         header: t("logStream.docNum"),
         sortable: true,
         resizable: true,
@@ -441,7 +537,7 @@ export default defineComponent({
       },
       {
         id: "storage_size",
-        accessorFn: (row: any) => formatSizeFromMB(row.storage_size),
+        accessorFn: (row: any) => formatBytes(row.storage_size),
         header: t("logStream.storageSize"),
         sortable: true,
         resizable: true,
@@ -451,17 +547,35 @@ export default defineComponent({
       },
       {
         id: "compressed_size",
-        accessorFn: (row: any) => formatSizeFromMB(row.compressed_size),
+        accessorFn: (row: any) => formatBytes(row.compressed_size),
         header: t("logStream.compressedSize"),
         sortable: true,
         resizable: true,
         hideable: true,
-        size: COL.sizeBytes,
+        // Wider than COL.sizeBytes: "Compressed Size" + the sort chevron does not
+        // fit the shared byte-column width and the header truncates to
+        // "Compressed Si…". minSize keeps the header readable when resized.
+        size: 160,
+        minSize: 150,
+        meta: { align: "right" },
+      },
+      {
+        id: "compression",
+        accessorFn: (row: any) => compressionRatio(row.storage_size, row.compressed_size),
+        header: t("logStream.compression"),
+        // NOT sortable — same reason as doc_time_max: the endpoint has no
+        // "compression" sort key, and a derived ratio cannot be sorted client-side
+        // either, because server pagination means we only hold one page of rows.
+        sortable: false,
+        resizable: true,
+        hideable: true,
+        size: 130,
+        minSize: 120,
         meta: { align: "right" },
       },
       {
         id: "index_size",
-        accessorFn: (row: any) => formatSizeFromMB(row.index_size),
+        accessorFn: (row: any) => formatBytes(row.index_size),
         header: t("logStream.indexSize"),
         sortable: true,
         resizable: true,
@@ -480,8 +594,12 @@ export default defineComponent({
       },
     ]);
 
+    // Cloud does not report compressed size, so neither it nor the ratio derived
+    // from it means anything there.
     if (config.isCloud == "true") {
-      columns.value = columns.value.filter((c: any) => c.id !== "compressed_size");
+      columns.value = columns.value.filter(
+        (c: any) => c.id !== "compressed_size" && c.id !== "compression",
+      );
     }
 
     const addStreamDialog = ref({
@@ -559,30 +677,25 @@ export default defineComponent({
         streamResponse
           .then((res: any) => {
             logStream.value = [];
-            let doc_num = "";
-            let storage_size = "";
-            let compressed_size = "";
-            let index_size = "";
             resultTotal.value = res.list.length;
             totalCount.value = res.total;
 
             logStream.value.push(
               ...res.list.map((data: any) => {
-                doc_num = "--";
-                storage_size = "--";
-                if (data.stats) {
-                  doc_num = data.stats.doc_num;
-                  storage_size = data.stats.storage_size + " MB";
-                  compressed_size = data.stats.compressed_size + " MB";
-                  index_size = data.stats.index_size + " MB";
-                }
+                // Raw numbers on the row (not pre-formatted strings): the columns
+                // format for display, while the magnitude bars and the liveness
+                // rail need the real values. `stats` is per-row — a stream without
+                // it must read null, never the previous row's numbers.
+                const stats = data.stats ?? {};
                 return {
                   _rowKey: `${data.name}-${data.stream_type}`,
                   name: data.name,
-                  doc_num: doc_num,
-                  storage_size: storage_size,
-                  compressed_size: compressed_size,
-                  index_size: index_size,
+                  doc_num: stats.doc_num ?? null,
+                  storage_size: stats.storage_size ?? null,
+                  compressed_size: stats.compressed_size ?? null,
+                  index_size: stats.index_size ?? null,
+                  // Microsecond epoch of the newest record — the liveness signal.
+                  doc_time_max: stats.doc_time_max ?? null,
                   storage_type: data.storage_type,
                   actions: "action buttons",
                   schema: data.schema ? data.schema : [],
@@ -628,6 +741,157 @@ export default defineComponent({
     };
 
     getLogStream();
+
+    // ── Stream liveness — the page's primary signal ──────────────────────────
+    // Derived from the RAW microsecond doc_time_max so it stays correct whatever
+    // the display timezone is.
+    //   hot   → newest record within the hour (data flowing right now)
+    //   live  → within the day
+    //   stale → nothing new for over a day
+    //   empty → never ingested a record
+    const LIVE_MS = 60 * 60 * 1000;
+    const STALE_MS = 24 * 60 * 60 * 1000;
+    const ingestAgeMs = (rawMicros: unknown): number | null => {
+      const n = Number(rawMicros);
+      if (!rawMicros || !Number.isFinite(n) || n <= 0) return null;
+      return Date.now() - n / 1000; // microseconds → milliseconds
+    };
+    const streamState = (row: any): "hot" | "live" | "stale" | "empty" => {
+      const age = ingestAgeMs(row?.doc_time_max);
+      if (age === null) return "empty";
+      if (age <= LIVE_MS) return "hot";
+      if (age <= STALE_MS) return "live";
+      return "stale";
+    };
+
+    // Extreme-left liveness rail — inset box-shadow so it paints regardless of
+    // border-collapse; rem width + token colour keep it theme-aware. Colours follow
+    // the monitoring convention rather than "older = worse":
+    //   green  — data arrived within the day
+    //   amber  — WAS ingesting and has gone quiet for over a day (silence worth a
+    //            look: the stream is configured and something stopped sending)
+    //   grey   — never ingested a record: unknown / not yet in use, not a fault.
+    //            A brand-new or schema-only stream is legitimately empty, so amber
+    //            here would cry wolf on every fresh stream. The muted "Never" in
+    //            the Last Ingested cell already says it.
+    // No full-row wash: a stream list has no outright failure state, and a wash on
+    // "quiet" or "empty" would tint most rows in a normal org.
+    const streamRowStyle = (row: any): Record<string, string> => {
+      const s = streamState(row);
+      const color =
+        s === "stale"
+          ? "var(--color-warning-500)"
+          : s === "empty"
+            ? "var(--color-grey-400)"
+            : "var(--color-success-500)";
+      return { boxShadow: `inset 0.25rem 0 0 0 ${color}` };
+    };
+
+    // ── Org-wide stream footprint (summary strip) ────────────────────────────
+    // The table is server-paginated per stream type, so the totals come from the
+    // org summary endpoint rather than the visible page.
+    const streamSummary = ref<{
+      num_streams: number;
+      total_records: number;
+      total_storage_size: number;
+      total_compressed_size: number;
+      total_index_size: number;
+    } | null>(null);
+    const summaryLoading = ref(true);
+
+    const getStreamSummary = () => {
+      if (!store.state.selectedOrganization?.identifier) return;
+      summaryLoading.value = true;
+      organizationsService
+        .get_organization_summary(store.state.selectedOrganization.identifier)
+        .then((res: any) => {
+          streamSummary.value = res.data?.streams ?? null;
+        })
+        .catch(() => {
+          // Silent: the strip is context, not the page's payload. Tiles fall back
+          // to a muted "—" and the table stays usable.
+          streamSummary.value = null;
+        })
+        .finally(() => {
+          summaryLoading.value = false;
+        });
+    };
+
+    // Same five figures as the Home → Usage tiles, and deliberately the SAME
+    // labels (the `home.*` keys), the same icons and the same formatters — the org
+    // footprint must not read as "2,900,000,000 Records" here and "2.9B Events"
+    // there. Tones stay in the decorative families (no green/amber/red) because
+    // none of these numbers is a health signal.
+    const summaryStats = computed<StatItem[]>(() => {
+      const s = streamSummary.value;
+      const count = (n: unknown): string => (Number(n) > 0 ? formatEventCount(Number(n)) : "—");
+      const size = (n: unknown): string => (Number(n) > 0 ? formatSizeFromMB(Number(n)) : "—");
+      // How much smaller the data is on disk than as ingested — shown as a trend
+      // beside the compressed size, so the tile keeps Home's number AND answers
+      // "how good is that?" without a second size to divide.
+      const compressionTrend = (): StatTrend | undefined => {
+        const ratio = compressionRatio(s?.total_storage_size, s?.total_compressed_size);
+        if (!ratio) return undefined;
+        return { direction: "down", label: ratio, tone: "success" };
+      };
+      return [
+        {
+          key: "streams",
+          label: t("home.streams"),
+          value: count(s?.num_streams),
+          icon: "window",
+          tone: "primary",
+          dataTest: "log-stream-summary-streams",
+        },
+        {
+          key: "events",
+          label: t("home.docsCountLbl"),
+          value: count(s?.total_records),
+          icon: "bar-chart",
+          tone: "info",
+          dataTest: "log-stream-summary-events",
+        },
+        {
+          key: "storage",
+          label: t("home.totalDataIngested"),
+          value: size(s?.total_storage_size),
+          icon: "download",
+          tone: "teal",
+          dataTest: "log-stream-summary-storage",
+        },
+        // Cloud does not report compressed size (its column and its Home tile are
+        // both hidden there), so the tile would only ever show a dash.
+        ...(config.isCloud !== "true"
+          ? [
+              {
+                key: "compressed",
+                label: t("home.totalDataCompressed"),
+                value: size(s?.total_compressed_size),
+                icon: "compress",
+                tone: "purple",
+                trend: compressionTrend(),
+                dataTest: "log-stream-summary-compressed",
+              } as StatItem,
+              {
+                key: "index",
+                label: t("home.indexSizeLbl"),
+                value: size(s?.total_index_size),
+                icon: "save",
+                tone: "neutral",
+                dataTest: "log-stream-summary-index",
+              } as StatItem,
+            ]
+          : []),
+      ];
+    });
+
+    // Refresh = rows + footprint. Pagination / sorting only re-fetch the rows.
+    const refreshStreams = () => {
+      getLogStream(true);
+      getStreamSummary();
+    };
+
+    getStreamSummary();
 
     const listSchema = (props: any) => {
       schemaData.value.name = props.row.name;
@@ -779,6 +1043,7 @@ export default defineComponent({
 
       if (previousOrgIdentifier.value != store.state.selectedOrganization.identifier) {
         getLogStream();
+        getStreamSummary();
       }
     });
     /**
@@ -936,7 +1201,7 @@ export default defineComponent({
       {
         id: "streamsRefresh",
         handler: () => {
-          if (!isInputFocused()) getLogStream(true);
+          if (!isInputFocused()) refreshStreams();
         },
       },
       {
@@ -956,6 +1221,13 @@ export default defineComponent({
       selectedItems,
       orgData,
       getLogStream: getLogStream,
+      refreshStreams,
+      streamState,
+      compressionRatio,
+      isPoorCompression,
+      streamRowStyle,
+      summaryStats,
+      summaryLoading,
       resultTotal,
       listSchema,
       deleteStream,
