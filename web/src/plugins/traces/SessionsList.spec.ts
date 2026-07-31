@@ -443,7 +443,7 @@ describe("SessionsList — agent filter", () => {
       2000,
       0,
       20,
-      `gen_ai_conversation_id IN (SELECT gen_ai_conversation_id FROM "agent-stream" WHERE gen_ai_conversation_id IS NOT NULL AND gen_ai_conversation_id != '' AND gen_ai_agent_id = 'agent-1' GROUP BY gen_ai_conversation_id)`,
+      `gen_ai_agent_id = 'agent-1'`,
     );
   });
 
