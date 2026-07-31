@@ -497,12 +497,13 @@ export class AlertCreationWizard {
         // The visible "Alert if No. of events" row lives directly on the SQL query config panel.
         // OSelect forwards data-test to an inner -trigger button; the wrapper div itself
         // is not clickable. Target the trigger so the popover actually opens.
-        const thresholdOperator = this.page.locator('[data-test="alert-trigger-operator-select"] [data-test$="-trigger"]').first();
-        await thresholdOperator.waitFor({ state: 'visible', timeout: 10000 });
+        const thresholdOperatorSelect = this.page.locator('[data-test="alert-trigger-operator-select"]').first();
+        await thresholdOperatorSelect.waitFor({ state: 'visible', timeout: 10000 });
         testLogger.info('Threshold section visible');
 
-        await thresholdOperator.click();
-        await this.page.locator('[data-test="alert-trigger-operator-select-popover"]').first().waitFor({ state: 'visible', timeout: 5000 });
+        // Open via the OSelect helper (clicks the inner -trigger until aria-expanded),
+        // not a raw click — the reka-ui trigger can open-then-close on a single click.
+        await openOSelectDropdown(this.page, thresholdOperatorSelect);
         await this.page.locator('[data-test="alert-trigger-operator-select-option"][data-test-value=">="]').first().click();
         testLogger.info('Set threshold operator: >=');
 
@@ -859,12 +860,13 @@ export class AlertCreationWizard {
         // on current builds (removed with the alert wizard revamp).
         // OSelect forwards data-test to an inner -trigger button; the wrapper div itself
         // is not clickable. Target the trigger so the popover actually opens.
-        const thresholdOperator = this.page.locator('[data-test="alert-trigger-operator-select"] [data-test$="-trigger"]').first();
-        await thresholdOperator.waitFor({ state: 'visible', timeout: 10000 });
+        const thresholdOperatorSelect = this.page.locator('[data-test="alert-trigger-operator-select"]').first();
+        await thresholdOperatorSelect.waitFor({ state: 'visible', timeout: 10000 });
         testLogger.info('Threshold section visible');
 
-        await thresholdOperator.click();
-        await this.page.locator('[data-test="alert-trigger-operator-select-popover"]').first().waitFor({ state: 'visible', timeout: 5000 });
+        // Open via the OSelect helper (clicks the inner -trigger until aria-expanded),
+        // not a raw click — the reka-ui trigger can open-then-close on a single click.
+        await openOSelectDropdown(this.page, thresholdOperatorSelect);
         await this.page.locator('[data-test="alert-trigger-operator-select-option"][data-test-value=">="]').first().click();
         testLogger.info('Set threshold operator: >=');
 
@@ -1374,14 +1376,34 @@ export class AlertCreationWizard {
         // ==================== ALERT SETTINGS (back in Alert Rules tab) ====================
         await this._switchToAlertRulesTab();
 
+        // The SQL query-editor drawer often doesn't close via its close button, and while it stays
+        // open reka disables pointer events on the rest of the page — so the threshold-operator
+        // click below is intercepted (by the drawer, its overlay, or ultimately <html>). Dismiss it
+        // with Escape until it is no longer open, which lets reka restore page interaction.
+        for (let i = 0; i < 5; i++) {
+            if ((await this.page.locator('[data-test="query-editor-dialog"][data-state="open"]').count()) === 0) break;
+            await this.page.keyboard.press('Escape').catch(() => {});
+            await this.page.waitForTimeout(400);
+        }
+        // Fallback: if it still won't close, re-enable page pointer events and hide any residue so
+        // the operator is reachable anyway.
+        await this.page.evaluate(() => {
+            document.body.style.pointerEvents = 'auto';
+            document.querySelectorAll(
+                '[data-test="query-editor-dialog"], [data-test="o-drawer-overlay"], div[data-reka-dialog-overlay], div[data-reka-portalled]'
+            ).forEach((el) => { el.style.display = 'none'; });
+        }).catch(() => {});
+        await this.page.waitForTimeout(300);
+
         // Threshold row via stable data-test hooks — the old `.alert-condition-row`/
         // `.alert-v3-select` class chain no longer exists on current builds.
         // OSelect forwards data-test to an inner -trigger button; the wrapper div itself
         // is not clickable. Target the trigger so the popover actually opens.
-        const thresholdOperator = this.page.locator('[data-test="alert-trigger-operator-select"] [data-test$="-trigger"]').first();
-        await thresholdOperator.waitFor({ state: 'visible', timeout: 10000 });
-        await thresholdOperator.click();
-        await this.page.locator('[data-test="alert-trigger-operator-select-popover"]').first().waitFor({ state: 'visible', timeout: 5000 });
+        const thresholdOperatorSelect = this.page.locator('[data-test="alert-trigger-operator-select"]').first();
+        await thresholdOperatorSelect.waitFor({ state: 'visible', timeout: 10000 });
+        // Open via the OSelect helper (clicks the inner -trigger until aria-expanded),
+        // not a raw click — the reka-ui trigger can open-then-close on a single click.
+        await openOSelectDropdown(this.page, thresholdOperatorSelect);
         await this.page.locator('[data-test="alert-trigger-operator-select-option"][data-test-value=">="]').first().click();
         testLogger.info('Set threshold operator: >=');
 
