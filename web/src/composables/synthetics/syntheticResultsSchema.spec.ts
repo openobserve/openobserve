@@ -41,6 +41,7 @@ import {
   evidenceSeverity,
   indexEvidenceByStep,
   stepOwnDetail,
+  mergeLocatorLadder,
   type EvidenceEvent,
 } from "./syntheticResultsSchema";
 
@@ -1109,5 +1110,102 @@ describe("stepOwnDetail", () => {
     );
     expect(d?.settleSignals).toHaveLength(1);
     expect(d?.stepId).toBe("s14");
+  });
+});
+
+// ── Locator ladder ─────────────────────────────────────────────────────────
+//
+// Shapes from the live "OpenObserve Cloud Happy Path" failure: step 16 asserts
+// a single role locator and reports `used_as_primary`, while its click steps
+// carry two or three candidates. Nothing on the record said which was which.
+describe("mergeLocatorLadder", () => {
+  const authored = [
+    { kind: "test_attribute", value: 'internal:testid=[data-test="x"]' },
+    { kind: "role", value: "internal:role=button" },
+    { kind: "css", value: "#submit" },
+  ];
+
+  it("marks authored candidates the probe never reached as not_tried", () => {
+    // `not_tried` has been in the union since the type was written and nothing
+    // ever produced it — this is the case it was for.
+    const ladder = mergeLocatorLadder(
+      [{ kind: "test_attribute", value: 'internal:testid=[data-test="x"]', outcome: "matched" }],
+      authored,
+    );
+    expect(ladder.map((c) => c.outcome)).toEqual(["matched", "not_tried", "not_tried"]);
+  });
+
+  it("keeps the authored order, which is the order the probe walks them", () => {
+    const ladder = mergeLocatorLadder([], authored);
+    expect(ladder.map((c) => c.kind)).toEqual(["test_attribute", "role", "css"]);
+  });
+
+  it("pairs an outcome to its candidate by value, not by position", () => {
+    // A probe that skips a rung would otherwise shift every outcome up one.
+    const ladder = mergeLocatorLadder(
+      [{ kind: "css", value: "#submit", outcome: "matched" }],
+      authored,
+    );
+    expect(ladder[2]).toMatchObject({ value: "#submit", outcome: "matched" });
+    expect(ladder[0].outcome).toBe("not_tried");
+  });
+
+  it("falls back to what was tried when the record carries no authored bundle", () => {
+    // Older records predate the locator bundle; showing nothing would be worse
+    // than showing the attempts.
+    const tried = [{ kind: "role", value: "r", outcome: "used_as_primary" as const }];
+    expect(mergeLocatorLadder(tried, undefined)).toEqual(tried);
+    expect(mergeLocatorLadder(tried, [])).toEqual(tried);
+  });
+
+  it("keeps an attempted candidate the authored bundle does not list", () => {
+    // Self-healing may reach for something not in the bundle; dropping it would
+    // hide the locator that actually ran.
+    const ladder = mergeLocatorLadder(
+      [{ kind: "role", value: "surprise", outcome: "matched" }],
+      authored,
+    );
+    expect(ladder.some((c) => c.value === "surprise")).toBe(true);
+    expect(ladder).toHaveLength(4);
+  });
+
+  it("returns nothing when there is neither a bundle nor an attempt", () => {
+    expect(mergeLocatorLadder([], undefined)).toEqual([]);
+  });
+});
+
+describe("stepOwnDetail locator ladder", () => {
+  const step = (over: any) => ({
+    step_id: "s16", status: "fail" as const, duration_ms: 60000,
+    error: null, start_time: 0, end_time: 1, screenshot_key: null, ...over,
+  });
+  const RUN = {
+    stepId: "s16", stepName: "Assert visible row", stepIndex: 16,
+    error: "Timeout 60000ms exceeded", candidatesTried: [], settleSignals: [],
+    settleMs: null, observedDurationMs: null, screenshotKey: null, traceKey: null,
+  };
+
+  it("shows the whole authored ladder, not only what ran", () => {
+    const d = stepOwnDetail(
+      step({ candidates_tried: [{ kind: "role", value: "a", outcome: "used_as_primary" }] }),
+      RUN,
+      [
+        { kind: "role", value: "a" },
+        { kind: "css", value: "b" },
+      ],
+    );
+    expect(d?.candidatesTried).toHaveLength(2);
+    expect(d?.candidatesTried[1].outcome).toBe("not_tried");
+  });
+
+  it("reports a one-rung ladder as exactly that", () => {
+    // The Happy Path failure: one authored candidate, so no fallback existed.
+    const d = stepOwnDetail(
+      step({ candidates_tried: [{ kind: "role", value: "a", outcome: "used_as_primary" }] }),
+      RUN,
+      [{ kind: "role", value: "a" }],
+    );
+    expect(d?.candidatesTried).toHaveLength(1);
+    expect(d?.candidatesTried[0].outcome).toBe("used_as_primary");
   });
 });

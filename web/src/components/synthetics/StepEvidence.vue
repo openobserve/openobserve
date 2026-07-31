@@ -106,15 +106,74 @@ function outcomeVariant(outcome: string): "success" | "error" | "default" {
   if (outcome === "not_found") return "error";
   return "default";
 }
+
+/**
+ * Raw enum values are the probe's vocabulary, not the reader's. `used_as_primary`
+ * in a neutral badge said nothing about whether a fallback existed, which is the
+ * one question a failed locator raises.
+ */
+const OUTCOME_LABEL: Record<string, string> = {
+  matched: "synthetics.runDetail.locatorOutcomeMatched",
+  not_found: "synthetics.runDetail.locatorOutcomeNotFound",
+  used_as_primary: "synthetics.runDetail.locatorOutcomePrimary",
+  not_tried: "synthetics.runDetail.locatorOutcomeNotTried",
+};
+
+function outcomeLabel(outcome: string): string {
+  const key = OUTCOME_LABEL[outcome];
+  // An outcome this UI does not know about is shown verbatim rather than
+  // dropped — a new probe value must not render as a blank badge.
+  return key ? t(key) : outcome;
+}
+
+/** How far down the ladder the probe actually got. */
+const triedCount = computed(() => candidates.value.filter((c) => c.outcome !== "not_tried").length);
+
+/**
+ * One authored locator and no second rung.
+ *
+ * Distinct from "every candidate failed": there was nothing to fall back TO,
+ * which is a property of how the step was recorded rather than of the page. On
+ * the run that prompted this, every assert step in the journey was built this
+ * way, and the panel had no way to say so.
+ */
+const noFallback = computed(() => candidates.value.length === 1);
 </script>
 
 <template>
   <div class="flex flex-col gap-3" data-test="synthetics-run-detail-step-evidence">
     <!-- Item 3: which locator candidates were tried, and what happened. -->
     <section v-if="candidates.length" data-test="synthetics-run-detail-locator-resolution">
-      <h4 class="text-text-heading m-0 mb-1 text-xs font-semibold">
-        {{ t("synthetics.runDetail.locatorResolution") }}
-      </h4>
+      <!-- The count answers "was a fallback tried?" before any row is read:
+           "1 of 3 tried" and "1 of 1 tried" are different findings that used to
+           render as the same single row. -->
+      <div class="mb-1 flex items-baseline gap-2">
+        <h4 class="text-text-heading m-0 text-xs font-semibold">
+          {{ t("synthetics.runDetail.locatorResolution") }}
+        </h4>
+        <span
+          class="text-text-secondary text-2xs"
+          data-test="synthetics-run-detail-locator-count"
+        >
+          {{
+            t("synthetics.runDetail.locatorTriedOf", {
+              tried: triedCount,
+              total: candidates.length,
+            })
+          }}
+        </span>
+      </div>
+      <!-- A step with one locator did not "fail to heal" — it had nothing to
+           heal with. That is a recording property, and it is actionable in a way
+           the outcome badge never was. -->
+      <p
+        v-if="noFallback"
+        class="text-status-warning-text m-0 mb-1 flex items-start gap-1 text-xs"
+        data-test="synthetics-run-detail-locator-no-fallback"
+      >
+        <OIcon name="warning" size="xs" class="mt-0.5 shrink-0" aria-hidden="true" />
+        <span>{{ t("synthetics.runDetail.locatorNoFallback") }}</span>
+      </p>
       <p
         v-if="noneMatched"
         class="text-text-secondary m-0 mb-1 text-xs"
@@ -130,12 +189,19 @@ function outcomeVariant(outcome: string): "success" | "error" | "default" {
         {{ t("synthetics.runDetail.locatorHealed") }}
       </p>
       <ul class="m-0 flex list-none flex-col gap-1 p-0">
+        <!-- Untried rungs are dimmed, not hidden: the same treatment a skipped
+             step gets in the timeline. Hiding them would restore exactly the
+             ambiguity this section exists to remove. -->
         <li
           v-for="(c, i) in candidates"
           :key="`${c.kind}-${i}`"
           class="flex items-center gap-2 text-xs"
+          :class="c.outcome === 'not_tried' ? 'opacity-50' : ''"
+          data-test="synthetics-run-detail-locator-candidate"
         >
-          <OBadge :variant="outcomeVariant(c.outcome)" size="sm">{{ c.outcome }}</OBadge>
+          <OBadge :variant="outcomeVariant(c.outcome)" size="sm">{{
+            outcomeLabel(c.outcome)
+          }}</OBadge>
           <span class="text-text-secondary shrink-0">{{ c.kind }}</span>
           <span class="text-text-body min-w-0 flex-1 truncate font-mono">{{ c.value }}</span>
         </li>

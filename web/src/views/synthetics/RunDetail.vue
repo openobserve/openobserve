@@ -823,7 +823,9 @@ function buildSteps(
       // so hanging it off the failing row credited that step with traffic from
       // steps 2 through 14 and left the stale signal invisible on the step that
       // actually produced it.
-      evidence: stepOwnDetail(ex, failureDetail),
+      // The authored bundle comes from THIS run's snapshot, so a later edit to
+      // the check cannot rewrite what the run is shown to have tried.
+      evidence: stepOwnDetail(ex, failureDetail, recorded?.locator?.candidates),
       // Per step, not per failure: the step that CAUSED the problem is often
       // not the one that failed, so evidence hangs off whichever step owns it.
       appEvidence: detail.evidenceByStep.find((e) => e.stepId === ex.step_id) ?? null,

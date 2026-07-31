@@ -257,6 +257,17 @@ export interface RecordedStep {
   value: string | null;
   key: string | null;
   text: string | null;
+  /**
+   * The locator bundle as authored — every candidate the probe MAY walk, in
+   * the order it walks them.
+   *
+   * `candidates_tried` on the result says what ran; this says what was
+   * available. The difference is the whole question "was a fallback tried?":
+   * one authored candidate means no fallback existed, which reads very
+   * differently from three authored and the first one matching. The mapper has
+   * always passed this through untouched — only the type omitted it.
+   */
+  locator?: { candidates?: Array<{ kind: string; value: string; origin?: string }> };
 }
 
 export interface StepExecution {
@@ -635,15 +646,53 @@ function mapSettleSignal(sig: any): SettleSignal {
  * Returns null when the step has nothing of its own to show, so a passing step
  * does not grow an empty evidence block.
  */
+/**
+ * The full locator ladder: every authored candidate, annotated with what
+ * happened to it.
+ *
+ * `candidates_tried` lists only the rungs the probe actually stood on, so a
+ * step that matched on the first candidate looks identical to a step that had
+ * no other candidate to try. Both render as one row, and the reader cannot tell
+ * "the primary worked" from "there was nothing else". Folding the authored
+ * bundle back in makes the untried rungs visible as `not_tried` — a value the
+ * type has always allowed and nothing ever produced.
+ *
+ * Paired by VALUE, not by position: a probe that skips a rung would otherwise
+ * shift every outcome onto the wrong candidate.
+ */
+export function mergeLocatorLadder(
+  tried: LocatorAttempt[],
+  authored: Array<{ kind: string; value: string }> | undefined,
+): LocatorAttempt[] {
+  // No bundle on the record (it predates them) — the attempts are all we know.
+  if (!authored?.length) return tried;
+
+  const byValue = new Map(tried.map((c) => [c.value, c]));
+  const ladder: LocatorAttempt[] = authored.map(
+    (a) => byValue.get(a.value) ?? { kind: a.kind, value: a.value, outcome: "not_tried" },
+  );
+
+  // Anything the probe reached for that the bundle does not list — self-healing
+  // can go outside the bundle, and dropping it would hide the locator that ran.
+  const authoredValues = new Set(authored.map((a) => a.value));
+  for (const c of tried) {
+    if (!authoredValues.has(c.value)) ladder.push(c);
+  }
+  return ladder;
+}
+
 export function stepOwnDetail(
   ex: StepExecution,
   failureDetail: FailureDetail | null,
+  /** The step's authored locator bundle, so untried rungs stay visible. */
+  authoredCandidates?: Array<{ kind: string; value: string }>,
 ): FailureDetail | null {
   const isFailing = !!failureDetail && failureDetail.stepId === ex.step_id;
   const signals = Array.isArray(ex.settle_signals) ? ex.settle_signals.map(mapSettleSignal) : [];
-  const candidates = Array.isArray(ex.candidates_tried)
-    ? (ex.candidates_tried as LocatorAttempt[])
-    : [];
+  const candidates = mergeLocatorLadder(
+    Array.isArray(ex.candidates_tried) ? (ex.candidates_tried as LocatorAttempt[]) : [],
+    authoredCandidates,
+  );
   const settleMs = typeof ex.settle_ms === "number" ? ex.settle_ms : null;
 
   if (!isFailing && !signals.length && !candidates.length) return null;
