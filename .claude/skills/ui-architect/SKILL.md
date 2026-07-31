@@ -213,6 +213,16 @@ considering the UI done:
       from `<div>` + utility classes. Classes are for layout only.
 - [ ] Tabular data uses `OTable` with `OTableColumnDef[]` columns; server mode
       only for backend-paginated data.
+- [ ] **Server mode was checked against the backend**: every `sortable: true`
+      column has a real sort key in the handler (an unknown key falls back
+      silently and orders by something else), and any page-relative device
+      (`ODataBarCell` bars, a `#subheader` count strip) is on a **client**-paginated
+      table only. No hand-rolled `#` index column (`show-index`), no positional
+      `columns.splice`, and column `size` fits the header + sort chevron.
+      See [core-controls-table](references/core-controls-table.md).
+- [ ] A figure/label that already exists on another screen reuses **that screen's
+      formatter and i18n key** (promote a component-local formatter into
+      `utils/formatters.ts` rather than copying it).
 - [ ] Listing page uses the **full-height flush skeleton** (root
       `flex flex-col h-full p-0`, header `shrink-0 border-b` — OPageHeader bakes
       in its own `px-page-edge`, never add a `px-*`, table wrapper

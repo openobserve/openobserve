@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :frame="false"
           :key="activeTab"
           data-test="pipeline-list-table"
-          :data="filteredPipelines"
+          :data="displayedPipelines"
           :columns="otableColumns"
           row-key="pipeline_id"
           :loading="loading"
@@ -43,13 +43,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model:selected-ids="selectedPipelineIds"
           :expansion="activeTab === 'scheduled' ? 'single' : 'none'"
           :expand-on-row-click="(row: any) => row.source?.source_type === 'scheduled'"
-          :row-class="
-            (row: any) => (row.source?.source_type === 'scheduled' ? 'cursor-pointer' : '')
-          "
+          :row-class="pipelineRowClass"
+          :get-row-style="pipelineRowStyle"
           v-model:expanded-ids="expandedId"
           width="100%"
           class="h-full w-full"
         >
+          <!-- Summary strip: operational state counts for the current tab, doubling
+               as the state facet (the toggle group above facets by pipeline TYPE,
+               so the two never overlap). Always rendered so rows never shift. -->
+          <template #subheader>
+            <div
+              class="px-page-edge border-table-row-divider border-b py-1.5"
+              data-test="pipeline-list-summary"
+            >
+              <OStatStrip
+                :items="summaryStats"
+                :loading="loading"
+                selectable
+                :selected-key="stateFilter"
+                @select="onStatSelect"
+              />
+            </div>
+          </template>
+
           <template #toolbar>
             <div class="flex w-full items-center gap-2">
               <OToggleGroup
@@ -108,6 +125,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <template #cell-type="{ row }">
             <OTag type="pipelineType" :value="row.type" />
+          </template>
+
+          <!-- State: the page's primary signal. Errored rows also carry WHEN they
+               last failed — recency is shown for the exception only, never for the
+               healthy majority. -->
+          <template #cell-state="{ row }">
+            <span class="inline-flex min-w-0 items-center gap-1.5">
+              <OTag
+                :variant="stateVariant(row)"
+                size="sm"
+                :data-test="`pipeline-list-${row.name}-state`"
+              >
+                <template #icon>
+                  <OIcon :name="stateIconName(row)" size="xs" />
+                </template>
+                {{ stateLabel(row) }}
+              </OTag>
+              <span v-if="pipelineState(row) === 'errored'" class="text-text-secondary text-xs">
+                <OTimeCell
+                  :value="row.last_error?.last_error_timestamp"
+                  unit="us"
+                  mode="relative"
+                  :timezone="store.state.timezone"
+                />
+              </span>
+            </span>
           </template>
 
           <template #cell-actions="{ row }">
@@ -258,11 +301,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OEmptyState
               size="hero"
               preset="no-pipelines"
-              :filtered="!!filterQuery"
+              :filtered="!!(filterQuery || stateFilter)"
               @action="
                 (id) =>
                   id === 'clear-filters'
-                    ? (filterQuery = '')
+                    ? ((filterQuery = ''), (stateFilter = null))
                     : id === 'import'
                       ? goToImportPipeline()
                       : goToCreatePipeline()
@@ -453,6 +496,11 @@ import config from "@/aws-exports";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
+import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
+import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
+import type { IconName } from "@/lib/core/Icon/OIcon.icons";
+import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
@@ -555,6 +603,139 @@ const currentRouteName = computed(() => {
 
 const otableColumns = computed(() => columns.value);
 
+// ── Pipeline operational state (single source of truth) ─────────────────────
+// errored → last run reported an error (needs attention, whether or not it runs)
+// active  → enabled and running
+// paused  → disabled
+const pipelineState = (row: any): "errored" | "active" | "paused" => {
+  if (row?.last_error) return "errored";
+  return row?.enabled ? "active" : "paused";
+};
+
+const stateVariant = (row: any): BadgeVariant => {
+  const s = pipelineState(row);
+  return s === "errored" ? "error-soft" : s === "paused" ? "default-soft" : "success-soft";
+};
+const stateIconName = (row: any): IconName => {
+  const s = pipelineState(row);
+  return s === "errored" ? "error-outline" : s === "paused" ? "pause" : "check-circle";
+};
+const stateLabel = (row: any): string => {
+  const s = pipelineState(row);
+  return s === "errored"
+    ? t("pipeline_list.stateErrored")
+    : s === "paused"
+      ? t("pipeline_list.statePaused")
+      : t("pipeline_list.stateActive");
+};
+
+// Full-row wash for the EXCEPTIONS only — errored gets a light red, paused a
+// muted grey, healthy rows stay clean (their state reads from the green rail).
+// Scheduled rows keep their click affordance for the SQL expansion.
+const pipelineRowClass = (row: any): string => {
+  const s = pipelineState(row);
+  const stateClass =
+    s === "errored" ? "!bg-status-error-bg" : s === "paused" ? "!bg-surface-panel" : "";
+  const cursorClass = row?.source?.source_type === "scheduled" ? "cursor-pointer" : "";
+  return [cursorClass, stateClass].filter(Boolean).join(" ");
+};
+
+// Extreme-left state rail — inset box-shadow so it paints regardless of
+// border-collapse; rem width + token colour keep it theme-aware.
+const pipelineRowStyle = (row: any): Record<string, string> => {
+  const s = pipelineState(row);
+  const color =
+    s === "errored"
+      ? "var(--color-error-500)"
+      : s === "paused"
+        ? "var(--color-grey-400)"
+        : "var(--color-success-500)";
+  return { boxShadow: `inset 0.25rem 0 0 0 ${color}` };
+};
+
+// ── State facet + summary strip ─────────────────────────────────────────────
+// Counts run over the TYPE-filtered rows (not the state-filtered ones) so the
+// tiles keep their totals while a facet is active.
+const stateFilter = ref<"errored" | "paused" | "active" | null>(null);
+
+const displayedPipelines = computed(() => {
+  const rows = filteredPipelines.value || [];
+  const f = stateFilter.value;
+  if (!f) return rows;
+  return rows.filter((row: any) => pipelineState(row) === f);
+});
+
+const onStatSelect = (key: string) => {
+  if (key === "total") {
+    stateFilter.value = null;
+    return;
+  }
+  stateFilter.value = stateFilter.value === key ? null : (key as "errored" | "paused" | "active");
+};
+
+const stateCounts = computed(() => {
+  const rows = filteredPipelines.value || [];
+  let errored = 0;
+  let paused = 0;
+  let active = 0;
+  for (const row of rows) {
+    const s = pipelineState(row);
+    if (s === "errored") errored += 1;
+    else if (s === "paused") paused += 1;
+    else active += 1;
+  }
+  return { errored, paused, active, total: rows.length };
+});
+
+// Attention-first, left → right: errored (needs action) → paused (inert) →
+// active (healthy) → Total last, and never itself the selected tile.
+const summaryStats = computed<StatItem[]>(() => {
+  const c = stateCounts.value;
+  const hasData = c.total > 0;
+  const v = (n: number): string | number => (hasData ? n : "—");
+  const share = hasData ? c.total : undefined;
+  return [
+    {
+      key: "errored",
+      label: t("pipeline_list.summaryErrored"),
+      value: v(c.errored),
+      icon: "error-outline",
+      tone: "error",
+      max: share,
+      dataTest: "pipeline-summary-errored",
+    },
+    {
+      key: "paused",
+      label: t("pipeline_list.summaryPaused"),
+      value: v(c.paused),
+      icon: "pause",
+      tone: "neutral",
+      max: share,
+      dataTest: "pipeline-summary-paused",
+    },
+    {
+      key: "active",
+      label: t("pipeline_list.summaryActive"),
+      value: v(c.active),
+      icon: "check-circle",
+      tone: "success",
+      max: share,
+      dataTest: "pipeline-summary-active",
+    },
+    {
+      key: "total",
+      label: t("pipeline_list.summaryTotal"),
+      value: v(c.total),
+      icon: "format-list-bulleted",
+      tone: "primary",
+      // Clickable (it CLEARS the state facet) but never shows the ring — the
+      // selected key is only ever a real state, never "total". No bar: its share
+      // of itself is always 100%.
+      dataTest: "pipeline-summary-total",
+    },
+  ];
+});
+
 const updateActiveTab = () => {
   expandedId.value = [];
   if (activeTab.value === "all") {
@@ -620,6 +801,18 @@ const getColumnsForActiveTab = (tab: any) => {
     size: COL.name,
     minSize: 160,
     meta: { align: "left", flex: true },
+  };
+  const stateColumn = {
+    id: "state",
+    header: t("pipeline_list.state"),
+    // Sorts by the state word so errored / paused / active group together.
+    accessorFn: (row: any) => pipelineState(row),
+    sortable: true,
+    resizable: true,
+    hideable: true,
+    size: COL.status,
+    minSize: 96,
+    meta: { align: "left" },
   };
   const streamNameColumn = {
     id: "stream_name",
@@ -702,6 +895,7 @@ const getColumnsForActiveTab = (tab: any) => {
   if (tab === "all") {
     return [
       nameColumn,
+      stateColumn,
       typeColumn,
       streamNameColumn,
       scheduledStreamTypeColumn,
@@ -712,10 +906,11 @@ const getColumnsForActiveTab = (tab: any) => {
     ];
   }
   if (tab === "realtime") {
-    return [nameColumn, streamNameColumn, streamTypeColumn, actionsColumn];
+    return [nameColumn, stateColumn, streamNameColumn, streamTypeColumn, actionsColumn];
   }
   return [
     nameColumn,
+    stateColumn,
     scheduledStreamTypeColumn,
     frequencyColumn,
     periodColumn,

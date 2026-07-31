@@ -304,6 +304,53 @@ interface OTableColumnDef<TData = any> {
 }
 ```
 
+**Server mode — check the backend BEFORE you write the column.** In
+`sorting="server"` the table does not sort anything: it emits the column **id** as
+the `sort` field and the backend does the work. OpenObserve's list endpoints match
+that field against a fixed list and **fall through to a default on anything else**
+(`stream_comparator`'s `_ => a.name.cmp(&b.name)` is typical) — no 400, no console
+error, just rows quietly ordered by something else. Symptom: the header shows its
+arrow, the rows re-order, and the order is wrong.
+
+- Open the handler and read its sort match/allow-list. A column gets
+  `sortable: true` **only if a key exists for it**; otherwise `sortable: false`
+  plus a one-line comment naming the missing key. Never leave a control that
+  silently lies.
+- Name the column `id` after the backend key (`doc_time_max`, not `lastIngested`)
+  so the mapping is obvious, or map it explicitly via `sortFieldMap`.
+- **Derived columns can't be rescued client-side.** Under server pagination you
+  hold one page of N rows, so sorting a computed ratio locally would just reorder
+  that page. Either add the sort key to the backend or ship the column unsorted.
+- Same reasoning for `filterMode="server"` and any `keyword`/facet param: if the
+  endpoint ignores it, the UI shows an unfiltered list as if it were filtered.
+- **The dev UI usually talks to a REMOTE backend**, not your working tree —
+  `web/.env`'s `VITE_OPENOBSERVE_ENDPOINT` points at a shared dev deployment. A
+  Rust change in your branch is not live there, so "the API ignores my new
+  param" is expected until it deploys. Confirm which is which before debugging the
+  frontend: check the request in DevTools (the param IS being sent), then check
+  whether the endpoint you're hitting is local.
+
+**Column hygiene** — mistakes that keep recurring:
+
+- **Never hand-roll a `#` index column.** A data column with `accessorKey: "id"`
+  is draggable, resizable, hideable, and its numbers stop matching the visible
+  rows the moment the table is sorted or filtered. Pass `showIndex` and let OTable
+  render the fixed gutter.
+- **Hide conditional columns by id, not by position** — `columns.splice(2, 1)`
+  silently removes the wrong column as soon as someone inserts one above it. Use
+  `columns.filter((c) => c.id !== "region")`.
+- **Size a column for its header plus the sort chevron.** The shared `COL.*`
+  presets fit typical *values*, not long labels — `COL.sizeBytes` truncates
+  "Compressed Size" to "Compressed Si…". Set an explicit `size` (+ `minSize` floor)
+  when the header is longer than the numbers under it.
+- **`persistColumns` persists widths as well as visibility**, keyed by `tableId`
+  in localStorage. Once a user drags a column, later changes to that column's
+  default `size` never reach them — test width changes in a fresh profile, and
+  point users at the column menu's reset action.
+- **One number per numeric cell.** Two values in one right-aligned cell means
+  neither owns the column's edge and both look indented at random; give the second
+  value its own column.
+
 **Main emits:**
 - Pagination: `update:currentPage`, `update:pageSize`, `pagination-change`
 - Sorting: `update:sortBy`, `update:sortOrder`, `sort-change`
@@ -368,7 +415,7 @@ Prebuilt cell components — pass as a column's `cell`. Import individually or f
 - **OUserCell** (`@/lib/core/Table/cells/OUserCell.vue`) — person/owner/created-by column; renders email or explicit `name` as truncated plain text, dash when empty.
 - **ONumberCell** (`@/lib/core/Table/cells/ONumberCell.vue`) — consistent numeric rendering (tabular-nums); `format` = `number`/`compact`/`bytesFromMB`/`durationSec`/`durationMs`/`durationUs`/`durationNs`/`percent`. Pair the column with `meta.align: "right"`.
 - **OCodeCell** (`@/lib/core/Table/cells/OCodeCell.vue`) — monospace identifiers / SQL / tokens, truncated with title tooltip and optional hover copy button (`copy`, default true).
-- **ODataBarCell** (`@/lib/core/Table/cells/ODataBarCell.vue`) — value with a proportional background bar (width = value/`max`, caller supplies the column max and pre-formatted `display`); `variant` `default`/`warning`/`danger` for threshold columns.
+- **ODataBarCell** (`@/lib/core/Table/cells/ODataBarCell.vue`) — value with a proportional background bar (width = value/`max`, caller supplies the column max and pre-formatted `display`); `variant` `default`/`warning`/`danger` for threshold columns. ⚠️ **Client-paginated tables only:** the caller can only compute `max` over the rows it holds, so on a server-paginated table the bar means "biggest on this page" — the scale shifts as you page and the same row draws a different bar. There, drop the bars and let sortable numbers rank the rows.
 
 Also exported from the barrel: `statusVariant`, `humanizeStatus` helpers (+ `StatusTone`, `StatusVariantResult` types) for status badge styling.
 
