@@ -104,6 +104,22 @@ describe("OInlineEdit", () => {
 
       expect((input(wrapper).element as HTMLInputElement).value).toBe("My Custom Name");
     });
+
+    it("restores the re-derived value on Escape (not the stale open-time value)", async () => {
+      const wrapper = mountInlineEdit({ modelValue: "Record count" });
+      await trigger(wrapper).trigger("click");
+      // The model re-derives while the editor sits open and untouched.
+      await wrapper.setProps({ modelValue: "Record count, Count of X" });
+      // The user types, then bails with Escape.
+      await input(wrapper).setValue("Record count, Count of XY");
+
+      await input(wrapper).trigger("keydown.esc");
+
+      // Restore point was re-baselined on the first keystroke → the re-derived
+      // value comes back, so the consumer re-arms auto-naming instead of freezing.
+      expect(wrapper.emitted("cancel")?.at(-1)).toEqual(["Record count, Count of X"]);
+      expect(wrapper.emitted("update:modelValue")?.at(-1)).toEqual(["Record count, Count of X"]);
+    });
   });
 
   it("restores the pre-edit value on Escape", async () => {

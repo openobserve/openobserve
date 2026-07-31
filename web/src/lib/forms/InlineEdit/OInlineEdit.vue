@@ -120,6 +120,11 @@ const cancel = () => {
 };
 
 const onInput = (event: Event) => {
+  // First keystroke: re-baseline the Escape restore point to the value the field
+  // holds RIGHT NOW. An auto-name may have re-derived into the editor while it
+  // sat open (see the modelValue watch); restoring the open-time value would put
+  // a stale name back and, via onCommit, freeze auto-naming.
+  if (!dirty.value) valueAtEditStart.value = props.modelValue ?? "";
   dirty.value = true;
   draft.value = (event.target as HTMLInputElement).value;
   emit("update:modelValue", draft.value);
@@ -307,6 +312,7 @@ defineExpose({ focus: startEdit });
             textClasses,
             isEmpty ? 'text-text-placeholder' : error ? 'text-input-error-text' : valueToneClass,
           ]"
+          :title="displayValue || undefined"
           :data-test="dataTest ? `${dataTest}-value` : undefined"
           >{{ displayValue || placeholder }}</span
         >
