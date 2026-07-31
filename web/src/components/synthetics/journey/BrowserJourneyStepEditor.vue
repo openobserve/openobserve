@@ -25,6 +25,7 @@ import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import type { CheckboxModelValue } from "@/lib/forms/Checkbox/OCheckbox.types";
 import BrowserJourneyLocator from "./BrowserJourneyLocator.vue";
 import BrowserJourneyAssertion from "./BrowserJourneyAssertion.vue";
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 
 /**
  * The expanded editor for one journey step — every author-editable field a step
@@ -361,14 +362,14 @@ const advancedCaption = computed(
     <!-- What this step will do, in the author's words rather than the tool's.
          Composed from the same values the fields below show, so the two cannot
          disagree. -->
-    <p class="text-text-body m-0 text-sm" data-test="synthetics-journey-step-summary">
-      {{ summary }}
-    </p>
 
     <!-- What this step does — no disclosure of its own. These are the fields the
          step cannot function without, and every field that can carry a validation
          error is here, so an error can never be collapsed out of view. -->
-    <div class="flex w-full flex-col gap-3" data-test="synthetics-journey-step-group-does">
+    <div
+      class="flex w-full max-w-200 flex-col gap-3"
+      data-test="synthetics-journey-step-group-does"
+    >
       <div class="flex w-full gap-2">
         <OSelect
           v-model="actionComputed"
@@ -400,16 +401,6 @@ const advancedCaption = computed(
         <OIcon name="info-outline" size="xs" class="mt-0.5 shrink-0" aria-hidden="true" />
         <span>{{ t("synthetics.journey.actionChangedNotice") }}</span>
       </p>
-
-      <!-- Target — the locator bundle is the only way a step names its element.
-           `stepNeedsTarget` is the same rule the save-time validator uses, so the
-           block appears exactly when a target is required. -->
-      <BrowserJourneyLocator
-        v-if="showTarget"
-        :locator="effectiveLocator"
-        @update:locator="updateLocator"
-      />
-
       <!-- Value (action-specific label) -->
       <OInput
         v-if="showValue"
@@ -435,6 +426,16 @@ const advancedCaption = computed(
       />
     </div>
 
+    <!-- Target — the locator bundle is the only way a step names its element.
+           `stepNeedsTarget` is the same rule the save-time validator uses, so the
+           block appears exactly when a target is required. -->
+    <BrowserJourneyLocator
+      v-if="showTarget"
+      :locator="effectiveLocator"
+      class="mt-2 w-full max-w-200"
+      @update:locator="updateLocator"
+    />
+
     <!-- Advanced — settling, timeout and failure behaviour, all of which a
          recording or a runner default already answers. Rendered unconditionally:
          the budget input is the only way to create a budget, so gating on "has
@@ -445,20 +446,20 @@ const advancedCaption = computed(
          is hidden from them. -->
     <OCollapsible
       :label="t('synthetics.journey.groupAdvancedLabel')"
-      :caption="advancedCaption"
       :default-open="!!advancedChanges"
+      variant="sidebar"
+      class="mt-2 w-full max-w-200 border"
       data-test="synthetics-journey-step-group-advanced"
     >
-      <div class="flex w-full flex-col gap-3 pt-2">
+      <div class="flex w-full flex-col gap-3 px-2 py-2">
         <!-- Waiting: what the recording observed, then the two numbers that bound
              the wait. Adjacent because they answer one question. -->
         <div class="flex w-full flex-col gap-2" data-test="synthetics-journey-step-settle">
           <template v-if="hasRecordedSettle">
-            <span class="text-text-secondary text-xs">{{
-              t("synthetics.journey.settleLabel")
-            }}</span>
+            <span class="text-text-primary text-sm">{{ t("synthetics.journey.settleLabel") }}</span>
 
-            <p v-if="settleNavigationLine" class="text-text-secondary m-0 font-mono text-xs">
+            <OSeparator />
+            <p v-if="settleNavigationLine" class="text-text-secondary m-0 text-xs">
               {{ settleNavigationLine }}
             </p>
 
@@ -478,10 +479,6 @@ const advancedCaption = computed(
                 {{ settleResponseLabel(response) }}
               </span>
             </div>
-
-            <p v-if="settleObservedLine" class="text-text-secondary m-0 font-mono text-xs">
-              {{ settleObservedLine }}
-            </p>
           </template>
 
           <OInput
@@ -489,7 +486,7 @@ const advancedCaption = computed(
             :label="t('synthetics.journey.settleBudgetLabel')"
             :placeholder="String(DEFAULT_SETTLE_BUDGET_MS)"
             type="number"
-            class="w-full"
+            class="mt-2 w-75!"
             data-test="synthetics-journey-step-settle-budget-input"
           />
           <p
@@ -507,19 +504,17 @@ const advancedCaption = computed(
           </p>
         </div>
 
+        <OSeparator />
+
         <OInput
           v-model="timeoutComputed"
           :label="t('synthetics.journey.timeoutLabel')"
           :placeholder="String(timeoutDefault)"
+          :helpText="timeoutHelp"
           type="number"
-          class="w-full"
+          class="w-75!"
           data-test="synthetics-journey-step-timeout-input"
         />
-        <!-- Additive to the placeholder, which P1.1.5 mandates: says what blank
-             means, and on navigate/assert that the default is also the ceiling. -->
-        <p class="text-text-secondary m-0 text-xs" data-test="synthetics-journey-step-timeout-help">
-          {{ timeoutHelp }}
-        </p>
         <p
           v-if="timeoutBelowDefault"
           class="text-status-warning-text m-0 flex items-start gap-1 text-xs"
@@ -536,6 +531,8 @@ const advancedCaption = computed(
              verdict, and that `always_run` only reaches steps AFTER the failure.
              Both-set is legitimate (a best-effort logout), so this explains rather
              than prevents (D11). -->
+        <OSeparator />
+
         <div class="flex items-center gap-1">
           <OCheckbox
             v-model="optionalComputed"

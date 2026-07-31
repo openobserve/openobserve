@@ -26,10 +26,7 @@
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import type { LocatorCandidate, StepLocator } from "@/types/synthetics";
-import {
-  isFrameworkGeneratedId,
-  isPositionalSelector,
-} from "@/utils/synthetics/locatorStability";
+import { isFrameworkGeneratedId, isPositionalSelector } from "@/utils/synthetics/locatorStability";
 import { deriveLocatorKind } from "@/utils/synthetics/deriveLocatorKind";
 import type { CompositePart } from "@/utils/synthetics/composeLocator";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
@@ -67,7 +64,7 @@ const isEmpty = computed(() => !candidates.value.length);
 const columns = computed<OTableColumnDef<LocatorCandidate>[]>(() => [
   { id: "locator", header: "", size: 200, meta: { autoWidth: true } },
   { id: "origin", header: "", size: 96 },
-  { id: "actions", header: "", size: 140, isAction: true },
+  { id: "actions", header: "", size: 10 },
 ]);
 
 const selectedIds = ref<string[]>([]);
@@ -126,7 +123,9 @@ const draft = ref("");
  * picker that only set `kind` would store `role=` semantics on a bare CSS
  * string.
  */
-const draftKind = computed(() => (draft.value.trim() ? deriveLocatorKind(draft.value.trim()) : null));
+const draftKind = computed(() =>
+  draft.value.trim() ? deriveLocatorKind(draft.value.trim()) : "css",
+);
 
 function append(candidate: LocatorCandidate): boolean {
   if (candidates.value.some((c) => c.value === candidate.value)) {
@@ -168,7 +167,7 @@ function onCombine(built: { value: string; from: CompositePart[] }) {
     <!-- In the empty state the block IS a single input, and that input already
          carries this heading as its label — showing both would say it twice. -->
     <div v-if="!isEmpty" class="flex items-center gap-2">
-      <span class="text-text-secondary text-xs">{{ t("synthetics.journey.locatorLabel") }}</span>
+      <span class="text-text-primary text-sm">{{ t("synthetics.journey.locatorLabel") }}</span>
       <OTooltip :content="t('synthetics.journey.locatorHelp')">
         <OIcon name="info-outline" size="xs" class="text-text-secondary" aria-hidden="true" />
       </OTooltip>
@@ -201,7 +200,10 @@ function onCombine(built: { value: string; from: CompositePart[] }) {
       @update:selected-ids="selectedIds = $event"
     >
       <template #cell-locator="{ row }">
-        <div class="flex min-w-0 items-center gap-2" data-test="synthetics-journey-step-locator-row">
+        <div
+          class="flex min-w-0 items-center gap-2"
+          data-test="synthetics-journey-step-locator-row"
+        >
           <OBadge variant="default" size="sm">
             {{ t(`synthetics.journey.locatorKind.${row.kind}`) }}
           </OBadge>
@@ -218,7 +220,7 @@ function onCombine(built: { value: string; from: CompositePart[] }) {
             :content="t('synthetics.journey.locatorPositionalWarningHelp')"
           >
             <span
-              class="text-status-warning-text flex shrink-0 items-center gap-1 text-2xs"
+              class="text-status-warning-text text-2xs flex shrink-0 items-center gap-1"
               data-test="synthetics-journey-step-locator-row-positional"
             >
               <OIcon name="warning" size="xs" aria-hidden="true" />
@@ -230,7 +232,7 @@ function onCombine(built: { value: string; from: CompositePart[] }) {
             :content="t('synthetics.journey.locatorGeneratedIdWarningHelp')"
           >
             <span
-              class="text-status-warning-text flex shrink-0 items-center gap-1 text-2xs"
+              class="text-status-warning-text text-2xs flex shrink-0 items-center gap-1"
               data-test="synthetics-journey-step-locator-row-generated-id"
             >
               <OIcon name="warning" size="xs" aria-hidden="true" />
@@ -247,24 +249,13 @@ function onCombine(built: { value: string; from: CompositePart[] }) {
       </template>
 
       <template #cell-actions="{ row }">
-        <div class="flex shrink-0 items-center gap-1">
-          <OButton
-            variant="ghost"
-            size="xs"
-            data-test="synthetics-journey-step-locator-start-from-btn"
-            @click="startFrom(row)"
-          >
-            {{ t("synthetics.journey.locatorStartFromThis") }}
-          </OButton>
-          <OButton
-            variant="ghost"
-            size="xs"
-            data-test="synthetics-journey-step-locator-delete-btn"
-            @click="remove(row)"
-          >
-            {{ t("synthetics.journey.locatorDelete") }}
-          </OButton>
-        </div>
+        <OButton
+          variant="ghost"
+          size="xs"
+          data-test="synthetics-journey-step-locator-delete-btn"
+          icon-left="delete"
+          @click="remove(row)"
+        />
       </template>
     </OTable>
 
@@ -295,6 +286,19 @@ function onCombine(built: { value: string; from: CompositePart[] }) {
     <!-- The author's own entry, after every recorded one. It APPENDS rather
          than overriding: the row can then be dragged wherever they want it. -->
     <div class="flex w-full items-end gap-2">
+      <!-- Read from the value, not chosen: `kind` labels a locator, it does not
+           parse it, so a picker that only set `kind` would store a contradiction. -->
+      <OTooltip :content="t('synthetics.journey.locatorDerivedKindHelp')">
+        <OBadge
+          variant="default"
+          size="sm"
+          data-test="synthetics-journey-step-locator-derived-kind"
+          class="mb-2"
+        >
+          {{ t(`synthetics.journey.locatorKind.${draftKind}`) }}
+        </OBadge>
+      </OTooltip>
+
       <OInput
         v-model="draft"
         :label="
@@ -312,22 +316,17 @@ function onCombine(built: { value: string; from: CompositePart[] }) {
         data-test="synthetics-journey-step-locator-override-input"
         @keyup.enter="addOwn"
       />
-      <!-- Read from the value, not chosen: `kind` labels a locator, it does not
-           parse it, so a picker that only set `kind` would store a contradiction. -->
-      <OTooltip v-if="draftKind" :content="t('synthetics.journey.locatorDerivedKindHelp')">
-        <OBadge variant="default" size="sm" data-test="synthetics-journey-step-locator-derived-kind">
-          {{ t(`synthetics.journey.locatorKind.${draftKind}`) }}
-        </OBadge>
-      </OTooltip>
-      <OButton
-        variant="secondary"
-        size="sm"
-        :disabled="!draft.trim()"
-        data-test="synthetics-journey-step-locator-add"
-        @click="addOwn"
-      >
-        {{ t("synthetics.journey.locatorOverrideApply") }}
-      </OButton>
+
+      <div class="w-23! text-center">
+        <OButton
+          variant="ghost"
+          size="sm"
+          :disabled="!draft.trim()"
+          icon-left="add"
+          data-test="synthetics-journey-step-locator-add"
+          @click="addOwn"
+        />
+      </div>
     </div>
 
     <LocatorComposeDialog
