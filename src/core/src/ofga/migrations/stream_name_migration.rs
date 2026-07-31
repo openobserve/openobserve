@@ -19,7 +19,9 @@ use o2_openfga::{
     authorizer::authz::{get_ownership_tuple, update_tuples},
     config::get_config as get_ofga_config,
 };
-use sea_orm::{ColumnTrait, ConnectionTrait, PaginatorTrait, QueryFilter, QuerySelect};
+use sea_orm::{
+    ColumnTrait, ConnectionTrait, EntityTrait, PaginatorTrait, QueryFilter, QuerySelect,
+};
 
 use crate::auth::{into_ofga_supported_format, is_ofga_unsupported};
 

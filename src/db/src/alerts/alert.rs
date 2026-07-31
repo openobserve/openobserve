@@ -217,7 +217,7 @@ pub async fn create<C: TransactionTrait>(
         for w in &alert.workflows {
             db::workflows::associate_workflow(
                 org_id,
-                &w,
+                w,
                 &alert_id,
                 WorkflowTriggerEntity::Alert.to_string(),
                 WorkflowTriggerType::AlertFired.to_string(),
