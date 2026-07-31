@@ -5516,6 +5516,7 @@
     "name": "Name",
     "sourceType": "Source type",
     "urlHeader": "Webhook URL",
+    "statusColumnHeader": "Status",
     "save": "Save",
     "cancel": "Cancel",
     "actions": "Actions",

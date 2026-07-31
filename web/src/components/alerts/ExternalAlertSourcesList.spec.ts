@@ -231,6 +231,60 @@ describe("ExternalAlertSourcesList", () => {
     );
   });
 
+  it("fetches senders for every additional integration, not just the default", async () => {
+    (alertSources.list as any).mockResolvedValue({
+      data: {
+        integrations: [
+          DEFAULT_SOURCE,
+          { ...DEFAULT_SOURCE, id: "int-2", name: "grafana-staging", source_type: "grafana" },
+        ],
+      },
+    });
+    const wrapper = buildWrapper();
+    await flushPromises();
+    expect(alertSources.listSenders).toHaveBeenCalledWith("myorg", "int-1");
+    expect(alertSources.listSenders).toHaveBeenCalledWith("myorg", "int-2");
+  });
+
+  it("shows a rolled-up status tag per additional source", async () => {
+    (alertSources.list as any).mockResolvedValue({
+      data: {
+        integrations: [
+          DEFAULT_SOURCE,
+          { ...DEFAULT_SOURCE, id: "int-2", name: "grafana-staging", source_type: "grafana" },
+        ],
+      },
+    });
+    (alertSources.listSenders as any).mockImplementation((_org: string, integrationId: string) => {
+      if (integrationId === "int-2") {
+        return Promise.resolve({
+          data: {
+            senders: [
+              {
+                integration_id: "int-2",
+                detected_source: "grafana",
+                display_name: "grafana",
+                first_received_at: 1,
+                last_received_at: Date.now() * 1000,
+                accepted_count: 3,
+                rejected_count: 0,
+                resolved_seen: true,
+                resolve_wiring_hint: false,
+              },
+            ],
+          },
+        });
+      }
+      return Promise.resolve({ data: { senders: [] } });
+    });
+    const wrapper = buildWrapper();
+    await flushPromises();
+    (wrapper.vm as any).showAdvanced = true;
+    await flushPromises();
+    expect((wrapper.vm as any).additionalStatusById["int-2"]).toBe("receiving");
+    expect((wrapper.vm as any).additionalStatusById["int-1"]).toBeUndefined();
+  });
+
   it("toggling showAddEditor shows the AddExternalAlertSource component", async () => {
     const wrapper = buildWrapper();
     await flushPromises();

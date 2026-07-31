@@ -169,6 +169,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :page-size="10"
             data-test="alert-sources-advanced-table"
           >
+            <template #cell-status="{ row }">
+              <OTag v-if="additionalStatusById[row.id] === 'receiving'" variant="success-soft" dot>
+                {{ t("alert_sources.statusReceiving") }}
+              </OTag>
+              <OTag v-else-if="additionalStatusById[row.id] === 'stale'" variant="warning-soft" dot>
+                {{ t("alert_sources.statusStale") }}
+              </OTag>
+              <OTag v-else variant="default-outline">
+                {{ t("alert_sources.statusNotConnected") }}
+              </OTag>
+            </template>
             <template #cell-url="{ row }">
               <div class="flex items-center gap-1">
                 <OButton
@@ -284,9 +295,11 @@ export default defineComponent({
       showAddEditor: false,
       selectedSetupType: "grafana" as "grafana" | "alertmanager" | "generic",
       revealedAdditionalIds: [] as string[],
+      additionalStatusById: {} as Record<string, "receiving" | "stale" | "not_connected">,
       advancedColumns: [
         { id: "name", header: this.t("alert_sources.name"), accessorKey: "name", sortable: true },
         { id: "source_type", header: this.t("alert_sources.sourceType"), accessorKey: "source_type" },
+        { id: "status", header: this.t("alert_sources.statusColumnHeader"), accessorKey: "id" },
         { id: "url", header: this.t("alert_sources.urlHeader"), accessorKey: "url" },
         { id: "actions", header: this.t("alert_sources.actions"), isAction: true, size: 100 },
       ] as any[],
@@ -341,9 +354,14 @@ export default defineComponent({
   methods: {
     async fetchAll() {
       await this.fetchIntegrations();
+      const fetches: Promise<void>[] = [];
       if (this.defaultSource) {
-        await this.fetchSenders(this.defaultSource.id);
+        fetches.push(this.fetchSenders(this.defaultSource.id));
       }
+      for (const integration of this.additionalIntegrations) {
+        fetches.push(this.fetchAdditionalStatus(integration.id));
+      }
+      await Promise.all(fetches);
     },
     async fetchIntegrations() {
       this.loading = true;
@@ -367,6 +385,22 @@ export default defineComponent({
           rejectedCount: s.rejected_count,
           resolveWiringHint: s.resolve_wiring_hint,
         }));
+      } catch (e) {
+        toast({ variant: "error", message: this.t("alert_sources.senderError") });
+      }
+    },
+    async fetchAdditionalStatus(integrationId: string) {
+      try {
+        const res = await alertSources.listSenders(this.orgIdentifier, integrationId);
+        const now = Date.now() * 1000;
+        const statuses = res.data.senders.map((s: any) => getAlertSourceStatus(s.last_received_at, now));
+        if (statuses.length === 0) {
+          this.additionalStatusById = { ...this.additionalStatusById, [integrationId]: "not_connected" };
+        } else if (statuses.includes("receiving")) {
+          this.additionalStatusById = { ...this.additionalStatusById, [integrationId]: "receiving" };
+        } else {
+          this.additionalStatusById = { ...this.additionalStatusById, [integrationId]: "stale" };
+        }
       } catch (e) {
         toast({ variant: "error", message: this.t("alert_sources.senderError") });
       }
