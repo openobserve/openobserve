@@ -485,7 +485,7 @@ test.describe("dashboard UI testcases", () => {
     await deleteDashboard(page, randomDashboardName);
   });
 
-  test("should display an error message when some fields are missing or incorrect", async ({
+  test("should auto-populate the panel name and save the panel", async ({
     page,
   }) => {
     const pm = new PageManager(page);
@@ -517,15 +517,16 @@ test.describe("dashboard UI testcases", () => {
     await pm.dashboardTimeRefresh.setRelative("30", "m");
     await pm.dashboardPanelActions.applyDashboardBtn();
 
-    // Attempt to save the panel without a name. The name field is now an
-    // OForm field with a required-schema rule, so an empty name is blocked at
-    // the form layer with an inline field error (no error toast is produced).
-    await pm.dashboardPanelActions.savePanel();
+    // The panel title auto-generates from the configured stream/fields, so it is
+    // never empty — a name is always present without the user typing one. Assert
+    // it is NOT the empty-state placeholder ("Untitled panel"), which the value
+    // span would fall back to if auto-naming produced nothing.
+    await expect(pm.dashboardPanelActions.getPanelNameValue()).toBeVisible();
     await expect(
-      pm.dashboardPanelActions.getPanelNameError().first()
-    ).toBeVisible();
+      pm.dashboardPanelActions.getPanelNameValue()
+    ).not.toHaveText("Untitled panel");
 
-    // Add a panel name and save again
+    // Set an explicit name and save again
     await pm.dashboardPanelActions.addPanelName(panelName);
     await pm.chartTypeSelector.removeField("y_axis_1", "y");
     await pm.chartTypeSelector.searchAndAddField(

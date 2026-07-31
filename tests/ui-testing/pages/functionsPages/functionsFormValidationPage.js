@@ -9,8 +9,10 @@ class FunctionsFormValidationPage {
 
     // ==================== AddFunction / FunctionsToolbar locators ====================
 
-    // Name input (OInput — derives -field and -error automatically)
-    this.functionNameField = page.locator('[data-test="add-function-name-input-field"]');
+    // Name is an inline-edited title (OFormInlineEdit): a display trigger swaps
+    // to an input on click; -error is the validation message.
+    this.functionNameTrigger = page.locator('[data-test="add-function-name-input-trigger"]');
+    this.functionNameField = page.locator('[data-test="add-function-name-input-input"]');
     this.functionNameError = page.locator('[data-test="add-function-name-input-error"]');
 
     // VRL editor wrapper
@@ -120,12 +122,17 @@ class FunctionsFormValidationPage {
     await this.navigateToFunctions(org);
     await this.addFunctionButton.waitFor({ state: 'visible', timeout: 15000 });
     await this.addFunctionButton.click();
-    await this.functionNameField.waitFor({ state: 'visible', timeout: 15000 });
+    // The name trigger is what renders in display mode (the input only appears
+    // once the trigger is clicked) — wait on it as the form-open signal.
+    await this.functionNameTrigger.waitFor({ state: 'visible', timeout: 15000 });
     testLogger.info('Add Function form opened');
   }
 
   async fillFunctionName(name) {
     testLogger.info(`Filling function name: ${name}`);
+    // Open the inline editor, then fill the revealed input.
+    await this.functionNameTrigger.waitFor({ state: 'visible' });
+    await this.functionNameTrigger.click();
     await this.functionNameField.waitFor({ state: 'visible' });
     await this.functionNameField.fill(name);
   }
@@ -191,8 +198,9 @@ class FunctionsFormValidationPage {
 
     // The editor's @update:query emit is DEBOUNCED (500ms) and flushed on blur.
     // Blur the editor (focus the name field) so formData.function updates
-    // immediately — deterministic instead of racing the debounce timer.
-    await this.functionNameField.click();
+    // immediately — deterministic instead of racing the debounce timer. Clicking
+    // the inline-edit trigger moves focus off Monaco (and opens the name editor).
+    await this.functionNameTrigger.click();
     await this.page.waitForTimeout(200);
   }
 

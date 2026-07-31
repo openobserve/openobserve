@@ -49,21 +49,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
       </Teleport>
 
-      <!-- Pipeline name input for NEW pipelines, teleported into the shell
-           header (Functions.vue #o2-page-title-trail) next to the title —
-           mirrors the actions teleport above. Owned here, alongside
-           savePipeline, which validates it via the OForm schema. -->
-      <Teleport v-if="isCreatePipeline" defer to="#o2-page-title-trail">
-        <div class="w-64 shrink-0">
-          <OForm :form="metaForm">
-            <OFormInput
-              name="name"
-              :placeholder="t('pipeline.pipelineName')"
-              hide-bottom-space
-              data-test="pipeline-editor-name-input"
-            />
-          </OForm>
-        </div>
+      <!-- Pipeline name for NEW pipelines, teleported into the shell header
+           (Functions.vue #o2-page-title-trail) next to the title — mirrors the
+           actions teleport above. Owned here, alongside savePipeline, which
+           validates it via the OForm schema. Rendered as inline-edited heading
+           text rather than a boxed field, matching the panel and alert editors;
+           the shell's own breadcrumb already carries "Pipelines ›". -->
+      <Teleport v-if="isCreatePipeline" defer to="#o2-page-title">
+        <OFormInlineEdit
+          name="name"
+          :placeholder="t('pipeline.pipelineName')"
+          :aria-label="t('pipeline.pipelineName')"
+          :edit-hint="t('pipeline.renameHint')"
+          data-test="pipeline-editor-name-input"
+        />
       </Teleport>
 
       <!-- Rail + canvas, laid out exactly like the Dashboards list (folder rail +
@@ -201,6 +200,7 @@ import {
   onBeforeMount,
   onMounted,
   onUnmounted,
+  provide,
   watch,
   ref,
   type Ref,
@@ -221,9 +221,9 @@ import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import OForm from "@/lib/forms/Form/OForm.vue";
-import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import OFormInlineEdit from "@/lib/forms/InlineEdit/OFormInlineEdit.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
+import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
 import {
   makePipelineMetaSchema,
   pipelineMetaDefaults,
@@ -471,17 +471,25 @@ const validationErrors = ref<string[]>([]);
 const { track } = useReo();
 
 // ── Pipeline name: OForm-owned ───────────────────────────────────────────────
-// The name input is a headless OForm so the teleported <OFormInput> validates
-// via the schema (submit-then-change timing; the inline error appears on the
-// first save attempt). `currentSelectedPipeline.name` stays the PERSISTED field
-// — the save payload, JSON editor and FlowChart all read it — so the two are
-// kept mirrored by the guarded watches below (guards break the echo loop).
+// A headless form so the teleported <OFormInlineEdit> validates via the schema
+// (submit-then-change timing; the inline error appears on the first save
+// attempt). `currentSelectedPipeline.name` stays the PERSISTED field — the save
+// payload, JSON editor and FlowChart all read it — so the two are kept mirrored
+// by the guarded watches below (guards break the echo loop).
+//
+// The context is PROVIDED here rather than by wrapping the field in <OForm>.
+// The field teleports into the shell header's <h1>, and a <form> element is
+// both invalid there and useless: this page saves through savePipeline(), not
+// through form submission. provide/inject follows the component tree, which a
+// Teleport preserves, so the teleported field still resolves it.
 const isCreatePipeline = computed(() => router.currentRoute.value.name === "createPipeline");
 
 const metaForm = useOForm<PipelineMetaForm>({
   defaultValues: pipelineMetaDefaults(),
   schema: makePipelineMetaSchema(t),
 });
+
+provide(FORM_CONTEXT_KEY, metaForm);
 
 // form → store: reflect what the user types into the persisted pipeline name.
 watch(

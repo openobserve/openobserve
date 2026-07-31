@@ -85,9 +85,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon :name="icon" size="md" />
         </span>
 
-        <div class="flex min-w-0 shrink-0 flex-col justify-center">
+        <!-- shrink-0 keeps a short static title from being squeezed by tabs.
+             An interactive title (titleOverflow="visible") holds a real name
+             that can be long, so it may instead consume the free space in the
+             row and only ellipsise once genuinely out of room. -->
+        <div
+          class="flex min-w-0 flex-col justify-center"
+          :class="titleOverflow === 'visible' ? '' : 'shrink-0'"
+        >
           <h1
-            class="text-text-heading min-h-6 truncate text-base! leading-[1.45]! font-semibold! tracking-[-0.02em]!"
+            class="text-text-heading min-h-6 text-base! leading-[1.45]! font-semibold! tracking-[-0.02em]!"
+            :class="titleOverflow === 'visible' ? 'min-w-0' : 'truncate'"
             :title="title"
             :data-test="titleDataTest"
           >
@@ -167,10 +175,19 @@ const props = withDefaults(
     /** Render the #tabs slot as a full-width strip below row 1 (prototype's
      *  two-row header) instead of inline beside the title. */
     tabsBelow?: boolean;
+    /**
+     * The <h1> clips its content by default (truncate → overflow:hidden), which
+     * is right for text but wrong when the #title slot hosts an interactive
+     * control: it would swallow that control's focus ring and any message it
+     * floats below itself. Pass "visible" in that case — the slot content then
+     * owns its own overflow (an inline-edited page name does exactly this).
+     */
+    titleOverflow?: "truncate" | "visible";
   }>(),
   {
     title: "",
     subtitle: "",
+    titleOverflow: "truncate",
   },
 );
 

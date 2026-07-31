@@ -158,8 +158,10 @@ test.describe("Traces Pipeline Tests", { tag: ['@all', '@pipelines', '@traces', 
     await pageManager.pipelinesPage.addPipeline();
     await page.waitForTimeout(500);
 
-    // Verify dialog opened - check for pipeline name input using POM
-    await expect(pageManager.pipelinesPage.pipelineNameInput).toBeVisible();
+    // Verify the editor opened. The pipeline name is now an inline-edited title:
+    // in display mode it shows a trigger (the input only mounts once clicked), so
+    // the trigger is the correct "form is open" signal.
+    await expect(pageManager.pipelinesPage.pipelineNameTrigger).toBeVisible();
     testLogger.info('Pipeline name input is visible');
 
     // Enter a pipeline name using POM method

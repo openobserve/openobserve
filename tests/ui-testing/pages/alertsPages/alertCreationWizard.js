@@ -21,6 +21,21 @@ export class AlertCreationWizard {
     }
 
     /**
+     * Fill the alert name. The name is an inline-edited title (OFormInlineEdit):
+     * a display trigger swaps to an input on click. This helper is idempotent —
+     * if a caller already opened the editor (e.g. clicked the wrapper), the input
+     * is filled directly; otherwise the trigger is clicked first.
+     */
+    async fillAlertNameField(name) {
+        const input = this.page.locator(this.locators.alertNameInputField);
+        if (!(await input.isVisible().catch(() => false))) {
+            await this.page.locator(this.locators.alertNameTrigger).click();
+            await input.waitFor({ state: 'visible', timeout: 5000 });
+        }
+        await input.fill(name);
+    }
+
+    /**
      * Select a stream from the stream name dropdown using keyboard filtering.
      * The dropdown uses virtual scroll which only renders visible items.
      * Typing the stream name triggers QSelect's built-in filter to narrow results.
@@ -71,7 +86,7 @@ export class AlertCreationWizard {
 
             // Re-fill alert name (lost on re-entry)
             await expect(this.page.locator(this.locators.alertNameInput)).toBeVisible({ timeout: 10000 });
-            await this.page.locator(this.locators.alertNameInputField).fill(this.currentAlertName);
+            await this.fillAlertNameField(this.currentAlertName);
 
             // Re-select stream type (logs) via OSelect popover pattern (§4)
             await this.page.locator(this.locators.streamTypeDropdown).click();
@@ -106,7 +121,7 @@ export class AlertCreationWizard {
             await this.page.waitForTimeout(2000);
 
             await expect(this.page.locator(this.locators.alertNameInput)).toBeVisible({ timeout: 10000 });
-            await this.page.locator(this.locators.alertNameInputField).fill(this.currentAlertName);
+            await this.fillAlertNameField(this.currentAlertName);
             await this.page.locator(this.locators.streamTypeDropdown).click();
             await expect(this.page.locator(this.locators.streamTypePopover)).toBeVisible({ timeout: 10000 });
             await this.page.locator(`${this.locators.streamTypeOption}[data-test-value="logs"]`).click();
@@ -180,7 +195,7 @@ export class AlertCreationWizard {
         // ==================== STEP 1: ALERT SETUP ====================
         await expect(this.page.locator(this.locators.alertNameInput)).toBeVisible({ timeout: 10000 });
         await this.page.locator(this.locators.alertNameInput).click();
-        await this.page.locator(this.locators.alertNameInputField).fill(randomAlertName);
+        await this.fillAlertNameField(randomAlertName);
 
         // Select stream type via OSelect popover pattern (§4)
         await this.page.locator(this.locators.streamTypeDropdown).click();
@@ -300,7 +315,7 @@ export class AlertCreationWizard {
         // ==================== STEP 1: ALERT SETUP ====================
         await expect(this.page.locator(this.locators.alertNameInput)).toBeVisible({ timeout: 10000 });
         await this.page.locator(this.locators.alertNameInput).click();
-        await this.page.locator(this.locators.alertNameInputField).fill(randomAlertName);
+        await this.fillAlertNameField(randomAlertName);
 
         // Select stream type via OSelect popover pattern (§4)
         await this.page.locator(this.locators.streamTypeDropdown).click();
@@ -412,7 +427,7 @@ export class AlertCreationWizard {
         // ==================== STEP 1: ALERT SETUP ====================
         await expect(this.page.locator(this.locators.alertNameInput)).toBeVisible({ timeout: 10000 });
         await this.page.locator(this.locators.alertNameInput).click();
-        await this.page.locator(this.locators.alertNameInputField).fill(randomAlertName);
+        await this.fillAlertNameField(randomAlertName);
 
         // Select stream type via OSelect popover pattern (§4)
         await this.page.locator(this.locators.streamTypeDropdown).click();
@@ -612,7 +627,7 @@ export class AlertCreationWizard {
         // ==================== STEP 1: ALERT SETUP ====================
         await expect(this.page.locator(this.locators.alertNameInput)).toBeVisible({ timeout: 10000 });
         await this.page.locator(this.locators.alertNameInput).click();
-        await this.page.locator(this.locators.alertNameInputField).fill(randomAlertName);
+        await this.fillAlertNameField(randomAlertName);
 
         // Select stream type (logs) via OSelect popover pattern (§4)
         await this.page.locator(this.locators.streamTypeDropdown).click();
@@ -787,7 +802,7 @@ export class AlertCreationWizard {
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         testLogger.info('Add alert dialog opened');
 
-        await this.page.locator(this.locators.alertNameInputField).fill(randomAlertName);
+        await this.fillAlertNameField(randomAlertName);
         testLogger.info('Filled alert name', { alertName: randomAlertName });
 
         // Select stream type (logs) via OSelect popover pattern (§4)
@@ -992,7 +1007,7 @@ export class AlertCreationWizard {
 
         // Fill Alert Setup
         await expect(this.page.locator(this.locators.alertNameInput)).toBeVisible({ timeout: 10000 });
-        await this.page.locator(this.locators.alertNameInputField).fill(alertName);
+        await this.fillAlertNameField(alertName);
 
         // Select stream type (logs) via OSelect popover pattern (§4)
         await this.page.locator(this.locators.streamTypeDropdown).click();
@@ -1285,7 +1300,7 @@ export class AlertCreationWizard {
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         testLogger.info('Add alert dialog opened');
 
-        await this.page.locator(this.locators.alertNameInputField).fill(randomAlertName);
+        await this.fillAlertNameField(randomAlertName);
         testLogger.info('Filled alert name', { alertName: randomAlertName });
 
         // Select stream type (logs) via OSelect popover pattern (§4)
@@ -1540,7 +1555,7 @@ export class AlertCreationWizard {
             .catch(() => testLogger.debug('networkidle timeout after addAlert click — continuing'));
 
         await expect(this.page.locator(this.locators.alertNameInput)).toBeVisible({ timeout: 10000 });
-        await this.page.locator(this.locators.alertNameInputField).fill(randomAlertName);
+        await this.fillAlertNameField(randomAlertName);
 
         // Select stream type (logs) via OSelect popover pattern (§4)
         await this.page.locator(this.locators.streamTypeDropdown).click();
@@ -1757,7 +1772,7 @@ export class AlertCreationWizard {
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         testLogger.info('Add alert dialog opened');
 
-        await this.page.locator(this.locators.alertNameInputField).fill(randomAlertName);
+        await this.fillAlertNameField(randomAlertName);
         testLogger.info('Filled alert name', { alertName: randomAlertName });
 
         // Select stream type (metrics) via OSelect popover pattern (§4) — IMPORTANT: Must be metrics for PromQL tab to appear
