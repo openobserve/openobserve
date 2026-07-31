@@ -202,14 +202,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             {{ warningThresholdError }}
                           </div>
                         </div>
-                        <div class="flex h-8.5 items-center gap-1">
-                          <OFormCheckbox
-                            name="trigger_condition.notify_on_warning"
-                            :label="t('alerts.notifyOnWarning')"
-                            data-test="alert-notify-on-warning-checkbox"
-                          />
-                          <OTooltip :content="t('alerts.notifyOnWarningTooltip')" :delay="300" />
-                        </div>
                         <OButton
                           variant="ghost"
                           size="icon-circle-sm"
@@ -299,14 +291,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           >
                             {{ aggregationWarningError }}
                           </div>
-                        </div>
-                        <div class="flex h-8.5 items-center gap-1">
-                          <OFormCheckbox
-                            name="trigger_condition.notify_on_warning"
-                            :label="t('alerts.notifyOnWarning')"
-                            data-test="alert-notify-on-warning-checkbox"
-                          />
-                          <OTooltip :content="t('alerts.notifyOnWarningTooltip')" :delay="300" />
                         </div>
                         <OButton
                           variant="ghost"
@@ -582,14 +566,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             {{ warningThresholdError }}
                           </div>
                         </div>
-                        <div class="flex h-8.5 items-center gap-1">
-                          <OFormCheckbox
-                            name="trigger_condition.notify_on_warning"
-                            :label="t('alerts.notifyOnWarning')"
-                            data-test="alert-notify-on-warning-checkbox"
-                          />
-                          <OTooltip :content="t('alerts.notifyOnWarningTooltip')" :delay="300" />
-                        </div>
                         <OButton
                           variant="ghost"
                           size="icon-circle-sm"
@@ -678,14 +654,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           >
                             {{ aggregationWarningError }}
                           </div>
-                        </div>
-                        <div class="flex h-8.5 items-center gap-1">
-                          <OFormCheckbox
-                            name="trigger_condition.notify_on_warning"
-                            :label="t('alerts.notifyOnWarning')"
-                            data-test="alert-notify-on-warning-checkbox"
-                          />
-                          <OTooltip :content="t('alerts.notifyOnWarningTooltip')" :delay="300" />
                         </div>
                         <OButton
                           variant="ghost"
@@ -1397,14 +1365,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         {{ warningThresholdError }}
                       </div>
                     </div>
-                    <div class="flex h-8.5 items-center gap-1">
-                      <OFormCheckbox
-                        name="trigger_condition.notify_on_warning"
-                        :label="t('alerts.notifyOnWarning')"
-                        data-test="alert-notify-on-warning-checkbox"
-                      />
-                      <OTooltip :content="t('alerts.notifyOnWarningTooltip')" :delay="300" />
-                    </div>
                     <OButton
                       variant="ghost"
                       size="icon-circle-sm"
@@ -1510,14 +1470,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         >
                           {{ promqlWarningError }}
                         </div>
-                      </div>
-                      <div class="flex h-8.5 items-center gap-1">
-                        <OFormCheckbox
-                          name="trigger_condition.notify_on_warning"
-                          :label="t('alerts.notifyOnWarning')"
-                          data-test="alert-notify-on-warning-checkbox"
-                        />
-                        <OTooltip :content="t('alerts.notifyOnWarningTooltip')" :delay="300" />
                       </div>
                       <OButton
                         variant="ghost"
@@ -1693,7 +1645,6 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import AlertMultiToggle from "@/components/alerts/AlertMultiToggle.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OFormCheckbox from "@/lib/forms/Checkbox/OFormCheckbox.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
@@ -1705,7 +1656,6 @@ const UnifiedQueryEditor = defineAsyncComponent(() => import("@/components/Query
 export default defineComponent({
   name: "Step2QueryConfig",
   components: {
-    OFormCheckbox,
     OTag,
     AlertMultiToggle,
     FilterGroup,

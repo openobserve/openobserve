@@ -208,22 +208,15 @@ export const getAlertPayload = (formData: PayloadFormData, context: PayloadConte
   // stripping here keeps the scheduled→realtime switch saveable.
   if (payload.is_real_time === true) {
     delete (payload.trigger_condition as any).warning_threshold;
-    delete (payload.trigger_condition as any).notify_on_warning;
     delete (payload.query_condition as any).promql_warning_value;
     if (payload.query_condition.aggregation) {
       delete (payload.query_condition.aggregation as any).warning_value;
     }
   }
-  // notify_on_warning is meaningless without a warning threshold — drop it so
-  // single-level alerts stay byte-identical to their legacy payloads.
-  const hasAnyWarning =
-    "warning_threshold" in payload.trigger_condition ||
-    (payload.query_condition?.aggregation &&
-      "warning_value" in payload.query_condition.aggregation) ||
-    "promql_warning_value" in (payload.query_condition ?? {});
-  if (!hasAnyWarning) {
-    delete (payload.trigger_condition as any).notify_on_warning;
-  }
+  // notify_on_warning was removed from the UI — a breached warning always sends
+  // to the destination. Never emit the flag, so the backend applies its default
+  // (`notify_on_warning.unwrap_or(true)` = always notify).
+  delete (payload.trigger_condition as any).notify_on_warning;
 
   // Feature 2 (PT-1/PT-6). The select yields a string when a user picks a
   // value, so coerce; an unset priority is DELETED rather than sent as null or

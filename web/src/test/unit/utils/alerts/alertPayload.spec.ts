@@ -170,14 +170,15 @@ describe("getAlertPayload warning-field normalization", () => {
     expect("notify_on_warning" in payload.trigger_condition).toBe(false);
   });
 
-  it("notify_on_warning survives when a warning IS configured", () => {
+  it("notify_on_warning is always dropped (removed from UI — warnings always notify)", () => {
     const payload = getAlertPayload(
       makeFormData({
         trigger_condition: { warning_threshold: "2", notify_on_warning: false },
       }),
       makeContext({ tab: "sql" }),
     );
-    expect(payload.trigger_condition.notify_on_warning).toBe(false);
+    // Never emitted, so the backend applies its default (unwrap_or(true) = notify).
+    expect("notify_on_warning" in payload.trigger_condition).toBe(false);
   });
 
   it("stale promql warning is dropped on non-promql tabs", () => {

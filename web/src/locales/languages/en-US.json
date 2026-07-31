@@ -5323,8 +5323,6 @@
     "warningIf": "Warning if",
     "addWarning": "Add warning",
     "removeWarning": "Remove warning",
-    "notifyOnWarning": "Notify",
-    "notifyOnWarningTooltip": "When off, Warning updates state and history but sends no notification — Critical still notifies.",
     "optional": "optional",
     "warnMustBeLower": "Warning ({warning}) must be lower than critical ({critical}) for {operator}",
     "warnMustBeHigher": "Warning ({warning}) must be higher than critical ({critical}) for {operator}",

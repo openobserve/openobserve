@@ -537,10 +537,6 @@ export const queryConfigDefaults = (args: {
       operator: tc.operator ?? ">=",
       threshold: tc.threshold ?? 1,
       frequency: tc.frequency ?? 10,
-      // Backend default is TRUE (delivery_decision unwrap_or(true)) — the
-      // checkbox must seed checked, or the form would silently misreport the
-      // policy for alerts that never set it.
-      notify_on_warning: tc.notify_on_warning ?? true,
     },
     query_condition: {
       conditions: inputData.conditions ?? {
