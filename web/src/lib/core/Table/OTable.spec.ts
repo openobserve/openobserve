@@ -1069,6 +1069,125 @@ describe("OTable", () => {
 
   // ── Column Management ──────────────────────────────────────
 
+  describe("bounded elastic (fillRemaining) column width", () => {
+    // A scrolling table sizes columns to max-content, so without a clamp the
+    // filler stretches to its longest value instead of taking the leftover.
+    const longValue = "x".repeat(4000);
+    // Built, not written literally: a bare `var(--header-x-size)` in source
+    // trips scripts/check-css-tokens.mjs (no static `--header-x-size:` decl).
+    const sizeVar = (id: string) => `var(--header-${id}-size)`;
+
+    function mountElastic(
+      props: Record<string, unknown> = {},
+      fillMeta: Record<string, unknown> = { autoWidth: true, fillRemaining: true },
+    ) {
+      const cols: OTableColumnDef<any>[] = [
+        { id: "ts", header: "Timestamp", accessorKey: "ts", size: 236 },
+        {
+          id: "body",
+          header: "Body",
+          accessorKey: "body",
+          size: 800,
+          minSize: 800,
+          meta: fillMeta,
+        },
+      ];
+      return mount(OTable, {
+        props: {
+          data: [{ ts: "2026-07-31 10:00:00.000", body: longValue }],
+          columns: cols,
+          horizontalScroll: true,
+          ...props,
+        },
+      });
+    }
+
+    it("should clamp the elastic column to the leftover width when scrolling", () => {
+      wrapper = mountElastic();
+      const cell = wrapper.find('[data-test="o2-table-cell-body"]');
+      expect(cell.exists()).toBe(true);
+      expect(cell.attributes("style")).toContain("max-width: 0");
+      expect(cell.attributes("style")).toContain("min-width: 800px");
+      expect(cell.classes()).toContain("text-ellipsis");
+      expect(cell.classes()).toContain("overflow-hidden");
+    });
+
+    it("should clamp the elastic header in step with its cells", () => {
+      wrapper = mountElastic();
+      const th = wrapper.find('[data-test="o2-table-th-body"]');
+      expect(th.exists()).toBe(true);
+      expect(th.attributes("style")).toContain("max-width: 0");
+    });
+
+    it("should pin sized columns beside it, since the table loses min-w-max", () => {
+      wrapper = mountElastic();
+      const cell = wrapper.find('[data-test="o2-table-cell-ts"]');
+      expect(cell.exists()).toBe(true);
+      expect(cell.attributes("style")).not.toContain("max-width: 0");
+      expect(cell.attributes("style")).toContain(`min-width: ${sizeVar("ts")}`);
+    });
+
+    // Regression: once another field is selected `body` becomes an ordinary
+    // sized column, and nothing capped those — its own text stretched it to
+    // ~3000px and dragged the row into horizontal scroll.
+    it("should pin a long-valued sized column at its size instead of its content", () => {
+      wrapper = mountElastic({
+        columns: [
+          { id: "ts", header: "Timestamp", accessorKey: "ts", size: 236 },
+          // no longer last, so it is sized — and its value is enormous
+          { id: "body", header: "Body", accessorKey: "body", size: 800 },
+          {
+            id: "level",
+            header: "Level",
+            accessorKey: "level",
+            size: 150,
+            minSize: 150,
+            meta: { autoWidth: true, fillRemaining: true },
+          },
+        ],
+        data: [{ ts: "2026-07-31 10:00:00.000", body: longValue, level: "INFO" }],
+      });
+      const cell = wrapper.find('[data-test="o2-table-cell-body"]');
+      expect(cell.exists()).toBe(true);
+      expect(cell.attributes("style")).toContain(`width: ${sizeVar("body")}`);
+      expect(cell.attributes("style")).toContain(`min-width: ${sizeVar("body")}`);
+      expect(cell.attributes("style")).toContain(`max-width: ${sizeVar("body")}`);
+      expect(cell.classes()).toContain("text-ellipsis");
+      const th = wrapper.find('[data-test="o2-table-th-body"]');
+      expect(th.attributes("style")).toContain(`max-width: ${sizeVar("body")}`);
+    });
+
+    it("should size the table to the container rather than max-content", () => {
+      wrapper = mountElastic();
+      const table = wrapper.find("table");
+      expect(table.classes()).toContain("w-full");
+      expect(table.classes()).not.toContain("min-w-max");
+    });
+
+    it("should leave a plain autoWidth column content-sized and scrolling", () => {
+      wrapper = mountElastic({}, { autoWidth: true });
+      const cell = wrapper.find('[data-test="o2-table-cell-body"]');
+      expect(cell.exists()).toBe(true);
+      expect(cell.attributes("style") ?? "").not.toContain("max-width: 0");
+      expect(wrapper.find("table").classes()).toContain("min-w-max");
+    });
+
+    it("should release the clamp while wrapping so the text can reflow", () => {
+      wrapper = mountElastic({ wrap: true });
+      const cell = wrapper.find('[data-test="o2-table-cell-body"]');
+      expect(cell.exists()).toBe(true);
+      expect(cell.attributes("style") ?? "").not.toContain("max-width: 0");
+      expect(cell.classes()).toContain("whitespace-normal");
+    });
+
+    it("should leave non-scrolling tables to the container-bounded layout", () => {
+      wrapper = mountElastic({ horizontalScroll: false });
+      const cell = wrapper.find('[data-test="o2-table-cell-body"]');
+      expect(cell.exists()).toBe(true);
+      expect(cell.attributes("style") ?? "").not.toContain("max-width: 0");
+    });
+  });
+
   describe("column resize", () => {
     it("shows resize handle on resizable columns", () => {
       const cols: OTableColumnDef<TestRow>[] = [
