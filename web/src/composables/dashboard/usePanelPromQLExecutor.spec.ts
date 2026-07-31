@@ -376,56 +376,67 @@ describe("usePanelPromQLExecutor", () => {
 
 describe("the heatmap column cap", () => {
   /**
-   * `usePanelDataLoader` builds start/end with `new Date(...).getTime()` — they are
-   * MILLISECONDS. The cap divided by 1e6 as if they were microseconds, which made
-   * every range look ~1000x shorter, collapsed the step to MIN_STEP_SECONDS (15s),
-   * and inverted the cap: a 24h heatmap asked for 5,760 columns instead of 120 —
-   * worse than no cap at all, since the backend's own default returns ~300.
+   * The start/end `usePanelDataLoader` passes here are MICROSECONDS, not ms. They
+   * come from `meta.dateTime`, whose Dates are built straight off
+   * `getConsumableDateTime()` — which is in µs — with no conversion
+   * (`plugins/metrics/Index.vue:419-428`, `views/Dashboards/ViewDashboard.vue`).
+   * `usePanelVariableSubstitution` reads the same pair and divides by 1e6.
    *
-   * The original bug survived review because it was only ever tested at 15m, the
-   * one range where a 15s step happens to land under the cap (60 columns). So this
-   * table starts at 15m and does not stop there.
+   * A previous revision of the cap divided by 1000, so every range looked 1000x
+   * LONGER: a 15m heatmap asked for a 7500s step over a 900s window, Prometheus
+   * returned a single sample per series, and the chart collapsed to one full-width
+   * column per bucket. This spec asserted the same wrong unit, so it stayed green
+   * while the product was broken — hence the explicit magnitude checks below.
    */
-  const MS = {
-    "15m": 15 * 60_000,
-    "1h": 3_600_000,
-    "6h": 21_600_000,
-    "24h": 86_400_000,
-    "7d": 604_800_000,
+  const US = {
+    "15m": 900_000_000,
+    "1h": 3_600_000_000,
+    "6h": 21_600_000_000,
+    "24h": 86_400_000_000,
+    "7d": 604_800_000_000,
   };
 
-  const stepFor = async (rangeMs: number) => {
+  const stepFor = async (rangeUs: number) => {
     const panelSchema = makePanelSchema();
     panelSchema.value.type = "heatmap";
     const { ctx, fetchQueryDataWithHttpStream } = makeCtx({ panelSchema });
     const { executePromQL } = usePanelPromQLExecutor(ctx as any);
-    // Exactly what the loader passes: getTime() milliseconds.
-    await executePromQL(1_700_000_000_000, 1_700_000_000_000 + rangeMs, null);
+    // Exactly what the loader passes: getTime() on a Date built from µs.
+    await executePromQL(1_700_000_000_000_000, 1_700_000_000_000_000 + rangeUs, null);
     const step = fetchQueryDataWithHttpStream.mock.calls[0][0].queryReq.step;
     return Number(String(step).replace(/s$/, ""));
   };
 
-  for (const [label, rangeMs] of Object.entries(MS)) {
+  for (const [label, rangeUs] of Object.entries(US)) {
     it(`keeps a ${label} heatmap within ${HEATMAP_MAX_COLUMNS} columns`, async () => {
-      const stepSeconds = await stepFor(rangeMs);
-      const columns = rangeMs / 1000 / stepSeconds;
+      const stepSeconds = await stepFor(rangeUs);
+      const columns = rangeUs / 1_000_000 / stepSeconds;
 
       expect(stepSeconds).toBeGreaterThan(0);
       expect(columns).toBeLessThanOrEqual(HEATMAP_MAX_COLUMNS);
     });
   }
 
-  it("does not collapse to the 15s floor at long ranges (the actual bug)", async () => {
-    // With the ms/µs confusion the step was 15s at EVERY range. It must scale.
-    expect(await stepFor(MS["24h"])).toBeGreaterThan(15);
-    expect(await stepFor(MS["7d"])).toBeGreaterThan(await stepFor(MS["6h"]));
+  it("still returns enough columns to be a heatmap (the reported bug)", async () => {
+    // The 1000x-too-large step yielded ONE column. Every range must stay plural,
+    // and a 15m window must match what the metrics-explorer card already renders.
+    for (const [label, rangeUs] of Object.entries(US)) {
+      const columns = rangeUs / 1_000_000 / (await stepFor(rangeUs));
+      expect(columns, `${label} collapsed to ${columns} column(s)`).toBeGreaterThan(10);
+    }
+    expect(await stepFor(US["15m"])).toBeLessThanOrEqual(30);
+  });
+
+  it("does not collapse to the 15s floor at long ranges", async () => {
+    expect(await stepFor(US["24h"])).toBeGreaterThan(15);
+    expect(await stepFor(US["7d"])).toBeGreaterThan(await stepFor(US["6h"]));
   });
 
   it("leaves a non-heatmap panel on the server default", async () => {
     const panelSchema = makePanelSchema(); // type: line
     const { ctx, fetchQueryDataWithHttpStream } = makeCtx({ panelSchema });
     const { executePromQL } = usePanelPromQLExecutor(ctx as any);
-    await executePromQL(1_700_000_000_000, 1_700_000_000_000 + MS["24h"], null);
+    await executePromQL(1_700_000_000_000_000, 1_700_000_000_000_000 + US["24h"], null);
     expect(fetchQueryDataWithHttpStream.mock.calls[0][0].queryReq.step).toBe("0");
   });
 
@@ -435,7 +446,7 @@ describe("the heatmap column cap", () => {
     panelSchema.value.queries[0].config = { step_value: "300" };
     const { ctx, fetchQueryDataWithHttpStream } = makeCtx({ panelSchema });
     const { executePromQL } = usePanelPromQLExecutor(ctx as any);
-    await executePromQL(1_700_000_000_000, 1_700_000_000_000 + MS["24h"], null);
+    await executePromQL(1_700_000_000_000_000, 1_700_000_000_000_000 + US["24h"], null);
     expect(fetchQueryDataWithHttpStream.mock.calls[0][0].queryReq.step).toBe("300");
   });
 });
