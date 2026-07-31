@@ -202,7 +202,29 @@ export default class DashboardVariables {
     }
 
     const option = this.variableOptionByValue(label, value);
-    await option.waitFor({ state: "visible", timeout: 10000 });
+
+    // The option list comes from a backend query over data that may have
+    // been ingested via a raw HTTP POST moments earlier in this test — a 200
+    // response there confirms accepted, not yet queryable/indexed. Rather than
+    // wait once on a fixed timeout, close and reopen the dropdown (forcing a
+    // fresh values query) until the option shows up or we've given indexing
+    // a generous window to catch up.
+    await expect.poll(async () => {
+      if (await option.isVisible()) return true;
+      await this.page.keyboard.press("Escape");
+      await trigger.click();
+      await this.variablePopover(label)
+        .waitFor({ state: "visible", timeout: 5000 })
+        .catch(() => {});
+      if (hasSearch) {
+        await searchInput
+          .waitFor({ state: "visible", timeout: 5000 })
+          .catch(() => {});
+        await searchInput.fill(value).catch(() => {});
+      }
+      return await option.isVisible();
+    }, { timeout: 40000, intervals: [1000, 2000, 3000, 5000, 5000, 5000, 5000] }).toBe(true);
+
     await option.click();
   }
 

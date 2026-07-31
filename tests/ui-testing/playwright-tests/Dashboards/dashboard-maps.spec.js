@@ -73,7 +73,20 @@ test.describe("dashboard maps testcases", () => {
     await conditionSearch.fill("India");
     // Select the matching option via data-test-value
     const indiaOption = page.locator('[data-test="dashboard-add-condition-list-tab-option"][data-test-value="India"]');
-    await indiaOption.waitFor({ state: "visible", timeout: 5000 });
+
+    // The option list is a backend query over data ingested via a raw HTTP
+    // POST moments earlier in beforeEach — a 200 response there confirms
+    // accepted, not yet queryable/indexed. Retry by reopening the list and
+    // re-searching rather than waiting once on a fixed timeout.
+    await expect.poll(async () => {
+      if (await indiaOption.isVisible()) return true;
+      await page.keyboard.press("Escape");
+      await conditionList.click().catch(() => {});
+      await conditionSearch.waitFor({ state: "visible", timeout: 5000 }).catch(() => {});
+      await conditionSearch.fill("India").catch(() => {});
+      return await indiaOption.isVisible();
+    }, { timeout: 40000, intervals: [1000, 2000, 3000, 5000, 5000, 5000, 5000] }).toBe(true);
+
     await indiaOption.click();
 
     // Apply Dashboard Changes
