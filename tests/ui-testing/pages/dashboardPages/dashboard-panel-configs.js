@@ -656,7 +656,7 @@ export default class DashboardPanelConfigs {
    * @param {Object} options
    * @param {string} [options.value] - Value to match (type=value row)
    * @param {string} [options.text] - Display text to show
-   * @param {boolean} [options.setColor] - Whether to initialize the color (clicks "Set color")
+   * @param {boolean} [options.setColor] - Whether to set a background colour (clicks a swatch in the picker)
    */
   async configureValueMapping({ value = "test_value", text = "Mapped!", setColor = true } = {}) {
     const valueMappingBtn = this.page.locator('[data-test="dashboard-addpanel-config-value-mapping-add-btn"]');
@@ -674,9 +674,11 @@ export default class DashboardPanelConfigs {
     await textInput.locator('[data-test$="-field"]').fill(text);
 
     if (setColor) {
-      const setColorBtn = popup.locator('[data-test="dashboard-addpanel-config-value-mapping-set-color-btn-0"]');
-      await setColorBtn.click();
-      await setColorBtn.waitFor({ state: "hidden", timeout: 5000 });
+      const bgSwatch = popup.locator(
+        '[data-test="dashboard-addpanel-config-value-mapping-bg-color-0-swatch-0"]'
+      );
+      await bgSwatch.waitFor({ state: "visible", timeout: 5000 });
+      await bgSwatch.click();
     }
 
     // ValueMappingPopUp is now an ODialog — Apply is the primary footer button
