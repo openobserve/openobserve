@@ -1,17 +1,4 @@
 // Copyright 2026 OpenObserve Inc.
-//
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU Affero General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU Affero General Public License for more details.
-//
-// You should have received a copy of the GNU Affero General Public License
-// along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it } from "vitest";
 import {
@@ -40,6 +27,7 @@ import {
   mapRun,
   evidenceSeverity,
   indexEvidenceByStep,
+  stepOwnDetail,
   type EvidenceEvent,
 } from "./syntheticResultsSchema";
 
@@ -1019,5 +1007,94 @@ describe("indexEvidenceByStep", () => {
       evidenceEv({ kind: "console", level: "log", ts: 100 }),
     ]);
     expect(byStep.get("s1")!.map((e) => e.ts)).toEqual([100, 500]);
+  });
+});
+
+// ── Per-step settle attribution ────────────────────────────────────────────
+//
+// Shapes copied from a live "OpenObserve Sys Query" failure (run 3HFCZ3fm…),
+// where failure_detail carried the whole journey's 13 signals while the failed
+// step owned none of them.
+describe("stepOwnDetail", () => {
+  const RUN_LEVEL = {
+    stepId: "s15",
+    stepName: "Click on synthetics_results",
+    stepIndex: 15,
+    error: "did not become visible within 30000 ms",
+    candidatesTried: [],
+    settleSignals: [
+      { kind: "response" as const, signal: "POST **/auth/login", status: "fired" as const, required: false, waitedMs: 5298 },
+      { kind: "navigation" as const, signal: "navigation to **/web/logs/**", status: "fired" as const, required: false, waitedMs: 2532 },
+      { kind: "response" as const, signal: "POST **/_search_stream", status: "stale" as const, required: false, waitedMs: 30274 },
+    ],
+    settleMs: 30274,
+    observedDurationMs: 1200,
+    screenshotKey: null,
+    traceKey: null,
+  };
+
+  const step = (over: any) => ({
+    step_id: "s14", status: "ok" as const, duration_ms: 30285,
+    error: null, start_time: 0, end_time: 1, screenshot_key: null, ...over,
+  });
+
+  it("gives the failing step only the signals it actually owns", () => {
+    // The run-level list is an accumulation across every step; rendering it on
+    // the failed step credits it with traffic from steps it never ran.
+    const d = stepOwnDetail(step({ step_id: "s15", status: "fail", settle_signals: [] }), RUN_LEVEL);
+    expect(d?.settleSignals).toEqual([]);
+    expect(d?.error).toBe("did not become visible within 30000 ms");
+  });
+
+  it("puts a stale signal on the step that produced it", () => {
+    const d = stepOwnDetail(
+      step({
+        settle_signals: [
+          { kind: "response", signal: "POST **/_search_stream", status: "stale", required: false, waited_ms: 30274 },
+        ],
+      }),
+      RUN_LEVEL,
+    );
+    expect(d?.settleSignals).toHaveLength(1);
+    expect(d?.settleSignals[0]).toMatchObject({ status: "stale", waitedMs: 30274 });
+  });
+
+  it("normalises waited_ms the same way the run-level mapper does", () => {
+    const d = stepOwnDetail(
+      step({ settle_signals: [{ kind: "navigation", signal: "nav", status: "fired", waited_ms: 46 }] }),
+      RUN_LEVEL,
+    );
+    expect(d?.settleSignals[0].waitedMs).toBe(46);
+    expect(d?.settleSignals[0].required).toBe(false);
+  });
+
+  it("carries the step's own locator candidates", () => {
+    const d = stepOwnDetail(
+      step({ candidates_tried: [{ kind: "role", value: "button", outcome: "matched" }] }),
+      RUN_LEVEL,
+    );
+    expect(d?.candidatesTried).toHaveLength(1);
+  });
+
+  it("returns null for a passing step with nothing of its own to show", () => {
+    // Otherwise every row grows an empty evidence block.
+    expect(stepOwnDetail(step({}), RUN_LEVEL)).toBeNull();
+  });
+
+  it("never borrows the run-level error for a step that did not fail", () => {
+    const d = stepOwnDetail(
+      step({ settle_signals: [{ kind: "navigation", signal: "nav", status: "fired", waited_ms: 1 }] }),
+      RUN_LEVEL,
+    );
+    expect(d?.error).toBe("");
+  });
+
+  it("works when there is no run-level failure detail at all", () => {
+    const d = stepOwnDetail(
+      step({ settle_signals: [{ kind: "navigation", signal: "nav", status: "fired", waited_ms: 1 }] }),
+      null,
+    );
+    expect(d?.settleSignals).toHaveLength(1);
+    expect(d?.stepId).toBe("s14");
   });
 });

@@ -1,17 +1,4 @@
 // Copyright 2026 OpenObserve Inc.
-//
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU Affero General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU Affero General Public License for more details.
-//
-// You should have received a copy of the GNU Affero General Public License
-// along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
  * Single isolation point between the `synthetics_results` log stream and the
@@ -267,6 +254,15 @@ export interface StepExecution {
   start_time: number;
   end_time: number;
   screenshot_key: string | null;
+  /**
+   * This step's OWN settle signals and locator candidates, as the probe wrote
+   * them. Declared because the record has carried them all along — the mapper
+   * spreads the raw step — while only the run-level `failure_detail` copy was
+   * ever read, which credited the failing step with the whole journey's traffic.
+   */
+  settle_signals?: unknown[];
+  candidates_tried?: unknown[];
+  settle_ms?: number;
 }
 
 export interface RetryAttempt {
@@ -599,6 +595,64 @@ function byEvidenceRank(a: EvidenceEvent, b: EvidenceEvent): number {
  * `step_id`s — so "we could not attribute this" is a finding the caller must be
  * able to state, not a step it can quietly index.
  */
+/** Normalise one raw `settle_signals` entry. Shared by both call sites. */
+function mapSettleSignal(sig: any): SettleSignal {
+  return {
+    kind: sig?.kind,
+    signal: str(sig?.signal),
+    status: sig?.status,
+    required: !!sig?.required,
+    waitedMs: typeof sig?.waited_ms === "number" ? sig.waited_ms : 0,
+  };
+}
+
+/**
+ * The evidence one step owns, as opposed to the run's.
+ *
+ * `failure_detail.settle_signals` is an ACCUMULATION across the whole journey:
+ * on a live 16-step failure it held 13 signals — one from step 2, six from step
+ * 8, two from step 14 — and the failing step owned none of them. Rendering that
+ * list under the failed step reads as "step 15 waited on /auth/login", which the
+ * page never did; the signal that actually went stale belonged to step 14.
+ *
+ * So attribution comes from the step's own row, and only the narrative fields
+ * (the error, the recorded baseline) come from `failure_detail`, and only for
+ * the step that failed.
+ *
+ * Returns null when the step has nothing of its own to show, so a passing step
+ * does not grow an empty evidence block.
+ */
+export function stepOwnDetail(
+  ex: StepExecution,
+  failureDetail: FailureDetail | null,
+): FailureDetail | null {
+  const isFailing = !!failureDetail && failureDetail.stepId === ex.step_id;
+  const signals = Array.isArray(ex.settle_signals) ? ex.settle_signals.map(mapSettleSignal) : [];
+  const candidates = Array.isArray(ex.candidates_tried)
+    ? (ex.candidates_tried as LocatorAttempt[])
+    : [];
+  const settleMs = typeof ex.settle_ms === "number" ? ex.settle_ms : null;
+
+  if (!isFailing && !signals.length && !candidates.length) return null;
+
+  return {
+    stepId: ex.step_id,
+    stepName: isFailing ? failureDetail!.stepName : "",
+    stepIndex: isFailing ? failureDetail!.stepIndex : 0,
+    // Only the failing step gets the error — it is the one statement on the
+    // record that describes a failure, and it describes exactly one.
+    error: isFailing ? failureDetail!.error : "",
+    candidatesTried: candidates,
+    settleSignals: signals,
+    settleMs,
+    // The recorded baseline is written per failure, not per step, so it stays
+    // with the failing step rather than being invented for its neighbours.
+    observedDurationMs: isFailing ? failureDetail!.observedDurationMs : null,
+    screenshotKey: isFailing ? failureDetail!.screenshotKey : null,
+    traceKey: isFailing ? failureDetail!.traceKey : null,
+  };
+}
+
 export function indexEvidenceByStep(events: EvidenceEvent[]): {
   byStep: Map<string, EvidenceEvent[]>;
   unattributed: EvidenceEvent[];
@@ -1589,13 +1643,7 @@ function mapFailureDetail(raw: unknown, recordTraceKey?: unknown): FailureDetail
     error: str(d.error),
     candidatesTried: Array.isArray(d.candidates_tried) ? d.candidates_tried : [],
     settleSignals: Array.isArray(d.settle_signals)
-      ? d.settle_signals.map((sig: any) => ({
-          kind: sig?.kind,
-          signal: str(sig?.signal),
-          status: sig?.status,
-          required: !!sig?.required,
-          waitedMs: typeof sig?.waited_ms === "number" ? sig.waited_ms : 0,
-        }))
+      ? d.settle_signals.map(mapSettleSignal)
       : [],
     settleMs: typeof d.settle_ms === "number" ? d.settle_ms : null,
     observedDurationMs: typeof d.observed_duration_ms === "number" ? d.observed_duration_ms : null,

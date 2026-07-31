@@ -1,18 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <http://www.gnu.org/licenses/>.
--->
+<!-- Copyright 2026 OpenObserve Inc. -->
 
 <!--
   RunDetail — Full page run detail view for synthetic monitoring.
@@ -171,7 +157,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model="selectedAttemptValue"
             :options="attemptOptions"
             size="sm"
-            class="w-56"
+            class="w-56!"
             data-test="synthetics-run-detail-attempt-dropdown"
           />
           <!-- Superseded attempts keep only a compact timeline; the full
@@ -621,7 +607,10 @@ import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
-import { buildAttemptViews } from "@/composables/synthetics/syntheticResultsSchema";
+import {
+  buildAttemptViews,
+  stepOwnDetail,
+} from "@/composables/synthetics/syntheticResultsSchema";
 import type {
   AttemptView,
   EvidenceEvent,
@@ -814,9 +803,13 @@ function buildSteps(
       // record's key would show the surviving attempt's pixels under the
       // failing attempt's label.
       screenshotKey: attempt?.screenshotKeys.get(ex.step_id) ?? ex.screenshot_key,
-      // Scoped to the failing step: the report describes one failure, and
-      // hanging it off every row would imply each step had its own.
-      evidence: failureDetail && failureDetail.stepId === ex.step_id ? failureDetail : null,
+      // Each step's OWN settle signals and locator candidates, not the run's.
+      // `failure_detail.settle_signals` accumulates across the whole journey —
+      // 13 signals on a live 16-step failure, none of them the failed step's —
+      // so hanging it off the failing row credited that step with traffic from
+      // steps 2 through 14 and left the stale signal invisible on the step that
+      // actually produced it.
+      evidence: stepOwnDetail(ex, failureDetail),
       // Per step, not per failure: the step that CAUSED the problem is often
       // not the one that failed, so evidence hangs off whichever step owns it.
       appEvidence: detail.evidenceByStep.find((e) => e.stepId === ex.step_id) ?? null,
