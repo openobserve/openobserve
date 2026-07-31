@@ -77,7 +77,9 @@ pub fn into_ofga_supported_format(name: &str) -> String {
             .unwrap_or("")
             .to_string()
     });
-    RE_OFGA_UNSUPPORTED_NAME.replace_all(&result, ".").to_string()
+    RE_OFGA_UNSUPPORTED_NAME
+        .replace_all(&result, ".")
+        .to_string()
 }
 
 /// True if `name` contains any character an OpenFGA object id cannot represent.

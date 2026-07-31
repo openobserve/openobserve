@@ -535,7 +535,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
                             log::info!("[OFGA:Local] Stream names migrated to openfga");
                         }
                         Err(e) => {
-                            log::error!("[OFGA:Local] Error migrating stream names to openfga: {e}");
+                            log::error!(
+                                "[OFGA:Local] Error migrating stream names to openfga: {e}"
+                            );
                         }
                     }
                 }
