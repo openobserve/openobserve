@@ -133,7 +133,6 @@ describe("adding your own locator", () => {
     });
   });
 
-  it("keeps the override label, unmarked, when candidates exist", () => {
   it("appends it, with a kind read from the value", async () => {
     const wrapper = render();
     await addOwn(wrapper, 'internal:role=button[name="Go"i]');
