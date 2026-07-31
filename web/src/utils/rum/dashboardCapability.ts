@@ -29,8 +29,19 @@
  * See docs/designs/MOBILE_RUM_ADAPTIVE_UI_DESIGN.md.
  */
 
-/** 12-column dashboard grid (matches the RUM dashboard layouts). */
-const GRID_WIDTH = 12;
+/**
+ * Column count of the grid the RUM Performance dashboards actually render on.
+ *
+ * `convertDashboardSchemaVersion` migrates every dashboard to a 192-column layout
+ * (12 → 48 → 192) and `RenderDashboardCharts` lays out on `column: 192`. Reflow MUST
+ * pack survivors into that same grid: an earlier value of 12 here clamped each real
+ * `w=48` tile down to 12 and put one per row, which is what made the mobile-only
+ * Overview render as a single narrow, stacked column instead of a full-width row.
+ *
+ * Exposed and overridable per call so the reflow-packing unit tests can exercise the
+ * algorithm with readable small-grid fixtures.
+ */
+export const DASHBOARD_GRID_COLUMNS = 192;
 
 /**
  * Columns referenced by the Performance dashboards that are NOT guaranteed to exist for
@@ -136,7 +147,10 @@ const panelReferencesAbsentField = (panel: DashboardPanel, presentFields: Set<st
  * original reading order (top-to-bottom, left-to-right). Used only after panels are
  * removed, so gaps left by dropped panels don't remain in the layout.
  */
-const reflowPanels = (panels: DashboardPanel[]): DashboardPanel[] => {
+const reflowPanels = (
+  panels: DashboardPanel[],
+  gridWidth: number = DASHBOARD_GRID_COLUMNS,
+): DashboardPanel[] => {
   const ordered = [...panels].sort(
     (a, b) => a.layout.y - b.layout.y || a.layout.x - b.layout.x,
   );
@@ -146,8 +160,8 @@ const reflowPanels = (panels: DashboardPanel[]): DashboardPanel[] => {
   let rowHeight = 0;
 
   return ordered.map((panel) => {
-    const w = Math.min(panel.layout.w, GRID_WIDTH);
-    if (cursorX + w > GRID_WIDTH) {
+    const w = Math.min(panel.layout.w, gridWidth);
+    if (cursorX + w > gridWidth) {
       rowY += rowHeight;
       cursorX = 0;
       rowHeight = 0;
@@ -195,6 +209,7 @@ const totalPanelCount = (dashboard: RumDashboard): number => {
 export const filterDashboardBySchema = (
   dashboard: RumDashboard,
   presentFields: Set<string> | null | undefined,
+  gridWidth: number = DASHBOARD_GRID_COLUMNS,
 ): FilterResult => {
   // Unknown schema → don't touch anything (non-regression for the common browser path).
   if (!presentFields || presentFields.size === 0) {
@@ -214,7 +229,7 @@ export const filterDashboardBySchema = (
       droppedCount += panels.length - kept.length;
       keptCount += kept.length;
       // Only rebuild a tab whose panels actually changed, so untouched tabs keep identity.
-      return kept.length === panels.length ? tab : { ...tab, panels: reflowPanels(kept) };
+      return kept.length === panels.length ? tab : { ...tab, panels: reflowPanels(kept, gridWidth) };
     });
 
     if (droppedCount === 0) return { dashboard, droppedCount: 0, keptCount };
@@ -231,7 +246,7 @@ export const filterDashboardBySchema = (
   }
 
   return {
-    dashboard: { ...dashboard, panels: reflowPanels(kept) },
+    dashboard: { ...dashboard, panels: reflowPanels(kept, gridWidth) },
     droppedCount,
     keptCount: kept.length,
   };
