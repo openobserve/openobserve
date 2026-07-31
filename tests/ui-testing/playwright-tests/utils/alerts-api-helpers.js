@@ -120,9 +120,42 @@ async function seedAlertFixtures(page) {
   ]).catch(() => {});
 }
 
+/** Ingest rows into a stream (creates it on first write). */
+async function ingest(page, stream, rows) {
+  return api(page, 'post', `${urls().v1}/${stream}/_json`, rows);
+}
+
+/** Per-group state of a multi-alert (empty list on a simple alert). */
+async function getAlertGroups(page, alertId) {
+  const r = await api(page, 'get', `${urls().v2}/alerts/${alertId}/groups`);
+  return r.ok() ? r.json() : { list: [] };
+}
+
+/**
+ * Poll the alert list until `name` has a run outcome (i.e. the scheduler evaluated it),
+ * or the timeout elapses. Returns the list item (or null). Scheduled alerts are picked
+ * up within ~15s, so 60s is a generous ceiling.
+ */
+async function waitForAlertOutcome(page, name, { timeoutMs = 60000, pollMs = 5000 } = {}) {
+  const deadline = Date.now() + timeoutMs;
+  let item = null;
+  for (;;) {
+    item = (await listAlerts(page)).find((a) => a.name === name) || null;
+    if (item && item.last_outcome) return item;
+    if (Date.now() >= deadline) return item;
+    await page.waitForTimeout(pollMs);
+  }
+}
+
+/** True for outcomes that mean the alert fired (delivery success is a separate axis). */
+function isFiringOutcome(outcome) {
+  return outcome === 'firing' || outcome === 'notify_failed';
+}
+
 module.exports = {
   BASE, STREAM, TMPL, DEST,
   uniq, urls, api,
   simpleAlert, multiAlert, groupedSimpleAlert, realtimeAlert,
   createAlert, listAlerts, findAlertId, deleteAlerts, seedAlertFixtures,
+  ingest, getAlertGroups, waitForAlertOutcome, isFiringOutcome,
 };

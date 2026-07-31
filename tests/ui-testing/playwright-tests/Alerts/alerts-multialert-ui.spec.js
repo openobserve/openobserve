@@ -50,7 +50,7 @@ test.describe('Alerts 4.0 — multi-alert UI', {
     created.length = 0;
   });
 
-  test('create-form happy path — a simple scheduled alert saves and lands on the list', async ({ page }) => {
+  test('creating a simple scheduled alert saves it and shows it on the list', async ({ page }) => {
     const name = uniq('p0ui_simple');
     await page.goto(`${BASE}/web/alerts?org_identifier=${getOrgIdentifier()}`);
 
@@ -71,7 +71,7 @@ test.describe('Alerts 4.0 — multi-alert UI', {
     created.push(await findAlertId(page, name));
   });
 
-  test('MA-01 — the Simple/Multi toggle shows "Multi alert" selected when editing a multi-alert', async ({ page }) => {
+  test('editing a per-group alert shows the Multi option selected', async ({ page }) => {
     const name = uniq('p0ui_multi');
     const id = await createMultiViaApi(page, name);
     expect(id).toBeTruthy();
@@ -81,7 +81,7 @@ test.describe('Alerts 4.0 — multi-alert UI', {
     await pm.alertsPage.expectMultiAlertSelected();
   });
 
-  test('DET-01/03 — the multi-alert detail page shows the multi badge, stat strip and group table', async ({ page }) => {
+  test('the per-group alert detail page shows the multi badge, stat strip and group table', async ({ page }) => {
     const name = uniq('p0ui_det');
     const id = await createMultiViaApi(page, name);
     expect(id).toBeTruthy();

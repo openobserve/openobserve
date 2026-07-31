@@ -40,7 +40,7 @@ test.describe('Alerts 4.0 — no-regression guards', {
     await deleteAlerts(page, created);
   });
 
-  test('REG-01 — a legacy simple alert round-trips with no opt-in field injected', async ({ page }) => {
+  test('a legacy alert round-trips unchanged with no new fields added', async ({ page }) => {
     const name = uniq('reg_legacy');
     const resp = await createAlert(page, simpleAlert(name));
     expect(resp.status(), await resp.text()).toBe(200);
@@ -55,7 +55,7 @@ test.describe('Alerts 4.0 — no-regression guards', {
     expect(a.trigger_condition.warning_threshold ?? null, 'warning threshold must not be injected').toBeNull();
   });
 
-  test('REG-02 — a grouped alert without multi_alert stays simple (nothing inferred from group_by)', async ({ page }) => {
+  test('a grouped alert stays simple until the per-group flag is turned on', async ({ page }) => {
     const name = uniq('reg_grouped');
     const resp = await createAlert(page, groupedSimpleAlert(name));
     expect(resp.status(), await resp.text()).toBe(200);
@@ -69,7 +69,7 @@ test.describe('Alerts 4.0 — no-regression guards', {
     expect(a.query_condition.aggregation.multi_alert ?? false, 'multi_alert must stay off').toBeFalsy();
   });
 
-  test('REG-07/THR-08 — realtime alerts reject the warning family', async ({ page }) => {
+  test('a realtime alert rejects the warning threshold family', async ({ page }) => {
     const a = realtimeAlert(uniq('reg_rt_warn'));
     a.trigger_condition.warning_threshold = 2;
     a.trigger_condition.notify_on_warning = true;
@@ -79,7 +79,7 @@ test.describe('Alerts 4.0 — no-regression guards', {
     expect(body.toLowerCase(), 'the error should name real-time as the reason').toContain('real-time');
   });
 
-  test('OUT-08/INV-6 — a realtime alert persists no run-state, but still carries priority', async ({ page }) => {
+  test('a realtime alert keeps no run state but still carries its priority', async ({ page }) => {
     const name = uniq('reg_rt');
     const a = realtimeAlert(name);
     a.priority = 2; // inert metadata IS allowed on realtime (PT-01)

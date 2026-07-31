@@ -47,13 +47,13 @@ test.describe('Alerts 4.0 — multi-alert API contract & guardrails', {
   //    provably-equivalent "any breaching group" shape (M-10) and not combined
   //    with incident creation (MN-11). Each must 400, never silently accept. ──
   const badMulti = [
-    ['MA-05 rejects creates_incident', (a) => { a.creates_incident = true; }],
-    ['MA-03 rejects a group-count threshold > 1', (a) => { a.trigger_condition.threshold = 3; }],
-    ['MA-04 rejects an empty group_by', (a) => { a.query_condition.aggregation.group_by = []; }],
-    ['MA-06 rejects an unordered operator (=)', (a) => { a.query_condition.aggregation.having.operator = '='; }],
+    ['reject a per-group alert that also creates an incident', (a) => { a.creates_incident = true; }],
+    ['reject a per-group alert with a group-count threshold above one', (a) => { a.trigger_condition.threshold = 3; }],
+    ['reject a per-group alert with no group by', (a) => { a.query_condition.aggregation.group_by = []; }],
+    ['reject a per-group alert whose operator has no severity order', (a) => { a.query_condition.aggregation.having.operator = '='; }],
   ];
   for (const [title, mutate] of badMulti) {
-    test(`multi-alert save validation — ${title}`, async ({ page }) => {
+    test(title, async ({ page }) => {
       const a = multiAlert(uniq('p0_badmulti'));
       mutate(a);
       const resp = await createAlert(page, a);
@@ -61,7 +61,7 @@ test.describe('Alerts 4.0 — multi-alert API contract & guardrails', {
     });
   }
 
-  test('THR-03 threshold matrix — warning not less severe than critical is rejected', async ({ page }) => {
+  test('reject a warning threshold that is not less severe than the critical threshold', async ({ page }) => {
     const a = simpleAlert(uniq('p0_badwarn'));
     a.trigger_condition.operator = '>';
     a.trigger_condition.threshold = 5;      // critical
@@ -71,14 +71,14 @@ test.describe('Alerts 4.0 — multi-alert API contract & guardrails', {
     expect(resp.status(), await resp.text()).toBe(400);
   });
 
-  test('PT-06 tag validation — a tag that does not start with a letter is rejected', async ({ page }) => {
+  test('reject a tag that does not start with a letter', async ({ page }) => {
     const a = simpleAlert(uniq('p0_badtag'));
     a.tags = ['1prod'];
     const resp = await createAlert(page, a);
     expect(resp.status(), await resp.text()).toBe(400);
   });
 
-  test('API-01/02 — a valid multi-alert round-trips and its group endpoints are authorized (B1 regression)', async ({ page }) => {
+  test('a valid per-group alert saves, round-trips, and its group endpoints are readable', async ({ page }) => {
     const name = uniq('p0_multi');
     const resp = await createAlert(page, multiAlert(name));
     expect(resp.status(), await resp.text()).toBe(200);
@@ -106,7 +106,7 @@ test.describe('Alerts 4.0 — multi-alert API contract & guardrails', {
     expect(trans.status(), 'group transitions endpoint must not 403 (B1)').toBe(200);
   });
 
-  test('PT-13/PT-10 — tags normalize + dedupe into the facet, and priority filters', async ({ page }) => {
+  test('tags are normalized and deduped, and alerts can be filtered by priority', async ({ page }) => {
     const name = uniq('p0_tags');
     const a = simpleAlert(name);
     a.priority = 1;
