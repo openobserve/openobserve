@@ -26,7 +26,12 @@
  */
 
 import { buildMetricCardFor, type MetricStream } from "./metricFamily";
-import { getMetricDefaults, PANEL_RATE_WINDOW, resolveVariant } from "./metricDefaults";
+import {
+  getMetricDefaults,
+  PANEL_PERCENTILE_WINDOW,
+  PANEL_RATE_WINDOW,
+  resolveVariant,
+} from "./metricDefaults";
 import { buildPanelDataForCard } from "./metricsHandoff";
 
 export interface PromqlSeed {
@@ -67,6 +72,7 @@ export interface SeedOptions {
    * was picked.
    */
   rateWindow?: string;
+  percentileWindow?: string;
 }
 
 /**
@@ -123,6 +129,7 @@ export function buildPromqlSeed(
       familyType: card.familyType,
       labels: card.labels,
       rateWindow: opts.rateWindow ?? PANEL_RATE_WINDOW,
+      percentileWindow: opts.percentileWindow ?? PANEL_PERCENTILE_WINDOW,
     },
   );
 

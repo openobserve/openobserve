@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { ref } from "vue";
 import { usePanelVariableSubstitution } from "./usePanelVariableSubstitution";
+import { computePercentileWindow } from "@/utils/metrics/metricDefaults";
 
 // Mock utilities that have heavy dependencies (vuex, services, async parser)
 vi.mock("@/utils/query/sqlUtils", () => ({
@@ -470,5 +471,92 @@ describe("applyDynamicVariables", () => {
     expect(metadata).toHaveLength(2);
     expect(metadata.map((m: any) => m.name)).toContain("env");
     expect(metadata.map((m: any) => m.name)).toContain("region");
+  });
+});
+
+/**
+ * `$__percentile_interval` is the `quantile_over_time` counterpart to
+ * `$__rate_interval`. It exists because the rate window — sized for rate()'s
+ * two-sample need — left a quantile with so few samples that p90 and p99
+ * interpolated between the same top pair and drew as one line.
+ */
+describe("$__percentile_interval", () => {
+  // 1h in MICROSECONDS: the substitution reads these as µs (see __range_seconds).
+  const HOUR_US = 3_600_000_000;
+  const substitute = (query: string) => {
+    const { replaceQueryValue } = makeComposable();
+    // Returns { query, metadata } — the substituted text is `.query`.
+    return replaceQueryValue(query, 0, HOUR_US, "promql").query as string;
+  };
+
+  it("resolves to at least MIN_PERCENTILE_SAMPLES x the scrape interval", () => {
+    const out = substitute("quantile_over_time(0.99, up[$__percentile_interval])");
+    expect(out).not.toContain("$__percentile_interval");
+
+    const seconds = [...out.matchAll(/(\d+)([hms])/g)].reduce(
+      (acc, m) => acc + Number(m[1]) * { h: 3600, m: 60, s: 1 }[m[2] as "h"],
+      0,
+    );
+    // makeStore declares a 15s scrape, so the floor is 20 x 15s = 300s.
+    expect(seconds).toBeGreaterThanOrEqual(300);
+  });
+
+  it("is wider than $__rate_interval — the whole point of a separate variable", () => {
+    const asSeconds = (out: string) =>
+      [...out.matchAll(/(\d+)([hms])/g)].reduce(
+        (acc, m) => acc + Number(m[1]) * { h: 3600, m: 60, s: 1 }[m[2] as "h"],
+        0,
+      );
+    expect(asSeconds(substitute("up[$__percentile_interval]"))).toBeGreaterThan(
+      asSeconds(substitute("up[$__rate_interval]")),
+    );
+  });
+
+  it("does not collide with $__interval or $__rate_interval in one query", () => {
+    // Naive replaceAll over overlapping names is how this class of bug happens.
+    const out = substitute("a[$__interval] b[$__rate_interval] c[$__percentile_interval]");
+    expect(out).not.toContain("$__");
+    expect(out).not.toContain("percentile");
+  });
+
+  /**
+   * The explorer card executes its own preview and computes a concrete window;
+   * the panel resolves this variable. If the two disagree, clicking a card
+   * re-smooths the metric and the chart visibly changes for no reason — the
+   * exact failure `computeRateWindow`'s doc warns about. The panel initially
+   * shipped without the range/4 cap and gave 5m where the card gave 3m45s.
+   */
+  it("agrees with the card's computePercentileWindow at short ranges", () => {
+    const { replaceQueryValue } = makeComposable();
+    for (const rangeSeconds of [900, 3600, 21600]) {
+      const panel = String(
+        replaceQueryValue("x[$__percentile_interval]", 0, rangeSeconds * 1_000_000, "promql").query,
+      ).replace(/^x\[|\]$/g, "");
+      expect(panel, `range=${rangeSeconds}s`).toBe(computePercentileWindow(rangeSeconds, 120, 15));
+    }
+  });
+
+  it("caps at a quarter of the range, like the card does", () => {
+    const { replaceQueryValue } = makeComposable();
+    // 15m: the uncapped target (20 x 15s = 5m) is a THIRD of the view.
+    const panel = String(
+      replaceQueryValue("x[$__percentile_interval]", 0, 900 * 1_000_000, "promql").query,
+    );
+    expect(panel).toBe("x[3m45s]");
+  });
+
+  it("still emits a parseable duration when the range is not finite", () => {
+    // formatRateInterval(NaN) is "", which would emit the unparseable `x[]`.
+    const { replaceQueryValue } = makeComposable();
+    for (const end of [NaN, undefined as any]) {
+      const out = String(replaceQueryValue("x[$__percentile_interval]", 0, end, "promql").query);
+      expect(out, `end=${end}`).toMatch(/^x\[\d+[dhms]/);
+    }
+  });
+
+  it("supports the ${...} and {{...}} spellings the other fixed variables do", () => {
+    for (const q of ["up[${__percentile_interval}]", "up[{{__percentile_interval}}]"]) {
+      expect(substitute(q)).not.toContain("__percentile_interval");
+    }
   });
 });

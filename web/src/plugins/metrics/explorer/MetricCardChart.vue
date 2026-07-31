@@ -111,6 +111,28 @@ export default defineComponent({
       return 2;
     };
 
+    /** How many series the chart will actually draw, across every query. */
+    const seriesCount = () => {
+      let n = 0;
+      for (const response of props.results ?? []) n += response?.result?.length ?? 0;
+      return n;
+    };
+
+    /**
+     * A single series keeps the card's accent colour — that colour is the card's
+     * identity, and a lone line needs no distinguishing. The moment there is more
+     * than one, `fixed` paints them all the SAME colour (colorPalette resolves
+     * `fixed` to `fixedColor[0]` for every series name), which on a legend-less
+     * tile makes a Percentiles or Min/Max variant unreadable: three lines you
+     * cannot tell apart, or — when they coincide — indistinguishable from one.
+     * Hashing the series NAME into the palette also keeps p50 the same colour on
+     * every re-render and between the tile and the card it applies to.
+     */
+    const colorConfig = () =>
+      seriesCount() > 1
+        ? { mode: "palette-classic-by-series" }
+        : { mode: "fixed", fixedColor: [props.color] };
+
     /**
      * The panel schema. The same shape the drill-in hands the editor, which is
      * what keeps "what you click is what you get" true. `type` is fixed from the
@@ -139,7 +161,7 @@ export default defineComponent({
         connect_nulls: true,
         line_interpolation: "smooth",
         line_thickness: 1.5,
-        color: { mode: "fixed", fixedColor: [props.color] },
+        color: colorConfig(),
         // Injected data is never "loading", so the converter would auto-range
         // the x-axis; pin it to the queried window instead. See `timeRange`.
         pin_x_axis_to_range: true,
