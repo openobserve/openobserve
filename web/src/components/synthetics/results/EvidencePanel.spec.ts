@@ -277,3 +277,57 @@ describe("EvidencePanel", () => {
     expect(w.find('[data-test="synthetics-evidence-download"]').text()).toContain(".ndjson");
   });
 });
+
+describe("EvidencePanel filter chips", () => {
+  const named = () =>
+    parseEvidenceNdjson(NDJSON).map((e) => ({
+      ...e,
+      stepName: e.stepId ? STEP_DEFS.get(e.stepId)?.name || e.stepId : null,
+    }));
+
+  const mountPanel = () =>
+    mount(EvidencePanel, {
+      props: {
+        evidenceKey: "k",
+        resolveUrl: (k: string) => k,
+        stepDefs: STEP_DEFS,
+        events: named(),
+        status: "ready",
+        error: null,
+      },
+      global: { plugins: [i18n] },
+    });
+
+  it("narrows the list when a chip is chosen", async () => {
+    const w = mountPanel();
+    await w.find('[data-test="synthetics-evidence-chip-consoleErrors"]').trigger("click");
+    await w.vm.$nextTick();
+    // The console group survives the filter; the network group does not.
+    expect(w.find('[data-test="synthetics-evidence-group-console"]').exists()).toBe(true);
+    expect(w.find('[data-test="synthetics-evidence-group-network"]').exists()).toBe(false);
+  });
+
+  it("keeps the selection when the active chip is clicked again", async () => {
+    // Swapping the bare buttons for OToggleGroup put a deselect-on-reclick
+    // behaviour within reach. It does not fire here, and it must not start to:
+    // an empty filter would blank the chip row and silently show everything,
+    // a state the old buttons could never reach.
+    const w = mountPanel();
+    const chip = '[data-test="synthetics-evidence-chip-consoleErrors"]';
+    await w.find(chip).trigger("click");
+    await w.vm.$nextTick();
+    await w.find(chip).trigger("click");
+    await w.vm.$nextTick();
+    expect(w.find('[data-test="synthetics-evidence-group-console"]').exists()).toBe(true);
+    expect(w.find('[data-test="synthetics-evidence-group-network"]').exists()).toBe(false);
+  });
+
+  it("returns to the whole run when All is chosen", async () => {
+    const w = mountPanel();
+    await w.find('[data-test="synthetics-evidence-chip-consoleErrors"]').trigger("click");
+    await w.vm.$nextTick();
+    await w.find('[data-test="synthetics-evidence-chip-all"]').trigger("click");
+    await w.vm.$nextTick();
+    expect(w.find('[data-test="synthetics-evidence-group-network"]').exists()).toBe(true);
+  });
+});

@@ -182,7 +182,7 @@ function onCombine(built: { value: string; from: CompositePart[] }) {
     <!-- In the empty state the block IS a single input, and that input already
          carries this heading as its label — showing both would say it twice. -->
     <div v-if="!isEmpty" class="flex items-center gap-2">
-      <span class="text-text-primary text-sm">{{ t("synthetics.journey.locatorLabel") }}</span>
+      <span class="text-text-heading text-sm">{{ t("synthetics.journey.locatorLabel") }}</span>
       <OTooltip :content="t('synthetics.journey.locatorHelp')">
         <OIcon name="info-outline" size="xs" class="text-text-secondary" aria-hidden="true" />
       </OTooltip>

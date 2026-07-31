@@ -471,7 +471,7 @@ const advancedCaption = computed(
              the wait. Adjacent because they answer one question. -->
         <div class="flex w-full flex-col gap-2" data-test="synthetics-journey-step-settle">
           <template v-if="hasRecordedSettle">
-            <span class="text-text-primary text-sm">{{ t("synthetics.journey.settleLabel") }}</span>
+            <span class="text-text-heading text-sm">{{ t("synthetics.journey.settleLabel") }}</span>
 
             <OSeparator />
             <p v-if="settleNavigationLine" class="text-text-secondary m-0 text-xs">

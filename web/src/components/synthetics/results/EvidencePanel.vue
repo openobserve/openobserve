@@ -38,6 +38,9 @@ import {
 import EvidenceEvents from "./EvidenceEvents.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import type { EvidenceStatus } from "@/composables/useSyntheticEvidence";
@@ -256,28 +259,25 @@ const downloadUrl = computed(() => (props.evidenceKey ? props.resolveUrl(props.e
              indistinguishable from a chip that does not exist, and "no console
              errors" is information. -->
         <div class="flex flex-wrap items-center gap-2">
-          <button
-            v-for="c in chips"
-            :key="c.key"
-            type="button"
-            class="rounded-default border-border-default border px-2 py-0.5 text-xs"
-            :class="[
-              filter === c.key ? 'bg-surface-raised text-text-body' : 'text-text-secondary',
-              c.count === 0 && c.key !== 'all' ? 'opacity-50' : '',
-            ]"
-            :data-test="`synthetics-evidence-chip-${c.key}`"
-            @click="filter = c.key"
-          >
-            {{ c.label }} {{ c.count }}
-          </button>
-          <label class="text-text-secondary ml-2 flex items-center gap-1 text-xs">
-            <input
-              v-model="firstPartyOnly"
-              type="checkbox"
-              data-test="synthetics-evidence-first-party"
-            />
-            {{ t("synthetics.evidence.firstPartyOnly") }}
-          </label>
+          <OToggleGroup v-model="filter" type="single">
+            <OToggleGroupItem
+              v-for="c in chips"
+              :key="c.key"
+              :value="c.key"
+              size="xs"
+              :class="c.count === 0 && c.key !== 'all' ? 'opacity-50' : ''"
+              :data-test="`synthetics-evidence-chip-${c.key}`"
+            >
+              {{ c.label }} {{ c.count }}
+            </OToggleGroupItem>
+          </OToggleGroup>
+          <OCheckbox
+            v-model="firstPartyOnly"
+            size="sm"
+            :label="t('synthetics.evidence.firstPartyOnly')"
+            class="ml-2"
+            data-test="synthetics-evidence-first-party"
+          />
         </div>
 
         <div v-if="!bundle.counts.all" class="text-text-secondary text-sm">
