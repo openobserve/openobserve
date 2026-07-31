@@ -417,7 +417,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
         log::error!("Failed to run audit publish");
     };
     #[cfg(feature = "cloud")]
-    tokio::task::spawn(self_reporting::cloud_events::flush_cloud_events());
+    {
+        tokio::task::spawn(self_reporting::cloud_events::flush_cloud_events());
+        tokio::task::spawn(o2_enterprise::enterprise::cloud::org_invites::watch());
+    }
 
     #[cfg(feature = "enterprise")]
     {
