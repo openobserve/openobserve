@@ -1648,6 +1648,9 @@
     "addGroup": "New user group",
     "addRole": "New role",
     "roleName": "Role Name",
+    "roleUsers": "Users",
+    "summaryInvited": "Invited",
+    "summaryTotalUsers": "Users",
     "groupName": "Group Name",
     "permissionName": "Permission Name",
     "permission": "Permission",
@@ -1933,7 +1936,8 @@
     },
     "addRolePage": {
       "roleCreated": "Role \"{name}\" Created Successfully!"
-    }
+    },
+    "summaryOtherRoles": "+{count} more roles"
   },
   "ticket": {
     "header": "Support Tickets",
@@ -9746,7 +9750,6 @@
       "actionClick": "click",
       "actionType": "type",
       "all": "All",
-      "allStatuses": "All Statuses",
       "allBrowsers": "All browsers",
       "allDevices": "All devices",
       "allLocations": "All locations",
@@ -10308,7 +10311,7 @@
       "passRateByLocation": "Pass Rate by Location",
       "durationByLocation": "Duration by Location (Avg)",
       "flakyRate": "Flaky Rate",
-      "stepsWindowTruncated": "Showing the newest {count} executions ({from} \u2013 {to}); the selected range holds more.",
+      "stepsWindowTruncated": "Showing the newest {count} executions ({from} – {to}); the selected range holds more.",
       "retryRate": "Retry Rate",
       "statusTimeline": "Status Timeline",
       "tabOverview": "Overview",

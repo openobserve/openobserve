@@ -77,6 +77,7 @@
           :mode="monitorTableMode"
           :data="filteredMonitors"
           :loading="loading"
+          :timezone="store.state.timezone"
           :footer-title="footerTitle"
           :empty-message="emptyMessage"
           :selected-ids="selectedMonitorIds"
@@ -108,6 +109,24 @@
           "
           @empty-action="onEmptyAction"
         >
+          <!-- Health strip: the status facet, attention-first (failing → degrading
+               → passing → unknown), with Total last. It replaces the status dropdown
+               that used to hide these same counts inside its option labels. -->
+          <template #subheader>
+            <div
+              class="px-page-edge border-table-row-divider border-b py-1.5"
+              data-test="synthetic-monitoring-summary"
+            >
+              <OStatStrip
+                :items="summaryStats"
+                :loading="loading"
+                selectable
+                :selected-key="statusFilter === 'all' ? null : statusFilter"
+                @select="onStatSelect"
+              />
+            </div>
+          </template>
+
           <!-- Toolbar content rendered inside OTable's toolbar bar -->
           <template #toolbar>
             <div class="flex min-w-0 flex-1 items-center gap-2">
@@ -168,8 +187,8 @@
                 </OInput>
               </div>
 
-              <!-- Status filter -->
-              <OSelect v-model="statusFilter" :options="statusOpts" size="md" class="w-35!" />
+              <!-- Status is faceted by the summary strip below, not by a dropdown -
+                   the counts belong on screen, not hidden inside option labels. -->
             </div>
           </template>
 
@@ -314,7 +333,6 @@ import { useStore } from "vuex";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
@@ -344,6 +362,8 @@ import {
 } from "@/types/synthetics";
 import { CHECK_TYPE_CARDS } from "@/constants/synthetics";
 import { useI18n } from "vue-i18n";
+import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
+import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import syntheticsService from "@/services/synthetics";
 import { locationDisplayLabel } from "@/utils/synthetics/format";
 import { getFoldersListByType } from "@/utils/commons";
@@ -424,6 +444,8 @@ function mapMonitor(m: ApiMonitor) {
     responseTime: m.last_response_ms !== null ? `${m.last_response_ms}ms` : null,
     locations: m.locations,
     lastCheck: m.last_check_at !== null ? formatTimeAgo(m.last_check_at) : "—",
+    // Raw microsecond epoch — drives the relative Last Check cell.
+    lastCheckAt: m.last_check_at,
     enabled: m.enabled,
     uptime: null as number | null,
     history: [] as unknown[],
@@ -797,39 +819,73 @@ const filteredStatusMonitors = computed(() =>
   ),
 );
 
-const statusTabs = computed(() => {
+// Attention-first order, matching every other strip in the app. Counts come from
+// `filteredStatusMonitors` (everything except the status facet itself), so the
+// tiles keep their totals while a status is selected.
+const summaryStats = computed<StatItem[]>(() => {
   const ms = filteredStatusMonitors.value;
-  const tabs = [
-    { filter: "all", label: t("synthetics.filters.allStatuses"), count: ms.length },
+  const total = ms.length;
+  const count = (status: string) => ms.filter((m) => m.status === status).length;
+  const v = (n: number): string | number => (total > 0 ? n : "—");
+  const share = total > 0 ? total : undefined;
+  const tiles: StatItem[] = [
     {
-      filter: "passed",
-      label: t("synthetics.filters.passed"),
-      count: ms.filter((m) => m.status === "passed").length,
-    },
-    {
-      filter: "warning",
-      label: t("synthetics.filters.warning"),
-      count: ms.filter((m) => m.status === "warning").length,
-    },
-    {
-      filter: "failed",
+      key: "failed",
       label: t("synthetics.filters.failed"),
-      count: ms.filter((m) => m.status === "failed").length,
+      value: v(count("failed")),
+      icon: "error-outline",
+      tone: "error",
+      max: share,
+      dataTest: "synthetics-summary-failed",
+    },
+    {
+      key: "warning",
+      label: t("synthetics.filters.warning"),
+      value: v(count("warning")),
+      icon: "warning-amber",
+      tone: "warning",
+      max: share,
+      dataTest: "synthetics-summary-warning",
+    },
+    {
+      key: "passed",
+      label: t("synthetics.filters.passed"),
+      value: v(count("passed")),
+      icon: "check-circle",
+      tone: "success",
+      max: share,
+      dataTest: "synthetics-summary-passed",
     },
   ];
-  const unknownCount = ms.filter((m) => m.status === "unknown").length;
-  if (unknownCount > 0) {
-    tabs.push({ filter: "unknown", label: t("synthetics.labels.unknown"), count: unknownCount });
+  // "Unknown" only means something once a monitor has never reported.
+  if (count("unknown") > 0) {
+    tiles.push({
+      key: "unknown",
+      label: t("synthetics.labels.unknown"),
+      value: v(count("unknown")),
+      icon: "help-outline",
+      tone: "neutral",
+      max: share,
+      dataTest: "synthetics-summary-unknown",
+    });
   }
-  return tabs;
+  tiles.push({
+    key: "all",
+    // "All", not "All Statuses": the tile sits in a row of statuses, so the noun is
+    // already established, and its job is simply "clear the facet".
+    label: t("synthetics.filters.all"),
+    value: v(total),
+    icon: "monitor-heart",
+    tone: "primary",
+    dataTest: "synthetics-summary-total",
+  });
+  return tiles;
 });
 
-const statusOpts = computed(() =>
-  statusTabs.value.map((s) => ({
-    label: `${s.label} (${s.count})`,
-    value: s.filter,
-  })),
-);
+// Selecting the active tile clears back to "all", like every other strip.
+const onStatSelect = (key: string) => {
+  statusFilter.value = key === "all" || statusFilter.value === key ? "all" : key;
+};
 
 const filteredMonitors = computed(() =>
   enrichedMonitors.value.filter(

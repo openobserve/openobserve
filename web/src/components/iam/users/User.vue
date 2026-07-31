@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTable
           :key="tableKey"
           :frame="false"
-          :data="rows"
+          :data="displayedRows"
           :columns="columns"
           row-key="email"
           :loading="loading"
@@ -62,6 +62,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           table-id="iam-users-list"
           @update:selected-ids="handleSelectedIdsUpdate"
         >
+          <!-- Access screens have no health state, so the strip counts ROLE
+               MEMBERSHIP and doubles as the role facet: the org's biggest roles
+               first, the tail folded into one tile, Total last and never
+               highlighted. Deliberately no green/amber/red — a role is a category,
+               not a severity. -->
+          <template #subheader>
+            <div
+              class="px-page-edge border-table-row-divider border-b py-1.5"
+              data-test="user-list-summary"
+            >
+              <OStatStrip
+                :items="summaryStats"
+                :loading="loading"
+                selectable
+                :selected-key="roleFilter"
+                @select="onStatSelect"
+              />
+            </div>
+          </template>
+
           <template #toolbar>
             <div class="flex w-full items-center gap-2">
               <OSearchInput
@@ -92,8 +112,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OEmptyState
               size="hero"
               preset="no-users"
-              :filtered="!!filterQuery"
-              @action="(id) => (id === 'clear-filters' ? (filterQuery = '') : addRoutePush({}))"
+              :filtered="!!(filterQuery || roleFilter)"
+              @action="
+                (id) =>
+                  id === 'clear-filters'
+                    ? ((filterQuery = ''), (roleFilter = null))
+                    : addRoutePush({})
+              "
             />
           </template>
 
@@ -103,16 +128,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span v-else class="text-text-body">—</span>
           </template>
 
-          <!-- Roles badges — typed userRole tags for built-in roles, custom
-               roles keep their original casing via an untyped tag. -->
+          <!-- Roles badges — built-in roles carry the privilege colour from the
+               userRole group; a custom role is a category, not a privilege level, so
+               it gets one stable neutral chip rather than an untyped tag whose
+               colour would be derived from the role's spelling. The invited chip
+               rides along here too: pending users are otherwise indistinguishable
+               on this path. -->
           <template #cell-roles="{ row }">
             <div class="flex flex-wrap items-center gap-1">
               <OTag
                 v-for="(roleName, idx) in row.roles || []"
                 :key="`${roleName}-${idx}`"
                 :type="isBuiltinRole(roleName) ? 'userRole' : undefined"
+                :variant="isBuiltinRole(roleName) ? undefined : 'default-soft'"
                 :value="roleName"
               />
+              <OTag v-if="row.status === 'pending'" type="userStatus" value="invited" />
             </div>
           </template>
 
@@ -252,6 +283,9 @@ import { defineComponent, ref, onActivated, onBeforeMount, watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
+import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
+import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -291,6 +325,7 @@ export default defineComponent({
     OButton,
     OTooltip,
     OTag,
+    OStatStrip,
     OIcon,
     ODialog,
     OEmptyState,
@@ -466,6 +501,188 @@ export default defineComponent({
       "serviceaccount",
     ]);
     const isBuiltinRole = (r: string) => BUILTIN_ROLES.has(String(r ?? "").toLowerCase());
+
+    // ── Role tiles — the page's primary signal ──────────────────────────────
+    // A user can hold SEVERAL roles (built-in + custom), so the strip counts role
+    // MEMBERSHIP, not buckets: one Admin+custom user is counted under both tiles.
+    // Tiles therefore do not sum to the user total — each is "how many users hold
+    // this role", and its bar is that share of all users, which stays meaningful
+    // under overlap. Roles come from the data, so custom roles appear as first-class
+    // tiles without being enumerated anywhere.
+    const PRIVILEGE_RANK: Record<string, number> = {
+      root: 5,
+      admin: 4,
+      editor: 3,
+      member: 3,
+      user: 2,
+      viewer: 2,
+      serviceaccount: 1,
+    };
+    // Roles are unbounded (an org can define dozens), and a strip is a fixed row of
+    // tiles — past this many the strip stops being scannable, so the tail collapses
+    // into one "Other roles" tile that still filters. Five leaves room for that
+    // tile plus Invited and Total without the strip wrapping on a laptop.
+    const MAX_ROLE_TILES = 5;
+
+    const userRoles = (row: any): string[] => {
+      const roles = Array.isArray(row?.roles) && row.roles.length ? row.roles : [row?.role];
+      const seen = new Set<string>();
+      // Dedupe per user: a role listed twice must not count twice.
+      return roles
+        .filter(Boolean)
+        .map((r: any) =>
+          String(r)
+            .replace(/\s*\(Invited\)\s*$/i, "")
+            .trim(),
+        )
+        .filter((r: string) => {
+          const key = r.toLowerCase();
+          if (!r || seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
+    };
+    const hasRole = (row: any, roleKey: string): boolean =>
+      userRoles(row).some((r) => r.toLowerCase() === roleKey);
+    const isInvited = (row: any): boolean => row?.status === "pending";
+
+    // role key -> { label (original casing), count of users holding it }
+    const roleTally = computed(() => {
+      const tally = new Map<string, { label: string; count: number }>();
+      for (const row of rows.value || []) {
+        for (const role of userRoles(row)) {
+          const key = role.toLowerCase();
+          const entry = tally.get(key);
+          if (entry) entry.count += 1;
+          else tally.set(key, { label: role, count: 1 });
+        }
+      }
+      return tally;
+    });
+
+    // BIGGEST roles first, so the tiles are the org's actual top roles rather than
+    // whichever ones happen to outrank the others: a two-user built-in must not
+    // take a slot from a role half the org holds. Privilege breaks ties (Admin
+    // before Viewer at equal size), then the name for stability.
+    const rankedRoles = computed(() => {
+      return Array.from(roleTally.value.entries())
+        .map(([key, entry]) => ({ key, ...entry, rank: PRIVILEGE_RANK[key] ?? 0 }))
+        .sort((a, b) => b.count - a.count || b.rank - a.rank || a.key.localeCompare(b.key));
+    });
+    const visibleRoles = computed(() => rankedRoles.value.slice(0, MAX_ROLE_TILES));
+    const overflowRoles = computed(() => rankedRoles.value.slice(MAX_ROLE_TILES));
+    // Unique users holding ANY overflow role — summing the tail would double-count
+    // anyone holding two of them.
+    const overflowUserCount = computed(() => {
+      const keys = new Set(overflowRoles.value.map((r) => r.key));
+      if (!keys.size) return 0;
+      return (rows.value || []).filter((row: any) =>
+        userRoles(row).some((r) => keys.has(r.toLowerCase())),
+      ).length;
+    });
+
+    // Built-in roles keep the privilege ramp; every custom role reads teal so it is
+    // visibly "not a built-in" without each one inventing its own colour.
+    const roleTone = (key: string): StatItem["tone"] => {
+      if (key === "root" || key === "admin") return "orange";
+      if (key === "editor" || key === "member") return "blue";
+      if (key === "user" || key === "viewer") return "neutral";
+      if (key === "serviceaccount") return "purple";
+      return "teal";
+    };
+    const roleIcon = (key: string): IconName => {
+      if (key === "root" || key === "admin") return "admin-panel-settings";
+      if (key === "editor" || key === "member") return "edit";
+      if (key === "user" || key === "viewer") return "visibility";
+      if (key === "serviceaccount") return "key";
+      return "manage-accounts";
+    };
+
+    // ── Role facet + summary strip ──────────────────────────────────────────
+    // Counts run over the full row set (not the facet-filtered one) so the tiles
+    // keep their totals while a facet is active.
+    const OVERFLOW_KEY = "__other_roles__";
+    const INVITED_KEY = "__invited__";
+    const roleFilter = ref<string | null>(null);
+
+    const displayedRows = computed(() => {
+      const all = rows.value || [];
+      const f = roleFilter.value;
+      if (!f) return all;
+      if (f === INVITED_KEY) return all.filter((row: any) => isInvited(row));
+      if (f === OVERFLOW_KEY) {
+        const keys = new Set(overflowRoles.value.map((r) => r.key));
+        return all.filter((row: any) => userRoles(row).some((r) => keys.has(r.toLowerCase())));
+      }
+      return all.filter((row: any) => hasRole(row, f));
+    });
+
+    const onStatSelect = (key: string) => {
+      if (key === "total") {
+        roleFilter.value = null;
+        return;
+      }
+      roleFilter.value = roleFilter.value === key ? null : key;
+    };
+
+    const invitedCount = computed(
+      () => (rows.value || []).filter((row: any) => isInvited(row)).length,
+    );
+
+    const summaryStats = computed<StatItem[]>(() => {
+      const total = (rows.value || []).length;
+      const hasData = total > 0;
+      const v = (n: number): string | number => (hasData ? n : "—");
+      const share = hasData ? total : undefined;
+
+      const tiles: StatItem[] = visibleRoles.value.map((role) => ({
+        key: role.key,
+        // The label is the role name itself — data, not a translatable string.
+        label: role.label,
+        value: v(role.count),
+        icon: roleIcon(role.key),
+        tone: roleTone(role.key),
+        max: share,
+        dataTest: `user-summary-role-${role.key}`,
+      }));
+
+      if (overflowRoles.value.length) {
+        tiles.push({
+          key: OVERFLOW_KEY,
+          label: t("iam.summaryOtherRoles", { count: overflowRoles.value.length }),
+          value: v(overflowUserCount.value),
+          icon: "more-horiz",
+          tone: "teal",
+          max: share,
+          dataTest: "user-summary-other-roles",
+        });
+      }
+
+      // Invited is a lifecycle state, not a privilege, so it sits after the roles.
+      if (invitedCount.value > 0) {
+        tiles.push({
+          key: INVITED_KEY,
+          label: t("iam.summaryInvited"),
+          value: v(invitedCount.value),
+          icon: "person-add",
+          tone: "purple",
+          max: share,
+          dataTest: "user-summary-invited",
+        });
+      }
+
+      tiles.push({
+        key: "total",
+        label: t("iam.summaryTotalUsers"),
+        value: v(total),
+        icon: "group-work",
+        tone: "primary",
+        // Clickable (it clears the facet) but never shows the ring.
+        dataTest: "user-summary-total",
+      });
+      return tiles;
+    });
+
     const userEmail: any = ref("");
     const options = ref<{ label: string; value: string }[]>([]);
     const customRoles = ref<string[]>([]);
@@ -1235,20 +1452,13 @@ export default defineComponent({
       openBulkDeleteDialog,
       bulkDeleteUsers,
       rows,
+      displayedRows,
+      roleFilter,
+      onStatSelect,
+      summaryStats,
       tableKey,
       // showAddUserBtn,
     };
   },
 });
 </script>
-
-<style scoped>
-/* keep(lib-override): compact role chip styling (child OTag DOM) */
-:deep(.o2-role-chip) {
-  padding: 0.125rem 0.5rem;
-  font-size: var(--text-2xs);
-  font-weight: 600;
-  border-radius: 0.375rem;
-  line-height: 1.4;
-}
-</style>

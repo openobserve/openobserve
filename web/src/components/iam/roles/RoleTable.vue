@@ -1,8 +1,9 @@
 ﻿<!-- Copyright 2026 OpenObserve Inc. -->
 
 <script setup lang="ts">
+import { computed } from "vue";
 import OTable from "@/lib/core/Table/OTable.vue";
-import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -11,7 +12,7 @@ import { useI18n } from "vue-i18n";
 
 const { t } = useI18n();
 
-defineProps<{
+const props = defineProps<{
   data: any[];
   loading?: boolean;
   actionLoading?: boolean;
@@ -36,15 +37,37 @@ const onEmptyStateAction = (id?: string) => {
   if (id === "create") emit("create");
 };
 
-const columns: OTableColumnDef[] = [
-  {
-    id: "role_name",
-    header: t("iam.roleName"),
-    accessorKey: "role_name",
-    sortable: true,
-    meta: { align: "left", autoWidth: true, isName: true },
-  },
-  {
+// The Users column only exists when the caller could resolve member counts (the
+// batched user→roles map is enterprise-only) — an all-dash column would be noise.
+const hasUserCounts = computed(() =>
+  (props.data ?? []).some((row: any) => typeof row?.user_count === "number"),
+);
+
+const columns = computed<OTableColumnDef[]>(() => {
+  const cols: OTableColumnDef[] = [
+    {
+      id: "role_name",
+      header: t("iam.roleName"),
+      accessorKey: "role_name",
+      sortable: true,
+      meta: { align: "left", autoWidth: true, isName: true },
+    },
+  ];
+
+  if (hasUserCounts.value) {
+    cols.push({
+      id: "user_count",
+      header: t("iam.roleUsers"),
+      accessorKey: "user_count",
+      sortable: true,
+      resizable: true,
+      hideable: true,
+      size: COL.count,
+      meta: { align: "right" },
+    });
+  }
+
+  cols.push({
     id: "actions",
     header: t("common.actions"),
     isAction: true,
@@ -53,8 +76,15 @@ const columns: OTableColumnDef[] = [
     minSize: 64,
     maxSize: 100,
     meta: { align: "center", actionCount: 2 },
-  },
-];
+  });
+
+  return cols;
+});
+
+// A role nobody holds reads muted in the Users column — a cleanup candidate, not a
+// fault. No summary strip: the count is already in the footer and "unused" is just
+// this column sorted ascending, so a strip would restate what the rows already say.
+const isUnusedRole = (row: any): boolean => row?.user_count === 0;
 </script>
 
 <template>
@@ -89,6 +119,16 @@ const columns: OTableColumnDef[] = [
           @update:model-value="emit('update:globalFilter', $event)"
         />
       </div>
+    </template>
+
+    <!-- Members: a role with nobody in it is muted, not coloured — it is a cleanup
+         candidate, not an error. -->
+    <template #cell-user_count="{ row }">
+      <span
+        class="tabular-nums"
+        :class="isUnusedRole(row) ? 'text-text-muted' : 'text-text-body'"
+        >{{ typeof row.user_count === "number" ? row.user_count : "—" }}</span
+      >
     </template>
     <template #toolbar-trailing>
       <slot name="toolbar-trailing" />

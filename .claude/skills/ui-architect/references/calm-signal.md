@@ -54,8 +54,30 @@ All token-backed and dark-mode-safe. Reuse these before inventing anything.
   colour everywhere. Need a new family? Add a group there, don't hand-roll a pill.
 - **Row state signal** — an extreme-left colour **rail** via `OTable`'s
   per-row `getRowStyle` (inset box-shadow, rem width, token colour) + a **light
-  exception highlight** via `row-class` (tint only the rows that need action —
-  never the normal ones).
+  exception highlight** via `row-class`. The rail and the wash are two different
+  strengths of the same signal, and the rail is the default:
+
+  | | Rail (`getRowStyle`) | Wash (`row-class`) |
+  | --- | --- | --- |
+  | Cost | a few px at the row edge | ~the whole row |
+  | Use for | **every** state, always | only the two cases below |
+
+  A full-row wash is the loudest thing on a list, so it earns its place only when
+  **all three** hold: the state means **act now** (not merely "not green"), it is
+  **rare in a healthy system**, and **the row is the unit of action**. In practice
+  that leaves exactly two washes:
+  - `!bg-status-error-bg` — failing/errored/offline. *Alerts* failed, *Pipelines*
+    errored, *Nodes* offline, *Synthetics* failed.
+  - `!bg-surface-panel` — paused/disabled. This one is **de-emphasis, not alarm**:
+    the row is deliberately inert, so it recedes rather than shouts.
+
+  Everything else keeps a clean row and reads from the rail — including states
+  that are "bad but not urgent": **degraded/warning** (worth noticing, not worth
+  acting on this second), **stale**, **unknown**, **never-ran**. And whatever the
+  state means, if it is **common** the wash is wrong regardless: *Streams* drops it
+  entirely, because "never ingested" and "quiet for a day" describe a large share
+  of rows in a normal org and a table where most rows are tinted signals nothing.
+  Pages with no failure state at all — Users, Roles, Dashboards — never wash.
 - **Recency** — `OTimeCell` `mode="relative"` (`"3 min ago"`) with a hot/warm/
   cold dot, instead of a raw timestamp column.
 - **People** — `OUserCell` for owner/author columns.
@@ -101,6 +123,24 @@ strip feeds a drill-down.
 
 Colour only earns attention if most of the screen stays quiet:
 
+- **Earn every tile — a strip is not a page decoration.** Before adding one, put
+  each tile to three questions: does the number **vary**, does someone **act** on
+  it, and is it **not already on screen**? Tiles that fail are noise dressed as
+  signal:
+  - *structurally constant* — "System accounts" is 1 in almost every org, so the
+    tile is a label with a number stuck to it;
+  - *almost always zero* — "New this week" on a list that gains an item a quarter;
+  - *derivable from its neighbours* — "In use" beside "Unused" and "Total";
+  - *already in the footer* — `footerTitle` renders "N Dashboards" under every
+    table, so a Total tile alone is not a reason to have a strip.
+  A page whose only candidates fail these gets **no strip** — keep the per-row
+  signals (relative recency, a state rail, a count column) and stop. Dashboards,
+  Service Accounts and Roles all ended up here: pages where a strip added pixels
+  and no information. Roles is the clearest case — "Unused" is just the member
+  column sorted ascending, so two tiles restated what the rows already said. **A
+  count column plus sorting usually beats a strip**; reach for a strip only when
+  the page has a real distribution to summarise (Users across roles, monitors
+  across health) *and* the tiles double as the facet.
 - **Highlight exceptions, not the norm.** Tint the failed/paused rows; leave the
   healthy majority clean. A table where every row is coloured signals nothing.
 - **Muted zero.** A `0` renders muted, not in the loud tone colour, and "no
