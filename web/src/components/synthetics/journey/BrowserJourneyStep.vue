@@ -3,16 +3,8 @@
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { copyToClipboard } from "@/utils/clipboard";
-import type { BrowserStep, SelectorType, StepReplayResult, WireStep } from "@/types/synthetics";
-import {
-  ACTION_ICONS,
-  ACTION_LABELS,
-  SELECTOR_ACTIONS,
-  VALUE_ACTIONS,
-  VALUE_LABELS,
-  SELECTOR_TYPE_OPTIONS,
-  actionOptions,
-} from "@/constants/synthetics";
+import type { BrowserStep, StepReplayResult } from "@/types/synthetics";
+import { ACTION_ICONS, ACTION_LABELS } from "@/constants/synthetics";
 
 /**
  * Replay status dot states.
@@ -21,12 +13,11 @@ import {
  */
 export type StepDotState = "pending" | "active" | "pass" | "fail" | "skip";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
-import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import BrowserJourneyStepEditor from "./BrowserJourneyStepEditor.vue";
 
 const { t } = useI18n();
 
@@ -55,64 +46,20 @@ const emit = defineEmits<{
 }>();
 
 // ── Computed from shared constants ──────────────────────────────────
-const selectorTypeOptions = SELECTOR_TYPE_OPTIONS;
 const actionIcon = computed(() => ACTION_ICONS[props.step.action]);
 const actionLabel = computed(() => ACTION_LABELS[props.step.action]);
 const displayName = computed(() => props.step.name || actionLabel.value);
-const selectorPreview = computed(() => props.step.selector || props.step.value || "");
-const showSelector = computed(() => SELECTOR_ACTIONS.includes(props.step.action));
-const showValue = computed(() => VALUE_ACTIONS.includes(props.step.action));
-const valueLabel = computed(
-  () => VALUE_LABELS[props.step.action] || t("synthetics.journey.valueFallback"),
-);
-
-function update(patch: Partial<BrowserStep>) {
-  // Patch edited fields into wire instead of clearing it, so replay still has
-  // the original extension metadata (framePath, pageAlias, position, snapshot).
-  // Action changes clear wire since the step type fundamentally changed.
-  let wire = props.step.wire ? { ...props.step.wire } : undefined;
-  if (wire) {
-    if (patch.name !== undefined) wire.name = patch.name;
-    if (patch.selector !== undefined) wire.selector = patch.selector;
-    if (patch.selectorType !== undefined)
-      wire.selector_type = patch.selectorType.toLowerCase() as WireStep["selector_type"];
-    if (patch.value !== undefined) wire.value = patch.value;
-    if (patch.timeout !== undefined) wire.timeout_ms = patch.timeout;
-    if (patch.action !== undefined) wire = undefined; // action changed — wire metadata is no longer accurate
-  }
-  emit("update:step", { ...props.step, wire, ...patch });
-}
-
-// Computed getters/setters for inline editor fields
-const actionComputed = computed({
-  get: () => props.step.action,
-  set: (v: BrowserStep["action"]) => update({ action: v }),
-});
-
-const nameComputed = computed({
-  get: () => props.step.name ?? "",
-  set: (v: string) => update({ name: v }),
-});
-
-const selectorTypeComputed = computed({
-  get: () => props.step.selectorType ?? "CSS",
-  set: (v: string | number | boolean | null | undefined) =>
-    update({ selectorType: (v as SelectorType) ?? undefined }),
-});
-
-const selectorComputed = computed({
-  get: () => props.step.selector ?? "",
-  set: (v: string) => update({ selector: v }),
-});
-
-const valueComputed = computed({
-  get: () => props.step.value ?? "",
-  set: (v: string) => update({ value: v }),
-});
-
-const timeoutComputed = computed({
-  get: () => String(props.step.timeout ?? ""),
-  set: (v: string) => update({ timeout: v ? Number(v) : undefined }),
+/**
+ * What the collapsed row shows on the right.
+ *
+ * A version-2 step has no bare `selector` — its identity is the locator bundle —
+ * so reading `selector` alone would leave every recorded step's row blank. The
+ * pin wins when there is one, because that is what the run will actually use.
+ */
+const selectorPreview = computed(() => {
+  const locator = props.step.locator;
+  const effective = locator?.user_override ?? locator?.candidates?.[0];
+  return effective?.value || props.step.selector || props.step.value || "";
 });
 
 // ── Status dot visual mapping (combines with step number during replay) ─────
@@ -406,62 +353,13 @@ function toggleExpanded() {
       </div>
     </div>
 
-    <!-- Inline editor (expanded) -->
-    <div v-if="expanded" class="flex w-32! flex-col gap-3 px-8 pt-3 pb-3">
-      <!-- Action select -->
-      <OSelect
-        v-model="actionComputed"
-        :label="t('synthetics.journey.actionLabel')"
-        :options="actionOptions"
-        class="w-[25rem]!"
-        data-test="synthetics-journey-step-action-select"
-      />
-
-      <!-- Step name -->
-      <OInput
-        v-model="nameComputed"
-        :label="t('synthetics.journey.stepNameOptional')"
-        :placeholder="t('synthetics.journey.stepNamePlaceholder')"
-        data-test="synthetics-journey-step-name-input"
-      />
-
-      <!-- Selector type + selector (when applicable) -->
-      <template v-if="showSelector">
-        <div class="flex gap-2">
-          <OSelect
-            v-model="selectorTypeComputed"
-            :label="t('synthetics.journey.selectorTypeLabel')"
-            :options="selectorTypeOptions"
-            class="w-[25rem]! shrink-0"
-            data-test="synthetics-journey-step-selector-type-select"
-          />
-          <OInput
-            v-model="selectorComputed"
-            :label="t('synthetics.journey.selectorLabel')"
-            placeholder="#my-button or .class-name"
-            class="flex-1"
-            data-test="synthetics-journey-step-selector-input"
-          />
-        </div>
-      </template>
-
-      <!-- Value (action-specific label) -->
-      <OInput
-        v-if="showValue"
-        v-model="valueComputed"
-        :label="valueLabel"
-        :placeholder="valueLabel"
-        data-test="synthetics-journey-step-value-input"
-      />
-
-      <!-- Timeout -->
-      <OInput
-        v-model="timeoutComputed"
-        :label="t('synthetics.journey.timeoutLabel')"
-        :placeholder="t('synthetics.journey.timeoutPlaceholder')"
-        type="number"
-        data-test="synthetics-journey-step-timeout-input"
-      />
-    </div>
+    <!-- Inline editor (expanded) — same component the edit view renders, so
+         both surfaces always offer the same fields -->
+    <BrowserJourneyStepEditor
+      v-if="expanded"
+      class="px-8 pt-3 pb-3"
+      :step="step"
+      @update:step="emit('update:step', $event)"
+    />
   </div>
 </template>
