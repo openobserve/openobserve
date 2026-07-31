@@ -72,7 +72,6 @@ use crate::common::meta::{
         (status = 200, description = "Success", content_type = "application/json", body = inline(OrganizationResponse)),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Organizations", "operation": "list"})),
         ("x-o2-mcp" = json!({"description": "Get user organizations", "category": "users"}))
     )
 )]
