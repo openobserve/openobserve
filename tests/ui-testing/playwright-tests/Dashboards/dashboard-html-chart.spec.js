@@ -8,7 +8,6 @@ import logData from "../../fixtures/log.json";
 import { ingestion } from "./utils/dashIngestion.js";
 import PageManager from "../../pages/page-manager";
 import { waitForDashboardPage, deleteDashboard } from "./utils/dashCreation.js";
-import { waitForValuesStreamComplete } from "../utils/streaming-helpers.js";
 // Each test runs in parallel (mode: "parallel" below), so the name must be
 // generated fresh per test — a single shared name caused cross-test races
 // where one test's create/delete collided with another's mid-flight.
@@ -144,16 +143,12 @@ test.describe("HTML chart dashboard", () => {
       pm.chartTypeSelector.getHtmlHeading("Openobserve")
     ).toBeVisible();
 
-    // Wait for values stream API to complete before selecting variable value
-    const valuesStreamPromise = waitForValuesStreamComplete(page);
-
+    // selectValueFromVariableDropDown itself waits for the /_values_stream
+    // response (see dashboard-variables.js) before checking the option.
     await pm.dashboardVariables.selectValueFromVariableDropDown(
       "variablename",
       "controller"
     );
-
-    // Wait for the API call to complete
-    await valuesStreamPromise;
 
     await expect(
       pm.chartTypeSelector.getHtmlRendererText("controller")
