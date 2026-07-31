@@ -184,7 +184,6 @@ describe("SyntaxGuide.vue", () => {
     wrapper = createWrapper({ sqlmode: true });
     const button = wrapper.findComponent({ name: "OButton" });
     const dropdown = wrapper.findComponent({ name: "ODropdown" });
-    // QTooltip is replaced by OTooltip in the migration.
     const tooltip = wrapper.findComponent({ name: "OTooltip" });
 
     expect(button.exists()).toBe(true);
@@ -208,7 +207,6 @@ describe("SyntaxGuide.vue", () => {
   // Test 19: Tooltip exists and uses translation key
   it("should have tooltip with translation", () => {
     wrapper = createWrapper();
-    // QTooltip was replaced by OTooltip in the migration.
     const tooltip = wrapper.findComponent({ name: "OTooltip" });
     expect(tooltip.exists()).toBe(true);
     // Tooltip should use the translation function

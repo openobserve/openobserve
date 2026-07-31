@@ -27,6 +27,7 @@ use {
 
 use crate::common::meta::user::{UserOrgRole, UserRequest};
 
+mod alert_group_reaper;
 #[cfg(feature = "enterprise")]
 pub mod alert_grouping;
 mod alert_manager;
@@ -51,6 +52,7 @@ mod promql_self_consume;
 #[cfg(feature = "enterprise")]
 mod service_graph;
 mod session_cleanup;
+mod slo_maintenance;
 mod stats;
 
 use enrichment_data::enrichment_table::geoip::wait_for_initialization;
@@ -909,7 +911,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
             |org_id, anomaly_id, anomaly_name, success, error_msg, start_us, end_us| {
                 Box::pin(async move {
                     use config::meta::self_reporting::usage::{
-                        TriggerData, TriggerDataStatus, TriggerDataType,
+                        RunOutcome, TriggerData, TriggerDataType,
                     };
                     usage_reporting::publish_triggers_usage(TriggerData {
                         _timestamp: start_us,
@@ -920,9 +922,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
                         is_realtime: false,
                         is_silenced: false,
                         status: if success {
-                            TriggerDataStatus::Completed
+                            RunOutcome::Succeeded
                         } else {
-                            TriggerDataStatus::Failed
+                            RunOutcome::Error
                         },
                         start_time: start_us,
                         end_time: end_us,
@@ -1061,6 +1063,15 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(pipeline::run());
     pipeline_error_cleanup::run();
     session_cleanup::run();
+    // Multi-alert group lifecycle (M-7): retires groups the evaluation path
+    // can never retire on its own, because a vanished group produces no
+    // observation to act on.
+    alert_group_reaper::run();
+    // Reconciliation is what makes the rolling window actually roll: the
+    // ingest pass only ever ADDS, so without this a 7-day SLO's covered_slices
+    // climbs past what its window can hold. Also releases expired budget
+    // residuals (S-14c).
+    slo_maintenance::run();
 
     if LOCAL_NODE.is_compactor() {
         tokio::task::spawn(file_list_dump::run());

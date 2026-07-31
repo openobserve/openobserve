@@ -158,7 +158,7 @@ const ODialogStub = {
 };
 
 const defaultStubs = {
-  QTablePagination: true,
+  Pagination: true,
   SchemaIndex: true,
   NoData: true,
   AddStream: true,

@@ -1306,8 +1306,8 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     // signal. Reading earlier counted zero of everything on the dashboard page
     // that was still on screen.
     const panelNameInput = builder.getPanelNameInput();
-    await expect(panelNameInput).toHaveValue(new RegExp(panelTitle), { timeout: 15000 });
-    testLogger.info(`Panel name: ${await panelNameInput.inputValue()}`);
+    await expect(panelNameInput).toHaveText(new RegExp(panelTitle), { timeout: 15000 });
+    testLogger.info(`Panel name: ${await panelNameInput.textContent()}`);
 
     // Verify builder mode is active (PromQL + Builder tabs)
     // OToggleGroupItem uses data-state="on" (Reka UI) rather than a "selected" CSS class

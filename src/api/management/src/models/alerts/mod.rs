@@ -27,6 +27,33 @@ use serde_json::Value as JsonValue;
 use svix_ksuid::Ksuid;
 use utoipa::ToSchema;
 
+/// Deserialize an optional float that has to survive a `#[serde(flatten)]`.
+///
+/// `serde_json` is built workspace-wide with `arbitrary_precision` (root
+/// `Cargo.toml`), which represents a non-integer number as a magic one-key
+/// map rather than visiting `f64`. `CreateAlertRequestBody`/`UpdateAlert...`
+/// flatten the whole `Alert`, and `flatten` makes serde buffer the body
+/// through its `Content` type first — at which point that map can no longer
+/// be visited as an `f64`. A plain `Option<f64>` field therefore rejects
+/// `99.5` with "invalid type: map, expected f64" while quietly accepting
+/// `99`, so a fractional warning threshold is unreachable over the API.
+///
+/// Routing through `serde_json::Number` reads both the buffered map and a
+/// direct number, and still rejects strings and non-numeric values.
+fn de_opt_f64<'de, D>(deserializer: D) -> Result<Option<f64>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let parsed = Option::<serde_json::Number>::deserialize(deserializer)?;
+    parsed
+        .map(|n| {
+            n.as_f64().ok_or_else(|| {
+                serde::de::Error::custom(format!("`{n}` is not representable as a number"))
+            })
+        })
+        .transpose()
+}
+
 /// Alert configuration for monitoring streams and triggering notifications.
 ///
 /// An alert watches a stream (logs, metrics, or traces) using SQL or PromQL queries,
@@ -145,6 +172,24 @@ pub struct Alert {
     #[serde(default)]
     #[schema(example = json!(["abcde12345"]))]
     pub workflows: Vec<String>,
+
+    /// Priority 1..=5 (P1 = most urgent), Feature 2 / PT-1.
+    ///
+    /// Mutable configuration; display + propagation only — it does not affect
+    /// when the alert fires. Omitted = unset.
+    ///
+    /// `value_type` is required because the enum serializes as an integer via
+    /// serde `try_from`/`into`; without it the OpenAPI schema would advertise a
+    /// string enum and lie about the payload.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<u8>, example = 3)]
+    pub priority: Option<config::meta::alerts::priority::AlertPriority>,
+
+    /// Selection tags (PT-6): `prod`, `service:checkout`. Normalized and
+    /// validated on save; omitted when empty.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[schema(example = json!(["prod", "service:checkout"]))]
+    pub tags: Vec<String>,
 }
 
 /// Configuration for when and how an alert should be triggered.
@@ -176,6 +221,23 @@ pub struct TriggerCondition {
     #[serde(default)]
     #[schema(example = 100)]
     pub threshold_count: i64,
+
+    /// Optional WARNING threshold, sharing `operator` with `threshold` — one
+    /// operator for both levels, no mixed directions. Omitted = single-level
+    /// alert, i.e. exactly the current behaviour. Must be strictly less severe than `threshold` —
+    /// "less severe" is operator-dependent, so `>` requires a smaller value and
+    /// `<` a larger one; `=`/`!=`/`contains` reject it outright.
+    #[serde(rename = "warning_threshold", skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
+    #[schema(example = 50)]
+    pub warning_threshold_count: Option<i64>,
+
+    /// Whether a Warning-level match sends a notification. Defaults to true —
+    /// opting out is explicit. Set false for "page me only on critical" —
+    /// warnings still update state, history and the UI.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(example = true)]
+    pub notify_on_warning: Option<bool>,
 
     /// How often (in minutes) to run the alert query. Used with frequency_type="minutes".
     #[serde(rename = "frequency")]
@@ -293,6 +355,28 @@ pub struct QueryCondition {
 
     /// Condition to apply to PromQL results. Required with type="promql".
     pub promql_condition: Option<Condition>,
+    /// Optional WARNING value for the PromQL condition, sharing
+    /// `promql_condition.operator` with critical. Omitted = single-level.
+    // Lenient: reached through CreateAlertRequestBody's `#[serde(flatten)]`,
+    // which buffers via `Value`, where `arbitrary_precision` makes a number a
+    // map. Without this a FRACTIONAL warning is rejected while an integer one
+    // is accepted. Both branches found this independently; `de_opt_f64` is the
+    // local helper and `config::meta::slo::lenient_f64` the shared one used
+    // where this helper is not reachable.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "de_opt_f64"
+    )]
+    #[schema(example = 300.0)]
+    pub promql_warning_value: Option<f64>,
+
+    /// Evaluate and page per SERIES rather than collapsing the query to one
+    /// verdict (M-9). PromQL's counterpart to `aggregation.multi_alert`; the
+    /// group key is the series' full label set, chosen by the expression's own
+    /// `by (…)` clause.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub promql_multi_alert: bool,
 
     /// Aggregation configuration for "custom" query type.
     pub aggregation: Option<Aggregation>,
@@ -308,13 +392,40 @@ pub struct QueryCondition {
     /// Historical comparison periods for anomaly detection.
     #[serde(default)]
     pub multi_time_range: Option<Vec<CompareHistoricData>>,
+
+    /// SLO condition. Required with type="slo" (Feature 5, D42).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<Object>)]
+    pub slo_condition: Option<config::meta::slo::condition::SloCondition>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema, PartialEq)]
 pub struct Aggregation {
     pub group_by: Option<Vec<String>>,
     pub function: AggFunction,
+    /// CRITICAL threshold for the aggregate value.
     pub having: Condition,
+    /// Optional WARNING threshold, sharing `having.operator` and
+    /// `having.column` with critical. Omitted = single-level aggregation
+    /// alert. Must be strictly less severe than `having.value` — direction
+    /// depends on the operator.
+    // Same lenient deserialization as `promql_warning_value`, same reason.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "de_opt_f64"
+    )]
+    #[schema(example = 50.0)]
+    pub warning_value: Option<f64>,
+    /// Opt in to per-group evaluation (multi-alerts): each group gets its own
+    /// level, state row and notifications. Omitted = `false` = the alert
+    /// evaluates as a single collapsed result, exactly as before.
+    ///
+    /// Requires a non-empty `group_by`, an orderable `having.operator`, and
+    /// "any group" count thresholds — see `alerts_2.md` M-9/M-10.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    #[schema(example = false)]
+    pub multi_alert: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, ToSchema)]
@@ -352,6 +463,10 @@ pub enum QueryType {
     SQL,
     #[serde(rename = "promql")]
     PromQL,
+    /// Feature 5 (D28). An SLO alert reads precomputed SLO status rather than
+    /// running a query.
+    #[serde(rename = "slo")]
+    Slo,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
@@ -449,6 +564,8 @@ impl From<(meta_alerts::alert::Alert, Option<Trigger>)> for Alert {
             deduplication: alert.deduplication,
             creates_incident: alert.creates_incident,
             workflows: alert.workflows,
+            priority: alert.priority,
+            tags: alert.tags,
         }
     }
 }
@@ -459,6 +576,8 @@ impl From<meta_alerts::TriggerCondition> for TriggerCondition {
             period_minutes: value.period,
             operator: value.operator.into(),
             threshold_count: value.threshold,
+            warning_threshold_count: value.warning_threshold,
+            notify_on_warning: value.notify_on_warning,
             frequency_minutes: value.frequency / 60,
             cron: value.cron,
             frequency_type: value.frequency_type.into(),
@@ -496,12 +615,15 @@ impl From<meta_alerts::QueryCondition> for QueryCondition {
             sql: value.sql,
             promql: value.promql,
             promql_condition: value.promql_condition.map(|pc| pc.into()),
+            promql_warning_value: value.promql_warning_value,
+            promql_multi_alert: value.promql_multi_alert,
             aggregation: value.aggregation.map(|a| a.into()),
             vrl_function: value.vrl_function,
             search_event_type: value.search_event_type.map(|t| t.into()),
             multi_time_range: value
                 .multi_time_range
                 .map(|cs| cs.into_iter().map(|c| c.into()).collect()),
+            slo_condition: value.slo_condition,
         }
     }
 }
@@ -512,6 +634,8 @@ impl From<meta_alerts::Aggregation> for Aggregation {
             group_by: value.group_by,
             function: value.function.into(),
             having: value.having.into(),
+            warning_value: value.warning_value,
+            multi_alert: value.multi_alert,
         }
     }
 }
@@ -540,6 +664,7 @@ impl From<meta_alerts::QueryType> for QueryType {
             meta_alerts::QueryType::Custom => Self::Custom,
             meta_alerts::QueryType::SQL => Self::SQL,
             meta_alerts::QueryType::PromQL => Self::PromQL,
+            meta_alerts::QueryType::Slo => Self::Slo,
         }
     }
 }
@@ -631,6 +756,8 @@ impl From<Alert> for meta_alerts::alert::Alert {
         alert.deduplication = value.deduplication;
         alert.creates_incident = value.creates_incident;
         alert.workflows = value.workflows;
+        alert.priority = value.priority;
+        alert.tags = value.tags;
 
         alert
     }
@@ -643,6 +770,8 @@ impl From<TriggerCondition> for meta_alerts::TriggerCondition {
             period: value.period_minutes,
             operator: value.operator.into(),
             threshold: value.threshold_count,
+            warning_threshold: value.warning_threshold_count,
+            notify_on_warning: value.notify_on_warning,
             frequency: value.frequency_minutes * 60,
             cron: value.cron,
             frequency_type: value.frequency_type.into(),
@@ -679,12 +808,15 @@ impl From<QueryCondition> for meta_alerts::QueryCondition {
             sql: value.sql,
             promql: value.promql,
             promql_condition: value.promql_condition.map(|pc| pc.into()),
+            promql_warning_value: value.promql_warning_value,
+            promql_multi_alert: value.promql_multi_alert,
             aggregation: value.aggregation.map(|a| a.into()),
             vrl_function: value.vrl_function,
             search_event_type: value.search_event_type.map(|t| t.into()),
             multi_time_range: value
                 .multi_time_range
                 .map(|cs| cs.into_iter().map(|c| c.into()).collect()),
+            slo_condition: value.slo_condition,
         }
     }
 }
@@ -695,6 +827,8 @@ impl From<Aggregation> for meta_alerts::Aggregation {
             group_by: value.group_by,
             function: value.function.into(),
             having: value.having.into(),
+            warning_value: value.warning_value,
+            multi_alert: value.multi_alert,
         }
     }
 }
@@ -723,6 +857,7 @@ impl From<QueryType> for meta_alerts::QueryType {
             QueryType::Custom => Self::Custom,
             QueryType::SQL => Self::SQL,
             QueryType::PromQL => Self::PromQL,
+            QueryType::Slo => Self::Slo,
         }
     }
 }
@@ -1186,6 +1321,8 @@ mod tests {
     #[test]
     fn test_trigger_condition_from_meta_converts_frequency_to_minutes() {
         let meta = meta_alerts::TriggerCondition {
+            warning_threshold: None,
+            notify_on_warning: None,
             period: 15,
             operator: meta_alerts::Operator::GreaterThan,
             threshold: 5,
@@ -1211,6 +1348,8 @@ mod tests {
     #[test]
     fn test_trigger_condition_to_meta_converts_frequency_to_seconds() {
         let tc = TriggerCondition {
+            warning_threshold_count: None,
+            notify_on_warning: None,
             period_minutes: 10,
             operator: Operator::LessThan,
             threshold_count: 3,
@@ -1236,6 +1375,8 @@ mod tests {
     #[test]
     fn test_aggregation_from_meta() {
         let meta = meta_alerts::Aggregation {
+            warning_value: None,
+            multi_alert: false,
             group_by: Some(vec!["service".to_string(), "region".to_string()]),
             function: meta_alerts::AggFunction::Count,
             having: meta_alerts::Condition {
@@ -1257,6 +1398,8 @@ mod tests {
     #[test]
     fn test_aggregation_to_meta() {
         let agg = Aggregation {
+            warning_value: None,
+            multi_alert: false,
             group_by: None,
             function: AggFunction::Avg,
             having: Condition {
@@ -1280,16 +1423,78 @@ mod tests {
             sql: Some("SELECT count(*) FROM logs".to_string()),
             promql: None,
             promql_condition: None,
+            promql_warning_value: None,
+            promql_multi_alert: false,
             aggregation: None,
             vrl_function: None,
             search_event_type: None,
             multi_time_range: None,
+            slo_condition: None,
         };
         let qc = QueryCondition::from(meta);
         assert!(matches!(qc.query_type, QueryType::SQL));
         assert_eq!(qc.sql, Some("SELECT count(*) FROM logs".to_string()));
         assert!(qc.conditions.is_none());
         assert!(qc.aggregation.is_none());
+    }
+
+    /// The API model is the only path a client can set this flag through, so
+    /// a conversion that silently dropped it would make the whole feature
+    /// unreachable over HTTP while every layer below it still worked.
+    #[test]
+    fn test_promql_multi_alert_survives_the_round_trip_through_the_api_model() {
+        let qc = QueryCondition {
+            query_type: QueryType::PromQL,
+            conditions: None,
+            sql: None,
+            promql: Some("sum by (pod) (rate(errors[5m]))".to_string()),
+            promql_condition: None,
+            promql_warning_value: None,
+            promql_multi_alert: true,
+            aggregation: None,
+            vrl_function: None,
+            search_event_type: None,
+            multi_time_range: None,
+            slo_condition: None,
+        };
+        let meta = meta_alerts::QueryCondition::from(qc);
+        assert!(meta.promql_multi_alert);
+        assert!(meta.multi_alert_enabled());
+
+        // ...and back out again, for the GET that renders the edit form.
+        let back = QueryCondition::from(meta);
+        assert!(back.promql_multi_alert);
+    }
+
+    #[test]
+    fn test_promql_multi_alert_defaults_off_through_the_api_model() {
+        let meta = meta_alerts::QueryCondition {
+            query_type: meta_alerts::QueryType::PromQL,
+            conditions: None,
+            sql: None,
+            promql: Some("up == 0".to_string()),
+            promql_condition: None,
+            promql_warning_value: None,
+            promql_multi_alert: false,
+            aggregation: None,
+            vrl_function: None,
+            search_event_type: None,
+            multi_time_range: None,
+            slo_condition: None,
+        };
+        assert!(!QueryCondition::from(meta).promql_multi_alert);
+    }
+
+    /// A request body that never mentions the field must parse, and parse as
+    /// off — that is every PromQL alert any existing client sends.
+    #[test]
+    fn test_an_api_payload_without_the_field_parses_as_off() {
+        let body = serde_json::json!({
+            "type": "promql",
+            "promql": "up == 0",
+        });
+        let qc: QueryCondition = serde_json::from_value(body).expect("deserializable");
+        assert!(!qc.promql_multi_alert);
     }
 
     #[test]
@@ -1300,10 +1505,13 @@ mod tests {
             sql: Some("SELECT count(*) FROM logs".to_string()),
             promql: None,
             promql_condition: None,
+            promql_warning_value: None,
+            promql_multi_alert: false,
             aggregation: None,
             vrl_function: Some("fn".to_string()),
             search_event_type: None,
             multi_time_range: None,
+            slo_condition: None,
         };
         let meta = meta_alerts::QueryCondition::from(qc);
         assert!(matches!(meta.query_type, meta_alerts::QueryType::SQL));

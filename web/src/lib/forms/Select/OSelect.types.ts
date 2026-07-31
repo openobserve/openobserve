@@ -29,6 +29,21 @@ export const NULL_VALUE_SENTINEL = "__o2__null__";
 
 export type SelectSize = "sm" | "md";
 
+/**
+ * Trigger chrome.
+ *
+ * - `"field"` (default) — the standard bordered control with a fixed height.
+ * - `"inline"` — the trigger reads as a WORD INSIDE RUNNING TEXT: no border, no
+ *   background, no fixed height, sized to its own content and contributing
+ *   nothing to the surrounding line box. For a value that belongs to a sentence
+ *   rather than to a form row — e.g. the folder in a page header's description
+ *   line ("Add Alert in KTX"). Everything else (search, keyboard, options list,
+ *   `#after-options`) is identical to `"field"`.
+ *
+ * Single-select only; `multiple` renders chips that need the field chrome.
+ */
+export type SelectAppearance = "field" | "inline";
+
 // ── Option shape ──────────────────────────────────────────────────────────
 
 export interface SelectOption {
@@ -113,6 +128,8 @@ export interface SelectProps {
   disabled?: boolean;
   /** Control size */
   size?: SelectSize;
+  /** Trigger chrome — `field` (default) or the running-text `inline`. */
+  appearance?: SelectAppearance;
   /** HTML id */
   id?: string;
   /** HTML name */
