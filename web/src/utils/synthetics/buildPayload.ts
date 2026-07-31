@@ -13,6 +13,7 @@ import type {
 } from "@/types/synthetics";
 import { convertDateToTimestamp } from "@/utils/timezone";
 import { journeyToWireSteps, mapWireSteps } from "./mapRecordedStep";
+import { buildV2Steps, isV2Journey } from "./buildV2Steps";
 import { useLocalTimezone } from "../storage";
 
 // ── Outbound: BrowserCheck → API payload ─────────────────────────────────────
@@ -124,7 +125,12 @@ export function buildCreateBrowserTestPayload(check: BrowserCheck): Record<strin
     frequency: buildFrequency(schedule),
 
     config: {
-      steps: journeyToWireSteps(journey),
+      // `steps_version` describes the whole array, so the journey qualifies as a
+      // whole or not at all — see isV2Journey. A v2 payload is built field by
+      // field rather than spread, because the server refuses unknown fields.
+      ...(isV2Journey(journey)
+        ? { steps_version: 2, steps: buildV2Steps(journey) }
+        : { steps: journeyToWireSteps(journey) }),
       browser_devices: browserDevices ?? [{ browser: "chromium", device: "desktop" }],
       timeout_ms: 30000,
       capture: {
@@ -375,6 +381,10 @@ export function mapResponseToBrowserCheck(data: Record<string, unknown>): Browse
 
     browserDevices: config?.browser_devices,
 
+    // No `preserveWire`: a stored version-2 step is poorer than what
+    // buildWireFromStep rebuilds from the UI fields, so keeping it would shadow
+    // the correct reconstruction — which is how a reloaded `select` came to
+    // replay as "select nothing". See MapWireStepOptions.
     journey: mapWireSteps(config?.steps ?? []),
 
     ...(variables?.length && {

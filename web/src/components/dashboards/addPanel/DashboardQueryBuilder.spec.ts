@@ -325,15 +325,6 @@ describe("DashboardQueryBuilder", () => {
             template:
               "<div data-test='dashboard-dynamic-function-popup' class='dynamic-function-popup'></div>",
           },
-          QIcon: true,
-          QTooltip: true,
-          QSeparator: true,
-          QBtn: true,
-          QBtnGroup: true,
-          QMenu: true,
-          QSelect: true,
-          QInput: true,
-          QCheckbox: true,
         },
       },
     });

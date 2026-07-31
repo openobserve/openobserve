@@ -253,7 +253,7 @@ export class PipelinesPage {
         this.monacoEditorViewLines = page.locator('.monaco-editor .view-lines');
         this.searchStreamInput = page.getByPlaceholder('Search Stream');
         this.exploreButton = page.getByRole('button', { name: 'Explore' });
-        this.timestampColumnMenu = page.locator('[data-test="log-table-column-1-_timestamp"] [data-test="table-row-expand-menu"]');
+        this.timestampColumnMenu = page.locator('[data-test="o2-table-expand-1"]');
         this.nameCell = page.getByRole('cell', { name: 'Name' });
         this.streamIcon = page.getByRole("img", { name: "Stream", exact: true });
         this.outputStreamIcon = page.getByRole("img", { name: "Output Stream" });
@@ -2062,7 +2062,7 @@ export class PipelinesPage {
         await this.exploreButton.first().click();
         await this.page.waitForTimeout(3000);
 
-        await this.page.waitForSelector('[data-test="logs-search-result-table-body"]');
+        await this.page.waitForSelector('[data-test="o2-table-body"]');
 
         // Expand the log table menu
         await this.timestampColumnMenu.click();
@@ -3875,27 +3875,30 @@ export class PipelinesPage {
 
     /**
      * Get status counts from history/backfill page
-     * @returns {Promise<{success: number, error: number, warning: number}>} Status counts
+     * @returns {Promise<{success: number, error: number, warning: number, skipped: number}>} Status counts
      */
     async getStatusCounts() {
         // Each status badge stamps `data-test-status="<status>"` (lowercased).
-        // Backend TriggerDataStatus enum (usage.rs) defines exactly four values:
-        //   completed | failed | condition_not_satisfied | skipped
-        // getStatusVariant() in PipelineHistory.vue maps them to badge variants.
+        // Accept both the current RunOutcome vocabulary and legacy trigger
+        // statuses while old rows remain in the triggers stream.
         const successCount = await this.page.locator(
+            '[data-test="pipeline-history-status-badge"][data-test-status="firing"], ' +
+            '[data-test="pipeline-history-status-badge"][data-test-status="normal"], ' +
+            '[data-test="pipeline-history-status-badge"][data-test-status="succeeded"], ' +
             '[data-test="pipeline-history-status-badge"][data-test-status="completed"], ' +
+            '[data-test="pipeline-history-status-badge"][data-test-status="condition_not_satisfied"], ' +
             '[data-test="pipeline-history-status-badge"][data-test-status="success"], ' +
             '[data-test="pipeline-history-status-badge"][data-test-status="ok"]'
         ).count();
         const errorCount = await this.page.locator(
-            '[data-test="pipeline-history-status-badge"][data-test-status="failed"], ' +
-            '[data-test="pipeline-history-status-badge"][data-test-status="error"]'
+            '[data-test="pipeline-history-status-badge"][data-test-status="error"], ' +
+            '[data-test="pipeline-history-status-badge"][data-test-status="notify_failed"], ' +
+            '[data-test="pipeline-history-status-badge"][data-test-status="failed"]'
         ).count();
         const warningCount = await this.page.locator(
             '[data-test="pipeline-history-status-badge"][data-test-status="warning"]'
         ).count();
         const skippedCount = await this.page.locator(
-            '[data-test="pipeline-history-status-badge"][data-test-status="condition_not_satisfied"], ' +
             '[data-test="pipeline-history-status-badge"][data-test-status="skipped"]'
         ).count();
         return {

@@ -17,7 +17,7 @@ use std::collections::HashMap;
 
 use config::meta::{
     pipeline::components::NodeData,
-    self_reporting::usage::{TriggerData, TriggerDataStatus, TriggerDataType},
+    self_reporting::usage::{RunOutcome, TriggerData, TriggerDataType},
 };
 use db::{
     self,
@@ -748,7 +748,7 @@ pub async fn handle_workflow_trigger(trigger: WorkflowTrigger) {
         ),
         is_realtime: false,
         is_silenced: false,
-        status: TriggerDataStatus::Completed,
+        status: RunOutcome::Succeeded,
         start_time,
         end_time,
         error,

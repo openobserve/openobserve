@@ -276,7 +276,6 @@ describe("DashboardSettings.vue", () => {
       wrapper = mountComponent();
 
       const vm = wrapper.vm as any;
-      // OTabPanels is used instead of QTabPanels; verify via active tab state
       expect(vm.activeTab).toBe("generalSettings");
     });
 

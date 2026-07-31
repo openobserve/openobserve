@@ -190,8 +190,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #bottom>
               <!-- h-12 / w-50 are exact rem equivalents of the pixel sizes this
                    footer used to hardcode, so it renders unchanged. `mr-md` was
-                   dropped — a Quasar-style class this repo does not generate, so
-                   it never applied. -->
+                   dropped — a legacy CSS-framework class this repo does not
+                   generate, so it never applied. -->
               <div class="flex h-12 w-full items-center justify-between">
                 <div class="o2-table-footer-title flex w-50 items-center">
                   {{ resultTotal }} {{ t("workflow.header") }}

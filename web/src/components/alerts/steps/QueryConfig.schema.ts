@@ -227,6 +227,8 @@ export const makeQueryConfigSchema = (t: Translator) =>
         .looseObject({
           operator: z.string().optional(),
           threshold: z.unknown().optional(),
+          /** Optional count-family WARNING threshold (alerts_2.md Feature 1). */
+          warning_threshold: z.unknown().optional(),
           frequency: z.unknown().optional(),
         })
         .optional(),
@@ -237,6 +239,8 @@ export const makeQueryConfigSchema = (t: Translator) =>
             .looseObject({
               group_by: z.array(z.string()).optional(),
               function: z.string().optional(),
+              /** Optional aggregate-value WARNING (shares having.operator). */
+              warning_value: z.unknown().optional(),
               having: z
                 .looseObject({
                   column: z.string().optional(),
@@ -254,6 +258,8 @@ export const makeQueryConfigSchema = (t: Translator) =>
             })
             .nullable()
             .optional(),
+          /** Optional PromQL-value WARNING (shares promql_condition.operator). */
+          promql_warning_value: z.unknown().optional(),
         })
         .optional(),
       /** Logs/traces group-by lives on its own field (metrics group-by lives on
@@ -356,6 +362,65 @@ export const makeQueryConfigSchema = (t: Translator) =>
               });
             }
           }
+        }
+      }
+
+      // ── Warning/critical matrix (alerts_2.md §4.5) ──────────────────────────
+      // The same operator-direction rules the backend enforces
+      // (validate_thresholds): for `>`/`>=` warning must be LOWER than
+      // critical, for `<`/`<=` HIGHER, and `=`/`!=` cannot carry a warning at
+      // all. Path-addressed per family so the offending input paints, and the
+      // form BLOCKS submit instead of relying on the backend 400. Blank
+      // warning = single-level alert = always valid.
+      const matrixIssue = (w: unknown, c: unknown, op: unknown): string | null => {
+        if (isBlank(w)) return null;
+        const wn = Number(w);
+        const cn = Number(c);
+        if (Number.isNaN(wn) || Number.isNaN(cn)) return null;
+        if (op === "=" || op === "!=") {
+          return t("alerts.warnOperatorUnordered", { operator: op });
+        }
+        if ((op === ">" || op === ">=") && !(wn < cn)) {
+          return t("alerts.warnMustBeLower", { warning: wn, critical: cn, operator: op });
+        }
+        if ((op === "<" || op === "<=") && !(wn > cn)) {
+          return t("alerts.warnMustBeHigher", { warning: wn, critical: cn, operator: op });
+        }
+        return null;
+      };
+      // Count family: SQL tab, or builder count mode.
+      if (isSql || (isCustom && !isMeasure)) {
+        const msg = matrixIssue(tc.warning_threshold, tc.threshold, tc.operator);
+        if (msg) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["trigger_condition", "warning_threshold"],
+            message: msg,
+          });
+        }
+      }
+      // Aggregation family: warning_value vs having.value on having.operator.
+      if (isCustom && isMeasure && meta.aggregationEnabled && qc.aggregation) {
+        const havingCfg = (qc.aggregation.having ?? {}) as Record<string, unknown>;
+        const msg = matrixIssue(qc.aggregation.warning_value, havingCfg.value, havingCfg.operator);
+        if (msg) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["query_condition", "aggregation", "warning_value"],
+            message: msg,
+          });
+        }
+      }
+      // PromQL family: promql_warning_value vs promql_condition.
+      if (isPromql) {
+        const pc = (qc.promql_condition ?? {}) as Record<string, unknown>;
+        const msg = matrixIssue(qc.promql_warning_value, pc.value, pc.operator);
+        if (msg) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["query_condition", "promql_warning_value"],
+            message: msg,
+          });
         }
       }
 

@@ -22,6 +22,7 @@ import { z } from "zod";
 import {
   MIN_COMPLETION_IDLE_WINDOW_SECS,
   TRACE_COMPLETION_WINDOW_DEFAULTS,
+  completionWindowLimitsForScope,
 } from "../utils/completionWindow";
 
 const requiredText = (message: string) =>
@@ -68,6 +69,34 @@ export const makeJobFormSchema = (t: (_key: string) => string) =>
           path: ["samplingValue"],
           message: t("onlineEvals.job.validation.samplingValueRequired"),
         });
+      }
+
+      // Per-scope hard ceilings, mirroring the backend guard rails.
+      const limits = completionWindowLimitsForScope(val.targetScope);
+      if (limits) {
+        const isTrace = val.targetScope === "trace";
+        if (val.idleWindowSecs > limits.maxIdleWindowSecs) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["idleWindowSecs"],
+            message: t(
+              isTrace
+                ? "onlineEvals.job.validation.idleWindowMaximumTrace"
+                : "onlineEvals.job.validation.idleWindowMaximumSession",
+            ),
+          });
+        }
+        if (val.maxAgeSecs > limits.maxAgeSecs) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["maxAgeSecs"],
+            message: t(
+              isTrace
+                ? "onlineEvals.job.validation.maxAgeMaximumTrace"
+                : "onlineEvals.job.validation.maxAgeMaximumSession",
+            ),
+          });
+        }
       }
     });
 

@@ -79,9 +79,18 @@ interface BuildVariantsContext {
   metricName: string;
   base: string;
   sel: string;
+  /**
+   * `sel` with the NaN guard NEVER applied. A range vector `[w]` may only be
+   * taken over a SELECTOR, so any variant that builds one has to start here —
+   * `(x and x > -Inf)[5m]` does not parse, and the subquery form `(...)[5m:]`
+   * is rejected by the engine unless the inner expression is already a matrix.
+   */
+  rawSel: string;
   baseSel?: string;
   countSel: string;
   w: string;
+  /** The `[w]` for `quantile_over_time`. Wider than `w` — see MIN_PERCENTILE_SAMPLES. */
+  pw: string;
   labels?: string[];
   unit: string;
   builderLabels: PromqlLabelMatcher[];
@@ -115,6 +124,7 @@ interface MetricDefaultsContext {
   familyType?: string;
   filters?: FilterInput[];
   rateWindow?: string;
+  percentileWindow?: string;
   labels?: string[];
   applyNanGuard?: boolean;
 }
@@ -712,14 +722,21 @@ export function computeStepSeconds(
  *
  * @returns {string} a PromQL duration, e.g. "4m"
  */
+function rateWindowSeconds(
+  rangeSeconds: number,
+  maxDataPoints: number,
+  scrapeIntervalSeconds: number,
+): number {
+  const step = computeStepSeconds(rangeSeconds, maxDataPoints);
+  return Math.max(4 * scrapeIntervalSeconds, step + scrapeIntervalSeconds);
+}
+
 export function computeRateWindow(
   rangeSeconds: number,
   maxDataPoints: number = MAX_DATA_POINTS,
   scrapeIntervalSeconds: number = DEFAULT_SCRAPE_INTERVAL_SECONDS,
 ): string {
-  const step = computeStepSeconds(rangeSeconds, maxDataPoints);
-  const w = Math.max(4 * scrapeIntervalSeconds, step + scrapeIntervalSeconds);
-  return formatPromDuration(w);
+  return formatPromDuration(rateWindowSeconds(rangeSeconds, maxDataPoints, scrapeIntervalSeconds));
 }
 
 /**
@@ -740,6 +757,56 @@ export const PANEL_RATE_WINDOW = "$__rate_interval";
 
 /** The window used when a caller supplies no time context. */
 const DEFAULT_RATE_WINDOW = formatPromDuration(4 * DEFAULT_SCRAPE_INTERVAL_SECONDS);
+
+/**
+ * Samples a `quantile_over_time` window should contain before its percentiles
+ * mean anything.
+ *
+ * The rate window is sized for `rate()`, which needs two samples — 4 x scrape is
+ * plenty. A quantile is a different question: over 4 samples, p90 lands at index
+ * 0.9 x 3 = 2.7 and p99 at 2.97, so both interpolate between the same top pair
+ * and draw as one line. That is the whole reason percentiles looked broken.
+ */
+export const MIN_PERCENTILE_SAMPLES = 20;
+
+/**
+ * The `[w]` for a `quantile_over_time`, in a card the explorer executes itself.
+ *
+ * Three bounds, in order of who wins when:
+ *  - FLOOR, the rate window itself: it already guarantees consecutive evaluation
+ *    points leave no gaps, and a quantile can never want LESS data than a rate.
+ *    This dominates at long ranges, where the step is already large — there the
+ *    two windows coincide.
+ *  - TARGET `MIN_PERCENTILE_SAMPLES x scrape`: enough samples to separate the
+ *    percentiles. This dominates at short ranges, where the step is at its floor.
+ *  - CAP `range / 4`: a window near the width of the view returns one global
+ *    quantile per series and flattens the chart. Keeping four windows across the
+ *    view leaves visible variation. Never allowed to undercut the FLOOR.
+ *
+ * @returns {string} a PromQL duration, e.g. "5m"
+ */
+export function computePercentileWindow(
+  rangeSeconds: number,
+  maxDataPoints: number = MAX_DATA_POINTS,
+  scrapeIntervalSeconds: number = DEFAULT_SCRAPE_INTERVAL_SECONDS,
+): string {
+  const floor = rateWindowSeconds(rangeSeconds, maxDataPoints, scrapeIntervalSeconds);
+  const target = MIN_PERCENTILE_SAMPLES * scrapeIntervalSeconds;
+  const cap = Math.max(floor, Math.max(0, Number(rangeSeconds) || 0) / 4);
+  return formatPromDuration(Math.min(Math.max(floor, target), cap));
+}
+
+/**
+ * The percentile window to hand to a PANEL — the `$__rate_interval` counterpart
+ * for `quantile_over_time`, resolved by usePanelVariableSubstitution against the
+ * panel's own range and width. Same reasoning as `PANEL_RATE_WINDOW`.
+ */
+export const PANEL_PERCENTILE_WINDOW = "$__percentile_interval";
+
+/** The percentile window used when a caller supplies no time context. */
+const DEFAULT_PERCENTILE_WINDOW = formatPromDuration(
+  MIN_PERCENTILE_SAMPLES * DEFAULT_SCRAPE_INTERVAL_SECONDS,
+);
 
 /* -------------------------------------------------------------------------- */
 /* Rule set B — unit inference                                                 */
@@ -877,9 +944,10 @@ const TOPK = (k: number, byLabels: string[] = []): PromqlStep => ({
   id: PromqlStepId.TopK,
   params: [k, [...byLabels]],
 });
-const QUANTILE = (ratio: number, byLabels: string[] = []): PromqlStep => ({
-  id: PromqlStepId.Quantile,
-  params: [ratio, [...byLabels]],
+/** `quantile_over_time(ratio, sel[window])` — params are [ratio, window]. */
+const QUANTILE_OVER_TIME = (ratio: number, window: string): PromqlStep => ({
+  id: PromqlStepId.QuantileOverTime,
+  params: [ratio, window],
 });
 const HISTOGRAM_QUANTILE = (ratio: number): PromqlStep => ({
   id: PromqlStepId.HistogramQuantile,
@@ -910,7 +978,19 @@ function resolveTopkLabel(labels: string[] | undefined): string | null {
  * and an ExponentialHistogram fallback gets only its count line.
  */
 function buildVariants(cardKind: string, ctx: BuildVariantsContext): Variant[] {
-  const { metricName, base, sel, countSel, w, labels, unit, builderLabels, builderSafe } = ctx;
+  const {
+    metricName,
+    base,
+    sel,
+    rawSel,
+    countSel,
+    w,
+    pw,
+    labels,
+    unit,
+    builderLabels,
+    builderSafe,
+  } = ctx;
 
   /**
    * Builder state for one query, or `undefined` when this variant cannot be
@@ -963,8 +1043,26 @@ function buildVariants(cardKind: string, ctx: BuildVariantsContext): Variant[] {
           // `resolveVariant` narrows these queries down to the checked set — so
           // any percentile without a query here is a checkbox that silently does
           // nothing (or worse, empties the subset and falls back to all of them).
+          //
+          // Percentiles OVER TIME, not across series. `quantile(φ, v)` aggregates
+          // the series present at each timestamp, so on a single-series gauge —
+          // the common case — p50, p90 and p99 all collapse onto the raw value
+          // and the tile draws one line under three legends. `quantile_over_time`
+          // asks the question a gauge actually poses ("what was the p99 of this
+          // signal over the last [w]?") and stays meaningful at any series count.
+          //
+          // Built from `rawSel`: a range vector needs a SELECTOR, so the guarded
+          // `(x and x > -Inf)` form cannot carry a range. See `rawSel`'s doc.
+          //
+          // `pw`, NOT `w`: the rate window is sized for rate()'s two-sample need
+          // and leaves a quantile with too few samples to separate. See
+          // MIN_PERCENTILE_SAMPLES.
           queries: GAUGE_PERCENTILES.map((p) =>
-            q(`quantile(${p / 100}, ${sel})`, `p${p}`, b(metricName, [QUANTILE(p / 100)])),
+            q(
+              `quantile_over_time(${p / 100}, ${rawSel}[${pw}])`,
+              `p${p}`,
+              b(metricName, [QUANTILE_OVER_TIME(p / 100, pw)]),
+            ),
           ),
           chartType: "line",
           // Checked by default; the other offered percentiles start unchecked.
@@ -1288,6 +1386,7 @@ const FOOTER_LABEL = {
  *   familyType?: string,         // the family's declared type
  *   filters?: Array<{label: string, value: string, operator?: string}>,
  *   rateWindow?: string,         // PromQL duration; defaults to the 4m floor
+ *   percentileWindow?: string,   // quantile_over_time's window; defaults to 20 x scrape
  *   labels?: string[],           // the stream's label names, when known
  *   applyNanGuard?: boolean, // retry mode: guard the selector against NaN samples
  * }} [ctx]
@@ -1302,12 +1401,14 @@ export function getMetricDefaults(
   const base = baseNameOf(metricName);
   const filters = ctx?.filters ?? [];
   const w = ctx?.rateWindow || DEFAULT_RATE_WINDOW;
+  const pw = ctx?.percentileWindow || DEFAULT_PERCENTILE_WINDOW;
 
   const supportsNanGuard = RATE_FREE_KINDS.includes(cardKind);
   const guarded = !!ctx?.applyNanGuard && supportsNanGuard;
   const guard = guarded ? withNanGuard : (selector: string) => selector;
 
-  const sel = guard(buildSelector(metricName, filters));
+  const rawSel = buildSelector(metricName, filters);
+  const sel = guard(rawSel);
   const baseSel = guard(buildSelector(base, filters));
   const countSel = buildSelector(`${base}_count`, filters);
 
@@ -1318,9 +1419,11 @@ export function getMetricDefaults(
     metricName,
     base,
     sel,
+    rawSel,
     baseSel,
     countSel,
     w,
+    pw,
     labels: ctx?.labels,
     unit,
     builderLabels: builderLabelsOf(filters),

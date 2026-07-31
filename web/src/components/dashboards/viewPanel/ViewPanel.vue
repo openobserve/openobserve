@@ -97,9 +97,9 @@
                 :tabId="currentTabId"
                 :panelId="currentPanelId"
               />
-              <div class="flex-1 overflow-hidden">
+              <div class="flex min-h-0 flex-1 flex-col overflow-hidden">
                 <div
-                  class="mr-2 flex items-center justify-end"
+                  class="mr-2 flex shrink-0 items-center justify-end"
                   data-test="view-panel-last-refreshed-at"
                 >
                   <!-- Error/Warning tooltips -->
@@ -116,7 +116,7 @@
                   />
                 </div>
                 <PanelSchemaRenderer
-                  class="h-[calc(100%_-_1.3125rem)]"
+                  class="min-h-0 flex-1"
                   v-if="chartData"
                   :key="dashboardPanelData.data.type"
                   :panelSchema="chartData"

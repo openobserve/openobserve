@@ -1020,6 +1020,7 @@ describe("Convert PromQL Data Utils", () => {
         xAxis: "10:00",
         yAxis: null,
         label: {
+          show: true,
           formatter: "{b}:{c}",
           position: "insideEndTop",
         },
@@ -1074,6 +1075,7 @@ describe("Convert PromQL Data Utils", () => {
         xAxis: null,
         yAxis: 20,
         label: {
+          show: true,
           formatter: "{b}:{c}",
           position: "insideEndTop",
         },
@@ -1127,6 +1129,7 @@ describe("Convert PromQL Data Utils", () => {
         xAxis: null,
         yAxis: 25,
         label: {
+          show: true,
           formatter: "{c}",
           position: "insideEndTop",
         },

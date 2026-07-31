@@ -508,6 +508,7 @@ const _anomalyCache = new Map<
 >();
 import { useI18n } from "vue-i18n";
 import { b64EncodeUnicode } from "@/utils/zincutils";
+import { isFiringOutcome, isErrorOutcome } from "@/utils/alerts/runOutcome";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import alertsService from "@/services/alerts";
@@ -809,9 +810,12 @@ const loadHistoryAndSplit = async () => {
     });
     const hits: any[] = res.data?.hits ?? [];
 
-    // Recent events: firing/error shown per-occurrence; failed deduped by alert_name with count
+    // Recent events: firing shown per-occurrence; failed deduped by alert_name with count.
+    // This previously filtered on the literal strings ["firing", "error"], neither
+    // of which the backend ever produced — so it silently matched nothing. The
+    // shared classifier covers both the current and the legacy vocabulary.
     const firingHits = hits
-      .filter((h) => ["firing", "error"].includes(h.status?.toLowerCase()))
+      .filter((h) => isFiringOutcome(h.status))
       .slice(0, 5)
       .map((h, idx) => ({
         id: h.id ?? `ev-${idx}`,
@@ -819,13 +823,16 @@ const loadHistoryAndSplit = async () => {
         service: h.stream_name ?? "—",
         description: h.alert_name ?? "",
         timeAgo: relativeTime_(h.timestamp),
+        // Firing rows need a sort key too — without rawTs they scored 0 and
+        // always sorted beneath every failure row regardless of timestamp.
+        rawTs: h.timestamp,
         failCount: 0,
       }));
 
     // Dedup failed: one row per alert_name, most recent timestamp, total count
     const failedMap = new Map<string, any>();
     hits
-      .filter((h) => h.status?.toLowerCase() === "failed")
+      .filter((h) => isErrorOutcome(h.status))
       .forEach((h) => {
         const key = h.alert_name ?? h.id ?? "unknown";
         const existing = failedMap.get(key);

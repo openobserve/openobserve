@@ -266,6 +266,9 @@ describe("JobFormPage", () => {
     wrapper = createWrapper();
 
     setField(wrapper, "targetScope", "trace");
+    // Let the scope watcher apply its defaults before overriding them, so the
+    // explicit values below are what the help text renders.
+    await wrapper.vm.$nextTick();
     setField(wrapper, "idleWindowSecs", 120);
     setField(wrapper, "maxAgeSecs", 1800);
     await wrapper.vm.$nextTick();
@@ -274,19 +277,19 @@ describe("JobFormPage", () => {
     expect(wrapper.find('[data-test="job-form-max-age-input"]').text()).toContain("30 min");
   });
 
-  it("defaults trace and session idle windows to 120 seconds", async () => {
+  it("defaults idle windows per scope: 30s for traces, 30m for sessions", async () => {
     wrapper = createWrapper();
 
     setField(wrapper, "targetScope", "trace");
     await wrapper.vm.$nextTick();
-    expect(oform(wrapper).form.state.values.idleWindowSecs).toBe(120);
+    expect(oform(wrapper).form.state.values.idleWindowSecs).toBe(30);
 
     setField(wrapper, "targetScope", "session");
     await wrapper.vm.$nextTick();
-    expect(oform(wrapper).form.state.values.idleWindowSecs).toBe(120);
+    expect(oform(wrapper).form.state.values.idleWindowSecs).toBe(1800);
   });
 
-  it("rejects completion idle windows below 45 seconds", async () => {
+  it("rejects non-positive completion idle windows", async () => {
     wrapper = createWrapper();
     setField(wrapper, "name", "trace-job");
     setField(wrapper, "stream", "default");
@@ -294,7 +297,24 @@ describe("JobFormPage", () => {
     await wrapper.vm.$nextTick();
     setField(wrapper, "scorerIds", ["s1"]);
     setField(wrapper, "samplingMode", "all");
-    setField(wrapper, "idleWindowSecs", 44);
+    setField(wrapper, "idleWindowSecs", 0);
+
+    await submit(wrapper);
+
+    expect(oform(wrapper).form.state.isValid).toBe(false);
+    expect(onlineEvalsService.jobs.create).not.toHaveBeenCalled();
+  });
+
+  it("rejects completion windows above the per-scope hard caps", async () => {
+    wrapper = createWrapper();
+    setField(wrapper, "name", "trace-job");
+    setField(wrapper, "stream", "default");
+    setField(wrapper, "targetScope", "trace");
+    await wrapper.vm.$nextTick();
+    setField(wrapper, "scorerIds", ["s1"]);
+    setField(wrapper, "samplingMode", "all");
+    // A 1-hour trace idle window is beyond the 30-minute trace cap.
+    setField(wrapper, "idleWindowSecs", 60 * 60);
 
     await submit(wrapper);
 

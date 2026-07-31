@@ -125,6 +125,9 @@ const FALLBACKS: Record<string, string> = {
   "--color-chart-metric-text": "#000000",
   // Brand accent (--color-primary-600), light value — metric sparkline default color.
   "--color-accent": "#3f7994",
+  // Alert threshold marklines (light values from semantic.css / base.css).
+  "--color-status-error-text": "#cc3645",
+  "--color-status-warning-text": "#e56d17",
 };
 
 /**

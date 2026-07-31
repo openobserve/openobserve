@@ -117,7 +117,7 @@ async function mountInvitationList(props = {}) {
       plugins: [i18n, store],
       stubs: {
         NoData: { template: '<div data-test="no-data-stub" />' },
-        QTablePagination: {
+        Pagination: {
           props: ["scope", "resultTotal", "perPageOptions", "position"],
           emits: ["update:changeRecordPerPage"],
           template: '<div data-test="table-pagination-stub" />',
