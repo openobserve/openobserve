@@ -115,6 +115,8 @@ export class AlertsPage {
             advancedTemplateOverrideSelect: '[data-test="advanced-template-override-select"]',
             // Alert destinations select (in AlertSettings.vue, condition tab)
             alertDestinationsSelect: '[data-test="alert-destinations-select"]',
+            // Alerts 4.0 (multi-alerts) — Simple/Multi toggle choice group
+            alertMultiToggleChoice: '[data-test="alerts-alertmultitoggle-choice"]',
             advancedTabBtn: '[data-test="add-alert-tab-advanced"]',
             // ODropdown content carries data-test="o-dropdown-content"
             visibleDropdownMenu: '[data-test="o-dropdown-content"]:visible',
@@ -834,6 +836,58 @@ export class AlertsPage {
      */
     getAdvancedTemplateOverrideSelect() {
         return this.page.locator(this.locators.advancedTemplateOverrideSelect).first();
+    }
+
+    // ==================== ALERTS 4.0 (MULTI-ALERT) FORM HELPERS ====================
+
+    /**
+     * Select an alert destination by name in the create/edit form.
+     * @param {string} destinationName
+     */
+    async selectDestinationByName(destinationName) {
+        const dropdown = this.page.locator(this.locators.alertDestinationsSelect);
+        await dropdown.waitFor({ state: 'visible', timeout: 10000 });
+        await openOSelectDropdown(this.page, dropdown);
+        await this.page
+            .locator(`[data-test="alert-destinations-select-option"][data-test-value="dest:${destinationName}"]`)
+            .first()
+            .click();
+        await this.page.keyboard.press('Escape');
+        testLogger.info('Selected alert destination', { destinationName });
+    }
+
+    /**
+     * Submit the alert create/edit form. The submit button sits in a scroll
+     * container that can clip it from the viewport, so a native DOM click is used.
+     */
+    async submitAlertForm() {
+        await this.page.evaluate((sel) => {
+            const btn = document.querySelector(sel);
+            if (btn) btn.click();
+        }, this.locators.alertSubmitButton);
+        testLogger.info('Submitted alert form');
+    }
+
+    /**
+     * Assert an alert with the given name is visible on the list table.
+     * @param {string} name
+     */
+    async expectAlertVisibleInList(name) {
+        const row = this.page.locator('tbody tr').filter({ hasText: name }).first();
+        await expect(row).toBeVisible({ timeout: 15000 });
+        testLogger.info('Alert visible on list', { name });
+    }
+
+    /**
+     * Assert the Simple/Multi toggle has "Multi alert" (value "true") selected.
+     * Reka-ui renders options as <button role="radio" data-test-value> carrying
+     * aria-checked (NOT native input.checked).
+     */
+    async expectMultiAlertSelected() {
+        const choice = this.page.locator(this.locators.alertMultiToggleChoice);
+        await expect(choice).toBeVisible({ timeout: 15000 });
+        await expect(choice.locator('[role="radio"][data-test-value="true"]')).toHaveAttribute('aria-checked', 'true', { timeout: 10000 });
+        await expect(choice.locator('[role="radio"][data-test-value="false"]')).toHaveAttribute('aria-checked', 'false');
     }
 
     /**
