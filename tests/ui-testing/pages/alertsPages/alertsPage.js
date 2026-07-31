@@ -117,6 +117,9 @@ export class AlertsPage {
             alertDestinationsSelect: '[data-test="alert-destinations-select"]',
             // Alerts 4.0 (multi-alerts) — Simple/Multi toggle choice group
             alertMultiToggleChoice: '[data-test="alerts-alertmultitoggle-choice"]',
+            // Alerts 4.0 — priority & tags (Feature 2)
+            prioritySelect: '[data-test="alert-priority-select"]',
+            tagsInput: '[data-test="alert-tags-input"]',
             advancedTabBtn: '[data-test="add-alert-tab-advanced"]',
             // ODropdown content carries data-test="o-dropdown-content"
             visibleDropdownMenu: '[data-test="o-dropdown-content"]:visible',
@@ -888,6 +891,91 @@ export class AlertsPage {
         await expect(choice).toBeVisible({ timeout: 15000 });
         await expect(choice.locator('[role="radio"][data-test-value="true"]')).toHaveAttribute('aria-checked', 'true', { timeout: 10000 });
         await expect(choice.locator('[role="radio"][data-test-value="false"]')).toHaveAttribute('aria-checked', 'false');
+    }
+
+    // ==================== ALERTS 4.0 (PRIORITY & TAGS) HELPERS ====================
+
+    /**
+     * Switch to the "Alert Rules" (condition) tab — where stream, threshold and destination live.
+     * Uses a normal click (waits for actionability) rather than the force-click in
+     * `_switchToTab`, which can fire before a just-closed popover settles and miss the tab.
+     */
+    async openConditionTab() {
+        await this.page.locator(this.locators.addAlertTabCondition).click();
+        await this.page.waitForTimeout(300);
+    }
+
+    /** Assert the Advanced-panel priority select and tag input are both present. */
+    async expectPriorityAndTagControlsVisible() {
+        await expect(this.page.locator(this.locators.prioritySelect)).toBeVisible({ timeout: 10000 });
+        await expect(this.page.locator(this.locators.tagsInput)).toBeVisible({ timeout: 10000 });
+    }
+
+    /** Open the priority select and assert every given label is offered (e.g. P1..P5). */
+    async expectPriorityOptions(labels) {
+        await openOSelectDropdown(this.page, this.page.locator(this.locators.prioritySelect));
+        for (const label of labels) {
+            await expect(
+                this.page.locator('[data-test$="-popover"] [data-test$="-option"]').filter({ hasText: label }).first()
+            ).toBeVisible({ timeout: 5000 });
+        }
+    }
+
+    /** Select a priority by its label (e.g. "P3"). */
+    async selectPriority(label) {
+        await openOSelectDropdown(this.page, this.page.locator(this.locators.prioritySelect));
+        await this.page
+            .locator('[data-test$="-popover"] [data-test$="-option"]')
+            .filter({ hasText: label })
+            .first()
+            .click();
+        testLogger.info('Selected alert priority', { label });
+    }
+
+    /** Type a tag into the tag input and commit it with Enter. */
+    async addTag(value) {
+        const input = this.page.locator(`${this.locators.tagsInput} input`).first();
+        await input.fill(value);
+        await input.press('Enter');
+    }
+
+    /** Open the destinations select and pick the first available option. */
+    async selectFirstDestination() {
+        const dropdown = this.page.locator(this.locators.alertDestinationsSelect);
+        await dropdown.waitFor({ state: 'visible', timeout: 10000 });
+        await openOSelectDropdown(this.page, dropdown);
+        const options = this.page.locator('[data-test$="-popover"] [data-test$="-option"]');
+        await expect(options.first()).toBeVisible({ timeout: 5000 });
+        await options.first().click();
+        await this.page.keyboard.press('Escape');
+        testLogger.info('Selected first available destination');
+    }
+
+    /** Assert the list row for `name` renders the given priority (string or RegExp). */
+    async expectAlertPriorityInList(name, matcher) {
+        const row = this.page.locator('tbody tr').filter({ hasText: name }).first();
+        await expect(row.locator(`[data-test="alert-list-${name}-priority"]`)).toHaveText(matcher, { timeout: 10000 });
+    }
+
+    /** Assert the list row for `name` renders exactly the given normalized tag chips. */
+    async expectAlertTagsInList(name, tags) {
+        const row = this.page.locator('tbody tr').filter({ hasText: name }).first();
+        const chips = row.locator(`[data-test="alert-list-${name}-tag"]`);
+        await expect(chips).toHaveCount(tags.length, { timeout: 10000 });
+        for (let i = 0; i < tags.length; i++) {
+            await expect(chips.nth(i)).toHaveText(tags[i]);
+        }
+    }
+
+    /** Assert the alert-list header includes all `present` columns and none of the `absent` ones. */
+    async expectListColumns({ present = [], absent = [] } = {}) {
+        const headerText = await this.page.locator('thead').first().innerText();
+        for (const col of present) {
+            expect(headerText, `"${col}" column must be on the alert list`).toContain(col);
+        }
+        for (const col of absent) {
+            expect(headerText, `"${col}" column must NOT be on the alert list`).not.toContain(col);
+        }
     }
 
     /**
