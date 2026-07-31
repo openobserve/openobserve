@@ -621,10 +621,7 @@ import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
-import {
-  buildAttemptViews,
-  stepOwnDetail,
-} from "@/composables/synthetics/syntheticResultsSchema";
+import { buildAttemptViews, stepOwnDetail } from "@/composables/synthetics/syntheticResultsSchema";
 import type {
   AttemptView,
   EvidenceEvent,
@@ -1205,7 +1202,11 @@ const displayMonitorName = computed(
 
 const steps = computed<StepRow[]>(() => {
   if (synthetics.runDetail.value) {
-    return buildSteps(synthetics.runDetail.value, currentAttempt.value, evidence.eventsByStep.value);
+    return buildSteps(
+      synthetics.runDetail.value,
+      currentAttempt.value,
+      evidence.eventsByStep.value,
+    );
   }
   return [];
 });

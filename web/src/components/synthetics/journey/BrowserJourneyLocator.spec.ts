@@ -175,7 +175,9 @@ describe("adding your own locator", () => {
 
   it("prefills from a row without editing the recorded value in place", async () => {
     const wrapper = render();
-    await wrapper.findAll(test("synthetics-journey-step-locator-start-from-btn"))[1].trigger("click");
+    await wrapper
+      .findAll(test("synthetics-journey-step-locator-start-from-btn"))[1]
+      .trigger("click");
 
     expect((ownInput(wrapper).element as HTMLInputElement).value).toBe(ROLE);
     // Copying, not editing: the stored list is what a later healing pass
@@ -230,9 +232,9 @@ describe("per-row warnings", () => {
       ],
     });
 
-    expect(
-      wrapper.findAll(test("synthetics-journey-step-locator-row-generated-id")),
-    ).toHaveLength(1);
+    expect(wrapper.findAll(test("synthetics-journey-step-locator-row-generated-id"))).toHaveLength(
+      1,
+    );
   });
 });
 
@@ -313,12 +315,10 @@ describe("combining", () => {
   it("appends the combination with its parts and how they were joined", async () => {
     const wrapper = render();
     await openDialog(wrapper, [TESTID, ROLE]);
-    await wrapper
-      .findComponent({ name: "LocatorComposeDialog" })
-      .vm.$emit("combine", {
-        value: `${TESTID} >> internal:and=${JSON.stringify(ROLE)}`,
-        from: [{ value: TESTID }, { relation: "and", value: ROLE }],
-      });
+    await wrapper.findComponent({ name: "LocatorComposeDialog" }).vm.$emit("combine", {
+      value: `${TESTID} >> internal:and=${JSON.stringify(ROLE)}`,
+      from: [{ value: TESTID }, { relation: "and", value: ROLE }],
+    });
 
     const next = emitted(wrapper);
     expect(next.candidates).toHaveLength(4);

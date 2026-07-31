@@ -1704,9 +1704,7 @@ function mapFailureDetail(raw: unknown, recordTraceKey?: unknown): FailureDetail
     stepIndex: typeof d.step_index === "number" ? d.step_index : 0,
     error: str(d.error),
     candidatesTried: Array.isArray(d.candidates_tried) ? d.candidates_tried : [],
-    settleSignals: Array.isArray(d.settle_signals)
-      ? d.settle_signals.map(mapSettleSignal)
-      : [],
+    settleSignals: Array.isArray(d.settle_signals) ? d.settle_signals.map(mapSettleSignal) : [],
     settleMs: typeof d.settle_ms === "number" ? d.settle_ms : null,
     observedDurationMs: typeof d.observed_duration_ms === "number" ? d.observed_duration_ms : null,
     screenshotKey: d.screenshot_key ? str(d.screenshot_key) : null,

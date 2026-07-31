@@ -301,9 +301,7 @@ describe("mapRecordedStep", () => {
 
   it("should not carry a timeout into the wire step unless the author set one", () => {
     expect(buildWireFromStep({ id: "s1", action: "click" })?.timeout_ms).toBeUndefined();
-    expect(
-      buildWireFromStep({ id: "s1", action: "click", timeout: 4200 })?.timeout_ms,
-    ).toBe(4200);
+    expect(buildWireFromStep({ id: "s1", action: "click", timeout: 4200 })?.timeout_ms).toBe(4200);
   });
 
   it("should generate a compact UUIDv7 id when the wire step has none", () => {

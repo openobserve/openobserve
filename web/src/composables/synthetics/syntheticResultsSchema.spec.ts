@@ -1037,9 +1037,27 @@ describe("stepOwnDetail", () => {
     error: "did not become visible within 30000 ms",
     candidatesTried: [],
     settleSignals: [
-      { kind: "response" as const, signal: "POST **/auth/login", status: "fired" as const, required: false, waitedMs: 5298 },
-      { kind: "navigation" as const, signal: "navigation to **/web/logs/**", status: "fired" as const, required: false, waitedMs: 2532 },
-      { kind: "response" as const, signal: "POST **/_search_stream", status: "stale" as const, required: false, waitedMs: 30274 },
+      {
+        kind: "response" as const,
+        signal: "POST **/auth/login",
+        status: "fired" as const,
+        required: false,
+        waitedMs: 5298,
+      },
+      {
+        kind: "navigation" as const,
+        signal: "navigation to **/web/logs/**",
+        status: "fired" as const,
+        required: false,
+        waitedMs: 2532,
+      },
+      {
+        kind: "response" as const,
+        signal: "POST **/_search_stream",
+        status: "stale" as const,
+        required: false,
+        waitedMs: 30274,
+      },
     ],
     settleMs: 30274,
     observedDurationMs: 1200,
@@ -1048,14 +1066,23 @@ describe("stepOwnDetail", () => {
   };
 
   const step = (over: any) => ({
-    step_id: "s14", status: "ok" as const, duration_ms: 30285,
-    error: null, start_time: 0, end_time: 1, screenshot_key: null, ...over,
+    step_id: "s14",
+    status: "ok" as const,
+    duration_ms: 30285,
+    error: null,
+    start_time: 0,
+    end_time: 1,
+    screenshot_key: null,
+    ...over,
   });
 
   it("gives the failing step only the signals it actually owns", () => {
     // The run-level list is an accumulation across every step; rendering it on
     // the failed step credits it with traffic from steps it never ran.
-    const d = stepOwnDetail(step({ step_id: "s15", status: "fail", settle_signals: [] }), RUN_LEVEL);
+    const d = stepOwnDetail(
+      step({ step_id: "s15", status: "fail", settle_signals: [] }),
+      RUN_LEVEL,
+    );
     expect(d?.settleSignals).toEqual([]);
     expect(d?.error).toBe("did not become visible within 30000 ms");
   });
@@ -1064,7 +1091,13 @@ describe("stepOwnDetail", () => {
     const d = stepOwnDetail(
       step({
         settle_signals: [
-          { kind: "response", signal: "POST **/_search_stream", status: "stale", required: false, waited_ms: 30274 },
+          {
+            kind: "response",
+            signal: "POST **/_search_stream",
+            status: "stale",
+            required: false,
+            waited_ms: 30274,
+          },
         ],
       }),
       RUN_LEVEL,
@@ -1075,7 +1108,9 @@ describe("stepOwnDetail", () => {
 
   it("normalises waited_ms the same way the run-level mapper does", () => {
     const d = stepOwnDetail(
-      step({ settle_signals: [{ kind: "navigation", signal: "nav", status: "fired", waited_ms: 46 }] }),
+      step({
+        settle_signals: [{ kind: "navigation", signal: "nav", status: "fired", waited_ms: 46 }],
+      }),
       RUN_LEVEL,
     );
     expect(d?.settleSignals[0].waitedMs).toBe(46);
@@ -1097,7 +1132,9 @@ describe("stepOwnDetail", () => {
 
   it("never borrows the run-level error for a step that did not fail", () => {
     const d = stepOwnDetail(
-      step({ settle_signals: [{ kind: "navigation", signal: "nav", status: "fired", waited_ms: 1 }] }),
+      step({
+        settle_signals: [{ kind: "navigation", signal: "nav", status: "fired", waited_ms: 1 }],
+      }),
       RUN_LEVEL,
     );
     expect(d?.error).toBe("");
@@ -1105,7 +1142,9 @@ describe("stepOwnDetail", () => {
 
   it("works when there is no run-level failure detail at all", () => {
     const d = stepOwnDetail(
-      step({ settle_signals: [{ kind: "navigation", signal: "nav", status: "fired", waited_ms: 1 }] }),
+      step({
+        settle_signals: [{ kind: "navigation", signal: "nav", status: "fired", waited_ms: 1 }],
+      }),
       null,
     );
     expect(d?.settleSignals).toHaveLength(1);
@@ -1176,13 +1215,26 @@ describe("mergeLocatorLadder", () => {
 
 describe("stepOwnDetail locator ladder", () => {
   const step = (over: any) => ({
-    step_id: "s16", status: "fail" as const, duration_ms: 60000,
-    error: null, start_time: 0, end_time: 1, screenshot_key: null, ...over,
+    step_id: "s16",
+    status: "fail" as const,
+    duration_ms: 60000,
+    error: null,
+    start_time: 0,
+    end_time: 1,
+    screenshot_key: null,
+    ...over,
   });
   const RUN = {
-    stepId: "s16", stepName: "Assert visible row", stepIndex: 16,
-    error: "Timeout 60000ms exceeded", candidatesTried: [], settleSignals: [],
-    settleMs: null, observedDurationMs: null, screenshotKey: null, traceKey: null,
+    stepId: "s16",
+    stepName: "Assert visible row",
+    stepIndex: 16,
+    error: "Timeout 60000ms exceeded",
+    candidatesTried: [],
+    settleSignals: [],
+    settleMs: null,
+    observedDurationMs: null,
+    screenshotKey: null,
+    traceKey: null,
   };
 
   it("shows the whole authored ladder, not only what ran", () => {

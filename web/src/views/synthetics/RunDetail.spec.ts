@@ -467,4 +467,3 @@ describe("RunDetail — per-step page activity", () => {
     w.unmount();
   });
 });
-

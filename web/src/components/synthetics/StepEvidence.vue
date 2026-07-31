@@ -151,10 +151,7 @@ const noFallback = computed(() => candidates.value.length === 1);
         <h4 class="text-text-heading m-0 text-xs font-semibold">
           {{ t("synthetics.runDetail.locatorResolution") }}
         </h4>
-        <span
-          class="text-text-secondary text-2xs"
-          data-test="synthetics-run-detail-locator-count"
-        >
+        <span class="text-text-secondary text-2xs" data-test="synthetics-run-detail-locator-count">
           {{
             t("synthetics.runDetail.locatorTriedOf", {
               tried: triedCount,

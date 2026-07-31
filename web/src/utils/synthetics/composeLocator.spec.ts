@@ -44,9 +44,9 @@ describe("composeLocator", () => {
   // `descendant` is `A >> B`, a plain chain. Quoting it would make Playwright
   // parse the whole selector as one opaque engine body.
   it("does not JSON-quote a descendant, which is a plain chain", () => {
-    expect(composeLocator({ parts: [{ value: ROW }, { relation: "descendant", value: "span" }] })).toBe(
-      `${ROW} >> span`,
-    );
+    expect(
+      composeLocator({ parts: [{ value: ROW }, { relation: "descendant", value: "span" }] }),
+    ).toBe(`${ROW} >> span`);
   });
 
   it("escapes the inner selector for the three nested relations", () => {
@@ -155,15 +155,15 @@ describe("decomposeLocator", () => {
     expect(decomposeLocator("div >> internal:has-text=/^acme$/")).toEqual([]);
     expect(isCompositeSelector(ROW)).toBe(false);
     expect(
-      isCompositeSelector(composeLocator({ parts: [{ value: ROW }, { relation: "and", value: TEXT }] })),
+      isCompositeSelector(
+        composeLocator({ parts: [{ value: ROW }, { relation: "and", value: TEXT }] }),
+      ),
     ).toBe(true);
   });
 
   it("is not fooled by a >> inside a quoted engine body", () => {
     const inner = "div >> internal:has-text=/^acme$/";
-    const parts = decomposeLocator(
-      `${ROW} >> internal:and=${JSON.stringify(inner)}`,
-    );
+    const parts = decomposeLocator(`${ROW} >> internal:and=${JSON.stringify(inner)}`);
     expect(parts).toEqual([{ value: ROW }, { relation: "and", value: inner }]);
   });
 

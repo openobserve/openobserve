@@ -480,7 +480,12 @@ describe("BrowserJourney per-step failure evidence", () => {
 
   const journey = [
     { id: "s1", action: "navigate", name: "Open app", value: "https://app.test" },
-    { id: "s2", action: "click", name: "Sign in", locator: { candidates: [{ kind: "css", value: "#go" }] } },
+    {
+      id: "s2",
+      action: "click",
+      name: "Sign in",
+      locator: { candidates: [{ kind: "css", value: "#go" }] },
+    },
   ];
 
   function mountFailed() {

@@ -215,7 +215,12 @@ const downloadUrl = computed(() => (props.evidenceKey ? props.resolveUrl(props.e
         data-test="synthetics-evidence-error"
       >
         <template #actions>
-          <OButton variant="ghost" size="xs" data-test="synthetics-evidence-retry-btn" @click="emit('retry')">
+          <OButton
+            variant="ghost"
+            size="xs"
+            data-test="synthetics-evidence-retry-btn"
+            @click="emit('retry')"
+          >
             {{ t("synthetics.evidence.retry") }}
           </OButton>
         </template>

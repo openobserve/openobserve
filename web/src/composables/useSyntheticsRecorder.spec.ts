@@ -150,9 +150,7 @@ describe("useSyntheticsRecorder", () => {
       expect(cmd.testIdAttr).toBe("data-test");
 
       // Stream steps
-      const browserSteps: WireStep[] = [
-        { id: "s1", action: "click", selector: "#go" },
-      ];
+      const browserSteps: WireStep[] = [{ id: "s1", action: "click", selector: "#go" }];
       emitStreamEvent({ method: "setActions", browserSteps });
       expect(r.liveSteps.value).toHaveLength(1);
       expect(r.liveSteps.value[0].selector).toBe("#go");

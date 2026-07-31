@@ -83,8 +83,7 @@ const TRAILING_NTH = /\s*>>\s*nth=(\d+)\s*$/;
  * always emits a search engine first — so this only catches locators an author
  * typed. `has` expresses the same intent correctly.
  */
-const BARE_FILTER_ENGINE =
-  /^\s*internal:(?:has-text|has-not-text|has|has-not)=/;
+const BARE_FILTER_ENGINE = /^\s*internal:(?:has-text|has-not-text|has|has-not)=/;
 
 /** Would this value match nothing if used as the right-hand side of `and`? */
 export function isBareFilterEngine(value: string): boolean {

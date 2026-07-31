@@ -74,7 +74,7 @@ describe("isFrameworkGeneratedId", () => {
     expect(isFrameworkGeneratedId('[id=":r1a\\:"]')).toBe(true);
     expect(isFrameworkGeneratedId("div[_ngcontent-abc-c12]")).toBe(true);
     expect(isFrameworkGeneratedId(".css-1q2w3e4")).toBe(true);
-    expect(isFrameworkGeneratedId('[data-v-7ba5bd90]')).toBe(true);
+    expect(isFrameworkGeneratedId("[data-v-7ba5bd90]")).toBe(true);
   });
 
   // Upstream's own isGuidLike happens to catch Vue's useId() output while the

@@ -33,8 +33,7 @@ import { buildCreateBrowserTestPayload, mapResponseToBrowserCheck } from "./buil
  * of them fails.
  */
 
-const COMBINED =
-  '[data-test="org-row"] >> internal:and="div >> internal:has-text=/^acme_prod$/"';
+const COMBINED = '[data-test="org-row"] >> internal:and="div >> internal:has-text=/^acme_prod$/"';
 
 function journey(): BrowserStep[] {
   return [

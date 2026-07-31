@@ -136,9 +136,7 @@ describe("a part that can only narrow something else down", () => {
     expect(
       wrapper.find(test("synthetics-journey-step-locator-combine-filter-error")).exists(),
     ).toBe(true);
-    expect(
-      wrapper.find(test("stub-primary")).attributes("disabled"),
-    ).toBeDefined();
+    expect(wrapper.find(test("stub-primary")).attributes("disabled")).toBeDefined();
   });
 
   it("is fine under wraps", async () => {
@@ -154,7 +152,8 @@ describe("a part that can only narrow something else down", () => {
 // The one control that picks between the two shapes in the design: precision,
 // or an assertion that fails loudly the day the list is reordered.
 describe("the position toggle", () => {
-  const toggle = (w: VueWrapper) => w.find(test("synthetics-journey-step-locator-combine-position"));
+  const toggle = (w: VueWrapper) =>
+    w.find(test("synthetics-journey-step-locator-combine-position"));
 
   it("is absent when the base part carries no index", () => {
     expect(toggle(render([c(TESTID), c(ROLE)])).exists()).toBe(false);

@@ -201,7 +201,7 @@ function apply() {
           <span class="text-text-body min-w-0 flex-1 truncate font-mono text-xs">
             {{ part.value }}
           </span>
-          <span class="text-text-muted shrink-0 text-2xs">{{ matchedLabel(part) }}</span>
+          <span class="text-text-muted text-2xs shrink-0">{{ matchedLabel(part) }}</span>
         </div>
       </section>
 
@@ -216,7 +216,10 @@ function apply() {
         <p class="text-text-body m-0 text-sm">
           {{ t("synthetics.journey.locatorCombineRelationQuestion") }}
         </p>
-        <ORadioGroup :model-value="relation ?? undefined" @update:model-value="relation = $event as CompositeRelation">
+        <ORadioGroup
+          :model-value="relation ?? undefined"
+          @update:model-value="relation = $event as CompositeRelation"
+        >
           <ORadio
             value="and"
             :label="t('synthetics.journey.locatorCombineRelationAnd')"
