@@ -401,6 +401,10 @@ export const executeTestRun = async (opts: {
       from_node: opts.fromNode || undefined,
     });
     const errors = res.data?.errors || {};
+    // Per-node INPUT map: node_id -> the records that node received. A node's
+    // OUTPUT is derived from this (see nodeTestOutputBranches): since the graph is
+    // a single-incoming tree, a child's input IS its parent's output on that edge.
+    const inputs = res.data?.inputs || {};
     // Which nodes ran: from a replay, `fromNode` + everything downstream;
     // otherwise everything reachable from the trigger. Nodes NOT reachable
     // (unwired / disconnected) never executed, so they must not paint a ✓.
@@ -411,6 +415,7 @@ export const executeTestRun = async (opts: {
     const ranNodeIds = startId ? [...reachableFrom(wf.edges || [], [startId])] : [];
     workflowObj.testRun.result = {
       errors,
+      inputs,
       ranNodeIds,
       blockedNodeIds: downstreamOfErrorNodes(Object.keys(errors)),
     };
@@ -420,6 +425,45 @@ export const executeTestRun = async (opts: {
     workflowObj.testRun.result = null;
     return { ok: false, error: e?.response?.data?.message };
   }
+};
+
+// A single downstream branch of a node's OUTPUT: the target it feeds and the
+// records that target received (== what this node emitted on that edge). `records`
+// is null when the target got nothing (filtered out / never reached).
+export interface NodeOutputBranch {
+  targetId: string;
+  nodeType: string;
+  detail: string;
+  records: any[] | null;
+}
+
+// The INPUT a node received on the last Test run — the raw records from the
+// backend `inputs` map (shape varies by node type; rendered as-is). Null when the
+// node isn't in the map (0 records reached it) or there's no run.
+export const nodeTestInput = (nodeId: string): any[] | null => {
+  const inputs = workflowObj.testRun.result?.inputs;
+  const v = inputs?.[nodeId];
+  return Array.isArray(v) ? v : null;
+};
+
+// A node's OUTPUT, per outgoing edge. The graph is a single-incoming tree, so
+// each child's input came ONLY from this node — child input == this node's output
+// on that branch. One entry per outgoing edge (so fan-out reads per-target); an
+// empty array means a terminal node (a destination/sink) with no derivable output.
+export const nodeTestOutputBranches = (nodeId: string): NodeOutputBranch[] => {
+  const wf = workflowObj.currentSelectedWorkflow;
+  const byId = new Map<string, any>((wf.nodes || []).map((n: any) => [n.id, n]));
+  return (wf.edges || [])
+    .filter((e: any) => e.source === nodeId)
+    .map((e: any) => {
+      const target = byId.get(e.target);
+      return {
+        targetId: e.target,
+        nodeType: target?.data?.node_type || "",
+        detail: nodeConfigDetail(target?.data, 40),
+        records: nodeTestInput(e.target),
+      };
+    });
 };
 
 // Load a PAST run (from the Executions history) into the same testRun.result the

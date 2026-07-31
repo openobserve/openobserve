@@ -48,6 +48,8 @@ import useWorkflowCanvas, {
   loadWorkflowRun,
   executeTestRun,
   serializeWorkflow,
+  nodeTestInput,
+  nodeTestOutputBranches,
   currentTriggerKind,
 } from "@/plugins/workflows/useWorkflowCanvas";
 
@@ -314,6 +316,94 @@ describe("executeTestRun — ran-node scope + badge state", () => {
     expect(r.ok).toBe(false);
     expect(r.error).toBe("down");
     expect(workflowObj.testRun.result).toBeNull();
+  });
+});
+
+// nodeTestInput / nodeTestOutputBranches derive per-node Input and Output from the
+// backend `inputs` map. Output on an edge == the child's input (single-incoming
+// tree), so these two helpers power the whole step-drawer.
+describe("nodeTestInput + nodeTestOutputBranches — per-node I/O derivation", () => {
+  beforeEach(() => {
+    // trigger(t) -> function(f) -> destination(d);  t also -> condition(c) (fan-out)
+    workflowObj.currentSelectedWorkflow = {
+      id: "wf1",
+      name: "wf",
+      nodes: [
+        { id: "t", data: { node_type: "workflow_trigger" } },
+        { id: "f", data: { node_type: "function", name: "fn" } },
+        { id: "d", data: { node_type: "destination", destination_id: "sink" } },
+        { id: "c", data: { node_type: "condition" } },
+      ],
+      edges: [
+        { source: "t", target: "f" },
+        { source: "t", target: "c" },
+        { source: "f", target: "d" },
+      ],
+    } as any;
+    workflowObj.testRun.result = {
+      errors: {},
+      inputs: { t: [{ x: 0 }], f: [{ x: 1 }], d: [{ x: 2 }] }, // c got nothing
+      ranNodeIds: ["t", "f", "c", "d"],
+      blockedNodeIds: [],
+    } as any;
+  });
+
+  it("nodeTestInput returns the records a node received, null when absent", () => {
+    expect(nodeTestInput("f")).toEqual([{ x: 1 }]);
+    expect(nodeTestInput("c")).toBeNull(); // filtered out — not in inputs
+    expect(nodeTestInput("missing")).toBeNull();
+  });
+
+  it("nodeTestInput is null when there is no run", () => {
+    workflowObj.testRun.result = null as any;
+    expect(nodeTestInput("f")).toBeNull();
+  });
+
+  it("nodeTestOutputBranches: a node's output == each child's input", () => {
+    const branches = nodeTestOutputBranches("f");
+    expect(branches).toHaveLength(1);
+    expect(branches[0]).toMatchObject({ targetId: "d", nodeType: "destination" });
+    expect(branches[0].records).toEqual([{ x: 2 }]); // == inputs[d]
+  });
+
+  it("fan-out yields one branch per outgoing edge; a filtered branch has null records", () => {
+    const branches = nodeTestOutputBranches("t");
+    expect(branches.map((b) => b.targetId).sort()).toEqual(["c", "f"]);
+    const toC = branches.find((b) => b.targetId === "c")!;
+    const toF = branches.find((b) => b.targetId === "f")!;
+    expect(toC.records).toBeNull(); // c received nothing
+    expect(toF.records).toEqual([{ x: 1 }]);
+  });
+
+  it("a terminal (destination) has no outgoing edges → no branches", () => {
+    expect(nodeTestOutputBranches("d")).toEqual([]);
+  });
+});
+
+// executeTestRun stores the per-node inputs map so the drawer/badges can read it.
+describe("executeTestRun — stores the per-node inputs map", () => {
+  it("keeps res.data.inputs on testRun.result", async () => {
+    workflowObj.currentSelectedWorkflow = {
+      id: "wf1",
+      name: "wf",
+      nodes: [{ id: "t", data: { node_type: "workflow_trigger" } }],
+      edges: [],
+    } as any;
+    mockTest.mockResolvedValue({ data: { errors: {}, inputs: { t: [{ x: 1 }] } } });
+    await executeTestRun({ orgId: "o", inputs: [{ a: 1 }] });
+    expect((workflowObj.testRun.result as any).inputs).toEqual({ t: [{ x: 1 }] });
+  });
+
+  it("defaults inputs to {} when the response omits it", async () => {
+    workflowObj.currentSelectedWorkflow = {
+      id: "wf1",
+      name: "wf",
+      nodes: [{ id: "t", data: { node_type: "workflow_trigger" } }],
+      edges: [],
+    } as any;
+    mockTest.mockResolvedValue({ data: { errors: {} } });
+    await executeTestRun({ orgId: "o", inputs: [{ a: 1 }] });
+    expect((workflowObj.testRun.result as any).inputs).toEqual({});
   });
 });
 
