@@ -150,14 +150,14 @@ export class AlertsPage {
             alertConditionOperatorSelectOption: '[data-test="alert-condition-operator-select-option"]',
             alertTriggerThresholdInputField: '[data-test="alert-trigger-threshold-input-field"]',
 
-            // Alert Details Dialog (PR #10470 - rewritten from drawer to dialog)
-            alertDetailsDialog: '[data-test="alert-details-dialog"]',
-            alertDetailsTitle: '[data-test="alert-details-title"]',
-            alertDetailsEditButton: '[data-test="alert-details-edit-btn"]',
-            alertDetailsRefreshButton: '[data-test="alert-history-refresh-btn"]',
-            alertDetailsCloseButton: '[data-test="o-drawer-close-btn"]',
+            // Alert detail page (Alerts 2.0 replaced the row-click drawer with a route)
+            alertDetailsDialog: '[data-test="alerts-alertdetail-title"]',
+            alertDetailsTitle: '[data-test="alerts-alertdetail-title"]',
+            alertDetailsEditButton: '[data-test="alerts-alertdetail-edit"]',
+            alertDetailsRefreshButton: '[data-test="alerts-alertevaluationhistory-refresh"]',
             alertDetailsCopyConditionsButton: '[data-test="alert-details-copy-conditions-btn"]',
-            alertDetailsHistoryTable: '[data-test="alert-details-history-table"]',
+            alertDetailsHistoryTable: '[data-test="alerts-alertevaluationhistory-table"]',
+            alertDetailsHistoryEmpty: '[data-test="alerts-alertevaluationhistory-empty"]',
 
             // Evaluation Status Indicator (v3 UI - rendered in AlertWizardRightColumn with data-test)
             alertStatusIndicator: '[data-test="alert-status-indicator"]',
@@ -512,21 +512,21 @@ export class AlertsPage {
         return this.management.submitAlertEdit();
     }
 
-    // ==================== ALERT DETAILS DIALOG (PR #10470) ====================
+    // ==================== ALERT DETAIL PAGE ====================
 
     /**
-     * Open alert details dialog by clicking alert name in the list
+     * Open the alert detail page by clicking the alert name in the list
      */
     async openAlertDetailsDialog(alertName) {
         return this.management.openAlertDetailsDialog(alertName);
     }
 
     /**
-     * Verify alert details dialog is visible
+     * Verify the alert detail page is visible
      */
     async expectAlertDetailsDialogVisible() {
         await expect(this.page.locator(this.locators.alertDetailsDialog)).toBeVisible({ timeout: 10000 });
-        testLogger.info('Alert details dialog is visible');
+        testLogger.info('Alert detail page is visible');
     }
 
     /**
@@ -534,15 +534,15 @@ export class AlertsPage {
      * Returns 'table' if history table is visible, 'empty' if empty state is shown
      */
     async expectAlertDetailsHistorySectionVisible() {
-        // The history section shows either a history table (when history exists) or an empty state
         const table = this.page.locator(this.locators.alertDetailsHistoryTable);
-        const emptyState = this.page.locator('text=No history available').or(this.page.locator('.OIcon:has-text("history")'));
+        const historyEntry = table.locator('[data-test="alerts-alertevaluationhistory-status"]').first();
+        const emptyState = this.page.locator(this.locators.alertDetailsHistoryEmpty);
 
-        // Wait for either to appear — use .first() because .or() can match multiple elements
-        // (e.g. the history icon may appear in the dialog AND in navigation)
-        await expect(table.or(emptyState).first()).toBeVisible({ timeout: 10000 });
+        // The table shell renders before its async history request completes. Wait for
+        // actual row content or the explicit empty state so callers cannot race the fetch.
+        await expect(historyEntry.or(emptyState).first()).toBeVisible({ timeout: 15000 });
 
-        if (await table.isVisible({ timeout: 1000 }).catch(() => false)) {
+        if (await historyEntry.isVisible({ timeout: 1000 }).catch(() => false)) {
             testLogger.info('Alert details history table is visible');
             return 'table';
         }
@@ -551,18 +551,18 @@ export class AlertsPage {
     }
 
     /**
-     * Get the alert details dialog title text
+     * Get the alert detail page title text
      */
     async getAlertDetailsTitleText() {
         const title = this.page.locator(this.locators.alertDetailsTitle);
         await expect(title).toBeVisible({ timeout: 5000 });
         const text = await title.textContent();
         testLogger.info('Alert details title', { text });
-        return text.trim();
+        return (text || '').trim();
     }
 
     /**
-     * Click the edit button in alert details dialog
+     * Click the edit button on the alert detail page
      */
     async clickAlertDetailsEditButton() {
         await this.page.locator(this.locators.alertDetailsEditButton).click();
@@ -572,7 +572,7 @@ export class AlertsPage {
     }
 
     /**
-     * Click the refresh button in alert details dialog
+     * Click the history refresh button on the alert detail page
      */
     async clickAlertDetailsRefreshButton() {
         await this.page.locator(this.locators.alertDetailsRefreshButton).click();
@@ -590,20 +590,12 @@ export class AlertsPage {
     }
 
     /**
-     * Close the alert details dialog
+     * Return from the alert detail page to the alert list
      */
     async closeAlertDetailsDialog() {
-        const closeBtn = this.page.locator(this.locators.alertDetailsCloseButton);
-        if (await closeBtn.isVisible({ timeout: 3000 })) {
-            await closeBtn.click();
-            await this.page.waitForTimeout(500);
-            testLogger.info('Closed alert details dialog');
-        } else {
-            await this.page.locator('[data-test="o-dialog-close-btn"]').first().click().catch(() => {
-                this.page.locator('body').click({ position: { x: 10, y: 10 } });
-            });
-            testLogger.info('Closed alert details dialog via close button');
-        }
+        await this.page.goBack();
+        await expect(this.page.locator('[data-test="alert-list-page"]')).toBeVisible({ timeout: 10000 });
+        testLogger.info('Returned from alert detail page to alert list');
     }
 
     /**
@@ -728,23 +720,23 @@ export class AlertsPage {
     }
 
     /**
-     * Verify action buttons (close, optional refresh) are visible in the alert details dialog
-     * Note: Edit button was removed from the UI in alert history sidebar refactoring
+     * Verify action buttons are visible on the alert detail page
      */
     async expectAlertDetailsActionButtonsVisible() {
         // Refresh button may not be present on all deployments (absent on alpha1 cloud)
         const refreshVisible = await this.page.locator(this.locators.alertDetailsRefreshButton)
             .isVisible({ timeout: 3000 }).catch(() => false);
-        await expect(this.page.locator(this.locators.alertDetailsCloseButton)).toBeVisible({ timeout: 10000 });
+        await expect(this.page.locator(this.locators.alertDetailsEditButton)).toBeVisible({ timeout: 10000 });
         testLogger.info('Alert details action buttons visible', { refreshButton: refreshVisible });
     }
 
     /**
-     * Verify the alert details dialog is closed / not visible
+     * Verify the alert detail page is closed / not visible
      */
     async expectAlertDetailsDialogClosed() {
         await expect(this.page.locator(this.locators.alertDetailsDialog)).not.toBeVisible({ timeout: 5000 });
-        testLogger.info('Alert details dialog is closed');
+        await expect(this.page.locator('[data-test="alert-list-page"]')).toBeVisible({ timeout: 5000 });
+        testLogger.info('Alert detail page is closed');
     }
 
     // ==================== DELEGATE TO BULK OPERATIONS ====================

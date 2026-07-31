@@ -516,12 +516,11 @@ export class AlertManagement {
     }
 
     /**
-     * Open alert details dialog by clicking alert name in the list (PR #10470)
-     * The new AlertHistoryDrawer is rendered inside a dialog
+     * Open the routed alert detail page by clicking the alert name in the list
      * @param {string} alertName - Name of the alert
      */
     async openAlertDetailsDialog(alertName) {
-        testLogger.info('Opening alert details dialog', { alertName });
+        testLogger.info('Opening alert detail page', { alertName });
 
         // Try folder-specific search first
         await this.searchAlert(alertName);
@@ -546,14 +545,13 @@ export class AlertManagement {
 
         await alertRow.waitFor({ state: 'visible', timeout: 15000 });
 
-        // Click the alert name cell (2nd column) to open details dialog
-        const alertNameCell = alertRow.locator('td').nth(1);
-        await alertNameCell.click();
-        await this.page.waitForTimeout(1500);
-
-        // Wait for the new dialog to appear
-        await expect(this.page.locator('[data-test="alert-details-dialog"]')).toBeVisible({ timeout: 10000 });
-        testLogger.info('Alert details dialog opened', { alertName });
+        // Clicking anywhere on the row opens the Alerts 2.0 detail route. Click the
+        // exact name rather than a column index because selection/index columns are
+        // configurable and can shift the name cell.
+        await alertRow.getByText(alertName, { exact: true }).first().click();
+        await expect(this.page).toHaveURL(/\/alerts\/detail\/[^/?]+(?:\?|$)/, { timeout: 10000 });
+        await expect(this.page.locator('[data-test="alerts-alertdetail-title"]')).toBeVisible({ timeout: 10000 });
+        testLogger.info('Alert detail page opened', { alertName });
     }
 
     /**

@@ -552,7 +552,7 @@ export class AlertCreationWizard {
         // transient (OToast auto-dismisses) and under concurrent load can land after the wait
         // window or be missed entirely — racing it caused the intermittent flake. Arm a
         // waitForResponse on the POST/PUT to /alerts BEFORE clicking, so we sync on the true
-        // save-complete event; the toast/'15 Mins' row then become fast, best-effort checks.
+        // save-complete event.
         const savePromise = this.page.waitForResponse(
             (r) => /\/alerts$/.test(new URL(r.url()).pathname) && ['POST', 'PUT'].includes(r.request().method()),
             { timeout: 45000 }
@@ -580,7 +580,14 @@ export class AlertCreationWizard {
         if (!savedViaApi && !toastSeen) {
             throw new Error('Scheduled alert save not confirmed by API response or success toast');
         }
-        await expect(this.page.getByRole('cell', { name: '15 Mins' }).first()).toBeVisible({ timeout: 15000 });
+        // Alerts 2.0 intentionally removed the Frequency column from the list, so
+        // "15 Mins" is no longer a valid post-save signal. Verify the created row
+        // itself after the wizard returns to the folder list.
+        const createdAlertRow = this.page
+            .locator('[data-test="alert-list-table"] tbody tr')
+            .filter({ hasText: randomAlertName })
+            .first();
+        await expect(createdAlertRow).toBeVisible({ timeout: 15000 });
         testLogger.info('Successfully created scheduled alert', { alertName: randomAlertName, savedViaApi, toastSeen });
 
         return randomAlertName;
