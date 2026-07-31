@@ -479,7 +479,8 @@ pub fn create_action_server_router() -> axum::Router {
         middleware,
         routing::{get, post},
     };
-    use openobserve_api_http::handler::http::{request::action_server, router::cors_layer};
+    use openobserve_api_http::handler::http::router::cors_layer;
+    use openobserve_api_management::request::action_server;
 
     let cfg = get_config();
 

@@ -7258,6 +7258,7 @@ dependencies = [
  "openobserve-api-grpc",
  "openobserve-api-http",
  "openobserve-api-management",
+ "openobserve-api-pipelines",
  "openobserve-core",
  "openobserve-jobs",
  "openobserve-mcp",
