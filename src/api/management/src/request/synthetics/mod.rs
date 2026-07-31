@@ -1106,7 +1106,7 @@ async fn process_ack(
         key: format!("{}/{}", resp.synthetics_name, resp.synthetics_id),
         start_time: checked_at,
         end_time: checked_at,
-        status: config::meta::self_reporting::usage::TriggerDataStatus::Completed,
+        status: config::meta::self_reporting::usage::RunOutcome::Succeeded,
         success_response: Some(status.clone()),
         error: error.clone(),
         evaluation_took_in_secs: Some(response_time_ms / 1000.0),

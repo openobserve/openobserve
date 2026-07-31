@@ -97,3 +97,11 @@ tests/ui-testing/.env.old
 /.claude/skills/*
 !/.claude/skills/ui-architect/
 !/.claude/skills/eslint-error-handling/
+
+alert_mock
+node_modules/
+# Local verification artifacts (browser screenshots, per-crate scratch DBs)
+/alerts-list-f2.png
+/final-list.png
+/form-advanced.png
+src/*/data/

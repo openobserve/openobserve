@@ -106,7 +106,7 @@ describe("ActionScripts", () => {
             props: ["title", "message"],
             emits: ["update:ok", "update:cancel"],
           },
-          QTablePagination: {
+          Pagination: {
             template: '<div data-test="table-pagination">Pagination</div>',
             props: ["scope", "pageTitle", "position", "resultTotal", "perPageOptions"],
             emits: ["update:changeRecordPerPage"],
@@ -539,7 +539,7 @@ describe("ActionScripts", () => {
 
   describe("Pagination", () => {
     // The component uses OTable with built-in client-side pagination (pagination="client").
-    // There is no changePagination method or QTablePagination component in this version.
+    // There is no changePagination method or Pagination component in this version.
     // The OTable component handles all pagination state internally.
 
     it("should display the action scripts table which owns pagination", () => {

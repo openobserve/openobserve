@@ -229,7 +229,6 @@ describe("SyntaxGuide", () => {
 
     it("should have tooltip component for accessibility", () => {
       const button = wrapper.find('[data-cy="syntax-guide-button"]');
-      // Check that QTooltip component is present as a child
       const tooltipComponent = button.findComponent({ name: "OTooltip" });
       expect(tooltipComponent.exists()).toBe(true);
     });
@@ -238,7 +237,6 @@ describe("SyntaxGuide", () => {
   describe("Component Integration", () => {
     it("should work with i18n translations", () => {
       const button = wrapper.find('[data-cy="syntax-guide-button"]');
-      // Check that QTooltip component is present
       const tooltipComponent = button.findComponent({ name: "OTooltip" });
       expect(tooltipComponent.exists()).toBe(true);
     });

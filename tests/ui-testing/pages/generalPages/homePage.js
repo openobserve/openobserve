@@ -546,7 +546,7 @@ export class HomePage {
      */
     async isDarkMode() {
         // The dark-mode signal is the `.dark` class on <html>
-        // (document.documentElement) — set by utils/theme.ts. The legacy Quasar
+        // (document.documentElement) — set by utils/theme.ts. The legacy
         // `body--dark` class on <body> was retired in the design-token
         // migration (#13173).
         return await this.page.evaluate(() => document.documentElement.classList.contains('dark'));

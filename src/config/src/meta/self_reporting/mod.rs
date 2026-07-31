@@ -277,7 +277,7 @@ impl ReportingRunner {
 #[cfg(test)]
 mod tests {
     use tokio::time::Duration;
-    use usage::{TriggerData, TriggerDataStatus, TriggerDataType, UsageData, UsageEvent};
+    use usage::{RunOutcome, TriggerData, TriggerDataType, UsageData, UsageEvent};
 
     use super::*;
 
@@ -361,7 +361,7 @@ mod tests {
             next_run_at: 1234567890,
             is_realtime: true,
             is_silenced: false,
-            status: TriggerDataStatus::Completed,
+            status: RunOutcome::Succeeded,
             start_time: 1234567890,
             end_time: 1234567890,
             retries: 0,
@@ -380,6 +380,12 @@ mod tests {
             dedup_count: None,
             grouped: None,
             group_size: None,
+            actual_value: None,
+            threshold_value: None,
+            threshold_operator: None,
+            level: None,
+            group_label: None,
+            value_is_lower_bound: None,
         };
 
         let result = queue
@@ -395,7 +401,7 @@ mod tests {
                 assert_eq!(data.org, "test_org");
                 assert_eq!(data.module, TriggerDataType::Alert);
                 assert_eq!(data.key, "test_key");
-                assert_eq!(data.status, TriggerDataStatus::Completed);
+                assert_eq!(data.status, RunOutcome::Succeeded);
             }
             _ => panic!("Expected Trigger data"),
         }
@@ -895,7 +901,7 @@ mod tests {
             next_run_at: 1234567890,
             is_realtime: true,
             is_silenced: false,
-            status: TriggerDataStatus::Completed,
+            status: RunOutcome::Succeeded,
             start_time: 1234567890,
             end_time: 1234567890,
             retries: 0,
@@ -914,6 +920,12 @@ mod tests {
             dedup_count: None,
             grouped: None,
             group_size: None,
+            actual_value: None,
+            threshold_value: None,
+            threshold_operator: None,
+            level: None,
+            group_label: None,
+            value_is_lower_bound: None,
         };
 
         let error_data = error::ErrorData {
@@ -963,7 +975,7 @@ mod tests {
             next_run_at: 1234567890,
             is_realtime: true,
             is_silenced: false,
-            status: TriggerDataStatus::Completed,
+            status: RunOutcome::Succeeded,
             start_time: 1234567890,
             end_time: 1234567890,
             retries: 0,
@@ -982,6 +994,12 @@ mod tests {
             dedup_count: None,
             grouped: None,
             group_size: None,
+            actual_value: None,
+            threshold_value: None,
+            threshold_operator: None,
+            level: None,
+            group_label: None,
+            value_is_lower_bound: None,
         };
 
         let trigger_data2 = TriggerData {
@@ -1021,7 +1039,7 @@ mod tests {
             next_run_at: 1234567890,
             is_realtime: true,
             is_silenced: false,
-            status: TriggerDataStatus::Completed,
+            status: RunOutcome::Succeeded,
             start_time: 1234567890,
             end_time: 1234567890,
             retries: 0,
@@ -1040,6 +1058,12 @@ mod tests {
             dedup_count: None,
             grouped: None,
             group_size: None,
+            actual_value: None,
+            threshold_value: None,
+            threshold_operator: None,
+            level: None,
+            group_label: None,
+            value_is_lower_bound: None,
         };
 
         // Should succeed when queue has space

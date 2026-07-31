@@ -285,6 +285,13 @@ jobs:
                 "alerts-template-prebuilt-guard.spec.js",
                 "alerts-form-validation.spec.js",
                 "anomaly-detection-form-validation.spec.js",
+                # Alerts 4.0 (multi-alerts) e2e — PR #13547
+                "alerts-priority-tags.spec.js",
+                "alerts-multialert-api.spec.js",
+                "alerts-multialert-ui.spec.js",
+                "alerts-multialert-regression.spec.js",
+                "alerts-multialert-firing.spec.js",
+                "alerts-multialert-transitions.spec.js",
               ]
           - testfolder: "Dashboards-Core"
             browser: "chrome"

@@ -598,6 +598,7 @@ describe("AlertHistoryDrawer.vue", () => {
         "#",
         "timestamp",
         "status",
+        "condition",
         "evaluation_time",
         "query_time",
         "error",

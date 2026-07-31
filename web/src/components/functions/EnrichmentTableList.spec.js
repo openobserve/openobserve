@@ -163,34 +163,10 @@ describe("EnrichmentTableList Component", () => {
           store: store,
         },
         stubs: {
-          QCard: false,
-          QPage: false,
-          QTable: {
-            template:
-              '<div><slot name="top" :scope="scope"></slot><slot></slot><slot name="body-cell-actions" :props="rowProps"></slot></div>',
-            data() {
-              return {
-                scope: {
-                  pagination: { rowsPerPage: 20 },
-                },
-                rowProps: {
-                  row: { name: "test-table" },
-                },
-              };
-            },
-            methods: {
-              setPagination: vi.fn(),
-            },
-          },
-          QBtn: false,
-          QInput: false,
-          QDialog: false,
           QTd: false,
-          QTooltip: false,
-          QIcon: false,
           RouterLink: true,
           NoData: true,
-          QTablePagination: true,
+          Pagination: true,
           AddEnrichmentTable: true,
           ConfirmDialog: true,
           EnrichmentSchema: true,

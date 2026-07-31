@@ -21,6 +21,11 @@ const TEST_STREAM = 'e2e_automate';
 // Test timeout constants (in milliseconds)
 const NETWORK_IDLE_TIMEOUT_MS = 30000;
 
+// Self-contained notification sink — this instance's own ingest, replacing the previous
+// external webhook placeholder (no third-party dependency or rate limit). These tests only
+// need a destination that SAVES; delivery is not asserted here.
+const notificationSinkUrl = () => `${process.env.ZO_BASE_URL}/api/${getOrgIdentifier()}/alerts_notify_sink/_json`;
+
 test.describe("Alerts Advanced Coverage Tests", () => {
     let pm;
 
@@ -55,8 +60,8 @@ test.describe("Alerts Advanced Coverage Tests", () => {
 
         await pm.alertDestinationsPage.navigateToDestinations();
         await pm.alertDestinationsPage.waitForDestinationListReady();
-        const webhookUrl = 'https://webhook.site/test-multicond-' + uniqueSuffix;
-        await pm.alertDestinationsPage.createDestination(destinationName, webhookUrl, templateName);
+        const destinationUrl = notificationSinkUrl();
+        await pm.alertDestinationsPage.createDestination(destinationName, destinationUrl, templateName);
         testLogger.info('Destination created', { destinationName });
 
         const alertsUrl = `${logData.alertUrl}?org_identifier=${getOrgIdentifier()}`;
@@ -91,8 +96,8 @@ test.describe("Alerts Advanced Coverage Tests", () => {
 
         await pm.alertDestinationsPage.navigateToDestinations();
         await pm.alertDestinationsPage.waitForDestinationListReady();
-        const webhookUrl = 'https://webhook.site/test-toggle-' + uniqueSuffix;
-        await pm.alertDestinationsPage.createDestination(destinationName, webhookUrl, templateName);
+        const destinationUrl = notificationSinkUrl();
+        await pm.alertDestinationsPage.createDestination(destinationName, destinationUrl, templateName);
         testLogger.info('Destination created', { destinationName });
 
         // Navigate back to alerts page
@@ -125,8 +130,8 @@ test.describe("Alerts Advanced Coverage Tests", () => {
 
         await pm.alertDestinationsPage.navigateToDestinations();
         await pm.alertDestinationsPage.waitForDestinationListReady();
-        const webhookUrl = 'https://webhook.site/test-bulk-' + uniqueSuffix;
-        await pm.alertDestinationsPage.createDestination(destinationName, webhookUrl, templateName);
+        const destinationUrl = notificationSinkUrl();
+        await pm.alertDestinationsPage.createDestination(destinationName, destinationUrl, templateName);
         testLogger.info('Destination created', { destinationName });
 
         const alertsUrl = `${logData.alertUrl}?org_identifier=${getOrgIdentifier()}`;
@@ -181,8 +186,8 @@ test.describe("Alerts Advanced Coverage Tests", () => {
 
         await pm.alertDestinationsPage.navigateToDestinations();
         await pm.alertDestinationsPage.waitForDestinationListReady();
-        const webhookUrl = 'https://webhook.site/test-dedup-' + uniqueSuffix;
-        await pm.alertDestinationsPage.createDestination(destinationName, webhookUrl, templateName);
+        const destinationUrl = notificationSinkUrl();
+        await pm.alertDestinationsPage.createDestination(destinationName, destinationUrl, templateName);
         testLogger.info('Destination created', { destinationName });
 
         const alertsUrl = `${logData.alertUrl}?org_identifier=${getOrgIdentifier()}`;

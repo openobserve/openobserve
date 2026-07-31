@@ -283,6 +283,22 @@ impl DeduplicationConfig {
     }
 }
 
+/// Whether an existing dedup reservation should suppress this notification
+/// (`alerts_2.md` §5.5 MN-6).
+///
+/// Deduplication currently records a fingerprint as *seen* the moment a row
+/// passes — before the notification is sent — so a send that then fails is
+/// suppressed as a duplicate on the retry, and the page is lost for the whole
+/// dedup window. The `notification_sent` column already exists for exactly
+/// this and has never been read.
+///
+/// The rule: a reservation suppresses only once it has been **confirmed** by a
+/// successful delivery. An unconfirmed reservation inside the window is a
+/// delivery that never landed, so the next evaluation must be allowed through.
+pub fn reservation_suppresses(notification_sent: bool, within_window: bool) -> bool {
+    within_window && notification_sent
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -669,5 +685,46 @@ mod tests {
     #[test]
     fn test_default_group_wait() {
         assert_eq!(default_group_wait(), 30);
+    }
+
+    // ── §5.5 MN-6: reserve, then confirm on successful delivery ─────────────
+
+    #[test]
+    fn test_an_unconfirmed_reservation_does_not_suppress() {
+        // THE bug this rule exists for. The previous evaluation reserved the
+        // fingerprint and its send then failed, so nothing was delivered.
+        // Suppressing here would convert one transient webhook error into a
+        // page silently lost for the whole dedup window.
+        assert!(!reservation_suppresses(false, true));
+    }
+
+    #[test]
+    fn test_a_confirmed_reservation_inside_the_window_suppresses() {
+        // The ordinary case dedup exists for: it really was delivered.
+        assert!(reservation_suppresses(true, true));
+    }
+
+    #[test]
+    fn test_an_expired_reservation_never_suppresses() {
+        // Outside the window nothing suppresses, confirmed or not — otherwise
+        // a delivered alert could never fire again.
+        assert!(!reservation_suppresses(true, false));
+        assert!(!reservation_suppresses(false, false));
+    }
+
+    #[test]
+    fn test_confirmation_is_required_not_merely_preferred() {
+        // Stated as the invariant rather than a case list: within the window,
+        // suppression must track confirmation exactly. An implementation that
+        // ignored `notification_sent` (today's behaviour) fails this.
+        for within in [true, false] {
+            for sent in [true, false] {
+                assert_eq!(
+                    reservation_suppresses(sent, within),
+                    within && sent,
+                    "within_window={within}, notification_sent={sent}"
+                );
+            }
+        }
     }
 }
