@@ -52,6 +52,10 @@ All token-backed and dark-mode-safe. Reuse these before inventing anything.
   `badgeGroups.ts` (`alertStatus`, `alertType`, `severity`, `streamType`,
   `userRole`, `serviceStatus`, …). One registry → the same value is the same
   colour everywhere. Need a new family? Add a group there, don't hand-roll a pill.
+  Check the group covers **every** value the API can return (a missing key falls
+  back to a generic chip) — and don't set `size` on the group: a group-level size
+  silently overrides the call sites, so its chips end up a different size from the
+  Status chip beside them. Pass `size` at the call site, matching its siblings.
 - **Row state signal** — an extreme-left colour **rail** via `OTable`'s
   per-row `getRowStyle` (inset box-shadow, rem width, token colour) + a **light
   exception highlight** via `row-class` (tint only the rows that need action —
@@ -125,12 +129,37 @@ strip feeds a drill-down.
 
 ---
 
+### Before you colour a state, check how it CLEARS
+
+A State column is a claim about *now*. Read the write path of whatever field backs
+it and confirm something resets it — an expiry/retention job, a success write, a
+status transition. A sticky error field (written on failure, never cleared) pins a
+row to "Errored" forever and the column becomes noise within a week. Pipelines'
+`last_error` is safe because the backend expires it on a retention interval;
+verify the equivalent before promoting any field to a chip. If nothing clears it,
+label it for what it is ("Last error", a timestamp) instead of a live state.
+
+### Grey vs amber — the two "not green" states
+
+They are not interchangeable, and the wrong pick cries wolf:
+
+- **Grey = no data / unknown / not in use.** Never ingested, never run, not yet
+  configured. Usually benign — a stream created five minutes ago, a schema-only
+  stream, a job that has not had its first run. Pair with a muted "Never".
+- **Amber = it WAS working and went quiet, or is degrading.** Silence from a thing
+  that used to report is the case worth a second look.
+
+Amber on the "never" case fires on every freshly created object, which trains
+people to ignore the colour. When in doubt, grey.
+
 ## Step 3 — Keep everything else calm
 
 Colour only earns attention if most of the screen stays quiet:
 
 - **Highlight exceptions, not the norm.** Tint the failed/paused rows; leave the
   healthy majority clean. A table where every row is coloured signals nothing.
+  And if a page has no true failure state (a catalog list), the calm answer is a
+  rail with no row wash at all — not a wash invented for symmetry with Alerts.
 - **Muted zero.** A `0` renders muted, not in the loud tone colour, and "no
   data" is a `—`, not a wall of zeros. (`OStatCard` does this.)
 - **State is border/colour, not fills.** Selected/hover on interactive tiles use
