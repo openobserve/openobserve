@@ -291,6 +291,7 @@ jobs:
                 "alerts-multialert-ui.spec.js",
                 "alerts-multialert-regression.spec.js",
                 "alerts-multialert-firing.spec.js",
+                "alerts-multialert-transitions.spec.js",
               ]
           - testfolder: "Dashboards-Core"
             browser: "chrome"

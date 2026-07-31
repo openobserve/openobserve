@@ -131,6 +131,12 @@ async function getAlertGroups(page, alertId) {
   return r.ok() ? r.json() : { list: [] };
 }
 
+/** Durable level-change history for an alert (from_level -> to_level, newest first). */
+async function getAlertTransitions(page, alertId, { limit = 20 } = {}) {
+  const r = await api(page, 'get', `${urls().v2}/alerts/${alertId}/groups/transitions?limit=${limit}`);
+  return r.ok() ? r.json() : { list: [] };
+}
+
 /**
  * Poll the alert list until `name` has a run outcome (i.e. the scheduler evaluated it),
  * or the timeout elapses. Returns the list item (or null). Scheduled alerts are picked
@@ -147,6 +153,22 @@ async function waitForAlertOutcome(page, name, { timeoutMs = 60000, pollMs = 500
   }
 }
 
+/**
+ * Poll the alert list until `name` reaches `level` (ok|warning|critical|no_data),
+ * or the timeout elapses. Returns the matching list item, or the last item seen
+ * (or null) so the caller can assert a helpful message on timeout.
+ */
+async function waitForAlertLevel(page, name, level, { timeoutMs = 120000, pollMs = 5000 } = {}) {
+  const deadline = Date.now() + timeoutMs;
+  let item = null;
+  for (;;) {
+    item = (await listAlerts(page)).find((a) => a.name === name) || null;
+    if (item && item.level === level) return item;
+    if (Date.now() >= deadline) return item;
+    await page.waitForTimeout(pollMs);
+  }
+}
+
 /** True for outcomes that mean the alert fired (delivery success is a separate axis). */
 function isFiringOutcome(outcome) {
   return outcome === 'firing' || outcome === 'notify_failed';
@@ -157,5 +179,6 @@ module.exports = {
   uniq, urls, api,
   simpleAlert, multiAlert, groupedSimpleAlert, realtimeAlert,
   createAlert, listAlerts, findAlertId, deleteAlerts, seedAlertFixtures,
-  ingest, getAlertGroups, waitForAlertOutcome, isFiringOutcome,
+  ingest, getAlertGroups, getAlertTransitions,
+  waitForAlertOutcome, waitForAlertLevel, isFiringOutcome,
 };
