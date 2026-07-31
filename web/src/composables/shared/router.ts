@@ -423,11 +423,70 @@ const useRoutes = () => {
       ],
     },
     {
+      path: "slos",
+      name: "sloList",
+      component: () => import("@/views/slos/SloList.vue"),
+      meta: {
+        title: "SLOs",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    },
+    {
+      // Literal segments before the {slo_id} catch-all, matching the router's
+      // ordering rule.
+      path: "slos/add",
+      name: "addSlo",
+      component: () => import("@/views/slos/AddSlo.vue"),
+      meta: {
+        title: "New SLO",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    },
+    {
+      path: "slos/edit/:slo_id",
+      name: "editSlo",
+      component: () => import("@/views/slos/AddSlo.vue"),
+      meta: {
+        title: "Edit SLO",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    },
+    {
+      path: "slos/:slo_id",
+      name: "sloDetail",
+      component: () => import("@/views/slos/SloDetail.vue"),
+      meta: {
+        title: "SLO",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    },
+    {
       path: "alerts",
       name: "alertList",
       component: AlertList,
       meta: {
         title: "Alerts",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    },
+    {
+      // Alert status page. Replaces the row-click side panel, and is where a
+      // multi-alert's per-group state lives (alerts_2.md §5.4).
+      path: "alerts/detail/:alert_id",
+      name: "alertDetail",
+      component: () => import("@/views/alerts/AlertDetail.vue"),
+      meta: {
+        title: "Alert Detail",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);

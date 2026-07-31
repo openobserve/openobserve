@@ -96,8 +96,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :columns="tableColumns"
               row-key="_rowKey"
               pagination="none"
-              :default-columns="false"
               :row-height="24"
+              :default-columns="false"
               :show-global-filter="false"
               :global-filter="detailSearchQuery"
               class="o2-table o2-schema-table log-detail-source-table border-card-glass-border w-full border border-solid"
@@ -553,7 +553,7 @@ export default defineComponent({
     },
     initialTab: {
       type: String,
-      default: "table",
+      default: "json",
     },
   },
   methods: {
@@ -586,7 +586,7 @@ export default defineComponent({
     const store = useStore();
     const { isDark } = useTheme();
     const tableDropdownOpenMap = reactive<Record<string, boolean>>({});
-    const tab = ref(props.initialTab || "table");
+    const tab = ref(props.initialTab || "json");
     const selectedRelativeValue = ref<number>(10);
     const recordSizeOptions = ref<Array<{ label: string; value: number }>>([
       { label: "10", value: 10 },
@@ -708,14 +708,14 @@ export default defineComponent({
     const availableTabs = computed(() => {
       const tabs = [
         {
-          name: "table",
-          label: t("common.table"),
-          dataTest: "log-detail-table-tab",
-        },
-        {
           name: "json",
           label: t("common.json"),
           dataTest: "log-detail-json-tab",
+        },
+        {
+          name: "table",
+          label: t("common.table"),
+          dataTest: "log-detail-table-tab",
         },
       ];
       if (serviceStreamsEnabled.value && config.isEnterprise === "true") {

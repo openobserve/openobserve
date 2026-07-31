@@ -106,6 +106,46 @@ describe("groupNavLinks", () => {
     expect(entries.some((e) => e.type === "linkGroup")).toBe(false);
   });
 
+  it("moves SLOs under the Alerts group", () => {
+    const entries = groupNavLinks([link("home"), link("alertList"), link("sloList")]);
+    // SLOs is absorbed; the Alerts tile takes the alertList slot.
+    expect(keysOf(entries)).toEqual(["link:home", "linkGroup:alerts"]);
+    const alerts = entries.find(
+      (e): e is Extract<RailEntry, { type: "linkGroup" }> =>
+        e.type === "linkGroup" && e.item.name === "alerts",
+    );
+    expect(alerts?.item.link).toBe("/alerts");
+    expect(alerts?.children.map((c) => c.name)).toEqual(["alertList", "sloList"]);
+  });
+
+  it("keeps Alerts a plain link when SLOs is hidden", () => {
+    // custom_hide_menus can drop either item; a one-child group is pointless.
+    expect(keysOf(groupNavLinks([link("home"), link("alertList")]))).toEqual([
+      "link:home",
+      "link:alertList",
+    ]);
+  });
+
+  it("keeps SLOs a plain link when Alerts is hidden", () => {
+    expect(keysOf(groupNavLinks([link("home"), link("sloList")]))).toEqual([
+      "link:home",
+      "link:sloList",
+    ]);
+  });
+
+  it("keeps Incidents out of the Alerts group, between it and Data", () => {
+    // MainLayout splices Incidents after alertList, i.e. BETWEEN the two
+    // absorbed items — the Alerts tile must still land in the alertList slot.
+    const entries = groupNavLinks([
+      link("alertList"),
+      link("incidentList"),
+      link("sloList"),
+      link("streams"),
+      link("pipeline"),
+    ]);
+    expect(keysOf(entries)).toEqual(["linkGroup:alerts", "link:incidentList", "linkGroup:data"]);
+  });
+
   it("moves Reports under the Dashboards group", () => {
     const entries = groupNavLinks([
       link("home"),

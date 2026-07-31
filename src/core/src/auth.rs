@@ -1061,6 +1061,11 @@ mod tests {
         // If we reach here, the function completed successfully
     }
 
+    // Gated to match what it asserts. Without this the test runs under
+    // `--features enterprise` too, where `get_role` returns the mapped role
+    // rather than collapsing to Admin — so it failed the entire enterprise
+    // test build on a claim it never made about enterprise.
+    #[cfg(not(feature = "enterprise"))]
     #[test]
     fn test_get_role_non_enterprise() {
         let user_role = UserOrgRole {

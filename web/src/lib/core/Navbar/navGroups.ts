@@ -91,6 +91,26 @@ export interface NavGroupDef {
 
 export const NAV_GROUPS: NavGroupDef[] = [
   {
+    key: "alerts",
+    titleKey: "menu.alerts",
+    icon: "shield-alert-outline",
+    parentLink: "/alerts",
+    absorbs: ["alertList", "sloList"],
+    children: [
+      {
+        titleKey: "menu.alerts",
+        icon: "shield-alert-outline",
+        name: "alertList",
+        requires: "alertList",
+      },
+      // An SLO is what an SLO alert burns against, so the two are navigated
+      // together. Both children carry `requires` so that hiding either one via
+      // `custom_hide_menus` collapses the group back to a plain link for the
+      // survivor rather than leaving a one-item flyout.
+      { titleKey: "menu.slos", icon: "target", name: "sloList", requires: "sloList" },
+    ],
+  },
+  {
     key: "data",
     titleKey: "menu.data",
     icon: "database",

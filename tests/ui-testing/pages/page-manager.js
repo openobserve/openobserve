@@ -26,6 +26,7 @@ import LogsVisualise from "./dashboardPages/visualise";
 import { DashboardPage } from "./dashboardPages/dashboardPage.js";
 import { AlertsPage } from "./alertsPages/alertsPage.js";
 import { AlertHistoryPage } from "./alertsPages/alertHistoryPage.js";
+import { AlertDetailPage } from "./alertsPages/alertDetailPage.js";
 
 // ===== SANITY SPEC ADDITIONAL PAGE OBJECTS =====
 import { LogsPage } from "./logsPages/logsPage.js";
@@ -145,6 +146,7 @@ class PageManager {
     // ===== EXISTING ALERTS PAGE OBJECT =====
     this.alertsPage = new AlertsPage(page);
     this.alertHistoryPage = new AlertHistoryPage(page);
+    this.alertDetailPage = new AlertDetailPage(page);
 
     // ===== API CLEANUP =====
     this.apiCleanup = new APICleanup(page);

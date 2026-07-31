@@ -59,7 +59,7 @@ vi.mock("@/components/cipherkeys/AddCipherKey.vue", () => ({
 
 vi.mock("@/components/shared/grid/Pagination.vue", () => ({
   default: {
-    name: "QTablePagination",
+    name: "Pagination",
     template: "<div data-test='table-pagination'></div>",
     props: ["scope", "pageTitle", "resultTotal", "perPageOptions", "position"],
     emits: ["update:changeRecordPerPage"],
@@ -162,7 +162,7 @@ const createWrapper = (props = {}, options = {}) => {
           template: "<div data-test-stub='add-cipher-key'></div>",
           emits: ["cancel:hideform"],
         },
-        QTablePagination: {
+        Pagination: {
           template: "<div data-test-stub='table-pagination'></div>",
           props: ["scope", "pageTitle", "resultTotal", "perPageOptions", "position"],
           emits: ["update:changeRecordPerPage"],

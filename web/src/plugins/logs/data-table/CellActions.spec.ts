@@ -32,10 +32,6 @@ vi.mock("vuex", () => ({
 
 // ── Global stubs ──────────────────────────────────────────────────────────────
 const globalStubs = {
-  QBtn: {
-    template: '<button @click="$attrs.onClick?.($event)"><slot /></button>',
-  },
-  QIcon: { template: "<span><slot /></span>" },
   EqualIcon: { template: "<svg />" },
   NotEqualIcon: { template: "<svg />" },
   O2AIContextAddBtn: {

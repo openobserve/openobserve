@@ -139,6 +139,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTag type="alertState" :value="value" data-test="alert-history-status-badge" />
           </template>
 
+          <!-- T-10: what was observed, against what, and the level it
+               classified to. Pre-change rows (no actual_value) render "—". -->
+          <template #cell-condition="{ row }">
+            <div class="flex min-w-0 items-center gap-1.5">
+              <span class="text-compact whitespace-nowrap tabular-nums">
+                {{ conditionSummary(row) }}
+              </span>
+              <template v-if="row.level">
+                <span class="text-text-secondary text-2xs shrink-0">→</span>
+                <OTag type="alertLevel" :value="row.level" class="shrink-0" />
+              </template>
+              <span
+                v-if="row.group_label"
+                class="text-2xs text-text-secondary min-w-0 truncate"
+                data-test="alert-history-group-label"
+              >
+                {{ t("alerts.historyTable.forGroup", { group: row.group_label }) }}
+                <OTooltip :content="row.group_label" :max-width="'300px'" />
+              </span>
+            </div>
+          </template>
+
           <template #cell-is_realtime="{ value }">
             <OIcon
               :name="value ? 'check-circle' : 'schedule'"
@@ -445,6 +467,7 @@ import NoData from "@/components/shared/grid/NoData.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import { conditionSummary } from "@/utils/alerts/runOutcome";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -577,6 +600,16 @@ const columns = ref<OTableColumnDef[]>([
     sortable: true,
     size: COL.status,
     maxSize: COL.status,
+    cell: " ",
+    meta: { align: "left" },
+  },
+  {
+    // T-10 value context: "actual operator threshold → level" per run.
+    id: "condition",
+    header: t("alerts.historyTable.condition"),
+    accessorKey: "actual_value",
+    sortable: false,
+    size: 220,
     cell: " ",
     meta: { align: "left" },
   },

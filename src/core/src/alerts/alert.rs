@@ -109,6 +109,49 @@ pub enum AlertError {
     #[error("Alert destination or workflows is required")]
     AlertDestinationMissing,
 
+    /// The warning/critical pair is invalid for the chosen operator.
+    /// "Less severe" is direction-dependent — see `level::validate_thresholds`.
+    #[error("Invalid warning threshold: {0}")]
+    InvalidWarningThreshold(config::meta::alerts::level::ThresholdError),
+
+    /// Aggregation alerts carry their thresholds in `aggregation.having.value`
+    /// / `aggregation.warning_value`, validated separately (§4.4).
+    #[error("Invalid aggregation warning value: {0}")]
+    InvalidAggregationThreshold(config::meta::alerts::aggregation_level::AggThresholdError),
+
+    /// Per-group alerting (`multi_alert`) has its own admissibility rules —
+    /// group_by, orderable operator, "any group" count gates, and the v1
+    /// exclusions for incidents and multi-window comparison (alerts_2.md
+    /// M-9/M-10, §5.5 MN-11).
+    #[error("Invalid per-group alert configuration: {0}")]
+    InvalidMultiAlert(config::meta::alerts::grouping::MultiAlertError),
+
+    /// Realtime alerts are out of scope for multi-level thresholds (D12):
+    /// they persist no state and never classify a level.
+    #[error("Warning thresholds are not supported on real-time alerts")]
+    WarningThresholdOnRealtimeAlert,
+
+    /// A PromQL warning value without the condition it qualifies.
+    #[error("A PromQL warning value requires a PromQL condition")]
+    PromqlWarningWithoutCondition,
+
+    /// A tag failed normalization (PT-7). The inner error names the offending
+    /// tag so the user knows exactly which one to fix.
+    #[error("Invalid tag: {0}")]
+    InvalidTag(config::meta::alerts::tags::TagError),
+
+    /// On aggregation and PromQL alerts, `trigger_condition.threshold` is a
+    /// COVERAGE gate (group/series count), not severity — a warning there is
+    /// explicitly disallowed (D13). Severity warnings belong to the family's
+    /// own field: `aggregation.warning_value` / `promql_warning_value`.
+    #[error(
+        "warning_threshold is not supported on {family} alerts: the count threshold is coverage, not severity — use {field} instead"
+    )]
+    WarningOnCoverageGate {
+        family: &'static str,
+        field: &'static str,
+    },
+
     #[error("Alert already exists")]
     CreateAlreadyExists,
 
@@ -236,7 +279,9 @@ pub async fn save(
     }
 }
 
-async fn create_default_alerts_folder(org_id: &str) -> Result<Folder, AlertError> {
+/// `pub(crate)` because SLOs live in these same folders (§6b, D28) and their
+/// save path needs the identical create-on-demand behaviour.
+pub(crate) async fn create_default_alerts_folder(org_id: &str) -> Result<Folder, AlertError> {
     let default_folder = Folder {
         folder_id: DEFAULT_FOLDER.to_owned(),
         name: "default".to_owned(),
@@ -245,6 +290,78 @@ async fn create_default_alerts_folder(org_id: &str) -> Result<Folder, AlertError
     folders::save_folder(org_id, default_folder, FolderType::Alerts, true)
         .await
         .map_err(|_| AlertError::CreateDefaultFolderError)
+}
+
+/// Per-group alerting admissibility (M-9/M-10, §5.5 MN-11).
+///
+/// A no-op for every alert that has not opted in — which is every alert that
+/// predates the feature, since the flag cannot be present in JSON written
+/// before it existed. Called from `prepare_alert`, so it runs on BOTH create
+/// and update: removing the last `group_by` column from a multi-alert, or
+/// turning on incidents, is rejected on the edit path too.
+///
+/// Extracted rather than inlined so the boundary tests can call **this exact
+/// function**. Duplicating the call in a test helper would still compile after
+/// the production call changed, leaving the tests quietly verifying something
+/// else.
+// Sync (unlike its async AlertError-returning neighbours, whose futures hide
+// the size from this lint); boxing the error is not worth the churn here.
+#[allow(clippy::result_large_err)]
+fn validate_multi_alert_config(alert: &Alert) -> Result<(), AlertError> {
+    config::meta::alerts::grouping::validate_multi_alert(
+        &alert.query_condition,
+        &alert.trigger_condition,
+        alert.creates_incident,
+    )
+    .map_err(AlertError::InvalidMultiAlert)?;
+
+    // Checked here, not in `validate_multi_alert`, because the grouping
+    // config is a sibling of the query condition rather than part of it.
+    // Same shape as MN-11's incidents rule.
+    let notification_grouping = alert
+        .deduplication
+        .as_ref()
+        .and_then(|d| d.grouping.as_ref())
+        .is_some_and(|g| g.enabled);
+    if alert.query_condition.multi_alert_enabled() && notification_grouping {
+        return Err(AlertError::InvalidMultiAlert(
+            config::meta::alerts::grouping::MultiAlertError::NotificationGroupingUnsupported,
+        ));
+    }
+    Ok(())
+}
+
+/// Drop the per-group rows of an alert that is no longer a multi-alert (§5.3).
+///
+/// Runs **after** the row is committed, so the flag is durably off before the
+/// rows go: an evaluation racing this cleanup is caught either by
+/// `persist_group_plan`'s in-transaction re-check or, failing that, by the
+/// reaper — which keys off the *existence* of non-rollup rows rather than the
+/// current flag, precisely so rows orphaned by a crash between save and
+/// cleanup are still collected.
+///
+/// Best-effort by design: the reaper is the backstop, so a failure here must
+/// not fail the user's save. It is not, however, a substitute for this call —
+/// the sweep can be turned off entirely (`ZO_ALERT_GROUP_SWEEP_INTERVAL=0`),
+/// and rollback is supposed to be immediate.
+async fn clean_up_opted_out_groups(alert: &Alert) {
+    if alert.query_condition.multi_alert_enabled() {
+        return;
+    }
+    let Some(alert_id) = alert.id.as_ref().map(|id| id.to_string()) else {
+        return;
+    };
+    match infra::table::alert_states::delete_all_groups(&alert_id).await {
+        Ok(0) => {}
+        Ok(n) => log::info!(
+            "alert {alert_id}: per-group alerting turned off, dropped {n} group state row(s) \
+             without transitions"
+        ),
+        Err(e) => log::error!(
+            "alert {alert_id}: could not drop group state rows after opt-out, leaving them to the \
+             reaper: {e}"
+        ),
+    }
 }
 
 /// Validates the alert and prepares it before it is written to the database.
@@ -397,6 +514,12 @@ async fn prepare_alert(
         alert.context_attributes = Some(new_attrs);
     }
 
+    // Tags are normalized at save (PT-7), NOT merely validated: the repaired
+    // form (trimmed, lowercased, deduped) is what gets stored, so filtering
+    // compares like with like. Rejections name the offending tag.
+    alert.tags =
+        config::meta::alerts::tags::normalize_tags(&alert.tags).map_err(AlertError::InvalidTag)?;
+
     // before saving alert check column type to decide numeric condition
     let schema = infra::schema::get(org_id, stream_name, stream_type).await?;
     if stream_name.is_empty() || schema.fields().is_empty() {
@@ -421,6 +544,71 @@ async fn prepare_alert(
 
     if alert.is_real_time && alert.query_condition.query_type != QueryType::Custom {
         return Err(AlertError::RealtimeMissingCustomQuery);
+    }
+
+    // Multi-level thresholds (alerts_2.md Feature 1). Rejected at write time so
+    // an unreachable warning level can never reach the evaluator.
+    //
+    // Realtime alerts persist no state and never classify a level (D12), so
+    // EVERY warning family is rejected on them — not just the count one.
+    if alert.is_real_time
+        && (alert.trigger_condition.warning_threshold.is_some()
+            || alert
+                .query_condition
+                .aggregation
+                .as_ref()
+                .is_some_and(|a| a.warning_value.is_some())
+            || alert.query_condition.promql_warning_value.is_some())
+    {
+        return Err(AlertError::WarningThresholdOnRealtimeAlert);
+    }
+    if alert.trigger_condition.warning_threshold.is_some() {
+        // On aggregation/PromQL alerts the count threshold is a COVERAGE gate
+        // (group/series count), and a coverage warning is disallowed (D13).
+        if alert.query_condition.aggregation.is_some() {
+            return Err(AlertError::WarningOnCoverageGate {
+                family: "aggregation",
+                field: "aggregation.warning_value",
+            });
+        }
+        if alert.query_condition.promql_condition.is_some()
+            || alert.query_condition.query_type == QueryType::PromQL
+        {
+            return Err(AlertError::WarningOnCoverageGate {
+                family: "PromQL",
+                field: "promql_warning_value",
+            });
+        }
+        config::meta::alerts::level::validate_thresholds(
+            alert.trigger_condition.operator,
+            alert.trigger_condition.threshold,
+            alert.trigger_condition.warning_threshold,
+        )
+        .map_err(AlertError::InvalidWarningThreshold)?;
+    }
+
+    // Aggregation alerts use a different threshold pair entirely (§4.4): the
+    // critical value lives in `having.value` and the warning in
+    // `warning_value`. Validate whenever an aggregation is present, so a
+    // non-numeric `having.value` is caught at write time rather than failing
+    // every evaluation.
+    if let Some(agg) = alert.query_condition.aggregation.as_ref() {
+        config::meta::alerts::aggregation_level::validate_aggregation_thresholds(agg)
+            .map_err(AlertError::InvalidAggregationThreshold)?;
+    }
+
+    validate_multi_alert_config(alert)?;
+
+    // PromQL carries a third threshold family: the condition value baked into
+    // the query. Its warning needs the same §4.5 direction check, measured
+    // against `promql_condition.operator`.
+    if let Some(warning) = alert.query_condition.promql_warning_value {
+        let Some(pc) = alert.query_condition.promql_condition.as_ref() else {
+            return Err(AlertError::PromqlWarningWithoutCondition);
+        };
+        let critical = config::utils::json::get_float_value(&pc.value);
+        config::meta::alerts::level::validate_thresholds_f64(pc.operator, critical, Some(warning))
+            .map_err(AlertError::InvalidWarningThreshold)?;
     }
 
     match alert.query_condition.query_type {
@@ -688,6 +876,7 @@ pub async fn update<C: ConnectionTrait + TransactionTrait>(
     }
 
     let alert = db::alerts::alert::update(conn, org_id, dst_folder_id_info, alert).await?;
+    clean_up_opted_out_groups(&alert).await;
     #[cfg(feature = "enterprise")]
     if let Some((curr_folder_id, dst_folder_id)) = _folder_info
         && get_openfga_config().enabled
@@ -834,6 +1023,12 @@ pub async fn delete_by_id<C: ConnectionTrait>(
     match db::alerts::alert::delete_by_id(conn, org_id, alert_id).await {
         Ok(_) => {
             remove_ownership(org_id, "alerts", Authz::new(&alert_id_str)).await;
+            // Alert run state is owned by the alert's lifecycle (Part IV of
+            // alerts.md), so it goes when the alert does. Best-effort: a
+            // leftover state row must not fail the delete.
+            if let Err(e) = infra::table::alert_states::delete_by_alert(&alert_id_str).await {
+                log::warn!("failed to delete alert state for {alert_id_str}: {e}");
+            }
             Ok(())
         }
         Err(e) => Err(e.into()),
@@ -929,6 +1124,8 @@ pub async fn trigger_by_id<C: ConnectionTrait>(
             synthetic_row,
             notify,
             now,
+            // Manual triggers evaluate nothing; no level to map.
+            None,
         )
         .await
         {
@@ -966,7 +1163,7 @@ pub async fn trigger_by_id<C: ConnectionTrait>(
     let trace_id = format!("trig_id_{trace_id}");
     let (success_message, err_message) = if !incident_routed {
         alert
-            .send_notification(&trace_id, &[], now, None, now)
+            .send_notification(&trace_id, &[], now, None, now, None, None, None)
             .await?
     } else {
         (String::new(), String::new())
@@ -1011,6 +1208,8 @@ pub async fn trigger_by_name(
             synthetic_row,
             notify,
             now,
+            // Manual triggers evaluate nothing; no level to map.
+            None,
         )
         .await
         {
@@ -1048,7 +1247,7 @@ pub async fn trigger_by_name(
     let trace_id = format!("trig_name_{trace_id}");
     let (success_message, err_message) = if !incident_routed {
         alert
-            .send_notification(&trace_id, &[], now, None, now)
+            .send_notification(&trace_id, &[], now, None, now, None, None, None)
             .await?
     } else {
         (String::new(), String::new())
@@ -1070,6 +1269,10 @@ pub trait AlertExt: Sync + Send + 'static {
 
     /// Returns a tuple containing a boolean - if all the send notification jobs successfully
     /// and the error message if any
+    /// `level` is the severity this evaluation classified (alerts_2.md T-5).
+    /// `None` for single-level alerts and for paths with no classification —
+    /// templates then render `{alert_level}` as empty.
+    #[allow(clippy::too_many_arguments)]
     async fn send_notification(
         &self,
         trace_id: &str,
@@ -1077,6 +1280,13 @@ pub trait AlertExt: Sync + Send + 'static {
         rows_end_time: i64,
         start_time: Option<i64>,
         evaluation_timestamp: i64,
+        level: Option<config::meta::alerts::level::AlertLevel>,
+        // The exact evaluated observation (T-9). Hybrid count evaluation
+        // samples only PAYLOAD_SAMPLE_ROWS rows for the payload, so
+        // `rows.len()` caps at 100 — `{alert_count}` must come from here.
+        actual_value: Option<f64>,
+        // Per-group notification identity (M-4). `None` = alert-level send.
+        group_labels: Option<&std::collections::BTreeMap<String, String>>,
     ) -> Result<(String, String), AlertError>;
 }
 
@@ -1090,6 +1300,12 @@ impl AlertExt for Alert {
     ) -> Result<TriggerEvalResults, anyhow::Error> {
         if self.is_real_time {
             self.query_condition.evaluate_realtime(row).await
+        } else if self.query_condition.query_type == config::meta::alerts::QueryType::Slo {
+            // Branch BEFORE the search path: an SLO alert runs no query. It
+            // reads the aggregate the ingest pass already computed, which is
+            // what decouples the alert's cadence from the measurement's and
+            // makes five alerts on one SLO cost zero extra raw-data scans.
+            evaluate_slo_alert(self, end_time).await
         } else {
             let mut search_event_ctx = SearchEventContext::with_alert(Some(format!(
                 "/alerts/{}/{}/{}/{}",
@@ -1119,6 +1335,9 @@ impl AlertExt for Alert {
         rows_end_time: i64,
         start_time: Option<i64>,
         evaluation_timestamp: i64,
+        level: Option<config::meta::alerts::level::AlertLevel>,
+        actual_value: Option<f64>,
+        group_labels: Option<&std::collections::BTreeMap<String, String>>,
     ) -> Result<(String, String), AlertError> {
         let mut err_message = "".to_string();
         let mut success_message = "".to_string();
@@ -1189,6 +1408,9 @@ impl AlertExt for Alert {
                 rows_end_time,
                 start_time,
                 evaluation_timestamp,
+                level,
+                actual_value,
+                group_labels,
             )
             .await
             {
@@ -1325,6 +1547,7 @@ pub(crate) async fn dispatch_notification(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn send_notification(
     alert: &Alert,
     dest_type: &DestinationType,
@@ -1333,6 +1556,9 @@ async fn send_notification(
     rows_end_time: i64,
     start_time: Option<i64>,
     evaluation_timestamp: i64,
+    level: Option<config::meta::alerts::level::AlertLevel>,
+    actual_value: Option<f64>,
+    group_labels: Option<&std::collections::BTreeMap<String, String>>,
 ) -> Result<String, anyhow::Error> {
     let org_name = if let Some(org) = ORGANIZATIONS.read().await.get(&alert.org_id) {
         org.name.clone()
@@ -1367,8 +1593,11 @@ async fn send_notification(
             start_time,
             evaluation_timestamp,
             is_email,
+            level,
+            actual_value,
         },
         metadata,
+        group_labels,
     )
     .await;
 
@@ -1384,8 +1613,11 @@ async fn send_notification(
                 start_time,
                 evaluation_timestamp,
                 is_email,
+                level,
+                actual_value,
             },
             metadata,
+            group_labels,
         )
         .await
     } else {
@@ -1652,6 +1884,14 @@ fn process_row_template(
                 &alert.trigger_condition.threshold.to_string(),
             )
             .replace("{alert_count}", &alert_count.to_string())
+            .replace(
+                "{alert_warning_threshold}",
+                &alert
+                    .trigger_condition
+                    .warning_threshold
+                    .map(|w| w.to_string())
+                    .unwrap_or_default(),
+            )
             .replace("{alert_start_time}", &alert_start_time_str)
             .replace("{alert_end_time}", &alert_end_time_str);
 
@@ -1690,8 +1930,22 @@ struct ProcessTemplateOptions {
     pub start_time: Option<i64>,
     pub evaluation_timestamp: i64,
     pub is_email: bool,
+    /// Severity classified by this evaluation, for `{alert_level}`.
+    pub level: Option<config::meta::alerts::level::AlertLevel>,
+    /// Exact evaluated observation (T-9); `{alert_count}` for count alerts.
+    pub actual_value: Option<f64>,
 }
 
+/// Render an f64 that is usually an integral count without a trailing `.0`.
+fn fmt_observed(v: f64) -> String {
+    if v.is_finite() && v.fract() == 0.0 {
+        format!("{}", v as i64)
+    } else {
+        v.to_string()
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
 async fn process_dest_template(
     org_name: &str,
     tpl: &str,
@@ -1700,6 +1954,9 @@ async fn process_dest_template(
     rows_tpl_val: &[Value],
     options: ProcessTemplateOptions,
     metadata: &hashbrown::HashMap<String, String>,
+    // Group labels for a per-group notification (M-4). `None` for every
+    // ungrouped alert, which keeps their rendering byte-identical.
+    group_labels: Option<&std::collections::BTreeMap<String, String>>,
 ) -> String {
     let cfg = get_config();
     let ProcessTemplateOptions {
@@ -1707,9 +1964,38 @@ async fn process_dest_template(
         start_time,
         evaluation_timestamp,
         is_email,
+        level,
+        actual_value,
     } = options;
-    // format values
-    let alert_count = rows.len();
+    // {alert_count}: for count-family alerts, the EXACT evaluated count —
+    // hybrid evaluation (§4.4c) samples only PAYLOAD_SAMPLE_ROWS rows for the
+    // payload, so `rows.len()` would render 48,213 real matches as "100".
+    // Aggregation/PromQL payloads are groups/series; their length stands.
+    let is_count_family = alert.query_condition.aggregation.is_none()
+        && alert.query_condition.promql_condition.is_none();
+    let alert_count = match actual_value {
+        Some(v) if is_count_family => fmt_observed(v),
+        _ => rows.len().to_string(),
+    };
+    // T-5: family-aware threshold variables. `{alert_threshold}` keeps its
+    // legacy meaning (the count threshold); `{alert_threshold_crit}` /
+    // `{alert_threshold_warn}` resolve from the ACTIVE threshold family, so an
+    // aggregation or PromQL notification reports the comparison it actually
+    // made.
+    let (family_crit, family_warn) = if let Some(agg) = alert.query_condition.aggregation.as_ref() {
+        config::meta::alerts::aggregation_level::aggregation_thresholds(agg)
+            .unwrap_or((alert.trigger_condition.threshold as f64, None))
+    } else if let Some(pc) = alert.query_condition.promql_condition.as_ref() {
+        (
+            config::utils::json::get_float_value(&pc.value),
+            alert.query_condition.promql_warning_value,
+        )
+    } else {
+        (
+            alert.trigger_condition.threshold as f64,
+            alert.trigger_condition.warning_threshold.map(|w| w as f64),
+        )
+    };
     let mut vars = HashMap::with_capacity(rows.len());
     for row in rows.iter() {
         for (key, value) in row.iter() {
@@ -1874,7 +2160,35 @@ async fn process_dest_template(
             "{alert_threshold}",
             &alert.trigger_condition.threshold.to_string(),
         )
-        .replace("{alert_count}", &alert_count.to_string())
+        .replace("{alert_count}", &alert_count)
+        // Multi-level threshold variables (alerts_2.md T-5). `{alert_level}` is
+        // what lets a template branch warning vs critical wording — per-level
+        // DESTINATIONS are Phase 4; v1 routing is template-side.
+        .replace(
+            "{alert_level}",
+            &level.map(|l| l.to_string()).unwrap_or_default(),
+        )
+        // Feature 2 (PT-4 / PT-9). Scope is DESTINATION TEMPLATES ONLY (D25):
+        // incident notifications build custom JSON and workflows carry
+        // hard-coded metadata; neither is wired here in v1. Unset priority and
+        // empty tags render as "" rather than "P0"/"null", so a template that
+        // interpolates them unconditionally still produces clean output.
+        .replace(
+            "{alert_priority}",
+            &alert.priority.map(|p| p.to_string()).unwrap_or_default(),
+        )
+        .replace("{alert_tags}", &alert.tags.join(","))
+        .replace("{alert_threshold_crit}", &fmt_observed(family_crit))
+        .replace(
+            "{alert_threshold_warn}",
+            &family_warn.map(fmt_observed).unwrap_or_default(),
+        )
+        // Legacy alias for `{alert_threshold_warn}` — now family-aware too;
+        // previously it always read the count-family warning.
+        .replace(
+            "{alert_warning_threshold}",
+            &family_warn.map(fmt_observed).unwrap_or_default(),
+        )
         .replace("{alert_start_time}", &alert_start_time_str)
         .replace("{alert_end_time}", &alert_end_time_str)
         .replace("{alert_url}", &alert_url)
@@ -2009,6 +2323,21 @@ async fn process_dest_template(
     // credential_priority)
     for (key, value) in metadata.iter() {
         resp = resp.replace(&format!("{{{}}}", key), value);
+    }
+
+    // ── Group variables, LAST (M-4) ─────────────────────────────────────────
+    // Position is the whole defence, not a detail. Label values are user data
+    // and can contain `{...}`; because nothing runs after this, a pod named
+    // `{alert_name}` is written literally instead of being expanded into the
+    // alert's name by a later pass. Anything added below this point reopens
+    // that hole.
+    //
+    // The `group.` prefix is the other half: it stops a label called
+    // `alert_name` from shadowing the alert's own variable.
+    if let Some(labels) = group_labels {
+        for (name, value) in config::meta::alerts::grouping::group_template_vars(labels) {
+            process_variable_replace(&mut resp, &name, &VarValue::Str(&value), is_email);
+        }
     }
 
     resp
@@ -2406,6 +2735,362 @@ async fn permitted_alerts(
     .map_err(|err| AlertError::PermittedAlertsValidator(err.to_string()))?;
 
     Ok(permitted_objects)
+}
+
+#[cfg(test)]
+mod threshold_validation_tests {
+    //! Write-time validation of the warning/critical pair (alerts_2.md T-6).
+    //! The pure matrix lives in `config::meta::alerts::level`; these cover the
+    //! wiring — that the save path actually rejects, and maps to HTTP 400.
+
+    use config::meta::alerts::{
+        Operator,
+        level::{ThresholdError, validate_thresholds},
+    };
+
+    use super::AlertError;
+
+    /// The error must survive the wrap into `AlertError` with its cause intact,
+    /// so the API can tell the user *why* the pair was rejected.
+    #[test]
+    fn test_invalid_pair_wraps_into_alert_error() {
+        let err = validate_thresholds(Operator::GreaterThan, 50, Some(100)).unwrap_err();
+        let wrapped = AlertError::InvalidWarningThreshold(err);
+        let msg = wrapped.to_string();
+        assert!(
+            msg.contains("less severe"),
+            "the reason must reach the user, got: {msg}"
+        );
+    }
+
+    #[test]
+    fn test_unorderable_operator_reason_reaches_the_user() {
+        let err = validate_thresholds(Operator::EqualTo, 100, Some(50)).unwrap_err();
+        assert_eq!(err, ThresholdError::OperatorNotOrderable(Operator::EqualTo));
+        let msg = AlertError::InvalidWarningThreshold(err).to_string();
+        assert!(msg.contains("no severity ordering"), "got: {msg}");
+    }
+
+    // ── Feature 2: tag validation reaches the API as a 400 (PT-7) ──────────
+
+    /// The offending tag must survive the wrap into `AlertError`, so the user
+    /// is told exactly which tag to fix rather than "invalid tags".
+    #[test]
+    fn test_invalid_tag_error_names_the_offending_tag() {
+        use config::meta::alerts::tags::{TagError, normalize_tags};
+
+        let err = normalize_tags(&["1bad".to_string()]).unwrap_err();
+        assert_eq!(err, TagError::MustStartWithLetter("1bad".to_string()));
+
+        let wrapped = AlertError::InvalidTag(err).to_string();
+        assert!(
+            wrapped.contains("1bad"),
+            "the offending tag must reach the user, got: {wrapped}"
+        );
+    }
+
+    /// Normalization is applied at save, not merely checked: the REPAIRED
+    /// form is what gets stored, so a later filter compares like with like.
+    #[test]
+    fn test_save_stores_the_normalized_form_not_the_raw_input() {
+        use config::meta::alerts::tags::normalize_tags;
+
+        let stored = normalize_tags(&[
+            "  Prod  ".to_string(),
+            "SERVICE:Checkout".to_string(),
+            "prod".to_string(),
+            "".to_string(),
+        ])
+        .unwrap();
+        assert_eq!(stored, vec!["prod", "service:checkout"]);
+    }
+
+    /// D13: on aggregation/PromQL alerts the count threshold is COVERAGE, not
+    /// severity — a warning attached to it must be rejected with a message
+    /// that points at the family's own warning field.
+    #[test]
+    fn test_coverage_gate_warning_error_names_the_right_field() {
+        let msg = AlertError::WarningOnCoverageGate {
+            family: "aggregation",
+            field: "aggregation.warning_value",
+        }
+        .to_string();
+        assert!(msg.contains("coverage"), "got: {msg}");
+        assert!(msg.contains("aggregation.warning_value"), "got: {msg}");
+
+        let msg = AlertError::WarningOnCoverageGate {
+            family: "PromQL",
+            field: "promql_warning_value",
+        }
+        .to_string();
+        assert!(msg.contains("promql_warning_value"), "got: {msg}");
+    }
+
+    // ── Per-group alerting rules as `prepare_alert` applies them ───────────
+    // (M-9/M-10, §5.5 MN-11.)
+    //
+    // SCOPE, stated plainly so these are not mistaken for boundary tests:
+    // they call `validate_multi_alert_config` — the function `prepare_alert`
+    // delegates to — with realistic whole-`Alert` inputs. They pin the RULES
+    // and the HTTP mapping. They do NOT pin the WIRING: deleting
+    // `validate_multi_alert_config(alert)?` from `prepare_alert` would leave
+    // every one of them green.
+    //
+    // Closing that needs `prepare_alert` itself, which reaches for folders,
+    // `get_by_id_db` and `infra::schema::get` — all through the global
+    // `ORM_CLIENT` rather than an injectable connection. The infra SQLite
+    // harness cannot reach it without first making that global overridable in
+    // tests; until then the wiring is verified by review, not by test.
+
+    use config::{meta::alerts::alert::Alert, utils::json::json};
+
+    /// The **production** function `prepare_alert` delegates to — not a copy.
+    /// Changing the rule therefore changes what these tests exercise. It does
+    /// not, and cannot, prove `prepare_alert` still calls it.
+    use super::validate_multi_alert_config as validate_rules;
+
+    fn multi_alert_fixture() -> Alert {
+        let mut alert = Alert::default();
+        alert.trigger_condition.operator = config::meta::alerts::Operator::GreaterThanEquals;
+        alert.trigger_condition.threshold = 1;
+        alert.query_condition.aggregation = Some(config::meta::alerts::Aggregation {
+            group_by: Some(vec!["host".to_string()]),
+            function: config::meta::alerts::AggFunction::Avg,
+            having: config::meta::alerts::Condition {
+                column: "value".into(),
+                operator: config::meta::alerts::Operator::GreaterThan,
+                value: json!(90),
+                ignore_case: false,
+            },
+            warning_value: None,
+            multi_alert: true,
+        });
+        alert
+    }
+
+    /// A PromQL per-series alert. No `aggregation` at all — the grouping lives
+    /// in the expression, which is the whole reason this family needed its own
+    /// opt-in field.
+    fn promql_multi_alert_fixture() -> Alert {
+        let mut alert = Alert::default();
+        alert.query_condition.query_type = config::meta::alerts::QueryType::PromQL;
+        alert.query_condition.promql = Some("sum by (pod) (rate(errors[5m]))".to_string());
+        alert.query_condition.promql_condition = Some(config::meta::alerts::Condition {
+            column: "value".into(),
+            operator: config::meta::alerts::Operator::GreaterThan,
+            value: json!(10),
+            ignore_case: false,
+        });
+        alert.query_condition.promql_multi_alert = true;
+        alert.trigger_condition.operator = config::meta::alerts::Operator::GreaterThanEquals;
+        alert.trigger_condition.threshold = 1;
+        alert
+    }
+
+    #[test]
+    fn test_a_valid_promql_multi_alert_passes_the_rules() {
+        assert!(validate_rules(&promql_multi_alert_fixture()).is_ok());
+    }
+
+    /// The bug this whole family risked: `validate_multi_alert` used to return
+    /// `Ok` the moment `aggregation` was `None`, so a PromQL alert could not be
+    /// rejected for anything at all.
+    #[test]
+    fn test_promql_multi_alert_is_no_longer_waved_through_for_lacking_an_aggregation() {
+        let mut alert = promql_multi_alert_fixture();
+        alert.creates_incident = true;
+        assert!(alert.query_condition.aggregation.is_none());
+        let err = validate_rules(&alert).unwrap_err();
+        assert!(
+            format!("{err}").contains("incident"),
+            "expected the MN-11 rejection, got: {err}"
+        );
+    }
+
+    #[test]
+    fn test_promql_multi_alert_rejects_an_unorderable_operator() {
+        let mut alert = promql_multi_alert_fixture();
+        alert
+            .query_condition
+            .promql_condition
+            .as_mut()
+            .unwrap()
+            .operator = config::meta::alerts::Operator::EqualTo;
+        assert!(validate_rules(&alert).is_err());
+    }
+
+    #[test]
+    fn test_promql_multi_alert_rejects_a_series_count_threshold() {
+        let mut alert = promql_multi_alert_fixture();
+        alert.trigger_condition.threshold = 3;
+        assert!(validate_rules(&alert).is_err());
+    }
+
+    /// Without a condition there is no threshold to classify a series against.
+    #[test]
+    fn test_promql_multi_alert_rejects_a_missing_condition() {
+        let mut alert = promql_multi_alert_fixture();
+        alert.query_condition.promql_condition = None;
+        assert!(validate_rules(&alert).is_err());
+    }
+
+    /// The opt-in is the ONLY thing that turns per-series evaluation on — a
+    /// PromQL alert that simply returns many series keeps collapsing (M-9).
+    #[test]
+    fn test_a_promql_alert_that_did_not_opt_in_is_unaffected_by_the_rules() {
+        let mut alert = promql_multi_alert_fixture();
+        alert.query_condition.promql_multi_alert = false;
+        alert.creates_incident = true;
+        alert.trigger_condition.threshold = 42;
+        assert!(validate_rules(&alert).is_ok());
+    }
+
+    #[test]
+    fn test_a_valid_multi_alert_passes_the_rules() {
+        assert!(validate_rules(&multi_alert_fixture()).is_ok());
+    }
+
+    #[test]
+    fn test_the_rules_reject_multi_alert_with_incidents() {
+        // MN-11. Without this wiring the pure rule exists but every API
+        // client can still create the unsupported combination.
+        let mut alert = multi_alert_fixture();
+        alert.creates_incident = true;
+
+        let err = validate_rules(&alert).expect_err("must be rejected");
+        assert!(matches!(err, AlertError::InvalidMultiAlert(_)));
+        assert!(
+            err.to_string().contains("creates_incident"),
+            "the message must name the field: {err}"
+        );
+    }
+
+    #[test]
+    fn test_the_rules_reject_multi_alert_with_a_group_count_threshold() {
+        // M-10: "at least 3 groups" and "any breaching group" are different
+        // alerts; accepting both would leave the 3 doing nothing.
+        let mut alert = multi_alert_fixture();
+        alert.trigger_condition.threshold = 3;
+
+        assert!(matches!(
+            validate_rules(&alert),
+            Err(AlertError::InvalidMultiAlert(_))
+        ));
+    }
+
+    #[test]
+    fn test_the_rules_reject_removing_the_last_group_by_from_a_multi_alert() {
+        // The UPDATE path specifically: `prepare_alert` runs on both, so an
+        // edit that empties group_by while the flag stays on is rejected.
+        let mut alert = multi_alert_fixture();
+        alert.query_condition.aggregation.as_mut().unwrap().group_by = Some(vec![]);
+
+        assert!(matches!(
+            validate_rules(&alert),
+            Err(AlertError::InvalidMultiAlert(_))
+        ));
+    }
+
+    #[test]
+    fn test_the_rules_leave_ordinary_incident_alerts_alone() {
+        // The guard is multi-only. An incident-creating alert with a group
+        // count threshold and no opt-in stays perfectly valid.
+        let mut alert = multi_alert_fixture();
+        alert.creates_incident = true;
+        alert.trigger_condition.threshold = 3;
+        alert
+            .query_condition
+            .aggregation
+            .as_mut()
+            .unwrap()
+            .multi_alert = false;
+
+        assert!(validate_rules(&alert).is_ok());
+    }
+
+    /// §5.5: alert-level notification grouping would collapse per-group pages
+    /// back into one batch — rejected at save time, never silently rerouted.
+    #[test]
+    fn test_multi_alert_rejects_notification_grouping() {
+        let mut alert = multi_alert_fixture();
+        alert.deduplication = Some(config::meta::alerts::deduplication::DeduplicationConfig {
+            enabled: true,
+            grouping: Some(config::meta::alerts::deduplication::GroupingConfig {
+                enabled: true,
+                ..serde_json::from_str("{}").expect("GroupingConfig defaults")
+            }),
+            ..Default::default()
+        });
+
+        let err = validate_rules(&alert).unwrap_err();
+        assert!(matches!(
+            err,
+            AlertError::InvalidMultiAlert(
+                config::meta::alerts::grouping::MultiAlertError::NotificationGroupingUnsupported
+            )
+        ));
+
+        // Grouping configured but DISABLED must stay valid.
+        alert
+            .deduplication
+            .as_mut()
+            .unwrap()
+            .grouping
+            .as_mut()
+            .unwrap()
+            .enabled = false;
+        assert!(validate_rules(&alert).is_ok());
+    }
+
+    #[test]
+    fn test_multi_alert_rejection_is_a_bad_request() {
+        // Misconfiguration is user input, not a server fault — the same 400
+        // the other threshold validations produce.
+        for variant in [
+            config::meta::alerts::grouping::MultiAlertError::IncidentsUnsupported,
+            config::meta::alerts::grouping::MultiAlertError::NotGrouped,
+            config::meta::alerts::grouping::MultiAlertError::CountGateNotAnyGroup,
+            config::meta::alerts::grouping::MultiAlertError::MultiTimeRangeUnsupported,
+        ] {
+            let resp: axum::response::Response = AlertError::InvalidMultiAlert(variant).into();
+            assert_eq!(
+                resp.status(),
+                axum::http::StatusCode::BAD_REQUEST,
+                "{variant:?} must be a 400, not a server error"
+            );
+        }
+    }
+
+    /// D12: realtime alerts are out of scope for levels entirely.
+    #[test]
+    fn test_realtime_rejection_has_its_own_error() {
+        let msg = AlertError::WarningThresholdOnRealtimeAlert.to_string();
+        assert!(
+            msg.contains("real-time"),
+            "realtime rejection must be distinguishable from a bad pair, got: {msg}"
+        );
+    }
+
+    /// G5: an alert that configures no warning threshold must never be
+    /// rejected, whatever its operator — including the unorderable ones.
+    #[test]
+    fn test_single_level_alerts_are_never_rejected() {
+        for op in [
+            Operator::EqualTo,
+            Operator::NotEqualTo,
+            Operator::GreaterThan,
+            Operator::GreaterThanEquals,
+            Operator::LessThan,
+            Operator::LessThanEquals,
+            Operator::Contains,
+            Operator::NotContains,
+        ] {
+            assert!(
+                validate_thresholds(op, 100, None).is_ok(),
+                "operator {op:?} must stay valid with no warning threshold"
+            );
+        }
+    }
 }
 
 #[cfg(test)]
@@ -3281,6 +3966,8 @@ mod tests {
             start_time: None,
             evaluation_timestamp: 0,
             is_email: false,
+            level: None,
+            actual_value: None,
         };
 
         let result = process_dest_template(
@@ -3291,6 +3978,7 @@ mod tests {
             &rows_tpl_val,
             options,
             &hashbrown::HashMap::new(),
+            None,
         )
         .await;
 
@@ -3327,6 +4015,8 @@ mod tests {
             start_time: None,
             evaluation_timestamp: 0,
             is_email: false,
+            level: None,
+            actual_value: None,
         };
 
         let result = process_dest_template(
@@ -3337,6 +4027,7 @@ mod tests {
             &rows_tpl_val,
             options,
             &hashbrown::HashMap::new(),
+            None,
         )
         .await;
 
@@ -3367,6 +4058,8 @@ mod tests {
             start_time: None,
             evaluation_timestamp: 0,
             is_email: false,
+            level: None,
+            actual_value: None,
         };
 
         let result = process_dest_template(
@@ -3377,6 +4070,7 @@ mod tests {
             &rows_tpl_val,
             options,
             &hashbrown::HashMap::new(),
+            None,
         )
         .await;
 
@@ -3413,6 +4107,8 @@ mod tests {
             start_time: None,
             evaluation_timestamp: 0,
             is_email: false,
+            level: None,
+            actual_value: None,
         };
 
         let result = process_dest_template(
@@ -3423,6 +4119,7 @@ mod tests {
             &rows_tpl_val,
             options,
             &hashbrown::HashMap::new(),
+            None,
         )
         .await;
 
@@ -3499,6 +4196,8 @@ mod tests {
             start_time: None,
             evaluation_timestamp: 0,
             is_email: false,
+            level: None,
+            actual_value: None,
         };
 
         let result = process_dest_template(
@@ -3509,6 +4208,7 @@ mod tests {
             &rows_tpl_val,
             options,
             &hashbrown::HashMap::new(),
+            None,
         )
         .await;
 
@@ -3554,6 +4254,8 @@ mod tests {
             start_time: None,
             evaluation_timestamp: 0,
             is_email: false,
+            level: None,
+            actual_value: None,
         };
 
         let result = process_dest_template(
@@ -3564,6 +4266,7 @@ mod tests {
             &rows_tpl_val,
             options,
             &hashbrown::HashMap::new(),
+            None,
         )
         .await;
 
@@ -3596,6 +4299,8 @@ mod tests {
             start_time: None,
             evaluation_timestamp: 0,
             is_email: false,
+            level: None,
+            actual_value: None,
         };
 
         let result = process_dest_template(
@@ -3606,6 +4311,7 @@ mod tests {
             &rows_tpl_val,
             options,
             &hashbrown::HashMap::new(),
+            None,
         )
         .await;
 
@@ -4125,6 +4831,8 @@ mod tests {
             start_time: None,
             evaluation_timestamp: 0,
             is_email: false,
+            level: None,
+            actual_value: None,
         };
 
         let result = process_dest_template(
@@ -4135,6 +4843,7 @@ mod tests {
             &rows_tpl_val,
             options,
             &hashbrown::HashMap::new(),
+            None,
         )
         .await;
 
@@ -4158,6 +4867,8 @@ mod tests {
             start_time: None,
             evaluation_timestamp: 0,
             is_email: false,
+            level: None,
+            actual_value: None,
         };
 
         let result = process_dest_template(
@@ -4168,6 +4879,7 @@ mod tests {
             &rows_tpl_val,
             options,
             &hashbrown::HashMap::new(),
+            None,
         )
         .await;
 
@@ -4175,4 +4887,417 @@ mod tests {
         assert_eq!(parsed["full"], "hello world");
         assert_eq!(parsed["short"], "hello");
     }
+
+    /// §4.4c: hybrid evaluation samples only 100 payload rows but knows the
+    /// exact count. `{alert_count}` must render the exact count, not the
+    /// sample size.
+    #[tokio::test]
+    async fn test_alert_count_uses_exact_count_for_count_alerts() {
+        let mut row = Map::new();
+        row.insert("x".to_string(), json!(1));
+        let rows = vec![row; 3]; // payload sample: 3 rows
+        let alert = Alert::default(); // count family: no aggregation, no promql
+        let options = ProcessTemplateOptions {
+            rows_end_time: 0,
+            start_time: None,
+            evaluation_timestamp: 0,
+            is_email: false,
+            level: None,
+            actual_value: Some(48213.0), // exact COUNT(*)
+        };
+        let result = process_dest_template(
+            "test_org",
+            "count={alert_count}",
+            &alert,
+            &rows,
+            &[Value::String("".into())],
+            options,
+            &hashbrown::HashMap::new(),
+            None,
+        )
+        .await;
+        assert_eq!(result, "count=48213");
+    }
+
+    /// Without an exact count (legacy single-query path may not set it),
+    /// `{alert_count}` falls back to the payload length.
+    #[tokio::test]
+    async fn test_alert_count_falls_back_to_rows_len() {
+        let mut row = Map::new();
+        row.insert("x".to_string(), json!(1));
+        let rows = vec![row; 3];
+        let alert = Alert::default();
+        let options = ProcessTemplateOptions {
+            rows_end_time: 0,
+            start_time: None,
+            evaluation_timestamp: 0,
+            is_email: false,
+            level: None,
+            actual_value: None,
+        };
+        let result = process_dest_template(
+            "test_org",
+            "count={alert_count}",
+            &alert,
+            &rows,
+            &[Value::String("".into())],
+            options,
+            &hashbrown::HashMap::new(),
+            None,
+        )
+        .await;
+        assert_eq!(result, "count=3");
+    }
+
+    /// PT-4/PT-9: priority and tags reach destination templates.
+    #[tokio::test]
+    async fn test_priority_and_tags_render_into_templates() {
+        // `Alert` has private fields, so a functional-update literal is not
+        // available outside the `config` crate.
+        let mut alert = Alert::default();
+        alert.priority = Some(config::meta::alerts::priority::AlertPriority::P2);
+        alert.tags = vec!["prod".to_string(), "service:checkout".to_string()];
+        let options = ProcessTemplateOptions {
+            rows_end_time: 0,
+            start_time: None,
+            evaluation_timestamp: 0,
+            is_email: false,
+            level: None,
+            actual_value: None,
+        };
+        let result = process_dest_template(
+            "test_org",
+            "p={alert_priority} tags={alert_tags}",
+            &alert,
+            &[],
+            &[Value::String("".into())],
+            options,
+            &hashbrown::HashMap::new(),
+            None,
+        )
+        .await;
+        // `P2`, not `2`: templates and UI use the human form (PT-4).
+        assert_eq!(result, "p=P2 tags=prod,service:checkout");
+    }
+
+    /// Unset priority and empty tags render as EMPTY, never "P0" or "null" —
+    /// a template that always interpolates them must still read cleanly.
+    #[tokio::test]
+    async fn test_unset_priority_and_empty_tags_render_empty() {
+        let alert = Alert::default();
+        let options = ProcessTemplateOptions {
+            rows_end_time: 0,
+            start_time: None,
+            evaluation_timestamp: 0,
+            is_email: false,
+            level: None,
+            actual_value: None,
+        };
+        let result = process_dest_template(
+            "test_org",
+            "p=[{alert_priority}] tags=[{alert_tags}]",
+            &alert,
+            &[],
+            &[Value::String("".into())],
+            options,
+            &hashbrown::HashMap::new(),
+            None,
+        )
+        .await;
+        assert_eq!(result, "p=[] tags=[]");
+    }
+
+    /// T-5: `{alert_threshold_crit}`/`{alert_threshold_warn}` resolve from the
+    /// ACTIVE threshold family — for an aggregation alert that is
+    /// `having.value`/`warning_value`, not the count pair.
+    #[tokio::test]
+    async fn test_threshold_vars_resolve_from_aggregation_family() {
+        let mut alert = Alert::default();
+        alert.trigger_condition.threshold = 1; // count gate — NOT the answer
+        alert.query_condition.aggregation = Some(config::meta::alerts::Aggregation {
+            group_by: None,
+            function: config::meta::alerts::AggFunction::Avg,
+            having: config::meta::alerts::Condition {
+                column: "value".into(),
+                operator: config::meta::alerts::Operator::GreaterThanEquals,
+                value: json!(85.5),
+                ignore_case: false,
+            },
+            warning_value: Some(70.0),
+            multi_alert: false,
+        });
+        let options = ProcessTemplateOptions {
+            rows_end_time: 0,
+            start_time: None,
+            evaluation_timestamp: 0,
+            is_email: false,
+            level: None,
+            actual_value: Some(91.2),
+        };
+        let result = process_dest_template(
+            "test_org",
+            "crit={alert_threshold_crit} warn={alert_threshold_warn} count={alert_count}",
+            &alert,
+            &[],
+            &[Value::String("".into())],
+            options,
+            &hashbrown::HashMap::new(),
+            None,
+        )
+        .await;
+        // aggregation family: crit/warn come from having/warning_value; and
+        // alert_count stays payload-length (groups), NOT actual_value.
+        assert_eq!(result, "crit=85.5 warn=70 count=0");
+    }
+
+    // ── M-4: group variables, and why position matters ──────────────────────
+
+    #[tokio::test]
+    async fn test_group_labels_render_as_prefixed_variables() {
+        let mut alert = Alert::default();
+        alert.name = "disk".into();
+        let labels: std::collections::BTreeMap<String, String> =
+            [("host".to_string(), "web-1".to_string())]
+                .into_iter()
+                .collect();
+
+        let result = process_dest_template(
+            "test_org",
+            "host={group.host}",
+            &alert,
+            &[],
+            &[Value::String("".into())],
+            ProcessTemplateOptions {
+                rows_end_time: 0,
+                start_time: None,
+                evaluation_timestamp: 0,
+                is_email: false,
+                level: None,
+                actual_value: None,
+            },
+            &hashbrown::HashMap::new(),
+            Some(&labels),
+        )
+        .await;
+
+        assert_eq!(result, "host=web-1");
+    }
+
+    #[tokio::test]
+    async fn test_a_group_value_containing_a_variable_is_not_expanded() {
+        // THE injection guarantee, and the reason group variables are
+        // substituted LAST. Label values are user data — a pod really can be
+        // named `{alert_name}`. Because nothing runs after this substitution,
+        // the value is written literally; if group vars were applied earlier
+        // (say through `context_attributes`, which is position 5 of 7), the
+        // built-in pass would then rewrite it into the alert's own name.
+        let mut alert = Alert::default();
+        alert.name = "disk-usage".into();
+        let labels: std::collections::BTreeMap<String, String> =
+            [("pod".to_string(), "{alert_name}".to_string())]
+                .into_iter()
+                .collect();
+
+        let result = process_dest_template(
+            "test_org",
+            "pod={group.pod}",
+            &alert,
+            &[],
+            &[Value::String("".into())],
+            ProcessTemplateOptions {
+                rows_end_time: 0,
+                start_time: None,
+                evaluation_timestamp: 0,
+                is_email: false,
+                level: None,
+                actual_value: None,
+            },
+            &hashbrown::HashMap::new(),
+            Some(&labels),
+        )
+        .await;
+
+        assert_eq!(
+            result, "pod={alert_name}",
+            "a label value must render literally, never expand into another variable"
+        );
+        assert!(
+            !result.contains("disk-usage"),
+            "the alert name leaked into a user-controlled label value"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_a_group_label_cannot_shadow_a_builtin_variable() {
+        // A label literally called `alert_name` must not overwrite the alert's
+        // own `{alert_name}`. The `group.` prefix is the whole defence.
+        let mut alert = Alert::default();
+        alert.name = "real-alert".into();
+        let labels: std::collections::BTreeMap<String, String> =
+            [("alert_name".to_string(), "spoofed".to_string())]
+                .into_iter()
+                .collect();
+
+        let result = process_dest_template(
+            "test_org",
+            "name={alert_name}",
+            &alert,
+            &[],
+            &[Value::String("".into())],
+            ProcessTemplateOptions {
+                rows_end_time: 0,
+                start_time: None,
+                evaluation_timestamp: 0,
+                is_email: false,
+                level: None,
+                actual_value: None,
+            },
+            &hashbrown::HashMap::new(),
+            Some(&labels),
+        )
+        .await;
+
+        assert_eq!(result, "name=real-alert");
+    }
+
+    #[tokio::test]
+    async fn test_an_ungrouped_alert_renders_exactly_as_before() {
+        // `None` must leave rendering byte-identical, or every existing alert's
+        // notification changes on upgrade.
+        let mut alert = Alert::default();
+        alert.name = "legacy".into();
+        let opts = || ProcessTemplateOptions {
+            rows_end_time: 0,
+            start_time: None,
+            evaluation_timestamp: 0,
+            is_email: false,
+            level: None,
+            actual_value: None,
+        };
+
+        let result = process_dest_template(
+            "test_org",
+            "n={alert_name} g={group.host}",
+            &alert,
+            &[],
+            &[Value::String("".into())],
+            opts(),
+            &hashbrown::HashMap::new(),
+            None,
+        )
+        .await;
+
+        assert_eq!(
+            result, "n=legacy g={group.host}",
+            "with no group context the placeholder is left untouched, as it is today"
+        );
+    }
+}
+
+/// Evaluate an SLO alert from stored status (`alerts_2.md` §6b.3).
+///
+/// A **frozen** classification returns `data: None` and `level: None`,
+/// which is what makes the caller leave `level`, `level_since` and
+/// `level_at` untouched (§7.6). That is the whole safety property: an
+/// unmeasurable window must never be reported as a recovery, or a search
+/// outage resolves every burn-rate alert in the org at once (D34).
+async fn evaluate_slo_alert(
+    alert: &Alert,
+    end_time: i64,
+) -> Result<TriggerEvalResults, anyhow::Error> {
+    let mut results = TriggerEvalResults {
+        end_time,
+        ..Default::default()
+    };
+    let Some(cond) = alert.query_condition.slo_condition.as_ref() else {
+        // query_type says slo but no condition was stored. Nothing to
+        // evaluate, and inventing a level here would be worse than
+        // reporting nothing.
+        log::warn!(
+            "[alert {}/{}] query_type is slo but no slo_condition is stored",
+            alert.org_id,
+            alert.name
+        );
+        return Ok(results);
+    };
+
+    let now_secs = end_time / 1_000_000;
+    let evals = crate::slo::evaluate::evaluate(cond, &alert.org_id, now_secs).await?;
+
+    // The most severe OBSERVED result decides the alert's level; frozen
+    // groups contribute nothing rather than dragging it to Ok.
+    let mut best: Option<&crate::slo::evaluate::SloEvalResult> = None;
+    for e in &evals {
+        let Some(level) = e.classification.level() else {
+            continue;
+        };
+        if level == config::meta::alerts::level::AlertLevel::Ok {
+            continue;
+        }
+        let better = match best.and_then(|b| b.classification.level()) {
+            Some(config::meta::alerts::level::AlertLevel::Critical) => false,
+            Some(_) => level == config::meta::alerts::level::AlertLevel::Critical,
+            None => true,
+        };
+        if better {
+            best = Some(e);
+        }
+    }
+
+    // Every group frozen means the whole evaluation is frozen: no level,
+    // no data, nothing touched.
+    if best.is_none() && evals.iter().all(|e| e.classification.is_frozen()) {
+        return Ok(results);
+    }
+
+    if let Some(e) = best {
+        results.level = e.classification.level();
+        results.actual_value = e.actual_value;
+        results.group_label = e.group_key.clone();
+        // These keys become notification template variables verbatim —
+        // `{slo_name}`, `{burn_rate}` and so on — because the template engine
+        // substitutes from the row map.
+        let mut row = Map::new();
+        row.insert("slo_id".to_string(), Value::String(cond.slo_id.clone()));
+        row.insert("slo_name".to_string(), Value::String(e.slo_name.clone()));
+        row.insert(
+            "slo_window".to_string(),
+            Value::String(format!("{}d", e.slo_window_secs / 86_400)),
+        );
+        if let Some(g) = &e.group_key {
+            row.insert("group".to_string(), Value::String(g.clone()));
+        }
+
+        let put = |row: &mut Map<String, Value>, key: &str, v: f64| {
+            if let Some(n) = serde_json::Number::from_f64(v) {
+                row.insert(key.to_string(), Value::Number(n));
+            }
+        };
+        put(&mut row, "slo_target", e.slo_target);
+        if let Some(v) = e.actual_value {
+            put(&mut row, "value", v);
+            // Also named for the kind, so a template written for a burn-rate
+            // alert reads as one rather than referring to a generic `value`.
+            match cond.kind {
+                config::meta::slo::condition::SloAlertKind::BurnRate => {
+                    put(&mut row, "burn_rate", v)
+                }
+                config::meta::slo::condition::SloAlertKind::ErrorBudget => {
+                    put(&mut row, "error_budget_consumed", v)
+                }
+            }
+        }
+        if let Some(s) = e.sli {
+            put(&mut row, "sli", s);
+        }
+        if let Some(b) = e.error_budget_remaining {
+            put(&mut row, "error_budget_remaining", b);
+        }
+        results.data = Some(vec![row]);
+    } else {
+        // Observed and healthy. A real measurement, categorically
+        // different from frozen — the level is recorded as Ok.
+        results.level = Some(config::meta::alerts::level::AlertLevel::Ok);
+    }
+    Ok(results)
 }

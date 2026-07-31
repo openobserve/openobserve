@@ -610,6 +610,18 @@ fn resolve_module_configs(
             poll_interval_secs: pick_interval(cfg.limit.scheduler_anomaly_interval),
         },
         ModuleSchedulerConfig {
+            module: TriggerModule::Slo,
+            concurrency: pick_concurrency(cfg.limit.scheduler_slo_concurrency),
+            poll_interval_secs: pick_interval(cfg.limit.scheduler_slo_interval),
+        },
+        ModuleSchedulerConfig {
+            // Its own lane on purpose: a bulk historical scan sharing a
+            // budget with incremental SLI passes would starve them (§6b.9).
+            module: TriggerModule::SloBackfill,
+            concurrency: std::cmp::max(1, cfg.limit.scheduler_slo_backfill_concurrency),
+            poll_interval_secs: pick_interval(cfg.limit.scheduler_slo_backfill_interval),
+        },
+        ModuleSchedulerConfig {
             module: TriggerModule::QueryRecommendations,
             concurrency: pick_concurrency(cfg.limit.scheduler_query_reco_concurrency),
             poll_interval_secs: pick_interval(cfg.limit.scheduler_query_reco_interval),
@@ -749,10 +761,10 @@ mod tests {
         // never be pulled once per-module pullers are enabled.
         let cfg = config::Config::default();
         let configs = resolve_module_configs(&cfg, &make_config());
-        assert_eq!(configs.len(), 6);
+        assert_eq!(configs.len(), 8);
         let modules: std::collections::HashSet<_> =
             configs.iter().map(|c| c.module.clone()).collect();
-        assert_eq!(modules.len(), 6, "duplicate module in resolved configs");
+        assert_eq!(modules.len(), 8, "duplicate module in resolved configs");
         for m in [
             TriggerModule::Alert,
             TriggerModule::Report,
@@ -760,6 +772,8 @@ mod tests {
             TriggerModule::Backfill,
             TriggerModule::AnomalyDetection,
             TriggerModule::QueryRecommendations,
+            TriggerModule::Slo,
+            TriggerModule::SloBackfill,
         ] {
             assert!(modules.contains(&m), "missing module {m:?}");
         }
@@ -779,6 +793,7 @@ mod tests {
             TriggerModule::DerivedStream,
             TriggerModule::AnomalyDetection,
             TriggerModule::QueryRecommendations,
+            TriggerModule::Slo,
         ] {
             let c = find_module(&configs, m.clone());
             assert_eq!(c.concurrency, 3, "{m:?} should inherit base concurrency");
@@ -794,6 +809,13 @@ mod tests {
             backfill.poll_interval_secs, 10,
             "backfill inherits the alert pull frequency"
         );
+
+        // SLO backfill floors to 1 for the same reason the alert backfill
+        // does: a bulk historical scan must never crowd out the incremental
+        // passes that alerts read from.
+        let slo_backfill = find_module(&configs, TriggerModule::SloBackfill);
+        assert_eq!(slo_backfill.concurrency, 1, "slo backfill floors to 1");
+        assert_eq!(slo_backfill.poll_interval_secs, 10);
     }
 
     #[test]
@@ -805,6 +827,8 @@ mod tests {
         cfg.limit.scheduler_anomaly_concurrency = 4;
         cfg.limit.scheduler_query_reco_concurrency = 2;
         cfg.limit.scheduler_backfill_concurrency = 3;
+        cfg.limit.scheduler_slo_concurrency = 5;
+        cfg.limit.scheduler_slo_backfill_concurrency = 2;
         let configs = resolve_module_configs(&cfg, &base);
 
         // Alert has no dedicated var: it reuses the base (ZO_ALERT_SCHEDULE_CONCURRENCY).
@@ -826,6 +850,11 @@ mod tests {
             find_module(&configs, TriggerModule::Backfill).concurrency,
             3
         );
+        assert_eq!(find_module(&configs, TriggerModule::Slo).concurrency, 5);
+        assert_eq!(
+            find_module(&configs, TriggerModule::SloBackfill).concurrency,
+            2
+        );
     }
 
     #[test]
@@ -838,6 +867,8 @@ mod tests {
         cfg.limit.scheduler_derived_stream_interval = 120;
         cfg.limit.scheduler_backfill_interval = 60;
         cfg.limit.scheduler_anomaly_interval = 30;
+        cfg.limit.scheduler_slo_interval = 45;
+        cfg.limit.scheduler_slo_backfill_interval = 300;
         // query_reco left at 0 → inherits the alert pull frequency (10)
         let configs = resolve_module_configs(&cfg, &base);
 
@@ -861,6 +892,14 @@ mod tests {
         assert_eq!(
             find_module(&configs, TriggerModule::AnomalyDetection).poll_interval_secs,
             30
+        );
+        assert_eq!(
+            find_module(&configs, TriggerModule::Slo).poll_interval_secs,
+            45
+        );
+        assert_eq!(
+            find_module(&configs, TriggerModule::SloBackfill).poll_interval_secs,
+            300
         );
         assert_eq!(
             find_module(&configs, TriggerModule::QueryRecommendations).poll_interval_secs,

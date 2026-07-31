@@ -21,7 +21,7 @@ This is **OpenObserve**, an open-source observability platform written in **Rust
 - **Frontend**: Vue 3 SPA with Vite, using Vuex for state management. When reviewing changes under
   `web/`, **read the tracked skills `.claude/skills/ui-architect/SKILL.md` (UI house rules) and
   `.claude/skills/eslint-error-handling/SKILL.md` (lint/type-check playbook)** first — they are the
-  authoritative source for frontend conventions (O2 component library over Quasar, no
+  authoritative source for frontend conventions (build from the O2 component library, no
   `any`/`!`/use-site `as`, type-clean + lint-clean, design tokens + i18n over hardcoded strings).
   Flag deviations from them.
 - **Testing**: Rust unit tests with `cargo test`, E2E with Playwright

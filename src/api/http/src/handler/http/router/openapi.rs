@@ -147,6 +147,7 @@ use crate::{
         openobserve_api_management::request::alerts::clone_alert,
         openobserve_api_management::request::alerts::generate_sql,
         openobserve_api_management::request::alerts::move_alerts,
+        openobserve_api_management::request::alerts::list_alert_tags,
         openobserve_api_management::request::alerts::history::get_alert_history,
         openobserve_api_management::request::alerts::incidents::list_incidents,
         openobserve_api_management::request::alerts::incidents::get_incident,
@@ -265,6 +266,8 @@ use crate::{
         openobserve_api_management::request::alerts::deduplication::preview_semantic_groups_diff,
         openobserve_api_management::request::alerts::deduplication::save_semantic_groups,
         openobserve_api_management::request::alerts::dedup_stats::get_dedup_summary,
+        // TODO(slo): the SLO handlers are deferred along with their routes
+        // in `router/mod.rs`, so they are not documented here.
         synthetics::list_synthetics,
         synthetics::create_synthetic,
         synthetics::get_synthetic,
@@ -346,6 +349,7 @@ use crate::{
             openobserve_api_management::models::alerts::responses::GetAlertResponseBody,
             openobserve_api_management::models::alerts::responses::ListAlertsResponseBody,
             openobserve_api_management::models::alerts::responses::ListAlertsResponseBodyItem,
+            openobserve_api_management::request::alerts::AlertTagCount,
             openobserve_api_management::models::alerts::responses::EnableAlertResponseBody,
             openobserve_api_management::models::alerts::Alert,
             openobserve_api_management::models::alerts::TriggerCondition,

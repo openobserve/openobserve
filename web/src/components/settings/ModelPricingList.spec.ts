@@ -156,8 +156,8 @@ const AppTabsStub = {
   template: `<div data-test="app-tabs-stub" :data-active="activeTab" />`,
 };
 
-const QTablePaginationStub = {
-  name: "QTablePagination",
+const PaginationStub = {
+  name: "Pagination",
   props: ["scope", "position", "resultTotal", "perPageOptions"],
   emits: ["update:changeRecordPerPage"],
   template: `<div data-test="table-pagination-stub" />`,
@@ -291,7 +291,7 @@ const globalStubs: Record<string, any> = {
   ImportModelPricing: ImportModelPricingStub,
   TestModelMatchDialog: TestModelMatchDialogStub,
   AppTabs: AppTabsStub,
-  QTablePagination: QTablePaginationStub,
+  Pagination: PaginationStub,
 };
 
 // ── Test helpers ─────────────────────────────────────────────────────────────

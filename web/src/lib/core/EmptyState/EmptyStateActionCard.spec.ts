@@ -151,7 +151,7 @@ describe("EmptyStateActionCard", () => {
     const wrapper = mountCard({ sublabel: "Get started with observability" });
     // The button should have 3 direct children: tile span, text span, chevron icon
     const root = wrapper.find("button");
-    // Quasar stubs or wrapper internals may add extra nodes — check by content instead
+    // Stubs or wrapper internals may add extra nodes — check by content instead
     expect(wrapper.text()).toContain("Create Dashboard");
     expect(wrapper.text()).toContain("Get started with observability");
     expect(wrapper.find("[data-icon-name='chevron-right']").exists()).toBe(true);

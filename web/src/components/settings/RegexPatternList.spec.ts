@@ -1196,7 +1196,7 @@ describe("RegexPatternList.vue - ODrawer Migration", () => {
           ImportRegexPattern: true,
           ConfirmDialog: true,
           NoData: true,
-          QTablePagination: true,
+          Pagination: true,
           OButton: true,
           Pencil: true,
           Trash2: true,
@@ -1205,14 +1205,9 @@ describe("RegexPatternList.vue - ODrawer Migration", () => {
           // needing a Layout context; without one the page could silently
           // fail to render its slot, which would hide the ODrawer that lives
           // inside.
-          QPage: { template: "<div><slot /></div>" },
-          QTable: { template: '<div><slot name="no-data" /></div>' },
-          QInput: { template: "<input />" },
-          QIcon: { template: "<span />" },
           QTr: { template: "<tr><slot /></tr>" },
           QTd: { template: "<td><slot /></td>" },
           QTh: { template: "<th><slot /></th>" },
-          QCheckbox: { template: '<input type="checkbox" />' },
           OTable: { template: "<div><slot /></div>" },
           OIcon: { template: "<span />" },
           OInput: { template: "<input />", methods: { focus() {} } },

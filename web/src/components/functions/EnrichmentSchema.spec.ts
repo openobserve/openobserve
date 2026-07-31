@@ -103,7 +103,7 @@ function buildMountOptions(store: any = mockStore, props: Record<string, unknown
       },
       stubs: {
         ODrawer: ODrawerStub,
-        QTablePagination: true,
+        Pagination: true,
       },
     },
   };
