@@ -92,6 +92,24 @@ pub struct LlmScoreRecord {
     pub score_config_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub score_config_version: Option<String>,
+    /// Physical immutable Score Config row used for this Score. Queue reviews
+    /// use it to prove exact N/N rubric coverage.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub score_config_row_id: Option<String>,
+    /// Logical N/N grouping key for authoritative annotation-source Scores.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub review_submission_id: Option<String>,
+    /// Queue provenance for Workbench review Scores. Together with
+    /// `review_submission_id`, these fields make `_llm_scores` independently
+    /// queryable without a relational Review or Review Score table.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub queue_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub queue_item_id: Option<String>,
+    /// Distinct physical Score Config rows required for this complete N/N
+    /// review submission.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub review_submission_score_count: Option<i64>,
     pub source_type: LlmScoreDataSourceType,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub source_stream: Option<String>,
@@ -109,8 +127,13 @@ pub struct LlmScoreRecord {
     pub job_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub job_version: Option<i32>,
+    /// Justification for this individual Score dimension.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reasoning: Option<String>,
+    /// Overall comment for the complete Review Submission. Annotation
+    /// projection repeats this value on each Score in the submission.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub review_submission_comments: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<serde_json::Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -144,6 +167,11 @@ impl LlmScoreRecord {
             scorer_version: Some(String::new()),
             score_config_id: Some(String::new()),
             score_config_version: Some(String::new()),
+            score_config_row_id: Some(String::new()),
+            review_submission_id: Some(String::new()),
+            queue_id: Some(String::new()),
+            queue_item_id: Some(String::new()),
+            review_submission_score_count: Some(0),
             source_type: LlmScoreDataSourceType::LlmJudge,
             source_stream: Some(String::new()),
             source_stream_type: Some(String::new()),
@@ -154,6 +182,7 @@ impl LlmScoreRecord {
             job_id: Some(String::new()),
             job_version: Some(0),
             reasoning: Some(String::new()),
+            review_submission_comments: Some(String::new()),
             metadata: Some(serde_json::json!({})),
             author: Some(String::new()),
             _timestamp: 0,
@@ -223,6 +252,11 @@ mod tests {
             scorer_version: Some("1".to_string()),
             score_config_id: Some("cfg-1".to_string()),
             score_config_version: Some("1".to_string()),
+            score_config_row_id: None,
+            review_submission_id: None,
+            queue_id: None,
+            queue_item_id: None,
+            review_submission_score_count: None,
             source_type,
             source_stream: Some("traces".to_string()),
             source_stream_type: Some("traces".to_string()),
@@ -233,6 +267,7 @@ mod tests {
             job_id: Some("job-1".to_string()),
             job_version: Some(1),
             reasoning: None,
+            review_submission_comments: None,
             metadata: None,
             author: None,
             _timestamp: timestamp,
@@ -265,6 +300,11 @@ mod tests {
             scorer_version: Some("1".to_string()),
             score_config_id: Some("cfg-entity-1".to_string()),
             score_config_version: Some("1".to_string()),
+            score_config_row_id: None,
+            review_submission_id: None,
+            queue_id: None,
+            queue_item_id: None,
+            review_submission_score_count: None,
             source_type: LlmScoreDataSourceType::LlmJudge,
             source_stream: Some("traces".to_string()),
             source_stream_type: Some("traces".to_string()),
@@ -275,6 +315,7 @@ mod tests {
             job_id: Some("job-1".to_string()),
             job_version: Some(1),
             reasoning: None,
+            review_submission_comments: None,
             metadata: None,
             author: None,
             _timestamp: 1700000000000,
@@ -293,6 +334,29 @@ mod tests {
         assert_eq!(back.source_stream_type, Some("traces".to_string()));
         assert_eq!(back.agent_name, Some("agent-a".to_string()));
         assert_eq!(back.agent_id, Some("agent-1".to_string()));
+    }
+
+    #[test]
+    fn annotation_score_keeps_dimension_reasoning_and_submission_comments_distinct() {
+        let mut record = test_score_record(
+            "annotation-score-1",
+            "org=org-1;submission=submission-1;config=cfg-1;target=span-1",
+            1,
+            1,
+            LlmScoreDataSourceType::Annotation,
+            0.9,
+        );
+        record.review_submission_id = Some("submission-1".to_string());
+        record.reasoning = Some("Reason for this dimension".to_string());
+        record.review_submission_comments = Some("Overall reviewer comment".to_string());
+
+        let json = serde_json::to_value(&record).unwrap();
+        assert_eq!(json["review_submission_id"], "submission-1");
+        assert_eq!(json["reasoning"], "Reason for this dimension");
+        assert_eq!(
+            json["review_submission_comments"],
+            "Overall reviewer comment"
+        );
     }
 
     #[test]
@@ -321,6 +385,11 @@ mod tests {
         assert!(obj.contains_key("score_config_id"));
         assert!(!obj.contains_key("score_config_entity_id"));
         assert!(obj.contains_key("score_config_version"));
+        assert!(obj.contains_key("score_config_row_id"));
+        assert!(obj.contains_key("review_submission_id"));
+        assert!(obj.contains_key("queue_id"));
+        assert!(obj.contains_key("queue_item_id"));
+        assert!(obj.contains_key("review_submission_score_count"));
         assert!(obj.contains_key("source_type"));
         assert!(obj.contains_key("source_stream"));
         assert!(obj.contains_key("source_stream_type"));
@@ -330,6 +399,7 @@ mod tests {
         assert!(!obj.contains_key("target_agent_id"));
         assert!(obj.contains_key("job_id"));
         assert!(obj.contains_key("reasoning"));
+        assert!(obj.contains_key("review_submission_comments"));
         assert!(obj.contains_key("metadata"));
         assert!(obj.contains_key("author"));
         assert!(obj.contains_key("_timestamp"));
@@ -361,6 +431,11 @@ mod tests {
             scorer_version: None,
             score_config_id: None,
             score_config_version: None,
+            score_config_row_id: None,
+            review_submission_id: None,
+            queue_id: None,
+            queue_item_id: None,
+            review_submission_score_count: None,
             source_type: LlmScoreDataSourceType::LlmJudge,
             source_stream: None,
             source_stream_type: None,
@@ -371,6 +446,7 @@ mod tests {
             job_id: None,
             job_version: None,
             reasoning: None,
+            review_submission_comments: None,
             metadata: None,
             author: None,
             _timestamp: 0,
@@ -386,9 +462,11 @@ mod tests {
         assert!(!obj.contains_key("value_boolean"));
         assert!(!obj.contains_key("scorer_id"));
         assert!(!obj.contains_key("score_config_id"));
+        assert!(!obj.contains_key("review_submission_id"));
         assert!(!obj.contains_key("agent_name"));
         assert!(!obj.contains_key("agent_id"));
         assert!(!obj.contains_key("reasoning"));
+        assert!(!obj.contains_key("review_submission_comments"));
         assert!(!obj.contains_key("author"));
     }
 
