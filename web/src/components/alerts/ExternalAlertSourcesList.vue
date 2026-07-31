@@ -169,6 +169,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :page-size="10"
             data-test="alert-sources-advanced-table"
           >
+            <template #cell-url="{ row }">
+              <div class="flex items-center gap-1">
+                <OButton
+                  variant="ghost"
+                  size="icon-xs-sq"
+                  :icon-left="revealedAdditionalIds.includes(row.id) ? 'visibility-off' : 'visibility'"
+                  :title="
+                    revealedAdditionalIds.includes(row.id)
+                      ? t('alert_sources.hideToken')
+                      : t('alert_sources.revealToken')
+                  "
+                  :data-test="`alert-sources-additional-reveal-${row.id}`"
+                  @click="toggleAdditionalReveal(row.id)"
+                />
+                <OButton
+                  variant="ghost"
+                  size="icon-xs-sq"
+                  icon-left="content-copy"
+                  :title="t('alert_sources.copyUrl')"
+                  :data-test="`alert-sources-additional-copy-${row.id}`"
+                  @click="copyAdditionalUrl(row)"
+                />
+                <span class="truncate font-mono text-xs">{{ displayedUrlFor(row) }}</span>
+              </div>
+            </template>
             <template #cell-actions="{ row }">
               <OButton
                 :variant="row.enabled ? 'ghost-destructive' : 'ghost-success'"
@@ -258,9 +283,11 @@ export default defineComponent({
       showAdvanced: false,
       showAddEditor: false,
       selectedSetupType: "grafana" as "grafana" | "alertmanager" | "generic",
+      revealedAdditionalIds: [] as string[],
       advancedColumns: [
         { id: "name", header: this.t("alert_sources.name"), accessorKey: "name", sortable: true },
         { id: "source_type", header: this.t("alert_sources.sourceType"), accessorKey: "source_type" },
+        { id: "url", header: this.t("alert_sources.urlHeader"), accessorKey: "url" },
         { id: "actions", header: this.t("alert_sources.actions"), isAction: true, size: 100 },
       ] as any[],
     };
@@ -274,6 +301,10 @@ export default defineComponent({
     },
     additionalIntegrations(): AlertSourceIntegration[] {
       return this.integrations.filter((i) => i.name !== "default");
+    },
+    ingestionBaseUrl(): string {
+      const ingestionURL = getIngestionURL();
+      return getEndPoint(ingestionURL).url;
     },
     fullUrl(): string {
       if (!this.defaultSource) return "";
@@ -346,6 +377,27 @@ export default defineComponent({
     copyUrl() {
       if (!this.defaultSource) return;
       copyToClipboard(this.fullUrl);
+    },
+    fullUrlFor(integration: AlertSourceIntegration): string {
+      return `${this.ingestionBaseUrl}${integration.url}`;
+    },
+    displayedUrlFor(integration: AlertSourceIntegration): string {
+      const full = this.fullUrlFor(integration);
+      if (this.revealedAdditionalIds.includes(integration.id)) return full;
+      const token = integration.token;
+      const masked = `${token.slice(0, 6)}****${token.slice(-4)}`;
+      return full.replace(token, masked);
+    },
+    toggleAdditionalReveal(integrationId: string) {
+      const idx = this.revealedAdditionalIds.indexOf(integrationId);
+      if (idx === -1) {
+        this.revealedAdditionalIds.push(integrationId);
+      } else {
+        this.revealedAdditionalIds.splice(idx, 1);
+      }
+    },
+    copyAdditionalUrl(integration: AlertSourceIntegration) {
+      copyToClipboard(this.fullUrlFor(integration));
     },
     confirmRotate() {
       this.rotateDialogVisible = true;

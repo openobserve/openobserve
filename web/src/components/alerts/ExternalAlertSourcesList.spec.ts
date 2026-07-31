@@ -174,6 +174,63 @@ describe("ExternalAlertSourcesList", () => {
     expect((wrapper.vm as any).additionalIntegrations[0].name).toBe("grafana-staging");
   });
 
+  it("shows a masked URL per additional source, revealing on click", async () => {
+    (alertSources.list as any).mockResolvedValue({
+      data: {
+        integrations: [
+          DEFAULT_SOURCE,
+          {
+            ...DEFAULT_SOURCE,
+            id: "int-2",
+            name: "grafana-staging",
+            source_type: "grafana",
+            token: "o2iat_staging1234efgh5678",
+            url: "/api/v2/myorg/incidents/events/o2iat_staging1234efgh5678",
+          },
+        ],
+      },
+    });
+    const wrapper = buildWrapper();
+    await flushPromises();
+    (wrapper.vm as any).showAdvanced = true;
+    await flushPromises();
+    expect(wrapper.text()).toContain("staging1234efgh5678".slice(-4));
+    expect(wrapper.text()).not.toContain("o2iat_staging1234efgh5678");
+    (wrapper.vm as any).toggleAdditionalReveal("int-2");
+    await flushPromises();
+    expect(wrapper.text()).toContain("http://localhost:5080/api/v2/myorg/incidents/events/o2iat_staging1234efgh5678");
+  });
+
+  it("copies an additional source's full URL via copyToClipboard", async () => {
+    const { copyToClipboard } = await import("@/utils/clipboard");
+    (alertSources.list as any).mockResolvedValue({
+      data: {
+        integrations: [
+          DEFAULT_SOURCE,
+          {
+            ...DEFAULT_SOURCE,
+            id: "int-2",
+            name: "grafana-staging",
+            source_type: "grafana",
+            token: "o2iat_staging1234efgh5678",
+            url: "/api/v2/myorg/incidents/events/o2iat_staging1234efgh5678",
+          },
+        ],
+      },
+    });
+    const wrapper = buildWrapper();
+    await flushPromises();
+    (wrapper.vm as any).showAdvanced = true;
+    await flushPromises();
+    (wrapper.vm as any).copyAdditionalUrl({
+      id: "int-2",
+      url: "/api/v2/myorg/incidents/events/o2iat_staging1234efgh5678",
+    });
+    expect(copyToClipboard).toHaveBeenCalledWith(
+      "http://localhost:5080/api/v2/myorg/incidents/events/o2iat_staging1234efgh5678",
+    );
+  });
+
   it("toggling showAddEditor shows the AddExternalAlertSource component", async () => {
     const wrapper = buildWrapper();
     await flushPromises();

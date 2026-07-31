@@ -5515,6 +5515,7 @@
     "addTitle": "Add Alert Source",
     "name": "Name",
     "sourceType": "Source type",
+    "urlHeader": "Webhook URL",
     "save": "Save",
     "cancel": "Cancel",
     "actions": "Actions",
