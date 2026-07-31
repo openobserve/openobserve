@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :pagination="showPagination ? 'client' : 'none'"
       :page-size="effectivePageSize"
       :custom-pagination-bar="showPagination"
-      :horizontal-scroll="isPivot"
+      :horizontal-scroll="true"
       :row-height="22"
       :virtual-scroll="virtualizeRows"
       :default-columns="false"
