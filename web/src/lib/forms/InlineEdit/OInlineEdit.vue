@@ -45,6 +45,11 @@ const dataTest = computed(() => $attrs["data-test"] as string | undefined);
 const isEditing = ref(false);
 const draft = ref("");
 const valueAtEditStart = ref("");
+// Whether the user has typed since opening the editor. Merely opening the field
+// (e.g. to read the name) is NOT taking it over — only a keystroke is. This lets
+// a re-derived value (an auto-name) flow into an open-but-untouched editor, and
+// stops a stale draft from being committed back over that newer value.
+const dirty = ref(false);
 const inputRef = ref<HTMLInputElement | null>(null);
 const triggerRef = ref<HTMLButtonElement | null>(null);
 
@@ -52,12 +57,14 @@ const displayValue = computed(() => (props.modelValue ?? "").trim());
 const isEmpty = computed(() => displayValue.value === "");
 const canEdit = computed(() => !props.disabled && !props.readonly);
 
-// An auto-name (or an async edit-mode prefill) can land while the field sits in
-// display mode; keep the draft in step so re-entering edit starts from truth.
+// Keep the draft in step with the model whenever the user isn't actively typing:
+// in display mode, and in edit mode until the first keystroke. So an auto-name
+// that re-derives while the editor sits open updates the input instead of being
+// clobbered by a stale draft on commit.
 watch(
   () => props.modelValue,
   (next) => {
-    if (!isEditing.value) draft.value = next ?? "";
+    if (!isEditing.value || !dirty.value) draft.value = next ?? "";
   },
   { immediate: true },
 );
@@ -73,6 +80,7 @@ const startEdit = async () => {
   if (!canEdit.value || isEditing.value) return;
   valueAtEditStart.value = props.modelValue ?? "";
   draft.value = props.modelValue ?? "";
+  dirty.value = false;
   isEditing.value = true;
   emit("edit-start");
   await nextTick();
@@ -85,9 +93,11 @@ const commit = () => {
   if (!isEditing.value) return;
   isEditing.value = false;
   const finalValue = draft.value.trim();
-  // Emit when trimming changed the text, and also when the consumer never
-  // echoed the live emissions back — either way the final value must land.
-  if (finalValue !== draft.value || finalValue !== (props.modelValue ?? "")) {
+  // Only push a value the user actually typed. If they opened the editor and
+  // never touched it, `finalValue` already mirrors the live model (kept in sync
+  // by the watch) — re-emitting it would clobber a value that moved underneath
+  // and read as a manual edit. Committing still reports the current value.
+  if (dirty.value && finalValue !== (props.modelValue ?? "")) {
     emit("update:modelValue", finalValue);
   }
   draft.value = finalValue;
@@ -97,16 +107,20 @@ const commit = () => {
 const cancel = () => {
   if (!isEditing.value) return;
   isEditing.value = false;
-  // Compare against the DRAFT, not the prop: typing already emitted, so the
-  // restore has to be emitted whenever the draft moved — whether or not the
-  // consumer echoed those emissions back into modelValue.
-  const shouldRestore = draft.value !== valueAtEditStart.value;
+  // Nothing typed → nothing to restore; the draft already tracks the live model.
+  if (!dirty.value) {
+    draft.value = props.modelValue ?? "";
+    emit("cancel", (props.modelValue ?? "").trim());
+    return;
+  }
+  // The user typed, then bailed: put the pre-edit value back.
   draft.value = valueAtEditStart.value;
-  if (shouldRestore) emit("update:modelValue", valueAtEditStart.value);
+  emit("update:modelValue", valueAtEditStart.value);
   emit("cancel", valueAtEditStart.value);
 };
 
 const onInput = (event: Event) => {
+  dirty.value = true;
   draft.value = (event.target as HTMLInputElement).value;
   emit("update:modelValue", draft.value);
 };

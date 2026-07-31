@@ -69,6 +69,43 @@ describe("OInlineEdit", () => {
     expect(wrapper.emitted("commit")).toEqual([["Panel two"]]);
   });
 
+  // An open-but-untouched editor must follow a value that re-derives underneath
+  // it (e.g. an auto-name updating as the query changes). Committing the stale
+  // draft back would clobber the newer value and freeze auto-naming.
+  describe("re-derivation while the editor is open", () => {
+    it("tracks the model into an open editor when the user has not typed", async () => {
+      const wrapper = mountInlineEdit({ modelValue: "Record count" });
+      await trigger(wrapper).trigger("click");
+
+      await wrapper.setProps({ modelValue: "Record count, Count of X" });
+
+      expect((input(wrapper).element as HTMLInputElement).value).toBe("Record count, Count of X");
+    });
+
+    it("commits the live value (not a stale draft) and emits no clobbering update", async () => {
+      const wrapper = mountInlineEdit({ modelValue: "Record count" });
+      await trigger(wrapper).trigger("click");
+      await wrapper.setProps({ modelValue: "Record count, Count of X" });
+
+      await input(wrapper).trigger("blur");
+
+      // No update:modelValue — nothing was typed, so the live value is left alone.
+      expect(wrapper.emitted("update:modelValue")).toBeUndefined();
+      // commit reports the current value, so the consumer re-arms auto-naming.
+      expect(wrapper.emitted("commit")).toEqual([["Record count, Count of X"]]);
+    });
+
+    it("keeps a typed value even if the model re-derives underneath", async () => {
+      const wrapper = mountInlineEdit({ modelValue: "Record count" });
+      await trigger(wrapper).trigger("click");
+      await input(wrapper).setValue("My Custom Name");
+
+      await wrapper.setProps({ modelValue: "Record count, Count of X" });
+
+      expect((input(wrapper).element as HTMLInputElement).value).toBe("My Custom Name");
+    });
+  });
+
   it("restores the pre-edit value on Escape", async () => {
     const wrapper = mountInlineEdit();
     await trigger(wrapper).trigger("click");
