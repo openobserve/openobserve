@@ -47,10 +47,10 @@ Install `protoc`:
 
 ```
 # Linux
-# Download the latest release from https://github.com/protocolbuffers/protobuf/releases
-# Replace <VERSION> and <ARCH> with the appropriate values (e.g. 29.3 and linux-x86_64)
-wget https://github.com/protocolbuffers/protobuf/releases/download/v<VERSION>/protoc-<VERSION>-<ARCH>.zip
-unzip protoc-<VERSION>-<ARCH>.zip -d protoc
+# Download the latest protoc release for your platform from:
+# https://github.com/protocolbuffers/protobuf/releases
+# Then install it:
+unzip protoc-*-linux-x86_64.zip -d protoc
 sudo cp protoc/bin/protoc /usr/local/bin/
 sudo cp -r protoc/include/google /usr/local/include/
 
@@ -60,9 +60,10 @@ export PROTOC_INCLUDE=/usr/local/include
 # You could also set it in your .env file
 
 # Windows
-# Download the latest release from https://github.com/protocolbuffers/protobuf/releases
-curl -L -o protoc-win64.zip https://github.com/protocolbuffers/protobuf/releases/download/v<VERSION>/protoc-<VERSION>-win64.zip
-unzip protoc-win64.zip -d protoc
+# Download the latest protoc release for your platform from:
+# https://github.com/protocolbuffers/protobuf/releases
+# Then install it:
+unzip protoc-*-win64.zip -d protoc
 cp protoc/bin/protoc.exe C:/windows/system32/protoc.exe
 cp -r protoc/include/google C:/windows/system32/
 
