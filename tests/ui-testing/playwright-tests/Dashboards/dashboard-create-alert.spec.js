@@ -169,11 +169,13 @@ test.describe("Dashboard Create Alert testcases", () => {
       await streamPromise;
       await pm.dashboardPanelActions.waitForChartToRender();
 
-      // Save the panel and wait for dashboard to reload chart data
-      const dashboardStreamPromise = page.waitForResponse(
-        (resp) => resp.url().includes("_search_stream") && resp.status() === 200,
-        { timeout: 30000 }
-      );
+      // Save the panel and wait for dashboard to reload chart data.
+      // _search_stream is SSE/chunked (progress events, then a final
+      // [[DONE]] message) — page.waitForResponse(status===200) resolves on
+      // the first response event (headers), which fires as soon as the
+      // stream opens, not when it actually finishes. waitForStreamComplete
+      // reads the body and waits for the real [[DONE]] marker instead.
+      const dashboardStreamPromise = waitForStreamComplete(page, 30000);
       await pm.dashboardPanelActions.savePanel();
       await dashboardStreamPromise;
       await page.locator('[data-test="chart-renderer"] canvas').first().waitFor({ state: "visible", timeout: 15000 });
@@ -265,11 +267,13 @@ test.describe("Dashboard Create Alert testcases", () => {
       await streamPromise;
       await pm.dashboardPanelActions.waitForChartToRender();
 
-      // Save the panel and wait for dashboard to reload chart data
-      const dashboardStreamPromise = page.waitForResponse(
-        (resp) => resp.url().includes("_search_stream") && resp.status() === 200,
-        { timeout: 30000 }
-      );
+      // Save the panel and wait for dashboard to reload chart data.
+      // _search_stream is SSE/chunked (progress events, then a final
+      // [[DONE]] message) — page.waitForResponse(status===200) resolves on
+      // the first response event (headers), which fires as soon as the
+      // stream opens, not when it actually finishes. waitForStreamComplete
+      // reads the body and waits for the real [[DONE]] marker instead.
+      const dashboardStreamPromise = waitForStreamComplete(page, 30000);
       await pm.dashboardPanelActions.savePanel();
       await dashboardStreamPromise;
       await page.locator('[data-test="chart-renderer"] canvas').first().waitFor({ state: "visible", timeout: 15000 });
@@ -342,11 +346,13 @@ test.describe("Dashboard Create Alert testcases", () => {
       await streamPromise;
       await pm.dashboardPanelActions.waitForChartToRender();
 
-      // Save the panel and wait for dashboard to reload chart data
-      const dashboardStreamPromise = page.waitForResponse(
-        (resp) => resp.url().includes("_search_stream") && resp.status() === 200,
-        { timeout: 30000 }
-      );
+      // Save the panel and wait for dashboard to reload chart data.
+      // _search_stream is SSE/chunked (progress events, then a final
+      // [[DONE]] message) — page.waitForResponse(status===200) resolves on
+      // the first response event (headers), which fires as soon as the
+      // stream opens, not when it actually finishes. waitForStreamComplete
+      // reads the body and waits for the real [[DONE]] marker instead.
+      const dashboardStreamPromise = waitForStreamComplete(page, 30000);
       await pm.dashboardPanelActions.savePanel();
       await dashboardStreamPromise;
       await page.locator('[data-test="chart-renderer"] canvas').first().waitFor({ state: "visible", timeout: 15000 });

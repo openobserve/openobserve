@@ -3,6 +3,7 @@
 //addDashboardVariable params: name, streamtype, streamName, field, customValueSearch, filterConfig, showMultipleValues
 import { expect } from "@playwright/test";
 import { selectStreamFromDropdown, selectFieldFromDropdown } from "./dashboard-stream-field-utils.js";
+import { waitForValuesStreamComplete } from "../../playwright-tests/utils/streaming-helpers.js";
 
 export default class DashboardVariables {
   constructor(page) {
@@ -198,17 +199,26 @@ export default class DashboardVariables {
     const hasSearch = await searchInput.count() > 0;
     if (hasSearch) {
       await searchInput.waitFor({ state: "visible", timeout: 5000 });
+      // The values list is fetched via a real HTTP fetch() to /_values_stream
+      // (useStreamingSearch, SSE-style: progress events then a final
+      // "data: [[DONE]]"), triggered by this search-term fill. Register the
+      // listener before filling so we don't miss the response, and treat it
+      // as a best-effort signal — reading a streaming body via CDP isn't
+      // always reliable, so a timeout here just falls through rather than
+      // failing (the poll below is the real backstop).
+      const valuesStreamPromise = waitForValuesStreamComplete(this.page, 10000);
       await searchInput.fill(value);
+      await valuesStreamPromise;
     }
 
     const option = this.variableOptionByValue(label, value);
 
     // The option list comes from a backend query over data that may have
     // been ingested via a raw HTTP POST moments earlier in this test — a 200
-    // response there confirms accepted, not yet queryable/indexed. Rather than
-    // wait once on a fixed timeout, close and reopen the dropdown (forcing a
-    // fresh values query) until the option shows up or we've given indexing
-    // a generous window to catch up.
+    // response there confirms accepted, not yet queryable/indexed. The
+    // values-stream wait above is the primary signal; on top of it, close
+    // and reopen the dropdown (forcing a fresh values query) until the
+    // option shows up or we've given indexing a generous window to catch up.
     await expect.poll(async () => {
       if (await option.isVisible()) return true;
       await this.page.keyboard.press("Escape");
@@ -220,7 +230,9 @@ export default class DashboardVariables {
         await searchInput
           .waitFor({ state: "visible", timeout: 5000 })
           .catch(() => {});
+        const retryValuesPromise = waitForValuesStreamComplete(this.page, 5000);
         await searchInput.fill(value).catch(() => {});
+        await retryValuesPromise;
       }
       return await option.isVisible();
     }, { timeout: 40000, intervals: [1000, 2000, 3000, 5000, 5000, 5000, 5000] }).toBe(true);
