@@ -109,7 +109,7 @@ async function ingestAndAwaitTopology(page, {
   minNodes = 10,
   minEdges = 10,
   rounds = 2,
-  roundWaitMs = 120_000,
+  roundWaitMs = 200_000,
   deadlineAt = null,
   onProgress = () => {},
 } = {}) {
