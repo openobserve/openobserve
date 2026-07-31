@@ -648,6 +648,7 @@ describe("convertPanelData", () => {
         mockChartPanelStyle,
         mockAnnotations,
         false,
+        undefined,
       );
     });
 
@@ -927,6 +928,7 @@ describe("convertPanelData", () => {
         mockChartPanelStyle,
         mockAnnotations,
         true,
+        undefined,
       );
     });
 
@@ -999,6 +1001,7 @@ describe("convertPanelData", () => {
         expect.anything(),
         expect.anything(),
         false,
+        undefined,
       );
     });
 

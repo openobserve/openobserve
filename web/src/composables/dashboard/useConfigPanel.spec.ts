@@ -196,10 +196,11 @@ describe("ORDERED_SECTION_IDS", () => {
     "comparison",
     "markLines",
     "background",
+    "sparkline",
   ];
 
-  it("contains all 20 sections", () => {
-    expect(ORDERED_SECTION_IDS).toHaveLength(20);
+  it("contains all 21 sections", () => {
+    expect(ORDERED_SECTION_IDS).toHaveLength(21);
   });
 
   it("contains every expected section id", () => {

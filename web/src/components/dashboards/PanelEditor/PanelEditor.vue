@@ -497,7 +497,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             :error="errorMessage"
                             :maxQueryRangeWarning="maxQueryRangeWarning"
                             :limitNumberOfSeriesWarningMessage="limitNumberOfSeriesWarningMessage"
-                      :sparklineWarning="sparklineWarning"
+                            :sparklineWarning="sparklineWarning"
                             :isCachedDataDifferWithCurrentTimeRange="
                               isCachedDataDifferWithCurrentTimeRange
                             "
