@@ -283,6 +283,33 @@ export const BADGE_GROUPS = {
     },
   },
 
+  // Pipeline execution outcome — dot.
+  //
+  // `RunOutcome` replaced the legacy trigger status vocabulary for every
+  // scheduler-backed module. Pipeline history must accept both generations
+  // while old rows remain in the triggers stream.
+  pipelineRunOutcome: {
+    mode: "dot",
+    shape: "pill",
+    values: {
+      // Current RunOutcome vocabulary.
+      firing: { variant: "success-soft" },
+      normal: { variant: "success-soft" },
+      succeeded: { variant: "success-soft" },
+      error: { variant: "error-soft" },
+      notifyfailed: { variant: "error-soft" },
+      skipped: { variant: "warning-soft" },
+      // Legacy trigger status vocabulary and older UI aliases.
+      completed: { variant: "success-soft" },
+      conditionnotsatisfied: { variant: "success-soft" },
+      failed: { variant: "error-soft" },
+      success: { variant: "success-soft" },
+      ok: { variant: "success-soft" },
+      warning: { variant: "warning-soft" },
+    },
+    fallback: { variant: "default-soft" },
+  },
+
   // Service / node health — dot.
   serviceStatus: {
     mode: "dot",

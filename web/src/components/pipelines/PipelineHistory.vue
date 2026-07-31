@@ -137,7 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="pipeline-history-status-badge"
               :data-test-status="(row.status || '').toLowerCase()"
             >
-              <OTag type="queryStatus" :value="row.status" />
+              <OTag type="pipelineRunOutcome" :value="row.status" />
             </span>
           </template>
 
@@ -242,7 +242,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div class="w-1/2">
                 <div class="text-text-label mb-1 text-xs">Status</div>
-                <OTag type="queryStatus" :value="selectedRow.status" />
+                <OTag type="pipelineRunOutcome" :value="selectedRow.status" />
               </div>
             </div>
           </div>

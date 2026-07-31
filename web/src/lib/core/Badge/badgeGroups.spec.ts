@@ -210,6 +210,28 @@ describe("badgeGroups", () => {
     expect(resolveBadge("alertState", "succeeded").variant).toBe("success-soft");
   });
 
+  it("pipeline run outcomes support current and legacy trigger vocabularies", () => {
+    for (const value of [
+      "firing",
+      "normal",
+      "succeeded",
+      "completed",
+      "condition_not_satisfied",
+      "success",
+      "ok",
+    ]) {
+      expect(resolveBadge("pipelineRunOutcome", value).variant, value).toBe("success-soft");
+    }
+
+    for (const value of ["error", "notify_failed", "failed"]) {
+      expect(resolveBadge("pipelineRunOutcome", value).variant, value).toBe("error-soft");
+    }
+
+    for (const value of ["skipped", "warning"]) {
+      expect(resolveBadge("pipelineRunOutcome", value).variant, value).toBe("warning-soft");
+    }
+  });
+
   it("resolves the groups added in the OTag type/value sweep", () => {
     expect(resolveBadge("billingTag", "discount").variant).toBe("primary-soft");
     expect(resolveBadge("billingTag", "subscribed").variant).toBe("primary-soft");
