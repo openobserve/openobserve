@@ -14,6 +14,7 @@ const { getAuthHeaders, getOrgIdentifier } = require('./cloud-auth.js');
 
 const BASE = process.env.ZO_BASE_URL || 'http://localhost:5080';
 const STREAM = 'alerts_p0_stream';
+const SINK = 'alerts_notify_sink'; // dogfood destination target — this instance's own ingest
 const TMPL = 'auto_p0_tmpl';
 const DEST = 'auto_p0_dest';
 
@@ -102,16 +103,30 @@ async function deleteAlerts(page, ids) {
   }
 }
 
-/** Idempotently seed the template + webhook destination + a 3-group stream the specs need. */
+/**
+ * Idempotently seed the template + a "dogfood" destination + a 3-group stream.
+ *
+ * The destination points back at THIS OpenObserve instance's own ingest endpoint
+ * (a dedicated sink stream) rather than an external webhook, so a firing alert
+ * actually delivers with no third-party dependency or rate limit. The self-call
+ * authenticates via the same Basic-auth headers the specs already use.
+ */
 async function seedAlertFixtures(page) {
   const { v1 } = urls();
   await api(page, 'post', `${v1}/alerts/templates`, {
     name: TMPL, body: '{"text":"{alert_name} {alert_level}"}', type: 'http', title: '',
   }).catch(() => {});
-  await api(page, 'post', `${v1}/alerts/destinations`, {
-    name: DEST, url: 'https://webhook.site/00000000-0000-0000-0000-000000000000',
-    method: 'post', template: TMPL, type: 'http', headers: {},
-  }).catch(() => {});
+
+  const destination = {
+    name: DEST,
+    url: `${v1}/${SINK}/_json`, // this instance's own ingest -> self-contained delivery
+    method: 'post', template: TMPL, type: 'http',
+    headers: getAuthHeaders(), // Basic auth so the self-call is authorized
+  };
+  // create-if-absent, then update so a stale definition on a persistent env is corrected.
+  await api(page, 'post', `${v1}/alerts/destinations`, destination).catch(() => {});
+  await api(page, 'put', `${v1}/alerts/destinations/${DEST}`, destination).catch(() => {});
+
   // city = group key, latency = the measure; three groups so a multi-alert can fan out.
   await api(page, 'post', `${v1}/${STREAM}/_json`, [
     { city: 'bangalore', latency: 890, status: 500 },
@@ -175,7 +190,7 @@ function isFiringOutcome(outcome) {
 }
 
 module.exports = {
-  BASE, STREAM, TMPL, DEST,
+  BASE, STREAM, SINK, TMPL, DEST,
   uniq, urls, api,
   simpleAlert, multiAlert, groupedSimpleAlert, realtimeAlert,
   createAlert, listAlerts, findAlertId, deleteAlerts, seedAlertFixtures,
