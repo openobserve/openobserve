@@ -107,6 +107,7 @@
                     :error="errorMessage"
                     :maxQueryRangeWarning="maxQueryRangeWarning"
                     :limitNumberOfSeriesWarningMessage="limitNumberOfSeriesWarningMessage"
+                    :sparklineWarning="sparklineWarning"
                     :isCachedDataDifferWithCurrentTimeRange="isCachedDataDifferWithCurrentTimeRange"
                     :isPartialData="isPartialData"
                     :isPanelLoading="isPanelLoading"
@@ -137,6 +138,7 @@
                   @limit-number-of-series-warning-message-update="
                     handleLimitNumberOfSeriesWarningMessage
                   "
+                  @sparkline-warning-update="handleSparklineWarningUpdate"
                   @is-partial-data-update="handleIsPartialDataUpdate"
                   @loading-state-change="handleLoadingStateChange"
                   @is-cached-data-differ-with-current-time-range-update="
@@ -327,6 +329,7 @@ export default defineComponent({
     // Warning messages
     const maxQueryRangeWarning = ref("");
     const limitNumberOfSeriesWarningMessage = ref("");
+    const sparklineWarning = ref("");
     const errorMessage = ref("");
     const isPartialData = ref(false);
     const isPanelLoading = ref(false);
@@ -677,6 +680,9 @@ export default defineComponent({
     const handleLimitNumberOfSeriesWarningMessage = (message: string) => {
       limitNumberOfSeriesWarningMessage.value = message;
     };
+    const handleSparklineWarningUpdate = (message: string) => {
+      sparklineWarning.value = message;
+    };
 
     const handleResultMetadataUpdate = (metadata: any) => {
       maxQueryRangeWarning.value = processQueryMetadataErrors(metadata, store.state.timezone);
@@ -792,6 +798,7 @@ export default defineComponent({
       handleChartApiError,
       handleResultMetadataUpdate,
       handleLimitNumberOfSeriesWarningMessage,
+      handleSparklineWarningUpdate,
       variablesDataUpdated,
       currentDashboardData,
       variablesData,
@@ -816,6 +823,7 @@ export default defineComponent({
       store,
       maxQueryRangeWarning,
       limitNumberOfSeriesWarningMessage,
+      sparklineWarning,
       errorMessage,
       warning: "warning",
       currentTabId,

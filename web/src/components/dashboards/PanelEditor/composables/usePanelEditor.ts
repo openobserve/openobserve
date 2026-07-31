@@ -120,6 +120,9 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
   /** Series limit warning message */
   const limitNumberOfSeriesWarningMessage: Ref<string> = ref("");
 
+  /** Sparkline-unavailable warning (e.g. JOIN queries — API code 20013) */
+  const sparklineWarning: Ref<string> = ref("");
+
   /** General error message */
   const errorMessage: Ref<string> = ref("");
 
@@ -383,6 +386,10 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
     limitNumberOfSeriesWarningMessage.value = message;
   };
 
+  const handleSparklineWarningUpdate = (message: string): void => {
+    sparklineWarning.value = message;
+  };
+
   /**
    * Handle partial data update from PanelSchemaRenderer
    * @param value - Whether data is partial (loading was interrupted)
@@ -611,6 +618,7 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
     errorMessage.value = "";
     maxQueryRangeWarning.value = "";
     limitNumberOfSeriesWarningMessage.value = "";
+    sparklineWarning.value = "";
   };
 
   /**
@@ -771,6 +779,7 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
     shouldRefreshWithoutCache,
     maxQueryRangeWarning,
     limitNumberOfSeriesWarningMessage,
+    sparklineWarning,
     errorMessage,
     isPartialData,
     isPanelLoading,
@@ -795,6 +804,7 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
     handleChartApiError,
     handleLastTriggeredAtUpdate,
     handleLimitNumberOfSeriesWarningMessage,
+    handleSparklineWarningUpdate,
     handleIsPartialDataUpdate,
     handleLoadingStateChange,
     handleIsCachedDataDifferWithCurrentTimeRangeUpdate,

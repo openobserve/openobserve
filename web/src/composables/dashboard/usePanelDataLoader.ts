@@ -153,6 +153,10 @@ export const usePanelDataLoader = (
     resultMetaData: [] as any, // 2D array: [queryIndex][partitionIndex]
     // Metric sparkline: per-query histogram hits from a 2nd is_ui_histogram fetch.
     sparklineData: [] as any,
+    // Non-blocking warning when the sparkline histogram is unavailable for the
+    // query (e.g. JOIN/UNION/CTE/DISTINCT/LIMIT — API code 20013). The metric
+    // value still renders; this is surfaced as a panel-header warning.
+    sparklineWarning: "" as string,
     lastTriggeredAt: null as any,
     isCachedDataDifferWithCurrentTimeRange: false,
     searchRequestTraceIds: <string[]>[],

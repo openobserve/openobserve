@@ -452,6 +452,7 @@ export default defineComponent({
     "updated:vrlFunctionFieldList",
     "loading-state-change",
     "limit-number-of-series-warning-message-update",
+    "sparkline-warning-update",
     "is-partial-data-update",
     "series-data-update",
     "contextmenu",
@@ -643,6 +644,7 @@ export default defineComponent({
       metadata,
       resultMetaData,
       sparklineData,
+      sparklineWarning,
       annotations,
       lastTriggeredAt,
       isCachedDataDifferWithCurrentTimeRange,
@@ -1530,6 +1532,11 @@ export default defineComponent({
     // Watch isPartialData changes and emit them
     watch(isPartialData, (newValue) => {
       emit("is-partial-data-update", newValue);
+    });
+
+    // Surface the sparkline-unavailable warning (e.g. JOIN queries) on the header.
+    watch(sparklineWarning, (newValue) => {
+      emit("sparkline-warning-update", newValue);
     });
 
     const tableRendererData = computed(() => {

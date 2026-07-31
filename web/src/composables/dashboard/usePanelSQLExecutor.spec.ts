@@ -744,5 +744,55 @@ describe("usePanelSQLExecutor", () => {
 
       expect(state.sparklineData[0]).toEqual(hits);
     });
+
+    const HISTOGRAM_UNAVAILABLE = {
+      code: 20013,
+      message: "Search histogram not available",
+      error_detail: "Histogram unavailable for CTEs, DISTINCT, UNION, JOIN and LIMIT queries.",
+    };
+
+    it("sets sparklineWarning when the histogram-unavailable error (20013) arrives via the data event", async () => {
+      const { ctx, state, fetchQueryDataWithHttpStream } = makeMetricCtx(true);
+      const { executeSQL } = usePanelSQLExecutor(ctx);
+      await executeSQL(0, 300_000_000, null);
+
+      const histCall = fetchQueryDataWithHttpStream.mock.calls.find(
+        ([p]: any) => p?.meta?.is_ui_histogram === true,
+      );
+      const [payload, handlers] = histCall;
+      // The API delivers this as a data event of type "error" (see handleSearchResponse),
+      // not the error callback — the handler must catch it there.
+      handlers.data(payload, { type: "error", content: HISTOGRAM_UNAVAILABLE });
+
+      expect(state.sparklineWarning).toBe(HISTOGRAM_UNAVAILABLE.error_detail);
+    });
+
+    it("also sets sparklineWarning when 20013 arrives via the error callback", async () => {
+      const { ctx, state, fetchQueryDataWithHttpStream } = makeMetricCtx(true);
+      const { executeSQL } = usePanelSQLExecutor(ctx);
+      await executeSQL(0, 300_000_000, null);
+
+      const histCall = fetchQueryDataWithHttpStream.mock.calls.find(
+        ([p]: any) => p?.meta?.is_ui_histogram === true,
+      );
+      const [payload, handlers] = histCall;
+      handlers.error(payload, { type: "error", content: HISTOGRAM_UNAVAILABLE });
+
+      expect(state.sparklineWarning).toBe(HISTOGRAM_UNAVAILABLE.error_detail);
+    });
+
+    it("stays silent for other (transient) histogram errors", async () => {
+      const { ctx, state, fetchQueryDataWithHttpStream } = makeMetricCtx(true);
+      const { executeSQL } = usePanelSQLExecutor(ctx);
+      await executeSQL(0, 300_000_000, null);
+
+      const histCall = fetchQueryDataWithHttpStream.mock.calls.find(
+        ([p]: any) => p?.meta?.is_ui_histogram === true,
+      );
+      const [payload, handlers] = histCall;
+      handlers.error(payload, { type: "error", content: { code: 500, message: "boom" } });
+
+      expect(state.sparklineWarning).toBe("");
+    });
   });
 });

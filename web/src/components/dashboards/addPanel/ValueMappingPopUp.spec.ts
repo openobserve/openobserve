@@ -144,10 +144,10 @@ describe("ValueMappingPopUp", () => {
       expect(dialog.props("open")).toBe(false);
     });
 
-    it("should forward width 70 to ODialog", () => {
+    it("uses the lg size preset on ODialog", () => {
       wrapper = createWrapper();
       const dialog = wrapper.findComponent(ODialogStub);
-      expect(dialog.props("width")).toBe(70);
+      expect(dialog.props("size")).toBe("lg");
     });
 
     it("should pass the Add-new mapping label as the neutral button label", () => {

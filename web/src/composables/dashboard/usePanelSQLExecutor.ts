@@ -248,6 +248,15 @@ export const usePanelSQLExecutor = (ctx: {
         },
         clear_cache: false,
       };
+      // Histogram is unavailable for CTE/DISTINCT/UNION/JOIN/LIMIT queries (API
+      // code 20013). Surface a non-blocking header warning; the metric value still
+      // renders. Other transient errors stay silent. The API delivers this either
+      // as a `data` event of type "error" or via the stream `error` callback.
+      const captureSparklineError = (content: any) => {
+        if (content?.code === 20013) {
+          state.sparklineWarning = content?.error_detail || content?.message || "";
+        }
+      };
       // Same contract as handleSearchResponse: (requestPayload, streamResponse).
       // The response is the 2nd arg; the 1st is our own request (type "histogram").
       fetchQueryDataWithHttpStream(payload, {
@@ -255,9 +264,14 @@ export const usePanelSQLExecutor = (ctx: {
           if (response?.type === "search_response_hits") {
             const h = response?.content?.results?.hits;
             if (Array.isArray(h)) hits.push(...h);
+          } else if (response?.type === "error") {
+            captureSparklineError(response?.content);
           }
         },
-        error: () => removeTraceId(traceId),
+        error: (_payload: any, wsError: any) => {
+          captureSparklineError(wsError?.content);
+          removeTraceId(traceId);
+        },
         complete: () => {
           // Reassign the whole array so the render watcher (shallow ref) fires.
           const next = Array.isArray(state.sparklineData) ? state.sparklineData.slice() : [];
@@ -288,6 +302,7 @@ export const usePanelSQLExecutor = (ctx: {
       };
       state.resultMetaData = [];
       state.sparklineData = [];
+      state.sparklineWarning = "";
       state.annotations = [];
       state.isOperationCancelled = false;
 
