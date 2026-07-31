@@ -363,7 +363,7 @@ pub mod remote {
 pub mod local {
     use config::{
         meta::stream::{FileMeta, StreamType},
-        utils::parquet::write_recordbatch_to_parquet,
+        utils::{file::get_file_modified_time, parquet::write_recordbatch_to_parquet},
     };
     use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
 
@@ -448,8 +448,12 @@ pub mod local {
             return Ok(Values::RecordBatch(vec![]));
         }
 
-        // sort the files by created_at
-        files.sort_by_key(|f| f.metadata().unwrap().created().unwrap());
+        // sort the files by modified time
+        files.sort_by_key(|f| {
+            f.metadata()
+                .map(|m| get_file_modified_time(&m))
+                .unwrap_or_default()
+        });
 
         // read the files in order and keep as RecordBatch
         let mut batches = Vec::new();

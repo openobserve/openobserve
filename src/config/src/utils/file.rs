@@ -18,6 +18,7 @@ use std::{
     io::{Read, Seek, Write},
     ops::Range,
     path::Path,
+    time::UNIX_EPOCH,
 };
 
 use async_recursion::async_recursion;
@@ -25,6 +26,15 @@ use async_recursion::async_recursion;
 #[inline(always)]
 pub fn get_file_meta(path: impl AsRef<Path>) -> Result<Metadata, std::io::Error> {
     metadata(path)
+}
+
+pub fn get_file_modified_time(metadata: &Metadata) -> u64 {
+    metadata
+        .modified()
+        .unwrap_or(UNIX_EPOCH)
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_micros() as u64
 }
 
 #[inline(always)]
@@ -205,6 +215,17 @@ mod tests {
     use tempfile::TempDir;
 
     use super::*;
+
+    #[test]
+    fn test_get_file_modified_time() {
+        let dir = TempDir::new().unwrap();
+        let file_name = dir.path().join("sample.parquet");
+        put_file_contents(file_name.to_str().unwrap(), b"Some Text").unwrap();
+
+        let meta = get_file_meta(&file_name).unwrap();
+        let modified = get_file_modified_time(&meta);
+        assert!(modified > 0);
+    }
 
     #[test]
     fn test_scan_files() {

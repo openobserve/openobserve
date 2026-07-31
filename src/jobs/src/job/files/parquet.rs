@@ -16,7 +16,6 @@
 use std::{
     path::Path,
     sync::{Arc, LazyLock as Lazy},
-    time::UNIX_EPOCH,
 };
 
 use arrow_schema::Schema;
@@ -31,7 +30,7 @@ use config::{
     metrics,
     utils::{
         async_file::{get_file_meta, get_file_size},
-        file::scan_files_with_channel,
+        file::{get_file_modified_time, scan_files_with_channel},
         parquet::{read_metadata_from_file, read_schema_from_file},
         schema_ext::SchemaExt,
     },
@@ -492,13 +491,8 @@ async fn move_files(
             let Ok(file_meta) = get_file_meta(&wal_dir.join(&file.key)).await else {
                 continue;
             };
-            let file_created = file_meta
-                .created()
-                .unwrap_or(UNIX_EPOCH)
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_micros() as i64;
-            if file_created <= min_ts {
+            let file_written = get_file_modified_time(&file_meta) as i64;
+            if file_written <= min_ts {
                 has_expired_files = true;
                 break;
             }

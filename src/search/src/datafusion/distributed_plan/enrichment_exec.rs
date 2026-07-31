@@ -342,7 +342,7 @@ async fn read_from_disk(
     table_name: &str,
     schema: &SchemaRef,
 ) -> Result<Vec<RecordBatch>> {
-    use config::utils::enrichment_local_cache::{get_key, get_table_dir};
+    use config::utils::enrichment_local_cache::{get_file_modified_time, get_key, get_table_dir};
 
     let key = get_key(org_id, table_name);
     let file_dir = get_table_dir(&key);
@@ -377,8 +377,8 @@ async fn read_from_disk(
         ));
     }
 
-    // Sort files by created time
-    files.sort_by_key(|f| f.metadata().unwrap().created().unwrap());
+    // Sort files by created_at, which is their file name
+    files.sort_by_key(|f| get_file_modified_time(f));
 
     // Read all parquet files and collect batches
     let mut all_batches = Vec::new();
