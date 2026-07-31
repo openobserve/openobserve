@@ -66,6 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :back="back"
           :title-data-test="titleDataTest"
           :tabs-below="tabsBelow"
+          :title-overflow="titleOverflow"
         >
           <template v-if="!!slots.title" #title><slot name="title" /></template>
           <template v-if="!!slots['title-prefix']" #title-prefix
@@ -174,6 +175,11 @@ const props = withDefaults(
     titleDataTest?: string;
     /** Render #header-tabs on a second row below the title (Level-2 module nav). */
     tabsBelow?: boolean;
+    /**
+     * Forwarded to OPageHeader. Pass "visible" when #title hosts an interactive
+     * control (an inline-edited page name) so the <h1> stops clipping it.
+     */
+    titleOverflow?: "truncate" | "visible";
     // Body
     bleed?: boolean;
     padY?: boolean;

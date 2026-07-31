@@ -15,7 +15,58 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="flex items-center gap-1">
+  <!-- INLINE variant — the SAME OSelect as the default branch, just wearing its
+       `inline` appearance: a word inside running text rather than a control
+       parked beside one. Search, keyboard handling and the options list all
+       come from OSelect; the only thing added here is the "New folder" row in
+       its #after-options slot. -->
+  <span v-if="variant === 'inline'" class="inline-flex shrink-0 items-center">
+    <OSelect
+      :model-value="modelValue"
+      :options="folderOptions"
+      appearance="inline"
+      labelKey="label"
+      valueKey="value"
+      searchable
+      :search-placeholder="t('dashboard.searchFolder')"
+      :disabled="disable"
+      data-test="inline-select-folder-dropdown"
+      @update:model-value="$emit('update:modelValue', $event)"
+    >
+      <template v-if="!disable" #after-options>
+        <OSeparator />
+        <!-- Padded, outlined and at the standard 34px control height: flush
+             against the option list it read as one more option rather than as
+             the action that leaves the list. -->
+        <div class="p-2">
+          <OButton
+            variant="outline"
+            size="sm"
+            icon-left="add"
+            block
+            data-test="inline-select-folder-dropdown-add"
+            @click="showDialog = true"
+          >
+            {{ t("dashboard.newFolder") }}
+          </OButton>
+        </div>
+      </template>
+    </OSelect>
+
+    <!-- OUTSIDE the select, deliberately. The options list is unmounted while
+         closed and choosing "New folder" closes it — a dialog nested in there
+         is destroyed in the same tick it is asked to appear, and never shows. -->
+    <AddFolder
+      v-if="!disable"
+      data-test="inline-select-folder-dropdown-dialog"
+      v-model:open="showDialog"
+      :type="type"
+      :edit-mode="false"
+      @update:modelValue="onFolderAdded"
+    />
+  </span>
+
+  <div v-else class="flex items-center gap-1">
     <OSelect
       :model-value="modelValue"
       :options="folderOptions"
@@ -49,15 +100,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, ref, computed, onMounted } from "vue";
 import { useStore } from "vuex";
+import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import AddFolder from "./AddFolder.vue";
 import { getFoldersListByType } from "@/utils/commons";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 
 export default defineComponent({
   name: "InlineSelectFolderDropdown",
-  components: { AddFolder, OButton, OIcon, OSelect },
+  components: {
+    AddFolder,
+    OButton,
+    OIcon,
+    OSelect,
+    OSeparator,
+  },
   emits: ["update:modelValue"],
   props: {
     modelValue: {
@@ -72,9 +131,20 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    /**
+     * `select` (default) — a labelled OSelect plus a separate "+" button, for
+     * form rows and toolbars.
+     * `inline` — a text-styled dropdown that sits inside running text (a page
+     * header's description line), with "New folder" folded into the menu.
+     */
+    variant: {
+      type: String as () => "select" | "inline",
+      default: "select",
+    },
   },
   setup(props, { emit }) {
     const store: any = useStore();
+    const { t } = useI18n();
     const showDialog = ref(false);
 
     const folderOptions = computed(
@@ -97,6 +167,7 @@ export default defineComponent({
     });
 
     return {
+      t,
       store,
       showDialog,
       folderOptions,

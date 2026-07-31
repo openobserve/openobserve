@@ -260,7 +260,9 @@ export class MetricsBuilderPage {
     }
 
     getPanelNameInput() {
-        return this.page.locator('[data-test="dashboard-panel-name-field"]');
+        // Panel name is an inline-edited title (OFormInlineEdit): in display mode
+        // it renders as a read-only value span, not an input. Read its text.
+        return this.page.locator('[data-test="dashboard-panel-name-value"]');
     }
 
     getDashboardApplyBtn() {
