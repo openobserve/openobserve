@@ -1142,6 +1142,7 @@ async fn process_ack(
             consecutive_failures: resp.consecutive_failures,
             flaky,
             degraded,
+            status_reason: resp.status_reason.clone(),
             failing_locations: resp.failing_locations.clone(),
         };
         tokio::spawn(async move {

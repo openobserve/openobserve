@@ -1191,8 +1191,28 @@ export default defineComponent({
 
     // [END] date picker related variables
 
-    // back button → dashboards list scoped to the current folder.
+    // back button → the dashboards list the user actually came from.
+    //
+    // Prefer real history: a dashboard opened from the Favorites pseudo-folder
+    // carries the folder it *lives in* in the URL, so rebuilding the list route
+    // from route.query.folder would drop the user into that folder instead of
+    // Favorites. Going back restores whichever list view they left.
+    //
+    // Only honour history when the previous entry is the dashboards list itself
+    // (deep links have no previous entry; arriving via add_panel or another
+    // module would send the "Dashboards" button somewhere it doesn't name), and
+    // fall back to the folder-scoped push otherwise. In-view URL syncs use
+    // router.replace, so tab/time-range changes never bury the list entry.
     const goBackToDashboardList = () => {
+      const back = (router.options?.history?.state as any)?.back;
+      if (typeof back === "string") {
+        // endsWith rather than === so a deployment served under a base path
+        // (getPath() can be "/web/") still matches if the base ever leaks in.
+        const path = back.split(/[?#]/)[0].replace(/\/$/, "");
+        if (path === "/dashboards" || path.endsWith("/dashboards")) {
+          return router.back();
+        }
+      }
       return router.push({
         path: "/dashboards",
         query: {

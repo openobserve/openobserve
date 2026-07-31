@@ -51,6 +51,10 @@ pub struct CheckNotification {
     /// Kept distinct from `flaky` because they arrive as the same `warning`
     /// status: a flaky run fixed itself and needs no action, a degrading one
     /// will not fix itself and needs action before it becomes an outage.
+    /// Why the run was a warning, straight from the probe: `cert_expiring`,
+    /// `sftp_degraded`, `flaky`. `None` from a probe too old to report one, in
+    /// which case the message stays generic rather than guessing.
+    pub status_reason: Option<String>,
     pub degraded: bool,
     /// Locations that did not pass, worst first.
     ///
@@ -101,9 +105,22 @@ pub async fn notify_check_result(n: CheckNotification) {
                         n.monitor_name
                     )
                 } else if n.degraded {
-                    // Not "is WARNING": the point of the message is that this
-                    // needs action before it becomes an outage.
-                    format!("[OpenObserve Synthetics] 🟡 {} is DEGRADED", n.monitor_name)
+                    // Not "is WARNING": the point of the message is that this needs
+                    // action before it becomes an outage. Named where we know the
+                    // condition, because the subject is the line that decides
+                    // whether anyone opens the alert — and "CERTIFICATE EXPIRING"
+                    // gets renewed where a generic "DEGRADED" gets skimmed.
+                    match n.status_reason.as_deref() {
+                        Some("cert_expiring") => format!(
+                            "[OpenObserve Synthetics] 🟡 {} — CERTIFICATE EXPIRING SOON",
+                            n.monitor_name
+                        ),
+                        Some("sftp_degraded") => format!(
+                            "[OpenObserve Synthetics] 🟡 {} — SFTP DEGRADED",
+                            n.monitor_name
+                        ),
+                        _ => format!("[OpenObserve Synthetics] 🟡 {} is DEGRADED", n.monitor_name),
+                    }
                 } else if n.flaky {
                     format!("[OpenObserve Synthetics] 🔁 {} is FLAKY", n.monitor_name)
                 } else {
@@ -151,10 +168,24 @@ fn status_headline(n: &CheckNotification) -> String {
     // `warning` covers two unrelated things, and they need opposite responses:
     // a flaky run already fixed itself, a degrading target will not.
     if n.degraded {
-        return format!(
-            "{} is reachable but degrading — this needs attention before it fails",
-            n.monitor_name
-        );
+        // Name the condition. "Degrading" is true but not actionable, and the
+        // reader's next step differs entirely: renew a certificate, or go and look
+        // at an SFTP subsystem. QA reported the generic case as the bug — an
+        // expiring certificate that read as "passed only after retries (flaky)".
+        return match n.status_reason.as_deref() {
+            Some("cert_expiring") => format!(
+                "{} — the TLS certificate is expiring soon, renew it before it lapses",
+                n.monitor_name
+            ),
+            Some("sftp_degraded") => format!(
+                "{} connects and authenticates, but its SFTP subsystem is failing",
+                n.monitor_name
+            ),
+            _ => format!(
+                "{} is reachable but degrading — this needs attention before it fails",
+                n.monitor_name
+            ),
+        };
     }
     if n.flaky {
         return format!(
