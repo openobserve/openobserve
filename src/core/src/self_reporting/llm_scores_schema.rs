@@ -147,6 +147,13 @@ mod tests {
         assert!(obj.contains_key("value_boolean"));
         assert!(obj.contains_key("data_type"));
         assert!(obj.contains_key("score_config_id"));
+        assert!(obj.contains_key("score_config_row_id"));
+        assert!(obj.contains_key("review_submission_id"));
+        assert!(obj.contains_key("queue_id"));
+        assert!(obj.contains_key("queue_item_id"));
+        assert!(obj.contains_key("review_submission_score_count"));
+        assert!(obj.contains_key("reasoning"));
+        assert!(obj.contains_key("review_submission_comments"));
         assert!(obj.contains_key("scorer_id"));
         assert!(obj.contains_key("source_stream_type"));
         assert!(!obj.contains_key("agent_name"));
@@ -163,5 +170,15 @@ mod tests {
         assert!(schema.field_with_name("value_numeric").is_ok());
         assert!(schema.field_with_name("value_categorical").is_ok());
         assert!(schema.field_with_name("value_boolean").is_ok());
+        assert!(schema.field_with_name("score_config_row_id").is_ok());
+        assert!(schema.field_with_name("review_submission_id").is_ok());
+        assert!(schema.field_with_name("queue_id").is_ok());
+        assert!(schema.field_with_name("queue_item_id").is_ok());
+        assert!(
+            schema
+                .field_with_name("review_submission_score_count")
+                .is_ok()
+        );
+        assert!(schema.field_with_name("review_submission_comments").is_ok());
     }
 }
