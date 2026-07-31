@@ -102,17 +102,14 @@ export interface OTableColumnMeta {
   /** Format function applied to cell value before rendering */
   format?: (value: any, row: any) => any;
   /**
-   * Elastic column: carries no explicit width, so it absorbs whatever the sized
-   * columns leave over. In a `horizontalScroll` table it is content-sized — it
-   * grows to its longest value and the table scrolls.
+   * Elastic column: no explicit width, so it absorbs the leftover. In a
+   * `horizontalScroll` table it is content-sized — it grows to its longest
+   * value and the table scrolls.
    */
   autoWidth?: boolean;
   /**
-   * Bounded elastic column: absorbs the leftover width like `autoWidth`, but
-   * stays inside the container and ellipsis-truncates instead of growing to its
-   * content. Set it alongside `autoWidth`. Costs the table its `min-w-max`, so
-   * the sized columns pin their min-widths and the row scrolls only when they
-   * genuinely don't fit.
+   * Bounded elastic column: absorbs the leftover like `autoWidth`, but stays
+   * inside the container and ellipsis-truncates. Set alongside `autoWidth`.
    */
   fillRemaining?: boolean;
   /** Arbitrary metadata for custom cell renderers */

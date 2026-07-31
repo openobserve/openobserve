@@ -154,25 +154,16 @@ const pivotTotalStyle = computed<Record<string, any>>(() => {
 
 const isAutoWidth = computed(() => meta.value?.autoWidth === true);
 
-// Bounded filler: takes the leftover width but stays inside the container and
-// clips, rather than growing to its longest value. Held there by `max-width: 0`
-// (see `cellStyle`), so it must also clip — the pre-migration table's
-// `overflow: hidden` — instead of spilling over the next column.
 const boundedFillTable = inject<{ value: boolean } | null>("o2TableBoundedFill", null);
-// Only meaningful on a scrolling table: the clamp exists to counteract
-// `min-w-max`, and a container-bounded table already sizes the filler correctly.
+// The clamp only counteracts `min-w-max`; a container-bounded table needs none.
 const inBoundedFillTable = computed(
   () => !!boundedFillTable?.value && !!horizontalScroll?.value && !props.wrap,
 );
 const isBoundedFill = computed(
   () => meta.value?.fillRemaining === true && inBoundedFillTable.value,
 );
-// Sized columns SHARING a table with a bounded filler are pinned to their own
-// size and clip. Without this a long value stretches the column well past its
-// width (nothing caps it in a scrolling table), which is what made `body` jump
-// to ~3000px the moment another field was added and it stopped being the filler.
-// Pre-migration these were `{ width: size, minWidth: size, flexShrink: 0 }` with
-// an ellipsis, i.e. never content-sized.
+// Sized siblings of a bounded filler pin to their own size and clip — otherwise
+// a long value stretches the column (nothing else caps it when scrolling).
 const isSizeClamped = computed(
   () =>
     inBoundedFillTable.value && !isAutoWidth.value && !isAction.value && !meta.value?.fixedWidth,
@@ -188,12 +179,10 @@ const cellStyle = computed(() => {
     // wrapped. Keeping minSize here pins the column open and nothing ever wraps.
     const min = props.cell.column.columnDef.minSize;
     if (min && !props.wrap) base.minWidth = `${min}px`;
-    // A bounded filler must not report its text as intrinsic width, or the auto
-    // layout sizes the column to the longest log line. `max-width: 0` takes it
-    // out of that calculation — min-width still floors it, and with no `width`
-    // it collects whatever the sized columns leave over. Do NOT set `width:100%`
-    // here: the percentage resolves against the table, which is itself sized
-    // from its cells, and the column runs away to ~500000px.
+    // `max-width: 0` keeps the filler's text out of the intrinsic-width sum, so
+    // it takes the leftover instead of sizing to its longest value; min-width
+    // still floors it. Never `width: 100%` — the percentage resolves against a
+    // table sized from its own cells and the column runs away to ~500000px.
     if (isBoundedFill.value) base.maxWidth = "0";
   } else {
     const sizeVar = `var(--header-${props.cell.column.id.replace(/[^a-zA-Z0-9]/g, "-")}-size)`;
@@ -206,8 +195,7 @@ const cellStyle = computed(() => {
     } else if (!horizontalScroll?.value) {
       base.maxWidth = sizeVar;
     } else if (isSizeClamped.value) {
-      // Pinned both ways: min so the auto layout can't squeeze it (the table has
-      // no `min-w-max` here), max so its own content can't stretch it.
+      // min: auto layout can't squeeze it; max: its content can't stretch it.
       base.minWidth = sizeVar;
       base.maxWidth = sizeVar;
     } else if (props.wrap) {
