@@ -1134,18 +1134,18 @@ fn build_latest_session_page_sql(
     validated: &super::schema_compat::ValidatedLlmSchema,
 ) -> String {
     let session_id_col = validated.columns.session_id;
-    let session_filter = if filter.is_empty() {
-        format!("{session_id_col} IS NOT NULL AND {session_id_col} != ''")
+    let membership_filter = if filter.is_empty() {
+        String::new()
     } else {
-        format!("{session_id_col} IS NOT NULL AND {session_id_col} != '' AND {filter}")
+        format!(" HAVING max(CASE WHEN {filter} THEN 1 ELSE 0 END) = 1")
     };
     format!(
         "SELECT {session_id_col} as session_id, \
-         min({TIMESTAMP_COL_NAME}) as zo_sql_timestamp \
+         min(start_time) as session_start_time \
          FROM \"{stream_name}\" \
-         WHERE {session_filter} \
-         GROUP BY {session_id_col} \
-         ORDER BY zo_sql_timestamp DESC"
+         WHERE {session_id_col} IS NOT NULL AND {session_id_col} != '' \
+         GROUP BY {session_id_col}{membership_filter} \
+         ORDER BY session_start_time DESC, session_id DESC"
     )
 }
 
@@ -1296,11 +1296,10 @@ fn normalize_latest_session_hits(
         .enumerate()
         .map(|(index, session_id)| (session_id.as_str(), index))
         .collect();
-    // Phase 1 selects the page by matching-span timestamp, while phase 2
-    // computes the timestamp displayed by the UI from all spans in a session.
-    // Sort by that final value so the returned Timestamp column is descending,
-    // matching the behavior of the previous Rust-side session aggregation.
-    // Preserve phase 1 order as a deterministic tie-breaker.
+    // Both phases use the earliest span start_time across the full session.
+    // Keep the explicit final sort because distributed aggregation does not
+    // guarantee phase 2 row order. Preserve phase 1 order as a deterministic
+    // tie-breaker for sessions with the same start time.
     hits.sort_by(|left, right| {
         let start_time =
             |hit: &json::Value| json::get_int_value(hit.get("start_time").unwrap_or_default());
@@ -1547,6 +1546,12 @@ mod tests {
 
         assert!(page_sql.contains(filter));
         assert!(!page_sql.contains("trace_id"));
+        assert!(page_sql.contains("min(start_time) as session_start_time"));
+        assert!(page_sql.contains(&format!(
+            "HAVING max(CASE WHEN {filter} THEN 1 ELSE 0 END) = 1"
+        )));
+        assert!(page_sql.contains("ORDER BY session_start_time DESC, session_id DESC"));
+        assert!(!page_sql.contains("min(_timestamp)"));
         assert!(sql.contains("count(DISTINCT trace_id) as trace_count"));
         assert!(sql.contains("GROUP BY gen_ai_conversation_id"));
         assert!(sql.contains("gen_ai_conversation_id IN ('session-1','session''2')"));
@@ -1556,6 +1561,20 @@ mod tests {
         assert!(sql.contains("FIRST_VALUE(gen_ai_input_messages ORDER BY start_time ASC)"));
         assert!(!sql.contains("array_agg(DISTINCT trace_id)"));
         assert!(!sql.contains("WHERE trace_id IN"));
+    }
+
+    #[test]
+    fn latest_session_page_sql_without_filter_has_no_membership_having() {
+        let validated = super::super::schema_compat::ValidatedLlmSchema::fallback(true);
+        let sql = build_latest_session_page_sql("bench_traces", "", &validated);
+
+        assert!(
+            sql.contains(
+                "WHERE gen_ai_conversation_id IS NOT NULL AND gen_ai_conversation_id != ''"
+            )
+        );
+        assert!(!sql.contains("HAVING"));
+        assert!(sql.contains("ORDER BY session_start_time DESC, session_id DESC"));
     }
 
     #[test]
