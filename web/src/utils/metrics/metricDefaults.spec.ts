@@ -21,6 +21,7 @@ import {
   computePercentileWindow,
   computeRateWindow,
   computeStepSeconds,
+  computeWidenedRateWindows,
   formatPromDuration,
   getMetricDefaults,
   MIN_PERCENTILE_SAMPLES,
@@ -132,6 +133,48 @@ describe("rate window (PRD 6.4)", () => {
     expect(formatPromDuration(3660)).toBe("1h1m");
     expect(formatPromDuration(90)).toBe("1m30s");
     expect(formatPromDuration(86400)).toBe("1d");
+  });
+});
+
+/**
+ * The retry ladder for a rate query whose standard window found nothing while
+ * the metric's samples sit right there in the range: the org's configured
+ * scrape interval overstated how often the data actually arrives, so the
+ * window gets widened geometrically before the card concedes "too few samples".
+ */
+describe("widened rate windows (sparse retry)", () => {
+  it("escalates 4x then 16x from the standard window", () => {
+    // The demo-app case: 15m range at a declared 15s scrape gives a [1m]
+    // standard window, but the app exports every 60s — [1m] rarely holds two
+    // samples. The first rung, [4m], is exactly the window a correctly
+    // configured 60s org would have computed; the second absorbs the
+    // range/2 cap.
+    expect(computeRateWindow(15 * 60, undefined, 15)).toBe("1m");
+    expect(computeWidenedRateWindows(15 * 60, undefined, 15)).toEqual(["4m", "7m30s"]);
+  });
+
+  it("widens multiplicatively even where the step dominates the scrape floor", () => {
+    // At long ranges the standard window is already step-sized, and adding a
+    // few scrape intervals to it would barely move it — a metric arriving at a
+    // 10m cadence under a 5m-ish window would still find nothing. Scaling the
+    // whole window is what actually reaches slower cadences.
+    const range = 24 * 3600; // step 288s, standard window 303s
+    expect(computeWidenedRateWindows(range, undefined, 15)).toEqual(["20m12s", "1h20m48s"]);
+  });
+
+  it("caps every rung at half the range, and dedupes rungs the cap flattens", () => {
+    // A window wider than half the view is one global average pretending to be
+    // a trend; and if two samples don't fit in half the range, no window was
+    // ever going to chart this as a rate.
+    const rungs = computeWidenedRateWindows(15 * 60, undefined, 60); // standard [4m], cap 7m30s
+    expect(rungs).toEqual(["7m30s"]);
+  });
+
+  it("returns nothing when the cap leaves no room to widen", () => {
+    // A 5m view at a 60s scrape already has a [4m] standard window — wider than
+    // the 2m30s cap. There is no honest wider window to offer; the card keeps
+    // its "too few samples" message.
+    expect(computeWidenedRateWindows(5 * 60, undefined, 60)).toEqual([]);
   });
 });
 

@@ -1180,8 +1180,19 @@ export default defineComponent({
       // panel arrives frozen at whatever the range happened to be on the card —
       // and a 4-minute rate window sampled every 30 minutes on a 7-day view is
       // not a chart of anything.
+      //
+      // EXCEPT when the card only charted because it widened its window: the
+      // editor resolves `$__rate_interval` from the org's scrape interval — the
+      // very value whose overstatement forced the widening — so handing it the
+      // variable would resolve straight back to the window that returned
+      // nothing, and the drill-in would open on an empty chart of a metric the
+      // card is visibly charting. The concrete widened window goes over
+      // instead. It IS frozen to the card's range, but frozen-and-charting
+      // beats adaptive-and-blank, and it keeps the drill-in contract: the
+      // editor opens on what the card actually shows.
+      const widenedRateWindow = grid.previews.value[card.name]?.widenedRateWindow;
       const { defaults, resolved } = grid.effectiveVariant(card, undefined, {
-        rateWindow: PANEL_RATE_WINDOW,
+        rateWindow: widenedRateWindow ?? PANEL_RATE_WINDOW,
         percentileWindow: PANEL_PERCENTILE_WINDOW,
       });
       if (!resolved) return;
@@ -1288,8 +1299,12 @@ export default defineComponent({
       for (const name of grid.favorites.value) {
         const card = byName.get(name);
         if (!card) continue;
+        // Same rule as the drill-in: a card that only charted through a widened
+        // window must hand the panel that concrete window, or the dashboard is
+        // born with a permanently blank panel for a metric the card charts.
+        const widenedRateWindow = grid.previews.value[name]?.widenedRateWindow;
         const { defaults, resolved } = grid.effectiveVariant(card, undefined, {
-          rateWindow: PANEL_RATE_WINDOW,
+          rateWindow: widenedRateWindow ?? PANEL_RATE_WINDOW,
           percentileWindow: PANEL_PERCENTILE_WINDOW,
         });
         if (!resolved) continue;
