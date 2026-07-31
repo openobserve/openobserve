@@ -76,6 +76,38 @@ describe("useAutoName", () => {
     expect(field.value.value).toBe("Record count");
   });
 
+  it("re-syncs to the CURRENT suggestion on commit, not the one present when editing began", async () => {
+    const field = makeField();
+    const auto = useAutoName({ suggestion: suggestion as any, ...field });
+    // User starts editing and clears; meanwhile the query changes and the
+    // suggestion moves on underneath the open editor.
+    auto.markManual();
+    field.apply("");
+    suggestion.value = "Avg of duration";
+    await nextTick();
+
+    auto.onCommit("");
+
+    // Re-armed with the value the generator produces NOW, not the stale one.
+    expect(field.value.value).toBe("Avg of duration");
+    expect(auto.isAuto.value).toBe(true);
+  });
+
+  it("steps aside when the field is written externally after auto armed (never clobbers a human value)", async () => {
+    const field = makeField();
+    // Arms auto and writes "Record count"; lastApplied now tracks that.
+    const auto = useAutoName({ suggestion: suggestion as any, ...field });
+
+    // Something other than the generator sets the field — a late edit-mode
+    // prefill / JSON import. auto must relinquish and never overwrite it.
+    field.apply("Imported title");
+    suggestion.value = "Avg of duration";
+    await nextTick();
+
+    expect(field.value.value).toBe("Imported title");
+    expect(auto.isAuto.value).toBe(false);
+  });
+
   it("does not re-fill mid-edit — only a commit re-arms", async () => {
     const field = makeField();
     const auto = useAutoName({ suggestion: suggestion as any, ...field });

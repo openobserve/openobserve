@@ -129,6 +129,54 @@ describe("buildPanelAutoName", () => {
     expect(buildPanelAutoName(undefined, t)).toBe("");
     expect(buildPanelAutoName({ data: { queries: [] } }, t)).toBe("");
   });
+
+  // The BUILDER shape is what usePanelFields actually writes today: the column
+  // lives in `args[{type:'field'}].value.field`, the aggregation in
+  // `functionName`, and the time flag in `treatAsNonTimestamp`. The legacy
+  // `{column, aggregationFunction}` shape above is the older/imported form. These
+  // guard the args-traversal / functionName / treatAsNonTimestamp branches that
+  // the "_timestamp by Cost" bug originally slipped through.
+  describe("builder-shape fields", () => {
+    const yField = (fn: string, field: string, extra: Record<string, unknown> = {}) => ({
+      functionName: fn,
+      args: [{ type: "field", value: { field } }],
+      treatAsNonTimestamp: true,
+      ...extra,
+    });
+
+    it("names a builder-shape measure (column read from args, aggregation from functionName)", () => {
+      expect(buildPanelAutoName(panel({ y: [yField("avg", "duration")] }), t)).toBe(
+        "Avg of duration",
+      );
+    });
+
+    it("reads a builder count on the time column as a record count", () => {
+      // treatAsNonTimestamp:false marks the field AS the time column, even when
+      // its name isn't the default `_timestamp`.
+      const field = yField("count", "event_time", { treatAsNonTimestamp: false });
+      expect(buildPanelAutoName(panel({ y: [field] }), t)).toBe("Record count");
+    });
+
+    it("uses a builder breakdown as the 'by' dimension", () => {
+      expect(
+        buildPanelAutoName(
+          panel({ y: [yField("avg", "duration")], breakdown: [yField("count", "service")] }),
+          t,
+        ),
+      ).toBe("Avg of duration by service");
+    });
+
+    it("honours a deployment's custom timestamp_column for a builder count", () => {
+      // Column matches the configured time column by NAME (no treatAsNonTimestamp).
+      const field = {
+        functionName: "count",
+        args: [{ type: "field", value: { field: "event_time" } }],
+      };
+      expect(buildPanelAutoName(panel({ y: [field] }), t, { timestampColumn: "event_time" })).toBe(
+        "Record count",
+      );
+    });
+  });
 });
 
 const alert = (overrides: Record<string, unknown> = {}) => ({
