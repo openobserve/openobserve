@@ -6,6 +6,7 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import type {
   BrowserCheck,
+  BrowserStep,
   SyntheticsLocation,
   SyntheticsDevice,
   SyntheticsFolder,
@@ -265,7 +266,13 @@ const check = ref<BrowserCheck>({
   journey: [],
   schedule: { type: "interval", intervalValue: 5, intervalUnit: "minutes" },
   locations: [],
-  retries: 0,
+  // New browser monitors retry once before declaring failure (spec P1.3).
+  // A single slow render should never page an on-call engineer; passing on retry
+  // is reported as `warning` (flaky), which never alerts. Deliberately changed
+  // ONLY here — the buildPayload fallbacks are absent-field defaults, and
+  // raising those would silently re-interpret existing monitors stored without
+  // a retries value (P1.3.3).
+  retries: 1,
   waitBeforeRetrySecs: 5,
   alertIfFails: 1,
   cooldownMins: 5,
@@ -433,10 +440,15 @@ async function persist(): Promise<boolean> {
     if (errors["name"] || errors["url"] || errors["locations"]) {
       currentStep.value = 2;
     } else if (Object.keys(errors).some((k) => k.startsWith("journey."))) {
-      // Step selector errors — switch to Journey tab and auto-expand
+      // Step errors — switch to Journey tab and auto-expand
       currentStep.value = 1;
       journeyRef.value?.validateStepSelectors?.();
     }
+    // Hand every step-scoped issue to the journey so it renders against the
+    // field it names, rather than only as the toast below. Done unconditionally:
+    // a journey issue can coexist with a Details-tab one, and the author should
+    // find both waiting when they switch tabs.
+    journeyRef.value?.setStepFieldErrors?.(result.error.issues);
     toast({
       variant: "error",
       message: t("synthetics.validation.fixHighlightedFields"),
@@ -531,7 +543,24 @@ const blockedReason = computed<"incognito" | null>(() =>
 );
 
 function onReplay() {
-  const steps = journeyToWireSteps(check.value.journey);
+  runReplay(check.value.journey);
+}
+
+/**
+ * Replay only the first `upTo` steps (1-based, inclusive).
+ *
+ * A single step cannot be replayed on its own: journey state is cumulative and the
+ * extension starts every replay from the target URL, so step 5 alone would run
+ * against a fresh page with none of the preceding state. A prefix IS runnable, and
+ * `replay()` already takes an arbitrary WireStep[] — so slicing the journey is the
+ * whole implementation, with no extension change.
+ */
+function onReplayUpTo(upTo: number) {
+  runReplay(check.value.journey.slice(0, Math.max(1, upTo)));
+}
+
+function runReplay(journey: BrowserStep[]) {
+  const steps = journeyToWireSteps(journey);
   if (steps.length === 0) return;
   recorder
     .replay(
@@ -821,6 +850,7 @@ function onClearResults() {
               class="h-full!"
               @need-extension-setup="onNeedExtensionSetup"
               @replay="onReplay"
+              @replay-up-to="onReplayUpTo"
               @stop-replay="onStopReplay"
               @clear-results="onClearResults"
               @auto-record-consumed="autoRecord = false"

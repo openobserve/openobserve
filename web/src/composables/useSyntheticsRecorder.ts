@@ -17,6 +17,7 @@ import type {
   WireStep,
 } from "@/types/synthetics";
 import { substituteVariables } from "@/utils/synthetics/mapRecordedStep";
+import { DEFAULT_TEST_ID_ATTR } from "@/constants/synthetics";
 
 /**
  * Encapsulates all communication with the OpenObserve Extension (playwright-crx)
@@ -52,6 +53,18 @@ const useSyntheticsRecorder = () => {
 
   const BRIDGE_CHANNEL = "oo-bridge";
   const COMMAND_TIMEOUT_MS = 4000;
+
+  // `replay` is the one command the extension answers only when the whole
+  // journey has finished — the service worker resolves it from handleReplay,
+  // after the last step. Racing it against COMMAND_TIMEOUT_MS made the UI fall
+  // back to "idle" four seconds in while the extension kept replaying in its
+  // own window. A single step alone may legitimately take 60 s (the flat
+  // preview timeout, P1.R.1), so this is not a journey bound — it is a
+  // last-resort watchdog for a bridge that died without answering. Sized to
+  // LEASE_SECS = 900 (D-9), the outer bound one attempt is ever contained in;
+  // anything shorter would make the preview stricter than production (X-8.1).
+  // See docs/synthetics/reliability/synthetics-recorded-test-reliability-spec.md.
+  const REPLAY_TIMEOUT_MS = 15 * 60 * 1000;
 
   let nonceCounter = 0;
   function nextNonce(): string {
@@ -117,19 +130,32 @@ const useSyntheticsRecorder = () => {
     bridgeDataHandler?.(msg);
   });
 
-  /** One-shot command via postMessage. Resolves `null` when the extension is unreachable. */
-  function sendCommand<T>(command: RecorderCommand): Promise<T | null> {
+  /**
+   * One-shot command via postMessage. Resolves `null` when the extension is
+   * unreachable. `timeoutMs` is how long to wait for the ack — long-running
+   * commands (`replay`) pass their own window.
+   */
+  function sendCommand<T>(
+    command: RecorderCommand,
+    timeoutMs: number = COMMAND_TIMEOUT_MS,
+  ): Promise<T | null> {
     const nonce = nextNonce();
 
-    const timeout = new Promise<null>((resolve) =>
-      setTimeout(() => {
+    let timer: ReturnType<typeof setTimeout>;
+    const timeout = new Promise<null>((resolve) => {
+      timer = setTimeout(() => {
         pendingCommands.delete(nonce);
         resolve(null);
-      }, COMMAND_TIMEOUT_MS),
-    );
+      }, timeoutMs);
+    });
 
     const promise = new Promise<T | null>((resolve) => {
-      pendingCommands.set(nonce, resolve);
+      pendingCommands.set(nonce, (response) => {
+        // Release the watchdog — a replay's is 15 minutes long, and leaving one
+        // armed per replay would keep the timer alive well past the answer.
+        clearTimeout(timer);
+        resolve(response);
+      });
     });
     window.postMessage(
       { ch: BRIDGE_CHANNEL, dir: "to-ext", nonce, msg: { type: "synthetics-command", command } },
@@ -172,7 +198,10 @@ const useSyntheticsRecorder = () => {
     const { payload } = msg;
     switch (payload.method) {
       case "setActions":
-        liveSteps.value = mapWireSteps(payload.browserSteps);
+        // Live capture: keep the extension's own step for replay fidelity. These
+        // wires carry fields the v2 schema cannot store (options, modifiers,
+        // button, position, framePath).
+        liveSteps.value = mapWireSteps(payload.browserSteps, { preserveWire: true });
         break;
       case "recordingStarted":
         currentUrl.value = payload.url;
@@ -197,6 +226,10 @@ const useSyntheticsRecorder = () => {
           durationMs: payload.duration_ms,
           error: payload.error,
           structuredError: payload.structuredError,
+          // X-8.2: the player reports what it could not reproduce. Dropping this
+          // made every such divergence silent — including a skipped step that
+          // would otherwise read as a pass.
+          fidelity: payload.fidelity,
         });
         activeStepId.value = null;
         break;
@@ -227,7 +260,7 @@ const useSyntheticsRecorder = () => {
    * `targetUrl` is kept only for the local recording banner — the extension
    * command itself takes no URL.
    */
-  async function startRecording(targetUrl: string): Promise<void> {
+  async function startRecording(targetUrl: string, testIdAttr?: string): Promise<void> {
     error.value = "";
     liveSteps.value = [];
     currentUrl.value = targetUrl;
@@ -247,7 +280,17 @@ const useSyntheticsRecorder = () => {
       isRecording.value = false;
     };
 
-    const res = await sendCommand<RecorderStartResponse>({ action: "startRecording", targetUrl });
+    // The extension defaults to Playwright's `data-testid` when this is absent,
+    // and it was absent on every recording ever made — the field existed on the
+    // command type but nothing populated it. O2 markup uses `data-test`, which
+    // only produced test-attribute candidates because upstream's generator
+    // happens to carry a hardcoded fallback list containing it. An app on
+    // `data-qa` or `data-cy` got none at all, silently.
+    const res = await sendCommand<RecorderStartResponse>({
+      action: "startRecording",
+      targetUrl,
+      testIdAttr: testIdAttr || DEFAULT_TEST_ID_ATTR,
+    });
     if (!res?.success) {
       console.debug("Disconnect ---", res);
       error.value = res?.error || "Failed to start recording.";
@@ -347,11 +390,14 @@ const useSyntheticsRecorder = () => {
     // intercept property access — postMessage structured clone sees the proxy,
     // not the underlying object, and silently drops all fields.
     const plainSteps = JSON.parse(JSON.stringify(resolvedSteps)) as WireStep[];
-    const res = await sendCommand<ReplayResponse>({
-      action: "replay",
-      steps: plainSteps,
-      targetUrl,
-    });
+    const res = await sendCommand<ReplayResponse>(
+      {
+        action: "replay",
+        steps: plainSteps,
+        targetUrl,
+      },
+      REPLAY_TIMEOUT_MS,
+    );
     isReplaying.value = false;
     replayResult.value = res;
     if (res) {

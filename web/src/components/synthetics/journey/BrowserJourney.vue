@@ -2,35 +2,35 @@
 // Copyright 2026 OpenObserve Inc.
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import type { BrowserStep, ReplayPhase, StepReplayResult, WireStep } from "@/types/synthetics";
+import type { BrowserStep, ReplayPhase, StepReplayResult } from "@/types/synthetics";
 import type { StepDotState } from "./JourneySteps.vue";
 import useSyntheticsRecorder from "@/composables/useSyntheticsRecorder";
 import { getUUIDv7 } from "@/utils/zincutils";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
-import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import JourneySteps from "./JourneySteps.vue";
-import {
-  ACTION_LABELS,
-  SELECTOR_ACTIONS as SELECTOR_ACTIONS_CONST,
-  VALUE_ACTIONS as VALUE_ACTIONS_CONST,
-  VALUE_LABELS,
-  SELECTOR_TYPE_OPTIONS,
-  actionOptions,
-  VALUE_WIDTH_MAP,
-  VALUE_TOOLTIP_MAP,
-} from "@/constants/synthetics";
+import UpgradeJourneyBanner from "./UpgradeJourneyBanner.vue";
+import ZeroAssertionNotice from "./ZeroAssertionNotice.vue";
+import TestIdMisconfiguredNotice from "./TestIdMisconfiguredNotice.vue";
+import { DEFAULT_TEST_ID_ATTR } from "@/constants/synthetics";
+import BrowserJourneyStepEditor from "./BrowserJourneyStepEditor.vue";
+import BrowserJourneyStepError from "./BrowserJourneyStepError.vue";
+import { stepIsMissingTarget } from "@/utils/synthetics/stepTarget";
 
 const props = defineProps<{
   modelValue: BrowserStep[];
   readonly?: boolean;
   startUrl?: string; // URL shown in the recording banner
+  /**
+   * DOM attribute the recorder selects on, from the monitor's config.
+   * Absent falls back to DEFAULT_TEST_ID_ATTR — see useSyntheticsRecorder.
+   */
+  testIdAttr?: string;
   extensionReady?: boolean; // when false, Record button triggers need-extension-setup
   autoRecord?: boolean; // if true, start recording immediately on mount
   /** Owned by the parent (CreateBrowserTest). */
@@ -48,6 +48,17 @@ const emit = defineEmits<{
   "need-extension-setup": [];
   "clear-results": [];
   replay: [];
+  /**
+   * Replay only the first `upTo` steps (1-based, inclusive).
+   *
+   * A single step is not independently runnable — journey state is cumulative and
+   * the extension starts each replay from the target URL, so step 5 alone would run
+   * against a fresh page with none of the preceding state. A PREFIX is runnable, and
+   * `replay()` already accepts an arbitrary WireStep[], so this needs no extension
+   * change. The old error-card button emitted a full `replay` while sitting inside a
+   * per-step card, promising something it did not do (SE-4).
+   */
+  "replay-up-to": [upTo: number];
   "stop-replay": [];
   "auto-record-consumed": [];
   "selection-changed": [{ count: number; isRecording: boolean }];
@@ -105,6 +116,39 @@ const failedStepResult = computed<StepReplayResult | undefined>(() => {
   const step = props.modelValue[firstFailedIndex.value];
   return props.stepResults?.get(step.id);
 });
+
+/**
+ * The failed replay result for a given row, if any.
+ *
+ * Only while a replay is in a terminal/active state — a stale result from a previous
+ * run must not keep a card on screen after the journey is edited.
+ */
+function failedResultFor(row: BrowserStep): StepReplayResult | undefined {
+  if (!isReplayActive.value) return undefined;
+  const r = props.stepResults?.get(row.id);
+  return r && !r.passed ? r : undefined;
+}
+
+function stepNumberOf(row: BrowserStep): number {
+  return props.modelValue.findIndex((s) => s.id === row.id) + 1;
+}
+
+/**
+ * A failed step's evidence lives in the row's expansion, so open it automatically —
+ * the same thing validateJourneySteps does for validation errors. Without this a
+ * tester has to guess which row to expand to find out what happened.
+ */
+watch(
+  () => (props.replayPhase === "failed" ? firstFailedIndex.value : -1),
+  (idx) => {
+    if (idx < 0) return;
+    const step = props.modelValue[idx];
+    if (step && !expandedStepIds.value.includes(step.id)) {
+      expandedStepIds.value = [...expandedStepIds.value, step.id];
+    }
+  },
+  { immediate: true },
+);
 
 /** Derive the status dot state for a step based on replay results. */
 function stepDotState(stepId: string): StepDotState | undefined {
@@ -204,20 +248,53 @@ watch([selectedCount, isRecording], ([count, recording]) => {
 const selectorErrors = ref<Set<string>>(new Set());
 const firstStepError = ref(false);
 
+/**
+ * Field errors for the expanded editor, keyed by step id then field name.
+ *
+ * Populated from the zod issue paths so one enforcement path produces both the
+ * save block and the inline messages. Keying by step **id** rather than index
+ * means a reorder or a delete cannot leave an error pointing at the wrong row.
+ */
+const stepFieldErrors = ref<Map<string, Record<string, string>>>(new Map());
+
+/** Record zod issues whose path points at a journey step field. */
+function setStepFieldErrors(issues: { path: PropertyKey[]; message: string }[]) {
+  const next = new Map<string, Record<string, string>>();
+  for (const issue of issues) {
+    if (issue.path[0] !== "journey" || typeof issue.path[1] !== "number") continue;
+    const step = props.modelValue[issue.path[1]];
+    if (!step) continue;
+    // `journey.3.assertion.expected` → "assertion.expected"; a bare
+    // `journey.3` (a whole-step issue) is attributed to the action field.
+    const field = issue.path.slice(2).join(".") || "action";
+    next.set(step.id, { ...(next.get(step.id) ?? {}), [field]: issue.message });
+  }
+  stepFieldErrors.value = next;
+}
+
+function fieldError(stepId: string, field: string): string {
+  return stepFieldErrors.value.get(stepId)?.[field] ?? "";
+}
+
+function clearFieldError(stepId: string, field: string) {
+  const current = stepFieldErrors.value.get(stepId);
+  if (!current?.[field]) return;
+  const { [field]: _dropped, ...rest } = current;
+  const next = new Map(stepFieldErrors.value);
+  next.set(stepId, rest);
+  stepFieldErrors.value = next;
+}
+
 function validateJourneySteps(): boolean {
   // 1. First step must be "navigate"
   const first = props.modelValue[0];
   firstStepError.value = first ? first.action !== "navigate" : false;
 
-  // 2. Selector-requiring steps must have a selector
+  // 2. Element-acting steps must name their element — by a v1 `selector` or a
+  //    v2 locator bundle. See stepIsMissingTarget.
   const selErrs = new Set<string>();
   for (const step of props.modelValue) {
-    if (
-      SELECTOR_ACTIONS_CONST.includes(step.action as any) &&
-      (!step.selector || step.selector.trim() === "")
-    ) {
-      selErrs.add(step.id);
-    }
+    if (stepIsMissingTarget(step)) selErrs.add(step.id);
   }
   selectorErrors.value = selErrs;
 
@@ -268,10 +345,14 @@ defineExpose({
   stopActiveRecording,
   stopActiveReplay,
   validateStepSelectors: validateJourneySteps,
+  // The parent view owns the zod parse, so it pushes the resulting issues back
+  // down here to be rendered against the fields they name. `fieldError` stays
+  // internal — the template is its only caller.
+  setStepFieldErrors,
 });
 
 function startRecording() {
-  recorder.startRecording(props.startUrl ?? "").catch((err) => {
+  recorder.startRecording(props.startUrl ?? "", props.testIdAttr).catch((err) => {
     console.log("error ---", err);
     recorder.error.value = err instanceof Error ? err.message : String(err);
   });
@@ -409,8 +490,12 @@ function handleInsertBelow(row: BrowserStep) {
     id: getUUIDv7(true),
     action: "click",
     name: "",
-    timeout: 30000,
     code: "",
+    // A new step is a version-2 step: its identity is the locator bundle, never a
+    // bare `selector`. Seeding it empty is what makes the editor render the
+    // Locator block from the start, and what lets isV2Journey stay true once the
+    // author supplies a locator instead of flipping the journey to v1 (SE-18).
+    locator: { candidates: [], user_override: null },
   });
   emit("update:modelValue", next);
 }
@@ -426,7 +511,14 @@ function handleUpdateExpanded(ids: string[]) {
 function addStep() {
   emit("update:modelValue", [
     ...props.modelValue,
-    { id: getUUIDv7(true), action: "click", name: "", timeout: 30000, code: "" },
+    {
+      id: getUUIDv7(true),
+      action: "click",
+      name: "",
+      code: "",
+      // See handleInsertBelow — a new step is version 2.
+      locator: { candidates: [], user_override: null },
+    },
   ]);
 }
 function duplicateCapturedStep(index: number, step: BrowserStep) {
@@ -447,44 +539,16 @@ function getRowStatusColor(row: BrowserStep): string | undefined {
   return undefined;
 }
 
-// ── Inline editor helpers ──────────────────────────────────────────────────
-const selectorActions = SELECTOR_ACTIONS_CONST;
-const valueActions = VALUE_ACTIONS_CONST;
-const selectorTypeOptions = SELECTOR_TYPE_OPTIONS;
-
-function valueActionLabel(action: string): string {
-  return VALUE_LABELS[action] || t("synthetics.journey.valueFallback");
-}
-
-function valueWidthClass(action: string): string {
-  return VALUE_WIDTH_MAP[action] || "w-152!";
-}
-
-function valueTooltip(action: string): string | undefined {
-  return VALUE_TOOLTIP_MAP[action];
-}
-
-function handleStepUpdate(row: BrowserStep, patch: Partial<BrowserStep>) {
+// ── Inline editor ──────────────────────────────────────────────────────────
+// BrowserJourneyStepEditor owns the field rendering AND the wire sync, and
+// emits a complete replacement step. Keeping a second copy of that logic here
+// is what let the two editors drift apart in the first place.
+function handleStepReplace(row: BrowserStep, next: BrowserStep) {
   const idx = findIndex(row);
   if (idx < 0) return;
-  const next = [...props.modelValue];
-
-  // Sync edits into the recorded wire step so the API receives the updated
-  // values. journeyToWireSteps prefers wire over UI fields, so without this
-  // sync, edits to recorded steps are silently discarded on save.
-  let wire = next[idx].wire ? { ...next[idx].wire } : undefined;
-  if (wire) {
-    if (patch.name !== undefined) wire.name = patch.name;
-    if (patch.selector !== undefined) wire.selector = patch.selector;
-    if (patch.selectorType !== undefined)
-      wire.selector_type = patch.selectorType.toLowerCase() as WireStep["selector_type"];
-    if (patch.value !== undefined) wire.value = patch.value;
-    if (patch.timeout !== undefined) wire.timeout_ms = patch.timeout;
-    if (patch.action !== undefined) wire = undefined; // action changed → wire metadata is no longer accurate
-  }
-
-  next[idx] = { ...next[idx], wire, ...patch };
-  emit("update:modelValue", next);
+  const steps = [...props.modelValue];
+  steps[idx] = next;
+  emit("update:modelValue", steps);
 }
 
 function openChromeExtensions() {
@@ -607,6 +671,31 @@ function openChromeExtensions() {
         </OButton>
       </div>
     </div>
+
+    <!-- Version-2 upgrade offer. Sits above the steps because saving is refused
+         while a retired action remains, and the remedy belongs next to the
+         problem rather than in a menu. -->
+    <UpgradeJourneyBanner
+      v-if="!readonly"
+      :steps="modelValue"
+      @upgrade="(steps) => emit('update:modelValue', steps)"
+    />
+
+    <!-- A journey that verifies nothing can pass against a broken application,
+         so the author is offered an assertion rather than left to think of it. -->
+    <ZeroAssertionNotice
+      v-if="!readonly"
+      :steps="modelValue"
+      @add-assertion="(step) => emit('update:modelValue', [...modelValue, step])"
+    />
+
+    <!-- Zero test attributes across a whole recording is a misconfiguration,
+         not a property of the page, and it is otherwise completely silent. -->
+    <TestIdMisconfiguredNotice
+      v-if="!readonly"
+      :steps="modelValue"
+      :test-id-attr="testIdAttr ?? DEFAULT_TEST_ID_ATTR"
+    />
 
     <!-- Incognito blocked warning card (pre-flight failure) -->
     <div
@@ -900,105 +989,50 @@ function openChromeExtensions() {
       @insert-below="handleInsertBelow"
       @retry-replay="emit('replay')"
     >
-      <!-- Inline editor (expanded content) -->
+      <!-- Inline editor (expanded content) — the same component the recording
+           panel renders, so an author sees the same fields either way -->
       <template #expansion="{ row }">
-        <div class="flex flex-col gap-3 px-8 pt-3 pb-3">
-          <!-- Action + Step name in one row -->
-          <div class="flex gap-2">
-            <OSelect
-              :model-value="row.action"
-              :label="t('synthetics.journey.actionLabel')"
-              :options="actionOptions"
-              class="w-50! shrink-0"
-              :error="firstStepError && props.modelValue[0]?.id === row.id"
-              :error-message="
-                firstStepError && props.modelValue[0]?.id === row.id
-                  ? t('synthetics.validation.firstStepMustNavigate')
-                  : ''
-              "
-              data-test="synthetics-journey-step-action-select"
-              @update:model-value="
-                (v: any) => {
-                  handleStepUpdate(row, { action: v as any });
-                  clearFirstStepError();
-                }
-              "
-            />
-            <OInput
-              :model-value="row.name ?? ''"
-              :label="t('synthetics.journey.stepNameOptional')"
-              :placeholder="t('synthetics.journey.stepNamePlaceholder')"
-              class="w-100!"
-              data-test="synthetics-journey-step-name-input"
-              @update:model-value="(v: any) => handleStepUpdate(row, { name: v })"
-            />
-          </div>
-          <!-- Selector type + selector (when applicable) -->
-          <template v-if="selectorActions.includes(row.action)">
-            <div class="flex w-fit! gap-2">
-              <OSelect
-                :model-value="row.selectorType ?? 'CSS'"
-                :label="t('synthetics.journey.selectorTypeLabel')"
-                :options="selectorTypeOptions"
-                class="w-50! shrink-0"
-                data-test="synthetics-journey-step-selector-type-select"
-                @update:model-value="(v: any) => handleStepUpdate(row, { selectorType: v })"
-              />
-              <OInput
-                :model-value="row.selector ?? ''"
-                :label="t('synthetics.journey.selectorLabel')"
-                placeholder="#my-button or .class-name"
-                class="w-100!"
-                :required="true"
-                :error="selectorErrors.has(row.id)"
-                :error-message="
-                  selectorErrors.has(row.id)
-                    ? t('synthetics.validation.selectorRequired', {
-                        step:
-                          row.name ||
-                          t('synthetics.results.steps.step', {
-                            step: props.modelValue.indexOf(row) + 1,
-                          }),
-                      })
-                    : ''
-                "
-                data-test="synthetics-journey-step-selector-input"
-                @update:model-value="
-                  (v: any) => {
-                    handleStepUpdate(row, { selector: v });
-                    clearSelectorError(row.id);
-                  }
-                "
-              />
-            </div>
-          </template>
-          <!-- Value (action-specific label) -->
-          <OInput
-            v-if="valueActions.includes(row.action)"
-            :model-value="row.value ?? ''"
-            :label="valueActionLabel(row.action)"
-            :placeholder="valueActionLabel(row.action)"
-            :class="valueWidthClass(row.action)"
-            data-test="synthetics-journey-step-value-input"
-            @update:model-value="(v: any) => handleStepUpdate(row, { value: v })"
-          >
-            <template v-if="valueTooltip(row.action)" #tooltip>
-              <OTooltip :content="valueTooltip(row.action)!" />
-            </template>
-          </OInput>
-          <!-- Timeout -->
-          <OInput
-            :model-value="String(row.timeout ?? '')"
-            :label="t('synthetics.journey.timeoutLabel')"
-            :placeholder="t('synthetics.journey.timeoutPlaceholder')"
-            type="number"
-            class="w-50!"
-            data-test="synthetics-journey-step-timeout-input"
-            @update:model-value="
-              (v: any) => handleStepUpdate(row, { timeout: v ? Number(v) : undefined })
-            "
-          />
-        </div>
+        <!-- What the runner saw, when this step is the one that failed. Above the
+             editor because it is the reason the author opened the row. -->
+        <BrowserJourneyStepError
+          v-if="failedResultFor(row)"
+          class="mx-8 mt-3"
+          :result="failedResultFor(row)!"
+          :step-number="stepNumberOf(row)"
+          @retry-replay="emit('replay-up-to', stepNumberOf(row))"
+        />
+        <BrowserJourneyStepEditor
+          class="px-8 pt-3 pb-3"
+          :step="row"
+          :action-error-message="
+            (firstStepError && props.modelValue[0]?.id === row.id
+              ? t('synthetics.validation.firstStepMustNavigate')
+              : '') || fieldError(row.id, 'action')
+          "
+          :name-error-message="fieldError(row.id, 'name')"
+          :selector-error-message="
+            (selectorErrors.has(row.id)
+              ? t('synthetics.validation.selectorRequired', {
+                  step:
+                    row.name ||
+                    t('synthetics.results.steps.step', {
+                      step: props.modelValue.indexOf(row) + 1,
+                    }),
+                })
+              : '') || fieldError(row.id, 'selector')
+          "
+          :value-error-message="fieldError(row.id, 'value')"
+          :expected-error-message="fieldError(row.id, 'assertion.expected')"
+          @update:step="(next: BrowserStep) => handleStepReplace(row, next)"
+          @action-edited="
+            clearFirstStepError();
+            clearFieldError(row.id, 'action');
+          "
+          @selector-edited="
+            clearSelectorError(row.id);
+            clearFieldError(row.id, 'selector');
+          "
+        />
       </template>
     </JourneySteps>
 
