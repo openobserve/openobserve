@@ -19,7 +19,6 @@ import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import type { BrowserStep, SettleResponse, StepAssertion, StepLocator } from "@/types/synthetics";
 import {
-  ACTION_LABELS,
   DEFAULT_SETTLE_BUDGET_MS,
   MAX_SETTLE_BUDGET_MS,
   MAX_STEP_TIMEOUT_MS,
@@ -303,25 +302,6 @@ const settleBudgetOutOfRange = computed(() => {
 
 const seconds = (ms: number) => Number((ms / 1000).toFixed(1));
 
-// ── Plain-language summary (spec SE-6) ──────────────────────────────────────
-// Every comparable tool leads a step editor with a sentence describing the step in
-// the author's words rather than the tool's. Composed entirely from values already
-// on screen, so it can never disagree with the fields below it.
-
-/** What the run will actually target: the author's first choice. */
-const effectiveTarget = computed(() => props.step.locator?.candidates?.[0]?.value ?? "");
-
-const summary = computed(() => {
-  const action = ACTION_LABELS[props.step.action] ?? props.step.action;
-  const target = showTarget.value ? effectiveTarget.value : (props.step.value ?? "");
-  const sentence = target ? t("synthetics.journey.summaryWithTarget", { action, target }) : action;
-  const effectiveTimeout = props.step.timeout ?? timeoutDefault.value;
-  return t("synthetics.journey.summaryWaitingUpTo", {
-    sentence,
-    seconds: seconds(effectiveTimeout),
-  });
-});
-
 // ── Timeout helper (spec SE-9 / D8, SE-20) ──────────────────────────────────
 // The placeholder stays — P1.1.5 mandates it, and T1-13 asserts it — but a
 // placeholder alone reads as "empty" to the audience it was meant to inform. This
@@ -342,42 +322,23 @@ const timeoutHelp = computed(() =>
 );
 
 /**
- * Everything inside `Advanced` that is not a default, named.
+ * Does `Advanced` hold anything that is not a default?
  *
- * A collapsed section must advertise what it holds or collapsing hides state. Empty
- * when the step carries nothing but defaults, which is also the signal for whether
- * the section opens itself — see `advancedCaption`.
+ * Drives whether the section opens itself, so that nothing an author set — or a
+ * recording observed — is hidden behind a collapsed trigger.
  */
-const advancedChanges = computed(() => {
-  const parts: string[] = [];
-  if (hasRecordedSettle.value) parts.push(t("synthetics.journey.captionRecorded"));
-  const budget = props.step.settle?.budget_ms;
-  if (budget !== undefined)
-    parts.push(t("synthetics.journey.captionBudget", { seconds: seconds(budget) }));
-  if (props.step.timeout !== undefined)
-    parts.push(t("synthetics.journey.captionTimeout", { seconds: seconds(props.step.timeout) }));
-  if (props.step.optional) parts.push(t("synthetics.journey.captionOptional"));
-  if (props.step.alwaysRun) parts.push(t("synthetics.journey.captionAlwaysRun"));
-  return parts.join(" · ");
-});
-
-/**
- * Names the non-default values when there are any, and what the section is for
- * when there are not — matching how the alert form captions its own Advanced step
- * ("Context variables, description, and row template"). A bare label would leave
- * an author guessing whether anything in here applies to their step.
- */
-const advancedCaption = computed(
-  () => advancedChanges.value || t("synthetics.journey.groupAdvancedCaption"),
+const hasAdvancedChanges = computed(
+  () =>
+    hasRecordedSettle.value ||
+    props.step.settle?.budget_ms !== undefined ||
+    props.step.timeout !== undefined ||
+    !!props.step.optional ||
+    !!props.step.alwaysRun,
 );
 </script>
 
 <template>
   <div class="flex w-full flex-col gap-2" data-test="synthetics-journey-step-editor">
-    <!-- What this step will do, in the author's words rather than the tool's.
-         Composed from the same values the fields below show, so the two cannot
-         disagree. -->
-
     <!-- What this step does — no disclosure of its own. These are the fields the
          step cannot function without, and every field that can carry a validation
          error is here, so an error can never be collapsed out of view. -->
@@ -461,7 +422,7 @@ const advancedCaption = computed(
          is hidden from them. -->
     <OCollapsible
       :label="t('synthetics.journey.groupAdvancedLabel')"
-      :default-open="!!advancedChanges"
+      :default-open="hasAdvancedChanges"
       variant="sidebar"
       class="mt-2 w-full max-w-200 border"
       data-test="synthetics-journey-step-group-advanced"
