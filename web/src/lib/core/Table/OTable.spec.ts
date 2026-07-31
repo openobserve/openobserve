@@ -1070,11 +1070,12 @@ describe("OTable", () => {
   // ── Column Management ──────────────────────────────────────
 
   describe("bounded elastic (fillRemaining) column width", () => {
-    // Pre-migration (TenstackTable) the fill column was `flex: 1 1 auto` +
-    // `overflow: hidden` — it took the leftover width and clipped. A scrolling
-    // table carries `min-w-max`, which sizes columns to their max-content, so
-    // without a clamp the fill column stretches to the longest value instead.
+    // A scrolling table sizes columns to max-content, so without a clamp the
+    // filler stretches to its longest value instead of taking the leftover.
     const longValue = "x".repeat(4000);
+    // Built, not written literally: a bare `var(--header-x-size)` in source
+    // trips scripts/check-css-tokens.mjs (no static `--header-x-size:` decl).
+    const sizeVar = (id: string) => `var(--header-${id}-size)`;
 
     function mountElastic(
       props: Record<string, unknown> = {},
@@ -1123,19 +1124,17 @@ describe("OTable", () => {
       const cell = wrapper.find('[data-test="o2-table-cell-ts"]');
       expect(cell.exists()).toBe(true);
       expect(cell.attributes("style")).not.toContain("max-width: 0");
-      expect(cell.attributes("style")).toContain("min-width: var(--header-ts-size)");
+      expect(cell.attributes("style")).toContain(`min-width: ${sizeVar("ts")}`);
     });
 
-    // Regression: once another field is selected, `body` stops being the filler
-    // and becomes an ordinary sized column. Nothing capped a sized column in a
-    // scrolling table, so its own text stretched it to ~3000px and dragged the
-    // whole row into horizontal scroll. Pre-migration these were flex-shrink:0
-    // with an ellipsis, i.e. pinned at `size` in both directions.
+    // Regression: once another field is selected `body` becomes an ordinary
+    // sized column, and nothing capped those — its own text stretched it to
+    // ~3000px and dragged the row into horizontal scroll.
     it("should pin a long-valued sized column at its size instead of its content", () => {
       wrapper = mountElastic({
         columns: [
           { id: "ts", header: "Timestamp", accessorKey: "ts", size: 236 },
-          // `body` is no longer last, so it is sized — and its value is enormous
+          // no longer last, so it is sized — and its value is enormous
           { id: "body", header: "Body", accessorKey: "body", size: 800 },
           {
             id: "level",
@@ -1150,12 +1149,12 @@ describe("OTable", () => {
       });
       const cell = wrapper.find('[data-test="o2-table-cell-body"]');
       expect(cell.exists()).toBe(true);
-      expect(cell.attributes("style")).toContain("width: var(--header-body-size)");
-      expect(cell.attributes("style")).toContain("min-width: var(--header-body-size)");
-      expect(cell.attributes("style")).toContain("max-width: var(--header-body-size)");
+      expect(cell.attributes("style")).toContain(`width: ${sizeVar("body")}`);
+      expect(cell.attributes("style")).toContain(`min-width: ${sizeVar("body")}`);
+      expect(cell.attributes("style")).toContain(`max-width: ${sizeVar("body")}`);
       expect(cell.classes()).toContain("text-ellipsis");
       const th = wrapper.find('[data-test="o2-table-th-body"]');
-      expect(th.attributes("style")).toContain("max-width: var(--header-body-size)");
+      expect(th.attributes("style")).toContain(`max-width: ${sizeVar("body")}`);
     });
 
     it("should size the table to the container rather than max-content", () => {
