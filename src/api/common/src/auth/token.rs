@@ -47,10 +47,11 @@ use super::validator::{AuthError, AuthValidationResult, RequestData};
 #[cfg(any(feature = "enterprise", test))]
 fn may_skip_permission_check(
     is_list_invite_call: bool,
+    is_reject_invite_call: bool,
     is_member_subscription: bool,
     is_org_list_call: bool,
 ) -> bool {
-    is_list_invite_call || is_member_subscription || is_org_list_call
+    is_list_invite_call || is_reject_invite_call || is_member_subscription || is_org_list_call
 }
 
 #[cfg(feature = "enterprise")]
@@ -213,6 +214,7 @@ pub async fn token_validator(
                     // bypass. Similarly specifically for org list, we check by email
                     None if may_skip_permission_check(
                         is_list_invite_call,
+                        is_reject_invite_call,
                         is_member_subscription,
                         path_suffix.eq(&"organizations") && auth_info.method.eq("LIST"),
                     ) =>
