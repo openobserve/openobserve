@@ -1,12 +1,26 @@
 // Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import type { BrowserStep, StepAction } from "@/types/synthetics";
 import { RETIRED_ACTIONS } from "@/constants/synthetics";
+import { stepIsMissingTarget } from "./stepTarget";
 
 /**
- * The version-2 step as it goes on the wire.
+ * The step as it goes on the wire.
  *
- * Deliberately a separate type from {@link BrowserStep}: the server validates v2
+ * Deliberately a separate type from {@link BrowserStep}: the server validates
  * steps with `deny_unknown_fields`, so a stray `code`, `selectorType` or
  * `startTime` is a 400, not a harmless extra. Building the payload from an
  * explicit shape rather than by spreading the editor's model is what keeps that
@@ -18,8 +32,13 @@ export interface V2WireStep {
   name?: string;
   url?: string;
   locator?: {
-    candidates: Array<{ kind: string; value: string }>;
-    user_override?: { kind: string; value: string } | null;
+    candidates: Array<{
+      kind: string;
+      value: string;
+      origin?: string;
+      from?: Array<{ value: string; relation?: string }>;
+    }>;
+    author_ordered?: boolean;
   };
   value?: string;
   key?: string;
@@ -49,28 +68,31 @@ const ACTION_TO_V2: Partial<Record<StepAction, string>> = {
   assert: "assert",
 };
 
-/** Actions that carry no element and therefore need no locator. */
-const PAGE_LEVEL_ASSERTIONS = new Set(["url_matches", "page_title"]);
+/**
+ * Whether this action can be stored at all.
+ *
+ * A retired action has no runner behind it, and an action outside
+ * {@link ACTION_TO_V2} has no name the server recognises. Either way the step
+ * cannot be built, so the save gate has to say so rather than let
+ * {@link buildV2Step} throw at payload time.
+ */
+export function isStorableAction(action: string): boolean {
+  if ((RETIRED_ACTIONS as readonly string[]).includes(action)) return false;
+  return !!ACTION_TO_V2[action as StepAction];
+}
 
 /**
- * Whether a journey can be stored as version 2.
+ * Whether every step of this journey can be stored.
  *
- * All-or-nothing on purpose. `steps_version` describes the whole `steps` array,
- * so a journey where only some steps carry a locator bundle has no honest
- * version — storing it as v2 would fail validation on the bundle-less steps, and
- * storing it as v1 would silently discard the bundles that were captured. A
- * journey qualifies once every step could be executed by the v2 runner.
+ * All-or-nothing on purpose, and it is now the save gate rather than a version
+ * question: a journey that fails this used to fall back to the version-1 payload
+ * shape, which silently discarded every locator bundle the recorder captured.
+ * With version 1 gone there is nothing to fall back to, so the answer has to
+ * reach the author instead — see `makeBrowserCheckSaveSchema`.
  */
-export function isV2Journey(steps: BrowserStep[]): boolean {
+export function isSaveableJourney(steps: BrowserStep[]): boolean {
   if (steps.length === 0) return false;
-  return steps.every((step) => {
-    if ((RETIRED_ACTIONS as readonly string[]).includes(step.action)) return false;
-    if (!ACTION_TO_V2[step.action]) return false;
-    if (step.action === "navigate") return true;
-    if (step.action === "assert" && PAGE_LEVEL_ASSERTIONS.has(step.assertion?.kind ?? ""))
-      return true;
-    return !!(step.locator?.candidates?.length || step.locator?.user_override);
-  });
+  return steps.every((step) => isStorableAction(step.action) && !stepIsMissingTarget(step));
 }
 
 /** The value field a v2 step uses for this action. The UI keeps only one. */
@@ -93,18 +115,18 @@ function v2Value(step: BrowserStep): Pick<V2WireStep, "url" | "value" | "key" | 
 }
 
 /**
- * Build the stored v2 step for one editor step.
+ * Build the stored step for one editor step.
  *
  * Every field is copied explicitly rather than spread. That is the point: it is
  * the only way to be sure the payload contains nothing the schema will refuse,
  * and it makes adding a field a deliberate act in both repositories at once.
  */
 export function buildV2Step(step: BrowserStep): V2WireStep {
-  const action = ACTION_TO_V2[step.action];
+  const action = isStorableAction(step.action) ? ACTION_TO_V2[step.action] : undefined;
   if (!action) {
     throw new Error(
-      `step "${step.id}": "${step.action}" has no version-2 equivalent. ` +
-        `Check isV2Journey before building a version-2 payload.`,
+      `step "${step.id}": "${step.action}" cannot be stored. ` +
+        `Check isSaveableJourney before building a payload.`,
     );
   }
 
@@ -113,15 +135,23 @@ export function buildV2Step(step: BrowserStep): V2WireStep {
   if (step.name) wire.name = step.name;
   Object.assign(wire, v2Value(step));
 
-  if (step.locator?.candidates?.length || step.locator?.user_override) {
+  if (step.locator?.candidates?.length) {
     wire.locator = {
-      candidates: (step.locator.candidates ?? []).map((c) => ({ kind: c.kind, value: c.value })),
-      ...(step.locator.user_override && {
-        user_override: {
-          kind: step.locator.user_override.kind,
-          value: step.locator.user_override.value,
-        },
-      }),
+      // Provenance travels. Without it the editor's work never reaches storage:
+      // the save looks fine, and healing later overwrites an authored entry
+      // because nothing recorded that a human wrote it.
+      candidates: step.locator.candidates.map((c) => ({
+        kind: c.kind,
+        value: c.value,
+        ...(c.origin && { origin: c.origin }),
+        ...(c.from?.length && {
+          from: c.from.map((p) => ({
+            value: p.value,
+            ...(p.relation && { relation: p.relation }),
+          })),
+        }),
+      })),
+      ...(step.locator.author_ordered && { author_ordered: true }),
     };
   }
 

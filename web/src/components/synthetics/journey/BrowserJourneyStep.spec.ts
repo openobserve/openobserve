@@ -1,4 +1,17 @@
 // Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
@@ -51,7 +64,6 @@ function makeStep(overrides: Partial<BrowserStep> = {}): BrowserStep {
     name: "Open page",
     value: "https://example.com",
     timeout: 30000,
-    code: "",
     ...overrides,
   };
 }
@@ -111,8 +123,15 @@ describe("BrowserJourneyStep", () => {
       expect(wrapper.text()).toContain("Click login");
     });
 
-    it("should render selector preview text", () => {
-      wrapper = mountStep({ step: makeStep({ action: "click", selector: "#login-btn" }) });
+    // The row shows what the run tries FIRST, which is position 0. A bare
+    // `selector` is the retired version-1 channel and never reaches the wire.
+    it("should render the first locator as the preview", () => {
+      wrapper = mountStep({
+        step: makeStep({
+          action: "click",
+          locator: { candidates: [{ kind: "css", value: "#login-btn" }] },
+        }),
+      });
 
       expect(wrapper.text()).toContain("#login-btn");
     });
@@ -198,9 +217,11 @@ describe("BrowserJourneyStep", () => {
     });
 
     // ── Timeout guard rails (spec P1.1.4, P1.1.5 / T1-13, T1-14) ───────────
-    // The recorder no longer stamps a timeout, so this field renders empty. An
-    // empty box reads as "no timeout", which is wrong and invites needless
-    // overrides — show the default the runner will actually apply.
+    // Only the warning is asserted here. The field itself, its placeholder and
+    // the retired-action notice all live inside BrowserJourneyStepEditor — the
+    // input behind its Advanced group — and are covered by that component's own
+    // spec. Reaching for them through this wrapper tested the layout of a
+    // component this one only embeds.
     describe("timeout guard rails", () => {
       const timeoutInput = (w: VueWrapper) =>
         w.find('[data-test="synthetics-journey-step-timeout-input"]');

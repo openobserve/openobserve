@@ -1,4 +1,17 @@
 // Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import type { AssertionKind, StepAction, SyntheticCheckType } from "@/types/synthetics";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
@@ -38,10 +51,20 @@ export const ACTION_ICONS: Record<StepAction, IconName> = {
 };
 
 // ── Action groups ────────────────────────────────────────────────────────
+/**
+ * Actions that act on an element and so must name one.
+ *
+ * Mirrors the server's `V2_ELEMENT_ACTIONS` (`synthetics.rs`). `press` belongs
+ * here for that reason: the server requires a locator for it, and while a
+ * bundle-less journey could still fall back to the version-1 payload shape the
+ * disagreement only cost a silent downgrade. With version 1 gone it would be a
+ * 400 at save time instead.
+ */
 export const SELECTOR_ACTIONS: readonly StepAction[] = [
   "click",
   "type",
   "select",
+  "press",
   "check",
   "uncheck",
   "upload",
@@ -134,9 +157,8 @@ export const actionOptions = (Object.keys(ACTION_LABELS) as StepAction[])
   }));
 
 // The selector-type picker (CSS / XPath / Text / TestID / Role) is gone with the
-// v1 authoring path: a version-2 step names its element with a locator bundle,
-// whose value carries its own engine prefix. `SelectorType` itself survives in
-// types/synthetics.ts for liftJourney, which issue 006 owns.
+// v1 authoring path: a step names its element with a locator bundle, whose value
+// carries its own engine prefix.
 
 // ── Value field labels (action-specific) ─────────────────────────────────
 export const VALUE_LABELS: Record<string, string> = {
@@ -239,3 +261,10 @@ export const VALUE_TOOLTIP_MAP: Record<string, string> = {
  * all, and every step silently degraded to role/text/css.
  */
 export const DEFAULT_TEST_ID_ATTR = "data-test";
+
+/**
+ * How many evidence events a step expansion shows before deferring to the
+ * Evidence tab. A live bundle held 158 events across two steps — uncapped, one
+ * expansion would run to 136 rows and break the step timeline's scroll.
+ */
+export const INLINE_EVIDENCE_LIMIT = 5;

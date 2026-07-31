@@ -1,6 +1,17 @@
 // Copyright 2026 OpenObserve Inc.
-
-export type SelectorType = "CSS" | "XPath" | "Text" | "TestID" | "Role";
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 // ── Replay state machine ──────────────────────────────────────────────────────
 export type ReplayPhase = "idle" | "running" | "passed" | "failed" | "stopped";
@@ -54,33 +65,61 @@ export type StepAction =
   | "assert"
   | "screenshot";
 
-// ── Version-2 locator bundle ────────────────────────────────────────────────
-// A v1 step identifies its element with a single selector, so any cosmetic
-// markup change breaks the monitor. A v2 step carries every way the recorder
-// could find the element, ordered most-stable-first, and the runner falls back
-// through them.
+// ── Locator bundle ──────────────────────────────────────────────────────────
+// A step carries every way to find its element, tried in order, so a cosmetic
+// markup change no longer breaks a monitor that is otherwise healthy.
 //
-// Ordering matters and is not cosmetic: candidates only agree while the markup
-// is unchanged. Once it changes — the case fallback exists for — a lower-ranked
-// candidate may match a *different* element, so rank is what breaks ties.
+// The ORDER IS THE AUTHOR'S. It arrives as Playwright's, and from there they
+// drag rows, add locators of their own, delete ones they do not want and
+// combine recorded ones into something stricter. That replaced pinning, which
+// was exclusive: the only way to say "prefer this one" was to turn fallback off
+// entirely.
+//
+// Ordering is not cosmetic. Candidates only agree while the markup is
+// unchanged; once it changes — the case fallback exists for — a later candidate
+// may match a *different* element.
 
-/** Ordered most stable to least. `css`/`xpath` are structural and brittle. */
+/** How the element is found. Says nothing about how long it will keep working. */
 export type LocatorKind = "test_attribute" | "role" | "text" | "css" | "xpath";
+
+/**
+ * Where a candidate came from.
+ *
+ * The heal-suppression signal (H1-H6): healing may replace the value of a
+ * `recorded` entry in place, and must not touch anything else.
+ */
+export type LocatorOrigin = "recorded" | "authored" | "composite";
+
+/** How one part of a combined locator attaches to the part before it. */
+export type CompositeRelation = "and" | "has" | "has_not" | "descendant";
+
+export interface CompositePart {
+  value: string;
+  /** Absent on the first (base) part. */
+  relation?: CompositeRelation;
+}
 
 export interface LocatorCandidate {
   kind: LocatorKind;
   value: string;
+  /** Absent means `recorded` — the shape every pre-Phase-2b bundle has. */
+  origin?: LocatorOrigin;
+  /**
+   * What a combined locator was built from, and how. Present only on a
+   * `composite`. Structured rather than `string[]` because the relation cannot
+   * be recomputed: it depends on DOM structure the editor never sees.
+   */
+  from?: CompositePart[];
 }
 
 export interface StepLocator {
-  /**
-   * Machine-derived evidence from the recording session. Read-only in the UI:
-   * author intent is expressed only by pinning, which keeps the stored list
-   * byte-comparable for the self-healing precondition.
-   */
+  /** Tried in order, top first. The first one that matches is used. */
   candidates: LocatorCandidate[];
-  /** Author-pinned. When set, used exclusively — never falls back. */
-  user_override?: LocatorCandidate | null;
+  /**
+   * A human has reordered, added, deleted or combined. Healing must never
+   * reorder such a list.
+   */
+  author_ordered?: boolean;
 }
 
 // ── Version-2 settle block ──────────────────────────────────────────────────
@@ -144,7 +183,6 @@ export interface BrowserStep {
   action: StepAction;
   name?: string;
   selector?: string;
-  selectorType?: SelectorType;
   /** Version-2 locator bundle. Absent on v1 steps, which use `selector`. */
   locator?: StepLocator;
   /** Version-2 settle block: what to wait for after this step's action. */
@@ -157,7 +195,6 @@ export interface BrowserStep {
   alwaysRun?: boolean;
   value?: string;
   timeout?: number; // ms; undefined = runner's per-category default
-  code: string;
   // Original, untouched extension step (see WireStep). Preserved for replay,
   // which sends the rich step back to the extension verbatim. Absent on
   // manually-added steps.
@@ -178,7 +215,6 @@ export interface WireStep {
   id: string;
   action: string; // navigate | click | type | press | select | check | uncheck | setInputFiles | waitFor | assert | screenshot
   selector?: string;
-  selector_type?: "css" | "xpath" | "text" | "role" | "data-test";
   /**
    * Version-2 evidence captured by the extension. Present on recorded steps
    * only; a hand-added step has none until it is re-recorded.
@@ -286,11 +322,16 @@ export type RecorderPushPayload =
       duration_ms: number;
       error?: string;
       structuredError?: StructuredError;
-      /** X-8.2 divergence notes, as the extension emits them. Declared here as
-       *  well as on `StepReplayResult` because this is the INBOUND shape the
-       *  composable reads from; without it, reading `payload.fidelity` does not
-       *  type-check, and dropping the read instead would make every divergence
-       *  silent again — a skipped step reading as a pass. */
+      /**
+       * What the preview could not evaluate for this step (X-8.2).
+       *
+       * Declared because the extension really sends it — `background.ts` sets it
+       * from `replayFidelity`, and `useSyntheticsRecorder` reads it straight
+       * into {@link StepReplayResult}. Omitting it here made that read a type
+       * error while the value flowed anyway: a green result WITH notes is a
+       * weaker claim than one without, and this is the field carrying the
+       * difference.
+       */
       fidelity?: { level: string; notes: string[] };
     }
   | { method: "stepReplayStarted"; stepId: string; stepName?: string };

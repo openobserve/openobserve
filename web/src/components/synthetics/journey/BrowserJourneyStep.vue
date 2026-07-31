@@ -1,5 +1,20 @@
+<!-- Copyright 2026 OpenObserve Inc.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+-->
+
 <script setup lang="ts">
-// Copyright 2026 OpenObserve Inc.
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { copyToClipboard } from "@/utils/clipboard";
@@ -52,15 +67,13 @@ const displayName = computed(() => props.step.name || actionLabel.value);
 /**
  * What the collapsed row shows on the right.
  *
- * A version-2 step has no bare `selector` — its identity is the locator bundle —
- * so reading `selector` alone would leave every recorded step's row blank. The
- * pin wins when there is one, because that is what the run will actually use.
+ * A step has no bare `selector` — its identity is the locator bundle — so
+ * reading `selector` alone would leave every recorded step's row blank.
+ * Position 0 is what the run tries first, which is what this row is claiming.
  */
-const selectorPreview = computed(() => {
-  const locator = props.step.locator;
-  const effective = locator?.user_override ?? locator?.candidates?.[0];
-  return effective?.value || props.step.selector || props.step.value || "";
-});
+const selectorPreview = computed(
+  () => props.step.locator?.candidates?.[0]?.value || props.step.value || "",
+);
 
 // ── Status dot visual mapping (combines with step number during replay) ─────
 /** Tailwind classes for the step number badge (replay = colored circle). */

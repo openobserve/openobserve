@@ -1,7 +1,41 @@
 // Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import http from "./http";
+import store from "@/stores";
 
 const STREAM_NAME = "synthetics_results";
+
+/**
+ * The API origin, for URLs that do NOT go through the axios wrapper.
+ *
+ * Everything else in this file is issued by `http()`, which sets
+ * `baseURL: store.state.API_ENDPOINT`. Artifact URLs are different: they are
+ * handed to `<img src>` and `fetch()` directly, so they carry no baseURL and
+ * resolve against whatever origin serves the page. In dev that is the Vite
+ * server on :8081, which has no `/api` route and no proxy — so every screenshot
+ * and every evidence bundle 404s until the origin is spelled out here.
+ *
+ * Returns "" when the app is served from the API's own origin (`API_ENDPOINT`
+ * is "/" or unset). Prefixing "/" would yield `//api/...`, which the browser
+ * reads as protocol-relative — a request to a host literally named "api".
+ */
+function apiOrigin(): string {
+  const base = store.state.API_ENDPOINT;
+  if (!base || base === "/") return "";
+  return base.endsWith("/") ? base.slice(0, -1) : base;
+}
 
 export interface ListRunsPayload {
   query: {
@@ -89,7 +123,7 @@ const syntheticsService = {
     const parts = key.split("/");
     const synthetics_id = parts[2] ?? "_";
     const folderParam = folderId ? `&folder=${folderId}` : "";
-    return `/api/${orgIdentifier}/synthetics/${synthetics_id}/artifact?key=${encodeURIComponent(key)}${folderParam}`;
+    return `${apiOrigin()}/api/${orgIdentifier}/synthetics/${synthetics_id}/artifact?key=${encodeURIComponent(key)}${folderParam}`;
   },
 
   // Batch-sign artifact download URLs. Returns { mode: "presigned" | "proxy",

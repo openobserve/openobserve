@@ -1,6 +1,19 @@
 // Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import type { BrowserStep, SelectorType, StepAction, WireStep } from "@/types/synthetics";
+import type { BrowserStep, StepAction, WireStep } from "@/types/synthetics";
 import { getUUIDv7 } from "../uuid";
 
 // Maps the extension's Playwright-flavoured action names onto the UI's StepAction.
@@ -25,23 +38,6 @@ const ACTION_MAP: Record<string, StepAction> = {
   assert: "assert",
   screenshot: "screenshot",
   setInputFiles: "upload",
-};
-
-const SELECTOR_TYPE_MAP: Record<string, SelectorType> = {
-  css: "CSS",
-  xpath: "XPath",
-  text: "Text",
-  role: "Role",
-  "data-test": "TestID",
-};
-
-// Inverse of SELECTOR_TYPE_MAP, for building wire steps from manual UI steps.
-const WIRE_SELECTOR_TYPE_MAP: Record<SelectorType, WireStep["selector_type"]> = {
-  CSS: "css",
-  XPath: "xpath",
-  Text: "text",
-  Role: "role",
-  TestID: "data-test",
 };
 
 /**
@@ -150,7 +146,6 @@ export function mapWireStep(wire: WireStep, opts: MapWireStepOptions = {}): Brow
     action,
     name: wire.name,
     selector: wire.selector,
-    selectorType: wire.selector_type ? SELECTOR_TYPE_MAP[wire.selector_type] : undefined,
     value: mapValue(wire, action),
     // Undefined means "use the runner's category default" (spec P1.1.2). The
     // recorder no longer stamps a value, and substituting one here would put the
@@ -165,7 +160,6 @@ export function mapWireStep(wire: WireStep, opts: MapWireStepOptions = {}): Brow
     assertion: wire.assertion,
     optional: wire.optional,
     alwaysRun: wire.always_run,
-    code: wire.code || "",
     // Keep the original extension step untouched for replay (full fidelity) —
     // only when the caller says this wire came from a live recording. See
     // MapWireStepOptions.
@@ -196,7 +190,6 @@ export function buildWireFromStep(step: BrowserStep): WireStep | null {
     action: step.action,
     name: step.name ?? "",
     selector: step.selector,
-    selector_type: step.selectorType ? WIRE_SELECTOR_TYPE_MAP[step.selectorType] : undefined,
     // Only carry a timeout the author actually set; absence means runner default.
     timeout_ms: step.timeout,
     // Sent back so the preview can report what it cannot simulate (spec P5.S.3)

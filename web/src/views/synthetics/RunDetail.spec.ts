@@ -15,8 +15,10 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
-import { ref } from "vue";
+import { ref, shallowRef } from "vue";
 import RunDetail from "./RunDetail.vue";
+import StepPageActivity from "@/components/synthetics/results/StepPageActivity.vue";
+import EvidencePanel from "@/components/synthetics/results/EvidencePanel.vue";
 
 vi.mock("vue-router", () => ({
   useRouter: () => ({
@@ -48,7 +50,10 @@ vi.mock("vuex", () => ({
   }),
 }));
 
-const mockRunDetailRef: { value: any } = { value: null };
+// A real ref, not a plain object: the run arrives AFTER mount in production,
+// and only a reactive source lets a test reproduce that ordering — which is
+// what drives the auto-expand watcher and, through it, the bundle fetch.
+const mockRunDetailRef = shallowRef<any>(null);
 
 const mockRunDetail = {
   timestamp: Date.now() / 1000,
@@ -372,6 +377,93 @@ describe("RunDetail — steps / evidence tabs", () => {
     await flushPromises();
     expect(w.find('[data-test="synthetics-run-detail-attempt-select"]').exists()).toBe(true);
     expect(w.find('[data-test="synthetics-run-detail-attempt-dropdown"]').exists()).toBe(true);
+    w.unmount();
+  });
+});
+
+// ── Per-step page activity ─────────────────────────────────────────────────
+//
+// The shared fixture carries no steps, so this suite brings its own: a failed
+// run whose one step owns bundle events. Extending the shared fixture instead
+// would put a steps table into all fourteen tests above.
+const NDJSON_S19 = [
+  '{"ts":100,"kind":"response","method":"GET","url":"https://app.dev/a","status":200,"initiated_ts":90,"duration_ms":10,"first_party":true,"step_id":"s19"}',
+  '{"ts":200,"kind":"console","level":"error","text":"boom","step_id":"s19"}',
+].join("\n");
+
+const mockFailedWithEvidence = {
+  ...mockRunDetail,
+  status: "failed",
+  failedStep: "s19",
+  evidenceKey: "synthetics/org/mon/RUN/EXEC/evidence.ndjson",
+  recordedSteps: [
+    { id: "s19", action: "click", name: "Click Sign In", selector: "[data-test=signin]", url: "" },
+  ],
+  lastAttemptSteps: [
+    {
+      step_id: "s19",
+      status: "fail",
+      duration_ms: 30000,
+      error: "locator.click: Timeout 30000ms exceeded",
+      screenshot_key: null,
+    },
+  ],
+};
+
+describe("RunDetail — per-step page activity", () => {
+  beforeEach(() => {
+    globalThis.fetch = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      statusText: "OK",
+      text: async () => NDJSON_S19,
+    })) as any;
+  });
+
+  /**
+   * Mount empty, then deliver the run — the real sequence.
+   *
+   * Seeding the mocked ref before mount would leave `steps` unchanged after
+   * setup, so the auto-expand watcher never fires and the whole trigger path
+   * this suite exists to cover would be skipped.
+   */
+  async function mountWithRun(detail: Record<string, unknown>) {
+    mockRunDetailRef.value = null;
+    const w = mountComponent();
+    await flushPromises();
+    mockRunDetailRef.value = detail;
+    await flushPromises();
+    return w;
+  }
+
+  it("fetches the bundle once when a failed step auto-expands", async () => {
+    // Failed steps auto-expand, so this is load-time on a failed run — 256 KB at
+    // the cap, paid on exactly the run someone is triaging.
+    const w = await mountWithRun({ ...mockFailedWithEvidence });
+    expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+    w.unmount();
+  });
+
+  it("renders the activity block on a step that owns events", async () => {
+    const w = await mountWithRun({ ...mockFailedWithEvidence });
+    expect(w.find('[data-test="synthetics-step-page-activity"]').exists()).toBe(true);
+    w.unmount();
+  });
+
+  it("sends view-all to the Evidence tab filtered to that step", async () => {
+    const w = await mountWithRun({ ...mockFailedWithEvidence });
+    w.findComponent(StepPageActivity).vm.$emit("view-all", "s19");
+    await flushPromises();
+    const panel = w.findComponent(EvidencePanel);
+    expect(panel.exists()).toBe(true);
+    expect(panel.props("stepFilter")).toBe("s19");
+    w.unmount();
+  });
+
+  it("issues no bundle request when the attempt has no evidence", async () => {
+    const w = await mountWithRun({ ...mockFailedWithEvidence, evidenceKey: null });
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+    expect(w.find('[data-test="synthetics-step-page-activity"]').exists()).toBe(false);
     w.unmount();
   });
 });
