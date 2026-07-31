@@ -123,24 +123,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :activeFolderId="selectedFolder.value"
                         />
                       </div>
-                      <div
-                        v-if="filesImportResults.length"
-                        class="py-2"
-                        data-test="dashboard-import-file-results"
-                      >
-                        <div v-for="(importResult, index) in filesImportResults" :key="index">
-                          <span
-                            v-if="importResult.status == 'rejected'"
-                            class="text-status-negative"
-                            data-test="dashboard-import-file-rejected"
-                          >
-                            <code class="bg-surface-panel p-0.75">{{
-                              importResult?.reason?.file
-                            }}</code>
-                            : {{ importResult?.reason?.error }}
-                          </span>
-                        </div>
-                      </div>
                     </div>
                     <QueryEditor
                       data-test="dashboard-import-json-file-editor"
@@ -232,6 +214,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <span v-else data-test="dashboard-import-error-message">{{
                       errorMessage.message || errorMessage
                     }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div
+                v-if="filesImportResults.some((r) => r.status === 'rejected')"
+                class="error-section mb-2.5 shrink-0 overflow-auto p-2.5"
+                data-test="dashboard-import-file-results"
+              >
+                <div v-for="(importResult, index) in filesImportResults" :key="'file-' + index">
+                  <div
+                    v-if="importResult.status == 'rejected'"
+                    class="error-item text-status-negative py-1.25 text-sm"
+                    data-test="dashboard-import-file-rejected"
+                  >
+                    <code v-if="importResult?.reason?.file" class="bg-surface-panel p-0.75">{{
+                      importResult.reason.file
+                    }}</code>
+                    <template v-if="importResult?.reason?.file"> : </template
+                    >{{ importResult?.reason?.error }}
                   </div>
                 </div>
               </div>

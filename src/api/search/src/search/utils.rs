@@ -281,7 +281,7 @@ mod tests {
     async fn test_validate_query_fields_join_with_mixed_uds() {
         use arrow_schema::{DataType, Field, Schema};
         use config::meta::stream::{StreamSettings, StreamType};
-        use infra::schema::{STREAM_SCHEMAS_LATEST, STREAM_SETTINGS, SchemaCache};
+        use infra::schema::{STREAM_SCHEMAS_LATEST, SchemaCache};
 
         let org_id = "test_org_join_uds";
         let stream_name_a = "oly";
@@ -324,17 +324,11 @@ mod tests {
             ..Default::default()
         };
 
-        {
-            let mut w = STREAM_SETTINGS.write().await;
-            w.insert(cache_key_a.clone(), settings_a.clone());
-            w.insert(cache_key_b.clone(), settings_b.clone());
-
-            // Also update the atomic cache which is used by get_settings
-            let mut atomic_cache = hashbrown::HashMap::new();
-            atomic_cache.insert(cache_key_a.clone(), settings_a);
-            atomic_cache.insert(cache_key_b.clone(), settings_b);
-            infra::schema::set_stream_settings_atomic(atomic_cache);
-        }
+        infra::schema::put_stream_settings_batch(vec![
+            (cache_key_a.clone(), std::sync::Arc::new(settings_a)),
+            (cache_key_b.clone(), std::sync::Arc::new(settings_b)),
+        ])
+        .await;
 
         // Test the JOIN query where:
         // - a.continent is valid (exists in schema AND in UDS for "oly")
@@ -357,11 +351,8 @@ JOIN "test1" AS b"#;
             w.remove(&cache_key_a);
             w.remove(&cache_key_b);
         }
-        {
-            let mut w = STREAM_SETTINGS.write().await;
-            w.remove(&cache_key_a);
-            w.remove(&cache_key_b);
-        }
+        infra::schema::remove_stream_settings(&cache_key_a).await;
+        infra::schema::remove_stream_settings(&cache_key_b).await;
 
         // Assert that validation fails with the correct error
         assert!(
@@ -399,7 +390,7 @@ mod validate_query_edge_cases {
     mod helpers {
         use arrow_schema::{DataType, Field, Schema};
         use config::meta::stream::{StreamSettings, StreamType};
-        use infra::schema::{STREAM_SCHEMAS_LATEST, STREAM_SETTINGS, SchemaCache};
+        use infra::schema::{STREAM_SCHEMAS_LATEST, SchemaCache};
 
         use super::*;
 
@@ -418,11 +409,8 @@ mod validate_query_edge_cases {
                     w.remove(&self.cache_key_oly);
                     w.remove(&self.cache_key_test1);
                 }
-                {
-                    let mut w = STREAM_SETTINGS.write().await;
-                    w.remove(&self.cache_key_oly);
-                    w.remove(&self.cache_key_test1);
-                }
+                infra::schema::remove_stream_settings(&self.cache_key_oly).await;
+                infra::schema::remove_stream_settings(&self.cache_key_test1).await;
             }
         }
 
@@ -505,17 +493,11 @@ mod validate_query_edge_cases {
             }
 
             // Setup UDS settings
-            {
-                let mut w = STREAM_SETTINGS.write().await;
-                w.insert(cache_key_oly.clone(), oly_uds.clone());
-                w.insert(cache_key_test1.clone(), test1_uds.clone());
-
-                // Update atomic cache
-                let mut atomic_cache = hashbrown::HashMap::new();
-                atomic_cache.insert(cache_key_oly.clone(), oly_uds);
-                atomic_cache.insert(cache_key_test1.clone(), test1_uds);
-                infra::schema::set_stream_settings_atomic(atomic_cache);
-            }
+            infra::schema::put_stream_settings_batch(vec![
+                (cache_key_oly.clone(), std::sync::Arc::new(oly_uds)),
+                (cache_key_test1.clone(), std::sync::Arc::new(test1_uds)),
+            ])
+            .await;
 
             TestContext {
                 org_id,
@@ -927,7 +909,7 @@ JOIN "test1" AS b ON a._timestamp = b._timestamp"#;
 mod test_cte_multi_stream_regression {
     use arrow_schema::{DataType, Field, Schema};
     use config::meta::stream::{StreamSettings, StreamType};
-    use infra::schema::{STREAM_SCHEMAS_LATEST, STREAM_SETTINGS, SchemaCache};
+    use infra::schema::{STREAM_SCHEMAS_LATEST, SchemaCache};
 
     use super::*;
 
@@ -962,15 +944,17 @@ mod test_cte_multi_stream_regression {
             w.insert(key_default.clone(), SchemaCache::new(default_schema));
             w.insert(key_k8s.clone(), SchemaCache::new(k8s_events_schema));
         }
-        {
-            let mut w = STREAM_SETTINGS.write().await;
-            w.insert(key_default.clone(), StreamSettings::default());
-            w.insert(key_k8s.clone(), StreamSettings::default());
-            let mut atomic = hashbrown::HashMap::new();
-            atomic.insert(key_default.clone(), StreamSettings::default());
-            atomic.insert(key_k8s.clone(), StreamSettings::default());
-            infra::schema::set_stream_settings_atomic(atomic);
-        }
+        infra::schema::put_stream_settings_batch(vec![
+            (
+                key_default.clone(),
+                std::sync::Arc::new(StreamSettings::default()),
+            ),
+            (
+                key_k8s.clone(),
+                std::sync::Arc::new(StreamSettings::default()),
+            ),
+        ])
+        .await;
 
         // Exact query shape that triggered the bug in alerts validation
         let sql = r#"
@@ -996,11 +980,8 @@ FROM k8s_events_agg"#;
             w.remove(&key_default);
             w.remove(&key_k8s);
         }
-        {
-            let mut w = STREAM_SETTINGS.write().await;
-            w.remove(&key_default);
-            w.remove(&key_k8s);
-        }
+        infra::schema::remove_stream_settings(&key_default).await;
+        infra::schema::remove_stream_settings(&key_k8s).await;
 
         // OLD code: body_type (k8s_events field) checked against default schema → Err
         // FIXED:    only default's fields validated against default schema → Ok

@@ -223,6 +223,7 @@
                     :label="t('onlineEvals.job.idleWindowLabel')"
                     type="number"
                     :min="MIN_COMPLETION_IDLE_WINDOW_SECS"
+                    :max="completionLimits?.maxIdleWindowSecs"
                     size="sm"
                     :help-text="idleWindowHelp"
                     data-test="job-form-idle-window-input"
@@ -234,6 +235,7 @@
                     :label="t('onlineEvals.job.maxAgeLabel')"
                     type="number"
                     min="1"
+                    :max="completionLimits?.maxAgeSecs"
                     size="sm"
                     :help-text="maxAgeHelp"
                     data-test="job-form-max-age-input"
@@ -366,6 +368,7 @@ import {
   buildCompletionConfigPayloads,
   completionWindowConfigFromJob,
   completionWindowDefaultsForScope,
+  completionWindowLimitsForScope,
   durationPartsFromSecs,
   MIN_COMPLETION_IDLE_WINDOW_SECS,
   TRACE_COMPLETION_WINDOW_DEFAULTS,
@@ -483,6 +486,10 @@ function humanizeSecs(value: string | number): string | null {
 
 // NOTE: `formValues` is a store ref; script reads need `.value` (templates
 // auto-unwrap, script does not).
+const completionLimits = computed(() =>
+  completionWindowLimitsForScope(formValues.value.targetScope),
+);
+
 const idleWindowHelp = computed<string>(() => {
   const duration = humanizeSecs(formValues.value.idleWindowSecs);
   return duration

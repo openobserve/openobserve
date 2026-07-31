@@ -1083,7 +1083,11 @@ export const useStreamFields = () => {
               showWrap: false,
               wrapContent: false,
             },
-            size: 260,
+            // 236 + the 24px expand gutter = the 260 the pre-migration table
+            // gave the timestamp cell, which rendered the chevron INSIDE it.
+            // The arrow is its own column here (so it stays put if timestamp
+            // ever stops being first), so its width comes out of this budget.
+            size: 236,
           });
         }
 
@@ -1095,11 +1099,14 @@ export const useStreamFields = () => {
             cell: (info: any) => info.getValue(),
             header: "source",
             sortable: true,
-            enableResizing: false,
+            // Elastic: the source column fills the width left beside the
+            // fixed-width timestamp column.
+            resizable: false,
             meta: {
               closable: false,
               showWrap: false,
               wrapContent: false,
+              autoWidth: true,
             },
           });
         }
@@ -1136,7 +1143,11 @@ export const useStreamFields = () => {
               showWrap: false,
               wrapContent: false,
             },
-            size: 260,
+            // 236 + the 24px expand gutter = the 260 the pre-migration table
+            // gave the timestamp cell, which rendered the chevron INSIDE it.
+            // The arrow is its own column here (so it stays put if timestamp
+            // ever stops being first), so its width comes out of this budget.
+            size: 236,
           });
         }
 
@@ -1187,6 +1198,27 @@ export const useStreamFields = () => {
               maxSize: window.innerWidth,
             });
           }
+        }
+
+        // The last column absorbs whatever width the fixed ones leave over — the
+        // pre-migration table did this with `flex: 1 1 auto` on the last column,
+        // OTable's equivalent is `meta.autoWidth`. Without an absorber the table
+        // (table-layout:auto + w-full) spreads the surplus across EVERY column,
+        // so the fixed-width timestamp visibly stretches whenever the selected
+        // columns are narrower than the panel. `minSize` stops it collapsing
+        // below its own measured width.
+        // `resultGrid.columns` is untyped, so `.at()` widens to `{}` — name the
+        // few fields we touch rather than reaching through `any`.
+        interface GridColumn {
+          id: string;
+          size?: number;
+          minSize?: number;
+          meta?: Record<string, unknown>;
+        }
+        const lastColumn = searchObj.data.resultGrid.columns.at(-1) as GridColumn | undefined;
+        if (lastColumn && lastColumn.id !== store.state.zoConfig.timestamp_column) {
+          lastColumn.minSize = lastColumn.size;
+          lastColumn.meta = { ...lastColumn.meta, autoWidth: true };
         }
       }
 

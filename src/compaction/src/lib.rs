@@ -20,7 +20,7 @@ use config::{
     get_config,
     meta::{
         cluster::{CompactionJobType, Role},
-        stream::{ALL_STREAM_TYPES, PartitionTimeLevel, StreamType},
+        stream::{PartitionTimeLevel, StreamType},
     },
 };
 use infra::{
@@ -98,15 +98,14 @@ pub async fn run_retention() -> Result<(), anyhow::Error> {
 
 /// Generate job for compactor
 pub async fn run_generate_job(job_type: CompactionJobType) -> Result<(), anyhow::Error> {
-    let orgs = db::schema::list_organizations_from_cache().await;
-    for org_id in orgs {
+    let grouped = db::schema::list_all_streams_grouped().await;
+    for (org_id, stream_types) in grouped {
         // check backlist
         if !db::file_list::BLOCKED_ORGS.is_empty() && db::file_list::BLOCKED_ORGS.contains(&org_id)
         {
             continue;
         }
-        for stream_type in ALL_STREAM_TYPES {
-            let streams = db::schema::list_streams_from_cache(&org_id, stream_type).await;
+        for (stream_type, streams) in stream_types {
             for stream_name in streams {
                 let Some(node_name) =
                     get_node_from_consistent_hash(&stream_name, &Role::Compactor, None).await
@@ -192,15 +191,15 @@ pub async fn run_generate_job(job_type: CompactionJobType) -> Result<(), anyhow:
 /// Generate downsampling job for Metrics
 #[cfg(feature = "enterprise")]
 pub async fn run_generate_downsampling_job() -> Result<(), anyhow::Error> {
-    let orgs = db::schema::list_organizations_from_cache().await;
-    for org_id in orgs {
+    let grouped = db::schema::list_all_streams_grouped().await;
+    for (org_id, mut stream_types) in grouped {
         // check backlist
         if !db::file_list::BLOCKED_ORGS.is_empty() && db::file_list::BLOCKED_ORGS.contains(&org_id)
         {
             continue;
         }
         let stream_type = StreamType::Metrics;
-        let streams = db::schema::list_streams_from_cache(&org_id, stream_type).await;
+        let streams = stream_types.remove(&stream_type).unwrap_or_default();
         for stream_name in streams {
             let Some(node_name) =
                 get_node_from_consistent_hash(&stream_name, &Role::Compactor, None).await

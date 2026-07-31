@@ -687,7 +687,7 @@ async fn get_file_list_by_ids(
     let stream_settings = infra::schema::get_settings(org_id, stream_name, stream_type)
         .await
         .unwrap_or_default();
-    let partition_keys = stream_settings.partition_keys;
+    let partition_keys = &stream_settings.partition_keys;
     let file_list =
         crate::file_list::query_by_ids(trace_id, org_id, stream_type, stream_name, time_range, ids)
             .await?;
@@ -700,7 +700,7 @@ async fn get_file_list_by_ids(
             stream_name,
             time_range,
             &file,
-            &partition_keys,
+            partition_keys,
             equal_items,
         )
         .await

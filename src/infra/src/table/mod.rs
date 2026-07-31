@@ -24,6 +24,7 @@ use crate::{
 
 pub mod action_scripts;
 pub mod alert_incidents;
+pub mod alert_states;
 pub mod alerts;
 pub mod anomaly_detection;
 pub mod backfill_jobs;
@@ -61,6 +62,10 @@ pub mod search_queue;
 pub mod service_streams;
 pub mod sessions;
 pub mod short_urls;
+pub mod slo;
+pub mod slo_backfill_jobs;
+pub mod slo_budget;
+pub mod slos;
 pub mod source_maps;
 pub mod synthetics_agents;
 pub mod synthetics_jobs;

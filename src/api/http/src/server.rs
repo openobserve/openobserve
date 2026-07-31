@@ -22,8 +22,9 @@ use crate::handler::http::router::create_app_router;
 /// Run the primary HTTP frontend.
 ///
 /// The UI route factory remains supplied by the binary so the API crate does
-/// not depend on the web crate.
-pub async fn run(ui_routes: fn() -> axum::Router) -> Result<(), anyhow::Error> {
+/// not depend on the web crate. It takes the `<base href>` value because the
+/// web crate does not depend on `config` either.
+pub async fn run(ui_routes: fn(&str) -> axum::Router) -> Result<(), anyhow::Error> {
     let cfg = config::get_config();
     let haddr = server_addr()?;
     log::info!(

@@ -1,0 +1,333 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+import { describe, it, expect } from "vitest";
+import { mount } from "@vue/test-utils";
+
+import i18n from "@/locales";
+import EvidencePanel from "./EvidencePanel.vue";
+import {
+  foldEvidenceBundle,
+  isEvidenceAnomaly,
+  parseEvidenceNdjson,
+} from "@/composables/synthetics/syntheticResultsSchema";
+
+// ── Real bundle lines, copied from a live run ───────────────────────────────
+//
+// `intro test (expect fail)`: 18 all-200 responses, the run failing on a locator
+// timeout at step 20. That combination is the panel's whole reason for existing —
+// `evidence_by_step` is EMPTY here because summarise() only emits for anomalous
+// steps, so the record says "nothing to report" while the bundle says what the
+// page was doing.
+const NDJSON = [
+  '{"ts":1785356285799,"kind":"response","method":"GET","url":"https://o2.example.dev/web/login","status":200,"resource_type":"document","initiated_ts":1785356285501,"duration_ms":298,"first_party":true,"step_id":"s19"}',
+  '{"ts":1785356286100,"kind":"response","method":"GET","url":"https://cdn.third-party.io/a.js","status":200,"resource_type":"script","initiated_ts":1785356285900,"duration_ms":80,"first_party":false,"step_id":"s19"}',
+  '{"ts":1785356286500,"kind":"response","method":"GET","url":"https://o2.example.dev/api/streams","status":500,"resource_type":"xhr","initiated_ts":1785356286200,"duration_ms":300,"first_party":true,"step_id":"s19"}',
+  '{"ts":1785356286600,"kind":"console","level":"error","text":"Uncaught TypeError: e.map is not a function","step_id":"s19"}',
+].join("\n");
+
+const STEP_DEFS = new Map([
+  ["s19", { name: "Navigate to /web/login", selector: null }],
+  ["fa1", { name: 'Assert visible [data-test="element-that-never-exists"]', selector: null }],
+]);
+
+describe("evidence bundle parsing", () => {
+  it("parses NDJSON line by line, not as a JSON document", () => {
+    // JSON.parse on the whole payload throws — which is also why the download
+    // button must not be labelled "JSON".
+    expect(() => JSON.parse(NDJSON)).toThrow();
+    expect(parseEvidenceNdjson(NDJSON)).toHaveLength(4);
+  });
+
+  it("drops only the malformed line, never the panel", () => {
+    // A bundle truncated at the cap ends mid-line by construction, so this is
+    // the expected case at the limit rather than corruption.
+    const withJunk = `${NDJSON}\n{"ts":1,"kind":"response"`;
+    expect(parseEvidenceNdjson(withJunk)).toHaveLength(4);
+    expect(parseEvidenceNdjson("")).toEqual([]);
+    expect(parseEvidenceNdjson("\n\n  \n")).toEqual([]);
+  });
+
+  it("keeps both timestamps distinct", () => {
+    // Work begun in step 9 completes during step 10; collapsing ts and
+    // initiated_ts would hide that rather than show it.
+    const [first] = parseEvidenceNdjson(NDJSON);
+    expect(first.ts).toBe(1785356285799);
+    expect(first.initiatedTs).toBe(1785356285501);
+  });
+
+  it("treats a missing first_party as first-party, not third", () => {
+    const [e] = parseEvidenceNdjson('{"ts":1,"kind":"response","status":200}');
+    expect(e.firstParty).toBe(true);
+  });
+});
+
+describe("anomaly classification", () => {
+  it("counts only what an engineer would call a problem", () => {
+    const mk = (o: any) => parseEvidenceNdjson(JSON.stringify({ ts: 1, ...o }))[0];
+    expect(isEvidenceAnomaly(mk({ kind: "response", status: 200 }))).toBe(false);
+    expect(isEvidenceAnomaly(mk({ kind: "response", status: 302 }))).toBe(false);
+    expect(isEvidenceAnomaly(mk({ kind: "response", status: 404 }))).toBe(true);
+    expect(isEvidenceAnomaly(mk({ kind: "requestfailed" }))).toBe(true);
+    expect(isEvidenceAnomaly(mk({ kind: "pageerror" }))).toBe(true);
+    // A console *warning* is not an anomaly; only an error is.
+    expect(isEvidenceAnomaly(mk({ kind: "console", level: "warning" }))).toBe(false);
+    expect(isEvidenceAnomaly(mk({ kind: "console", level: "error" }))).toBe(true);
+  });
+});
+
+describe("evidence grouping", () => {
+  const fold = (text = NDJSON) => foldEvidenceBundle(parseEvidenceNdjson(text), STEP_DEFS);
+
+  it("groups by kind, not by step", () => {
+    // Step grouping reads well in a wireframe and degenerates on real data: a
+    // live 158-event bundle held two distinct step_ids, so it produced one
+    // section of 136 and one of 22 and told the reader nothing.
+    expect(fold().groups.map((g) => g.kind)).toEqual(["console", "network"]);
+  });
+
+  it("orders groups by severity, not by volume", () => {
+    // 153 responses must not bury one page error.
+    const text = [
+      '{"ts":5,"kind":"response","status":200,"initiated_ts":5}',
+      '{"ts":1,"kind":"pageerror","message":"boom"}',
+      '{"ts":2,"kind":"requestfailed","url":"https://x/y"}',
+      '{"ts":3,"kind":"console","level":"error","text":"bad"}',
+    ].join("\n");
+    expect(fold(text).groups.map((g) => g.kind)).toEqual([
+      "pageErrors",
+      "requestsFailed",
+      "console",
+      "network",
+    ]);
+  });
+
+  it("orders events within a group by when they were initiated", () => {
+    const g = fold().groups.find((x) => x.kind === "network")!;
+    expect(g.events.map((e) => e.initiatedTs)).toEqual([
+      1785356285501, 1785356285900, 1785356286200,
+    ]);
+  });
+
+  it("flags a group that contains an anomaly", () => {
+    const groups = fold().groups;
+    // network holds the 502, console holds the error.
+    expect(groups.find((g) => g.kind === "network")!.hasAnomaly).toBe(true);
+    expect(groups.find((g) => g.kind === "console")!.hasAnomaly).toBe(true);
+    // All-200 network is not flagged.
+    const clean = fold('{"ts":1,"kind":"response","status":200}');
+    expect(clean.groups[0].hasAnomaly).toBe(false);
+  });
+
+  it("resolves the step name onto each row, falling back to the id", () => {
+    // Attribution is kept; it just moved off the grouping axis.
+    const g = fold().groups.find((x) => x.kind === "network")!;
+    expect(g.events[0].stepName).toBe("Navigate to /web/login");
+    const unknown = fold('{"ts":1,"kind":"response","status":200,"step_id":"s99"}');
+    expect(unknown.groups[0].events[0].stepName).toBe("s99");
+  });
+
+  it("leaves an unattributed event's step name null rather than guessing", () => {
+    const b = fold('{"ts":1,"kind":"pageerror","message":"boom"}');
+    expect(b.groups[0].events[0].stepName).toBeNull();
+  });
+
+  it("counts each anomaly kind separately", () => {
+    expect(fold().counts).toMatchObject({
+      all: 4,
+      consoleErrors: 1,
+      nonNon2xx: 1,
+      pageErrors: 0,
+      requestsFailed: 0,
+    });
+  });
+
+  it("reports truncation from either the record or a truncation event", () => {
+    expect(fold().truncated).toBe(false);
+    expect(foldEvidenceBundle(parseEvidenceNdjson(NDJSON), STEP_DEFS, true).truncated).toBe(true);
+    expect(
+      foldEvidenceBundle(parseEvidenceNdjson('{"ts":1,"kind":"truncation"}'), STEP_DEFS).truncated,
+    ).toBe(true);
+  });
+});
+
+describe("EvidencePanel", () => {
+  // The panel no longer fetches; the composable does. It receives events.
+  //
+  // NDJSON's four lines all sit on s19, so a fifth on another step is added
+  // here — without it, "filtered to s19" and "the whole run" are the same set
+  // and the narrowing assertion below would pass on a broken filter.
+  const OTHER_STEP =
+    '{"ts":1785356287000,"kind":"response","method":"GET","url":"https://o2.example.dev/api/late","status":404,"initiated_ts":1785356286900,"first_party":true,"step_id":"fa1"}';
+
+  const named = () =>
+    parseEvidenceNdjson(`${NDJSON}\n${OTHER_STEP}`).map((e) => ({
+      ...e,
+      stepName: e.stepId ? STEP_DEFS.get(e.stepId)?.name || e.stepId : null,
+    }));
+
+  const mountPanel = (props: Record<string, unknown> = {}) =>
+    mount(EvidencePanel, {
+      props: {
+        evidenceKey: "synthetics/org/mon/RUN/EXEC/attempt-1-evidence.ndjson",
+        resolveUrl: (k: string) => `/artifact?key=${k}`,
+        stepDefs: STEP_DEFS,
+        events: named(),
+        status: "ready",
+        error: null,
+        truncated: false,
+        stepFilter: null,
+        stepFilterName: "",
+        ...props,
+      },
+      global: { plugins: [i18n] },
+    });
+
+  it("renders a section per kind", () => {
+    const w = mountPanel();
+    expect(w.find('[data-test="synthetics-evidence-panel"]').exists()).toBe(true);
+    expect(w.find('[data-test="synthetics-evidence-group-network"]').exists()).toBe(true);
+    expect(w.find('[data-test="synthetics-evidence-group-console"]').exists()).toBe(true);
+    // No page errors in this bundle, so no empty section header for them.
+    expect(w.find('[data-test="synthetics-evidence-group-pageErrors"]').exists()).toBe(false);
+  });
+
+  it("shows which step each row belongs to", () => {
+    const w = mountPanel();
+    expect(w.find('[data-test="synthetics-evidence-events-step"]').text()).toContain(
+      "Navigate to /web/login",
+    );
+  });
+
+  it("keeps zero-count chips visible rather than hiding them", () => {
+    const w = mountPanel();
+    // A hidden zero is indistinguishable from a chip that does not exist, and
+    // "no page errors" is information.
+    expect(w.find('[data-test="synthetics-evidence-chip-pageErrors"]').exists()).toBe(true);
+    expect(w.find('[data-test="synthetics-evidence-chip-pageErrors"]').text()).toContain("0");
+  });
+
+  it("narrows both the rows and the chip counts to the filtered step", () => {
+    // A chip that counts the whole run while the list shows one step is a lie.
+    const all = mountPanel();
+    const scoped = mountPanel({ stepFilter: "s19", stepFilterName: "Navigate to /web/login" });
+    expect(scoped.find('[data-test="synthetics-evidence-chip-all"]').text()).not.toBe(
+      all.find('[data-test="synthetics-evidence-chip-all"]').text(),
+    );
+    expect(scoped.find('[data-test="synthetics-evidence-step-filter"]').text()).toContain(
+      "Navigate to /web/login",
+    );
+  });
+
+  it("clears the step filter on request", async () => {
+    const w = mountPanel({ stepFilter: "s19", stepFilterName: "Navigate to /web/login" });
+    await w.find('[data-test="synthetics-evidence-clear-step-filter-btn"]').trigger("click");
+    expect(w.emitted("clear-step-filter")).toBeTruthy();
+  });
+
+  it("shows no step-filter banner when unfiltered", () => {
+    expect(mountPanel().find('[data-test="synthetics-evidence-step-filter"]').exists()).toBe(false);
+  });
+
+  it("reports a failed load instead of rendering a quiet run", () => {
+    const w = mountPanel({ status: "error", error: "403 Forbidden", events: [] });
+    expect(w.find('[data-test="synthetics-evidence-error"]').text()).toContain("403");
+  });
+
+  it("asks the owner to retry rather than refetching itself", async () => {
+    const w = mountPanel({ status: "error", error: "403 Forbidden", events: [] });
+    await w.find('[data-test="synthetics-evidence-retry-btn"]').trigger("click");
+    expect(w.emitted("retry")).toBeTruthy();
+  });
+
+  it("distinguishes capture-off from not-kept from absent", () => {
+    const off = mountPanel({ evidenceKey: null, captureOff: true });
+    expect(off.find('[data-test="synthetics-evidence-empty"]').text()).toContain("capture is off");
+
+    const passed = mountPanel({ evidenceKey: null, runPassed: true });
+    expect(passed.find('[data-test="synthetics-evidence-empty"]').text()).toContain(
+      "failed runs only",
+    );
+
+    const none = mountPanel({ evidenceKey: null });
+    expect(none.find('[data-test="synthetics-evidence-empty"]').text()).toContain(
+      "No evidence bundle",
+    );
+  });
+
+  it("states truncation rather than showing a quietly short list", () => {
+    const w = mountPanel({ truncated: true });
+    expect(w.find('[data-test="synthetics-evidence-truncated"]').exists()).toBe(true);
+  });
+
+  it("labels the download as NDJSON", () => {
+    const w = mountPanel();
+    expect(w.find('[data-test="synthetics-evidence-download"]').text()).toContain(".ndjson");
+  });
+});
+
+describe("EvidencePanel filter chips", () => {
+  const named = () =>
+    parseEvidenceNdjson(NDJSON).map((e) => ({
+      ...e,
+      stepName: e.stepId ? STEP_DEFS.get(e.stepId)?.name || e.stepId : null,
+    }));
+
+  const mountPanel = () =>
+    mount(EvidencePanel, {
+      props: {
+        evidenceKey: "k",
+        resolveUrl: (k: string) => k,
+        stepDefs: STEP_DEFS,
+        events: named(),
+        status: "ready",
+        error: null,
+      },
+      global: { plugins: [i18n] },
+    });
+
+  it("narrows the list when a chip is chosen", async () => {
+    const w = mountPanel();
+    await w.find('[data-test="synthetics-evidence-chip-consoleErrors"]').trigger("click");
+    await w.vm.$nextTick();
+    // The console group survives the filter; the network group does not.
+    expect(w.find('[data-test="synthetics-evidence-group-console"]').exists()).toBe(true);
+    expect(w.find('[data-test="synthetics-evidence-group-network"]').exists()).toBe(false);
+  });
+
+  it("keeps the selection when the active chip is clicked again", async () => {
+    // Swapping the bare buttons for OToggleGroup put a deselect-on-reclick
+    // behaviour within reach. It does not fire here, and it must not start to:
+    // an empty filter would blank the chip row and silently show everything,
+    // a state the old buttons could never reach.
+    const w = mountPanel();
+    const chip = '[data-test="synthetics-evidence-chip-consoleErrors"]';
+    await w.find(chip).trigger("click");
+    await w.vm.$nextTick();
+    await w.find(chip).trigger("click");
+    await w.vm.$nextTick();
+    expect(w.find('[data-test="synthetics-evidence-group-console"]').exists()).toBe(true);
+    expect(w.find('[data-test="synthetics-evidence-group-network"]').exists()).toBe(false);
+  });
+
+  it("returns to the whole run when All is chosen", async () => {
+    const w = mountPanel();
+    await w.find('[data-test="synthetics-evidence-chip-consoleErrors"]').trigger("click");
+    await w.vm.$nextTick();
+    await w.find('[data-test="synthetics-evidence-chip-all"]').trigger("click");
+    await w.vm.$nextTick();
+    expect(w.find('[data-test="synthetics-evidence-group-network"]').exists()).toBe(true);
+  });
+});

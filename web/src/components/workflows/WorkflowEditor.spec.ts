@@ -121,10 +121,15 @@ const globalStubs = {
   ConfirmDialog: ConfirmDialogStub,
   OPageHeader: {
     name: "OPageHeader",
-    props: ["title", "back"],
+    props: ["title", "subtitle", "back"],
+    // The name and mode/description now live in the #title and #subtitle slots
+    // (inline-edited), not in a `title` prop — render both so the OInlineEdit
+    // controls under test actually mount.
     template:
       '<div class="app-page-header" :data-title="title">' +
       '<button class="header-back" @click="back && back.onClick()" />' +
+      '<div class="header-title"><slot name="title" /></div>' +
+      '<div class="header-subtitle"><slot name="subtitle" /></div>' +
       '<slot name="title-trail" /><slot name="actions" /></div>',
   },
   OButton: {
@@ -173,7 +178,6 @@ const placeTrigger = (id = "t1") => {
 };
 const dialogByTitle = (w: any, title: string) =>
   w.findAllComponents(ConfirmDialogStub).find((d: any) => d.props("title") === title)!;
-const saveTestDialog = (w: any) => dialogByTitle(w, t("workflow.test.saveToTestTitle"));
 const deleteDialog = (w: any) => dialogByTitle(w, t("workflow.deleteNodeTitle"));
 const palette = (w: any) => w.findComponent({ name: "NodePalette" });
 
@@ -319,7 +323,9 @@ describe("WorkflowEditor", () => {
       await flushPromises();
       workflowObj.nameError = true;
 
-      await wrapper.find('[data-test="workflow-editor-name"]').setValue("wf-a");
+      // The name is an inline-edited title: click to open the editor, then type.
+      await wrapper.find('[data-test="workflow-editor-name-trigger"]').trigger("click");
+      await wrapper.find('[data-test="workflow-editor-name-input"]').setValue("wf-a");
 
       expect(wf().name).toBe("wf-a");
       expect(workflowObj.nameError).toBe(false);
@@ -328,7 +334,8 @@ describe("WorkflowEditor", () => {
     it("binds the description input", async () => {
       wrapper = mountEditor();
       await flushPromises();
-      await wrapper.find('[data-test="workflow-editor-description"]').setValue("d");
+      await wrapper.find('[data-test="workflow-editor-description-trigger"]').trigger("click");
+      await wrapper.find('[data-test="workflow-editor-description-input"]').setValue("d");
       expect(wf().description).toBe("d");
     });
   });
@@ -417,19 +424,25 @@ describe("WorkflowEditor", () => {
       wrapper = mountEditor();
       await flushPromises();
 
-      expect(wrapper.find(".app-page-header").attributes("data-title")).toBe("my workflow");
-      expect(wrapper.find('[data-test="workflow-editor-name"]').exists()).toBe(false);
+      // Edit mode is readonly: the name shows as plain heading text (a -value
+      // span), with no click-to-edit trigger and no input.
+      expect(wrapper.find('[data-test="workflow-editor-name-value"]').text()).toBe("my workflow");
+      expect(wrapper.find('[data-test="workflow-editor-name-trigger"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="workflow-editor-name-input"]').exists()).toBe(false);
       expect(wrapper.find('[data-test="workflow-editor-history"]').exists()).toBe(true);
     });
 
-    it("falls back to the module title when the saved workflow has no name", async () => {
+    it("shows the name placeholder when the saved workflow has no name", async () => {
       hydrateWorkflow(savedGraph({ name: "" }));
       mockRouter.currentRoute.value = { query: { id: "wf-1" } };
 
       wrapper = mountEditor();
       await flushPromises();
 
-      expect(wrapper.find(".app-page-header").attributes("data-title")).toBe(t("workflow.header"));
+      // A nameless workflow still renders a readonly title — the placeholder.
+      expect(wrapper.find('[data-test="workflow-editor-name-value"]').text()).toBe(
+        t("workflow.namePlaceholder"),
+      );
     });
   });
 
@@ -1114,18 +1127,28 @@ describe("WorkflowEditor", () => {
       await flushPromises();
     };
 
-    it("prompts to save first when the workflow has never been saved", async () => {
+    // Test now dry-runs the whole in-memory graph (sent in the request), so it
+    // opens the Test dialog directly whether the workflow is brand-new, has
+    // unsaved edits, or is a clean saved workflow — there is no save-first prompt.
+    // It still requires a runnable graph though: trigger + a connected step.
+    it("opens the Test dialog directly for a never-saved (but connected) graph", async () => {
+      // A create draft (no route id): mount runs startNewWorkflow(), then we build
+      // a valid graph on the canvas before testing.
       wrapper = mountEditor();
       await flushPromises();
+      hydrateWorkflow(savedGraph({ id: "", name: "" }));
+      await nextTick();
 
       await clickTest(wrapper);
 
-      expect(saveTestDialog(wrapper).props("modelValue")).toBe(true);
-      expect(workflowObj.testRun.show).toBe(false);
-      expect(wrapper.find('[data-test="WorkflowTestDialog"]').exists()).toBe(false);
+      expect(workflowObj.testRun.show).toBe(true);
+      expect(wrapper.find('[data-test="WorkflowTestDialog"]').exists()).toBe(true);
+      // No persistence happens just by opening Test.
+      expect(createWorkflow).not.toHaveBeenCalled();
+      expect(updateWorkflow).not.toHaveBeenCalled();
     });
 
-    it("prompts to save first when there are unsaved edits", async () => {
+    it("opens the Test dialog directly when there are unsaved edits", async () => {
       hydrateWorkflow(savedGraph());
       mockRouter.currentRoute.value = { query: { id: "wf-1" } };
       wrapper = mountEditor();
@@ -1134,8 +1157,8 @@ describe("WorkflowEditor", () => {
 
       await clickTest(wrapper);
 
-      expect(saveTestDialog(wrapper).props("modelValue")).toBe(true);
-      expect(workflowObj.testRun.show).toBe(false);
+      expect(workflowObj.testRun.show).toBe(true);
+      expect(updateWorkflow).not.toHaveBeenCalled();
     });
 
     it("opens the Test dialog directly for a clean saved workflow", async () => {
@@ -1148,61 +1171,55 @@ describe("WorkflowEditor", () => {
 
       expect(workflowObj.testRun.show).toBe(true);
       expect(wrapper.find('[data-test="WorkflowTestDialog"]').exists()).toBe(true);
-      expect(saveTestDialog(wrapper).props("modelValue")).toBe(false);
     });
 
-    it("saves then opens the Test dialog on Save & Test", async () => {
-      hydrateWorkflow(savedGraph());
-      mockRouter.currentRoute.value = { query: { id: "wf-1" } };
+    // A draft doesn't need a name to test, but it does need to be runnable: a
+    // trigger plus at least one connected step, no orphan nodes.
+    it("blocks Test with a warning when the graph has only a trigger (no step)", async () => {
       wrapper = mountEditor();
       await flushPromises();
-      workflowObj.dirtyFlag = true;
+      placeTrigger();
+      await nextTick();
+
       await clickTest(wrapper);
-
-      saveTestDialog(wrapper).vm.$emit("update:ok");
-      await flushPromises();
-
-      expect(updateWorkflow).toHaveBeenCalledTimes(1);
-      expect(workflowObj.testRun.show).toBe(true);
-      expect(saveTestDialog(wrapper).props("modelValue")).toBe(false);
-    });
-
-    it("does not open the Test dialog when the Save & Test save fails", async () => {
-      hydrateWorkflow(savedGraph());
-      mockRouter.currentRoute.value = { query: { id: "wf-1" } };
-      updateWorkflow.mockRejectedValue(new Error("nope"));
-      wrapper = mountEditor();
-      await flushPromises();
-      workflowObj.dirtyFlag = true;
-      await clickTest(wrapper);
-
-      saveTestDialog(wrapper).vm.$emit("update:ok");
-      await flushPromises();
 
       expect(workflowObj.testRun.show).toBe(false);
+      expect(wrapper.find('[data-test="WorkflowTestDialog"]').exists()).toBe(false);
+      expect(mockToast).toHaveBeenCalledWith({
+        message: t("workflow.addStepRequired"),
+        variant: "warning",
+      });
     });
 
-    it("dismisses the Save & Test prompt on cancel", async () => {
+    it("blocks Test with a warning when a node is left unconnected (orphan)", async () => {
+      // trigger + a destination that has NO incoming edge -> orphan.
       wrapper = mountEditor();
       await flushPromises();
-      await clickTest(wrapper);
-
-      saveTestDialog(wrapper).vm.$emit("update:cancel");
+      hydrateWorkflow(savedGraph({ id: "", name: "", edges: [] }));
       await nextTick();
 
-      expect(saveTestDialog(wrapper).props("modelValue")).toBe(false);
-      expect(createWorkflow).not.toHaveBeenCalled();
+      await clickTest(wrapper);
+
+      expect(workflowObj.testRun.show).toBe(false);
+      expect(mockToast).toHaveBeenCalledWith({
+        message: t("workflow.connectAllNodes"),
+        variant: "warning",
+      });
     });
 
-    it("dismisses the Save & Test prompt when the dialog closes itself (v-model)", async () => {
+    it("does not require a name to test a connected draft", async () => {
       wrapper = mountEditor();
       await flushPromises();
-      await clickTest(wrapper);
-
-      saveTestDialog(wrapper).vm.$emit("update:modelValue", false);
+      hydrateWorkflow(savedGraph({ id: "", name: "" }));
       await nextTick();
 
-      expect(saveTestDialog(wrapper).props("modelValue")).toBe(false);
+      await clickTest(wrapper);
+
+      expect(workflowObj.testRun.show).toBe(true);
+      // no name warning was raised
+      expect(mockToast).not.toHaveBeenCalledWith(
+        expect.objectContaining({ message: t("workflow.nameRequired") }),
+      );
     });
 
     it("renders the per-step result drawer when a node's badge opens it", async () => {

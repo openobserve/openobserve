@@ -77,6 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :monitor-status="monitorStatus"
         :last-triggered-at="lastTriggeredAt"
         :check-type="checkType"
+        :retries="retries"
         @edit="editMonitor"
         @open-run="openRunDetail"
         @refresh="refresh"
@@ -152,6 +153,9 @@ const orgIdentifier = computed(() => store.state.selectedOrganization?.identifie
 // and distinguishes "never triggered" from "no runs in this window."
 const lastTriggeredAt = ref(0);
 const checkType = ref("browser");
+/** The check's configured retry count. 0 means nothing can ever be observed as
+ *  flaky, so the flakiness tiles have no answer to give rather than a zero. */
+const retries = ref(0);
 // True once fetchCheck() resolves — the drawer can auto-open from a run/exec
 // query param before that happens, so RunDetail must not trust checkType's
 // "browser" default until it's confirmed.
@@ -386,6 +390,8 @@ async function fetchCheck() {
     if (res?.data) {
       lastTriggeredAt.value = Number(res.data.last_triggered_at) || 0;
       checkType.value = res.data.type ?? "browser";
+      // The flaky tiles are only answerable when the check is allowed to retry.
+      retries.value = Number(res.data.retries ?? res.data.settings?.retries ?? 0) || 0;
     }
   } catch (err: any) {
     if (err?.response?.status === 404) {

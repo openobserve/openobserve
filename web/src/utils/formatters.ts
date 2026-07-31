@@ -125,6 +125,25 @@ export const formatLargeNumber = (number: number) => {
   }
 };
 
+/**
+ * Compact record/event count, as shown on the Home → Usage tiles: exact below
+ * 100 000, then K/M/B/T with one decimal ("2.9B"). Shared so every surface that
+ * prints an event count prints the SAME string — Home and the Streams page must
+ * not disagree about the size of the same number.
+ */
+export const formatEventCount = (num: number): string => {
+  if (!Number.isFinite(num)) return "";
+  if (num < 100000) return num.toString();
+
+  const units = ["", "K", "M", "B", "T"];
+  let tier = Math.floor(Math.log10(num) / 3);
+
+  if (tier >= units.length) tier = units.length - 1;
+
+  const scaled = num / Math.pow(10, tier * 3);
+  return scaled.toFixed(1).replace(/\.0$/, "") + units[tier];
+};
+
 export const formatSizeFromMB = (sizeInMB: string | number) => {
   let size = parseFloat(String(sizeInMB));
 

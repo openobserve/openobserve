@@ -25,9 +25,16 @@ use axum::{
 };
 use config::get_config;
 use openobserve_api_common::X_O2_ASSISTANT_SESSION_ID;
+use openobserve_api_ingest::request::{clusters, logs, metrics, rum};
+#[cfg(feature = "cloud")]
+use openobserve_api_management::request::cloud;
+#[cfg(feature = "profiling")]
+use openobserve_api_management::request::profiling;
 use openobserve_api_management::request::{
-    alerts, authz, dashboards, folders, organization, users,
+    alerts, authz, dashboards, folders, kv, model_pricing, organization, service_accounts,
+    short_url, sourcemaps, status, stream, users,
 };
+use openobserve_api_pipelines::request::{enrichment_table, functions, pipeline, pipelines};
 use openobserve_api_search::{promql, search, traces};
 use openobserve_core::auth::AuthExtractor;
 use tower_http::{
@@ -46,9 +53,17 @@ use {
         auditor::{AuditMessage, Protocol, ResponseMeta},
         config::get_config as get_o2_config,
     },
+    openobserve_api_management::request::{
+        actions, ai, anomaly_detection, domain_management, eval_jobs, gen_ai, keys, license,
+        providers, score_configs, scorers, service_streams, synthetics, workflows,
+    },
+    openobserve_api_pipelines::request::re_pattern,
+    openobserve_api_search::search::patterns,
 };
 
-use super::request::*;
+use super::request::mcp;
+#[cfg(feature = "enterprise")]
+use super::request::ratelimit;
 use crate::{
     common::meta::{middleware_data::RumExtraData, proxy::PathParamProxyURL},
     handler::http::{
@@ -64,7 +79,7 @@ pub mod decompression;
 pub mod middlewares;
 pub mod openapi;
 
-pub use common::meta::http::ERROR_HEADER;
+use common::meta::http::ERROR_HEADER;
 
 /// Create CORS layer for axum
 pub fn cors_layer() -> CorsLayer {
@@ -829,6 +844,12 @@ pub fn service_routes() -> Router {
         .route("/v2/{org_id}/reports/{report_id}/enable", patch(dashboards::reports::enable_report_v2))
         .route("/v2/{org_id}/reports/{report_id}/trigger", put(dashboards::reports::trigger_report_v2))
 
+        // TODO(slo): the SLO routes are deferred and deliberately absent —
+        // spelling them out even in a comment would make the enterprise
+        // coverage test demand ROUTE_PERMISSIONS entries for them, since it
+        // scans this file's text. The handlers still live in
+        // `request::slos`; restore both sides together.
+
         // Folders (v2)
         .route("/v2/{org_id}/folders/{folder_type}", get(folders::list_folders).post(folders::create_folder))
         .route("/v2/{org_id}/folders/{folder_type}/{folder_id}", get(folders::get_folder).put(folders::update_folder).delete(folders::delete_folder))
@@ -837,6 +858,8 @@ pub fn service_routes() -> Router {
         // Alerts (v2)
         .route("/v2/{org_id}/alerts", get(alerts::list_alerts).post(alerts::create_alert))
         .route("/v2/{org_id}/alerts/{alert_id}", get(alerts::get_alert).put(alerts::update_alert).delete(alerts::delete_alert))
+        .route("/v2/{org_id}/alerts/{alert_id}/groups", get(alerts::list_alert_groups))
+        .route("/v2/{org_id}/alerts/{alert_id}/groups/transitions", get(alerts::list_alert_group_transitions))
         .route("/v2/{org_id}/alerts/{alert_id}/export", post(alerts::export_alert))
         .route("/v2/{org_id}/alerts/bulk", delete(alerts::delete_alert_bulk))
         .route("/v2/{org_id}/alerts/{alert_id}/enable", patch(alerts::enable_alert))
@@ -846,6 +869,7 @@ pub fn service_routes() -> Router {
         .route("/v2/{org_id}/alerts/{alert_id}/clone", post(alerts::clone_alert))
         .route("/v2/{org_id}/alerts/generate_sql", post(alerts::generate_sql))
         .route("/v2/{org_id}/alerts/move", patch(alerts::move_alerts))
+        .route("/v2/{org_id}/alerts/tags", get(alerts::list_alert_tags))
         .route("/v2/{org_id}/alerts/history", get(alerts::history::get_alert_history))
         .route("/v2/{org_id}/alerts/dedup/summary", get(alerts::dedup_stats::get_dedup_summary))
 
@@ -958,7 +982,7 @@ pub fn service_routes() -> Router {
             .route("/{org_id}/settings/gen_ai/agent_registry", delete(gen_ai::clear_agent_registry))
             .route("/{org_id}/gen_ai/agents", get(gen_ai::list_scored_agents));
 
-        if get_o2_config().common.online_evals_enabled {
+        if get_o2_config().llm_eval_config.enabled {
             router = router
                 // LLM Providers (Online Eval Phase 2)
                 .route("/{org_id}/providers", get(providers::list_providers).post(providers::create_provider))
@@ -1082,9 +1106,10 @@ pub fn service_routes() -> Router {
                     "/{org_id}/workflows/{id}",
                     delete(workflows::delete_workflows).put(workflows::update_workflows),
                 )
+                .route("/{org_id}/workflows/test", post(workflows::test_workflow))
                 .route(
-                    "/{org_id}/workflows/{id}/test",
-                    post(workflows::test_workflow),
+                    "/{org_id}/workflows/{id}/trigger",
+                    post(workflows::trigger_workflow),
                 )
                 .route(
                     "/{org_id}/workflows/{id}/history",
@@ -1329,7 +1354,7 @@ pub fn other_service_routes() -> Router {
 }
 
 /// Create the full application router
-pub fn create_app_router(ui_routes: fn() -> Router) -> Router {
+pub fn create_app_router(ui_routes: fn(&str) -> Router) -> Router {
     let cfg = get_config();
 
     let mut app = if config::cluster::LOCAL_NODE.is_router() {
@@ -1368,13 +1393,16 @@ pub fn create_app_router(ui_routes: fn() -> Router) -> Router {
     let web_path = format!("{}/web/", cfg.common.base_uri);
     // Add UI routes at app level (outside basic_routes to avoid any middleware conflicts)
     if cfg.common.ui_enabled {
+        // `web_path` is also the `<base href>` the UI needs; resolve it here so the
+        // web crate does not have to depend on `config`.
+        let ui = ui_routes(&web_path);
         let web_path = web_path.clone();
         app = app
             .route(
                 "/",
                 get(move || core::future::ready(axum::response::Redirect::permanent(&web_path))),
             )
-            .nest_service("/web", ui_routes());
+            .nest_service("/web", ui);
     }
 
     // Set request body size limit (equivalent to actix-web's PayloadConfig)

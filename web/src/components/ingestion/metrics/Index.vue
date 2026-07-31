@@ -55,6 +55,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         label="Nightingale"
       />
       <ORouteTab
+        name="categraf"
+        data-test="ingestion-metrics-tab-categraf"
+        :to="{
+          name: 'categraf',
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        }"
+        :icon="'img:' + getImageURL('images/ingestion/categraf.png')"
+        label="Categraf"
+      />
+      <ORouteTab
         name="otelCollector"
         :to="{
           name: 'otelCollector',
@@ -148,6 +160,7 @@ export default defineComponent({
         "prometheus",
         "vmagent",
         "nightingale",
+        "categraf",
         "otelCollector",
         "telegraf",
         "cloudwatchMetrics",

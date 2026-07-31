@@ -1106,15 +1106,26 @@ async fn process_ack(
         key: format!("{}/{}", resp.synthetics_name, resp.synthetics_id),
         start_time: checked_at,
         end_time: checked_at,
-        status: config::meta::self_reporting::usage::TriggerDataStatus::Completed,
+        status: config::meta::self_reporting::usage::RunOutcome::Succeeded,
         success_response: Some(status.clone()),
         error: error.clone(),
         evaluation_took_in_secs: Some(response_time_ms / 1000.0),
         ..Default::default()
     });
 
-    // Notify once per run, not once per job ack.
-    if resp.run_complete && !resp.destinations.is_empty() {
+    // Notify once per run, not once per job ack — and only when the check's own
+    // `alert_if_fails` / `cooldown_mins` settings say so. This used to fire on
+    // every completed run that had a destination, which is why `alert_if_fails:
+    // 3` alerted on the first failure and a 30-minute cooldown sent thirty
+    // notifications.
+    use o2_enterprise::enterprise::synthetics::job_api::AlertDecision;
+    let recovery = matches!(resp.alert, AlertDecision::Recovered);
+    let flaky = matches!(resp.alert, AlertDecision::Flaky);
+    // A degrading target is `warning` on every run for as long as the condition
+    // lasts, so this one is throttled by transition upstream, not by cooldown.
+    let degraded = matches!(resp.alert, AlertDecision::Degraded);
+    let should_notify = !matches!(resp.alert, AlertDecision::Silent);
+    if should_notify && !resp.destinations.is_empty() {
         let notification = openobserve_core::synthetics::CheckNotification {
             org_id: resp.org_id.clone(),
             monitor_name: resp.synthetics_name.clone(),
@@ -1127,6 +1138,12 @@ async fn process_ack(
             job_count: resp.job_count as i64,
             error: error.clone(),
             checked_at,
+            recovery,
+            consecutive_failures: resp.consecutive_failures,
+            flaky,
+            degraded,
+            status_reason: resp.status_reason.clone(),
+            failing_locations: resp.failing_locations.clone(),
         };
         tokio::spawn(async move {
             openobserve_core::synthetics::notify_check_result(notification).await;

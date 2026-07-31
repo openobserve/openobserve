@@ -780,18 +780,46 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <OSpinner size="md" />
                     </div>
 
-                    <TenstackTable
+                    <OTable
                       v-else-if="expandState.output && rows.length > 0 && tab == 'sql'"
                       style="height: calc(100vh - 190px) !important"
                       ref="searchTableRef"
                       :columns="getColumns"
-                      :rows="rows"
-                      :jsonpreviewStreamName="selectedStreamName"
-                      :expandedRows="expandedLogs"
-                      @expand-row="expandLog"
-                      @copy="copyLogToClipboard"
-                      @sendToAiChat="sendToAiChat"
-                    />
+                      :data="rows"
+                      row-key="_timestamp"
+                      :default-columns="false"
+                      :row-height="28"
+                      :show-global-filter="false"
+                      pagination="none"
+                      :enable-cell-copy="true"
+                      expansion="multiple"
+                      :expand-on-row-click="true"
+                      data-test="scheduled-pipeline-sql-preview-table"
+                    >
+                      <template #cell-source="{ row }">
+                        <span class="font-mono text-xs">{{ JSON.stringify(row) }}</span>
+                      </template>
+                      <template #cell-hover-actions="{ row, column, active }">
+                        <O2AIContextAddBtn
+                          v-if="active && column.id === '_timestamp'"
+                          data-test="scheduled-pipeline-send-to-ai-btn"
+                          @send-to-ai-chat="sendToAiChat(JSON.stringify(row), true)"
+                        />
+                      </template>
+                      <template #expansion="{ row }">
+                        <JsonPreview
+                          :value="row"
+                          show-copy-button
+                          class="py-1.5"
+                          mode="expanded"
+                          :stream-name="selectedStreamName"
+                          :hide-view-related="true"
+                          :hide-search-term-actions="true"
+                          @copy="copyLogToClipboard"
+                          @send-to-ai-chat="sendToAiChat"
+                        />
+                      </template>
+                    </OTable>
 
                     <div
                       v-else-if="rows.length == 0 && expandState.output && tab == 'sql'"
@@ -952,7 +980,9 @@ import {
   type FieldGroupingConfig,
 } from "@/composables/useServiceCorrelation";
 
-import TenstackTable from "@/plugins/logs/TenstackTable.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
+import JsonPreview from "@/plugins/logs/JsonPreview.vue";
+import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
 import PreviewPromqlQuery from "./PreviewPromqlQuery.vue";
 
 import config from "../../../aws-exports";

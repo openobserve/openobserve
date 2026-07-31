@@ -41,6 +41,7 @@ import {
 import {
   buildPresenceQuery,
   computeRateWindow,
+  computePercentileWindow,
   computeStepSeconds,
   DEFAULT_SCRAPE_INTERVAL_SECONDS,
   getMetricDefaults,
@@ -956,14 +957,14 @@ export function useMetricsExplorerGrid() {
   const effectiveVariant = (
     card: MetricCard,
     points = pointsFor(card),
-    opts?: { applyNanGuard?: boolean; rateWindow?: string },
+    opts?: { applyNanGuard?: boolean; rateWindow?: string; percentileWindow?: string },
   ) => {
     const epoch = variantEpoch.value;
     if (epoch !== cachedEpoch) {
       variantCache.clear();
       cachedEpoch = epoch;
     }
-    const cacheKey = `${card.name}|${points}|${opts?.applyNanGuard ? 1 : 0}|${opts?.rateWindow ?? ""}`;
+    const cacheKey = `${card.name}|${points}|${opts?.applyNanGuard ? 1 : 0}|${opts?.rateWindow ?? ""}|${opts?.percentileWindow ?? ""}`;
     const hit = variantCache.get(cacheKey);
     if (hit) return hit;
 
@@ -990,6 +991,11 @@ export function useMetricsExplorerGrid() {
         rateWindow:
           opts?.rateWindow ??
           computeRateWindow(rangeSeconds.value, points, scrapeIntervalSeconds.value),
+        // Wider than the rate window on purpose — a quantile needs samples, not
+        // just two points. See `computePercentileWindow`.
+        percentileWindow:
+          opts?.percentileWindow ??
+          computePercentileWindow(rangeSeconds.value, points, scrapeIntervalSeconds.value),
         labels: card.labels ?? labelsByStream.value[card.name],
         applyNanGuard: opts?.applyNanGuard,
       },

@@ -171,7 +171,6 @@ describe("VariableQueryValueSelector", () => {
         if (qSelect.exists()) {
           expect(qSelect.props("multiple")).toBe(true);
         } else {
-          // If QSelect stub not found, verify the multiSelect prop was passed to component
           expect(wrapper.props("variableItem").multiSelect).toBe(true);
         }
       }
@@ -1055,7 +1054,6 @@ describe("VariableQueryValueSelector", () => {
         },
         global: {
           plugins: [],
-          stubs: ["QSelect", "QItem", "QItemSection", "QItemLabel", "QCheckbox", "QSeparator"],
         },
       });
       expect(wrapper.exists()).toBe(true);

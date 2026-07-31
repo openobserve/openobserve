@@ -1344,8 +1344,8 @@ async fn process_llm_evaluation_node(
         return count;
     }
     if !o2_enterprise::enterprise::common::config::get_config()
-        .common
-        .online_evals_enabled
+        .llm_eval_config
+        .enabled
     {
         log::warn!(
             "[Pipeline] {} [inv={inv_id}]: LLM evaluation node {} skipped because online evals are disabled",
@@ -2345,6 +2345,10 @@ async fn process_destination_node(
     let mut data = Vec::new();
     while let Some(pipeline_item) = channels.receiver.recv().await {
         data.push(std::sync::Arc::new(pipeline_item.record));
+    }
+
+    if data.is_empty() {
+        return Ok(0);
     }
 
     let data_count = data.len();

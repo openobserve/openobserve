@@ -143,7 +143,7 @@ const alignClassFor = (col: Column<any, any>): string => {
       }"
     >
       <!-- Expand chevron placeholder — matches OTableBodyRow exactly -->
-      <td v-if="expansionEnabled" class="w-4 min-w-4 px-0 text-center align-middle" />
+      <td v-if="expansionEnabled" class="w-6 max-w-6 min-w-6 px-0 text-center align-middle" />
 
       <!-- Selection checkbox placeholder — matches OTableBodyRow exactly -->
       <td

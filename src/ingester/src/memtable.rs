@@ -29,6 +29,7 @@ use crate::{
     ReadRecordBatchEntry,
     entry::{Entry, PersistStat, RecordBatchEntry},
     errors::Result,
+    pack::PackWriter,
     stream::Stream,
 };
 
@@ -100,6 +101,7 @@ impl MemTable {
         idx: usize,
         org_id: &str,
         stream_type: &str,
+        mut pack: Option<&mut PackWriter>,
     ) -> Result<(usize, Vec<(PathBuf, PersistStat)>)> {
         let mut schema_size = 0;
         let mut paths = Vec::with_capacity(self.streams.len());
@@ -111,7 +113,14 @@ impl MemTable {
                 (org_id, stream_name.as_ref())
             };
             let (part_schema_size, partitions) = stream
-                .persist(id, idx, org_id, stream_type, stream_name)
+                .persist(
+                    id,
+                    idx,
+                    org_id,
+                    stream_type,
+                    stream_name,
+                    pack.as_deref_mut(),
+                )
                 .await?;
             schema_size += part_schema_size;
             paths.extend(partitions);

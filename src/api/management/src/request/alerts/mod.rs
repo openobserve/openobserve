@@ -21,6 +21,7 @@ use axum::{
     http::StatusCode,
     response::Response,
 };
+use axum_extra::extract::Query as ExtraQuery;
 use config::meta::{
     alerts::alert::{Alert as MetaAlert, AlertTypeFilter},
     triggers::{Trigger, TriggerModule},
@@ -57,9 +58,10 @@ use crate::{
             UpdateAlertRequestBody,
         },
         responses::{
-            AlertBulkEnableResponse, EnableAlertResponseBody, GenerateSqlMetadata,
-            GenerateSqlResponseBody, GetAlertResponseBody, ListAlertsResponseBody,
-            ListAlertsResponseBodyItem,
+            AlertBulkEnableResponse, AlertGroupLabel, AlertGroupResponseItem,
+            AlertGroupTransitionItem, EnableAlertResponseBody, GenerateSqlMetadata,
+            GenerateSqlResponseBody, GetAlertResponseBody, ListAlertGroupTransitionsResponseBody,
+            ListAlertGroupsResponseBody, ListAlertsResponseBody, ListAlertsResponseBodyItem,
         },
     },
     request::{
@@ -184,10 +186,213 @@ async fn create_anomaly_alert(
             .filter(|f| !f.is_empty())
             .or_else(|| Some(query_folder_id.to_string()).filter(|f| !f.is_empty())),
         owner,
+        // Feature 2: anomaly configs take the same triage metadata as
+        // alerts, threaded from the shared request body.
+        priority: req_body.alert.priority,
+        tags: req_body.alert.tags,
     };
 
     match openobserve_core::anomaly_detection::create_config(org_id, req).await {
         Ok(v) => MetaHttpResponse::json(v),
+        // A bad tag is user input: the same 400 the alert save path gives.
+        Err(e)
+            if e.downcast_ref::<config::meta::alerts::tags::TagError>()
+                .is_some() =>
+        {
+            MetaHttpResponse::bad_request(e.to_string())
+        }
+        Err(e) => MetaHttpResponse::internal_error(e.to_string()),
+    }
+}
+
+/// Split a rendered `k=v,k=v` label string back into pairs.
+///
+/// Rendering is lossy where a value contains the separators, which is exactly
+/// why `group_key` — not this — is the identity. Splitting on the first `=`
+/// keeps `path=/a=b` intact, the common case; anything genuinely ambiguous
+/// still displays, it just may split oddly.
+fn parse_group_labels(rendered: Option<&str>) -> Vec<AlertGroupLabel> {
+    rendered
+        .unwrap_or("")
+        .split(',')
+        .filter(|s| !s.is_empty())
+        .filter_map(|pair| {
+            pair.split_once('=').map(|(name, value)| AlertGroupLabel {
+                name: name.to_string(),
+                value: value.to_string(),
+            })
+        })
+        .collect()
+}
+
+/// ListAlertGroups
+#[utoipa::path(
+    get,
+    path = "/v2/{org_id}/alerts/{alert_id}/groups",
+    context_path = "/api",
+    tag = "Alerts",
+    operation_id = "ListAlertGroups",
+    summary = "List a multi-alert's tracked groups",
+    description = "Returns the per-group state rows of a multi-alert, most severe first, with the pre-cap group counts needed to render 'N of M groups firing'. Empty for alerts that have not opted in to per-group evaluation.",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("alert_id" = String, Path, description = "Alert ID"),
+      ),
+    responses(
+        (status = 200, description = "Success",  content_type = "application/json", body = inline(ListAlertGroupsResponseBody)),
+        (status = 404, description = "NotFound", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "get"})),
+        ("x-o2-mcp" = json!({"description": "List the per-group states of a multi-alert", "category": "alerts"}))
+    )
+)]
+pub async fn list_alert_groups(Path((org_id, alert_id)): Path<(String, String)>) -> Response {
+    let Ok(ksuid) = Ksuid::from_str(&alert_id) else {
+        return MetaHttpResponse::not_found(format!("invalid alert id {alert_id}"));
+    };
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    // Resolve through the alert itself so this endpoint inherits the same
+    // org scoping and not-found behaviour as every other alert read — a raw
+    // state-table query would happily serve another org's group labels, which
+    // carry host and service names.
+    if let Err(e) = alert::get_by_id(client, &org_id, ksuid).await {
+        return e.into();
+    }
+
+    let mut groups = match infra::table::alert_states::list_groups(&alert_id).await {
+        Ok(g) => g,
+        Err(e) => return MetaHttpResponse::internal_error(e.to_string()),
+    };
+    // Most severe first (§5.4), then by key so equal levels keep a stable
+    // order across polls instead of shuffling on every refresh.
+    groups.sort_by(|a, b| {
+        let rank = |s: &config::meta::alerts::state::AlertState| {
+            s.level.map(|l| l.severity_rank()).unwrap_or(0)
+        };
+        rank(b)
+            .cmp(&rank(a))
+            .then_with(|| a.group_key.cmp(&b.group_key))
+    });
+
+    let rollup = infra::table::alert_states::get_rollups(std::slice::from_ref(&alert_id))
+        .await
+        .ok()
+        .and_then(|mut r| r.pop());
+    let groups_observed = rollup
+        .as_ref()
+        .and_then(|r| r.groups_observed)
+        .and_then(|n| i32::try_from(n).ok());
+    let group_cap = config::get_config().limit.alert_max_groups;
+
+    let list: Vec<AlertGroupResponseItem> = groups
+        .into_iter()
+        .map(|g| AlertGroupResponseItem {
+            labels: parse_group_labels(g.group_labels.as_deref()),
+            group_key: g.group_key,
+            group_labels: g.group_labels,
+            level: g.level.map(|l| l.to_string()),
+            level_since: g.level_since,
+            last_outcome: g.last_outcome.map(|o| o.to_string()),
+            last_outcome_at: g.last_outcome_at,
+            last_seen: g.last_seen,
+            silenced_until: g.silenced_until,
+            last_notified_level: g.last_notified_level.map(|l| l.to_string()),
+        })
+        .collect();
+
+    // Compare the PRE-cap observed total against the cap, not the length of
+    // `list`: the retained rows are post-cap, so they would report "cap of
+    // cap" and an overflowing alert would look identical to one that fit.
+    let capped =
+        group_cap > 0 && groups_observed.is_some_and(|observed| observed as usize > group_cap);
+
+    MetaHttpResponse::json(ListAlertGroupsResponseBody {
+        list,
+        groups_observed,
+        groups_firing: rollup
+            .as_ref()
+            .and_then(|r| r.groups_firing)
+            .and_then(|n| i32::try_from(n).ok()),
+        groups_observed_is_lower_bound: rollup
+            .as_ref()
+            .and_then(|r| r.groups_observed_is_lower_bound),
+        groups_firing_is_lower_bound: rollup.as_ref().and_then(|r| r.groups_firing_is_lower_bound),
+        capped,
+        group_cap,
+    })
+}
+
+/// ListAlertGroupTransitions
+#[utoipa::path(
+    get,
+    path = "/v2/{org_id}/alerts/{alert_id}/groups/transitions",
+    context_path = "/api",
+    tag = "Alerts",
+    operation_id = "ListAlertGroupTransitions",
+    summary = "Per-group state history for a multi-alert",
+    description = "Returns level/outcome transitions for a multi-alert, newest first, optionally scoped to one group (M-8). Reads the durable transitions table rather than the triggers stream, so history survives group reaping.",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("alert_id" = String, Path, description = "Alert ID"),
+        ("group_key" = Option<String>, Query, description = "Restrict to one group. Omit for every group."),
+        ("limit" = Option<u64>, Query, description = "Max rows (default 100, max 1000)"),
+      ),
+    responses(
+        (status = 200, description = "Success",  content_type = "application/json", body = inline(ListAlertGroupTransitionsResponseBody)),
+        (status = 404, description = "NotFound", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "get"})),
+        ("x-o2-mcp" = json!({"description": "Per-group alert state history", "category": "alerts"}))
+    )
+)]
+pub async fn list_alert_group_transitions(
+    Path((org_id, alert_id)): Path<(String, String)>,
+    Query(query): Query<HashMap<String, String>>,
+) -> Response {
+    let Ok(ksuid) = Ksuid::from_str(&alert_id) else {
+        return MetaHttpResponse::not_found(format!("invalid alert id {alert_id}"));
+    };
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    if let Err(e) = alert::get_by_id(client, &org_id, ksuid).await {
+        return e.into();
+    }
+
+    // `None` means every group, which is NOT `Some("")` — that is the rollup
+    // row's own key. An empty query value therefore has to mean "unset".
+    let group_key = query
+        .get("group_key")
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty());
+    let limit = query
+        .get("limit")
+        .and_then(|l| l.parse::<u64>().ok())
+        .unwrap_or(100)
+        .clamp(1, 1000);
+
+    match infra::table::alert_states::list_transitions_filtered(&alert_id, group_key, limit).await {
+        Ok(transitions) => MetaHttpResponse::json(ListAlertGroupTransitionsResponseBody {
+            list: transitions
+                .into_iter()
+                .map(|t| AlertGroupTransitionItem {
+                    group_key: t.group_key,
+                    group_labels: t.group_labels,
+                    from_level: t.from_level.map(|l| l.to_string()),
+                    to_level: t.to_level.map(|l| l.to_string()),
+                    from_outcome: t.from_outcome.map(|o| o.to_string()),
+                    to_outcome: t.to_outcome.to_string(),
+                    at: t.at,
+                    value: t.value,
+                })
+                .collect(),
+        }),
         Err(e) => MetaHttpResponse::internal_error(e.to_string()),
     }
 }
@@ -582,10 +787,24 @@ async fn build_and_run_anomaly_update(
         enabled: fields.enabled,
         folder_id: fields.folder_id,
         owner,
+        // The v2 PUT carries the FULL alert body, so this is replace
+        // semantics: wrapping in `Some` means an omitted priority clears it,
+        // matching how tags behave one line down.
+        priority: Some(alert.priority),
+        // `Some(vec![])` clears; the shared body always supplies a Vec,
+        // so an edit that removes every tag does clear them.
+        tags: Some(alert.tags),
     };
 
     match openobserve_core::anomaly_detection::update_config(org_id, anomaly_id, req).await {
         Ok(v) => MetaHttpResponse::json(v),
+        // Same 400 as create: an invalid tag is the caller's to fix.
+        Err(e)
+            if e.downcast_ref::<config::meta::alerts::tags::TagError>()
+                .is_some() =>
+        {
+            MetaHttpResponse::bad_request(e.to_string())
+        }
         Err(e) => MetaHttpResponse::internal_error(e.to_string()),
     }
 }
@@ -755,6 +974,102 @@ pub async fn delete_alert_bulk(
     })
 }
 
+/// Query parameters for the tag facet endpoint (PT-8b).
+#[derive(Debug, serde::Deserialize, utoipa::IntoParams)]
+#[into_params(style = Form, parameter_in = Query)]
+#[serde(rename_all = "snake_case")]
+pub struct ListAlertTagsQuery {
+    /// Optional case-insensitive prefix filter for autocomplete.
+    pub prefix: Option<String>,
+    /// Maximum tags to return. Defaults to 100, capped at 1000.
+    pub limit: Option<usize>,
+    /// Restrict to one folder, matching the list endpoint's scope.
+    pub folder: Option<String>,
+}
+
+/// One tag and how many visible alerts carry it.
+#[derive(Debug, serde::Serialize, utoipa::ToSchema)]
+pub struct AlertTagCount {
+    pub tag: String,
+    pub count: u64,
+}
+
+/// ListAlertTags
+///
+/// Distinct alert tags for autocomplete and facets (PT-8b).
+///
+/// **Authorization is load-bearing, not incidental (D23):** tag values leak
+/// service, environment, team and customer names, so this returns only tags
+/// carried by alerts the caller may actually list. It reuses the list
+/// endpoint's permission path rather than scanning the org-wide cache.
+#[utoipa::path(
+    get,
+    path = "/{org_id}/alerts/tags",
+    context_path = "/api/v2",
+    tag = "Alerts",
+    operation_id = "ListAlertTags",
+    summary = "List distinct alert tags",
+    description = "Returns distinct tags across the alerts the caller can see, with occurrence counts, for autocomplete and filter facets.",
+    security(("Authorization" = [])),
+    params(("org_id" = String, Path, description = "Organization name"), ListAlertTagsQuery),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Vec<AlertTagCount>),
+        (status = 403, description = "Forbidden", content_type = "application/json"),
+    ),
+)]
+pub async fn list_alert_tags(
+    Path(org_id): Path<String>,
+    Query(query): Query<ListAlertTagsQuery>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    #[cfg(not(feature = "enterprise"))]
+    let user_id = None;
+    #[cfg(feature = "enterprise")]
+    let user_id = Some(user_email.user_id.as_str());
+
+    // Bounded (PT-8b): 1,000 alerts x 64 tags is 64,000 values, so "return
+    // everything" is not an option the response size can afford.
+    const DEFAULT_LIMIT: usize = 100;
+    const MAX_LIMIT: usize = 1000;
+    let limit = query.limit.unwrap_or(DEFAULT_LIMIT).clamp(1, MAX_LIMIT);
+
+    // Resolve the caller's VISIBLE alerts through the same permission path the
+    // list endpoint uses — this is what keeps the facet from leaking tags off
+    // alerts the caller cannot see.
+    let mut params = config::meta::alerts::alert::ListAlertsParams::new(&org_id);
+    if let Some(folder) = query.folder.clone() {
+        params = params.in_folder(&folder);
+    }
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let visible_ids: Vec<String> = match alert::list_v2(client, user_id, params).await {
+        Ok(list) => list
+            .into_iter()
+            .filter_map(|(_, a)| a.id.map(|id| id.to_string()))
+            .collect(),
+        Err(e) => return e.into(),
+    };
+
+    let mut counts = db::alerts::alert::tag_counts_for_alerts(&org_id, &visible_ids).await;
+
+    if let Some(prefix) = query.prefix.as_deref() {
+        let prefix = prefix.trim().to_lowercase();
+        if !prefix.is_empty() {
+            counts.retain(|(tag, _)| tag.starts_with(&prefix));
+        }
+    }
+
+    // Deterministic order: most-used first, then lexicographic so the tail is
+    // stable rather than hash-ordered.
+    counts.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+    counts.truncate(limit);
+
+    let body: Vec<AlertTagCount> = counts
+        .into_iter()
+        .map(|(tag, count)| AlertTagCount { tag, count })
+        .collect();
+    MetaHttpResponse::json(body)
+}
+
 /// ListAlerts
 #[utoipa::path(
     get,
@@ -785,7 +1100,11 @@ pub async fn delete_alert_bulk(
 )]
 pub async fn list_alerts(
     Path(org_id): Path<String>,
-    Query(query): Query<ListAlertsQuery>,
+    // `axum_extra`'s Query (serde_html_form) rather than axum's
+    // (serde_urlencoded): only the former deserializes REPEATED keys into a
+    // `Vec`, which PT-3 requires for `?priority=1&priority=2`. axum's Query
+    // errors with "invalid type: string, expected a sequence".
+    ExtraQuery(query): ExtraQuery<ListAlertsQuery>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
 ) -> Response {
     #[cfg(not(feature = "enterprise"))]
@@ -800,12 +1119,38 @@ pub async fn list_alerts(
     #[cfg(feature = "enterprise")]
     let page_size_and_idx = query.page_size.map(|s| (s, query.page_idx.unwrap_or(0)));
 
+    // Resolve the tag filter to an alert-ID set BEFORE building the query
+    // (PT-8): the tags column is JSON, and the filter must enter the SQL as an
+    // ID predicate so pagination and sorting stay correct rather than
+    // post-filtering an already-fetched page.
+    let requested_tags = query.requested_tags();
+
     #[cfg(not(feature = "enterprise"))]
-    let params = query.into(&org_id);
+    let mut params = query.into(&org_id);
     #[cfg(feature = "enterprise")]
     let mut params = query.into(&org_id);
 
+    if !requested_tags.is_empty() {
+        // `Some(empty)` is meaningful: no alert carries these tags, so the
+        // result must be empty. Leaving it `None` would match everything.
+        params = params.with_tag_alert_ids(
+            db::alerts::alert::resolve_alert_ids_by_tags(&org_id, &requested_tags).await,
+        );
+    }
+
     let alert_type = params.alert_type;
+    // Anomaly configs are merged in AFTER the SQL query, so the priority/tag
+    // filters in the query never touch them — they must be applied in Rust to
+    // the merged rows instead (see below). Captured before `params` is moved.
+    // (enterprise-only consumers; OSS builds merge no anomaly configs)
+    #[cfg_attr(not(feature = "enterprise"), allow(unused_variables))]
+    let priority_filter = params.priority.clone();
+    #[cfg_attr(not(feature = "enterprise"), allow(unused_variables))]
+    let tag_filter = requested_tags.clone();
+    // Anomaly rows bypass the SQL ORDER BY too, so a merged list must be
+    // re-sorted in memory.
+    #[cfg_attr(not(feature = "enterprise"), allow(unused_variables))]
+    let requested_sort = (params.sort_by, params.sort_desc);
 
     // In enterprise builds, pagination is applied after merging regular alerts with
     // anomaly detection configs, so we fetch all matching results from the DB here.
@@ -863,7 +1208,33 @@ pub async fn list_alerts(
     )
     .await
     {
-        list.extend(configs.iter().filter_map(anomaly_config_to_list_item));
+        // Apply the Feature-2 filters here, because these rows bypassed the
+        // SQL WHERE clause entirely. Without this a priority or tag filter
+        // would return every anomaly config alongside the matching alerts.
+        let before = list.len();
+        list.extend(
+            configs
+                .iter()
+                .filter_map(anomaly_config_to_list_item)
+                .filter(|item| match &priority_filter {
+                    None => true,
+                    // An empty set means "asked for priorities, none valid" —
+                    // matches nothing, same as the SQL side.
+                    Some(wanted) => item
+                        .priority
+                        .is_some_and(|p| wanted.iter().any(|w| w.to_i32() as u8 == p)),
+                })
+                .filter(|item| {
+                    config::meta::alerts::tags::matches_all_tags(&item.tags, &tag_filter)
+                }),
+        );
+        // Without this the appended rows pin to the tail whatever order was
+        // requested, and the pagination below cuts the combined list in the
+        // wrong places. Only when something merged — an untouched list keeps
+        // the database's own collation.
+        if list.len() > before {
+            sort_merged_alert_list(&mut list, requested_sort.0, requested_sort.1);
+        }
     }
 
     // Apply pagination to the combined list (regular alerts + anomaly configs).
@@ -879,7 +1250,106 @@ pub async fn list_alerts(
         list
     };
 
+    // Enrich with durable run state (Part IV of alerts.md). One batched query
+    // over the page that is actually being returned — not per alert.
+    let mut list = list;
+    enrich_with_run_state(&mut list).await;
+
     MetaHttpResponse::json(ListAlertsResponseBody { list })
+}
+
+/// Attach `last_outcome` / `last_outcome_at` / `last_outcome_since` to a page of
+/// alerts from the `alert_states` rollup rows.
+///
+/// Best-effort: if the lookup fails the list is still returned, just without run
+/// state. A state table problem must not take down the alerts page.
+/// Re-sort a merged (regular + anomaly) list the way the SQL ORDER BY sorts
+/// the regular one (PT-3): unset priority LAST in both directions, ties broken
+/// on (name, folder name, id) so pagination stays a total order.
+#[cfg(feature = "enterprise")]
+fn sort_merged_alert_list(
+    list: &mut [ListAlertsResponseBodyItem],
+    sort_by: Option<config::meta::alerts::alert::AlertSortField>,
+    sort_desc: bool,
+) {
+    use std::cmp::Ordering;
+
+    use config::meta::alerts::alert::AlertSortField;
+
+    let tail = |a: &ListAlertsResponseBodyItem, b: &ListAlertsResponseBodyItem| {
+        a.name
+            .cmp(&b.name)
+            .then_with(|| a.folder_name.cmp(&b.folder_name))
+            .then_with(|| a.alert_id.to_string().cmp(&b.alert_id.to_string()))
+    };
+    match sort_by {
+        Some(AlertSortField::Priority) => list.sort_by(|a, b| {
+            // NULL priority sorts last regardless of direction, matching the
+            // SQL's explicit CASE.
+            let nulls = (a.priority.is_none() as u8).cmp(&(b.priority.is_none() as u8));
+            let pri = match (a.priority, b.priority) {
+                (Some(x), Some(y)) if sort_desc => y.cmp(&x),
+                (Some(x), Some(y)) => x.cmp(&y),
+                _ => Ordering::Equal,
+            };
+            nulls.then(pri).then_with(|| tail(a, b))
+        }),
+        Some(AlertSortField::Name) => list.sort_by(|a, b| {
+            let name = if sort_desc {
+                b.name.cmp(&a.name)
+            } else {
+                a.name.cmp(&b.name)
+            };
+            name.then_with(|| a.folder_name.cmp(&b.folder_name))
+                .then_with(|| a.alert_id.to_string().cmp(&b.alert_id.to_string()))
+        }),
+        // Historical default, matching the SQL arm.
+        None => list.sort_by(|a, b| {
+            a.name
+                .cmp(&b.name)
+                .then_with(|| a.folder_name.cmp(&b.folder_name))
+        }),
+    }
+}
+
+async fn enrich_with_run_state(list: &mut [ListAlertsResponseBodyItem]) {
+    if list.is_empty() {
+        return;
+    }
+    let ids: Vec<String> = list.iter().map(|i| i.alert_id.to_string()).collect();
+    let states = match infra::table::alert_states::get_rollups(&ids).await {
+        Ok(s) => s,
+        Err(e) => {
+            log::warn!("failed to load alert run state for list: {e}");
+            return;
+        }
+    };
+    if states.is_empty() {
+        return;
+    }
+    let by_id: std::collections::HashMap<_, _> = states
+        .into_iter()
+        .map(|s| (s.alert_id.clone(), s))
+        .collect();
+    for item in list.iter_mut() {
+        if let Some(state) = by_id.get(&item.alert_id.to_string()) {
+            item.last_outcome = state.last_outcome.as_ref().map(|o| o.to_string());
+            item.last_outcome_at = state.last_outcome_at;
+            item.last_outcome_since = state.since;
+            item.level = state.level.map(|l| l.to_string());
+            item.level_since = state.level_since;
+            // §5.4: the group counts live on the rollup row and are the only
+            // source for the "N of M groups firing" chip — they are computed
+            // pre-cap, so they cannot be reconstructed by counting the
+            // retained state rows. The exactness markers ride along because
+            // exactness likewise cannot be re-derived from the counts and a
+            // mutable cap setting.
+            item.groups_observed = state.groups_observed.and_then(|n| i32::try_from(n).ok());
+            item.groups_firing = state.groups_firing.and_then(|n| i32::try_from(n).ok());
+            item.groups_observed_is_lower_bound = state.groups_observed_is_lower_bound;
+            item.groups_firing_is_lower_bound = state.groups_firing_is_lower_bound;
+        }
+    }
 }
 
 /// EnableAlert

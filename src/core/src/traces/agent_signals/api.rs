@@ -140,9 +140,11 @@ pub async fn get_agent_signals(
 /// rollup-write bound — not the span-time window. 30 days matches the FE's
 /// version-enumeration retention.
 ///
-/// Only referenced from the enterprise compare path; also compiled under `test`
-/// so the pure-helper unit tests below build in the OSS (non-enterprise) config.
-#[cfg(any(feature = "enterprise", test))]
+/// Only referenced from the enterprise compare path (`fetch_arm_aggregate` and
+/// `fetch_arm_failures`), so it is gated on `enterprise` alone. The unit tests
+/// below exercise only the pure aggregation helpers and never read it — adding
+/// `test` to this gate just makes the OSS lib-test build warn `never used`.
+#[cfg(feature = "enterprise")]
 const COMPARE_ROLLUP_LOOKBACK_MICROS: i64 = 30 * 24 * 60 * 60 * 1_000_000;
 
 /// One arm (A or B) of a version-compare request.

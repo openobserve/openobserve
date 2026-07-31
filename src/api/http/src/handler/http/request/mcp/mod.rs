@@ -22,20 +22,172 @@ use axum::{
 };
 use futures_util::StreamExt;
 use openobserve_mcp::{
-    MCP_PROTOCOL_VERSION, MCPRequest, handle_mcp_request, handle_mcp_request_stream,
+    MCP_PROTOCOL_VERSION_MODERN, MCP_SUPPORTED_PROTOCOL_VERSIONS, MCPRequest,
+    decode_mcp_header_value, handle_mcp_request, handle_mcp_request_stream,
+    is_supported_protocol_version,
 };
 #[cfg(feature = "enterprise")]
 use openobserve_mcp::{OAuthProtectedResourceMetadata, OAuthServerMetadata};
+use serde_json::{Value, json};
 
-/// MCP protocol version header name (MCP 2025-11-25)
+/// MCP protocol version header name
 const MCP_PROTOCOL_VERSION_HEADER: &str = "MCP-Protocol-Version";
+/// Mirrors the JSON-RPC `method` field (required on 2026-07-28 requests)
+const MCP_METHOD_HEADER: &str = "Mcp-Method";
+/// Mirrors `params.name` on tools/call (required on 2026-07-28 requests)
+const MCP_NAME_HEADER: &str = "Mcp-Name";
+
+/// JSON-RPC error codes surfaced with a non-200 HTTP status per the
+/// 2026-07-28 Streamable HTTP transport.
+const JSONRPC_HEADER_MISMATCH: i32 = -32020;
+const JSONRPC_UNSUPPORTED_PROTOCOL_VERSION: i32 = -32022;
+const JSONRPC_METHOD_NOT_FOUND: i32 = -32601;
+
+/// Build an HTTP response carrying a JSON-RPC error body.
+fn jsonrpc_error_response(
+    status: StatusCode,
+    id: Option<&Value>,
+    code: i32,
+    message: String,
+    data: Option<Value>,
+) -> Response {
+    let mut error = json!({ "code": code, "message": message });
+    if let Some(data) = data {
+        error["data"] = data;
+    }
+    let body = json!({
+        "jsonrpc": "2.0",
+        "id": id.cloned().unwrap_or(Value::Null),
+        "error": error,
+    });
+    Response::builder()
+        .status(status)
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(body.to_string()))
+        .unwrap()
+}
+
+/// Validate the Streamable HTTP request metadata headers (dual-era).
+///
+/// Legacy (initialize-handshake, ≤2025-11-25) clients may omit all of these
+/// headers. Modern requests — those whose body `_meta` declares a protocol
+/// version — must carry `MCP-Protocol-Version`, `Mcp-Method`, and (for
+/// tools/call) `Mcp-Name`, each matching the body. Per 2026-07-28:
+/// header/body mismatches → 400 + HeaderMismatch (-32020); an unsupported
+/// version (header or body) → 400 + UnsupportedProtocolVersionError
+/// (-32022) listing the versions we support.
+fn validate_mcp_headers(headers: &HeaderMap, request: &MCPRequest) -> Option<Response> {
+    let id = request.id.as_ref();
+    let unsupported = |requested: &str| {
+        jsonrpc_error_response(
+            StatusCode::BAD_REQUEST,
+            id,
+            JSONRPC_UNSUPPORTED_PROTOCOL_VERSION,
+            "Unsupported protocol version".to_string(),
+            Some(json!({
+                "supported": MCP_SUPPORTED_PROTOCOL_VERSIONS,
+                "requested": requested,
+            })),
+        )
+    };
+    let mismatch = |message: String| {
+        jsonrpc_error_response(
+            StatusCode::BAD_REQUEST,
+            id,
+            JSONRPC_HEADER_MISMATCH,
+            message,
+            None,
+        )
+    };
+
+    let header_version = headers
+        .get(MCP_PROTOCOL_VERSION_HEADER)
+        .and_then(|v| v.to_str().ok());
+    let meta_version = request.meta_protocol_version();
+
+    if let Some(hv) = header_version {
+        if !is_supported_protocol_version(hv) {
+            return Some(unsupported(hv));
+        }
+        if let Some(mv) = meta_version
+            && mv != hv
+        {
+            return Some(mismatch(format!(
+                "Header mismatch: MCP-Protocol-Version header value '{hv}' does not match body value '{mv}'"
+            )));
+        }
+    }
+    if let Some(mv) = meta_version
+        && !is_supported_protocol_version(mv)
+    {
+        return Some(unsupported(mv));
+    }
+
+    // Modern requests must mirror body fields into headers so that
+    // intermediaries can route without parsing the body.
+    if meta_version == Some(MCP_PROTOCOL_VERSION_MODERN) {
+        if header_version.is_none() {
+            return Some(mismatch(
+                "Header mismatch: missing required MCP-Protocol-Version header".to_string(),
+            ));
+        }
+        match headers.get(MCP_METHOD_HEADER).and_then(|v| v.to_str().ok()) {
+            None => {
+                return Some(mismatch(
+                    "Header mismatch: missing required Mcp-Method header".to_string(),
+                ));
+            }
+            Some(m) if m != request.method => {
+                return Some(mismatch(format!(
+                    "Header mismatch: Mcp-Method header value '{m}' does not match body value '{}'",
+                    request.method
+                )));
+            }
+            _ => {}
+        }
+        if request.method == "tools/call" {
+            let body_name = request
+                .params
+                .get("name")
+                .and_then(Value::as_str)
+                .unwrap_or_default();
+            match headers
+                .get(MCP_NAME_HEADER)
+                .and_then(|v| v.to_str().ok())
+                .map(decode_mcp_header_value)
+            {
+                None => {
+                    return Some(mismatch(
+                        "Header mismatch: missing required Mcp-Name header".to_string(),
+                    ));
+                }
+                Some(None) => {
+                    return Some(mismatch(
+                        "Header mismatch: Mcp-Name header value is malformed".to_string(),
+                    ));
+                }
+                Some(Some(name)) if name != body_name => {
+                    return Some(mismatch(format!(
+                        "Header mismatch: Mcp-Name header value '{name}' does not match body value '{body_name}'"
+                    )));
+                }
+                _ => {}
+            }
+        }
+    }
+
+    None
+}
 
 /// Handler for MCP POST requests (single request/response)
 ///
-/// Per MCP 2025-11-25 (Streamable HTTP transport):
+/// Dual-era (MCP 2025-11-25 + 2026-07-28) Streamable HTTP transport:
 /// - Requests with `id` → 200 with JSON or SSE response
 /// - Notifications (no `id`) → 202 Accepted, no body
-/// - Validates `MCP-Protocol-Version` header on non-initialize requests
+/// - Validates protocol version and the 2026-07-28 request metadata headers (`Mcp-Method`,
+///   `Mcp-Name`) on modern requests
+/// - Maps modern JSON-RPC errors to HTTP status codes (unsupported version → 400, unknown method →
+///   404)
 #[utoipa::path(
     post,
     path = "/{org_id}/mcp",
@@ -52,7 +204,8 @@ const MCP_PROTOCOL_VERSION_HEADER: &str = "MCP-Protocol-Version";
     responses(
         (status = 200, description = "Success", content_type = "application/json"),
         (status = 202, description = "Accepted (notification, no response body)"),
-        (status = 400, description = "Bad Request (unsupported protocol version)"),
+        (status = 400, description = "Bad Request (unsupported protocol version or header mismatch)"),
+        (status = 404, description = "Not Found (unknown method, 2026-07-28 requests)"),
         (status = 500, description = "Internal Server Error"),
     ),
     extensions(
@@ -71,26 +224,15 @@ pub async fn handle_mcp_post(
         .and_then(|v| v.to_str().ok())
         .map(|s| s.to_string());
 
-    // Per MCP 2025-11-25: validate MCP-Protocol-Version header on all
-    // requests after initialization (initialize itself won't have it yet).
-    if mcp_request.method != "initialize"
-        && let Some(client_version) = headers
-            .get(MCP_PROTOCOL_VERSION_HEADER)
-            .and_then(|v| v.to_str().ok())
-        && client_version != MCP_PROTOCOL_VERSION
-    {
-        return Response::builder()
-            .status(StatusCode::BAD_REQUEST)
-            .header(header::CONTENT_TYPE, "application/json")
-            .body(Body::from(format!(
-                "{{\"error\": \"Unsupported MCP protocol version '{}', expected '{}'\"}}",
-                client_version, MCP_PROTOCOL_VERSION
-            )))
-            .unwrap();
+    // Validate protocol version and (for 2026-07-28 requests) the mirrored
+    // request metadata headers before doing any work.
+    if let Some(error_response) = validate_mcp_headers(&headers, &mcp_request) {
+        return error_response;
     }
+    let modern = mcp_request.is_modern();
 
-    // Per MCP 2025-11-25: JSON-RPC notifications (no `id`) require HTTP 202,
-    // no response body. Process the notification but return 202.
+    // JSON-RPC notifications (no `id`) require HTTP 202, no response body.
+    // Process the notification but return 202.
     if mcp_request.id.is_none() && mcp_request.method != "initialize" {
         // Fire-and-forget: process notification asynchronously, don't wait
         let _ = handle_mcp_request(mcp_request, auth_token).await;
@@ -109,45 +251,43 @@ pub async fn handle_mcp_post(
     // Determine if client wants SSE streaming
     let wants_sse = accept_header.contains("text/event-stream");
 
-    if wants_sse {
-        // Return streaming SSE response (MCP Streamable HTTP spec)
-        let stream = match handle_mcp_request_stream(mcp_request, auth_token).await {
-            Ok(s) => s,
-            Err(e) => {
-                return Response::builder()
-                    .status(StatusCode::INTERNAL_SERVER_ERROR)
-                    .header(header::CONTENT_TYPE, "application/json")
-                    .body(Body::from(format!("{{\"error\": \"MCP error: {}\"}}", e)))
-                    .unwrap();
-            }
-        };
+    let response = match handle_mcp_request(mcp_request, auth_token).await {
+        Ok(r) => r,
+        Err(e) => {
+            log::error!("MCP handle_mcp_request error: {e}");
+            return Response::builder()
+                .status(StatusCode::INTERNAL_SERVER_ERROR)
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(format!("{{\"error\": \"MCP error: {}\"}}", e)))
+                .unwrap();
+        }
+    };
 
-        let body_stream =
-            stream.map(|result| result.map_err(|e| std::io::Error::other(e.to_string())));
+    // Per 2026-07-28, some JSON-RPC errors carry a non-200 HTTP status so
+    // dual-era clients can distinguish a modern server from a legacy one.
+    // Legacy responses keep 200 with the error in-band, as before.
+    let status = match response.error.as_ref().map(|e| e.code) {
+        Some(JSONRPC_UNSUPPORTED_PROTOCOL_VERSION) => StatusCode::BAD_REQUEST,
+        Some(JSONRPC_METHOD_NOT_FOUND) if modern => StatusCode::NOT_FOUND,
+        _ => StatusCode::OK,
+    };
 
+    if wants_sse && status == StatusCode::OK {
+        // SSE response stream scoped to this request (single final event)
+        let sse_data = format!(
+            "data: {}\n\n",
+            serde_json::to_string(&response).unwrap_or_default()
+        );
         Response::builder()
             .status(StatusCode::OK)
             .header(header::CONTENT_TYPE, "text/event-stream")
             .header(header::CACHE_CONTROL, "no-cache")
             .header("X-Accel-Buffering", "no")
-            .body(Body::from_stream(body_stream))
+            .body(Body::from(sse_data))
             .unwrap()
     } else {
-        // Return single JSON response (fallback for simpler clients)
-        let response = match handle_mcp_request(mcp_request, auth_token).await {
-            Ok(r) => r,
-            Err(e) => {
-                log::error!("MCP handle_mcp_request error: {e}");
-                return Response::builder()
-                    .status(StatusCode::INTERNAL_SERVER_ERROR)
-                    .header(header::CONTENT_TYPE, "application/json")
-                    .body(Body::from(format!("{{\"error\": \"MCP error: {}\"}}", e)))
-                    .unwrap();
-            }
-        };
-
         Response::builder()
-            .status(StatusCode::OK)
+            .status(status)
             .header(header::CONTENT_TYPE, "application/json")
             .body(Body::from(serde_json::to_string(&response).unwrap()))
             .unwrap()
@@ -492,6 +632,34 @@ mod tests {
         }
     }
 
+    /// A 2026-07-28 request: protocol version in `_meta`, plus `name` for tools/call
+    fn modern_request(method: &str, name: Option<&str>) -> MCPRequest {
+        let mut params = json!({
+            "_meta": { "io.modelcontextprotocol/protocolVersion": "2026-07-28" }
+        });
+        if let Some(name) = name {
+            params["name"] = json!(name);
+            params["arguments"] = json!({});
+        }
+        MCPRequest {
+            jsonrpc: "2.0".to_string(),
+            id: Some(json!(1)),
+            method: method.to_string(),
+            params,
+        }
+    }
+
+    /// Matching 2026-07-28 request metadata headers
+    fn modern_headers(method: &str, name: Option<&str>) -> HeaderMap {
+        let mut headers = HeaderMap::new();
+        headers.insert(MCP_PROTOCOL_VERSION_HEADER, "2026-07-28".parse().unwrap());
+        headers.insert(MCP_METHOD_HEADER, method.parse().unwrap());
+        if let Some(name) = name {
+            headers.insert(MCP_NAME_HEADER, name.parse().unwrap());
+        }
+        headers
+    }
+
     #[tokio::test]
     async fn post_ping_is_available() {
         let response = handle_mcp_post(
@@ -513,6 +681,95 @@ mod tests {
             handle_mcp_post(Path("default".to_string()), headers, Json(ping_request())).await;
 
         assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn legacy_version_header_is_accepted() {
+        let mut headers = HeaderMap::new();
+        headers.insert(MCP_PROTOCOL_VERSION_HEADER, "2025-11-25".parse().unwrap());
+
+        let response =
+            handle_mcp_post(Path("default".to_string()), headers, Json(ping_request())).await;
+
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn modern_server_discover_is_available() {
+        let response = handle_mcp_post(
+            Path("default".to_string()),
+            modern_headers("server/discover", None),
+            Json(modern_request("server/discover", None)),
+        )
+        .await;
+
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn modern_request_without_version_header_is_rejected() {
+        let response = handle_mcp_post(
+            Path("default".to_string()),
+            HeaderMap::new(),
+            Json(modern_request("server/discover", None)),
+        )
+        .await;
+
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn modern_request_missing_mcp_method_header_is_rejected() {
+        let mut headers = modern_headers("server/discover", None);
+        headers.remove(MCP_METHOD_HEADER);
+
+        let response = handle_mcp_post(
+            Path("default".to_string()),
+            headers,
+            Json(modern_request("server/discover", None)),
+        )
+        .await;
+
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn modern_tools_call_with_mismatched_name_header_is_rejected() {
+        let response = handle_mcp_post(
+            Path("default".to_string()),
+            modern_headers("tools/call", Some("other_tool")),
+            Json(modern_request("tools/call", Some("tool_search"))),
+        )
+        .await;
+
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn version_header_body_mismatch_is_rejected() {
+        let mut headers = modern_headers("server/discover", None);
+        headers.insert(MCP_PROTOCOL_VERSION_HEADER, "2025-11-25".parse().unwrap());
+
+        let response = handle_mcp_post(
+            Path("default".to_string()),
+            headers,
+            Json(modern_request("server/discover", None)),
+        )
+        .await;
+
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn modern_unknown_method_returns_not_found() {
+        let response = handle_mcp_post(
+            Path("default".to_string()),
+            modern_headers("bogus/method", None),
+            Json(modern_request("bogus/method", None)),
+        )
+        .await;
+
+        assert_eq!(response.status(), StatusCode::NOT_FOUND);
     }
 
     #[tokio::test]

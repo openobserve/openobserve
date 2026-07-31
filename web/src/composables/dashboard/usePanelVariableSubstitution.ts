@@ -23,6 +23,7 @@ import {
 } from "@/utils/dashboard/variables/variablesUtils";
 import { escapeSingleQuotes } from "@/utils/zincutils";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
+import { MIN_PERCENTILE_SAMPLES } from "@/utils/metrics/metricDefaults";
 
 /**
  * Composable that encapsulates all panel-level variable substitution logic.
@@ -411,6 +412,21 @@ export const usePanelVariableSubstitution = ({
     const __range_micros = endISOTimestamp - startISOTimestamp;
     const __range_seconds = __range_micros / 1000000; // Convert microseconds to seconds
 
+    // `quantile_over_time`'s window — the same three bounds as the explorer's
+    // `computePercentileWindow`, so a card and the panel it drills into smooth
+    // the metric identically:
+    //   FLOOR  the rate interval (no gaps between evaluation points)
+    //   TARGET MIN_PERCENTILE_SAMPLES x scrape, so p90 and p99 stop interpolating
+    //          between the same top pair and drawing as one line
+    //   CAP    a quarter of the range, or the window flattens the whole chart
+    // A non-finite range must not reach the cap: Math.max/min propagate NaN, and
+    // formatRateInterval(NaN) is "", which would emit the unparseable `x[]`.
+    const cappableRange = Number.isFinite(__range_seconds) ? Math.max(0, __range_seconds) : 0;
+    const __percentile_interval: any = Math.min(
+      Math.max(__rate_interval, MIN_PERCENTILE_SAMPLES * scrapeInterval),
+      Math.max(__rate_interval, cappableRange / 4),
+    );
+
     // format range, ensuring it's never empty (minimum 1s for PromQL compatibility)
     const formattedRange = formatRateInterval(__range_seconds) || "1s";
 
@@ -426,6 +442,10 @@ export const usePanelVariableSubstitution = ({
       {
         name: "__rate_interval",
         value: `${formatRateInterval(__rate_interval)}`,
+      },
+      {
+        name: "__percentile_interval",
+        value: `${formatRateInterval(__percentile_interval)}`,
       },
       {
         name: "__range",

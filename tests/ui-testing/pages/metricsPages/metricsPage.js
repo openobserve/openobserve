@@ -91,12 +91,24 @@ export class MetricsPage {
 
         // PromQL Table Chart locators
         this.promqlTableModeSelect = page.locator('[data-test="dashboard-config-promql-table-mode"]');
+        this.promqlTableModeTrigger = page.locator('[data-test="dashboard-config-promql-table-mode-trigger"]');
         this.promqlTableModePopover = page.locator('[data-test="dashboard-config-promql-table-mode-popover"]');
         this.promqlTableModeOptions = page.locator('[data-test="dashboard-config-promql-table-mode-option"]');
+        // Per-value factory (OSelect option convention, §4) — scoped to the popover so a
+        // stale teleported copy of the option list can never be matched.
+        this.promqlTableModeOptionByValue = (value) =>
+            this.promqlTableModePopover.locator(
+                `[data-test="dashboard-config-promql-table-mode-option"][data-test-value="${value}"]`
+            );
         this.promqlTableChart = page.locator('[data-test="promql-table-chart"]');
         // TenstackTable headers — data-test="o2-table-th-<columnId>"; we walk all headers in DOM order.
         this.promqlTableHeaders = page.locator(
             '[data-test="promql-table-chart"] [data-test^="o2-table-th-"]:not([data-test*="-sort-"]):not([data-test*="-remove-"])'
+        );
+        // Trailing "Value" column of the expanded_timeseries / all layouts — the
+        // stable render-complete signal for the table (see waitForPromqlTableLayoutReady).
+        this.promqlTableValueHeader = page.locator(
+            '[data-test="promql-table-chart"] [data-test="o2-table-th-value"]'
         );
 
         // ===== ConfigPanel sidebar (PanelSidebar + Reka Collapsible sections) =====
@@ -2398,7 +2410,7 @@ export class MetricsPage {
      * Uses OSelect's `data-test-value` per ruleset §4.
      */
     async selectPromqlTableMode(modeValue) {
-        const trigger = this.page.locator('[data-test="dashboard-config-promql-table-mode-trigger"]');
+        const trigger = this.promqlTableModeTrigger;
         await trigger.waitFor({ state: 'visible', timeout: 5000 });
         // Bound the scroll to the element's own actionability window so it can never
         // hang on the default 30s timeout if layout is momentarily unstable.
@@ -2406,11 +2418,20 @@ export class MetricsPage {
         await trigger.click();
         await this.promqlTableModePopover.waitFor({ state: 'visible', timeout: 5000 });
         // Pick the option by its data-test-value (per AGENT_RULES §4 OSelectItem stamp).
-        const optionByValue = this.page.locator(
-            `[data-test="dashboard-config-promql-table-mode-option"][data-test-value="${modeValue}"]`
-        );
+        const optionByValue = this.promqlTableModeOptionByValue(modeValue);
         await optionByValue.first().waitFor({ state: 'visible', timeout: 5000 });
-        await optionByValue.first().click();
+        // Bound the click so a stalled actionability check (popover mid-animation
+        // under CI load) fails fast; then retry once against a freshly-opened popover.
+        try {
+            await optionByValue.first().click({ timeout: 5000 });
+        } catch {
+            await this.page.keyboard.press('Escape');
+            await this.promqlTableModePopover.waitFor({ state: 'hidden', timeout: 5000 });
+            await trigger.click();
+            await this.promqlTableModePopover.waitFor({ state: 'visible', timeout: 5000 });
+            await optionByValue.first().waitFor({ state: 'visible', timeout: 5000 });
+            await optionByValue.first().click({ timeout: 5000 });
+        }
         await this.promqlTableModePopover.waitFor({ state: 'hidden', timeout: 5000 });
     }
 
@@ -2419,6 +2440,31 @@ export class MetricsPage {
      */
     async getPromqlTableHeaderCount() {
         return await this.promqlTableHeaders.count();
+    }
+
+    /**
+     * Waits until the PromQL table chart has rendered at least one header cell.
+     * Counting immediately after a mode switch races the table re-render and
+     * can observe an empty header row.
+     */
+    async waitForPromqlTableHeaders(timeout = 15000) {
+        await this.promqlTableHeaders.first().waitFor({ state: 'visible', timeout });
+    }
+
+    /**
+     * Waits until the expanded_timeseries layout has finished rendering.
+     *
+     * That layout is [Timestamp, ...metric labels, Value] — Value is always the
+     * final column (convertPromQLTableChart appends it after the label columns).
+     * Gate on the Value header's own id rather than on `nth(count - 1)`: the
+     * count and the positional read are two separate round-trips, so a table
+     * still painting its columns (or repainting as a fresh query response lands
+     * under parallel-worker load in CI) yields a count taken before the Value
+     * column exists, and `nth(count - 1)` then resolves to the last *label*
+     * (`start_time`) instead. Keying off the id removes the race entirely.
+     */
+    async waitForPromqlTableLayoutReady(timeout = 20000) {
+        await this.promqlTableValueHeader.waitFor({ state: 'visible', timeout });
     }
 
     /**

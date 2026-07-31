@@ -30,7 +30,7 @@
 use chrono::{DateTime, Duration, TimeZone, Utc};
 use config::{
     get_config, is_local_disk_storage,
-    meta::stream::{ALL_STREAM_TYPES, StreamType, TimeRange},
+    meta::stream::{StreamType, TimeRange},
     utils::time::now,
 };
 use db;
@@ -89,9 +89,9 @@ pub async fn run(
     } else {
         // process every stream: load schema cache to enumerate orgs/streams
         db::schema::cache().await?;
-        let orgs = db::schema::list_organizations_from_cache().await;
-        for org_id in orgs {
-            for stream_type in ALL_STREAM_TYPES {
+        let grouped = db::schema::list_all_streams_grouped().await;
+        for (org_id, stream_types) in grouped {
+            for (stream_type, streams) in stream_types {
                 // enrichment tables and file_list streams are not subject to data
                 // retention, skip them (same as compactor retention::generate_jobs)
                 if stream_type == StreamType::EnrichmentTables
@@ -99,7 +99,6 @@ pub async fn run(
                 {
                     continue;
                 }
-                let streams = db::schema::list_streams_from_cache(&org_id, stream_type).await;
                 for stream_name in streams {
                     let (dirs, files) = gc_stream(
                         &org_id,

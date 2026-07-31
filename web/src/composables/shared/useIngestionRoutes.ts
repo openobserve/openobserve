@@ -30,6 +30,7 @@ import OpenTelemetry from "@/components/ingestion/traces/OpenTelemetry.vue";
 import PrometheusConfig from "@/components/ingestion/metrics/PrometheusConfig.vue";
 import VMagentConfig from "@/components/ingestion/metrics/VMagentConfig.vue";
 import NightingaleConfig from "@/components/ingestion/metrics/NightingaleConfig.vue";
+import CategrafConfig from "@/components/ingestion/metrics/CategrafConfig.vue";
 import OtelCollector from "@/components/ingestion/metrics/OtelCollector.vue";
 import TelegrafConfig from "@/components/ingestion/metrics/TelegrafConfig.vue";
 import CloudWatchMetricConfig from "@/components/ingestion/metrics/CloudWatchMetrics.vue";
@@ -263,6 +264,14 @@ const useIngestionRoutes = () => {
                   path: "nightingale",
                   name: "nightingale",
                   component: NightingaleConfig,
+                  beforeEnter(to: any, from: any, next: any) {
+                    routeGuard(to, from, next);
+                  },
+                },
+                {
+                  path: "categraf",
+                  name: "categraf",
+                  component: CategrafConfig,
                   beforeEnter(to: any, from: any, next: any) {
                     routeGuard(to, from, next);
                   },

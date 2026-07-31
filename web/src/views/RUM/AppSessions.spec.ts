@@ -222,9 +222,10 @@ describe("AppSessions.vue", () => {
             emits: ["update:query"],
           },
           SearchFieldList: {
+            name: "SearchFieldList",
             template:
               '<div data-test="field-list" v-bind="$attrs" @event-emitted="$emit(\'event-emitted\', $event)"></div>',
-            props: ["fields", "timeStamp", "streamName"],
+            props: ["fields", "timeStamp", "streamName", "query", "baseFilter"],
             emits: ["event-emitted"],
           },
           FrustrationBadge: {
@@ -499,6 +500,19 @@ describe("AppSessions.vue", () => {
       wrapper.vm.handleSidebarEvent("add-field", "env='staging'");
 
       expect(mockSessionState.data.editorValue).toBe("env='staging'");
+    });
+
+    it("should pass the session-row base filter to the sidebar", () => {
+      const fieldList = wrapper.findComponent({ name: "SearchFieldList" });
+      expect(fieldList.props("baseFilter")).toBe("session_has_replay IS NOT NULL");
+    });
+
+    // The base filter used to be concatenated into `query`, which made the
+    // sidebar read it back as an active exclude filter and show session_id /
+    // session_has_replay permanently ticked.
+    it("should keep the base filter out of the sidebar query prop", () => {
+      const fieldList = wrapper.findComponent({ name: "SearchFieldList" });
+      expect(fieldList.props("query")).not.toContain("session_has_replay");
     });
   });
 

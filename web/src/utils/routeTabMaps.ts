@@ -106,6 +106,7 @@ const ROUTE_TAB_MAPS: Record<string, Record<string, string>> = {
     prometheus: "prometheus",
     vmagent: "vmagent",
     nightingale: "nightingale",
+    categraf: "categraf",
     otelCollector: "otelCollector",
     telegraf: "telegraf",
     cloudwatchMetrics: "cloudwatchMetrics",

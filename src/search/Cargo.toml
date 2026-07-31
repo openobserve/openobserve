@@ -62,4 +62,5 @@ tracing-opentelemetry.workspace = true
 url.workspace = true
 utoipa.workspace = true
 vortex = { workspace = true }
+vortex-btrblocks = { workspace = true }
 vortex-datafusion = { workspace = true }

@@ -87,7 +87,7 @@
           "queryType": "sql",
           "queries": [
             {
-              "query": "SELECT (COUNT(CASE WHEN status='completed' THEN 1 END) * 100.0 / NULLIF(COUNT(*), 0)) as \"y_axis_1\" FROM \"triggers\" WHERE module = 'alert' [WHERE_CLAUSE_ADDITIONAL]",
+              "query": "SELECT (COUNT(CASE WHEN status IN ('completed', 'firing', 'notify_failed') THEN 1 END) * 100.0 / NULLIF(COUNT(*), 0)) as \"y_axis_1\" FROM \"triggers\" WHERE module = 'alert' [WHERE_CLAUSE_ADDITIONAL]",
               "customQuery": true,
               "fields": {
                 "stream": "triggers",
@@ -183,7 +183,7 @@
           "queryType": "sql",
           "queries": [
             {
-              "query": "SELECT COUNT(*) as \"y_axis_1\" FROM \"triggers\" WHERE module = 'alert' AND status='failed' [WHERE_CLAUSE_ADDITIONAL]",
+              "query": "SELECT COUNT(*) as \"y_axis_1\" FROM \"triggers\" WHERE module = 'alert' AND status IN ('failed', 'error') [WHERE_CLAUSE_ADDITIONAL]",
               "customQuery": true,
               "fields": {
                 "stream": "triggers",
@@ -234,7 +234,7 @@
           "queryType": "sql",
           "queries": [
             {
-              "query": "WITH trigger_metrics AS ( SELECT _timestamp, key, status, (end_time - start_time) as duration, retries, CASE WHEN is_silenced THEN 1 ELSE 0 END as silenced_count, CASE WHEN status='completed' THEN 1 ELSE 0 END as firing_count, CASE WHEN status='failed' THEN 1 ELSE 0 END as errored_count FROM \"triggers\" WHERE module = 'alert' [WHERE_CLAUSE_ADDITIONAL] ) SELECT histogram(_timestamp) as time_bucket, COUNT(*) as total_evaluations, SUM(firing_count) as firing_triggers, SUM(errored_count) as errored_triggers, AVG(duration) as avg_duration, SUM(retries) as total_retries FROM trigger_metrics GROUP BY time_bucket ORDER BY time_bucket ASC",
+              "query": "WITH trigger_metrics AS ( SELECT _timestamp, key, status, (end_time - start_time) as duration, retries, CASE WHEN is_silenced THEN 1 ELSE 0 END as silenced_count, CASE WHEN status IN ('completed', 'firing', 'notify_failed') THEN 1 ELSE 0 END as firing_count, CASE WHEN status IN ('failed', 'error') THEN 1 ELSE 0 END as errored_count FROM \"triggers\" WHERE module = 'alert' [WHERE_CLAUSE_ADDITIONAL] ) SELECT histogram(_timestamp) as time_bucket, COUNT(*) as total_evaluations, SUM(firing_count) as firing_triggers, SUM(errored_count) as errored_triggers, AVG(duration) as avg_duration, SUM(retries) as total_retries FROM trigger_metrics GROUP BY time_bucket ORDER BY time_bucket ASC",
               "customQuery": true,
               "fields": {
                 "stream": "triggers",
@@ -293,7 +293,7 @@
           "queryType": "sql",
           "queries": [
             {
-              "query": "WITH trigger_metrics AS ( SELECT _timestamp, CASE WHEN status='completed' THEN 1 ELSE 0 END as firing_count FROM \"triggers\" WHERE module = 'alert' [WHERE_CLAUSE_ADDITIONAL] ) SELECT histogram(_timestamp) as time_bucket, (SUM(firing_count) * 100.0 / NULLIF(COUNT(*), 0)) as firing_rate FROM trigger_metrics GROUP BY time_bucket ORDER BY time_bucket ASC",
+              "query": "WITH trigger_metrics AS ( SELECT _timestamp, CASE WHEN status IN ('completed', 'firing', 'notify_failed') THEN 1 ELSE 0 END as firing_count FROM \"triggers\" WHERE module = 'alert' [WHERE_CLAUSE_ADDITIONAL] ) SELECT histogram(_timestamp) as time_bucket, (SUM(firing_count) * 100.0 / NULLIF(COUNT(*), 0)) as firing_rate FROM trigger_metrics GROUP BY time_bucket ORDER BY time_bucket ASC",
               "customQuery": true,
               "fields": {
                 "stream": "triggers",
@@ -341,7 +341,7 @@
           "queryType": "sql",
           "queries": [
             {
-              "query": "SELECT CASE WHEN status = 'completed' THEN 'Firing' WHEN status = 'failed' THEN 'Errored' WHEN status = 'condition_not_satisfied' THEN 'Resolved' WHEN status = 'skipped' THEN 'Skipped' ELSE status END as \"x_axis_1\", COUNT(*) as \"y_axis_1\" FROM \"triggers\" WHERE module = 'alert' [WHERE_CLAUSE_ADDITIONAL] GROUP BY status ORDER BY y_axis_1 DESC",
+              "query": "SELECT CASE WHEN status IN ('completed', 'firing') THEN 'Firing' WHEN status = 'notify_failed' THEN 'Notify Failed' WHEN status IN ('failed', 'error') THEN 'Errored' WHEN status IN ('condition_not_satisfied', 'normal') THEN 'Resolved' WHEN status = 'skipped' THEN 'Skipped' ELSE status END as \"x_axis_1\", COUNT(*) as \"y_axis_1\" FROM \"triggers\" WHERE module = 'alert' [WHERE_CLAUSE_ADDITIONAL] GROUP BY x_axis_1 ORDER BY y_axis_1 DESC",
               "customQuery": true,
               "fields": {
                 "stream": "triggers",
@@ -398,7 +398,7 @@
           "queryType": "sql",
           "queries": [
             {
-              "query": "SELECT SPLIT_PART(key, '/', 1) as \"x_axis_1\", COUNT(*) as firing_count FROM \"triggers\" WHERE module = 'alert' AND status='completed' [WHERE_CLAUSE_ADDITIONAL] GROUP BY SPLIT_PART(key, '/', 1) ORDER BY firing_count DESC LIMIT 30",
+              "query": "SELECT SPLIT_PART(key, '/', 1) as \"x_axis_1\", COUNT(*) as firing_count FROM \"triggers\" WHERE module = 'alert' AND status IN ('completed', 'firing', 'notify_failed') [WHERE_CLAUSE_ADDITIONAL] GROUP BY SPLIT_PART(key, '/', 1) ORDER BY firing_count DESC LIMIT 30",
               "customQuery": true,
               "fields": {
                 "stream": "triggers",
@@ -443,7 +443,7 @@
           "queryType": "sql",
           "queries": [
             {
-              "query": "SELECT SPLIT_PART(key, '/', 1) as key, COUNT(*) as total_firings, COUNT(*) / 24.0 as firings_per_hour, ROUND(COUNT(*) * 0.95) as potential_dedup_savings, ROUND((COUNT(*) * 0.95) * 100.0 / NULLIF(COUNT(*), 0), 1) as savings_percent FROM \"triggers\" WHERE module = 'alert' AND status='completed' [WHERE_CLAUSE_ADDITIONAL] GROUP BY SPLIT_PART(key, '/', 1) HAVING firings_per_hour >= 5 ORDER BY total_firings DESC LIMIT 20",
+              "query": "SELECT SPLIT_PART(key, '/', 1) as key, COUNT(*) as total_firings, COUNT(*) / 24.0 as firings_per_hour, ROUND(COUNT(*) * 0.95) as potential_dedup_savings, ROUND((COUNT(*) * 0.95) * 100.0 / NULLIF(COUNT(*), 0), 1) as savings_percent FROM \"triggers\" WHERE module = 'alert' AND status IN ('completed', 'firing', 'notify_failed') [WHERE_CLAUSE_ADDITIONAL] GROUP BY SPLIT_PART(key, '/', 1) HAVING firings_per_hour >= 5 ORDER BY total_firings DESC LIMIT 20",
               "customQuery": true,
               "fields": {
                 "stream": "triggers",
@@ -629,7 +629,7 @@
           "queryType": "sql",
           "queries": [
             {
-              "query": "SELECT SUBSTR(error, 1, 100) as error_message, COUNT(*) as occurrence_count, COUNT(DISTINCT SPLIT_PART(key, '/', 1)) as affected_alerts FROM \"triggers\" WHERE module = 'alert' AND status='failed' AND error IS NOT NULL [WHERE_CLAUSE_ADDITIONAL] GROUP BY SUBSTR(error, 1, 100) ORDER BY occurrence_count DESC LIMIT 20",
+              "query": "SELECT SUBSTR(error, 1, 100) as error_message, COUNT(*) as occurrence_count, COUNT(DISTINCT SPLIT_PART(key, '/', 1)) as affected_alerts FROM \"triggers\" WHERE module = 'alert' AND status IN ('failed', 'error', 'notify_failed') AND error IS NOT NULL [WHERE_CLAUSE_ADDITIONAL] GROUP BY SUBSTR(error, 1, 100) ORDER BY occurrence_count DESC LIMIT 20",
               "customQuery": true,
               "fields": {
                 "stream": "triggers",
@@ -690,7 +690,7 @@
           "queryType": "sql",
           "queries": [
             {
-              "query": "SELECT SPLIT_PART(key, '/', 1) as key, COUNT(*) as total_evaluations, COUNT(CASE WHEN status='completed' THEN 1 END) as firing, COUNT(CASE WHEN status='condition_not_satisfied' THEN 1 END) as resolved, COUNT(CASE WHEN status='failed' THEN 1 END) as errored, COUNT(CASE WHEN is_silenced=true THEN 1 END) as silenced, ROUND((COUNT(CASE WHEN status='completed' THEN 1 END) * 100.0 / NULLIF(COUNT(*), 0)), 1) as firing_rate, ROUND(AVG(end_time - start_time) / 60000000.0, 3) as avg_duration_min FROM \"triggers\" WHERE module = 'alert' [WHERE_CLAUSE_ADDITIONAL] GROUP BY SPLIT_PART(key, '/', 1) ORDER BY total_evaluations DESC LIMIT 30",
+              "query": "SELECT SPLIT_PART(key, '/', 1) as key, COUNT(*) as total_evaluations, COUNT(CASE WHEN status IN ('completed', 'firing', 'notify_failed') THEN 1 END) as firing, COUNT(CASE WHEN status IN ('condition_not_satisfied', 'normal') THEN 1 END) as resolved, COUNT(CASE WHEN status IN ('failed', 'error') THEN 1 END) as errored, COUNT(CASE WHEN is_silenced=true THEN 1 END) as silenced, ROUND((COUNT(CASE WHEN status IN ('completed', 'firing', 'notify_failed') THEN 1 END) * 100.0 / NULLIF(COUNT(*), 0)), 1) as firing_rate, ROUND(AVG(end_time - start_time) / 60000000.0, 3) as avg_duration_min FROM \"triggers\" WHERE module = 'alert' [WHERE_CLAUSE_ADDITIONAL] GROUP BY SPLIT_PART(key, '/', 1) ORDER BY total_evaluations DESC LIMIT 30",
               "customQuery": true,
               "fields": {
                 "stream": "triggers",

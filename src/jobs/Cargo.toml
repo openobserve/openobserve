@@ -62,6 +62,7 @@ arrow-schema.workspace = true
 bytes.workspace = true
 chrono.workspace = true
 config.workspace = true
+datafusion.workspace = true
 futures.workspace = true
 hashbrown.workspace = true
 infra.workspace = true

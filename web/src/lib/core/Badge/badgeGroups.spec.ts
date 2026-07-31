@@ -181,9 +181,55 @@ describe("badgeGroups", () => {
     }
   });
 
-  it("alert 'condition_not_satisfied' resolves to the Ok label", () => {
-    expect(resolveBadge("alertState", "condition_not_satisfied").label).toBe("Ok");
-    expect(resolveBadge("alertState", "Condition Not Satisfied").label).toBe("Ok");
+  // Legacy `condition_not_satisfied` and current `normal` are the same state,
+  // so they must render with the same word — otherwise history rows read
+  // differently depending on whether they predate the RunOutcome rename.
+  it("alert 'condition_not_satisfied' resolves to the Normal label", () => {
+    expect(resolveBadge("alertState", "condition_not_satisfied").label).toBe("Normal");
+    expect(resolveBadge("alertState", "Condition Not Satisfied").label).toBe("Normal");
+    expect(resolveBadge("alertState", "normal").label).toBe("Normal");
+  });
+
+  // The backend's `completed` meant "the alert fired". Rendering it green
+  // contradicted both the backend and the timeline's own aggregation.
+  it("alert 'completed' is a FIRING state, not a success state", () => {
+    const r = resolveBadge("alertState", "completed");
+    expect(r.variant).toBe("error-soft");
+    expect(r.label).toBe("Firing");
+  });
+
+  it("alert 'notify_failed' renders as a firing state", () => {
+    const r = resolveBadge("alertState", "notify_failed");
+    expect(r.variant).toBe("error-soft");
+    expect(r.label).toBe("Notify Failed");
+  });
+
+  it("alert 'firing' and 'normal' resolve to opposite tones", () => {
+    expect(resolveBadge("alertState", "firing").variant).toBe("error-soft");
+    expect(resolveBadge("alertState", "normal").variant).toBe("success-soft");
+    expect(resolveBadge("alertState", "succeeded").variant).toBe("success-soft");
+  });
+
+  it("pipeline run outcomes support current and legacy trigger vocabularies", () => {
+    for (const value of [
+      "firing",
+      "normal",
+      "succeeded",
+      "completed",
+      "condition_not_satisfied",
+      "success",
+      "ok",
+    ]) {
+      expect(resolveBadge("pipelineRunOutcome", value).variant, value).toBe("success-soft");
+    }
+
+    for (const value of ["error", "notify_failed", "failed"]) {
+      expect(resolveBadge("pipelineRunOutcome", value).variant, value).toBe("error-soft");
+    }
+
+    for (const value of ["skipped", "warning"]) {
+      expect(resolveBadge("pipelineRunOutcome", value).variant, value).toBe("warning-soft");
+    }
   });
 
   it("resolves the groups added in the OTag type/value sweep", () => {

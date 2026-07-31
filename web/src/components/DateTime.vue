@@ -546,7 +546,6 @@ export default defineComponent({
 
     onMounted(() => {
       // updateDisplayValue();
-      if (props.disableRelative) setDateType("absolute");
       try {
         resetTime("", "");
 
@@ -567,7 +566,8 @@ export default defineComponent({
               : props.defaultAbsoluteTime?.endTime * 1000;
         }
 
-        selectedType.value = props.defaultType;
+        const initialType = props.disableRelative ? "absolute" : props.defaultType;
+        selectedType.value = initialType;
 
         setAbsoluteTime(startTime, endTime);
 
@@ -575,7 +575,7 @@ export default defineComponent({
 
         if (props.queryRangeRestrictionInHour) computeRelativePeriod();
         // displayValue.value = getDisplayValue();
-        saveDate(props.defaultType);
+        saveDate(initialType);
       } catch (e) {
         console.log(e);
       }

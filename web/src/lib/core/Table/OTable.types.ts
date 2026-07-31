@@ -1,7 +1,23 @@
 // Copyright 2026 OpenObserve Inc.
 
-import type { Component } from "vue";
+import type { Component, ComputedRef, InjectionKey, Ref } from "vue";
 import type { Row, Table } from "@tanstack/vue-table";
+
+// ─── Cell hover-actions context ──────────────────────────────────
+/**
+ * Single-active-cell hover model shared by OTable → OTableBodyCell via
+ * provide/inject, so a consumer's hover overlay renders for one cell at a time.
+ * `enabled` is false when no `#cell-hover-actions` slot is present, letting
+ * cells skip the mouse bookkeeping entirely.
+ */
+export interface OTableCellActionsContext {
+  activeCellKey: Ref<string | null>;
+  setActiveCell: (key: string | null) => void;
+  enabled: ComputedRef<boolean>;
+}
+
+export const OTableCellActionsKey: InjectionKey<OTableCellActionsContext> =
+  Symbol("OTableCellActions");
 
 // ─── Shared column size constants ────────────────────────────────
 /**
@@ -187,6 +203,9 @@ export interface OTableProps<TData = any> {
   totalCount?: number;
   /** When true, the page index is NOT reset when the data array changes (e.g. on row expand/collapse). Defaults to false. */
   keepPageOnDataChange?: boolean;
+  /** When true, the caller's `#bottom` slot IS the pagination bar and replaces
+   *  the built-in controls. Leave false when `#bottom` holds only bulk actions. */
+  customPaginationBar?: boolean;
 
   // ── Sorting ──
   sorting?: OTableSortingMode;
@@ -216,8 +235,11 @@ export interface OTableProps<TData = any> {
    *  (renders with `cursor: not-allowed` and ignores toggles). E.g. block bulk
    *  selection of the root user in IAM. */
   isRowSelectable?: (row: TData) => boolean;
-  /** Field used as unique row identifier */
-  rowKey?: string;
+  /** Field used as unique row identifier, or a resolver for rows that have no
+   *  naturally unique field. Pass a resolver when the obvious candidate can
+   *  repeat across rows (e.g. log hits sharing a `_timestamp`), otherwise every
+   *  row with the same value expands/selects as one. */
+  rowKey?: string | ((row: TData) => string);
 
   // ── Expansion ──
   expansion?: OTableExpansionMode;
@@ -270,7 +292,15 @@ export interface OTableProps<TData = any> {
   showIndex?: boolean;
   enableColumnResize?: boolean;
   enableColumnReorder?: boolean;
+  /**
+   * Column id that is locked to the first position (e.g. the timestamp column in
+   * logs). It cannot be picked up by a drag, and any reorder that would push it
+   * out of slot 0 is normalised back. Only meaningful with `enableColumnReorder`.
+   */
+  pinnedFirstColumn?: string;
   enableColumnPin?: boolean;
+  /** Show the per-column value-filter dropdown on `filterable` columns (client-side) */
+  enableColumnFilter?: boolean;
   /** Initial column visibility */
   columnVisibility?: Record<string, boolean>;
   /**
@@ -352,9 +382,12 @@ export interface OTableProps<TData = any> {
   // ── Pivot (Dashboard) ──
   /** Pivot header levels (multi-level headers) */
   pivotHeaderLevels?: any[];
-  /** Pivot row field columns (for sticky headers) */
+  /** Pivot row field columns (for sticky headers + row-field cell merge) */
   pivotRowColumns?: any[];
-  /** Show sticky row totals */
+  /** Grand-total row rendered as a sticky `<tfoot>`, keyed by each column's
+   *  `accessorKey`/`id`; values run through the column's `meta.format`. */
+  stickyTotalRow?: Record<string, any> | null;
+  /** Show sticky row totals (pins the grand-total `<tfoot>` to the bottom) */
   stickyRowTotals?: boolean;
   /** Show sticky column totals */
   stickyColTotals?: boolean;
@@ -396,10 +429,15 @@ export interface OTableEmits<TData = any> {
   "row-mouseenter": [row: TData, event: MouseEvent];
   "row-mouseleave": [row: TData];
   "cell-click": [params: { columnId: string; row: TData; value: any }];
+  /** Right-click on a body cell. Not prevented — the consumer decides whether
+   *  to open its own menu. */
+  "cell-contextmenu": [params: { columnId: string; row: TData; value: any }];
 
   // Column events
   "column-order-change": [order: string[]];
   "column-visibility-change": [visibility: Record<string, boolean>];
+  /** A column's close ("x") affordance was clicked; the consumer decides how to remove it. */
+  "close-column": [column: OTableColumnDef<TData>];
   "update:columnSizes": [sizes: Record<string, number>, idMap: Record<string, string>];
 
   // Row reorder
@@ -420,9 +458,31 @@ export interface OTableSlots<TData = any> {
     value: any;
     table: Table<TData>;
   }) => any;
-  /** Per-column cell slot (`#cell-<columnId>`) — scoped to the plain row data (`row.original`) + row index */
+  /**
+   * Per-cell hover-action overlay, absolutely positioned inside every data cell.
+   * `active` is true only for the cell the pointer is hovering (debounced), so
+   * consumers can mount heavy action menus lazily.
+   *
+   * NOTE: deliberately not named `cell-actions` — that is the per-column cell
+   * slot for a column whose `id` is `"actions"` (the `#cell-{id}` convention).
+   */
+  "cell-hover-actions"?: (props: {
+    row: TData;
+    column: OTableColumnDef<TData>;
+    value: any;
+    active?: boolean;
+  }) => any;
+  /** Per-column cell slot (`#cell-<columnId>`) — scoped to the plain row data
+   *  (`row.original`) + row index. `active` is only ever passed to the reserved
+   *  `cell-hover-actions` key, which this signature has to admit. */
   [key: `cell-${string}`]:
-    | ((props: { row: TData; column: OTableColumnDef<TData>; value: any; index: number }) => any)
+    | ((props: {
+        row: TData;
+        column: OTableColumnDef<TData>;
+        value: any;
+        index: number;
+        active?: boolean;
+      }) => any)
     | undefined;
   /** Custom header content */
   "header-actions"?: () => any;
@@ -472,6 +532,9 @@ export interface OTableExposed<TData = any> {
   toggleAllRows: () => void;
   /** Clear selection */
   clearSelection: () => void;
+  /** True when column resizing is enabled and the user has resized at least one
+   *  column. Read this when rendering your own `OTableColumnToggle`. */
+  hasResizedColumns: boolean;
   /** Reset column sizes to default */
   resetColumnSizes: () => void;
   /** Reset column order to default */

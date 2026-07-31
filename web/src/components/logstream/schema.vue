@@ -2184,6 +2184,11 @@ export default defineComponent({
       }
     };
     const calculateDateRange = () => {
+      if (dataRetentionDays.value <= 0) {
+        minDate.value = null;
+        return;
+      }
+
       const today = new Date();
       const currentDate = new Date(today);
       currentDate.setDate(today.getDate() - (dataRetentionDays.value - 1)); // Adjust to the desired number of days (dataRetentionDays of  days in this case)

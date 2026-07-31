@@ -328,7 +328,15 @@ const NO_DATA_STUB = {
 const SEARCH_FIELD_LIST_STUB = {
   name: "SearchFieldList",
   template: '<div data-test="search-field-list-stub" />',
-  props: ["fields", "timeStamp", "streamName", "streamType", "enableGrouping", "query"],
+  props: [
+    "fields",
+    "timeStamp",
+    "streamName",
+    "streamType",
+    "enableGrouping",
+    "query",
+    "baseFilter",
+  ],
   emits: ["event-emitted"],
 };
 
@@ -874,6 +882,27 @@ describe("AppErrors", () => {
 
       // After removal, error_type condition should be gone
       expect(errorTrackingState.data.editorValue).not.toContain("error_type");
+    });
+
+    it("passes the error-row base filter to the sidebar", async () => {
+      ({ wrapper, router } = await mountAppErrors());
+      await flushPromises();
+
+      const fieldList = wrapper.findComponent(SEARCH_FIELD_LIST_STUB);
+      expect(fieldList.props("baseFilter")).toBe("type='error'");
+    });
+
+    it("adds the service chip to the sidebar base filter", async () => {
+      ({ wrapper, router } = await mountAppErrors());
+      await flushPromises();
+
+      await wrapper
+        .findComponent({ name: "ErrorsFilterBar" })
+        .vm.$emit("update:service", "check'out");
+      await flushPromises();
+
+      const fieldList = wrapper.findComponent(SEARCH_FIELD_LIST_STUB);
+      expect(fieldList.props("baseFilter")).toBe("type='error' AND service='check''out'");
     });
   });
 
