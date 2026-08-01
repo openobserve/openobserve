@@ -271,6 +271,15 @@ const settleBudgetComputed = computed({
   },
 });
 
+// The settle budget's counterpart to `timeoutHelp`. Both fields are numbers in
+// milliseconds with a blank-means-default placeholder, sitting one phase apart,
+// and only one of them said so. It also names which clock this is: P3.3.1 draws
+// the line between the action timeout and the settle budget precisely because
+// the two are otherwise indistinguishable to an author.
+const settleBudgetHelp = computed(() =>
+  t("synthetics.journey.settleBudgetHelp", { seconds: seconds(DEFAULT_SETTLE_BUDGET_MS) }),
+);
+
 // Advisory, like the timeout warning: the server enforces the range, so a value
 // outside it must be visible here rather than surfacing as a save failure.
 const settleBudgetOutOfRange = computed(() => {
@@ -443,9 +452,18 @@ const hasAdvancedChanges = computed(
       </template>
 
       <!-- Three phases of one step, not three unrelated groups of settings: what
-           happens before it acts, while it acts, and if it fails. The numbered
+           happens while it acts, after it acts, and if it fails. The numbered
            rail carries that sequence; the rules that used to separate these
            blocks said only "these are different" and are gone.
+
+           The rail's order is the RUNNER's order, and settling is the second
+           phase, not the first: the probe arms its watchers before the action,
+           but the wait this panel configures happens strictly after the action
+           completes (spec P3.3). The rail previously read settle-then-timeout
+           under the heading "Before it acts", which described the invisible
+           arming rather than the budget the author is setting — and inverted the
+           one relationship P3.3.1 exists to draw, that `timeout_ms` bounds the
+           action while `budget_ms` bounds the wait that follows it.
 
            `expanded` is OStepper's checklist mode — every panel rendered at once
            rather than only the active one. `model-value="0"` is the documented
@@ -456,78 +474,6 @@ const hasAdvancedChanges = computed(
         <OStepper :model-value="0" orientation="vertical" expanded :animated="false">
           <OStep
             :name="1"
-            :title="t('synthetics.journey.advancedSettleHeading')"
-            data-test="synthetics-journey-step-advanced-settle"
-          >
-            <div class="flex w-full flex-col gap-2" data-test="synthetics-journey-step-settle">
-              <!-- What the recording observed is evidence, so it is boxed and reads
-                 as read-only — except the one checkbox on it, which is a judgement
-                 about the application that only the author can make. -->
-              <div
-                v-if="hasRecordedSettle"
-                class="border-border-default rounded-default bg-surface-base flex w-full flex-col gap-1 border p-2"
-                data-test="synthetics-journey-step-settle-recorded"
-              >
-                <span class="text-text-secondary text-xs">{{
-                  t("synthetics.journey.settleLabel")
-                }}</span>
-
-                <p v-if="settleNavigationLine" class="text-text-body m-0 font-mono text-xs">
-                  {{ settleNavigationLine }}
-                </p>
-
-                <div
-                  v-for="(response, i) in settleResponses"
-                  :key="`${response.url_pattern}-${i}`"
-                  class="flex w-full items-center gap-2"
-                >
-                  <OCheckbox
-                    :model-value="!!response.required"
-                    size="xs"
-                    :label="t('synthetics.journey.settleRequiredLabel')"
-                    :data-test="`synthetics-journey-step-settle-required-${i}`"
-                    @update:model-value="setResponseRequired(i, $event)"
-                  />
-                  <span class="text-text-body min-w-0 truncate font-mono text-xs">
-                    {{ settleResponseLabel(response) }}
-                  </span>
-                </div>
-
-                <p
-                  v-if="settleObservedLine"
-                  class="text-text-secondary m-0 text-xs"
-                  data-test="synthetics-journey-step-settle-observed"
-                >
-                  {{ settleObservedLine }}
-                </p>
-              </div>
-
-              <OInput
-                v-model="settleBudgetComputed"
-                :label="t('synthetics.journey.settleBudgetLabel')"
-                :placeholder="String(DEFAULT_SETTLE_BUDGET_MS)"
-                type="number"
-                class="w-75!"
-                data-test="synthetics-journey-step-settle-budget-input"
-              />
-              <p
-                v-if="settleBudgetOutOfRange"
-                class="text-status-warning-text m-0 flex items-start gap-1 text-xs"
-                data-test="synthetics-journey-step-settle-budget-warning"
-              >
-                <OIcon name="warning" size="xs" class="mt-0.5 shrink-0" aria-hidden="true" />
-                <span>{{
-                  t("synthetics.journey.settleBudgetRangeWarning", {
-                    min: MIN_SETTLE_BUDGET_MS,
-                    max: MAX_SETTLE_BUDGET_MS,
-                  })
-                }}</span>
-              </p>
-            </div>
-          </OStep>
-
-          <OStep
-            :name="2"
             :title="t('synthetics.journey.advancedTimeoutHeading')"
             data-test="synthetics-journey-step-advanced-timeout"
           >
@@ -550,6 +496,99 @@ const hasAdvancedChanges = computed(
                 t("synthetics.journey.timeoutBelowDefaultWarning", { default: timeoutDefault })
               }}</span>
             </p>
+          </OStep>
+
+          <OStep
+            :name="2"
+            :title="t('synthetics.journey.advancedSettleHeading')"
+            data-test="synthetics-journey-step-advanced-settle"
+          >
+            <div class="flex w-full flex-col gap-2" data-test="synthetics-journey-step-settle">
+              <!-- What the recording observed is evidence, so it is boxed and reads
+                 as read-only — except the one checkbox on it, which is a judgement
+                 about the application that only the author can make. -->
+              <div
+                v-if="hasRecordedSettle"
+                class="border-border-default rounded-default bg-surface-base flex w-full flex-col gap-1 border p-2"
+                data-test="synthetics-journey-step-settle-recorded"
+              >
+                <span class="text-text-secondary text-xs">{{
+                  t("synthetics.journey.settleLabel")
+                }}</span>
+
+                <p v-if="settleNavigationLine" class="text-text-body m-0 font-mono text-xs">
+                  {{ settleNavigationLine }}
+                </p>
+
+                <!-- `Required` is the highest-stakes control in this panel: it
+                     converts an advisory signal, whose absence the run tolerates
+                     and carries forward one step, into one that fails this step
+                     outright. Both flags in the failure phase carry a tooltip
+                     for semantics their labels cannot hold; this one had none,
+                     and it is the toggle whose two states differ most. -->
+                <div
+                  v-for="(response, i) in settleResponses"
+                  :key="`${response.url_pattern}-${i}`"
+                  class="flex w-full items-center gap-2"
+                >
+                  <OCheckbox
+                    :model-value="!!response.required"
+                    size="xs"
+                    :label="t('synthetics.journey.settleRequiredLabel')"
+                    :data-test="`synthetics-journey-step-settle-required-${i}`"
+                    @update:model-value="setResponseRequired(i, $event)"
+                  />
+                  <OTooltip :content="t('synthetics.journey.settleRequiredHelp')">
+                    <OIcon
+                      name="info-outline"
+                      size="xs"
+                      class="text-text-secondary shrink-0"
+                      :data-test="`synthetics-journey-step-settle-required-help-${i}`"
+                      aria-hidden="true"
+                    />
+                  </OTooltip>
+                  <span class="text-text-body min-w-0 truncate font-mono text-xs">
+                    {{ settleResponseLabel(response) }}
+                  </span>
+                </div>
+
+                <p
+                  v-if="settleObservedLine"
+                  class="text-text-secondary m-0 text-xs"
+                  data-test="synthetics-journey-step-settle-observed"
+                >
+                  {{ settleObservedLine }}
+                </p>
+              </div>
+
+              <!-- Same argument as the timeout's help line (SE-9 / D8): a bare
+                   placeholder reads as "empty" to the author it was meant to
+                   inform. It also says which clock this is — P3.3.1's whole
+                   point is that the two answer different questions, and the
+                   fields are peers with nothing else to tell them apart. -->
+              <OInput
+                v-model="settleBudgetComputed"
+                :label="t('synthetics.journey.settleBudgetLabel')"
+                :placeholder="String(DEFAULT_SETTLE_BUDGET_MS)"
+                :helpText="settleBudgetHelp"
+                type="number"
+                class="w-75!"
+                data-test="synthetics-journey-step-settle-budget-input"
+              />
+              <p
+                v-if="settleBudgetOutOfRange"
+                class="text-status-warning-text m-0 flex items-start gap-1 text-xs"
+                data-test="synthetics-journey-step-settle-budget-warning"
+              >
+                <OIcon name="warning" size="xs" class="mt-0.5 shrink-0" aria-hidden="true" />
+                <span>{{
+                  t("synthetics.journey.settleBudgetRangeWarning", {
+                    min: MIN_SETTLE_BUDGET_MS,
+                    max: MAX_SETTLE_BUDGET_MS,
+                  })
+                }}</span>
+              </p>
+            </div>
           </OStep>
 
           <!-- Both flags are fully implemented in the probe with semantics the labels

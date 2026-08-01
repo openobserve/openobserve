@@ -250,23 +250,53 @@ describe("BrowserJourneyStepEditor field layout", () => {
     expect(wrapper.find(test("synthetics-journey-step-timeout-input")).exists()).toBe(false);
   });
 
-  // The three groups inside Advanced are one sequence — before it acts, while it
+  // The three groups inside Advanced are one sequence — while it acts, after it
   // acts, if it fails — and the numbered rail is what says so. Rules between them
   // said only "these are different".
+  //
+  // The order is the RUNNER's: spec P3.3 has the probe wait for its settle
+  // signals AFTER the action completes, so the timeout phase precedes the settle
+  // phase. The rail once read the other way round, under the heading "Before it
+  // acts", which described the watchers being armed rather than the budget the
+  // field actually sets.
   it("orders Advanced as three numbered phases of the step", async () => {
     const wrapper = render();
     await openAdvanced(wrapper);
     const phases = wrapper.findAll('[data-test^="synthetics-journey-step-advanced-"]');
     expect(phases.map((p) => p.attributes("data-test"))).toEqual([
-      "synthetics-journey-step-advanced-settle",
       "synthetics-journey-step-advanced-timeout",
+      "synthetics-journey-step-advanced-settle",
       "synthetics-journey-step-advanced-failure",
     ]);
     // The rail's numbers are the sequence, so they are read rather than assumed.
     expect(phases.map((p) => p.text().trim()[0])).toEqual(["1", "2", "3"]);
-    expect(phases[0].text()).toMatch(/let the page settle/i);
-    expect(phases[1].text()).toMatch(/give up after/i);
+    expect(phases[0].text()).toMatch(/give up after/i);
+    expect(phases[1].text()).toMatch(/let the page settle/i);
     expect(phases[2].text()).toMatch(/if it fails/i);
+  });
+
+  // Settling happens after the action, and the heading is the only place that
+  // sequence is stated in words rather than by rail position.
+  it("names the settle phase as following the action, not preceding it", async () => {
+    const wrapper = render();
+    await openAdvanced(wrapper);
+    const settle = wrapper.find(test("synthetics-journey-step-advanced-settle"));
+    expect(settle.text()).toMatch(/after it acts/i);
+    expect(settle.text()).not.toMatch(/before it acts/i);
+  });
+
+  // `Required` turns a signal the run tolerates the absence of into one that
+  // fails the step. That is the largest behavioural difference any control in
+  // this panel makes, and the label alone cannot carry it.
+  // No `openAdvanced` here: recorded settle evidence opens Advanced by itself,
+  // and the helper is a toggle — clicking it would close the section.
+  it("explains what marking a settle signal required does", () => {
+    const wrapper = render({
+      settle: { responses: [{ url_pattern: "**/api/login", method: "POST", required: false }] },
+    });
+    expect(wrapper.find(test("synthetics-journey-step-settle-required-help-0")).exists()).toBe(
+      true,
+    );
   });
 
   // These phases always all apply — there is no step the author is "on" — so the
