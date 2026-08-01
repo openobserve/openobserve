@@ -820,6 +820,7 @@ pub async fn correlate_external_event(
         triggered_at,
         &correlation_reason,
         &service_name,
+        None, // external events carry no evaluated alert level
     )
     .await?;
 
@@ -828,9 +829,11 @@ pub async fn correlate_external_event(
     // empty-`notify_rows` manual-trigger case to guard against here.
     match &outcome {
         IncidentCorrelationOutcome::NewIncidentCreated { incident_id, .. }
-        | IncidentCorrelationOutcome::NewAlertTypeJoined { incident_id, .. } => {
+        | IncidentCorrelationOutcome::NewAlertTypeJoined { incident_id, .. }
+        | IncidentCorrelationOutcome::SeverityEscalated { incident_id, .. } => {
             let event = match &outcome {
                 IncidentCorrelationOutcome::NewIncidentCreated { .. } => "new_incident_created",
+                IncidentCorrelationOutcome::SeverityEscalated { .. } => "severity_escalated",
                 _ => "new_alert_correlated",
             };
             let merged_destinations =
@@ -1320,7 +1323,7 @@ async fn find_or_create_incident(
                     IncidentEvent::severity_upgrade(
                         current_severity,
                         new_severity,
-                        format!("alert '{}' escalated to {}", alert.name, new_severity),
+                        format!("alert '{}' escalated to {}", subject.name, new_severity),
                     ),
                 )
                 .await
@@ -1333,7 +1336,7 @@ async fn find_or_create_incident(
                 log::info!(
                     "[Incidents] Incident {} escalated {current_severity} -> {new_severity} by alert '{}'",
                     incident.id,
-                    alert.name
+                    subject.name
                 );
                 return Ok(IncidentCorrelationOutcome::SeverityEscalated {
                     incident_id: incident.id,
