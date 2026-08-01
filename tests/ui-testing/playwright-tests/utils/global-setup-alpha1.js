@@ -671,10 +671,28 @@ async function verifySharedAuth(baseUrl) {
       return false;
     }
 
-    // Verify the main menu is visible
-    const menuItem = page.locator('[data-test="menu-link-\\/-item"]');
-    await menuItem.waitFor({ state: 'visible', timeout: NAV_RAIL_TIMEOUT });
-    testLogger.info('[alpha1] Shared auth verified — menu visible');
+    // Validate the SESSION, not the nav rail.
+    //
+    // The app shell mounts as soon as the SPA boots with a valid session; the rail
+    // only fills once GET /config resolves, which on a loaded alpha takes 20-68s or
+    // never. Gating session validity on the rail means a slow /config makes us
+    // DISCARD a perfectly good session and fall back to a fresh Dex login — and in
+    // run 30703603442 that fallback then failed all three attempts, killing the
+    // Traces and GeneralTests shards outright before a single test ran:
+    //   Shared auth verification error: locator.waitFor: Timeout 90000ms exceeded
+    //   Shared auth state invalid — falling back to Dex login
+    //   All 3 login attempts failed.
+    // The shell is the correct signal: if we were unauthenticated we would be on
+    // Dex or /web/login and it would not exist.
+    const appShell = page.locator('[data-test="navbar-main-nav"]');
+    await appShell.waitFor({ state: 'visible', timeout: 45000 });
+    testLogger.info('[alpha1] Shared auth verified — app shell rendered');
+
+    // The rail is nice-to-have here; log it but never invalidate the session on it.
+    const railReady = await page.locator('[data-test="navbar-main-nav"] [data-test^="menu-link-"]').first()
+      .waitFor({ state: 'visible', timeout: NAV_RAIL_TIMEOUT })
+      .then(() => true).catch(() => false);
+    testLogger.info(`[alpha1] Nav rail populated during shared-auth check: ${railReady}`);
 
     // NOTE ON THE ACTIVE ORG — do not "fix" this by re-switching and re-saving.
     //
