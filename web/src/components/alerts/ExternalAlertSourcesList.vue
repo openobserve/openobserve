@@ -36,42 +36,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div v-if="defaultSource" class="flex flex-col gap-6 text-sm">
       <!-- Webhook URL -->
       <div class="flex flex-col gap-2">
-        <div class="flex items-center justify-between">
-          <div class="font-semibold">{{ t("alert_sources.webhookUrlLabel") }}</div>
-          <div class="flex items-center gap-2">
-            <OButton
-              variant="ghost"
-              size="icon-xs-sq"
-              :icon-left="revealed ? 'visibility-off' : 'visibility'"
-              :title="revealed ? t('alert_sources.hideToken') : t('alert_sources.revealToken')"
-              data-test="alert-sources-reveal-btn"
-              @click="toggleReveal"
-            />
-            <OButton
-              variant="outline-destructive"
-              size="sm-action"
-              data-test="alert-sources-rotate-btn"
-              @click="confirmRotate"
-            >
-              <OIcon name="autorenew" size="sm" />
-              {{ t("alert_sources.rotateToken") }}
-            </OButton>
-            <OButton
-              :variant="defaultSource.enabled ? 'ghost-destructive' : 'ghost-success'"
-              size="sm-action"
-              data-test="alert-sources-toggle-enabled-btn"
-              @click="toggleEnabled"
-            >
-              <OIcon :name="defaultSource.enabled ? 'pause' : 'play-arrow'" size="sm" />
-              {{ defaultSource.enabled ? t("alert_sources.disable") : t("alert_sources.enable") }}
-            </OButton>
-          </div>
-        </div>
+        <div class="font-semibold">{{ t("alert_sources.webhookUrlLabel") }}</div>
         <p class="text-text-secondary">{{ t("alert_sources.webhookUrlHelp") }}</p>
         <CopyContent
-          :key="revealed ? 'revealed' : 'masked'"
-          :content="fullUrl"
-          :display-content="displayedUrl"
+          :key="isRevealed(defaultSource) ? 'revealed' : 'masked'"
+          :content="fullUrlFor(defaultSource)"
+          :display-content="displayedUrlFor(defaultSource)"
           data-test="alert-sources-url-cell"
         />
       </div>
@@ -103,123 +73,110 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <CopyContent v-else-if="selectedSetupType === 'generic'" :content="genericSnippet" />
       </div>
 
-      <!-- Status -->
-      <div
-        class="rounded-surface border-border-default bg-surface-panel flex flex-col gap-3 border p-3"
-        data-test="alert-sources-status"
-      >
-        <div class="font-semibold">{{ t("alert_sources.statusHeader") }}</div>
-        <div v-if="sourceStatuses.length === 0" class="flex items-start gap-2">
-          <OTag variant="default-outline">{{ t("alert_sources.statusNotConnected") }}</OTag>
-          <p class="text-text-secondary">{{ t("alert_sources.statusNotConnectedHelp") }}</p>
+      <!-- Alert sources table -->
+      <div class="mt-2 flex flex-col gap-3 text-sm">
+        <div class="flex items-center justify-between">
+          <div class="font-semibold">{{ t("alert_sources.statusHeader") }}</div>
+          <OButton
+            v-if="!showAddEditor"
+            variant="primary"
+            size="sm"
+            icon-left="add"
+            data-test="alert-sources-add-btn"
+            @click="showAddEditor = true"
+          >
+            {{ t("alert_sources.add") }}
+          </OButton>
         </div>
-        <div v-for="status in sourceStatuses" :key="status.displayName" class="flex flex-col gap-1">
-          <div class="flex items-center gap-2">
-            <span>{{ status.displayName }}</span>
-            <OTag v-if="status.status === 'receiving'" variant="success-soft" dot>
+        <AddExternalAlertSource
+          v-if="showAddEditor"
+          @created="fetchIntegrations"
+          @cancel:hideform="showAddEditor = false"
+        />
+        <OTable
+          :data="tableRows"
+          :columns="advancedColumns"
+          row-key="rowKey"
+          pagination="client"
+          :page-size="10"
+          data-test="alert-sources-advanced-table"
+        >
+          <template #cell-name="{ row }">
+            <div class="flex items-center gap-2">
+              <span>{{ row.displayName }}</span>
+              <OTag
+                v-if="row.sharesDefaultToken"
+                variant="default-outline"
+                :title="t('alert_sources.sharedTokenHint')"
+                data-test="alert-sources-shared-token-badge"
+              >
+                {{ t("alert_sources.sharedTokenBadge") }}
+              </OTag>
+            </div>
+          </template>
+          <template #cell-status="{ row }">
+            <OTag v-if="row.status === 'receiving'" variant="success-soft" dot>
               {{ t("alert_sources.statusReceiving") }}
             </OTag>
-            <OTag v-else-if="status.status === 'stale'" variant="warning-soft" dot>
+            <OTag v-else-if="row.status === 'stale'" variant="warning-soft" dot>
               {{ t("alert_sources.statusStale") }}
             </OTag>
             <OTag v-else variant="default-outline">
               {{ t("alert_sources.statusNotConnected") }}
             </OTag>
-            <span class="text-text-secondary">
-              {{ t("alert_sources.acceptedCount") }}: {{ status.acceptedCount }},
-              {{ t("alert_sources.rejectedCount") }}: {{ status.rejectedCount }}
-            </span>
-          </div>
-          <div v-if="status.resolveWiringHint" class="text-warning">
-            {{ t("alert_sources.resolveHintMessage") }}
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="mt-6">
-      <OButton
-        variant="ghost"
-        size="sm"
-        :icon-left="showAdvanced ? 'expand-less' : 'expand-more'"
-        data-test="alert-sources-advanced-toggle"
-        @click="showAdvanced = !showAdvanced"
-      >
-        {{ t("alert_sources.advancedSectionTitle") }}
-      </OButton>
-      <div v-if="showAdvanced" class="mt-2 flex flex-col gap-3 text-sm">
-        <p class="text-text-secondary">{{ t("alert_sources.advancedSectionDesc") }}</p>
-        <div v-if="!showAddEditor">
-          <div class="mb-2 flex justify-end">
-            <OButton
-              variant="primary"
-              size="sm"
-              icon-left="add"
-              data-test="alert-sources-add-btn"
-              @click="showAddEditor = true"
-            >
-              {{ t("alert_sources.add") }}
-            </OButton>
-          </div>
-          <OTable
-            :data="additionalIntegrations"
-            :columns="advancedColumns"
-            row-key="id"
-            pagination="client"
-            :page-size="10"
-            data-test="alert-sources-advanced-table"
-          >
-            <template #cell-status="{ row }">
-              <OTag v-if="additionalStatusById[row.id] === 'receiving'" variant="success-soft" dot>
-                {{ t("alert_sources.statusReceiving") }}
-              </OTag>
-              <OTag v-else-if="additionalStatusById[row.id] === 'stale'" variant="warning-soft" dot>
-                {{ t("alert_sources.statusStale") }}
-              </OTag>
-              <OTag v-else variant="default-outline">
-                {{ t("alert_sources.statusNotConnected") }}
-              </OTag>
-            </template>
-            <template #cell-url="{ row }">
-              <div class="flex items-center gap-1">
-                <OButton
-                  variant="ghost"
-                  size="icon-xs-sq"
-                  :icon-left="revealedAdditionalIds.includes(row.id) ? 'visibility-off' : 'visibility'"
-                  :title="
-                    revealedAdditionalIds.includes(row.id)
-                      ? t('alert_sources.hideToken')
-                      : t('alert_sources.revealToken')
-                  "
-                  :data-test="`alert-sources-additional-reveal-${row.id}`"
-                  @click="toggleAdditionalReveal(row.id)"
-                />
-                <OButton
-                  variant="ghost"
-                  size="icon-xs-sq"
-                  icon-left="content-copy"
-                  :title="t('alert_sources.copyUrl')"
-                  :data-test="`alert-sources-additional-copy-${row.id}`"
-                  @click="copyAdditionalUrl(row)"
-                />
-                <span class="truncate font-mono text-xs">{{ displayedUrlFor(row) }}</span>
-              </div>
-            </template>
-            <template #cell-actions="{ row }">
+          </template>
+          <template #cell-url="{ row }">
+            <div v-if="row.integration" class="flex items-center gap-1">
               <OButton
-                :variant="row.enabled ? 'ghost-destructive' : 'ghost-success'"
-                size="icon-sm"
-                :icon-left="row.enabled ? 'pause' : 'play-arrow'"
-                @click="toggleEnabledFor(row)"
+                variant="ghost"
+                size="icon-xs-sq"
+                :icon-left="isRevealed(row.integration) ? 'visibility-off' : 'visibility'"
+                :title="isRevealed(row.integration) ? t('alert_sources.hideToken') : t('alert_sources.revealToken')"
+                :data-test="`alert-sources-reveal-${row.integration.id}`"
+                @click="toggleRevealFor(row.integration)"
               />
-            </template>
-          </OTable>
-        </div>
-        <AddExternalAlertSource
-          v-else
-          @created="fetchIntegrations"
-          @cancel:hideform="showAddEditor = false"
-        />
+              <OButton
+                variant="ghost"
+                size="icon-xs-sq"
+                icon-left="content-copy"
+                :title="t('alert_sources.copyUrl')"
+                :data-test="`alert-sources-copy-${row.integration.id}`"
+                @click="copyUrlFor(row.integration)"
+              />
+              <span class="truncate font-mono text-xs">{{ displayedUrlFor(row.integration) }}</span>
+            </div>
+            <span v-else class="text-text-secondary">—</span>
+          </template>
+          <template #cell-actions="{ row }">
+            <div v-if="row.integration" class="flex items-center gap-1">
+              <OButton
+                variant="ghost"
+                size="icon-sm"
+                icon-left="autorenew"
+                :title="t('alert_sources.rotateToken')"
+                :data-test="`alert-sources-rotate-${row.integration.id}`"
+                @click="confirmRotate(row.integration)"
+              />
+              <OButton
+                :variant="row.integration.enabled ? 'ghost-destructive' : 'ghost-success'"
+                size="icon-sm"
+                :icon-left="row.integration.enabled ? 'pause' : 'play-arrow'"
+                :title="row.integration.enabled ? t('alert_sources.disable') : t('alert_sources.enable')"
+                :data-test="`alert-sources-toggle-enabled-${row.integration.id}`"
+                @click="toggleEnabledFor(row.integration)"
+              />
+              <OButton
+                v-if="row.integration.name !== 'default'"
+                variant="ghost-destructive"
+                size="icon-sm"
+                icon-left="delete"
+                :title="t('alert_sources.delete')"
+                :data-test="`alert-sources-delete-${row.integration.id}`"
+                @click="confirmDelete(row.integration)"
+              />
+            </div>
+          </template>
+        </OTable>
       </div>
     </div>
 
@@ -233,6 +190,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="alert-sources-rotate-dialog"
       @update:ok="doRotate"
     />
+
+    <ConfirmDialog
+      v-model="deleteDialogVisible"
+      :title="t('alert_sources.deleteConfirmTitle')"
+      :message="t('alert_sources.deleteConfirmMessage')"
+      :warning-message="t('alert_sources.deleteConfirmWarning')"
+      :ok-label="t('alert_sources.delete')"
+      ok-color="destructive"
+      data-test="alert-sources-delete-dialog"
+      @update:ok="doDelete"
+    />
   </OPageLayout>
 </template>
 
@@ -243,7 +211,6 @@ import { useI18n } from "vue-i18n";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
@@ -271,7 +238,6 @@ export default defineComponent({
     OPageLayout,
     OButton,
     OTag,
-    OIcon,
     OTable,
     OTabs,
     OTab,
@@ -289,18 +255,19 @@ export default defineComponent({
       loading: false,
       integrations: [] as AlertSourceIntegration[],
       sourceStatuses: [] as SourceStatusRow[],
-      revealed: false,
+      revealedIds: [] as string[],
       rotateDialogVisible: false,
-      showAdvanced: false,
+      rotateTarget: undefined as AlertSourceIntegration | undefined,
+      deleteDialogVisible: false,
+      deleteTarget: undefined as AlertSourceIntegration | undefined,
       showAddEditor: false,
       selectedSetupType: "grafana" as "grafana" | "alertmanager" | "generic",
-      revealedAdditionalIds: [] as string[],
       additionalStatusById: {} as Record<string, "receiving" | "stale" | "not_connected">,
       advancedColumns: [
-        { id: "name", header: this.t("alert_sources.name"), accessorKey: "name", sortable: true },
-        { id: "source_type", header: this.t("alert_sources.sourceType"), accessorKey: "source_type" },
-        { id: "status", header: this.t("alert_sources.statusColumnHeader"), accessorKey: "id" },
-        { id: "url", header: this.t("alert_sources.urlHeader"), accessorKey: "url" },
+        { id: "name", header: this.t("alert_sources.name"), accessorKey: "displayName", sortable: true },
+        { id: "source_type", header: this.t("alert_sources.sourceType"), accessorKey: "sourceType" },
+        { id: "status", header: this.t("alert_sources.statusColumnHeader"), accessorKey: "rowKey" },
+        { id: "url", header: this.t("alert_sources.urlHeader"), accessorKey: "rowKey" },
         { id: "actions", header: this.t("alert_sources.actions"), isAction: true, size: 100 },
       ] as any[],
     };
@@ -321,16 +288,63 @@ export default defineComponent({
     },
     fullUrl(): string {
       if (!this.defaultSource) return "";
-      const ingestionURL = getIngestionURL();
-      const base = getEndPoint(ingestionURL).url;
-      return `${base}${this.defaultSource.url}`;
+      return this.fullUrlFor(this.defaultSource);
     },
-    displayedUrl(): string {
-      if (!this.defaultSource) return "";
-      if (this.revealed) return this.fullUrl;
-      const token = this.defaultSource.token;
-      const masked = `${token.slice(0, 6)}****${token.slice(-4)}`;
-      return this.fullUrl.replace(token, masked);
+    tableRows(): Array<{
+      rowKey: string;
+      displayName: string;
+      sourceType: string;
+      status: "receiving" | "stale" | "not_connected";
+      integration: AlertSourceIntegration | undefined;
+      sharesDefaultToken: boolean;
+    }> {
+      const rows: Array<{
+        rowKey: string;
+        displayName: string;
+        sourceType: string;
+        status: "receiving" | "stale" | "not_connected";
+        integration: AlertSourceIntegration | undefined;
+        sharesDefaultToken: boolean;
+      }> = [];
+
+      if (this.defaultSource) {
+        if (this.sourceStatuses.length === 0) {
+          rows.push({
+            rowKey: `default:${this.defaultSource.id}`,
+            displayName: this.defaultSource.name,
+            sourceType: this.defaultSource.source_type,
+            status: "not_connected",
+            integration: this.defaultSource,
+            sharesDefaultToken: false,
+          });
+        } else {
+          this.sourceStatuses.forEach((s, idx) => {
+            rows.push({
+              rowKey: `default:${this.defaultSource!.id}:${s.displayName}`,
+              displayName: s.displayName,
+              sourceType: this.defaultSource!.source_type,
+              status: s.status,
+              // Only the first sender row carries the shared URL/token controls
+              // to avoid repeating identical actions per sender.
+              integration: idx === 0 ? this.defaultSource : undefined,
+              sharesDefaultToken: true,
+            });
+          });
+        }
+      }
+
+      for (const integration of this.additionalIntegrations) {
+        rows.push({
+          rowKey: `additional:${integration.id}`,
+          displayName: integration.name,
+          sourceType: integration.source_type,
+          status: this.additionalStatusById[integration.id] ?? "not_connected",
+          integration,
+          sharesDefaultToken: false,
+        });
+      }
+
+      return rows;
     },
     alertmanagerSnippet(): string {
       return [
@@ -405,63 +419,58 @@ export default defineComponent({
         toast({ variant: "error", message: this.t("alert_sources.senderError") });
       }
     },
-    toggleReveal() {
-      this.revealed = !this.revealed;
+    isRevealed(integration: AlertSourceIntegration): boolean {
+      return this.revealedIds.includes(integration.id);
     },
-    copyUrl() {
-      if (!this.defaultSource) return;
-      copyToClipboard(this.fullUrl);
+    toggleRevealFor(integration: AlertSourceIntegration) {
+      const idx = this.revealedIds.indexOf(integration.id);
+      if (idx === -1) {
+        this.revealedIds.push(integration.id);
+      } else {
+        this.revealedIds.splice(idx, 1);
+      }
+    },
+    copyUrlFor(integration: AlertSourceIntegration) {
+      copyToClipboard(this.fullUrlFor(integration));
     },
     fullUrlFor(integration: AlertSourceIntegration): string {
       return `${this.ingestionBaseUrl}${integration.url}`;
     },
     displayedUrlFor(integration: AlertSourceIntegration): string {
       const full = this.fullUrlFor(integration);
-      if (this.revealedAdditionalIds.includes(integration.id)) return full;
+      if (this.isRevealed(integration)) return full;
       const token = integration.token;
       const masked = `${token.slice(0, 6)}****${token.slice(-4)}`;
       return full.replace(token, masked);
     },
-    toggleAdditionalReveal(integrationId: string) {
-      const idx = this.revealedAdditionalIds.indexOf(integrationId);
-      if (idx === -1) {
-        this.revealedAdditionalIds.push(integrationId);
-      } else {
-        this.revealedAdditionalIds.splice(idx, 1);
-      }
-    },
-    copyAdditionalUrl(integration: AlertSourceIntegration) {
-      copyToClipboard(this.fullUrlFor(integration));
-    },
-    confirmRotate() {
+    confirmRotate(integration: AlertSourceIntegration) {
+      this.rotateTarget = integration;
       this.rotateDialogVisible = true;
     },
     async doRotate() {
-      if (!this.defaultSource) return;
+      if (!this.rotateTarget) return;
       try {
-        await alertSources.rotate(this.orgIdentifier, this.defaultSource.id);
+        await alertSources.rotate(this.orgIdentifier, this.rotateTarget.id);
         toast({ variant: "success", message: this.t("alert_sources.rotatedSuccess") });
-        this.revealed = false;
+        this.revealedIds = this.revealedIds.filter((id) => id !== this.rotateTarget?.id);
+        this.rotateTarget = undefined;
         await this.fetchAll();
       } catch (e) {
         toast({ variant: "error", message: this.t("alert_sources.error") });
       }
     },
-    async toggleEnabled() {
-      if (!this.defaultSource) return;
+    confirmDelete(integration: AlertSourceIntegration) {
+      this.deleteTarget = integration;
+      this.deleteDialogVisible = true;
+    },
+    async doDelete() {
+      if (!this.deleteTarget) return;
       try {
-        await alertSources.setEnabled(
-          this.orgIdentifier,
-          this.defaultSource.id,
-          !this.defaultSource.enabled,
-        );
-        toast({
-          variant: "success",
-          message: this.defaultSource.enabled
-            ? this.t("alert_sources.disabledSuccess")
-            : this.t("alert_sources.enabledSuccess"),
-        });
-        await this.fetchIntegrations();
+        await alertSources.delete(this.orgIdentifier, this.deleteTarget.id);
+        toast({ variant: "success", message: this.t("alert_sources.deletedSuccess") });
+        this.revealedIds = this.revealedIds.filter((id) => id !== this.deleteTarget?.id);
+        this.deleteTarget = undefined;
+        await this.fetchAll();
       } catch (e) {
         toast({ variant: "error", message: this.t("alert_sources.error") });
       }

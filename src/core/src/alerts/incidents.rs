@@ -81,10 +81,11 @@ async fn extract_filtered_semantic_dimensions(
     // Load ServiceIdentityConfig with auto-configuration applied
     let identity_config = crate::db::system_settings::get_service_identity_config(org_id).await;
 
-    // Validate config has at least one set
-    if identity_config.sets.is_empty() {
+    // No identity sets configured AND service is opted out — nothing to extract.
+    // Otherwise fall through: "service" alone is a viable dimension even with zero sets.
+    if identity_config.sets.is_empty() && identity_config.service_optional {
         log::debug!(
-            "[incidents] ServiceIdentityConfig for org {} has no identity sets, semantic extraction skipped",
+            "[incidents] ServiceIdentityConfig for org {} has no identity sets and service is optional, semantic extraction skipped",
             org_id
         );
         return None;
@@ -98,6 +99,12 @@ async fn extract_filtered_semantic_dimensions(
     let mut all_distinguish_by: Vec<String> = Vec::new();
     for set in &identity_config.sets {
         all_distinguish_by.extend(set.distinguish_by.iter().cloned());
+    }
+    // "service" is always a correlation dimension unless the org has explicitly
+    // opted out via service_optional (same toggle Service Discovery uses to match
+    // streams without requiring the service attribute).
+    if !identity_config.service_optional {
+        all_distinguish_by.push("service".to_string());
     }
     // Remove duplicates and sort for deterministic processing
     all_distinguish_by.sort();
@@ -850,6 +857,50 @@ pub async fn correlate_external_event(
     Ok(Some(outcome))
 }
 
+/// Auto-resolve the open incident containing `external.id`, but only once every
+/// other `External`-kind alert already linked to that incident is also resolved
+/// in `external_alerts` — a single source clearing shouldn't close an incident
+/// that other still-firing sources are correlated into.
+pub async fn try_auto_resolve_incident_for_external_alert(
+    org_id: &str,
+    external_alert_id: &str,
+) -> Result<(), anyhow::Error> {
+    let Some(incident) =
+        infra::table::alert_incidents::find_open_incident_containing_alert(
+            org_id,
+            external_alert_id,
+        )
+        .await?
+    else {
+        return Ok(());
+    };
+
+    let links = infra::table::alert_incidents::get_incident_alerts(&incident.id).await?;
+    let external_alert_ids: Vec<String> = links
+        .into_iter()
+        .filter(|l| l.alert_kind == "external")
+        .map(|l| l.alert_id)
+        .collect();
+
+    if external_alert_ids.is_empty() {
+        return Ok(());
+    }
+
+    let records = infra::table::external_alerts::get_by_ids(org_id, &external_alert_ids).await?;
+    let all_resolved = records.iter().all(|r| r.state == "resolved");
+
+    if all_resolved {
+        update_status(org_id, &incident.id, "resolved", "system@openobserve.ai").await?;
+        log::info!(
+            "[incidents] Auto-resolved incident {} — all {} contributing external alert(s) resolved",
+            incident.id,
+            external_alert_ids.len()
+        );
+    }
+
+    Ok(())
+}
+
 /// Query Service Discovery for group_values using the correlation API
 ///
 /// Uses ServiceStorage::correlate() for proper dimension matching
@@ -1215,7 +1266,7 @@ async fn find_or_create_incident(
             if let Err(e) = crate::incidents::send_incident_event_trigger(
                 org_id,
                 &incident.id,
-                IncidentEvent::alert(&alert_id, &alert.name, triggered_at),
+                IncidentEvent::alert(&alert_id, &subject.name, triggered_at),
             )
             .await
             {
@@ -1357,7 +1408,7 @@ async fn find_or_create_incident(
                 && let Err(e) = crate::incidents::send_incident_event_trigger(
                     org_id,
                     &existing.id,
-                    IncidentEvent::alert(alert.get_unique_key(), &alert.name, triggered_at),
+                    IncidentEvent::alert(&subject.id, &subject.name, triggered_at),
                 )
                 .await
             {

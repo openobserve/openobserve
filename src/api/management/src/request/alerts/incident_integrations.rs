@@ -253,6 +253,34 @@ pub async fn rotate_integration_token(
 }
 
 #[cfg(feature = "enterprise")]
+pub async fn delete_integration(
+    Path((org_id, integration_id)): Path<(String, String)>,
+) -> Response {
+    if let Some(resp) = gate_enabled() {
+        return resp;
+    }
+
+    let integration = match infra::table::incident_integrations::list_by_org(&org_id).await {
+        Ok(records) => records.into_iter().find(|r| r.id == integration_id),
+        Err(e) => return MetaHttpResponse::internal_error(e),
+    };
+    let Some(integration) = integration else {
+        return MetaHttpResponse::not_found("Integration not found");
+    };
+    if integration.name == infra::table::incident_integrations::DEFAULT_INTEGRATION_NAME {
+        return MetaHttpResponse::bad_request(
+            "The default alert source cannot be deleted — disable it instead",
+        );
+    }
+
+    match infra::table::incident_integrations::delete(&org_id, &integration_id).await {
+        Ok(true) => MetaHttpResponse::ok("deleted"),
+        Ok(false) => MetaHttpResponse::not_found("Integration not found"),
+        Err(e) => MetaHttpResponse::internal_error(e),
+    }
+}
+
+#[cfg(feature = "enterprise")]
 pub async fn list_integration_senders(
     Path((org_id, integration_id)): Path<(String, String)>,
 ) -> Response {
@@ -307,6 +335,11 @@ pub async fn rotate_integration_token(_path: Path<(String, String)>) -> Response
 
 #[cfg(not(feature = "enterprise"))]
 pub async fn list_integration_senders(_path: Path<(String, String)>) -> Response {
+    MetaHttpResponse::forbidden("Not Supported")
+}
+
+#[cfg(not(feature = "enterprise"))]
+pub async fn delete_integration(_path: Path<(String, String)>) -> Response {
     MetaHttpResponse::forbidden("Not Supported")
 }
 

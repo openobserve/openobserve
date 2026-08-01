@@ -358,6 +358,44 @@ async fn update_sender(
     Ok(())
 }
 
+/// Delete an integration and its companion sender rows. There is no FK/cascade
+/// on `incident_integration_senders` or `external_alerts.integration_id`, so
+/// sender rows are removed manually here; `external_alerts` history rows are
+/// deliberately left in place (audit trail — they retain their own org/data
+/// and don't block re-listing).
+///
+/// Returns `Ok(false)` if no matching row was found (already deleted / wrong
+/// org), `Ok(true)` on success.
+pub async fn delete(org_id: &str, id: &str) -> Result<bool, errors::Error> {
+    let _lock = get_lock().await;
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+
+    let existing = Entity::find()
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::Id.eq(id))
+        .one(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+    let Some(existing) = existing else {
+        return Ok(false);
+    };
+
+    SenderEntity::delete_many()
+        .filter(SenderColumn::IntegrationId.eq(id))
+        .exec(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+
+    Entity::delete_many()
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::Id.eq(existing.id))
+        .exec(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+
+    Ok(true)
+}
+
 /// List all observed senders for an integration.
 pub async fn list_senders(integration_id: &str) -> Result<Vec<SenderRecord>, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;

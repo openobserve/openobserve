@@ -151,7 +151,6 @@ async fn handle_events(
             Ok((record, outcome)) => {
                 accepted += 1;
                 use infra::table::external_alerts::UpsertOutcome::*;
-                // P1: correlate firing states only (resolve lifecycle = P2).
                 if matches!(outcome, Inserted | Refreshed | Reopened)
                     && let Err(e) = openobserve_core::alerts::incidents::correlate_external_event(
                         &org_id,
@@ -162,6 +161,17 @@ async fn handle_events(
                 {
                     log::warn!(
                         "[external_alerts] correlation failed for {}: {e}",
+                        record.id
+                    );
+                } else if matches!(outcome, ResolvedApplied)
+                    && let Err(e) =
+                        openobserve_core::alerts::incidents::try_auto_resolve_incident_for_external_alert(
+                            &org_id, &record.id,
+                        )
+                        .await
+                {
+                    log::warn!(
+                        "[external_alerts] auto-resolve check failed for {}: {e}",
                         record.id
                     );
                 }

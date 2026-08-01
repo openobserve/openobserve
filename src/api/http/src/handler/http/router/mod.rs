@@ -907,6 +907,7 @@ pub fn service_routes() -> Router {
         // Alerts - incidents must be before alerts to avoid route conflicts
         .route("/v2/{org_id}/alerts/incidents", get(alerts::incidents::list_incidents))
         .route("/v2/{org_id}/alerts/incidents/stats", get(alerts::incidents::get_incident_stats))
+        .route("/v2/{org_id}/alerts/incidents/external-alerts/{external_alert_id}/payload", get(alerts::incidents::get_external_alert_payload))
         .route("/v2/{org_id}/alerts/incidents/{incident_id}", get(alerts::incidents::get_incident))
         .route("/v2/{org_id}/alerts/incidents/{incident_id}/rca", post(alerts::incidents::trigger_incident_rca).delete(alerts::incidents::cancel_incident_rca))
         .route("/v2/{org_id}/alerts/incidents/{incident_id}/rca/history", get(alerts::incidents::get_incident_rca_history))
@@ -914,6 +915,7 @@ pub fn service_routes() -> Router {
         .route("/v2/{org_id}/alerts/incidents/{incident_id}/events", get(alerts::incidents::get_incident_events))
         .route("/v2/{org_id}/alerts/incidents/{incident_id}/events/comment", post(alerts::incidents::post_incident_comment))
         .route("/v2/{org_id}/incidents/integrations", get(alerts::incident_integrations::list_integrations).post(alerts::incident_integrations::create_integration))
+        .route("/v2/{org_id}/incidents/integrations/{integration_id}", delete(alerts::incident_integrations::delete_integration))
         .route("/v2/{org_id}/incidents/integrations/{integration_id}/enable", patch(alerts::incident_integrations::set_integration_enabled))
         .route("/v2/{org_id}/incidents/integrations/{integration_id}/rotate", post(alerts::incident_integrations::rotate_integration_token))
         .route("/v2/{org_id}/incidents/integrations/{integration_id}/senders", get(alerts::incident_integrations::list_integration_senders))

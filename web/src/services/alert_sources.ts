@@ -38,6 +38,11 @@ const alertSources = {
       `/api/v2/${org_identifier}/incidents/integrations/${integration_id}/senders`,
     );
   },
+  delete: (org_identifier: string, integration_id: string) => {
+    return http().delete(
+      `/api/v2/${org_identifier}/incidents/integrations/${integration_id}`,
+    );
+  },
 };
 
 export default alertSources;
