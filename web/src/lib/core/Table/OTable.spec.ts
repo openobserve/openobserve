@@ -286,6 +286,28 @@ describe("OTable", () => {
       expect(info.text()).toContain("200");
     });
 
+    it("supports lower-bound totals without pretending the last page is known", async () => {
+      wrapper = mount(OTable, {
+        props: {
+          data: makeRows(20),
+          columns: makeColumns(),
+          pagination: "server",
+          totalCount: 21,
+          totalCountExact: false,
+          pageSize: 20,
+          currentPage: 1,
+        },
+      });
+
+      expect(wrapper.find('[data-test="o2-table-pagination-info"]').text()).toContain("21+");
+      expect(wrapper.find('[data-test="o2-table-first-page-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="o2-table-last-page-btn"]').exists()).toBe(false);
+
+      await wrapper.find('[data-test="o2-table-next-page-btn"]').trigger("click");
+      const events = wrapper.emitted("pagination-change") as any[][];
+      expect(events.at(-1)![0]).toEqual({ page: 2, size: 20 });
+    });
+
     it("should reflect a pageSize prop change in the footer", async () => {
       wrapper = mount(OTable, {
         props: {
