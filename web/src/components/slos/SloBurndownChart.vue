@@ -30,6 +30,16 @@
   window they aggregate over (see `toBurndownSeries`). Drawing them side by
   side is what makes that relationship legible: burn spikes above 1, budget
   bends downward.
+
+  Each panel does then carry a second y-axis on the right — which is not a
+  retreat from the paragraph above. What that paragraph rules out is two
+  SERIES sharing a panel through two independently chosen scalings, where the
+  crossing point is an artifact of the scalings. Here there is one series, and
+  the right axis relabels the very same axis through a fixed affine map: a
+  burn multiple IS an SLI, a share of budget IS a number of errors. Nothing
+  can disagree because there is nothing to disagree with, and both units are
+  ones people speak in — the SLO is written as "99.9%", and "we can afford 12
+  more errors" is a sentence an on-call engineer can act on.
 -->
 <template>
   <div class="flex flex-col gap-3" data-test="slos-sloburndownchart-root">
@@ -123,11 +133,19 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import searchService from "@/services/search";
 import {
   bucketSecsFor,
+  budgetedBadFor,
   buildSloBurndownQuery,
   toBurndownSeries,
   type SloBurndownPoint,
   type SloSliceBucket,
 } from "@/utils/slos/burndownQuery";
+import {
+  budgetAxisScale,
+  burnAxisScale,
+  decimalsFor,
+  mappedAxis,
+  type MappedAxisScale,
+} from "@/utils/slos/chartScale";
 
 const ChartRenderer = defineAsyncComponent(
   () => import("@/components/dashboards/panels/ChartRenderer.vue"),
@@ -141,12 +159,19 @@ const props = defineProps<{
   target: number;
   windowSecs: number;
   sliceIntervalSecs: number;
+  /** Decides what the burndown's second axis counts — `time_slice` measures
+   *  slices, everything else measures events. */
+  sliType?: string;
 }>();
 
 const { t } = useI18n();
 const store = useStore();
 
 const points = ref<SloBurndownPoint[]>([]);
+/** The window's budget in absolute bad events — the burndown's second axis.
+ *  Kept beside the points because the raw buckets it is summed from are not
+ *  retained. */
+const budgetedBad = ref(0);
 const loading = ref(false);
 const error = ref("");
 
@@ -168,12 +193,99 @@ const labels = computed(() =>
   points.value.map((p) => format(new Date(p.ts * 1000), labelFormat.value)),
 );
 
+/** Width of the error budget in SLI points — a 99.9% target leaves 0.1 of
+ *  them. Every conversion on this page divides by it. */
+const budgetWidth = computed(() => 100 - props.target);
+
+// ─── The paired axes ─────────────────────────────────────────────────────────
+// Each panel carries a second y-axis on the right that relabels the first
+// through a fixed affine map: a burn multiple IS an SLI, a share of budget IS
+// a number of errors. Both are derived from the pinned left axis rather than
+// from the data, which is what makes the gridlines line up — see chartScale.ts.
+
+const burnScale = computed(() => burnAxisScale(points.value.map((p) => p.burn)));
+/** More burn is less SLI, so this map is decreasing and comes back inverted. */
+const sliScale = computed<MappedAxisScale>(() =>
+  mappedAxis(burnScale.value, (burn) => 100 - burn * budgetWidth.value),
+);
+
+const budgetScale = computed(() => budgetAxisScale(points.value.map((p) => p.remaining)));
+/** Percent of budget left → errors still affordable. */
+const eventsScale = computed<MappedAxisScale>(() =>
+  mappedAxis(budgetScale.value, (pct) => (pct * budgetedBad.value) / 100),
+);
+
+/** Precision follows the axis STEP, not the unit: at a four-nines target the
+ *  SLI axis steps by thousandths and two decimals would print every gridline
+ *  as "100.00%". */
+const sliDecimals = computed(() => decimalsFor(sliScale.value.interval));
+const formatSliPct = (value: number, extra = 0): string =>
+  `${value.toFixed(Math.min(6, sliDecimals.value + extra))}%`;
+
+/** Counts get no forced decimals, and go compact past a thousand — a
+ *  six-digit tick label eats the plot area it is there to explain. */
+function formatCount(value: number): string {
+  const abs = Math.abs(value);
+  if (abs >= 1e6) return `${Number((value / 1e6).toFixed(1))}M`;
+  if (abs >= 1e3) return `${Number((value / 1e3).toFixed(1))}k`;
+  return `${Math.round(value)}`;
+}
+
+/** The unit the burndown's second axis counts. A time-slice SLI measures
+ *  slices (so the budget reads as minutes of badness), everything else counts
+ *  events. */
+const budgetUnitLabel = computed(() =>
+  props.sliType === "time_slice"
+    ? t("slos.chart.slicesAffordable")
+    : t("slos.chart.errorsAffordable"),
+);
+
+/** The crosshair answers in both units too. Having to convert one into the
+ *  other by eye is exactly the arithmetic the second axis exists to spare, and
+ *  the axis can only be read to its gridline. */
+function twoUnitTooltip(rows: (value: number) => Array<[string, string]>) {
+  return {
+    trigger: "axis",
+    axisPointer: { type: "line" },
+    formatter: (params: any) => {
+      const point = Array.isArray(params) ? params[0] : params;
+      if (!point) return "";
+      const head = point.axisValueLabel ?? point.name ?? "";
+      const raw = Number(point.value);
+      // A gap is a bucket nobody measured, and it has no reading in EITHER
+      // unit. Echarts would otherwise render it as a bare dash.
+      if (point.value === null || point.value === undefined || !Number.isFinite(raw)) {
+        return [head, t("slos.chart.unmeasured")].join("<br/>");
+      }
+      return [head, ...rows(raw).map(([label, value]) => `${label}: ${value}`)].join("<br/>");
+    },
+  };
+}
+
+/** A right-hand axis is a SCALE, not a second series: it borrows the left
+ *  axis's gridlines and draws no chrome of its own, so nobody goes hunting for
+ *  the line that belongs to it. */
+function pairedAxis(scale: MappedAxisScale, axisColor: string, formatter: (v: number) => string) {
+  return {
+    type: "value",
+    position: "right",
+    min: scale.min,
+    max: scale.max,
+    interval: scale.interval,
+    inverse: scale.inverse,
+    axisLabel: { formatter, color: axisColor },
+    splitLine: { show: false },
+    axisLine: { show: false },
+    axisTick: { show: false },
+  };
+}
+
 /** Shared chrome. Recessive axes and a crosshair tooltip on both charts, so
  *  the pair reads as one instrument rather than two unrelated panels. */
-function baseOptions(axisColor: string, gridColor: string) {
+function baseOptions(axisColor: string, gridColor: string, tooltip: unknown) {
   return {
     grid: { left: 8, right: 12, top: 16, bottom: 8, containLabel: true },
-    tooltip: { trigger: "axis", axisPointer: { type: "line" } },
+    tooltip,
     xAxis: {
       type: "category",
       data: labels.value,
@@ -193,12 +305,30 @@ const budgetOptions = computed(() => {
   const gridColor = resolveToken("--color-border-default", "#e5e7eb");
 
   return {
-    ...baseOptions(axisColor, gridColor),
-    yAxis: {
-      type: "value",
-      axisLabel: { formatter: "{value}%", color: axisColor },
-      splitLine: { lineStyle: { color: gridColor, type: "dashed" } },
-    },
+    ...baseOptions(
+      axisColor,
+      gridColor,
+      twoUnitTooltip((pct) => [
+        [t("slos.chart.budgetRemaining"), `${Number(pct.toFixed(1))}%`],
+        [budgetUnitLabel.value, formatCount((pct * budgetedBad.value) / 100)],
+      ]),
+    ),
+    yAxis: [
+      {
+        type: "value",
+        min: budgetScale.value.min,
+        max: budgetScale.value.max,
+        interval: budgetScale.value.interval,
+        axisLabel: { formatter: "{value}%", color: axisColor },
+        splitLine: { lineStyle: { color: gridColor, type: "dashed" } },
+      },
+      // Nothing to count against when the window measured nothing, and an axis
+      // of zeroes is worse than no axis.
+      {
+        ...pairedAxis(eventsScale.value, axisColor, formatCount),
+        show: budgetedBad.value > 0,
+      },
+    ],
     series: [
       {
         name: t("slos.chart.budgetRemaining"),
@@ -232,13 +362,27 @@ const burnOptions = computed(() => {
   const gridColor = resolveToken("--color-border-default", "#e5e7eb");
 
   return {
-    ...baseOptions(axisColor, gridColor),
-    yAxis: {
-      type: "value",
-      min: 0,
-      axisLabel: { formatter: "×{value}", color: axisColor },
-      splitLine: { lineStyle: { color: gridColor, type: "dashed" } },
-    },
+    ...baseOptions(
+      axisColor,
+      gridColor,
+      twoUnitTooltip((burn) => [
+        [t("slos.chart.burnRate"), `×${Number(burn.toFixed(2))}`],
+        // One decimal past the axis: the axis is read to its gridline, a
+        // crosshair is read to the point it is sitting on.
+        [t("slos.chart.sli"), formatSliPct(100 - burn * budgetWidth.value, 1)],
+      ]),
+    ),
+    yAxis: [
+      {
+        type: "value",
+        min: burnScale.value.min,
+        max: burnScale.value.max,
+        interval: burnScale.value.interval,
+        axisLabel: { formatter: "×{value}", color: axisColor },
+        splitLine: { lineStyle: { color: gridColor, type: "dashed" } },
+      },
+      pairedAxis(sliScale.value, axisColor, (v: number) => formatSliPct(v)),
+    ],
     series: [
       {
         name: t("slos.chart.burnRate"),
@@ -344,12 +488,14 @@ async function load() {
     if (controller !== mine) return;
     const hits: SloSliceBucket[] = res?.data?.hits ?? [];
     points.value = toBurndownSeries(hits, props.target);
+    budgetedBad.value = budgetedBadFor(hits, props.target);
   } catch (e: any) {
     // An abort is this component tidying up after itself, not a failure to
     // report to the user.
     if (e?.name === "CanceledError" || e?.code === "ERR_CANCELED") return;
     if (controller !== mine) return;
     points.value = [];
+    budgetedBad.value = 0;
     error.value = e?.response?.data?.message || t("slos.chart.loadFailed");
   } finally {
     // Only the CURRENT request may clear the spinner. `finally` runs even for

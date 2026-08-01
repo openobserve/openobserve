@@ -123,6 +123,25 @@ export function buildSloBurndownQuery(opts: {
 }
 
 /**
+ * The window's error budget in ABSOLUTE bad events — how many failures the
+ * target affords over everything the window actually saw.
+ *
+ * Exported because it is the unit of the burndown chart's second y-axis:
+ * `remaining %` is a share of THIS number, so `budget × remaining ÷ 100` is
+ * "errors we can still afford". Same denominator `toBurndownSeries` divides
+ * by, from the same function, so the two axes cannot drift apart.
+ *
+ * Returns 0 when the target leaves no budget (100%) or nothing was measured —
+ * both mean "there is no second scale to draw".
+ */
+export function budgetedBadFor(buckets: SloSliceBucket[], target: number): number {
+  const budgetWidth = 100 - target;
+  if (!(budgetWidth > 0)) return 0;
+  const totalAll = buckets.reduce((sum, b) => sum + (Number(b.total) || 0), 0);
+  return (totalAll * budgetWidth) / 100;
+}
+
+/**
  * Fold bucketed counts into the burndown and burn-rate series.
  *
  * The two differ in the window they read over, which is the whole distinction
@@ -160,8 +179,7 @@ export function toBurndownSeries(buckets: SloSliceBucket[], target: number): Slo
   // This is knowable here precisely because the chart's window is entirely in
   // the past: the budget is a fixed share of the events the window actually
   // saw, so it can be computed once up front and spent down against.
-  const totalAll = sorted.reduce((sum, b) => sum + (Number(b.total) || 0), 0);
-  const budgetedBad = (totalAll * budgetWidth) / 100;
+  const budgetedBad = budgetedBadFor(sorted, target);
 
   let cumBad = 0;
   let measured = false;

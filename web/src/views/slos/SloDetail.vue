@@ -125,6 +125,7 @@
             :target="slo.target"
             :window-secs="slo.window_secs"
             :slice-interval-secs="slo.slice_interval_secs"
+            :sli-type="slo.sli_type"
             data-test="slos-slodetail-burndown"
           />
         </OContent>
