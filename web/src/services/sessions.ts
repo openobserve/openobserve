@@ -45,12 +45,17 @@ export interface SessionApiHit {
 
 export interface SessionApiResponse {
   took: number;
+  /** Exact on the last page; otherwise a lower bound sufficient to enable Next. */
   total: number;
   from: number;
   size: number;
   hits: SessionApiHit[];
   trace_id?: string;
   function_error?: string;
+  /** Whether at least one session exists after this page. */
+  has_more: boolean;
+  /** False when `total` is only the known lower bound used for pagination. */
+  total_is_exact: boolean;
 }
 
 export interface SessionDetailsApiResponse {

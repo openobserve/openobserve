@@ -80,6 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       pagination="server"
       :current-page="currentPage"
       :total-count="total"
+      :total-count-exact="totalIsExact"
       :page-size="rowsPerPage"
       :page-size-options="rowsPerPageOptions"
       :footer-title="t('traces.sessionsList.sessions')"
@@ -247,6 +248,7 @@ const store = useStore();
 const {
   sessions,
   total,
+  totalIsExact,
   loading,
   error,
   hasLoadedOnce,
@@ -516,6 +518,7 @@ function syncFilterUrl() {
 function clearSessionRows() {
   sessions.value = [];
   total.value = 0;
+  totalIsExact.value = true;
 }
 
 async function loadSessions(startTime?: number, endTime?: number, force = false) {

@@ -11,6 +11,7 @@ import { ref } from "vue";
 // Reactive state that tests can mutate to drive component rendering
 const mockSessions = ref<any[]>([]);
 const mockTotal = ref(0);
+const mockTotalIsExact = ref(true);
 const mockLoading = ref(false);
 const mockError = ref<string | null>(null);
 const mockHasLoadedOnce = ref(false);
@@ -33,6 +34,7 @@ vi.mock("./composables/useSessions", () => ({
   useSessions: vi.fn(() => ({
     sessions: mockSessions,
     total: mockTotal,
+    totalIsExact: mockTotalIsExact,
     loading: mockLoading,
     error: mockError,
     hasLoadedOnce: mockHasLoadedOnce,
@@ -94,7 +96,7 @@ vi.mock("vue-i18n", () => ({
 vi.mock("@/lib/core/Table/OTable.vue", () => ({
   default: {
     name: "OTable",
-    props: ["data", "columns", "loading", "rowKey", "totalCount", "footerTitle"],
+    props: ["data", "columns", "loading", "rowKey", "totalCount", "totalCountExact", "footerTitle"],
     emits: ["row-click"],
     // Mirrors the OTable contract the component relies on: a loading state, one
     // row per item, the `#empty` slot when there are no rows, and a footer that
@@ -228,6 +230,7 @@ beforeEach(() => {
   localStorage.clear();
   mockSessions.value = [];
   mockTotal.value = 0;
+  mockTotalIsExact.value = true;
   mockLoading.value = false;
   mockError.value = null;
   mockHasLoadedOnce.value = false;
@@ -390,6 +393,18 @@ describe("SessionsList — sessions table", () => {
     const footer = wrapper.find("[data-test='sessions-list-footer']");
     expect(footer.exists()).toBe(true);
     expect(footer.text()).toContain("42");
+  });
+
+  it("passes lower-bound count metadata to server pagination", async () => {
+    mockHasLoadedOnce.value = true;
+    mockSessions.value = [makeSession()];
+    mockTotal.value = 21;
+    mockTotalIsExact.value = false;
+
+    const wrapper = await mountComponent();
+    const table = wrapper.findComponent({ name: "OTable" });
+    expect(table.props("totalCount")).toBe(21);
+    expect(table.props("totalCountExact")).toBe(false);
   });
 
   it("status badge shows 'ok' status for ok sessions", async () => {

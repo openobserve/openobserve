@@ -35,6 +35,25 @@ use crate::{
     search::error_utils::map_error_to_http_response,
 };
 
+/// Session-list pagination deliberately avoids an exact count query because
+/// counting every distinct session is more expensive than fetching one page.
+/// `total` is therefore a lower bound while `has_more` is true, and becomes
+/// exact on the final page.
+#[derive(Serialize)]
+struct LatestSessionsResponse {
+    took: usize,
+    total: usize,
+    from: i64,
+    size: i64,
+    hits: Vec<json::Value>,
+    #[serde(skip_serializing_if = "String::is_empty")]
+    trace_id: String,
+    #[serde(skip_serializing_if = "String::is_empty")]
+    function_error: String,
+    has_more: bool,
+    total_is_exact: bool,
+}
+
 /// GetLatestSessions
 ///
 /// #{"ratelimit_module":"Traces", "ratelimit_module_operation":"list"}#
@@ -62,7 +81,9 @@ use crate::{
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({
             "took": 155,
-            "total": 2,
+            "total": 11,
+            "has_more": true,
+            "total_is_exact": false,
             "from": 0,
             "size": 10,
             "hits": [
@@ -165,10 +186,12 @@ pub async fn get_latest_sessions(
 
     let from = query
         .get("from")
-        .map_or(0, |v| v.parse::<i64>().unwrap_or(0));
+        .map_or(0, |v| v.parse::<i64>().unwrap_or(0))
+        .max(0);
     let size = query
         .get("size")
-        .map_or(10, |v| v.parse::<i64>().unwrap_or(10));
+        .map_or(10, |v| v.parse::<i64>().unwrap_or(10))
+        .max(1);
     let mut start_time = query
         .get("start_time")
         .map_or(0, |v| v.parse::<i64>().unwrap_or(0));
@@ -219,7 +242,7 @@ pub async fn get_latest_sessions(
                 // all required LLM fields pass, we cannot run a session query
                 // without something to group by.
                 if s.field_with_name(v.columns.session_id).is_err() {
-                    return MetaHttpResponse::json(PaginatedResponse {
+                    return MetaHttpResponse::json(LatestSessionsResponse {
                         took: 0,
                         total: 0,
                         from,
@@ -227,6 +250,8 @@ pub async fn get_latest_sessions(
                         hits: vec![],
                         trace_id,
                         function_error: String::new(),
+                        has_more: false,
+                        total_is_exact: true,
                     });
                 }
                 Some(v)
@@ -238,7 +263,7 @@ pub async fn get_latest_sessions(
     let validated = match validated {
         Some(v) => v,
         None => {
-            return MetaHttpResponse::json(PaginatedResponse {
+            return MetaHttpResponse::json(LatestSessionsResponse {
                 took: 0,
                 total: 0,
                 from,
@@ -246,6 +271,8 @@ pub async fn get_latest_sessions(
                 hits: vec![],
                 trace_id,
                 function_error: String::new(),
+                has_more: false,
+                total_is_exact: true,
             });
         }
     };
@@ -256,7 +283,9 @@ pub async fn get_latest_sessions(
         query: config::meta::search::Query {
             sql: query_sql,
             from,
-            size,
+            // Fetch one extra grouped session to determine whether a next page
+            // exists without running a full distinct-session count query.
+            size: size.saturating_add(1),
             start_time,
             end_time,
             ..Default::default()
@@ -308,21 +337,26 @@ pub async fn get_latest_sessions(
             return map_error_to_http_response(&err, Some(trace_id));
         }
     };
-    let session_ids: Vec<String> = resp_page
+    let mut session_ids: Vec<String> = resp_page
         .hits
         .iter()
         .filter_map(|hit| hit.get("session_id").and_then(|value| value.as_str()))
         .map(String::from)
         .collect();
+    let has_more = session_ids.len() > size as usize;
+    session_ids.truncate(size as usize);
+    let pagination_total = from as usize + session_ids.len() + usize::from(has_more);
     if session_ids.is_empty() {
-        return MetaHttpResponse::json(PaginatedResponse {
+        return MetaHttpResponse::json(LatestSessionsResponse {
             took: start.elapsed().as_millis() as usize,
-            total: 0,
+            total: pagination_total,
             from,
             size,
             hits: vec![],
             trace_id,
             function_error: range_error,
+            has_more,
+            total_is_exact: !has_more,
         });
     }
 
@@ -394,14 +428,16 @@ pub async fn get_latest_sessions(
         ])
         .inc();
 
-    MetaHttpResponse::json(PaginatedResponse {
+    MetaHttpResponse::json(LatestSessionsResponse {
         took: (time * 1000.0) as usize,
-        total: sessions_data.len(),
+        total: pagination_total,
         from,
         size,
         hits: sessions_data,
         trace_id,
         function_error: range_error,
+        has_more,
+        total_is_exact: !has_more,
     })
 }
 
@@ -1128,12 +1164,53 @@ fn optional_sum_expr(has_field: bool, column: &str, alias: &str) -> String {
     }
 }
 
+/// Older clients wrapped the agent predicate in a same-stream session
+/// membership subquery. Inside the grouped page query that becomes an
+/// unsupported `InSubquery` expression, while its inner WHERE clause has the
+/// exact membership semantics we need. Only unwrap the narrow legacy shape;
+/// leave every other filter untouched.
+fn normalize_latest_session_filter(
+    filter: &str,
+    stream_name: &str,
+    session_id_col: &str,
+) -> String {
+    let trimmed = filter.trim();
+    let normalized_outer = trimmed.to_ascii_lowercase();
+    let outer_prefix = format!("{} in (", session_id_col.to_ascii_lowercase());
+    if !normalized_outer.starts_with(&outer_prefix) || !trimmed.ends_with(')') {
+        return trimmed.to_string();
+    }
+
+    let inner = &trimmed[outer_prefix.len()..trimmed.len() - 1];
+    let normalized_inner = inner
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .to_ascii_lowercase();
+    let session_id_col = session_id_col.to_ascii_lowercase();
+    let stream_name = stream_name.to_ascii_lowercase();
+    let quoted_prefix = format!("select {session_id_col} from \"{stream_name}\" where ");
+    let bare_prefix = format!("select {session_id_col} from {stream_name} where ");
+    let group_suffix = format!(" group by {session_id_col}");
+    if !(normalized_inner.starts_with(&quoted_prefix) || normalized_inner.starts_with(&bare_prefix))
+        || !normalized_inner.ends_with(&group_suffix)
+    {
+        return trimmed.to_string();
+    }
+
+    search::sql::visitor::pickup_where::pickup_where(inner)
+        .ok()
+        .flatten()
+        .unwrap_or_else(|| trimmed.to_string())
+}
+
 fn build_latest_session_page_sql(
     stream_name: &str,
     filter: &str,
     validated: &super::schema_compat::ValidatedLlmSchema,
 ) -> String {
     let session_id_col = validated.columns.session_id;
+    let filter = normalize_latest_session_filter(filter, stream_name, session_id_col);
     let membership_filter = if filter.is_empty() {
         String::new()
     } else {
@@ -1536,7 +1613,7 @@ mod tests {
         validated.has_input_messages = true;
         validated.has_total_tokens = true;
         validated.has_cache_read_input_tokens = true;
-        let filter = "gen_ai_conversation_id IN (SELECT gen_ai_conversation_id FROM bench_traces)";
+        let filter = "gen_ai_conversation_id IN (SELECT gen_ai_conversation_id FROM \"bench_traces\" WHERE gen_ai_conversation_id IS NOT NULL AND gen_ai_conversation_id != '' AND gen_ai_agent_id = 'agent-123' GROUP BY gen_ai_conversation_id)";
         let page_sql = build_latest_session_page_sql("bench_traces", filter, &validated);
         let sql = build_latest_sessions_sql(
             "bench_traces",
@@ -1544,12 +1621,11 @@ mod tests {
             &validated,
         );
 
-        assert!(page_sql.contains(filter));
+        assert!(!page_sql.contains("IN (SELECT"));
         assert!(!page_sql.contains("trace_id"));
         assert!(page_sql.contains("max(end_time) as session_last_activity"));
-        assert!(page_sql.contains(&format!(
-            "HAVING max(CASE WHEN {filter} THEN 1 ELSE 0 END) = 1"
-        )));
+        assert!(page_sql.contains("gen_ai_agent_id = 'agent-123'"));
+        assert!(page_sql.contains("HAVING max(CASE WHEN"));
         assert!(page_sql.contains("ORDER BY session_last_activity DESC, session_id DESC"));
         assert!(!page_sql.contains("min(start_time) as session_start_time"));
         assert!(sql.contains("count(DISTINCT trace_id) as trace_count"));
@@ -1575,6 +1651,15 @@ mod tests {
         );
         assert!(!sql.contains("HAVING"));
         assert!(sql.contains("ORDER BY session_last_activity DESC, session_id DESC"));
+    }
+
+    #[test]
+    fn latest_session_page_sql_keeps_unrelated_subqueries_unchanged() {
+        let validated = super::super::schema_compat::ValidatedLlmSchema::fallback(true);
+        let filter = "gen_ai_conversation_id IN (SELECT other_id FROM other_stream WHERE active = true GROUP BY other_id)";
+        let sql = build_latest_session_page_sql("bench_traces", filter, &validated);
+
+        assert!(sql.contains(filter));
     }
 
     #[test]
