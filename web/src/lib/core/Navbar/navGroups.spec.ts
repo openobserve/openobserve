@@ -223,11 +223,7 @@ describe("groupNavLinks", () => {
       link("alertList"),
     ]);
     // Reports is absorbed; the Dashboards tile takes the dashboards slot.
-    expect(keysOf(entries)).toEqual([
-      "link:home",
-      "linkGroup:dashboards",
-      "linkGroup:reliability",
-    ]);
+    expect(keysOf(entries)).toEqual(["link:home", "linkGroup:dashboards", "linkGroup:reliability"]);
     const dash = entries.find(
       (e): e is Extract<RailEntry, { type: "linkGroup" }> =>
         e.type === "linkGroup" && e.item.name === "dashboards",
@@ -249,11 +245,7 @@ describe("groupNavLinks", () => {
       link("alertList"),
     ]);
     // rum/synthetics are absorbed; the Experience tile takes rum's slot.
-    expect(keysOf(entries)).toEqual([
-      "link:home",
-      "linkGroup:experience",
-      "linkGroup:reliability",
-    ]);
+    expect(keysOf(entries)).toEqual(["link:home", "linkGroup:experience", "linkGroup:reliability"]);
     const experience = entries.find(
       (e): e is Extract<RailEntry, { type: "linkGroup" }> =>
         e.type === "linkGroup" && e.item.name === "experience",

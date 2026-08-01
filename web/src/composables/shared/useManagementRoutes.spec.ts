@@ -144,10 +144,12 @@ describe("useManagementRoutes", () => {
       expect(alertDestRoute.name).toBeUndefined();
       // `action=import` opens the import view — dropping the query would break
       // every existing deep link into it.
-      expect(alertDestRoute.redirect({ query: { org_identifier: "o", action: "import" } })).toEqual({
-        name: "alertDestinations",
-        query: { org_identifier: "o", action: "import" },
-      });
+      expect(alertDestRoute.redirect({ query: { org_identifier: "o", action: "import" } })).toEqual(
+        {
+          name: "alertDestinations",
+          query: { org_identifier: "o", action: "import" },
+        },
+      );
     });
 
     it("should redirect templates to alertTemplates, preserving the query", () => {
