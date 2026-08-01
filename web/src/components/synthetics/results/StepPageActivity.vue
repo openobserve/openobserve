@@ -40,6 +40,7 @@ import { useI18n } from "vue-i18n";
 
 import EvidenceEvents from "./EvidenceEvents.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
@@ -91,15 +92,17 @@ const isLoading = computed(() => props.status === "idle" || props.status === "lo
   <OCollapsible
     :label="t('synthetics.runDetail.pageActivity')"
     :default-open="true"
+    class="border-border-default rounded-default bg-surface-base border px-3 py-2"
     data-test="synthetics-step-page-activity"
   >
     <template #trigger>
-      <span class="text-text-heading text-xs font-semibold">
+      <OIcon name="search" size="sm" class="text-text-secondary shrink-0" aria-hidden="true" />
+      <span class="text-text-heading text-sm font-semibold">
         {{ t("synthetics.runDetail.pageActivity") }}
       </span>
       <span
         v-if="status === 'ready'"
-        class="text-text-secondary text-2xs ml-2"
+        class="text-text-secondary ml-2 text-xs"
         data-test="synthetics-step-page-activity-count"
       >
         {{ countLabel }}
@@ -107,6 +110,23 @@ const isLoading = computed(() => props.status === "idle" || props.status === "lo
     </template>
 
     <div class="flex flex-col gap-2">
+      <!-- The action sits at the top of the body, not on the trigger row where
+           the design puts it: OCollapsible renders its trigger AS a button, and
+           a button cannot contain another one. Keeping the disclosure is worth
+           more than the alignment — the section defaults open, so the link is
+           visible in the same glance either way. -->
+      <div v-if="hasMore" class="flex justify-end">
+        <OButton
+          variant="ghost"
+          size="xs"
+          icon-right="arrow-forward"
+          data-test="synthetics-step-page-activity-view-all-btn"
+          @click="emit('view-all', stepId)"
+        >
+          {{ t("synthetics.runDetail.pageActivityViewAllShort") }}
+        </OButton>
+      </div>
+
       <div
         v-if="isLoading"
         class="flex flex-col gap-1"
@@ -152,17 +172,6 @@ const isLoading = computed(() => props.status === "idle" || props.status === "lo
 
       <template v-else>
         <EvidenceEvents :events="shown" mode="inline" />
-        <div v-if="hasMore" class="flex">
-          <OButton
-            variant="ghost"
-            size="xs"
-            icon-right="arrow-forward"
-            data-test="synthetics-step-page-activity-view-all-btn"
-            @click="emit('view-all', stepId)"
-          >
-            {{ t("synthetics.runDetail.pageActivityViewAll", { count: events.length }) }}
-          </OButton>
-        </div>
       </template>
     </div>
   </OCollapsible>

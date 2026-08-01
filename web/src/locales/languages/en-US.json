@@ -9992,6 +9992,10 @@
       "showWindow": "Show window",
       "stepCount": "({count} steps)",
       "stepHeader": "Step",
+      "shotHeader": "Shot",
+      "timeHeader": "Time",
+      "timelineHeader": "Timeline",
+      "timelineHeaderWindow": "Timeline \u00b7 0 \u2013 {end}",
       "stepNameLabel": "Step name",
       "stepNamePlaceholder": "Enter a descriptive name",
       "stepNamePurposePlaceholder": "Sign in with valid credentials",
@@ -10391,7 +10395,9 @@
       "pageActivity": "Page activity",
       "pageActivityCount": "{shown} of {total}",
       "pageActivityCountTruncated": "{shown} of {total}+",
-      "pageActivityViewAll": "View all {count} events for this step"
+      "pageActivityViewAll": "View all {count} events for this step",
+      "pageActivityViewAllShort": "View all in Evidence",
+      "expandScreenshot": "Expand"
     },
     "runRowExpansion": {
       "browserHeader": "Browser",

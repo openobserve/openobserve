@@ -143,15 +143,20 @@ const noFallback = computed(() => candidates.value.length === 1);
 <template>
   <div class="flex flex-col gap-3" data-test="synthetics-run-detail-step-evidence">
     <!-- Item 3: which locator candidates were tried, and what happened. -->
-    <section v-if="candidates.length" data-test="synthetics-run-detail-locator-resolution">
-      <!-- The count answers "was a fallback tried?" before any row is read:
-           "1 of 3 tried" and "1 of 1 tried" are different findings that used to
-           render as the same single row. -->
-      <div class="mb-1 flex items-baseline gap-2">
-        <h4 class="text-text-heading m-0 text-xs font-semibold">
+    <section
+      v-if="candidates.length"
+      class="border-border-default rounded-default bg-surface-base flex flex-col gap-2 border p-3"
+      data-test="synthetics-run-detail-locator-resolution"
+    >
+      <!-- Heading and finding on one line. The count answers "was a fallback
+           tried?" before any row is read — "1 of 3 tried" and "1 of 1 tried" are
+           different findings — and the verdict that follows it is the same
+           sentence continued, so stacking them read as two separate remarks. -->
+      <div class="flex flex-wrap items-baseline gap-x-2">
+        <h4 class="text-text-heading m-0 text-sm font-semibold">
           {{ t("synthetics.runDetail.locatorResolution") }}
         </h4>
-        <span class="text-text-secondary text-2xs" data-test="synthetics-run-detail-locator-count">
+        <span class="text-text-secondary text-xs" data-test="synthetics-run-detail-locator-count">
           {{
             t("synthetics.runDetail.locatorTriedOf", {
               tried: triedCount,
@@ -159,31 +164,31 @@ const noFallback = computed(() => candidates.value.length === 1);
             })
           }}
         </span>
+        <span
+          v-if="noneMatched"
+          class="text-text-secondary text-xs"
+          data-test="synthetics-run-detail-locator-none-matched"
+        >
+          {{ `\u00b7 ${t("synthetics.runDetail.locatorNoneMatched")}` }}
+        </span>
+        <span
+          v-else-if="healed"
+          class="text-text-secondary text-xs"
+          data-test="synthetics-run-detail-locator-healed"
+        >
+          {{ `\u00b7 ${t("synthetics.runDetail.locatorHealed")}` }}
+        </span>
       </div>
       <!-- A step with one locator did not "fail to heal" — it had nothing to
            heal with. That is a recording property, and it is actionable in a way
            the outcome badge never was. -->
       <p
         v-if="noFallback"
-        class="text-status-warning-text m-0 mb-1 flex items-start gap-1 text-xs"
+        class="text-status-warning-text m-0 flex items-start gap-1 text-xs"
         data-test="synthetics-run-detail-locator-no-fallback"
       >
         <OIcon name="warning" size="xs" class="mt-0.5 shrink-0" aria-hidden="true" />
         <span>{{ t("synthetics.runDetail.locatorNoFallback") }}</span>
-      </p>
-      <p
-        v-if="noneMatched"
-        class="text-text-secondary m-0 mb-1 text-xs"
-        data-test="synthetics-run-detail-locator-none-matched"
-      >
-        {{ t("synthetics.runDetail.locatorNoneMatched") }}
-      </p>
-      <p
-        v-else-if="healed"
-        class="text-text-secondary m-0 mb-1 text-xs"
-        data-test="synthetics-run-detail-locator-healed"
-      >
-        {{ t("synthetics.runDetail.locatorHealed") }}
       </p>
       <ul class="m-0 flex list-none flex-col gap-1 p-0">
         <!-- Untried rungs are dimmed, not hidden: the same treatment a skipped
@@ -206,18 +211,26 @@ const noFallback = computed(() => candidates.value.length === 1);
     </section>
 
     <!-- Item 4: which recorded signals arrived, and which did not. -->
-    <section v-if="signals.length" data-test="synthetics-run-detail-settle-signals">
-      <h4 class="text-text-heading m-0 mb-1 text-xs font-semibold">
-        {{ t("synthetics.runDetail.settleSignals") }}
-      </h4>
-      <p
-        v-if="staleSignals.length"
-        class="text-status-warning-text m-0 mb-1 flex items-start gap-1 text-xs"
-        data-test="synthetics-run-detail-settle-stale-note"
-      >
-        <OIcon name="warning" size="xs" class="mt-0.5 shrink-0" aria-hidden="true" />
-        <span>{{ t("synthetics.runDetail.settleStaleNote") }}</span>
-      </p>
+    <section
+      v-if="signals.length"
+      class="border-border-default rounded-default bg-surface-base flex flex-col gap-2 border p-3"
+      data-test="synthetics-run-detail-settle-signals"
+    >
+      <!-- The stale note qualifies the heading rather than following it: a
+           recorded signal that never arrived is what the list below is FOR. -->
+      <div class="flex flex-wrap items-baseline gap-x-2">
+        <h4 class="text-text-heading m-0 text-sm font-semibold">
+          {{ t("synthetics.runDetail.settleSignals") }}
+        </h4>
+        <span
+          v-if="staleSignals.length"
+          class="text-status-warning-text flex items-start gap-1 text-xs"
+          data-test="synthetics-run-detail-settle-stale-note"
+        >
+          <OIcon name="warning" size="xs" class="mt-0.5 shrink-0" aria-hidden="true" />
+          <span>{{ t("synthetics.runDetail.settleStaleNote") }}</span>
+        </span>
+      </div>
       <ul class="m-0 flex list-none flex-col gap-1 p-0">
         <li
           v-for="(s, i) in signals"
@@ -236,12 +249,13 @@ const noFallback = computed(() => candidates.value.length === 1);
     <!-- Item 5: what settling cost today, against what recording observed. -->
     <section
       v-if="detail.settleMs !== null || detail.observedDurationMs !== null"
+      class="border-border-default rounded-default bg-surface-base flex flex-col gap-2 border p-3"
       data-test="synthetics-run-detail-settle-timing"
     >
-      <h4 class="text-text-heading m-0 mb-1 text-xs font-semibold">
-        {{ t("synthetics.runDetail.settleTiming") }}
-      </h4>
-      <p class="text-text-secondary m-0 text-xs">
+      <p class="text-text-secondary m-0 flex flex-wrap items-baseline gap-x-2 text-xs">
+        <span class="text-text-heading text-sm font-semibold">
+          {{ t("synthetics.runDetail.settleTiming") }}
+        </span>
         {{
           t("synthetics.runDetail.settleTimingValue", {
             now: fmtMs(detail.settleMs),
@@ -264,8 +278,12 @@ const noFallback = computed(() => candidates.value.length === 1);
       is the difference between "an element did not appear" and "the login call
       returned 503".
     -->
-    <section v-if="hasEvidence" data-test="synthetics-run-detail-app-evidence">
-      <h4 class="text-text-heading m-0 mb-1 text-xs font-semibold">
+    <section
+      v-if="hasEvidence"
+      class="border-border-default rounded-default bg-surface-base flex flex-col gap-2 border p-3"
+      data-test="synthetics-run-detail-app-evidence"
+    >
+      <h4 class="text-text-heading m-0 text-sm font-semibold">
         {{ t("synthetics.runDetail.applicationEvidence") }}
       </h4>
 

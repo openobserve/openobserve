@@ -331,8 +331,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div class="min-h-0 flex-1 overflow-auto pb-2">
                     <!-- JourneySteps in results mode -->
                     <JourneySteps
-                      :data="stepsWithTotal"
+                      :data="steps"
                       mode="results"
+                      :total-duration-ms="totalDurationMs"
                       action-key="action"
                       name-key="name"
                       detail-key="detail"
@@ -412,6 +413,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   </span>
                                 </template>
                               </div>
+                            </div>
+
+                            <!-- The lightbox was reachable only by hovering the
+                                 thumbnail and noticing an icon fade in, which is
+                                 discovery by accident. Naming it costs one row. -->
+                            <div v-if="row.screenshotKey" class="mt-2 flex justify-center">
+                              <OButton
+                                variant="ghost"
+                                size="xs"
+                                icon-left="fullscreen"
+                                data-test="synthetics-run-detail-step-screenshot-expand-btn"
+                                @click="openLightbox(row.id)"
+                              >
+                                {{ t("synthetics.runDetail.expandScreenshot") }}
+                              </OButton>
                             </div>
                           </div>
 
@@ -753,6 +769,20 @@ interface StepRow {
   detail: string;
   url: string;
   duration: number;
+  /**
+   * Milliseconds from the start of the run to the start of this step — the
+   * timeline column's x-position.
+   *
+   * Accumulated from the preceding steps' durations rather than read from the
+   * record: `StepExecution` declares `start_time`/`end_time`, but the probe's
+   * `toStepExecutionResults()` has never emitted them (see
+   * `docs/synthetics/step-failure-evidence-design.md` §2.1), so there is no
+   * wall-clock origin to read. Steps run sequentially, so the running sum is
+   * the true ordering and the true relative cost; what it cannot show is a GAP
+   * between steps — probe start-up, or a wait that belongs to neither side.
+   * When the probe starts emitting `start_time`, this becomes a read of it.
+   */
+  offsetMs: number;
   status: "pass" | "fail";
   icon: string;
   statusIcon: string;
@@ -792,9 +822,12 @@ function buildSteps(
   for (const rs of detail.recordedSteps) {
     recordedMap.set(rs.id, rs);
   }
+  let elapsedMs = 0;
   return steps.map((ex, idx) => {
     const recorded = recordedMap.get(ex.step_id);
     const isFail = ex.status === "fail";
+    const offsetMs = elapsedMs;
+    elapsedMs += ex.duration_ms ?? 0;
     return {
       id: idx + 1,
       stepId: ex.step_id,
@@ -803,6 +836,7 @@ function buildSteps(
       detail: recorded?.selector ?? recorded?.url ?? ex.step_id,
       url: recorded?.url ?? "",
       duration: ex.duration_ms,
+      offsetMs,
       status: isFail ? ("fail" as const) : ("pass" as const),
       icon: recorded ? actionIcon(recorded.action) : "radio_button_checked",
       statusIcon: isFail ? "cancel" : "check-circle",
@@ -1126,11 +1160,14 @@ function stepDotState(row: any): StepDotState | undefined {
   return row.status === "fail" ? "fail" : "pass";
 }
 
-/** Steps enriched with total duration for progress bar calculation. */
-const stepsWithTotal = computed(() => {
-  const total = currentRun.value.duration || 1;
-  return steps.value.map((s) => ({ ...s, _totalDuration: total }));
-});
+/**
+ * The scale the timeline column is drawn against.
+ *
+ * Passed to `JourneySteps` as one number rather than stamped onto every row —
+ * the run's duration is a property of the run, and copying it per step meant
+ * rebuilding the whole array whenever it changed.
+ */
+const totalDurationMs = computed(() => currentRun.value.duration || 0);
 
 /** Current step shown in the session-replay panel (first step for now). */
 const selectedStep = computed<StepRow | null>(() => steps.value[0] ?? null);
