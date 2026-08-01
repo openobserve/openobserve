@@ -69,9 +69,8 @@ const sessions = {
    * `GET /api/{org_id}/{stream_name}/traces/session`.
    *
    * Server expects microsecond timestamps for `start_time`/`end_time` and
-   * does the GROUP BY + per-session aggregation in two phases (session →
-   * trace_id list, then per-trace gen_ai usage rollup) so the frontend
-   * doesn't need to build the SQL itself.
+   * pages by the complete session's latest end_time, then aggregates the
+   * selected session IDs, so the frontend doesn't need to build SQL itself.
    *
    * @example
    *   await sessions.list({

@@ -124,10 +124,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OEmptyState size="hero" preset="no-llm-sessions" @action="onEmptyAction" />
         </div>
       </template>
-      <!-- Timestamp -->
-      <template #cell-firstSeenNanos="{ row }">
+      <!-- Last activity -->
+      <template #cell-lastSeenNanos="{ row }">
         <span class="text-xs tabular-nums">
-          {{ formatTimestamp(row.firstSeenNanos) }}
+          {{ formatTimestamp(row.lastSeenNanos) }}
         </span>
       </template>
 
@@ -367,9 +367,9 @@ watch(total, () => {
 const tableColumns = computed(() =>
   [
     {
-      id: "firstSeenNanos",
-      header: t("traces.sessionsList.columns.timestamp"),
-      accessorKey: "firstSeenNanos",
+      id: "lastSeenNanos",
+      header: t("traces.sessionsList.columns.lastActivity"),
+      accessorKey: "lastSeenNanos",
       size: 170,
       sortable: false,
       hideable: true,

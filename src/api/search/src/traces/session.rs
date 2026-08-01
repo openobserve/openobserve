@@ -1141,11 +1141,11 @@ fn build_latest_session_page_sql(
     };
     format!(
         "SELECT {session_id_col} as session_id, \
-         min(start_time) as session_start_time \
+         max(end_time) as session_last_activity \
          FROM \"{stream_name}\" \
          WHERE {session_id_col} IS NOT NULL AND {session_id_col} != '' \
          GROUP BY {session_id_col}{membership_filter} \
-         ORDER BY session_start_time DESC, session_id DESC"
+         ORDER BY session_last_activity DESC, session_id DESC"
     )
 }
 
@@ -1296,13 +1296,13 @@ fn normalize_latest_session_hits(
         .enumerate()
         .map(|(index, session_id)| (session_id.as_str(), index))
         .collect();
-    // Both phases use the earliest span start_time across the full session.
+    // Both phases use the latest span end_time across the full session.
     // Keep the explicit final sort because distributed aggregation does not
     // guarantee phase 2 row order. Preserve phase 1 order as a deterministic
-    // tie-breaker for sessions with the same start time.
+    // tie-breaker for sessions with the same last activity time.
     hits.sort_by(|left, right| {
-        let start_time =
-            |hit: &json::Value| json::get_int_value(hit.get("start_time").unwrap_or_default());
+        let last_activity =
+            |hit: &json::Value| json::get_int_value(hit.get("end_time").unwrap_or_default());
         let page_index = |hit: &json::Value| {
             hit.get("session_id")
                 .and_then(|value| value.as_str())
@@ -1311,8 +1311,8 @@ fn normalize_latest_session_hits(
                 .unwrap_or(usize::MAX)
         };
 
-        start_time(right)
-            .cmp(&start_time(left))
+        last_activity(right)
+            .cmp(&last_activity(left))
             .then_with(|| page_index(left).cmp(&page_index(right)))
     });
     hits
@@ -1546,12 +1546,12 @@ mod tests {
 
         assert!(page_sql.contains(filter));
         assert!(!page_sql.contains("trace_id"));
-        assert!(page_sql.contains("min(start_time) as session_start_time"));
+        assert!(page_sql.contains("max(end_time) as session_last_activity"));
         assert!(page_sql.contains(&format!(
             "HAVING max(CASE WHEN {filter} THEN 1 ELSE 0 END) = 1"
         )));
-        assert!(page_sql.contains("ORDER BY session_start_time DESC, session_id DESC"));
-        assert!(!page_sql.contains("min(_timestamp)"));
+        assert!(page_sql.contains("ORDER BY session_last_activity DESC, session_id DESC"));
+        assert!(!page_sql.contains("min(start_time) as session_start_time"));
         assert!(sql.contains("count(DISTINCT trace_id) as trace_count"));
         assert!(sql.contains("GROUP BY gen_ai_conversation_id"));
         assert!(sql.contains("gen_ai_conversation_id IN ('session-1','session''2')"));
@@ -1574,7 +1574,7 @@ mod tests {
             )
         );
         assert!(!sql.contains("HAVING"));
-        assert!(sql.contains("ORDER BY session_start_time DESC, session_id DESC"));
+        assert!(sql.contains("ORDER BY session_last_activity DESC, session_id DESC"));
     }
 
     #[test]
@@ -1597,6 +1597,7 @@ mod tests {
             json!({
                 "session_id": "session-1",
                 "start_time": 100,
+                "end_time": 300,
                 "zo_sql_timestamp": 300,
                 "gen_ai_input_messages": [
                     {"role": "assistant", "content": "hi"},
@@ -1607,6 +1608,7 @@ mod tests {
             json!({
                 "session_id": "session-2",
                 "start_time": 200,
+                "end_time": 250,
                 "zo_sql_timestamp": 200,
                 "gen_ai_input_messages": [],
                 "user_ids": []
@@ -1615,13 +1617,13 @@ mod tests {
 
         let normalized = normalize_latest_session_hits(
             hits,
-            &["session-1".to_string(), "session-2".to_string()],
+            &["session-2".to_string(), "session-1".to_string()],
         );
-        assert_eq!(normalized[0]["session_id"], "session-2");
-        assert_eq!(normalized[1]["first_user_message"], "show me the weather");
-        assert_eq!(normalized[1]["user_ids"], json!(["alpha", "zeta"]));
-        assert!(normalized[1].get("zo_sql_timestamp").is_none());
-        assert!(normalized[1].get("gen_ai_input_messages").is_none());
+        assert_eq!(normalized[0]["session_id"], "session-1");
+        assert_eq!(normalized[0]["first_user_message"], "show me the weather");
+        assert_eq!(normalized[0]["user_ids"], json!(["alpha", "zeta"]));
+        assert!(normalized[0].get("zo_sql_timestamp").is_none());
+        assert!(normalized[0].get("gen_ai_input_messages").is_none());
     }
 
     #[test]

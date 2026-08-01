@@ -114,7 +114,7 @@ vi.mock("@/lib/core/Table/OTable.vue", () => ({
             @click="$emit('row-click', row)"
           >
             <slot name="cell-sessionId" :row="row">{{ row.sessionId }}</slot>
-            <slot name="cell-firstSeenNanos" :row="row">{{ row.firstSeenNanos }}</slot>
+            <slot name="cell-lastSeenNanos" :row="row">{{ row.lastSeenNanos }}</slot>
             <slot name="cell-turns" :row="row">{{ row.turns }}</slot>
             <slot name="cell-durationNanos" :row="row">{{ row.durationNanos }}</slot>
             <span data-test="sessions-list-token-cell">
@@ -333,6 +333,20 @@ describe("SessionsList — loading state", () => {
 });
 
 describe("SessionsList — sessions table", () => {
+  it("uses the session end time for the Last activity column", async () => {
+    mockHasLoadedOnce.value = true;
+    mockSessions.value = [makeSession()];
+
+    const wrapper = await mountComponent();
+    const table = wrapper.findComponent({ name: "OTable" });
+    const column = (table.props("columns") as any[]).find((item) => item.id === "lastSeenNanos");
+
+    expect(column.header).toBe("traces.sessionsList.columns.lastActivity");
+    expect(column.accessorKey).toBe("lastSeenNanos");
+    expect(wrapper.text()).toContain("2023-11-14 22:30:00");
+    expect(wrapper.text()).not.toContain("2023-11-14 22:13:20");
+  });
+
   it("should fetch stream sessions with no agent filter when in stream mode", async () => {
     // Default scope is "agent" now — stream mode is opted into ONLY via the URL
     // `?type=stream` param (a stale saved preference must not land on stream).
