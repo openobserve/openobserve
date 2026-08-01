@@ -39,7 +39,8 @@ import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import type { CheckboxModelValue } from "@/lib/forms/Checkbox/OCheckbox.types";
 import BrowserJourneyLocator from "./BrowserJourneyLocator.vue";
 import BrowserJourneyAssertion from "./BrowserJourneyAssertion.vue";
-import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+import OStepper from "@/lib/navigation/Stepper/OStepper.vue";
+import OStep from "@/lib/navigation/Stepper/OStep.vue";
 
 /**
  * The expanded editor for one journey step — every author-editable field a step
@@ -421,126 +422,186 @@ const hasAdvancedChanges = computed(
          Opens itself when the step carries a non-default, so nothing an author set
          is hidden from them. -->
     <OCollapsible
-      :label="t('synthetics.journey.groupAdvancedLabel')"
       :default-open="hasAdvancedChanges"
       variant="sidebar"
-      class="mt-2 w-full max-w-200 border"
+      class="rounded-default bg-surface-panel mt-2 w-full max-w-200 border"
       data-test="synthetics-journey-step-group-advanced"
+      trigger-class="border-b"
     >
-      <div class="flex w-full flex-col gap-3 px-2 py-2">
-        <!-- Waiting: what the recording observed, then the two numbers that bound
-             the wait. Adjacent because they answer one question. -->
-        <div class="flex w-full flex-col gap-2" data-test="synthetics-journey-step-settle">
-          <template v-if="hasRecordedSettle">
-            <span class="text-text-heading text-sm">{{ t("synthetics.journey.settleLabel") }}</span>
+      <!-- Label and caption on one line. The `caption` prop stacks them, which
+           made `Advanced` twice as tall as the row it sits in and read as a
+           heading with a subtitle rather than as one trigger. -->
+      <template #trigger>
+        <span class="flex min-w-0 flex-1 flex-wrap items-center gap-x-2">
+          <span class="text-text-heading text-sm font-medium">
+            {{ t("synthetics.journey.groupAdvancedLabel") }}
+          </span>
+          <span class="text-text-secondary truncate text-xs">
+            {{ t("synthetics.journey.groupAdvancedCaption") }}
+          </span>
+        </span>
+      </template>
 
-            <OSeparator />
-            <p v-if="settleNavigationLine" class="text-text-secondary m-0 text-xs">
-              {{ settleNavigationLine }}
-            </p>
+      <!-- Three phases of one step, not three unrelated groups of settings: what
+           happens before it acts, while it acts, and if it fails. The numbered
+           rail carries that sequence; the rules that used to separate these
+           blocks said only "these are different" and are gone.
 
-            <div
-              v-for="(response, i) in settleResponses"
-              :key="`${response.url_pattern}-${i}`"
-              class="flex w-full items-center gap-2"
-            >
-              <OCheckbox
-                :model-value="!!response.required"
-                size="xs"
-                :label="t('synthetics.journey.settleRequiredLabel')"
-                :data-test="`synthetics-journey-step-settle-required-${i}`"
-                @update:model-value="setResponseRequired(i, $event)"
+           `expanded` is OStepper's checklist mode — every panel rendered at once
+           rather than only the active one. `model-value="0"` is the documented
+           "no step is active" value: these are phases of one step that always all
+           apply, not a wizard the author walks through, so none of them is
+           current and all three indicators read alike. -->
+      <div class="w-full px-2 py-3">
+        <OStepper :model-value="0" orientation="vertical" expanded :animated="false">
+          <OStep :name="1" :title="t('synthetics.journey.advancedSettleHeading')">
+            <div class="flex w-full flex-col gap-2" data-test="synthetics-journey-step-settle">
+              <!-- What the recording observed is evidence, so it is boxed and reads
+                 as read-only — except the one checkbox on it, which is a judgement
+                 about the application that only the author can make. -->
+              <div
+                v-if="hasRecordedSettle"
+                class="border-border-default rounded-default bg-surface-base flex w-full flex-col gap-1 border p-2"
+                data-test="synthetics-journey-step-settle-recorded"
+              >
+                <span class="text-text-secondary text-xs">{{
+                  t("synthetics.journey.settleLabel")
+                }}</span>
+
+                <p v-if="settleNavigationLine" class="text-text-body m-0 font-mono text-xs">
+                  {{ settleNavigationLine }}
+                </p>
+
+                <div
+                  v-for="(response, i) in settleResponses"
+                  :key="`${response.url_pattern}-${i}`"
+                  class="flex w-full items-center gap-2"
+                >
+                  <OCheckbox
+                    :model-value="!!response.required"
+                    size="xs"
+                    :label="t('synthetics.journey.settleRequiredLabel')"
+                    :data-test="`synthetics-journey-step-settle-required-${i}`"
+                    @update:model-value="setResponseRequired(i, $event)"
+                  />
+                  <span class="text-text-body min-w-0 truncate font-mono text-xs">
+                    {{ settleResponseLabel(response) }}
+                  </span>
+                </div>
+
+                <p
+                  v-if="settleObservedLine"
+                  class="text-text-secondary m-0 text-xs"
+                  data-test="synthetics-journey-step-settle-observed"
+                >
+                  {{ settleObservedLine }}
+                </p>
+              </div>
+
+              <OInput
+                v-model="settleBudgetComputed"
+                :label="t('synthetics.journey.settleBudgetLabel')"
+                :placeholder="String(DEFAULT_SETTLE_BUDGET_MS)"
+                type="number"
+                class="w-75!"
+                data-test="synthetics-journey-step-settle-budget-input"
               />
-              <span class="text-text-secondary min-w-0 truncate font-mono text-xs">
-                {{ settleResponseLabel(response) }}
-              </span>
+              <p
+                v-if="settleBudgetOutOfRange"
+                class="text-status-warning-text m-0 flex items-start gap-1 text-xs"
+                data-test="synthetics-journey-step-settle-budget-warning"
+              >
+                <OIcon name="warning" size="xs" class="mt-0.5 shrink-0" aria-hidden="true" />
+                <span>{{
+                  t("synthetics.journey.settleBudgetRangeWarning", {
+                    min: MIN_SETTLE_BUDGET_MS,
+                    max: MAX_SETTLE_BUDGET_MS,
+                  })
+                }}</span>
+              </p>
             </div>
-          </template>
+          </OStep>
 
-          <OInput
-            v-model="settleBudgetComputed"
-            :label="t('synthetics.journey.settleBudgetLabel')"
-            :placeholder="String(DEFAULT_SETTLE_BUDGET_MS)"
-            type="number"
-            class="mt-2 w-75!"
-            data-test="synthetics-journey-step-settle-budget-input"
-          />
-          <p
-            v-if="settleBudgetOutOfRange"
-            class="text-status-warning-text m-0 flex items-start gap-1 text-xs"
-            data-test="synthetics-journey-step-settle-budget-warning"
-          >
-            <OIcon name="warning" size="xs" class="mt-0.5 shrink-0" aria-hidden="true" />
-            <span>{{
-              t("synthetics.journey.settleBudgetRangeWarning", {
-                min: MIN_SETTLE_BUDGET_MS,
-                max: MAX_SETTLE_BUDGET_MS,
-              })
-            }}</span>
-          </p>
-        </div>
+          <OStep :name="2" :title="t('synthetics.journey.advancedTimeoutHeading')">
+            <OInput
+              v-model="timeoutComputed"
+              :label="t('synthetics.journey.timeoutLabel')"
+              :placeholder="String(timeoutDefault)"
+              :helpText="timeoutHelp"
+              type="number"
+              class="w-75!"
+              data-test="synthetics-journey-step-timeout-input"
+            />
+            <p
+              v-if="timeoutBelowDefault"
+              class="text-status-warning-text m-0 flex items-start gap-1 text-xs"
+              data-test="synthetics-journey-step-timeout-warning"
+            >
+              <OIcon name="warning" size="xs" class="mt-0.5 shrink-0" aria-hidden="true" />
+              <span>{{
+                t("synthetics.journey.timeoutBelowDefaultWarning", { default: timeoutDefault })
+              }}</span>
+            </p>
+          </OStep>
 
-        <OSeparator />
-
-        <OInput
-          v-model="timeoutComputed"
-          :label="t('synthetics.journey.timeoutLabel')"
-          :placeholder="String(timeoutDefault)"
-          :helpText="timeoutHelp"
-          type="number"
-          class="w-75!"
-          data-test="synthetics-journey-step-timeout-input"
-        />
-        <p
-          v-if="timeoutBelowDefault"
-          class="text-status-warning-text m-0 flex items-start gap-1 text-xs"
-          data-test="synthetics-journey-step-timeout-warning"
-        >
-          <OIcon name="warning" size="xs" class="mt-0.5 shrink-0" aria-hidden="true" />
-          <span>{{
-            t("synthetics.journey.timeoutBelowDefaultWarning", { default: timeoutDefault })
-          }}</span>
-        </p>
-
-        <!-- Both flags are fully implemented in the probe with semantics the labels
+          <!-- Both flags are fully implemented in the probe with semantics the labels
              omit — the `skipped` result status, the cleanup pass, the neutral
              verdict, and that `always_run` only reaches steps AFTER the failure.
              Both-set is legitimate (a best-effort logout), so this explains rather
-             than prevents (D11). -->
-        <OSeparator />
+             than prevents (D11).
 
-        <div class="flex items-center gap-1">
-          <OCheckbox
-            v-model="optionalComputed"
-            :label="t('synthetics.journey.optionalLabel')"
-            data-test="synthetics-journey-step-optional-checkbox"
-          />
-          <OTooltip :content="t('synthetics.journey.optionalHelp')">
-            <OIcon
-              name="info-outline"
-              size="xs"
-              class="text-text-secondary"
-              data-test="synthetics-journey-step-optional-help"
-              aria-hidden="true"
-            />
-          </OTooltip>
-        </div>
-        <div class="flex items-center gap-1">
-          <OCheckbox
-            v-model="alwaysRunComputed"
-            :label="t('synthetics.journey.alwaysRunLabel')"
-            data-test="synthetics-journey-step-always-run-checkbox"
-          />
-          <OTooltip :content="t('synthetics.journey.alwaysRunHelp')">
-            <OIcon
-              name="info-outline"
-              size="xs"
-              class="text-text-secondary"
-              data-test="synthetics-journey-step-always-run-help"
-              aria-hidden="true"
-            />
-          </OTooltip>
-        </div>
+             Side by side because they are alternatives an author weighs against
+             each other, and each carries the sentence that says which to pick.
+             The full semantics stay on the tooltip: a card can hold two lines,
+             not the paragraph the probe's behaviour actually needs. -->
+          <OStep :name="3" :title="t('synthetics.journey.advancedFailureHeading')">
+            <div class="grid w-full grid-cols-1 gap-3 sm:grid-cols-2">
+              <div class="border-border-default rounded-default flex flex-col gap-1 border p-3">
+                <div class="flex items-center gap-1">
+                  <OCheckbox
+                    v-model="optionalComputed"
+                    :label="t('synthetics.journey.optionalShortLabel')"
+                    data-test="synthetics-journey-step-optional-checkbox"
+                  />
+                  <OTooltip :content="t('synthetics.journey.optionalHelp')">
+                    <OIcon
+                      name="info-outline"
+                      size="xs"
+                      class="text-text-secondary"
+                      data-test="synthetics-journey-step-optional-help"
+                      aria-hidden="true"
+                    />
+                  </OTooltip>
+                </div>
+                <p class="text-text-secondary m-0 text-xs">
+                  {{ t("synthetics.journey.optionalDescription") }}
+                </p>
+              </div>
+
+              <div class="border-border-default rounded-default flex flex-col gap-1 border p-3">
+                <div class="flex items-center gap-1">
+                  <OCheckbox
+                    v-model="alwaysRunComputed"
+                    :label="t('synthetics.journey.alwaysRunShortLabel')"
+                    data-test="synthetics-journey-step-always-run-checkbox"
+                  />
+                  <OTooltip :content="t('synthetics.journey.alwaysRunHelp')">
+                    <OIcon
+                      name="info-outline"
+                      size="xs"
+                      class="text-text-secondary"
+                      data-test="synthetics-journey-step-always-run-help"
+                      aria-hidden="true"
+                    />
+                  </OTooltip>
+                </div>
+                <p class="text-text-secondary m-0 text-xs">
+                  {{ t("synthetics.journey.alwaysRunDescription") }}
+                </p>
+              </div>
+            </div>
+          </OStep>
+        </OStepper>
       </div>
     </OCollapsible>
   </div>

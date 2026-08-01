@@ -249,6 +249,70 @@ describe("BrowserJourneyStepEditor field layout", () => {
     const wrapper = render();
     expect(wrapper.find(test("synthetics-journey-step-timeout-input")).exists()).toBe(false);
   });
+
+  // The three groups inside Advanced are one sequence — before it acts, while it
+  // acts, if it fails — and the numbered rail is what says so. Rules between them
+  // said only "these are different".
+  it("orders Advanced as three numbered phases of the step", async () => {
+    const wrapper = render();
+    await openAdvanced(wrapper);
+    const steps = wrapper.findAllComponents({ name: "OStep" });
+    expect(steps.map((s) => s.props("name"))).toEqual([1, 2, 3]);
+    expect(steps[0].text()).toMatch(/let the page settle/i);
+    expect(steps[1].text()).toMatch(/give up after/i);
+    expect(steps[2].text()).toMatch(/if it fails/i);
+  });
+
+  // These phases always all apply — there is no step the author is "on" — so the
+  // rail must not single one out. 0 is OStepper's "no step active" value.
+  it("highlights none of the phases as current", async () => {
+    const wrapper = render();
+    await openAdvanced(wrapper);
+    expect(wrapper.findComponent({ name: "OStepper" }).props("modelValue")).toBe(0);
+    expect(wrapper.find("[aria-current='step']").exists()).toBe(false);
+  });
+
+  // A collapsed section that names only itself leaves an author guessing whether
+  // anything in it applies to their step.
+  it("says what Advanced holds on the trigger itself", () => {
+    const wrapper = render();
+    expect(wrapper.find(test("synthetics-journey-step-group-advanced")).text()).toContain(
+      "Page settling",
+    );
+  });
+});
+
+// Phase 3 / P3.3, P4. What the recording observed is evidence: it is shown as one
+// read-only block so it cannot be mistaken for a field, apart from the single
+// checkbox on it that is genuinely the author's call.
+describe("BrowserJourneyStepEditor recorded settle evidence", () => {
+  async function openAdvanced(wrapper: ReturnType<typeof render>) {
+    await wrapper.find(`${test("synthetics-journey-step-group-advanced")} button`).trigger("click");
+  }
+
+  it("reports how long settling actually took when it was recorded", () => {
+    const wrapper = render({
+      settle: { navigation: { url_pattern: "**/home" }, observed_duration_ms: 1200 },
+    });
+    expect(wrapper.find(test("synthetics-journey-step-settle-observed")).text()).toContain("1.2");
+  });
+
+  it("shows no evidence block on a step that was never recorded", async () => {
+    const wrapper = render();
+    await openAdvanced(wrapper);
+    expect(wrapper.find(test("synthetics-journey-step-settle-recorded")).exists()).toBe(false);
+    expect(wrapper.find(test("synthetics-journey-step-settle-observed")).exists()).toBe(false);
+  });
+
+  // SE-16 again, from the other side: the budget is a field, not evidence, so it
+  // must stay reachable when there is no evidence to sit under.
+  it("keeps the budget field outside the evidence block", async () => {
+    const wrapper = render();
+    await openAdvanced(wrapper);
+    const recorded = wrapper.find(test("synthetics-journey-step-settle-recorded"));
+    expect(recorded.exists()).toBe(false);
+    expect(wrapper.find(test("synthetics-journey-step-settle-budget-input")).exists()).toBe(true);
+  });
 });
 
 // Phase 3 / SE-9, SE-20.
