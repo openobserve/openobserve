@@ -149,7 +149,7 @@ pub(crate) fn validate_create(payload: &CreateIntegrationPayload) -> Result<(), 
 #[cfg(feature = "enterprise")]
 fn gate_enabled() -> Option<Response> {
     use o2_enterprise::enterprise::common::config::get_config as o2_config;
-    if !o2_config().incidents.enabled || !o2_config().incidents.external_sources_enabled {
+    if !o2_config().incidents.enabled {
         return Some(MetaHttpResponse::forbidden(
             "External alert sources not enabled",
         ));

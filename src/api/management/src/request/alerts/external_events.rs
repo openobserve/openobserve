@@ -75,7 +75,7 @@ async fn handle_events(
     body: serde_json::Value,
 ) -> Response {
     use o2_enterprise::enterprise::common::config::get_config as o2_config;
-    if !o2_config().incidents.enabled || !o2_config().incidents.external_sources_enabled {
+    if !o2_config().incidents.enabled {
         return MetaHttpResponse::forbidden("External alert sources not enabled");
     }
     let Some(token) = token else {
