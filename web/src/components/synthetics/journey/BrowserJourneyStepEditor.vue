@@ -454,7 +454,11 @@ const hasAdvancedChanges = computed(
            current and all three indicators read alike. -->
       <div class="w-full px-2 py-3">
         <OStepper :model-value="0" orientation="vertical" expanded :animated="false">
-          <OStep :name="1" :title="t('synthetics.journey.advancedSettleHeading')">
+          <OStep
+            :name="1"
+            :title="t('synthetics.journey.advancedSettleHeading')"
+            data-test="synthetics-journey-step-advanced-settle"
+          >
             <div class="flex w-full flex-col gap-2" data-test="synthetics-journey-step-settle">
               <!-- What the recording observed is evidence, so it is boxed and reads
                  as read-only — except the one checkbox on it, which is a judgement
@@ -522,7 +526,11 @@ const hasAdvancedChanges = computed(
             </div>
           </OStep>
 
-          <OStep :name="2" :title="t('synthetics.journey.advancedTimeoutHeading')">
+          <OStep
+            :name="2"
+            :title="t('synthetics.journey.advancedTimeoutHeading')"
+            data-test="synthetics-journey-step-advanced-timeout"
+          >
             <OInput
               v-model="timeoutComputed"
               :label="t('synthetics.journey.timeoutLabel')"
@@ -554,7 +562,11 @@ const hasAdvancedChanges = computed(
              each other, and each carries the sentence that says which to pick.
              The full semantics stay on the tooltip: a card can hold two lines,
              not the paragraph the probe's behaviour actually needs. -->
-          <OStep :name="3" :title="t('synthetics.journey.advancedFailureHeading')">
+          <OStep
+            :name="3"
+            :title="t('synthetics.journey.advancedFailureHeading')"
+            data-test="synthetics-journey-step-advanced-failure"
+          >
             <div class="grid w-full grid-cols-1 gap-3 sm:grid-cols-2">
               <div class="border-border-default rounded-default flex flex-col gap-1 border p-3">
                 <div class="flex items-center gap-1">

@@ -256,11 +256,17 @@ describe("BrowserJourneyStepEditor field layout", () => {
   it("orders Advanced as three numbered phases of the step", async () => {
     const wrapper = render();
     await openAdvanced(wrapper);
-    const steps = wrapper.findAllComponents({ name: "OStep" });
-    expect(steps.map((s) => s.props("name"))).toEqual([1, 2, 3]);
-    expect(steps[0].text()).toMatch(/let the page settle/i);
-    expect(steps[1].text()).toMatch(/give up after/i);
-    expect(steps[2].text()).toMatch(/if it fails/i);
+    const phases = wrapper.findAll('[data-test^="synthetics-journey-step-advanced-"]');
+    expect(phases.map((p) => p.attributes("data-test"))).toEqual([
+      "synthetics-journey-step-advanced-settle",
+      "synthetics-journey-step-advanced-timeout",
+      "synthetics-journey-step-advanced-failure",
+    ]);
+    // The rail's numbers are the sequence, so they are read rather than assumed.
+    expect(phases.map((p) => p.text().trim()[0])).toEqual(["1", "2", "3"]);
+    expect(phases[0].text()).toMatch(/let the page settle/i);
+    expect(phases[1].text()).toMatch(/give up after/i);
+    expect(phases[2].text()).toMatch(/if it fails/i);
   });
 
   // These phases always all apply — there is no step the author is "on" — so the
