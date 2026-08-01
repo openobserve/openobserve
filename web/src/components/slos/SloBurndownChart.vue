@@ -42,7 +42,40 @@
       <div
         class="border-border-default text-compact text-text-heading flex min-h-7 w-full items-center justify-between gap-2 border-b px-2 py-1 font-medium tracking-[0.02em]"
       >
-        <span>{{ panel.label }}</span>
+        <span class="flex items-center gap-1">
+          {{ panel.label }}
+          <!-- The formula, not just prose: "budget remaining" and "burn rate"
+               are both derived numbers, and a reader deciding whether to page
+               someone needs to know exactly what was divided by what. -->
+          <OIcon
+            name="info"
+            size="sm"
+            class="text-icon-color cursor-help"
+            :label="t('slos.chart.about')"
+            :data-test="`slos-sloburndownchart-${panel.key}-info`"
+          >
+            <OTooltip side="right" max-width="26rem" :delay="150" hoverable>
+              <template #content>
+                <div class="flex flex-col gap-2">
+                  <p class="text-xs leading-relaxed">{{ panel.explain }}</p>
+                  <div class="flex flex-col gap-1">
+                    <span class="text-text-secondary text-2xs font-semibold uppercase">
+                      {{ t("slos.chart.formulaLabel") }}
+                    </span>
+                    <!-- The interpolation hugs the tags: `whitespace-pre-line`
+                         keeps newlines, so template indentation around it would
+                         render as a blank first line inside the block. -->
+                    <code
+                      class="bg-surface-subtle text-text-code rounded-default text-2xs block px-2 py-1 leading-relaxed whitespace-pre-line"
+                      >{{ panel.formula }}</code
+                    >
+                  </div>
+                  <p class="text-text-secondary text-2xs leading-relaxed">{{ panel.note }}</p>
+                </div>
+              </template>
+            </OTooltip>
+          </OIcon>
+        </span>
         <span class="text-text-secondary font-normal">{{ panel.hint }}</span>
       </div>
 
@@ -84,7 +117,9 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { format } from "date-fns";
 
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import searchService from "@/services/search";
 import {
   bucketSecsFor,
@@ -230,17 +265,28 @@ const burnOptions = computed(() => {
   };
 });
 
+// `explain` / `formula` / `note` are the info tooltip's three parts, in the
+// order a reader needs them: what the line is, the arithmetic behind it, and
+// how to read the threshold. The formulas mirror `toBurndownSeries` (and so
+// `config::meta::slo::math`) — if the arithmetic there changes, these change
+// with it, or the page documents a calculation it no longer performs.
 const panels = computed(() => [
   {
     key: "budget",
     label: t("slos.chart.budgetTitle"),
     hint: t("slos.chart.cumulativeHint"),
+    explain: t("slos.chart.budgetExplain"),
+    formula: t("slos.chart.budgetFormula"),
+    note: t("slos.chart.budgetNote"),
     options: budgetOptions.value,
   },
   {
     key: "burn",
     label: t("slos.chart.burnTitle"),
     hint: t("slos.chart.perBucketHint"),
+    explain: t("slos.chart.burnExplain"),
+    formula: t("slos.chart.burnFormula"),
+    note: t("slos.chart.burnNote"),
     options: burnOptions.value,
   },
 ]);
