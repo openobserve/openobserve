@@ -414,7 +414,6 @@ pub async fn get_latest_users(
                 gen_ai_usage_cost: json::get_float_value(
                     item.get("gen_ai_usage_cost_details").unwrap_or_default(),
                 ),
-                ..Default::default()
             },
         );
     }
