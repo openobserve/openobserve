@@ -3,7 +3,7 @@ import { LogsQueryPage } from './logsQueryPage.js';
 import { LoginPage } from '../generalPages/loginPage.js';
 import { IngestionPage } from '../generalPages/ingestionPage.js';
 import { ManagementPage } from '../generalPages/managementPage.js';
-import { openNavFlyoutChild } from '../commonActions.js';
+import { openNavFlyoutChild, waitForNavRailReady } from '../commonActions.js';
 import { openOSelectDropdown } from '../alertsPages/oselectHelpers.js';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -3264,6 +3264,11 @@ export class LogsPage {
     }
 
     async clickStreamsMenuItem() {
+        // menu-link-/streams-item does not exist until MainLayout's menuReady flips on
+        // GET /config, so a bare click here lands on nothing and the caller then times
+        // out on the streams page (streams-search-stream-input, 45s — Streams shard in
+        // run 30576576717). Gate on the rail first.
+        await waitForNavRailReady(this.page);
         return await this.page.locator(this.streamsMenuItem).click({ force: true });
     }
 

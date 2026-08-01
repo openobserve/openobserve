@@ -1,4 +1,6 @@
 import { expect } from '@playwright/test';
+import { waitForNavRailReady } from '../commonActions.js';
+import { getOrgIdentifier } from '../../playwright-tests/utils/cloud-auth.js';
 
 export const path = require('path');
 export
@@ -23,6 +25,20 @@ export
     }
 
     async navigateToManagement() {
+        // Go straight to the settings URL instead of hovering home and clicking
+        // menu-link-/settings-item. Those are nav-rail elements, and the rail is
+        // empty until GET /config resolves — on a loaded alpha the 45s wait on
+        // [name='home'] simply expires (Streams shard, run 30576576717). A URL
+        // navigation does not depend on the rail; the rail click stays as fallback.
+        const org = getOrgIdentifier() || process.env['ORGNAME'] || 'default';
+        const baseUrl = (process.env['ZO_BASE_URL'] || '').replace(/\/+$/, '');
+        await this.page.goto(`${baseUrl}/web/settings?org_identifier=${encodeURIComponent(org)}`).catch(() => {});
+        await this.page.waitForLoadState('domcontentloaded').catch(() => {});
+        const landed = await this.page.getByRole('main')
+            .waitFor({ state: 'visible', timeout: 20000 }).then(() => true).catch(() => false);
+        if (landed) return;
+
+        await waitForNavRailReady(this.page);
         await this.page.waitForSelector("[name ='home']");
         await this.homeIcon.hover();
         await this.page.waitForSelector('[data-test="menu-link-/settings-item"]');
@@ -31,6 +47,8 @@ export
 
     async goToManagement() {
  // Follow same pattern as navigateToManagement() but with validation
+    // Rail must be populated before any menu-link is clickable — see navigateToManagement.
+    await waitForNavRailReady(this.page);
     await this.page.waitForSelector("[name ='home']");
     await this.homeIcon.hover();
     await this.page.waitForSelector('[data-test="menu-link-/settings-item"]');

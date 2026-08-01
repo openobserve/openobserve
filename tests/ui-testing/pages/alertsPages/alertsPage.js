@@ -23,6 +23,7 @@ import { AlertManagement } from './alertManagement.js';
 import { AlertBulkOperations } from './alertBulkOperations.js';
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
 const { getAuthHeaders, isCloudEnvironment } = require('../../playwright-tests/utils/cloud-auth.js');
+import { getOrgIdentifier } from '../../playwright-tests/utils/cloud-auth.js';
 
 export class AlertsPage {
     constructor(page) {
@@ -1000,9 +1001,19 @@ export class AlertsPage {
         const isDirectlyVisible = await alertCell.isVisible({ timeout: 5000 }).catch(() => false);
 
         if (!isDirectlyVisible) {
-            // If not found, navigate to alerts page and search
+            // If not found, navigate to alerts page and search.
+            //
+            // By URL, NOT by clicking menu-link-/alerts-item. That is a nav-rail item,
+            // and the rail is empty until GET /config resolves — so on a loaded alpha the
+            // click silently never lands, we stay on the previous page, and all four
+            // search attempts below then look for the row on the wrong page. That is
+            // exactly how three Alerts specs failed in run 30576576717: the failure
+            // surfaced as "cell not found" rather than anything mentioning navigation.
+            // A URL navigation does not depend on the rail at all.
             testLogger.info('Alert not immediately visible, navigating to alerts and searching', { alertName: nameToVerify });
-            await this.page.locator(this.locators.alertMenuItem).click();
+            const org = getOrgIdentifier() || process.env['ORGNAME'] || 'default';
+            const baseUrl = (process.env['ZO_BASE_URL'] || '').replace(/\/+$/, '');
+            await this.page.goto(`${baseUrl}/web/alerts?org_identifier=${encodeURIComponent(org)}`).catch(() => {});
             await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
             // Re-search across attempts: under concurrent load the alerts-list refetch after a
