@@ -10830,6 +10830,7 @@
     "delete": "Delete",
     "pause": "Pause",
     "resume": "Resume",
+    "refresh": "Reload SLOs",
     "paused": "Paused",
     "pausedNotice": "SLO paused",
     "resumed": "SLO resumed",
@@ -10905,6 +10906,7 @@
       "coverage": "Coverage"
     },
     "tab": {
+      "trend": "Trend",
       "groups": "Groups",
       "configuration": "Configuration"
     },
@@ -11006,6 +11008,18 @@
       "goodEvents": "Good events",
       "badEvents": "Bad events",
       "needsDefinition": "Pick a stream and define \"good when\" to preview"
+    },
+    "chart": {
+      "budgetTitle": "Error budget burndown",
+      "burnTitle": "Burn rate",
+      "budgetRemaining": "Budget remaining",
+      "burnRate": "Burn rate",
+      "cumulativeHint": "cumulative over the window",
+      "perBucketHint": "per bucket",
+      "exhausted": "Budget exhausted",
+      "neutralBurn": "Budget-neutral (×1)",
+      "empty": "No slices measured in this window yet.",
+      "loadFailed": "Could not load measurement history"
     }
   }
 }

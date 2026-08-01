@@ -77,7 +77,7 @@
            default `min-width: auto` would let a wide child (the query
            editors) push the column past its share. -->
       <div class="flex min-w-0 flex-col gap-4">
-        <SloSection :title="t('slos.section.identity')">
+        <OFormSection :title="t('slos.section.identity')">
           <!-- One row: folder, name, tags — in that order. The folder column
                is fixed-width so the name (the field people actually type in)
                takes the slack; tags get their own share. Wraps to a column on
@@ -121,9 +121,9 @@
             class="mt-3"
             data-test="slos-addslo-description"
           />
-        </SloSection>
+        </OFormSection>
 
-        <SloSection :title="t('slos.section.sli')">
+        <OFormSection :title="t('slos.section.sli')">
           <OToggleGroup v-model="form.sli_type" data-test="slos-addslo-sli-type">
             <OToggleGroupItem
               v-for="opt in sliTypeOptions"
@@ -243,9 +243,9 @@
           <OBanner v-else variant="info" class="mt-3">
             {{ t("slos.alertSli.unavailable") }}
           </OBanner>
-        </SloSection>
+        </OFormSection>
 
-        <SloSection :title="t('slos.section.objective')">
+        <OFormSection :title="t('slos.section.objective')">
           <div class="grid grid-cols-2 gap-3">
             <OInput
               v-model.number="form.target"
@@ -300,9 +300,9 @@
           <p v-if="isGrouped" class="text-compact text-text-secondary mt-1">
             {{ t("slos.groupedSliceNote") }}
           </p>
-        </SloSection>
+        </OFormSection>
 
-        <SloSection :title="t('slos.section.grouping')">
+        <OFormSection :title="t('slos.section.grouping')">
           <!-- Constraining wrapper: OTagInput's root is `h-full`. -->
           <OSelect
             v-model="groupByList"
@@ -321,7 +321,7 @@
             class="mt-3"
             data-test="slos-addslo-groups-estimate"
           />
-        </SloSection>
+        </OFormSection>
       </div>
 
       <div class="flex flex-col gap-4">
@@ -340,7 +340,7 @@
 
         <!-- Summary. Mirrors the backend's own arithmetic so a budget rejection
            at save time is never the first time a user sees the numbers. -->
-        <SloSection :title="t('slos.section.summary')" class="h-fit">
+        <OFormSection :title="t('slos.section.summary')" class="h-fit">
           <dl class="text-compact grid grid-cols-[8rem_1fr] gap-y-2">
             <dt class="text-text-secondary">{{ t("slos.field.sliType") }}</dt>
             <dd>{{ sliTypeLabel(form.sli_type) }}</dd>
@@ -367,7 +367,7 @@
           <OBanner variant="info" class="mt-3">
             {{ t("slos.backfillNote") }}
           </OBanner>
-        </SloSection>
+        </OFormSection>
       </div>
     </div>
   </OPageLayout>
@@ -381,7 +381,7 @@ import { useStore } from "vuex";
 
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import SloSection from "@/components/slos/SloSection.vue";
+import OFormSection from "@/lib/core/FormSection/OFormSection.vue";
 import SloPreviewChart from "@/components/slos/SloPreviewChart.vue";
 import SloExpressionField from "@/components/slos/SloExpressionField.vue";
 import SelectFolderDropDown from "@/components/common/sidebar/SelectFolderDropDown.vue";
