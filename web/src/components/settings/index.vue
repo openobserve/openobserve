@@ -89,9 +89,7 @@ export default defineComponent({
       queryManagement: "queryManagement",
       query_management: "queryManagement",
       domainManagement: "domain_management",
-      alertDestinations: "alert_destinations",
       pipelineDestinations: "pipeline_destinations",
-      alertTemplates: "templates",
       modelPricing: "model_pricing",
       modelPricingEditor: "model_pricing",
       llmProviders: "llm_providers",
@@ -174,7 +172,7 @@ export default defineComponent({
     const settingsGroupOrder = [
       "General",
       "Access & Security",
-      "Destinations & Templates",
+      "Destinations",
       "Data & AI",
       "Operations",
       "Synthetics",
@@ -238,15 +236,10 @@ export default defineComponent({
           dataTest: "domain-management-tab",
           group: "Access & Security",
         },
-        {
-          key: "alert_destinations",
-          label: t("alert_destinations.header"),
-          description: t("settings.alertDestinationsDesc"),
-          icon: "location-on",
-          to: { name: "alertDestinations", query: { org_identifier: org } },
-          dataTest: "alert-destinations-tab",
-          group: "Destinations & Templates",
-        },
+        // Notification Destinations and Templates are alerting configuration and
+        // now live under Reliability (/alert-destinations, /alert-templates).
+        // Pipeline Destinations stays here — it belongs to pipelines, not
+        // alerting — so the group is just "Destinations" now.
         {
           key: "pipeline_destinations",
           label: t("pipeline_destinations.header"),
@@ -255,16 +248,7 @@ export default defineComponent({
           to: { name: "pipelineDestinations", query: { org_identifier: org } },
           visible: isEnt,
           dataTest: "pipeline-destinations-tab",
-          group: "Destinations & Templates",
-        },
-        {
-          key: "templates",
-          label: t("alert_templates.header"),
-          description: t("settings.templatesDesc"),
-          icon: "description",
-          to: { name: "alertTemplates", query: { org_identifier: org } },
-          dataTest: "alert-templates-tab",
-          group: "Destinations & Templates",
+          group: "Destinations",
         },
         {
           key: "storageSettings",
@@ -396,7 +380,7 @@ export default defineComponent({
       const groupLabels: Record<string, string> = {
         General: t("settings.groupGeneral"),
         "Access & Security": t("settings.groupAccessSecurity"),
-        "Destinations & Templates": t("settings.groupDestinationsTemplates"),
+        Destinations: t("settings.groupDestinations"),
         "Data & AI": t("settings.groupDataAI"),
         Operations: t("settings.groupOperations"),
         Synthetics: t("settings.groupSynthetics"),

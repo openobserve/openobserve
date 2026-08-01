@@ -32,7 +32,7 @@ use openobserve_api_management::request::cloud;
 use openobserve_api_management::request::profiling;
 use openobserve_api_management::request::{
     alerts, authz, dashboards, folders, kv, model_pricing, organization, service_accounts,
-    short_url, sourcemaps, status, stream, users,
+    short_url, slos, sourcemaps, status, stream, users,
 };
 use openobserve_api_pipelines::request::{enrichment_table, functions, pipeline, pipelines};
 use openobserve_api_search::{promql, search, traces};
@@ -844,11 +844,25 @@ pub fn service_routes() -> Router {
         .route("/v2/{org_id}/reports/{report_id}/enable", patch(dashboards::reports::enable_report_v2))
         .route("/v2/{org_id}/reports/{report_id}/trigger", put(dashboards::reports::trigger_report_v2))
 
-        // TODO(slo): the SLO routes are deferred and deliberately absent —
-        // spelling them out even in a comment would make the enterprise
-        // coverage test demand ROUTE_PERMISSIONS entries for them, since it
-        // scans this file's text. The handlers still live in
-        // `request::slos`; restore both sides together.
+        // SLOs. Deliberately NOT enterprise-gated: nothing about SLO
+        // measurement is an enterprise capability, and the handlers already
+        // return 501 when ZO_SLO_ENABLED is false. Literal segments are
+        // registered before the {slo_id} catch-all, per the router's ordering
+        // rule.
+        .route(
+            "/{org_id}/slos",
+            get(slos::list_slos).post(slos::create_slo),
+        )
+        // Before the {slo_id} catch-all, or "move" is parsed as an SLO id.
+        .route("/{org_id}/slos/move", post(slos::move_slos))
+        .route("/{org_id}/slos/{slo_id}/enable", put(slos::enable_slo))
+        .route("/{org_id}/slos/{slo_id}/groups", get(slos::get_slo_groups))
+        .route(
+            "/{org_id}/slos/{slo_id}",
+            get(slos::get_slo)
+                .put(slos::update_slo)
+                .delete(slos::delete_slo),
+        )
 
         // Folders (v2)
         .route("/v2/{org_id}/folders/{folder_type}", get(folders::list_folders).post(folders::create_folder))

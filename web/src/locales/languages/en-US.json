@@ -914,7 +914,8 @@
     "keyboardShortcuts": "Keyboard Shortcuts",
     "synthetic": "Synthetics",
     "experience": "Experience",
-    "slos": "SLOs"
+    "slos": "SLOs",
+    "reliability": "Reliability"
   },
   "rum": {
     "noSessionReplay": "No session replay available",
@@ -5866,7 +5867,7 @@
     "generalLabel": "General Settings",
     "groupGeneral": "General",
     "groupAccessSecurity": "Access & Security",
-    "groupDestinationsTemplates": "Destinations & Templates",
+    "groupDestinations": "Destinations",
     "groupDataAI": "Data & AI",
     "groupOperations": "Operations",
     "groupSynthetics": "Synthetics",

@@ -2,8 +2,6 @@ import config from "@/aws-exports";
 import { routeGuard } from "@/utils/zincutils";
 
 const Settings = () => import("@/components/settings/index.vue");
-const TemplateList = () => import("@/components/alerts/TemplateList.vue");
-const AlertsDestinationList = () => import("@/components/alerts/AlertsDestinationList.vue");
 
 const useManagementRoutes = () => {
   const routes: any = [
@@ -41,16 +39,14 @@ const useManagementRoutes = () => {
             routeGuard(to, from, next);
           },
         },
+        // Notification destinations moved to /alert-destinations (Reliability).
+        // Kept as a redirect so existing bookmarks and links still resolve.
+        // The function form is required to carry the query across: callers pass
+        // `org_identifier`, and `?action=import` opens the import view — an
+        // object redirect would silently drop both.
         {
           path: "alert_destinations",
-          name: "alertDestinations",
-          meta: {
-            title: "Alert Destinations",
-          },
-          component: AlertsDestinationList,
-          beforeEnter(to: any, from: any, next: any) {
-            routeGuard(to, from, next);
-          },
+          redirect: (to: any) => ({ name: "alertDestinations", query: to.query }),
         },
         {
           path: "model_pricing",
@@ -75,16 +71,11 @@ const useManagementRoutes = () => {
             routeGuard(to, from, next);
           },
         },
+        // Alert templates moved to /alert-templates (Reliability). Redirect kept
+        // for the same reason as alert_destinations above, query included.
         {
           path: "templates",
-          name: "alertTemplates",
-          meta: {
-            title: "Templates",
-          },
-          component: TemplateList,
-          beforeEnter(to: any, from: any, next: any) {
-            routeGuard(to, from, next);
-          },
+          redirect: (to: any) => ({ name: "alertTemplates", query: to.query }),
         },
       ],
     },
