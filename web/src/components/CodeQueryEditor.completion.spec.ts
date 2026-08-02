@@ -18,6 +18,7 @@ import { createStore } from "vuex";
 // getModel() that returns a fresh object each call makes the provider
 // permanently unreachable from tests — which is why the provider specs below
 // were previously skipped.
+let modelSeq = 0;
 const makeModel = () => ({
   getValue: vi.fn(() => ""),
   setValue: vi.fn(),
@@ -30,7 +31,12 @@ const makeModel = () => ({
   getValueInRange: vi.fn(() => ""),
   getWordUntilPosition: vi.fn(() => ({ word: "", startColumn: 1, endColumn: 1 })),
   getWordAtPosition: vi.fn(() => ({ word: "", startColumn: 1, endColumn: 1 })),
-  uri: { toString: () => `inmemory://model/${Math.random()}` },
+  // Stable per model, as real monaco URIs are. A fresh value on every call
+  // would break any implementation keying per-editor config by uri.
+  uri: (() => {
+    const value = `inmemory://model/${modelSeq++}`;
+    return { toString: () => value };
+  })(),
 });
 
 // The default model, used by the tests that only ever mount one editor.
@@ -541,7 +547,9 @@ describe("Phase 3 — providers return the shapes monaco requires", () => {
       timeout: 15000,
       interval: 25,
     });
-    return api;
+    // Hand back THIS editor's model. Invoking a provider with an unrelated
+    // model is exactly what a correct per-model implementation should refuse.
+    return { api, model: createdEditors.at(-1)!.getModel() };
   };
 
   const position = { lineNumber: 1, column: 12 };
@@ -550,12 +558,12 @@ describe("Phase 3 — providers return the shapes monaco requires", () => {
     "D2 — provideSignatureHelp returns { value, dispose }, not a bare SignatureHelp",
     { timeout: 30000 },
     async () => {
-      const api = await mountAndGet();
+      const { api, model } = await mountAndGet();
       const provider = vi
         .mocked((api.languages as any).registerSignatureHelpProvider)
         .mock.calls.at(-1)![1];
-      mockModel.getValueInRange.mockReturnValue("SELECT sum(");
-      const result = await provider.provideSignatureHelp(mockModel, position, {}, {});
+      model.getValueInRange.mockReturnValue("SELECT sum(");
+      const result = await provider.provideSignatureHelp(model, position, {}, {});
       // monaco reads result.value (SignatureHelpResult extends IDisposable).
       // Returning the SignatureHelp directly yields undefined and NO hint, silently.
       expect(result).toBeTruthy();
@@ -566,19 +574,19 @@ describe("Phase 3 — providers return the shapes monaco requires", () => {
   );
 
   it("D2 — returns null when the cursor is not in a call", { timeout: 30000 }, async () => {
-    const api = await mountAndGet();
+    const { api, model } = await mountAndGet();
     const provider = vi
       .mocked((api.languages as any).registerSignatureHelpProvider)
       .mock.calls.at(-1)![1];
-    mockModel.getValueInRange.mockReturnValue("SELECT * FROM logs ");
-    expect(await provider.provideSignatureHelp(mockModel, position, {}, {})).toBeNull();
+    model.getValueInRange.mockReturnValue("SELECT * FROM logs ");
+    expect(await provider.provideSignatureHelp(model, position, {}, {})).toBeNull();
   });
 
   it(
     "D3 — provideHover returns { contents } as IMarkdownString[]",
     { timeout: 30000 },
     async () => {
-      const api = await mountAndGet();
+      const { api, model } = await mountAndGet();
       const provider = vi
         .mocked((api.languages as any).registerHoverProvider)
         .mock.calls.at(-1)![1];
@@ -587,7 +595,7 @@ describe("Phase 3 — providers return the shapes monaco requires", () => {
         startColumn: 1,
         endColumn: 10,
       });
-      const hover = await provider.provideHover(mockModel, position, {});
+      const hover = await provider.provideHover(model, position, {});
       expect(hover).toBeTruthy();
       expect(Array.isArray(hover.contents)).toBe(true);
       expect(hover.contents[0].value).toContain("Utf8");
@@ -595,15 +603,140 @@ describe("Phase 3 — providers return the shapes monaco requires", () => {
   );
 
   it("D3 — returns null for a word it knows nothing about", { timeout: 30000 }, async () => {
-    const api = await mountAndGet();
+    const { api, model } = await mountAndGet();
     const provider = vi.mocked((api.languages as any).registerHoverProvider).mock.calls.at(-1)![1];
     mockModel.getWordAtPosition.mockReturnValue({
       word: "zzz_unknown",
       startColumn: 1,
       endColumn: 12,
     });
-    expect(await provider.provideHover(mockModel, position, {})).toBeNull();
+    expect(await provider.provideHover(model, position, {})).toBeNull();
   });
+});
+
+describe("Phase 3 — C4: the value lookup is awaited inside the provider", () => {
+  const store5 = createStore({ state: { theme: "light" } });
+  let spy: ReturnType<typeof vi.spyOn>;
+  afterAll(() => spy?.mockRestore());
+
+  // Awaiting the provider in the tests above only PERMITS an async
+  // implementation; it does not require one. Nothing so far fails if the
+  // current arrangement survives untouched: parent debounces, calls
+  // getSuggestions, pushes contextKeywords down as a prop, then force-reopens
+  // the widget. This is the test that makes the difference observable — the
+  // values must be in the FIRST result the provider returns, with no second
+  // trigger and no prop round trip.
+  it(
+    "returns field values on the FIRST call, from a delayed resolver",
+    { timeout: 30000 },
+    async () => {
+      const api = await import("monaco-editor/esm/vs/editor/editor.api");
+      const createFn = vi.mocked(api.editor.create);
+      const registerFn = vi.mocked(api.languages.registerCompletionItemProvider);
+      const before = createFn.mock.calls.length;
+
+      let resolverCalls = 0;
+      const fieldValueResolver = vi.fn(async (field: string) => {
+        resolverCalls += 1;
+        // Deliberately slower than a microtask: a provider that forgets to await
+        // returns before this settles.
+        await new Promise((r) => setTimeout(r, 60));
+        return field === "level" ? ["error", "warn"] : [];
+      });
+
+      spy = vi
+        .spyOn(document, "getElementById")
+        .mockImplementation(() => document.createElement("div"));
+      mount(CodeQueryEditor, {
+        props: {
+          editorId: "c4-editor",
+          language: "sql",
+          query: "",
+          keywords: [
+            { name: "level", label: "level", kind: "Field", insertText: "level", detail: "Utf8" },
+          ],
+          suggestions: [],
+          fieldValueResolver,
+        },
+        global: { plugins: [store5] },
+      });
+      await vi.waitFor(() => expect(createFn.mock.calls.length).toBe(before + 1), {
+        timeout: 15000,
+        interval: 25,
+      });
+
+      const model = createdEditors.at(-1)!.getModel();
+      const provider = registerFn.mock.calls.filter((c) => c[0] === "sql").at(-1)![1];
+      model.getValueInRange.mockReturnValue("SELECT * FROM logs WHERE level = '");
+      model.getWordUntilPosition.mockReturnValue({ word: "", startColumn: 34, endColumn: 34 });
+
+      const result = await provider.provideCompletionItems(
+        model,
+        { lineNumber: 1, column: 34 },
+        {},
+        {},
+      );
+
+      expect(fieldValueResolver, "the provider never asked for values").toHaveBeenCalledWith(
+        "level",
+      );
+      const labels = result.suggestions.map((s: any) => s.label);
+      expect(labels, "values did not make the first result — they were not awaited").toEqual(
+        expect.arrayContaining(["error", "warn"]),
+      );
+      expect(resolverCalls).toBe(1);
+    },
+  );
+
+  it(
+    "offers the normal list when the cursor is not after an operator",
+    { timeout: 30000 },
+    async () => {
+      const api = await import("monaco-editor/esm/vs/editor/editor.api");
+      const createFn = vi.mocked(api.editor.create);
+      const registerFn = vi.mocked(api.languages.registerCompletionItemProvider);
+      const before = createFn.mock.calls.length;
+      const fieldValueResolver = vi.fn(async () => ["error"]);
+
+      spy = vi
+        .spyOn(document, "getElementById")
+        .mockImplementation(() => document.createElement("div"));
+      mount(CodeQueryEditor, {
+        props: {
+          editorId: "c4-editor-2",
+          language: "sql",
+          query: "",
+          keywords: [
+            { name: "level", label: "level", kind: "Field", insertText: "level", detail: "Utf8" },
+          ],
+          suggestions: [],
+          fieldValueResolver,
+        },
+        global: { plugins: [store5] },
+      });
+      await vi.waitFor(() => expect(createFn.mock.calls.length).toBe(before + 1), {
+        timeout: 15000,
+        interval: 25,
+      });
+
+      const model = createdEditors.at(-1)!.getModel();
+      const provider = registerFn.mock.calls.filter((c) => c[0] === "sql").at(-1)![1];
+      model.getValueInRange.mockReturnValue("SELECT le");
+      model.getWordUntilPosition.mockReturnValue({ word: "le", startColumn: 8, endColumn: 10 });
+
+      const result = await provider.provideCompletionItems(
+        model,
+        { lineNumber: 1, column: 10 },
+        {},
+        {},
+      );
+      expect(result.suggestions.map((s: any) => s.label)).toContain("level");
+      expect(
+        fieldValueResolver,
+        "resolver was called outside value context",
+      ).not.toHaveBeenCalled();
+    },
+  );
 });
 
 describe("Phase 3 — C5: one provider per language, not per editor", () => {
