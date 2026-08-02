@@ -131,7 +131,12 @@ vi.mock("vuex", async () => {
 let mockStoreInstance: any;
 
 // Mock useSuggestions composable
-vi.mock("@/composables/useSuggestions", () => ({
+vi.mock("@/composables/useSuggestions", async () => {
+  // Real refs, so the template unwraps them exactly as it does in production.
+  // Plain { value } objects are NOT unwrapped by Vue and would reach the child
+  // component as the wrapper object itself.
+  const { ref: vueRef } = await vi.importActual<typeof import("vue")>("vue");
+  return {
   default: vi.fn(() => ({
     autoCompleteData: {
       value: {
@@ -144,11 +149,19 @@ vi.mock("@/composables/useSuggestions", () => ({
       },
     },
     autoCompleteIsSuggesting: { value: false },
+    // Deliberately DISTINCT arrays: a test can then tell whether the template
+    // binds the base list or the context-aware view (tmp/code.md N1).
+    autoCompleteKeywords: vueRef([{ label: "BASE_FIELD", kind: "Field" }]),
+    autoCompleteSuggestions: vueRef([{ label: "BASE_FN", kind: "Function" }]),
+    effectiveKeywords: vueRef([{ label: "CONTEXT_VALUE", kind: "Value" }]),
+    effectiveSuggestions: vueRef([]),
     updateFieldValues: vi.fn(),
     updateFieldKeywords: vi.fn(),
+    updateStreamKeywords: vi.fn(),
     getSuggestions: vi.fn().mockResolvedValue([]),
   })),
-}));
+  };
+});
 
 // Mock zincutils
 vi.mock("@/utils/zincutils", () => ({
@@ -2041,7 +2054,7 @@ describe("QueryConfig.vue", () => {
     const inlineEditorStub = {
       name: "UnifiedQueryEditor",
       template: '<div class="stub-inline-editor" />',
-      props: ["query", "keywords", "suggestions"],
+      props: ["query", "keywords", "suggestions", "dataTestPrefix"],
       emits: ["update:query", "focus", "blur"],
       methods: {
         // handleInlineQueryUpdate reads these off the ref.
@@ -2077,45 +2090,38 @@ describe("QueryConfig.vue", () => {
           stubs: { UnifiedQueryEditor: inlineEditorStub },
         },
       });
-      editorStub = host.findComponent({ name: "UnifiedQueryEditor" });
+      // Two UnifiedQueryEditors render here (inline SQL and inline VRL); only
+      // the SQL one carries the autocomplete bindings.
+      editorStub = host
+        .findAllComponents({ name: "UnifiedQueryEditor" })
+        .find((c: any) => c.props("dataTestPrefix") === "alert-inline-sql");
     });
 
     afterEach(() => host?.unmount());
 
-    it("renders the inline editor on the sql tab", () => {
+    it("renders the inline sql editor on the sql tab", () => {
+      expect(editorStub).toBeDefined();
       expect(editorStub.exists()).toBe(true);
     });
 
-    it("delivers field VALUES to the editor once the cursor is after an operator", async () => {
-      // Drives useSuggestions into its value branch; getFieldValuesForSuggestion
-      // is mocked (bottom of file) to return two values.
-      await editorStub.vm.$emit("update:query", "level = ");
-      await flushPromises();
-      await nextTick();
+    // NOTE: this spec mocks @/composables/useSuggestions wholesale, so the real
+    // value-context pipeline cannot run here — QueryEditorDialog.spec.ts covers
+    // that end to end against the real composable. What IS provable here, and
+    // what N1 actually is, is WHICH list the template binds. The mock returns
+    // distinct arrays for the base and context-aware views.
 
-      const delivered = (editorStub.props("keywords") ?? []) as any[];
-      expect(delivered.length).toBeGreaterThan(0);
-      // With the buggy binding the editor receives the BASE list (Field/Function/
-      // Keyword kinds) and never a single Value.
-      expect(delivered.some((k) => k.kind === "Value")).toBe(true);
+    it("binds the context-aware keyword view, not the base list", () => {
+      const delivered = editorStub.props("keywords") as any[];
+      expect(delivered).toBeDefined();
+      expect(delivered.map((k) => k.label)).toEqual(["CONTEXT_VALUE"]);
+      expect(delivered.map((k) => k.label)).not.toContain("BASE_FIELD");
     });
 
-    it("delivers the stored values themselves, not field names", async () => {
-      await editorStub.vm.$emit("update:query", "level = ");
-      await flushPromises();
-      await nextTick();
-
-      const labels = ((editorStub.props("keywords") ?? []) as any[]).map((k) => k.label);
-      expect(labels).toContain("error");
-      expect(labels).toContain("warn");
-    });
-
-    it("blanks the function suggestions while in value context", async () => {
-      await editorStub.vm.$emit("update:query", "level = ");
-      await flushPromises();
-      await nextTick();
-
-      expect(editorStub.props("suggestions")).toEqual([]);
+    it("binds the context-aware suggestion view, not the base list", () => {
+      const delivered = editorStub.props("suggestions") as any[];
+      expect(delivered).toBeDefined();
+      // effectiveSuggestions is [] in value context; the base list is not.
+      expect(delivered).toEqual([]);
     });
   });
 });

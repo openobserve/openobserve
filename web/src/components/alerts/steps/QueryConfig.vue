@@ -1052,8 +1052,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :query="localTab === 'sql' ? localSqlQuery : localPromqlQuery"
                         editor-height="100%"
                         :disable-ai="!streamName"
-                        :keywords="autoCompleteKeywords"
-                        :suggestions="autoCompleteSuggestions"
+                        :keywords="effectiveKeywords"
+                        :suggestions="effectiveSuggestions"
                         @focus="onQueryEditorFocus"
                         @blur="onBlurInlineSqlEditor"
                         @update:query="handleInlineQueryUpdate"
@@ -1886,6 +1886,10 @@ export default defineComponent({
       autoCompleteData,
       autoCompleteKeywords,
       autoCompleteSuggestions,
+      // Context-aware views — see QueryEditorDialog for why the raw lists are
+      // not what the editor should receive.
+      effectiveKeywords,
+      effectiveSuggestions,
       getSuggestions,
       updateFieldKeywords,
     } = useSqlSuggestions();
@@ -3568,6 +3572,8 @@ export default defineComponent({
       inlineQueryEditorRef,
       autoCompleteKeywords,
       autoCompleteSuggestions,
+      effectiveKeywords,
+      effectiveSuggestions,
       handleInlineQueryUpdate,
       inlineEditorPlaceholder,
       promqlSamples,

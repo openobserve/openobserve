@@ -186,8 +186,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @blur="onBlurQueryEditor"
                         editor-height="100%"
                         data-test-prefix="alert"
-                        :keywords="autoCompleteKeywords"
-                        :suggestions="autoCompleteSuggestions"
+                        :keywords="effectiveKeywords"
+                        :suggestions="effectiveSuggestions"
                       />
                       <div
                         v-if="
@@ -1099,6 +1099,11 @@ const {
   autoCompleteData,
   autoCompleteKeywords,
   autoCompleteSuggestions,
+  // Context-aware views: these swap in stream names after FROM and field VALUES
+  // after an operator. Binding the raw lists above meant the value popup showed
+  // field names exactly where values belong.
+  effectiveKeywords,
+  effectiveSuggestions,
   getSuggestions,
   updateFieldKeywords,
 } = useSqlSuggestions();

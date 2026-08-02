@@ -79,6 +79,11 @@ const loadMonaco = async () => {
 };
 
 import { vrlLanguageDefinition } from "@/utils/query/vrlLanguageDefinition";
+import {
+  resolveKeywords,
+  resolveSuggestions,
+  buildCompletionItems,
+} from "@/utils/query/sqlCompletion";
 import { loadPromqlLanguage } from "@/utils/query/promqlLanguageDefinition";
 
 import { useStore } from "vuex";
@@ -201,163 +206,6 @@ export default defineComponent({
     let provider: Ref<any | null> = ref(null);
     const currentEditorText = ref("");
 
-    // These will be initialized when Monaco loads
-    let CompletionKind: any = null;
-    let insertTextRules: any = null;
-
-    const initializeMonacoConstants = () => {
-      if (!monaco || CompletionKind) return;
-
-      CompletionKind = {
-        Keyword: monaco.languages.CompletionItemKind.Keyword,
-        Operator: monaco.languages.CompletionItemKind.Operator,
-        Text: monaco.languages.CompletionItemKind.Text,
-        Value: monaco.languages.CompletionItemKind.Value,
-        Method: monaco.languages.CompletionItemKind.Method,
-        Function: monaco.languages.CompletionItemKind.Function,
-        Constructor: monaco.languages.CompletionItemKind.Constructor,
-        Field: monaco.languages.CompletionItemKind.Field,
-        Variable: monaco.languages.CompletionItemKind.Variable,
-      };
-
-      insertTextRules = {
-        InsertAsSnippet: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-        KeepWhitespace: monaco.languages.CompletionItemInsertTextRule.KeepWhitespace,
-        None: monaco.languages.CompletionItemInsertTextRule.None,
-      };
-    };
-
-    const defaultKeywords = [
-      {
-        label: "and",
-        kind: "Keyword",
-        insertText: "and ",
-      },
-      {
-        label: "or",
-        kind: "Keyword",
-        insertText: "or ",
-      },
-      {
-        label: "like",
-        kind: "Keyword",
-        insertText: "like '%${1:params}%' ",
-        insertTextRules: "InsertAsSnippet",
-      },
-      {
-        label: "in",
-        kind: "Keyword",
-        insertText: "in ('${1:params}') ",
-        insertTextRules: "InsertAsSnippet",
-      },
-      {
-        label: "not in",
-        kind: "Keyword",
-        insertText: "not in ('${1:params}') ",
-        insertTextRules: "InsertAsSnippet",
-      },
-      {
-        label: "between",
-        kind: "Keyword",
-        insertText: "between '${1:params}' and '${1:params}' ",
-        insertTextRules: "InsertAsSnippet",
-      },
-      {
-        label: "not between",
-        kind: "Keyword",
-        insertText: "not between '${1:params}' and '${1:params}' ",
-        insertTextRules: "InsertAsSnippet",
-      },
-      {
-        label: "is null",
-        kind: "Keyword",
-        insertText: "is null ",
-      },
-      {
-        label: "is not null",
-        kind: "Keyword",
-        insertText: "is not null ",
-      },
-      {
-        label: ">",
-        kind: "Operator",
-        insertText: "> ",
-      },
-      {
-        label: "<",
-        kind: "Operator",
-        insertText: "< ",
-      },
-      {
-        label: ">=",
-        kind: "Operator",
-        insertText: ">= ",
-      },
-      {
-        label: "<=",
-        kind: "Operator",
-        insertText: "<= ",
-      },
-      {
-        label: "<>",
-        kind: "Operator",
-        insertText: "<> ",
-      },
-      {
-        label: "=",
-        kind: "Operator",
-        insertText: "= ",
-      },
-      {
-        label: "!=",
-        kind: "Operator",
-        insertText: "!= ",
-      },
-      {
-        label: "()",
-        kind: "Keyword",
-        insertText: "(${1:condition}) ",
-        insertTextRules: "InsertAsSnippet",
-      },
-    ];
-    const defaultSuggestions = [
-      {
-        label: (_keyword: string) => `match_all('${_keyword}')`,
-        kind: "Text",
-        insertText: (_keyword: string) => `match_all('${_keyword}')`,
-      },
-      {
-        label: (_keyword: string) => `match_all_raw('${_keyword}')`,
-        kind: "Text",
-        insertText: (_keyword: string) => `match_all_raw('${_keyword}')`,
-      },
-      {
-        label: (_keyword: string) => `match_all_raw_ignore_case('${_keyword}')`,
-        kind: "Text",
-        insertText: (_keyword: string) => `match_all_raw_ignore_case('${_keyword}')`,
-      },
-      {
-        label: () => `re_match(fieldname: string, regular_expression: string)`,
-        kind: "Text",
-        insertText: () => `re_match(fieldname, '')`,
-      },
-      {
-        label: () => `re_not_match(fieldname: string, regular_expression: string)`,
-        kind: "Text",
-        insertText: () => `re_not_match(fieldname, '')`,
-      },
-      {
-        label: (_keyword: string) => `str_match(fieldname, '${_keyword}')`,
-        kind: "Text",
-        insertText: (_keyword: string) => `str_match(fieldname, '${_keyword}')`,
-      },
-      {
-        label: (_keyword: string) => `str_match_ignore_case(fieldname, '${_keyword}')`,
-        kind: "Text",
-        insertText: (_keyword: string) => `str_match_ignore_case(fieldname, '${_keyword}')`,
-      },
-    ];
-
     watch(
       () => isDark.value,
       () => {
@@ -366,19 +214,14 @@ export default defineComponent({
       },
     );
 
-    const keywords = computed(() => {
-      if (props.language === "sql" && !props.keywords?.length) {
-        return defaultKeywords;
-      }
-      return props.keywords;
-    });
-
-    const suggestions = computed(() => {
-      if (props.language === "sql" && props.suggestions == null) {
-        return defaultSuggestions;
-      }
-      return props.suggestions ?? [];
-    });
+    // Both fall back to the shared catalog so every surface (Logs, Traces,
+    // Dashboards, Alerts, Pipelines) is served identical content. Traces passes
+    // no `suggestions` prop and used to get a 7-entry local list with no
+    // aggregate functions at all.
+    const keywords = computed(() => resolveKeywords(props.language, props.keywords as any[]));
+    const suggestions = computed(() =>
+      resolveSuggestions(props.language, props.suggestions as any[] | null),
+    );
 
     /**
      * Debounced function to detect natural language and auto-toggle NLP mode
@@ -505,23 +348,6 @@ export default defineComponent({
       }
     };
 
-    const createDependencyProposals = (range: any) => {
-      if (!CompletionKind || !insertTextRules) return [];
-      return keywords.value.map((keyword: any) => {
-        const itemObj: any = {
-          ...keyword,
-          label: keyword["label"],
-          kind: CompletionKind[keyword["kind"]],
-          insertText: keyword["insertText"],
-          range: range,
-        };
-        if (insertTextRules[keyword["insertTextRule"]]) {
-          itemObj["insertTextRules"] = insertTextRules[keyword["insertTextRule"]];
-        }
-        return itemObj;
-      });
-    };
-
     const setupEditor = async () => {
       // Lazy load Monaco Editor on first use
       const monacoModule = await loadMonaco();
@@ -532,9 +358,6 @@ export default defineComponent({
       if (typeof window !== "undefined") {
         (window as any).monaco = monacoModule;
       }
-
-      // Initialize Monaco constants after loading
-      initializeMonacoConstants();
 
       // Register custom languages after Monaco is loaded
       if (props.language === "promql") {
@@ -917,41 +740,31 @@ export default defineComponent({
           const own = editorObj?.getModel?.();
           if (own && model !== own) return { suggestions: [] };
 
-          // find out if we are completing a property in the 'dependencies' object.
-          var textUntilPosition = model.getValueInRange({
-            startLineNumber: 1,
-            startColumn: 1,
-            endLineNumber: position.lineNumber,
-            endColumn: position.column,
-          });
-
-          var word = model.getWordUntilPosition(position);
-          var range = {
+          // Monaco's own word at the cursor. Previously this was derived with
+          // textUntilPosition.trim().split(" ").pop(), which broke on every
+          // newline ("SELECT *\nFROM" yielded "*\nFROM") and on half-typed
+          // quoted values ("'err").
+          const word = model.getWordUntilPosition(position);
+          const range = {
             startLineNumber: position.lineNumber,
             endLineNumber: position.lineNumber,
             startColumn: word.startColumn,
             endColumn: word.endColumn,
           };
 
-          let arr = textUntilPosition.trim().split(" ");
-          let filteredSuggestions = [];
-          filteredSuggestions = createDependencyProposals(range);
-          filteredSuggestions = filteredSuggestions.filter((item) => {
-            return item.label.toLowerCase().includes(word.word.toLowerCase());
-          });
-
-          const lastElement = arr.pop();
-          suggestions.value.forEach((suggestion: any) => {
-            filteredSuggestions.push({
-              label: suggestion.label(lastElement),
-              kind: monaco.languages.CompletionItemKind[suggestion.kind || "Text"],
-              insertText: suggestion.insertText(lastElement),
-              range: range,
-            });
-          });
-
+          // No substring pre-filter here on purpose. Monaco scores candidates
+          // with a word-boundary-aware subsequence matcher; filtering with
+          // String.includes first threw away matches it would have ranked
+          // first (typing "knn" never surfaced kubernetes_namespace_name).
           return {
-            suggestions: filteredSuggestions,
+            suggestions: buildCompletionItems({
+              keywords: keywords.value as any[],
+              suggestions: suggestions.value as any[],
+              word: word.word,
+              range,
+              kinds: monaco.languages.CompletionItemKind,
+              insertTextRules: monaco.languages.CompletionItemInsertTextRule,
+            }),
           };
         },
       });
