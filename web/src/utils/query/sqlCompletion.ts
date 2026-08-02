@@ -311,17 +311,22 @@ export const SQL_FUNCTIONS: SqlCompletionEntry[] = [
     name: "unnest",
     label: "unnest",
     kind: "Function",
-    detail: "array -> rows",
-    documentation: "Expand an array into one row per element.",
-    insertText: "unnest",
+    detail: "(array)",
+    documentation:
+      "Expand an array into one row per element, e.g. `unnest(flatten(cast_to_arr(field)))`.",
+    insertText: "unnest(${1:array})",
+    insertTextRules: SNIPPET,
   },
   {
     name: "array_extract",
     label: "array_extract",
     kind: "Function",
-    detail: "array element",
-    documentation: "Extract a single element from an array.",
-    insertText: "array_extract",
+    detail: "(array, index)",
+    documentation:
+      "Extract a single element from an array by 1-based index, e.g. " +
+      "`array_extract(regexp_match(log, '...'), 1)`.",
+    insertText: "array_extract(${1:array}, ${2:1})",
+    insertTextRules: SNIPPET,
   },
   {
     name: "sum",
@@ -519,3 +524,19 @@ export const hasDynamicEntries = (entries: LooseEntry[] = []): boolean =>
 /** Bare function names, for consumers that must recognise a call site (e.g.
  *  natural-language detection). Keyed off `name`, never off the display label. */
 export const getSqlFunctionNames = (): string[] => SQL_FUNCTIONS.map((f) => f.name);
+
+/**
+ * Snippet argument list for a custom (VRL) function of `numArgs` arguments.
+ *
+ * Each argument gets its OWN tab stop. Monaco LINKS placeholders that share an
+ * index, so the previous `'${1:value}'` repeated per argument meant typing into
+ * one mirrored into all of them and a multi-argument function could not be
+ * filled in. That was invisible while insertTextRules was broken and the text
+ * was inserted literally; it became reachable the moment snippets started working.
+ */
+export const buildFunctionArgs = (numArgs: number | string): string => {
+  const count = Number.parseInt(String(numArgs), 10);
+  if (!Number.isFinite(count) || count <= 0) return "()";
+  const args = Array.from({ length: count }, (_, i) => `'\${${i + 1}:value}'`);
+  return `(${args.join(",")})`;
+};

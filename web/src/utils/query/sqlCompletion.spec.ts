@@ -174,6 +174,8 @@ describe("A3 — column arguments are unquoted, literal arguments are quoted", (
     "histogram",
     "approx_topk",
     "approx_topk_distinct",
+    "unnest",
+    "array_extract",
   ];
 
   it.each(COLUMN_FIRST)("%s does not wrap its first argument in quotes", (name) => {
@@ -226,6 +228,24 @@ describe("A3 — column arguments are unquoted, literal arguments are quoted", (
     expect(byName("approx_topk_distinct").insertText).toBe(
       "approx_topk_distinct(${1:field}, ${2:field2}, ${3:10})",
     );
+  });
+
+  it("unnest inserts a callable form, not a bare word", () => {
+    // Real usage: unnest(flatten(cast_to_arr(phase_data)))
+    expect(byName("unnest").insertText).toBe("unnest(${1:array})");
+    expect(byName("unnest").insertTextRules).toBe("InsertAsSnippet");
+  });
+
+  it("array_extract inserts a callable form with its index argument", () => {
+    // Real usage: array_extract(regexp_match(log, '...'), 1)
+    expect(byName("array_extract").insertText).toBe("array_extract(${1:array}, ${2:1})");
+    expect(byName("array_extract").insertTextRules).toBe("InsertAsSnippet");
+  });
+
+  it("no catalog function inserts a bare name — accepting one must yield callable SQL", () => {
+    for (const fn of SQL_FUNCTIONS) {
+      expect(fn.insertText, `${fn.name} inserts a bare name`).toContain("(");
+    }
   });
 
   it("match_all quotes its search term — it is a literal", () => {
@@ -467,6 +487,45 @@ describe("D7/N2 — the catalog is complete and internally consistent", () => {
 // ───────────────────────────────────────────────────────────────────────────
 // Back-compat — the `suggestions` prop is public; legacy shape must still work
 // ───────────────────────────────────────────────────────────────────────────
+
+// ───────────────────────────────────────────────────────────────────────────
+// Custom (VRL) function argument snippets
+// ───────────────────────────────────────────────────────────────────────────
+
+describe("buildFunctionArgs — one tab stop per argument", () => {
+  const args = async () => (await import("./sqlCompletion")).buildFunctionArgs;
+
+  it("gives each argument its OWN tab stop index", async () => {
+    // All-identical ${1:...} placeholders are LINKED by monaco: typing in one
+    // mirrors into every other, so a 3-arg function could not be filled in.
+    expect((await args())(3)).toBe("('${1:value}','${2:value}','${3:value}')");
+  });
+
+  it("handles a single argument", async () => {
+    expect((await args())(1)).toBe("('${1:value}')");
+  });
+
+  it("emits empty parens for a zero-argument function", async () => {
+    expect((await args())(0)).toBe("()");
+  });
+
+  it("accepts the string form the API returns", async () => {
+    expect((await args())("2")).toBe("('${1:value}','${2:value}')");
+  });
+
+  it("degrades to empty parens for junk input", async () => {
+    expect((await args())(undefined as any)).toBe("()");
+    expect((await args())("abc")).toBe("()");
+    expect((await args())(-1)).toBe("()");
+  });
+
+  it("never repeats a tab stop index", async () => {
+    const out = (await args())(5);
+    const indices = [...out.matchAll(/\$\{(\d+):/g)].map((m) => m[1]);
+    expect(new Set(indices).size).toBe(indices.length);
+    expect(indices).toEqual(["1", "2", "3", "4", "5"]);
+  });
+});
 
 describe("A2 — dynamic entries must be reported as an incomplete list", () => {
   it("reports static catalog entries as complete", async () => {

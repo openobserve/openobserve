@@ -364,11 +364,6 @@ export default defineComponent({
         }
 
         store.state.organizationData.functions.map((data: any) => {
-          const args: any = [];
-          for (let i = 0; i < parseInt(data.num_args); i++) {
-            args.push("'${1:value}'");
-          }
-
           functionList.value.push({
             name: data.name,
             function: data.function,
