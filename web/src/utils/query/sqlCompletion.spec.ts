@@ -204,6 +204,29 @@ describe("A3 — column arguments are unquoted, literal arguments are quoted", (
     expect(byName("arrcount").insertText).toBe("arrcount(${1:field})");
   });
 
+  // The COLUMN_FIRST sweep above only inspects argument 1. Functions with more
+  // than one column argument need an exact snippet so a later one cannot stay
+  // quoted unnoticed.
+  it("arrzip keeps BOTH column arguments unquoted and quotes only the delimiter", () => {
+    expect(byName("arrzip").insertText).toBe(
+      "arrzip(${1:field1}, ${2:field2}, '${3:delimiter}')",
+    );
+  });
+
+  it("arrindex keeps the column unquoted and both bounds numeric", () => {
+    expect(byName("arrindex").insertText).toBe("arrindex(${1:field}, ${2:1}, ${3:10})");
+  });
+
+  it("arrjoin keeps the column unquoted and quotes only the delimiter", () => {
+    expect(byName("arrjoin").insertText).toBe("arrjoin(${1:field}, '${2:delimiter}')");
+  });
+
+  it("approx_topk_distinct keeps both column arguments unquoted", () => {
+    expect(byName("approx_topk_distinct").insertText).toBe(
+      "approx_topk_distinct(${1:field}, ${2:field2}, ${3:10})",
+    );
+  });
+
   it("match_all quotes its search term — it is a literal", () => {
     expect(byName("match_all").insertText).toBe("match_all('${1:value}')");
   });
