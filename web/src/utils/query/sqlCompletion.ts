@@ -981,7 +981,13 @@ export const buildFunctionArgs = (numArgs: number | string): string => {
  * discarded; it is exactly what belongs in the suggest widget's inline column,
  * and it is what type-aware operator suggestions will key off later.
  */
-export const buildFieldEntry = (field: { name: string; type?: string }): SqlCompletionEntry => {
+export const buildFieldEntry = (field: {
+  name: string;
+  /** Dynamic fields and Alerts columns carry the type here. */
+  type?: string;
+  /** Logs SCHEMA fields carry it here instead (useStreamFields.ts:452). */
+  dataType?: string;
+}): SqlCompletionEntry => {
   const entry: SqlCompletionEntry = {
     name: field.name,
     label: field.name,
@@ -989,7 +995,9 @@ export const buildFieldEntry = (field: { name: string; type?: string }): SqlComp
     insertText: field.name,
     sortText: SORT_LANE.field + field.name,
   };
-  // Omit rather than render "undefined" in the widget.
-  if (field.type) entry.detail = field.type;
+  // Two field shapes exist in the app: schema fields use `dataType`, dynamic
+  // fields and Alerts columns use `type`. Omit rather than render "undefined".
+  const columnType = field.type || field.dataType;
+  if (columnType) entry.detail = columnType;
   return entry;
 };

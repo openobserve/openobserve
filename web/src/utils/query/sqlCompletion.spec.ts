@@ -849,6 +849,25 @@ describe("D1/N5 — field entries surface the column type", () => {
     expect(buildFieldEntry({ name: "code" } as any).detail).toBeUndefined();
   });
 
+  // Two field shapes exist in the app and both must work. Logs SCHEMA fields
+  // carry the type as `dataType` (useStreamFields.ts:452) while Logs DYNAMIC
+  // fields and the Alerts columns carry it as `type`. Reading only `type` left
+  // every schema field in Logs — the common case — with a blank detail, which
+  // 13k passing tests missed because every fixture used `type`.
+  it("reads the type from `dataType` as Logs schema fields supply it", () => {
+    expect(buildFieldEntry({ name: "host_name", dataType: "Utf8" } as any).detail).toBe("Utf8");
+  });
+
+  it("still reads `type` as dynamic fields and Alerts columns supply it", () => {
+    expect(buildFieldEntry({ name: "code", type: "Int64" }).detail).toBe("Int64");
+  });
+
+  it("prefers `type` when a field carries both", () => {
+    expect(buildFieldEntry({ name: "x", type: "Int64", dataType: "Utf8" } as any).detail).toBe(
+      "Int64",
+    );
+  });
+
   it("does not mark a plain field name as a snippet", () => {
     expect(buildFieldEntry({ name: "code", type: "Utf8" }).insertTextRules).toBeUndefined();
   });
