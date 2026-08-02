@@ -918,22 +918,91 @@ mod tests {
         let catalog = catalog_functions("default");
         let json = serde_json::to_value(&catalog).expect("catalog must serialize");
         let arr = json.as_array().expect("catalog serializes to an array");
-        let match_all = arr
-            .iter()
-            .find(|f| f.get("name").and_then(|n| n.as_str()) == Some("match_all"))
-            .expect("match_all must be in the serialized catalog");
 
-        for field in ["name", "signature", "doc", "kind", "deprecated"] {
+        for entry in arr {
+            for field in ["name", "signature", "kind", "deprecated"] {
+                assert!(
+                    entry.get(field).is_some(),
+                    "serialized entry {entry} is missing `{field}`"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn every_catalog_entry_has_a_name_kind_and_signature() {
+        // Sweeps the WHOLE catalog: a single spot check on match_all would let
+        // every DataFusion, JSON, alias or VRL entry ship blank metadata.
+        for f in catalog_functions("default") {
+            assert!(!f.name.is_empty(), "entry with an empty name");
+            assert!(!f.kind.is_empty(), "`{}` has no kind", f.name);
+            assert!(!f.signature.is_empty(), "`{}` has no signature", f.name);
+        }
+    }
+
+    #[test]
+    fn every_catalog_source_contributes_documented_entries() {
+        // Deliberately per-SOURCE rather than per-ENTRY. We author docs for the
+        // O2 UDFs, the rewriter aliases and the org VRL transforms, so those must
+        // be documented. DataFusion built-ins and the JSON family carry whatever
+        // upstream `documentation()` provides — a few hundred of them, not ours
+        // to write — so requiring prose on every single entry would fail for a
+        // reason unrelated to this change.
+        let catalog = catalog_functions("default");
+        let doc_of = |name: &str| {
+            catalog
+                .iter()
+                .find(|f| f.name == name)
+                .unwrap_or_else(|| panic!("`{name}` missing from the catalog"))
+                .doc
+                .clone()
+        };
+
+        for name in [
+            "match_all",
+            "histogram",
+            "str_match",
+            "spath",
+            "approx_topk",
+        ] {
             assert!(
-                match_all.get(field).is_some(),
-                "serialized entry is missing `{field}`"
+                !doc_of(name).is_empty(),
+                "O2 UDF `{name}` must be documented"
             );
         }
-        assert!(
-            !match_all["doc"].as_str().unwrap_or("").is_empty(),
-            "documentation must be non-empty in the serialized payload"
+        for name in ["match_all_raw", "match_all_raw_ignore_case"] {
+            assert!(
+                !doc_of(name).is_empty(),
+                "rewriter alias `{name}` must be documented"
+            );
+        }
+    }
+
+    #[test]
+    fn org_vrl_transforms_are_documented_and_signed() {
+        use config::meta::function::Transform;
+        transform::QUERY_FUNCTIONS.insert(
+            "doc_org/documented_fn".to_string(),
+            Transform {
+                function: ".".to_string(),
+                name: "documented_fn".to_string(),
+                params: "row".to_string(),
+                num_args: 1,
+                trans_type: Some(0),
+                streams: None,
+            },
         );
-        assert!(!match_all["signature"].as_str().unwrap_or("").is_empty());
+        let catalog = catalog_functions("doc_org");
+        let entry = catalog
+            .iter()
+            .find(|f| f.name == "documented_fn")
+            .expect("org transform missing");
+        assert!(!entry.doc.is_empty(), "org VRL transforms must carry a doc");
+        assert!(
+            !entry.signature.is_empty(),
+            "org VRL transforms must carry a signature"
+        );
+        transform::QUERY_FUNCTIONS.remove("doc_org/documented_fn");
     }
 
     #[test]

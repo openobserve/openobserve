@@ -75,7 +75,8 @@ describe("Phase 2 — the server catalog is actually fetched (B4 wiring)", () =>
   it("delivers the FETCHED functions into effectiveSuggestions", async () => {
     vi.mocked(queryFunctions.list).mockResolvedValue({ data: { list: SERVER_LIST } } as any);
     const c = makeComposable({ storedValues: [] });
-    await run(c, "SELECT * FROM stream WHERE ");
+    // Single awaited pass: getSuggestions must await the fetch, not surface the
+    // server functions only on the NEXT keystroke.
     await run(c, "SELECT * FROM stream WHERE ");
     const names = (c.effectiveSuggestions.value as any[]).map((s) => s.name);
     expect(names).toContain("date_trunc");
@@ -112,13 +113,13 @@ describe("Phase 2 — the server catalog is actually fetched (B4 wiring)", () =>
     );
 
     const c = makeComposable({ storedValues: [] });
-    await run(c, "SELECT * FROM stream WHERE ");
+    // ONE awaited pass must be enough. Needing a second would mean the previous
+    // org's functions are still on screen for the first popup after switching.
     await run(c, "SELECT * FROM stream WHERE ");
     let names = (c.effectiveSuggestions.value as any[]).map((s) => s.name);
     expect(names).toContain("myorg_only_fn");
 
     c.autoCompleteData.value.org = "otherorg";
-    await run(c, "SELECT * FROM stream WHERE ");
     await run(c, "SELECT * FROM stream WHERE ");
     names = (c.effectiveSuggestions.value as any[]).map((s) => s.name);
     expect(names).toContain("otherorg_only_fn");

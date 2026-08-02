@@ -1520,7 +1520,7 @@ mod tests {
     // the only assertion that fails if the endpoint is simply never registered.
 
     #[tokio::test]
-    async fn query_functions_route_is_registered() {
+    async fn query_functions_route_is_registered_and_auth_guarded() {
         let app = service_routes();
 
         let req = Request::builder()
@@ -1529,13 +1529,72 @@ mod tests {
             .unwrap();
 
         let response = app.oneshot(req).await.unwrap();
-        // Auth middleware may reject the request; what must NOT happen is 404,
-        // which would mean the route does not exist at all.
-        assert_ne!(
+
+        // service_routes() wraps the WHOLE router in auth_middleware, so an
+        // unauthenticated request can never reach the handler — 200 is not
+        // assertable here and the payload is checked by the handler test below.
+        // What this pins is the pair that a bare `!= 404` would not: the route
+        // exists, and it is behind auth.
+        assert_eq!(
+            response.status(),
+            StatusCode::UNAUTHORIZED,
+            "expected the route to exist and be auth-guarded, got {}",
+            response.status()
+        );
+    }
+
+    #[tokio::test]
+    async fn query_functions_route_rejects_an_unknown_org_path_shape() {
+        // Guards against the route being registered without its {org_id}
+        // segment, which would still answer the test above via a wildcard.
+        let app = service_routes();
+        let req = Request::builder()
+            .uri("/query_functions")
+            .body(Body::empty())
+            .unwrap();
+        let response = app.oneshot(req).await.unwrap();
+        assert_eq!(
             response.status(),
             StatusCode::NOT_FOUND,
-            "GET /{{org_id}}/query_functions is not registered"
+            "query_functions must be org-scoped, not mounted at the root"
         );
+    }
+
+    #[tokio::test]
+    async fn query_functions_handler_returns_the_documented_payload_shape() {
+        // Calls the handler DIRECTLY, bypassing auth, so the body contract the
+        // frontend service depends on ({ list: [...] }) is actually asserted.
+        use axum::extract::Path;
+
+        let response =
+            openobserve_api_search::search::query_functions::list(Path("default".to_string()))
+                .await
+                .into_response();
+
+        assert_eq!(response.status(), StatusCode::OK);
+
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let payload: Value = serde_json::from_slice(&body).expect("body must be JSON");
+
+        let list = payload
+            .get("list")
+            .and_then(Value::as_array)
+            .expect("payload must be { list: [...] } — the frontend reads data.list");
+        assert!(!list.is_empty(), "catalog must not be empty");
+
+        let entry = list
+            .iter()
+            .find(|f| f.get("name").and_then(Value::as_str) == Some("match_all"))
+            .expect("match_all must be present");
+        for field in ["name", "signature", "doc", "kind", "deprecated"] {
+            assert!(
+                entry.get(field).is_some(),
+                "serialized entry is missing `{field}`"
+            );
+        }
+        assert!(!entry["doc"].as_str().unwrap_or("").is_empty());
     }
 
     // ── is_origin_allowed unit tests ──────────────────────────────────────────
