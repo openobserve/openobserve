@@ -114,12 +114,36 @@ describe("parseCallContext — locating the enclosing call", () => {
     });
   });
 
-  it("ignores a bare parenthesised group with no function name", () => {
-    expect(parseCallContext("WHERE (a > 1 AND ")).toBeNull();
+  it("returns null when the paren has no identifier before it at all", () => {
+    expect(parseCallContext("WHERE (")).toBeNull();
+    expect(parseCallContext("(")).toBeNull();
   });
 
   it("tolerates whitespace between the name and the paren", () => {
     expect(parseCallContext("SELECT sum (")).toEqual({ name: "sum", activeParameter: 0 });
+  });
+
+  // This parser is purely syntactic: it reports whatever identifier precedes
+  // the open paren, including a SQL keyword. It cannot do otherwise — `WHERE (`
+  // and `sum (` are the same shape, and the text alone does not say which is a
+  // function. Rejecting non-functions is the catalog's job (see below), which
+  // is also what keeps a column named like a keyword from breaking anything.
+  it("reports a preceding keyword rather than trying to judge it", () => {
+    expect(parseCallContext("WHERE (a > 1 AND ")).toEqual({
+      name: "WHERE",
+      activeParameter: 0,
+    });
+  });
+});
+
+describe("keyword-shaped call sites produce no signature", () => {
+  it("the catalog rejects what the parser cannot", () => {
+    // End to end: `WHERE (` parses, then finds no function, so the provider has
+    // nothing to show. Neither half can make that decision alone.
+    const ctx = parseCallContext("WHERE (a > 1 AND ")!;
+    expect(ctx.name).toBe("WHERE");
+    expect(findFunctionEntry(ctx.name, [], SQL_FUNCTIONS)).toBeNull();
+    expect(buildSignatureHelp(findFunctionEntry(ctx.name, [], SQL_FUNCTIONS), 0)).toBeNull();
   });
 });
 

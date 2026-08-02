@@ -495,10 +495,17 @@ describe("Phase 3 — C5: one provider per language, not per editor", () => {
       }
 
       const added = reg.mock.calls.filter((c) => c[0] === "sql").length - providersBefore;
-      // Monaco aggregates every provider registered for a language, so N editors
-      // meant N providers answering on every keystroke — N-1 of them only to
-      // return an empty list for a model that did not ask.
-      expect(added, `three editors registered ${added} SQL completion providers`).toBe(1);
+      const total = reg.mock.calls.filter((c) => c[0] === "sql").length;
+
+      // Asserting `added === 1` would be order-dependent AND unsatisfiable once
+      // the fix lands: registration moves to module scope, so an earlier
+      // describe in this file has already done it and three more editors add
+      // ZERO. The order-independent invariant is that the module ever registers
+      // one SQL provider. Monaco aggregates every provider registered for a
+      // language, so today each editor adds another that answers every
+      // keystroke only to return an empty list for a model that did not ask.
+      expect(added, `three editors added ${added} SQL completion providers`).toBeLessThanOrEqual(1);
+      expect(total, `${total} SQL completion providers registered in this file`).toBe(1);
     },
   );
 });
