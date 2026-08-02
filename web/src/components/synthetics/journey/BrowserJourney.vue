@@ -17,12 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import type {
-  BlockedReason,
-  BrowserStep,
-  ReplayPhase,
-  StepReplayResult,
-} from "@/types/synthetics";
+import type { BlockedReason, BrowserStep, ReplayPhase, StepReplayResult } from "@/types/synthetics";
 import type { StepDotState } from "./JourneySteps.vue";
 import useSyntheticsRecorder from "@/composables/useSyntheticsRecorder";
 import { getUUIDv7 } from "@/utils/zincutils";
@@ -764,6 +759,7 @@ function openChromeExtensions() {
       v-if="!readonly"
       :steps="modelValue"
       @add-assertion="(step) => emit('update:modelValue', [...modelValue, step])"
+      class="mx-3"
     />
 
     <!-- Zero test attributes across a whole recording is a misconfiguration,
@@ -772,12 +768,13 @@ function openChromeExtensions() {
       v-if="!readonly"
       :steps="modelValue"
       :test-id-attr="testIdAttr ?? DEFAULT_TEST_ID_ATTR"
+      class="mx-3"
     />
 
     <!-- Incognito blocked warning card (pre-flight failure) -->
     <div
       v-if="blockedReason === 'incognito'"
-      class="rounded-default bg-warning-50 mb-3 flex flex-col gap-3 border border-[var(--color-warning-300)] px-3 py-3"
+      class="rounded-default bg-warning-50 mx-3 mb-3 flex flex-col gap-3 border border-[var(--color-warning-300)] py-3"
       role="alert"
       data-test="synthetics-journey-incognito-warning"
     >
