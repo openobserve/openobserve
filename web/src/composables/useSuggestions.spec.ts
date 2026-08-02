@@ -582,3 +582,67 @@ describe("Phase 2 — server-supplied functions reach the suggestion list (B4)",
     expect((c.effectiveSuggestions.value as any[]).length).toBeGreaterThan(0);
   });
 });
+
+// ─── Org VRL functions arrive by TWO paths ───────────────────────────────────
+// updateFunctionKeywords puts them in autoCompleteKeywords (the `keywords`
+// prop) and the server catalog puts the same names in autoCompleteSuggestions
+// (the `suggestions` prop). Monaco concatenates both, so the user sees each org
+// function twice — and the two entries disagree on quoting, so the duplicates
+// insert different text.
+
+describe("org VRL functions are offered exactly once", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  const seedBothPaths = (c: ReturnType<typeof useSqlSuggestions>) => {
+    // legacy path (Logs/Traces/Dashboards fetch these and pass args)
+    c.updateFunctionKeywords([{ name: "my_vrl_fn", args: "('${1:value}')" }]);
+    // server catalog reports the very same org transform
+    c.setServerFunctions([
+      { name: "my_vrl_fn", signature: "(arg1)", doc: "Org function.", kind: "vrl" },
+      { name: "date_trunc", signature: "(precision, timestamp)", doc: "T.", kind: "scalar" },
+    ]);
+  };
+
+  it("keeps the org function in keywords and drops it from suggestions", async () => {
+    const c = makeComposable({ storedValues: [] });
+    seedBothPaths(c);
+    await run(c, "SELECT * FROM stream WHERE ");
+
+    const keywords = c.effectiveKeywords.value.map((k: any) => k.label);
+    const suggestions = (c.effectiveSuggestions.value as any[]).map((s) => s.name);
+
+    expect(keywords).toContain("my_vrl_fn");
+    expect(suggestions, "server catalog re-added a function the keywords already carry").not.toContain(
+      "my_vrl_fn",
+    );
+  });
+
+  it("still adds server functions the keywords path does NOT carry", async () => {
+    const c = makeComposable({ storedValues: [] });
+    seedBothPaths(c);
+    await run(c, "SELECT * FROM stream WHERE ");
+    const suggestions = (c.effectiveSuggestions.value as any[]).map((s) => s.name);
+    expect(suggestions).toContain("date_trunc");
+  });
+
+  it("offers exactly one completion item for the org function", async () => {
+    const { buildCompletionItems } = await import("@/utils/query/sqlCompletion");
+    const c = makeComposable({ storedValues: [] });
+    seedBothPaths(c);
+    await run(c, "SELECT * FROM stream WHERE ");
+
+    // Mirrors what CodeQueryEditor hands monaco: keywords ++ suggestions.
+    const items = buildCompletionItems({
+      keywords: c.effectiveKeywords.value as any[],
+      suggestions: c.effectiveSuggestions.value as any[],
+      word: "",
+      range: {},
+      kinds: { Function: 1, Keyword: 17, Field: 3, Operator: 11, Value: 13, Text: 18 },
+      insertTextRules: { InsertAsSnippet: 4 },
+    });
+    const hits = items.filter((i: any) => i.label === "my_vrl_fn");
+    expect(hits).toHaveLength(1);
+    // The surviving entry keeps the legacy quoting that has always shipped.
+    expect(hits[0].insertText).toBe("my_vrl_fn('${1:value}')");
+  });
+});

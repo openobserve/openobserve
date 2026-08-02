@@ -343,7 +343,21 @@ const useSqlSuggestions = () => {
     // reassigned here — predicates and clauses would otherwise collapse into
     // one lane and interleave.
     autoCompleteKeywords.value.push(...defaultKeywords);
-    autoCompleteSuggestions.value = mergeServerFunctions(defaultSuggestions, serverFunctions.value);
+    // The org's own VRL transforms reach the editor through functionKeywords
+    // above (the `keywords` prop). The server catalog reports the same
+    // transforms, and monaco concatenates keywords with suggestions — so
+    // without this filter every org function is offered twice, by two entries
+    // that disagree on quoting. The keywords path wins: its argument quoting is
+    // what has always shipped.
+    const alreadyOffered = new Set(
+      functionKeywords.value.map((f: any) => String(f.label).toLowerCase()),
+    );
+    autoCompleteSuggestions.value = mergeServerFunctions(
+      defaultSuggestions,
+      (serverFunctions.value as any[]).filter(
+        (f: any) => !alreadyOffered.has(String(f?.name).toLowerCase()),
+      ),
+    );
   };
 
   // Shared helper — builds the field keyword array from a fields list,
