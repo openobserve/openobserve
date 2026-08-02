@@ -92,6 +92,7 @@ use crate::{
         rum::ingest::sessionreplay,
         openobserve_api_search::search::search,
         openobserve_api_search::search::search_partition,
+        openobserve_api_search::search::query_functions::list,
         openobserve_api_search::search::around_v1,
         openobserve_api_search::search::around_v2,
         openobserve_api_search::search::values,

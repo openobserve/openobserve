@@ -806,6 +806,7 @@ pub fn service_routes() -> Router {
 
         // Search
         .route("/{org_id}/_search", post(search::search))
+        .route("/{org_id}/query_functions", get(search::query_functions::list))
         .route("/{org_id}/_search_partition", post(search::search_partition))
         .route("/{org_id}/{stream_name}/_around", get(search::around_v1).post(search::around_v2))
         .route("/{org_id}/{stream_name}/_values", get(search::values))
@@ -1514,51 +1515,69 @@ mod tests {
         );
     }
 
+    // NOTE ON WHAT IS TESTABLE HERE.
+    //
+    // service_routes() wraps the entire router in auth_middleware, which
+    // short-circuits BEFORE routing: a completely nonexistent path also answers
+    // 401. So an HTTP-level test against service_routes() cannot tell a
+    // registered route from an absent one — an assertion like "not 404", or
+    // even "== 401", passes whether or not the endpoint exists.
+    //
+    // Registration is therefore pinned two ways that DO discriminate: the route
+    // appears in the OpenAPI surface, and a minimal router carrying only this
+    // route dispatches GET to the handler and rejects other methods.
+
+    #[tokio::test]
+    async fn query_functions_route_dispatches_get_and_rejects_other_methods() {
+        let app = Router::new().route(
+            "/{org_id}/query_functions",
+            get(search::query_functions::list),
+        );
+
+        let ok = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/myorg/query_functions")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(ok.status(), StatusCode::OK);
+
+        let wrong_method = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/myorg/query_functions")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            wrong_method.status(),
+            StatusCode::METHOD_NOT_ALLOWED,
+            "the catalog is read-only; the frontend issues GET"
+        );
+    }
+
+    #[test]
+    fn query_functions_is_published_in_the_openapi_surface() {
+        // Discriminating: this fails if the handler is dropped from openapi.rs.
+        let spec = super::openapi::ApiDoc::openapi();
+        let json = serde_json::to_string(&spec).unwrap();
+        assert!(
+            json.contains("/{org_id}/query_functions"),
+            "query_functions is missing from the OpenAPI surface"
+        );
+    }
+
     // ── tmp/code.md B4 — the query-function catalog route ─────────────────────
     //
     // catalog_functions() can be perfect while no HTTP route exposes it. This is
     // the only assertion that fails if the endpoint is simply never registered.
-
-    #[tokio::test]
-    async fn query_functions_route_is_registered_and_auth_guarded() {
-        let app = service_routes();
-
-        let req = Request::builder()
-            .uri("/myorg/query_functions")
-            .body(Body::empty())
-            .unwrap();
-
-        let response = app.oneshot(req).await.unwrap();
-
-        // service_routes() wraps the WHOLE router in auth_middleware, so an
-        // unauthenticated request can never reach the handler — 200 is not
-        // assertable here and the payload is checked by the handler test below.
-        // What this pins is the pair that a bare `!= 404` would not: the route
-        // exists, and it is behind auth.
-        assert_eq!(
-            response.status(),
-            StatusCode::UNAUTHORIZED,
-            "expected the route to exist and be auth-guarded, got {}",
-            response.status()
-        );
-    }
-
-    #[tokio::test]
-    async fn query_functions_route_rejects_an_unknown_org_path_shape() {
-        // Guards against the route being registered without its {org_id}
-        // segment, which would still answer the test above via a wildcard.
-        let app = service_routes();
-        let req = Request::builder()
-            .uri("/query_functions")
-            .body(Body::empty())
-            .unwrap();
-        let response = app.oneshot(req).await.unwrap();
-        assert_eq!(
-            response.status(),
-            StatusCode::NOT_FOUND,
-            "query_functions must be org-scoped, not mounted at the root"
-        );
-    }
 
     #[tokio::test]
     async fn query_functions_handler_returns_the_documented_payload_shape() {
@@ -1594,7 +1613,17 @@ mod tests {
                 "serialized entry is missing `{field}`"
             );
         }
-        assert!(!entry["doc"].as_str().unwrap_or("").is_empty());
+
+        // Assert non-empty doc on an entry the SERVER is the sole source for.
+        // The frontend catalog carries its own prose for the O2 UDFs and wins
+        // on merge, so requiring a server-side doc for match_all would pin data
+        // the UI never renders.
+        let alias = list
+            .iter()
+            .find(|f| f.get("name").and_then(Value::as_str) == Some("match_all_raw"))
+            .expect("rewriter alias must be present");
+        assert!(!alias["doc"].as_str().unwrap_or("").is_empty());
+        assert_eq!(alias["deprecated"], Value::Bool(true));
     }
 
     // ── is_origin_allowed unit tests ──────────────────────────────────────────

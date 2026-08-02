@@ -347,8 +347,11 @@ pub fn register_builtin_udfs(ctx: &SessionContext) {
 pub fn registered_function_names() -> &'static [String] {
     static NAMES: std::sync::OnceLock<Vec<String>> = std::sync::OnceLock::new();
     NAMES.get_or_init(|| {
-        let ctx = SessionContext::new();
+        let mut ctx = SessionContext::new();
         register_builtin_udfs(&ctx);
+        // Production contexts register these separately (see flight.rs); without
+        // the same call here the whole json_* family is missing from the catalog.
+        let _ = datafusion_functions_json::register_all(&mut ctx);
         let state = ctx.state();
         let mut names: Vec<String> = state.scalar_functions().keys().cloned().collect();
         names.extend(state.aggregate_functions().keys().cloned());
@@ -357,6 +360,117 @@ pub fn registered_function_names() -> &'static [String] {
         names.dedup();
         names
     })
+}
+
+/// One entry of the SQL function catalog served to the query editor.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq)]
+pub struct CatalogFunction {
+    pub name: String,
+    /// Argument list, e.g. "(field, k)". Drives the editor's `detail` column.
+    pub signature: String,
+    /// Prose for the editor's documentation panel. May be empty for upstream
+    /// DataFusion functions that carry no documentation of their own.
+    pub doc: String,
+    /// "udf" | "scalar" | "aggregate" | "window" | "vrl"
+    pub kind: String,
+    pub deprecated: bool,
+}
+
+/// Every function this org can call: the DataFusion registry (including the
+/// JSON family), the O2 UDFs, the SQL-rewriter aliases and the org's own VRL
+/// transforms.
+///
+/// The registry alone is not enough — rewriter-provided names appear in no
+/// registry at all, and JSON functions are registered by a separate call.
+pub fn catalog_functions(org_id: &str) -> Vec<CatalogFunction> {
+    let mut ctx = SessionContext::new();
+    register_builtin_udfs(&ctx);
+    let _ = datafusion_functions_json::register_all(&mut ctx);
+    let state = ctx.state();
+
+    let mut out: Vec<CatalogFunction> = Vec::new();
+
+    // `Signature` has no Display and describes accepted TYPES, not argument
+    // names. DataFusion's own documentation is the only source of a readable
+    // argument list, so prefer its named arguments, fall back to the paren
+    // group of its syntax example, and finally to an opaque placeholder.
+    fn describe(doc: Option<&datafusion::logical_expr::Documentation>) -> (String, String) {
+        let Some(d) = doc else {
+            return ("(...)".to_string(), String::new());
+        };
+        if let Some(args) = &d.arguments
+            && !args.is_empty()
+        {
+            let names: Vec<&str> = args.iter().map(|(n, _)| n.as_str()).collect();
+            return (format!("({})", names.join(", ")), d.description.clone());
+        }
+        let sig = d
+            .syntax_example
+            .find('(')
+            .map(|i| d.syntax_example[i..].to_string())
+            .unwrap_or_else(|| "(...)".to_string());
+        (sig, d.description.clone())
+    }
+
+    let mut push = |name: String, signature: String, doc: String, kind: &str, deprecated: bool| {
+        out.push(CatalogFunction {
+            name,
+            signature,
+            doc,
+            kind: kind.to_string(),
+            deprecated,
+        });
+    };
+
+    for (name, udf) in state.scalar_functions() {
+        let (sig, doc) = describe(udf.documentation());
+        push(name.clone(), sig, doc, "scalar", false);
+    }
+    for (name, udf) in state.aggregate_functions() {
+        let (sig, doc) = describe(udf.documentation());
+        push(name.clone(), sig, doc, "aggregate", false);
+    }
+    for (name, udf) in state.window_functions() {
+        let (sig, doc) = describe(udf.documentation());
+        push(name.clone(), sig, doc, "window", false);
+    }
+
+    // Rewriter aliases: valid SQL, in no registry.
+    for alias in crate::sql::rewriter::REWRITER_FUNCTION_ALIASES {
+        let target = crate::sql::rewriter::rewriter_alias_target(alias).unwrap_or("match_all");
+        push(
+            (*alias).to_string(),
+            "(term)".to_string(),
+            format!("Deprecated alias for `{target}` — rewritten before planning."),
+            "udf",
+            true,
+        );
+    }
+
+    // The org's own VRL transforms.
+    let org_prefix = format!("{org_id}/");
+    for transform in transform::QUERY_FUNCTIONS.iter() {
+        if !transform.key().starts_with(&org_prefix) {
+            continue;
+        }
+        let args: Vec<String> = (1..=transform.num_args)
+            .map(|i| format!("arg{i}"))
+            .collect();
+        push(
+            transform.name.clone(),
+            format!("({})", args.join(", ")),
+            format!(
+                "Organisation VRL function `{}` ({} argument(s)).",
+                transform.name, transform.num_args
+            ),
+            "vrl",
+            false,
+        );
+    }
+
+    out.sort_by(|a, b| a.name.cmp(&b.name));
+    out.dedup_by(|a, b| a.name == b.name);
+    out
 }
 
 pub async fn register_metrics_table(
@@ -941,41 +1055,49 @@ mod tests {
     }
 
     #[test]
-    fn every_catalog_source_contributes_documented_entries() {
-        // Deliberately per-SOURCE rather than per-ENTRY. We author docs for the
-        // O2 UDFs, the rewriter aliases and the org VRL transforms, so those must
-        // be documented. DataFusion built-ins and the JSON family carry whatever
-        // upstream `documentation()` provides — a few hundred of them, not ours
-        // to write — so requiring prose on every single entry would fail for a
-        // reason unrelated to this change.
+    fn catalog_functions_documents_what_only_the_SERVER_can_supply() {
+        // Deliberately NOT asserting docs for the O2 UDFs. The frontend catalog
+        // carries its own prose for those and wins on merge (it also owns which
+        // arguments are columns), so a server-side doc for `match_all` would
+        // never be displayed — dead data dressed up as coverage.
+        //
+        // What the server IS the only source for: the rewriter aliases and the
+        // org's VRL transforms.
         let catalog = catalog_functions("default");
-        let doc_of = |name: &str| {
-            catalog
+        for alias in crate::sql::rewriter::REWRITER_FUNCTION_ALIASES {
+            let entry = catalog
                 .iter()
-                .find(|f| f.name == name)
-                .unwrap_or_else(|| panic!("`{name}` missing from the catalog"))
-                .doc
-                .clone()
-        };
+                .find(|f| &f.name == alias)
+                .unwrap_or_else(|| panic!("`{alias}` missing from the catalog"));
+            assert!(
+                !entry.doc.is_empty(),
+                "rewriter alias `{alias}` must be documented"
+            );
+            assert!(
+                entry.deprecated,
+                "rewriter alias `{alias}` must be flagged deprecated"
+            );
+        }
+    }
 
-        for name in [
-            "match_all",
-            "histogram",
-            "str_match",
-            "spath",
-            "approx_topk",
-        ] {
-            assert!(
-                !doc_of(name).is_empty(),
-                "O2 UDF `{name}` must be documented"
-            );
-        }
-        for name in ["match_all_raw", "match_all_raw_ignore_case"] {
-            assert!(
-                !doc_of(name).is_empty(),
-                "rewriter alias `{name}` must be documented"
-            );
-        }
+    #[test]
+    fn catalog_functions_surfaces_upstream_documentation_where_it_exists() {
+        // Guards the describe() fallback: if it silently returned "(...)" and an
+        // empty doc for everything, every other assertion here would still pass.
+        let catalog = catalog_functions("default");
+        let documented = catalog.iter().filter(|f| !f.doc.is_empty()).count();
+        let with_named_args = catalog
+            .iter()
+            .filter(|f| f.signature != "(...)" && f.signature != "()")
+            .count();
+        assert!(
+            documented > 20,
+            "only {documented} entries carry documentation — is describe() reading upstream docs?"
+        );
+        assert!(
+            with_named_args > 20,
+            "only {with_named_args} entries have a named argument list"
+        );
     }
 
     #[test]

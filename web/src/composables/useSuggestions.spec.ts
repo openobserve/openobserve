@@ -16,6 +16,13 @@ vi.mock("@/composables/useFieldValueStore", () => ({
   getFieldValuesForSuggestion: vi.fn().mockResolvedValue([]),
 }));
 
+// getSuggestions now lazily loads the server function catalog. Stub it to an
+// empty list so this suite makes no HTTP call; the fetch itself is covered in
+// useSuggestions.serverCatalog.spec.ts.
+vi.mock("@/services/query_functions", () => ({
+  default: { list: vi.fn().mockResolvedValue({ data: { list: [] } }) },
+}));
+
 import { getFieldValuesForSuggestion } from "@/composables/useFieldValueStore";
 import useSqlSuggestions from "./useSuggestions";
 

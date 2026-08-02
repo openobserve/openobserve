@@ -1,13 +1,23 @@
 import { ref, computed } from "vue";
 import { useStore } from "vuex";
 import { getFieldValuesForSuggestion } from "@/composables/useFieldValueStore";
-import { SQL_KEYWORDS, SQL_FUNCTIONS } from "@/utils/query/sqlCompletion";
+import {
+  SQL_KEYWORDS,
+  SQL_CLAUSE_KEYWORDS,
+  SQL_FUNCTIONS,
+  buildFieldEntry,
+} from "@/utils/query/sqlCompletion";
+import { mergeServerFunctions } from "@/utils/query/serverFunctions";
+import queryFunctions, { type ServerQueryFunction } from "@/services/query_functions";
 
 const useSqlSuggestions = () => {
   // Both lists come from the shared catalog (web/src/utils/query/sqlCompletion.ts).
   // They used to be declared inline here AND in CodeQueryEditor.vue, and the two
   // copies had already drifted (7 entries vs 26).
-  const defaultKeywords = SQL_KEYWORDS;
+  // Predicates + structural SQL. Clause keywords are NOT gated on SQL mode:
+  // the Logs filter-fragment mode edits a WHERE clause but users still compose
+  // full queries there.
+  const defaultKeywords = [...SQL_KEYWORDS, ...SQL_CLAUSE_KEYWORDS];
   const defaultSuggestions = SQL_FUNCTIONS;
 
   const autoCompleteData = ref({
@@ -45,6 +55,53 @@ const useSqlSuggestions = () => {
   // after an operator).  Non-empty while the user is inside such a context.
   // Cleared back to [] in the normal branch of getSuggestions().
   const contextKeywords: any = ref([]);
+
+  // Server-supplied functions, merged over the local catalog. Fetched lazily on
+  // the first suggestion pass for an org and cached until the org changes, so
+  // no component has to remember to load them.
+  const serverFunctions: any = ref([]);
+  let fetchedOrg: string | null = null;
+  let inFlight: Promise<void> | null = null;
+
+  const setServerFunctions = (functions: ServerQueryFunction[] | null | undefined) => {
+    serverFunctions.value = Array.isArray(functions) ? functions : [];
+    // An explicit set means the caller has supplied the catalog for this org;
+    // marking it fetched stops the lazy loader from clearing it out again on
+    // the next suggestion pass.
+    fetchedOrg = autoCompleteData.value.org || fetchedOrg;
+    updateAutoComplete();
+  };
+
+  const ensureServerFunctions = async () => {
+    const org = autoCompleteData.value.org;
+    if (!org) return;
+    if (org === fetchedOrg) return;
+    if (inFlight) return inFlight;
+
+    // Drop the previous org's entries BEFORE awaiting: otherwise the first
+    // popup after switching still shows the old tenant's function names.
+    serverFunctions.value = [];
+    fetchedOrg = org;
+
+    inFlight = queryFunctions
+      .list(org)
+      .then((res: any) => {
+        // Only apply if the org has not changed again while we were waiting.
+        if (fetchedOrg !== org) return;
+        serverFunctions.value = Array.isArray(res?.data?.list) ? res.data.list : [];
+      })
+      .catch(() => {
+        // The local catalog is still perfectly usable; a failed lookup must not
+        // take autocomplete down with it.
+        if (fetchedOrg === org) serverFunctions.value = [];
+      })
+      .finally(() => {
+        inFlight = null;
+        updateAutoComplete();
+      });
+
+    return inFlight;
+  };
 
   // What the editor actually receives:
   //   - contextKeywords when non-empty (FROM / value context)
@@ -128,6 +185,9 @@ const useSqlSuggestions = () => {
   }
 
   const getSuggestions = async () => {
+    // Awaited so the server functions are present on the FIRST popup, not the
+    // next keystroke.
+    await ensureServerFunctions();
     // SearchBar sets autoCompleteData.value.cursorIndex at the top level.
     // autoCompleteData.value.position.cursorIndex is the legacy field — it
     // is never updated by SearchBar and stays 0. We read the top-level one
@@ -274,13 +334,11 @@ const useSqlSuggestions = () => {
       autoCompleteKeywords.value.push(item);
     }
     autoCompleteKeywords.value.push(...functionKeywords.value);
-    autoCompleteKeywords.value.push(
-      ...defaultKeywords.map((kw) => ({
-        ...kw,
-        sortText: "\x02" + kw.label,
-      })),
-    );
-    autoCompleteSuggestions.value = [...defaultSuggestions];
+    // Entries carry their own sortText lane (see SORT_LANE), so nothing is
+    // reassigned here — predicates and clauses would otherwise collapse into
+    // one lane and interleave.
+    autoCompleteKeywords.value.push(...defaultKeywords);
+    autoCompleteSuggestions.value = mergeServerFunctions(defaultSuggestions, serverFunctions.value);
   };
 
   // Shared helper — builds the field keyword array from a fields list,
@@ -289,13 +347,9 @@ const useSqlSuggestions = () => {
   const buildFieldKeywords = (fields: any[]) =>
     fields
       .filter((f) => f.name !== store.state.zoConfig.timestamp_column)
-      .map((f) => ({
-        label: f.name,
-        kind: "Field",
-        insertText: f.name,
-        insertTextRules: "InsertAsSnippet",
-        sortText: "\x00" + f.name,
-      }));
+      // buildFieldEntry carries the column type into `detail`; it used to be
+      // dropped on the floor even though every caller already supplies it.
+      .map((f) => buildFieldEntry(f));
 
   const updateFieldKeywords = (fields: any[]) => {
     fieldKeywords = buildFieldKeywords(fields);
@@ -351,6 +405,7 @@ const useSqlSuggestions = () => {
     updateFunctionKeywords,
     updateAllKeywords,
     updateStreamKeywords,
+    setServerFunctions,
     defaultSuggestions, // Export for use in natural language detection
   };
 };

@@ -637,3 +637,11 @@ describe("QueryEditorDialog - N1 context keywords reach the editor", () => {
 vi.mock("@/composables/useFieldValueStore", () => ({
   getFieldValuesForSuggestion: vi.fn().mockResolvedValue(["error", "warn"]),
 }));
+
+// getSuggestions now awaits a lazy fetch of the server function catalog. Stub it
+// so this suite makes no HTTP call and the awaited chain settles inside
+// flushPromises(); the fetch itself is covered in
+// useSuggestions.serverCatalog.spec.ts.
+vi.mock("@/services/query_functions", () => ({
+  default: { list: vi.fn().mockResolvedValue({ data: { list: [] } }) },
+}));
