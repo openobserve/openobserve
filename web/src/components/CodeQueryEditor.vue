@@ -551,10 +551,13 @@ export default defineComponent({
         // Monaco defaults strings to 'off', which is why field-VALUE completion
         // used to need a forced hide/re-trigger to appear at all.
         quickSuggestions: { other: "on", comments: "off", strings: "on" },
-        // Default is 'matchingDocuments'. Nothing observable comes from it in
-        // this app today, but the reason is not established — this states the
-        // intent rather than relying on that continuing to hold.
-        wordBasedSuggestions: "off",
+        // Default is 'matchingDocuments'. Off for the QUERY languages only,
+        // where every suggestion should come from the catalog and a word
+        // scraped out of the query text is noise. VRL, JS, JSON and the rest
+        // have no catalog, and there local word completion is the only
+        // completion they have.
+        wordBasedSuggestions:
+          props.language === "sql" || props.language === "promql" ? "off" : "matchingDocuments",
         stickyScroll: {
           enabled: props.stickyScroll,
         },
@@ -818,9 +821,20 @@ export default defineComponent({
           if (valueContext && resolver) {
             const values = await resolver(valueContext.field);
             if (values.length) {
+              // Monaco auto-closes a typed quote, so the closer is already
+              // sitting after the cursor — invisible to a parser that only sees
+              // the text before it. Without this the insert produced
+              // `level = 'error''`.
+              const closingQuoteAhead =
+                (model.getLineContent?.(position.lineNumber) ?? "").charAt(position.column - 1) ===
+                "'";
               return {
                 suggestions: buildCompletionItems({
-                  keywords: buildValueEntries(values, valueContext.hasOpenQuote) as any[],
+                  keywords: buildValueEntries(values, {
+                    hasOpenQuote: valueContext.hasOpenQuote,
+                    closingQuoteAhead,
+                    range,
+                  }) as any[],
                   suggestions: [],
                   word: word.word,
                   range,

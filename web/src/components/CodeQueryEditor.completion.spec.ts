@@ -505,6 +505,17 @@ describe("Phase 3 — providers are registered and configured", () => {
     expect(opts.wordBasedSuggestions).toBe("off");
   });
 
+  it("N4 — but NOT for the non-query languages", { timeout: 30000 }, async () => {
+    // N4 was about SQL and PromQL, where every suggestion should come from the
+    // catalog. VRL, JS, JSON and the rest have no catalog at all, so turning
+    // word-based completion off there removes the only completion they have.
+    for (const language of ["vrl", "javascript", "json", "markdown"]) {
+      const api = await mountEditor({ language });
+      const opts = vi.mocked(api.editor.create).mock.calls.at(-1)![1] as any;
+      expect(opts.wordBasedSuggestions, `${language} lost its word completion`).not.toBe("off");
+    }
+  });
+
   it("N3 — quick suggestions are enabled inside string literals", { timeout: 30000 }, async () => {
     const api = await mountEditor();
     const opts = vi.mocked(api.editor.create).mock.calls.at(-1)![1] as any;

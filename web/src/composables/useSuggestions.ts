@@ -133,74 +133,6 @@ const useSqlSuggestions = () => {
     contextKeywords.value.length ? [] : autoCompleteSuggestions.value,
   );
 
-  function analyzeSqlWhereClause(whereClause: string, cursorIndex: number) {
-    const labelMeta = {
-      hasLabels: false,
-      isFocused: false,
-      isEmpty: true,
-      focusOn: "", // label or value
-      meta: {
-        label: "",
-        value: "",
-        hasOpenQuote: false,
-      },
-    };
-
-    // Detects whether the cursor is positioned after an operator that expects
-    // a value, and extracts the field name to the left of that operator.
-    //
-    // 4 alternatives — each captures the field name in a different group:
-    //   match[1]: symbolic operators  =  !=  <>  >=  <=  >  <
-    //             e.g. "status = ", "code >= ", "env != 'pro"
-    //   match[2]: IN / NOT IN (
-    //             e.g. "status IN (", "env NOT IN ('pro"
-    //   match[3]: LIKE / NOT LIKE
-    //             e.g. "msg LIKE '", "path NOT LIKE '%api"
-    //   match[4]: str_match / fuzzy_match function second argument
-    //             e.g. "str_match(field, ", "fuzzy_match(field, 'par"
-    //
-    // Why >=/<= appear before >/<:
-    //   Regex alternation is left-to-right. If > appeared first, ">=" would
-    //   match on ">" and stop, leaving "=" unmatched. Longer tokens must come first.
-    //
-    // Why (?:'[^']*)?$ at the end of each alternative:
-    //   Allows the regex to match even after the user has typed an opening quote
-    //   and a partial value. Without it, "status = 'pro" would not match — we
-    //   would stop showing value suggestions the moment the user starts typing.
-    const columnValueRegex =
-      /(\w+)\s*(?:!=|<>|>=|<=|=|>|<)\s*(?:'[^']*)?$|(\w+)\s+(?:NOT\s+)?IN\s+\(\s*(?:'[^']*)?$|(\w+)\s+(?:NOT\s+)?LIKE\s*(?:'[^']*)?$|(?:str_match|fuzzy_match)\s*\(\s*(\w+)\s*,\s*(?:'[^']*)?$/i;
-
-    // Slice the query at the cursor position before matching, so that the $
-    // anchor lands at the cursor — not at the end of the full query string.
-    //
-    // Why this matters — auto-closing brackets example:
-    //   User types "status IN (" → editor auto-inserts ")" → full string is "status IN ()"
-    //   Without slicing: $ anchors after ")" → regex does NOT match
-    //   After slicing at cursor (between "(" and ")"): text is "status IN (" → matches
-    //
-    // Slice the WHERE clause up to (and including) the cursor position.
-    // Fall back to full string length only when cursorIndex is negative,
-    // which indicates no cursor tracking (e.g. called without a position).
-    const endIdx = cursorIndex >= 0 ? cursorIndex + 1 : whereClause.length;
-    const textUpToCursor = whereClause.slice(0, endIdx);
-    const match = columnValueRegex.exec(textUpToCursor);
-    if (match) {
-      labelMeta.focusOn = "value";
-      labelMeta.isFocused = true;
-      // Pick whichever capture group matched — only one will be non-null.
-      labelMeta.meta.label = match[1] ?? match[2] ?? match[3] ?? match[4];
-      // True when the user has already typed an opening quote, e.g. field = 'partial
-      // In this case insertText should be  value'  (close only), not  'value'
-      //
-      // Scope the check to the text starting at the current match, not the full
-      // query. A closed quote from a preceding condition (e.g. http = 'te') has
-      // no trailing non-quote chars after it until cursor, which would otherwise
-      // make /'[^']*$/ fire and wrongly set hasOpenQuote for the new condition.
-      labelMeta.meta.hasOpenQuote = /'[^']*$/.test(textUpToCursor.slice(match.index));
-    }
-    return labelMeta;
-  }
-
   /**
    * Field values for one column, for the completion provider to await directly.
    *
@@ -230,6 +162,16 @@ const useSqlSuggestions = () => {
     return [...new Set([...inSession, ...stored])];
   };
 
+  /**
+   * Context suggestions the PARENT still owns: stream names after FROM.
+   *
+   * Field VALUES used to be resolved here too — the same lookup this file's
+   * resolveFieldValues does — and then pushed down as contextKeywords with a
+   * forced popup.open. The completion provider now awaits the resolver inline
+   * (C4), so keeping that branch meant every value edit did the lookup twice
+   * and re-opened the widget on top of a list it had already produced. The
+   * provider is the only value path now.
+   */
   const getSuggestions = async () => {
     // Awaited so the server functions are present on the FIRST popup, not the
     // next keystroke.
@@ -241,7 +183,8 @@ const useSqlSuggestions = () => {
     const cursorIndex =
       (autoCompleteData.value as any).cursorIndex ?? autoCompleteData.value.position.cursorIndex;
 
-    // Compute text up to cursor (same slice logic used by analyzeSqlWhereClause).
+    // Compute text up to cursor, so the FROM regex anchors at the cursor rather
+    // than at the end of the query.
     const query = autoCompleteData.value.query;
     const endIdx = cursorIndex >= 0 ? cursorIndex + 1 : query.length;
     let textUpToCursor = query.slice(0, endIdx);
@@ -280,83 +223,6 @@ const useSqlSuggestions = () => {
           insertText: hasOpenQuote && !hasTrailingQuote ? kw.label + '"' : kw.label,
         }));
         autoCompleteData.value.popup.open?.(autoCompleteData.value.query);
-        return;
-      }
-    }
-
-    // Determine if the cursor is currently after an operator expecting a value.
-    // If so, sqlWhereClause.meta.label is the field name (e.g. "status").
-    const sqlWhereClause = analyzeSqlWhereClause(autoCompleteData.value.query, cursorIndex);
-
-    if (sqlWhereClause.meta.label) {
-      const fieldName = sqlWhereClause.meta.label;
-
-      // In-session values — collected from the current session's
-      // search result hits and stored in the reactive fieldValues prop.
-      // These are available immediately (no async) but disappear on page reload.
-      const inSessionValues = Array.from(
-        autoCompleteData.value.fieldValues[fieldName] || new Set(),
-      ) as string[];
-
-      // Persisted values — read from IndexedDB (via in-memory cache).
-      // These survive page reloads and accumulate across multiple searches.
-      // Guard: only query IDB if stream context is set — without org/streamType/
-      // streamName we cannot build the composite key and would get empty results.
-      let storedValues: string[] = [];
-      if (
-        autoCompleteData.value.org &&
-        autoCompleteData.value.streamType &&
-        autoCompleteData.value.streamName
-      ) {
-        storedValues = await getFieldValuesForSuggestion(
-          {
-            org: autoCompleteData.value.org,
-            streamType: autoCompleteData.value.streamType,
-            streamName: autoCompleteData.value.streamName,
-          },
-          fieldName,
-        );
-      }
-
-      // Merge in-session + stored, deduplicate via Set.
-      // inSessionValues come first so they appear at the top of the dropdown
-      // (they are from the current search context, most relevant).
-      // storedValues from previous sessions fill in anything not seen today.
-      const merged = [...new Set([...inSessionValues, ...storedValues])];
-
-      if (merged.length > 0) {
-        const hasOpenQuote = sqlWhereClause.meta.hasOpenQuote;
-
-        // Build Monaco suggestion items with smart quoting and sort order.
-        contextKeywords.value = merged.map((item, idx) => {
-          const isNumeric = item !== "" && !isNaN(Number(item));
-          const isBoolean = item === "true" || item === "false";
-
-          // Quoting rules:
-          //   numeric / boolean → no quotes  (SQL: status = 200, active = true)
-          //   string, open quote already typed → close only  (field = 'val → val')
-          //   string, no open quote → wrap fully  (field =  → 'val')
-          let insertText: string;
-          if (isNumeric || isBoolean) {
-            insertText = item;
-          } else if (hasOpenQuote) {
-            insertText = `${item}'`; // user already typed the opening '
-          } else {
-            insertText = `'${item}'`;
-          }
-
-          // \x01 (ASCII 1) is the lowest-sorting printable character.
-          // Prefixing sortText with it ensures value suggestions always appear
-          // ABOVE keywords ("and", "or", "like") and functions in the Monaco
-          // dropdown, which sort by their label (starting with a letter > \x01).
-          // The padded index preserves the order of values as returned from IDB.
-          const sortText = `\x01${String(idx).padStart(6, "0")}`;
-          return { label: item, insertText, kind: "Value", sortText };
-        });
-
-        autoCompleteData.value.popup.open?.(autoCompleteData.value.query);
-        // Return early — do NOT fall through to updateAutoComplete().
-        // We don't want keywords/fields/functions mixed into a value dropdown.
         return;
       }
     }

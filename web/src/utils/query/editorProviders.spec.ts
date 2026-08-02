@@ -32,6 +32,8 @@ import {
   isNumericField,
   wantsNumericColumn,
   rankNumericFieldsFirst,
+  parseValueContext,
+  buildValueEntries,
 } from "./editorProviders";
 
 const fn = (name: string) => SQL_FUNCTIONS.find((f) => f.name === name)!;
@@ -571,5 +573,125 @@ describe("rankNumericFieldsFirst", () => {
       { label: "a_num", kind: "Field", detail: "Int64" },
     ] as any[]);
     expect(order(ranked)).toEqual(["a_num", "b_num"]);
+  });
+});
+
+// ───────────────────────────────────────────────────────────────────────────
+// Field VALUE completion
+//
+// parseValueContext decides the cursor is where a value belongs;
+// buildValueEntries decides how to insert one. The quoting is the fiddly half:
+// monaco AUTO-CLOSES a typed quote, so the text is already `level = ''` with
+// the cursor between them, and appending our own closer produced
+// `level = 'error''` — reported from the SLO scope field.
+// ───────────────────────────────────────────────────────────────────────────
+
+describe("parseValueContext — where a value belongs", () => {
+  it("recognises the comparison operators", () => {
+    for (const op of ["=", "!=", "<>", ">", "<", ">=", "<="]) {
+      expect(parseValueContext(`WHERE code ${op} `)?.field, op).toBe("code");
+    }
+  });
+
+  it("recognises IN, NOT IN and LIKE", () => {
+    expect(parseValueContext("WHERE level IN (")?.field).toBe("level");
+    expect(parseValueContext("WHERE level NOT IN (")?.field).toBe("level");
+    expect(parseValueContext("WHERE body LIKE ")?.field).toBe("body");
+  });
+
+  it("recognises the match functions' value argument", () => {
+    expect(parseValueContext("WHERE str_match(body, ")?.field).toBe("body");
+    expect(parseValueContext("WHERE fuzzy_match(body, ")?.field).toBe("body");
+  });
+
+  it("reports an open quote so the inserted value can close it", () => {
+    expect(parseValueContext("WHERE level = '")).toEqual({ field: "level", hasOpenQuote: true });
+    expect(parseValueContext("WHERE level = ")).toEqual({ field: "level", hasOpenQuote: false });
+  });
+
+  it("stays open while the value is being typed", () => {
+    expect(parseValueContext("WHERE level = 'err")).toEqual({ field: "level", hasOpenQuote: true });
+  });
+
+  it("is not fooled by a CLOSED quote from an earlier condition", () => {
+    // `http = 'te'` has no unterminated quote; the new condition must not
+    // inherit one, or its value would be inserted with a stray closer.
+    expect(parseValueContext("WHERE http = 'te' AND level = ")).toEqual({
+      field: "level",
+      hasOpenQuote: false,
+    });
+  });
+
+  it("returns null where no value belongs", () => {
+    expect(parseValueContext("")).toBeNull();
+    expect(parseValueContext("SELECT ")).toBeNull();
+    expect(parseValueContext("SELECT * FROM logs WHERE ")).toBeNull();
+  });
+});
+
+describe("buildValueEntries — inserting a value", () => {
+  const RANGE = { startLineNumber: 1, endLineNumber: 1, startColumn: 12, endColumn: 12 };
+  const insert = (v: string[], o: any) => buildValueEntries(v, o).map((e) => e.insertText);
+
+  it("wraps a bare string in quotes when none was typed", () => {
+    expect(insert(["error"], { hasOpenQuote: false })).toEqual(["'error'"]);
+  });
+
+  it("closes the quote the user opened", () => {
+    expect(insert(["error"], { hasOpenQuote: true })).toEqual(["error'"]);
+  });
+
+  it("leaves numbers and booleans unquoted", () => {
+    expect(insert(["200", "true", "false", "1.5"], { hasOpenQuote: false })).toEqual([
+      "200",
+      "true",
+      "false",
+      "1.5",
+    ]);
+  });
+
+  it("quotes a value that only looks empty", () => {
+    expect(insert([""], { hasOpenQuote: false })).toEqual(["''"]);
+  });
+
+  it("sorts values above every other lane, in the order given", () => {
+    const entries = buildValueEntries(["b", "a"], { hasOpenQuote: false });
+    expect(entries.map((e) => e.sortText)).toEqual(["\u0000000000", "\u0000000001"]);
+    expect(entries.every((e) => e.kind === "Value")).toBe(true);
+  });
+
+  describe("when monaco has already auto-closed the quote", () => {
+    const opts = { hasOpenQuote: true, closingQuoteAhead: true, range: RANGE };
+
+    it("still inserts its own closing quote", () => {
+      expect(insert(["error"], opts)).toEqual(["error'"]);
+    });
+
+    it("extends the range over monaco's quote so it is not left behind", () => {
+      // Text-only alternatives (omit the closer, keep the range) produce the
+      // right string but park the cursor INSIDE the literal, so the next thing
+      // typed lands inside the quotes.
+      const [entry] = buildValueEntries(["error"], opts);
+      expect(entry.range).toEqual({ ...RANGE, endColumn: RANGE.endColumn + 1 });
+    });
+
+    it("does NOT extend it for a numeric value, which inserts no closer", () => {
+      // Swallowing the quote there would leave `status = '200` unterminated.
+      const [entry] = buildValueEntries(["200"], opts);
+      expect(entry.range).toBeUndefined();
+      expect(entry.insertText).toBe("200");
+    });
+
+    it("does not touch the range when no quote is ahead", () => {
+      expect(
+        buildValueEntries(["error"], { hasOpenQuote: true, range: RANGE })[0].range,
+      ).toBeUndefined();
+    });
+
+    it("degrades to text-only when the caller supplies no range", () => {
+      const [entry] = buildValueEntries(["error"], { hasOpenQuote: true, closingQuoteAhead: true });
+      expect(entry.insertText).toBe("error'");
+      expect(entry.range).toBeUndefined();
+    });
   });
 });

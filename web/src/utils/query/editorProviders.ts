@@ -289,23 +289,60 @@ export const parseValueContext = (
   };
 };
 
-/** Build completion entries for resolved field values, quoted appropriately. */
-export const buildValueEntries = (values: string[], hasOpenQuote: boolean): LooseEntry[] =>
+export interface ValueEntryOptions {
+  /** The user has typed an opening quote, so the value only needs closing. */
+  hasOpenQuote: boolean;
+  /**
+   * Monaco's auto-closed quote sits immediately after the cursor.
+   *
+   * Invisible to a parser that sees only the text BEFORE the cursor: typing a
+   * quote makes the text `level = ''` with the cursor between them, and
+   * appending our own closer produced `level = 'error''`.
+   */
+  closingQuoteAhead?: boolean;
+  /** The replacement range monaco reported. Needed to swallow that quote. */
+  range?: Record<string, number>;
+}
+
+/**
+ * Build completion entries for resolved field values, quoted appropriately.
+ *
+ * When monaco has already auto-closed the quote, the entry EXTENDS its
+ * replacement range over that quote and inserts its own. Simply omitting the
+ * closer produces the right TEXT but leaves the cursor inside the string, so
+ * the next thing typed lands inside the quotes -- which is how
+ * `severity = 'INFO AND service_name = INFO'` happened while testing this.
+ * Numeric values keep the plain range: they insert no closer, so swallowing
+ * the quote would leave the literal unterminated.
+ */
+export const buildValueEntries = (
+  values: string[],
+  { hasOpenQuote, closingQuoteAhead = false, range }: ValueEntryOptions,
+): LooseEntry[] =>
   values.map((value, index) => {
     const isNumeric = value !== "" && !Number.isNaN(Number(value));
     const isBoolean = value === "true" || value === "false";
-    let insertText: string;
-    if (isNumeric || isBoolean) insertText = value;
-    else if (hasOpenQuote) insertText = `${value}'`;
-    else insertText = `'${value}'`;
-    return {
+
+    const entry: LooseEntry = {
       name: value,
       label: value,
       kind: "Value",
-      insertText,
+      insertText: value,
       // Values sort above every other lane. Written as an ESCAPE, not a raw
-      // control character: a literal NUL in the source makes the file binary to
-      // git and grep, and is silently easy to mangle in an edit.
+      // control character: a literal NUL in the source makes the file binary
+      // to git and grep, and is silently easy to mangle in an edit.
       sortText: `\u0000${String(index).padStart(6, "0")}`,
     };
+
+    if (isNumeric || isBoolean) return entry;
+    if (!hasOpenQuote) {
+      entry.insertText = `'${value}'`;
+      return entry;
+    }
+
+    entry.insertText = `${value}'`;
+    if (closingQuoteAhead && range) {
+      entry.range = { ...range, endColumn: (range.endColumn ?? 1) + 1 };
+    }
+    return entry;
   });

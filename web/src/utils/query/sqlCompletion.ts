@@ -66,6 +66,13 @@ export interface SqlCompletionEntry {
   sortText?: string;
   /** Still accepted by the backend, but rewritten to something else. */
   deprecated?: boolean;
+  /**
+   * Replacement range for THIS entry, overriding the one the provider computed.
+   *
+   * Only field values use it, to extend over monaco's auto-closed quote. The
+   * shared range is right for everything else, so leaving it unset is normal.
+   */
+  range?: Record<string, number>;
 }
 
 /** An entry as it may arrive from the `suggestions` prop — callers outside this
@@ -906,7 +913,9 @@ const toMonacoItem = (
     label,
     kind: kinds[entry.kind ?? "Text"],
     insertText,
-    range,
+    // An entry may widen its own range — a field value swallows monaco's
+    // auto-closed quote so the cursor ends up outside the string.
+    range: entry.range ?? range,
   };
 
   // The string name MUST be translated here. Monaco does `insertTextRules & 4`,

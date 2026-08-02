@@ -58,239 +58,35 @@ const run = async (
   return c.effectiveKeywords.value;
 };
 
-// ─── operator detection ───────────────────────────────────────────────────────
+// ─── merge and IDB key: retargeted at the resolver ───────────────────────────
+// The merge and the composite key still belong to this composable — only the
+// caller changed. These were written against getSuggestions' value branch;
+// that branch is gone (the provider awaits resolveFieldValues directly), so
+// they now exercise the resolver. Cases the Phase 3 describe below already
+// covers are not duplicated.
 
-describe("analyzeSqlWhereClause — operator detection", () => {
+describe("resolveFieldValues — in-session and stored value merge", () => {
   beforeEach(() => vi.clearAllMocks());
-
-  const operators: [string, string][] = [
-    ["=", "status = "],
-    ["!=", "status != "],
-    ["<>", "status <> "],
-    [">=", "code >= "],
-    ["<=", "code <= "],
-    [">", "code > "],
-    ["<", "code < "],
-  ];
-
-  it.each(operators)("detects field %s operator", async (_op, query) => {
-    const c = makeComposable({ storedValues: ["200"] });
-    const keywords = await run(c, query);
-    expect(keywords.some((k: any) => k.kind === "Value")).toBe(true);
-  });
-
-  it("detects IN (", async () => {
-    const c = makeComposable({ storedValues: ["200"] });
-    const q = "status IN (";
-    const keywords = await run(c, q, q.length);
-    expect(keywords.some((k: any) => k.kind === "Value")).toBe(true);
-  });
-
-  it("detects NOT IN (", async () => {
-    const c = makeComposable({ storedValues: ["200"] });
-    const q = "status NOT IN (";
-    const keywords = await run(c, q, q.length);
-    expect(keywords.some((k: any) => k.kind === "Value")).toBe(true);
-  });
-
-  it("detects LIKE (space)", async () => {
-    const c = makeComposable({ storedValues: ["api"] });
-    const keywords = await run(c, "msg LIKE ");
-    expect(keywords.some((k: any) => k.kind === "Value")).toBe(true);
-  });
-
-  it("detects LIKE with open quote", async () => {
-    const c = makeComposable({ storedValues: ["api"] });
-    const q = "msg LIKE '";
-    const keywords = await run(c, q, q.length);
-    expect(keywords.some((k: any) => k.kind === "Value")).toBe(true);
-  });
-
-  it("detects NOT LIKE", async () => {
-    const c = makeComposable({ storedValues: ["api"] });
-    const q = "path NOT LIKE '";
-    const keywords = await run(c, q, q.length);
-    expect(keywords.some((k: any) => k.kind === "Value")).toBe(true);
-  });
-
-  it("detects str_match(field, )", async () => {
-    const c = makeComposable({ storedValues: ["frontend"] });
-    const q = "str_match(service, '";
-    const keywords = await run(c, q, q.length);
-    expect(keywords.some((k: any) => k.kind === "Value")).toBe(true);
-  });
-
-  it("detects fuzzy_match(field, )", async () => {
-    const c = makeComposable({ storedValues: ["frontend"] });
-    const q = "fuzzy_match(service, '";
-    const keywords = await run(c, q, q.length);
-    expect(keywords.some((k: any) => k.kind === "Value")).toBe(true);
-  });
-
-  it("handles auto-closed bracket IN () — cursor between ( and )", async () => {
-    const c = makeComposable({ storedValues: ["200"] });
-    const full = "status IN ()";
-    // cursor is between ( and ) — Monaco offset 11, getCursorIndex = offset-1 = 10.
-    // slice(0, 10+1) = "status IN (" which matches the IN regex.
-    const keywords = await run(c, full, 10);
-    expect(keywords.some((k: any) => k.kind === "Value")).toBe(true);
-  });
-
-  it("detects partial typed value after operator: field = '20", async () => {
-    const c = makeComposable({ storedValues: ["200"] });
-    const q = "status = '20";
-    const keywords = await run(c, q, q.length);
-    expect(keywords.some((k: any) => k.kind === "Value")).toBe(true);
-  });
-
-  it("falls through to keywords when no operator context", async () => {
-    const c = makeComposable({ storedValues: [] });
-    const keywords = await run(c, "SELECT * FROM stream WHERE ");
-    expect(keywords.some((k: any) => k.kind === "Value")).toBe(false);
-    expect(keywords.length).toBeGreaterThan(0);
-  });
-
-  it("shows default keywords for empty query", async () => {
-    const c = makeComposable({ storedValues: [] });
-    const keywords = await run(c, "");
-    expect(keywords.some((k: any) => k.kind === "Value")).toBe(false);
-    expect(keywords.length).toBeGreaterThan(0);
-  });
-});
-
-// ─── insertText quoting logic ─────────────────────────────────────────────────
-
-describe("getSuggestions — insertText quoting", () => {
-  beforeEach(() => vi.clearAllMocks());
-
-  it("wraps string value in single quotes when no open quote", async () => {
-    const c = makeComposable({ storedValues: ["prod"] });
-    const keywords = await run(c, "env = ");
-    const item = keywords.find((k: any) => k.label === "prod");
-    expect(item?.insertText).toBe("'prod'");
-  });
-
-  it("closes only when open quote already typed", async () => {
-    const c = makeComposable({ storedValues: ["prod"] });
-    const q = "env = '";
-    const keywords = await run(c, q, q.length);
-    const item = keywords.find((k: any) => k.label === "prod");
-    expect(item?.insertText).toBe("prod'");
-  });
-
-  it("wraps in quotes for second condition when first condition's closing quote is in the query", async () => {
-    // Regression: http = 'te' and host = <cursor>
-    // The closing quote of 'te' must NOT be mistaken for an open quote for host.
-    const c = makeComposable({ storedValues: ["node-1"] });
-    const q = "http = 'te' and host = ";
-    const keywords = await run(c, q, q.length);
-    const item = keywords.find((k: any) => k.label === "node-1");
-    expect(item?.insertText).toBe("'node-1'");
-  });
-
-  it("closes only when second condition genuinely has an open quote", async () => {
-    const c = makeComposable({ storedValues: ["node-1"] });
-    const q = "http = 'te' and host = '";
-    const keywords = await run(c, q, q.length);
-    const item = keywords.find((k: any) => k.label === "node-1");
-    expect(item?.insertText).toBe("node-1'");
-  });
-
-  it("inserts numeric values without quotes", async () => {
-    const c = makeComposable({ storedValues: ["200", "404"] });
-    const keywords = await run(c, "status = ");
-    const item = keywords.find((k: any) => k.label === "200");
-    expect(item?.insertText).toBe("200");
-  });
-
-  it("inserts boolean 'true' without quotes", async () => {
-    const c = makeComposable({ storedValues: ["true"] });
-    const keywords = await run(c, "active = ");
-    const item = keywords.find((k: any) => k.label === "true");
-    expect(item?.insertText).toBe("true");
-  });
-
-  it("inserts boolean 'false' without quotes", async () => {
-    const c = makeComposable({ storedValues: ["false"] });
-    const keywords = await run(c, "active = ");
-    const item = keywords.find((k: any) => k.label === "false");
-    expect(item?.insertText).toBe("false");
-  });
-
-  it("sortText starts with \\x01 so values sort above keywords", async () => {
-    const c = makeComposable({ storedValues: ["200"] });
-    const keywords = await run(c, "status = ");
-    const item = keywords.find((k: any) => k.kind === "Value");
-    expect(item?.sortText.startsWith("\x01")).toBe(true);
-  });
-
-  it("all value suggestions have kind = 'Value'", async () => {
-    const c = makeComposable({ storedValues: ["200", "404", "500"] });
-    const keywords = await run(c, "status = ");
-    const valueItems = keywords.filter((k: any) => k.kind === "Value");
-    expect(valueItems).toHaveLength(3);
-  });
-});
-
-// ─── merge: in-session vs stored ─────────────────────────────────────────────
-
-describe("getSuggestions — in-session and stored value merge", () => {
-  beforeEach(() => vi.clearAllMocks());
-
-  it("shows in-session values from fieldValues prop", async () => {
-    const c = makeComposable({
-      storedValues: [],
-      inSessionValues: { status: ["200", "404"] },
-    });
-    const keywords = await run(c, "status = ");
-    const labels = keywords.map((k: any) => k.label);
-    expect(labels).toContain("200");
-    expect(labels).toContain("404");
-  });
-
-  it("merges stored values with in-session values", async () => {
-    const c = makeComposable({
-      storedValues: ["500"],
-      inSessionValues: { status: ["200"] },
-    });
-    const keywords = await run(c, "status = ");
-    const labels = keywords.map((k: any) => k.label);
-    expect(labels).toContain("200");
-    expect(labels).toContain("500");
-  });
 
   it("deduplicates values appearing in both sources", async () => {
     const c = makeComposable({
       storedValues: ["200", "500"],
       inSessionValues: { status: ["200", "404"] },
     });
-    const keywords = await run(c, "status = ");
-    const labels = keywords.map((k: any) => k.label);
-    expect(labels.filter((l: string) => l === "200")).toHaveLength(1);
-    expect(labels).toContain("404");
-    expect(labels).toContain("500");
+    const values = await c.resolveFieldValues("status");
+    expect(values.filter((v: string) => v === "200")).toHaveLength(1);
+    expect(values).toContain("404");
+    expect(values).toContain("500");
   });
 
-  it("skips IDB read when stream context is missing", async () => {
+  it("skips the IDB read when stream context is missing", async () => {
     const c = useSqlSuggestions();
     // org/streamType/streamName left as empty strings
     c.autoCompleteData.value.fieldValues = {};
-    c.autoCompleteData.value.popup.open = vi.fn();
-    await run(c, "status = ");
+    await c.resolveFieldValues("status");
     expect(getFieldValuesForSuggestion).not.toHaveBeenCalled();
   });
 
-  it("falls through to updateAutoComplete when merged is empty", async () => {
-    const c = makeComposable({ storedValues: [] });
-    const keywords = await run(c, "status = ");
-    expect(keywords.some((k: any) => k.kind === "Value")).toBe(false);
-    expect(keywords.length).toBeGreaterThan(0);
-  });
-});
-
-// ─── IDB context forwarding ───────────────────────────────────────────────────
-
-describe("getSuggestions — IDB context forwarding", () => {
   it("passes org/streamType/streamName to getFieldValuesForSuggestion", async () => {
     vi.mocked(getFieldValuesForSuggestion).mockResolvedValue(["prod"]);
     const c = useSqlSuggestions();
@@ -298,8 +94,7 @@ describe("getSuggestions — IDB context forwarding", () => {
     c.autoCompleteData.value.streamType = "traces";
     c.autoCompleteData.value.streamName = "default";
     c.autoCompleteData.value.fieldValues = {};
-    c.autoCompleteData.value.popup.open = vi.fn();
-    await run(c, "env = ");
+    await c.resolveFieldValues("env");
     expect(getFieldValuesForSuggestion).toHaveBeenCalledWith(
       { org: "acme", streamType: "traces", streamName: "default" },
       "env",
@@ -327,45 +122,34 @@ describe("updateFieldKeywords", () => {
   });
 });
 
-// ─── effectiveSuggestions: no functions when showing values ───────────────────
+// ─── effectiveSuggestions: no functions when a context list is showing ───────
+// This describe used to drive the invariant through the value branch. That
+// branch is gone, but the invariant is not — the FROM branch is now its only
+// producer, and a stream list mixed with functions is exactly as wrong as a
+// value list was.
 
-describe("effectiveSuggestions — empty when value suggestions are shown", () => {
+describe("effectiveSuggestions — empty while a context list is showing", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("is empty when value context is active", async () => {
-    const c = makeComposable({ storedValues: ["200", "404"] });
-    await run(c, "status = ");
+  it("is empty when the FROM context is active", async () => {
+    const c = makeComposable({ storedValues: [] });
+    c.updateStreamKeywords([{ name: "http_logs" }]);
+    await run(c, "SELECT * FROM ");
+    expect(c.effectiveKeywords.value.map((k: any) => k.label)).toEqual(["http_logs"]);
     expect(c.effectiveSuggestions.value).toEqual([]);
   });
 
-  it("effectiveKeywords has no Text-kind function items during value context", async () => {
-    const c = makeComposable({ storedValues: ["200"] });
-    await run(c, "status = ");
-    const functionItems = c.effectiveKeywords.value.filter((k: any) => k.kind === "Text");
-    expect(functionItems).toHaveLength(0);
-  });
-
-  it("only Value-kind items appear in effectiveKeywords during value context", async () => {
-    const c = makeComposable({ storedValues: ["200", "404"] });
-    await run(c, "status = ");
-    const kinds = c.effectiveKeywords.value.map((k: any) => k.kind);
-    expect(kinds.every((kind: string) => kind === "Value")).toBe(true);
-  });
-
-  it("is non-empty in normal (non-value) context", async () => {
+  it("is non-empty in normal context", async () => {
     const c = makeComposable({ storedValues: [] });
     await run(c, "SELECT * FROM stream WHERE ");
     expect(c.effectiveSuggestions.value.length).toBeGreaterThan(0);
   });
 
-  it("transitions back to non-empty after value context clears", async () => {
-    const c = makeComposable({ storedValues: ["200"] });
-    // First enter value context
-    await run(c, "status = ");
+  it("transitions back to non-empty once the context clears", async () => {
+    const c = makeComposable({ storedValues: [] });
+    c.updateStreamKeywords([{ name: "http_logs" }]);
+    await run(c, "SELECT * FROM ");
     expect(c.effectiveSuggestions.value).toEqual([]);
-    // Then move to a context with no operator match (no stored values for empty)
-    vi.mocked(getFieldValuesForSuggestion).mockResolvedValue([]);
-    c.autoCompleteData.value.fieldValues = {};
     await run(c, "SELECT * FROM stream WHERE ");
     expect(c.effectiveSuggestions.value.length).toBeGreaterThan(0);
   });
@@ -500,12 +284,16 @@ describe("Phase 2 — SQL clause keywords are offered (B1)", () => {
     expect(labels).toContain("=");
   });
 
-  it("suppresses clause keywords in value context", async () => {
-    const c = makeComposable({ storedValues: ["error"] });
-    await run(c, "level = ");
+  it("suppresses clause keywords while a context list is showing", async () => {
+    // Was written against the value branch, which no longer exists here; the
+    // FROM branch is now the only producer of a context list, and mixing
+    // SELECT into a list of stream names is the same mistake.
+    const c = makeComposable({ storedValues: [] });
+    c.updateStreamKeywords([{ name: "http_logs" }]);
+    await run(c, "SELECT * FROM ");
     const labels = c.effectiveKeywords.value.map((k: any) => k.label);
     expect(labels).not.toContain("SELECT");
-    expect(labels).toEqual(["error"]);
+    expect(labels).toEqual(["http_logs"]);
   });
 
   it("sorts fields ahead of clause keywords", async () => {
@@ -560,10 +348,11 @@ describe("Phase 2 — server-supplied functions reach the suggestion list (B4)",
     expect(sums[0].insertText).toBe("sum(${1:field})");
   });
 
-  it("still blanks the suggestion list in value context", async () => {
-    const c = makeComposable({ storedValues: ["error"] });
+  it("still blanks the suggestion list while a context list is showing", async () => {
+    const c = makeComposable({ storedValues: [] });
     c.setServerFunctions(serverList);
-    await run(c, "level = ");
+    c.updateStreamKeywords([{ name: "http_logs" }]);
+    await run(c, "SELECT * FROM ");
     expect(c.effectiveSuggestions.value).toEqual([]);
   });
 
