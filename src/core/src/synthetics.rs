@@ -62,6 +62,14 @@ pub struct CheckNotification {
     /// region could only say "the check is failing" and the reader had to open
     /// the UI to find out where.
     pub failing_locations: Vec<String>,
+    /// Locations that passed, alphabetical.
+    ///
+    /// Carried because `failing_locations` is empty on a recovery **by
+    /// definition** — nothing is failing — which left the recovery message
+    /// unable to name anything and degrading to a bare count. With both sides
+    /// a partial recovery is expressible too: "2 of 3 recovered, the third is
+    /// still down".
+    pub passing_locations: Vec<String>,
 }
 
 /// Fires once per run (when all jobs have completed) for non-passing runs.
@@ -123,7 +131,7 @@ pub async fn notify_check_result(n: CheckNotification) {
                 } else {
                     format!(
                         "[OpenObserve Synthetics] {} {} is {}",
-                        status_emoji(&n.status),
+                        status_emoji(&n),
                         n.check_name,
                         n.status.to_uppercase()
                     )
@@ -146,10 +154,33 @@ pub async fn notify_check_result(n: CheckNotification) {
 }
 
 #[cfg(feature = "enterprise")]
-fn status_emoji(status: &str) -> &'static str {
-    match status {
-        "recovered" => "✅",
-        "failed" | "down" => "🔴",
+/// Emoji for a notification, branching on the **same flags** as
+/// [`status_headline`] and in the same order.
+///
+/// This used to take `&str` and branch on `status` alone, which put a 🔴 on
+/// every recovery: `status_headline` reads the `recovery` bool, but on a
+/// recovery run `status` is `"passed"` — the run genuinely did pass — so the
+/// emoji fell through to the catch-all. The headline said "has recovered" next
+/// to an outage marker, and in a busy channel that reads as a second outage.
+///
+/// The old `"recovered" => "✅"` arm was unreachable: nothing sets `status` to
+/// that literal. `AlertDecision::Recovered` becomes the `recovery` bool at the
+/// ack and never round-trips into the status string.
+///
+/// Taking the whole notification is what keeps the two in step — a future
+/// branch added to the headline is a compile-visible omission here, rather than
+/// a silently wrong glyph.
+fn status_emoji(n: &CheckNotification) -> &'static str {
+    if n.recovery {
+        return "✅";
+    }
+    if n.degraded {
+        return "🟡";
+    }
+    if n.flaky {
+        return "🔁";
+    }
+    match n.status.as_str() {
         "warning" => "🟡",
         "error" => "⚠️",
         _ => "🔴",
@@ -236,6 +267,36 @@ fn run_url(n: &CheckNotification) -> String {
 /// six-of-six outage read identically.
 fn locations_line(n: &CheckNotification) -> String {
     let total = if n.job_count > 0 { n.job_count } else { 1 };
+
+    // On a recovery the interesting set is what came back, not what is broken —
+    // and `failing_locations` is empty by definition, which is what used to make
+    // this degrade to a bare count and tell the reader nothing.
+    if n.recovery {
+        return match (
+            n.passing_locations.is_empty(),
+            n.failing_locations.is_empty(),
+        ) {
+            // Nothing to name at all — an older ack, or the query failed.
+            (true, _) => total.to_string(),
+            // Full recovery.
+            (false, true) => format!(
+                "{} of {} recovered: {}",
+                n.passing_locations.len(),
+                total,
+                n.passing_locations.join(", ")
+            ),
+            // Partial: some came back, some did not. Naming both is the whole
+            // point — "2 of 3 recovered" alone would read as an all-clear.
+            (false, false) => format!(
+                "{} of {} recovered: {} — still failing: {}",
+                n.passing_locations.len(),
+                total,
+                n.passing_locations.join(", "),
+                n.failing_locations.join(", ")
+            ),
+        };
+    }
+
     if n.failing_locations.is_empty() {
         return total.to_string();
     }
@@ -253,7 +314,7 @@ fn locations_line(n: &CheckNotification) -> String {
 fn build_slack_json(n: &CheckNotification) -> String {
     let checked_secs = n.checked_at / 1_000_000;
     let mut lines = vec![
-        format!("{} *{}*", status_emoji(&n.status), status_headline(n)),
+        format!("{} *{}*", status_emoji(n), status_headline(n)),
         String::new(),
         format!("*Check:* {} ({})", n.check_name, n.check_type),
         format!("*Target:* {}", n.target),
@@ -329,7 +390,7 @@ fn build_email_html(n: &CheckNotification) -> String {
     <a href="{url}" style="background:{color};color:#fff;padding:8px 16px;border-radius:4px;text-decoration:none;">View run details</a>
   </p>
 </div>"#,
-        emoji = status_emoji(&n.status),
+        emoji = status_emoji(n),
         headline = html_escape(&status_headline(n)),
         name = html_escape(&n.check_name),
         mtype = html_escape(&n.check_type),
@@ -466,6 +527,164 @@ mod tests {
     #[test]
     fn checked_at_utc_falls_back_to_the_raw_value_when_out_of_range() {
         assert_eq!(checked_at_utc(i64::MAX), i64::MAX.to_string());
+    }
+
+    /// A firing notification for a 3-location check, two of them broken.
+    fn firing() -> CheckNotification {
+        CheckNotification {
+            org_id: "default".into(),
+            check_name: "EU1 Cloud Health Check".into(),
+            check_id: "abc123".into(),
+            check_type: "http".into(),
+            target: "https://example.com".into(),
+            destinations: vec![],
+            run_id: "run1".into(),
+            status: "failed".into(),
+            job_count: 3,
+            error: None,
+            checked_at: 1_785_000_000_000_000,
+            recovery: false,
+            consecutive_failures: 3,
+            flaky: false,
+            status_reason: None,
+            degraded: false,
+            failing_locations: vec!["aws-us-east-1".into(), "aws-us-west-1".into()],
+            passing_locations: vec!["aws-eu-central-1".into()],
+        }
+    }
+
+    /// The same check recovering: status is "passed", nothing is failing.
+    fn recovered() -> CheckNotification {
+        CheckNotification {
+            status: "passed".into(),
+            recovery: true,
+            consecutive_failures: 0,
+            failing_locations: vec![],
+            passing_locations: vec![
+                "aws-eu-central-1".into(),
+                "aws-us-east-1".into(),
+                "aws-us-west-1".into(),
+            ],
+            ..firing()
+        }
+    }
+
+    // ── 2324-a · the emoji must agree with the headline ────────────────────
+
+    #[test]
+    fn recovery_is_not_marked_as_an_outage() {
+        // The bug: status is "passed" on a recovery, so branching on the status
+        // string fell through to the 🔴 catch-all while the headline said
+        // "has recovered". In a busy channel that reads as a second outage.
+        let n = recovered();
+        assert_eq!(status_emoji(&n), "✅");
+        assert!(status_headline(&n).contains("has recovered"));
+    }
+
+    #[test]
+    fn emoji_and_headline_agree_on_every_branch() {
+        // The two are only correct together; this is the invariant the old
+        // signature could not express.
+        let cases: Vec<(CheckNotification, &str, &str)> = vec![
+            (recovered(), "✅", "has recovered"),
+            (
+                CheckNotification {
+                    degraded: true,
+                    status: "warning".into(),
+                    status_reason: Some("cert_expiring".into()),
+                    ..firing()
+                },
+                "🟡",
+                "certificate is expiring",
+            ),
+            (
+                CheckNotification {
+                    flaky: true,
+                    status: "warning".into(),
+                    ..firing()
+                },
+                "🔁",
+                "flaky",
+            ),
+            (firing(), "🔴", "is failing"),
+            (
+                CheckNotification {
+                    status: "error".into(),
+                    ..firing()
+                },
+                "⚠️",
+                "could not be checked",
+            ),
+        ];
+        for (n, emoji, headline_fragment) in cases {
+            assert_eq!(status_emoji(&n), emoji, "status={}", n.status);
+            assert!(
+                status_headline(&n).contains(headline_fragment),
+                "status={} headline={}",
+                n.status,
+                status_headline(&n)
+            );
+        }
+    }
+
+    #[test]
+    fn degraded_outranks_flaky_exactly_as_the_headline_does() {
+        // Both arrive as `warning`. The order matters: a degrading target needs
+        // action, a flaky one already fixed itself.
+        let n = CheckNotification {
+            degraded: true,
+            flaky: true,
+            status: "warning".into(),
+            ..firing()
+        };
+        assert_eq!(status_emoji(&n), "🟡");
+    }
+
+    // ── 2324-b · a recovery must be able to name its locations ─────────────
+
+    #[test]
+    fn full_recovery_names_the_locations_that_came_back() {
+        // The bug: failing_locations is empty by definition on a recovery, so
+        // this used to render the bare count "3".
+        let line = locations_line(&recovered());
+        assert!(line.contains("3 of 3 recovered"), "{line}");
+        assert!(line.contains("aws-us-east-1"), "{line}");
+    }
+
+    #[test]
+    fn partial_recovery_names_both_sides() {
+        // "2 of 3 recovered" alone would read as an all-clear.
+        let n = CheckNotification {
+            recovery: true,
+            status: "passed".into(),
+            passing_locations: vec!["aws-us-east-1".into(), "aws-us-west-1".into()],
+            failing_locations: vec!["aws-eu-central-1".into()],
+            ..firing()
+        };
+        let line = locations_line(&n);
+        assert!(line.contains("2 of 3 recovered"), "{line}");
+        assert!(line.contains("still failing: aws-eu-central-1"), "{line}");
+    }
+
+    #[test]
+    fn recovery_with_no_location_data_falls_back_to_the_count() {
+        // An older ack, or the query failed. Better a bare count than a lie.
+        let n = CheckNotification {
+            recovery: true,
+            passing_locations: vec![],
+            failing_locations: vec![],
+            ..recovered()
+        };
+        assert_eq!(locations_line(&n), "3");
+    }
+
+    #[test]
+    fn firing_still_names_only_what_is_broken() {
+        // The passing set exists now, but a firing message must not list it —
+        // the reader wants the outage, not the healthy regions.
+        let line = locations_line(&firing());
+        assert!(line.starts_with("2 of 3: "), "{line}");
+        assert!(!line.contains("aws-eu-central-1"), "{line}");
     }
 }
 

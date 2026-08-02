@@ -1144,6 +1144,7 @@ async fn process_ack(
             degraded,
             status_reason: resp.status_reason.clone(),
             failing_locations: resp.failing_locations.clone(),
+            passing_locations: resp.passing_locations.clone(),
         };
         tokio::spawn(async move {
             openobserve_core::synthetics::notify_check_result(notification).await;

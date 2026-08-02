@@ -691,26 +691,67 @@ pub async fn failing_locations<C: ConnectionTrait>(
     conn: &C,
     run_id: &str,
 ) -> Result<Vec<String>, errors::Error> {
-    let rows = Entity::find()
+    Ok(run_location_outcomes(conn, run_id).await?.failing)
+}
+
+/// Every location of a run, split by whether it passed.
+///
+/// `failing_locations` alone could not describe a recovery: on a recovered run
+/// nothing is failing **by definition**, so the list came back empty and the
+/// message degraded to a bare count ("Locations: 2"). The reader was told a
+/// check recovered without being told where.
+///
+/// It also could not describe a *partial* recovery — "2 of 3 recovered,
+/// aws-eu-central-1 still down" — because only one side of the split was ever
+/// carried.
+///
+/// One query for both sides rather than two: the rows are already being read,
+/// and the passing/failing split is a partition of the same result set.
+#[derive(Debug, Default, PartialEq, Eq)]
+pub struct RunLocationOutcomes {
+    /// Locations that did not pass, worst first (Error > Warning > Failed).
+    pub failing: Vec<String>,
+    /// Locations that passed, alphabetical.
+    pub passing: Vec<String>,
+}
+
+pub async fn run_location_outcomes<C: ConnectionTrait>(
+    conn: &C,
+    run_id: &str,
+) -> Result<RunLocationOutcomes, errors::Error> {
+    const STATUS_PASSED: i32 = 3;
+
+    let mut rows = Entity::find()
         .select_only()
         .column(Column::Location)
         .column(Column::Status)
         .filter(Column::RunId.eq(run_id))
-        .filter(Column::Status.ne(3))
         .into_tuple::<(String, i32)>()
         .all(conn)
         .await?;
-    let mut rows = rows;
+
     // Worst first: Error(6) > Warning(5) > Failed(4). A reader scanning the first
     // line of a message should see the most severe location, not the
-    // alphabetically first.
+    // alphabetically first. Passing rows sort last and are split out below.
     rows.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
-    let mut out: Vec<String> = Vec::with_capacity(rows.len());
-    for (loc, _) in rows {
-        if !out.contains(&loc) {
-            out.push(loc);
+
+    let mut out = RunLocationOutcomes::default();
+    for (loc, status) in rows {
+        // A location runs once per run, but dedupe anyway: a requeued job can
+        // leave two rows for one location, and naming it twice in a message
+        // reads as two separate outages.
+        let bucket = if status == STATUS_PASSED {
+            &mut out.passing
+        } else {
+            &mut out.failing
+        };
+        if !bucket.contains(&loc) {
+            bucket.push(loc);
         }
     }
+    // Failing is severity-ordered; passing has no severity, so alphabetical is
+    // the only stable order a reader can predict.
+    out.passing.sort();
     Ok(out)
 }
 
