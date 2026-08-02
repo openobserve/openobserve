@@ -56,6 +56,130 @@ function quoteIdent(name: string): string {
   return `"${name.replace(/"/g, '""')}"`;
 }
 
+/** The aliases `time_slice_sql` projects (`query.rs`). Mirrored so a preview
+ *  result and an ingest result are the same shape, and a question about one
+ *  can be answered by reading the other. */
+export const SLICE_ALIAS = "slice_start";
+export const VALUE_ALIAS = "zo_slo_value";
+
+/** Bucket width in the form `histogram()` accepts — the TS twin of
+ *  `config::meta::slo::interval_literal`. */
+export function intervalLiteral(sliceIntervalSecs: number): string {
+  switch (sliceIntervalSecs) {
+    case 60:
+      return "1 minute";
+    case 300:
+      return "5 minute";
+    default:
+      return `${Math.max(1, Math.floor(sliceIntervalSecs))} second`;
+  }
+}
+
+/**
+ * Preview query for a TIME-SLICE SLI: one aggregate per slice, no
+ * classification.
+ *
+ * The shape is `time_slice_sql`'s exactly, and the omission is the point —
+ * the ingest pass does not put the threshold in SQL either. A time-slice SLI
+ * aggregates first and classifies afterwards, so that a threshold edit
+ * re-reads the stored aggregates instead of making old slices and the new
+ * definition disagree. The preview classifies the same way, in
+ * {@link classifyPreviewSlices}, from the same numbers.
+ *
+ * Returns `null` when there is nothing drawable yet.
+ */
+export function buildSloTimeSlicePreviewQuery(opts: {
+  stream: string | undefined;
+  scope?: string;
+  /** The aggregate expression, e.g. `approx_percentile_cont(latency, 0.95)`. */
+  aggregate: string | undefined;
+  sliceIntervalSecs: number;
+}): string | null {
+  const stream = opts.stream?.trim();
+  const aggregate = opts.aggregate?.trim();
+  if (!stream || !aggregate) return null;
+
+  let sql =
+    `SELECT histogram(_timestamp, '${intervalLiteral(opts.sliceIntervalSecs)}') AS ${SLICE_ALIAS}, ` +
+    `${aggregate} AS ${VALUE_ALIAS} ` +
+    `FROM ${quoteIdent(stream)}`;
+  const scope = opts.scope?.trim();
+  // Parenthesised: the user fragment must not re-associate against anything
+  // appended around it.
+  if (scope) sql += ` WHERE (${scope})`;
+  return sql + ` GROUP BY ${SLICE_ALIAS} ORDER BY ${SLICE_ALIAS}`;
+}
+
+/** What a run of preview slices came to, in the terms the target is set in. */
+export interface PreviewSliceTally {
+  good: number;
+  bad: number;
+  /** Buckets whose aggregate was not a finite number. NOT bad — see below. */
+  unmeasured: number;
+  /** Good + bad. Excludes unmeasured, which no SLI can be computed from. */
+  measured: number;
+  /** Percentage of measured slices that were good, or `null` if none were. */
+  sli: number | null;
+}
+
+/**
+ * Score preview slices the way `classify_time_slice` scores real ones.
+ *
+ * The non-finite check comes BEFORE the comparison, and that ordering is the
+ * whole subtlety: a null or NaN aggregate compares false against every
+ * operator, so falling through to the comparison would record a bucket nobody
+ * could measure as real downtime. It is withheld instead, exactly as the
+ * ingest pass rejects it and lets coverage fall.
+ *
+ * An unknown comparator is unmeasurable for the same reason rather than bad —
+ * inventing downtime from a definition we cannot read is the worse failure.
+ */
+export function classifyPreviewSlices(
+  values: Array<number | null | undefined>,
+  comparator: string,
+  threshold: number,
+): PreviewSliceTally {
+  let good = 0;
+  let bad = 0;
+  let unmeasured = 0;
+
+  for (const raw of values) {
+    const value = Number(raw);
+    if (
+      raw === null ||
+      raw === undefined ||
+      !Number.isFinite(value) ||
+      !Number.isFinite(threshold)
+    ) {
+      unmeasured++;
+      continue;
+    }
+    let isGood: boolean;
+    switch (comparator) {
+      case "<":
+        isGood = value < threshold;
+        break;
+      case "<=":
+        isGood = value <= threshold;
+        break;
+      case ">":
+        isGood = value > threshold;
+        break;
+      case ">=":
+        isGood = value >= threshold;
+        break;
+      default:
+        unmeasured++;
+        continue;
+    }
+    if (isGood) good++;
+    else bad++;
+  }
+
+  const measured = good + bad;
+  return { good, bad, unmeasured, measured, sli: measured > 0 ? (100 * good) / measured : null };
+}
+
 /**
  * Replace the identifier being typed at the end of `text` with a picked field
  * name — the splice behind the scope/good-when typeahead. OCombobox replaces

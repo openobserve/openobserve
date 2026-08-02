@@ -51,15 +51,6 @@
       <FolderList type="alerts" @update:activeFolderId="onFolderChange" />
     </template>
 
-    <OStatStrip
-      v-if="!loading"
-      :items="stats"
-      selectable
-      :selected="healthFilter"
-      data-test="slos-slolist-stats"
-      @select="onStatSelect"
-    />
-
     <OTable
       v-model:selected-ids="selectedIds"
       selection="multiple"
@@ -104,14 +95,55 @@
               {{ opt.label }}
             </OToggleGroupItem>
           </OToggleGroup>
-          <OSearchInput
-            v-model="search"
-            class="flex-1"
-            :placeholder="t('slos.searchPlaceholder')"
-            clearable
-            data-test="slos-slolist-search"
+          <!-- min-w-0 on the wrapper, not flex-1 on the input: a flex child
+               will not shrink below its content width without it, which is
+               how a long placeholder pushes the toolbar wider than the table.
+               Same wrapper the Alerts toolbar uses. -->
+          <div class="min-w-0 flex-1">
+            <OSearchInput
+              v-model="search"
+              class="w-full"
+              :placeholder="t('slos.searchPlaceholder')"
+              clearable
+              data-test="slos-slolist-search"
+            />
+          </div>
+        </div>
+      </template>
+
+      <!-- Refresh lives in #toolbar-trailing so it lands AFTER the auto-injected
+           column-visibility toggle, which is the order every other list uses
+           (OTable renders toolbar → column toggle → toolbar-trailing). Inside
+           #toolbar it sat before the toggle and the two pages disagreed. -->
+      <template #toolbar-trailing>
+        <OButton
+          variant="outline"
+          size="icon-sm"
+          icon-left="refresh"
+          :loading="loading"
+          data-test="slos-slolist-refresh"
+          @click="load"
+        >
+          <OTooltip side="bottom" :content="t('slos.refresh')" />
+        </OButton>
+      </template>
+
+      <!-- Health tiles sit in #subheader so search and the type filter stay
+           ABOVE them, matching the Alerts list: you narrow the set first, then
+           read the counts for what you narrowed to. Always rendered (skeleton
+           while loading) so data arriving never shifts the rows below. -->
+      <template #subheader>
+        <div
+          class="px-page-edge border-table-row-divider border-b py-1.5"
+          data-test="slos-slolist-stats"
+        >
+          <OStatStrip
+            :items="stats"
+            :loading="loading"
+            selectable
+            :selected-key="healthFilter"
+            @select="onStatSelect"
           />
-          <ORefreshButton :loading="loading" @refresh="load" />
         </div>
       </template>
 
@@ -205,7 +237,7 @@
         <div class="flex items-center gap-1" @click.stop>
           <OButton
             variant="ghost"
-            size="xs"
+            size="icon-sm"
             icon-left="edit"
             :title="t('slos.edit')"
             :data-test="`slos-slolist-edit-${row.name}`"
@@ -213,7 +245,7 @@
           />
           <OButton
             variant="ghost"
-            size="xs"
+            size="icon-sm"
             icon-left="drive-file-move"
             :title="t('slos.move')"
             :data-test="`slos-slolist-move-${row.name}`"
@@ -221,16 +253,18 @@
           />
           <OButton
             variant="ghost"
-            size="xs"
+            size="icon-sm"
             :icon-left="row.enabled ? 'pause' : 'play-arrow'"
             :title="row.enabled ? t('slos.pause') : t('slos.resume')"
+            :data-test="`slos-slolist-toggle-${row.name}`"
             @click="toggleEnabled(row)"
           />
           <OButton
             variant="ghost"
-            size="xs"
+            size="icon-sm"
             icon-left="delete"
             :title="t('slos.delete')"
+            :data-test="`slos-slolist-delete-${row.name}`"
             @click="confirmDelete(row)"
           />
         </div>
@@ -315,8 +349,8 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
-import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -435,7 +469,18 @@ const columns = computed<OTableColumnDef<SloListItem>[]>(() => [
     hideable: true,
     size: 140,
   },
-  { id: "actions", header: t("slos.column.actions"), accessor: () => "", size: 120 },
+  // No hardcoded `size`: OTable derives an action column's width from
+  // `actionCount` (4 × 32px button + 3 × 4px gap + padding), but only when
+  // `isAction` marks it as one. Without the flag it fell through to the
+  // generic size and clipped the last two buttons.
+  {
+    id: "actions",
+    header: t("slos.column.actions"),
+    accessor: () => "",
+    sortable: false,
+    isAction: true,
+    meta: { align: "center", actionCount: 4 },
+  },
 ]);
 
 // The list is folder-scoped, so every row shows the same folder — the column
