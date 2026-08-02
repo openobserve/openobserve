@@ -494,7 +494,10 @@ async function loadMonitors(folderId?: string) {
           ? undefined
           : activeFolderId.value;
     const res = await syntheticsService.listByFolderId(orgIdentifier.value, targetFolder);
-    monitors.value = ((res.data as any).monitors ?? []).map(mapMonitor);
+    // The API field was renamed `monitors` -> `checks`. Both are read so a
+    // bundle and a server on opposite sides of that rename still render.
+    const rows = (res.data as any).checks ?? (res.data as any).monitors ?? [];
+    monitors.value = rows.map(mapMonitor);
   } finally {
     loading.value = false;
   }
