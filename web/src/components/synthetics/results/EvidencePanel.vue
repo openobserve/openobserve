@@ -237,7 +237,7 @@ const downloadUrl = computed(() => (props.evidenceKey ? props.resolveUrl(props.e
            holds the bundle, so retrying is its call, not this panel's. -->
       <OBanner
         v-else-if="loadError"
-        variant="error"
+        variant="error-soft"
         dense
         inline-actions
         data-test="synthetics-evidence-error"
