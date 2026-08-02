@@ -64,8 +64,9 @@ pub fn resolve_display_name(detected_source: &str, sender_label: Option<&str>) -
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::collections::HashMap;
+
+    use super::*;
 
     fn grafana_payload() -> serde_json::Value {
         serde_json::json!({
@@ -263,12 +264,18 @@ mod tests {
             ..event_with_label(None)
         };
         let events = vec![first, second];
-        assert_eq!(derive_sender_label(&events), Some("first-sender".to_string()));
+        assert_eq!(
+            derive_sender_label(&events),
+            Some("first-sender".to_string())
+        );
     }
 
     #[test]
     fn test_resolve_display_name_with_label() {
-        assert_eq!(resolve_display_name("generic", Some("solarwinds")), "solarwinds");
+        assert_eq!(
+            resolve_display_name("generic", Some("solarwinds")),
+            "solarwinds"
+        );
     }
 
     #[test]

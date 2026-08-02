@@ -229,7 +229,9 @@ describe("ExternalAlertSourcesList", () => {
     expect(wrapper.text()).not.toContain("o2iat_staging1234efgh5678");
     (wrapper.vm as any).toggleRevealFor({ id: "int-2" });
     await flushPromises();
-    expect(wrapper.text()).toContain("http://localhost:5080/api/v2/myorg/incidents/events/o2iat_staging1234efgh5678");
+    expect(wrapper.text()).toContain(
+      "http://localhost:5080/api/v2/myorg/incidents/events/o2iat_staging1234efgh5678",
+    );
   });
 
   it("copies an additional source's full URL via copyToClipboard", async () => {

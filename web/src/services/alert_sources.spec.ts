@@ -20,18 +20,13 @@ describe("alert_sources service", () => {
 
   it("list() calls GET /api/v2/{org}/incidents/integrations", () => {
     alertSources.list("myorg");
-    expect(mockClient.get).toHaveBeenCalledWith(
-      "/api/v2/myorg/incidents/integrations",
-    );
+    expect(mockClient.get).toHaveBeenCalledWith("/api/v2/myorg/incidents/integrations");
   });
 
   it("create() calls POST with payload", () => {
     const payload = { name: "grafana-prod", source_type: "grafana" };
     alertSources.create("myorg", payload);
-    expect(mockClient.post).toHaveBeenCalledWith(
-      "/api/v2/myorg/incidents/integrations",
-      payload,
-    );
+    expect(mockClient.post).toHaveBeenCalledWith("/api/v2/myorg/incidents/integrations", payload);
   });
 
   it("setEnabled() calls PATCH with { enabled }", () => {

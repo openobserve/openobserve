@@ -71,10 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
 
           <span v-if="externalSources.length" class="inline-flex cursor-default">
-            <OTag
-              variant="default-outline"
-              data-test="incident-external-source-badge"
-            >
+            <OTag variant="default-outline" data-test="incident-external-source-badge">
               <OIcon name="webhook" size="xs" />
               {{ externalSources.join(", ") }}
             </OTag>

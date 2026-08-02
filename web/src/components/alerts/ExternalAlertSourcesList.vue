@@ -131,7 +131,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="ghost"
                 size="icon-xs-sq"
                 :icon-left="isRevealed(row.integration) ? 'visibility-off' : 'visibility'"
-                :title="isRevealed(row.integration) ? t('alert_sources.hideToken') : t('alert_sources.revealToken')"
+                :title="
+                  isRevealed(row.integration)
+                    ? t('alert_sources.hideToken')
+                    : t('alert_sources.revealToken')
+                "
                 :data-test="`alert-sources-reveal-${row.integration.id}`"
                 @click="toggleRevealFor(row.integration)"
               />
@@ -161,7 +165,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :variant="row.integration.enabled ? 'ghost-destructive' : 'ghost-success'"
                 size="icon-sm"
                 :icon-left="row.integration.enabled ? 'pause' : 'play-arrow'"
-                :title="row.integration.enabled ? t('alert_sources.disable') : t('alert_sources.enable')"
+                :title="
+                  row.integration.enabled ? t('alert_sources.disable') : t('alert_sources.enable')
+                "
                 :data-test="`alert-sources-toggle-enabled-${row.integration.id}`"
                 @click="toggleEnabledFor(row.integration)"
               />
@@ -264,8 +270,17 @@ export default defineComponent({
       selectedSetupType: "grafana" as "grafana" | "alertmanager" | "generic",
       additionalStatusById: {} as Record<string, "receiving" | "stale" | "not_connected">,
       advancedColumns: [
-        { id: "name", header: this.t("alert_sources.name"), accessorKey: "displayName", sortable: true },
-        { id: "source_type", header: this.t("alert_sources.sourceType"), accessorKey: "sourceType" },
+        {
+          id: "name",
+          header: this.t("alert_sources.name"),
+          accessorKey: "displayName",
+          sortable: true,
+        },
+        {
+          id: "source_type",
+          header: this.t("alert_sources.sourceType"),
+          accessorKey: "sourceType",
+        },
         { id: "status", header: this.t("alert_sources.statusColumnHeader"), accessorKey: "rowKey" },
         { id: "url", header: this.t("alert_sources.urlHeader"), accessorKey: "rowKey" },
         { id: "actions", header: this.t("alert_sources.actions"), isAction: true, size: 100 },
@@ -407,11 +422,19 @@ export default defineComponent({
       try {
         const res = await alertSources.listSenders(this.orgIdentifier, integrationId);
         const now = Date.now() * 1000;
-        const statuses = res.data.senders.map((s: any) => getAlertSourceStatus(s.last_received_at, now));
+        const statuses = res.data.senders.map((s: any) =>
+          getAlertSourceStatus(s.last_received_at, now),
+        );
         if (statuses.length === 0) {
-          this.additionalStatusById = { ...this.additionalStatusById, [integrationId]: "not_connected" };
+          this.additionalStatusById = {
+            ...this.additionalStatusById,
+            [integrationId]: "not_connected",
+          };
         } else if (statuses.includes("receiving")) {
-          this.additionalStatusById = { ...this.additionalStatusById, [integrationId]: "receiving" };
+          this.additionalStatusById = {
+            ...this.additionalStatusById,
+            [integrationId]: "receiving",
+          };
         } else {
           this.additionalStatusById = { ...this.additionalStatusById, [integrationId]: "stale" };
         }

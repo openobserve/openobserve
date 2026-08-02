@@ -29,19 +29,13 @@ const alertSources = {
     );
   },
   rotate: (org_identifier: string, integration_id: string) => {
-    return http().post(
-      `/api/v2/${org_identifier}/incidents/integrations/${integration_id}/rotate`,
-    );
+    return http().post(`/api/v2/${org_identifier}/incidents/integrations/${integration_id}/rotate`);
   },
   listSenders: (org_identifier: string, integration_id: string) => {
-    return http().get(
-      `/api/v2/${org_identifier}/incidents/integrations/${integration_id}/senders`,
-    );
+    return http().get(`/api/v2/${org_identifier}/incidents/integrations/${integration_id}/senders`);
   },
   delete: (org_identifier: string, integration_id: string) => {
-    return http().delete(
-      `/api/v2/${org_identifier}/incidents/integrations/${integration_id}`,
-    );
+    return http().delete(`/api/v2/${org_identifier}/incidents/integrations/${integration_id}`);
   },
 };
 

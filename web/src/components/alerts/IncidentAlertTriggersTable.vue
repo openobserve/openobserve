@@ -123,8 +123,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <pre
           data-test="trigger-payload-json"
-          class="bg-surface-secondary max-h-[60vh] overflow-auto rounded p-3 text-xs"
-        >{{ formattedPayload }}</pre>
+          class="bg-surface-secondary rounded-surface max-h-[60vh] overflow-auto p-3 text-xs"
+          >{{ formattedPayload }}</pre
+        >
       </template>
     </ODialog>
   </div>
@@ -290,8 +291,7 @@ export default defineComponent({
         const response = await incidentsService.getExternalAlertPayload(orgId, row.alert_id);
         payloadData.value = response.data;
       } catch (err: any) {
-        payloadError.value =
-          err?.response?.data?.message || t("alerts.incidents.rawPayloadError");
+        payloadError.value = err?.response?.data?.message || t("alerts.incidents.rawPayloadError");
       } finally {
         payloadLoading.value = false;
       }
