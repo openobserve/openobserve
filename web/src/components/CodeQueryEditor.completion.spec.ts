@@ -29,6 +29,7 @@ const mockModel = {
   getLineContent: vi.fn(() => ""),
   getValueInRange: vi.fn(() => ""),
   getWordUntilPosition: vi.fn(() => ({ word: "", startColumn: 1, endColumn: 1 })),
+  getWordAtPosition: vi.fn(() => ({ word: "", startColumn: 1, endColumn: 1 })),
 };
 
 // Stable mock editor instance so tests can reference it directly
@@ -457,6 +458,104 @@ describe("Phase 3 — providers are registered and configured", () => {
     // Monaco defaults strings to 'off', which is why field-VALUE completion
     // needed the hide/re-trigger hack.
     expect(opts.quickSuggestions).toMatchObject({ other: "on", strings: "on" });
+  });
+});
+
+describe("Phase 3 — providers return the shapes monaco requires", () => {
+  const store4 = createStore({ state: { theme: "light" } });
+  let spy: ReturnType<typeof vi.spyOn>;
+  afterAll(() => spy?.mockRestore());
+
+  const mountAndGet = async () => {
+    const api = await import("monaco-editor/esm/vs/editor/editor.api");
+    const createFn = vi.mocked(api.editor.create);
+    const before = createFn.mock.calls.length;
+    spy = vi
+      .spyOn(document, "getElementById")
+      .mockImplementation(() => document.createElement("div"));
+    mount(CodeQueryEditor, {
+      props: {
+        editorId: `shape-${Math.random()}`,
+        language: "sql",
+        query: "",
+        keywords: [
+          {
+            name: "host_name",
+            label: "host_name",
+            kind: "Field",
+            insertText: "host_name",
+            detail: "Utf8",
+          },
+        ],
+      },
+      global: { plugins: [store4] },
+    });
+    await vi.waitFor(() => expect(createFn.mock.calls.length).toBe(before + 1), {
+      timeout: 15000,
+      interval: 25,
+    });
+    return api;
+  };
+
+  const position = { lineNumber: 1, column: 12 };
+
+  it(
+    "D2 — provideSignatureHelp returns { value, dispose }, not a bare SignatureHelp",
+    { timeout: 30000 },
+    async () => {
+      const api = await mountAndGet();
+      const provider = vi
+        .mocked((api.languages as any).registerSignatureHelpProvider)
+        .mock.calls.at(-1)![1];
+      mockModel.getValueInRange.mockReturnValue("SELECT sum(");
+      const result = await provider.provideSignatureHelp(mockModel, position, {}, {});
+      // monaco reads result.value (SignatureHelpResult extends IDisposable).
+      // Returning the SignatureHelp directly yields undefined and NO hint, silently.
+      expect(result).toBeTruthy();
+      expect(result.value, "provider returned a bare SignatureHelp").toBeTruthy();
+      expect(result.value.signatures[0].label).toContain("sum");
+      expect(typeof result.dispose).toBe("function");
+    },
+  );
+
+  it("D2 — returns null when the cursor is not in a call", { timeout: 30000 }, async () => {
+    const api = await mountAndGet();
+    const provider = vi
+      .mocked((api.languages as any).registerSignatureHelpProvider)
+      .mock.calls.at(-1)![1];
+    mockModel.getValueInRange.mockReturnValue("SELECT * FROM logs ");
+    expect(await provider.provideSignatureHelp(mockModel, position, {}, {})).toBeNull();
+  });
+
+  it(
+    "D3 — provideHover returns { contents } as IMarkdownString[]",
+    { timeout: 30000 },
+    async () => {
+      const api = await mountAndGet();
+      const provider = vi
+        .mocked((api.languages as any).registerHoverProvider)
+        .mock.calls.at(-1)![1];
+      mockModel.getWordAtPosition.mockReturnValue({
+        word: "host_name",
+        startColumn: 1,
+        endColumn: 10,
+      });
+      const hover = await provider.provideHover(mockModel, position, {});
+      expect(hover).toBeTruthy();
+      expect(Array.isArray(hover.contents)).toBe(true);
+      expect(hover.contents[0].value).toContain("Utf8");
+    },
+  );
+
+  it("D3 — returns null for a word it knows nothing about", { timeout: 30000 }, async () => {
+    const api = await mountAndGet();
+    const provider = vi.mocked((api.languages as any).registerHoverProvider).mock.calls.at(-1)![1];
+    mockModel.getWordAtPosition.mockReturnValue({
+      word: "zzz_unknown",
+      startColumn: 1,
+      endColumn: 12,
+    });
+    expect(await provider.provideHover(mockModel, position, {})).toBeNull();
   });
 });
 

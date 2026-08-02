@@ -356,3 +356,71 @@ describe("buildHoverContents", () => {
     expect(buildHoverContents(null)).toBeNull();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Organisation VRL functions
+//
+// These do NOT live in the suggestion catalog. updateFunctionKeywords pushes
+// them into the KEYWORDS list with kind "Function", and -- unlike every catalog
+// entry -- they carry a `label` and no `name`. A lookup that searched only
+// suggestions, or keyed only off `name`, would leave signature help and hover
+// silently dead for exactly the functions a user is least likely to know.
+// ---------------------------------------------------------------------------
+
+describe("org VRL functions reach the providers", () => {
+  const orgFn = {
+    label: "my_org_fn",
+    kind: "Function" as const,
+    insertText: "my_org_fn('${1:value}')",
+    insertTextRules: "InsertAsSnippet" as const,
+    sortText: "my_org_fn",
+  };
+  const keywords = [
+    { name: "host_name", label: "host_name", kind: "Field" as const, insertText: "host_name" },
+    orgFn,
+  ];
+
+  it("findFunctionEntry finds a function that lives in the KEYWORDS list", () => {
+    expect(findFunctionEntry("my_org_fn", keywords as any, SQL_FUNCTIONS)).toBeTruthy();
+  });
+
+  it("matches on `label` when the entry has no `name`", () => {
+    const found = findFunctionEntry("my_org_fn", keywords as any, SQL_FUNCTIONS)!;
+    expect(found.label).toBe("my_org_fn");
+  });
+
+  it("still refuses a Field of the same shape", () => {
+    expect(findFunctionEntry("host_name", keywords as any, SQL_FUNCTIONS)).toBeNull();
+  });
+
+  it("builds a usable signature even with no detail metadata", () => {
+    // The keywords path carries no `detail`, so there are no parameter names to
+    // show. It must degrade to a bare label, not print "undefined".
+    const help = buildSignatureHelp(orgFn as any, 0)!;
+    expect(help.signatures[0].label).toContain("my_org_fn");
+    expect(help.signatures[0].label).not.toContain("undefined");
+    expect(help.signatures[0].parameters).toEqual([]);
+  });
+
+  it("hovers without inventing a signature or a type", () => {
+    const contents = buildHoverContents(orgFn as any)!;
+    const text = contents.map((c) => c.value).join(" ");
+    expect(text).toContain("my_org_fn");
+    expect(text).not.toContain("undefined");
+  });
+});
+
+describe("parseCallContext ignores SQL comments", () => {
+  it("does not treat a call inside a line comment as the enclosing call", () => {
+    // An unclosed paren in a comment would otherwise pin the hint to a function
+    // the user is not writing.
+    expect(parseCallContext("-- sum(\nSELECT ")).toBeNull();
+  });
+
+  it("still finds a real call on a line after a comment", () => {
+    expect(parseCallContext("-- a note\nSELECT abs(")).toEqual({
+      name: "abs",
+      activeParameter: 0,
+    });
+  });
+});
