@@ -361,13 +361,14 @@ function onCombine(built: { value: string; from: CompositePart[] }) {
 
       <!-- The author's own entry, after every recorded one. It APPENDS rather
          than overriding: the row can then be dragged wherever they want it. -->
-      <div class="flex w-full items-end gap-2">
+      <div class="flex w-full items-end gap-2 pt-2">
         <!-- Read from the value, not chosen: `kind` labels a locator, it does not
            parse it, so a picker that only set `kind` would store a contradiction. -->
         <OTooltip :content="t('synthetics.journey.locatorDerivedKindHelp')" class="mb-2">
           <OBadge
             variant="default"
             size="sm"
+            :class="!draft.trim() ? 'invisible!' : ''"
             data-test="synthetics-journey-step-locator-derived-kind"
           >
             {{ t(`synthetics.journey.locatorKind.${draftKind}`) }}
@@ -395,7 +396,7 @@ function onCombine(built: { value: string; from: CompositePart[] }) {
         <OButton
           variant="outline"
           size="sm"
-          class="mb-2 shrink-0"
+          class="shrink-0"
           :disabled="!draft.trim()"
           icon-left="add"
           :aria-label="t('synthetics.journey.locatorOverrideApply')"
