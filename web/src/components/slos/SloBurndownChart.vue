@@ -346,7 +346,17 @@ const budgetOptions = computed(() => {
           animation: false,
           silent: true,
           lineStyle: { color: danger, type: "dashed" },
-          label: { formatter: t("slos.chart.exhausted"), position: "insideEndTop" },
+          // Coloured like the line it names, and carrying its value, because
+          // echarts parks a markLine label at the RIGHT end — inches from the
+          // series' latest point. A bare "Budget exhausted" there reads as a
+          // verdict on the current value rather than as the name of the line
+          // at zero, which is the opposite of what it says when the budget is
+          // merely low.
+          label: {
+            formatter: t("slos.chart.exhausted"),
+            position: "insideEndTop",
+            color: danger,
+          },
           data: [{ yAxis: 0 }],
         },
       },
@@ -401,7 +411,11 @@ const burnOptions = computed(() => {
           animation: false,
           silent: true,
           lineStyle: { color: warning, type: "dashed" },
-          label: { formatter: t("slos.chart.neutralBurn"), position: "insideEndTop" },
+          label: {
+            formatter: t("slos.chart.neutralBurn"),
+            position: "insideEndTop",
+            color: warning,
+          },
           data: [{ yAxis: 1 }],
         },
       },

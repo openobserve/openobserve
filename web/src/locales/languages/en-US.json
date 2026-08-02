@@ -11016,7 +11016,7 @@
       "burnRate": "Burn rate",
       "cumulativeHint": "cumulative over the window",
       "perBucketHint": "per bucket",
-      "exhausted": "Budget exhausted",
+      "exhausted": "Budget exhausted (0%)",
       "neutralBurn": "Budget-neutral (×1)",
       "empty": "No slices measured in this window yet.",
       "loadFailed": "Could not load measurement history",
