@@ -133,6 +133,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import searchService from "@/services/search";
 import {
   bucketSecsFor,
+  budgetUnitsFor,
   budgetedBadFor,
   buildSloBurndownQuery,
   toBurndownSeries,
@@ -159,8 +160,8 @@ const props = defineProps<{
   target: number;
   windowSecs: number;
   sliceIntervalSecs: number;
-  /** Decides what the burndown's second axis counts — `time_slice` measures
-   *  slices, everything else measures events. */
+  /** Decides what the burndown's second axis counts. Types that score a whole
+   *  slice report in seconds; a count SLI reports in events. */
   sliType?: string;
 }>();
 
@@ -168,9 +169,10 @@ const { t } = useI18n();
 const store = useStore();
 
 const points = ref<SloBurndownPoint[]>([]);
-/** The window's budget in absolute bad events — the burndown's second axis.
- *  Kept beside the points because the raw buckets it is summed from are not
- *  retained. */
+/** The window's budget as the SLI type counts it: bad EVENTS for a count SLI,
+ *  bad SECONDS for one that scores whole slices. `budgetUnits` converts;
+ *  nothing should read this directly. Kept beside the points because the raw
+ *  buckets it is summed from are not retained. */
 const budgetedBad = ref(0);
 const loading = ref(false);
 const error = ref("");
@@ -210,9 +212,9 @@ const sliScale = computed<MappedAxisScale>(() =>
 );
 
 const budgetScale = computed(() => budgetAxisScale(points.value.map((p) => p.remaining)));
-/** Percent of budget left → errors still affordable. */
+/** Percent of budget left → whatever the SLI type counts (see budgetUnits). */
 const eventsScale = computed<MappedAxisScale>(() =>
-  mappedAxis(budgetScale.value, (pct) => (pct * budgetedBad.value) / 100),
+  mappedAxis(budgetScale.value, (pct) => (pct * budgetUnits.value) / 100),
 );
 
 /** Precision follows the axis STEP, not the unit: at a four-nines target the
@@ -228,16 +230,35 @@ function formatCount(value: number): string {
   const abs = Math.abs(value);
   if (abs >= 1e6) return `${Number((value / 1e6).toFixed(1))}M`;
   if (abs >= 1e3) return `${Number((value / 1e3).toFixed(1))}k`;
+  // One decimal in single digits. Integers were fine while this axis counted
+  // thousands of events, but a per-slice SLI's budget is single-digit SLICES —
+  // rounding 7.8 to "8" there hands back most of a slice that does not exist.
+  if (abs < 10) return `${Number(value.toFixed(1))}`;
   return `${Math.round(value)}`;
 }
 
-/** The unit the burndown's second axis counts. A time-slice SLI measures
- *  slices (so the budget reads as minutes of badness), everything else counts
- *  events. */
+/** SLI types where a SLICE is scored as a whole rather than events counted
+ *  within it. `classify_time_slice` reports these in SECONDS — a good slice is
+ *  `(interval, interval)` — so their budget arrives in seconds too. */
+const scoresWholeSlices = computed(
+  () => props.sliType === "time_slice" || props.sliType === "alert",
+);
+
+/**
+ * The burndown's second axis, in the unit the SLI type actually counts.
+ *
+ * For a count SLI `budgetedBad` is already events. For a per-slice SLI it is
+ * SECONDS, and dividing by the slice interval is what turns it back into the
+ * thing a reader can act on: "101 more bad slices" is a sentence, "30,240
+ * seconds" is arithmetic homework — and labelling those seconds as slices,
+ * which is what this did at first, is off by the whole interval.
+ */
+const budgetUnits = computed(() =>
+  budgetUnitsFor(budgetedBad.value, props.sliType, props.sliceIntervalSecs),
+);
+
 const budgetUnitLabel = computed(() =>
-  props.sliType === "time_slice"
-    ? t("slos.chart.slicesAffordable")
-    : t("slos.chart.errorsAffordable"),
+  scoresWholeSlices.value ? t("slos.chart.slicesAffordable") : t("slos.chart.errorsAffordable"),
 );
 
 /** The crosshair answers in both units too. Having to convert one into the
@@ -310,7 +331,7 @@ const budgetOptions = computed(() => {
       gridColor,
       twoUnitTooltip((pct) => [
         [t("slos.chart.budgetRemaining"), `${Number(pct.toFixed(1))}%`],
-        [budgetUnitLabel.value, formatCount((pct * budgetedBad.value) / 100)],
+        [budgetUnitLabel.value, formatCount((pct * budgetUnits.value) / 100)],
       ]),
     ),
     yAxis: [
@@ -326,7 +347,7 @@ const budgetOptions = computed(() => {
       // of zeroes is worse than no axis.
       {
         ...pairedAxis(eventsScale.value, axisColor, formatCount),
-        show: budgetedBad.value > 0,
+        show: budgetUnits.value > 0,
       },
     ],
     series: [
@@ -434,7 +455,11 @@ const panels = computed(() => [
     label: t("slos.chart.budgetTitle"),
     hint: t("slos.chart.cumulativeHint"),
     explain: t("slos.chart.budgetExplain"),
-    formula: t("slos.chart.budgetFormula"),
+    // The right axis counts a different thing per SLI type, so the formula
+    // that documents it has to follow.
+    formula: scoresWholeSlices.value
+      ? t("slos.chart.budgetFormulaPerSlice")
+      : t("slos.chart.budgetFormula"),
     note: t("slos.chart.budgetNote"),
     options: budgetOptions.value,
   },

@@ -142,6 +142,29 @@ export function budgetedBadFor(buckets: SloSliceBucket[], target: number): numbe
 }
 
 /**
+ * The window's budget in the unit its SLI type actually counts.
+ *
+ * `budgetedBadFor` returns whatever `good`/`total` were recorded in, and that
+ * differs by SLI type: a count SLI records EVENTS, while a type that scores a
+ * whole slice records SECONDS — `classify_time_slice` reports a good slice as
+ * `(interval, interval)`. Dividing by the slice interval turns those seconds
+ * back into slices.
+ *
+ * Getting this wrong is not a rounding error: at a 5-minute interval it labels
+ * 30,240 seconds as "30,240 slices" when the honest answer is 101, so the
+ * reader is off by the whole interval in the direction that sounds reassuring.
+ */
+export function budgetUnitsFor(
+  budgetedBad: number,
+  sliType: string | undefined,
+  sliceIntervalSecs: number,
+): number {
+  const scoresWholeSlices = sliType === "time_slice" || sliType === "alert";
+  if (!scoresWholeSlices) return budgetedBad;
+  return budgetedBad / Math.max(1, Math.floor(sliceIntervalSecs) || 1);
+}
+
+/**
  * Fold bucketed counts into the burndown and burn-rate series.
  *
  * The two differ in the window they read over, which is the whole distinction

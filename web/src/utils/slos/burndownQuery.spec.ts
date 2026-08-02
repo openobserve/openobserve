@@ -15,7 +15,12 @@
 
 import { describe, expect, it } from "vitest";
 
-import { bucketSecsFor, buildSloBurndownQuery, toBurndownSeries } from "./burndownQuery";
+import {
+  bucketSecsFor,
+  budgetUnitsFor,
+  buildSloBurndownQuery,
+  toBurndownSeries,
+} from "./burndownQuery";
 
 const DAY = 86400;
 
@@ -236,5 +241,26 @@ describe("toBurndownSeries", () => {
     // Every formula divides by (100 - target); NaN through the series is worse
     // than an empty chart.
     expect(toBurndownSeries([{ bucket: 0, good: 1, total: 1 }], 100)).toEqual([]);
+  });
+});
+
+describe("budgetUnitsFor", () => {
+  // The bug this exists to stop: a time-slice SLO's budget arrives in SECONDS,
+  // and labelling those seconds as slices overstates by the whole interval.
+  it("converts a whole-slice SLI's seconds into slices", () => {
+    // 95% over 7 days = 30,240 s of budget; at 5-minute slices that is 100.8.
+    expect(budgetUnitsFor(30_240, "time_slice", 300)).toBeCloseTo(100.8, 6);
+    expect(budgetUnitsFor(30_240, "alert", 300)).toBeCloseTo(100.8, 6);
+    expect(budgetUnitsFor(30_240, "time_slice", 60)).toBeCloseTo(504, 6);
+  });
+
+  it("leaves a count SLI's events alone", () => {
+    expect(budgetUnitsFor(58, "count", 300)).toBe(58);
+    expect(budgetUnitsFor(58, undefined, 300)).toBe(58);
+  });
+
+  it("never divides by zero on a malformed interval", () => {
+    expect(budgetUnitsFor(300, "time_slice", 0)).toBe(300);
+    expect(budgetUnitsFor(300, "time_slice", Number.NaN)).toBe(300);
   });
 });
