@@ -336,10 +336,14 @@
       </div>
 
       <div class="flex flex-col gap-4">
-        <!-- Preview sits above the summary: it answers "is my predicate
-             right?", which is the question asked while the left column is
-             still being filled in. Count SLI only — the other SLI types do
-             not have a good/bad event count to draw. -->
+        <!-- Preview sits above the summary: it answers the question being
+             asked while the left column is still being filled in. Which
+             question that is depends on the SLI type — a count SLI is a
+             PREDICATE and the doubt is whether it is right; a time-slice SLI
+             is a NUMBER and the doubt is whether it is set anywhere sensible.
+             So each gets its own preview rather than one being bent to serve
+             both. An alert SLI has neither: it reads the triggers stream, and
+             there is nothing to draw until it ships. -->
         <SloPreviewChart
           v-if="form.sli_type === 'count' && form.config.stream && form.config.good_expr"
           data-test="slos-addslo-preview-section"
@@ -347,6 +351,18 @@
           :stream="form.config.stream"
           :scope="form.config.scope"
           :good-expr="form.config.good_expr"
+        />
+        <SloTimeSlicePreview
+          v-else-if="form.sli_type === 'time_slice' && form.config.stream && form.config.query"
+          data-test="slos-addslo-timeslice-preview-section"
+          :stream-type="form.config.stream_type"
+          :stream="form.config.stream"
+          :scope="form.config.scope"
+          :aggregate="form.config.query"
+          :comparator="form.config.comparator"
+          :threshold="form.config.threshold"
+          :slice-interval-secs="form.slice_interval_secs"
+          :target="form.target"
         />
 
         <!-- Summary. Mirrors the backend's own arithmetic so a budget rejection
@@ -394,6 +410,7 @@ import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OFormSection from "@/lib/core/FormSection/OFormSection.vue";
 import SloPreviewChart from "@/components/slos/SloPreviewChart.vue";
+import SloTimeSlicePreview from "@/components/slos/SloTimeSlicePreview.vue";
 import SloExpressionField from "@/components/slos/SloExpressionField.vue";
 import SelectFolderDropDown from "@/components/common/sidebar/SelectFolderDropDown.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";

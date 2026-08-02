@@ -11011,7 +11011,14 @@
       "title": "Preview",
       "goodEvents": "Good events",
       "badEvents": "Bad events",
-      "needsDefinition": "Pick a stream and define \"good when\" to preview"
+      "needsDefinition": "Pick a stream and define \"good when\" to preview",
+      "sliceValues": "Slice value vs threshold",
+      "sliceValue": "Slice value",
+      "sliceTally": "{sli}% good — {good}/{total} slices",
+      "sliceGaps": "{n}/{total} slots in this range produced no data — unmeasured, not bad. The percentage above is over the rest.",
+      "thresholdLabel": "Threshold {value}",
+      "noSlices": "No slices in this range yet",
+      "loadFailed": "Could not run the preview query"
     },
     "chart": {
       "budgetTitle": "Error budget burndown",
