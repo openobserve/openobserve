@@ -81,6 +81,8 @@ vi.mock("monaco-editor/esm/vs/editor/editor.api", () => ({
     register: vi.fn(),
     setMonarchTokensProvider: vi.fn(),
     registerCompletionItemProvider: vi.fn(() => ({ dispose: vi.fn() })),
+    registerSignatureHelpProvider: vi.fn(() => ({ dispose: vi.fn() })),
+    registerHoverProvider: vi.fn(() => ({ dispose: vi.fn() })),
   },
   KeyMod: { CtrlCmd: 1 },
   KeyCode: { Enter: 13 },
@@ -375,14 +377,20 @@ describe("Phase 3 — providers are registered and configured", () => {
 
   const mountEditor = async (props: any = {}) => {
     const monacoApi = await import("monaco-editor/esm/vs/editor/editor.api");
-    spy = vi.spyOn(document, "getElementById").mockImplementation(() =>
-      document.createElement("div"),
-    );
+    const createFn = vi.mocked(monacoApi.editor.create);
+    // Wait for THIS mount, not for any past one. createContextKey is a shared
+    // spy that earlier describes have already tripped, so waiting on
+    // toHaveBeenCalled() returns instantly and the assertions below would read
+    // whatever the previous test left behind.
+    const createsBefore = createFn.mock.calls.length;
+    spy = vi
+      .spyOn(document, "getElementById")
+      .mockImplementation(() => document.createElement("div"));
     mount(CodeQueryEditor, {
       props: { editorId: `p3-${Math.random()}`, language: "sql", query: "", ...props },
       global: { plugins: [providerStore2] },
     });
-    await vi.waitFor(() => expect(mockEditorObj.createContextKey).toHaveBeenCalled(), {
+    await vi.waitFor(() => expect(createFn.mock.calls.length).toBe(createsBefore + 1), {
       timeout: 15000,
       interval: 25,
     });
@@ -401,7 +409,9 @@ describe("Phase 3 — providers are registered and configured", () => {
 
   it("D2 — signature help triggers on ( and ,", { timeout: 30000 }, async () => {
     const api = await mountEditor();
-    const provider = vi.mocked((api.languages as any).registerSignatureHelpProvider).mock.calls.at(-1)![1];
+    const provider = vi
+      .mocked((api.languages as any).registerSignatureHelpProvider)
+      .mock.calls.at(-1)![1];
     expect(provider.signatureHelpTriggerCharacters).toEqual(expect.arrayContaining(["(", ","]));
   });
 
@@ -421,11 +431,17 @@ describe("Phase 3 — providers are registered and configured", () => {
     expect(provider.triggerCharacters).toEqual(expect.arrayContaining(["(", ",", "'", "."]));
   });
 
-  it("D4 — completion supplies resolveCompletionItem for lazy docs", { timeout: 30000 }, async () => {
-    const api = await mountEditor();
-    const provider = vi.mocked(api.languages.registerCompletionItemProvider).mock.calls.at(-1)![1];
-    expect(typeof provider.resolveCompletionItem).toBe("function");
-  });
+  it(
+    "D4 — completion supplies resolveCompletionItem for lazy docs",
+    { timeout: 30000 },
+    async () => {
+      const api = await mountEditor();
+      const provider = vi
+        .mocked(api.languages.registerCompletionItemProvider)
+        .mock.calls.at(-1)![1];
+      expect(typeof provider.resolveCompletionItem).toBe("function");
+    },
+  );
 
   it("N4 — word-based suggestions are off for SQL", { timeout: 30000 }, async () => {
     const api = await mountEditor();
@@ -449,36 +465,40 @@ describe("Phase 3 — C5: one provider per language, not per editor", () => {
   let spy: ReturnType<typeof vi.spyOn>;
   afterAll(() => spy?.mockRestore());
 
-  it("registers the completion provider once for three SQL editors", { timeout: 60000 }, async () => {
-    const api = await import("monaco-editor/esm/vs/editor/editor.api");
-    const reg = vi.mocked(api.languages.registerCompletionItemProvider);
-    const createFn = vi.mocked(api.editor.create);
-    const providersBefore = reg.mock.calls.filter((c) => c[0] === "sql").length;
+  it(
+    "registers the completion provider once for three SQL editors",
+    { timeout: 60000 },
+    async () => {
+      const api = await import("monaco-editor/esm/vs/editor/editor.api");
+      const reg = vi.mocked(api.languages.registerCompletionItemProvider);
+      const createFn = vi.mocked(api.editor.create);
+      const providersBefore = reg.mock.calls.filter((c) => c[0] === "sql").length;
 
-    spy = vi.spyOn(document, "getElementById").mockImplementation(() =>
-      document.createElement("div"),
-    );
+      spy = vi
+        .spyOn(document, "getElementById")
+        .mockImplementation(() => document.createElement("div"));
 
-    // Mounted SEQUENTIALLY, each awaited to completion. Mounting them in one
-    // synchronous burst is not equivalent: only the first editor finishes
-    // initialising, so the count would look like 1 whether or not the
-    // per-language fix exists — a green test for the wrong reason.
-    for (const id of ["c5-a", "c5-b", "c5-c"]) {
-      const createsBefore = createFn.mock.calls.length;
-      mount(CodeQueryEditor, {
-        props: { editorId: id, language: "sql", query: "" },
-        global: { plugins: [store3] },
-      });
-      await vi.waitFor(() => expect(createFn.mock.calls.length).toBe(createsBefore + 1), {
-        timeout: 15000,
-        interval: 25,
-      });
-    }
+      // Mounted SEQUENTIALLY, each awaited to completion. Mounting them in one
+      // synchronous burst is not equivalent: only the first editor finishes
+      // initialising, so the count would look like 1 whether or not the
+      // per-language fix exists — a green test for the wrong reason.
+      for (const id of ["c5-a", "c5-b", "c5-c"]) {
+        const createsBefore = createFn.mock.calls.length;
+        mount(CodeQueryEditor, {
+          props: { editorId: id, language: "sql", query: "" },
+          global: { plugins: [store3] },
+        });
+        await vi.waitFor(() => expect(createFn.mock.calls.length).toBe(createsBefore + 1), {
+          timeout: 15000,
+          interval: 25,
+        });
+      }
 
-    const added = reg.mock.calls.filter((c) => c[0] === "sql").length - providersBefore;
-    // Monaco aggregates every provider registered for a language, so N editors
-    // meant N providers answering on every keystroke — N-1 of them only to
-    // return an empty list for a model that did not ask.
-    expect(added, `three editors registered ${added} SQL completion providers`).toBe(1);
-  });
+      const added = reg.mock.calls.filter((c) => c[0] === "sql").length - providersBefore;
+      // Monaco aggregates every provider registered for a language, so N editors
+      // meant N providers answering on every keystroke — N-1 of them only to
+      // return an empty list for a model that did not ask.
+      expect(added, `three editors registered ${added} SQL completion providers`).toBe(1);
+    },
+  );
 });

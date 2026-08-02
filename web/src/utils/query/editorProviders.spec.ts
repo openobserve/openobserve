@@ -28,6 +28,7 @@ import {
   buildSignatureHelp,
   buildHoverContents,
   findCatalogEntry,
+  findFunctionEntry,
 } from "./editorProviders";
 
 const fn = (name: string) => SQL_FUNCTIONS.find((f) => f.name === name)!;
@@ -184,7 +185,13 @@ describe("buildSignatureHelp", () => {
 
 describe("findCatalogEntry", () => {
   const fields = [
-    { name: "host_name", label: "host_name", kind: "Field" as const, insertText: "host_name", detail: "Utf8" },
+    {
+      name: "host_name",
+      label: "host_name",
+      kind: "Field" as const,
+      insertText: "host_name",
+      detail: "Utf8",
+    },
   ];
 
   it("finds a function from the suggestion catalog", () => {
@@ -207,10 +214,47 @@ describe("findCatalogEntry", () => {
     expect(findCatalogEntry("", fields, SQL_FUNCTIONS)).toBeNull();
   });
 
-  it("prefers the field when a field and a function share a name", () => {
-    // A column named `count` is the thing under the cursor in that buffer.
-    const shadow = [{ name: "count", label: "count", kind: "Field" as const, insertText: "count", detail: "Int64" }];
+  it("prefers the field when a bare word matches both a field and a function", () => {
+    // Hovering `count` in `WHERE count > 5` is about the column.
+    const shadow = [
+      {
+        name: "count",
+        label: "count",
+        kind: "Field" as const,
+        insertText: "count",
+        detail: "Int64",
+      },
+    ];
     expect(findCatalogEntry("count", shadow, SQL_FUNCTIONS)?.kind).toBe("Field");
+  });
+});
+
+describe("findFunctionEntry — call sites resolve to FUNCTIONS", () => {
+  it("resolves a function even when a column shadows its name", () => {
+    // Signature help runs at `count(`, which is unambiguously a call. Reusing
+    // the field-preferring lookup here would silently produce no signature for
+    // any function whose name matches a column in the stream.
+    const shadow = [
+      {
+        name: "count",
+        label: "count",
+        kind: "Field" as const,
+        insertText: "count",
+        detail: "Int64",
+      },
+    ];
+    expect(findFunctionEntry("count", shadow as any, SQL_FUNCTIONS)?.kind).toBe("Function");
+  });
+
+  it("matches case-insensitively", () => {
+    expect(findFunctionEntry("HISTOGRAM", [], SQL_FUNCTIONS)?.name).toBe("histogram");
+  });
+
+  it("returns null for a word that is not a function", () => {
+    const fields = [
+      { name: "host_name", label: "host_name", kind: "Field" as const, insertText: "host_name" },
+    ];
+    expect(findFunctionEntry("host_name", fields as any, SQL_FUNCTIONS)).toBeNull();
   });
 });
 
@@ -253,9 +297,35 @@ describe("buildHoverContents", () => {
     expect(contents[0].value).not.toContain("undefined");
   });
 
-  it("marks a deprecated entry as deprecated", () => {
-    const contents = buildHoverContents(fn("match_all_raw"))!;
-    expect(contents.map((c) => c.value).join(" ").toLowerCase()).toContain("deprecated");
+  it("marks a deprecated entry as deprecated from the FLAG, not its prose", () => {
+    // Using match_all_raw here would prove nothing: its documentation already
+    // begins "Deprecated alias for...", so the assertion would pass even if the
+    // `deprecated` flag were ignored entirely.
+    const contents = buildHoverContents({
+      name: "legacy_fn",
+      label: "legacy_fn",
+      kind: "Function",
+      insertText: "legacy_fn()",
+      detail: "()",
+      documentation: "Does a thing.",
+      deprecated: true,
+    })!;
+    expect(
+      contents
+        .map((c) => c.value)
+        .join(" ")
+        .toLowerCase(),
+    ).toContain("deprecated");
+  });
+
+  it("does not call a live function deprecated", () => {
+    const contents = buildHoverContents(fn("match_all"))!;
+    expect(
+      contents
+        .map((c) => c.value)
+        .join(" ")
+        .toLowerCase(),
+    ).not.toContain("deprecated");
   });
 
   it("returns null when there is nothing to say", () => {
