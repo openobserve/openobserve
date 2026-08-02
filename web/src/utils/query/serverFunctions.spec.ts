@@ -51,9 +51,7 @@ describe("toCompletionEntries — server payload to catalog entries", () => {
   });
 
   it("never reuses a tab stop index", () => {
-    const [e] = toCompletionEntries([
-      serverFn({ name: "f", signature: "(a, b, c, d)" }),
-    ]);
+    const [e] = toCompletionEntries([serverFn({ name: "f", signature: "(a, b, c, d)" })]);
     const indices = [...e.insertText.matchAll(/\$\{(\d+):/g)].map((m) => m[1]);
     expect(indices).toEqual(["1", "2", "3", "4"]);
   });
@@ -139,5 +137,16 @@ describe("mergeServerFunctions — local catalog wins on insertion detail", () =
     const a = mergeServerFunctions(SQL_FUNCTIONS, [serverFn(), serverFn({ name: "coalesce" })]);
     const b = mergeServerFunctions(SQL_FUNCTIONS, [serverFn({ name: "coalesce" }), serverFn()]);
     expect(a.map((f) => f.name)).toEqual(b.map((f) => f.name));
+  });
+});
+
+describe("snippet safety — upstream argument names are untrusted text", () => {
+  it("strips snippet metacharacters from argument names", () => {
+    const [e] = toCompletionEntries([
+      { name: "f", signature: "(we${ird}, ok)", doc: "d", kind: "scalar" } as any,
+    ]);
+    expect(e.insertText).toBe("f(${1:weird}, ${2:ok})");
+    // One tab stop per argument, none opened by a stray brace.
+    expect([...e.insertText.matchAll(/\$\{(\d+):/g)].map((m) => m[1])).toEqual(["1", "2"]);
   });
 });

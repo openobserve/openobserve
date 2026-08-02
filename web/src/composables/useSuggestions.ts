@@ -75,8 +75,13 @@ const useSqlSuggestions = () => {
   const ensureServerFunctions = async () => {
     const org = autoCompleteData.value.org;
     if (!org) return;
-    if (org === fetchedOrg) return;
-    if (inFlight) return inFlight;
+    // Already handled for this org — but if its request is still in the air,
+    // await THAT one rather than returning early with an empty list.
+    if (org === fetchedOrg) return inFlight ?? undefined;
+    // A request for a DIFFERENT org is in the air. Do not return it: awaiting
+    // another org's fetch would leave this org unfetched for the whole pass.
+    // Falling through starts the correct request; the stale one is discarded by
+    // the fetchedOrg check in its own handlers.
 
     // Drop the previous org's entries BEFORE awaiting: otherwise the first
     // popup after switching still shows the old tenant's function names.

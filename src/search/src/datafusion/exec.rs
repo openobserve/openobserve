@@ -376,78 +376,96 @@ pub struct CatalogFunction {
     pub deprecated: bool,
 }
 
-/// Every function this org can call: the DataFusion registry (including the
-/// JSON family), the O2 UDFs, the SQL-rewriter aliases and the org's own VRL
-/// transforms.
+/// Argument list and prose for a registry function.
 ///
-/// The registry alone is not enough — rewriter-provided names appear in no
-/// registry at all, and JSON functions are registered by a separate call.
-pub fn catalog_functions(org_id: &str) -> Vec<CatalogFunction> {
-    let mut ctx = SessionContext::new();
-    register_builtin_udfs(&ctx);
-    let _ = datafusion_functions_json::register_all(&mut ctx);
-    let state = ctx.state();
-
-    let mut out: Vec<CatalogFunction> = Vec::new();
-
-    // `Signature` has no Display and describes accepted TYPES, not argument
-    // names. DataFusion's own documentation is the only source of a readable
-    // argument list, so prefer its named arguments, fall back to the paren
-    // group of its syntax example, and finally to an opaque placeholder.
-    fn describe(doc: Option<&datafusion::logical_expr::Documentation>) -> (String, String) {
-        let Some(d) = doc else {
-            return ("(...)".to_string(), String::new());
-        };
-        if let Some(args) = &d.arguments
-            && !args.is_empty()
-        {
-            let names: Vec<&str> = args.iter().map(|(n, _)| n.as_str()).collect();
-            return (format!("({})", names.join(", ")), d.description.clone());
-        }
-        let sig = d
-            .syntax_example
-            .find('(')
-            .map(|i| d.syntax_example[i..].to_string())
-            .unwrap_or_else(|| "(...)".to_string());
-        (sig, d.description.clone())
-    }
-
-    let mut push = |name: String, signature: String, doc: String, kind: &str, deprecated: bool| {
-        out.push(CatalogFunction {
-            name,
-            signature,
-            doc,
-            kind: kind.to_string(),
-            deprecated,
-        });
+/// `Signature` has no Display and describes accepted TYPES, not argument names,
+/// so DataFusion's own documentation is the only source of a readable argument
+/// list: prefer its named arguments, fall back to the paren group of its syntax
+/// example, and finally to an opaque placeholder.
+fn describe_registry_fn(doc: Option<&datafusion::logical_expr::Documentation>) -> (String, String) {
+    let Some(d) = doc else {
+        return ("(...)".to_string(), String::new());
     };
+    if let Some(args) = &d.arguments
+        && !args.is_empty()
+    {
+        let names: Vec<&str> = args.iter().map(|(n, _)| n.as_str()).collect();
+        return (format!("({})", names.join(", ")), d.description.clone());
+    }
+    let sig = d
+        .syntax_example
+        .find('(')
+        .map(|i| d.syntax_example[i..].to_string())
+        .unwrap_or_else(|| "(...)".to_string());
+    (sig, d.description.clone())
+}
 
-    for (name, udf) in state.scalar_functions() {
-        let (sig, doc) = describe(udf.documentation());
-        push(name.clone(), sig, doc, "scalar", false);
-    }
-    for (name, udf) in state.aggregate_functions() {
-        let (sig, doc) = describe(udf.documentation());
-        push(name.clone(), sig, doc, "aggregate", false);
-    }
-    for (name, udf) in state.window_functions() {
-        let (sig, doc) = describe(udf.documentation());
-        push(name.clone(), sig, doc, "window", false);
-    }
+/// The org-INDEPENDENT half of the catalog: the DataFusion registry (including
+/// the JSON family) plus the SQL-rewriter aliases.
+///
+/// Snapshotted once. Building it means standing up a SessionContext and
+/// registering ~350 functions, which is far too much to repeat per HTTP
+/// request; `registered_function_names` above caches for the same reason.
+fn base_catalog_functions() -> &'static [CatalogFunction] {
+    static BASE: std::sync::OnceLock<Vec<CatalogFunction>> = std::sync::OnceLock::new();
+    BASE.get_or_init(|| {
+        let mut ctx = SessionContext::new();
+        register_builtin_udfs(&ctx);
+        let _ = datafusion_functions_json::register_all(&mut ctx);
+        let state = ctx.state();
 
-    // Rewriter aliases: valid SQL, in no registry.
-    for alias in crate::sql::rewriter::REWRITER_FUNCTION_ALIASES {
-        let target = crate::sql::rewriter::rewriter_alias_target(alias).unwrap_or("match_all");
-        push(
-            (*alias).to_string(),
-            "(term)".to_string(),
-            format!("Deprecated alias for `{target}` — rewritten before planning."),
-            "udf",
-            true,
-        );
-    }
+        let mut out: Vec<CatalogFunction> = Vec::new();
+        let mut push = |name: String, signature: String, doc: String, kind: &str, deprecated| {
+            out.push(CatalogFunction {
+                name,
+                signature,
+                doc,
+                kind: kind.to_string(),
+                deprecated,
+            });
+        };
 
-    // The org's own VRL transforms.
+        for (name, udf) in state.scalar_functions() {
+            let (sig, doc) = describe_registry_fn(udf.documentation());
+            push(name.clone(), sig, doc, "scalar", false);
+        }
+        for (name, udf) in state.aggregate_functions() {
+            let (sig, doc) = describe_registry_fn(udf.documentation());
+            push(name.clone(), sig, doc, "aggregate", false);
+        }
+        for (name, udf) in state.window_functions() {
+            let (sig, doc) = describe_registry_fn(udf.documentation());
+            push(name.clone(), sig, doc, "window", false);
+        }
+
+        // Valid SQL that appears in no registry: a rewriter desugars these
+        // before planning.
+        for alias in crate::sql::rewriter::REWRITER_FUNCTION_ALIASES {
+            let target = crate::sql::rewriter::rewriter_alias_target(alias).unwrap_or("match_all");
+            push(
+                (*alias).to_string(),
+                "(term)".to_string(),
+                format!("Deprecated alias for `{target}` — rewritten before planning."),
+                "udf",
+                true,
+            );
+        }
+
+        out
+    })
+}
+
+/// Every function this org can call: the shared registry above plus the org's
+/// own VRL transforms.
+pub fn catalog_functions(org_id: &str) -> Vec<CatalogFunction> {
+    // Keyed by name so the result is sorted and deduplicated for free, and so a
+    // later insert wins — which is what makes the org's VRL transforms override
+    // a same-named builtin, exactly as register_udf does at query time.
+    let mut by_name: std::collections::BTreeMap<String, CatalogFunction> = base_catalog_functions()
+        .iter()
+        .map(|f| (f.name.clone(), f.clone()))
+        .collect();
+
     let org_prefix = format!("{org_id}/");
     for transform in transform::QUERY_FUNCTIONS.iter() {
         if !transform.key().starts_with(&org_prefix) {
@@ -456,21 +474,22 @@ pub fn catalog_functions(org_id: &str) -> Vec<CatalogFunction> {
         let args: Vec<String> = (1..=transform.num_args)
             .map(|i| format!("arg{i}"))
             .collect();
-        push(
+        by_name.insert(
             transform.name.clone(),
-            format!("({})", args.join(", ")),
-            format!(
-                "Organisation VRL function `{}` ({} argument(s)).",
-                transform.name, transform.num_args
-            ),
-            "vrl",
-            false,
+            CatalogFunction {
+                name: transform.name.clone(),
+                signature: format!("({})", args.join(", ")),
+                doc: format!(
+                    "Organisation VRL function `{}` ({} argument(s)).",
+                    transform.name, transform.num_args
+                ),
+                kind: "vrl".to_string(),
+                deprecated: false,
+            },
         );
     }
 
-    out.sort_by(|a, b| a.name.cmp(&b.name));
-    out.dedup_by(|a, b| a.name == b.name);
-    out
+    by_name.into_values().collect()
 }
 
 pub async fn register_metrics_table(
@@ -1125,6 +1144,40 @@ mod tests {
             "org VRL transforms must carry a signature"
         );
         transform::QUERY_FUNCTIONS.remove("doc_org/documented_fn");
+    }
+
+    #[test]
+    fn org_vrl_transform_overrides_a_same_named_builtin() {
+        // register_udf lets an org's VRL transform shadow a builtin at query
+        // time, so the catalog must report the one that would actually run.
+        use config::meta::function::Transform;
+        transform::QUERY_FUNCTIONS.insert(
+            "shadow_org/concat".to_string(),
+            Transform {
+                function: ".".to_string(),
+                name: "concat".to_string(),
+                params: "row".to_string(),
+                num_args: 1,
+                trans_type: Some(0),
+                streams: None,
+            },
+        );
+
+        let catalog = catalog_functions("shadow_org");
+        let entries: Vec<&CatalogFunction> =
+            catalog.iter().filter(|f| f.name == "concat").collect();
+        assert_eq!(entries.len(), 1, "a shadowed builtin must not appear twice");
+        assert_eq!(
+            entries[0].kind, "vrl",
+            "the org transform is what actually runs, so it is what the catalog must report"
+        );
+
+        // Another org still sees the builtin.
+        let other = catalog_functions("unrelated_org");
+        let builtin = other.iter().find(|f| f.name == "concat").unwrap();
+        assert_eq!(builtin.kind, "scalar");
+
+        transform::QUERY_FUNCTIONS.remove("shadow_org/concat");
     }
 
     #[test]

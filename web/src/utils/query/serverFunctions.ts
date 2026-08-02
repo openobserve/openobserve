@@ -52,7 +52,9 @@ const buildInsertText = (name: string, signature?: string): string => {
   // than inserting a bare name that is not valid SQL.
   if (args === null) return `${name}(\${1:arg})`;
   if (args.length === 0) return `${name}()`;
-  const stops = args.map((arg, i) => `\${${i + 1}:${arg}}`);
+  // Argument names come from upstream documentation; a stray $ { } or \ would
+  // corrupt the snippet monaco parses.
+  const stops = args.map((arg, i) => `\${${i + 1}:${arg.replace(/[${}\\]/g, "")}}`);
   return `${name}(${stops.join(", ")})`;
 };
 
