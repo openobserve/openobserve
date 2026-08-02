@@ -28,9 +28,36 @@ const emit = defineEmits<{ "update:check": [value: BrowserCheck] }>();
 
 const { t } = useI18n();
 
+/**
+ * Retry ceiling for this check's type, mirroring the server's
+ * `SyntheticType::max_retries()`.
+ *
+ * Browser is capped lower, and the cap is load-bearing rather than a
+ * preference: a browser run costs devices x attempts x journey_budget, so at 3
+ * retries a ~100s journey already reaches the browser Lambda's function
+ * timeout. The config would validate here and then be killed mid-journey,
+ * reporting a failure the target never had.
+ *
+ * Protocol checks are one request per attempt, so their worst case stays well
+ * inside the budget.
+ */
+const MAX_BROWSER_RETRIES = 2;
+const MAX_NET_RETRIES = 3;
+
+/** `checkType` is present on ProtocolCheck only; BrowserCheck has no discriminator. */
+const isBrowser = computed(() => !("checkType" in props.check));
+const maxRetries = computed(() => (isBrowser.value ? MAX_BROWSER_RETRIES : MAX_NET_RETRIES));
+
 const retries = computed({
   get: () => props.check.retries ?? 0,
-  set: (v: string | number) => emit("update:check", { ...props.check, retries: Number(v) }),
+  // Clamped rather than only bounded by the input's `max`: a typed value
+  // bypasses the spinner, and the server would reject it on save with an error
+  // the user has to read to understand. Correcting it here is quieter.
+  set: (v: string | number) => {
+    const n = Number(v);
+    const clamped = Number.isFinite(n) ? Math.min(Math.max(Math.trunc(n), 0), maxRetries.value) : 0;
+    emit("update:check", { ...props.check, retries: clamped });
+  },
 });
 
 const retryDelayMs = computed({
@@ -59,6 +86,8 @@ const retryDelayMs = computed({
         <OInput
           v-model="retries"
           type="number"
+          min="0"
+          :max="maxRetries"
           class="w-25!"
           placeholder="0"
           data-test="synthetics-check-retries-count-input"
@@ -67,6 +96,16 @@ const retryDelayMs = computed({
           t("synthetics.scheduleAlert.retriesOnFailureSuffix")
         }}</span>
       </div>
+      <!-- Why the ceiling exists, not just what it is: a browser run multiplies
+           by devices and attempts, and a config that outruns the probe's
+           function timeout is killed mid-journey. -->
+      <p class="text-text-secondary text-xs" data-test="synthetics-check-retries-max-hint">
+        {{
+          isBrowser
+            ? t("synthetics.scheduleAlert.retriesMaxBrowserHint", { max: maxRetries })
+            : t("synthetics.scheduleAlert.retriesMaxHint", { max: maxRetries })
+        }}
+      </p>
       <div class="flex flex-nowrap items-center gap-2">
         <label class="text-text-body w-32 text-sm font-medium whitespace-nowrap">{{
           t("synthetics.scheduleAlert.retryDelay")
