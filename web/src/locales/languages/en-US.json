@@ -10933,7 +10933,7 @@
       "goodWhen": "Good when",
       "goodWhenHint": "Boolean predicate over a row, e.g. status_code < 500",
       "aggregate": "Aggregate",
-      "aggregateHint": "Evaluated per slice; compared against the threshold below.",
+      "aggregateHint": "Aggregated over each slice, then compared against the threshold below, e.g. approx_percentile_cont(duration_ms, 0.95)",
       "comparator": "Comparator",
       "threshold": "Threshold",
       "target": "Target",

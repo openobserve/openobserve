@@ -209,13 +209,21 @@
                 data-test="slos-addslo-timeslice-stream"
               />
             </div>
-            <OInput
+            <!-- The same editor as `scope` below it and `good when` above,
+                 because this is the same kind of thing: SQL over the stream's
+                 schema. It is in fact the field with the strongest claim on
+                 the typeahead — the aggregate names a column, and a mistyped
+                 column is invisible until the ingest query fails. -->
+            <SloExpressionField
               v-model="form.config.query"
+              editor-id="slo-aggregate-editor"
               :label="t('slos.field.aggregate')"
               :hint="t('slos.field.aggregateHint')"
+              :keywords="autoCompleteKeywords"
+              :suggestions="autoCompleteSuggestions"
               class="mt-3"
               required
-              placeholder="approx_percentile_cont(duration_ms, 0.95)"
+              data-test="slos-addslo-aggregate"
             />
             <div class="mt-3 grid grid-cols-2 gap-3">
               <OSelect
