@@ -444,6 +444,7 @@ export default defineComponent({
       getSuggestions: sqlGetSuggestions,
       updateAllKeywords: sqlUpdateAllKeywords,
       updateStreamKeywords: sqlUpdateStreamKeywords,
+      resolveFieldValues,
     } = useSqlSuggestions();
 
     const queryEditorRef = ref<QueryEditorInstance | null>(null);
@@ -933,6 +934,7 @@ export default defineComponent({
       saveQueryName,
       cancelQueryNameEdit,
       currentEditorKeywords,
+      resolveFieldValues,
       currentEditorSuggestions,
       _sqlOnFocus,
       _sqlOnBlur,

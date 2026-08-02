@@ -2391,6 +2391,7 @@ export default defineComponent({
       updateFieldKeywords,
       updateFunctionKeywords,
       updateStreamKeywords,
+      resolveFieldValues,
     } = useSqlSuggestions();
 
     const refreshTimeChange = (item) => {
@@ -4941,6 +4942,7 @@ export default defineComponent({
       autoCompleteKeywords,
       autoCompleteSuggestions,
       effectiveKeywords,
+      resolveFieldValues,
       effectiveSuggestions,
       onRefreshIntervalUpdate,
       updateTimezone,

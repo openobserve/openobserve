@@ -323,6 +323,7 @@ const {
   effectiveSuggestions,
   getSuggestions,
   updateFieldKeywords,
+  resolveFieldValues,
 } = useSqlSuggestions();
 
 const updateAutoComplete = (value: string) => {

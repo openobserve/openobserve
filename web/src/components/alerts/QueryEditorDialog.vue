@@ -1107,6 +1107,7 @@ const {
   effectiveSuggestions,
   getSuggestions,
   updateFieldKeywords,
+  resolveFieldValues,
 } = useSqlSuggestions();
 
 // Rebuild field keywords whenever columns prop changes

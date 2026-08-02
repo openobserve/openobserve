@@ -394,6 +394,7 @@ const {
   getSuggestions,
   updateFieldKeywords,
   updateStreamKeywords,
+  resolveFieldValues,
 } = useSqlSuggestions();
 
 // ─── Query editor typewriter placeholder ─────────────────────────────

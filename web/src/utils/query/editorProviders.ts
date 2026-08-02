@@ -187,7 +187,9 @@ export const buildHoverContents = (entry: LooseEntry | null): { value: string }[
 
   if (entry.kind === "Field") {
     // Omit rather than render "undefined" for a field with no known type.
-    contents.push({ value: `\`\`\`sql\n${name}${entry.detail ? `: ${entry.detail}` : ""}\n\`\`\`` });
+    contents.push({
+      value: `\`\`\`sql\n${name}${entry.detail ? `: ${entry.detail}` : ""}\n\`\`\``,
+    });
   } else {
     const args = entry.detail && entry.detail.startsWith("(") ? entry.detail : "";
     contents.push({ value: `\`\`\`sql\n${name}${args}\n\`\`\`` });
@@ -237,8 +239,9 @@ export const buildValueEntries = (values: string[], hasOpenQuote: boolean): Loos
       label: value,
       kind: "Value",
       insertText,
-      // Values sort above everything else: at this position nothing else is
-      // plausible.   is the lowest-sorting prefix in use.
-      sortText: ` ${String(index).padStart(6, "0")}`,
+      // Values sort above every other lane. Written as an ESCAPE, not a raw
+      // control character: a literal NUL in the source makes the file binary to
+      // git and grep, and is silently easy to mangle in an edit.
+      sortText: `\u0000${String(index).padStart(6, "0")}`,
     };
   });

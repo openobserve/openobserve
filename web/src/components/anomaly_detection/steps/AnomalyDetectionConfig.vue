@@ -788,7 +788,8 @@ export default defineComponent({
     // Same completion machinery every other SQL editor in the app uses, so this
     // one also gets SQL keywords, the O2 functions and the server function
     // catalog rather than bare field names.
-    const { effectiveKeywords, effectiveSuggestions, updateFieldKeywords } = useSqlSuggestions();
+    const { effectiveKeywords, effectiveSuggestions, updateFieldKeywords, resolveFieldValues } =
+      useSqlSuggestions();
     const numericStreamFields = ref<string[]>([]); // only numeric types for avg/sum/min/max/pXX
     const filteredStreamFields = ref<string[]>([]);
     const filteredDetectionFields = ref<string[]>([]);
@@ -1209,6 +1210,7 @@ export default defineComponent({
       retrainIntervalOptions,
       allStreamFields,
       effectiveKeywords,
+      resolveFieldValues,
       effectiveSuggestions,
       filteredStreamFields,
       filteredDetectionFields,

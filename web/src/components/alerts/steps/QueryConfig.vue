@@ -1893,6 +1893,7 @@ export default defineComponent({
       effectiveSuggestions,
       getSuggestions,
       updateFieldKeywords,
+      resolveFieldValues,
     } = useSqlSuggestions();
 
     // Rebuild field keywords whenever columns prop changes
@@ -3574,6 +3575,7 @@ export default defineComponent({
       autoCompleteKeywords,
       autoCompleteSuggestions,
       effectiveKeywords,
+      resolveFieldValues,
       effectiveSuggestions,
       handleInlineQueryUpdate,
       inlineEditorPlaceholder,

@@ -561,7 +561,8 @@ const streamFieldNames = computed(() => streamFields.value.map((f) => f.value));
 // builds the field list (dropping the timestamp column) and merges it with
 // the SQL keyword and function sets. Nothing about autocomplete is
 // reimplemented here.
-const { effectiveKeywords, effectiveSuggestions, updateFieldKeywords } = useSqlSuggestions();
+const { effectiveKeywords, effectiveSuggestions, updateFieldKeywords, resolveFieldValues } =
+  useSqlSuggestions();
 
 async function loadStreamFields(streamName: string) {
   if (!streamName || !form.config.stream_type) {

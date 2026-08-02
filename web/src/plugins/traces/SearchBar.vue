@@ -497,6 +497,7 @@ export default defineComponent({
       getSuggestions,
       updateFieldKeywords,
       updateStreamKeywords,
+      resolveFieldValues,
     } = useSqlSuggestions();
 
     onActivated(async () => {
@@ -894,6 +895,7 @@ export default defineComponent({
       setEditorValue,
       autoCompleteKeywords,
       effectiveKeywords,
+      resolveFieldValues,
       effectiveSuggestions,
       updateTimezone,
       dateTimeRef,
