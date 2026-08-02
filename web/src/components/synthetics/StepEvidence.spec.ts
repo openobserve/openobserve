@@ -117,17 +117,19 @@ describe("StepEvidence — settle signals (P5.4 item 4)", () => {
   });
 });
 
-describe("StepEvidence — settle timing (P5.4 item 5)", () => {
-  it("shows today against recording, and calls out a large regression", () => {
-    // Slow-but-healthy separates from broken on this line alone.
+describe("StepEvidence — settle timing is not rendered", () => {
+  /**
+   * The card is gone. `observed_duration_ms` is written PER FAILURE, not per
+   * step, so only the failing step ever had a baseline to compare against and
+   * every other step drew a half-finished sentence.
+   *
+   * Asserted rather than merely deleted: the timing fields are still on the
+   * record, so nothing stops the card being reintroduced by reflex. It should
+   * only come back once the probe writes the baseline per step.
+   */
+  it("does not render a timing card even when both numbers are present", () => {
     const w = render(detail({ settleMs: 41000, observedDurationMs: 2300 }));
-    expect(w.text()).toContain("41.0s");
-    expect(w.text()).toContain("2.3s");
-    expect(w.find('[data-test="synthetics-run-detail-settle-slower"]').exists()).toBe(true);
-  });
-
-  it("does not cry regression when timing is comparable", () => {
-    const w = render(detail({ settleMs: 2400, observedDurationMs: 2300 }));
+    expect(w.find('[data-test="synthetics-run-detail-settle-timing"]').exists()).toBe(false);
     expect(w.find('[data-test="synthetics-run-detail-settle-slower"]').exists()).toBe(false);
   });
 
@@ -137,7 +139,6 @@ describe("StepEvidence — settle timing (P5.4 item 5)", () => {
     const w = render(detail());
     expect(w.find('[data-test="synthetics-run-detail-locator-resolution"]').exists()).toBe(false);
     expect(w.find('[data-test="synthetics-run-detail-settle-signals"]').exists()).toBe(false);
-    expect(w.find('[data-test="synthetics-run-detail-settle-timing"]').exists()).toBe(false);
   });
 });
 
