@@ -359,3 +359,126 @@ describe("Phase 1 — the registered completion provider", () => {
     expect(labels.join("|")).not.toContain("\n");
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PHASE 3 — IntelliSense parity (tmp/code.md D2, D3, C3, D4, N3, N4, C5)
+//
+// Deliberately at the REGISTRATION level, not against helper modules. Every
+// gap that escaped in this workstream — Alerts binding the base list, the SLO
+// form never loading the catalog, Traces omitting a prop — was a helper that
+// worked perfectly and a component that never called it.
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("Phase 3 — providers are registered and configured", () => {
+  const providerStore2 = createStore({ state: { theme: "light" } });
+  let spy: ReturnType<typeof vi.spyOn>;
+
+  const mountEditor = async (props: any = {}) => {
+    const monacoApi = await import("monaco-editor/esm/vs/editor/editor.api");
+    spy = vi.spyOn(document, "getElementById").mockImplementation(() =>
+      document.createElement("div"),
+    );
+    mount(CodeQueryEditor, {
+      props: { editorId: `p3-${Math.random()}`, language: "sql", query: "", ...props },
+      global: { plugins: [providerStore2] },
+    });
+    await vi.waitFor(() => expect(mockEditorObj.createContextKey).toHaveBeenCalled(), {
+      timeout: 15000,
+      interval: 25,
+    });
+    return monacoApi;
+  };
+
+  afterAll(() => spy?.mockRestore());
+
+  it("D2 — registers a signature help provider for SQL", { timeout: 30000 }, async () => {
+    const api = await mountEditor();
+    const reg = vi.mocked((api.languages as any).registerSignatureHelpProvider);
+    expect(reg, "no signature help provider is registered at all").toBeDefined();
+    expect(reg.mock.calls.length).toBeGreaterThan(0);
+    expect(reg.mock.calls.at(-1)![0]).toBe("sql");
+  });
+
+  it("D2 — signature help triggers on ( and ,", { timeout: 30000 }, async () => {
+    const api = await mountEditor();
+    const provider = vi.mocked((api.languages as any).registerSignatureHelpProvider).mock.calls.at(-1)![1];
+    expect(provider.signatureHelpTriggerCharacters).toEqual(expect.arrayContaining(["(", ","]));
+  });
+
+  it("D3 — registers a hover provider for SQL", { timeout: 30000 }, async () => {
+    const api = await mountEditor();
+    const reg = vi.mocked((api.languages as any).registerHoverProvider);
+    expect(reg, "no hover provider is registered at all").toBeDefined();
+    expect(reg.mock.calls.length).toBeGreaterThan(0);
+    expect(reg.mock.calls.at(-1)![0]).toBe("sql");
+  });
+
+  it("C3 — completion declares trigger characters", { timeout: 30000 }, async () => {
+    const api = await mountEditor();
+    const provider = vi.mocked(api.languages.registerCompletionItemProvider).mock.calls.at(-1)![1];
+    // Without these nothing opens after a paren, a comma or an opening quote —
+    // exactly the positions where the user most needs help.
+    expect(provider.triggerCharacters).toEqual(expect.arrayContaining(["(", ",", "'", "."]));
+  });
+
+  it("D4 — completion supplies resolveCompletionItem for lazy docs", { timeout: 30000 }, async () => {
+    const api = await mountEditor();
+    const provider = vi.mocked(api.languages.registerCompletionItemProvider).mock.calls.at(-1)![1];
+    expect(typeof provider.resolveCompletionItem).toBe("function");
+  });
+
+  it("N4 — word-based suggestions are off for SQL", { timeout: 30000 }, async () => {
+    const api = await mountEditor();
+    const opts = vi.mocked(api.editor.create).mock.calls.at(-1)![1] as any;
+    // Default is 'matchingDocuments', which pulls raw buffer text from every
+    // other SQL editor on the page into this one's dropdown.
+    expect(opts.wordBasedSuggestions).toBe("off");
+  });
+
+  it("N3 — quick suggestions are enabled inside string literals", { timeout: 30000 }, async () => {
+    const api = await mountEditor();
+    const opts = vi.mocked(api.editor.create).mock.calls.at(-1)![1] as any;
+    // Monaco defaults strings to 'off', which is why field-VALUE completion
+    // needed the hide/re-trigger hack.
+    expect(opts.quickSuggestions).toMatchObject({ other: "on", strings: "on" });
+  });
+});
+
+describe("Phase 3 — C5: one provider per language, not per editor", () => {
+  const store3 = createStore({ state: { theme: "light" } });
+  let spy: ReturnType<typeof vi.spyOn>;
+  afterAll(() => spy?.mockRestore());
+
+  it("registers the completion provider once for three SQL editors", { timeout: 60000 }, async () => {
+    const api = await import("monaco-editor/esm/vs/editor/editor.api");
+    const reg = vi.mocked(api.languages.registerCompletionItemProvider);
+    const createFn = vi.mocked(api.editor.create);
+    const providersBefore = reg.mock.calls.filter((c) => c[0] === "sql").length;
+
+    spy = vi.spyOn(document, "getElementById").mockImplementation(() =>
+      document.createElement("div"),
+    );
+
+    // Mounted SEQUENTIALLY, each awaited to completion. Mounting them in one
+    // synchronous burst is not equivalent: only the first editor finishes
+    // initialising, so the count would look like 1 whether or not the
+    // per-language fix exists — a green test for the wrong reason.
+    for (const id of ["c5-a", "c5-b", "c5-c"]) {
+      const createsBefore = createFn.mock.calls.length;
+      mount(CodeQueryEditor, {
+        props: { editorId: id, language: "sql", query: "" },
+        global: { plugins: [store3] },
+      });
+      await vi.waitFor(() => expect(createFn.mock.calls.length).toBe(createsBefore + 1), {
+        timeout: 15000,
+        interval: 25,
+      });
+    }
+
+    const added = reg.mock.calls.filter((c) => c[0] === "sql").length - providersBefore;
+    // Monaco aggregates every provider registered for a language, so N editors
+    // meant N providers answering on every keystroke — N-1 of them only to
+    // return an empty list for a model that did not ask.
+    expect(added, `three editors registered ${added} SQL completion providers`).toBe(1);
+  });
+});
