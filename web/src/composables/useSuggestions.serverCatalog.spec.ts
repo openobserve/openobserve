@@ -13,12 +13,19 @@
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
+// A SINGLE store object, not a fresh one per useStore() call: the composable
+// captures the instance it is handed, so a test that mutates the store has to
+// be mutating the same one.
+const mockStore = vi.hoisted(() => ({
+  state: {
+    zoConfig: { timestamp_column: "_timestamp" },
+    selectedOrganization: { identifier: "storeorg" } as { identifier: string } | undefined,
+  },
+}));
+
 vi.mock("vuex", async (importOriginal) => {
   const actual = await importOriginal<typeof import("vuex")>();
-  return {
-    ...actual,
-    useStore: vi.fn(() => ({ state: { zoConfig: { timestamp_column: "_timestamp" } } })),
-  };
+  return { ...actual, useStore: vi.fn(() => mockStore) };
 });
 
 vi.mock("@/composables/useFieldValueStore", () => ({
@@ -129,9 +136,16 @@ describe("Phase 2 — the server catalog is actually fetched (B4 wiring)", () =>
   });
 
   it("does not call the service before an organisation is known", async () => {
+    // The composable now falls back to the store's org, so "unknown" means
+    // absent from BOTH sources — the state during early boot.
+    const saved = mockStore.state.selectedOrganization;
+    mockStore.state.selectedOrganization = undefined;
+
     const c = makeComposable({ storedValues: [] });
     c.autoCompleteData.value.org = "";
     await run(c, "SELECT * FROM stream WHERE ");
+
+    mockStore.state.selectedOrganization = saved;
     expect(queryFunctions.list).not.toHaveBeenCalled();
   });
 
@@ -149,5 +163,66 @@ describe("Phase 2 — the server catalog is actually fetched (B4 wiring)", () =>
     await run(c, "SELECT * FROM stream WHERE ");
     const names = (c.effectiveSuggestions.value as any[]).map((s) => s.name);
     expect(names).toContain("match_all");
+  });
+});
+
+// ─── Surfaces that never call getSuggestions ─────────────────────────────────
+// The SLO form (AddSlo.vue) wires the editor with updateFieldKeywords ONLY: it
+// never calls getSuggestions and never sets autoCompleteData.org. Hanging the
+// catalog fetch off getSuggestions therefore left that page with the ~26 local
+// functions and none of the ~330 from the registry — reported as "many
+// functions are not available in typeahead".
+
+describe("Phase 2 — the catalog loads for surfaces that only set up fields", () => {
+  const SERVER_LIST = [
+    { name: "date_trunc", signature: "(precision, timestamp)", doc: "Truncate.", kind: "scalar" },
+  ];
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(queryFunctions.list).mockResolvedValue({ data: { list: [] } } as any);
+  });
+
+  const settle = async () => {
+    await Promise.resolve();
+    await Promise.resolve();
+    await new Promise((r) => setTimeout(r, 0));
+  };
+
+  it("fetches using the store's org when no caller supplied one", async () => {
+    vi.mocked(queryFunctions.list).mockResolvedValue({ data: { list: SERVER_LIST } } as any);
+    const c = useSqlSuggestions();
+    // Exactly what AddSlo does — no org, no getSuggestions.
+    c.updateFieldKeywords([{ name: "code", type: "Int64" }]);
+    await settle();
+    expect(queryFunctions.list).toHaveBeenCalledWith("storeorg");
+  });
+
+  it("delivers the fetched functions to a surface that never calls getSuggestions", async () => {
+    vi.mocked(queryFunctions.list).mockResolvedValue({ data: { list: SERVER_LIST } } as any);
+    const c = useSqlSuggestions();
+    c.updateFieldKeywords([{ name: "code", type: "Int64" }]);
+    await settle();
+    const names = (c.autoCompleteSuggestions.value as any[]).map((f) => f.name);
+    expect(names).toContain("date_trunc");
+    expect(names).toContain("match_all"); // local catalog still there
+  });
+
+  it("prefers an explicitly supplied org over the store", async () => {
+    const c = useSqlSuggestions();
+    c.autoCompleteData.value.org = "explicitorg";
+    c.updateFieldKeywords([{ name: "code" }]);
+    await settle();
+    expect(queryFunctions.list).toHaveBeenCalledWith("explicitorg");
+  });
+
+  it("does not refetch on every keyword rebuild", async () => {
+    const c = useSqlSuggestions();
+    c.updateFieldKeywords([{ name: "a" }]);
+    await settle();
+    c.updateFieldKeywords([{ name: "b" }]);
+    c.updateFieldKeywords([{ name: "c" }]);
+    await settle();
+    expect(vi.mocked(queryFunctions.list).mock.calls.length).toBe(1);
   });
 });

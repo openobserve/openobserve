@@ -170,8 +170,8 @@
               editor-id="slo-scope-editor"
               :label="t('slos.field.scope')"
               :hint="t('slos.field.scopeHint')"
-              :keywords="autoCompleteKeywords"
-              :suggestions="autoCompleteSuggestions"
+              :keywords="effectiveKeywords"
+              :suggestions="effectiveSuggestions"
               class="mt-3"
               data-test="slos-addslo-scope"
             />
@@ -180,8 +180,8 @@
               editor-id="slo-good-expr-editor"
               :label="t('slos.field.goodWhen')"
               :hint="t('slos.field.goodWhenHint')"
-              :keywords="autoCompleteKeywords"
-              :suggestions="autoCompleteSuggestions"
+              :keywords="effectiveKeywords"
+              :suggestions="effectiveSuggestions"
               required
               class="mt-3"
               data-test="slos-addslo-good-expr"
@@ -219,8 +219,8 @@
               editor-id="slo-aggregate-editor"
               :label="t('slos.field.aggregate')"
               :hint="t('slos.field.aggregateHint')"
-              :keywords="autoCompleteKeywords"
-              :suggestions="autoCompleteSuggestions"
+              :keywords="effectiveKeywords"
+              :suggestions="effectiveSuggestions"
               class="mt-3"
               required
               data-test="slos-addslo-aggregate"
@@ -241,8 +241,8 @@
               v-model="form.config.scope"
               editor-id="slo-timeslice-scope-editor"
               :label="t('slos.field.scope')"
-              :keywords="autoCompleteKeywords"
-              :suggestions="autoCompleteSuggestions"
+              :keywords="effectiveKeywords"
+              :suggestions="effectiveSuggestions"
               class="mt-3"
               data-test="slos-addslo-timeslice-scope"
             />
@@ -557,7 +557,7 @@ const streamFieldNames = computed(() => streamFields.value.map((f) => f.value));
 // builds the field list (dropping the timestamp column) and merges it with
 // the SQL keyword and function sets. Nothing about autocomplete is
 // reimplemented here.
-const { autoCompleteKeywords, autoCompleteSuggestions, updateFieldKeywords } = useSqlSuggestions();
+const { effectiveKeywords, effectiveSuggestions, updateFieldKeywords } = useSqlSuggestions();
 
 async function loadStreamFields(streamName: string) {
   if (!streamName || !form.config.stream_type) {

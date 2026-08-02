@@ -62,18 +62,27 @@ const useSqlSuggestions = () => {
   const serverFunctions: any = ref([]);
   let fetchedOrg: string | null = null;
   let inFlight: Promise<void> | null = null;
+  // Bumped whenever the catalog is superseded, so a late response from an
+  // earlier request cannot overwrite newer state.
+  let requestSeq = 0;
 
   const setServerFunctions = (functions: ServerQueryFunction[] | null | undefined) => {
     serverFunctions.value = Array.isArray(functions) ? functions : [];
     // An explicit set means the caller has supplied the catalog for this org;
     // marking it fetched stops the lazy loader from clearing it out again on
-    // the next suggestion pass.
-    fetchedOrg = autoCompleteData.value.org || fetchedOrg;
+    // the next suggestion pass, and bumping the sequence makes any request
+    // already in the air discard its result instead of overwriting this one.
+    fetchedOrg =
+      autoCompleteData.value.org || store.state.selectedOrganization?.identifier || fetchedOrg;
+    requestSeq += 1;
     updateAutoComplete();
   };
 
   const ensureServerFunctions = async () => {
-    const org = autoCompleteData.value.org;
+    // Fall back to the store's org. Surfaces that only wire up field keywords —
+    // the SLO form does exactly that — never populate autoCompleteData.org, and
+    // requiring them to would be one more thing a caller must remember.
+    const org = autoCompleteData.value.org || store.state.selectedOrganization?.identifier;
     if (!org) return;
     // Already handled for this org — but if its request is still in the air,
     // await THAT one rather than returning early with an empty list.
@@ -87,18 +96,21 @@ const useSqlSuggestions = () => {
     // popup after switching still shows the old tenant's function names.
     serverFunctions.value = [];
     fetchedOrg = org;
+    requestSeq += 1;
+    const seq = requestSeq;
 
     inFlight = queryFunctions
       .list(org)
       .then((res: any) => {
-        // Only apply if the org has not changed again while we were waiting.
-        if (fetchedOrg !== org) return;
+        // Discard if the org changed, or if the catalog was superseded while we
+        // were waiting (setServerFunctions, or a newer request).
+        if (fetchedOrg !== org || seq !== requestSeq) return;
         serverFunctions.value = Array.isArray(res?.data?.list) ? res.data.list : [];
       })
       .catch(() => {
         // The local catalog is still perfectly usable; a failed lookup must not
         // take autocomplete down with it.
-        if (fetchedOrg === org) serverFunctions.value = [];
+        if (fetchedOrg === org && seq === requestSeq) serverFunctions.value = [];
       })
       .finally(() => {
         inFlight = null;
@@ -352,6 +364,12 @@ const useSqlSuggestions = () => {
     const alreadyOffered = new Set(
       functionKeywords.value.map((f: any) => String(f.label).toLowerCase()),
     );
+    // Kick the catalog load from here too: getSuggestions is not called by every
+    // surface (the SLO form only calls updateFieldKeywords), so hanging the
+    // fetch off it alone left those pages with the local functions only.
+    // Guarded by fetchedOrg, so this is a no-op after the first call.
+    void ensureServerFunctions();
+
     autoCompleteSuggestions.value = mergeServerFunctions(
       defaultSuggestions,
       (serverFunctions.value as any[]).filter(
