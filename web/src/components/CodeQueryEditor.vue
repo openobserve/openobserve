@@ -1050,6 +1050,18 @@ export default defineComponent({
   visibility: visible !important;
 }
 
+/* Monaco sizes the suggest documentation panel with
+   `layout(width, type.clientHeight + docs.clientHeight)` and assigns that height
+   to THIS element (suggestWidgetDetails.js:161) — arithmetic that assumes
+   content-box. The app's global reset makes everything border-box, so the
+   panel's own 1px top and bottom borders eat 2px of the content it just
+   measured, and the documentation scrolls by exactly that sliver every time.
+   Restoring content-box for this one node is less fragile than trying to
+   out-compute the library. */
+.logs-query-editor :deep(.suggest-details) {
+  box-sizing: content-box;
+}
+
 /* Error decoration — class name is handed to monaco.deltaDecorations(), so the
    element only ever exists inside Monaco's view-lines. */
 .logs-query-editor :deep(.highlight-error) {
