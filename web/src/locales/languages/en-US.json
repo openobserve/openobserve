@@ -10851,6 +10851,10 @@
     "deleteConfirmBody": "\"{name}\" and its measurement history will be removed.",
     "deleteBudgetNote": "The slices already written stay on disk until they age out, so this SLO's row reservation is released then rather than now.",
     "groupedSliceNote": "Grouped SLOs use 5-minute slices.",
+    "sliceNote": {
+      "count": "The slice width does not change this SLO's numbers — the same events are counted either way. 5-minute slices store a fifth as much history.",
+      "perSlice": "Each slice is scored good or bad as a whole, so the width is the smallest amount of budget one failure can spend. At 99.9% over 7 days a single bad 5-minute slice spends about half the budget — choose 1 minute for tight targets on short windows."
+    },
     "backfillNote": "Backfill runs on save — chunked, newest history first. Alerts stay frozen until coverage clears the floor.",
     "budgetHint": "error budget = {budget}",
     "budgetDays": "{n} days",

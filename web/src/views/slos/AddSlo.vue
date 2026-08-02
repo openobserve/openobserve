@@ -300,6 +300,17 @@
           <p v-if="isGrouped" class="text-compact text-text-secondary mt-1">
             {{ t("slos.groupedSliceNote") }}
           </p>
+          <!-- The choice is only ever interesting for one reason, and it is a
+               different reason per SLI type — so say which one applies rather
+               than describing both and leaving the reader to work out which
+               half is theirs. -->
+          <p
+            v-else
+            class="text-compact text-text-secondary mt-1"
+            data-test="slos-addslo-slice-note"
+          >
+            {{ sliceNote }}
+          </p>
         </OFormSection>
 
         <OFormSection :title="t('slos.section.grouping')">
@@ -419,7 +430,14 @@ const form = reactive<any>({
   config: { stream_type: "logs", stream: "", scope: "", good_expr: "" },
   target: 99.9,
   window_secs: 30 * 86400,
-  slice_interval_secs: 60,
+  // 5 minutes, not 1. For a count SLI the slice width does not touch the
+  // arithmetic at all — the window SLI is Σgood/Σtotal, and repartitioning the
+  // same events into different buckets changes neither sum — so a 60s slice
+  // buys bit-identical numbers for 5× the stored rows (139,680 per series at
+  // the 97-day horizon against 27,936). A time-slice SLI is the exception,
+  // because there the slice IS the unit scored good or bad; see the hint under
+  // the control.
+  slice_interval_secs: 300,
   group_by: null,
   groups_estimate: null,
   enabled: true,
@@ -557,6 +575,22 @@ const sliceOptions = computed(() => [
   { value: 60, label: t("slos.slice.1m"), disable: isGrouped.value },
   { value: 300, label: t("slos.slice.5m") },
 ]);
+
+/** What the slice width actually costs or buys, which is not the same question
+ *  per SLI type.
+ *
+ *  For a count SLI it buys nothing: the window SLI is Σgood/Σtotal, so
+ *  repartitioning the same events leaves both sums untouched and a finer slice
+ *  returns bit-identical numbers for five times the rows.
+ *
+ *  Where the slice is itself scored good or bad — time-slice, and alert-uptime
+ *  when it ships — the width IS the definition, and it sets the smallest amount
+ *  of budget one failure can spend. That is the case worth paying for. */
+const sliceNote = computed(() =>
+  form.sli_type === "time_slice" || form.sli_type === "alert"
+    ? t("slos.sliceNote.perSlice")
+    : t("slos.sliceNote.count"),
+);
 
 // D30: grouped SLOs are pinned to 5-minute slices. Enforced here as well as at
 // the API so the form cannot present a combination the backend will reject.
