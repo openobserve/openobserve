@@ -844,7 +844,11 @@ mod tests {
         let mut sorted = names.to_vec();
         sorted.sort();
         sorted.dedup();
-        assert_eq!(names, sorted.as_slice(), "names must be sorted and deduplicated");
+        assert_eq!(
+            names,
+            sorted.as_slice(),
+            "names must be sorted and deduplicated"
+        );
     }
 
     #[test]
@@ -884,7 +888,10 @@ mod tests {
             .iter()
             .find(|f| f.name == "match_all")
             .expect("match_all should be in the catalog");
-        assert!(!match_all.signature.is_empty(), "signature must be populated");
+        assert!(
+            !match_all.signature.is_empty(),
+            "signature must be populated"
+        );
         assert!(!match_all.kind.is_empty(), "kind must be populated");
     }
 
@@ -895,9 +902,38 @@ mod tests {
             .iter()
             .find(|f| f.name == "match_all_raw")
             .expect("match_all_raw should be in the catalog");
-        assert!(raw.deprecated, "rewriter aliases must be flagged deprecated");
+        assert!(
+            raw.deprecated,
+            "rewriter aliases must be flagged deprecated"
+        );
         let canonical = catalog.iter().find(|f| f.name == "match_all").unwrap();
         assert!(!canonical.deprecated, "match_all itself is not deprecated");
+    }
+
+    #[test]
+    fn catalog_functions_serialize_with_every_field_the_editor_needs() {
+        // Asserting on the Rust struct does not prove the HTTP body carries the
+        // fields: a rename or a skip_serializing_if would pass the struct tests
+        // and still ship an empty docs panel.
+        let catalog = catalog_functions("default");
+        let json = serde_json::to_value(&catalog).expect("catalog must serialize");
+        let arr = json.as_array().expect("catalog serializes to an array");
+        let match_all = arr
+            .iter()
+            .find(|f| f.get("name").and_then(|n| n.as_str()) == Some("match_all"))
+            .expect("match_all must be in the serialized catalog");
+
+        for field in ["name", "signature", "doc", "kind", "deprecated"] {
+            assert!(
+                match_all.get(field).is_some(),
+                "serialized entry is missing `{field}`"
+            );
+        }
+        assert!(
+            !match_all["doc"].as_str().unwrap_or("").is_empty(),
+            "documentation must be non-empty in the serialized payload"
+        );
+        assert!(!match_all["signature"].as_str().unwrap_or("").is_empty());
     }
 
     #[test]
@@ -912,8 +948,10 @@ mod tests {
 
     #[test]
     fn catalog_functions_scopes_vrl_transforms_to_their_own_org() {
-        // Per-org VRL transforms are the third source in the union. An org must
-        // never be shown another org's functions.
+        // Org IDs deliberately OVERLAP as substrings. get_all_transform matches
+        // with `key().contains(org_id)`, so a fixture like org_alpha/org_beta
+        // passes even though "acme" matches the key "acme-prod/...". A prefix
+        // match on "{org}/" is what isolation actually requires.
         use config::meta::function::Transform;
         let mk = |name: &str| Transform {
             function: ".".to_string(),
@@ -923,35 +961,41 @@ mod tests {
             trans_type: Some(0),
             streams: None,
         };
-        transform::QUERY_FUNCTIONS.insert("org_alpha/alpha_only_fn".to_string(), mk("alpha_only_fn"));
-        transform::QUERY_FUNCTIONS.insert("org_beta/beta_only_fn".to_string(), mk("beta_only_fn"));
+        transform::QUERY_FUNCTIONS.insert("acme/acme_only_fn".to_string(), mk("acme_only_fn"));
+        transform::QUERY_FUNCTIONS.insert("acme-prod/prod_only_fn".to_string(), mk("prod_only_fn"));
 
-        let alpha: Vec<String> = catalog_functions("org_alpha")
+        let acme: Vec<String> = catalog_functions("acme")
             .iter()
             .map(|f| f.name.clone())
             .collect();
-        let beta: Vec<String> = catalog_functions("org_beta")
+        let prod: Vec<String> = catalog_functions("acme-prod")
             .iter()
             .map(|f| f.name.clone())
             .collect();
 
-        assert!(alpha.contains(&"alpha_only_fn".to_string()), "own transform missing");
         assert!(
-            !alpha.contains(&"beta_only_fn".to_string()),
-            "LEAKED another org's VRL transform into the catalog"
+            acme.contains(&"acme_only_fn".to_string()),
+            "own transform missing"
         );
-        assert!(beta.contains(&"beta_only_fn".to_string()), "own transform missing");
         assert!(
-            !beta.contains(&"alpha_only_fn".to_string()),
-            "LEAKED another org's VRL transform into the catalog"
+            !acme.contains(&"prod_only_fn".to_string()),
+            "LEAKED acme-prod's VRL transform into acme — substring org matching"
+        );
+        assert!(
+            prod.contains(&"prod_only_fn".to_string()),
+            "own transform missing"
+        );
+        assert!(
+            !prod.contains(&"acme_only_fn".to_string()),
+            "LEAKED acme's VRL transform into acme-prod"
         );
 
         // Built-ins are org-independent and must appear for both.
-        assert!(alpha.contains(&"match_all".to_string()));
-        assert!(beta.contains(&"match_all".to_string()));
+        assert!(acme.contains(&"match_all".to_string()));
+        assert!(prod.contains(&"match_all".to_string()));
 
-        transform::QUERY_FUNCTIONS.remove("org_alpha/alpha_only_fn");
-        transform::QUERY_FUNCTIONS.remove("org_beta/beta_only_fn");
+        transform::QUERY_FUNCTIONS.remove("acme/acme_only_fn");
+        transform::QUERY_FUNCTIONS.remove("acme-prod/prod_only_fn");
     }
 
     #[test]
@@ -973,10 +1017,18 @@ mod tests {
             .iter()
             .find(|f| f.name == "gamma_fn")
             .expect("org transform should be in the catalog");
-        assert_eq!(gamma.kind, "vrl", "org transforms must be distinguishable from builtins");
-        assert!(
-            gamma.signature.contains("2") || !gamma.signature.is_empty(),
-            "signature should reflect the declared argument count"
+        assert_eq!(
+            gamma.kind, "vrl",
+            "org transforms must be distinguishable from builtins"
+        );
+        // Count the placeholders rather than sniffing for a digit: the previous
+        // `contains("2") || !is_empty()` reduced to "non-empty", so even "()"
+        // passed for a two-argument transform.
+        assert_eq!(
+            gamma.signature.matches("arg").count(),
+            2,
+            "signature must expose one placeholder per declared argument, got {}",
+            gamma.signature
         );
         transform::QUERY_FUNCTIONS.remove("org_gamma/gamma_fn");
     }

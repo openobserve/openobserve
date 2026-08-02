@@ -97,6 +97,36 @@ describe("Phase 2 — the server catalog is actually fetched (B4 wiring)", () =>
     expect(queryFunctions.list).toHaveBeenCalledWith("otherorg");
   });
 
+  it("DROPS the previous organisation's functions when the org changes", async () => {
+    // A second request is not enough: if the old org's entries survive the
+    // switch, one tenant sees another tenant's VRL function names.
+    vi.mocked(queryFunctions.list).mockImplementation((org: string) =>
+      Promise.resolve({
+        data: {
+          list:
+            org === "myorg"
+              ? [{ name: "myorg_only_fn", signature: "(a)", doc: "A.", kind: "vrl" }]
+              : [{ name: "otherorg_only_fn", signature: "(a)", doc: "B.", kind: "vrl" }],
+        },
+      } as any),
+    );
+
+    const c = makeComposable({ storedValues: [] });
+    await run(c, "SELECT * FROM stream WHERE ");
+    await run(c, "SELECT * FROM stream WHERE ");
+    let names = (c.effectiveSuggestions.value as any[]).map((s) => s.name);
+    expect(names).toContain("myorg_only_fn");
+
+    c.autoCompleteData.value.org = "otherorg";
+    await run(c, "SELECT * FROM stream WHERE ");
+    await run(c, "SELECT * FROM stream WHERE ");
+    names = (c.effectiveSuggestions.value as any[]).map((s) => s.name);
+    expect(names).toContain("otherorg_only_fn");
+    expect(names, "stale org functions survived the switch").not.toContain("myorg_only_fn");
+    // Local catalog is org-independent and must survive.
+    expect(names).toContain("match_all");
+  });
+
   it("does not call the service before an organisation is known", async () => {
     const c = makeComposable({ storedValues: [] });
     c.autoCompleteData.value.org = "";

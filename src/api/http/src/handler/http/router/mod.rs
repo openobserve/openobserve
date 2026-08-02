@@ -1514,6 +1514,30 @@ mod tests {
         );
     }
 
+    // ── tmp/code.md B4 — the query-function catalog route ─────────────────────
+    //
+    // catalog_functions() can be perfect while no HTTP route exposes it. This is
+    // the only assertion that fails if the endpoint is simply never registered.
+
+    #[tokio::test]
+    async fn query_functions_route_is_registered() {
+        let app = service_routes();
+
+        let req = Request::builder()
+            .uri("/myorg/query_functions")
+            .body(Body::empty())
+            .unwrap();
+
+        let response = app.oneshot(req).await.unwrap();
+        // Auth middleware may reject the request; what must NOT happen is 404,
+        // which would mean the route does not exist at all.
+        assert_ne!(
+            response.status(),
+            StatusCode::NOT_FOUND,
+            "GET /{{org_id}}/query_functions is not registered"
+        );
+    }
+
     // ── is_origin_allowed unit tests ──────────────────────────────────────────
 
     #[test]
