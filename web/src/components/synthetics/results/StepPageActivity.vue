@@ -42,7 +42,6 @@ import EvidenceEvents from "./EvidenceEvents.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import { INLINE_EVIDENCE_LIMIT } from "@/constants/synthetics";
 import {
@@ -52,7 +51,10 @@ import {
   type EvidenceErrorKind,
   type EvidenceStatus,
 } from "@/composables/useSyntheticEvidence";
-import type { EvidenceEvent } from "@/composables/synthetics/syntheticResultsSchema";
+import {
+  evidenceOriginTs,
+  type EvidenceEvent,
+} from "@/composables/synthetics/syntheticResultsSchema";
 
 const props = withDefaults(
   defineProps<{
@@ -78,6 +80,15 @@ const { t } = useI18n();
 
 const shown = computed(() => props.events.slice(0, INLINE_EVIDENCE_LIMIT));
 const hasMore = computed(() => props.events.length > INLINE_EVIDENCE_LIMIT);
+
+/**
+ * Elapsed readings count from the step's first event, not the shown five.
+ *
+ * The bucket is ranked worst-first, so the earliest event is routinely one the
+ * cap dropped; zeroing on `shown` would move every offset in the card whenever
+ * a new anomaly outranked the row that happened to be first.
+ */
+const originTs = computed(() => evidenceOriginTs(props.events));
 
 /**
  * "5 of 136", or "5 of 136+" when the cap bound during capture.
@@ -126,26 +137,22 @@ function reloadPage() {
   <!--
     Same chrome as the StepEvidence sections it sits beside: bordered container
     that CLIPS, header strip, full-bleed divider, padded body. Padding lives on
-    the trigger and the body, never on the container — a container inset would
+    the header and the body, never on the container — a container inset would
     stop the divider short of the edges.
 
-    `!` on the trigger's padding and radius because OCollapsible's own defaults
-    (`rounded-default px-2 py-2`) are utilities of the same specificity: without
-    it, which one wins depends on Tailwind's output order rather than on this
-    class list. Same reason FieldExpansion writes `px-0! py-0!`.
-
-    The divider is gated on `data-[state=open]` — a border under a collapsed
-    trigger is a line with nothing beneath it, sitting a pixel above the card's
-    own bottom edge.
+    Not a disclosure. It was one, and the collapse never earned its cost: the
+    section defaults open, the body is height-capped below, and the trigger being
+    a <button> forced the section's own action into the body where it read as a
+    row of the list rather than as the header's action.
   -->
-  <OCollapsible
-    :label="t('synthetics.runDetail.pageActivity')"
-    :default-open="true"
+  <section
     class="card-container rounded-default border-border-default bg-card-glass-bg flex flex-col overflow-hidden border"
-    trigger-class="border-border-default rounded-none! px-3! py-2! data-[state=open]:border-b"
     data-test="synthetics-step-page-activity"
   >
-    <template #trigger>
+    <div
+      class="border-border-default flex min-h-9 items-center gap-x-2 border-b px-3 py-1.5"
+      data-test="synthetics-step-page-activity-header"
+    >
       <OIcon name="search" size="sm" class="text-text-secondary shrink-0" aria-hidden="true" />
       <span class="text-text-heading text-sm font-semibold">
         {{ t("synthetics.runDetail.pageActivity") }}
@@ -157,26 +164,23 @@ function reloadPage() {
       >
         {{ countLabel }}
       </span>
-    </template>
+      <!-- Trailing in the header, where the section's scope is stated: the list
+           below is a capped window on the run log, and this is the way out of
+           the window. In the body it sat above the rows and read as one. -->
+      <OButton
+        v-if="hasMore"
+        variant="ghost"
+        size="xs"
+        icon-right="arrow-forward"
+        class="ml-auto shrink-0"
+        data-test="synthetics-step-page-activity-view-all-btn"
+        @click="emit('view-all', stepId)"
+      >
+        {{ t("synthetics.runDetail.pageActivityViewAllShort") }}
+      </OButton>
+    </div>
 
     <div class="flex flex-col gap-2 px-3 py-2.5">
-      <!-- The action sits at the top of the body, not on the trigger row where
-           the design puts it: OCollapsible renders its trigger AS a button, and
-           a button cannot contain another one. Keeping the disclosure is worth
-           more than the alignment — the section defaults open, so the link is
-           visible in the same glance either way. -->
-      <div v-if="hasMore" class="flex justify-end">
-        <OButton
-          variant="ghost"
-          size="xs"
-          icon-right="arrow-forward"
-          data-test="synthetics-step-page-activity-view-all-btn"
-          @click="emit('view-all', stepId)"
-        >
-          {{ t("synthetics.runDetail.pageActivityViewAllShort") }}
-        </OButton>
-      </div>
-
       <div
         v-if="isLoading"
         class="flex flex-col gap-1"
@@ -242,9 +246,14 @@ function reloadPage() {
         </span>
       </p>
 
-      <template v-else>
-        <EvidenceEvents :events="shown" mode="inline" />
-      </template>
+      <!-- Four dense rows tall (4 × 2.375rem), then scroll. The cap is INLINE_
+           EVIDENCE_LIMIT rows, so the fifth sits just past the fold: a step
+           expansion holding several of these cards has to stay readable as a
+           timeline, and a partially visible row is what says "there is more"
+           without a second affordance. -->
+      <div v-else class="max-h-38 overflow-y-auto" data-test="synthetics-step-page-activity-events">
+        <EvidenceEvents :events="shown" mode="inline" :origin-ts="originTs" />
+      </div>
     </div>
-  </OCollapsible>
+  </section>
 </template>
