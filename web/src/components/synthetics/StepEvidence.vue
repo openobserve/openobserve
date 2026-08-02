@@ -66,6 +66,7 @@ import type {
 } from "@/composables/synthetics/syntheticResultsSchema";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 const props = defineProps<{
   detail: FailureDetail;
@@ -161,9 +162,7 @@ const noFallback = computed(() => candidates.value.length === 1);
            tried?" before any row is read — "1 of 3 tried" and "1 of 1 tried" are
            different findings — and the verdict that follows it is the same
            sentence continued, so stacking them read as two separate remarks. -->
-      <div
-        class="border-border-default flex flex-wrap items-baseline gap-x-2 border-b px-3 py-2"
-      >
+      <div class="border-border-default flex flex-wrap items-baseline gap-x-2 border-b px-3 py-2">
         <h4 class="text-text-heading m-0 text-sm font-semibold">
           {{ t("synthetics.runDetail.locatorResolution") }}
         </h4>
@@ -232,19 +231,20 @@ const noFallback = computed(() => candidates.value.length === 1);
       <!-- The stale note qualifies the heading rather than following it: a
            recorded signal that never arrived is what the list below is FOR. -->
       <div
-        class="border-border-default flex flex-wrap items-baseline gap-x-2 border-b px-3 py-2"
+        class="border-border-default flex flex-wrap items-baseline items-center gap-x-2 border-b px-3 py-2"
       >
         <h4 class="text-text-heading m-0 text-sm font-semibold">
           {{ t("synthetics.runDetail.settleSignals") }}
         </h4>
-        <span
-          v-if="staleSignals.length"
-          class="text-status-warning-text flex items-start gap-1 text-xs"
-          data-test="synthetics-run-detail-settle-stale-note"
-        >
-          <OIcon name="warning" size="xs" class="mt-0.5 shrink-0" aria-hidden="true" />
-          <span>{{ t("synthetics.runDetail.settleStaleNote") }}</span>
-        </span>
+        <OTooltip :content="t('synthetics.runDetail.settleStaleNote')">
+          <span
+            v-if="staleSignals.length"
+            class="text-status-warning-text flex items-start gap-1 text-xs"
+            data-test="synthetics-run-detail-settle-stale-note"
+          >
+            <OIcon name="warning" size="sm" class="shrink-0" aria-hidden="true" />
+          </span>
+        </OTooltip>
       </div>
       <div class="flex flex-col gap-2 px-3 py-2.5">
         <ul class="m-0 flex list-none flex-col gap-1 p-0">

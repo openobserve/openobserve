@@ -188,7 +188,7 @@ function reloadPage() {
       <!-- A failed fetch is reported, never rendered as an empty step. -->
       <OBanner
         v-else-if="status === 'error'"
-        variant="error"
+        variant="error-soft"
         dense
         inline-actions
         data-test="synthetics-step-page-activity-error"
