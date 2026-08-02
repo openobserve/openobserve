@@ -45,7 +45,13 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import { INLINE_EVIDENCE_LIMIT } from "@/constants/synthetics";
-import type { EvidenceStatus } from "@/composables/useSyntheticEvidence";
+import {
+  EVIDENCE_ERROR_MESSAGE,
+  evidenceErrorCanRetry,
+  evidenceErrorNeedsReload,
+  type EvidenceErrorKind,
+  type EvidenceStatus,
+} from "@/composables/useSyntheticEvidence";
 import type { EvidenceEvent } from "@/composables/synthetics/syntheticResultsSchema";
 
 const props = withDefaults(
@@ -54,13 +60,16 @@ const props = withDefaults(
     /** This step's bucket, already ranked worst-first. */
     events: EvidenceEvent[];
     status: EvidenceStatus;
+    /** Raw technical detail. Shown under the explanation, never as it. */
     error: string | null;
+    /** What kind of failure, so the banner can say what to do about it. */
+    errorKind?: EvidenceErrorKind | null;
     /** True when the capture cap bound during the run (X-8.2). */
     truncated?: boolean;
     /** Events the bundle could not attribute to any step. */
     unattributedCount?: number;
   }>(),
-  { truncated: false, unattributedCount: 0 },
+  { truncated: false, unattributedCount: 0, errorKind: null },
 );
 
 const emit = defineEmits<{ (e: "view-all", stepId: string): void; (e: "retry"): void }>();
@@ -86,13 +95,54 @@ const countLabel = computed(() =>
 );
 
 const isLoading = computed(() => props.status === "idle" || props.status === "loading");
+
+/**
+ * What the reader should understand and do.
+ *
+ * The banner used to interpolate the raw throw — "Could not load the evidence
+ * bundle: 401 Unauthorized". That names the symptom in HTTP and leaves the
+ * reader to guess whether the RUN is broken, whether their session died, or
+ * whether the evidence is simply gone. Each has a different response, so each
+ * gets its own sentence; the raw status moves to a detail line beneath, where
+ * support can still read it.
+ */
+const errorMessage = computed(() =>
+  // No kind means a caller that does not pass one; fall back to the generic
+  // wording rather than rendering nothing.
+  props.errorKind
+    ? t(EVIDENCE_ERROR_MESSAGE[props.errorKind])
+    : t("synthetics.evidence.loadFailed", { error: props.error ?? "" }),
+);
+
+const canRetry = computed(() => evidenceErrorCanRetry(props.errorKind ?? null));
+const needsReload = computed(() => evidenceErrorNeedsReload(props.errorKind ?? null));
+
+function reloadPage() {
+  window.location.reload();
+}
 </script>
 
 <template>
+  <!--
+    Same chrome as the StepEvidence sections it sits beside: bordered container
+    that CLIPS, header strip, full-bleed divider, padded body. Padding lives on
+    the trigger and the body, never on the container — a container inset would
+    stop the divider short of the edges.
+
+    `!` on the trigger's padding and radius because OCollapsible's own defaults
+    (`rounded-default px-2 py-2`) are utilities of the same specificity: without
+    it, which one wins depends on Tailwind's output order rather than on this
+    class list. Same reason FieldExpansion writes `px-0! py-0!`.
+
+    The divider is gated on `data-[state=open]` — a border under a collapsed
+    trigger is a line with nothing beneath it, sitting a pixel above the card's
+    own bottom edge.
+  -->
   <OCollapsible
     :label="t('synthetics.runDetail.pageActivity')"
     :default-open="true"
-    class="border-border-default rounded-default bg-surface-base border px-3 py-2"
+    class="card-container rounded-default border-border-default bg-card-glass-bg flex flex-col overflow-hidden border"
+    trigger-class="border-border-default rounded-none! px-3! py-2! data-[state=open]:border-b"
     data-test="synthetics-step-page-activity"
   >
     <template #trigger>
@@ -102,14 +152,14 @@ const isLoading = computed(() => props.status === "idle" || props.status === "lo
       </span>
       <span
         v-if="status === 'ready'"
-        class="text-text-secondary ml-2 text-xs"
+        class="text-text-secondary text-xs"
         data-test="synthetics-step-page-activity-count"
       >
         {{ countLabel }}
       </span>
     </template>
 
-    <div class="flex flex-col gap-2">
+    <div class="flex flex-col gap-2 px-3 py-2.5">
       <!-- The action sits at the top of the body, not on the trigger row where
            the design puts it: OCollapsible renders its trigger AS a button, and
            a button cannot contain another one. Keeping the disclosure is worth
@@ -141,11 +191,33 @@ const isLoading = computed(() => props.status === "idle" || props.status === "lo
         variant="error"
         dense
         inline-actions
-        :content="t('synthetics.evidence.loadFailed', { error: error ?? '' })"
         data-test="synthetics-step-page-activity-error"
       >
+        <div class="flex min-w-0 flex-col gap-0.5">
+          <span>{{ errorMessage }}</span>
+          <!-- The HTTP status still has to be readable — it is the first thing
+               anyone debugging this asks for — but as a footnote, not as the
+               message the user is expected to act on. -->
+          <span
+            v-if="error && errorKind"
+            class="text-text-secondary font-mono text-xs break-words"
+            data-test="synthetics-step-page-activity-error-detail"
+          >
+            {{ t("synthetics.evidence.loadFailedDetail", { error }) }}
+          </span>
+        </div>
         <template #actions>
           <OButton
+            v-if="needsReload"
+            variant="ghost"
+            size="xs"
+            data-test="synthetics-step-page-activity-reload-btn"
+            @click="reloadPage"
+          >
+            {{ t("synthetics.evidence.reload") }}
+          </OButton>
+          <OButton
+            v-else-if="canRetry"
             variant="ghost"
             size="xs"
             data-test="synthetics-step-page-activity-retry-btn"

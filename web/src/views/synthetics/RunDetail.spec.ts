@@ -170,6 +170,10 @@ vi.mock("@/services/synthetics", () => ({
     getLocations: (...args: any[]) => mockGetLocations(...args),
     presignArtifacts: vi.fn().mockResolvedValue({ data: { urls: [] } }),
     artifactUrl: vi.fn(() => ""),
+    // useSyntheticEvidence asks this before fetching, to decide whether the URL
+    // is our cookie-authed proxy or a presigned object URL. Omitting it threw
+    // inside the load path, so no fetch was ever issued.
+    isProxyArtifactUrl: vi.fn(() => false),
   },
 }));
 

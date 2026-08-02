@@ -43,7 +43,13 @@ import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
-import type { EvidenceStatus } from "@/composables/useSyntheticEvidence";
+import {
+  EVIDENCE_ERROR_MESSAGE,
+  evidenceErrorCanRetry,
+  evidenceErrorNeedsReload,
+  type EvidenceErrorKind,
+  type EvidenceStatus,
+} from "@/composables/useSyntheticEvidence";
 
 const props = withDefaults(
   defineProps<{
@@ -56,7 +62,10 @@ const props = withDefaults(
     /** The attempt's events, already fetched and named by useSyntheticEvidence. */
     events: EvidenceEvent[];
     status: EvidenceStatus;
+    /** Raw technical detail. Shown under the explanation, never as it. */
     error: string | null;
+    /** What kind of failure, so the banner can say what to do about it. */
+    errorKind?: EvidenceErrorKind | null;
     /** `evidence_truncated` from the record, or a truncation event in the stream. */
     truncated?: boolean;
     /** Scope every row and every count to one step. Null shows the whole run. */
@@ -74,6 +83,7 @@ const props = withDefaults(
     stepFilterName: "",
     captureOff: false,
     runPassed: false,
+    errorKind: null,
   },
 );
 
@@ -88,6 +98,20 @@ const firstPartyOnly = ref(false);
 
 const loading = computed(() => props.status === "loading" || props.status === "idle");
 const loadError = computed(() => (props.status === "error" ? props.error : null));
+
+// Same wording and same affordance as the per-step Page activity block — one
+// failure must not be described two ways depending on which surface saw it.
+const errorMessage = computed(() =>
+  props.errorKind
+    ? t(EVIDENCE_ERROR_MESSAGE[props.errorKind])
+    : t("synthetics.evidence.loadFailed", { error: loadError.value ?? "" }),
+);
+const canRetry = computed(() => evidenceErrorCanRetry(props.errorKind ?? null));
+const needsReload = computed(() => evidenceErrorNeedsReload(props.errorKind ?? null));
+
+function reloadPage() {
+  window.location.reload();
+}
 
 /**
  * Events after the STEP filter, before the kind filter.
@@ -211,11 +235,33 @@ const downloadUrl = computed(() => (props.evidenceKey ? props.resolveUrl(props.e
         variant="error"
         dense
         inline-actions
-        :content="t('synthetics.evidence.loadFailed', { error: loadError })"
         data-test="synthetics-evidence-error"
       >
+        <div class="flex min-w-0 flex-col gap-0.5">
+          <span>{{ errorMessage }}</span>
+          <!-- The HTTP status stays readable — it is the first thing anyone
+               debugging this asks for — but as a footnote, not as the message
+               the user is expected to act on. -->
+          <span
+            v-if="loadError && errorKind"
+            class="text-text-secondary font-mono text-xs break-words"
+            data-test="synthetics-evidence-error-detail"
+          >
+            {{ t("synthetics.evidence.loadFailedDetail", { error: loadError }) }}
+          </span>
+        </div>
         <template #actions>
           <OButton
+            v-if="needsReload"
+            variant="ghost"
+            size="xs"
+            data-test="synthetics-evidence-reload-btn"
+            @click="reloadPage"
+          >
+            {{ t("synthetics.evidence.reload") }}
+          </OButton>
+          <OButton
+            v-else-if="canRetry"
             variant="ghost"
             size="xs"
             data-test="synthetics-evidence-retry-btn"
