@@ -108,6 +108,17 @@ const useManagementRoutes = () => {
         routeGuard(to, from, next);
       },
     });
+    routes[0].children.push({
+      path: "alert_sources",
+      name: "alertSources",
+      component: () => import("@/components/alerts/ExternalAlertSourcesList.vue"),
+      meta: {
+        title: "Alert Sources",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    });
   }
   if (config.isEnterprise == "true") {
     routes[0].children.push(
