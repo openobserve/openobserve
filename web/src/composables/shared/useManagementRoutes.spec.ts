@@ -134,20 +134,32 @@ describe("useManagementRoutes", () => {
       expect(orgRoute.path).toBe("organization");
     });
 
-    it("should have alertDestinations route", () => {
+    // Notification Destinations and Templates moved to /alert-* (Reliability).
+    // What is left here is a bare redirect, so old bookmarks still resolve.
+    it("should redirect alert_destinations to alertDestinations, preserving the query", () => {
       const alertDestRoute = routes[0].children.find(
-        (child: any) => child.name === "alertDestinations",
+        (child: any) => child.path === "alert_destinations",
       );
       expect(alertDestRoute).toBeDefined();
-      expect(alertDestRoute.path).toBe("alert_destinations");
+      expect(alertDestRoute.name).toBeUndefined();
+      // `action=import` opens the import view — dropping the query would break
+      // every existing deep link into it.
+      expect(alertDestRoute.redirect({ query: { org_identifier: "o", action: "import" } })).toEqual(
+        {
+          name: "alertDestinations",
+          query: { org_identifier: "o", action: "import" },
+        },
+      );
     });
 
-    it("should have alertTemplates route", () => {
-      const templateRoute = routes[0].children.find(
-        (child: any) => child.name === "alertTemplates",
-      );
+    it("should redirect templates to alertTemplates, preserving the query", () => {
+      const templateRoute = routes[0].children.find((child: any) => child.path === "templates");
       expect(templateRoute).toBeDefined();
-      expect(templateRoute.path).toBe("templates");
+      expect(templateRoute.name).toBeUndefined();
+      expect(templateRoute.redirect({ query: { org_identifier: "o", action: "import" } })).toEqual({
+        name: "alertTemplates",
+        query: { org_identifier: "o", action: "import" },
+      });
     });
 
     it("should NOT have llmProviders route in OSS builds", () => {
@@ -174,19 +186,8 @@ describe("useManagementRoutes", () => {
       expect(typeof orgRoute.beforeEnter).toBe("function");
     });
 
-    it("should have beforeEnter hook for alertDestinations route", () => {
-      const alertDestRoute = routes[0].children.find(
-        (child: any) => child.name === "alertDestinations",
-      );
-      expect(typeof alertDestRoute.beforeEnter).toBe("function");
-    });
-
-    it("should have beforeEnter hook for alertTemplates route", () => {
-      const templateRoute = routes[0].children.find(
-        (child: any) => child.name === "alertTemplates",
-      );
-      expect(typeof templateRoute.beforeEnter).toBe("function");
-    });
+    // The two alerting redirects carry no guard by design: they resolve to
+    // /alerts/* routes, which run routeGuard themselves.
 
     it("should call routeGuard in general route beforeEnter", () => {
       const generalRoute = routes[0].children.find((child: any) => child.name === "general");
@@ -210,34 +211,12 @@ describe("useManagementRoutes", () => {
       expect(routeGuard).toHaveBeenCalledWith(mockTo, mockFrom, mockNext);
     });
 
-    it("should call routeGuard in alertDestinations route beforeEnter", () => {
-      const alertDestRoute = routes[0].children.find(
-        (child: any) => child.name === "alertDestinations",
-      );
-      const mockTo = { path: "/settings/alert_destinations" };
-      const mockFrom = { path: "/settings" };
-      const mockNext = vi.fn();
-
-      alertDestRoute.beforeEnter(mockTo, mockFrom, mockNext);
-      expect(routeGuard).toHaveBeenCalledWith(mockTo, mockFrom, mockNext);
-    });
-
-    it("should call routeGuard in alertTemplates route beforeEnter", () => {
-      const templateRoute = routes[0].children.find(
-        (child: any) => child.name === "alertTemplates",
-      );
-      const mockTo = { path: "/settings/templates" };
-      const mockFrom = { path: "/settings" };
-      const mockNext = vi.fn();
-
-      templateRoute.beforeEnter(mockTo, mockFrom, mockNext);
-      expect(routeGuard).toHaveBeenCalledWith(mockTo, mockFrom, mockNext);
-    });
-
-    it("should have component defined for each base child route", () => {
-      routes[0].children.forEach((child: any) => {
-        expect(child.component).toBeDefined();
-      });
+    it("should have component defined for each non-redirect base child route", () => {
+      routes[0].children
+        .filter((child: any) => !child.redirect)
+        .forEach((child: any) => {
+          expect(child.component).toBeDefined();
+        });
     });
 
     it("should have correct path for each base child route", () => {
@@ -253,8 +232,13 @@ describe("useManagementRoutes", () => {
       expect(actualPaths).toEqual(expectedPaths);
     });
 
-    it("should have unique names for each base child route", () => {
-      const names = routes[0].children.slice(0, 6).map((child: any) => child.name);
+    it("should have unique names for each named base child route", () => {
+      // Redirect-only children are deliberately unnamed — their name belongs to
+      // the /alerts/* route they point at.
+      const names = routes[0].children
+        .slice(0, 6)
+        .filter((child: any) => !child.redirect)
+        .map((child: any) => child.name);
       const uniqueNames = [...new Set(names)];
       expect(names).toHaveLength(uniqueNames.length);
     });
@@ -575,11 +559,15 @@ describe("useManagementRoutes", () => {
   });
 
   describe("Route Configuration Validation", () => {
-    it("should have unique route names across all children", () => {
+    it("should have unique route names across all named children", () => {
       config.isEnterprise = "true";
       config.isCloud = "true";
       const routes = useManagementRoutes();
-      const names = routes[0].children.map((child: any) => child.name);
+      // Redirect-only children are unnamed by design (their name lives on the
+      // /alerts/* target), so they cannot participate in a uniqueness check.
+      const names = routes[0].children
+        .filter((child: any) => !child.redirect)
+        .map((child: any) => child.name);
       const uniqueNames = [...new Set(names)];
       expect(names).toHaveLength(uniqueNames.length);
     });
@@ -597,11 +585,15 @@ describe("useManagementRoutes", () => {
       config.isEnterprise = "true";
       config.isCloud = "true";
       const routes = useManagementRoutes();
-      routes[0].children.forEach((child: any) => {
-        expect(child.name).toBeDefined();
-        expect(child.name).not.toBe("");
-        expect(typeof child.name).toBe("string");
-      });
+      // Redirect-only children are unnamed on purpose; every other child must
+      // carry a real name.
+      routes[0].children
+        .filter((child: any) => !child.redirect)
+        .forEach((child: any) => {
+          expect(child.name).toBeDefined();
+          expect(child.name).not.toBe("");
+          expect(typeof child.name).toBe("string");
+        });
     });
 
     it("should not have empty or undefined route paths", () => {
@@ -615,16 +607,18 @@ describe("useManagementRoutes", () => {
       });
     });
 
-    it("should have valid component imports for all routes", () => {
+    it("should have valid component imports for all non-redirect routes", () => {
       config.isEnterprise = "true";
       config.isCloud = "true";
       const routes = useManagementRoutes();
-      routes[0].children.forEach((child: any) => {
-        expect(child.component).toBeDefined();
-        expect(typeof child.component === "function" || typeof child.component === "object").toBe(
-          true,
-        );
-      });
+      routes[0].children
+        .filter((child: any) => !child.redirect)
+        .forEach((child: any) => {
+          expect(child.component).toBeDefined();
+          expect(typeof child.component === "function" || typeof child.component === "object").toBe(
+            true,
+          );
+        });
     });
   });
 
