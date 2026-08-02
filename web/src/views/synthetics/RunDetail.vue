@@ -65,15 +65,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             {{ statusLabel }}
           </OBadge>
+          <!--
+            `truncate` belongs on the text, NOT on the badge. OBadge's root is
+            `inline-flex`, and `text-overflow: ellipsis` never reaches a flex
+            ITEM — so the class on the root hard-cut the URL at max-w with no
+            ellipsis and no way to read the rest. The inner span is the block box
+            that can actually ellipsise, and the tooltip makes the full URL
+            recoverable at any width.
+          -->
           <OBadge
             v-if="currentRun.url"
             variant="default"
             size="sm"
             icon="link"
-            class="max-w-50 truncate"
+            class="max-w-xs min-w-0"
             data-test="synthetics-run-detail-url-badge"
           >
-            {{ currentRun.url }}
+            <span class="block min-w-0 truncate">{{ currentRun.url }}</span>
+            <OTooltip side="bottom" :content="currentRun.url" :max-width="'32rem'" />
           </OBadge>
           <div class="ml-1 flex">
             <OButton
@@ -214,6 +223,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :events="evidence.events.value"
                 :status="evidence.status.value"
                 :error="evidence.error.value"
+                :error-kind="evidence.errorKind.value"
                 :truncated="evidence.truncated.value"
                 :step-filter="evidenceStepFilter"
                 :step-filter-name="evidenceStepFilterName"
@@ -537,6 +547,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               :events="row.bundleEvents"
                               :status="evidence.status.value"
                               :error="evidence.error.value"
+                              :error-kind="evidence.errorKind.value"
                               :truncated="evidence.truncated.value"
                               :unattributed-count="evidence.unattributedCount.value"
                               class="mt-3"
@@ -620,6 +631,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import StepEvidence from "@/components/synthetics/StepEvidence.vue";
 import StepPageActivity from "@/components/synthetics/results/StepPageActivity.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import BetaBadge from "@/components/common/BetaBadge.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
