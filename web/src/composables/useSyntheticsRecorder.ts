@@ -416,8 +416,11 @@ const useSyntheticsRecorder = () => {
     if (res) {
       if (res.stopped) replayPhase.value = "stopped";
       else if (res.passed) replayPhase.value = "passed";
-      else if (stepResults.size === 0)
-        replayPhase.value = "idle"; // pre-flight failure (e.g. incognito)
+      // Nothing streamed back, so no step ran: a pre-flight failure, not a
+      // journey that failed on the page. Stay `idle` rather than `failed` —
+      // the caller classifies the cause from `res.error` (see
+      // CreateBrowserTest's `blockedReason`) and must not assume incognito.
+      else if (stepResults.size === 0) replayPhase.value = "idle";
       else replayPhase.value = "failed";
     } else {
       replayPhase.value = "idle";
