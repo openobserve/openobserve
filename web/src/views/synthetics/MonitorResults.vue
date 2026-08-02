@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }"
         :default-relative-time="timeState.relativeTimePeriod ?? ''"
         data-test="synthetic-monitor-results-date-time"
-        class="h-8.5!"
+        class=""
         @on:date-change="onDateChange"
       />
       <OButton
@@ -57,6 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         icon-left="play-arrow"
         :loading="isTriggering"
         data-test="synthetic-monitor-results-trigger-run-btn"
+        class="h-7.5!"
         @click="triggerRun"
       >
         {{ t("synthetics.runs.triggerRun") }}
@@ -66,6 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="sm"
         icon-left="edit"
         data-test="synthetic-monitor-results-edit-btn"
+        class="h-7.5!"
         @click="editMonitor"
       >
         {{ t("synthetics.results.editCheck") }}
@@ -76,6 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         icon-left="refresh"
         :loading="isRefreshing"
         data-test="synthetic-monitor-results-refresh-btn"
+        class="h-7.5!"
         @click="refresh"
       />
     </template>
@@ -101,7 +104,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     bleed
     v-model:open="drawerOpen"
     side="right"
-    :width="90"
+    size="xxl"
+    :width="checkType === 'browser' ? 85 : undefined"
     :title="monitorName"
     :subTitle="drawerTimestamp"
     data-test="synthetics-run-detail-drawer"
