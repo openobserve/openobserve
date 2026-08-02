@@ -106,13 +106,15 @@ async fn handle_events(
         Ok(evs) => evs,
         Err(reason) => {
             let _ = infra::table::incident_integrations::touch_sender(
-                &integration.id,
-                detected.as_str(),
-                None,
-                now,
-                0,
-                1,
-                false,
+                infra::table::incident_integrations::TouchSenderParams {
+                    integration_id: &integration.id,
+                    detected_source: detected.as_str(),
+                    sender_label: None,
+                    now,
+                    accepted: 0,
+                    rejected: 1,
+                    saw_resolved: false,
+                },
             )
             .await;
             return MetaHttpResponse::bad_request(reason);
@@ -184,13 +186,15 @@ async fn handle_events(
     }
     let sender_label = openobserve_core::alerts::external_alerts::derive_sender_label(&events);
     let _ = infra::table::incident_integrations::touch_sender(
-        &integration.id,
-        detected.as_str(),
-        sender_label.as_deref(),
-        now,
-        accepted,
-        rejected,
-        saw_resolved,
+        infra::table::incident_integrations::TouchSenderParams {
+            integration_id: &integration.id,
+            detected_source: detected.as_str(),
+            sender_label: sender_label.as_deref(),
+            now,
+            accepted,
+            rejected,
+            saw_resolved,
+        },
     )
     .await;
 

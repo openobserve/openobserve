@@ -445,9 +445,9 @@ describe("useManagementRoutes", () => {
       });
     });
 
-    it("should have exactly 19 children routes when enterprise is enabled", () => {
+    it("should have exactly 20 children routes when enterprise is enabled", () => {
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(19); // 6 base + llmProviders + genAiAgentMapping + 11 enterprise
+      expect(routes[0].children).toHaveLength(20); // 6 base + llmProviders + genAiAgentMapping + alertSources + 11 enterprise
     });
   });
 
@@ -508,9 +508,9 @@ describe("useManagementRoutes", () => {
       expect(orgMgmtRoute.component).toBeDefined();
     });
 
-    it("should have exactly 9 children routes when cloud is enabled", () => {
+    it("should have exactly 10 children routes when cloud is enabled", () => {
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(9); // 6 base + llmProviders + genAiAgentMapping + 1 cloud
+      expect(routes[0].children).toHaveLength(10); // 6 base + llmProviders + genAiAgentMapping + alertSources + 1 cloud
     });
   });
 
@@ -525,9 +525,9 @@ describe("useManagementRoutes", () => {
       expect(routes[0].children.length).toBeGreaterThan(10);
     });
 
-    it("should have exactly 20 children routes when both enterprise and cloud are enabled", () => {
+    it("should have exactly 21 children routes when both enterprise and cloud are enabled", () => {
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(20); // 6 base + llmProviders + genAiAgentMapping + 11 enterprise + 1 cloud
+      expect(routes[0].children).toHaveLength(21); // 6 base + llmProviders + genAiAgentMapping + alertSources + 11 enterprise + 1 cloud
     });
 
     it("should have all enterprise routes when both are enabled", () => {

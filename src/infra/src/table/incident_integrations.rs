@@ -252,17 +252,32 @@ pub async fn rotate_token(org_id: &str, id: &str) -> Result<String, errors::Erro
     Ok(new_token)
 }
 
+/// Parameters for [`touch_sender`] — bundled to keep the function's arg count
+/// reasonable now that sender rows also carry a derived label.
+#[derive(Debug, Clone, Copy)]
+pub struct TouchSenderParams<'a> {
+    pub integration_id: &'a str,
+    pub detected_source: &'a str,
+    pub sender_label: Option<&'a str>,
+    pub now: i64,
+    pub accepted: u32,
+    pub rejected: u32,
+    pub saw_resolved: bool,
+}
+
 /// Upsert an observed sender row for an integration: increments counters, sets
 /// `last_received_at`, and ORs `resolved_seen`.
-pub async fn touch_sender(
-    integration_id: &str,
-    detected_source: &str,
-    sender_label: Option<&str>,
-    now: i64,
-    accepted: u32,
-    rejected: u32,
-    saw_resolved: bool,
-) -> Result<(), errors::Error> {
+pub async fn touch_sender(params: TouchSenderParams<'_>) -> Result<(), errors::Error> {
+    let TouchSenderParams {
+        integration_id,
+        detected_source,
+        sender_label,
+        now,
+        accepted,
+        rejected,
+        saw_resolved,
+    } = params;
+
     let _lock = get_lock().await;
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let mut existing_query = SenderEntity::find()
@@ -280,13 +295,7 @@ pub async fn touch_sender(
     if let Some(existing) = existing {
         return update_sender(
             client,
-            integration_id,
-            detected_source,
-            sender_label,
-            now,
-            accepted,
-            rejected,
-            saw_resolved || existing.resolved_seen,
+            params.with_saw_resolved(saw_resolved || existing.resolved_seen),
         )
         .await;
     }
@@ -307,33 +316,36 @@ pub async fn touch_sender(
         Err(e) => match e.sql_err() {
             Some(SqlErr::UniqueConstraintViolation(_)) => {
                 // Concurrent insert raced us — fall back to the update path.
-                update_sender(
-                    client,
-                    integration_id,
-                    detected_source,
-                    sender_label,
-                    now,
-                    accepted,
-                    rejected,
-                    saw_resolved,
-                )
-                .await
+                update_sender(client, params).await
             }
             _ => Err(Error::DbError(DbError::SeaORMError(e.to_string()))),
         },
     }
 }
 
+impl<'a> TouchSenderParams<'a> {
+    fn with_saw_resolved(self, saw_resolved: bool) -> Self {
+        Self {
+            saw_resolved,
+            ..self
+        }
+    }
+}
+
 async fn update_sender(
     client: &sea_orm::DatabaseConnection,
-    integration_id: &str,
-    detected_source: &str,
-    sender_label: Option<&str>,
-    now: i64,
-    accepted: u32,
-    rejected: u32,
-    resolved_seen: bool,
+    params: TouchSenderParams<'_>,
 ) -> Result<(), errors::Error> {
+    let TouchSenderParams {
+        integration_id,
+        detected_source,
+        sender_label,
+        now,
+        accepted,
+        rejected,
+        saw_resolved: resolved_seen,
+    } = params;
+
     let mut query = SenderEntity::update_many()
         .col_expr(
             SenderColumn::AcceptedCount,
