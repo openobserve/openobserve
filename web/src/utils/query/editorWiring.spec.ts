@@ -73,6 +73,15 @@ describe("editor wiring — every surface supplies both completion sources", () 
     // await a resolver something hands it. A surface that omits this gets a
     // working editor with no value completion — silently, exactly like the
     // three prop-wiring gaps before it.
+    //
+    // DECIDED: applies to EVERY host, with no exemption list. A surface with no
+    // stream context supplies a resolver returning [] — which the composable's
+    // resolveFieldValues already does when streamName is unset, so complying
+    // costs nothing. Pass-throughs (QueryEditor.vue, SloExpressionField.vue)
+    // forward the prop as they already forward keywords and suggestions.
+    // An exemption list is where the next silent gap would hide: every wiring
+    // bug in this workstream reached production because one surface was quietly
+    // different from the rest.
     expect(
       /:field-value-resolver\s*=|:fieldValueResolver\s*=/.test(source),
       `${path} mounts an editor without a field-value resolver`,
