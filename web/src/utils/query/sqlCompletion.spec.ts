@@ -41,6 +41,9 @@ const KINDS = {
   Snippet: 27,
 } as const;
 
+// Mirrors monaco.languages.CompletionItemTag.
+const TAGS = { Deprecated: 1 } as const;
+
 // Mirrors monaco.languages.CompletionItemInsertTextRule.
 const INSERT_RULES = {
   None: 0,
@@ -208,9 +211,7 @@ describe("A3 — column arguments are unquoted, literal arguments are quoted", (
   // than one column argument need an exact snippet so a later one cannot stay
   // quoted unnoticed.
   it("arrzip keeps BOTH column arguments unquoted and quotes only the delimiter", () => {
-    expect(byName("arrzip").insertText).toBe(
-      "arrzip(${1:field1}, ${2:field2}, '${3:delimiter}')",
-    );
+    expect(byName("arrzip").insertText).toBe("arrzip(${1:field1}, ${2:field2}, '${3:delimiter}')");
   });
 
   it("arrindex keeps the column unquoted and both bounds numeric", () => {
@@ -315,10 +316,12 @@ describe("N7 — optional metadata is forwarded to monaco", () => {
     expect(build({ suggestions: [rich] })[0].detail).toBe("(field, k) → top-k values");
   });
 
-  it("forwards documentation", () => {
-    expect(build({ suggestions: [rich] })[0].documentation).toBe(
-      "Approximate top-k aggregation.",
-    );
+  it("forwards documentation as an IMarkdownString so backticks render", () => {
+    // A plain string renders literally in the docs panel — `match_all` would
+    // show its backticks. monaco renders markdown only for { value }.
+    expect(build({ suggestions: [rich] })[0].documentation).toEqual({
+      value: "Approximate top-k aggregation.",
+    });
   });
 
   it("forwards sortText", () => {
@@ -336,6 +339,53 @@ describe("N7 — optional metadata is forwarded to monaco", () => {
       expect(fn.detail, `${fn.name} needs a detail signature`).toBeTruthy();
     }
   });
+
+  // `detail` renders in the suggest widget's NARROW inline column. Prose there
+  // gets clipped ("...frequent values"). It must stay a compact signature; the
+  // description belongs in `documentation`, which gets the resizable panel.
+  it("detail is a compact signature, short enough for the inline column", () => {
+    for (const fn of SQL_FUNCTIONS) {
+      expect(
+        fn.detail!.length,
+        `${fn.name} detail is too long for the inline column: ${fn.detail}`,
+      ).toBeLessThanOrEqual(32);
+    }
+  });
+
+  it("detail carries no prose separator — that belongs in documentation", () => {
+    for (const fn of SQL_FUNCTIONS) {
+      expect(fn.detail, `${fn.name} detail should not embed prose`).not.toContain("—");
+    }
+  });
+
+  it("every catalog function carries prose documentation", () => {
+    for (const fn of SQL_FUNCTIONS) {
+      expect(fn.documentation, `${fn.name} needs documentation`).toBeTruthy();
+      expect(fn.documentation!.length, `${fn.name} documentation too terse`).toBeGreaterThan(15);
+    }
+  });
+
+  it("forwards documentation from the catalog through to monaco", () => {
+    const [item] = build({ suggestions: [byName("approx_topk")] });
+    expect(item.documentation).toEqual({ value: byName("approx_topk").documentation });
+  });
+
+  // `deprecated` was previously data that nothing consumed: set on two entries
+  // and asserted by a test, but never translated into anything monaco renders.
+  it("translates deprecated into monaco's Deprecated tag", () => {
+    const [item] = build({ suggestions: [byName("match_all_raw")], tags: TAGS });
+    expect(item.tags).toEqual([TAGS.Deprecated]);
+  });
+
+  it("leaves non-deprecated entries untagged", () => {
+    const [item] = build({ suggestions: [byName("match_all")], tags: TAGS });
+    expect(item.tags).toBeUndefined();
+  });
+
+  it("omits tags entirely when the caller supplies no tag enum", () => {
+    const [item] = build({ suggestions: [byName("match_all_raw")] });
+    expect(item.tags).toBeUndefined();
+  });
 });
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -344,7 +394,12 @@ describe("N7 — optional metadata is forwarded to monaco", () => {
 
 describe("C1 — candidates are not pre-filtered by substring", () => {
   const fields = [
-    { name: "kubernetes_namespace_name", label: "kubernetes_namespace_name", kind: "Field" as const, insertText: "kubernetes_namespace_name" },
+    {
+      name: "kubernetes_namespace_name",
+      label: "kubernetes_namespace_name",
+      kind: "Field" as const,
+      insertText: "kubernetes_namespace_name",
+    },
     { name: "code", label: "code", kind: "Field" as const, insertText: "code" },
   ];
 
@@ -376,13 +431,19 @@ describe("D7/N2 — the catalog is complete and internally consistent", () => {
 
   it("includes the aggregates Traces was missing", () => {
     for (const name of ["sum", "avg", "count", "max", "min", "histogram", "approx_topk"]) {
-      expect(SQL_FUNCTIONS.some((f) => f.name === name), `missing ${name}`).toBe(true);
+      expect(
+        SQL_FUNCTIONS.some((f) => f.name === name),
+        `missing ${name}`,
+      ).toBe(true);
     }
   });
 
   it("includes the array family", () => {
     for (const name of ["arrcount", "arrsort", "arrindex", "arrjoin", "arrzip", "arr_descending"]) {
-      expect(SQL_FUNCTIONS.some((f) => f.name === name), `missing ${name}`).toBe(true);
+      expect(
+        SQL_FUNCTIONS.some((f) => f.name === name),
+        `missing ${name}`,
+      ).toBe(true);
     }
   });
 
@@ -406,6 +467,26 @@ describe("D7/N2 — the catalog is complete and internally consistent", () => {
 // ───────────────────────────────────────────────────────────────────────────
 // Back-compat — the `suggestions` prop is public; legacy shape must still work
 // ───────────────────────────────────────────────────────────────────────────
+
+describe("A2 — dynamic entries must be reported as an incomplete list", () => {
+  it("reports static catalog entries as complete", async () => {
+    const { hasDynamicEntries } = await import("./sqlCompletion");
+    expect(hasDynamicEntries(SQL_FUNCTIONS)).toBe(false);
+    expect(hasDynamicEntries(SQL_KEYWORDS)).toBe(false);
+  });
+
+  it("reports a callable label as dynamic", async () => {
+    const { hasDynamicEntries } = await import("./sqlCompletion");
+    expect(hasDynamicEntries([{ label: (w: string) => w, kind: "Text" } as any])).toBe(true);
+  });
+
+  it("reports a callable insertText as dynamic", async () => {
+    const { hasDynamicEntries } = await import("./sqlCompletion");
+    expect(
+      hasDynamicEntries([{ label: "x", insertText: (w: string) => w, kind: "Text" } as any]),
+    ).toBe(true);
+  });
+});
 
 describe("back-compat — legacy callable label/insertText entries still build", () => {
   const legacy = {

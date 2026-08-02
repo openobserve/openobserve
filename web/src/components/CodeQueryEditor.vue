@@ -83,6 +83,7 @@ import {
   resolveKeywords,
   resolveSuggestions,
   buildCompletionItems,
+  hasDynamicEntries,
 } from "@/utils/query/sqlCompletion";
 import { loadPromqlLanguage } from "@/utils/query/promqlLanguageDefinition";
 
@@ -764,7 +765,16 @@ export default defineComponent({
               range,
               kinds: monaco.languages.CompletionItemKind,
               insertTextRules: monaco.languages.CompletionItemInsertTextRule,
+              tags: monaco.languages.CompletionItemTag,
             }),
+            // Monaco filters a returned list client-side and only re-queries
+            // mid-word when it is marked incomplete. The shared catalog is
+            // static so that would be wasted work, but a legacy caller passing
+            // callable label/insertText needs the re-query or its content
+            // freezes at the first keystroke.
+            incomplete:
+              hasDynamicEntries(suggestions.value as any[]) ||
+              hasDynamicEntries(keywords.value as any[]),
           };
         },
       });

@@ -162,7 +162,8 @@ export const SQL_FUNCTIONS: SqlCompletionEntry[] = [
     name: "match_all",
     label: "match_all",
     kind: "Function",
-    detail: "(term) — full-text search across indexed fields",
+    detail: "(term)",
+    documentation: "Full-text search for a term across all indexed fields of the stream.",
     insertText: "match_all('${1:value}')",
     insertTextRules: SNIPPET,
   },
@@ -170,7 +171,9 @@ export const SQL_FUNCTIONS: SqlCompletionEntry[] = [
     name: "match_all_raw",
     label: "match_all_raw",
     kind: "Function",
-    detail: "(term) — deprecated alias, rewritten to match_all",
+    detail: "(term)",
+    documentation:
+      "Deprecated alias for `match_all` — the query planner rewrites it before execution. Prefer `match_all`.",
     insertText: "match_all_raw('${1:value}')",
     insertTextRules: SNIPPET,
     deprecated: true,
@@ -179,7 +182,9 @@ export const SQL_FUNCTIONS: SqlCompletionEntry[] = [
     name: "match_all_raw_ignore_case",
     label: "match_all_raw_ignore_case",
     kind: "Function",
-    detail: "(term) — deprecated alias, rewritten to match_all",
+    detail: "(term)",
+    documentation:
+      "Deprecated alias for `match_all` — the query planner rewrites it before execution. Prefer `match_all`.",
     insertText: "match_all_raw_ignore_case('${1:value}')",
     insertTextRules: SNIPPET,
     deprecated: true,
@@ -188,7 +193,8 @@ export const SQL_FUNCTIONS: SqlCompletionEntry[] = [
     name: "re_match",
     label: "re_match",
     kind: "Function",
-    detail: "(field, regex) — regular-expression match",
+    detail: "(field, regex)",
+    documentation: "Return rows where the field matches the regular expression.",
     insertText: "re_match(${1:field}, '${2:regex}')",
     insertTextRules: SNIPPET,
   },
@@ -196,7 +202,8 @@ export const SQL_FUNCTIONS: SqlCompletionEntry[] = [
     name: "re_not_match",
     label: "re_not_match",
     kind: "Function",
-    detail: "(field, regex) — negated regular-expression match",
+    detail: "(field, regex)",
+    documentation: "Return rows where the field does NOT match the regular expression.",
     insertText: "re_not_match(${1:field}, '${2:regex}')",
     insertTextRules: SNIPPET,
   },
@@ -204,7 +211,8 @@ export const SQL_FUNCTIONS: SqlCompletionEntry[] = [
     name: "str_match",
     label: "str_match",
     kind: "Function",
-    detail: "(field, value) — case-sensitive substring match",
+    detail: "(field, value)",
+    documentation: "Case-sensitive substring match against a field.",
     insertText: "str_match(${1:field}, '${2:value}')",
     insertTextRules: SNIPPET,
   },
@@ -212,7 +220,8 @@ export const SQL_FUNCTIONS: SqlCompletionEntry[] = [
     name: "str_match_ignore_case",
     label: "str_match_ignore_case",
     kind: "Function",
-    detail: "(field, value) — case-insensitive substring match",
+    detail: "(field, value)",
+    documentation: "Case-insensitive substring match against a field.",
     insertText: "str_match_ignore_case(${1:field}, '${2:value}')",
     insertTextRules: SNIPPET,
   },
@@ -220,7 +229,8 @@ export const SQL_FUNCTIONS: SqlCompletionEntry[] = [
     name: "arr_descending",
     label: "arr_descending",
     kind: "Function",
-    detail: "(field) — sort an array descending",
+    detail: "(field)",
+    documentation: "Sort the elements of an array field in descending order.",
     insertText: "arr_descending(${1:field})",
     insertTextRules: SNIPPET,
   },
@@ -228,7 +238,8 @@ export const SQL_FUNCTIONS: SqlCompletionEntry[] = [
     name: "arrcount",
     label: "arrcount",
     kind: "Function",
-    detail: "(field) — number of elements in an array",
+    detail: "(field)",
+    documentation: "Number of elements in an array field.",
     insertText: "arrcount(${1:field})",
     insertTextRules: SNIPPET,
   },
@@ -236,7 +247,8 @@ export const SQL_FUNCTIONS: SqlCompletionEntry[] = [
     name: "arrsort",
     label: "arrsort",
     kind: "Function",
-    detail: "(field) — sort an array ascending",
+    detail: "(field)",
+    documentation: "Sort the elements of an array field in ascending order.",
     insertText: "arrsort(${1:field})",
     insertTextRules: SNIPPET,
   },
@@ -244,7 +256,8 @@ export const SQL_FUNCTIONS: SqlCompletionEntry[] = [
     name: "cast_to_arr",
     label: "cast_to_arr",
     kind: "Function",
-    detail: "(field) — cast a value to an array",
+    detail: "(field)",
+    documentation: "Cast a field value to an array so the arr* functions can operate on it.",
     insertText: "cast_to_arr(${1:field})",
     insertTextRules: SNIPPET,
   },
@@ -252,7 +265,8 @@ export const SQL_FUNCTIONS: SqlCompletionEntry[] = [
     name: "arrindex",
     label: "arrindex",
     kind: "Function",
-    detail: "(field, start, end) — slice an array by index range",
+    detail: "(field, start, end)",
+    documentation: "Slice an array field by an inclusive index range.",
     insertText: "arrindex(${1:field}, ${2:1}, ${3:10})",
     insertTextRules: SNIPPET,
   },
@@ -260,7 +274,8 @@ export const SQL_FUNCTIONS: SqlCompletionEntry[] = [
     name: "arrjoin",
     label: "arrjoin",
     kind: "Function",
-    detail: "(field, delimiter) — join array elements into a string",
+    detail: "(field, delimiter)",
+    documentation: "Join the elements of an array field into a single string.",
     insertText: "arrjoin(${1:field}, '${2:delimiter}')",
     insertTextRules: SNIPPET,
   },
@@ -268,7 +283,8 @@ export const SQL_FUNCTIONS: SqlCompletionEntry[] = [
     name: "arrzip",
     label: "arrzip",
     kind: "Function",
-    detail: "(field1, field2, delimiter) — zip two arrays together",
+    detail: "(field1, field2, delimiter)",
+    documentation: "Pair up two array fields element by element, joined by the delimiter.",
     insertText: "arrzip(${1:field1}, ${2:field2}, '${3:delimiter}')",
     insertTextRules: SNIPPET,
   },
@@ -276,7 +292,9 @@ export const SQL_FUNCTIONS: SqlCompletionEntry[] = [
     name: "spath",
     label: "spath",
     kind: "Function",
-    detail: "(field, path) — extract a nested value by dotted path",
+    detail: "(field, path)",
+    documentation:
+      "Extract a nested value from a structured field using a dotted path, e.g. `spath(body, 'user.id')`.",
     insertText: "spath(${1:field}, '${2:path}')",
     insertTextRules: SNIPPET,
   },
@@ -284,7 +302,8 @@ export const SQL_FUNCTIONS: SqlCompletionEntry[] = [
     name: "to_array_string",
     label: "to_array_string",
     kind: "Function",
-    detail: "(field) — render an array as a string",
+    detail: "(field)",
+    documentation: "Render an array field as its string representation.",
     insertText: "to_array_string(${1:field})",
     insertTextRules: SNIPPET,
   },
@@ -292,21 +311,24 @@ export const SQL_FUNCTIONS: SqlCompletionEntry[] = [
     name: "unnest",
     label: "unnest",
     kind: "Function",
-    detail: "expand an array into rows",
+    detail: "array -> rows",
+    documentation: "Expand an array into one row per element.",
     insertText: "unnest",
   },
   {
     name: "array_extract",
     label: "array_extract",
     kind: "Function",
-    detail: "extract an element from an array",
+    detail: "array element",
+    documentation: "Extract a single element from an array.",
     insertText: "array_extract",
   },
   {
     name: "sum",
     label: "sum",
     kind: "Function",
-    detail: "(field) — sum of values",
+    detail: "(field)",
+    documentation: "Sum of all values in the field. Aggregate — pair with GROUP BY.",
     insertText: "sum(${1:field})",
     insertTextRules: SNIPPET,
   },
@@ -314,7 +336,8 @@ export const SQL_FUNCTIONS: SqlCompletionEntry[] = [
     name: "avg",
     label: "avg",
     kind: "Function",
-    detail: "(field) — arithmetic mean",
+    detail: "(field)",
+    documentation: "Arithmetic mean of the field. Aggregate — pair with GROUP BY.",
     insertText: "avg(${1:field})",
     insertTextRules: SNIPPET,
   },
@@ -322,7 +345,8 @@ export const SQL_FUNCTIONS: SqlCompletionEntry[] = [
     name: "count",
     label: "count",
     kind: "Function",
-    detail: "(field) — number of rows",
+    detail: "(field)",
+    documentation: "Number of rows. Aggregate — pair with GROUP BY.",
     insertText: "count(${1:field})",
     insertTextRules: SNIPPET,
   },
@@ -330,7 +354,8 @@ export const SQL_FUNCTIONS: SqlCompletionEntry[] = [
     name: "max",
     label: "max",
     kind: "Function",
-    detail: "(field) — largest value",
+    detail: "(field)",
+    documentation: "Largest value in the field. Aggregate — pair with GROUP BY.",
     insertText: "max(${1:field})",
     insertTextRules: SNIPPET,
   },
@@ -338,7 +363,8 @@ export const SQL_FUNCTIONS: SqlCompletionEntry[] = [
     name: "min",
     label: "min",
     kind: "Function",
-    detail: "(field) — smallest value",
+    detail: "(field)",
+    documentation: "Smallest value in the field. Aggregate — pair with GROUP BY.",
     insertText: "min(${1:field})",
     insertTextRules: SNIPPET,
   },
@@ -346,7 +372,9 @@ export const SQL_FUNCTIONS: SqlCompletionEntry[] = [
     name: "histogram",
     label: "histogram",
     kind: "Function",
-    detail: "(field, interval) — bucket a timestamp into intervals",
+    detail: "(field, interval)",
+    documentation:
+      "Bucket a timestamp column into fixed intervals, e.g. `histogram(_timestamp, '30 second')`. Use as the x-axis of a time series.",
     insertText: "histogram(${1:_timestamp}, '${2:30 second}')",
     insertTextRules: SNIPPET,
   },
@@ -354,7 +382,9 @@ export const SQL_FUNCTIONS: SqlCompletionEntry[] = [
     name: "approx_topk",
     label: "approx_topk",
     kind: "Function",
-    detail: "(field, k) — approximate top-k most frequent values",
+    detail: "(field, k)",
+    documentation:
+      "Approximate the k most frequent values of a field. Much cheaper than an exact GROUP BY ... ORDER BY count DESC on high-cardinality fields.",
     insertText: "approx_topk(${1:field}, ${2:10})",
     insertTextRules: SNIPPET,
   },
@@ -362,7 +392,9 @@ export const SQL_FUNCTIONS: SqlCompletionEntry[] = [
     name: "approx_topk_distinct",
     label: "approx_topk_distinct",
     kind: "Function",
-    detail: "(field, distinct_field, k) — approximate top-k by distinct count",
+    detail: "(field, distinct_field, k)",
+    documentation:
+      "Approximate the k values of `field` with the highest distinct count of `distinct_field`.",
     insertText: "approx_topk_distinct(${1:field}, ${2:field2}, ${3:10})",
     insertTextRules: SNIPPET,
   },
@@ -401,6 +433,8 @@ export interface BuildCompletionItemsOptions {
   kinds: Record<string, number>;
   /** monaco.languages.CompletionItemInsertTextRule */
   insertTextRules: Record<string, number>;
+  /** monaco.languages.CompletionItemTag. Optional — omit and no item is tagged. */
+  tags?: Record<string, number>;
 }
 
 const toMonacoItem = (
@@ -409,6 +443,7 @@ const toMonacoItem = (
   range: unknown,
   kinds: Record<string, number>,
   rules: Record<string, number>,
+  tags?: Record<string, number>,
 ): Record<string, unknown> => {
   // Legacy callable shape is still supported: `suggestions` is a public prop.
   const label = typeof entry.label === "function" ? entry.label(word) : entry.label;
@@ -430,8 +465,19 @@ const toMonacoItem = (
   if (ruleName && rules[ruleName] !== undefined) item.insertTextRules = rules[ruleName];
 
   if (entry.detail !== undefined) item.detail = entry.detail;
-  if (entry.documentation !== undefined) item.documentation = entry.documentation;
+  // Wrapped as an IMarkdownString: monaco renders markdown only for the object
+  // form, so a plain string would show its backticks literally in the docs panel.
+  if (entry.documentation !== undefined) {
+    item.documentation =
+      typeof entry.documentation === "string"
+        ? { value: entry.documentation }
+        : entry.documentation;
+  }
   if (entry.sortText !== undefined) item.sortText = entry.sortText;
+
+  // Renders the label with a strikethrough. match_all_raw and friends are still
+  // accepted (sql/rewriter rewrites them) but should not be reached for.
+  if (entry.deprecated && tags?.Deprecated !== undefined) item.tags = [tags.Deprecated];
 
   return item;
 };
@@ -451,10 +497,24 @@ export const buildCompletionItems = ({
   range,
   kinds,
   insertTextRules,
+  tags,
 }: BuildCompletionItemsOptions): Record<string, unknown>[] => [
-  ...keywords.map((k) => toMonacoItem(k, word, range, kinds, insertTextRules)),
-  ...suggestions.map((s) => toMonacoItem(s, word, range, kinds, insertTextRules)),
+  ...keywords.map((k) => toMonacoItem(k, word, range, kinds, insertTextRules, tags)),
+  ...suggestions.map((s) => toMonacoItem(s, word, range, kinds, insertTextRules, tags)),
 ];
+
+/**
+ * True when any entry derives its content from the typed word.
+ *
+ * Monaco calls a provider once per word and then filters the returned list
+ * client-side; it only re-queries mid-word when the list is marked
+ * `incomplete`. Nothing in the shared catalog is dynamic, but the `suggestions`
+ * prop is public and legacy callers may still pass callables — for those the
+ * caller must report the list as incomplete or the content freezes at the first
+ * keystroke (the original approx_topk('a', 10) bug).
+ */
+export const hasDynamicEntries = (entries: LooseEntry[] = []): boolean =>
+  entries.some((e) => typeof e.label === "function" || typeof e.insertText === "function");
 
 /** Bare function names, for consumers that must recognise a call site (e.g.
  *  natural-language detection). Keyed off `name`, never off the display label. */

@@ -77,6 +77,7 @@ vi.mock("monaco-editor/esm/vs/editor/editor.api", () => ({
       Snippet: 27,
     },
     CompletionItemInsertTextRule: { None: 0, KeepWhitespace: 1, InsertAsSnippet: 4 },
+    CompletionItemTag: { Deprecated: 1 },
     register: vi.fn(),
     setMonarchTokensProvider: vi.fn(),
     registerCompletionItemProvider: vi.fn(() => ({ dispose: vi.fn() })),
@@ -195,9 +196,9 @@ describe("Phase 1 — the registered completion provider", () => {
     const monacoApi = await import("monaco-editor/esm/vs/editor/editor.api");
     const registerFn = vi.mocked(monacoApi.languages.registerCompletionItemProvider);
 
-    getElementByIdSpy = vi.spyOn(document, "getElementById").mockImplementation(() =>
-      document.createElement("div"),
-    );
+    getElementByIdSpy = vi
+      .spyOn(document, "getElementById")
+      .mockImplementation(() => document.createElement("div"));
 
     const mountAndCapture = async (editorId: string, props: any) => {
       const baseline = registerFn.mock.calls.length;
@@ -270,7 +271,7 @@ describe("Phase 1 — the registered completion provider", () => {
     const item = itemFor(invokeSug("SELECT ", ""), "approx_topk");
     expect(item).toBeDefined();
     expect(item.detail).toBe("(field, k) → top-k values");
-    expect(item.documentation).toBe("Approximate top-k.");
+    expect(item.documentation).toEqual({ value: "Approximate top-k." });
     expect(item.sortText).toBe("zz-approx_topk");
   });
 
@@ -316,6 +317,39 @@ describe("Phase 1 — the registered completion provider", () => {
     expect(sum.kind).toBe(1);
     expect(sum.insertTextRules).toBe(4);
     expect(sum.insertText).toBe("sum(${1:field})");
+  });
+
+  it("A2 — a list containing legacy callables is reported as incomplete", () => {
+    // SUGGESTIONS includes one callable entry, so monaco must re-query as the
+    // user keeps typing rather than freezing the first-keystroke content.
+    expect(invokeSug("SELECT a", "a").incomplete).toBe(true);
+  });
+
+  it("A2 — a purely static list is NOT reported as incomplete", () => {
+    // Re-querying every keystroke for content that cannot change is wasted work.
+    expect(invokeKw("SELECT a", "a").incomplete).toBeFalsy();
+    expect(invokeFallback("SELECT a", "a").incomplete).toBeFalsy();
+  });
+
+  it("B3 — deprecated aliases carry monaco's Deprecated tag (strikethrough)", () => {
+    const raw = invokeFallback("SELECT ", "").suggestions.find(
+      (s: any) => s.label === "match_all_raw",
+    );
+    expect(raw).toBeDefined();
+    expect(raw.tags).toEqual([1]); // CompletionItemTag.Deprecated
+  });
+
+  it("B3 — match_all itself is not tagged deprecated", () => {
+    const ok = invokeFallback("SELECT ", "").suggestions.find((s: any) => s.label === "match_all");
+    expect(ok.tags).toBeUndefined();
+  });
+
+  it("D1 — catalog items carry a compact detail and prose documentation", () => {
+    const topk = invokeFallback("SELECT ", "").suggestions.find(
+      (s: any) => s.label === "approx_topk",
+    );
+    expect(topk.detail).toBe("(field, k)");
+    expect(String((topk.documentation as any).value).length).toBeGreaterThan(15);
   });
 
   it("A4 — legacy callables get monaco's word, not a space-split token", () => {
