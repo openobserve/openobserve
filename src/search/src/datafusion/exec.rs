@@ -786,6 +786,97 @@ mod tests {
         Ok(())
     }
 
+    // ── tmp/code.md B4 — the function catalog served to the query editor ─────
+    //
+    // registered_function_names() is the authoritative list. Two gaps were
+    // found reviewing it: JSON functions are registered by a SEPARATE call that
+    // the snapshot context never made, and functions provided by SQL rewriters
+    // never appear in any registry at all.
+
+    #[test]
+    fn registered_function_names_includes_o2_udfs() {
+        let names = registered_function_names();
+        for expected in [
+            "str_match",
+            "match_all",
+            "histogram",
+            "spath",
+            "arrcount",
+            "re_match",
+            "cast_to_timestamp",
+        ] {
+            assert!(
+                names.iter().any(|n| n == expected),
+                "registry is missing the O2 UDF `{expected}`"
+            );
+        }
+    }
+
+    #[test]
+    fn registered_function_names_includes_datafusion_builtins() {
+        let names = registered_function_names();
+        for expected in ["date_trunc", "coalesce", "concat", "regexp_replace", "abs"] {
+            assert!(
+                names.iter().any(|n| n == expected),
+                "registry is missing the DataFusion builtin `{expected}`"
+            );
+        }
+    }
+
+    #[test]
+    fn registered_function_names_includes_json_functions() {
+        // Production contexts call datafusion_functions_json::register_all
+        // separately (see flight.rs). Without that call here the whole json_*
+        // family is absent from the catalog the editor is served.
+        let names = registered_function_names();
+        for expected in ["json_get", "json_get_str", "json_length"] {
+            assert!(
+                names.iter().any(|n| n == expected),
+                "registry is missing the JSON function `{expected}` — is                  datafusion_functions_json::register_all wired into the snapshot context?"
+            );
+        }
+    }
+
+    #[test]
+    fn registered_function_names_is_sorted_and_deduped() {
+        let names = registered_function_names();
+        assert!(!names.is_empty());
+        let mut sorted = names.to_vec();
+        sorted.sort();
+        sorted.dedup();
+        assert_eq!(names, sorted.as_slice(), "names must be sorted and deduplicated");
+    }
+
+    #[test]
+    fn rewriter_aliases_are_exposed_for_the_catalog() {
+        // match_all_raw / match_all_raw_ignore_case are valid user-facing SQL
+        // (sql/rewriter/match_all_raw.rs rewrites them to match_all before
+        // planning) but appear in NO registry. A catalog built only from the
+        // registry would silently drop two functions users rely on today.
+        let aliases = crate::sql::rewriter::REWRITER_FUNCTION_ALIASES;
+        for expected in ["match_all_raw", "match_all_raw_ignore_case"] {
+            assert!(
+                aliases.contains(&expected),
+                "rewriter alias `{expected}` is not exported for the catalog"
+            );
+        }
+    }
+
+    #[test]
+    fn catalog_function_names_unions_registry_and_rewriter_aliases() {
+        let catalog = catalog_function_names();
+        assert!(catalog.iter().any(|n| n == "match_all"), "registry entry missing");
+        assert!(
+            catalog.iter().any(|n| n == "match_all_raw"),
+            "rewriter alias missing from the catalog union"
+        );
+        assert!(catalog.iter().any(|n| n == "json_get"), "json function missing");
+        let mut sorted = catalog.clone();
+        sorted.sort();
+        sorted.dedup();
+        assert_eq!(catalog, sorted, "catalog must be sorted and deduplicated");
+    }
+
     #[test]
     fn test_table_builder_new() {
         let builder = TableBuilder::new();

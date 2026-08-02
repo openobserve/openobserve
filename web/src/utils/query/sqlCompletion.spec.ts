@@ -22,7 +22,9 @@ import { describe, it, expect } from "vitest";
 import {
   SQL_FUNCTIONS,
   SQL_KEYWORDS,
+  SQL_CLAUSE_KEYWORDS,
   buildCompletionItems,
+  buildFieldEntry,
   type SqlCompletionEntry,
 } from "./sqlCompletion";
 
@@ -612,5 +614,184 @@ describe("N2/D7 — resolveSuggestions / resolveKeywords", () => {
     const { resolveKeywords } = await import("./sqlCompletion");
     const custom = [{ name: "host", label: "host", kind: "Field", insertText: "host" }] as any;
     expect(resolveKeywords("sql", custom)).toBe(custom);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PHASE 2
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ───────────────────────────────────────────────────────────────────────────
+// B1 — SQL clause keywords
+//
+// monaco's sql.contribution.js is TOKENIZER-ONLY (zero matches for
+// registerCompletionItemProvider). Nothing ever offered SELECT/FROM/WHERE; the
+// only reason they appeared to work was the word-based provider echoing text
+// already in the buffer.
+// ───────────────────────────────────────────────────────────────────────────
+
+describe("B1 — the clause keyword catalog", () => {
+  const clause = (label: string) => SQL_CLAUSE_KEYWORDS.find((k) => k.label === label);
+
+  const REQUIRED = [
+    "SELECT",
+    "FROM",
+    "WHERE",
+    "GROUP BY",
+    "ORDER BY",
+    "HAVING",
+    "LIMIT",
+    "OFFSET",
+    "DISTINCT",
+    "AS",
+    "WITH",
+    "UNION",
+    "UNION ALL",
+    "INNER JOIN",
+    "LEFT JOIN",
+    "RIGHT JOIN",
+    "FULL OUTER JOIN",
+    "ON",
+    "CASE",
+    "CAST",
+    "OVER",
+    "PARTITION BY",
+    "ASC",
+    "DESC",
+    "NULLS FIRST",
+    "NULLS LAST",
+    "EXISTS",
+  ];
+
+  it.each(REQUIRED)("offers %s", (label) => {
+    expect(clause(label), `SQL_CLAUSE_KEYWORDS is missing ${label}`).toBeDefined();
+  });
+
+  it("labels clause keywords in uppercase — the SQL convention", () => {
+    for (const k of SQL_CLAUSE_KEYWORDS) {
+      expect(k.label, `${k.name} should be uppercase`).toBe(k.label.toUpperCase());
+    }
+  });
+
+  it("marks every clause keyword as kind Keyword", () => {
+    for (const k of SQL_CLAUSE_KEYWORDS) expect(k.kind, k.name).toBe("Keyword");
+  });
+
+  it("gives every clause keyword a detail so the widget explains it", () => {
+    for (const k of SQL_CLAUSE_KEYWORDS) expect(k.detail, `${k.name} needs detail`).toBeTruthy();
+  });
+
+  it("does not duplicate anything already in SQL_KEYWORDS", () => {
+    const predicates = new Set(SQL_KEYWORDS.map((k) => k.name.toLowerCase()));
+    for (const k of SQL_CLAUSE_KEYWORDS) {
+      expect(predicates.has(k.name.toLowerCase()), `${k.name} duplicates a predicate`).toBe(false);
+    }
+  });
+
+  it("has no duplicates within itself", () => {
+    const names = SQL_CLAUSE_KEYWORDS.map((k) => k.name);
+    expect(new Set(names).size).toBe(names.length);
+  });
+
+  it("expands CASE into a full snippet, not a bare word", () => {
+    const c = clause("CASE")!;
+    expect(c.insertText).toContain("WHEN");
+    expect(c.insertText).toContain("END");
+    expect(c.insertTextRules).toBe("InsertAsSnippet");
+  });
+
+  it("expands JOINs with an ON clause tab stop", () => {
+    const j = clause("INNER JOIN")!;
+    expect(j.insertText).toContain("ON");
+    expect(j.insertTextRules).toBe("InsertAsSnippet");
+  });
+
+  it("gives multi-tab-stop clause snippets distinct indices", () => {
+    for (const k of SQL_CLAUSE_KEYWORDS) {
+      const indices = [...k.insertText.matchAll(/\$\{(\d+)[:}]/g)].map((m) => m[1]);
+      expect(new Set(indices).size, `${k.name} reuses a tab stop index`).toBe(indices.length);
+    }
+  });
+
+  it("declares InsertAsSnippet for every entry carrying a tab stop", () => {
+    for (const k of SQL_CLAUSE_KEYWORDS) {
+      if (k.insertText.includes("${")) {
+        expect(k.insertTextRules, `${k.name}`).toBe("InsertAsSnippet");
+      }
+    }
+  });
+
+  it("sorts clause keywords after fields but they remain reachable", () => {
+    // Clause keywords are structural: useful, but never ahead of a column name.
+    for (const k of SQL_CLAUSE_KEYWORDS) {
+      expect(k.sortText, `${k.name} needs an explicit sortText`).toBeTruthy();
+    }
+  });
+});
+
+describe("B1 — clause keywords reach a SQL editor through the fallback", () => {
+  it("resolveKeywords serves predicates AND clauses for SQL", async () => {
+    const { resolveKeywords } = await import("./sqlCompletion");
+    const resolved = resolveKeywords("sql", []) as SqlCompletionEntry[];
+    const names = resolved.map((k) => k.name);
+    expect(names).toContain("SELECT");
+    expect(names).toContain("GROUP BY");
+    expect(names).toContain("and"); // predicates still there
+  });
+
+  it("does not leak SQL clauses into non-SQL editors", async () => {
+    const { resolveKeywords } = await import("./sqlCompletion");
+    expect(resolveKeywords("json", [])).toEqual([]);
+    expect(resolveKeywords("promql", [])).toEqual([]);
+  });
+
+  it("still prefers caller-supplied keywords over the defaults", async () => {
+    const { resolveKeywords } = await import("./sqlCompletion");
+    const custom = [{ name: "host", label: "host", kind: "Field", insertText: "host" }] as any;
+    expect(resolveKeywords("sql", custom)).toBe(custom);
+  });
+});
+
+// ───────────────────────────────────────────────────────────────────────────
+// D1 / N5 — column type in `detail`
+//
+// The type is already carried on every field object (Utf8, Int64, …) and was
+// discarded when building keywords. It is exactly what belongs in the suggest
+// widget's inline column.
+// ───────────────────────────────────────────────────────────────────────────
+
+describe("D1/N5 — field entries surface the column type", () => {
+  it("puts the column type in detail", () => {
+    expect(buildFieldEntry({ name: "code", type: "Int64" }).detail).toBe("Int64");
+  });
+
+  it("keeps the field name as label and insertText", () => {
+    const e = buildFieldEntry({ name: "k8s_pod_name", type: "Utf8" });
+    expect(e.label).toBe("k8s_pod_name");
+    expect(e.insertText).toBe("k8s_pod_name");
+  });
+
+  it("marks it kind Field", () => {
+    expect(buildFieldEntry({ name: "code", type: "Int64" }).kind).toBe("Field");
+  });
+
+  it("sorts fields ahead of functions and keywords", () => {
+    const field = buildFieldEntry({ name: "code", type: "Int64" });
+    const clause = SQL_CLAUSE_KEYWORDS[0];
+    expect(field.sortText! < clause.sortText!).toBe(true);
+  });
+
+  it("omits detail rather than inventing one when the type is unknown", () => {
+    expect(buildFieldEntry({ name: "code" } as any).detail).toBeUndefined();
+  });
+
+  it("does not mark a plain field name as a snippet", () => {
+    expect(buildFieldEntry({ name: "code", type: "Utf8" }).insertTextRules).toBeUndefined();
+  });
+
+  it("forwards the type through to monaco as detail", () => {
+    const [item] = build({ keywords: [buildFieldEntry({ name: "code", type: "Int64" })] });
+    expect(item.detail).toBe("Int64");
+    expect(item.kind).toBe(KINDS.Field);
   });
 });

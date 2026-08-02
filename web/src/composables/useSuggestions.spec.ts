@@ -410,3 +410,87 @@ describe("catalog wiring — suggestions come from the shared sqlCompletion modu
     expect(host.sortText < and.sortText).toBe(true);
   });
 });
+
+// ─── Phase 2 (tmp/code.md D1/N5 + B1) ────────────────────────────────────────
+// The composable is what Logs/Traces/Alerts actually consume, so the column
+// type and the clause keywords have to survive the trip through it — not just
+// exist in the catalog.
+
+describe("Phase 2 — column types reach the editor as detail (D1/N5)", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("carries the column type into each field keyword's detail", () => {
+    const c = makeComposable();
+    c.updateFieldKeywords([
+      { name: "code", type: "Int64" },
+      { name: "message", type: "Utf8" },
+    ]);
+    const code = c.autoCompleteKeywords.value.find((k: any) => k.label === "code");
+    const message = c.autoCompleteKeywords.value.find((k: any) => k.label === "message");
+    expect(code.detail).toBe("Int64");
+    expect(message.detail).toBe("Utf8");
+  });
+
+  it("still excludes the timestamp column", () => {
+    const c = makeComposable();
+    c.updateFieldKeywords([
+      { name: "_timestamp", type: "Int64" },
+      { name: "code", type: "Int64" },
+    ]);
+    const labels = c.autoCompleteKeywords.value.map((k: any) => k.label);
+    expect(labels).not.toContain("_timestamp");
+    expect(labels).toContain("code");
+  });
+
+  it("tolerates fields with no type rather than emitting 'undefined'", () => {
+    const c = makeComposable();
+    c.updateFieldKeywords([{ name: "code" }]);
+    const code = c.autoCompleteKeywords.value.find((k: any) => k.label === "code");
+    expect(code.detail).toBeUndefined();
+  });
+
+  it("carries types through updateAllKeywords too", () => {
+    const c = makeComposable();
+    c.updateAllKeywords([{ name: "code", type: "Int64" }], []);
+    const code = c.autoCompleteKeywords.value.find((k: any) => k.label === "code");
+    expect(code.detail).toBe("Int64");
+  });
+});
+
+describe("Phase 2 — SQL clause keywords are offered (B1)", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("includes SELECT/FROM/WHERE in the base keyword list", async () => {
+    const c = makeComposable({ storedValues: [] });
+    await run(c, "SELECT * FROM stream WHERE ");
+    const labels = c.effectiveKeywords.value.map((k: any) => k.label);
+    for (const kw of ["SELECT", "FROM", "WHERE", "GROUP BY", "ORDER BY", "LIMIT"]) {
+      expect(labels, `missing ${kw}`).toContain(kw);
+    }
+  });
+
+  it("keeps predicates alongside the clauses", async () => {
+    const c = makeComposable({ storedValues: [] });
+    await run(c, "SELECT * FROM stream WHERE ");
+    const labels = c.effectiveKeywords.value.map((k: any) => k.label);
+    expect(labels).toContain("and");
+    expect(labels).toContain("=");
+  });
+
+  it("suppresses clause keywords in value context", async () => {
+    const c = makeComposable({ storedValues: ["error"] });
+    await run(c, "level = ");
+    const labels = c.effectiveKeywords.value.map((k: any) => k.label);
+    expect(labels).not.toContain("SELECT");
+    expect(labels).toEqual(["error"]);
+  });
+
+  it("sorts fields ahead of clause keywords", async () => {
+    const c = makeComposable({ storedValues: [] });
+    c.updateFieldKeywords([{ name: "host", type: "Utf8" }]);
+    await run(c, "SELECT * FROM stream WHERE ");
+    const host = c.effectiveKeywords.value.find((k: any) => k.label === "host");
+    const select = c.effectiveKeywords.value.find((k: any) => k.label === "SELECT");
+    expect(host.sortText < select.sortText).toBe(true);
+  });
+});
