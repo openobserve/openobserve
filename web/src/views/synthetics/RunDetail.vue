@@ -209,7 +209,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <EvidencePanel
                 v-if="detailTab === 'evidence'"
                 :evidence-key="evidenceKey"
-                :resolve-url="screenshotUrl"
                 :step-defs="evidenceStepDefs"
                 :events="evidence.events.value"
                 :status="evidence.status.value"

@@ -48,8 +48,8 @@ const STEP_DEFS = new Map([
 
 describe("evidence bundle parsing", () => {
   it("parses NDJSON line by line, not as a JSON document", () => {
-    // JSON.parse on the whole payload throws — which is also why the download
-    // button must not be labelled "JSON".
+    // JSON.parse on the whole payload throws: the bundle is one object per line,
+    // not an array.
     expect(() => JSON.parse(NDJSON)).toThrow();
     expect(parseEvidenceNdjson(NDJSON)).toHaveLength(4);
   });
@@ -185,7 +185,6 @@ describe("EvidencePanel", () => {
     mount(EvidencePanel, {
       props: {
         evidenceKey: "synthetics/org/mon/RUN/EXEC/attempt-1-evidence.ndjson",
-        resolveUrl: (k: string) => `/artifact?key=${k}`,
         stepDefs: STEP_DEFS,
         events: named(),
         status: "ready",
@@ -320,11 +319,6 @@ describe("EvidencePanel", () => {
     const w = mountPanel({ truncated: true });
     expect(w.find('[data-test="synthetics-evidence-truncated"]').exists()).toBe(true);
   });
-
-  it("labels the download as NDJSON", () => {
-    const w = mountPanel();
-    expect(w.find('[data-test="synthetics-evidence-download"]').text()).toContain(".ndjson");
-  });
 });
 
 describe("EvidencePanel view filter", () => {
@@ -338,7 +332,6 @@ describe("EvidencePanel view filter", () => {
     mount(EvidencePanel, {
       props: {
         evidenceKey: "k",
-        resolveUrl: (k: string) => k,
         stepDefs: STEP_DEFS,
         events: named(),
         status: "ready",

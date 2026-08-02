@@ -57,8 +57,6 @@ const props = withDefaults(
   defineProps<{
     /** Object-storage key of the selected attempt's bundle. Null when none exists. */
     evidenceKey: string | null;
-    /** Resolves a key to a fetchable URL — used for the download link only. */
-    resolveUrl: (key: string) => string;
     /** step_id -> definition, for naming the step on each row. */
     stepDefs: Map<string, { name: string; selector: string | null }>;
     /** The attempt's events, already fetched and named by useSyntheticEvidence. */
@@ -211,8 +209,6 @@ const views = computed(() => [
     count: countIn(VIEW_GROUPS.console),
   },
 ]);
-
-const downloadUrl = computed(() => (props.evidenceKey ? props.resolveUrl(props.evidenceKey) : ""));
 </script>
 
 <template>
