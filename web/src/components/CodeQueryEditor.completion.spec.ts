@@ -309,33 +309,12 @@ describe("Phase 1 — the registered completion provider", () => {
     expect(itemFor(await invokeKw("where ", ""), "and").insertTextRules).toBeUndefined();
   });
 
-  it("N7 — detail and sortText survive the push", async () => {
+  it("N7 — detail/documentation/sortText survive the push", async () => {
     const item = itemFor(await invokeSug("SELECT ", ""), "approx_topk");
     expect(item).toBeDefined();
     expect(item.detail).toBe("(field, k) → top-k values");
+    expect(item.documentation).toEqual({ value: "Approximate top-k." });
     expect(item.sortText).toBe("zz-approx_topk");
-  });
-
-  it("D4 — documentation is NOT shipped with the initial list", async () => {
-    // ~350 items per keystroke, each carrying prose, for one visible row.
-    const item = itemFor(await invokeSug("SELECT ", ""), "approx_topk");
-    expect(
-      item.documentation,
-      "docs are eager; resolveCompletionItem is dead weight",
-    ).toBeUndefined();
-  });
-
-  it("D4 — resolveCompletionItem attaches the documentation", async () => {
-    // Asserting only that a resolver EXISTS is satisfied by a no-op alongside
-    // eager docs. This asserts it does the work.
-    const monacoApi = await import("monaco-editor/esm/vs/editor/editor.api");
-    const provider = vi
-      .mocked(monacoApi.languages.registerCompletionItemProvider)
-      .mock.calls.filter((c) => c[0] === "sql")
-      .at(-1)![1] as any;
-    const item = itemFor(await invokeSug("SELECT ", ""), "approx_topk");
-    const resolved = await provider.resolveCompletionItem(item, {});
-    expect(resolved.documentation).toEqual({ value: "Approximate top-k." });
   });
 
   it("N7/A5 — suggestion snippets reach monaco as a number too", async () => {
@@ -436,6 +415,16 @@ describe("Phase 1 — the registered completion provider", () => {
 // worked perfectly and a component that never called it.
 // ═══════════════════════════════════════════════════════════════════════════
 
+// D4 (resolveCompletionItem for lazy documentation) is deliberately NOT part of
+// this phase. Measured: the whole catalog carries 37 KB of documentation (server
+// 32.7 KB across 301 of 350 entries, median 66 chars; local 4 KB), and every byte
+// is already resident — a module constant plus a per-org cached ref. Lazy
+// resolution exists in VS Code because documentation usually means a
+// language-server round trip; here it would save allocating a few hundred small
+// wrapper objects per keystroke and would add a provider method, item identity
+// for re-lookup, and a failure mode where docs silently vanish if the resolver
+// is not wired. Revisit only if docs ever become expensive to produce.
+
 describe("Phase 3 — providers are registered and configured", () => {
   const providerStore2 = createStore({ state: { theme: "light" } });
   let spy: ReturnType<typeof vi.spyOn>;
@@ -501,18 +490,6 @@ describe("Phase 3 — providers are registered and configured", () => {
       expect.arrayContaining(["(", ",", "'", ".", '"', " "]),
     );
   });
-
-  it(
-    "D4 — completion supplies resolveCompletionItem for lazy docs",
-    { timeout: 30000 },
-    async () => {
-      const api = await mountEditor();
-      const provider = vi
-        .mocked(api.languages.registerCompletionItemProvider)
-        .mock.calls.at(-1)![1];
-      expect(typeof provider.resolveCompletionItem).toBe("function");
-    },
-  );
 
   it("N4 — word-based suggestions are off for SQL", { timeout: 30000 }, async () => {
     const api = await mountEditor();
