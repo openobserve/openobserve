@@ -460,6 +460,22 @@ describe("Phase 2 — column types reach the editor as detail (D1/N5)", () => {
 describe("Phase 2 — SQL clause keywords are offered (B1)", () => {
   beforeEach(() => vi.clearAllMocks());
 
+  // Decision: clause keywords are NOT gated on SQL mode. They are offered in
+  // every SQL-language editor, including the Logs filter-fragment ("non-SQL")
+  // mode, where a user may still be composing a full query. There is therefore
+  // no mode flag anywhere in this contract — only CONTEXT suppression (see the
+  // value-context test below), which is a different thing.
+
+  it("offers clause keywords for a bare filter fragment, not just a full query", () => {
+    // The Logs non-SQL mode edits a WHERE fragment; clauses must still appear.
+    const c = makeComposable({ storedValues: [] });
+    c.updateFieldKeywords([{ name: "level", type: "Utf8" }]);
+    const labels = c.autoCompleteKeywords.value.map((k: any) => k.label);
+    for (const kw of ["SELECT", "FROM", "WHERE"]) {
+      expect(labels, `missing ${kw} in fragment mode`).toContain(kw);
+    }
+  });
+
   it("includes SELECT/FROM/WHERE in the base keyword list", async () => {
     const c = makeComposable({ storedValues: [] });
     await run(c, "SELECT * FROM stream WHERE ");
