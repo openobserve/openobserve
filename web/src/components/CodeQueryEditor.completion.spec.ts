@@ -18,7 +18,7 @@ import { createStore } from "vuex";
 // getModel() that returns a fresh object each call makes the provider
 // permanently unreachable from tests — which is why the provider specs below
 // were previously skipped.
-const mockModel = {
+const makeModel = () => ({
   getValue: vi.fn(() => ""),
   setValue: vi.fn(),
   getLineCount: vi.fn(() => 1),
@@ -30,10 +30,16 @@ const mockModel = {
   getValueInRange: vi.fn(() => ""),
   getWordUntilPosition: vi.fn(() => ({ word: "", startColumn: 1, endColumn: 1 })),
   getWordAtPosition: vi.fn(() => ({ word: "", startColumn: 1, endColumn: 1 })),
-};
+  uri: { toString: () => `inmemory://model/${Math.random()}` },
+});
 
-// Stable mock editor instance so tests can reference it directly
-const mockEditorObj = {
+// The default model, used by the tests that only ever mount one editor.
+const mockModel = makeModel();
+
+/** Every editor stub monaco.editor.create has handed out, newest last. */
+const createdEditors: any[] = [];
+
+const makeEditorStub = (model: any) => ({
   onDidChangeModelContent: vi.fn(),
   createContextKey: vi.fn(),
   addCommand: vi.fn(),
@@ -43,7 +49,7 @@ const mockEditorObj = {
   getValue: vi.fn(() => ""),
   setValue: vi.fn(),
   layout: vi.fn(),
-  getModel: vi.fn(() => mockModel),
+  getModel: vi.fn(() => model),
   updateOptions: vi.fn(),
   hasWidgetFocus: vi.fn(() => false),
   getRawOptions: vi.fn(() => ({ readOnly: false })),
@@ -51,14 +57,26 @@ const mockEditorObj = {
   getPosition: vi.fn(() => ({ lineNumber: 1, column: 1 })),
   trigger: vi.fn(),
   getAction: vi.fn(() => ({ run: vi.fn(() => Promise.resolve()) })),
-};
+});
+
+// Kept for the tests that assert on "the editor" without caring which one.
+// Points at the most recently created stub.
+const mockEditorObj: any = makeEditorStub(mockModel);
 
 // Simple mock for monaco editor
 vi.mock("monaco-editor/esm/vs/editor/editor.all.js", () => ({}));
 vi.mock("monaco-editor/esm/vs/editor/editor.api", () => ({
   default: {},
   editor: {
-    create: vi.fn(() => mockEditorObj),
+    create: vi.fn(() => {
+      // A fresh editor AND model per call, as real monaco does. Sharing one
+      // stub makes a per-language singleton provider impossible to test: it
+      // distinguishes editors by model.
+      const stub = makeEditorStub(makeModel());
+      createdEditors.push(stub);
+      Object.assign(mockEditorObj, stub);
+      return stub;
+    }),
     defineTheme: vi.fn(),
     setTheme: vi.fn(),
     setModelMarkers: vi.fn(),
@@ -195,169 +213,215 @@ describe("Phase 1 — the registered completion provider", () => {
     },
   ];
 
+  let kwModel: any;
+  let sugModel: any;
+  let fallbackModel: any;
+
   beforeAll(async () => {
     const monacoApi = await import("monaco-editor/esm/vs/editor/editor.api");
     const registerFn = vi.mocked(monacoApi.languages.registerCompletionItemProvider);
+    const createFn = vi.mocked(monacoApi.editor.create);
 
     getElementByIdSpy = vi
       .spyOn(document, "getElementById")
       .mockImplementation(() => document.createElement("div"));
 
+    // Waits for THIS editor to be created, then takes the current provider.
+    // Deliberately does NOT require a new registration per mount: C5 makes the
+    // provider a per-language singleton, at which point the second and third
+    // mounts register nothing and a "wait for another registration" helper
+    // would hang forever.
     const mountAndCapture = async (editorId: string, props: any) => {
-      const baseline = registerFn.mock.calls.length;
+      const createsBefore = createFn.mock.calls.length;
       mount(CodeQueryEditor, {
         props: { editorId, language: "sql", query: "SELECT * FROM logs", ...props },
         global: { plugins: [providerStore] },
       });
-      await vi.waitFor(() => expect(registerFn.mock.calls.length).toBeGreaterThan(baseline), {
+      await vi.waitFor(() => expect(createFn.mock.calls.length).toBe(createsBefore + 1), {
         timeout: 15000,
         interval: 25,
       });
-      return registerFn.mock.calls[baseline][1].provideCompletionItems as Function;
+      const sqlCalls = registerFn.mock.calls.filter((c) => c[0] === "sql");
+      const provider = sqlCalls.at(-1)![1].provideCompletionItems as Function;
+      const model = createdEditors.at(-1)!.getModel();
+      return { provider, model };
     };
 
-    provideKw = await mountAndCapture("provider-kw", {
+    ({ provider: provideKw, model: kwModel } = await mountAndCapture("provider-kw", {
       keywords: KEYWORDS,
       suggestions: [],
-    });
-    provideSug = await mountAndCapture("provider-sug", {
+    }));
+    ({ provider: provideSug, model: sugModel } = await mountAndCapture("provider-sug", {
       keywords: [],
       suggestions: SUGGESTIONS,
-    });
-    // N2/D7: suggestions prop omitted => the component must fall back to the
-    // SHARED catalog. Its old local copy had 7 entries and no aggregates, which
-    // is what Traces was shipping.
-    provideFallback = await mountAndCapture("provider-fallback", { keywords: [] });
-    // editorObj must exist so the provider's own-model guard resolves to mockModel.
-    await vi.waitFor(() => expect(mockEditorObj.createContextKey).toHaveBeenCalled(), {
-      timeout: 15000,
-      interval: 25,
-    });
+    }));
+    // suggestions omitted => the shared catalog fallback (N2/D7)
+    ({ provider: provideFallback, model: fallbackModel } = await mountAndCapture(
+      "provider-fallback",
+      { keywords: [] },
+    ));
   }, 60000);
 
   afterAll(() => getElementByIdSpy?.mockRestore());
 
-  /** Invoke a provider as monaco would, for a given buffer + current word. */
-  const invokeWith = (provide: Function, textUntilCursor: string, word: string) => {
-    mockModel.getValueInRange.mockReturnValue(textUntilCursor);
-    mockModel.getWordUntilPosition.mockReturnValue({
+  /**
+   * Invoke a provider as monaco would.
+   *
+   * Awaited on purpose: C4 turns provideCompletionItems async so the field-value
+   * lookup can be resolved inline. A helper that read `.suggestions` off the
+   * returned value would silently read it off a Promise and every assertion
+   * here would start failing the moment that lands.
+   */
+  const invokeWith = async (
+    provide: Function,
+    model: any,
+    textUntilCursor: string,
+    word: string,
+  ) => {
+    model.getValueInRange.mockReturnValue(textUntilCursor);
+    model.getWordUntilPosition.mockReturnValue({
       word,
       startColumn: 1,
       endColumn: word.length + 1,
     });
-    return provide(mockModel, { lineNumber: 1, column: word.length + 1 });
+    return await provide(model, { lineNumber: 1, column: word.length + 1 });
   };
-  const invokeKw = (t: string, w: string) => invokeWith(provideKw, t, w);
-  const invokeSug = (t: string, w: string) => invokeWith(provideSug, t, w);
-  const invokeFallback = (t: string, w: string) => invokeWith(provideFallback, t, w);
+  const invokeKw = (t: string, w: string) => invokeWith(provideKw, kwModel, t, w);
+  const invokeSug = (t: string, w: string) => invokeWith(provideSug, sugModel, t, w);
+  const invokeFallback = (t: string, w: string) => invokeWith(provideFallback, fallbackModel, t, w);
 
   const itemFor = (result: any, label: string) =>
     result.suggestions.find((s: any) => s.label === label);
 
-  it("answers for its own model", () => {
+  it("answers for its own model", async () => {
     expect(provideKw).toBeTypeOf("function");
-    expect(invokeKw("SELECT ", "").suggestions.length).toBeGreaterThan(0);
+    expect((await invokeKw("SELECT ", "")).suggestions.length).toBeGreaterThan(0);
   });
 
-  it("A5 — snippet keywords carry the NUMERIC InsertAsSnippet flag", () => {
-    const item = itemFor(invokeKw("where ", ""), "like");
+  it("A5 — snippet keywords carry the NUMERIC InsertAsSnippet flag", async () => {
+    const item = itemFor(await invokeKw("where ", ""), "like");
     expect(item).toBeDefined();
     expect(typeof item.insertTextRules).toBe("number");
     expect(item.insertTextRules).toBe(4);
   });
 
-  it("A5 — plain keywords carry no snippet flag", () => {
-    expect(itemFor(invokeKw("where ", ""), "and").insertTextRules).toBeUndefined();
+  it("A5 — plain keywords carry no snippet flag", async () => {
+    expect(itemFor(await invokeKw("where ", ""), "and").insertTextRules).toBeUndefined();
   });
 
-  it("N7 — detail/documentation/sortText survive the push", () => {
-    const item = itemFor(invokeSug("SELECT ", ""), "approx_topk");
+  it("N7 — detail and sortText survive the push", async () => {
+    const item = itemFor(await invokeSug("SELECT ", ""), "approx_topk");
     expect(item).toBeDefined();
     expect(item.detail).toBe("(field, k) → top-k values");
-    expect(item.documentation).toEqual({ value: "Approximate top-k." });
     expect(item.sortText).toBe("zz-approx_topk");
   });
 
-  it("N7/A5 — suggestion snippets reach monaco as a number too", () => {
-    expect(itemFor(invokeSug("SELECT ", ""), "approx_topk").insertTextRules).toBe(4);
+  it("D4 — documentation is NOT shipped with the initial list", async () => {
+    // ~350 items per keystroke, each carrying prose, for one visible row.
+    const item = itemFor(await invokeSug("SELECT ", ""), "approx_topk");
+    expect(
+      item.documentation,
+      "docs are eager; resolveCompletionItem is dead weight",
+    ).toBeUndefined();
   });
 
-  it("A1 — a Function-kind suggestion maps to monaco kind 1", () => {
-    expect(itemFor(invokeSug("SELECT ", ""), "approx_topk").kind).toBe(1);
+  it("D4 — resolveCompletionItem attaches the documentation", async () => {
+    // Asserting only that a resolver EXISTS is satisfied by a no-op alongside
+    // eager docs. This asserts it does the work.
+    const monacoApi = await import("monaco-editor/esm/vs/editor/editor.api");
+    const provider = vi
+      .mocked(monacoApi.languages.registerCompletionItemProvider)
+      .mock.calls.filter((c) => c[0] === "sql")
+      .at(-1)![1] as any;
+    const item = itemFor(await invokeSug("SELECT ", ""), "approx_topk");
+    const resolved = await provider.resolveCompletionItem(item, {});
+    expect(resolved.documentation).toEqual({ value: "Approximate top-k." });
   });
 
-  it("C1 — subsequence candidates are not dropped by a substring pre-filter", () => {
+  it("N7/A5 — suggestion snippets reach monaco as a number too", async () => {
+    expect(itemFor(await invokeSug("SELECT ", ""), "approx_topk").insertTextRules).toBe(4);
+  });
+
+  it("A1 — a Function-kind suggestion maps to monaco kind 1", async () => {
+    expect(itemFor(await invokeSug("SELECT ", ""), "approx_topk").kind).toBe(1);
+  });
+
+  it("C1 — subsequence candidates are not dropped by a substring pre-filter", async () => {
     // "knn" is a subsequence of kubernetes_namespace_name but NOT a substring,
     // so String.includes() removes it before monaco can score it.
-    expect(itemFor(invokeKw("SELECT knn", "knn"), "kubernetes_namespace_name")).toBeDefined();
+    expect(itemFor(await invokeKw("SELECT knn", "knn"), "kubernetes_namespace_name")).toBeDefined();
   });
 
-  it("A2 — items are identical no matter how much of the word is typed", () => {
-    const a = itemFor(invokeSug("SELECT a", "a"), "approx_topk");
-    const appr = itemFor(invokeSug("SELECT appr", "appr"), "approx_topk");
+  it("A2 — items are identical no matter how much of the word is typed", async () => {
+    const a = itemFor(await invokeSug("SELECT a", "a"), "approx_topk");
+    const appr = itemFor(await invokeSug("SELECT appr", "appr"), "approx_topk");
     expect(a.label).toBe(appr.label);
     expect(a.insertText).toBe(appr.insertText);
   });
 
-  it("N2 — the SQL fallback serves the shared catalog, aggregates included", () => {
-    const labels = invokeFallback("SELECT ", "").suggestions.map((s: any) => s.label);
+  it("N2 — the SQL fallback serves the shared catalog, aggregates included", async () => {
+    const labels = (await invokeFallback("SELECT ", "")).suggestions.map((s: any) => s.label);
     // The component's old 7-entry local list had none of these.
     for (const agg of ["sum", "avg", "count", "max", "min", "histogram", "approx_topk"]) {
       expect(labels, `fallback missing ${agg}`).toContain(agg);
     }
   });
 
-  it("N2 — the SQL fallback also serves the array family", () => {
-    const labels = invokeFallback("SELECT ", "").suggestions.map((s: any) => s.label);
+  it("N2 — the SQL fallback also serves the array family", async () => {
+    const labels = (await invokeFallback("SELECT ", "")).suggestions.map((s: any) => s.label);
     for (const fn of ["arrcount", "arrsort", "arrjoin", "arrzip", "spath"]) {
       expect(labels, `fallback missing ${fn}`).toContain(fn);
     }
   });
 
-  it("N2 — fallback items are Function-kinded and snippet-enabled", () => {
-    const sum = invokeFallback("SELECT ", "").suggestions.find((s: any) => s.label === "sum");
+  it("N2 — fallback items are Function-kinded and snippet-enabled", async () => {
+    const sum = (await invokeFallback("SELECT ", "")).suggestions.find(
+      (s: any) => s.label === "sum",
+    );
     expect(sum).toBeDefined();
     expect(sum.kind).toBe(1);
     expect(sum.insertTextRules).toBe(4);
     expect(sum.insertText).toBe("sum(${1:field})");
   });
 
-  it("A2 — a list containing legacy callables is reported as incomplete", () => {
+  it("A2 — a list containing legacy callables is reported as incomplete", async () => {
     // SUGGESTIONS includes one callable entry, so monaco must re-query as the
     // user keeps typing rather than freezing the first-keystroke content.
-    expect(invokeSug("SELECT a", "a").incomplete).toBe(true);
+    expect((await invokeSug("SELECT a", "a")).incomplete).toBe(true);
   });
 
-  it("A2 — a purely static list is NOT reported as incomplete", () => {
+  it("A2 — a purely static list is NOT reported as incomplete", async () => {
     // Re-querying every keystroke for content that cannot change is wasted work.
-    expect(invokeKw("SELECT a", "a").incomplete).toBeFalsy();
-    expect(invokeFallback("SELECT a", "a").incomplete).toBeFalsy();
+    expect((await invokeKw("SELECT a", "a")).incomplete).toBeFalsy();
+    expect((await invokeFallback("SELECT a", "a")).incomplete).toBeFalsy();
   });
 
-  it("B3 — deprecated aliases carry monaco's Deprecated tag (strikethrough)", () => {
-    const raw = invokeFallback("SELECT ", "").suggestions.find(
+  it("B3 — deprecated aliases carry monaco's Deprecated tag (strikethrough)", async () => {
+    const raw = (await invokeFallback("SELECT ", "")).suggestions.find(
       (s: any) => s.label === "match_all_raw",
     );
     expect(raw).toBeDefined();
     expect(raw.tags).toEqual([1]); // CompletionItemTag.Deprecated
   });
 
-  it("B3 — match_all itself is not tagged deprecated", () => {
-    const ok = invokeFallback("SELECT ", "").suggestions.find((s: any) => s.label === "match_all");
+  it("B3 — match_all itself is not tagged deprecated", async () => {
+    const ok = (await invokeFallback("SELECT ", "")).suggestions.find(
+      (s: any) => s.label === "match_all",
+    );
     expect(ok.tags).toBeUndefined();
   });
 
-  it("D1 — catalog items carry a compact detail and prose documentation", () => {
-    const topk = invokeFallback("SELECT ", "").suggestions.find(
+  it("D1 — catalog items carry a compact detail and prose documentation", async () => {
+    const topk = (await invokeFallback("SELECT ", "")).suggestions.find(
       (s: any) => s.label === "approx_topk",
     );
     expect(topk.detail).toBe("(field, k)");
     expect(String((topk.documentation as any).value).length).toBeGreaterThan(15);
   });
 
-  it("A4 — legacy callables get monaco's word, not a space-split token", () => {
+  it("A4 — legacy callables get monaco's word, not a space-split token", async () => {
     // Old code did textUntilPosition.trim().split(" ").pop() => "*\nFROM".
-    const labels = invokeSug("SELECT *\nFROM", "FROM").suggestions.map((s: any) => s.label);
+    const labels = (await invokeSug("SELECT *\nFROM", "FROM")).suggestions.map((s: any) => s.label);
     expect(labels).toContain("legacy('FROM')");
     expect(labels.join("|")).not.toContain("\n");
   });
@@ -429,7 +493,13 @@ describe("Phase 3 — providers are registered and configured", () => {
     const provider = vi.mocked(api.languages.registerCompletionItemProvider).mock.calls.at(-1)![1];
     // Without these nothing opens after a paren, a comma or an opening quote —
     // exactly the positions where the user most needs help.
-    expect(provider.triggerCharacters).toEqual(expect.arrayContaining(["(", ",", "'", "."]));
+    // The full set from the plan. Omitting the double quote leaves quoted
+    // identifiers (FROM "my stream") untriggered, and omitting the space leaves
+    // the position right after a keyword untriggered — both the moments a user
+    // most expects the list to appear.
+    expect(provider.triggerCharacters).toEqual(
+      expect.arrayContaining(["(", ",", "'", ".", '"', " "]),
+    );
   });
 
   it(
