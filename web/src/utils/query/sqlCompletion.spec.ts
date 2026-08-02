@@ -308,7 +308,7 @@ describe("A5 — snippet rules are mapped from string name to numeric enum", () 
   });
 
   it("every catalog entry containing a ${…} tab stop declares InsertAsSnippet", () => {
-    for (const entry of [...SQL_FUNCTIONS, ...SQL_KEYWORDS]) {
+    for (const entry of [...SQL_FUNCTIONS, ...SQL_KEYWORDS, ...SQL_CLAUSE_KEYWORDS]) {
       if (entry.insertText.includes("${")) {
         expect(entry.insertTextRules, `${entry.name} has tab stops but no snippet rule`).toBe(
           "InsertAsSnippet",
@@ -605,9 +605,12 @@ describe("N2/D7 — resolveSuggestions / resolveKeywords", () => {
     expect(resolveSuggestions("promql", null)).toEqual([]);
   });
 
-  it("falls back to the shared keyword list when the SQL keywords prop is empty", async () => {
+  it("falls back to predicates AND clause keywords when the SQL prop is empty", async () => {
+    // Was `toEqual(SQL_KEYWORDS)` — written before clause keywords existed, and
+    // directly contradicted by the B1 expectations below (which require SELECT
+    // to come back from this same call). A SQL editor needs both lists.
     const { resolveKeywords } = await import("./sqlCompletion");
-    expect(resolveKeywords("sql", [])).toEqual(SQL_KEYWORDS);
+    expect(resolveKeywords("sql", [])).toEqual([...SQL_KEYWORDS, ...SQL_CLAUSE_KEYWORDS]);
   });
 
   it("prefers caller-supplied keywords over the defaults", async () => {
@@ -721,10 +724,34 @@ describe("B1 — the clause keyword catalog", () => {
     }
   });
 
-  it("sorts clause keywords after fields but they remain reachable", () => {
+  it("sorts every clause keyword behind a field of the same name-space", () => {
     // Clause keywords are structural: useful, but never ahead of a column name.
+    // Assert the ORDERING the title claims, not merely that a sortText exists.
+    const field = buildFieldEntry({ name: "zzz_last_field", type: "Utf8" });
     for (const k of SQL_CLAUSE_KEYWORDS) {
       expect(k.sortText, `${k.name} needs an explicit sortText`).toBeTruthy();
+      expect(
+        field.sortText! < k.sortText!,
+        `${k.name} (${k.sortText}) must sort after fields (${field.sortText})`,
+      ).toBe(true);
+    }
+  });
+});
+
+describe("B1 — keyword ordering is coherent in the raw catalog", () => {
+  it("gives predicates an explicit sortText too, not just clauses", () => {
+    // useSuggestions assigns one at runtime, but the component fallback used by
+    // Traces and Dashboards consumes the catalog directly. Without it there,
+    // predicates sort by label and interleave with the clause keywords.
+    for (const k of SQL_KEYWORDS) {
+      expect(k.sortText, `${k.name} needs an explicit sortText`).toBeTruthy();
+    }
+  });
+
+  it("orders predicates and clauses in the same name-space", () => {
+    const field = buildFieldEntry({ name: "zzz", type: "Utf8" });
+    for (const k of [...SQL_KEYWORDS, ...SQL_CLAUSE_KEYWORDS]) {
+      expect(field.sortText! < k.sortText!, `${k.name} sorts ahead of fields`).toBe(true);
     }
   });
 });

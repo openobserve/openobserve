@@ -871,10 +871,10 @@ mod tests {
             "rewriter alias missing from the catalog union"
         );
         assert!(catalog.iter().any(|n| n == "json_get"), "json function missing");
-        let mut sorted = catalog.clone();
+        let mut sorted = catalog.to_vec();
         sorted.sort();
         sorted.dedup();
-        assert_eq!(catalog, sorted, "catalog must be sorted and deduplicated");
+        assert_eq!(catalog.to_vec(), sorted, "catalog must be sorted and deduplicated");
     }
 
     #[test]

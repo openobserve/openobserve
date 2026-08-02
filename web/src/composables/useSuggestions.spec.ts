@@ -494,3 +494,68 @@ describe("Phase 2 — SQL clause keywords are offered (B1)", () => {
     expect(host.sortText < select.sortText).toBe(true);
   });
 });
+
+// ─── Phase 2 (tmp/code.md B4) — server functions must actually REACH the editor
+// Testing mergeServerFunctions in isolation would repeat the Phase 1 mistake:
+// the helper can be perfect while nothing wires it to what the editor consumes.
+
+describe("Phase 2 — server-supplied functions reach the suggestion list (B4)", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  const serverList = [
+    { name: "date_trunc", signature: "(precision, timestamp)", doc: "Truncate a timestamp." },
+    { name: "coalesce", signature: "(a, b)", doc: "First non-null argument." },
+  ];
+
+  it("adds server-only functions to what the editor receives", async () => {
+    const c = makeComposable({ storedValues: [] });
+    c.setServerFunctions(serverList);
+    await run(c, "SELECT * FROM stream WHERE ");
+    const names = (c.effectiveSuggestions.value as any[]).map((s) => s.name);
+    expect(names).toContain("date_trunc");
+    expect(names).toContain("coalesce");
+  });
+
+  it("keeps the hand-written O2 catalog alongside them", async () => {
+    const c = makeComposable({ storedValues: [] });
+    c.setServerFunctions(serverList);
+    await run(c, "SELECT * FROM stream WHERE ");
+    const names = (c.effectiveSuggestions.value as any[]).map((s) => s.name);
+    for (const local of ["match_all", "histogram", "approx_topk"]) {
+      expect(names, `lost local ${local}`).toContain(local);
+    }
+  });
+
+  it("does NOT let a server entry override local insertion detail", async () => {
+    // The server knows arity, not which arguments are columns. Letting it win
+    // would reintroduce sum('field') — the A3 bug Phase 1 fixed.
+    const c = makeComposable({ storedValues: [] });
+    c.setServerFunctions([{ name: "sum", signature: "(expr)", doc: "Sum." }]);
+    await run(c, "SELECT * FROM stream WHERE ");
+    const sums = (c.effectiveSuggestions.value as any[]).filter((s) => s.name === "sum");
+    expect(sums).toHaveLength(1);
+    expect(sums[0].insertText).toBe("sum(${1:field})");
+  });
+
+  it("still blanks the suggestion list in value context", async () => {
+    const c = makeComposable({ storedValues: ["error"] });
+    c.setServerFunctions(serverList);
+    await run(c, "level = ");
+    expect(c.effectiveSuggestions.value).toEqual([]);
+  });
+
+  it("is a no-op when the server call returned nothing", async () => {
+    const c = makeComposable({ storedValues: [] });
+    c.setServerFunctions([]);
+    await run(c, "SELECT * FROM stream WHERE ");
+    const names = (c.effectiveSuggestions.value as any[]).map((s) => s.name);
+    expect(names).toContain("match_all");
+  });
+
+  it("survives a failed server call without throwing", async () => {
+    const c = makeComposable({ storedValues: [] });
+    expect(() => c.setServerFunctions(undefined as any)).not.toThrow();
+    await run(c, "SELECT * FROM stream WHERE ");
+    expect((c.effectiveSuggestions.value as any[]).length).toBeGreaterThan(0);
+  });
+});
