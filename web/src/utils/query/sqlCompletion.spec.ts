@@ -878,3 +878,41 @@ describe("D1/N5 — field entries surface the column type", () => {
     expect(item.kind).toBe(KINDS.Field);
   });
 });
+
+// ───────────────────────────────────────────────────────────────────────────
+// Robustness: callers pass field lists in more than one shape
+// ───────────────────────────────────────────────────────────────────────────
+
+describe("tolerates the keyword shapes callers actually pass", () => {
+  it("accepts a bare string as a field name", () => {
+    // AnomalyDetectionConfig binds a string[] of field names. Before this, such
+    // an entry produced { label: undefined, insertText: "undefined" }.
+    const [item] = build({ keywords: ["host_name"] as any });
+    expect(item.label).toBe("host_name");
+    expect(item.insertText).toBe("host_name");
+    expect(item.kind).toBe(KINDS.Field);
+  });
+
+  it("never emits the literal string 'undefined' as insert text", () => {
+    const items = build({ keywords: ["a", { label: "b" }] as any });
+    for (const i of items) {
+      expect(i.insertText).not.toBe("undefined");
+      expect(i.label).toBeTruthy();
+    }
+  });
+
+  it("drops entries with no usable label instead of rendering undefined", () => {
+    expect(build({ keywords: [null, undefined, {}, ""] as any })).toEqual([]);
+  });
+});
+
+describe("buildFieldEntry — the column type has four spellings in this app", () => {
+  it.each([
+    ["type", { name: "a", type: "Int64" }],
+    ["dataType", { name: "a", dataType: "Int64" }],
+    ["data_type", { name: "a", data_type: "Int64" }],
+    ["field_type", { name: "a", field_type: "Int64" }],
+  ])("reads the type from `%s`", (_k, field) => {
+    expect(buildFieldEntry(field as any).detail).toBe("Int64");
+  });
+});

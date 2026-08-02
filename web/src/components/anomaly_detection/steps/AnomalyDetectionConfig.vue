@@ -107,7 +107,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <QueryEditor
                 data-test-prefix="anomaly-custom-sql"
                 :query="customSql || ''"
-                :keywords="allStreamFields"
+                :keywords="effectiveKeywords"
+                :suggestions="effectiveSuggestions"
                 :show-auto-complete="true"
                 :disable-ai="!config.stream_name"
                 :disable-ai-reason="
@@ -579,6 +580,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import useSqlSuggestions from "@/composables/useSuggestions";
 import { computed, defineComponent, ref, watch, type PropType } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
@@ -782,6 +784,10 @@ export default defineComponent({
 
     // Stream fields for filter field selector and detection function field
     const allStreamFields = ref<string[]>([]);
+    // Same completion machinery every other SQL editor in the app uses, so this
+    // one also gets SQL keywords, the O2 functions and the server function
+    // catalog rather than bare field names.
+    const { effectiveKeywords, effectiveSuggestions, updateFieldKeywords } = useSqlSuggestions();
     const numericStreamFields = ref<string[]>([]); // only numeric types for avg/sum/min/max/pXX
     const filteredStreamFields = ref<string[]>([]);
     const filteredDetectionFields = ref<string[]>([]);
@@ -809,6 +815,7 @@ export default defineComponent({
       const streamType = props.config.stream_type;
       if (!streamName || !streamType) {
         allStreamFields.value = [];
+        updateFieldKeywords([]);
         numericStreamFields.value = [];
         filteredStreamFields.value = [];
         filteredDetectionFields.value = [];
@@ -840,6 +847,7 @@ export default defineComponent({
           : allStreamFields.value;
       } catch {
         allStreamFields.value = [];
+        updateFieldKeywords([]);
         numericStreamFields.value = [];
         filteredStreamFields.value = [];
         filteredDetectionFields.value = [];
@@ -1199,6 +1207,8 @@ export default defineComponent({
       intervalUnits,
       retrainIntervalOptions,
       allStreamFields,
+      effectiveKeywords,
+      effectiveSuggestions,
       filteredStreamFields,
       filteredDetectionFields,
       loadingFields,

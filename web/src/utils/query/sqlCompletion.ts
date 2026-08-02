@@ -875,6 +875,18 @@ export interface BuildCompletionItemsOptions {
   tags?: Record<string, number>;
 }
 
+/** Callers pass field lists in several shapes; a bare string is a field name. */
+const normalizeEntry = (entry: unknown): LooseEntry | null => {
+  if (typeof entry === "string") {
+    return entry ? { name: entry, label: entry, kind: "Field", insertText: entry } : null;
+  }
+  if (!entry || typeof entry !== "object") return null;
+  const e = entry as LooseEntry;
+  // An entry with no label cannot be rendered — it used to reach monaco as
+  // `undefined` with the literal text "undefined" as its insertion.
+  return e.label === undefined || e.label === null || e.label === "" ? null : e;
+};
+
 const toMonacoItem = (
   entry: LooseEntry,
   word: string,
@@ -936,10 +948,11 @@ export const buildCompletionItems = ({
   kinds,
   insertTextRules,
   tags,
-}: BuildCompletionItemsOptions): Record<string, unknown>[] => [
-  ...keywords.map((k) => toMonacoItem(k, word, range, kinds, insertTextRules, tags)),
-  ...suggestions.map((s) => toMonacoItem(s, word, range, kinds, insertTextRules, tags)),
-];
+}: BuildCompletionItemsOptions): Record<string, unknown>[] =>
+  [...keywords, ...suggestions]
+    .map(normalizeEntry)
+    .filter((e): e is LooseEntry => e !== null)
+    .map((e) => toMonacoItem(e, word, range, kinds, insertTextRules, tags));
 
 /**
  * True when any entry derives its content from the typed word.
@@ -981,13 +994,18 @@ export const buildFunctionArgs = (numArgs: number | string): string => {
  * discarded; it is exactly what belongs in the suggest widget's inline column,
  * and it is what type-aware operator suggestions will key off later.
  */
-export const buildFieldEntry = (field: {
+export interface FieldLike {
   name: string;
-  /** Dynamic fields and Alerts columns carry the type here. */
+  /** Dynamic fields and Alerts columns. */
   type?: string;
-  /** Logs SCHEMA fields carry it here instead (useStreamFields.ts:452). */
+  /** Logs SCHEMA fields (useStreamFields.ts:452). */
   dataType?: string;
-}): SqlCompletionEntry => {
+  /** Raw stream-schema payloads. */
+  data_type?: string;
+  field_type?: string;
+}
+
+export const buildFieldEntry = (field: FieldLike): SqlCompletionEntry => {
   const entry: SqlCompletionEntry = {
     name: field.name,
     label: field.name,
@@ -995,9 +1013,9 @@ export const buildFieldEntry = (field: {
     insertText: field.name,
     sortText: SORT_LANE.field + field.name,
   };
-  // Two field shapes exist in the app: schema fields use `dataType`, dynamic
-  // fields and Alerts columns use `type`. Omit rather than render "undefined".
-  const columnType = field.type || field.dataType;
+  // The column type reaches us under four different keys depending on which
+  // API the caller read it from. Omit rather than render "undefined".
+  const columnType = field.type || field.dataType || field.data_type || field.field_type;
   if (columnType) entry.detail = columnType;
   return entry;
 };
