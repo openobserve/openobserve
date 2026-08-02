@@ -212,6 +212,8 @@ export interface OTableProps<TData = any> {
   currentPage?: number;
   /** Total record count (required for server-side pagination) */
   totalCount?: number;
+  /** False when totalCount is a lower bound. The footer adds `+` and omits Last page. */
+  totalCountExact?: boolean;
   /** When true, the page index is NOT reset when the data array changes (e.g. on row expand/collapse). Defaults to false. */
   keepPageOnDataChange?: boolean;
   /** When true, the caller's `#bottom` slot IS the pagination bar and replaces

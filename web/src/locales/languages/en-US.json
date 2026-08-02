@@ -6864,7 +6864,7 @@
       "errorCountTooltip": "{count} errors in this session",
       "unknownUser": "Unknown user",
       "columns": {
-        "timestamp": "Timestamp",
+        "lastActivity": "Last activity",
         "sessionId": "Session ID",
         "user": "User",
         "firstMessage": "First message",

@@ -60,18 +60,16 @@ export function buildAgentTraceFilter(
 }
 
 /**
- * Build a session-level predicate for the LLM Sessions list. This differs from
- * `buildAgentTraceFilter`: first find sessions that contain at least one trace
- * for the selected agent, then let the outer sessions query collect every trace
- * in those sessions. That preserves full-conversation totals and first-message
- * derivation while still filtering the visible session list by agent.
+ * Build the agent predicate used to select a page of LLM sessions. The backend
+ * applies this predicate only while choosing session ids, then runs the final
+ * rollup over every span in those sessions. A direct predicate therefore keeps
+ * full-conversation totals without the previous session-membership subquery.
  */
 export function buildAgentSessionFilter(
   agent: GenAiAgentListItem | null | undefined,
   streamName: string,
   sessionField = "gen_ai_conversation_id",
 ): string {
-  const traceFilter = buildAgentTraceFilter(agent, streamName);
-  if (!traceFilter || !sessionField) return "";
-  return `${sessionField} IN (SELECT ${sessionField} FROM "${streamName}" WHERE ${sessionField} IS NOT NULL AND ${sessionField} != '' AND ${traceFilter} GROUP BY ${sessionField})`;
+  if (!sessionField) return "";
+  return buildAgentTraceFilter(agent, streamName);
 }

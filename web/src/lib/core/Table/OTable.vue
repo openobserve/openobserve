@@ -78,6 +78,7 @@ const props = withDefaults(defineProps<OTableProps<TData>>(), {
   filterMode: "client",
   defaultColumns: true,
   footerTitle: "",
+  totalCountExact: true,
   showHeader: true,
   fillHeight: true,
 });
@@ -1478,6 +1479,7 @@ defineExpose({
         :current-page="pagination.currentPage.value"
         :total-pages="pagination.totalPages.value"
         :total-count="pagination.totalCount.value"
+        :total-count-exact="props.totalCountExact"
         :page-size="pagination.pageSize.value"
         :page-size-options="pagination.pageSizeOptions.value"
         :showing-from="pagination.showingFrom.value"

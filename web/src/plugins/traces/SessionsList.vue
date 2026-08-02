@@ -80,6 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       pagination="server"
       :current-page="currentPage"
       :total-count="total"
+      :total-count-exact="totalIsExact"
       :page-size="rowsPerPage"
       :page-size-options="rowsPerPageOptions"
       :footer-title="t('traces.sessionsList.sessions')"
@@ -124,10 +125,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OEmptyState size="hero" preset="no-llm-sessions" @action="onEmptyAction" />
         </div>
       </template>
-      <!-- Timestamp -->
-      <template #cell-firstSeenNanos="{ row }">
+      <!-- Last activity -->
+      <template #cell-lastSeenNanos="{ row }">
         <span class="text-xs tabular-nums">
-          {{ formatTimestamp(row.firstSeenNanos) }}
+          {{ formatTimestamp(row.lastSeenNanos) }}
         </span>
       </template>
 
@@ -247,6 +248,7 @@ const store = useStore();
 const {
   sessions,
   total,
+  totalIsExact,
   loading,
   error,
   hasLoadedOnce,
@@ -367,9 +369,9 @@ watch(total, () => {
 const tableColumns = computed(() =>
   [
     {
-      id: "firstSeenNanos",
-      header: t("traces.sessionsList.columns.timestamp"),
-      accessorKey: "firstSeenNanos",
+      id: "lastSeenNanos",
+      header: t("traces.sessionsList.columns.lastActivity"),
+      accessorKey: "lastSeenNanos",
       size: 170,
       sortable: false,
       hideable: true,
@@ -516,6 +518,7 @@ function syncFilterUrl() {
 function clearSessionRows() {
   sessions.value = [];
   total.value = 0;
+  totalIsExact.value = true;
 }
 
 async function loadSessions(startTime?: number, endTime?: number, force = false) {
