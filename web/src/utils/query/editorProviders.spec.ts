@@ -29,6 +29,9 @@ import {
   buildHoverContents,
   findCatalogEntry,
   findFunctionEntry,
+  isNumericField,
+  wantsNumericColumn,
+  rankNumericFieldsFirst,
 } from "./editorProviders";
 
 const fn = (name: string) => SQL_FUNCTIONS.find((f) => f.name === name)!;
@@ -426,5 +429,147 @@ describe("parseCallContext ignores SQL comments", () => {
       name: "abs",
       activeParameter: 0,
     });
+  });
+});
+
+// ───────────────────────────────────────────────────────────────────────────
+// Numeric-column ranking
+//
+// Reported from the SLO form: inside approx_percentile_cont( on a metrics
+// stream the dropdown offered twenty string labels and buried `value` — the
+// only column the function can take — below the fold. The list was correct and
+// useless at the same time.
+//
+// This RANKS, it does not filter. A declared type is a strong hint, not a rule
+// (a quantity stored as Utf8 is still a legal argument), and hiding a column
+// the user knows is there is worse than ordering it late.
+// ───────────────────────────────────────────────────────────────────────────
+
+// The field lane prefix, written as an ESCAPE: a raw control character in a
+// source file is invisible in review and easy to mangle in an edit.
+const FIELD_LANE = "\u0000";
+
+describe("isNumericField — what counts as a numeric column", () => {
+  const field = (detail?: string) => ({ label: "c", kind: "Field", detail }) as any;
+
+  it("accepts the arrow types a stream schema actually reports", () => {
+    for (const t of ["Int64", "Int32", "UInt8", "Float64", "Float32", "Decimal128(10, 2)"]) {
+      expect(isNumericField(field(t)), t).toBe(true);
+    }
+  });
+
+  it("rejects the non-numeric ones", () => {
+    for (const t of ["Utf8", "Boolean", "Binary", "Timestamp(Nanosecond, None)"]) {
+      expect(isNumericField(field(t)), t).toBe(false);
+    }
+  });
+
+  it("is case-insensitive, since the type key varies by API", () => {
+    expect(isNumericField(field("float64"))).toBe(true);
+  });
+
+  it("treats an unknown type as non-numeric rather than guessing", () => {
+    expect(isNumericField(field(undefined))).toBe(false);
+    expect(isNumericField(field(""))).toBe(false);
+  });
+
+  it("never promotes a non-Field entry, whatever its detail says", () => {
+    // A function whose detail mentions a numeric type is still a function and
+    // must not be ranked in among the columns.
+    expect(isNumericField({ label: "abs", kind: "Function", detail: "(Int64)" } as any)).toBe(
+      false,
+    );
+  });
+});
+
+describe("wantsNumericColumn — when the ranking applies", () => {
+  it("applies to the first argument of a numeric aggregate", () => {
+    expect(wantsNumericColumn(parseCallContext("SELECT approx_percentile_cont("))).toBe(true);
+    expect(wantsNumericColumn(parseCallContext("SELECT avg("))).toBe(true);
+    expect(wantsNumericColumn(parseCallContext("SELECT sum(x"))).toBe(true);
+  });
+
+  it("is case-insensitive", () => {
+    expect(wantsNumericColumn(parseCallContext("SELECT AVG("))).toBe(true);
+  });
+
+  it("stops applying past the first argument", () => {
+    // approx_percentile_cont(value, 0.95) — argument 1 is a fraction, not a
+    // column, so there is nothing to rank.
+    expect(wantsNumericColumn(parseCallContext("SELECT approx_percentile_cont(value, "))).toBe(
+      false,
+    );
+  });
+
+  it("does not apply to functions that take any type", () => {
+    expect(wantsNumericColumn(parseCallContext("SELECT count("))).toBe(false);
+    expect(wantsNumericColumn(parseCallContext("SELECT str_match("))).toBe(false);
+  });
+
+  it("does not apply outside a call", () => {
+    expect(wantsNumericColumn(null)).toBe(false);
+    expect(wantsNumericColumn(parseCallContext("SELECT "))).toBe(false);
+  });
+
+  it("does not apply to a WHERE group, which parses as a call with no function", () => {
+    expect(wantsNumericColumn(parseCallContext("SELECT * FROM t WHERE ("))).toBe(false);
+  });
+});
+
+describe("rankNumericFieldsFirst", () => {
+  const entries = [
+    {
+      label: "availability_zone",
+      kind: "Field",
+      detail: "Utf8",
+      sortText: `${FIELD_LANE}availability_zone`,
+    },
+    { label: "value", kind: "Field", detail: "Float64", sortText: `${FIELD_LANE}value` },
+    { label: "duration_ms", kind: "Field", detail: "Int64", sortText: `${FIELD_LANE}duration_ms` },
+    { label: "avg", kind: "Function", detail: "(field)", sortText: "avg" },
+  ] as any[];
+
+  // localeCompare ignores the control characters the lanes are built from, so
+  // compare the raw code units — the same order monaco applies.
+  const order = (list: any[]) =>
+    [...list]
+      .sort((a, b) => (String(a.sortText) < String(b.sortText) ? -1 : 1))
+      .map((e) => e.label);
+
+  it("sorts every numeric column above every string one", () => {
+    expect(order(rankNumericFieldsFirst(entries))).toEqual([
+      "duration_ms",
+      "value",
+      "availability_zone",
+      "avg",
+    ]);
+  });
+
+  it("leaves the functions below the columns", () => {
+    const ranked = order(rankNumericFieldsFirst(entries));
+    expect(ranked.indexOf("avg")).toBeGreaterThan(ranked.indexOf("availability_zone"));
+  });
+
+  it("does not drop, add or rewrite any entry", () => {
+    const ranked = rankNumericFieldsFirst(entries);
+    expect(ranked).toHaveLength(entries.length);
+    expect(ranked.map((e: any) => e.label).sort()).toEqual(entries.map((e) => e.label).sort());
+    expect(ranked.find((e: any) => e.label === "value")!.detail).toBe("Float64");
+  });
+
+  it("does not mutate the caller's entries", () => {
+    // These are the composable's live refs. Mutating them would make the
+    // ranking permanent instead of contextual.
+    const before = entries.map((e) => e.sortText);
+    rankNumericFieldsFirst(entries);
+    expect(entries.map((e) => e.sortText)).toEqual(before);
+  });
+
+  it("orders a field with no sortText by its own name", () => {
+    const ranked = rankNumericFieldsFirst([
+      { label: "b_num", kind: "Field", detail: "Int64" },
+      { label: "a_num", kind: "Field", detail: "Int64" },
+    ] as any[]);
+    expect(order(ranked)).toEqual(["a_num", "b_num"]);
   });
 });

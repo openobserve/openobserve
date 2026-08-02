@@ -110,6 +110,8 @@ import {
   buildHoverContents,
   findCatalogEntry,
   findFunctionEntry,
+  wantsNumericColumn,
+  rankNumericFieldsFirst,
 } from "@/utils/query/editorProviders";
 import { loadPromqlLanguage } from "@/utils/query/promqlLanguageDefinition";
 
@@ -830,8 +832,18 @@ export default defineComponent({
             }
           }
 
-          const keywordList = config.keywords();
-          const suggestionList = config.suggestions();
+          // Inside avg( or approx_percentile_cont(, lift the numeric columns to
+          // the top. On a metrics stream every label sorts above `value` — the
+          // one column the function can take — which is a correct list and a
+          // useless one. Applied to both lists so it does not depend on which
+          // one a given host puts its fields in.
+          const numericFirst = wantsNumericColumn(parseCallContext(textUntilPosition));
+          const keywordList = numericFirst
+            ? rankNumericFieldsFirst(config.keywords())
+            : config.keywords();
+          const suggestionList = numericFirst
+            ? rankNumericFieldsFirst(config.suggestions())
+            : config.suggestions();
           return {
             suggestions: buildCompletionItems({
               keywords: keywordList,

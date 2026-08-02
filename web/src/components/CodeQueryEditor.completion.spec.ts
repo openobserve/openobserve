@@ -788,3 +788,84 @@ describe("Phase 3 — C5: one provider per language, not per editor", () => {
     },
   );
 });
+
+// Reported from the SLO form: inside approx_percentile_cont( on a metrics
+// stream, twenty string labels sorted above `value` — the one column the
+// function can take — and it fell below the visible list.
+describe("numeric columns rank first inside a numeric aggregate", () => {
+  const store6 = createStore({ state: { theme: "light" } });
+  let spy: ReturnType<typeof vi.spyOn>;
+  afterAll(() => spy?.mockRestore());
+
+  const FIELDS = [
+    {
+      name: "availability_zone",
+      label: "availability_zone",
+      kind: "Field",
+      insertText: "availability_zone",
+      detail: "Utf8",
+      sortText: "\u0000availability_zone",
+    },
+    {
+      name: "value",
+      label: "value",
+      kind: "Field",
+      insertText: "value",
+      detail: "Float64",
+      sortText: "\u0000value",
+    },
+  ];
+
+  /** Mount an editor and ask its provider for the list at `text`. */
+  const completionsAt = async (editorId: string, text: string) => {
+    const api = await import("monaco-editor/esm/vs/editor/editor.api");
+    const createFn = vi.mocked(api.editor.create);
+    const registerFn = vi.mocked(api.languages.registerCompletionItemProvider);
+    const before = createFn.mock.calls.length;
+
+    spy = vi
+      .spyOn(document, "getElementById")
+      .mockImplementation(() => document.createElement("div"));
+    mount(CodeQueryEditor, {
+      props: { editorId, language: "sql", query: "", keywords: FIELDS, suggestions: [] },
+      global: { plugins: [store6] },
+    });
+    await vi.waitFor(() => expect(createFn.mock.calls.length).toBe(before + 1), {
+      timeout: 15000,
+      interval: 25,
+    });
+
+    const model = createdEditors.at(-1)!.getModel();
+    const provider = registerFn.mock.calls.filter((c) => c[0] === "sql").at(-1)![1];
+    model.getValueInRange.mockReturnValue(text);
+    model.getWordUntilPosition.mockReturnValue({
+      word: "",
+      startColumn: text.length + 1,
+      endColumn: text.length + 1,
+    });
+    const result = await provider.provideCompletionItems(
+      model,
+      { lineNumber: 1, column: text.length + 1 },
+      {},
+      {},
+    );
+    // The order monaco applies to equally-scoring items.
+    return result.suggestions
+      .slice()
+      .sort((a: any, b: any) => (String(a.sortText) < String(b.sortText) ? -1 : 1))
+      .map((s: any) => s.label);
+  };
+
+  it("puts the numeric column above the string ones", { timeout: 30000 }, async () => {
+    const labels = await completionsAt("numeric-rank-a", "SELECT approx_percentile_cont(");
+    expect(labels.indexOf("value")).toBeLessThan(labels.indexOf("availability_zone"));
+  });
+
+  it("leaves the order alone outside such a call", { timeout: 30000 }, async () => {
+    // Without this the first test passes for a trivial reason -- alphabetical
+    // order would put `availability_zone` first either way, so a ranking that
+    // never fires must be observably different here.
+    const labels = await completionsAt("numeric-rank-b", "SELECT ");
+    expect(labels.indexOf("availability_zone")).toBeLessThan(labels.indexOf("value"));
+  });
+});

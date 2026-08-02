@@ -204,6 +204,70 @@ export const buildHoverContents = (entry: LooseEntry | null): { value: string }[
 };
 
 /**
+ * Aggregates whose FIRST argument is a numeric column.
+ *
+ * Only the first argument: approx_percentile_cont(value, 0.95) takes a fraction
+ * second, and percentile_cont takes one first — ranking columns there would be
+ * noise. Restricting to argument 0 covers the reported case and every common
+ * one without a per-function argument table nobody would keep up to date.
+ *
+ * min/max are here even though they accept strings: ranking is a hint, and the
+ * numeric case is overwhelmingly the intent in a metrics query.
+ */
+const NUMERIC_COLUMN_FUNCTIONS = new Set([
+  "avg",
+  "sum",
+  "min",
+  "max",
+  "median",
+  "approx_median",
+  "approx_percentile_cont",
+  "approx_percentile_cont_with_weight",
+  "stddev",
+  "stddev_pop",
+  "stddev_samp",
+  "var",
+  "var_pop",
+  "var_samp",
+  "variance",
+]);
+
+/** Arrow types that name a number. Decimal carries a precision suffix. */
+const NUMERIC_TYPE = /^(u?int(8|16|32|64)|float(16|32|64)|decimal)/i;
+
+/**
+ * Is this entry a column holding numbers?
+ *
+ * Kind is checked first: a FUNCTION whose detail happens to mention a numeric
+ * type is still a function and must not be ranked in among the columns.
+ */
+export const isNumericField = (entry: LooseEntry): boolean =>
+  entry.kind === "Field" && NUMERIC_TYPE.test(entry.detail ?? "");
+
+/** Does the cursor sit where a numeric column is wanted? */
+export const wantsNumericColumn = (call: CallContext | null): boolean =>
+  !!call && call.activeParameter === 0 && NUMERIC_COLUMN_FUNCTIONS.has(call.name.toLowerCase());
+
+/**
+ * Lift the numeric columns to the top of the list.
+ *
+ * RANKS, does not filter. A declared type is a strong hint, not a rule — a
+ * quantity stored as Utf8 is still a legal argument — and hiding a column the
+ * user knows exists is worse than ordering it late.
+ *
+ * Prefixing the existing sortText rather than rebuilding it keeps the relative
+ * order inside each group and works whatever lane scheme the host used. Copies
+ * are returned because the lists handed in are the composable's live refs:
+ * mutating them would make a contextual ranking permanent.
+ */
+export const rankNumericFieldsFirst = (entries: LooseEntry[]): LooseEntry[] =>
+  entries.map((entry) =>
+    isNumericField(entry)
+      ? { ...entry, sortText: `\u0000${entry.sortText ?? entryName(entry)}` }
+      : entry,
+  );
+
+/**
  * Detect that the cursor sits where a field VALUE belongs.
  *
  * Mirrors the operator set the composable has always recognised. Returned so
