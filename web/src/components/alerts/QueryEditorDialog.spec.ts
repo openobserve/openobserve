@@ -540,3 +540,79 @@ describe("QueryEditorDialog - ODrawer Migration", () => {
     expect(w.findComponent(ODrawerStub).exists()).toBe(true);
   });
 });
+
+// ─── Phase 1 (tmp/code.md N1) ─────────────────────────────────────────────────
+// Alerts wires the whole autocomplete pipeline (cursorIndex, popup.open,
+// getSuggestions) but binds :keywords="autoCompleteKeywords" instead of
+// effectiveKeywords. Result: in value context it force-opens the popup and then
+// shows the BASE field/function list where field VALUES belong.
+
+describe("QueryEditorDialog - N1 context keywords reach the editor", () => {
+  const keywordAwareStub = {
+    template: '<div class="stub-kw-editor"></div>',
+    props: ["query", "editorId", "keywords", "suggestions"],
+    emits: ["update:query", "blur"],
+  };
+
+  const mountWithKeywordStub = async (props: Record<string, any> = {}) =>
+    mount(QueryEditorDialog, {
+      props: {
+        modelValue: true,
+        tab: "sql",
+        sqlQuery: "",
+        promqlQuery: "",
+        vrlFunction: "",
+        streamName: "my-stream",
+        streamType: "logs",
+        columns: [
+          { label: "host", value: "host" },
+          { label: "level", value: "level" },
+        ],
+        period: 10,
+        multiTimeRange: [],
+        savedFunctions: [],
+        sqlQueryErrorMsg: "",
+        ...props,
+      },
+      global: {
+        plugins: [i18n, store],
+        stubs: {
+          CodeQueryEditor: keywordAwareStub,
+          QueryEditor: keywordAwareStub,
+          UnifiedQueryEditor: keywordAwareStub,
+          FullViewContainer: {
+            template: "<div><slot /><slot name='right' /></div>",
+            props: ["name", "label", "isExpanded"],
+            emits: ["update:isExpanded"],
+          },
+          O2AIChat: { template: "<div />", props: ["headerHeight", "isOpen"], emits: ["close"] },
+        },
+      },
+    });
+
+  it("binds a keywords source that switches to context keywords", async () => {
+    const wrapper = await mountWithKeywordStub();
+    await flushPromises();
+    const editor = wrapper.findComponent(keywordAwareStub);
+    expect(editor.exists()).toBe(true);
+
+    const vm = wrapper.vm as any;
+    // After the fix the template binds effectiveKeywords; the raw base list
+    // must not be what reaches the editor.
+    expect(vm.effectiveKeywords).toBeDefined();
+    expect(Array.isArray(editor.props("keywords"))).toBe(true);
+    expect(Array.isArray(vm.effectiveKeywords)).toBe(true);
+    expect(editor.props("keywords")).toStrictEqual(vm.effectiveKeywords);
+  });
+
+  it("binds effectiveSuggestions, so value context can blank the function list", async () => {
+    const wrapper = await mountWithKeywordStub();
+    await flushPromises();
+    const editor = wrapper.findComponent(keywordAwareStub);
+    const vm = wrapper.vm as any;
+    expect(vm.effectiveSuggestions).toBeDefined();
+    expect(Array.isArray(editor.props("suggestions"))).toBe(true);
+    expect(Array.isArray(vm.effectiveSuggestions)).toBe(true);
+    expect(editor.props("suggestions")).toStrictEqual(vm.effectiveSuggestions);
+  });
+});

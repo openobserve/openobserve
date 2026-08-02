@@ -363,3 +363,50 @@ describe("effectiveSuggestions — empty when value suggestions are shown", () =
     expect(c.effectiveSuggestions.value.length).toBeGreaterThan(0);
   });
 });
+
+// ─── Phase 1 (tmp/code.md): catalog wiring ────────────────────────────────────
+// The composable must source its suggestions/keywords from the shared
+// sqlCompletion catalog rather than its own inline copy (D7), so every surface
+// gets identical content.
+
+describe("catalog wiring — suggestions come from the shared sqlCompletion module", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("exposes the full catalog as defaultSuggestions", async () => {
+    const { SQL_FUNCTIONS } = await import("@/utils/query/sqlCompletion");
+    const c = makeComposable();
+    expect(c.defaultSuggestions).toEqual(SQL_FUNCTIONS);
+  });
+
+  it("every exposed suggestion is kind Function, never Text (A1)", () => {
+    const c = makeComposable();
+    for (const s of c.defaultSuggestions as any[]) {
+      expect(s.kind, `${s.name ?? s.label}`).toBe("Function");
+    }
+  });
+
+  it("every exposed suggestion has a static string label (A2)", () => {
+    const c = makeComposable();
+    for (const s of c.defaultSuggestions as any[]) {
+      expect(typeof s.label).toBe("string");
+    }
+  });
+
+  it("effectiveSuggestions in normal context carries the aggregates", async () => {
+    const c = makeComposable({ storedValues: [] });
+    await run(c, "SELECT * FROM stream WHERE ");
+    const names = (c.effectiveSuggestions.value as any[]).map((s) => s.name);
+    for (const agg of ["sum", "avg", "count", "max", "min", "histogram"]) {
+      expect(names, `missing ${agg}`).toContain(agg);
+    }
+  });
+
+  it("keeps field keywords sorted ahead of SQL keywords", async () => {
+    const c = makeComposable({ storedValues: [] });
+    c.updateFieldKeywords([{ name: "host" }, { name: "level" }]);
+    await run(c, "SELECT * FROM stream WHERE ");
+    const host = c.effectiveKeywords.value.find((k: any) => k.label === "host");
+    const and = c.effectiveKeywords.value.find((k: any) => k.label === "and");
+    expect(host.sortText < and.sortText).toBe(true);
+  });
+});

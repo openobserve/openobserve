@@ -2024,4 +2024,78 @@ describe("QueryConfig.vue", () => {
       h.unmount();
     });
   });
+  // ─── Phase 1 (tmp/code.md N1) ─────────────────────────────────────────────────
+  // QueryConfig wires the full autocomplete pipeline in handleInlineQueryUpdate
+  // (query, cursorIndex, org/stream context, popup.open, getSuggestions) but binds
+  // :keywords="autoCompleteKeywords" — the BASE list — instead of effectiveKeywords.
+  // In value context it therefore force-opens a popup showing field NAMES where
+  // field VALUES belong. Mirrors the QueryEditorDialog guard.
+
+  describe("QueryConfig — N1 context keywords reach the inline editor", () => {
+    let host: any;
+    let qc: any;
+
+    beforeEach(() => {
+      mockStore = createMockStore();
+      mockStoreInstance = mockStore;
+      // tab "sql" so the inline SQL editor actually renders.
+      const props = reactive({ ...baseQCProps(), tab: "sql" });
+      const Host = defineComponent({
+        components: { OForm, QueryConfig },
+        setup: () => ({
+          schema: addAlertSchema,
+          defaultValues: hostDefaults({}),
+          qcProps: props,
+        }),
+        template: `
+          <OForm :schema="schema" :default-values="defaultValues" @submit="() => {}">
+            <QueryConfig v-bind="qcProps" />
+          </OForm>
+        `,
+      });
+      host = mount(Host, {
+        global: {
+          mocks: { $store: mockStore },
+          provide: { store: mockStore },
+          plugins: [i18n],
+          stubs: {
+            UnifiedQueryEditor: {
+              name: "UnifiedQueryEditor",
+              template: '<div class="stub-inline-editor" />',
+              props: ["query", "keywords", "suggestions"],
+              emits: ["update:query", "focus", "blur"],
+            },
+          },
+        },
+      });
+      qc = host.findComponent(QueryConfig);
+    });
+
+    afterEach(() => host?.unmount());
+
+    it("exposes effectiveKeywords as the editor's keyword source", () => {
+      expect(qc.vm.effectiveKeywords).toBeDefined();
+    });
+
+    it("exposes effectiveSuggestions as the editor's suggestion source", () => {
+      expect(qc.vm.effectiveSuggestions).toBeDefined();
+    });
+
+    it("binds effectiveKeywords (not the base list) to the inline editor", () => {
+      const editor = host.findComponent({ name: "UnifiedQueryEditor" });
+      expect(editor.exists()).toBe(true);
+      // Guard against a vacuous pass where both sides are undefined.
+      expect(Array.isArray(editor.props("keywords"))).toBe(true);
+      expect(Array.isArray(qc.vm.effectiveKeywords)).toBe(true);
+      expect(editor.props("keywords")).toStrictEqual(qc.vm.effectiveKeywords);
+    });
+
+    it("binds effectiveSuggestions to the inline editor", () => {
+      const editor = host.findComponent({ name: "UnifiedQueryEditor" });
+      expect(Array.isArray(editor.props("suggestions"))).toBe(true);
+      expect(Array.isArray(qc.vm.effectiveSuggestions)).toBe(true);
+      expect(editor.props("suggestions")).toStrictEqual(qc.vm.effectiveSuggestions);
+    });
+  });
+
 });

@@ -828,3 +828,49 @@ describe("CodeQueryEditor", () => {
     });
   });
 });
+
+// ─── Phase 1 (tmp/code.md N2 / D7) ────────────────────────────────────────────
+// Traces binds :keywords but no :suggestions, so it falls through to the
+// component's LOCAL default list. That local copy had 7 entries while the
+// composable's had 26 — a shipped divergence. After collapsing the duplicated
+// catalogs the fallback must be the shared catalog.
+
+describe("N2/D7 — the suggestions fallback is the shared catalog", () => {
+  it("falls back to the shared SQL_FUNCTIONS catalog when suggestions prop is null", async () => {
+    const { SQL_FUNCTIONS } = await import("@/utils/query/sqlCompletion");
+    const wrapper = mount(CodeQueryEditor, {
+      props: { editorId: "fallback-editor", language: "sql", suggestions: null },
+      global: { plugins: [store] },
+    });
+    // `suggestions` is the computed the provider reads.
+    expect((wrapper.vm as any).suggestions).toEqual(SQL_FUNCTIONS);
+  });
+
+  it("the fallback includes the aggregates Traces was missing", async () => {
+    const wrapper = mount(CodeQueryEditor, {
+      props: { editorId: "fallback-editor-2", language: "sql", suggestions: null },
+      global: { plugins: [store] },
+    });
+    const names = ((wrapper.vm as any).suggestions as any[]).map((s) => s.name);
+    for (const agg of ["sum", "avg", "count", "max", "min", "histogram", "approx_topk"]) {
+      expect(names, `fallback missing ${agg}`).toContain(agg);
+    }
+  });
+
+  it("an explicit empty array still suppresses all suggestions", async () => {
+    const wrapper = mount(CodeQueryEditor, {
+      props: { editorId: "fallback-editor-3", language: "sql", suggestions: [] },
+      global: { plugins: [store] },
+    });
+    expect((wrapper.vm as any).suggestions).toEqual([]);
+  });
+
+  it("uses the shared catalog for its default keywords too", async () => {
+    const { SQL_KEYWORDS } = await import("@/utils/query/sqlCompletion");
+    const wrapper = mount(CodeQueryEditor, {
+      props: { editorId: "fallback-editor-4", language: "sql", keywords: [] },
+      global: { plugins: [store] },
+    });
+    expect((wrapper.vm as any).keywords).toEqual(SQL_KEYWORDS);
+  });
+});
