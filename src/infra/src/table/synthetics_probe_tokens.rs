@@ -145,6 +145,11 @@ pub async fn add(record: &SyntheticsProbeTokenRecord) -> Result<(), errors::Erro
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     match Entity::insert(model).exec(client).await {
         Ok(_) => {
+            // Release the SQLite write mutex BEFORE emitting. On a sqlite meta_store
+            // the coordinator's put() takes the *same* CLIENT_RW lock `get_lock()`
+            // returns, so emitting while holding it deadlocks the process — and the
+            // mutex is then held forever, hanging every later synthetics query.
+            drop(_lock);
             // A new token can become the org default, so both caches are stale.
             invalidate_and_publish(&record.org_id).await;
             Ok(())
@@ -263,6 +268,11 @@ pub async fn set_enabled(org_id: &str, name: &str, enabled: bool) -> Result<(), 
         .exec(client)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+    // Release the SQLite write mutex BEFORE emitting. On a sqlite meta_store
+    // the coordinator's put() takes the *same* CLIENT_RW lock `get_lock()`
+    // returns, so emitting while holding it deadlocks the process — and the
+    // mutex is then held forever, hanging every later synthetics query.
+    drop(_lock);
     invalidate_and_publish(org_id).await;
     Ok(())
 }
@@ -297,6 +307,11 @@ pub async fn set_default(org_id: &str, name: &str) -> Result<(), errors::Error> 
     txn.commit()
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+    // Release the SQLite write mutex BEFORE emitting. On a sqlite meta_store
+    // the coordinator's put() takes the *same* CLIENT_RW lock `get_lock()`
+    // returns, so emitting while holding it deadlocks the process — and the
+    // mutex is then held forever, hanging every later synthetics query.
+    drop(_lock);
     invalidate_and_publish(org_id).await;
     Ok(())
 }

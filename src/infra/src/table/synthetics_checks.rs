@@ -315,6 +315,11 @@ pub async fn create<C: TransactionTrait>(
     let model = am.insert(&txn).await?.try_into_model()?;
     let result = Synthetic::try_from(model)?;
     txn.commit().await?;
+    // Release the SQLite write mutex BEFORE emitting. On a sqlite meta_store
+    // the coordinator's put() takes the *same* CLIENT_RW lock `get_lock()`
+    // returns, so emitting while holding it deadlocks the process — and the
+    // mutex is then held forever, hanging every later synthetics query.
+    drop(_lock);
     invalidate_and_publish(&result.org_id, &result.id).await;
     Ok(result)
 }
@@ -339,6 +344,11 @@ pub async fn update<C: TransactionTrait>(
     let model = am.update(&txn).await?.try_into_model()?;
     let result = Synthetic::try_from(model)?;
     txn.commit().await?;
+    // Release the SQLite write mutex BEFORE emitting. On a sqlite meta_store
+    // the coordinator's put() takes the *same* CLIENT_RW lock `get_lock()`
+    // returns, so emitting while holding it deadlocks the process — and the
+    // mutex is then held forever, hanging every later synthetics query.
+    drop(_lock);
     invalidate_and_publish(&result.org_id, &result.id).await;
     Ok(result)
 }
@@ -374,6 +384,11 @@ pub async fn put<C: TransactionTrait>(
     };
 
     txn.commit().await?;
+    // Release the SQLite write mutex BEFORE emitting. On a sqlite meta_store
+    // the coordinator's put() takes the *same* CLIENT_RW lock `get_lock()`
+    // returns, so emitting while holding it deadlocks the process — and the
+    // mutex is then held forever, hanging every later synthetics query.
+    drop(_lock);
     invalidate_and_publish(&result.org_id, &result.id).await;
     Ok(result)
 }
@@ -389,6 +404,11 @@ pub async fn delete<C: ConnectionTrait>(
         .filter(Column::Id.eq(id))
         .exec(conn)
         .await?;
+    // Release the SQLite write mutex BEFORE emitting. On a sqlite meta_store
+    // the coordinator's put() takes the *same* CLIENT_RW lock `get_lock()`
+    // returns, so emitting while holding it deadlocks the process — and the
+    // mutex is then held forever, hanging every later synthetics query.
+    drop(_lock);
     invalidate_and_publish_delete(org_id, id).await;
     Ok(res.rows_affected > 0)
 }
@@ -414,6 +434,11 @@ pub async fn move_to_folder<C: ConnectionTrait>(
         .filter(Column::Id.is_in(ids.to_vec()))
         .exec(conn)
         .await?;
+    // Release the SQLite write mutex BEFORE emitting. On a sqlite meta_store
+    // the coordinator's put() takes the *same* CLIENT_RW lock `get_lock()`
+    // returns, so emitting while holding it deadlocks the process — and the
+    // mutex is then held forever, hanging every later synthetics query.
+    drop(_lock);
     for id in ids {
         invalidate_and_publish(org_id, id).await;
     }
@@ -438,6 +463,11 @@ pub async fn set_enabled<C: ConnectionTrait>(
         .filter(Column::Id.eq(id))
         .exec(conn)
         .await?;
+    // Release the SQLite write mutex BEFORE emitting. On a sqlite meta_store
+    // the coordinator's put() takes the *same* CLIENT_RW lock `get_lock()`
+    // returns, so emitting while holding it deadlocks the process — and the
+    // mutex is then held forever, hanging every later synthetics query.
+    drop(_lock);
     invalidate_and_publish(org_id, id).await;
     Ok(res.rows_affected > 0)
 }

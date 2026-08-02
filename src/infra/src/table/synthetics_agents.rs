@@ -143,6 +143,11 @@ pub async fn register(record: &SyntheticsAgentRecord) -> Result<(), errors::Erro
                 .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
         }
     }
+    // Release the SQLite write mutex BEFORE emitting. On a sqlite meta_store
+    // the coordinator's put() takes the *same* CLIENT_RW lock `get_lock()`
+    // returns, so emitting while holding it deadlocks the process — and the
+    // mutex is then held forever, hanging every later synthetics query.
+    drop(_lock);
     // Register is where capabilities change, so the cached copy is now stale.
     invalidate_and_publish(&record.id).await;
     Ok(())

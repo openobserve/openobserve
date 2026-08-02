@@ -172,6 +172,11 @@ pub async fn add(record: &SyntheticsLocationRecord) -> Result<(), errors::Error>
         .exec(client)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+    // Release the SQLite write mutex BEFORE emitting. On a sqlite meta_store
+    // the coordinator's put() takes the *same* CLIENT_RW lock `get_lock()`
+    // returns, so emitting while holding it deadlocks the process — and the
+    // mutex is then held forever, hanging every later synthetics query.
+    drop(_lock);
     invalidate_and_publish().await;
     Ok(())
 }
@@ -228,6 +233,11 @@ pub async fn update(id: &str, label: &str, enabled: bool) -> Result<(), errors::
         .exec(client)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+    // Release the SQLite write mutex BEFORE emitting. On a sqlite meta_store
+    // the coordinator's put() takes the *same* CLIENT_RW lock `get_lock()`
+    // returns, so emitting while holding it deadlocks the process — and the
+    // mutex is then held forever, hanging every later synthetics query.
+    drop(_lock);
     invalidate_and_publish().await;
     Ok(())
 }
@@ -240,6 +250,11 @@ pub async fn remove(id: &str) -> Result<(), errors::Error> {
         .exec(client)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+    // Release the SQLite write mutex BEFORE emitting. On a sqlite meta_store
+    // the coordinator's put() takes the *same* CLIENT_RW lock `get_lock()`
+    // returns, so emitting while holding it deadlocks the process — and the
+    // mutex is then held forever, hanging every later synthetics query.
+    drop(_lock);
     invalidate_and_publish().await;
     Ok(())
 }
