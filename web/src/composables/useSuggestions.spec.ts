@@ -612,9 +612,10 @@ describe("org VRL functions are offered exactly once", () => {
     const suggestions = (c.effectiveSuggestions.value as any[]).map((s) => s.name);
 
     expect(keywords).toContain("my_vrl_fn");
-    expect(suggestions, "server catalog re-added a function the keywords already carry").not.toContain(
-      "my_vrl_fn",
-    );
+    expect(
+      suggestions,
+      "server catalog re-added a function the keywords already carry",
+    ).not.toContain("my_vrl_fn");
   });
 
   it("still adds server functions the keywords path does NOT carry", async () => {
@@ -644,5 +645,50 @@ describe("org VRL functions are offered exactly once", () => {
     expect(hits).toHaveLength(1);
     // The surviving entry keeps the legacy quoting that has always shipped.
     expect(hits[0].insertText).toBe("my_vrl_fn('${1:value}')");
+  });
+});
+
+// ─── Phase 3 C4: the composable must expose the value resolver ───────────────
+// The provider-level test injects a fieldValueResolver straight into
+// CodeQueryEditor, which proves the component can use one but not that anything
+// supplies it. Alerts bound the wrong list, the SLO form never loaded the
+// catalog, and Traces omitted a prop — all "the helper works, nobody calls it".
+// The resolver therefore comes from the composable every surface already uses.
+
+describe("Phase 3 — resolveFieldValues is exposed for the editor to await", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("exposes a resolver", () => {
+    const c = makeComposable({ storedValues: [] });
+    expect(typeof (c as any).resolveFieldValues).toBe("function");
+  });
+
+  it("returns the stored values for a field", async () => {
+    const c = makeComposable({ storedValues: ["error", "warn"] });
+    await expect((c as any).resolveFieldValues("level")).resolves.toEqual(
+      expect.arrayContaining(["error", "warn"]),
+    );
+  });
+
+  it("merges in-session values ahead of stored ones", async () => {
+    const c = makeComposable({
+      storedValues: ["stored_only"],
+      inSessionValues: { level: ["fresh"] },
+    });
+    const values = await (c as any).resolveFieldValues("level");
+    expect(values[0]).toBe("fresh");
+    expect(values).toContain("stored_only");
+  });
+
+  it("resolves to an empty list rather than throwing when the lookup fails", async () => {
+    const c = makeComposable({ storedValues: [] });
+    vi.mocked(getFieldValuesForSuggestion).mockRejectedValueOnce(new Error("idb down"));
+    await expect((c as any).resolveFieldValues("level")).resolves.toEqual([]);
+  });
+
+  it("resolves to an empty list when no stream context is set", async () => {
+    const c = makeComposable({ storedValues: ["error"] });
+    c.autoCompleteData.value.streamName = "";
+    await expect((c as any).resolveFieldValues("level")).resolves.toEqual([]);
   });
 });

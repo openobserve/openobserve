@@ -590,7 +590,7 @@ describe("Phase 3 — providers return the shapes monaco requires", () => {
       const provider = vi
         .mocked((api.languages as any).registerHoverProvider)
         .mock.calls.at(-1)![1];
-      mockModel.getWordAtPosition.mockReturnValue({
+      model.getWordAtPosition.mockReturnValue({
         word: "host_name",
         startColumn: 1,
         endColumn: 10,
@@ -605,7 +605,7 @@ describe("Phase 3 — providers return the shapes monaco requires", () => {
   it("D3 — returns null for a word it knows nothing about", { timeout: 30000 }, async () => {
     const { api, model } = await mountAndGet();
     const provider = vi.mocked((api.languages as any).registerHoverProvider).mock.calls.at(-1)![1];
-    mockModel.getWordAtPosition.mockReturnValue({
+    model.getWordAtPosition.mockReturnValue({
       word: "zzz_unknown",
       startColumn: 1,
       endColumn: 12,

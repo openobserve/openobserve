@@ -55,20 +55,29 @@ describe("editor wiring — every surface supplies both completion sources", () 
     expect(editorHosts.length).toBeGreaterThan(8);
   });
 
-  it.each(editorHosts.map((f) => f.path))(
-    "%s binds :suggestions as well as :keywords",
-    (path) => {
-      const { source } = editorHosts.find((f) => f.path === path)!;
-      // Omitting :suggestions is not inert — CodeQueryEditor falls back to the
-      // STATIC local catalog, so the surface silently loses every function the
-      // server reports. That is exactly how Traces ended up short.
-      expect(
-        /:suggestions\s*=/.test(source),
-        `${path} binds :keywords but not :suggestions, so it falls back to the ` +
-          `static catalog and loses the server-supplied functions`,
-      ).toBe(true);
-    },
-  );
+  it.each(editorHosts.map((f) => f.path))("%s binds :suggestions as well as :keywords", (path) => {
+    const { source } = editorHosts.find((f) => f.path === path)!;
+    // Omitting :suggestions is not inert — CodeQueryEditor falls back to the
+    // STATIC local catalog, so the surface silently loses every function the
+    // server reports. That is exactly how Traces ended up short.
+    expect(
+      /:suggestions\s*=/.test(source),
+      `${path} binds :keywords but not :suggestions, so it falls back to the ` +
+        `static catalog and loses the server-supplied functions`,
+    ).toBe(true);
+  });
+
+  it.each(editorHosts.map((f) => f.path))("%s supplies a field-value resolver", (path) => {
+    const { source } = editorHosts.find((f) => f.path === path)!;
+    // C4 moves the field-VALUE lookup inside the provider, which can only
+    // await a resolver something hands it. A surface that omits this gets a
+    // working editor with no value completion — silently, exactly like the
+    // three prop-wiring gaps before it.
+    expect(
+      /:field-value-resolver\s*=|:fieldValueResolver\s*=/.test(source),
+      `${path} mounts an editor without a field-value resolver`,
+    ).toBe(true);
+  });
 
   it.each(editorHosts.map((f) => f.path))("%s does not bind the base keyword list", (path) => {
     const { source } = editorHosts.find((f) => f.path === path)!;
