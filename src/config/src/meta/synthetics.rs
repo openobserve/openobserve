@@ -217,7 +217,30 @@ pub enum SyntheticType {
     Dns,
 }
 
+/// Retry ceiling for browser checks. Lower than the protocol types because a
+/// browser run costs `devices x attempts x journey_budget`: at 3 retries a ~100s
+/// journey already reaches the browser Lambda's 303s function timeout, so the
+/// config would validate and then be killed mid-journey — reporting a failure
+/// the target never had.
+pub const MAX_BROWSER_RETRIES: i32 = 2;
+
+/// Retry ceiling for the protocol types. One attempt is a single request, so the
+/// worst case is bounded by `timeout_ms` and stays well inside the budget.
+pub const MAX_NET_RETRIES: i32 = 3;
+
 impl SyntheticType {
+    /// Largest `retries` value this type accepts.
+    ///
+    /// Note the product default is **0** for every type, and that is deliberate:
+    /// retries mask real failures, so opting in is the user's choice. This is
+    /// only the ceiling on that choice.
+    pub fn max_retries(&self) -> i32 {
+        match self {
+            Self::Browser => MAX_BROWSER_RETRIES,
+            _ => MAX_NET_RETRIES,
+        }
+    }
+
     /// JSON paths inside this type's `config` blob whose string values are
     /// credentials and must be AES-encrypted at rest (and decrypted on read).
     ///
@@ -935,19 +958,114 @@ const MAX_JOURNEY_BUDGET_MS: u32 = 900_000;
 /// case inside this number, which is in turn what lets the server lease for it
 /// unconditionally.
 ///
-/// NOTE: the AWS Lambda function timeout must be >= this value, or runs are
-/// killed mid-journey. That setting lives outside this repository and cannot be
-/// asserted here. 900s is also AWS's maximum, so raising `retries` or
-/// `journey_budget_ms` further requires re-deriving all three together.
-pub const JOB_LEASE_SECS: i64 = 900;
+/// NOTE: the AWS Lambda function timeout must be >= `max_check_budget_secs`, or
+/// runs are killed mid-journey. That setting lives outside this repository — it
+/// is applied by the probe deploy scripts — so it cannot be asserted here.
+/// 900s is also AWS's maximum.
+pub const DEFAULT_JOB_LEASE_SECS: i64 = 900;
+
+/// Ceiling on a check's worst-case run, in seconds. Deliberately **below**
+/// `job_lease_secs`: the gap is what dispatch and the ack need, because a run
+/// finishing exactly at the function timeout still has to report before the
+/// reaper assumes the probe is gone.
+pub const DEFAULT_MAX_CHECK_BUDGET_SECS: i64 = 840;
 
 /// Ceiling for ONE attempt of a non-browser check, in milliseconds.
 ///
 /// Net `timeout_ms` was previously unbounded: every protocol config defaults it
 /// to 10s, but nothing rejected `timeout_ms: 3_600_000`, so the worst case of a
-/// retry sequence had no upper limit and could not be checked against the lease.
-const MAX_NET_TIMEOUT_MS: u32 = 300_000;
+/// retry sequence had no upper limit and could not be checked against the budget.
+pub const DEFAULT_MAX_NET_TIMEOUT_MS: u32 = 300_000;
 const MIN_NET_TIMEOUT_MS: u32 = 1_000;
+
+/// The three stacked bounds, tunable by deployment.
+///
+/// ```text
+/// check worst case  <=  max_check_budget_secs  <  job_lease_secs
+///                              840s                   900s
+///                       (also the Lambda
+///                        function timeout)
+/// ```
+///
+/// Synthetics is enterprise-only, so the values are declared in
+/// `o2_enterprise`'s `SyntheticsConfig` (`O2_SYNTHETICS_*` env vars) and pushed
+/// in here at startup by [`init_limits`]. This crate cannot read them directly —
+/// `config` has no dependency on `o2_enterprise` — so the holder below is the
+/// seam, and it falls back to the `DEFAULT_*` values in OSS builds and in tests.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SyntheticsLimits {
+    pub job_lease_secs: i64,
+    pub max_check_budget_secs: i64,
+    pub max_net_timeout_ms: u32,
+}
+
+impl Default for SyntheticsLimits {
+    fn default() -> Self {
+        Self {
+            job_lease_secs: DEFAULT_JOB_LEASE_SECS,
+            max_check_budget_secs: DEFAULT_MAX_CHECK_BUDGET_SECS,
+            max_net_timeout_ms: DEFAULT_MAX_NET_TIMEOUT_MS,
+        }
+    }
+}
+
+impl SyntheticsLimits {
+    /// Rejects a set of limits that cannot hold together.
+    ///
+    /// The ordering is the whole point: a budget at or above the lease means a
+    /// check can be accepted, run to its limit, and still have its ack rejected
+    /// as stale — which surfaces to the user as a failure their target never
+    /// had. Operators own these values; this only refuses combinations that
+    /// cannot work.
+    pub fn validate(&self) -> Result<(), String> {
+        if self.max_check_budget_secs >= self.job_lease_secs {
+            return Err(format!(
+                "O2_SYNTHETICS_MAX_CHECK_BUDGET_SECS ({}) must be strictly less than \
+                 O2_SYNTHETICS_JOB_LEASE_SECS ({}) — the gap is what dispatch and the ack need. \
+                 A run that finishes at the budget still has to report before the reaper assumes \
+                 the probe is gone.",
+                self.max_check_budget_secs, self.job_lease_secs
+            ));
+        }
+        if self.max_check_budget_secs <= 0 || self.job_lease_secs <= 0 {
+            return Err("synthetics limits must be positive".to_string());
+        }
+        if self.max_net_timeout_ms as i64 > self.max_check_budget_secs * 1_000 {
+            return Err(format!(
+                "O2_SYNTHETICS_MAX_NET_TIMEOUT_MS ({}) exceeds the check budget ({}s) — a single \
+                 attempt could never fit",
+                self.max_net_timeout_ms, self.max_check_budget_secs
+            ));
+        }
+        Ok(())
+    }
+}
+
+static LIMITS: std::sync::OnceLock<SyntheticsLimits> = std::sync::OnceLock::new();
+
+/// Installs deployment-configured limits. Called once from `init_enterprise`.
+///
+/// **Not fatal.** A bad synthetics ceiling must not stop the whole application
+/// from starting — synthetics is one feature, and o2 serving ingest, search and
+/// dashboards matters more than it. On rejection nothing is installed, so
+/// [`limits`] keeps returning the `DEFAULT_*` values, which are known to hold
+/// together. The caller logs the error; an operator fixes the env var and
+/// restarts.
+///
+/// Falling back rather than accepting is the safe direction: the defaults are
+/// conservative, whereas an invalid pair (say budget == lease) is what silently
+/// converts healthy targets into alerts.
+pub fn init_limits(limits: SyntheticsLimits) -> Result<(), String> {
+    limits.validate()?;
+    let _ = LIMITS.set(limits);
+    Ok(())
+}
+
+/// The active limits — deployment-configured when enterprise has initialised,
+/// otherwise the `DEFAULT_*` values.
+pub fn limits() -> SyntheticsLimits {
+    LIMITS.get().copied().unwrap_or_default()
+}
 
 /// Worst-case wall clock for one leased job, in milliseconds.
 ///
@@ -993,20 +1111,23 @@ fn validate_net_retry_budget(
         .and_then(|v| u32::try_from(v).ok())
         .unwrap_or_else(default_timeout_ms);
 
-    if !(MIN_NET_TIMEOUT_MS..=MAX_NET_TIMEOUT_MS).contains(&timeout_ms) {
+    let max_net_timeout_ms = limits().max_net_timeout_ms;
+    if !(MIN_NET_TIMEOUT_MS..=max_net_timeout_ms).contains(&timeout_ms) {
         return Err(format!(
-            "config.timeout_ms: must be {MIN_NET_TIMEOUT_MS}..={MAX_NET_TIMEOUT_MS}, got {timeout_ms}"
+            "config.timeout_ms: must be {MIN_NET_TIMEOUT_MS}..={max_net_timeout_ms}, got {timeout_ms}"
         ));
     }
 
+    let budget_secs = limits().max_check_budget_secs;
     let worst_case_ms = worst_case_run_ms(timeout_ms, 1, retries, wait_before_retry_secs);
-    if worst_case_ms > JOB_LEASE_SECS * 1_000 {
+    if worst_case_ms > budget_secs * 1_000 {
         return Err(format!(
-            "config: a full retry sequence must fit inside the {JOB_LEASE_SECS}s job lease, but \
+            "config: a full retry sequence must fit inside the {budget_secs}s check budget, but \
              (retries={retries} + 1) x timeout_ms={timeout_ms} + retries x \
              wait_before_retry_secs={wait_before_retry_secs} needs {worst_case_ms}ms. Lower \
-             timeout_ms, retries, or wait_before_retry_secs — a check that outlives its lease has \
-             its job terminated mid-run and its real result rejected as a stale ack."
+             timeout_ms, retries, or wait_before_retry_secs — a check that outlives the budget is \
+             killed mid-run by the probe's function timeout and reports a failure the target \
+             never had."
         ));
     }
     Ok(())
@@ -1326,8 +1447,19 @@ impl Synthetic {
         }
 
         // ── retry / alert settings ─────────────────────────────────────────
-        if !(0..=3).contains(&self.retries) {
-            return Err(format!("retries: must be 0..=3, got {}", self.retries));
+        // Browser is capped lower than the protocol types, and the cap is
+        // load-bearing rather than a preference. A browser run is
+        // devices x attempts x journey_budget, so at 3 retries a ~100s journey
+        // already reaches the browser function's 303s timeout — the config
+        // would validate and then be killed mid-journey, reporting a failure
+        // the target never had. Raise this only together with the deployed
+        // function timeout and MAX_CHECK_BUDGET_SECS.
+        let max_retries = self.check_type.max_retries();
+        if !(0..=max_retries).contains(&self.retries) {
+            return Err(format!(
+                "retries: must be 0..={max_retries} for {:?} checks, got {}",
+                self.check_type, self.retries
+            ));
         }
         if !(0..=300).contains(&self.wait_before_retry_secs) {
             return Err(format!(
@@ -1817,14 +1949,16 @@ fn validate_browser_config(
     // duplicate. Which is verbatim what the LEASE_SECS comment in
     // `dispatcher/mod.rs` was written to prevent.
     let devices = i64::try_from(cfg.browser_devices.len().max(1)).unwrap_or(1);
+    let budget_secs = limits().max_check_budget_secs;
     let worst_case_ms = worst_case_run_ms(budget_ms, devices, retries, wait_before_retry_secs);
-    if worst_case_ms > JOB_LEASE_SECS * 1_000 {
+    if worst_case_ms > budget_secs * 1_000 {
         return Err(format!(
             "config: a full retry sequence across all browser/device combos must fit inside the \
-             {JOB_LEASE_SECS}s job lease, but browser_devices={devices} x (retries={retries} x \
+             {budget_secs}s check budget, but browser_devices={devices} x (retries={retries} x \
              journey_budget_ms={budget_ms} + wait_before_retry_secs={wait_before_retry_secs}) needs \
              {worst_case_ms}ms. Lower journey_budget_ms, retries, or the number of browser/device \
-             combos — a run that outlives its lease is requeued and executed a second time."
+             combos — a run that outlives the budget is killed mid-journey by the probe's function \
+             timeout, and one that outlives the lease is requeued and executed a second time."
         ));
     }
 
@@ -1955,6 +2089,82 @@ fn validate_browser_devices_and_schedule(
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod limits_tests {
+    use super::*;
+
+    #[test]
+    fn defaults_hold_together() {
+        SyntheticsLimits::default()
+            .validate()
+            .expect("shipped defaults must be a valid combination");
+    }
+
+    #[test]
+    fn budget_equal_to_lease_is_rejected() {
+        // The gap is what dispatch and the ack need. Equal means a run that
+        // uses its full budget cannot report before the reaper requeues it.
+        let l = SyntheticsLimits {
+            job_lease_secs: 900,
+            max_check_budget_secs: 900,
+            ..Default::default()
+        };
+        assert!(l.validate().is_err());
+    }
+
+    #[test]
+    fn budget_above_lease_is_rejected() {
+        let l = SyntheticsLimits {
+            job_lease_secs: 900,
+            max_check_budget_secs: 901,
+            ..Default::default()
+        };
+        assert!(l.validate().is_err());
+    }
+
+    #[test]
+    fn net_timeout_larger_than_the_budget_is_rejected() {
+        // One attempt could never fit, so every config of that type would fail
+        // validation for a reason the user cannot act on.
+        let l = SyntheticsLimits {
+            max_check_budget_secs: 10,
+            max_net_timeout_ms: 300_000,
+            ..Default::default()
+        };
+        assert!(l.validate().is_err());
+    }
+
+    #[test]
+    fn a_raised_but_still_ordered_pair_is_accepted() {
+        // Operators own these values; validation only refuses combinations that
+        // cannot work, not ones it merely dislikes.
+        let l = SyntheticsLimits {
+            job_lease_secs: 600,
+            max_check_budget_secs: 540,
+            max_net_timeout_ms: 120_000,
+        };
+        assert!(l.validate().is_ok());
+    }
+
+    #[test]
+    fn limits_fall_back_to_defaults_when_uninitialised() {
+        // Tests and OSS builds never call init_limits, so this is the path the
+        // whole validation suite actually runs on.
+        assert_eq!(limits(), SyntheticsLimits::default());
+    }
+
+    #[test]
+    fn browser_retries_are_capped_lower_than_net() {
+        assert_eq!(SyntheticType::Browser.max_retries(), MAX_BROWSER_RETRIES);
+        assert_eq!(SyntheticType::Http.max_retries(), MAX_NET_RETRIES);
+        assert!(
+            SyntheticType::Browser.max_retries() < SyntheticType::Http.max_retries(),
+            "browser is bounded by devices x attempts x journey budget, so its cap \
+             must stay below the protocol types'"
+        );
+    }
 }
 
 #[cfg(test)]
@@ -2260,16 +2470,20 @@ mod tests {
     }
 
     #[test]
-    fn net_retry_sequence_must_fit_the_job_lease() {
+    fn net_retry_sequence_must_fit_the_check_budget() {
         let (locs, brs, devs) = allowed();
-        // The lease covers the whole retry sequence because retries run inside
-        // the leased job. 4 x 300s alone is 1200s, past the 900s lease.
+        // The budget covers the whole retry sequence because retries run inside
+        // the leased job. 4 x 300s alone is 1200s, past the 840s budget.
+        //
+        // Validated against the BUDGET, not the lease: on the managed path the
+        // probe is a Lambda, and a function that hits its timeout is killed
+        // mid-run. Lease headroom is irrelevant once the process is gone.
         let mut s = valid_tcp_synthetic();
         s.config = serde_json::json!({ "port": 5432, "timeout_ms": 300_000 });
         s.retries = 3;
         s.wait_before_retry_secs = 0;
         let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
-        assert!(err.contains("job lease"), "{err}");
+        assert!(err.contains("check budget"), "{err}");
 
         // The gaps count too: 3 x 250s = 750s of attempts is fine on its own,
         // but not with 300s of waiting between them.
@@ -2278,7 +2492,7 @@ mod tests {
         s.retries = 2;
         s.wait_before_retry_secs = 300;
         let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
-        assert!(err.contains("job lease"), "{err}");
+        assert!(err.contains("check budget"), "{err}");
     }
 
     #[test]
@@ -3183,19 +3397,36 @@ mod tests {
     }
 
     #[test]
-    fn test_browser_journey_budget_exceeding_lease_rejected() {
+    fn test_browser_journey_budget_exceeding_check_budget_rejected() {
         let (locs, brs, devs) = allowed();
         let mut s = valid_browser_synthetic();
-        s.retries = 3;
+        // 2 is the browser cap; 3 would be rejected by the retries bound before
+        // ever reaching the budget arithmetic this test is about.
+        s.retries = MAX_BROWSER_RETRIES;
         s.wait_before_retry_secs = 5;
         s.config["journey_budget_ms"] = serde_json::json!(300_000);
-        // 4 * 300s + 15s = 1215s — well past the 900s lease.
+        // 3 * 300s + 10s = 910s — past the 840s check budget.
         let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
         // The error must name all three inputs, or an operator cannot tell which
         // one to change.
         assert!(err.contains("journey_budget_ms"), "{err}");
         assert!(err.contains("retries"), "{err}");
-        assert!(err.contains("lease"), "{err}");
+        assert!(err.contains("check budget"), "{err}");
+    }
+
+    #[test]
+    fn browser_retries_above_the_cap_are_rejected() {
+        let (locs, brs, devs) = allowed();
+        let mut s = valid_browser_synthetic();
+        s.retries = MAX_BROWSER_RETRIES + 1;
+        let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
+        assert!(err.contains("retries"), "{err}");
+
+        // The same value is fine on a protocol check, which is the point of the
+        // cap being per-type rather than global.
+        let mut n = valid_tcp_synthetic();
+        n.retries = MAX_BROWSER_RETRIES + 1;
+        assert!(n.validate(&locs, &brs, &devs, true).is_ok());
     }
 
     // The invariant above was per-DEVICE while the work is per-JOB: the probe runs
@@ -3254,12 +3485,12 @@ mod tests {
         let mut s = valid_browser_synthetic();
         s.retries = 1;
         s.wait_before_retry_secs = 0;
-        // Exactly 2 * 450s = 900s — equal to the lease, which is permitted.
-        s.config["journey_budget_ms"] = serde_json::json!(450_000);
+        // Exactly 2 * 420s = 840s — equal to the check budget, which is permitted.
+        s.config["journey_budget_ms"] = serde_json::json!(420_000);
         assert!(s.validate(&locs, &brs, &devs, true).is_ok());
 
         // One millisecond more per attempt tips it over.
-        s.config["journey_budget_ms"] = serde_json::json!(450_001);
+        s.config["journey_budget_ms"] = serde_json::json!(420_001);
         assert!(s.validate(&locs, &brs, &devs, true).is_err());
     }
 
