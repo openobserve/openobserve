@@ -232,12 +232,11 @@ describe("A5 — snippet rules are mapped from string name to numeric enum", () 
     expect(typeof item.insertTextRules).toBe("number");
   });
 
-  it("survives monaco's bitwise test (string would coerce to 0)", () => {
+  it("survives monaco's bitwise test", () => {
     const [item] = build({ suggestions: [snippetEntry] });
-    // suggestController.js:368 — if (!(insertTextRules & 4)) escape as plain text
+    // suggestController.js:368 — if (!(insertTextRules & 4)) escape as plain text.
+    // A string value coerces to 0 here, which is the bug this pins.
     expect(item.insertTextRules & INSERT_RULES.InsertAsSnippet).toBeTruthy();
-    // Prove the current bug would fail this: "InsertAsSnippet" & 4 === 0
-    expect(("InsertAsSnippet" as any) & INSERT_RULES.InsertAsSnippet).toBe(0);
   });
 
   it("applies the same mapping on the keywords path", () => {
@@ -401,5 +400,54 @@ describe("back-compat — legacy callable label/insertText entries still build",
   it("still maps a legacy string kind through the enum", () => {
     const [item] = build({ suggestions: [legacy as any], word: "abc" });
     expect(item.kind).toBe(KINDS.Text);
+  });
+
+  // A4: the old code derived the token with textUntilPosition.split(" "), which
+  // broke on newlines ("*\nFROM") and on partially quoted tokens ("'err").
+  // buildCompletionItems must receive monaco's own word and nothing else.
+  it("uses only the supplied word — never a space-split of the whole buffer", () => {
+    const [item] = build({ suggestions: [legacy as any], word: "err" });
+    expect(item.label).toBe("custom_fn('err')");
+    expect(item.label).not.toContain("\n");
+    expect(item.label).not.toContain("FROM");
+  });
+});
+
+// ───────────────────────────────────────────────────────────────────────────
+// N2 / D7 — prop fallback resolution (pure; the component delegates to this)
+// ───────────────────────────────────────────────────────────────────────────
+
+describe("N2/D7 — resolveSuggestions / resolveKeywords", () => {
+  it("falls back to the shared catalog when the SQL suggestions prop is null", async () => {
+    const { resolveSuggestions } = await import("./sqlCompletion");
+    expect(resolveSuggestions("sql", null)).toEqual(SQL_FUNCTIONS);
+  });
+
+  it("honours an explicit empty array (value context must stay empty)", async () => {
+    const { resolveSuggestions } = await import("./sqlCompletion");
+    expect(resolveSuggestions("sql", [])).toEqual([]);
+  });
+
+  it("passes a caller-supplied list through untouched", async () => {
+    const { resolveSuggestions } = await import("./sqlCompletion");
+    const custom = [{ name: "x", label: "x", kind: "Function", insertText: "x" }] as any;
+    expect(resolveSuggestions("sql", custom)).toBe(custom);
+  });
+
+  it("does not inject SQL suggestions into non-SQL editors", async () => {
+    const { resolveSuggestions } = await import("./sqlCompletion");
+    expect(resolveSuggestions("json", null)).toEqual([]);
+    expect(resolveSuggestions("promql", null)).toEqual([]);
+  });
+
+  it("falls back to the shared keyword list when the SQL keywords prop is empty", async () => {
+    const { resolveKeywords } = await import("./sqlCompletion");
+    expect(resolveKeywords("sql", [])).toEqual(SQL_KEYWORDS);
+  });
+
+  it("prefers caller-supplied keywords over the defaults", async () => {
+    const { resolveKeywords } = await import("./sqlCompletion");
+    const custom = [{ name: "host", label: "host", kind: "Field", insertText: "host" }] as any;
+    expect(resolveKeywords("sql", custom)).toBe(custom);
   });
 });

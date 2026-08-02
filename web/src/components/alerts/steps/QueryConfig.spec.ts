@@ -2024,21 +2024,37 @@ describe("QueryConfig.vue", () => {
       h.unmount();
     });
   });
-  // ─── Phase 1 (tmp/code.md N1) ─────────────────────────────────────────────────
+  // ─── Phase 1 (tmp/code.md N1) ─────────────────────────────────────────────
   // QueryConfig wires the full autocomplete pipeline in handleInlineQueryUpdate
   // (query, cursorIndex, org/stream context, popup.open, getSuggestions) but binds
   // :keywords="autoCompleteKeywords" — the BASE list — instead of effectiveKeywords.
-  // In value context it therefore force-opens a popup showing field NAMES where
-  // field VALUES belong. Mirrors the QueryEditorDialog guard.
+  //
+  // Asserting "editor.props(keywords) === vm.effectiveKeywords" is NOT enough:
+  // effectiveKeywords returns autoCompleteKeywords verbatim whenever no context is
+  // active, so such a test passes with the bug still present. The only honest probe
+  // is to drive a real VALUE context and require Value-kind items to reach the editor.
 
   describe("QueryConfig — N1 context keywords reach the inline editor", () => {
     let host: any;
-    let qc: any;
+    let editorStub: any;
 
-    beforeEach(() => {
+    const inlineEditorStub = {
+      name: "UnifiedQueryEditor",
+      template: '<div class="stub-inline-editor" />',
+      props: ["query", "keywords", "suggestions"],
+      emits: ["update:query", "focus", "blur"],
+      methods: {
+        // handleInlineQueryUpdate reads these off the ref.
+        getCursorIndex() {
+          return 9999; // past end-of-query => analyse the whole string
+        },
+        triggerAutoComplete() {},
+      },
+    };
+
+    beforeEach(async () => {
       mockStore = createMockStore();
       mockStoreInstance = mockStore;
-      // tab "sql" so the inline SQL editor actually renders.
       const props = reactive({ ...baseQCProps(), tab: "sql" });
       const Host = defineComponent({
         components: { OForm, QueryConfig },
@@ -2058,44 +2074,54 @@ describe("QueryConfig.vue", () => {
           mocks: { $store: mockStore },
           provide: { store: mockStore },
           plugins: [i18n],
-          stubs: {
-            UnifiedQueryEditor: {
-              name: "UnifiedQueryEditor",
-              template: '<div class="stub-inline-editor" />',
-              props: ["query", "keywords", "suggestions"],
-              emits: ["update:query", "focus", "blur"],
-            },
-          },
+          stubs: { UnifiedQueryEditor: inlineEditorStub },
         },
       });
-      qc = host.findComponent(QueryConfig);
+      editorStub = host.findComponent({ name: "UnifiedQueryEditor" });
     });
 
     afterEach(() => host?.unmount());
 
-    it("exposes effectiveKeywords as the editor's keyword source", () => {
-      expect(qc.vm.effectiveKeywords).toBeDefined();
+    it("renders the inline editor on the sql tab", () => {
+      expect(editorStub.exists()).toBe(true);
     });
 
-    it("exposes effectiveSuggestions as the editor's suggestion source", () => {
-      expect(qc.vm.effectiveSuggestions).toBeDefined();
+    it("delivers field VALUES to the editor once the cursor is after an operator", async () => {
+      // Drives useSuggestions into its value branch; getFieldValuesForSuggestion
+      // is mocked (bottom of file) to return two values.
+      await editorStub.vm.$emit("update:query", "level = ");
+      await flushPromises();
+      await nextTick();
+
+      const delivered = (editorStub.props("keywords") ?? []) as any[];
+      expect(delivered.length).toBeGreaterThan(0);
+      // With the buggy binding the editor receives the BASE list (Field/Function/
+      // Keyword kinds) and never a single Value.
+      expect(delivered.some((k) => k.kind === "Value")).toBe(true);
     });
 
-    it("binds effectiveKeywords (not the base list) to the inline editor", () => {
-      const editor = host.findComponent({ name: "UnifiedQueryEditor" });
-      expect(editor.exists()).toBe(true);
-      // Guard against a vacuous pass where both sides are undefined.
-      expect(Array.isArray(editor.props("keywords"))).toBe(true);
-      expect(Array.isArray(qc.vm.effectiveKeywords)).toBe(true);
-      expect(editor.props("keywords")).toStrictEqual(qc.vm.effectiveKeywords);
+    it("delivers the stored values themselves, not field names", async () => {
+      await editorStub.vm.$emit("update:query", "level = ");
+      await flushPromises();
+      await nextTick();
+
+      const labels = ((editorStub.props("keywords") ?? []) as any[]).map((k) => k.label);
+      expect(labels).toContain("error");
+      expect(labels).toContain("warn");
     });
 
-    it("binds effectiveSuggestions to the inline editor", () => {
-      const editor = host.findComponent({ name: "UnifiedQueryEditor" });
-      expect(Array.isArray(editor.props("suggestions"))).toBe(true);
-      expect(Array.isArray(qc.vm.effectiveSuggestions)).toBe(true);
-      expect(editor.props("suggestions")).toStrictEqual(qc.vm.effectiveSuggestions);
+    it("blanks the function suggestions while in value context", async () => {
+      await editorStub.vm.$emit("update:query", "level = ");
+      await flushPromises();
+      await nextTick();
+
+      expect(editorStub.props("suggestions")).toEqual([]);
     });
   });
-
 });
+
+// Stored field values for the N1 value-context probe above. Only useSuggestions
+// consumes this module, so mocking it does not affect the rest of the suite.
+vi.mock("@/composables/useFieldValueStore", () => ({
+  getFieldValuesForSuggestion: vi.fn().mockResolvedValue(["error", "warn"]),
+}));
