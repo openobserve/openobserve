@@ -664,6 +664,15 @@ describe("B1 — the clause keyword catalog", () => {
     "NULLS FIRST",
     "NULLS LAST",
     "EXISTS",
+    // Standalone CASE parts: a user editing an existing CASE expression needs
+    // to complete these individually. Their presence inside the CASE snippet
+    // does not make them completable.
+    "WHEN",
+    "THEN",
+    "ELSE",
+    "END",
+    "ANY",
+    "ALL",
   ];
 
   it.each(REQUIRED)("offers %s", (label) => {
@@ -682,6 +691,34 @@ describe("B1 — the clause keyword catalog", () => {
 
   it("gives every clause keyword a detail so the widget explains it", () => {
     for (const k of SQL_CLAUSE_KEYWORDS) expect(k.detail, `${k.name} needs detail`).toBeTruthy();
+  });
+
+  it("gives every clause keyword prose documentation for the docs panel", () => {
+    // Phase 2 item 10 is "detail AND documentation"; asserting only detail let
+    // the whole clause catalog ship with an empty docs panel.
+    for (const k of SQL_CLAUSE_KEYWORDS) {
+      expect(k.documentation, `${k.name} needs documentation`).toBeTruthy();
+      expect(k.documentation!.length, `${k.name} documentation too terse`).toBeGreaterThan(15);
+    }
+  });
+
+  it("documents the predicate keywords too — operators may rely on detail alone", () => {
+    // `=` and `>` are self-explanatory from detail; `between`/`is null` are not.
+    for (const k of SQL_KEYWORDS.filter((x) => x.kind === "Keyword")) {
+      expect(k.documentation, `${k.name} needs documentation`).toBeTruthy();
+    }
+  });
+
+  it("keeps a detail on every operator even without documentation", () => {
+    for (const k of SQL_KEYWORDS.filter((x) => x.kind === "Operator")) {
+      expect(k.detail, `${k.name} needs detail`).toBeTruthy();
+    }
+  });
+
+  it("forwards clause documentation through to monaco as markdown", () => {
+    const select = SQL_CLAUSE_KEYWORDS.find((k) => k.label === "SELECT")!;
+    const [item] = build({ keywords: [select] });
+    expect(item.documentation).toEqual({ value: select.documentation });
   });
 
   it("does not duplicate anything already in SQL_KEYWORDS", () => {

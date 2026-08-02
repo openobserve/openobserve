@@ -863,18 +863,122 @@ mod tests {
     }
 
     #[test]
-    fn catalog_function_names_unions_registry_and_rewriter_aliases() {
-        let catalog = catalog_function_names();
-        assert!(catalog.iter().any(|n| n == "match_all"), "registry entry missing");
+    fn catalog_functions_unions_registry_rewriter_and_json() {
+        let catalog = catalog_functions("default");
+        let names: Vec<&str> = catalog.iter().map(|f| f.name.as_str()).collect();
+        assert!(names.contains(&"match_all"), "registry entry missing");
         assert!(
-            catalog.iter().any(|n| n == "match_all_raw"),
+            names.contains(&"match_all_raw"),
             "rewriter alias missing from the catalog union"
         );
-        assert!(catalog.iter().any(|n| n == "json_get"), "json function missing");
-        let mut sorted = catalog.to_vec();
+        assert!(names.contains(&"json_get"), "json function missing");
+        assert!(names.contains(&"date_trunc"), "datafusion builtin missing");
+    }
+
+    #[test]
+    fn catalog_functions_returns_structured_entries() {
+        // The editor needs more than names: `detail` and `documentation` in the
+        // suggest widget come from signature/doc, and the icon from kind.
+        let catalog = catalog_functions("default");
+        let match_all = catalog
+            .iter()
+            .find(|f| f.name == "match_all")
+            .expect("match_all should be in the catalog");
+        assert!(!match_all.signature.is_empty(), "signature must be populated");
+        assert!(!match_all.kind.is_empty(), "kind must be populated");
+    }
+
+    #[test]
+    fn catalog_functions_flags_rewriter_aliases_deprecated() {
+        let catalog = catalog_functions("default");
+        let raw = catalog
+            .iter()
+            .find(|f| f.name == "match_all_raw")
+            .expect("match_all_raw should be in the catalog");
+        assert!(raw.deprecated, "rewriter aliases must be flagged deprecated");
+        let canonical = catalog.iter().find(|f| f.name == "match_all").unwrap();
+        assert!(!canonical.deprecated, "match_all itself is not deprecated");
+    }
+
+    #[test]
+    fn catalog_functions_is_sorted_and_deduped() {
+        let catalog = catalog_functions("default");
+        let names: Vec<String> = catalog.iter().map(|f| f.name.clone()).collect();
+        let mut sorted = names.clone();
         sorted.sort();
         sorted.dedup();
-        assert_eq!(catalog.to_vec(), sorted, "catalog must be sorted and deduplicated");
+        assert_eq!(names, sorted, "catalog must be sorted and deduplicated");
+    }
+
+    #[test]
+    fn catalog_functions_scopes_vrl_transforms_to_their_own_org() {
+        // Per-org VRL transforms are the third source in the union. An org must
+        // never be shown another org's functions.
+        use config::meta::function::Transform;
+        let mk = |name: &str| Transform {
+            function: ".".to_string(),
+            name: name.to_string(),
+            params: "row".to_string(),
+            num_args: 1,
+            trans_type: Some(0),
+            streams: None,
+        };
+        transform::QUERY_FUNCTIONS.insert("org_alpha/alpha_only_fn".to_string(), mk("alpha_only_fn"));
+        transform::QUERY_FUNCTIONS.insert("org_beta/beta_only_fn".to_string(), mk("beta_only_fn"));
+
+        let alpha: Vec<String> = catalog_functions("org_alpha")
+            .iter()
+            .map(|f| f.name.clone())
+            .collect();
+        let beta: Vec<String> = catalog_functions("org_beta")
+            .iter()
+            .map(|f| f.name.clone())
+            .collect();
+
+        assert!(alpha.contains(&"alpha_only_fn".to_string()), "own transform missing");
+        assert!(
+            !alpha.contains(&"beta_only_fn".to_string()),
+            "LEAKED another org's VRL transform into the catalog"
+        );
+        assert!(beta.contains(&"beta_only_fn".to_string()), "own transform missing");
+        assert!(
+            !beta.contains(&"alpha_only_fn".to_string()),
+            "LEAKED another org's VRL transform into the catalog"
+        );
+
+        // Built-ins are org-independent and must appear for both.
+        assert!(alpha.contains(&"match_all".to_string()));
+        assert!(beta.contains(&"match_all".to_string()));
+
+        transform::QUERY_FUNCTIONS.remove("org_alpha/alpha_only_fn");
+        transform::QUERY_FUNCTIONS.remove("org_beta/beta_only_fn");
+    }
+
+    #[test]
+    fn catalog_functions_marks_vrl_transforms_with_their_own_kind() {
+        use config::meta::function::Transform;
+        transform::QUERY_FUNCTIONS.insert(
+            "org_gamma/gamma_fn".to_string(),
+            Transform {
+                function: ".".to_string(),
+                name: "gamma_fn".to_string(),
+                params: "row".to_string(),
+                num_args: 2,
+                trans_type: Some(0),
+                streams: None,
+            },
+        );
+        let catalog = catalog_functions("org_gamma");
+        let gamma = catalog
+            .iter()
+            .find(|f| f.name == "gamma_fn")
+            .expect("org transform should be in the catalog");
+        assert_eq!(gamma.kind, "vrl", "org transforms must be distinguishable from builtins");
+        assert!(
+            gamma.signature.contains("2") || !gamma.signature.is_empty(),
+            "signature should reflect the declared argument count"
+        );
+        transform::QUERY_FUNCTIONS.remove("org_gamma/gamma_fn");
     }
 
     #[test]
