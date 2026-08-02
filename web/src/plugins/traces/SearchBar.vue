@@ -335,6 +335,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           editor-id="traces-query-editor"
           v-model:query="searchObj.data.editorValue"
           :keywords="effectiveKeywords"
+          :suggestions="effectiveSuggestions"
           language="sql"
           @update:query="updateQueryValue"
           @run-query="searchData"
@@ -491,6 +492,7 @@ export default defineComponent({
       autoCompleteData,
       autoCompleteKeywords,
       effectiveKeywords,
+      effectiveSuggestions,
       getSuggestions,
       updateFieldKeywords,
       updateStreamKeywords,
@@ -891,6 +893,7 @@ export default defineComponent({
       setEditorValue,
       autoCompleteKeywords,
       effectiveKeywords,
+      effectiveSuggestions,
       updateTimezone,
       dateTimeRef,
       resetFilters,

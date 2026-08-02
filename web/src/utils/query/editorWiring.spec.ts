@@ -1,0 +1,90 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+// A STRUCTURAL guard on how the query editor is wired across the app.
+//
+// Three separate per-surface wiring gaps have shipped from this workstream:
+// Alerts bound the base keyword list instead of the context-aware one; the SLO
+// form never triggered the server catalog load; and Traces omitted the
+// `suggestions` prop entirely, so it silently fell back to the component's
+// static 26-function catalog and never saw the ~330 from the registry.
+//
+// Every one was invisible to unit tests because each surface is wired by hand
+// and no test asserted anything ACROSS surfaces. This file does: it reads the
+// components that mount an editor and checks the invariants a reviewer would
+// otherwise have to hold in their head.
+
+import { describe, it, expect } from "vitest";
+import { readdirSync, readFileSync, statSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, join, resolve } from "node:path";
+
+// resolve from THIS file rather than cwd: vitest's root is src/, so a bare
+// "/src" path resolves against the filesystem root.
+const SRC = resolve(dirname(fileURLToPath(import.meta.url)), "../../") + "/";
+
+const walk = (dir: string, out: string[] = []): string[] => {
+  for (const entry of readdirSync(dir)) {
+    if (entry === "node_modules" || entry === "test") continue;
+    const full = join(dir, entry);
+    if (statSync(full).isDirectory()) walk(full, out);
+    else if (entry.endsWith(".vue")) out.push(full);
+  }
+  return out;
+};
+
+/** Files that bind :keywords on an editor — i.e. every editor host. */
+const editorHosts = walk(SRC)
+  .map((path) => ({ path: path.replace(SRC, ""), source: readFileSync(path, "utf-8") }))
+  .filter((f) => /:keywords\s*=/.test(f.source));
+
+describe("editor wiring — every surface supplies both completion sources", () => {
+  it("finds the editor hosts at all (guards against the walk silently breaking)", () => {
+    expect(editorHosts.length).toBeGreaterThan(8);
+  });
+
+  it.each(editorHosts.map((f) => f.path))(
+    "%s binds :suggestions as well as :keywords",
+    (path) => {
+      const { source } = editorHosts.find((f) => f.path === path)!;
+      // Omitting :suggestions is not inert — CodeQueryEditor falls back to the
+      // STATIC local catalog, so the surface silently loses every function the
+      // server reports. That is exactly how Traces ended up short.
+      expect(
+        /:suggestions\s*=/.test(source),
+        `${path} binds :keywords but not :suggestions, so it falls back to the ` +
+          `static catalog and loses the server-supplied functions`,
+      ).toBe(true);
+    },
+  );
+
+  it.each(editorHosts.map((f) => f.path))("%s does not bind the base keyword list", (path) => {
+    const { source } = editorHosts.find((f) => f.path === path)!;
+    // autoCompleteKeywords is the pre-context list; binding it means field
+    // VALUES and stream names never reach the editor.
+    expect(
+      /:keywords\s*=\s*"autoCompleteKeywords"/.test(source),
+      `${path} binds the base keyword list instead of the context-aware view`,
+    ).toBe(false);
+  });
+
+  it.each(editorHosts.map((f) => f.path))("%s does not bind the base suggestion list", (path) => {
+    const { source } = editorHosts.find((f) => f.path === path)!;
+    expect(
+      /:suggestions\s*=\s*"autoCompleteSuggestions"/.test(source),
+      `${path} binds the base suggestion list instead of the context-aware view`,
+    ).toBe(false);
+  });
+});
